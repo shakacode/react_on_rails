@@ -22,6 +22,7 @@ gsub_file_content("../spec/dummy/package.json", /"shakapacker": "[^"]*",/, '"sha
 
 # The below packages don't work on the oldest supported Node version and aren't needed there anyway
 gsub_file_content("../package.json", /"eslint": "[^"]*",/, "")
+gsub_file_content("../package.json", /"eslint-plugin-jest": "[^"]*",/, "")
 gsub_file_content("../package.json", /"globals": "[^"]*",/, "")
 gsub_file_content("../package.json", /"knip": "[^"]*",/, "")
 gsub_file_content("../package.json", /"publint": "[^"]*",/, "")

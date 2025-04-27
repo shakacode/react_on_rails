@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { globalIgnores } from 'eslint/config';
+import jest from 'eslint-plugin-jest';
 import prettierRecommended from 'eslint-plugin-prettier/recommended';
 import globals from 'globals';
 import tsEslint from 'typescript-eslint';
@@ -52,10 +53,6 @@ const config = tsEslint.config([
       globals: {
         ...globals.browser,
         ...globals.node,
-        ...globals.mocha,
-        ...globals.jest,
-        __DEBUG_SERVER_ERRORS__: true,
-        __SERVER_ERRORS__: true,
       },
 
       parserOptions: {
@@ -188,6 +185,16 @@ const config = tsEslint.config([
     files: ['**/app-react16/**/*'],
     rules: {
       'react/no-deprecated': 'off',
+    },
+  },
+  {
+    files: ['node_package/tests/**', '**/*.test.{js,jsx,ts,tsx}'],
+
+    extends: [jest.configs['flat/recommended'], jest.configs['flat/style']],
+
+    rules: {
+      // Allows Jest mocks before import
+      'import/first': 'off',
     },
   },
   // must be the last config in the array
