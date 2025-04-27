@@ -312,8 +312,6 @@ module ReactOnRails
         react_client_manifest_file,
         react_server_client_manifest_file
       ].compact_blank
-
-      self.webpack_generated_files = files
     end
 
     def configure_skip_display_none_deprecation
