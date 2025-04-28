@@ -4,7 +4,7 @@ import { ReactComponentOrRenderFunction, RenderFunction } from '../types/index.t
 import isRenderFunction from '../isRenderFunction.ts';
 import { ensureReactUseAvailable } from '../reactApis.cts';
 import { createRSCProvider } from '../RSCProvider.tsx';
-import { getReactServerComponent } from '../getReactServerComponent.client.ts';
+import getReactServerComponent from '../getReactServerComponent.client.ts';
 
 ensureReactUseAvailable();
 

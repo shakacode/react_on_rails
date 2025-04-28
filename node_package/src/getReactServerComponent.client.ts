@@ -10,7 +10,7 @@ declare global {
   }
 }
 
-export type ClientGetReactServerComponentProps = {
+type ClientGetReactServerComponentProps = {
   componentName: string;
   componentProps: unknown;
   railsContext: RailsContext;
@@ -71,7 +71,7 @@ const createFromPreloadedPayloads = (payloads: string[]) => {
   return createFromReadableStream<React.ReactNode>(transformedStream);
 };
 
-export const getReactServerComponent = ({
+const getReactServerComponent = ({
   componentName,
   componentProps,
   railsContext,
@@ -83,3 +83,5 @@ export const getReactServerComponent = ({
   }
   return fetchRSC({ componentName, componentProps, railsContext });
 };
+
+export default getReactServerComponent;
