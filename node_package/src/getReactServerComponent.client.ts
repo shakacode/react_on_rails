@@ -45,11 +45,10 @@ const createRSCStreamFromArray = (payloads: string[]) => {
       };
 
       payloads.forEach(handleChunk);
-      const originalPush = payloads.push;
       // eslint-disable-next-line no-param-reassign
       payloads.push = (...chunks) => {
         chunks.forEach(handleChunk);
-        return originalPush.call(payloads, ...chunks);
+        return chunks.length;
       };
       streamController = controller;
     },
