@@ -21,7 +21,7 @@ module ReactOnRails
         # Therefore, we need an additional unique identifier that can be used both on the client and server.
         # This ID can also be used to associate specific data with a particular rendered component
         # on either the server or client.
-        @render_request_id = SecureRandom.uuid
+        @render_request_id = self.class.generate_request_id
       end
 
       attr_reader :react_component_name, :render_request_id
@@ -144,6 +144,10 @@ module ReactOnRails
 
       def store_dependencies
         options[:store_dependencies]
+      end
+
+      def self.generate_request_id
+        SecureRandom.uuid
       end
 
       private

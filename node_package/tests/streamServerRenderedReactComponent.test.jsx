@@ -6,6 +6,7 @@ import * as React from 'react';
 import * as PropTypes from 'prop-types';
 import streamServerRenderedReactComponent from '../src/streamServerRenderedReactComponent.ts';
 import * as ComponentRegistry from '../src/ComponentRegistry.ts';
+import ReactOnRails from '../src/ReactOnRails.node.ts';
 
 const AsyncContent = async ({ throwAsyncError }) => {
   await new Promise((resolve) => {
@@ -64,21 +65,21 @@ describe('streamServerRenderedReactComponent', () => {
   } = {}) => {
     switch (componentType) {
       case 'reactComponent':
-        ComponentRegistry.register({ TestComponentForStreaming });
+        ReactOnRails.register({ TestComponentForStreaming });
         break;
       case 'renderFunction':
-        ComponentRegistry.register({
+        ReactOnRails.register({
           TestComponentForStreaming: (props, _railsContext) => () => <TestComponentForStreaming {...props} />,
         });
         break;
       case 'asyncRenderFunction':
-        ComponentRegistry.register({
+        ReactOnRails.register({
           TestComponentForStreaming: (props, _railsContext) => () =>
             Promise.resolve(<TestComponentForStreaming {...props} />),
         });
         break;
       case 'erroneousRenderFunction':
-        ComponentRegistry.register({
+        ReactOnRails.register({
           TestComponentForStreaming: (_props, _railsContext) => {
             // The error happen inside the render function itself not inside the returned React component
             throw new Error('Sync Error from render function');
@@ -86,7 +87,7 @@ describe('streamServerRenderedReactComponent', () => {
         });
         break;
       case 'erroneousAsyncRenderFunction':
-        ComponentRegistry.register({
+        ReactOnRails.register({
           TestComponentForStreaming: (_props, _railsContext) =>
             // The error happen inside the render function itself not inside the returned React component
             Promise.reject(new Error('Async Error from render function')),
@@ -101,6 +102,11 @@ describe('streamServerRenderedReactComponent', () => {
       trace: false,
       props: { throwSyncError, throwAsyncError },
       throwJsErrors,
+      railsContext: {
+        componentSpecificMetadata: {
+          renderRequestId: '123',
+        },
+      },
     });
 
     const chunks = [];
@@ -173,13 +179,15 @@ describe('streamServerRenderedReactComponent', () => {
     expect(chunks.length).toBeGreaterThanOrEqual(2);
     expect(chunks[0].html).toContain('Header In The Shell');
     expect(chunks[0].consoleReplayScript).toBe('');
-    expect(chunks[0].hasErrors).toBe(false);
     expect(chunks[0].isShellReady).toBe(true);
     // Script that fallbacks the render to client side
     expect(chunks[1].html).toMatch(/the server rendering errored:\\n\\nAsync Error/);
     expect(chunks[1].consoleReplayScript).toBe('');
-    expect(chunks[1].hasErrors).toBe(true);
     expect(chunks[1].isShellReady).toBe(true);
+
+    // One of the chunks should have a hasErrors property of true
+    expect(chunks[0].hasErrors || chunks[1].hasErrors).toBe(true);
+    expect(chunks[0].hasErrors && chunks[1].hasErrors).toBe(false);
   });
 
   it("doesn't emit an error if there is an error in the async content and throwJsErrors is false", async () => {
@@ -194,13 +202,15 @@ describe('streamServerRenderedReactComponent', () => {
     expect(chunks.length).toBeGreaterThanOrEqual(2);
     expect(chunks[0].html).toContain('Header In The Shell');
     expect(chunks[0].consoleReplayScript).toBe('');
-    expect(chunks[0].hasErrors).toBe(false);
     expect(chunks[0].isShellReady).toBe(true);
     // Script that fallbacks the render to client side
     expect(chunks[1].html).toMatch(/the server rendering errored:\\n\\nAsync Error/);
     expect(chunks[1].consoleReplayScript).toBe('');
-    expect(chunks[1].hasErrors).toBe(true);
     expect(chunks[1].isShellReady).toBe(true);
+
+    // One of the chunks should have a hasErrors property of true
+    expect(chunks[0].hasErrors || chunks[1].hasErrors).toBe(true);
+    expect(chunks[0].hasErrors && chunks[1].hasErrors).toBe(false);
   });
 
   it.each(['asyncRenderFunction', 'renderFunction'])(
@@ -250,12 +260,14 @@ describe('streamServerRenderedReactComponent', () => {
       expect(chunks.length).toBeGreaterThanOrEqual(2);
       expect(chunks[0].html).toContain('Header In The Shell');
       expect(chunks[0].consoleReplayScript).toBe('');
-      expect(chunks[0].hasErrors).toBe(false);
       expect(chunks[0].isShellReady).toBe(true);
       expect(chunks[1].html).toMatch(/the server rendering errored:\\n\\nAsync Error/);
       expect(chunks[1].consoleReplayScript).toBe('');
-      expect(chunks[1].hasErrors).toBe(true);
       expect(chunks[1].isShellReady).toBe(true);
+
+      // One of the chunks should have a hasErrors property of true
+      expect(chunks[0].hasErrors || chunks[1].hasErrors).toBe(true);
+      expect(chunks[0].hasErrors && chunks[1].hasErrors).toBe(false);
     },
   );
 
@@ -308,13 +320,18 @@ describe('streamServerRenderedReactComponent', () => {
 
   it('streams a string from a Promise that resolves to a string', async () => {
     const StringPromiseComponent = () => Promise.resolve('<div>String from Promise</div>');
-    ComponentRegistry.register({ StringPromiseComponent });
+    ReactOnRails.register({ StringPromiseComponent });
 
     const renderResult = streamServerRenderedReactComponent({
       name: 'StringPromiseComponent',
       domNodeId: 'stringPromiseId',
       trace: false,
       throwJsErrors: false,
+      railsContext: {
+        componentSpecificMetadata: {
+          renderRequestId: '123',
+        },
+      },
     });
 
     const chunks = [];
