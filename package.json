@@ -53,6 +53,7 @@
     "eslint-plugin-prettier": "^5.2.3",
     "eslint-plugin-react": "^7.37.4",
     "eslint-plugin-react-hooks": "^5.2.0",
+    "typescript-eslint": "^8.26.1",
     "globals": "^16.0.0",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
@@ -68,8 +69,7 @@
     "react-on-rails-rsc": "git+https://github.com/shakacode/react_on_rails_rsc.git#add-support-for-generating-client-components-manifest-for-server-bundle",
     "redux": "^4.2.1",
     "ts-jest": "^29.2.5",
-    "typescript": "^5.8.3",
-    "typescript-eslint": "^8.26.1"
+    "typescript": "^5.8.3"
   },
   "peerDependencies": {
     "react": ">= 16",
