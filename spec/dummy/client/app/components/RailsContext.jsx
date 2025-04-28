@@ -7,15 +7,14 @@ function renderContextRows(railsContext) {
   return _.transform(
     railsContext,
     (accum, value, key) => {
-      if (key !== 'serverSide') {
+      if (key !== 'serverSide' && key !== 'componentSpecificMetadata') {
         const className = `js-${key}`;
-        const stringifiedValue = typeof value === 'object' ? JSON.stringify(value) : value;
         accum.push(
           <tr key={className}>
             <td>
               <strong>{key}:&nbsp;</strong>
             </td>
-            <td className={className}>{`${stringifiedValue}`}</td>
+            <td className={className}>{`${value}`}</td>
           </tr>,
         );
       }
