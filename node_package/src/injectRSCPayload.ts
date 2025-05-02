@@ -14,11 +14,20 @@ function escapeScript(script: string) {
   return script.replace(/<!--/g, '<\\!--').replace(/<\/(script)/gi, '</\\$1');
 }
 
+function cacheKeyJSArray(cacheKey: string) {
+  return `(self.REACT_ON_RAILS_RSC_PAYLOADS||={})[${JSON.stringify(cacheKey)}]||=[]`;
+}
+
+function writeScript(script: string, transform: Transform) {
+  transform.push(`<script>${escapeScript(script)}</script>`);
+}
+
+function initializeCacheKeyJSArray(cacheKey: string, transform: Transform) {
+  writeScript(cacheKeyJSArray(cacheKey), transform);
+}
+
 function writeChunk(chunk: string, transform: Transform, cacheKey: string) {
-  const stringifiedKey = JSON.stringify(cacheKey);
-  transform.push(
-    `<script>${escapeScript(`((self.REACT_ON_RAILS_RSC_PAYLOADS||={})[${stringifiedKey}]||=[]).push(${chunk})`)}</script>`,
-  );
+  writeScript(`(${cacheKeyJSArray(cacheKey)}).push(${chunk})`, transform);
 }
 
 export default function injectRSCPayload(
@@ -29,11 +38,10 @@ export default function injectRSCPayload(
   pipeableHtmlStream.pipe(htmlStream);
   const decoder = new TextDecoder();
   let rscPromise: Promise<void> | null = null;
-  const htmlBuffer: string[] = [];
+  const htmlBuffer: Buffer[] = [];
   let timeout: NodeJS.Timeout | null = null;
   const resultStream = new PassThrough();
 
-  // Start reading RSC stream immediately
   const startRSC = async () => {
     try {
       const rscPromises: Promise<void>[] = [];
@@ -41,14 +49,25 @@ export default function injectRSCPayload(
       ReactOnRails.onRSCPayloadGenerated?.(railsContext, (streamInfo) => {
         const { stream, props, componentName } = streamInfo;
         const cacheKey = `${componentName}-${JSON.stringify(props)}-${railsContext.componentSpecificMetadata?.renderRequestId}`;
+
+        // When a component requests an RSC payload, we initialize a global array to store it.
+        // This array is injected into the HTML before the component's HTML markup.
+        // From our tests in SuspenseHydration.test.tsx, we know that client-side components
+        // only hydrate after their HTML is present in the page. This timing ensures that
+        // the RSC payload array is available before hydration begins.
+        // As a result, the component can access its RSC payload directly from the page
+        // instead of making a separate network request.
+        // The client-side RSCProvider actively monitors the array for new chunks, processing them as they arrive and forwarding them to the RSC payload stream, regardless of whether the array is initially empty.
+        initializeCacheKeyJSArray(cacheKey, resultStream);
         rscPromises.push(
-          // eslint-disable-next-line @typescript-eslint/no-misused-promises, no-async-promise-executor
-          new Promise(async (resolve) => {
-            for await (const chunk of stream ?? []) {
-              const decodedChunk = typeof chunk === 'string' ? chunk : decoder.decode(chunk);
-              writeChunk(JSON.stringify(decodedChunk), resultStream, cacheKey);
-            }
-            resolve();
+          new Promise((resolve, reject) => {
+            (async () => {
+              for await (const chunk of stream ?? []) {
+                const decodedChunk = typeof chunk === 'string' ? chunk : decoder.decode(chunk);
+                writeChunk(JSON.stringify(decodedChunk), resultStream, cacheKey);
+              }
+              resolve();
+            })().catch(reject);
           }),
         );
       });
@@ -68,15 +87,12 @@ export default function injectRSCPayload(
   };
 
   const writeHTMLChunks = () => {
-    for (const htmlChunk of htmlBuffer) {
-      resultStream.push(htmlChunk);
-    }
+    resultStream.push(Buffer.concat(htmlBuffer));
     htmlBuffer.length = 0;
   };
 
   htmlStream.on('data', (chunk: Buffer) => {
-    const buf = decoder.decode(chunk);
-    htmlBuffer.push(buf);
+    htmlBuffer.push(chunk);
     if (timeout) {
       return;
     }
