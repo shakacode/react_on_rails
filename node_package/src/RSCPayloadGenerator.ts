@@ -13,6 +13,12 @@ const mapRailsContextToRSCPayloadStreams = new Map<RailsContext, RSCPayloadStrea
 
 const rscPayloadCallbacks = new Map<RailsContext, Array<RSCPayloadCallback>>();
 
+// The RSC payload callbacks must be executed synchronously to maintain proper hydration timing.
+// This ensures that the RSC payload initialization script is injected into the HTML page
+// before the corresponding component's HTML markup appears. This timing is critical because:
+// 1. Client-side components only hydrate after their HTML is present in the page
+// 2. The RSC payload must be available before hydration begins to prevent unnecessary refetching
+// 3. Using setTimeout(callback, 0) would break this synchronization and could lead to hydration issues
 export const onRSCPayloadGenerated = (railsContext: RailsContext, callback: RSCPayloadCallback) => {
   const callbacks = rscPayloadCallbacks.get(railsContext) || [];
   callbacks.push(callback);
@@ -51,7 +57,8 @@ export const getRSCPayloadStream = async (
   streams.push(streamInfo);
   mapRailsContextToRSCPayloadStreams.set(railsContext, streams);
 
-  // Notify callbacks about the new stream
+  // Notify callbacks about the new stream in a sync manner to maintain proper hydration timing
+  // as described in the comment above onRSCPayloadGenerated
   const callbacks = rscPayloadCallbacks.get(railsContext) || [];
   callbacks.forEach((callback) => callback(streamInfo));
 

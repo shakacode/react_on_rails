@@ -47,9 +47,9 @@ const WrapServerComponentRenderer = (componentOrRenderFunction: ReactComponentOr
       throw new Error(`RSCClientRoot: No DOM node found for id: ${domNodeId}`);
     }
     if (domNode.innerHTML) {
-      ReactDOMClient.hydrateRoot(domNode, root);
+      ReactDOMClient.hydrateRoot(domNode, root, { identifierPrefix: domNodeId });
     } else {
-      ReactDOMClient.createRoot(domNode).render(root);
+      ReactDOMClient.createRoot(domNode, { identifierPrefix: domNodeId }).render(root);
     }
     // Added only to satisfy the return type of RenderFunction
     // However, the returned value of renderFunction is not used in ReactOnRails
