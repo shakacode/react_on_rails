@@ -2,8 +2,13 @@ import * as React from 'react';
 import { Suspense } from 'react';
 import { renderToReadableStream } from 'react-dom/server';
 import { hydrateRoot } from 'react-dom/client';
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore - TypeScript error can be ignored because:
+// 1. This test file is only executed when Node version >= 18
+// 2. The package is guaranteed to be available at runtime in Node 18+ environments
 import { screen, act, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
+import { getNodeVersion } from './testUtils.js';
 
 /**
  * Tests React's Suspense hydration behavior for async components
@@ -147,55 +152,59 @@ async function renderAndHydrate() {
   };
 }
 
-beforeEach(() => {
-  jest.clearAllMocks();
-  document.body.innerHTML = '';
-});
-
-it('hydrates the container when its content is written to the document', async () => {
-  const { onContainerHydrated, onAsyncComponentHydrated, writeFirstChunk, hydrate } =
-    await renderAndHydrate();
-
-  await act(async () => {
-    hydrate();
-    await writeFirstChunk();
+// React Server Components tests are compatible with React 19
+// That only run with node version 18 and above
+(getNodeVersion() >= 18 ? describe : describe.skip)('RSCClientRoot', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    document.body.innerHTML = '';
   });
-  await waitFor(() => {
+
+  it('hydrates the container when its content is written to the document', async () => {
+    const { onContainerHydrated, onAsyncComponentHydrated, writeFirstChunk, hydrate } =
+      await renderAndHydrate();
+
+    await act(async () => {
+      hydrate();
+      await writeFirstChunk();
+    });
+    await waitFor(() => {
+      expect(screen.queryByText('Loading...')).toBeInTheDocument();
+    });
+    expect(onContainerHydrated).toHaveBeenCalled();
+
+    // The async component is not hydrated until the second chunk is written to the document
+    await new Promise((resolve) => {
+      setTimeout(resolve, 1000);
+    });
+    expect(onAsyncComponentHydrated).not.toHaveBeenCalled();
     expect(screen.queryByText('Loading...')).toBeInTheDocument();
-  });
-  expect(onContainerHydrated).toHaveBeenCalled();
-
-  // The async component is not hydrated until the second chunk is written to the document
-  await new Promise((resolve) => {
-    setTimeout(resolve, 1000);
-  });
-  expect(onAsyncComponentHydrated).not.toHaveBeenCalled();
-  expect(screen.queryByText('Loading...')).toBeInTheDocument();
-  expect(screen.queryByText('Hello World')).not.toBeInTheDocument();
-});
-
-it('hydrates the container when its content is written to the document', async () => {
-  const { writeFirstChunk, writeSecondChunk, onAsyncComponentHydrated, onContainerHydrated, hydrate } =
-    await renderAndHydrate();
-
-  await act(async () => {
-    hydrate();
-    await writeFirstChunk();
-  });
-  await waitFor(() => {
-    expect(screen.queryByText('Loading...')).toBeInTheDocument();
+    expect(screen.queryByText('Hello World')).not.toBeInTheDocument();
   });
 
-  await act(async () => {
-    const secondChunk = await writeSecondChunk();
-    expect(secondChunk).toContain('script');
-    console.log(secondChunk);
-  });
-  await waitFor(() => {
-    expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
-    expect(screen.queryByText('Hello World')).toBeInTheDocument();
-  });
+  it('hydrates the container when its content is written to the document', async () => {
+    const { writeFirstChunk, writeSecondChunk, onAsyncComponentHydrated, onContainerHydrated, hydrate } =
+      await renderAndHydrate();
 
-  expect(onContainerHydrated).toHaveBeenCalled();
-  expect(onAsyncComponentHydrated).toHaveBeenCalled();
+    await act(async () => {
+      hydrate();
+      await writeFirstChunk();
+    });
+    await waitFor(() => {
+      expect(screen.queryByText('Loading...')).toBeInTheDocument();
+    });
+
+    await act(async () => {
+      const secondChunk = await writeSecondChunk();
+      expect(secondChunk).toContain('script');
+      console.log(secondChunk);
+    });
+    await waitFor(() => {
+      expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+      expect(screen.queryByText('Hello World')).toBeInTheDocument();
+    });
+
+    expect(onContainerHydrated).toHaveBeenCalled();
+    expect(onAsyncComponentHydrated).toHaveBeenCalled();
+  });
 });
