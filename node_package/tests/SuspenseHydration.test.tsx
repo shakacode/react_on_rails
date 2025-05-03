@@ -45,7 +45,6 @@ const AsyncComponentContainer = ({
   });
   return (
     <Suspense fallback={<div>Loading...</div>}>
-      {/* @ts-expect-error - This is a test */}
       <AsyncComponent promise={promise} onRendered={onAsyncComponentRendered} />
     </Suspense>
   );

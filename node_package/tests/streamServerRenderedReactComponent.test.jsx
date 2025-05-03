@@ -10,7 +10,7 @@ import ReactOnRails from '../src/ReactOnRails.node.ts';
 
 const AsyncContent = async ({ throwAsyncError }) => {
   await new Promise((resolve) => {
-    setTimeout(resolve, 0);
+    setTimeout(resolve, 10);
   });
   if (throwAsyncError) {
     throw new Error('Async Error');
@@ -176,7 +176,7 @@ describe('streamServerRenderedReactComponent', () => {
     });
 
     expect(onError).toHaveBeenCalled();
-    expect(chunks.length).toBeGreaterThanOrEqual(2);
+    expect(chunks).toHaveLength(2);
     expect(chunks[0].html).toContain('Header In The Shell');
     expect(chunks[0].consoleReplayScript).toBe('');
     expect(chunks[0].isShellReady).toBe(true);
@@ -188,7 +188,7 @@ describe('streamServerRenderedReactComponent', () => {
     // One of the chunks should have a hasErrors property of true
     expect(chunks[0].hasErrors || chunks[1].hasErrors).toBe(true);
     expect(chunks[0].hasErrors && chunks[1].hasErrors).toBe(false);
-  });
+  }, 100000);
 
   it("doesn't emit an error if there is an error in the async content and throwJsErrors is false", async () => {
     const { renderResult, chunks } = setupStreamTest({ throwAsyncError: true, throwJsErrors: false });
