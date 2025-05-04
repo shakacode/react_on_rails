@@ -13,12 +13,20 @@ const mapRailsContextToRSCPayloadStreams = new Map<RailsContext, RSCPayloadStrea
 
 const rscPayloadCallbacks = new Map<RailsContext, Array<RSCPayloadCallback>>();
 
-// The RSC payload callbacks must be executed synchronously to maintain proper hydration timing.
-// This ensures that the RSC payload initialization script is injected into the HTML page
-// before the corresponding component's HTML markup appears. This timing is critical because:
-// 1. Client-side components only hydrate after their HTML is present in the page
-// 2. The RSC payload must be available before hydration begins to prevent unnecessary refetching
-// 3. Using setTimeout(callback, 0) would break this synchronization and could lead to hydration issues
+/**
+ * Registers a callback to be executed when RSC payloads are generated.
+ *
+ * This function:
+ * 1. Stores the callback function by railsContext
+ * 2. Immediately executes the callback for any existing streams
+ *
+ * This synchronous execution is critical for preventing hydration race conditions.
+ * It ensures payload array initialization happens before component HTML appears
+ * in the response stream.
+ *
+ * @param railsContext - Context for the current request
+ * @param callback - Function to call when an RSC payload is generated
+ */
 export const onRSCPayloadGenerated = (railsContext: RailsContext, callback: RSCPayloadCallback) => {
   const callbacks = rscPayloadCallbacks.get(railsContext) || [];
   callbacks.push(callback);
@@ -29,6 +37,22 @@ export const onRSCPayloadGenerated = (railsContext: RailsContext, callback: RSCP
   existingStreams.forEach((streamInfo) => callback(streamInfo));
 };
 
+/**
+ * Generates and tracks RSC payloads for server components.
+ *
+ * getRSCPayloadStream:
+ * 1. Calls the global generateRSCPayload function
+ * 2. Tracks streams by railsContext for later injection
+ * 3. Notifies callbacks immediately to enable early payload embedding
+ *
+ * The immediate callback notification is critical for preventing hydration race conditions,
+ * as it ensures the payload array is initialized in the HTML stream before component rendering.
+ *
+ * @param componentName - Name of the server component
+ * @param props - Props for the server component
+ * @param railsContext - Context for the current request
+ * @returns A stream of the RSC payload
+ */
 export const getRSCPayloadStream = async (
   componentName: string,
   props: unknown,

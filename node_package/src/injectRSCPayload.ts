@@ -30,6 +30,24 @@ function writeChunk(chunk: string, transform: Transform, cacheKey: string) {
   writeScript(`(${cacheKeyJSArray(cacheKey)}).push(${chunk})`, transform);
 }
 
+/**
+ * Embeds RSC payloads into the HTML stream for optimal hydration.
+ *
+ * This function:
+ * 1. Creates a result stream for the combined HTML + RSC payloads
+ * 2. Listens for RSC payload generation via onRSCPayloadGenerated
+ * 3. Initializes global arrays for each payload BEFORE component HTML
+ * 4. Writes each payload chunk as a script tag that pushes to the array
+ * 5. Passes HTML through to the result stream
+ *
+ * The timing of array initialization is critical - it must occur before the
+ * component's HTML to ensure the array exists when client hydration begins.
+ * This prevents unnecessary HTTP requests during hydration.
+ *
+ * @param pipeableHtmlStream - HTML stream from React's renderToPipeableStream
+ * @param railsContext - Context for the current request
+ * @returns A combined stream with embedded RSC payloads
+ */
 export default function injectRSCPayload(
   pipeableHtmlStream: NodeJS.ReadableStream | PipeableStream,
   railsContext: RailsContext,

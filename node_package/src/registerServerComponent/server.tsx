@@ -5,15 +5,12 @@ import { ReactComponent, RenderFunction } from '../types/index.ts';
 import wrapServerComponentRenderer from '../wrapServerComponentRenderer/server.tsx';
 
 /**
- * Registers React Server Components (RSC) with React on Rails for the server bundle.
+ * Registers React Server Components for use in server bundles.
  *
- * This function wraps each component with RSCServerRoot, which handles the server-side
- * rendering of React Server Components using pre-generated RSC payloads.
- *
- * The RSCServerRoot component:
- * - Uses pre-generated RSC payloads from the RSC bundle
- * - Builds the rendering tree of the server component
- * - Handles the integration with React's streaming SSR
+ * This function:
+ * 1. Takes server component implementations
+ * 2. Wraps each component with RSCRoute using WrapServerComponentRenderer
+ * 3. Registers the wrapped components with ReactOnRails
  *
  * @param components - Object mapping component names to their implementations
  *
