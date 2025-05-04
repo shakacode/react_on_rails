@@ -17,6 +17,21 @@ const createFromReactOnRailsNodeStream = (
   return createFromNodeStream(transformedStream, ssrManifest);
 };
 
+/**
+ * Creates an SSR manifest for React's server components runtime.
+ *
+ * This function:
+ * 1. Loads the server and client component manifests
+ * 2. Creates a mapping between client and server module IDs
+ * 3. Builds a moduleMap structure required by React's SSR runtime
+ *
+ * The manifest allows React to correctly associate server components
+ * with their client counterparts during hydration.
+ *
+ * @param reactServerManifestFileName - Path to the server manifest file
+ * @param reactClientManifestFileName - Path to the client manifest file
+ * @returns A Promise resolving to the SSR manifest object
+ */
 const createSSRManifest = async (
   reactServerManifestFileName: string,
   reactClientManifestFileName: string,
@@ -52,6 +67,29 @@ const createSSRManifest = async (
   return ssrManifest;
 };
 
+/**
+ * Fetches and renders a server component on the server side.
+ *
+ * This function:
+ * 1. Validates the railsContext for required properties
+ * 2. Creates an SSR manifest mapping server and client modules
+ * 3. Gets the RSC payload stream via getRSCPayloadStream
+ * 4. Processes the stream with React's SSR runtime
+ *
+ * During SSR, this function ensures that the RSC payload is both:
+ * - Used to render the server component
+ * - Tracked so it can be embedded in the HTML response
+ *
+ * @param componentName - Name of the server component to render
+ * @param componentProps - Props to pass to the server component
+ * @param railsContext - Context for the current request
+ * @returns A Promise resolving to the rendered React element
+ *
+ * @important This is an internal function. End users should not use this directly.
+ * Instead, use the useRSC hook which provides getComponent and getCachedComponent functions
+ * for fetching or retrieving cached server components. For rendering server components,
+ * consider using RSCRoute component which handles the rendering logic automatically.
+ */
 const getReactServerComponent = async ({
   componentName,
   componentProps,
