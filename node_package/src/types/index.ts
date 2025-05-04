@@ -162,10 +162,6 @@ export interface RegisteredComponent {
   isRenderer: boolean;
 }
 
-export interface RegisterServerComponentOptions {
-  rscPayloadGenerationUrlPath: string;
-}
-
 export type ItemRegistrationCallback<T> = (component: T) => void;
 
 interface Params {

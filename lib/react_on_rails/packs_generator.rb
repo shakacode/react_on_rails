@@ -93,14 +93,10 @@ module ReactOnRails
                                ReactOnRailsPro.configuration.enable_rsc_support
 
       if load_server_components && !client_entrypoint?(file_path)
-        rsc_payload_generation_url_path = ReactOnRailsPro.configuration.rsc_payload_generation_url_path
-
         return <<~FILE_CONTENT.strip
           import registerServerComponent from 'react-on-rails/registerServerComponent/client';
 
-          registerServerComponent({
-            rscPayloadGenerationUrlPath: "#{rsc_payload_generation_url_path}",
-          }, "#{registered_component_name}")
+          registerServerComponent("#{registered_component_name}");
         FILE_CONTENT
       end
 

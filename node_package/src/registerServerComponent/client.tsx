@@ -1,7 +1,7 @@
 import * as React from 'react';
 import ReactOnRails from '../ReactOnRails.client.ts';
 import RSCRoute from '../RSCRoute.ts';
-import { ReactComponentOrRenderFunction, RegisterServerComponentOptions } from '../types/index.ts';
+import { ReactComponentOrRenderFunction } from '../types/index.ts';
 import WrapServerComponentRenderer from '../wrapServerComponentRenderer/client.tsx';
 
 /**
@@ -29,14 +29,12 @@ import WrapServerComponentRenderer from '../wrapServerComponentRenderer/client.t
  *
  * @example
  * ```js
- * registerServerComponent({
- *   rscPayloadGenerationUrlPath: '/rsc_payload'
- * }, 'ServerComponent1', 'ServerComponent2');
+ * registerServerComponent('ServerComponent1', 'ServerComponent2');
  *
  * // When ServerComponent1 renders, it will fetch from: /rsc_payload/ServerComponent1
  * ```
  */
-const registerServerComponent = (options: RegisterServerComponentOptions, ...componentNames: string[]) => {
+const registerServerComponent = (...componentNames: string[]) => {
   const componentsWrappedInRSCRoute: Record<string, ReactComponentOrRenderFunction> = {};
   for (const name of componentNames) {
     componentsWrappedInRSCRoute[name] = WrapServerComponentRenderer((props: unknown) => (

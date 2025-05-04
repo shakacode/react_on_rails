@@ -62,7 +62,7 @@ enableFetchMocks();
     const { stream, push } = createNodeReadableStream();
     window.fetchMock.mockResolvedValue(new Response(stream));
 
-    registerServerComponent({}, 'TestComponent');
+    registerServerComponent('TestComponent');
     const railsContext = {
       rscPayloadGenerationUrl: rscPayloadGenerationUrlPath,
       componentSpecificMetadata: {
@@ -172,7 +172,7 @@ enableFetchMocks();
       chunk1 = JSON.stringify(JSON.parse(fs.readFileSync(path.join(chunksDirectory, 'chunk1.json'), 'utf8')));
       chunk2 = JSON.stringify(JSON.parse(fs.readFileSync(path.join(chunksDirectory, 'chunk2.json'), 'utf8')));
 
-      registerServerComponent({}, 'TestComponent');
+      registerServerComponent('TestComponent');
       railsContext = {
         rscPayloadGenerationUrl: 'rsc-render',
         componentSpecificMetadata: {
