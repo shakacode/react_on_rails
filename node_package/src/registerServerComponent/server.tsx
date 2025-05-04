@@ -2,7 +2,7 @@ import * as React from 'react';
 import ReactOnRails from '../ReactOnRails.client.ts';
 import RSCRoute from '../RSCRoute.ts';
 import { ReactComponent, RenderFunction } from '../types/index.ts';
-import WrapServerComponentRenderer from '../wrapServerComponentRenderer/server.tsx';
+import wrapServerComponentRenderer from '../wrapServerComponentRenderer/server.tsx';
 
 /**
  * Registers React Server Components (RSC) with React on Rails for the server bundle.
@@ -28,7 +28,7 @@ import WrapServerComponentRenderer from '../wrapServerComponentRenderer/server.t
 const registerServerComponent = (components: Record<string, ReactComponent>) => {
   const componentsWrappedInRSCRoute: Record<string, RenderFunction> = {};
   for (const [componentName] of Object.entries(components)) {
-    componentsWrappedInRSCRoute[componentName] = WrapServerComponentRenderer((props: unknown) => (
+    componentsWrappedInRSCRoute[componentName] = wrapServerComponentRenderer((props: unknown) => (
       <RSCRoute componentName={componentName} componentProps={props} />
     ));
   }
