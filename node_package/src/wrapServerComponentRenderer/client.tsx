@@ -8,9 +8,9 @@ import getReactServerComponent from '../getReactServerComponent.client.ts';
 
 ensureReactUseAvailable();
 
-const WrapServerComponentRenderer = (componentOrRenderFunction: ReactComponentOrRenderFunction) => {
+const wrapServerComponentRenderer = (componentOrRenderFunction: ReactComponentOrRenderFunction) => {
   if (typeof componentOrRenderFunction !== 'function') {
-    throw new Error('WrapServerComponentRenderer: component is not a function');
+    throw new Error('wrapServerComponentRenderer: component is not a function');
   }
 
   const wrapper: RenderFunction = async (props, railsContext, domNodeId) => {
@@ -19,7 +19,7 @@ const WrapServerComponentRenderer = (componentOrRenderFunction: ReactComponentOr
       : componentOrRenderFunction;
 
     if (typeof Component !== 'function') {
-      throw new Error('WrapServerComponentRenderer: component is not a function');
+      throw new Error('wrapServerComponentRenderer: component is not a function');
     }
 
     if (!railsContext) {
@@ -60,4 +60,4 @@ const WrapServerComponentRenderer = (componentOrRenderFunction: ReactComponentOr
   return wrapper;
 };
 
-export default WrapServerComponentRenderer;
+export default wrapServerComponentRenderer;

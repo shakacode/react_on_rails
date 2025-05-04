@@ -4,9 +4,9 @@ import getReactServerComponent from '../getReactServerComponent.server.ts';
 import { createRSCProvider } from '../RSCProvider.tsx';
 import isRenderFunction from '../isRenderFunction.ts';
 
-const WrapServerComponentRenderer = (componentOrRenderFunction: ReactComponentOrRenderFunction) => {
+const wrapServerComponentRenderer = (componentOrRenderFunction: ReactComponentOrRenderFunction) => {
   if (typeof componentOrRenderFunction !== 'function') {
-    throw new Error('WrapServerComponentRenderer: component is not a function');
+    throw new Error('wrapServerComponentRenderer: component is not a function');
   }
 
   const wrapper: RenderFunction = async (props, railsContext) => {
@@ -19,7 +19,7 @@ const WrapServerComponentRenderer = (componentOrRenderFunction: ReactComponentOr
       : componentOrRenderFunction;
 
     if (typeof Component !== 'function') {
-      throw new Error('WrapServerComponentRenderer: component is not a function');
+      throw new Error('wrapServerComponentRenderer: component is not a function');
     }
 
     const RSCProvider = createRSCProvider({
@@ -41,4 +41,4 @@ const WrapServerComponentRenderer = (componentOrRenderFunction: ReactComponentOr
   return wrapper;
 };
 
-export default WrapServerComponentRenderer;
+export default wrapServerComponentRenderer;
