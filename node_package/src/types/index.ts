@@ -35,6 +35,15 @@ export type RailsContext = {
   search: string | null;
   httpAcceptLanguage: string;
   rscPayloadGenerationUrl?: string;
+  componentSpecificMetadata?: {
+    // The renderRequestId serves as a unique identifier for each render request.
+    // We cannot rely solely on nodeDomId, as it should be unique for each component on the page,
+    // but the server can render the same page multiple times concurrently for different users.
+    // Therefore, we need an additional unique identifier that can be used both on the client and server.
+    // This ID can also be used to associate specific data with a particular rendered component
+    // on either the server or client.
+    renderRequestId: string;
+  };
 } & (
   | {
       serverSide: false;
@@ -52,6 +61,12 @@ export type RailsContext = {
       reactServerClientManifestFileName?: string;
     }
 );
+
+export type RailsContextWithComponentSpecificMetadata = RailsContext & {
+  componentSpecificMetadata: {
+    renderRequestId: string;
+  };
+};
 
 // not strictly what we want, see https://github.com/microsoft/TypeScript/issues/17867#issuecomment-323164375
 type AuthenticityHeaders = Record<string, string> & {
@@ -151,10 +166,6 @@ export interface RegisteredComponent {
   // Supported on the client side only.
   // All renderer functions are render-functions, but not all render-functions are renderer functions.
   isRenderer: boolean;
-}
-
-export interface RegisterServerComponentOptions {
-  rscPayloadGenerationUrlPath: string;
 }
 
 export type ItemRegistrationCallback<T> = (component: T) => void;
@@ -286,7 +297,20 @@ export interface ReactOnRails {
    * @param otherHeaders Other headers
    */
   authenticityHeaders(otherHeaders: Record<string, string>): AuthenticityHeaders;
+  /**
+   * Adds a post SSR hook to be called after the SSR has completed.
+   * @param hook - The hook to be called after the SSR has completed.
+   */
+  addPostSSRHook(railsContext: RailsContextWithComponentSpecificMetadata, hook: () => void): void;
 }
+
+export type RSCPayloadStreamInfo = {
+  stream: NodeJS.ReadableStream;
+  props: unknown;
+  componentName: string;
+};
+
+export type RSCPayloadCallback = (streamInfo: RSCPayloadStreamInfo) => void;
 
 /** Contains the parts of the `ReactOnRails` API intended for internal use only. */
 export interface ReactOnRailsInternal extends ReactOnRails {
@@ -396,6 +420,45 @@ export interface ReactOnRailsInternal extends ReactOnRails {
    * Indicates if the RSC bundle is being used.
    */
   isRSCBundle: boolean;
+
+  // These functions are intended for use in Node.js environments only. They should be used on the server side and excluded from client-side bundles to reduce bundle size.
+  /**
+   * Generates a ReadableStream for a given component's RSC payload.
+   * @param componentName - The name of the component.
+   * @param props - The properties to pass to the component.
+   * @param railsContext - The Rails context of the current rendering request.
+   * @returns A promise that resolves to a NodeJS.ReadableStream.
+   */
+  getRSCPayloadStream?: (
+    componentName: string,
+    props: unknown,
+    railsContext: RailsContext,
+  ) => Promise<NodeJS.ReadableStream>;
+
+  /**
+   /**
+    * Retrieves all React Server Component (RSC) payload streams generated for a specific rendering request.
+    * @param railsContext - The Rails context of the current rendering request.
+    * @returns An array of objects, each containing the component name and its corresponding NodeJS.ReadableStream.
+    */
+  getRSCPayloadStreams?: (railsContext: RailsContext) => {
+    componentName: string;
+    props: unknown;
+    stream: NodeJS.ReadableStream;
+  }[];
+
+  /**
+   * Registers a callback to be called when an RSC payload stream is generated for a specific rendering request.
+   * @param railsContext - The Rails context of the current rendering request.
+   * @param callback - The callback to be called when an RSC payload stream is generated.
+   */
+  onRSCPayloadGenerated?: (railsContext: RailsContext, callback: RSCPayloadCallback) => void;
+
+  /**
+   * Clears all RSC payload streams generated for the rendering request of the given Rails context.
+   * @param railsContext - The Rails context of the current rendering request.
+   */
+  clearRSCPayloadStreams?: (railsContext: RailsContext) => void;
 }
 
 export type RenderStateHtml = FinalHtmlResult | Promise<FinalHtmlResult>;
