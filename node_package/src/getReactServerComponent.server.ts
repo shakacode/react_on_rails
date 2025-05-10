@@ -59,7 +59,8 @@ const createSSRManifest = async (
     // In our case, since the server code is bundled into a single bundle, there is no need to load additional JavaScript modules.
     // As a result, we set this property to an empty object because it will not be used.
     moduleLoading: {
-      prefix: '/webpack/development/',
+      prefix: `/webpack/${process.env.NODE_ENV}/`,
+      crossOrigin: null,
     },
     moduleMap,
   };
