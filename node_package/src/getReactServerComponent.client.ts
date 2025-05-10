@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { createFromReadableStream } from 'react-on-rails-rsc/client';
+import { createFromReadableStream } from 'react-on-rails-rsc/client.browser';
 import { fetch } from './utils.ts';
 import transformRSCStreamAndReplayConsoleLogs from './transformRSCStreamAndReplayConsoleLogs.ts';
 import { RailsContext } from './types/index.ts';

@@ -1,4 +1,5 @@
-import { renderToPipeableStream } from 'react-on-rails-rsc/server.node';
+import { BundleManifest } from 'react-on-rails-rsc';
+import { buildServerRenderer } from 'react-on-rails-rsc/server.node';
 import { PassThrough, Readable } from 'stream';
 
 import {
@@ -26,6 +27,8 @@ const stringToStream = (str: string) => {
   return stream;
 };
 
+let serverRenderer: ReturnType<typeof buildServerRenderer> | undefined;
+
 const streamRenderRSCComponent = (
   reactRenderingResult: StreamableComponentResult,
   options: RSCRenderParams,
@@ -44,9 +47,15 @@ const streamRenderRSCComponent = (
 
   const { pipeToTransform, readableStream, emitError } =
     transformRenderStreamChunksToResultObject(renderState);
-  Promise.all([loadJsonFile(reactClientManifestFileName), reactRenderingResult])
-    .then(([reactClientManifest, reactElement]) => {
-      const rscStream = renderToPipeableStream(reactElement, reactClientManifest, {
+  Promise.resolve(reactRenderingResult)
+    .then(async (reactElement) => {
+      if (!serverRenderer) {
+        const reactClientManifest = await loadJsonFile<BundleManifest>(reactClientManifestFileName);
+        serverRenderer = buildServerRenderer(reactClientManifest);
+      }
+
+      const { renderToPipeableStream } = serverRenderer;
+      const rscStream = renderToPipeableStream(reactElement, {
         onError: (err) => {
           const error = convertToError(err);
           console.error('Error in RSC stream', error);

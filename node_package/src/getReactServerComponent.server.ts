@@ -1,4 +1,5 @@
-import { createFromNodeStream } from 'react-on-rails-rsc/client.node';
+import { BundleManifest } from 'react-on-rails-rsc';
+import { buildClientRenderer } from 'react-on-rails-rsc/client.node';
 import transformRSCStream from './transformRSCNodeStream.ts';
 import loadJsonFile from './loadJsonFile.ts';
 import { RailsContext } from './types/index.ts';
@@ -9,63 +10,24 @@ type RSCServerRootProps = {
   railsContext: RailsContext;
 };
 
-const createFromReactOnRailsNodeStream = (
-  stream: NodeJS.ReadableStream,
-  ssrManifest: Record<string, unknown>,
-) => {
-  const transformedStream = transformRSCStream(stream);
-  return createFromNodeStream(transformedStream, ssrManifest);
-};
+let clientRenderer: ReturnType<typeof buildClientRenderer> | undefined;
 
-/**
- * Creates an SSR manifest for React's server components runtime.
- *
- * This function:
- * 1. Loads the server and client component manifests
- * 2. Creates a mapping between client and server module IDs
- * 3. Builds a moduleMap structure required by React's SSR runtime
- *
- * The manifest allows React to correctly associate server components
- * with their client counterparts during hydration.
- *
- * @param reactServerManifestFileName - Path to the server manifest file
- * @param reactClientManifestFileName - Path to the client manifest file
- * @returns A Promise resolving to the SSR manifest object
- */
-const createSSRManifest = async (
+const createFromReactOnRailsNodeStream = async (
+  stream: NodeJS.ReadableStream,
   reactServerManifestFileName: string,
   reactClientManifestFileName: string,
 ) => {
-  const [reactServerManifest, reactClientManifest] = await Promise.all([
-    loadJsonFile<Record<string, { id: string; chunks: string[] }>>(reactServerManifestFileName),
-    loadJsonFile<Record<string, { id: string }>>(reactClientManifestFileName),
-  ]);
+  if (!clientRenderer) {
+    const [reactServerManifest, reactClientManifest] = await Promise.all([
+      loadJsonFile<BundleManifest>(reactServerManifestFileName),
+      loadJsonFile<BundleManifest>(reactClientManifestFileName),
+    ]);
+    clientRenderer = buildClientRenderer(reactClientManifest, reactServerManifest);
+  }
 
-  const moduleMap: Record<string, unknown> = {};
-  Object.entries(reactClientManifest).forEach(([aboluteFileUrl, clientFileBundlingInfo]) => {
-    const { id, chunks } = reactServerManifest[aboluteFileUrl];
-    moduleMap[clientFileBundlingInfo.id] = {
-      '*': {
-        id,
-        chunks,
-        name: '*',
-      },
-    };
-  });
-
-  const ssrManifest = {
-    // The `moduleLoading` property is utilized by the React runtime to load JavaScript modules.
-    // It can accept options such as `prefix` and `crossOrigin` to specify the path and crossorigin attribute for the modules.
-    // In our case, since the server code is bundled into a single bundle, there is no need to load additional JavaScript modules.
-    // As a result, we set this property to an empty object because it will not be used.
-    moduleLoading: {
-      prefix: `/webpack/${process.env.NODE_ENV}/`,
-      crossOrigin: null,
-    },
-    moduleMap,
-  };
-
-  return ssrManifest;
+  const { createFromNodeStream } = clientRenderer;
+  const transformedStream = transformRSCStream(stream);
+  return createFromNodeStream<React.ReactNode>(transformedStream);
 };
 
 /**
@@ -115,17 +77,17 @@ const getReactServerComponent = async ({
     );
   }
 
-  const ssrManifest = await createSSRManifest(
-    railsContext.reactServerClientManifestFileName,
-    railsContext.reactClientManifestFileName,
-  );
   const rscPayloadStream = await ReactOnRails.getRSCPayloadStream(
     componentName,
     componentProps,
     railsContext,
   );
 
-  return createFromReactOnRailsNodeStream(rscPayloadStream, ssrManifest);
+  return createFromReactOnRailsNodeStream(
+    rscPayloadStream,
+    railsContext.reactServerClientManifestFileName,
+    railsContext.reactClientManifestFileName,
+  );
 };
 
 export default getReactServerComponent;
