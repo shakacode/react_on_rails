@@ -10,6 +10,7 @@ import { renderToPipeableStream, PipeableStream } from './ReactDOMServer.cts';
 import { createResultObject, convertToError, validateComponent } from './serverRenderUtils.ts';
 import type { RenderParams, StreamRenderState, StreamableComponentResult } from './types/index.ts';
 import injectRSCPayload from './injectRSCPayload.ts';
+import { notifySSREnd } from './postSSRHooks.ts';
 
 type BufferedEvent = {
   event: 'data' | 'error' | 'end';
@@ -186,6 +187,11 @@ const streamRenderReactComponent = (
         },
         onError(e) {
           reportError(convertToError(e));
+        },
+        onAllReady() {
+          if (railsContext.componentSpecificMetadata?.renderRequestId) {
+            notifySSREnd(railsContext as RailsContextWithComponentSpecificMetadata);
+          }
         },
         identifierPrefix: domNodeId,
       });

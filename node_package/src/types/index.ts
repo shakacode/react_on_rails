@@ -62,6 +62,12 @@ export type RailsContext = {
     }
 );
 
+export type RailsContextWithComponentSpecificMetadata = RailsContext & {
+  componentSpecificMetadata: {
+    renderRequestId: string;
+  };
+};
+
 // not strictly what we want, see https://github.com/microsoft/TypeScript/issues/17867#issuecomment-323164375
 type AuthenticityHeaders = Record<string, string> & {
   'X-CSRF-Token': string | null;
@@ -291,6 +297,11 @@ export interface ReactOnRails {
    * @param otherHeaders Other headers
    */
   authenticityHeaders(otherHeaders: Record<string, string>): AuthenticityHeaders;
+  /**
+   * Adds a post SSR hook to be called after the SSR has completed.
+   * @param hook - The hook to be called after the SSR has completed.
+   */
+  addPostSSRHook(railsContext: RailsContextWithComponentSpecificMetadata, hook: () => void): void;
 }
 
 export type RSCPayloadStreamInfo = {

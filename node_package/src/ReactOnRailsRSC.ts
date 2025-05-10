@@ -6,6 +6,7 @@ import ReactOnRails from './ReactOnRails.full.ts';
 import buildConsoleReplay from './buildConsoleReplay.ts';
 import handleError from './handleError.ts';
 import { convertToError, createResultObject } from './serverRenderUtils.ts';
+import { notifySSREnd, addPostSSRHook } from './postSSRHooks.ts';
 
 import {
   streamServerRenderedComponent,
@@ -61,6 +62,12 @@ const streamRenderRSCComponent = (
       const jsonResult = JSON.stringify(createResultObject(htmlResult, buildConsoleReplay(), renderState));
       return stringToStream(jsonResult);
     });
+
+  readableStream.on('end', () => {
+    if (options.railsContext?.componentSpecificMetadata) {
+      notifySSREnd(options.railsContext as RailsContextWithComponentSpecificMetadata);
+    }
+  });
   return readableStream;
 };
 
@@ -71,6 +78,8 @@ ReactOnRails.serverRenderRSCReactComponent = (options: RSCRenderParams) => {
     console.history = [];
   }
 };
+
+ReactOnRails.addPostSSRHook = addPostSSRHook;
 
 ReactOnRails.isRSCBundle = true;
 
