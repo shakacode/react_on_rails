@@ -1,7 +1,12 @@
 import { renderToPipeableStream } from 'react-on-rails-rsc/server.node';
 import { PassThrough, Readable } from 'stream';
 
-import { RSCRenderParams, StreamRenderState, StreamableComponentResult } from './types/index.ts';
+import {
+  RSCRenderParams,
+  RailsContextWithComponentSpecificMetadata,
+  StreamRenderState,
+  StreamableComponentResult,
+} from './types/index.ts';
 import ReactOnRails from './ReactOnRails.full.ts';
 import buildConsoleReplay from './buildConsoleReplay.ts';
 import handleError from './handleError.ts';

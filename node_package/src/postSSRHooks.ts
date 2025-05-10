@@ -1,4 +1,4 @@
-import { RailsContextWithComponentSpecificMetadata } from "./types/index.ts";
+import { RailsContextWithComponentSpecificMetadata } from './types/index.ts';
 
 type PostSSRHook = () => void;
 const postSSRHooks = new Map<string, PostSSRHook[]>();

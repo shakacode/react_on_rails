@@ -8,7 +8,12 @@ import buildConsoleReplay from './buildConsoleReplay.ts';
 import handleError from './handleError.ts';
 import { renderToPipeableStream, PipeableStream } from './ReactDOMServer.cts';
 import { createResultObject, convertToError, validateComponent } from './serverRenderUtils.ts';
-import type { RenderParams, StreamRenderState, StreamableComponentResult } from './types/index.ts';
+import type {
+  RailsContextWithComponentSpecificMetadata,
+  RenderParams,
+  StreamRenderState,
+  StreamableComponentResult,
+} from './types/index.ts';
 import injectRSCPayload from './injectRSCPayload.ts';
 import { notifySSREnd } from './postSSRHooks.ts';
 

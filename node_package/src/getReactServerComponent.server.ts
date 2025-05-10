@@ -37,8 +37,8 @@ const createSSRManifest = async (
   reactClientManifestFileName: string,
 ) => {
   const [reactServerManifest, reactClientManifest] = await Promise.all([
-    loadJsonFile(reactServerManifestFileName) as Promise<Record<string, { id: string; chunks: string[] }>>,
-    loadJsonFile(reactClientManifestFileName) as Promise<Record<string, { id: string }>>,
+    loadJsonFile<Record<string, { id: string; chunks: string[] }>>(reactServerManifestFileName),
+    loadJsonFile<Record<string, { id: string }>>(reactClientManifestFileName),
   ]);
 
   const moduleMap: Record<string, unknown> = {};
