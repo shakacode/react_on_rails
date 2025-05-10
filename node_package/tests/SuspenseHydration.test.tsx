@@ -182,7 +182,7 @@ async function renderAndHydrate() {
     expect(screen.queryByText('Hello World')).not.toBeInTheDocument();
   });
 
-  it('hydrates the container when its content is written to the document', async () => {
+  it('hydrates the child async component when its content is written to the document', async () => {
     const { writeFirstChunk, writeSecondChunk, onAsyncComponentHydrated, onContainerHydrated, hydrate } =
       await renderAndHydrate();
 
