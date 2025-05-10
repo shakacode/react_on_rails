@@ -1,4 +1,5 @@
 /* eslint-disable global-require,@typescript-eslint/no-require-imports */
+import * as React from 'react';
 import * as ReactDOM from 'react-dom';
 import type { ReactElement } from 'react';
 import type { RenderReturnType } from './types/index.ts' with { 'resolution-mode': 'import' };
@@ -50,3 +51,11 @@ export const unmountComponentAtNode: typeof ReactDOM.unmountComponentAtNode = su
   ? // not used if we use root API
     () => false
   : ReactDOM.unmountComponentAtNode;
+
+export const ensureReactUseAvailable = () => {
+  if (!('use' in React) || typeof React.use !== 'function') {
+    throw new Error(
+      'React.use is not defined. Please ensure you are using React 19 to use server components.',
+    );
+  }
+};

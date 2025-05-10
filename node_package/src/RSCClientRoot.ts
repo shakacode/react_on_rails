@@ -5,12 +5,15 @@ import * as ReactDOMClient from 'react-dom/client';
 import { createFromReadableStream } from 'react-on-rails-rsc/client';
 import { fetch } from './utils.ts';
 import transformRSCStreamAndReplayConsoleLogs from './transformRSCStreamAndReplayConsoleLogs.ts';
-import { RailsContext, RenderFunction } from './types/index.ts';
+import { RailsContext, RenderFunction, RSCPayloadChunk } from './types/index.ts';
+import { ensureReactUseAvailable } from './reactApis.cts';
 
-const { use } = React;
+ensureReactUseAvailable();
 
-if (typeof use !== 'function') {
-  throw new Error('React.use is not defined. Please ensure you are using React 19 to use server components.');
+declare global {
+  interface Window {
+    REACT_ON_RAILS_RSC_PAYLOAD?: RSCPayloadChunk[];
+  }
 }
 
 export type RSCClientRootProps = {
@@ -35,6 +38,60 @@ const fetchRSC = ({ componentName, rscPayloadGenerationUrlPath, componentProps }
   return createFromFetch(fetch(`/${strippedUrlPath}/${componentName}?props=${propsString}`));
 };
 
+const createRSCStreamFromPage = () => {
+  let streamController: ReadableStreamController<RSCPayloadChunk> | undefined;
+  const stream = new ReadableStream<RSCPayloadChunk>({
+    start(controller) {
+      if (typeof window === 'undefined') {
+        return;
+      }
+      const handleChunk = (chunk: RSCPayloadChunk) => {
+        controller.enqueue(chunk);
+      };
+
+      // The RSC payload transfer mechanism works in two possible scenarios:
+      // 1. RSCClientRoot executes first:
+      //    - Initializes REACT_ON_RAILS_RSC_PAYLOAD as an empty array
+      //    - Overrides the push function to handle incoming chunks
+      //    - When server scripts run later, they use the overridden push function
+      // 2. Server scripts execute first:
+      //    - Initialize REACT_ON_RAILS_RSC_PAYLOAD as an empty array
+      //    - Buffer RSC payload chunks in the array
+      //    - When RSCClientRoot runs, it reads buffered chunks and overrides push
+      //
+      // Key points:
+      // - The array is never reassigned, ensuring data consistency
+      // - The push function override ensures all chunks are properly handled
+      // - Execution order is irrelevant - both scenarios work correctly
+      if (!window.REACT_ON_RAILS_RSC_PAYLOAD) {
+        window.REACT_ON_RAILS_RSC_PAYLOAD = [];
+      }
+      window.REACT_ON_RAILS_RSC_PAYLOAD.forEach(handleChunk);
+      window.REACT_ON_RAILS_RSC_PAYLOAD.push = (...chunks) => {
+        chunks.forEach(handleChunk);
+        return chunks.length;
+      };
+      streamController = controller;
+    },
+  });
+
+  if (typeof document !== 'undefined' && document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      streamController?.close();
+    });
+  } else {
+    streamController?.close();
+  }
+
+  return stream;
+};
+
+const createFromRSCStream = () => {
+  const stream = createRSCStreamFromPage();
+  const transformedStream = transformRSCStreamAndReplayConsoleLogs(stream);
+  return createFromReadableStream<React.ReactNode>(transformedStream);
+};
+
 /**
  * RSCClientRoot is a React component that handles client-side rendering of React Server Components (RSC).
  * It manages the fetching, caching, and rendering of RSC payloads from the server.
@@ -53,7 +110,6 @@ const RSCClientRoot: RenderFunction = async (
   _railsContext?: RailsContext,
   domNodeId?: string,
 ) => {
-  const root = await fetchRSC({ componentName, rscPayloadGenerationUrlPath, componentProps });
   if (!domNodeId) {
     throw new Error('RSCClientRoot: No domNodeId provided');
   }
@@ -62,8 +118,10 @@ const RSCClientRoot: RenderFunction = async (
     throw new Error(`RSCClientRoot: No DOM node found for id: ${domNodeId}`);
   }
   if (domNode.innerHTML) {
+    const root = await createFromRSCStream();
     ReactDOMClient.hydrateRoot(domNode, root);
   } else {
+    const root = await fetchRSC({ componentName, rscPayloadGenerationUrlPath, componentProps });
     ReactDOMClient.createRoot(domNode).render(root);
   }
   // Added only to satisfy the return type of RenderFunction

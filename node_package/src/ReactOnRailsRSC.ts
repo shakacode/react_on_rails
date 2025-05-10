@@ -11,7 +11,7 @@ import {
   streamServerRenderedComponent,
   transformRenderStreamChunksToResultObject,
 } from './streamServerRenderedReactComponent.ts';
-import loadReactClientManifest from './loadReactClientManifest.ts';
+import loadJsonFile from './loadJsonFile.ts';
 
 const stringToStream = (str: string) => {
   const stream = new PassThrough();
@@ -24,7 +24,12 @@ const streamRenderRSCComponent = (
   reactRenderingResult: StreamableComponentResult,
   options: RSCRenderParams,
 ): Readable => {
-  const { throwJsErrors, reactClientManifestFileName } = options;
+  const { throwJsErrors } = options;
+  if (!options.railsContext?.serverSide || !options.railsContext.reactClientManifestFileName) {
+    throw new Error('Rails context is not available');
+  }
+
+  const { reactClientManifestFileName } = options.railsContext;
   const renderState: StreamRenderState = {
     result: null,
     hasErrors: false,
@@ -33,7 +38,7 @@ const streamRenderRSCComponent = (
 
   const { pipeToTransform, readableStream, emitError } =
     transformRenderStreamChunksToResultObject(renderState);
-  Promise.all([loadReactClientManifest(reactClientManifestFileName), reactRenderingResult])
+  Promise.all([loadJsonFile(reactClientManifestFileName), reactRenderingResult])
     .then(([reactClientManifest, reactElement]) => {
       const rscStream = renderToPipeableStream(reactElement, reactClientManifest, {
         onError: (err) => {
@@ -66,6 +71,8 @@ ReactOnRails.serverRenderRSCReactComponent = (options: RSCRenderParams) => {
     console.history = [];
   }
 };
+
+ReactOnRails.isRSCBundle = true;
 
 export * from './types/index.ts';
 export default ReactOnRails;
