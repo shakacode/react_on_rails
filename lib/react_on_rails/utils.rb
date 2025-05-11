@@ -128,6 +128,11 @@ module ReactOnRails
       return @react_server_manifest_path if @react_server_manifest_path && !Rails.env.development?
 
       asset_name = ReactOnRails.configuration.react_server_client_manifest_file
+      if asset_name.nil?
+        raise ReactOnRails::Error,
+              "react_server_client_manifest_file is nil, ensure to set it in your configuration"
+      end
+
       @react_server_manifest_path = File.join(generated_assets_full_path, asset_name)
     end
 
