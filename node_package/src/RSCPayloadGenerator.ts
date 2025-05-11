@@ -71,7 +71,7 @@ export const getRSCPayloadStream = async (
   const stream1 = new PassThrough();
   stream.pipe(stream1);
   const stream2 = new PassThrough();
-  stream1.pipe(stream2);
+  stream.pipe(stream2);
 
   const streamInfo: RSCPayloadStreamInfo = {
     componentName,

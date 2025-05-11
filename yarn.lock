@@ -5224,7 +5224,7 @@ react-is@^18.0.0:
 
 "react-on-rails-rsc@git+https://github.com/shakacode/react_on_rails_rsc.git#ssr-support":
   version "19.0.0"
-  resolved "git+https://github.com/shakacode/react_on_rails_rsc.git#f71fabc8eb62b08cb4d590da85d2b519d9f8d451"
+  resolved "git+https://github.com/shakacode/react_on_rails_rsc.git#c95a692b493e2dfc650e38d4378d61bd3194e8c8"
   dependencies:
     acorn-loose "^8.3.0"
     neo-async "^2.6.1"
