@@ -16,8 +16,7 @@ import { clear as clearComponentRegistry } from '../src/ComponentRegistry.ts';
 
 enableFetchMocks();
 
-// React Server Components tests are compatible with React 19
-// That only run with node version 18 and above
+// React Server Components tests require React 19 and only run with Node version 18 (`newest` in our CI matrix)
 (getNodeVersion() >= 18 ? describe : describe.skip)('RSCClientRoot', () => {
   let container;
   const mockDomNodeId = 'test-container';
@@ -242,7 +241,7 @@ enableFetchMocks();
         document.dispatchEvent(new Event('DOMContentLoaded'));
       });
 
-      // After second chunk, AsyncComponent should now be visible and loading indicator gone
+      // After the second chunk, AsyncComponent should now be visible and loading indicator gone
       expect(screen.getByText('AsyncComponent')).toBeInTheDocument();
       expect(screen.queryByText('Loading AsyncComponent...')).not.toBeInTheDocument();
 

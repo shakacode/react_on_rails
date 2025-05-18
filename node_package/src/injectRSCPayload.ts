@@ -1,5 +1,6 @@
 import { PipeableStream } from 'react-dom/server';
 import { PassThrough, Transform } from 'stream';
+import { finished } from 'stream/promises';
 import { RailsContextWithServerComponentCapabilities } from './types/index.ts';
 
 // In JavaScript, when an escape sequence with a backslash (\) is followed by a character
@@ -90,15 +91,7 @@ export default function injectRSCPayload(
         );
       });
 
-      await new Promise((resolve) => {
-        if (htmlStream.readableEnded) {
-          resolve(Promise.all(rscPromises));
-        } else {
-          htmlStream.on('end', () => {
-            resolve(Promise.all(rscPromises));
-          });
-        }
-      });
+      await finished(htmlStream).then(() => Promise.all(rscPromises));
     } catch (err) {
       resultStream.emit('error', err);
     }

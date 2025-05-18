@@ -14,8 +14,8 @@ import { ReactComponent, RenderFunction } from '../types/index.ts';
  * @example
  * ```js
  * registerServerComponent({
- *   ServerComponent1: ServerComponent1Component,
- *   ServerComponent2: ServerComponent2Component
+ *   ServerComponent1,
+ *   ServerComponent2,
  * });
  * ```
  */

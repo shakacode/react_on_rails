@@ -45,15 +45,13 @@ const wrapServerComponentRenderer = (componentOrRenderFunction: ReactComponentOr
       getServerComponent: getReactServerComponent,
     });
 
-    const suspensableServerComponent = (
-      <React.Suspense fallback={null}>
-        <Component {...props} />
-      </React.Suspense>
+    return () => (
+      <RSCProvider>
+        <React.Suspense fallback={null}>
+          <Component {...props} />
+        </React.Suspense>
+      </RSCProvider>
     );
-
-    const root = <RSCProvider>{suspensableServerComponent}</RSCProvider>;
-
-    return () => root;
   };
 
   return wrapper;

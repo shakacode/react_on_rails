@@ -45,21 +45,6 @@ const wrapServerComponentRenderer = (componentOrRenderFunction: ReactComponentOr
       throw new Error('wrapServerComponentRenderer: component is not a function');
     }
 
-    assertRailsContextWithComponentSpecificMetadata(railsContext);
-
-    const RSCProvider = createRSCProvider({
-      railsContext,
-      getServerComponent: getReactServerComponent,
-    });
-
-    const SuspensableRSCRoute = (
-      <React.Suspense fallback={null}>
-        <Component {...props} />
-      </React.Suspense>
-    );
-
-    const root = <RSCProvider>{SuspensableRSCRoute}</RSCProvider>;
-
     if (!domNodeId) {
       throw new Error('RSCClientRoot: No domNodeId provided');
     }
@@ -67,6 +52,22 @@ const wrapServerComponentRenderer = (componentOrRenderFunction: ReactComponentOr
     if (!domNode) {
       throw new Error(`RSCClientRoot: No DOM node found for id: ${domNodeId}`);
     }
+
+    assertRailsContextWithComponentSpecificMetadata(railsContext);
+
+    const RSCProvider = createRSCProvider({
+      railsContext,
+      getServerComponent: getReactServerComponent,
+    });
+
+    const root = (
+      <RSCProvider>
+        <React.Suspense fallback={null}>
+          <Component {...props} />
+        </React.Suspense>
+      </RSCProvider>
+    );
+
     if (domNode.innerHTML) {
       ReactDOMClient.hydrateRoot(domNode, root, { identifierPrefix: domNodeId });
     } else {

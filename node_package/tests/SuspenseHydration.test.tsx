@@ -21,7 +21,7 @@ import { getNodeVersion } from './testUtils.js';
  * RSC payload to be present in the page before client-side hydration can occur.
  * And because the RSCRoute is rendered on the server because it's being hydrated on the client,
  * we can sure that the RSC payload is present in the page before the RSCRoute is hydrated on the client.
- * That's because `getRSCPayloadStream` function embeds the RSC payload immediately to the html stream even before the RSCRoute is rendered on the server.
+ * That's because `getRSCPayloadStream` function embeds the RSC payload immediately to the HTML stream even before the RSCRoute is rendered on the server.
  * Without this guarantee, hydration would fail or produce incorrect results.
  */
 
@@ -152,8 +152,7 @@ async function renderAndHydrate() {
   };
 }
 
-// React Server Components tests are compatible with React 19
-// That only run with node version 18 and above
+// React Server Components tests require React 19 and only run with Node version 18 (`newest` in our CI matrix)
 (getNodeVersion() >= 18 ? describe : describe.skip)('RSCClientRoot', () => {
   beforeEach(() => {
     jest.clearAllMocks();
