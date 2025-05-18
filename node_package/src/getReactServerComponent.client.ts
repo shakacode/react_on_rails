@@ -1,8 +1,8 @@
 import * as React from 'react';
 import { createFromReadableStream } from 'react-on-rails-rsc/client.browser';
-import { fetch } from './utils.ts';
+import { createRSCPayloadKey, fetch } from './utils.ts';
 import transformRSCStreamAndReplayConsoleLogs from './transformRSCStreamAndReplayConsoleLogs.ts';
-import { RailsContext } from './types/index.ts';
+import { assertRailsContextWithComponentSpecificMetadata, RailsContext } from './types/index.ts';
 
 declare global {
   interface Window {
@@ -42,8 +42,8 @@ const createFromFetch = async (fetchPromise: Promise<Response>) => {
  */
 const fetchRSC = ({ componentName, componentProps, railsContext }: ClientGetReactServerComponentProps) => {
   const propsString = JSON.stringify(componentProps);
-  const { rscPayloadGenerationUrl } = railsContext;
-  const strippedUrlPath = rscPayloadGenerationUrl?.replace(/^\/|\/$/g, '');
+  const { rscPayloadGenerationUrlPath } = railsContext;
+  const strippedUrlPath = rscPayloadGenerationUrlPath?.replace(/^\/|\/$/g, '');
   return createFromFetch(fetch(`/${strippedUrlPath}/${componentName}?props=${propsString}`));
 };
 
@@ -126,7 +126,8 @@ const getReactServerComponent = ({
   componentProps,
   railsContext,
 }: ClientGetReactServerComponentProps) => {
-  const componentKey = `${componentName}-${JSON.stringify(componentProps)}-${railsContext.componentSpecificMetadata?.renderRequestId}`;
+  assertRailsContextWithComponentSpecificMetadata(railsContext);
+  const componentKey = createRSCPayloadKey(componentName, componentProps, railsContext);
   const payloads = window.REACT_ON_RAILS_RSC_PAYLOADS?.[componentKey];
   if (payloads) {
     return createFromPreloadedPayloads(payloads);

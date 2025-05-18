@@ -34,7 +34,7 @@ export type RailsContext = {
   pathname: string;
   search: string | null;
   httpAcceptLanguage: string;
-  rscPayloadGenerationUrl?: string;
+  rscPayloadGenerationUrlPath?: string;
   componentSpecificMetadata?: {
     // The renderRequestId serves as a unique identifier for each render request.
     // We cannot rely solely on nodeDomId, as it should be unique for each component on the page,
@@ -62,14 +62,29 @@ export type RailsContext = {
     }
 );
 
-export type RailsContextWithServerComponentCapabilities = RailsContext & {
+export type RailsContextWithComponentSpecificMetadata = RailsContext & {
+  componentSpecificMetadata: {
+    renderRequestId: string;
+  };
+};
+
+export type RailsContextWithServerComponentCapabilities = RailsContextWithComponentSpecificMetadata & {
   serverSide: true;
   serverSideRSCPayloadParameters: unknown;
   reactClientManifestFileName: string;
   reactServerClientManifestFileName: string;
-  componentSpecificMetadata: {
-    renderRequestId: string;
-  };
+};
+
+export const assertRailsContextWithComponentSpecificMetadata: (
+  context: RailsContext | undefined,
+) => asserts context is RailsContextWithComponentSpecificMetadata = (
+  context: RailsContext | undefined,
+): asserts context is RailsContextWithComponentSpecificMetadata => {
+  if (!context || !('componentSpecificMetadata' in context)) {
+    throw new Error(
+      'Rails context does not have component specific metadata. Please ensure you are using a compatible version of react_on_rails_pro',
+    );
+  }
 };
 
 export const assertRailsContextWithServerComponentCapabilities: (

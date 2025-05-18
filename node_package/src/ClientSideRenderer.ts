@@ -86,7 +86,7 @@ class ComponentRenderer {
     const renderRequestId = el.getAttribute('data-render-request-id');
 
     if (!renderRequestId) {
-      console.error(`renderRequestId is missing for ${name} in dom node with id: ${domNodeId}`);
+      console.error(`renderRequestId is missing for component ${name} in the DOM node with id ${domNodeId}`);
     }
 
     const componentSpecificRailsContext = {

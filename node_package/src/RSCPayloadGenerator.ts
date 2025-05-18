@@ -15,7 +15,7 @@ declare global {
 
 const mapRailsContextToRSCPayloadStreams = new Map<string, RSCPayloadStreamInfo[]>();
 
-const rscPayloadCallbacks = new Map<string, Array<RSCPayloadCallback>>();
+const rscPayloadCallbacks = new Map<string, RSCPayloadCallback[]>();
 
 /**
  * Registers a callback to be executed when RSC payloads are generated.
@@ -36,13 +36,18 @@ export const onRSCPayloadGenerated = (
   callback: RSCPayloadCallback,
 ) => {
   const { renderRequestId } = railsContext.componentSpecificMetadata;
-  const callbacks = rscPayloadCallbacks.get(renderRequestId) || [];
-  callbacks.push(callback);
-  rscPayloadCallbacks.set(renderRequestId, callbacks);
+  const callbacks = rscPayloadCallbacks.get(renderRequestId);
+  if (callbacks) {
+    callbacks.push(callback);
+  } else {
+    rscPayloadCallbacks.set(renderRequestId, [callback]);
+  }
 
   // Call callback for any existing streams for this context
-  const existingStreams = mapRailsContextToRSCPayloadStreams.get(renderRequestId) || [];
-  existingStreams.forEach((streamInfo) => callback(streamInfo));
+  const existingStreams = mapRailsContextToRSCPayloadStreams.get(renderRequestId);
+  if (existingStreams) {
+    existingStreams.forEach((streamInfo) => callback(streamInfo));
+  }
 };
 
 /**
@@ -76,7 +81,10 @@ export const getRSCPayloadStream = async (
 
   const { renderRequestId } = railsContext.componentSpecificMetadata;
   const stream = await generateRSCPayload(componentName, props, railsContext);
-  const streams = mapRailsContextToRSCPayloadStreams.get(renderRequestId) ?? [];
+  // Tee stream to allow for multiple consumers:
+  //   1. stream1 - Used by React's runtime to perform server-side rendering
+  //   2. stream2 - Used by react-on-rails to embed the RSC payloads
+  //      into the HTML stream for client-side hydration
   const stream1 = new PassThrough();
   stream.pipe(stream1);
   const stream2 = new PassThrough();
@@ -87,13 +95,19 @@ export const getRSCPayloadStream = async (
     props,
     stream: stream2,
   };
-  streams.push(streamInfo);
-  mapRailsContextToRSCPayloadStreams.set(renderRequestId, streams);
+  const streams = mapRailsContextToRSCPayloadStreams.get(renderRequestId);
+  if (streams) {
+    streams.push(streamInfo);
+  } else {
+    mapRailsContextToRSCPayloadStreams.set(renderRequestId, [streamInfo]);
+  }
 
   // Notify callbacks about the new stream in a sync manner to maintain proper hydration timing
   // as described in the comment above onRSCPayloadGenerated
-  const callbacks = rscPayloadCallbacks.get(renderRequestId) || [];
-  callbacks.forEach((callback) => callback(streamInfo));
+  const callbacks = rscPayloadCallbacks.get(renderRequestId);
+  if (callbacks) {
+    callbacks.forEach((callback) => callback(streamInfo));
+  }
 
   return stream1;
 };

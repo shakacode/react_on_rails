@@ -1,6 +1,7 @@
 import * as React from 'react';
-import { RailsContext } from './types/index.ts';
+import { RailsContextWithComponentSpecificMetadata } from './types/index.ts';
 import getReactServerComponent from './getReactServerComponent.client.ts';
+import { createRSCPayloadKey } from './utils.ts';
 
 type RSCContextType = {
   getCachedComponent: (componentName: string, componentProps: unknown) => React.ReactNode;
@@ -33,18 +34,14 @@ export const createRSCProvider = ({
   railsContext,
   getServerComponent,
 }: {
-  railsContext: RailsContext;
+  railsContext: RailsContextWithComponentSpecificMetadata;
   getServerComponent: typeof getReactServerComponent;
 }) => {
   const cachedComponents: Record<string, React.ReactNode> = {};
   const fetchRSCPromises: Record<string, Promise<React.ReactNode>> = {};
 
-  const generateCacheKey = (componentName: string, componentProps: unknown) => {
-    return `${componentName}-${JSON.stringify(componentProps)}-${railsContext.componentSpecificMetadata?.renderRequestId}`;
-  };
-
   const getCachedComponent = (componentName: string, componentProps: unknown) => {
-    const key = generateCacheKey(componentName, componentProps);
+    const key = createRSCPayloadKey(componentName, componentProps, railsContext);
     return cachedComponents[key];
   };
 
@@ -53,7 +50,7 @@ export const createRSCProvider = ({
     if (cachedComponent) {
       return cachedComponent;
     }
-    const key = generateCacheKey(componentName, componentProps);
+    const key = createRSCPayloadKey(componentName, componentProps, railsContext);
     if (key in fetchRSCPromises) {
       return fetchRSCPromises[key];
     }
@@ -66,9 +63,10 @@ export const createRSCProvider = ({
     return promise;
   };
 
+  const contextValue = { getCachedComponent, getComponent };
+
   return ({ children }: { children: React.ReactNode }) => {
-    // eslint-disable-next-line react/jsx-no-constructed-context-values
-    return <RSCContext.Provider value={{ getCachedComponent, getComponent }}>{children}</RSCContext.Provider>;
+    return <RSCContext.Provider value={contextValue}>{children}</RSCContext.Provider>;
   };
 };
 

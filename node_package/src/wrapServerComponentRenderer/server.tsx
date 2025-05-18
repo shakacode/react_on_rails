@@ -3,6 +3,7 @@ import type { RenderFunction, ReactComponentOrRenderFunction } from '../types/in
 import getReactServerComponent from '../getReactServerComponent.server.ts';
 import { createRSCProvider } from '../RSCProvider.tsx';
 import isRenderFunction from '../isRenderFunction.ts';
+import { assertRailsContextWithServerComponentCapabilities } from '../types/index.ts';
 
 /**
  * Wraps a client component with the necessary RSC context and handling for server-side operations.
@@ -29,9 +30,7 @@ const wrapServerComponentRenderer = (componentOrRenderFunction: ReactComponentOr
   }
 
   const wrapper: RenderFunction = async (props, railsContext) => {
-    if (!railsContext) {
-      throw new Error('RSCClientRoot: No railsContext provided');
-    }
+    assertRailsContextWithServerComponentCapabilities(railsContext);
 
     const Component = isRenderFunction(componentOrRenderFunction)
       ? await componentOrRenderFunction(props, railsContext)
