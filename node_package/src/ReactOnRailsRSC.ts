@@ -4,7 +4,7 @@ import { PassThrough, Readable } from 'stream';
 
 import {
   RSCRenderParams,
-  RailsContextWithComponentSpecificMetadata,
+  assertRailsContextWithServerComponentCapabilities,
   StreamRenderState,
   StreamableComponentResult,
 } from './types/index.ts';
@@ -34,11 +34,10 @@ const streamRenderRSCComponent = (
   options: RSCRenderParams,
 ): Readable => {
   const { throwJsErrors } = options;
-  if (!options.railsContext?.serverSide || !options.railsContext.reactClientManifestFileName) {
-    throw new Error('Rails context is not available');
-  }
+  const { railsContext } = options;
+  assertRailsContextWithServerComponentCapabilities(railsContext);
 
-  const { reactClientManifestFileName } = options.railsContext;
+  const { reactClientManifestFileName } = railsContext;
   const renderState: StreamRenderState = {
     result: null,
     hasErrors: false,
@@ -78,9 +77,7 @@ const streamRenderRSCComponent = (
     });
 
   readableStream.on('end', () => {
-    if (options.railsContext?.componentSpecificMetadata) {
-      notifySSREnd(options.railsContext as RailsContextWithComponentSpecificMetadata);
-    }
+    notifySSREnd(railsContext);
   });
   return readableStream;
 };

@@ -62,10 +62,36 @@ export type RailsContext = {
     }
 );
 
-export type RailsContextWithComponentSpecificMetadata = RailsContext & {
+export type RailsContextWithServerComponentCapabilities = RailsContext & {
+  serverSide: true;
+  serverSideRSCPayloadParameters: unknown;
+  reactClientManifestFileName: string;
+  reactServerClientManifestFileName: string;
   componentSpecificMetadata: {
     renderRequestId: string;
   };
+};
+
+export const assertRailsContextWithServerComponentCapabilities: (
+  context: RailsContext | undefined,
+) => asserts context is RailsContextWithServerComponentCapabilities = (
+  context: RailsContext | undefined,
+): asserts context is RailsContextWithServerComponentCapabilities => {
+  if (
+    !context ||
+    !('serverSideRSCPayloadParameters' in context) ||
+    !('reactClientManifestFileName' in context) ||
+    !('reactServerClientManifestFileName' in context) ||
+    !('componentSpecificMetadata' in context)
+  ) {
+    throw new Error(
+      'Rails context does not have server side RSC payload parameters.\n\n' +
+        'Please ensure:\n' +
+        '1. You are using a compatible version of react_on_rails_pro\n' +
+        '2. Server components support is enabled by setting:\n' +
+        '   ReactOnRailsPro.configuration.enable_rsc_support = true',
+    );
+  }
 };
 
 // not strictly what we want, see https://github.com/microsoft/TypeScript/issues/17867#issuecomment-323164375
@@ -183,7 +209,8 @@ export interface RenderParams extends Params {
   renderingReturnsPromises: boolean;
 }
 
-export interface RSCRenderParams extends RenderParams {
+export interface RSCRenderParams extends Omit<RenderParams, 'railsContext'> {
+  railsContext: RailsContextWithServerComponentCapabilities;
   reactClientManifestFileName: string;
 }
 
@@ -301,7 +328,7 @@ export interface ReactOnRails {
    * Adds a post SSR hook to be called after the SSR has completed.
    * @param hook - The hook to be called after the SSR has completed.
    */
-  addPostSSRHook(railsContext: RailsContextWithComponentSpecificMetadata, hook: () => void): void;
+  addPostSSRHook(railsContext: RailsContextWithServerComponentCapabilities, hook: () => void): void;
 }
 
 export type RSCPayloadStreamInfo = {
@@ -432,7 +459,7 @@ export interface ReactOnRailsInternal extends ReactOnRails {
   getRSCPayloadStream?: (
     componentName: string,
     props: unknown,
-    railsContext: RailsContext,
+    railsContext: RailsContextWithServerComponentCapabilities,
   ) => Promise<NodeJS.ReadableStream>;
 
   /**
@@ -441,7 +468,7 @@ export interface ReactOnRailsInternal extends ReactOnRails {
     * @param railsContext - The Rails context of the current rendering request.
     * @returns An array of objects, each containing the component name and its corresponding NodeJS.ReadableStream.
     */
-  getRSCPayloadStreams?: (railsContext: RailsContext) => {
+  getRSCPayloadStreams?: (railsContext: RailsContextWithServerComponentCapabilities) => {
     componentName: string;
     props: unknown;
     stream: NodeJS.ReadableStream;
@@ -452,13 +479,16 @@ export interface ReactOnRailsInternal extends ReactOnRails {
    * @param railsContext - The Rails context of the current rendering request.
    * @param callback - The callback to be called when an RSC payload stream is generated.
    */
-  onRSCPayloadGenerated?: (railsContext: RailsContext, callback: RSCPayloadCallback) => void;
+  onRSCPayloadGenerated?: (
+    railsContext: RailsContextWithServerComponentCapabilities,
+    callback: RSCPayloadCallback,
+  ) => void;
 
   /**
    * Clears all RSC payload streams generated for the rendering request of the given Rails context.
    * @param railsContext - The Rails context of the current rendering request.
    */
-  clearRSCPayloadStreams?: (railsContext: RailsContext) => void;
+  clearRSCPayloadStreams?: (railsContext: RailsContextWithServerComponentCapabilities) => void;
 }
 
 export type RenderStateHtml = FinalHtmlResult | Promise<FinalHtmlResult>;

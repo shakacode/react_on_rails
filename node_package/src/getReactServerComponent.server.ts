@@ -2,7 +2,7 @@ import { BundleManifest } from 'react-on-rails-rsc';
 import { buildClientRenderer } from 'react-on-rails-rsc/client.node';
 import transformRSCStream from './transformRSCNodeStream.ts';
 import loadJsonFile from './loadJsonFile.ts';
-import { RailsContext } from './types/index.ts';
+import { assertRailsContextWithServerComponentCapabilities, RailsContext } from './types/index.ts';
 
 type RSCServerRootProps = {
   componentName: string;
@@ -58,18 +58,7 @@ const getReactServerComponent = async ({
   componentProps,
   railsContext,
 }: RSCServerRootProps) => {
-  if (
-    !railsContext?.serverSide ||
-    !railsContext?.reactClientManifestFileName ||
-    !railsContext?.reactServerClientManifestFileName
-  ) {
-    throw new Error(
-      'serverClientManifestFileName and reactServerClientManifestFileName are required. ' +
-        'Please ensure that React Server Component webpack configurations are properly set ' +
-        'as stated in the React Server Component tutorial. ' +
-        'Make sure to use "stream_react_component" instead of "react_component" to SSR a server component.',
-    );
-  }
+  assertRailsContextWithServerComponentCapabilities(railsContext);
 
   if (typeof ReactOnRails.getRSCPayloadStream !== 'function') {
     throw new Error(

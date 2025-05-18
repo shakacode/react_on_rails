@@ -8,8 +8,8 @@ import buildConsoleReplay from './buildConsoleReplay.ts';
 import handleError from './handleError.ts';
 import { renderToPipeableStream, PipeableStream } from './ReactDOMServer.cts';
 import { createResultObject, convertToError, validateComponent } from './serverRenderUtils.ts';
-import type {
-  RailsContextWithComponentSpecificMetadata,
+import {
+  assertRailsContextWithServerComponentCapabilities,
   RenderParams,
   StreamRenderState,
   StreamableComponentResult,
@@ -138,7 +138,7 @@ const streamRenderReactComponent = (
   reactRenderingResult: StreamableComponentResult,
   options: RenderParams,
 ) => {
-  const { name: componentName, throwJsErrors, domNodeId } = options;
+  const { name: componentName, throwJsErrors, domNodeId, railsContext } = options;
   const renderState: StreamRenderState = {
     result: null,
     hasErrors: false,
@@ -163,10 +163,7 @@ const streamRenderReactComponent = (
     endStream();
   };
 
-  const { railsContext } = options;
-  if (!railsContext) {
-    throw new Error('railsContext is required to stream a React component');
-  }
+  assertRailsContextWithServerComponentCapabilities(railsContext);
 
   Promise.resolve(reactRenderingResult)
     .then((reactRenderedElement) => {
@@ -195,7 +192,7 @@ const streamRenderReactComponent = (
         },
         onAllReady() {
           if (railsContext.componentSpecificMetadata?.renderRequestId) {
-            notifySSREnd(railsContext as RailsContextWithComponentSpecificMetadata);
+            notifySSREnd(railsContext);
           }
         },
         identifierPrefix: domNodeId,

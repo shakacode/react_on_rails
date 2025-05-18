@@ -1,17 +1,21 @@
 import { PassThrough } from 'stream';
-import { RailsContext, RSCPayloadStreamInfo, RSCPayloadCallback } from './types/index.ts';
+import {
+  RailsContextWithServerComponentCapabilities,
+  RSCPayloadStreamInfo,
+  RSCPayloadCallback,
+} from './types/index.ts';
 
 declare global {
   function generateRSCPayload(
     componentName: string,
     props: unknown,
-    railsContext: RailsContext,
+    railsContext: RailsContextWithServerComponentCapabilities,
   ): Promise<NodeJS.ReadableStream>;
 }
 
-const mapRailsContextToRSCPayloadStreams = new Map<RailsContext, RSCPayloadStreamInfo[]>();
+const mapRailsContextToRSCPayloadStreams = new Map<string, RSCPayloadStreamInfo[]>();
 
-const rscPayloadCallbacks = new Map<RailsContext, Array<RSCPayloadCallback>>();
+const rscPayloadCallbacks = new Map<string, Array<RSCPayloadCallback>>();
 
 /**
  * Registers a callback to be executed when RSC payloads are generated.
@@ -27,13 +31,17 @@ const rscPayloadCallbacks = new Map<RailsContext, Array<RSCPayloadCallback>>();
  * @param railsContext - Context for the current request
  * @param callback - Function to call when an RSC payload is generated
  */
-export const onRSCPayloadGenerated = (railsContext: RailsContext, callback: RSCPayloadCallback) => {
-  const callbacks = rscPayloadCallbacks.get(railsContext) || [];
+export const onRSCPayloadGenerated = (
+  railsContext: RailsContextWithServerComponentCapabilities,
+  callback: RSCPayloadCallback,
+) => {
+  const { renderRequestId } = railsContext.componentSpecificMetadata;
+  const callbacks = rscPayloadCallbacks.get(renderRequestId) || [];
   callbacks.push(callback);
-  rscPayloadCallbacks.set(railsContext, callbacks);
+  rscPayloadCallbacks.set(renderRequestId, callbacks);
 
   // Call callback for any existing streams for this context
-  const existingStreams = mapRailsContextToRSCPayloadStreams.get(railsContext) || [];
+  const existingStreams = mapRailsContextToRSCPayloadStreams.get(renderRequestId) || [];
   existingStreams.forEach((streamInfo) => callback(streamInfo));
 };
 
@@ -56,7 +64,7 @@ export const onRSCPayloadGenerated = (railsContext: RailsContext, callback: RSCP
 export const getRSCPayloadStream = async (
   componentName: string,
   props: unknown,
-  railsContext: RailsContext,
+  railsContext: RailsContextWithServerComponentCapabilities,
 ): Promise<NodeJS.ReadableStream> => {
   if (typeof generateRSCPayload !== 'function') {
     throw new Error(
@@ -66,8 +74,9 @@ export const getRSCPayloadStream = async (
     );
   }
 
+  const { renderRequestId } = railsContext.componentSpecificMetadata;
   const stream = await generateRSCPayload(componentName, props, railsContext);
-  const streams = mapRailsContextToRSCPayloadStreams.get(railsContext) ?? [];
+  const streams = mapRailsContextToRSCPayloadStreams.get(renderRequestId) ?? [];
   const stream1 = new PassThrough();
   stream.pipe(stream1);
   const stream2 = new PassThrough();
@@ -79,25 +88,29 @@ export const getRSCPayloadStream = async (
     stream: stream2,
   };
   streams.push(streamInfo);
-  mapRailsContextToRSCPayloadStreams.set(railsContext, streams);
+  mapRailsContextToRSCPayloadStreams.set(renderRequestId, streams);
 
   // Notify callbacks about the new stream in a sync manner to maintain proper hydration timing
   // as described in the comment above onRSCPayloadGenerated
-  const callbacks = rscPayloadCallbacks.get(railsContext) || [];
+  const callbacks = rscPayloadCallbacks.get(renderRequestId) || [];
   callbacks.forEach((callback) => callback(streamInfo));
 
   return stream1;
 };
 
 export const getRSCPayloadStreams = (
-  railsContext: RailsContext,
+  railsContext: RailsContextWithServerComponentCapabilities,
 ): {
   componentName: string;
   props: unknown;
   stream: NodeJS.ReadableStream;
-}[] => mapRailsContextToRSCPayloadStreams.get(railsContext) ?? [];
+}[] => {
+  const { renderRequestId } = railsContext.componentSpecificMetadata;
+  return mapRailsContextToRSCPayloadStreams.get(renderRequestId) ?? [];
+};
 
-export const clearRSCPayloadStreams = (railsContext: RailsContext) => {
-  mapRailsContextToRSCPayloadStreams.delete(railsContext);
-  rscPayloadCallbacks.delete(railsContext);
+export const clearRSCPayloadStreams = (railsContext: RailsContextWithServerComponentCapabilities) => {
+  const { renderRequestId } = railsContext.componentSpecificMetadata;
+  mapRailsContextToRSCPayloadStreams.delete(renderRequestId);
+  rscPayloadCallbacks.delete(renderRequestId);
 };
