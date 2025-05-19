@@ -43,7 +43,7 @@ gsub_file_content("../spec/dummy/package.json", /"react-dom": "[^"]*",/, '"react
 gsub_file_content(
   "../package.json",
   "jest node_package/tests",
-  'jest node_package/tests --testPathIgnorePatterns=\".*(RSC|stream|serverRenderReactComponent).*\"'
+  'jest node_package/tests --testPathIgnorePatterns=\".*(RSC|stream|serverRenderReactComponent|SuspenseHydration).*\"'
 )
 gsub_file_content("../tsconfig.json", "react-jsx", "react")
 gsub_file_content("../spec/dummy/babel.config.js", "runtime: 'automatic'", "runtime: 'classic'")
