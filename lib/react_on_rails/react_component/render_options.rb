@@ -21,7 +21,8 @@ module ReactOnRails
         # Therefore, we need an additional unique identifier that can be used both on the client and server.
         # This ID can also be used to associate specific data with a particular rendered component
         # on either the server or client.
-        @render_request_id = self.class.generate_request_id
+        # This ID is only present if RSC support is enabled because it's only used in that case.
+        @render_request_id = self.class.generate_request_id if ReactOnRails::Utils.rsc_support_enabled?
       end
 
       attr_reader :react_component_name, :render_request_id

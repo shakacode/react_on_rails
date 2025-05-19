@@ -85,16 +85,16 @@ class ComponentRenderer {
     const trace = el.getAttribute('data-trace') === 'true';
     const renderRequestId = el.getAttribute('data-render-request-id');
 
-    if (!renderRequestId) {
-      console.error(`renderRequestId is missing for component ${name} in the DOM node with id ${domNodeId}`);
-    }
-
-    const componentSpecificRailsContext = {
-      ...railsContext,
-      componentSpecificMetadata: {
-        renderRequestId: renderRequestId || '',
-      },
-    };
+    // The renderRequestId is optional and only present when React Server Components (RSC) support is enabled.
+    // When RSC is enabled, this ID helps track and associate server-rendered components with their client-side hydration.
+    const componentSpecificRailsContext = renderRequestId
+      ? {
+          ...railsContext,
+          componentSpecificMetadata: {
+            renderRequestId,
+          },
+        }
+      : railsContext;
 
     try {
       const domNode = document.getElementById(domNodeId);
