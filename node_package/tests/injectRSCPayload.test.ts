@@ -1,5 +1,5 @@
 import { Readable, PassThrough } from 'stream';
-import ReactOnRails, { RailsContext } from '../src/ReactOnRails.node.ts';
+import ReactOnRails, { RailsContextWithServerComponentCapabilities } from '../src/ReactOnRails.node.ts';
 import injectRSCPayload from '../src/injectRSCPayload.ts';
 
 // Shared utilities
@@ -44,7 +44,7 @@ const setupTest = (mockRSC: Readable) => {
     componentSpecificMetadata: {
       renderRequestId: '123',
     },
-  } as RailsContext;
+  } as RailsContextWithServerComponentCapabilities;
 
   return { railsContext };
 };

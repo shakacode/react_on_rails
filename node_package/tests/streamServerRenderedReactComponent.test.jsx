@@ -43,6 +43,15 @@ TestComponentForStreaming.propTypes = {
 };
 
 describe('streamServerRenderedReactComponent', () => {
+  const testingRailsContext = {
+    serverSideRSCPayloadParameters: {},
+    reactClientManifestFileName: 'clientManifest.json',
+    reactServerClientManifestFileName: 'serverClientManifest.json',
+    componentSpecificMetadata: {
+      renderRequestId: '123',
+    },
+  };
+
   beforeEach(() => {
     ComponentRegistry.components().clear();
   });
@@ -102,11 +111,7 @@ describe('streamServerRenderedReactComponent', () => {
       trace: false,
       props: { throwSyncError, throwAsyncError },
       throwJsErrors,
-      railsContext: {
-        componentSpecificMetadata: {
-          renderRequestId: '123',
-        },
-      },
+      railsContext: testingRailsContext,
     });
 
     const chunks = [];
@@ -327,11 +332,7 @@ describe('streamServerRenderedReactComponent', () => {
       domNodeId: 'stringPromiseId',
       trace: false,
       throwJsErrors: false,
-      railsContext: {
-        componentSpecificMetadata: {
-          renderRequestId: '123',
-        },
-      },
+      railsContext: testingRailsContext,
     });
 
     const chunks = [];
