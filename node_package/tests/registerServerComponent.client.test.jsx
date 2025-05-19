@@ -63,7 +63,7 @@ enableFetchMocks();
 
     registerServerComponent('TestComponent');
     const railsContext = {
-      rscPayloadGenerationUrl: rscPayloadGenerationUrlPath,
+      rscPayloadGenerationUrlPath,
       componentSpecificMetadata: {
         renderRequestId: 'test-render-request-id',
       },
@@ -173,7 +173,7 @@ enableFetchMocks();
 
       registerServerComponent('TestComponent');
       railsContext = {
-        rscPayloadGenerationUrl: 'rsc-render',
+        rscPayloadGenerationUrlPath: 'rsc-render',
         componentSpecificMetadata: {
           renderRequestId: 'test-render-request-id',
         },
