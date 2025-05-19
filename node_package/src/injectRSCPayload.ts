@@ -1,7 +1,6 @@
-import { PipeableStream } from 'react-dom/server';
 import { PassThrough, Transform } from 'stream';
 import { finished } from 'stream/promises';
-import { RailsContextWithServerComponentCapabilities } from './types/index.ts';
+import { RailsContextWithServerComponentCapabilities, PipeableOrReadableStream } from './types/index.ts';
 
 // In JavaScript, when an escape sequence with a backslash (\) is followed by a character
 // that isn't a recognized escape character, the backslash is ignored, and the character
@@ -50,7 +49,7 @@ function writeChunk(chunk: string, transform: Transform, cacheKey: string) {
  * @returns A combined stream with embedded RSC payloads
  */
 export default function injectRSCPayload(
-  pipeableHtmlStream: NodeJS.ReadableStream | PipeableStream,
+  pipeableHtmlStream: PipeableOrReadableStream,
   railsContext: RailsContextWithServerComponentCapabilities,
 ) {
   const htmlStream = new PassThrough();

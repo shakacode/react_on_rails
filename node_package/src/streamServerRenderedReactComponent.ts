@@ -6,13 +6,14 @@ import createReactOutput from './createReactOutput.ts';
 import { isPromise, isServerRenderHash } from './isServerRenderResult.ts';
 import buildConsoleReplay from './buildConsoleReplay.ts';
 import handleError from './handleError.ts';
-import { renderToPipeableStream, PipeableStream } from './ReactDOMServer.cts';
+import { renderToPipeableStream } from './ReactDOMServer.cts';
 import { createResultObject, convertToError, validateComponent } from './serverRenderUtils.ts';
 import {
   assertRailsContextWithServerComponentCapabilities,
   RenderParams,
   StreamRenderState,
   StreamableComponentResult,
+  PipeableOrReadableStream,
 } from './types/index.ts';
 import injectRSCPayload from './injectRSCPayload.ts';
 import { notifySSREnd } from './postSSRHooks.ts';
@@ -112,8 +113,8 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
     },
   });
 
-  let pipedStream: PipeableStream | NodeJS.ReadableStream | null = null;
-  const pipeToTransform = (pipeableStream: PipeableStream | NodeJS.ReadableStream) => {
+  let pipedStream: PipeableOrReadableStream | null = null;
+  const pipeToTransform = (pipeableStream: PipeableOrReadableStream) => {
     pipeableStream.pipe(transformStream);
     pipedStream = pipeableStream;
   };

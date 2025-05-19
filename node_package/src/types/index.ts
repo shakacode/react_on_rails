@@ -1,6 +1,7 @@
 /// <reference types="react/experimental" />
 
 import type { ReactElement, ReactNode, Component, ComponentType } from 'react';
+import type { PipeableStream } from 'react-dom/server';
 import type { Readable } from 'stream';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -176,6 +177,8 @@ interface RenderFunction {
 
 type ReactComponentOrRenderFunction = ReactComponent | RenderFunction;
 
+type PipeableOrReadableStream = PipeableStream | NodeJS.ReadableStream;
+
 export type {
   ReactComponentOrRenderFunction,
   ReactComponent,
@@ -192,6 +195,7 @@ export type {
   RenderFunctionSyncResult,
   RenderFunctionAsyncResult,
   StreamableComponentResult,
+  PipeableOrReadableStream,
 };
 
 export interface RegisteredComponent {
