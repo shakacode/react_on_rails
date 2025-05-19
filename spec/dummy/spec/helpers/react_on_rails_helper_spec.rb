@@ -21,8 +21,6 @@ describe ReactOnRailsHelper do
         { "HTTP_ACCEPT_LANGUAGE" => "en" }
       )
     }
-
-    allow(ReactOnRails::ReactComponent::RenderOptions).to receive(:generate_request_id).and_return("123")
   end
 
   let(:hash) do
@@ -197,7 +195,7 @@ describe ReactOnRailsHelper do
         <script type="application/json" class="js-react-on-rails-component" \
         id="js-react-on-rails-component-App-react-component" \
         data-component-name="App" data-dom-id="App-react-component"
-        data-force-load="true" data-render-request-id="123">{"name":"My Test Name"}</script>
+        data-force-load="true">{"name":"My Test Name"}</script>
       SCRIPT
     end
 
@@ -206,7 +204,7 @@ describe ReactOnRailsHelper do
         <script type="application/json" class="js-react-on-rails-component" \
         id="js-react-on-rails-component-App-react-component" \
         data-component-name="App" data-dom-id="App-react-component"
-        data-force-load="true" data-render-request-id="123">{}</script>
+        data-force-load="true">{}</script>
       SCRIPT
     end
 
@@ -255,7 +253,7 @@ describe ReactOnRailsHelper do
           <script type="application/json" class="js-react-on-rails-component" \
           id="js-react-on-rails-component-App-react-component" \
           data-component-name="App" data-dom-id="App-react-component"
-          data-force-load="true" data-render-request-id="123">{"name":"My Test Name"}</script>
+          data-force-load="true">{"name":"My Test Name"}</script>
         SCRIPT
       end
 
@@ -271,7 +269,7 @@ describe ReactOnRailsHelper do
           <script type="application/json" class="js-react-on-rails-component" \
           id="js-react-on-rails-component-App-react-component-0" \
           data-component-name="App" data-dom-id="App-react-component-0"
-          data-force-load="true" data-render-request-id="123">{"name":"My Test Name"}</script>
+          data-force-load="true">{"name":"My Test Name"}</script>
         SCRIPT
       end
 
@@ -293,7 +291,7 @@ describe ReactOnRailsHelper do
           <script type="application/json" class="js-react-on-rails-component" \
           id="js-react-on-rails-component-App-react-component" \
           data-component-name="App" data-dom-id="App-react-component"
-          data-force-load="true" data-render-request-id="123">{"name":"My Test Name"}</script>
+          data-force-load="true">{"name":"My Test Name"}</script>
         SCRIPT
       end
 
@@ -311,7 +309,7 @@ describe ReactOnRailsHelper do
           <script type="application/json" class="js-react-on-rails-component" \
           id="js-react-on-rails-component-shaka_div" \
           data-component-name="App" data-dom-id="shaka_div"
-          data-force-load="true" data-render-request-id="123">{"name":"My Test Name"}</script>
+          data-force-load="true">{"name":"My Test Name"}</script>
         SCRIPT
       end
 
