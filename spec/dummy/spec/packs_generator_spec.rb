@@ -220,10 +220,7 @@ module ReactOnRails
       before do
         stub_packer_source_path(component_name: components_directory,
                                 packer_source_path: packer_source_path)
-        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
-        allow(ReactOnRailsPro.configuration).to receive_messages(
-          enable_rsc_support: true
-        )
+        allow(ReactOnRails::Utils).to receive_messages(react_on_rails_pro?: true, rsc_support_enabled?: true)
       end
 
       context "when common component is not a client entrypoint" do

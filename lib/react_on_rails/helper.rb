@@ -381,7 +381,7 @@ module ReactOnRails
         if ReactOnRails::Utils.react_on_rails_pro?
           result[:rorProVersion] = ReactOnRails::Utils.react_on_rails_pro_version
 
-          result[:rscPayloadGenerationUrlPath] = rsc_url if ReactOnRailsPro.configuration.enable_rsc_support
+          result[:rscPayloadGenerationUrlPath] = rsc_url if ReactOnRails::Utils.rsc_support_enabled?
         end
 
         if defined?(request) && request.present?

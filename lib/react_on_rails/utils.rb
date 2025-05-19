@@ -213,6 +213,13 @@ module ReactOnRails
                                     end
     end
 
+    def self.rsc_support_enabled?
+      return false unless react_on_rails_pro?
+
+      rorp_config = ReactOnRailsPro.configuration
+      rorp_config.respond_to?(:enable_rsc_support) && rorp_config.enable_rsc_support
+    end
+
     def self.full_text_errors_enabled?
       ENV["FULL_TEXT_ERRORS"] == "true"
     end
