@@ -78,15 +78,12 @@ export default function injectRSCPayload(
         // The client-side RSCProvider actively monitors the array for new chunks, processing them as they arrive and forwarding them to the RSC payload stream, regardless of whether the array is initially empty.
         initializeCacheKeyJSArray(cacheKey, resultStream);
         rscPromises.push(
-          new Promise((resolve, reject) => {
-            (async () => {
-              for await (const chunk of stream ?? []) {
-                const decodedChunk = typeof chunk === 'string' ? chunk : decoder.decode(chunk);
-                writeChunk(JSON.stringify(decodedChunk), resultStream, cacheKey);
-              }
-              resolve();
-            })().catch(reject);
-          }),
+          (async () => {
+            for await (const chunk of stream ?? []) {
+              const decodedChunk = typeof chunk === 'string' ? chunk : decoder.decode(chunk);
+              writeChunk(JSON.stringify(decodedChunk), resultStream, cacheKey);
+            }
+          })(),
         );
       });
 

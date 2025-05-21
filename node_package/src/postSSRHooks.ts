@@ -7,9 +7,12 @@ export const addPostSSRHook = (
   railsContext: RailsContextWithServerComponentCapabilities,
   hook: PostSSRHook,
 ) => {
-  const hooks = postSSRHooks.get(railsContext.componentSpecificMetadata.renderRequestId) || [];
-  hooks.push(hook);
-  postSSRHooks.set(railsContext.componentSpecificMetadata.renderRequestId, hooks);
+  const hooks = postSSRHooks.get(railsContext.componentSpecificMetadata.renderRequestId);
+  if (hooks) {
+    hooks.push(hook);
+  } else {
+    postSSRHooks.set(railsContext.componentSpecificMetadata.renderRequestId, [hook]);
+  }
 };
 
 export const notifySSREnd = (railsContext: RailsContextWithServerComponentCapabilities) => {
@@ -17,4 +20,5 @@ export const notifySSREnd = (railsContext: RailsContextWithServerComponentCapabi
   if (hooks) {
     hooks.forEach((hook) => hook());
   }
+  postSSRHooks.delete(railsContext.componentSpecificMetadata.renderRequestId);
 };

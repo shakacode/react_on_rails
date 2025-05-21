@@ -216,8 +216,10 @@ module ReactOnRails
     def self.rsc_support_enabled?
       return false unless react_on_rails_pro?
 
+      return @rsc_support_enabled if defined?(@rsc_support_enabled)
+
       rorp_config = ReactOnRailsPro.configuration
-      rorp_config.respond_to?(:enable_rsc_support) && rorp_config.enable_rsc_support
+      @rsc_support_enabled = rorp_config.respond_to?(:enable_rsc_support) && rorp_config.enable_rsc_support
     end
 
     def self.full_text_errors_enabled?
