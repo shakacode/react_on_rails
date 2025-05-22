@@ -37,6 +37,9 @@ module ReactOnRails
       )
       allow(ReactOnRails::Utils).to receive_messages(generated_assets_full_path: packer_source_entry_path,
                                                      server_bundle_js_file_path: server_bundle_js_file_path)
+      if ReactOnRails::Utils.instance_variable_defined?(:@rsc_support_enabled)
+        ReactOnRails::Utils.remove_instance_variable(:@rsc_support_enabled)
+      end
     end
 
     after do
