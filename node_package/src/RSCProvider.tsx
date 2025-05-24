@@ -45,11 +45,7 @@ export const createRSCProvider = ({
     return cachedComponents[key];
   };
 
-  const getComponent = async (componentName: string, componentProps: unknown) => {
-    const cachedComponent = getCachedComponent(componentName, componentProps);
-    if (cachedComponent) {
-      return cachedComponent;
-    }
+  const getComponent = (componentName: string, componentProps: unknown) => {
     const key = createRSCPayloadKey(componentName, componentProps, railsContext);
     if (key in fetchRSCPromises) {
       return fetchRSCPromises[key];

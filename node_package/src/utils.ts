@@ -19,3 +19,19 @@ export const createRSCPayloadKey = (
 ) => {
   return `${componentName}-${JSON.stringify(componentProps)}-${railsContext.componentSpecificMetadata.renderRequestId}`;
 };
+
+/**
+ * Wraps a promise from react-server-dom-webpack in a standard JavaScript Promise.
+ *
+ * This is necessary because promises returned by react-server-dom-webpack's methods
+ * (like `createFromReadableStream` and `createFromNodeStream`) have non-standard behavior:
+ * their `then()` method returns `null` instead of the promise itself, which breaks
+ * promise chaining. This wrapper creates a new standard Promise that properly
+ * forwards the resolution/rejection of the original promise.
+ */
+export const wrapInNewPromise = <T>(promise: Promise<T>) => {
+  return new Promise<T>((resolve, reject) => {
+    void promise.then(resolve);
+    void promise.catch(reject);
+  });
+};

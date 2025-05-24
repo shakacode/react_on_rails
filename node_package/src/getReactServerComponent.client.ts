@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { createFromReadableStream } from 'react-on-rails-rsc/client.browser';
-import { createRSCPayloadKey, fetch } from './utils.ts';
+import { createRSCPayloadKey, fetch, wrapInNewPromise } from './utils.ts';
 import transformRSCStreamAndReplayConsoleLogs from './transformRSCStreamAndReplayConsoleLogs.ts';
 import { assertRailsContextWithComponentSpecificMetadata, RailsContext } from './types/index.ts';
 
@@ -23,7 +23,8 @@ const createFromFetch = async (fetchPromise: Promise<Response>) => {
     throw new Error('No stream found in response');
   }
   const transformedStream = transformRSCStreamAndReplayConsoleLogs(stream);
-  return createFromReadableStream<React.ReactNode>(transformedStream);
+  const renderPromise = createFromReadableStream<React.ReactNode>(transformedStream);
+  return wrapInNewPromise(renderPromise);
 };
 
 /**
@@ -96,7 +97,8 @@ const createRSCStreamFromArray = (payloads: string[]) => {
 const createFromPreloadedPayloads = (payloads: string[]) => {
   const stream = createRSCStreamFromArray(payloads);
   const transformedStream = transformRSCStreamAndReplayConsoleLogs(stream);
-  return createFromReadableStream<React.ReactNode>(transformedStream);
+  const renderPromise = createFromReadableStream<React.ReactNode>(transformedStream);
+  return wrapInNewPromise(renderPromise);
 };
 
 /**

@@ -30,10 +30,13 @@ export type RSCRouteProps = {
 
 const RSCRoute = ({ componentName, componentProps }: RSCRouteProps) => {
   const { getComponent, getCachedComponent } = useRSC();
-  const component =
-    getCachedComponent(componentName, componentProps) ??
-    React.use(getComponent(componentName, componentProps));
-  return component;
+  const cachedComponent = getCachedComponent(componentName, componentProps);
+  if (cachedComponent) {
+    return cachedComponent;
+  }
+
+  const componentPromise = getComponent(componentName, componentProps);
+  return React.use(componentPromise);
 };
 
 export default RSCRoute;
