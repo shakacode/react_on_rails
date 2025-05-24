@@ -71,7 +71,7 @@ export type RailsContextWithComponentSpecificMetadata = RailsContext & {
 
 export type RailsContextWithServerComponentCapabilities = RailsContextWithComponentSpecificMetadata & {
   serverSide: true;
-  serverSideRSCPayloadParameters: unknown;
+  serverSideRSCPayloadParameters?: unknown;
   reactClientManifestFileName: string;
   reactServerClientManifestFileName: string;
 };
@@ -95,7 +95,6 @@ export const assertRailsContextWithServerComponentCapabilities: (
 ): asserts context is RailsContextWithServerComponentCapabilities => {
   if (
     !context ||
-    !('serverSideRSCPayloadParameters' in context) ||
     !('reactClientManifestFileName' in context) ||
     !('reactServerClientManifestFileName' in context) ||
     !('componentSpecificMetadata' in context)
