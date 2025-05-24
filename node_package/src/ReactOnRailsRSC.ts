@@ -1,11 +1,18 @@
-import { renderToPipeableStream } from 'react-on-rails-rsc/server.node';
+import { BundleManifest } from 'react-on-rails-rsc';
+import { buildServerRenderer } from 'react-on-rails-rsc/server.node';
 import { PassThrough, Readable } from 'stream';
 
-import { RSCRenderParams, StreamRenderState, StreamableComponentResult } from './types/index.ts';
+import {
+  RSCRenderParams,
+  assertRailsContextWithServerComponentCapabilities,
+  StreamRenderState,
+  StreamableComponentResult,
+} from './types/index.ts';
 import ReactOnRails from './ReactOnRails.full.ts';
 import buildConsoleReplay from './buildConsoleReplay.ts';
 import handleError from './handleError.ts';
 import { convertToError, createResultObject } from './serverRenderUtils.ts';
+import { notifySSREnd, addPostSSRHook } from './postSSRHooks.ts';
 
 import {
   streamServerRenderedComponent,
@@ -20,16 +27,17 @@ const stringToStream = (str: string) => {
   return stream;
 };
 
+let serverRenderer: ReturnType<typeof buildServerRenderer> | undefined;
+
 const streamRenderRSCComponent = (
   reactRenderingResult: StreamableComponentResult,
   options: RSCRenderParams,
 ): Readable => {
   const { throwJsErrors } = options;
-  if (!options.railsContext?.serverSide || !options.railsContext.reactClientManifestFileName) {
-    throw new Error('Rails context is not available');
-  }
+  const { railsContext } = options;
+  assertRailsContextWithServerComponentCapabilities(railsContext);
 
-  const { reactClientManifestFileName } = options.railsContext;
+  const { reactClientManifestFileName } = railsContext;
   const renderState: StreamRenderState = {
     result: null,
     hasErrors: false,
@@ -38,9 +46,15 @@ const streamRenderRSCComponent = (
 
   const { pipeToTransform, readableStream, emitError } =
     transformRenderStreamChunksToResultObject(renderState);
-  Promise.all([loadJsonFile(reactClientManifestFileName), reactRenderingResult])
-    .then(([reactClientManifest, reactElement]) => {
-      const rscStream = renderToPipeableStream(reactElement, reactClientManifest, {
+  Promise.resolve(reactRenderingResult)
+    .then(async (reactElement) => {
+      if (!serverRenderer) {
+        const reactClientManifest = await loadJsonFile<BundleManifest>(reactClientManifestFileName);
+        serverRenderer = buildServerRenderer(reactClientManifest);
+      }
+
+      const { renderToPipeableStream } = serverRenderer;
+      const rscStream = renderToPipeableStream(reactElement, {
         onError: (err) => {
           const error = convertToError(err);
           console.error('Error in RSC stream', error);
@@ -61,6 +75,10 @@ const streamRenderRSCComponent = (
       const jsonResult = JSON.stringify(createResultObject(htmlResult, buildConsoleReplay(), renderState));
       return stringToStream(jsonResult);
     });
+
+  readableStream.on('end', () => {
+    notifySSREnd(railsContext);
+  });
   return readableStream;
 };
 
@@ -71,6 +89,8 @@ ReactOnRails.serverRenderRSCReactComponent = (options: RSCRenderParams) => {
     console.history = [];
   }
 };
+
+ReactOnRails.addPostSSRHook = addPostSSRHook;
 
 ReactOnRails.isRSCBundle = true;
 

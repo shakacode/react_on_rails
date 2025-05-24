@@ -128,6 +128,11 @@ module ReactOnRails
       return @react_server_manifest_path if @react_server_manifest_path && !Rails.env.development?
 
       asset_name = ReactOnRails.configuration.react_server_client_manifest_file
+      if asset_name.nil?
+        raise ReactOnRails::Error,
+              "react_server_client_manifest_file is nil, ensure it is set in your configuration"
+      end
+
       @react_server_manifest_path = File.join(generated_assets_full_path, asset_name)
     end
 
@@ -206,6 +211,15 @@ module ReactOnRails
                                     else
                                       ""
                                     end
+    end
+
+    def self.rsc_support_enabled?
+      return false unless react_on_rails_pro?
+
+      return @rsc_support_enabled if defined?(@rsc_support_enabled)
+
+      rorp_config = ReactOnRailsPro.configuration
+      @rsc_support_enabled = rorp_config.respond_to?(:enable_rsc_support) && rorp_config.enable_rsc_support
     end
 
     def self.full_text_errors_enabled?

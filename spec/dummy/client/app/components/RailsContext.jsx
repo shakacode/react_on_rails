@@ -7,7 +7,7 @@ function renderContextRows(railsContext) {
   return _.transform(
     railsContext,
     (accum, value, key) => {
-      if (key !== 'serverSide') {
+      if (key !== 'serverSide' && key !== 'componentSpecificMetadata') {
         const className = `js-${key}`;
         accum.push(
           <tr key={className}>
