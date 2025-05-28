@@ -1,6 +1,6 @@
 import { BundleManifest } from 'react-on-rails-rsc';
 import { buildServerRenderer } from 'react-on-rails-rsc/server.node';
-import { PassThrough, Readable } from 'stream';
+import { Readable } from 'stream';
 
 import {
   RSCRenderParams,
@@ -9,9 +9,8 @@ import {
   StreamableComponentResult,
 } from './types/index.ts';
 import ReactOnRails from './ReactOnRails.full.ts';
-import buildConsoleReplay from './buildConsoleReplay.ts';
 import handleError from './handleError.ts';
-import { convertToError, createResultObject } from './serverRenderUtils.ts';
+import { convertToError } from './serverRenderUtils.ts';
 import { notifySSREnd, addPostSSRHook } from './postSSRHooks.ts';
 
 import {
@@ -19,13 +18,6 @@ import {
   transformRenderStreamChunksToResultObject,
 } from './streamServerRenderedReactComponent.ts';
 import loadJsonFile from './loadJsonFile.ts';
-
-const stringToStream = (str: string) => {
-  const stream = new PassThrough();
-  stream.push(str);
-  stream.push(null);
-  return stream;
-};
 
 let serverRenderer: ReturnType<typeof buildServerRenderer> | undefined;
 
@@ -44,37 +36,41 @@ const streamRenderRSCComponent = (
     isShellReady: true,
   };
 
-  const { pipeToTransform, readableStream, emitError } =
+  const { pipeToTransform, readableStream, emitError, writeChunk, endStream } =
     transformRenderStreamChunksToResultObject(renderState);
-  Promise.resolve(reactRenderingResult)
-    .then(async (reactElement) => {
-      if (!serverRenderer) {
-        const reactClientManifest = await loadJsonFile<BundleManifest>(reactClientManifestFileName);
-        serverRenderer = buildServerRenderer(reactClientManifest);
-      }
 
-      const { renderToPipeableStream } = serverRenderer;
-      const rscStream = renderToPipeableStream(reactElement, {
-        onError: (err) => {
-          const error = convertToError(err);
-          console.error('Error in RSC stream', error);
-          if (throwJsErrors) {
-            emitError(error);
-          }
-          renderState.hasErrors = true;
-          renderState.error = error;
-        },
-      });
-      pipeToTransform(rscStream);
-    })
-    .catch((e: unknown) => {
-      const error = convertToError(e);
-      renderState.hasErrors = true;
-      renderState.error = error;
-      const htmlResult = handleError({ e: error, name: options.name, serverSide: true });
-      const jsonResult = JSON.stringify(createResultObject(htmlResult, buildConsoleReplay(), renderState));
-      return stringToStream(jsonResult);
+  const reportError = (error: Error) => {
+    console.error('Error in RSC stream', error);
+    if (throwJsErrors) {
+      emitError(error);
+    }
+    renderState.hasErrors = true;
+    renderState.error = error;
+  };
+
+  const initializeAndRender = async () => {
+    if (!serverRenderer) {
+      const reactClientManifest = await loadJsonFile<BundleManifest>(reactClientManifestFileName);
+      serverRenderer = buildServerRenderer(reactClientManifest);
+    }
+
+    const { renderToPipeableStream } = serverRenderer;
+    const rscStream = renderToPipeableStream(await reactRenderingResult, {
+      onError: (err) => {
+        const error = convertToError(err);
+        reportError(error);
+      },
     });
+    pipeToTransform(rscStream);
+  };
+
+  initializeAndRender().catch((e: unknown) => {
+    const error = convertToError(e);
+    reportError(error);
+    const errorHtml = handleError({ e: error, name: options.name, serverSide: true });
+    writeChunk(errorHtml);
+    endStream();
+  });
 
   readableStream.on('end', () => {
     notifySSREnd(railsContext);

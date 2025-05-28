@@ -1,5 +1,6 @@
 import { PassThrough, Transform } from 'stream';
 import { finished } from 'stream/promises';
+import { createRSCPayloadKey } from './utils.ts';
 import { RailsContextWithServerComponentCapabilities, PipeableOrReadableStream } from './types/index.ts';
 
 // In JavaScript, when an escape sequence with a backslash (\) is followed by a character
@@ -66,7 +67,7 @@ export default function injectRSCPayload(
 
       ReactOnRails.onRSCPayloadGenerated?.(railsContext, (streamInfo) => {
         const { stream, props, componentName } = streamInfo;
-        const cacheKey = `${componentName}-${JSON.stringify(props)}-${railsContext.componentSpecificMetadata?.renderRequestId}`;
+        const cacheKey = createRSCPayloadKey(componentName, props, railsContext);
 
         // When a component requests an RSC payload, we initialize a global array to store it.
         // This array is injected into the HTML before the component's HTML markup.
