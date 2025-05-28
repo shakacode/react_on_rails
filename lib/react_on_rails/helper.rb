@@ -381,7 +381,7 @@ module ReactOnRails
         if ReactOnRails::Utils.react_on_rails_pro?
           result[:rorProVersion] = ReactOnRails::Utils.react_on_rails_pro_version
 
-          result[:rscPayloadGenerationUrl] = rsc_url if ReactOnRailsPro.configuration.enable_rsc_support
+          result[:rscPayloadGenerationUrlPath] = rsc_url if ReactOnRails::Utils.rsc_support_enabled?
         end
 
         if defined?(request) && request.present?
@@ -651,7 +651,8 @@ module ReactOnRails
                                                 "data-trace" => (render_options.trace ? true : nil),
                                                 "data-dom-id" => render_options.dom_id,
                                                 "data-store-dependencies" => render_options.store_dependencies&.to_json,
-                                                "data-force-load" => (render_options.force_load ? true : nil))
+                                                "data-force-load" => (render_options.force_load ? true : nil),
+                                                "data-render-request-id" => render_options.render_request_id)
 
       if render_options.force_load
         component_specification_tag.concat(
