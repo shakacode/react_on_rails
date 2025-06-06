@@ -167,9 +167,7 @@ async function renderAndHydrate() {
       hydrate();
       await writeFirstChunk();
     });
-    await waitFor(() => {
-      expect(screen.queryByText('Loading...')).toBeInTheDocument();
-    });
+    expect(await screen.findByText('Loading...')).toBeInTheDocument();
     expect(onContainerHydrated).toHaveBeenCalled();
 
     // The async component is not hydrated until the second chunk is written to the document
@@ -177,7 +175,7 @@ async function renderAndHydrate() {
       setTimeout(resolve, 1000);
     });
     expect(onAsyncComponentHydrated).not.toHaveBeenCalled();
-    expect(screen.queryByText('Loading...')).toBeInTheDocument();
+    expect(screen.getByText('Loading...')).toBeInTheDocument();
     expect(screen.queryByText('Hello World')).not.toBeInTheDocument();
   });
 
@@ -189,9 +187,7 @@ async function renderAndHydrate() {
       hydrate();
       await writeFirstChunk();
     });
-    await waitFor(() => {
-      expect(screen.queryByText('Loading...')).toBeInTheDocument();
-    });
+    expect(await screen.findByText('Loading...')).toBeInTheDocument();
 
     await act(async () => {
       const secondChunk = await writeSecondChunk();
@@ -199,8 +195,8 @@ async function renderAndHydrate() {
     });
     await waitFor(() => {
       expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
-      expect(screen.queryByText('Hello World')).toBeInTheDocument();
     });
+    expect(screen.getByText('Hello World')).toBeInTheDocument();
 
     expect(onContainerHydrated).toHaveBeenCalled();
     expect(onAsyncComponentHydrated).toHaveBeenCalled();
