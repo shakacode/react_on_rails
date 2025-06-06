@@ -2,6 +2,7 @@ import path from 'node:path';
 import { globalIgnores } from 'eslint/config';
 import jest from 'eslint-plugin-jest';
 import prettierRecommended from 'eslint-plugin-prettier/recommended';
+import testingLibrary from 'eslint-plugin-testing-library';
 import globals from 'globals';
 import tsEslint from 'typescript-eslint';
 import { includeIgnoreFile } from '@eslint/compat';
@@ -198,11 +199,17 @@ const config = tsEslint.config([
   {
     files: ['node_package/tests/**', '**/*.test.{js,jsx,ts,tsx}'],
 
-    extends: [jest.configs['flat/recommended'], jest.configs['flat/style']],
+    extends: [
+      jest.configs['flat/recommended'],
+      jest.configs['flat/style'],
+      testingLibrary.configs['flat/dom'],
+    ],
 
     rules: {
       // Allows Jest mocks before import
       'import/first': 'off',
+      // Avoiding these methods complicates tests and isn't useful for our purposes
+      'testing-library/no-node-access': 'off',
     },
   },
   // must be the last config in the array
