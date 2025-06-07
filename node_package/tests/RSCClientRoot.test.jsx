@@ -66,10 +66,7 @@ enableFetchMocks();
     };
 
     // Execute the render
-    const render = () =>
-      act(async () => {
-        await RSCClientRoot(props, undefined, mockDomNodeId);
-      });
+    const render = () => RSCClientRoot(props, undefined, mockDomNodeId);
 
     return {
       render,
