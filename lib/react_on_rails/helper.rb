@@ -362,10 +362,6 @@ module ReactOnRails
     def rails_context(server_side: true)
       # ALERT: Keep in sync with node_package/src/types/index.ts for the properties of RailsContext
       @rails_context ||= begin
-        rsc_url = if ReactOnRails::Utils.react_on_rails_pro?
-                    ReactOnRailsPro.configuration.rsc_payload_generation_url_path
-                  end
-
         result = {
           componentRegistryTimeout: ReactOnRails.configuration.component_registry_timeout,
           railsEnv: Rails.env,
@@ -381,7 +377,10 @@ module ReactOnRails
         if ReactOnRails::Utils.react_on_rails_pro?
           result[:rorProVersion] = ReactOnRails::Utils.react_on_rails_pro_version
 
-          result[:rscPayloadGenerationUrlPath] = rsc_url if ReactOnRails::Utils.rsc_support_enabled?
+          if ReactOnRails::Utils.rsc_support_enabled?
+            rsc_payload_url = ReactOnRailsPro.configuration.rsc_payload_generation_url_path
+            result[:rscPayloadGenerationUrlPath] = rsc_payload_url
+          end
         end
 
         if defined?(request) && request.present?
