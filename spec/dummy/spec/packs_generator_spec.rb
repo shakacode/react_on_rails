@@ -24,7 +24,7 @@ module ReactOnRails
     before do
       stub_const("ReactOnRailsPro", Class.new do
         def self.configuration
-          @configuration ||= Struct.new(:enable_rsc_support, :rsc_payload_generation_url_path).new(false, nil)
+          @configuration ||= Struct.new(:enable_rsc_support).new(false)
         end
       end)
       ReactOnRails.configuration.server_bundle_js_file = server_bundle_js_file
@@ -37,6 +37,9 @@ module ReactOnRails
       )
       allow(ReactOnRails::Utils).to receive_messages(generated_assets_full_path: packer_source_entry_path,
                                                      server_bundle_js_file_path: server_bundle_js_file_path)
+      if ReactOnRails::Utils.instance_variable_defined?(:@rsc_support_enabled)
+        ReactOnRails::Utils.remove_instance_variable(:@rsc_support_enabled)
+      end
     end
 
     after do
@@ -216,15 +219,13 @@ module ReactOnRails
 
     context "when RSC support is enabled" do
       let(:components_directory) { "ReactServerComponents" }
-      let(:rsc_payload_generation_url_path) { "/rsc" }
 
       before do
         stub_packer_source_path(component_name: components_directory,
                                 packer_source_path: packer_source_path)
         allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
         allow(ReactOnRailsPro.configuration).to receive_messages(
-          enable_rsc_support: true,
-          rsc_payload_generation_url_path: rsc_payload_generation_url_path
+          enable_rsc_support: true
         )
       end
 
@@ -240,9 +241,7 @@ module ReactOnRails
           expected_content = <<~CONTENT.strip
             import registerServerComponent from 'react-on-rails/registerServerComponent/client';
 
-            registerServerComponent({
-              rscPayloadGenerationUrlPath: "#{rsc_payload_generation_url_path}",
-            }, "#{component_name}")
+            registerServerComponent("#{component_name}");
           CONTENT
 
           expect(pack_content).to eq(expected_content)
@@ -276,9 +275,7 @@ module ReactOnRails
           expected_content = <<~CONTENT.strip
             import registerServerComponent from 'react-on-rails/registerServerComponent/client';
 
-            registerServerComponent({
-              rscPayloadGenerationUrlPath: "#{rsc_payload_generation_url_path}",
-            }, "#{component_name}")
+            registerServerComponent("#{component_name}");
           CONTENT
 
           expect(pack_content).to eq(expected_content)

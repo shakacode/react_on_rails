@@ -577,6 +577,97 @@ module ReactOnRails
         end
       end
     end
+
+    describe ".react_server_client_manifest_file_path" do
+      before do
+        described_class.instance_variable_set(:@react_server_manifest_path, nil)
+        allow(ReactOnRails.configuration).to receive(:react_server_client_manifest_file)
+          .and_return("react-server-client-manifest.json")
+        allow(Rails.env).to receive(:development?).and_return(false)
+      end
+
+      after do
+        described_class.instance_variable_set(:@react_server_manifest_path, nil)
+      end
+
+      context "when in development environment" do
+        before do
+          allow(Rails.env).to receive(:development?).and_return(true)
+          allow(described_class).to receive(:generated_assets_full_path)
+            .and_return("/path/to/generated/assets")
+        end
+
+        it "does not use cached path" do
+          # Call once to potentially set the cached path
+          described_class.react_server_client_manifest_file_path
+
+          # Change the configuration value
+          allow(ReactOnRails.configuration).to receive(:react_server_client_manifest_file)
+            .and_return("changed-manifest.json")
+
+          # Should use the new value
+          expect(described_class.react_server_client_manifest_file_path)
+            .to eq("/path/to/generated/assets/changed-manifest.json")
+        end
+      end
+
+      context "when not in development environment" do
+        before do
+          allow(described_class).to receive(:generated_assets_full_path)
+            .and_return("/path/to/generated/assets")
+        end
+
+        it "caches the path" do
+          # Call once to set the cached path
+          expected_path = "/path/to/generated/assets/react-server-client-manifest.json"
+          expect(described_class.react_server_client_manifest_file_path).to eq(expected_path)
+
+          # Change the configuration value
+          allow(ReactOnRails.configuration).to receive(:react_server_client_manifest_file)
+            .and_return("changed-manifest.json")
+
+          # Should still use the cached path
+          expect(described_class.react_server_client_manifest_file_path).to eq(expected_path)
+        end
+      end
+
+      context "with different manifest file names" do
+        before do
+          allow(described_class).to receive(:generated_assets_full_path)
+            .and_return("/path/to/generated/assets")
+        end
+
+        it "returns the correct path for default manifest name" do
+          allow(ReactOnRails.configuration).to receive(:react_server_client_manifest_file)
+            .and_return("react-server-client-manifest.json")
+
+          expect(described_class.react_server_client_manifest_file_path)
+            .to eq("/path/to/generated/assets/react-server-client-manifest.json")
+        end
+
+        it "returns the correct path for custom manifest name" do
+          allow(ReactOnRails.configuration).to receive(:react_server_client_manifest_file)
+            .and_return("custom-server-client-manifest.json")
+
+          expect(described_class.react_server_client_manifest_file_path)
+            .to eq("/path/to/generated/assets/custom-server-client-manifest.json")
+        end
+      end
+
+      context "with nil manifest file name" do
+        before do
+          allow(ReactOnRails.configuration).to receive(:react_server_client_manifest_file)
+            .and_return(nil)
+          allow(described_class).to receive(:generated_assets_full_path)
+            .and_return("/path/to/generated/assets")
+        end
+
+        it "raises an error when the manifest file name is nil" do
+          expect { described_class.react_server_client_manifest_file_path }
+            .to raise_error(ReactOnRails::Error, /react_server_client_manifest_file is nil/)
+        end
+      end
+    end
   end
 end
 # rubocop:enable Metrics/ModuleLength, Metrics/BlockLength

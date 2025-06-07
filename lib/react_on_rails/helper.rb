@@ -358,14 +358,10 @@ module ReactOnRails
     # second parameter passed to both component and store Render-Functions.
     # This method can be called from views and from the controller, as `helpers.rails_context`
     #
-    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
     def rails_context(server_side: true)
       # ALERT: Keep in sync with node_package/src/types/index.ts for the properties of RailsContext
       @rails_context ||= begin
-        rsc_url = if ReactOnRails::Utils.react_on_rails_pro?
-                    ReactOnRailsPro.configuration.rsc_payload_generation_url_path
-                  end
-
         result = {
           componentRegistryTimeout: ReactOnRails.configuration.component_registry_timeout,
           railsEnv: Rails.env,
@@ -381,7 +377,10 @@ module ReactOnRails
         if ReactOnRails::Utils.react_on_rails_pro?
           result[:rorProVersion] = ReactOnRails::Utils.react_on_rails_pro_version
 
-          result[:rscPayloadGenerationUrl] = rsc_url if ReactOnRailsPro.configuration.enable_rsc_support
+          if ReactOnRails::Utils.rsc_support_enabled?
+            rsc_payload_url = ReactOnRailsPro.configuration.rsc_payload_generation_url_path
+            result[:rscPayloadGenerationUrlPath] = rsc_payload_url
+          end
         end
 
         if defined?(request) && request.present?
@@ -439,7 +438,7 @@ module ReactOnRails
       append_stylesheet_pack_tag("generated/#{react_component_name}")
     end
 
-    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
 
     private
 
@@ -651,7 +650,8 @@ module ReactOnRails
                                                 "data-trace" => (render_options.trace ? true : nil),
                                                 "data-dom-id" => render_options.dom_id,
                                                 "data-store-dependencies" => render_options.store_dependencies&.to_json,
-                                                "data-force-load" => (render_options.force_load ? true : nil))
+                                                "data-force-load" => (render_options.force_load ? true : nil),
+                                                "data-render-request-id" => render_options.render_request_id)
 
       if render_options.force_load
         component_specification_tag.concat(
