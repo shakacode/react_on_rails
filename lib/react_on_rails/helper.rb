@@ -358,7 +358,7 @@ module ReactOnRails
     # second parameter passed to both component and store Render-Functions.
     # This method can be called from views and from the controller, as `helpers.rails_context`
     #
-    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
     def rails_context(server_side: true)
       # ALERT: Keep in sync with node_package/src/types/index.ts for the properties of RailsContext
       @rails_context ||= begin
@@ -438,7 +438,7 @@ module ReactOnRails
       append_stylesheet_pack_tag("generated/#{react_component_name}")
     end
 
-    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
 
     private
 
