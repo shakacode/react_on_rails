@@ -14,8 +14,7 @@ export default {
   }),
   testEnvironment: 'jsdom',
   setupFiles: ['<rootDir>/node_package/tests/jest.setup.js'],
-  // React Server Components tests are compatible with React 19
-  // That only run with node version 18 and above
+  // React Server Components tests require React 19 and only run with Node version 18 (`newest` in our CI matrix)
   moduleNameMapper:
     nodeVersion < 18
       ? {

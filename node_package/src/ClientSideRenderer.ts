@@ -83,6 +83,18 @@ class ComponentRenderer {
     const { domNodeId } = this;
     const props = el.textContent !== null ? (JSON.parse(el.textContent) as Record<string, unknown>) : {};
     const trace = el.getAttribute('data-trace') === 'true';
+    const renderRequestId = el.getAttribute('data-render-request-id');
+
+    // The renderRequestId is optional and only present when React Server Components (RSC) support is enabled.
+    // When RSC is enabled, this ID helps track and associate server-rendered components with their client-side hydration.
+    const componentSpecificRailsContext = renderRequestId
+      ? {
+          ...railsContext,
+          componentSpecificMetadata: {
+            renderRequestId,
+          },
+        }
+      : railsContext;
 
     try {
       const domNode = document.getElementById(domNodeId);
@@ -93,7 +105,7 @@ class ComponentRenderer {
         }
 
         if (
-          (await delegateToRenderer(componentObj, props, railsContext, domNodeId, trace)) ||
+          (await delegateToRenderer(componentObj, props, componentSpecificRailsContext, domNodeId, trace)) ||
           // @ts-expect-error The state can change while awaiting delegateToRenderer
           this.state === 'unmounted'
         ) {
@@ -108,7 +120,7 @@ class ComponentRenderer {
           props,
           domNodeId,
           trace,
-          railsContext,
+          railsContext: componentSpecificRailsContext,
           shouldHydrate,
         });
 

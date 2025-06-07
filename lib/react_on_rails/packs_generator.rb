@@ -89,18 +89,13 @@ module ReactOnRails
 
     def pack_file_contents(file_path)
       registered_component_name = component_name(file_path)
-      load_server_components = ReactOnRails::Utils.react_on_rails_pro? &&
-                               ReactOnRailsPro.configuration.enable_rsc_support
+      load_server_components = ReactOnRails::Utils.rsc_support_enabled?
 
       if load_server_components && !client_entrypoint?(file_path)
-        rsc_payload_generation_url_path = ReactOnRailsPro.configuration.rsc_payload_generation_url_path
-
         return <<~FILE_CONTENT.strip
           import registerServerComponent from 'react-on-rails/registerServerComponent/client';
 
-          registerServerComponent({
-            rscPayloadGenerationUrlPath: "#{rsc_payload_generation_url_path}",
-          }, "#{registered_component_name}")
+          registerServerComponent("#{registered_component_name}");
         FILE_CONTENT
       end
 
@@ -146,8 +141,7 @@ module ReactOnRails
         "import #{name} from '#{relative_path(generated_server_bundle_file_path, component_path)}';"
       end
 
-      load_server_components = ReactOnRails::Utils.react_on_rails_pro? &&
-                               ReactOnRailsPro.configuration.enable_rsc_support
+      load_server_components = ReactOnRails::Utils.rsc_support_enabled?
       server_components = component_for_server_registration_to_path.keys.delete_if do |name|
         next true unless load_server_components
 

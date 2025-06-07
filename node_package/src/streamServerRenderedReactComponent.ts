@@ -6,9 +6,17 @@ import createReactOutput from './createReactOutput.ts';
 import { isPromise, isServerRenderHash } from './isServerRenderResult.ts';
 import buildConsoleReplay from './buildConsoleReplay.ts';
 import handleError from './handleError.ts';
-import { renderToPipeableStream, PipeableStream } from './ReactDOMServer.cts';
+import { renderToPipeableStream } from './ReactDOMServer.cts';
 import { createResultObject, convertToError, validateComponent } from './serverRenderUtils.ts';
-import type { RenderParams, StreamRenderState, StreamableComponentResult } from './types/index.ts';
+import {
+  assertRailsContextWithServerComponentCapabilities,
+  RenderParams,
+  StreamRenderState,
+  StreamableComponentResult,
+  PipeableOrReadableStream,
+} from './types/index.ts';
+import injectRSCPayload from './injectRSCPayload.ts';
+import { notifySSREnd } from './postSSRHooks.ts';
 
 type BufferedEvent = {
   event: 'data' | 'error' | 'end';
@@ -88,21 +96,25 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
   let previouslyReplayedConsoleMessages = 0;
 
   const transformStream = new PassThrough({
-    transform(chunk, _, callback) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access
-      const htmlChunk = chunk.toString() as string;
+    transform(chunk: Buffer, _, callback) {
+      const htmlChunk = chunk.toString();
       const consoleReplayScript = buildConsoleReplay(consoleHistory, previouslyReplayedConsoleMessages);
       previouslyReplayedConsoleMessages = consoleHistory?.length || 0;
-
       const jsonChunk = JSON.stringify(createResultObject(htmlChunk, consoleReplayScript, renderState));
-
       this.push(`${jsonChunk}\n`);
+
+      // Reset the render state to ensure that the error is not carried over to the next chunk
+      // eslint-disable-next-line no-param-reassign
+      renderState.error = undefined;
+      // eslint-disable-next-line no-param-reassign
+      renderState.hasErrors = false;
+
       callback();
     },
   });
 
-  let pipedStream: PipeableStream | null = null;
-  const pipeToTransform = (pipeableStream: PipeableStream) => {
+  let pipedStream: PipeableOrReadableStream | null = null;
+  const pipeToTransform = (pipeableStream: PipeableOrReadableStream) => {
     pipeableStream.pipe(transformStream);
     pipedStream = pipeableStream;
   };
@@ -116,7 +128,9 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
   const writeChunk = (chunk: string) => transformStream.write(chunk);
   const endStream = () => {
     transformStream.end();
-    pipedStream?.abort();
+    if (pipedStream && 'abort' in pipedStream) {
+      pipedStream.abort();
+    }
   };
   return { readableStream, pipeToTransform, writeChunk, emitError, endStream };
 };
@@ -125,7 +139,7 @@ const streamRenderReactComponent = (
   reactRenderingResult: StreamableComponentResult,
   options: RenderParams,
 ) => {
-  const { name: componentName, throwJsErrors, domNodeId } = options;
+  const { name: componentName, throwJsErrors, domNodeId, railsContext } = options;
   const renderState: StreamRenderState = {
     result: null,
     hasErrors: false,
@@ -150,6 +164,8 @@ const streamRenderReactComponent = (
     endStream();
   };
 
+  assertRailsContextWithServerComponentCapabilities(railsContext);
+
   Promise.resolve(reactRenderingResult)
     .then((reactRenderedElement) => {
       if (typeof reactRenderedElement === 'string') {
@@ -170,10 +186,15 @@ const streamRenderReactComponent = (
         },
         onShellReady() {
           renderState.isShellReady = true;
-          pipeToTransform(renderingStream);
+          pipeToTransform(injectRSCPayload(renderingStream, railsContext));
         },
         onError(e) {
           reportError(convertToError(e));
+        },
+        onAllReady() {
+          if (railsContext.componentSpecificMetadata?.renderRequestId) {
+            notifySSREnd(railsContext);
+          }
         },
         identifierPrefix: domNodeId,
       });
@@ -183,7 +204,6 @@ const streamRenderReactComponent = (
       reportError(error);
       sendErrorHtml(error);
     });
-
   return readableStream;
 };
 

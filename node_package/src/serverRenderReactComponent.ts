@@ -115,7 +115,7 @@ async function createPromiseResult(
   } catch (e: unknown) {
     const errorRenderState = handleRenderingError(e, { componentName, throwJsErrors });
     const consoleReplayScript = buildConsoleReplay(consoleHistory);
-    return createResultObject(errorRenderState.result, consoleReplayScript, renderState);
+    return createResultObject(errorRenderState.result, consoleReplayScript, errorRenderState);
   }
 }
 

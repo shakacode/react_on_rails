@@ -26,11 +26,14 @@ gsub_file_content("../package.json", /"eslint-plugin-jest": "[^"]*",/, "")
 gsub_file_content("../package.json", /"globals": "[^"]*",/, "")
 gsub_file_content("../package.json", /"knip": "[^"]*",/, "")
 gsub_file_content("../package.json", /"publint": "[^"]*",/, "")
-gsub_file_content("../package.json", /"typescript-eslint": "[^"]*",/, "")
+gsub_file_content("../package.json", /"typescript-eslint": "[^"]*",?/, "")
 gsub_file_content("../package.json", %r{"@arethetypeswrong/cli": "[^"]*",}, "")
 gsub_file_content("../package.json", %r{"@eslint/compat": "[^"]*",}, "")
 gsub_file_content("../package.json", %r{"@testing-library/dom": "[^"]*",}, "")
 gsub_file_content("../package.json", %r{"@testing-library/react": "[^"]*",}, "")
+
+# Clean up any trailing commas before closing braces
+gsub_file_content("../package.json", /,(\s*})/, "\\1")
 
 # Switch to the oldest supported React version
 gsub_file_content("../package.json", /"react": "[^"]*",/, '"react": "16.14.0",')
@@ -40,7 +43,8 @@ gsub_file_content("../spec/dummy/package.json", /"react-dom": "[^"]*",/, '"react
 gsub_file_content(
   "../package.json",
   "jest node_package/tests",
-  'jest node_package/tests --testPathIgnorePatterns=\".*(RSC|stream|serverRenderReactComponent).*\"'
+  'jest node_package/tests --testPathIgnorePatterns=\".*(RSC|stream|' \
+  'registerServerComponent|serverRenderReactComponent|SuspenseHydration).*\"'
 )
 gsub_file_content("../tsconfig.json", "react-jsx", "react")
 gsub_file_content("../spec/dummy/babel.config.js", "runtime: 'automatic'", "runtime: 'classic'")

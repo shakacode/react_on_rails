@@ -373,8 +373,14 @@ module ReactOnRails
           # TODO: v13 just use the version if existing
           rorPro: ReactOnRails::Utils.react_on_rails_pro?
         }
+
         if ReactOnRails::Utils.react_on_rails_pro?
           result[:rorProVersion] = ReactOnRails::Utils.react_on_rails_pro_version
+
+          if ReactOnRails::Utils.rsc_support_enabled?
+            rsc_payload_url = ReactOnRailsPro.configuration.rsc_payload_generation_url_path
+            result[:rscPayloadGenerationUrlPath] = rsc_payload_url
+          end
         end
 
         if defined?(request) && request.present?
@@ -644,7 +650,8 @@ module ReactOnRails
                                                 "data-trace" => (render_options.trace ? true : nil),
                                                 "data-dom-id" => render_options.dom_id,
                                                 "data-store-dependencies" => render_options.store_dependencies&.to_json,
-                                                "data-force-load" => (render_options.force_load ? true : nil))
+                                                "data-force-load" => (render_options.force_load ? true : nil),
+                                                "data-render-request-id" => render_options.render_request_id)
 
       if render_options.force_load
         component_specification_tag.concat(
