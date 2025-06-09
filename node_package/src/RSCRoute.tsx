@@ -1,5 +1,34 @@
 import * as React from 'react';
 import { useRSC } from './RSCProvider.tsx';
+import { ServerComponentFetchError } from './ServerComponentFetchError.ts';
+
+/**
+ * Error boundary component for RSCRoute that adds server component name and props to the error
+ * So, the parent ErrorBoundary can refetch the server component
+ */
+class RSCRouteErrorBoundary extends React.Component<
+  { children: React.ReactNode; componentName: string; componentProps: unknown },
+  { error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode; componentName: string; componentProps: unknown }) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  render() {
+    const { error } = this.state;
+    const { componentName, componentProps, children } = this.props;
+    if (error) {
+      throw new ServerComponentFetchError(error.message, componentName, componentProps, error);
+    }
+
+    return children;
+  }
+}
 
 /**
  * Renders a React Server Component inside a React Client Component.
@@ -28,7 +57,11 @@ export type RSCRouteProps = {
   componentProps: unknown;
 };
 
-const RSCRoute = ({ componentName, componentProps }: RSCRouteProps) => {
+const PromiseWrapper = ({ promise }: { promise: Promise<React.ReactNode> }) => {
+  return React.use(promise);
+};
+
+const RSCRoute = ({ componentName, componentProps }: RSCRouteProps): React.ReactNode => {
   const { getComponent, getCachedComponent } = useRSC();
   const cachedComponent = getCachedComponent(componentName, componentProps);
   if (cachedComponent) {
@@ -36,7 +69,11 @@ const RSCRoute = ({ componentName, componentProps }: RSCRouteProps) => {
   }
 
   const componentPromise = getComponent(componentName, componentProps);
-  return React.use(componentPromise);
+  return (
+    <RSCRouteErrorBoundary componentName={componentName} componentProps={componentProps}>
+      <PromiseWrapper promise={componentPromise} />
+    </RSCRouteErrorBoundary>
+  );
 };
 
 export default RSCRoute;

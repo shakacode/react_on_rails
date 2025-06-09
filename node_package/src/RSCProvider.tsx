@@ -7,6 +7,8 @@ type RSCContextType = {
   getCachedComponent: (componentName: string, componentProps: unknown) => React.ReactNode;
 
   getComponent: (componentName: string, componentProps: unknown) => Promise<React.ReactNode>;
+
+  refetchComponent: (componentName: string, componentProps: unknown) => Promise<React.ReactNode>;
 };
 
 const RSCContext = React.createContext<RSCContextType | undefined>(undefined);
@@ -59,7 +61,20 @@ export const createRSCProvider = ({
     return promise;
   };
 
-  const contextValue = { getCachedComponent, getComponent };
+  const refetchComponent = (componentName: string, componentProps: unknown) => {
+    const key = createRSCPayloadKey(componentName, componentProps, railsContext);
+    cachedComponents[key] = undefined;
+    const promise = getServerComponent({
+      componentName,
+      componentProps,
+      railsContext,
+      enforceRefetch: true,
+    });
+    fetchRSCPromises[key] = promise;
+    return promise;
+  };
+
+  const contextValue = { getCachedComponent, getComponent, refetchComponent };
 
   return ({ children }: { children: React.ReactNode }) => {
     return <RSCContext.Provider value={contextValue}>{children}</RSCContext.Provider>;

@@ -14,6 +14,7 @@ type ClientGetReactServerComponentProps = {
   componentName: string;
   componentProps: unknown;
   railsContext: RailsContext;
+  enforceRefetch?: boolean;
 };
 
 const createFromFetch = async (fetchPromise: Promise<Response>) => {
@@ -116,6 +117,7 @@ const createFromPreloadedPayloads = (payloads: string[]) => {
  * @param componentName - Name of the server component to render
  * @param componentProps - Props to pass to the server component
  * @param railsContext - Context for the current request
+ * @param enforceRefetch - Whether to enforce a refetch of the component
  * @returns A Promise resolving to the rendered React element
  *
  * @important This is an internal function. End users should not use this directly.
@@ -127,11 +129,12 @@ const getReactServerComponent = ({
   componentName,
   componentProps,
   railsContext,
+  enforceRefetch = false,
 }: ClientGetReactServerComponentProps) => {
   assertRailsContextWithComponentSpecificMetadata(railsContext);
   const componentKey = createRSCPayloadKey(componentName, componentProps, railsContext);
   const payloads = window.REACT_ON_RAILS_RSC_PAYLOADS?.[componentKey];
-  if (payloads) {
+  if (!enforceRefetch && payloads) {
     return createFromPreloadedPayloads(payloads);
   }
   return fetchRSC({ componentName, componentProps, railsContext });

@@ -21,7 +21,9 @@
       "react-server": "./node_package/lib/wrapServerComponentRenderer/server.rsc.js",
       "default": "./node_package/lib/wrapServerComponentRenderer/server.js"
     },
-    "./RSCRoute": "./node_package/lib/RSCRoute.js"
+    "./RSCRoute": "./node_package/lib/RSCRoute.js",
+    "./RSCProvider": "./node_package/lib/RSCProvider.js",
+    "./ServerComponentFetchError": "./node_package/lib/ServerComponentFetchError.js"
   },
   "directories": {
     "doc": "docs"
