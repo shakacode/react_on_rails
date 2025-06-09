@@ -123,9 +123,11 @@ export default function injectRSCPayload(
       rscPromise = startRSC();
     }
     rscPromise
+      .finally(() => {
+        ReactOnRails.clearRSCPayloadStreams?.(railsContext);
+      })
       .then(() => {
         resultStream.end();
-        ReactOnRails.clearRSCPayloadStreams?.(railsContext);
       })
       .catch((err: unknown) => resultStream.emit('error', err));
   });

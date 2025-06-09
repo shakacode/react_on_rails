@@ -14,8 +14,60 @@ declare global {
 }
 
 const rscPayloadStreams = new Map<string, RSCPayloadStreamInfo[]>();
-
 const rscPayloadCallbacks = new Map<string, RSCPayloadCallback[]>();
+
+/**
+ * TTL (Time To Live) tracking for RSC payload cleanup.
+ * This Map stores timeout IDs for automatic cleanup of RSC payload data.
+ * The TTL mechanism serves as a safety net to prevent memory leaks in case
+ * the normal cleanup path (via clearRSCPayloadStreams) is not called.
+ */
+const rscPayloadTTLs = new Map<string, NodeJS.Timeout>();
+
+/**
+ * Default TTL duration of 5 minutes (300000 ms).
+ * This duration should be long enough to accommodate normal request processing
+ * while preventing long-term memory leaks if cleanup is missed.
+ */
+const DEFAULT_TTL = 300000;
+
+export const clearRSCPayloadStreams = (railsContext: RailsContextWithServerComponentCapabilities) => {
+  const { renderRequestId } = railsContext.componentSpecificMetadata;
+  rscPayloadStreams.delete(renderRequestId);
+  rscPayloadCallbacks.delete(renderRequestId);
+
+  // Clear TTL if it exists
+  const ttl = rscPayloadTTLs.get(renderRequestId);
+  if (ttl) {
+    clearTimeout(ttl);
+    rscPayloadTTLs.delete(renderRequestId);
+  }
+};
+
+/**
+ * Schedules automatic cleanup of RSC payload data after a TTL period.
+ * The TTL mechanism is necessary because:
+ * - It prevents memory leaks if clearRSCPayloadStreams is not called (e.g., due to errors)
+ * - It ensures cleanup happens even if the request is abandoned or times out
+ * - It provides a safety net for edge cases where the normal cleanup path might be missed
+ *
+ * @param railsContext - The Rails context containing the renderRequestId to schedule cleanup for
+ */
+function scheduleCleanup(railsContext: RailsContextWithServerComponentCapabilities) {
+  const { renderRequestId } = railsContext.componentSpecificMetadata;
+  // Clear any existing TTL to prevent multiple cleanup timers
+  const existingTTL = rscPayloadTTLs.get(renderRequestId);
+  if (existingTTL) {
+    clearTimeout(existingTTL);
+  }
+
+  // Set new TTL that will trigger cleanup after DEFAULT_TTL milliseconds
+  const ttl = setTimeout(() => {
+    clearRSCPayloadStreams(railsContext);
+  }, DEFAULT_TTL);
+
+  rscPayloadTTLs.set(renderRequestId, ttl);
+}
 
 /**
  * Registers a callback to be executed when RSC payloads are generated.
@@ -42,6 +94,9 @@ export const onRSCPayloadGenerated = (
   } else {
     rscPayloadCallbacks.set(renderRequestId, [callback]);
   }
+
+  // This ensures we have a safety net even if the normal cleanup path fails
+  scheduleCleanup(railsContext);
 
   // Call callback for any existing streams for this context
   const existingStreams = rscPayloadStreams.get(renderRequestId);
@@ -121,10 +176,4 @@ export const getRSCPayloadStreams = (
 }[] => {
   const { renderRequestId } = railsContext.componentSpecificMetadata;
   return rscPayloadStreams.get(renderRequestId) ?? [];
-};
-
-export const clearRSCPayloadStreams = (railsContext: RailsContextWithServerComponentCapabilities) => {
-  const { renderRequestId } = railsContext.componentSpecificMetadata;
-  rscPayloadStreams.delete(renderRequestId);
-  rscPayloadCallbacks.delete(renderRequestId);
 };
