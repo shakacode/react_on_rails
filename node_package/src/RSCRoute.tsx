@@ -62,12 +62,7 @@ const PromiseWrapper = ({ promise }: { promise: Promise<React.ReactNode> }) => {
 };
 
 const RSCRoute = ({ componentName, componentProps }: RSCRouteProps): React.ReactNode => {
-  const { getComponent, getCachedComponent } = useRSC();
-  const cachedComponent = getCachedComponent(componentName, componentProps);
-  if (cachedComponent) {
-    return cachedComponent;
-  }
-
+  const { getComponent } = useRSC();
   const componentPromise = getComponent(componentName, componentProps);
   return (
     <RSCRouteErrorBoundary componentName={componentName} componentProps={componentProps}>
