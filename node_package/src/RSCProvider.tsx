@@ -4,8 +4,6 @@ import getReactServerComponent from './getReactServerComponent.client.ts';
 import { createRSCPayloadKey } from './utils.ts';
 
 type RSCContextType = {
-  getCachedComponent: (componentName: string, componentProps: unknown) => React.ReactNode;
-
   getComponent: (componentName: string, componentProps: unknown) => Promise<React.ReactNode>;
 
   refetchComponent: (componentName: string, componentProps: unknown) => Promise<React.ReactNode>;
@@ -39,13 +37,7 @@ export const createRSCProvider = ({
   railsContext: RailsContextWithComponentSpecificMetadata;
   getServerComponent: typeof getReactServerComponent;
 }) => {
-  const cachedComponents: Record<string, React.ReactNode> = {};
   const fetchRSCPromises: Record<string, Promise<React.ReactNode>> = {};
-
-  const getCachedComponent = (componentName: string, componentProps: unknown) => {
-    const key = createRSCPayloadKey(componentName, componentProps, railsContext);
-    return cachedComponents[key];
-  };
 
   const getComponent = (componentName: string, componentProps: unknown) => {
     const key = createRSCPayloadKey(componentName, componentProps, railsContext);
@@ -53,17 +45,13 @@ export const createRSCProvider = ({
       return fetchRSCPromises[key];
     }
 
-    const promise = getServerComponent({ componentName, componentProps, railsContext }).then((rsc) => {
-      cachedComponents[key] = rsc;
-      return rsc;
-    });
+    const promise = getServerComponent({ componentName, componentProps, railsContext });
     fetchRSCPromises[key] = promise;
     return promise;
   };
 
   const refetchComponent = (componentName: string, componentProps: unknown) => {
     const key = createRSCPayloadKey(componentName, componentProps, railsContext);
-    cachedComponents[key] = undefined;
     const promise = getServerComponent({
       componentName,
       componentProps,
@@ -74,7 +62,7 @@ export const createRSCProvider = ({
     return promise;
   };
 
-  const contextValue = { getCachedComponent, getComponent, refetchComponent };
+  const contextValue = { getComponent, refetchComponent };
 
   return ({ children }: { children: React.ReactNode }) => {
     return <RSCContext.Provider value={contextValue}>{children}</RSCContext.Provider>;
@@ -85,8 +73,8 @@ export const createRSCProvider = ({
  * Hook to access the RSC context within client components.
  *
  * This hook provides access to:
- * - getCachedComponent: For retrieving already rendered server components
  * - getComponent: For fetching and rendering server components
+ * - refetchComponent: For refetching server components
  *
  * It must be used within a component wrapped by RSCProvider (typically done
  * automatically by wrapServerComponentRenderer).

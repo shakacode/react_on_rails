@@ -50,7 +50,7 @@ const createFromReactOnRailsNodeStream = async (
  * @returns A Promise resolving to the rendered React element
  *
  * @important This is an internal function. End users should not use this directly.
- * Instead, use the useRSC hook which provides getComponent and getCachedComponent functions
+ * Instead, use the useRSC hook which provides getComponent and refetchComponent functions
  * for fetching or retrieving cached server components. For rendering server components,
  * consider using RSCRoute component which handles the rendering logic automatically.
  */
