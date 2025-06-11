@@ -94,7 +94,7 @@ enableFetchMocks();
       pushFirstChunk();
       render();
     });
-    expect(window.fetch).toHaveBeenCalledWith('/rsc-render/TestComponent?props={}');
+    expect(window.fetch).toHaveBeenCalledWith('/rsc-render/TestComponent?props=%7B%7D');
     expect(window.fetch).toHaveBeenCalledTimes(1);
     expect(screen.getByText('StaticServerComponent')).toBeInTheDocument();
     expect(screen.getByText('Loading AsyncComponent...')).toBeInTheDocument();
@@ -149,7 +149,7 @@ enableFetchMocks();
       endStream();
     });
 
-    expect(window.fetch).toHaveBeenCalledWith('/rsc-render/TestComponent?props={}');
+    expect(window.fetch).toHaveBeenCalledWith('/rsc-render/TestComponent?props=%7B%7D');
     expect(window.fetch).toHaveBeenCalledTimes(1);
 
     expect(screen.getByText('StaticServerComponent')).toBeInTheDocument();
