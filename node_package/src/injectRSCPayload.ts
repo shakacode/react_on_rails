@@ -122,6 +122,10 @@ export default function injectRSCPayload(
     }, 0);
   });
 
+  htmlStream.on('error', (err) => {
+    resultStream.emit('error', err);
+  });
+
   htmlStream.on('end', () => {
     if (timeout) {
       clearTimeout(timeout);

@@ -481,11 +481,10 @@ export interface ReactOnRailsInternal extends ReactOnRails {
   ) => Promise<NodeJS.ReadableStream>;
 
   /**
-   /**
-    * Retrieves all React Server Component (RSC) payload streams generated for a specific rendering request.
-    * @param railsContext - The Rails context of the current rendering request.
-    * @returns An array of objects, each containing the component name and its corresponding NodeJS.ReadableStream.
-    */
+   * Retrieves all React Server Component (RSC) payload streams generated for a specific rendering request.
+   * @param railsContext - The Rails context of the current rendering request.
+   * @returns An array of objects, each containing the component name and its corresponding NodeJS.ReadableStream.
+   */
   getRSCPayloadStreams?: (railsContext: RailsContextWithServerComponentCapabilities) => {
     componentName: string;
     props: unknown;

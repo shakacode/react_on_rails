@@ -21,9 +21,14 @@ const createFromReactOnRailsNodeStream = async (
     clientRendererPromise = Promise.all([
       loadJsonFile<BundleManifest>(reactServerManifestFileName),
       loadJsonFile<BundleManifest>(reactClientManifestFileName),
-    ]).then(([reactServerManifest, reactClientManifest]) =>
-      buildClientRenderer(reactClientManifest, reactServerManifest),
-    );
+    ])
+      .then(([reactServerManifest, reactClientManifest]) =>
+        buildClientRenderer(reactClientManifest, reactServerManifest),
+      )
+      .catch((err: unknown) => {
+        clientRendererPromise = undefined;
+        throw err;
+      });
   }
 
   const { createFromNodeStream } = await clientRendererPromise;

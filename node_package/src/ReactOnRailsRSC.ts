@@ -50,9 +50,12 @@ const streamRenderRSCComponent = (
 
   const initializeAndRender = async () => {
     if (!serverRendererPromise) {
-      serverRendererPromise = loadJsonFile<BundleManifest>(reactClientManifestFileName).then(
-        (reactClientManifest) => buildServerRenderer(reactClientManifest),
-      );
+      serverRendererPromise = loadJsonFile<BundleManifest>(reactClientManifestFileName)
+        .then((reactClientManifest) => buildServerRenderer(reactClientManifest))
+        .catch((err: unknown) => {
+          serverRendererPromise = undefined;
+          throw err;
+        });
     }
 
     const { renderToPipeableStream } = await serverRendererPromise;
