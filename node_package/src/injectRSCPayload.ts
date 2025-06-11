@@ -65,6 +65,14 @@ export default function injectRSCPayload(
     try {
       const rscPromises: Promise<void>[] = [];
 
+      if (!ReactOnRails.onRSCPayloadGenerated) {
+        // This should never occur in normal operation and indicates a bug in react_on_rails that needs to be fixed.
+        // While not fatal, missing RSC payload injection will degrade performance by forcing
+        console.error(
+          'ReactOnRails Error: ReactOnRails.onRSCPayloadGenerated is not defined. RSC payloads cannot be injected.',
+        );
+      }
+
       ReactOnRails.onRSCPayloadGenerated?.(railsContext, (streamInfo) => {
         const { stream, props, componentName } = streamInfo;
         const cacheKey = createRSCPayloadKey(componentName, props, railsContext);
@@ -123,11 +131,16 @@ export default function injectRSCPayload(
       rscPromise = startRSC();
     }
     rscPromise
-      .finally(() => {
-        ReactOnRails.clearRSCPayloadStreams?.(railsContext);
-      })
       .then(() => {
         resultStream.end();
+      })
+      .finally(() => {
+        if (!ReactOnRails.clearRSCPayloadStreams) {
+          console.error('ReactOnRails Error: clearRSCPayloadStreams is not a function');
+          return;
+        }
+
+        ReactOnRails.clearRSCPayloadStreams(railsContext);
       })
       .catch((err: unknown) => resultStream.emit('error', err));
   });

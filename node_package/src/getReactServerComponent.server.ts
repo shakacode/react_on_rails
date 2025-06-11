@@ -10,22 +10,23 @@ type GetReactServerComponentOnServerProps = {
   railsContext: RailsContext;
 };
 
-let clientRenderer: ReturnType<typeof buildClientRenderer> | undefined;
+let clientRendererPromise: Promise<ReturnType<typeof buildClientRenderer>> | undefined;
 
 const createFromReactOnRailsNodeStream = async (
   stream: NodeJS.ReadableStream,
   reactServerManifestFileName: string,
   reactClientManifestFileName: string,
 ) => {
-  if (!clientRenderer) {
-    const [reactServerManifest, reactClientManifest] = await Promise.all([
+  if (!clientRendererPromise) {
+    clientRendererPromise = Promise.all([
       loadJsonFile<BundleManifest>(reactServerManifestFileName),
       loadJsonFile<BundleManifest>(reactClientManifestFileName),
-    ]);
-    clientRenderer = buildClientRenderer(reactClientManifest, reactServerManifest);
+    ]).then(([reactServerManifest, reactClientManifest]) =>
+      buildClientRenderer(reactClientManifest, reactServerManifest),
+    );
   }
 
-  const { createFromNodeStream } = clientRenderer;
+  const { createFromNodeStream } = await clientRendererPromise;
   const transformedStream = transformRSCStream(stream);
   return createFromNodeStream<React.ReactNode>(transformedStream);
 };

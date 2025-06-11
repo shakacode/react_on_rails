@@ -1,4 +1,4 @@
-import { PassThrough } from 'stream';
+import { PassThrough, Readable } from 'stream';
 import {
   RailsContextWithServerComponentCapabilities,
   RSCPayloadStreamInfo,
@@ -33,6 +33,15 @@ const DEFAULT_TTL = 300000;
 
 export const clearRSCPayloadStreams = (railsContext: RailsContextWithServerComponentCapabilities) => {
   const { renderRequestId } = railsContext.componentSpecificMetadata;
+  // Close any active streams before clearing
+  const streams = rscPayloadStreams.get(renderRequestId);
+  if (streams) {
+    streams.forEach(({ stream }) => {
+      if (typeof (stream as Readable).destroy === 'function') {
+        (stream as Readable).destroy();
+      }
+    });
+  }
   rscPayloadStreams.delete(renderRequestId);
   rscPayloadCallbacks.delete(renderRequestId);
 

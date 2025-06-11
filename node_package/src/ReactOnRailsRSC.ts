@@ -19,7 +19,7 @@ import {
 } from './streamServerRenderedReactComponent.ts';
 import loadJsonFile from './loadJsonFile.ts';
 
-let serverRenderer: ReturnType<typeof buildServerRenderer> | undefined;
+let serverRendererPromise: Promise<ReturnType<typeof buildServerRenderer>> | undefined;
 
 const streamRenderRSCComponent = (
   reactRenderingResult: StreamableComponentResult,
@@ -49,12 +49,13 @@ const streamRenderRSCComponent = (
   };
 
   const initializeAndRender = async () => {
-    if (!serverRenderer) {
-      const reactClientManifest = await loadJsonFile<BundleManifest>(reactClientManifestFileName);
-      serverRenderer = buildServerRenderer(reactClientManifest);
+    if (!serverRendererPromise) {
+      serverRendererPromise = loadJsonFile<BundleManifest>(reactClientManifestFileName).then(
+        (reactClientManifest) => buildServerRenderer(reactClientManifest),
+      );
     }
 
-    const { renderToPipeableStream } = serverRenderer;
+    const { renderToPipeableStream } = await serverRendererPromise;
     const rscStream = renderToPipeableStream(await reactRenderingResult, {
       onError: (err) => {
         const error = convertToError(err);

@@ -46,7 +46,8 @@ const fetchRSC = ({ componentName, componentProps, railsContext }: ClientGetReac
   const propsString = JSON.stringify(componentProps);
   const { rscPayloadGenerationUrlPath } = railsContext;
   const strippedUrlPath = rscPayloadGenerationUrlPath?.replace(/^\/|\/$/g, '');
-  return createFromFetch(fetch(`/${strippedUrlPath}/${componentName}?props=${propsString}`));
+  const encodedParams = new URLSearchParams({ props: propsString }).toString();
+  return createFromFetch(fetch(`/${strippedUrlPath}/${componentName}?${encodedParams}`));
 };
 
 const createRSCStreamFromArray = (payloads: string[]) => {

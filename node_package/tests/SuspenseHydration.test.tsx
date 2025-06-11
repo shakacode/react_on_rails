@@ -196,7 +196,6 @@ async function renderAndHydrate() {
     await act(async () => {
       const secondChunk = await writeSecondChunk();
       expect(secondChunk).toContain('script');
-      console.log(secondChunk);
     });
     await waitFor(() => {
       expect(screen.queryByText('Loading...')).not.toBeInTheDocument();

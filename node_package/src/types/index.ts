@@ -57,7 +57,7 @@ export type RailsContext = {
       // The react-on-rails package uses 'unknown' for these parameters to avoid direct dependency.
       // This ensures that if the communication protocol between the node renderer and the Rails server changes,
       // we don't need to update this type or introduce a breaking change.
-      serverSideRSCPayloadParameters: unknown;
+      serverSideRSCPayloadParameters?: unknown;
       reactClientManifestFileName?: string;
       reactServerClientManifestFileName?: string;
     }
