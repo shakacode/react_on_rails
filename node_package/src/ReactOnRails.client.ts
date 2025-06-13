@@ -188,6 +188,14 @@ globalThis.ReactOnRails = {
   resetOptions(): void {
     this.options = { ...DEFAULT_OPTIONS };
   },
+
+  isRSCBundle: false,
+
+  addPostSSRHook(): void {
+    throw new Error(
+      'addPostSSRHook is not available in "react-on-rails/client". Import "react-on-rails" server-side.',
+    );
+  },
 };
 
 globalThis.ReactOnRails.resetOptions();

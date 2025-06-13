@@ -59,8 +59,10 @@ Message: ${e.message}
 
 ${e.stack}`;
 
-    const reactElement = React.createElement('pre', null, msg);
+    // In RSC (React Server Components) bundles, renderToString is not available.
+    // Therefore, we return the raw error message as a string instead of converting it to HTML.
     if (typeof renderToString === 'function') {
+      const reactElement = React.createElement('pre', null, msg);
       return renderToString(reactElement);
     }
     return msg;

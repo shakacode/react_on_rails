@@ -42,6 +42,7 @@ const config = tsEslint.config([
     '**/node_modules/',
     // fixtures
     '**/fixtures/',
+    '**/.yalc/**/*',
   ]),
   {
     files: ['**/*.[jt]s', '**/*.[jt]sx', '**/*.[cm][jt]s'],
@@ -71,7 +72,7 @@ const config = tsEslint.config([
         alias: [['Assets', './spec/dummy/client/app/assets']],
 
         node: {
-          extensions: ['.js', '.jsx', '.ts', '.d.ts'],
+          extensions: ['.js', '.jsx', '.ts', '.tsx', '.d.ts'],
         },
       },
     },
@@ -96,6 +97,7 @@ const config = tsEslint.config([
           js: 'never',
           jsx: 'never',
           ts: 'never',
+          tsx: 'never',
         },
       ],
 
@@ -128,6 +130,12 @@ const config = tsEslint.config([
       'react/jsx-props-no-spreading': 'off',
       'react/static-property-placement': 'off',
       'jsx-a11y/anchor-is-valid': 'off',
+      'react/jsx-filename-extension': [
+        'error',
+        {
+          extensions: ['.jsx', '.tsx'],
+        },
+      ],
     },
   },
   {
@@ -153,7 +161,7 @@ const config = tsEslint.config([
     languageOptions: {
       parserOptions: {
         projectService: {
-          allowDefaultProject: ['eslint.config.ts', 'knip.ts', 'node_package/tests/*.test.ts'],
+          allowDefaultProject: ['eslint.config.ts', 'knip.ts', 'node_package/tests/*.test.{ts,tsx}'],
           // Needed because `import * as ... from` instead of `import ... from` doesn't work in this file
           // for some imports.
           defaultProject: 'tsconfig.eslint.json',
