@@ -12,7 +12,18 @@
     },
     "./client": "./node_package/lib/ReactOnRails.client.js",
     "./registerServerComponent/client": "./node_package/lib/registerServerComponent/client.js",
-    "./registerServerComponent/server": "./node_package/lib/registerServerComponent/server.js"
+    "./registerServerComponent/server": {
+      "react-server": "./node_package/lib/registerServerComponent/server.rsc.js",
+      "default": "./node_package/lib/registerServerComponent/server.js"
+    },
+    "./wrapServerComponentRenderer/client": "./node_package/lib/wrapServerComponentRenderer/client.js",
+    "./wrapServerComponentRenderer/server": {
+      "react-server": "./node_package/lib/wrapServerComponentRenderer/server.rsc.js",
+      "default": "./node_package/lib/wrapServerComponentRenderer/server.js"
+    },
+    "./RSCRoute": "./node_package/lib/RSCRoute.js",
+    "./RSCProvider": "./node_package/lib/RSCProvider.js",
+    "./ServerComponentFetchError": "./node_package/lib/ServerComponentFetchError.js"
   },
   "directories": {
     "doc": "docs"
@@ -44,7 +55,6 @@
     "eslint-plugin-prettier": "^5.2.3",
     "eslint-plugin-react": "^7.37.4",
     "eslint-plugin-react-hooks": "^5.2.0",
-    "typescript-eslint": "^8.29.1",
     "globals": "^16.0.0",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
@@ -57,15 +67,16 @@
     "publint": "^0.3.8",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-on-rails-rsc": "19.0.0",
+    "react-on-rails-rsc": "19.0.2",
     "redux": "^4.2.1",
     "ts-jest": "^29.2.5",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.29.1"
   },
   "peerDependencies": {
     "react": ">= 16",
     "react-dom": ">= 16",
-    "react-on-rails-rsc": "19.0.0"
+    "react-on-rails-rsc": "19.0.2"
   },
   "files": [
     "node_package/lib"

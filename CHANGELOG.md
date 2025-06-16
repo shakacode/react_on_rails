@@ -23,6 +23,14 @@ After a release, please make sure to run `bundle exec rake update_changelog`. Th
 
 Changes since the last non-beta release.
 
+#### Improved
+
+- Improved RSC rendering flow by eliminating double rendering of server components and reducing the number of HTTP requests.
+- Updated communication protocol between Node Renderer and Rails to version 2.0.0 which supports the ability to upload multiple bundles at once.
+- Added `RSCRoute` component to enable seamless server-side rendering of React Server Components. This component automatically handles RSC payload injection and hydration, allowing server components to be rendered directly within client components while maintaining optimal performance.
+
+[PR 1696](https://github.com/shakacode/react_on_rails/pull/1696) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 #### Added
 
 - Configuration option `generated_component_packs_loading_strategy` to control how generated component packs are loaded. It supports `sync`, `async`, and `defer` strategies. [PR 1712](https://github.com/shakacode/react_on_rails/pull/1712) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
