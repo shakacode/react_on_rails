@@ -5222,10 +5222,10 @@ react-is@^18.0.0:
   resolved "https://registry.yarnpkg.com/react-is/-/react-is-18.2.0.tgz#199431eeaaa2e09f86427efbb4f1473edb47609b"
   integrity sha512-xWGDIW6x921xtzPkhiULtthJHoJvBbF3q26fzloPCK0hsvxtPVelvftw3zjbHWSkR2km9Z+4uxbDDK/6Zw9B8w==
 
-react-on-rails-rsc@19.0.1:
-  version "19.0.1"
-  resolved "https://registry.yarnpkg.com/react-on-rails-rsc/-/react-on-rails-rsc-19.0.1.tgz#80794fa605d3fe06ff10cada95b9035c0715f904"
-  integrity sha512-cuJSl4eDrZd9eZPx6qjAEOGs4P6wwtDtgAbHHv7+i6aabGWM4vsRVy5OmfLXX3TYmdUtvU2mNnqJTGTn8BIntw==
+react-on-rails-rsc@19.0.2:
+  version "19.0.2"
+  resolved "https://registry.yarnpkg.com/react-on-rails-rsc/-/react-on-rails-rsc-19.0.2.tgz#9b0077674b0b55a45ec0fb7d9d22f59fb45bf55f"
+  integrity sha512-0q26jcWcr6v9nfYfB4wxtAdTwEC4PCDSb/5U7TPperP4Ac9U2K7nt3uLOSVh7BX4bacX3PrpDeI1C30cIkBPog==
   dependencies:
     acorn-loose "^8.3.0"
     neo-async "^2.6.1"

@@ -67,7 +67,7 @@
     "publint": "^0.3.8",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-on-rails-rsc": "19.0.1",
+    "react-on-rails-rsc": "19.0.2",
     "redux": "^4.2.1",
     "ts-jest": "^29.2.5",
     "typescript": "^5.8.3",
@@ -76,7 +76,7 @@
   "peerDependencies": {
     "react": ">= 16",
     "react-dom": ">= 16",
-    "react-on-rails-rsc": "19.0.1"
+    "react-on-rails-rsc": "19.0.2"
   },
   "files": [
     "node_package/lib"
