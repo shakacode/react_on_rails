@@ -114,10 +114,10 @@ export default function injectRSCPayload(
     }
 
     timeout = setTimeout(() => {
-      writeHTMLChunks();
       if (!rscPromise) {
         rscPromise = startRSC();
       }
+      writeHTMLChunks();
       timeout = null;
     }, 0);
   });
@@ -130,10 +130,10 @@ export default function injectRSCPayload(
     if (timeout) {
       clearTimeout(timeout);
     }
-    writeHTMLChunks();
     if (!rscPromise) {
       rscPromise = startRSC();
     }
+    writeHTMLChunks();
     rscPromise
       .then(() => {
         resultStream.end();

@@ -91,9 +91,9 @@ describe('injectRSCPayload', () => {
     const resultStr = await collectStreamData(result);
 
     expect(resultStr).toEqual(
-      '<html><body><div>Hello, world!</div></body></html>' +
+      '<script>(self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-123"]||=[]</script>' +
+        '<html><body><div>Hello, world!</div></body></html>' +
         '<div>Next chunk</div>' +
-        '<script>(self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-123"]||=[]</script>' +
         '<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-123"]||=[]).push("{\\"test\\": \\"data\\"}")</script>' +
         '<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-123"]||=[]).push("{\\"test\\": \\"data2\\"}")</script>',
     );
@@ -111,8 +111,8 @@ describe('injectRSCPayload', () => {
     const resultStr = await collectStreamData(result);
 
     expect(resultStr).toEqual(
-      '<html><body><div>Hello, world!</div></body></html>' +
-        '<script>(self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-123"]||=[]</script>' +
+      '<script>(self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-123"]||=[]</script>' +
+        '<html><body><div>Hello, world!</div></body></html>' +
         '<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-123"]||=[]).push("{\\"test\\": \\"data\\"}")</script>' +
         '<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-123"]||=[]).push("{\\"test\\": \\"data2\\"}")</script>' +
         '<div>Next chunk</div>',
@@ -134,9 +134,9 @@ describe('injectRSCPayload', () => {
     const resultStr = await collectStreamData(result);
 
     expect(resultStr).toEqual(
-      '<html><body><div>Hello, world!</div></body></html>' +
+      '<script>(self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-123"]||=[]</script>' +
+        '<html><body><div>Hello, world!</div></body></html>' +
         '<div>Next chunk</div>' +
-        '<script>(self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-123"]||=[]</script>' +
         '<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-123"]||=[]).push("{\\"test\\": \\"data\\"}")</script>' +
         '<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-123"]||=[]).push("{\\"test\\": \\"data2\\"}")</script>' +
         '<div>Third chunk</div>',
