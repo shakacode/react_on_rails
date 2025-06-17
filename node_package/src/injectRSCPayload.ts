@@ -103,6 +103,14 @@ export default function injectRSCPayload(
   };
 
   const writeHTMLChunks = () => {
+    if (htmlBuffer.length === 0) {
+      return;
+    }
+
+    if (!rscPromise) {
+      rscPromise = startRSC();
+    }
+
     resultStream.push(Buffer.concat(htmlBuffer));
     htmlBuffer.length = 0;
   };
@@ -114,9 +122,6 @@ export default function injectRSCPayload(
     }
 
     timeout = setTimeout(() => {
-      if (!rscPromise) {
-        rscPromise = startRSC();
-      }
       writeHTMLChunks();
       timeout = null;
     }, 0);
@@ -130,10 +135,13 @@ export default function injectRSCPayload(
     if (timeout) {
       clearTimeout(timeout);
     }
-    if (!rscPromise) {
-      rscPromise = startRSC();
-    }
     writeHTMLChunks();
+
+    if (!rscPromise) {
+      resultStream.end();
+      return;
+    }
+
     rscPromise
       .then(() => {
         resultStream.end();
