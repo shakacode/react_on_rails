@@ -35,7 +35,7 @@ function createRSCPayloadChunk(chunk: string, cacheKey: string) {
  * Embeds RSC payloads into the HTML stream for optimal hydration.
  *
  * This function implements a sophisticated buffer management system that coordinates
- * three different data sources and streams them in a specific order:
+ * three different data sources and streams them in a specific order.
  *
  * BUFFER MANAGEMENT STRATEGY:
  * - Three separate buffer arrays collect data from different sources
