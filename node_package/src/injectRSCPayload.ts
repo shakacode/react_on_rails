@@ -1,4 +1,4 @@
-import { PassThrough, Transform } from 'stream';
+import { PassThrough } from 'stream';
 import { finished } from 'stream/promises';
 import { createRSCPayloadKey } from './utils.ts';
 import { RailsContextWithServerComponentCapabilities, PipeableOrReadableStream } from './types/index.ts';
@@ -19,31 +19,39 @@ function cacheKeyJSArray(cacheKey: string) {
   return `(self.REACT_ON_RAILS_RSC_PAYLOADS||={})[${JSON.stringify(cacheKey)}]||=[]`;
 }
 
-function writeScript(script: string, transform: Transform) {
-  transform.push(`<script>${escapeScript(script)}</script>`);
+function createScriptTag(script: string) {
+  return `<script>${escapeScript(script)}</script>`;
 }
 
-function initializeCacheKeyJSArray(cacheKey: string, transform: Transform) {
-  writeScript(cacheKeyJSArray(cacheKey), transform);
+function createRSCPayloadInitializationScript(cacheKey: string) {
+  return createScriptTag(cacheKeyJSArray(cacheKey));
 }
 
-function writeChunk(chunk: string, transform: Transform, cacheKey: string) {
-  writeScript(`(${cacheKeyJSArray(cacheKey)}).push(${chunk})`, transform);
+function createRSCPayloadChunk(chunk: string, cacheKey: string) {
+  return createScriptTag(`(${cacheKeyJSArray(cacheKey)}).push(${JSON.stringify(chunk)})`);
 }
 
 /**
  * Embeds RSC payloads into the HTML stream for optimal hydration.
  *
- * This function:
- * 1. Creates a result stream for the combined HTML + RSC payloads
- * 2. Listens for RSC payload generation via onRSCPayloadGenerated
- * 3. Initializes global arrays for each payload BEFORE component HTML
- * 4. Writes each payload chunk as a script tag that pushes to the array
- * 5. Passes HTML through to the result stream
+ * This function implements a sophisticated buffer management system that coordinates
+ * three different data sources and streams them in a specific order.
  *
- * The timing of array initialization is critical - it must occur before the
- * component's HTML to ensure the array exists when client hydration begins.
- * This prevents unnecessary HTTP requests during hydration.
+ * BUFFER MANAGEMENT STRATEGY:
+ * - Three separate buffer arrays collect data from different sources
+ * - A scheduled flush mechanism combines and sends data in coordinated chunks
+ * - Streaming only begins after receiving the first HTML chunk
+ * - Each output chunk maintains a specific data order for proper hydration
+ *
+ * TIMING CONSTRAINTS:
+ * - RSC payload initialization must occur BEFORE component HTML
+ * - First output chunk MUST contain HTML data
+ * - Subsequent chunks can contain any combination of the three data types
+ *
+ * HYDRATION OPTIMIZATION:
+ * - RSC payloads are embedded directly in the HTML stream
+ * - Client components can access RSC data immediately without additional requests
+ * - Global arrays are initialized before component HTML to ensure availability
  *
  * @param pipeableHtmlStream - HTML stream from React's renderToPipeableStream
  * @param railsContext - Context for the current request
@@ -57,10 +65,143 @@ export default function injectRSCPayload(
   pipeableHtmlStream.pipe(htmlStream);
   const decoder = new TextDecoder();
   let rscPromise: Promise<void> | null = null;
-  const htmlBuffer: Buffer[] = [];
-  let timeout: NodeJS.Timeout | null = null;
-  const resultStream = new PassThrough();
 
+  // ========================================
+  // BUFFER ARRAYS - Three data sources
+  // ========================================
+
+  /**
+   * Buffer for RSC payload array initialization scripts.
+   * These scripts create global JavaScript arrays that will store RSC payload chunks.
+   * CRITICAL: Must be sent BEFORE the corresponding component HTML to ensure
+   * the arrays exist when client-side hydration begins.
+   */
+  const rscInitializationBuffers: Buffer[] = [];
+
+  /**
+   * Buffer for HTML chunks from the React rendering stream.
+   * Contains the actual component markup that will be displayed to users.
+   * CONSTRAINT: The first output chunk must contain HTML data to begin streaming.
+   */
+  const htmlBuffers: Buffer[] = [];
+
+  /**
+   * Buffer for RSC payload chunk scripts.
+   * These scripts push actual RSC data into the previously initialized global arrays.
+   * Can be sent after the component HTML since the arrays already exist.
+   */
+  const rscPayloadBuffers: Buffer[] = [];
+
+  // ========================================
+  // FLUSH SCHEDULING SYSTEM
+  // ========================================
+
+  let flushTimeout: NodeJS.Timeout | null = null;
+  const resultStream = new PassThrough();
+  let hasReceivedFirstHtmlChunk = false;
+
+  /**
+   * Combines all buffered data into a single chunk and sends it to the result stream.
+   *
+   * FLUSH BEHAVIOR:
+   * - Only starts streaming after receiving the first HTML chunk
+   * - Combines data in a specific order: RSC initialization → HTML → RSC payloads
+   * - Clears all buffers after flushing to prevent memory leaks
+   * - Uses efficient buffer allocation based on total size calculation
+   *
+   * OUTPUT CHUNK STRUCTURE:
+   * [RSC Array Initialization Scripts][HTML Content][RSC Payload Scripts]
+   */
+  const flush = () => {
+    // STREAMING CONSTRAINT: Don't start until we have HTML content
+    // This ensures the first chunk always contains HTML, which is required
+    // for proper page rendering and prevents empty initial chunks
+    if (!hasReceivedFirstHtmlChunk && htmlBuffers.length === 0) {
+      flushTimeout = null;
+      return;
+    }
+
+    // Calculate total buffer size for efficient memory allocation
+    const rscInitializationSize = rscInitializationBuffers.reduce((sum, buf) => sum + buf.length, 0);
+    const htmlSize = htmlBuffers.reduce((sum, buf) => sum + buf.length, 0);
+    const rscPayloadSize = rscPayloadBuffers.reduce((sum, buf) => sum + buf.length, 0);
+    const totalSize = rscInitializationSize + htmlSize + rscPayloadSize;
+
+    // Skip flush if no data is buffered
+    if (totalSize === 0) {
+      flushTimeout = null;
+      return;
+    }
+
+    // Create single buffer with exact size needed (no reallocation)
+    const combinedBuffer = Buffer.allocUnsafe(totalSize);
+    let offset = 0;
+
+    // COPY ORDER IS CRITICAL - matches hydration requirements:
+
+    // 1. RSC Payload array initialization scripts FIRST
+    // These must execute before HTML to create the global arrays
+    for (const buffer of rscInitializationBuffers) {
+      buffer.copy(combinedBuffer, offset);
+      offset += buffer.length;
+    }
+
+    // 2. HTML chunks SECOND
+    // Component markup that references the initialized arrays
+    for (const buffer of htmlBuffers) {
+      buffer.copy(combinedBuffer, offset);
+      offset += buffer.length;
+    }
+
+    // 3. RSC payload chunk scripts LAST
+    // Data pushed into the already-existing arrays
+    for (const buffer of rscPayloadBuffers) {
+      buffer.copy(combinedBuffer, offset);
+      offset += buffer.length;
+    }
+
+    // Send combined chunk to output stream
+    resultStream.push(combinedBuffer);
+
+    // Clear all buffers to free memory and prepare for next flush cycle
+    rscInitializationBuffers.length = 0;
+    htmlBuffers.length = 0;
+    rscPayloadBuffers.length = 0;
+
+    flushTimeout = null;
+  };
+
+  /**
+   * Schedules a flush operation using setTimeout to batch multiple data arrivals.
+   *
+   * SCHEDULING STRATEGY:
+   * - Uses setTimeout(flush, 0) to defer flush until the next event loop tick
+   * - Batches multiple rapid data arrivals into single output chunks
+   * - Provides optimal balance between latency and chunk efficiency
+   */
+  const scheduleFlush = () => {
+    if (flushTimeout) {
+      return;
+    }
+
+    flushTimeout = setTimeout(flush, 0);
+  };
+
+  /**
+   * Initializes RSC payload streaming and handles component registration.
+   *
+   * RSC WORKFLOW:
+   * 1. Components request RSC payloads via onRSCPayloadGenerated callback
+   * 2. For each component, we immediately create a global array initialization script
+   * 3. We then stream RSC payload chunks as they become available
+   * 4. Each chunk is converted to a script that pushes data to the global array
+   *
+   * TIMING GUARANTEE:
+   * - Array initialization scripts are buffered immediately when requested
+   * - HTML rendering proceeds independently
+   * - When HTML flushes, initialization scripts are sent first
+   * - This ensures arrays exist before component hydration begins
+   */
   const startRSC = async () => {
     try {
       const rscPromises: Promise<void>[] = [];
@@ -77,67 +218,93 @@ export default function injectRSCPayload(
         const { stream, props, componentName } = streamInfo;
         const cacheKey = createRSCPayloadKey(componentName, props, railsContext);
 
-        // When a component requests an RSC payload, we initialize a global array to store it.
-        // This array is injected into the HTML before the component's HTML markup.
-        // From our tests in SuspenseHydration.test.tsx, we know that client-side components
-        // only hydrate after their HTML is present in the page. This timing ensures that
-        // the RSC payload array is available before hydration begins.
-        // As a result, the component can access its RSC payload directly from the page
-        // instead of making a separate network request.
-        // The client-side RSCProvider actively monitors the array for new chunks, processing them as they arrive and forwarding them to the RSC payload stream, regardless of whether the array is initially empty.
-        initializeCacheKeyJSArray(cacheKey, resultStream);
+        // CRITICAL TIMING: Initialize global array IMMEDIATELY when component requests RSC
+        // This ensures the array exists before the component's HTML is rendered and sent.
+        // Client-side hydration depends on this array being present in the page.
+        //
+        // The initialization script creates: (self.REACT_ON_RAILS_RSC_PAYLOADS||={})[cacheKey]||=[]
+        // This creates a global array that the client-side RSCProvider monitors for new chunks.
+        const initializationScript = createRSCPayloadInitializationScript(cacheKey);
+        rscInitializationBuffers.push(Buffer.from(initializationScript));
+
+        // Process RSC payload stream asynchronously
         rscPromises.push(
           (async () => {
             for await (const chunk of stream ?? []) {
               const decodedChunk = typeof chunk === 'string' ? chunk : decoder.decode(chunk);
-              writeChunk(JSON.stringify(decodedChunk), resultStream, cacheKey);
+              const payloadScript = createRSCPayloadChunk(decodedChunk, cacheKey);
+              rscPayloadBuffers.push(Buffer.from(payloadScript));
+              scheduleFlush();
             }
           })(),
         );
       });
 
+      // Wait for HTML stream to complete, then wait for all RSC promises
       await finished(htmlStream).then(() => Promise.all(rscPromises));
     } catch (err) {
       resultStream.emit('error', err);
     }
   };
 
-  const writeHTMLChunks = () => {
-    resultStream.push(Buffer.concat(htmlBuffer));
-    htmlBuffer.length = 0;
-  };
+  // ========================================
+  // EVENT HANDLERS - Coordinate the three data sources
+  // ========================================
 
+  /**
+   * HTML data handler - receives chunks from React's rendering stream.
+   *
+   * RESPONSIBILITIES:
+   * - Buffer HTML chunks for coordinated flushing
+   * - Track when first HTML chunk arrives (enables streaming)
+   * - Initialize RSC processing on first HTML data
+   * - Schedule flush to send combined data
+   */
   htmlStream.on('data', (chunk: Buffer) => {
-    htmlBuffer.push(chunk);
-    if (timeout) {
-      return;
+    htmlBuffers.push(chunk);
+    hasReceivedFirstHtmlChunk = true;
+
+    if (!rscPromise) {
+      rscPromise = startRSC();
     }
 
-    timeout = setTimeout(() => {
-      if (!rscPromise) {
-        rscPromise = startRSC();
-      }
-      writeHTMLChunks();
-      timeout = null;
-    }, 0);
+    scheduleFlush();
   });
 
+  /**
+   * Error propagation from HTML stream to result stream.
+   */
   htmlStream.on('error', (err) => {
     resultStream.emit('error', err);
   });
 
+  /**
+   * HTML stream completion handler.
+   *
+   * CLEANUP RESPONSIBILITIES:
+   * - Cancel any pending flush timeout
+   * - Perform final flush to send remaining buffered data
+   * - Wait for RSC processing to complete
+   * - Clean up RSC payload streams
+   * - Close result stream
+   */
   htmlStream.on('end', () => {
-    if (timeout) {
-      clearTimeout(timeout);
-    }
+    const cleanup = () => {
+      if (flushTimeout) {
+        clearTimeout(flushTimeout);
+      }
+
+      flush();
+      resultStream.end();
+    };
+
     if (!rscPromise) {
-      rscPromise = startRSC();
+      cleanup();
+      return;
     }
-    writeHTMLChunks();
+
     rscPromise
-      .then(() => {
-        resultStream.end();
-      })
+      .then(cleanup)
       .finally(() => {
         if (!ReactOnRails.clearRSCPayloadStreams) {
           console.error('ReactOnRails Error: clearRSCPayloadStreams is not a function');
