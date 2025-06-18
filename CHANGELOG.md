@@ -23,6 +23,14 @@ After a release, please make sure to run `bundle exec rake update_changelog`. Th
 
 Changes since the last non-beta release.
 
+### [15.0.0-rc.0] - 2025-06-18
+
+#### Improved
+
+- Ensured that the RSC payload is injected after the component's HTML markup to improve the performance of the RSC payload injection. [PR 1738](https://github.com/shakacode/react_on_rails/pull/1738) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+### [15.0.0-rc.1] - 2025-06-16
+
 #### Improved
 
 - Improved RSC rendering flow by eliminating double rendering of server components and reducing the number of HTTP requests.
