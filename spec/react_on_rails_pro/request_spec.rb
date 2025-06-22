@@ -131,9 +131,37 @@ describe ReactOnRailsPro::Request do
       second_request_body = second_request_info[:request].body.instance_variable_get(:@body)
       second_request_form = second_request_body.instance_variable_get(:@form)
 
-      expect(second_request_form).to have_key("bundle")
-      expect(second_request_form["bundle"][:body]).to be_a(FakeFS::Pathname)
-      expect(second_request_form["bundle"][:body].to_s).to eq(server_bundle_path)
+      expect(second_request_form).to have_key("bundle_server_bundle.js")
+      expect(second_request_form["bundle_server_bundle.js"][:body]).to be_a(FakeFS::Pathname)
+      expect(second_request_form["bundle_server_bundle.js"][:body].to_s).to eq(server_bundle_path)
+    end
+
+    it "raises duplicate bundle upload error when server asks for bundle twice" do
+      first_request_info = mock_streaming_response(render_full_url, ReactOnRailsPro::STATUS_SEND_BUNDLE) do |yielder|
+        yielder.call("Bundle not found\n")
+      end
+      second_request_info = mock_streaming_response(render_full_url, ReactOnRailsPro::STATUS_SEND_BUNDLE) do |yielder|
+        yielder.call("Bundle still not found\n")
+      end
+
+      stream = described_class.render_code_as_stream("/render", "console.log('Hello, world!');", is_rsc_payload: false)
+      expect do
+        stream.each_chunk do |chunk|
+          # Do nothing
+        end
+      end.to raise_error(ReactOnRailsPro::Error, /The bundle has already been uploaded/)
+
+      # First request should not have a bundle
+      expect(first_request_info[:request].body.to_s).to include("renderingRequest=console.log")
+      expect(first_request_info[:request].body.to_s).not_to include("bundle")
+
+      # Second request should have a bundle
+      second_request_body = second_request_info[:request].body.instance_variable_get(:@body)
+      second_request_form = second_request_body.instance_variable_get(:@form)
+
+      expect(second_request_form).to have_key("bundle_server_bundle.js")
+      expect(second_request_form["bundle_server_bundle.js"][:body]).to be_a(FakeFS::Pathname)
+      expect(second_request_form["bundle_server_bundle.js"][:body].to_s).to eq(server_bundle_path)
     end
 
     it "raises incompatible error when server returns incompatible error" do

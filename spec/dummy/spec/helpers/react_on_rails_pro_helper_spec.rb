@@ -25,6 +25,7 @@ describe ReactOnRailsProHelper, type: :helper do
     allow(self).to receive(:request) {
       RequestDetails.new("http://foobar.com/development", { "HTTP_ACCEPT_LANGUAGE" => "en" })
     }
+    allow(ReactOnRails::ReactComponent::RenderOptions).to receive(:generate_request_id).and_return("123")
   end
 
   let(:hash) do
@@ -208,12 +209,13 @@ describe ReactOnRailsProHelper, type: :helper do
           data-trace="true"
           data-dom-id="TestingStreamableComponent-react-component-0"
           data-force-load="true"
+          data-render-request-id="123"
         >{"helloWorldData":{"name":"Mr. Server Side Rendering"}}</script>
       SCRIPT
     end
     let(:rails_context_tag) do
       <<-SCRIPT.strip_heredoc
-        <script type="application/json" id="js-react-on-rails-context">{"componentRegistryTimeout":5000,"railsEnv":"test","inMailer":false,"i18nLocale":"en","i18nDefaultLocale":"en","rorVersion":"#{ReactOnRails::VERSION}","rorPro":true,"rorProVersion":"#{ReactOnRailsPro::VERSION}","href":"http://foobar.com/development","location":"/development","scheme":"http","host":"foobar.com","port":null,"pathname":"/development","search":null,"httpAcceptLanguage":"en","somethingUseful":null,"serverSide":false}</script>
+        <script type="application/json" id="js-react-on-rails-context">{"componentRegistryTimeout":5000,"railsEnv":"test","inMailer":false,"i18nLocale":"en","i18nDefaultLocale":"en","rorVersion":"#{ReactOnRails::VERSION}","rorPro":true,"rorProVersion":"#{ReactOnRailsPro::VERSION}","rscPayloadGenerationUrlPath":"rsc_payload/","href":"http://foobar.com/development","location":"/development","scheme":"http","host":"foobar.com","port":null,"pathname":"/development","search":null,"httpAcceptLanguage":"en","somethingUseful":null,"serverSide":false}</script>
       SCRIPT
     end
     let(:react_component_div_with_initial_chunk) do

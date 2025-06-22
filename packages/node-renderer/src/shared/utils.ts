@@ -1,7 +1,7 @@
 import cluster from 'cluster';
 import path from 'path';
 import { MultipartFile } from '@fastify/multipart';
-import { createWriteStream, ensureDir, move, MoveOptions } from 'fs-extra';
+import { createWriteStream, ensureDir, move, MoveOptions, copy, CopyOptions, unlink } from 'fs-extra';
 import { Readable, pipeline, PassThrough } from 'stream';
 import { promisify } from 'util';
 import * as errorReporter from './errorReporter';
@@ -98,15 +98,31 @@ export function moveUploadedAsset(
   return move(asset.savedFilePath, destinationPath, options);
 }
 
-export async function moveUploadedAssets(uploadedAssets: Asset[]): Promise<void> {
-  const { bundlePath } = getConfig();
+export function copyUploadedAsset(
+  asset: Asset,
+  destinationPath: string,
+  options: CopyOptions = {},
+): Promise<void> {
+  return copy(asset.savedFilePath, destinationPath, options);
+}
 
-  const moveMultipleAssets = uploadedAssets.map((asset) => {
-    const destinationAssetFilePath = path.join(bundlePath, asset.filename);
-    return moveUploadedAsset(asset, destinationAssetFilePath, { overwrite: true });
+export async function copyUploadedAssets(uploadedAssets: Asset[], targetDirectory: string): Promise<void> {
+  const copyMultipleAssets = uploadedAssets.map((asset) => {
+    const destinationAssetFilePath = path.join(targetDirectory, asset.filename);
+    return copyUploadedAsset(asset, destinationAssetFilePath, { overwrite: true });
   });
-  await Promise.all(moveMultipleAssets);
-  log.info(`Moved assets ${JSON.stringify(uploadedAssets.map((fileDescriptor) => fileDescriptor.filename))}`);
+  await Promise.all(copyMultipleAssets);
+  log.info(
+    `Copied assets ${JSON.stringify(uploadedAssets.map((fileDescriptor) => fileDescriptor.filename))}`,
+  );
+}
+
+export async function deleteUploadedAssets(uploadedAssets: Asset[]): Promise<void> {
+  const deleteMultipleAssets = uploadedAssets.map((asset) => unlink(asset.savedFilePath));
+  await Promise.all(deleteMultipleAssets);
+  log.info(
+    `Deleted assets ${JSON.stringify(uploadedAssets.map((fileDescriptor) => fileDescriptor.filename))}`,
+  );
 }
 
 export function isPromise<T>(value: T | Promise<T>): value is Promise<T> {
@@ -137,3 +153,18 @@ export const delay = (milliseconds: number) =>
   new Promise((resolve) => {
     setTimeout(resolve, milliseconds);
   });
+
+export function getBundleDirectory(bundleTimestamp: string | number) {
+  const { bundlePath } = getConfig();
+  return path.join(bundlePath, `${bundleTimestamp}`);
+}
+
+export function getRequestBundleFilePath(bundleTimestamp: string | number) {
+  const bundleDirectory = getBundleDirectory(bundleTimestamp);
+  return path.join(bundleDirectory, `${bundleTimestamp}.js`);
+}
+
+export function getAssetPath(bundleTimestamp: string | number, filename: string) {
+  const bundleDirectory = getBundleDirectory(bundleTimestamp);
+  return path.join(bundleDirectory, filename);
+}

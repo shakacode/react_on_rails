@@ -6,10 +6,12 @@ import worker, { disableHttp2 } from '../src/worker';
 import packageJson from '../../../package.json';
 import {
   BUNDLE_TIMESTAMP,
+  SECONDARY_BUNDLE_TIMESTAMP,
   createVmBundle,
   resetForTest,
   vmBundlePath,
   getFixtureBundle,
+  getFixtureSecondaryBundle,
   getFixtureAsset,
   getOtherFixtureAsset,
   createAsset,
@@ -59,8 +61,38 @@ describe('worker', () => {
     expect(res.headers['cache-control']).toBe('public, max-age=31536000');
     expect(res.payload).toBe('{"html":"Dummy Object"}');
     expect(fs.existsSync(vmBundlePath(testName))).toBe(true);
-    expect(fs.existsSync(assetPath(testName))).toBe(true);
-    expect(fs.existsSync(assetPathOther(testName))).toBe(true);
+    expect(fs.existsSync(assetPath(testName, String(BUNDLE_TIMESTAMP)))).toBe(true);
+    expect(fs.existsSync(assetPathOther(testName, String(BUNDLE_TIMESTAMP)))).toBe(true);
+  });
+
+  test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest', async () => {
+    const app = worker({
+      bundlePath: bundlePathForTest(),
+    });
+
+    const form = formAutoContent({
+      gemVersion,
+      protocolVersion,
+      renderingRequest: 'ReactOnRails.dummy',
+      bundle: createReadStream(getFixtureBundle()),
+      [`bundle_${SECONDARY_BUNDLE_TIMESTAMP}`]: createReadStream(getFixtureSecondaryBundle()),
+      asset1: createReadStream(getFixtureAsset()),
+      asset2: createReadStream(getOtherFixtureAsset()),
+    });
+    const res = await app
+      .inject()
+      .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+      .payload(form.payload)
+      .headers(form.headers)
+      .end();
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['cache-control']).toBe('public, max-age=31536000');
+    expect(res.payload).toBe('{"html":"Dummy Object"}');
+    expect(fs.existsSync(vmBundlePath(testName))).toBe(true);
+    expect(fs.existsSync(assetPath(testName, String(BUNDLE_TIMESTAMP)))).toBe(true);
+    expect(fs.existsSync(assetPathOther(testName, String(BUNDLE_TIMESTAMP)))).toBe(true);
+    expect(fs.existsSync(assetPath(testName, String(SECONDARY_BUNDLE_TIMESTAMP)))).toBe(true);
+    expect(fs.existsSync(assetPathOther(testName, String(SECONDARY_BUNDLE_TIMESTAMP)))).toBe(true);
   });
 
   test(
@@ -168,7 +200,59 @@ describe('worker', () => {
   );
 
   test('post /asset-exists when asset exists', async () => {
-    await createAsset(testName);
+    const bundleHash = 'some-bundle-hash';
+    await createAsset(testName, bundleHash);
+
+    const app = worker({
+      bundlePath: bundlePathForTest(),
+      password: 'my_password',
+    });
+
+    const query = querystring.stringify({ filename: 'loadable-stats.json' });
+
+    const res = await app
+      .inject()
+      .post(`/asset-exists?${query}`)
+      .payload({
+        password: 'my_password',
+        targetBundles: [bundleHash],
+      })
+      .end();
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      exists: true,
+      results: [{ bundleHash, exists: true }],
+    });
+  });
+
+  test('post /asset-exists when asset not exists', async () => {
+    const bundleHash = 'some-bundle-hash';
+    await createAsset(testName, bundleHash);
+
+    const app = worker({
+      bundlePath: bundlePathForTest(),
+      password: 'my_password',
+    });
+
+    const query = querystring.stringify({ filename: 'foobar.json' });
+
+    const res = await app
+      .inject()
+      .post(`/asset-exists?${query}`)
+      .payload({
+        password: 'my_password',
+        targetBundles: [bundleHash],
+      })
+      .end();
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      exists: false,
+      results: [{ bundleHash, exists: false }],
+    });
+  });
+
+  test('post /asset-exists requires targetBundles (protocol version 2.0.0)', async () => {
+    await createAsset(testName, String(BUNDLE_TIMESTAMP));
     const app = worker({
       bundlePath: bundlePathForTest(),
       password: 'my_password',
@@ -183,31 +267,14 @@ describe('worker', () => {
         password: 'my_password',
       })
       .end();
-    expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ exists: true });
-  });
+    expect(res.statusCode).toBe(400);
 
-  test('post /asset-exists when asset not exists', async () => {
-    await createAsset(testName);
-    const app = worker({
-      bundlePath: bundlePathForTest(),
-      password: 'my_password',
-    });
-
-    const query = querystring.stringify({ filename: 'foobar.json' });
-
-    const res = await app
-      .inject()
-      .post(`/asset-exists?${query}`)
-      .payload({
-        password: 'my_password',
-      })
-      .end();
-    expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ exists: false });
+    expect(res.payload).toContain('No targetBundles provided');
   });
 
   test('post /upload-assets', async () => {
+    const bundleHash = 'some-bundle-hash';
+
     const app = worker({
       bundlePath: bundlePathForTest(),
       password: 'my_password',
@@ -217,12 +284,39 @@ describe('worker', () => {
       gemVersion,
       protocolVersion,
       password: 'my_password',
+      targetBundles: [bundleHash],
       asset1: createReadStream(getFixtureAsset()),
       asset2: createReadStream(getOtherFixtureAsset()),
     });
     const res = await app.inject().post(`/upload-assets`).payload(form.payload).headers(form.headers).end();
     expect(res.statusCode).toBe(200);
-    expect(fs.existsSync(assetPath(testName))).toBe(true);
-    expect(fs.existsSync(assetPathOther(testName))).toBe(true);
+    expect(fs.existsSync(assetPath(testName, bundleHash))).toBe(true);
+    expect(fs.existsSync(assetPathOther(testName, bundleHash))).toBe(true);
+  });
+
+  test('post /upload-assets with multiple bundles and assets', async () => {
+    const bundleHash = 'some-bundle-hash';
+    const bundleHashOther = 'some-other-bundle-hash';
+
+    const app = worker({
+      bundlePath: bundlePathForTest(),
+      password: 'my_password',
+    });
+
+    const form = formAutoContent({
+      gemVersion,
+      protocolVersion,
+      password: 'my_password',
+      targetBundles: [bundleHash, bundleHashOther],
+      asset1: createReadStream(getFixtureAsset()),
+      asset2: createReadStream(getOtherFixtureAsset()),
+    });
+
+    const res = await app.inject().post(`/upload-assets`).payload(form.payload).headers(form.headers).end();
+    expect(res.statusCode).toBe(200);
+    expect(fs.existsSync(assetPath(testName, bundleHash))).toBe(true);
+    expect(fs.existsSync(assetPathOther(testName, bundleHash))).toBe(true);
+    expect(fs.existsSync(assetPath(testName, bundleHashOther))).toBe(true);
+    expect(fs.existsSync(assetPathOther(testName, bundleHashOther))).toBe(true);
   });
 });

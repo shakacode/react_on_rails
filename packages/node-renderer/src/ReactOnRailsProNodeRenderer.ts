@@ -1,6 +1,6 @@
 import cluster from 'cluster';
 import { version as fastifyVersion } from 'fastify/package.json';
-import { Config } from './shared/configBuilder';
+import { Config, buildConfig } from './shared/configBuilder';
 import log from './shared/log';
 import { majorVersion } from './shared/utils';
 
@@ -26,13 +26,21 @@ and for "@fastify/..." dependencies in your package.json. Consider removing them
     );
   }
 
+  const { workersCount } = buildConfig(config);
   /* eslint-disable global-require,@typescript-eslint/no-require-imports --
    * Using normal `import` fails before the check above.
    */
-  if (cluster.isPrimary) {
-    (require('./master') as typeof import('./master'))(config);
+  const isSingleProcessMode = workersCount === 0;
+  if (isSingleProcessMode || cluster.isWorker) {
+    if (isSingleProcessMode) {
+      log.info('Running renderer in single process mode (workersCount: 0)');
+    }
+
+    const worker = require('./worker') as typeof import('./worker');
+    await worker.default(config).ready();
   } else {
-    await (require('./worker') as typeof import('./worker')).default(config).ready();
+    const master = require('./master') as typeof import('./master');
+    master(config);
   }
   /* eslint-enable global-require,@typescript-eslint/no-require-imports */
 }

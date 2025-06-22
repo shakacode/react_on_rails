@@ -18,7 +18,7 @@ function extractLoader(rule, loaderName) {
   });
 }
 
-const configureServer = () => {
+const configureServer = (rscBundle = false) => {
   // We need to use "merge" because the clientConfigObject, EVEN after running
   // toWebpackConfig() is a mutable GLOBAL. Thus any changes, like modifying the
   // entry value will result in changing the client config!
@@ -54,7 +54,9 @@ const configureServer = () => {
     minimize: false,
   };
 
-  serverWebpackConfig.plugins.push(new RSCWebpackPlugin({ isServer: true }));
+  if (!rscBundle) {
+    serverWebpackConfig.plugins.push(new RSCWebpackPlugin({ isServer: true }));
+  }
   serverWebpackConfig.plugins.unshift(new webpack.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));
   // Custom output for the server-bundle that matches the config in
   // config/initializers/react_on_rails.rb

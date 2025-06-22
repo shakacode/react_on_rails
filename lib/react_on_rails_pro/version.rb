@@ -2,5 +2,5 @@
 
 module ReactOnRailsPro
   VERSION = "4.0.0.rc.13"
-  PROTOCOL_VERSION = "1.0.0"
+  PROTOCOL_VERSION = "2.0.0"
 end

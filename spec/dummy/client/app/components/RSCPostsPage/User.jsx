@@ -1,8 +1,7 @@
 import React from 'react';
-import fetch from 'node-fetch';
 
-const User = async ({ userId }) => {
-  const user = await (await fetch(`http://localhost:3000/api/users/${userId}`)).json();
+const User = async ({ userId, fetchUser }) => {
+  const user = await fetchUser(userId);
 
   return (
     <p>

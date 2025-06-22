@@ -5,6 +5,10 @@ import React, { useState } from 'react';
 const SimpleClientComponent = ({ content }) => {
   const [shown, setShown] = useState(true);
 
+  React.useEffect(() => {
+    console.log('SimpleClientComponent mounted');
+  }, []);
+
   return (
     <div>
       <button

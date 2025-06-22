@@ -33,7 +33,7 @@ module ReactOnRailsPro
     )
   end
 
-  class Configuration
+  class Configuration # rubocop:disable Metrics/ClassLength
     DEFAULT_RENDERER_URL = "http://localhost:3800"
     DEFAULT_RENDERER_METHOD = "ExecJS"
     DEFAULT_RENDERER_FALLBACK_EXEC_JS = true
@@ -103,6 +103,18 @@ module ReactOnRailsPro
       setup_renderer_password
       setup_assets_to_copy
       setup_execjs_profiler_if_needed
+      check_react_on_rails_support_for_rsc
+    end
+
+    def check_react_on_rails_support_for_rsc
+      return unless enable_rsc_support
+
+      return if ReactOnRails::Utils.respond_to?(:rsc_support_enabled?)
+
+      raise ReactOnRailsPro::Error, <<~MSG
+        React Server Components (RSC) support requires react_on_rails version 15.0.0 or higher.
+        Please upgrade your react_on_rails gem to enable this feature.
+      MSG
     end
 
     def setup_execjs_profiler_if_needed

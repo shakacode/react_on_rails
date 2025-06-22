@@ -284,7 +284,7 @@ GEM
       ffi (~> 1.0)
     rdoc (6.12.0)
       psych (>= 4.0.0)
-    react_on_rails (15.0.0.alpha.2)
+    react_on_rails (15.0.0.rc.1)
       addressable
       connection_pool
       execjs (~> 2.5)
@@ -462,7 +462,7 @@ DEPENDENCIES
   pry-theme
   puma (~> 6)
   rails (~> 7.1)
-  react_on_rails (= 15.0.0.alpha.2)
+  react_on_rails (= 15.0.0.rc.1)
   react_on_rails_pro!
   rspec-rails
   rspec-retry

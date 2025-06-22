@@ -1,9 +1,8 @@
 import React, { Suspense } from 'react';
-import fetch from 'node-fetch';
 import SimpleClientComponent from '../components/SimpleClientComponent.jsx';
 
-const Post = async () => {
-  const post = await (await fetch('https://jsonplaceholder.org/posts/1')).json();
+const Post = async ({ postPromise }) => {
+  const post = await postPromise;
   return (
     <div>
       <h1>{post.title}</h1>
@@ -13,9 +12,13 @@ const Post = async () => {
 };
 
 const SimpleComponent = () => {
+  const postPromise = Promise.resolve({
+    title: 'Post 1',
+    content: 'Content 1',
+  });
   return (
     <Suspense fallback={<div>Loading Post...</div>}>
-      <Post />
+      <Post postPromise={postPromise} />
     </Suspense>
   );
 };
