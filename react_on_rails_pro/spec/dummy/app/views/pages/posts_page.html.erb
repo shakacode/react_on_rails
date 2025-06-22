@@ -1,5 +1,9 @@
 <%= react_component("PostsPage",
-    props: @app_props_server_render.merge(posts: @posts),
+    props: @app_props_server_render.merge(
+      artificialDelay: params[:artificial_delay] || 0, 
+      postsCount: params[:posts_count] || 2,
+      posts: @posts
+    ),
     prerender: true,
     trace: true,
     cache: false,

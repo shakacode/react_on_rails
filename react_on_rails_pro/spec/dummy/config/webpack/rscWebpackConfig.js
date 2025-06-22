@@ -1,7 +1,7 @@
 const { default: serverWebpackConfig, extractLoader } = require('./serverWebpackConfig');
 
 const configureRsc = () => {
-  const rscConfig = serverWebpackConfig();
+  const rscConfig = serverWebpackConfig(true);
 
   // Update the entry name to be `rsc-bundle` instead of `server-bundle`
   const rscEntry = {

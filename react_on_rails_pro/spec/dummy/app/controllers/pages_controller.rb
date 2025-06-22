@@ -2,6 +2,7 @@
 
 class PagesController < ApplicationController
   include ReactOnRailsPro::RSCPayloadRenderer
+  include RscPostsPageOverRedisHelper
 
   XSS_PAYLOAD = { "<script>window.alert('xss1');</script>" => '<script>window.alert("xss2");</script>' }.freeze
   PROPS_NAME = "Mr. Server Side Rendering"
@@ -40,27 +41,54 @@ class PagesController < ApplicationController
     stream_view_containing_react_components(template: "/pages/stream_async_components_for_testing")
   end
 
-  def rsc_posts_page
-    stream_view_containing_react_components(template: "/pages/rsc_posts_page")
+  def rsc_posts_page_over_http
+    stream_view_containing_react_components(template: "/pages/rsc_posts_page_over_http")
   end
 
-  def posts_page # rubocop:disable Metrics/AbcSize
-    artificial_delay = params[:artificial_delay] || 0
-    posts = JSON.parse(HTTPX.get("http://localhost:3000/api/posts").body, symbolize_names: true)
-    # pick one post per user
-    posts = posts.group_by { |post| post[:user_id] }.map { |_, user_posts| user_posts.first }
-    posts = posts.map do |post|
-      comments = JSON.parse(HTTPX.get("http://localhost:3000/api/posts/#{post[:id]}/comments").body,
-                            symbolize_names: true)
-      comments = comments.map do |comment|
-        comment.merge(user: JSON.parse(HTTPX.get("http://localhost:3000/api/users/#{comment[:user_id]}").body,
-                                       symbolize_names: true))
-      end
-      post.merge(comments: comments)
+  def rsc_posts_page_over_redis
+    @request_id = SecureRandom.uuid
+
+    redis_thread = Thread.new do
+      redis = ::Redis.new
+      write_posts_and_comments_to_redis(redis)
     rescue StandardError => e
-      raise "Error while fetching post #{post} #{post[:id]}: #{e.message}"
+      Rails.logger.error "Error writing posts and comments to Redis: #{e.message}"
+      Rails.logger.error e.backtrace.join("\n")
+      raise e
     end
-    sleep artificial_delay.to_i / 1000 * 2
+
+    stream_view_containing_react_components(template: "/pages/rsc_posts_page_over_redis")
+
+    return if redis_thread.join(10)
+
+    Rails.logger.error "Redis thread timed out"
+    raise "Redis thread timed out"
+  end
+
+  def async_on_server_sync_on_client
+    @render_on_server = true
+    stream_view_containing_react_components(template: "/pages/async_on_server_sync_on_client")
+  end
+
+  def async_on_server_sync_on_client_client_render
+    @render_on_server = false
+    render "/pages/async_on_server_sync_on_client"
+  end
+
+  def server_router
+    stream_view_containing_react_components(template: "/pages/server_router")
+  end
+
+  def posts_page
+    posts = fetch_posts.as_json
+    posts.each do |post|
+      post_comments = fetch_post_comments(post, []).as_json
+      post_comments.each do |comment|
+        comment["user"] = fetch_comment_user(comment).as_json
+      end
+      post["comments"] = post_comments
+    end
+
     @posts = posts
     render "/pages/posts_page"
   end

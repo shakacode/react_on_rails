@@ -70,8 +70,8 @@ module ReactOnRailsPro
 
     private_class_method :new
 
-    def each_chunk
-      return enum_for(:each_chunk) unless block_given?
+    def each_chunk(&block)
+      return enum_for(:each_chunk) unless block
 
       send_bundle = false
       error_body = +""
@@ -82,27 +82,37 @@ module ReactOnRailsPro
         # Also, we check the status code inside the loop block because calling `status` outside the loop block
         # is blocking, it will wait for the response to be fully received
         # Look at the spec of `status` in `spec/react_on_rails_pro/stream_spec.rb` for more details
-        loop_response_lines(stream_response) do |chunk|
-          if stream_response.status >= 400
-            error_body << chunk
-            next
-          end
-
-          processed_chunk = chunk.strip
-          yield processed_chunk unless processed_chunk.empty?
-        end
+        process_response_chunks(stream_response, error_body, &block)
         break
       rescue HTTPX::HTTPError => e
-        response = e.response
-        case response.status
-        when ReactOnRailsPro::STATUS_SEND_BUNDLE
-          send_bundle = true
+        send_bundle = handle_http_error(e, error_body, send_bundle)
+      end
+    end
+
+    def process_response_chunks(stream_response, error_body)
+      loop_response_lines(stream_response) do |chunk|
+        if !stream_response.respond_to?(:status) || stream_response.status >= 400
+          error_body << chunk
           next
-        when ReactOnRailsPro::STATUS_INCOMPATIBLE
-          raise ReactOnRailsPro::Error, error_body
-        else
-          raise ReactOnRailsPro::Error, "Unexpected response code from renderer: #{response.status}:\n#{error_body}"
         end
+
+        processed_chunk = chunk.strip
+        yield processed_chunk unless processed_chunk.empty?
+      end
+    end
+
+    def handle_http_error(error, error_body, send_bundle)
+      response = error.response
+      case response.status
+      when ReactOnRailsPro::STATUS_SEND_BUNDLE
+        # To prevent infinite loop
+        ReactOnRailsPro::Error.raise_duplicate_bundle_upload_error if send_bundle
+
+        true
+      when ReactOnRailsPro::STATUS_INCOMPATIBLE
+        raise ReactOnRailsPro::Error, error_body
+      else
+        raise ReactOnRailsPro::Error, "Unexpected response code from renderer: #{response.status}:\n#{error_body}"
       end
     end
 

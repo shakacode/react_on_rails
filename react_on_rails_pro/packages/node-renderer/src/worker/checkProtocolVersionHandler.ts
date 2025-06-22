@@ -15,8 +15,7 @@ export = function checkProtocolVersion(req: FastifyRequest) {
         reqProtocolVersion
           ? `request protocol ${reqProtocolVersion}`
           : `MISSING with body ${JSON.stringify(req.body)}`
-      } does not
-match installed renderer protocol ${packageJson.protocolVersion} for version ${packageJson.version}.
+      } does not match installed renderer protocol ${packageJson.protocolVersion} for version ${packageJson.version}.
 Update either the renderer or the Rails server`,
     };
   }

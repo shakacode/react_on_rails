@@ -5,6 +5,7 @@
 
 import path from 'path';
 import cluster from 'cluster';
+import { mkdir } from 'fs/promises';
 import fastify from 'fastify';
 import fastifyFormbody from '@fastify/formbody';
 import fastifyMultipart from '@fastify/multipart';
@@ -15,15 +16,18 @@ import fileExistsAsync from './shared/fileExistsAsync';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from './worker/types';
 import checkProtocolVersion from './worker/checkProtocolVersionHandler';
 import authenticate from './worker/authHandler';
-import handleRenderRequest from './worker/handleRenderRequest';
+import { handleRenderRequest, type ProvidedNewBundle } from './worker/handleRenderRequest';
 import {
   errorResponseResult,
   formatExceptionMessage,
-  moveUploadedAssets,
+  copyUploadedAssets,
   ResponseResult,
   workerIdLabel,
   saveMultipartFile,
   Asset,
+  getAssetPath,
+  getBundleDirectory,
+  deleteUploadedAssets,
 } from './shared/utils';
 import * as errorReporter from './shared/errorReporter';
 import { lock, unlock } from './shared/locks';
@@ -78,6 +82,12 @@ const setResponse = async (result: ResponseResult, res: FastifyReply) => {
 
 const isAsset = (value: unknown): value is Asset => (value as { type?: string }).type === 'asset';
 
+function assertAsset(value: unknown, key: string): asserts value is Asset {
+  if (!isAsset(value)) {
+    throw new Error(`React On Rails Error: Expected an asset for key: ${key}`);
+  }
+}
+
 // Remove after this issue is resolved: https://github.com/fastify/light-my-request/issues/315
 let useHttp2 = true;
 
@@ -86,12 +96,28 @@ export const disableHttp2 = () => {
   useHttp2 = false;
 };
 
+type WithBodyArrayField<T, K extends string> = T & { [P in K | `${K}[]`]?: string | string[] };
+
+const extractBodyArrayField = <Key extends string>(
+  body: WithBodyArrayField<Record<string, unknown>, Key>,
+  key: Key,
+): string[] | undefined => {
+  const value = body[key] ?? body[`${key}[]`];
+  if (Array.isArray(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    return [value];
+  }
+  return undefined;
+};
+
 export default function run(config: Partial<Config>) {
   // Store config in app state. From now it can be loaded by any module using
   // getConfig():
   buildConfig(config);
 
-  const { bundlePath, logHttpLevel, port, fastifyServerOptions } = getConfig();
+  const { bundlePath, logHttpLevel, port, fastifyServerOptions, workersCount } = getConfig();
 
   const app = fastify({
     http2: useHttp2 as true,
@@ -174,7 +200,12 @@ export default function run(config: Partial<Config>) {
   // the digest is part of the request URL. Yes, it's not used here, but the
   // server logs might show it to distinguish different requests.
   app.post<{
-    Body: { renderingRequest: string } & Record<string, Asset>;
+    Body: WithBodyArrayField<
+      {
+        renderingRequest: string;
+      },
+      'dependencyBundleTimestamps'
+    >;
     // Can't infer from the route like Express can
     Params: { bundleTimestamp: string; renderRequestDigest: string };
   }>('/bundles/:bundleTimestamp/render/:renderRequestDigest', async (req, res) => {
@@ -195,23 +226,29 @@ export default function run(config: Partial<Config>) {
 
     const { renderingRequest } = req.body;
     const { bundleTimestamp } = req.params;
-    let providedNewBundle: Asset | undefined;
+    const providedNewBundles: ProvidedNewBundle[] = [];
     const assetsToCopy: Asset[] = [];
     Object.entries(req.body).forEach(([key, value]) => {
       if (key === 'bundle') {
-        providedNewBundle = value as Asset;
+        assertAsset(value, key);
+        providedNewBundles.push({ timestamp: bundleTimestamp, bundle: value });
+      } else if (key.startsWith('bundle_')) {
+        assertAsset(value, key);
+        providedNewBundles.push({ timestamp: key.replace('bundle_', ''), bundle: value });
       } else if (isAsset(value)) {
         assetsToCopy.push(value);
       }
     });
 
     try {
+      const dependencyBundleTimestamps = extractBodyArrayField(req.body, 'dependencyBundleTimestamps');
       await trace(async (context) => {
         try {
           const result = await handleRenderRequest({
             renderingRequest,
             bundleTimestamp,
-            providedNewBundle,
+            dependencyBundleTimestamps,
+            providedNewBundles,
             assetsToCopy,
           });
           await setResponse(result, res);
@@ -235,7 +272,7 @@ export default function run(config: Partial<Config>) {
   // There can be additional files that might be required at the runtime.
   // Since the remote renderer doesn't contain any assets, they must be uploaded manually.
   app.post<{
-    Body: Record<string, Asset>;
+    Body: WithBodyArrayField<Record<string, Asset>, 'targetBundles'>;
   }>('/upload-assets', async (req, res) => {
     if (!(await requestPrechecks(req, res))) {
       return;
@@ -243,8 +280,19 @@ export default function run(config: Partial<Config>) {
     let lockAcquired = false;
     let lockfileName: string | undefined;
     const assets: Asset[] = Object.values(req.body).filter(isAsset);
+
+    // Handle targetBundles as either a string or an array
+    const targetBundles = extractBodyArrayField(req.body, 'targetBundles');
+    if (!targetBundles || targetBundles.length === 0) {
+      const errorMsg = 'No targetBundles provided. As of protocol version 2.0.0, targetBundles is required.';
+      log.error(errorMsg);
+      await setResponse(errorResponseResult(errorMsg), res);
+      return;
+    }
+
     const assetsDescription = JSON.stringify(assets.map((asset) => asset.filename));
-    const taskDescription = `Uploading files ${assetsDescription} to ${bundlePath}`;
+    const taskDescription = `Uploading files ${assetsDescription} to bundle directories: ${targetBundles.join(', ')}`;
+
     try {
       const { lockfileName: name, wasLockAcquired, errorMessage } = await lock('transferring-assets');
       lockfileName = name;
@@ -260,7 +308,31 @@ export default function run(config: Partial<Config>) {
       } else {
         log.info(taskDescription);
         try {
-          await moveUploadedAssets(assets);
+          // Prepare all directories first
+          const directoryPromises = targetBundles.map(async (bundleTimestamp) => {
+            const bundleDirectory = getBundleDirectory(bundleTimestamp);
+
+            // Check if bundle directory exists, create if not
+            if (!(await fileExistsAsync(bundleDirectory))) {
+              log.info(`Creating bundle directory: ${bundleDirectory}`);
+              await mkdir(bundleDirectory, { recursive: true });
+            }
+            return bundleDirectory;
+          });
+
+          const bundleDirectories = await Promise.all(directoryPromises);
+
+          // Copy assets to each bundle directory
+          const assetCopyPromises = bundleDirectories.map(async (bundleDirectory) => {
+            await copyUploadedAssets(assets, bundleDirectory);
+            log.info(`Copied assets to bundle directory: ${bundleDirectory}`);
+          });
+
+          await Promise.all(assetCopyPromises);
+
+          // Delete assets from uploads directory
+          await deleteUploadedAssets(assets);
+
           await setResponse(
             {
               status: 200,
@@ -299,6 +371,7 @@ export default function run(config: Partial<Config>) {
   // Checks if file exist
   app.post<{
     Querystring: { filename: string };
+    Body: WithBodyArrayField<Record<string, unknown>, 'targetBundles'>;
   }>('/asset-exists', async (req, res) => {
     if (!(await isAuthenticated(req, res))) {
       return;
@@ -313,17 +386,35 @@ export default function run(config: Partial<Config>) {
       return;
     }
 
-    const assetPath = path.join(bundlePath, filename);
-
-    const fileExists = await fileExistsAsync(assetPath);
-
-    if (fileExists) {
-      log.info(`/asset-exists Uploaded asset DOES exist: ${assetPath}`);
-      await setResponse({ status: 200, data: { exists: true }, headers: {} }, res);
-    } else {
-      log.info(`/asset-exists Uploaded asset DOES NOT exist: ${assetPath}`);
-      await setResponse({ status: 200, data: { exists: false }, headers: {} }, res);
+    // Handle targetBundles as either a string or an array
+    const targetBundles = extractBodyArrayField(req.body, 'targetBundles');
+    if (!targetBundles || targetBundles.length === 0) {
+      const errorMsg = 'No targetBundles provided. As of protocol version 2.0.0, targetBundles is required.';
+      log.error(errorMsg);
+      await setResponse(errorResponseResult(errorMsg), res);
+      return;
     }
+
+    // Check if the asset exists in each of the target bundles
+    const results = await Promise.all(
+      targetBundles.map(async (bundleHash) => {
+        const assetPath = getAssetPath(bundleHash, filename);
+        const exists = await fileExistsAsync(assetPath);
+
+        if (exists) {
+          log.info(`/asset-exists Uploaded asset DOES exist in bundle ${bundleHash}: ${assetPath}`);
+        } else {
+          log.info(`/asset-exists Uploaded asset DOES NOT exist in bundle ${bundleHash}: ${assetPath}`);
+        }
+
+        return { bundleHash, exists };
+      }),
+    );
+
+    // Asset exists if it exists in all target bundles
+    const allExist = results.every((result) => result.exists);
+
+    await setResponse({ status: 200, data: { exists: allExist, results }, headers: {} }, res);
   });
 
   app.get('/info', (_req, res) => {
@@ -337,9 +428,10 @@ export default function run(config: Partial<Config>) {
   // will not listen:
   // we are extracting worker from cluster to avoid false TS error
   const { worker } = cluster;
-  if (cluster.isWorker && worker !== undefined) {
+  if (workersCount === 0 || cluster.isWorker) {
     app.listen({ port }, () => {
-      log.info(`Node renderer worker #${worker.id} listening on port ${port}!`);
+      const workerName = worker ? `worker #${worker.id}` : 'master (single-process)';
+      log.info(`Node renderer ${workerName} listening on port ${port}!`);
     });
   }
 

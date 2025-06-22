@@ -16,6 +16,18 @@ You can find the **package** version numbers from this repo's tags and below in 
 ## [Unreleased]
 *Add changes in master not yet tagged.*
 
+## [4.0.0-rc.14] - 2025-06-22
+
+### Improved
+- Improved RSC rendering flow by eliminating double rendering of server components and reducing the number of HTTP requests.
+- Updated communication protocol between Node Renderer and Rails to version 2.0.0 which supports the ability to upload multiple bundles at once.
+- Added the ability to communicate between different bundles on the renderer by using the `runOnOtherBundle` function which is globally available for the rendering request.
+
+[PR 515](https://github.com/shakacode/react_on_rails_pro/pull/515) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+
+## [4.0.0-rc.13] - 2025-03-07
+
 ### Added
 - 🚀 **Introducing React Server Components Support!** 🎉
   - Experience the future of React with full RSC integration

@@ -1,7 +1,7 @@
 {
   "name": "@shakacode-tools/react-on-rails-pro-node-renderer",
   "version": "4.0.0-rc.13",
-  "protocolVersion": "1.0.0",
+  "protocolVersion": "2.0.0",
   "description": "react-on-rails-pro JavaScript for react_on_rails_pro Ruby gem",
   "exports": {
     ".": {
@@ -49,6 +49,7 @@
   "devDependencies": {
     "@babel/core": "^7.26.10",
     "@babel/eslint-parser": "^7.27.0",
+    "@babel/plugin-syntax-import-attributes": "^7.27.1",
     "@babel/preset-env": "^7.26.9",
     "@babel/preset-react": "^7.26.3",
     "@babel/preset-typescript": "^7.27.0",
@@ -84,7 +85,8 @@
     "nps": "^5.9.12",
     "pino-pretty": "^13.0.0",
     "prettier": "^3.2.5",
-    "react-on-rails": "15.0.0-alpha.2",
+    "react-on-rails": "15.0.0-rc.1",
+    "redis": "^5.0.1",
     "release-it": "^17.6.0",
     "sentry-testkit": "^5.0.6",
     "touch": "^3.1.0",

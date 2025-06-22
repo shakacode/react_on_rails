@@ -1,5 +1,3 @@
-'use client';
-
 // Super simple example of the simplest possible React component
 import React, { useState } from 'react';
 // TODO: CSS modules need to be configured to work properly with React Server Components (RSC)

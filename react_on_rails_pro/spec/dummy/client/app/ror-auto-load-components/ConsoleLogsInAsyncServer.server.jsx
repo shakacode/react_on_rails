@@ -1,3 +1,5 @@
+'use client';
+
 import React from 'react';
 import { renderToString } from 'react-dom/server';
 import ConsoleLogsInAsyncServer from '../components/ConsoleLogsInAsyncServer';

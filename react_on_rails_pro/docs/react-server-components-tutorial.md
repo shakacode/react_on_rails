@@ -14,4 +14,6 @@ This tutorial will guide you through learning [React Server Components (RSC)](ht
 
 6. [React Server Components Rendering Flow](react-server-components-rendering-flow.md) - Understand the detailed rendering flow of RSC, including bundle types, current limitations, and future improvements.
 
+7. [React Server Components Inside Client Components](react-server-components-inside-client-components.md) - Learn how to render server components inside client components.
+
 Each part of the tutorial builds on the concepts from previous sections, so it's recommended to follow them in order. Let's begin with creating your first React Server Component!

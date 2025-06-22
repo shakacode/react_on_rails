@@ -1,7 +1,7 @@
 import React from 'react';
 import _ from 'lodash';
-import ToggleContainer from './ToggleContainer';
 import PreloadedComment from './PreloadedComment';
+import ToggleContainer from './ToggleContainer';
 
 const PreloadedComments = ({ post }) => {
   const postComments = post.comments;

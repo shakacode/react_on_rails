@@ -1,3 +1,5 @@
+'use client';
+
 import React from 'react';
 import logo from 'Assets/images/256egghead.png';
 import legoIcon from 'Assets/images/lego_icon.svg';

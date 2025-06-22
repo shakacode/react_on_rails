@@ -35,6 +35,7 @@ export default defineConfig([
     '**/vendor/',
     '**/dist/',
     '**/.yalc/',
+    '**/*.chunk.js',
   ]),
   {
     files: ['**/*.[jt]s', '**/*.[cm][jt]s', '**/*.[jt]sx'],

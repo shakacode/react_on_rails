@@ -15,5 +15,6 @@ module Dummy
     # -- all .rb files in that directory are automatically loaded.
 
     config.load_defaults 7.0
+    config.middleware.use Rack::Deflater
   end
 end

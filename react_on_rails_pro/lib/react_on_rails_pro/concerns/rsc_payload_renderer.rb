@@ -22,6 +22,8 @@ module ReactOnRailsPro
     private
 
     def rsc_payload_component_props
+      return {} if params[:props].blank?
+
       JSON.parse(params[:props])
     end
 

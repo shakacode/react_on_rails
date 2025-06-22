@@ -1,5 +1,5 @@
 import React, { Suspense } from 'react';
-import HelloWorldHooks from '../components/HelloWorldHooks';
+import HelloWorldHooks from '../components/HelloWorldHooksForServerComponents';
 import HydrationStatus from '../components/HydrationStatus';
 
 const AsyncComponentsBranch = ({ branchName, level }) => {
