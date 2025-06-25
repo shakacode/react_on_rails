@@ -16,6 +16,11 @@ Because we own [HiChee.com](https://hichee.com), we can leverage that code for y
 Please email Justin Gordon [justin@shakacode.com](mailto:justin@shakacode.com), the
 maintainer of React on Rails, for more information.
 
+### Pro: React Server Components
+See the [announcement here](./react-server-components.md).
+
+Yes! Big performance gains for the newest React features!
+
 ### Pro: Fragment Caching
 
 Fragment caching is a [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/) feature. Fragment caching is a **HUGE** performance booster for your apps. Use the `cached_react_component` and `cached_react_component_hash`. The API is the same as `react_component` and `react_component_hash`, but for 2 differences:
