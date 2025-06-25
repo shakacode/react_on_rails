@@ -16,8 +16,11 @@ Because we own [HiChee.com](https://hichee.com), we can leverage that code for y
 Please email Justin Gordon [justin@shakacode.com](mailto:justin@shakacode.com), the
 maintainer of React on Rails, for more information.
 
+### Pro: Docs
+See https://www.shakacode.com/react-on-rails-pro/docs/.
+
 ### Pro: React Server Components
-See the [announcement here](./react-server-components.md).
+See the [announcement here](https://www.shakacode.com/react-on-rails/docs/react-on-rails-pro/react-server-components/).
 
 Yes! Big performance gains for the newest React features!
 
