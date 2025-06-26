@@ -45,8 +45,9 @@ Adopting these features in React on Rails Pro will help you deliver faster, lean
 
 **Ready to get started?**
 
-1. Update to the latest React on Rails Pro version
-2. Follow our [RSC & SSR Streaming migration guide](https://github.com/shakacode/react_on_rails_pro/blob/abanoubghadban/pro465/use-rsc-payload-to-render-server-components-on-server/docs/react-server-components-tutorial.md)
+1. Check out the [docs for RSC with React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/docs/react-server-components/#why-rsc-with-streaming).
+2. Update to the latest React on Rails Pro version
+3. Follow our [RSC & SSR Streaming migration guide](https://www.shakacode.com/react-on-rails-pro/docs/react-server-components-tutorial.md)
 
 Let’s make your apps faster—together.
 
