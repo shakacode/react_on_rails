@@ -6,38 +6,37 @@
 
 June 24, 2025
 
-
 We're thrilled to announce a major update: [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/) now supports **React Server Components** and **Server‑Side Rendering (SSR) Streaming**. These features have driven significant performance gains in real‑world applications—here’s how they can transform yours.
 
 ## 🎯 What This Means for Your Applications
 
-* **Faster load times**
-* **Smaller JavaScript bundles**
-* **Better Core Web Vitals**
-* **Improved SEO**
-* **Smoother user interactions**
+- **Faster load times**
+- **Smaller JavaScript bundles**
+- **Better Core Web Vitals**
+- **Improved SEO**
+- **Smoother user interactions**
 
 ## 🔥 React Server Components
 
 Server Components execute on the server and stream HTML to the client—no extra JavaScript in your bundle. Real‑world results include:
 
-* **62% reduction** in client‑side bundle size on productonboarding.com when migrating to RSC [[1]]
-* **63% improvement** in Google Speed Index on the RSC version of the same site [[1]]
-* **52% smaller** JavaScript codebase and Lighthouse scores rising from \~50 to 90+ on GeekyAnts.com [[2]]
+- **62% reduction** in client‑side bundle size on productonboarding.com when migrating to RSC [[1]]
+- **63% improvement** in Google Speed Index on the RSC version of the same site [[1]]
+- **52% smaller** JavaScript codebase and Lighthouse scores rising from \~50 to 90+ on GeekyAnts.com [[2]]
 
 ## 🌊 SSR Streaming
 
 SSR Streaming sends HTML to the browser in chunks as it’s generated, enabling progressive rendering:
 
-* **30% faster** full‑page load times at Hulu by combining streaming SSR with Server Components [[3]]
-* Popular libraries like styled‑components v3.1.0 have introduced streaming SSR support as the next generation of React app rendering [[4]]
+- **30% faster** full‑page load times at Hulu by combining streaming SSR with Server Components [[3]]
+- Popular libraries like styled‑components v3.1.0 have introduced streaming SSR support as the next generation of React app rendering [[4]]
 
 ## 📊 Core Web Vitals & TTI Improvements
 
-* **60% faster** Time to Interactive on Meta’s developer portal after adopting RSC (from 3.5 s to \~1.4 s) [[5]]
-* **45% quicker** First Contentful Paint in the same migration [[5]]
-* **50% lower** server response time with Server Components [[5]]
-* **15% improvement** in Core Web Vitals and **23% reduction** in Time to First Byte at Airbnb after RSC migration [[5]]
+- **60% faster** Time to Interactive on Meta’s developer portal after adopting RSC (from 3.5 s to \~1.4 s) [[5]]
+- **45% quicker** First Contentful Paint in the same migration [[5]]
+- **50% lower** server response time with Server Components [[5]]
+- **15% improvement** in Core Web Vitals and **23% reduction** in Time to First Byte at Airbnb after RSC migration [[5]]
 
 ---
 
