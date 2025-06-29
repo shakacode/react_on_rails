@@ -78,6 +78,11 @@
     "react-dom": ">= 16",
     "react-on-rails-rsc": "19.0.2"
   },
+  "peerDependenciesMeta": {
+    "react-on-rails-rsc": {
+      "optional": true
+    }
+  },
   "files": [
     "node_package/lib"
   ],

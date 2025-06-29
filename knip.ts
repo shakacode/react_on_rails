@@ -45,6 +45,9 @@ const config: KnipConfig = {
         '@eslint/js',
         // used by Jest
         'jsdom',
+        // This is an optional peer dependency because users without RSC don't need it
+        // but Knip doesn't like such dependencies to be referenced directly in code
+        'react-on-rails-rsc',
       ],
     },
     'spec/dummy': {
