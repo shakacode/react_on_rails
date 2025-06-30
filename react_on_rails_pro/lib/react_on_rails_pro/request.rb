@@ -28,7 +28,12 @@ module ReactOnRailsPro
         end
 
         ReactOnRailsPro::StreamRequest.create do |send_bundle|
-          form = form_with_code(js_code, send_bundle)
+          if send_bundle
+            Rails.logger.info { "[ReactOnRailsPro] Sending bundle to the node renderer" }
+            upload_assets
+          end
+
+          form = form_with_code(js_code, false)
           perform_request(path, form: form, stream: true)
         end
       end
