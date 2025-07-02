@@ -6,7 +6,8 @@ module ReactOnRails
   class VersionChecker
     attr_reader :node_package_version
 
-    MAJOR_MINOR_PATCH_VERSION_REGEX = /(\d+)\.(\d+)\.(\d+)/
+    # Semver uses - to separate pre-release, but RubyGems use .
+    VERSION_PARTS_REGEX = /(\d+)\.(\d+)\.(\d+)(?:[-.]([0-9A-Za-z.-]+))?/
 
     def self.build
       new(NodePackageVersion.build)
@@ -23,13 +24,7 @@ module ReactOnRails
       return if node_package_version.raw.nil? || node_package_version.local_path_or_url?
       return log_node_semver_version_warning if node_package_version.semver_wildcard?
 
-      node_major_minor_patch = node_package_version.major_minor_patch
-      gem_major_minor_patch = gem_major_minor_patch_version
-      versions_match = node_major_minor_patch[0] == gem_major_minor_patch[0] &&
-                       node_major_minor_patch[1] == gem_major_minor_patch[1] &&
-                       node_major_minor_patch[2] == gem_major_minor_patch[2]
-
-      log_differing_versions_warning unless versions_match
+      log_differing_versions_warning unless node_package_version.parts == gem_version_parts
     end
 
     private
@@ -39,20 +34,20 @@ module ReactOnRails
          Detected: #{node_package_version.raw}
               gem: #{gem_version}
          Ensure the installed version of the gem is the same as the version of
-         your installed node package. Do not use >= or ~> in your Gemfile for react_on_rails.
-         Do not use ^ or ~ in your package.json for react-on-rails.
+         your installed Node package. Do not use >= or ~> in your Gemfile for react_on_rails.
+         Do not use ^, ~, or other non-exact versions in your package.json for react-on-rails.
          Run `yarn add react-on-rails --exact` in the directory containing folder node_modules.
       MSG
     end
 
     def log_differing_versions_warning
-      msg = "**WARNING** ReactOnRails: ReactOnRails gem and node package versions do not match\n#{common_error_msg}"
+      msg = "**WARNING** ReactOnRails: ReactOnRails gem and Node package versions do not match\n#{common_error_msg}"
       Rails.logger.warn(msg)
     end
 
     def log_node_semver_version_warning
-      msg = "**WARNING** ReactOnRails: Your node package version for react-on-rails contains a " \
-            "^ or ~\n#{common_error_msg}"
+      msg = "**WARNING** ReactOnRails: Your Node package version for react-on-rails is not an exact version\n" \
+            "#{common_error_msg}"
       Rails.logger.warn(msg)
     end
 
@@ -60,9 +55,8 @@ module ReactOnRails
       ReactOnRails::VERSION
     end
 
-    def gem_major_minor_patch_version
-      match = gem_version.match(MAJOR_MINOR_PATCH_VERSION_REGEX)
-      [match[1], match[2], match[3]]
+    def gem_version_parts
+      gem_version.match(VERSION_PARTS_REGEX)&.captures.compact
     end
 
     class NodePackageVersion
@@ -100,7 +94,7 @@ module ReactOnRails
         # See https://docs.npmjs.com/cli/v10/configuring-npm/package-json#dependencies
         # We want to disallow all expressions other than exact versions
         # and the ones allowed by local_path_or_url?
-        raw.blank? || raw.match(/[~^><|*-]/).present?
+        raw.blank? || raw.start_with?(/[~^><*]/) || raw.include?(" - ") || raw.include?(" || ")
       end
 
       def local_path_or_url?
@@ -110,15 +104,15 @@ module ReactOnRails
         !raw.nil? && raw.include?("/") && !raw.start_with?("npm:")
       end
 
-      def major_minor_patch
+      def parts
         return if local_path_or_url?
 
-        match = raw.match(MAJOR_MINOR_PATCH_VERSION_REGEX)
+        match = raw.match(VERSION_PARTS_REGEX)
         unless match
           raise ReactOnRails::Error, "Cannot parse version number '#{raw}' (only exact versions are supported)"
         end
 
-        [match[1], match[2], match[3]]
+        match.captures.compact
       end
 
       private

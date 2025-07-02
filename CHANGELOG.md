@@ -23,6 +23,10 @@ After a release, please make sure to run `bundle exec rake update_changelog`. Th
 
 Changes since the last non-beta release.
 
+#### Fixed
+
+- Fixed invalid warnings about non-exact versions when using a pre-release version of React on Rails, as well as missing warnings when using different pre-release versions of the gem and the Node package. [PR 1742](https://github.com/shakacode/react_on_rails/pull/1742) by [alexeyr-ci2](https://github.com/alexeyr-ci2).
+
 ### [15.0.0-rc.1] - 2025-06-18
 
 #### Improved
