@@ -57,9 +57,7 @@ module ReactOnRails
     end
 
     def self.shakapacker_version_as_array
-      match = shakapacker_version.match(ReactOnRails::VersionChecker::MAJOR_MINOR_PATCH_VERSION_REGEX)
-
-      @shakapacker_version_as_array = [match[1].to_i, match[2].to_i, match[3].to_i]
+      Gem::Version.new(shakapacker_version).segments
     end
 
     def self.shakapacker_version_requirement_met?(required_version)
