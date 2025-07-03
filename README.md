@@ -92,7 +92,7 @@ Ruby on Rails >=5, rails/webpacker >= 4.2 or shakapacker > 6, Ruby >= 3.0.0
 
 # Support
 
-- [Click to join **React + Rails Slack**](https://reactrails.slack.com/join/shared_invite/enQtNjY3NTczMjczNzYxLTlmYjdiZmY3MTVlMzU2YWE0OWM0MzNiZDI0MzdkZGFiZTFkYTFkOGVjODBmOWEyYWQ3MzA2NGE1YWJjNmVlMGE).
+- [Click to join **React + Rails Slack**](https://join.slack.com/t/reactrails/shared_invite/zt-38oicm9d0-OO0V~bdg4aYNuZuUbRFSXg).
 
 - [**Subscribe**](https://app.mailerlite.com/webforms/landing/l1d9x5) for announcements of new releases of React on Rails and of our latest [blog articles](https://blog.shakacode.com) and tutorials.
 - [Discussions](https://github.com/shakacode/react_on_rails/discussions): Post your questions regarding React on Rails
