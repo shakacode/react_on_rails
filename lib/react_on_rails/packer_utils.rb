@@ -57,7 +57,10 @@ module ReactOnRails
     end
 
     def self.shakapacker_version_as_array
-      Gem::Version.new(shakapacker_version).segments
+      match = shakapacker_version.match(ReactOnRails::VersionChecker::VERSION_PARTS_REGEX)
+
+      # match[4] is the pre-release version, not normally a number but something like "beta.1" or `nil`
+      @shakapacker_version_as_array = [match[1].to_i, match[2].to_i, match[3].to_i, match[4]].compact
     end
 
     def self.shakapacker_version_requirement_met?(required_version)
@@ -171,7 +174,7 @@ module ReactOnRails
       msg = <<~MSG
         **ERROR** ReactOnRails: Please upgrade Shakapacker to version #{semver_to_string(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION)} or \
         above to use the automated bundle generation feature. The currently installed version is \
-        #{semver_to_string(ReactOnRails::PackerUtils.shakapacker_version_as_array)}.
+        #{ReactOnRails::PackerUtils.shakapacker_version}.
       MSG
 
       raise ReactOnRails::Error, msg
@@ -188,7 +191,7 @@ module ReactOnRails
     end
 
     def self.semver_to_string(ary)
-      "#{ary[0]}.#{ary[1]}.#{ary[2]}"
+      ary.join(".")
     end
   end
 end
