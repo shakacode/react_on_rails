@@ -5,7 +5,7 @@ require_relative "spec_helper"
 module ReactOnRails
   describe PackerUtils do
     describe ".shakapacker_version_requirement_met?" do
-      minimum_version = [6, 5, 3]
+      minimum_version = "6.5.3"
 
       it "returns false when version is lower than minimum_version" do
         allow(described_class).to receive(:shakapacker_version).and_return("6.5.0")
@@ -31,7 +31,7 @@ module ReactOnRails
         allow(described_class).to receive(:shakapacker_version).and_return("6.5.4")
         expect(described_class.shakapacker_version_requirement_met?(minimum_version)).to be(true)
 
-        allow(described_class).to receive(:shakapacker_version).and_return("7.7.7")
+        allow(described_class).to receive(:shakapacker_version).and_return("7.0.0")
         expect(described_class.shakapacker_version_requirement_met?(minimum_version)).to be(true)
       end
     end
