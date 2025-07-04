@@ -21,16 +21,12 @@ gsub_file_content("../Gemfile.development_dependencies", /gem "shakapacker", "[^
 gsub_file_content("../spec/dummy/package.json", /"shakapacker": "[^"]*",/, '"shakapacker": "6.6.0",')
 
 # The below packages don't work on the oldest supported Node version and aren't needed there anyway
-gsub_file_content("../package.json", /"eslint": "[^"]*",/, "")
-gsub_file_content("../package.json", /"eslint-plugin-jest": "[^"]*",/, "")
+gsub_file_content("../package.json", /"[^"]*eslint[^"]*": "[^"]*",?/, "")
 gsub_file_content("../package.json", /"globals": "[^"]*",/, "")
 gsub_file_content("../package.json", /"knip": "[^"]*",/, "")
 gsub_file_content("../package.json", /"publint": "[^"]*",/, "")
-gsub_file_content("../package.json", /"typescript-eslint": "[^"]*",?/, "")
 gsub_file_content("../package.json", %r{"@arethetypeswrong/cli": "[^"]*",}, "")
-gsub_file_content("../package.json", %r{"@eslint/compat": "[^"]*",}, "")
-gsub_file_content("../package.json", %r{"@testing-library/dom": "[^"]*",}, "")
-gsub_file_content("../package.json", %r{"@testing-library/react": "[^"]*",}, "")
+gsub_file_content("../package.json", %r{"@testing-library/[^"]*": "[^"]*",}, "")
 
 # Clean up any trailing commas before closing braces
 gsub_file_content("../package.json", /,(\s*})/, "\\1")
