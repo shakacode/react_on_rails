@@ -57,6 +57,8 @@ module ReactOnRails
     end
 
     def self.shakapacker_version_as_array
+      return @shakapacker_version_as_array if defined?(@shakapacker_version_as_array)
+
       match = shakapacker_version.match(ReactOnRails::VersionChecker::VERSION_PARTS_REGEX)
 
       # match[4] is the pre-release version, not normally a number but something like "beta.1" or `nil`
