@@ -18,7 +18,7 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
 
       context "when gem and node package major and minor versions are equal" do
         let(:node_package_version) do
-          double_package_version(raw: "2.2.5-beta.2", major_minor_patch: %w[2 2 5])
+          double_package_version(raw: "2.2.5-beta.2", parts: %w[2 2 5 beta.2])
         end
 
         before { stub_gem_version("2.2.5.beta.2") }
@@ -32,14 +32,14 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
 
       context "when major and minor versions are equal BUT node uses semver wildcard" do
         let(:node_package_version) do
-          double_package_version(raw: "^2.2.5", semver_wildcard: true, major_minor_patch: %w[2 2 5])
+          double_package_version(raw: "^2.2.5", semver_wildcard: true, parts: %w[2 2 5])
         end
 
         before { stub_gem_version("2.2.5") }
 
         it "logs" do
           allow(Rails.logger).to receive(:warn)
-          message = /ReactOnRails: Your node package version for react-on-rails contains a \^ or ~/
+          message = /ReactOnRails: Your Node package version for react-on-rails is not an exact version/
           check_version_and_log(node_package_version)
           expect(Rails.logger).to have_received(:warn).with(message)
         end
@@ -47,14 +47,14 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
 
       context "when gem and node package major versions differ" do
         let(:node_package_version) do
-          double_package_version(raw: "13.0.0.beta-2", major_minor_patch: %w[13 0 0])
+          double_package_version(raw: "13.0.0.beta-2", parts: %w[13 0 0 beta-2])
         end
 
         before { stub_gem_version("12.0.0.beta.1") }
 
         it "logs" do
           allow(Rails.logger).to receive(:warn)
-          message = /ReactOnRails: ReactOnRails gem and node package versions do not match/
+          message = /ReactOnRails: ReactOnRails gem and Node package versions do not match/
           check_version_and_log(node_package_version)
           expect(Rails.logger).to have_received(:warn).with(message)
         end
@@ -62,14 +62,14 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
 
       context "when gem and node package major versions match and minor differs" do
         let(:node_package_version) do
-          double_package_version(raw: "13.0.0.beta-2", major_minor_patch: %w[13 0 0])
+          double_package_version(raw: "13.0.0.beta-2", parts: %w[13 0 0 beta-2])
         end
 
         before { stub_gem_version("13.1.0") }
 
         it "logs" do
           allow(Rails.logger).to receive(:warn)
-          message = /ReactOnRails: ReactOnRails gem and node package versions do not match/
+          message = /ReactOnRails: ReactOnRails gem and Node package versions do not match/
           check_version_and_log(node_package_version)
           expect(Rails.logger).to have_received(:warn).with(message)
         end
@@ -77,14 +77,14 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
 
       context "when gem and node package major, minor versions match and patch differs" do
         let(:node_package_version) do
-          double_package_version(raw: "13.0.1", major_minor_patch: %w[13 0 1])
+          double_package_version(raw: "13.0.1", parts: %w[13 0 1])
         end
 
         before { stub_gem_version("13.0.0") }
 
         it "logs" do
           allow(Rails.logger).to receive(:warn)
-          message = /ReactOnRails: ReactOnRails gem and node package versions do not match/
+          message = /ReactOnRails: ReactOnRails gem and Node package versions do not match/
           check_version_and_log(node_package_version)
           expect(Rails.logger).to have_received(:warn).with(message)
         end
@@ -92,7 +92,7 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
 
       context "when package json uses a relative path with dots" do
         let(:node_package_version) do
-          double_package_version(raw: "../../..", major_minor_patch: "", local_path_or_url: true)
+          double_package_version(raw: "../../..", parts: nil, local_path_or_url: true)
         end
 
         before { stub_gem_version("2.0.0.beta.1") }
@@ -116,11 +116,11 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
     end
 
     def double_package_version(raw: nil, semver_wildcard: false,
-                               major_minor_patch: nil, local_path_or_url: false)
+                               parts: nil, local_path_or_url: false)
       instance_double(VersionChecker::NodePackageVersion,
                       raw: raw,
                       semver_wildcard?: semver_wildcard,
-                      major_minor_patch: major_minor_patch,
+                      parts: parts,
                       local_path_or_url?: local_path_or_url)
     end
 
@@ -187,8 +187,8 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           specify { expect(node_package_version.local_path_or_url?).to be false }
         end
 
-        describe "#major" do
-          specify { expect(node_package_version.major_minor_patch).to eq(%w[0 0 2]) }
+        describe "#parts" do
+          specify { expect(node_package_version.parts).to eq(%w[0 0 2]) }
         end
       end
 
@@ -203,8 +203,8 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           specify { expect(node_package_version.local_path_or_url?).to be false }
         end
 
-        describe "#major_minor_patch" do
-          specify { expect(node_package_version.major_minor_patch).to eq(%w[14 0 0]) }
+        describe "#parts" do
+          specify { expect(node_package_version.parts).to eq(%w[14 0 0 beta-2]) }
         end
       end
 
@@ -219,8 +219,8 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           specify { expect(node_package_version.local_path_or_url?).to be true }
         end
 
-        describe "#major" do
-          specify { expect(node_package_version.major_minor_patch).to be_nil }
+        describe "#parts" do
+          specify { expect(node_package_version.parts).to be_nil }
         end
       end
 
@@ -235,8 +235,8 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           specify { expect(node_package_version.local_path_or_url?).to be true }
         end
 
-        describe "#major" do
-          specify { expect(node_package_version.major_minor_patch).to be_nil }
+        describe "#parts" do
+          specify { expect(node_package_version.parts).to be_nil }
         end
       end
 
@@ -251,8 +251,8 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           specify { expect(node_package_version.local_path_or_url?).to be true }
         end
 
-        describe "#major" do
-          specify { expect(node_package_version.major_minor_patch).to be_nil }
+        describe "#parts" do
+          specify { expect(node_package_version.parts).to be_nil }
         end
       end
 
@@ -267,8 +267,8 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           specify { expect(node_package_version.local_path_or_url?).to be true }
         end
 
-        describe "#major" do
-          specify { expect(node_package_version.major_minor_patch).to be_nil }
+        describe "#parts" do
+          specify { expect(node_package_version.parts).to be_nil }
         end
       end
 

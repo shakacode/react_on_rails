@@ -10,7 +10,7 @@ module ReactOnRails
       return @using_shakapacker_const if defined?(@using_shakapacker_const)
 
       @using_shakapacker_const = ReactOnRails::Utils.gem_available?("shakapacker") &&
-                                 shakapacker_version_requirement_met?([7, 0, 0])
+                                 shakapacker_version_requirement_met?("7.0.0")
     end
 
     def self.using_webpacker_const?
@@ -57,15 +57,16 @@ module ReactOnRails
     end
 
     def self.shakapacker_version_as_array
-      match = shakapacker_version.match(ReactOnRails::VersionChecker::MAJOR_MINOR_PATCH_VERSION_REGEX)
+      return @shakapacker_version_as_array if defined?(@shakapacker_version_as_array)
 
-      @shakapacker_version_as_array = [match[1].to_i, match[2].to_i, match[3].to_i]
+      match = shakapacker_version.match(ReactOnRails::VersionChecker::VERSION_PARTS_REGEX)
+
+      # match[4] is the pre-release version, not normally a number but something like "beta.1" or `nil`
+      @shakapacker_version_as_array = [match[1].to_i, match[2].to_i, match[3].to_i, match[4]].compact
     end
 
     def self.shakapacker_version_requirement_met?(required_version)
-      req_ver = semver_to_string(required_version)
-
-      Gem::Version.new(shakapacker_version) >= Gem::Version.new(req_ver)
+      Gem::Version.new(shakapacker_version) >= Gem::Version.new(required_version)
     end
 
     # This returns either a URL for the webpack-dev-server, non-server bundle or
@@ -171,9 +172,9 @@ module ReactOnRails
 
     def self.raise_shakapacker_version_incompatible_for_autobundling
       msg = <<~MSG
-        **ERROR** ReactOnRails: Please upgrade Shakapacker to version #{semver_to_string(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION)} or \
+        **ERROR** ReactOnRails: Please upgrade Shakapacker to version #{ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION} or \
         above to use the automated bundle generation feature. The currently installed version is \
-        #{semver_to_string(ReactOnRails::PackerUtils.shakapacker_version_as_array)}.
+        #{ReactOnRails::PackerUtils.shakapacker_version}.
       MSG
 
       raise ReactOnRails::Error, msg
@@ -182,15 +183,11 @@ module ReactOnRails
     def self.raise_shakapacker_not_installed
       msg = <<~MSG
         **ERROR** ReactOnRails: Missing Shakapacker gem. Please upgrade to use Shakapacker \
-        #{semver_to_string(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION)} or above to use the \
+        #{ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION} or above to use the \
         automated bundle generation feature.
       MSG
 
       raise ReactOnRails::Error, msg
-    end
-
-    def self.semver_to_string(ary)
-      "#{ary[0]}.#{ary[1]}.#{ary[2]}"
     end
   end
 end
