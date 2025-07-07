@@ -4,17 +4,17 @@ import { Readable } from 'stream';
 
 import {
   RSCRenderParams,
-  assertRailsContextWithServerComponentCapabilities,
+  assertRailsContextWithServerStreamingCapabilities,
   StreamRenderState,
   StreamableComponentResult,
 } from './types/index.ts';
 import ReactOnRails from './ReactOnRails.full.ts';
 import handleError from './handleError.ts';
 import { convertToError } from './serverRenderUtils.ts';
-import { notifySSREnd, addPostSSRHook } from './postSSRHooks.ts';
 
 import {
   streamServerRenderedComponent,
+  StreamingTrackers,
   transformRenderStreamChunksToResultObject,
 } from './streamServerRenderedReactComponent.ts';
 import loadJsonFile from './loadJsonFile.ts';
@@ -24,10 +24,11 @@ let serverRendererPromise: Promise<ReturnType<typeof buildServerRenderer>> | und
 const streamRenderRSCComponent = (
   reactRenderingResult: StreamableComponentResult,
   options: RSCRenderParams,
+  streamingTrackers: StreamingTrackers,
 ): Readable => {
   const { throwJsErrors } = options;
   const { railsContext } = options;
-  assertRailsContextWithServerComponentCapabilities(railsContext);
+  assertRailsContextWithServerStreamingCapabilities(railsContext);
 
   const { reactClientManifestFileName } = railsContext;
   const renderState: StreamRenderState = {
@@ -77,7 +78,7 @@ const streamRenderRSCComponent = (
   });
 
   readableStream.on('end', () => {
-    notifySSREnd(railsContext);
+    streamingTrackers.postSSRHookTracker.notifySSREnd();
   });
   return readableStream;
 };
@@ -89,8 +90,6 @@ ReactOnRails.serverRenderRSCReactComponent = (options: RSCRenderParams) => {
     console.history = [];
   }
 };
-
-ReactOnRails.addPostSSRHook = addPostSSRHook;
 
 ReactOnRails.isRSCBundle = true;
 

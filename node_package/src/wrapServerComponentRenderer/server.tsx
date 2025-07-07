@@ -3,7 +3,8 @@ import type { RenderFunction, ReactComponentOrRenderFunction } from '../types/in
 import getReactServerComponent from '../getReactServerComponent.server.ts';
 import { createRSCProvider } from '../RSCProvider.tsx';
 import isRenderFunction from '../isRenderFunction.ts';
-import { assertRailsContextWithServerComponentCapabilities } from '../types/index.ts';
+import { assertRailsContextWithServerStreamingCapabilities } from '../types/index.ts';
+import { createRSCPayloadKey } from '../utils.ts';
 
 /**
  * Wraps a client component with the necessary RSC context and handling for server-side operations.
@@ -30,7 +31,7 @@ const wrapServerComponentRenderer = (componentOrRenderFunction: ReactComponentOr
   }
 
   const wrapper: RenderFunction = async (props, railsContext) => {
-    assertRailsContextWithServerComponentCapabilities(railsContext);
+    assertRailsContextWithServerStreamingCapabilities(railsContext);
 
     const Component = isRenderFunction(componentOrRenderFunction)
       ? await componentOrRenderFunction(props, railsContext)
@@ -43,6 +44,11 @@ const wrapServerComponentRenderer = (componentOrRenderFunction: ReactComponentOr
     const RSCProvider = createRSCProvider({
       railsContext,
       getServerComponent: getReactServerComponent,
+      // Server-side rendering processes each component in isolation during separate requests,
+      // eliminating the possibility of cache key conflicts between component instances.
+      // Therefore, we can safely use an empty string as the domNodeId parameter.
+      createRSCPayloadKey: (componentName, componentProps) =>
+        createRSCPayloadKey(componentName, componentProps, ''),
     });
 
     return () => (

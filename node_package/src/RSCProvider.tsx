@@ -1,7 +1,6 @@
 import * as React from 'react';
-import { RailsContextWithComponentSpecificMetadata } from './types/index.ts';
+import { RailsContextWithServerStreamingCapabilities } from './types/index.ts';
 import getReactServerComponent from './getReactServerComponent.client.ts';
-import { createRSCPayloadKey } from './utils.ts';
 
 type RSCContextType = {
   getComponent: (componentName: string, componentProps: unknown) => Promise<React.ReactNode>;
@@ -33,30 +32,33 @@ const RSCContext = React.createContext<RSCContextType | undefined>(undefined);
 export const createRSCProvider = ({
   railsContext,
   getServerComponent,
+  createRSCPayloadKey,
 }: {
-  railsContext: RailsContextWithComponentSpecificMetadata;
+  railsContext: RailsContextWithServerStreamingCapabilities;
   getServerComponent: typeof getReactServerComponent;
+  createRSCPayloadKey: (componentName: string, componentProps: unknown) => string;
 }) => {
   const fetchRSCPromises: Record<string, Promise<React.ReactNode>> = {};
 
   const getComponent = (componentName: string, componentProps: unknown) => {
-    const key = createRSCPayloadKey(componentName, componentProps, railsContext);
+    const key = createRSCPayloadKey(componentName, componentProps);
     if (key in fetchRSCPromises) {
       return fetchRSCPromises[key];
     }
 
-    const promise = getServerComponent({ componentName, componentProps, railsContext });
+    const promise = getServerComponent({ componentName, componentProps, railsContext, createRSCPayloadKey });
     fetchRSCPromises[key] = promise;
     return promise;
   };
 
   const refetchComponent = (componentName: string, componentProps: unknown) => {
-    const key = createRSCPayloadKey(componentName, componentProps, railsContext);
+    const key = createRSCPayloadKey(componentName, componentProps);
     const promise = getServerComponent({
       componentName,
       componentProps,
       railsContext,
       enforceRefetch: true,
+      createRSCPayloadKey,
     });
     fetchRSCPromises[key] = promise;
     return promise;

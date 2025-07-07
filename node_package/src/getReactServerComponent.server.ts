@@ -2,7 +2,7 @@ import { BundleManifest } from 'react-on-rails-rsc';
 import { buildClientRenderer } from 'react-on-rails-rsc/client.node';
 import transformRSCStream from './transformRSCNodeStream.ts';
 import loadJsonFile from './loadJsonFile.ts';
-import { assertRailsContextWithServerComponentCapabilities, RailsContext } from './types/index.ts';
+import { assertRailsContextWithServerStreamingCapabilities, RailsContext } from './types/index.ts';
 
 type GetReactServerComponentOnServerProps = {
   componentName: string;
@@ -65,19 +65,9 @@ const getReactServerComponent = async ({
   componentProps,
   railsContext,
 }: GetReactServerComponentOnServerProps) => {
-  assertRailsContextWithServerComponentCapabilities(railsContext);
+  assertRailsContextWithServerStreamingCapabilities(railsContext);
 
-  if (typeof ReactOnRails.getRSCPayloadStream !== 'function') {
-    throw new Error(
-      'ReactOnRails.getRSCPayloadStream is not defined. This likely means that you are not building the server bundle correctly. Please ensure that your server bundle is targeting Node.js',
-    );
-  }
-
-  const rscPayloadStream = await ReactOnRails.getRSCPayloadStream(
-    componentName,
-    componentProps,
-    railsContext,
-  );
+  const rscPayloadStream = await railsContext.getRSCPayloadStream(componentName, componentProps);
 
   return createFromReactOnRailsNodeStream(
     rscPayloadStream,

@@ -1,7 +1,8 @@
 import { PassThrough } from 'stream';
 import { finished } from 'stream/promises';
 import { createRSCPayloadKey } from './utils.ts';
-import { RailsContextWithServerComponentCapabilities, PipeableOrReadableStream } from './types/index.ts';
+import { PipeableOrReadableStream } from './types/index.ts';
+import RSCRequestTracker from './RSCRequestTracker.ts';
 
 // In JavaScript, when an escape sequence with a backslash (\) is followed by a character
 // that isn't a recognized escape character, the backslash is ignored, and the character
@@ -59,7 +60,8 @@ function createRSCPayloadChunk(chunk: string, cacheKey: string) {
  */
 export default function injectRSCPayload(
   pipeableHtmlStream: PipeableOrReadableStream,
-  railsContext: RailsContextWithServerComponentCapabilities,
+  rscRequestTracker: RSCRequestTracker,
+  domNodeId: string | undefined,
 ) {
   const htmlStream = new PassThrough();
   pipeableHtmlStream.pipe(htmlStream);
@@ -206,17 +208,9 @@ export default function injectRSCPayload(
     try {
       const rscPromises: Promise<void>[] = [];
 
-      if (!ReactOnRails.onRSCPayloadGenerated) {
-        // This should never occur in normal operation and indicates a bug in react_on_rails that needs to be fixed.
-        // While not fatal, missing RSC payload injection will degrade performance by forcing
-        console.error(
-          'ReactOnRails Error: ReactOnRails.onRSCPayloadGenerated is not defined. RSC payloads cannot be injected.',
-        );
-      }
-
-      ReactOnRails.onRSCPayloadGenerated?.(railsContext, (streamInfo) => {
+      rscRequestTracker.onRSCPayloadGenerated((streamInfo) => {
         const { stream, props, componentName } = streamInfo;
-        const cacheKey = createRSCPayloadKey(componentName, props, railsContext);
+        const cacheKey = createRSCPayloadKey(componentName, props, domNodeId);
 
         // CRITICAL TIMING: Initialize global array IMMEDIATELY when component requests RSC
         // This ensures the array exists before the component's HTML is rendered and sent.
@@ -306,12 +300,7 @@ export default function injectRSCPayload(
     rscPromise
       .then(cleanup)
       .finally(() => {
-        if (!ReactOnRails.clearRSCPayloadStreams) {
-          console.error('ReactOnRails Error: clearRSCPayloadStreams is not a function');
-          return;
-        }
-
-        ReactOnRails.clearRSCPayloadStreams(railsContext);
+        rscRequestTracker.clear();
       })
       .catch((err: unknown) => resultStream.emit('error', err));
   });

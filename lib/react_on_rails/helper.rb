@@ -650,8 +650,7 @@ module ReactOnRails
                                                 "data-trace" => (render_options.trace ? true : nil),
                                                 "data-dom-id" => render_options.dom_id,
                                                 "data-store-dependencies" => render_options.store_dependencies&.to_json,
-                                                "data-force-load" => (render_options.force_load ? true : nil),
-                                                "data-render-request-id" => render_options.render_request_id)
+                                                "data-force-load" => (render_options.force_load ? true : nil))
 
       if render_options.force_load
         component_specification_tag.concat(

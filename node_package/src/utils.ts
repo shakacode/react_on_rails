@@ -1,5 +1,3 @@
-import { RailsContextWithComponentSpecificMetadata } from './types/index.ts';
-
 // Override the fetch function to make it easier to test
 // The default fetch implementation in jest returns Node's Readable stream
 // In jest.setup.js, we configure this fetch to return a web-standard ReadableStream instead,
@@ -15,9 +13,15 @@ export { customFetch as fetch };
 export const createRSCPayloadKey = (
   componentName: string,
   componentProps: unknown,
-  railsContext: RailsContextWithComponentSpecificMetadata,
+  domNodeId: string | undefined,
 ) => {
-  return `${componentName}-${JSON.stringify(componentProps)}-${railsContext.componentSpecificMetadata.renderRequestId}`;
+  if (!domNodeId) {
+    console.warn(
+      'Warning: domNodeId is required when using React Server Components to ensure unique RSC payload caching and prevent conflicts between multiple instances of the same component.',
+    );
+  }
+
+  return `${componentName}-${JSON.stringify(componentProps)}-${domNodeId}`;
 };
 
 /**
