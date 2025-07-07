@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { RailsContextWithServerStreamingCapabilities } from './types/index.ts';
+import { RailsContext, RailsContextWithServerStreamingCapabilities } from './types/index.ts';
 import getReactServerComponent from './getReactServerComponent.client.ts';
 
 type RSCContextType = {
@@ -34,7 +34,7 @@ export const createRSCProvider = ({
   getServerComponent,
   createRSCPayloadKey,
 }: {
-  railsContext: RailsContextWithServerStreamingCapabilities;
+  railsContext: RailsContext;
   getServerComponent: typeof getReactServerComponent;
   createRSCPayloadKey: (componentName: string, componentProps: unknown) => string;
 }) => {

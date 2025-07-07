@@ -85,11 +85,10 @@ export const assertRailsContextWithServerComponentMetadata: (
   if (
     !context ||
     !('reactClientManifestFileName' in context) ||
-    !('reactServerClientManifestFileName' in context) ||
-    !('componentSpecificMetadata' in context)
+    !('reactServerClientManifestFileName' in context)
   ) {
     throwRailsContextMissingEntries(
-      'server side RSC payload parameters, reactClientManifestFileName, reactServerClientManifestFileName, and componentSpecificMetadata',
+      'server side RSC payload parameters, reactClientManifestFileName, and reactServerClientManifestFileName',
     );
   }
 };

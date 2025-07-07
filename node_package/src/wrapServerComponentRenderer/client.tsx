@@ -54,7 +54,9 @@ const wrapServerComponentRenderer = (componentOrRenderFunction: ReactComponentOr
       throw new Error(`RSCClientRoot: No DOM node found for id: ${domNodeId}`);
     }
 
-    assertRailsContextWithServerStreamingCapabilities(railsContext);
+    if (!railsContext) {
+      throw new Error('RSCClientRoot: No railsContext provided');
+    }
 
     const RSCProvider = createRSCProvider({
       railsContext,

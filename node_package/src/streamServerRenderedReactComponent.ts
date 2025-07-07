@@ -240,6 +240,11 @@ export const streamServerRenderedComponent = <T, P extends RenderParams>(
     getRSCPayloadStream: rscRequestTracker.getRSCPayloadStream.bind(rscRequestTracker),
   };
 
+  const optionsWithStreamingCapabilities = {
+    ...options,
+    railsContext: railsContextWithStreamingCapabilities,
+  };
+
   try {
     const componentObj = ComponentRegistry.get(componentName);
     validateComponent(componentObj, componentName);
@@ -267,10 +272,10 @@ export const streamServerRenderedComponent = <T, P extends RenderParams>(
         }
         return result;
       });
-      return renderStrategy(promiseAfterRejectingHash, options, streamingTrackers);
+      return renderStrategy(promiseAfterRejectingHash, optionsWithStreamingCapabilities, streamingTrackers);
     }
 
-    return renderStrategy(reactRenderingResult, options, streamingTrackers);
+    return renderStrategy(reactRenderingResult, optionsWithStreamingCapabilities, streamingTrackers);
   } catch (e) {
     const { readableStream, writeChunk, emitError, endStream } = transformRenderStreamChunksToResultObject({
       hasErrors: true,
