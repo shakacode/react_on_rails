@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { createFromReadableStream } from 'react-on-rails-rsc/client.browser';
-import { createRSCPayloadKey, fetch, wrapInNewPromise } from './utils.ts';
+import { createRSCPayloadKey, fetch, wrapInNewPromise, extractErrorMessage } from './utils.ts';
 import transformRSCStreamAndReplayConsoleLogs from './transformRSCStreamAndReplayConsoleLogs.ts';
 import { RailsContext } from './types/index.ts';
 
@@ -65,17 +65,13 @@ const fetchRSC = ({
 
     return createFromFetch(fetch(fetchUrl)).catch((error: unknown) => {
       throw new Error(
-        `Failed to fetch RSC payload for component "${componentName}" from "${fetchUrl}": ${
-          error instanceof Error ? error.message : String(error)
-        }`,
+        `Failed to fetch RSC payload for component "${componentName}" from "${fetchUrl}": ${extractErrorMessage(error)}`,
       );
     });
   } catch (error: unknown) {
     // Handle JSON.stringify errors or other synchronous errors
     throw new Error(
-      `Failed to prepare RSC request for component "${componentName}": ${
-        error instanceof Error ? error.message : String(error)
-      }`,
+      `Failed to prepare RSC request for component "${componentName}": ${extractErrorMessage(error)}`,
     );
   }
 };

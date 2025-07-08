@@ -1,4 +1,5 @@
 import { PassThrough, Readable } from 'stream';
+import { extractErrorMessage } from './utils.ts';
 import {
   RSCPayloadStreamInfo,
   RSCPayloadCallback,
@@ -141,9 +142,7 @@ class RSCRequestTracker {
     } catch (error) {
       // Provide a more helpful error message that includes context
       throw new Error(
-        `Failed to generate RSC payload for component "${componentName}": ${
-          error instanceof Error ? error.message : String(error)
-        }`,
+        `Failed to generate RSC payload for component "${componentName}": ${extractErrorMessage(error)}`,
       );
     }
   }
