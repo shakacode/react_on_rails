@@ -38,7 +38,8 @@ const createFromFetch = async (fetchPromise: Promise<Response>) => {
  * This is used for client-side navigation or when rendering components
  * that weren't part of the initial server render.
  *
- * @param props - Object containing component name and props
+ * @param componentName - Name of the server component
+ * @param componentProps - Props for the server component
  * @param railsContext - The Rails context containing configuration
  * @returns A Promise resolving to the rendered React element
  * @throws Error if RSC payload generation URL path is not configured or network request fails
