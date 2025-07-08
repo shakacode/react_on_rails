@@ -101,7 +101,7 @@ export const assertRailsContextWithServerStreamingCapabilities: (
   assertRailsContextWithServerComponentMetadata(context);
 
   if (!('getRSCPayloadStream' in context) || !('addPostSSRHook' in context)) {
-    throwRailsContextMissingEntries('getRSCPayloadStream function');
+    throwRailsContextMissingEntries('getRSCPayloadStream and addPostSSRHook functions');
   }
 };
 

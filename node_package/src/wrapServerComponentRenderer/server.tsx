@@ -46,9 +46,9 @@ const wrapServerComponentRenderer = (componentOrRenderFunction: ReactComponentOr
       getServerComponent: getReactServerComponent,
       // Server-side rendering processes each component in isolation during separate requests,
       // eliminating the possibility of cache key conflicts between component instances.
-      // Therefore, we can safely use an empty string as the domNodeId parameter.
+      // Therefore, we can safely use `server` as the domNodeId parameter.
       createRSCPayloadKey: (componentName, componentProps) =>
-        createRSCPayloadKey(componentName, componentProps, ''),
+        createRSCPayloadKey(componentName, componentProps, 'server'),
     });
 
     return () => (

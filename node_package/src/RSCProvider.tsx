@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { RailsContext, RailsContextWithServerStreamingCapabilities } from './types/index.ts';
+import { RailsContext } from './types/index.ts';
 import getReactServerComponent from './getReactServerComponent.client.ts';
 
 type RSCContextType = {
