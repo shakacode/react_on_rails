@@ -36,12 +36,22 @@ class RSCRequestTracker {
    * Clears all streams and callbacks for this request.
    * Should be called when the request is complete to ensure proper cleanup,
    * though garbage collection will handle cleanup automatically when the tracker goes out of scope.
+   *
+   * This method is safe to call multiple times and will handle any errors during cleanup gracefully.
    */
   clear(): void {
     // Close any active streams before clearing
-    this.streams.forEach(({ stream }) => {
-      if (typeof (stream as Readable).destroy === 'function') {
-        (stream as Readable).destroy();
+    this.streams.forEach(({ stream, componentName }, index) => {
+      try {
+        if (stream && typeof (stream as Readable).destroy === 'function') {
+          (stream as Readable).destroy();
+        }
+      } catch (error) {
+        // Log the error but don't throw to avoid disrupting cleanup of other streams
+        console.warn(
+          `Warning: Error while destroying RSC stream for component "${componentName}" at index ${index}:`,
+          error,
+        );
       }
     });
 
@@ -83,31 +93,50 @@ class RSCRequestTracker {
    * @param componentName - Name of the server component
    * @param props - Props for the server component
    * @returns A stream of the RSC payload
+   * @throws Error if generateRSCPayload is not available or fails
    */
   async getRSCPayloadStream(componentName: string, props: unknown): Promise<NodeJS.ReadableStream> {
-    const stream = await generateRSCPayload(componentName, props, this.railsContext);
+    // Validate that the global generateRSCPayload function is available
+    if (typeof generateRSCPayload !== 'function') {
+      throw new Error(
+        'generateRSCPayload is not defined. Please ensure that you are using at least version 4.0.0 of ' +
+          'React on Rails Pro and the Node renderer, and that ReactOnRailsPro.configuration.enable_rsc_support ' +
+          'is set to true.',
+      );
+    }
 
-    // Tee stream to allow for multiple consumers:
-    //   1. stream1 - Used by React's runtime to perform server-side rendering
-    //   2. stream2 - Used by react-on-rails to embed the RSC payloads
-    //      into the HTML stream for client-side hydration
-    const stream1 = new PassThrough();
-    stream.pipe(stream1);
-    const stream2 = new PassThrough();
-    stream.pipe(stream2);
+    try {
+      const stream = await generateRSCPayload(componentName, props, this.railsContext);
 
-    const streamInfo: RSCPayloadStreamInfo = {
-      componentName,
-      props,
-      stream: stream2,
-    };
+      // Tee stream to allow for multiple consumers:
+      //   1. stream1 - Used by React's runtime to perform server-side rendering
+      //   2. stream2 - Used by react-on-rails to embed the RSC payloads
+      //      into the HTML stream for client-side hydration
+      const stream1 = new PassThrough();
+      stream.pipe(stream1);
+      const stream2 = new PassThrough();
+      stream.pipe(stream2);
 
-    this.streams.push(streamInfo);
+      const streamInfo: RSCPayloadStreamInfo = {
+        componentName,
+        props,
+        stream: stream2,
+      };
 
-    // Notify callbacks about the new stream in a sync manner to maintain proper hydration timing
-    this.callbacks.forEach((callback) => callback(streamInfo));
+      this.streams.push(streamInfo);
 
-    return stream1;
+      // Notify callbacks about the new stream in a sync manner to maintain proper hydration timing
+      this.callbacks.forEach((callback) => callback(streamInfo));
+
+      return stream1;
+    } catch (error) {
+      // Provide a more helpful error message that includes context
+      throw new Error(
+        `Failed to generate RSC payload for component "${componentName}": ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
   }
 
   /**

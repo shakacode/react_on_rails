@@ -220,6 +220,22 @@ type StreamRenderer<T, P extends RenderParams> = (
   streamingTrackers: StreamingTrackers,
 ) => T;
 
+/**
+ * This module implements request-scoped tracking for React Server Components (RSC)
+ * and post-SSR hooks using local tracker instances per request.
+ *
+ * DESIGN PRINCIPLES:
+ * - Each request gets its own PostSSRHookTracker and RSCRequestTracker instances
+ * - State is automatically garbage collected when request completes
+ * - No shared state between concurrent requests
+ * - Simple, predictable cleanup lifecycle
+ *
+ * TRACKER RESPONSIBILITIES:
+ * - PostSSRHookTracker: Manages hooks that run after SSR completes
+ * - RSCRequestTracker: Handles RSC payload generation and stream tracking
+ * - Both inject their capabilities into the Rails context for component access
+ */
+
 export const streamServerRenderedComponent = <T, P extends RenderParams>(
   options: P,
   renderStrategy: StreamRenderer<T, P>,

@@ -42,13 +42,39 @@ const createFromFetch = async (fetchPromise: Promise<Response>) => {
  *
  * @param props - Object containing component name, props, and railsContext
  * @returns A Promise resolving to the rendered React element
+ * @throws Error if RSC payload generation URL path is not configured or network request fails
  */
 const fetchRSC = ({ componentName, componentProps, railsContext }: ClientGetReactServerComponentProps) => {
-  const propsString = JSON.stringify(componentProps);
   const { rscPayloadGenerationUrlPath } = railsContext;
-  const strippedUrlPath = rscPayloadGenerationUrlPath?.replace(/^\/|\/$/g, '');
-  const encodedParams = new URLSearchParams({ props: propsString }).toString();
-  return createFromFetch(fetch(`/${strippedUrlPath}/${componentName}?${encodedParams}`));
+
+  if (!rscPayloadGenerationUrlPath) {
+    throw new Error(
+      `Cannot fetch RSC payload for component "${componentName}": rscPayloadGenerationUrlPath is not configured. ` +
+        'Please ensure React Server Components support is properly enabled and configured.',
+    );
+  }
+
+  try {
+    const propsString = JSON.stringify(componentProps);
+    const strippedUrlPath = rscPayloadGenerationUrlPath.replace(/^\/|\/$/g, '');
+    const encodedParams = new URLSearchParams({ props: propsString }).toString();
+    const fetchUrl = `/${strippedUrlPath}/${componentName}?${encodedParams}`;
+
+    return createFromFetch(fetch(fetchUrl)).catch((error: unknown) => {
+      throw new Error(
+        `Failed to fetch RSC payload for component "${componentName}" from "${fetchUrl}": ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    });
+  } catch (error: unknown) {
+    // Handle JSON.stringify errors or other synchronous errors
+    throw new Error(
+      `Failed to prepare RSC request for component "${componentName}": ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
 };
 
 const createRSCStreamFromArray = (payloads: string[]) => {
