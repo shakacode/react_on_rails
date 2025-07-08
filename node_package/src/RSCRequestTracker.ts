@@ -5,6 +5,15 @@ import {
   RailsContextWithServerComponentMetadata,
 } from './types/index.ts';
 
+/**
+ * Global function provided by React on Rails Pro for generating RSC payloads.
+ *
+ * This function is injected into the global scope during server-side rendering
+ * by the RORP rendering request. It handles the actual generation of React Server
+ * Component payloads on the server side.
+ *
+ * @see https://github.com/shakacode/react_on_rails_pro/blob/master/lib/react_on_rails_pro/server_rendering_js_code.rb
+ */
 declare global {
   function generateRSCPayload(
     componentName: string,

@@ -4,7 +4,6 @@ import { ReactComponentOrRenderFunction, RenderFunction } from '../types/index.t
 import isRenderFunction from '../isRenderFunction.ts';
 import { ensureReactUseAvailable } from '../reactApis.cts';
 import { createRSCProvider } from '../RSCProvider.tsx';
-import { createRSCPayloadKey } from '../utils.ts';
 import getReactServerComponent from '../getReactServerComponent.client.ts';
 
 ensureReactUseAvailable();
@@ -55,10 +54,7 @@ const wrapServerComponentRenderer = (componentOrRenderFunction: ReactComponentOr
     }
 
     const RSCProvider = createRSCProvider({
-      railsContext,
-      getServerComponent: getReactServerComponent,
-      createRSCPayloadKey: (componentName, componentProps) =>
-        createRSCPayloadKey(componentName, componentProps, domNodeId),
+      getServerComponent: getReactServerComponent(domNodeId, railsContext),
     });
 
     const root = (

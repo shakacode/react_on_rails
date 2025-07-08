@@ -2,12 +2,11 @@ import { BundleManifest } from 'react-on-rails-rsc';
 import { buildClientRenderer } from 'react-on-rails-rsc/client.node';
 import transformRSCStream from './transformRSCNodeStream.ts';
 import loadJsonFile from './loadJsonFile.ts';
-import { assertRailsContextWithServerStreamingCapabilities, RailsContext } from './types/index.ts';
+import type { RailsContextWithServerStreamingCapabilities } from './types/index.ts';
 
 type GetReactServerComponentOnServerProps = {
   componentName: string;
   componentProps: unknown;
-  railsContext: RailsContext;
 };
 
 let clientRendererPromise: Promise<ReturnType<typeof buildClientRenderer>> | undefined;
@@ -37,9 +36,15 @@ const createFromReactOnRailsNodeStream = async (
 };
 
 /**
- * Fetches and renders a server component on the server side.
+ * Creates a function that fetches and renders a server component on the server side.
  *
- * This function:
+ * This style of higher-order function is necessary as the function that gets server components
+ * on server has different parameters than the function that gets them on client. The environment
+ * dependent parameters (railsContext) are passed from the `wrapServerComponentRenderer`
+ * function, while the environment agnostic parameters (componentName, componentProps) are
+ * passed from the RSCProvider which is environment agnostic.
+ *
+ * The returned function:
  * 1. Validates the railsContext for required properties
  * 2. Creates an SSR manifest mapping server and client modules
  * 3. Gets the RSC payload stream via getRSCPayloadStream
@@ -49,31 +54,28 @@ const createFromReactOnRailsNodeStream = async (
  * - Used to render the server component
  * - Tracked so it can be embedded in the HTML response
  *
+ * @param railsContext - Context for the current request with server streaming capabilities
+ * @returns A function that accepts RSC parameters and returns a Promise resolving to the rendered React element
+ *
+ * The returned function accepts:
  * @param componentName - Name of the server component to render
  * @param componentProps - Props to pass to the server component
- * @param railsContext - Context for the current request
- * @param enforceRefetch - Whether to enforce a refetch of the component
- * @returns A Promise resolving to the rendered React element
  *
  * @important This is an internal function. End users should not use this directly.
  * Instead, use the useRSC hook which provides getComponent and refetchComponent functions
  * for fetching or retrieving cached server components. For rendering server components,
  * consider using RSCRoute component which handles the rendering logic automatically.
  */
-const getReactServerComponent = async ({
-  componentName,
-  componentProps,
-  railsContext,
-}: GetReactServerComponentOnServerProps) => {
-  assertRailsContextWithServerStreamingCapabilities(railsContext);
+const getReactServerComponent =
+  (railsContext: RailsContextWithServerStreamingCapabilities) =>
+  async ({ componentName, componentProps }: GetReactServerComponentOnServerProps) => {
+    const rscPayloadStream = await railsContext.getRSCPayloadStream(componentName, componentProps);
 
-  const rscPayloadStream = await railsContext.getRSCPayloadStream(componentName, componentProps);
-
-  return createFromReactOnRailsNodeStream(
-    rscPayloadStream,
-    railsContext.reactServerClientManifestFileName,
-    railsContext.reactClientManifestFileName,
-  );
-};
+    return createFromReactOnRailsNodeStream(
+      rscPayloadStream,
+      railsContext.reactServerClientManifestFileName,
+      railsContext.reactClientManifestFileName,
+    );
+  };
 
 export default getReactServerComponent;

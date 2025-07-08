@@ -210,7 +210,8 @@ export default function injectRSCPayload(
 
       rscRequestTracker.onRSCPayloadGenerated((streamInfo) => {
         const { stream, props, componentName } = streamInfo;
-        const cacheKey = createRSCPayloadKey(componentName, props, domNodeId);
+        const cacheKey = createRSCPayloadKey(componentName, props);
+        const rscPayloadKey = `${cacheKey}-${domNodeId}`;
 
         // CRITICAL TIMING: Initialize global array IMMEDIATELY when component requests RSC
         // This ensures the array exists before the component's HTML is rendered and sent.
@@ -218,7 +219,7 @@ export default function injectRSCPayload(
         //
         // The initialization script creates: (self.REACT_ON_RAILS_RSC_PAYLOADS||={})[cacheKey]||=[]
         // This creates a global array that the client-side RSCProvider monitors for new chunks.
-        const initializationScript = createRSCPayloadInitializationScript(cacheKey);
+        const initializationScript = createRSCPayloadInitializationScript(rscPayloadKey);
         rscInitializationBuffers.push(Buffer.from(initializationScript));
 
         // Process RSC payload stream asynchronously
@@ -226,7 +227,7 @@ export default function injectRSCPayload(
           (async () => {
             for await (const chunk of stream ?? []) {
               const decodedChunk = typeof chunk === 'string' ? chunk : decoder.decode(chunk);
-              const payloadScript = createRSCPayloadChunk(decodedChunk, cacheKey);
+              const payloadScript = createRSCPayloadChunk(decodedChunk, rscPayloadKey);
               rscPayloadBuffers.push(Buffer.from(payloadScript));
               scheduleFlush();
             }
