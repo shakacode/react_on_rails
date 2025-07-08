@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { createFromReadableStream } from 'react-on-rails-rsc/client.browser';
-import { createRSCPayloadKey, fetch, wrapInNewPromise, extractErrorMessage } from './utils.ts';
+import { createServerComponentCacheKey, fetch, wrapInNewPromise, extractErrorMessage } from './utils.ts';
 import transformRSCStreamAndReplayConsoleLogs from './transformRSCStreamAndReplayConsoleLogs.ts';
 import { RailsContext } from './types/index.ts';
 
@@ -165,7 +165,7 @@ const createFromPreloadedPayloads = (payloads: string[]) => {
 const getReactServerComponent =
   (domNodeId: string, railsContext: RailsContext) =>
   ({ componentName, componentProps, enforceRefetch = false }: ClientGetReactServerComponentProps) => {
-    const componentCacheKey = createRSCPayloadKey(componentName, componentProps);
+    const componentCacheKey = createServerComponentCacheKey(componentName, componentProps);
 
     const rscPayloadKey = `${componentCacheKey}-${domNodeId}`;
     const payloads = window.REACT_ON_RAILS_RSC_PAYLOADS?.[rscPayloadKey];
