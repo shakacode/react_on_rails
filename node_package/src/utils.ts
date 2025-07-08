@@ -40,5 +40,3 @@ export const wrapInNewPromise = <T>(promise: Promise<T>) => {
     void promise.catch(reject);
   });
 };
-
-export const 
