@@ -165,10 +165,12 @@ const createFromPreloadedPayloads = (payloads: string[]) => {
 const getReactServerComponent =
   (domNodeId: string, railsContext: RailsContext) =>
   ({ componentName, componentProps, enforceRefetch = false }: ClientGetReactServerComponentProps) => {
-    const rscPayloadKey = createRSCPayloadKey(componentName, componentProps, domNodeId);
-    const payloads = window.REACT_ON_RAILS_RSC_PAYLOADS?.[rscPayloadKey];
-    if (!enforceRefetch && payloads) {
-      return createFromPreloadedPayloads(payloads);
+    if (!enforceRefetch && window.REACT_ON_RAILS_RSC_PAYLOADS) {
+      const rscPayloadKey = createRSCPayloadKey(componentName, componentProps, domNodeId);
+      const payloads = window.REACT_ON_RAILS_RSC_PAYLOADS[rscPayloadKey];
+      if (payloads) {
+        return createFromPreloadedPayloads(payloads);
+      }
     }
     return fetchRSC({ componentName, componentProps, railsContext });
   };
