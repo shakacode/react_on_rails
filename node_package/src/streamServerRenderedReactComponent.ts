@@ -9,14 +9,17 @@ import handleError from './handleError.ts';
 import { renderToPipeableStream } from './ReactDOMServer.cts';
 import { createResultObject, convertToError, validateComponent } from './serverRenderUtils.ts';
 import {
-  assertRailsContextWithServerComponentCapabilities,
+  assertRailsContextWithServerStreamingCapabilities,
   RenderParams,
   StreamRenderState,
   StreamableComponentResult,
   PipeableOrReadableStream,
+  RailsContextWithServerStreamingCapabilities,
+  assertRailsContextWithServerComponentMetadata,
 } from './types/index.ts';
 import injectRSCPayload from './injectRSCPayload.ts';
-import { notifySSREnd } from './postSSRHooks.ts';
+import PostSSRHookTracker from './PostSSRHookTracker.ts';
+import RSCRequestTracker from './RSCRequestTracker.ts';
 
 type BufferedEvent = {
   event: 'data' | 'error' | 'end';
@@ -135,9 +138,15 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
   return { readableStream, pipeToTransform, writeChunk, emitError, endStream };
 };
 
+export type StreamingTrackers = {
+  postSSRHookTracker: PostSSRHookTracker;
+  rscRequestTracker: RSCRequestTracker;
+};
+
 const streamRenderReactComponent = (
   reactRenderingResult: StreamableComponentResult,
   options: RenderParams,
+  streamingTrackers: StreamingTrackers,
 ) => {
   const { name: componentName, throwJsErrors, domNodeId, railsContext } = options;
   const renderState: StreamRenderState = {
@@ -164,7 +173,7 @@ const streamRenderReactComponent = (
     endStream();
   };
 
-  assertRailsContextWithServerComponentCapabilities(railsContext);
+  assertRailsContextWithServerStreamingCapabilities(railsContext);
 
   Promise.resolve(reactRenderingResult)
     .then((reactRenderedElement) => {
@@ -186,15 +195,13 @@ const streamRenderReactComponent = (
         },
         onShellReady() {
           renderState.isShellReady = true;
-          pipeToTransform(injectRSCPayload(renderingStream, railsContext));
+          pipeToTransform(injectRSCPayload(renderingStream, streamingTrackers.rscRequestTracker, domNodeId));
         },
         onError(e) {
           reportError(convertToError(e));
         },
         onAllReady() {
-          if (railsContext.componentSpecificMetadata?.renderRequestId) {
-            notifySSREnd(railsContext);
-          }
+          streamingTrackers.postSSRHookTracker.notifySSREnd();
         },
         identifierPrefix: domNodeId,
       });
@@ -207,13 +214,52 @@ const streamRenderReactComponent = (
   return readableStream;
 };
 
-type StreamRenderer<T, P extends RenderParams> = (reactElement: StreamableComponentResult, options: P) => T;
+type StreamRenderer<T, P extends RenderParams> = (
+  reactElement: StreamableComponentResult,
+  options: P,
+  streamingTrackers: StreamingTrackers,
+) => T;
+
+/**
+ * This module implements request-scoped tracking for React Server Components (RSC)
+ * and post-SSR hooks using local tracker instances per request.
+ *
+ * DESIGN PRINCIPLES:
+ * - Each request gets its own PostSSRHookTracker and RSCRequestTracker instances
+ * - State is automatically garbage collected when request completes
+ * - No shared state between concurrent requests
+ * - Simple, predictable cleanup lifecycle
+ *
+ * TRACKER RESPONSIBILITIES:
+ * - PostSSRHookTracker: Manages hooks that run after SSR completes
+ * - RSCRequestTracker: Handles RSC payload generation and stream tracking
+ * - Both inject their capabilities into the Rails context for component access
+ */
 
 export const streamServerRenderedComponent = <T, P extends RenderParams>(
   options: P,
   renderStrategy: StreamRenderer<T, P>,
 ): T => {
   const { name: componentName, domNodeId, trace, props, railsContext, throwJsErrors } = options;
+
+  assertRailsContextWithServerComponentMetadata(railsContext);
+  const postSSRHookTracker = new PostSSRHookTracker();
+  const rscRequestTracker = new RSCRequestTracker(railsContext);
+  const streamingTrackers = {
+    postSSRHookTracker,
+    rscRequestTracker,
+  };
+
+  const railsContextWithStreamingCapabilities: RailsContextWithServerStreamingCapabilities = {
+    ...railsContext,
+    addPostSSRHook: postSSRHookTracker.addPostSSRHook.bind(postSSRHookTracker),
+    getRSCPayloadStream: rscRequestTracker.getRSCPayloadStream.bind(rscRequestTracker),
+  };
+
+  const optionsWithStreamingCapabilities = {
+    ...options,
+    railsContext: railsContextWithStreamingCapabilities,
+  };
 
   try {
     const componentObj = ComponentRegistry.get(componentName);
@@ -224,7 +270,7 @@ export const streamServerRenderedComponent = <T, P extends RenderParams>(
       domNodeId,
       trace,
       props,
-      railsContext,
+      railsContext: railsContextWithStreamingCapabilities,
     });
 
     if (isServerRenderHash(reactRenderingResult)) {
@@ -242,10 +288,10 @@ export const streamServerRenderedComponent = <T, P extends RenderParams>(
         }
         return result;
       });
-      return renderStrategy(promiseAfterRejectingHash, options);
+      return renderStrategy(promiseAfterRejectingHash, optionsWithStreamingCapabilities, streamingTrackers);
     }
 
-    return renderStrategy(reactRenderingResult, options);
+    return renderStrategy(reactRenderingResult, optionsWithStreamingCapabilities, streamingTrackers);
   } catch (e) {
     const { readableStream, writeChunk, emitError, endStream } = transformRenderStreamChunksToResultObject({
       hasErrors: true,

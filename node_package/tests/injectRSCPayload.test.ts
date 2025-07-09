@@ -1,6 +1,7 @@
 import { Readable, PassThrough } from 'stream';
-import ReactOnRails, { RailsContextWithServerComponentCapabilities } from '../src/ReactOnRails.node.ts';
+import { RailsContextWithServerStreamingCapabilities } from '../src/types/index.ts';
 import injectRSCPayload from '../src/injectRSCPayload.ts';
+import RSCRequestTracker from '../src/RSCRequestTracker.ts';
 
 // Shared utilities
 const createMockStream = (chunks: (string | Buffer)[] | { [key: number]: string | string[] }) => {
@@ -36,46 +37,42 @@ const collectStreamData = async (stream: Readable) => {
 
 // Test setup helper
 const setupTest = (mockRSC: Readable) => {
-  jest.spyOn(ReactOnRails, 'onRSCPayloadGenerated').mockImplementation((_railsContext, callback) => {
+  const railsContext = {} as RailsContextWithServerStreamingCapabilities;
+  const rscRequestTracker = new RSCRequestTracker(railsContext);
+  jest.spyOn(rscRequestTracker, 'onRSCPayloadGenerated').mockImplementation((callback) => {
     callback({ stream: mockRSC, componentName: 'test', props: {} });
   });
 
-  const railsContext = {
-    componentSpecificMetadata: {
-      renderRequestId: '123',
-    },
-  } as RailsContextWithServerComponentCapabilities;
-
-  return { railsContext };
+  return { railsContext, rscRequestTracker, domNodeId: 'test-node' };
 };
 
 describe('injectRSCPayload', () => {
   it('should inject RSC payload as script tags', async () => {
     const mockRSC = createMockStream(['{"test": "data"}']);
     const mockHTML = createMockStream(['<html><body><div>Hello, world!</div></body></html>']);
-    const { railsContext } = setupTest(mockRSC);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
-    const result = injectRSCPayload(mockHTML, railsContext);
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
     const resultStr = await collectStreamData(result);
 
     expect(resultStr).toContain(
-      `<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-123"]||=[]).push("{\\"test\\": \\"data\\"}")</script>`,
+      `<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push("{\\"test\\": \\"data\\"}")</script>`,
     );
   });
 
   it('should handle multiple RSC payloads', async () => {
     const mockRSC = createMockStream(['{"test": "data"}', '{"test": "data2"}']);
     const mockHTML = createMockStream(['<html><body><div>Hello, world!</div></body></html>']);
-    const { railsContext } = setupTest(mockRSC);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
-    const result = injectRSCPayload(mockHTML, railsContext);
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
     const resultStr = await collectStreamData(result);
 
     expect(resultStr).toContain(
-      `<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-123"]||=[]).push("{\\"test\\": \\"data\\"}")</script>`,
+      `<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push("{\\"test\\": \\"data\\"}")</script>`,
     );
     expect(resultStr).toContain(
-      `<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-123"]||=[]).push("{\\"test\\": \\"data2\\"}")</script>`,
+      `<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push("{\\"test\\": \\"data2\\"}")</script>`,
     );
   });
 
@@ -85,17 +82,17 @@ describe('injectRSCPayload', () => {
       '<html><body><div>Hello, world!</div></body></html>',
       '<div>Next chunk</div>',
     ]);
-    const { railsContext } = setupTest(mockRSC);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
-    const result = injectRSCPayload(mockHTML, railsContext);
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
     const resultStr = await collectStreamData(result);
 
     expect(resultStr).toEqual(
-      '<script>(self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-123"]||=[]</script>' +
+      '<script>(self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]</script>' +
         '<html><body><div>Hello, world!</div></body></html>' +
         '<div>Next chunk</div>' +
-        '<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-123"]||=[]).push("{\\"test\\": \\"data\\"}")</script>' +
-        '<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-123"]||=[]).push("{\\"test\\": \\"data2\\"}")</script>',
+        '<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push("{\\"test\\": \\"data\\"}")</script>' +
+        '<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push("{\\"test\\": \\"data2\\"}")</script>',
     );
   });
 
@@ -105,16 +102,16 @@ describe('injectRSCPayload', () => {
       0: '<html><body><div>Hello, world!</div></body></html>',
       100: '<div>Next chunk</div>',
     });
-    const { railsContext } = setupTest(mockRSC);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
-    const result = injectRSCPayload(mockHTML, railsContext);
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
     const resultStr = await collectStreamData(result);
 
     expect(resultStr).toEqual(
-      '<script>(self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-123"]||=[]</script>' +
+      '<script>(self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]</script>' +
         '<html><body><div>Hello, world!</div></body></html>' +
-        '<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-123"]||=[]).push("{\\"test\\": \\"data\\"}")</script>' +
-        '<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-123"]||=[]).push("{\\"test\\": \\"data2\\"}")</script>' +
+        '<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push("{\\"test\\": \\"data\\"}")</script>' +
+        '<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push("{\\"test\\": \\"data2\\"}")</script>' +
         '<div>Next chunk</div>',
     );
   });
@@ -128,17 +125,17 @@ describe('injectRSCPayload', () => {
       100: ['<html><body><div>Hello, world!</div></body></html>', '<div>Next chunk</div>'],
       200: '<div>Third chunk</div>',
     });
-    const { railsContext } = setupTest(mockRSC);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
-    const result = injectRSCPayload(mockHTML, railsContext);
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
     const resultStr = await collectStreamData(result);
 
     expect(resultStr).toEqual(
-      '<script>(self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-123"]||=[]</script>' +
+      '<script>(self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]</script>' +
         '<html><body><div>Hello, world!</div></body></html>' +
         '<div>Next chunk</div>' +
-        '<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-123"]||=[]).push("{\\"test\\": \\"data\\"}")</script>' +
-        '<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-123"]||=[]).push("{\\"test\\": \\"data2\\"}")</script>' +
+        '<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push("{\\"test\\": \\"data\\"}")</script>' +
+        '<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push("{\\"test\\": \\"data2\\"}")</script>' +
         '<div>Third chunk</div>',
     );
   });

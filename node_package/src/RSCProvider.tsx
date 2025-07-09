@@ -1,6 +1,5 @@
 import * as React from 'react';
-import { RailsContextWithComponentSpecificMetadata } from './types/index.ts';
-import getReactServerComponent from './getReactServerComponent.client.ts';
+import type { ClientGetReactServerComponentProps } from './getReactServerComponent.client.ts';
 import { createRSCPayloadKey } from './utils.ts';
 
 type RSCContextType = {
@@ -31,31 +30,28 @@ const RSCContext = React.createContext<RSCContextType | undefined>(undefined);
  * for client-side rendering or 'react-on-rails/wrapServerComponentRenderer/server' for server-side rendering.
  */
 export const createRSCProvider = ({
-  railsContext,
   getServerComponent,
 }: {
-  railsContext: RailsContextWithComponentSpecificMetadata;
-  getServerComponent: typeof getReactServerComponent;
+  getServerComponent: (props: ClientGetReactServerComponentProps) => Promise<React.ReactNode>;
 }) => {
   const fetchRSCPromises: Record<string, Promise<React.ReactNode>> = {};
 
   const getComponent = (componentName: string, componentProps: unknown) => {
-    const key = createRSCPayloadKey(componentName, componentProps, railsContext);
+    const key = createRSCPayloadKey(componentName, componentProps);
     if (key in fetchRSCPromises) {
       return fetchRSCPromises[key];
     }
 
-    const promise = getServerComponent({ componentName, componentProps, railsContext });
+    const promise = getServerComponent({ componentName, componentProps });
     fetchRSCPromises[key] = promise;
     return promise;
   };
 
   const refetchComponent = (componentName: string, componentProps: unknown) => {
-    const key = createRSCPayloadKey(componentName, componentProps, railsContext);
+    const key = createRSCPayloadKey(componentName, componentProps);
     const promise = getServerComponent({
       componentName,
       componentProps,
-      railsContext,
       enforceRefetch: true,
     });
     fetchRSCPromises[key] = promise;
