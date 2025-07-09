@@ -1,6 +1,6 @@
 import { PassThrough } from 'stream';
 import { finished } from 'stream/promises';
-import { createServerComponentCacheKey } from './utils.ts';
+import { createRSCPayloadKey } from './utils.ts';
 import { PipeableOrReadableStream } from './types/index.ts';
 import RSCRequestTracker from './RSCRequestTracker.ts';
 
@@ -210,7 +210,7 @@ export default function injectRSCPayload(
 
       rscRequestTracker.onRSCPayloadGenerated((streamInfo) => {
         const { stream, props, componentName } = streamInfo;
-        const cacheKey = createServerComponentCacheKey(componentName, props);
+        const cacheKey = createRSCPayloadKey(componentName, props);
         const rscPayloadKey = `${cacheKey}-${domNodeId}`;
 
         // CRITICAL TIMING: Initialize global array IMMEDIATELY when component requests RSC

@@ -1,6 +1,6 @@
 import * as React from 'react';
 import type { ClientGetReactServerComponentProps } from './getReactServerComponent.client.ts';
-import { createServerComponentCacheKey } from './utils.ts';
+import { createRSCPayloadKey } from './utils.ts';
 
 type RSCContextType = {
   getComponent: (componentName: string, componentProps: unknown) => Promise<React.ReactNode>;
@@ -37,7 +37,7 @@ export const createRSCProvider = ({
   const fetchRSCPromises: Record<string, Promise<React.ReactNode>> = {};
 
   const getComponent = (componentName: string, componentProps: unknown) => {
-    const key = createServerComponentCacheKey(componentName, componentProps);
+    const key = createRSCPayloadKey(componentName, componentProps);
     if (key in fetchRSCPromises) {
       return fetchRSCPromises[key];
     }
@@ -48,7 +48,7 @@ export const createRSCProvider = ({
   };
 
   const refetchComponent = (componentName: string, componentProps: unknown) => {
-    const key = createServerComponentCacheKey(componentName, componentProps);
+    const key = createRSCPayloadKey(componentName, componentProps);
     const promise = getServerComponent({
       componentName,
       componentProps,
