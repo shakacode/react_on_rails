@@ -21,8 +21,8 @@ export { customFetch as fetch };
  * @param componentProps - Props passed to the component (serialized to JSON)
  * @returns A unique cache key string
  */
-export const createRSCPayloadKey = (componentName: string, componentProps: unknown) => {
-  return `${componentName}-${JSON.stringify(componentProps)}`;
+export const createRSCPayloadKey = (componentName: string, componentProps: unknown, domNodeId?: string) => {
+  return `${componentName}-${JSON.stringify(componentProps)}${domNodeId ? `-${domNodeId}` : ''}`;
 };
 
 /**

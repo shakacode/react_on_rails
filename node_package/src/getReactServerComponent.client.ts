@@ -165,9 +165,7 @@ const createFromPreloadedPayloads = (payloads: string[]) => {
 const getReactServerComponent =
   (domNodeId: string, railsContext: RailsContext) =>
   ({ componentName, componentProps, enforceRefetch = false }: ClientGetReactServerComponentProps) => {
-    const componentCacheKey = createRSCPayloadKey(componentName, componentProps);
-
-    const rscPayloadKey = `${componentCacheKey}-${domNodeId}`;
+    const rscPayloadKey = createRSCPayloadKey(componentName, componentProps, domNodeId);
     const payloads = window.REACT_ON_RAILS_RSC_PAYLOADS?.[rscPayloadKey];
     if (!enforceRefetch && payloads) {
       return createFromPreloadedPayloads(payloads);
