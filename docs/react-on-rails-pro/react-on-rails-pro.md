@@ -22,7 +22,7 @@ See https://www.shakacode.com/react-on-rails-pro/docs/.
 
 ### Pro: React Server Components
 
-See the [announcement here](https://www.shakacode.com/react-on-rails/docs/react-on-rails-pro/react-server-components/).
+See the [announcement here](./react-server-components.md).
 
 Yes! Big performance gains for the newest React features!
 

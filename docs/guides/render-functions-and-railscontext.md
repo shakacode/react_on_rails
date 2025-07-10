@@ -78,7 +78,7 @@ reduxStore = MyReduxStore(props, railsContext);
 > You never make these calls. React on Rails makes these calls when it does either client or server rendering. You will define functions that take these 2 params and return a React component or a Redux Store. Naturally, you do not have to use second parameter, `railsContext`, if you do not need it. If you don't take a second parameter, then you're probably defining a React function component and you will simply return a React Element, often just JSX.
 
 > [!NOTE]
-> See [Redux Store](https://www.shakacode.com/react-on-rails/docs/api/redux-store-api/#multiple-react-components-on-a-page-with-one-store) on how to set up Redux stores that allow multiple components to talk to the same store.
+> See [Redux Store](../api/redux-store-api.md#multiple-react-components-on-a-page-with-one-store) on how to set up Redux stores that allow multiple components to talk to the same store.
 
 The `railsContext` has: (see the implementation in [ReactOnRails::Helper](https://github.com/shakacode/react_on_rails/tree/master/lib/react_on_rails/helper.rb), method `rails_context` for the definitive list).
 
