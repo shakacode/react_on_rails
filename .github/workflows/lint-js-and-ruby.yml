@@ -60,13 +60,13 @@ jobs:
         uses: actions/cache@v4
         with:
           path: spec/dummy/vendor/bundle
-          key: dummy-app-gem-cache-${{ hashFiles('spec/dummy/Gemfile.lock') }}-oldest
+          key: spec-dummy-gem-cache-${{ hashFiles('spec/dummy/Gemfile.lock') }}-oldest
       - name: Install Ruby Gems for dummy app
         run: |
           cd spec/dummy
           bundle lock --add-platform 'x86_64-linux'
           if ! bundle check --path=vendor/bundle; then
-            bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
+            bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3 --frozen
           fi
       - name: generate file system-based packs
         run: cd spec/dummy && RAILS_ENV="test" bundle exec rake react_on_rails:generate_packs
