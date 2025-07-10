@@ -7,7 +7,7 @@
 1. [How React on Rails Works](./guides/how-react-on-rails-works.md)
 1. [Webpack Configuration](./guides/webpack-configuration.md)
 1. [View Helpers API](./api/view-helpers-api.md)
-1. [Caching and Performance: React on Rails Pro](https://www.shakacode.com/react-on-rails-pro.md).
+1. [Caching and Performance: React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/).
 1. [Deployment](./guides/deployment.md).
 
 ## Changes and Upgrades
@@ -24,4 +24,4 @@
 
 # Other Resources
 
-1. RailsConf 2020 talk: [Webpacker, It-Just-Works, But How?](https://www.shakacode.com/blog/railsconf-2020-webpacker-it-just-works-but-how.md)
+1. RailsConf 2020 talk: [Webpacker, It-Just-Works, But How?](https://www.shakacode.com/blog/railsconf-2020-webpacker-it-just-works-but-how/)
