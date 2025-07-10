@@ -24,7 +24,7 @@ Two very common, and quite useful, Webpack loaders are the [url-loader](https://
 
 The url-loader is great to use for smaller images! It is most commonly used with a set byte limit on the size of the files that can be loaded. When this is the case, anything below the byte limit will be loaded and returned as a Data Url. Anything that exceeds the byte limit, will delegate to file-loader for loading, passing any set query parameters as well to file-loader (if that sounds like gibberish right now, don't worry. You'll learn all about it soon!).
 
-The benefit of using url-loader first, and falling back on file-loader, is that the use of Data Urls saves HTTP Requests that need to be made to fetch files. That is very important in regards to how fast a webpage will load. Generally speaking, the less HTTP requests that need to be made, the faster a page will load. For more information about usage, and the pros & cons of Data Urls read [here](https://css-tricks.com/data-uris/).
+The benefit of using url-loader first, and falling back on file-loader, is that the use of Data Urls saves HTTP Requests that need to be made to fetch files. That is very important in regards to how fast a webpage will load. Generally speaking, the less HTTP requests that need to be made, the faster a page will load. For more information about usage, and the pros & cons of Data Urls read [here](https://css-tricks.com/data-uris.md).
 
 Note: _For the rest of this doc, we will be using file-loader. This is because its usage can be a little bit trickier, and it is used as url-loader's back up. Keep in mind that the usage for the two is EXTREMELY similar. For more info about using url-loader, check out its configuration for the `react_on_rails` sample app [here](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/client/webpack.client.base.config.js) (specifically lines 82-84)._
 
@@ -76,7 +76,7 @@ Note: _You can output these files in the asset pipeline wherever you see fit. My
 
 Lastly, we will set the publicPath to our file(s). This will be the endpoint on our Rails web server that you can visit to reach the asset (if you don't know how this works, read the [intro](#using-webpack-bundled-assets-with-the-rails-asset-pipeline)). If you've been following the previous steps, you know that we set our outputPath for our assets to be absolute at `app/assets/webpack/webpack-assets/`, which your Rails app should end up hosting at `/assets/webpack-assets/file-name+hash.ext` when the server is run.
 
-Note: _If you're having a hard time figuring out what an asset's path will be on your Rails server, simply run `rake assets:precompile` and `cd public/`. The path from there to your file will then be the path/url on your web server to that asset. On top of this, it is also a good idea to check out [this doc](https://www.shakacode.com/react-on-rails/docs/outdated/rails-assets/) to understand how `react_on_rails` allows us to access these files after precompilation, when Rails applies another hash onto the asset._
+Note: _If you're having a hard time figuring out what an asset's path will be on your Rails server, simply run `rake assets:precompile` and `cd public/`. The path from there to your file will then be the path/url on your web server to that asset. On top of this, it is also a good idea to check out [this doc](./rails-assets.md) to understand how `react_on_rails` allows us to access these files after precompilation, when Rails applies another hash onto the asset._
 
 Our publicPath setting will match the path to our outputted assets on our Rails web server. Given our assets in this example will be outputted to `/app/assets/webpack/webpack-assets/` and hosted at `/assets/webpack-assets/`, our publicPath would be:
 
@@ -190,4 +190,4 @@ module.exports = {
 };
 ```
 
-If you'd like to understand how react_on_rails handles these bundled assets after asset precompilation and in production mode, check out: [Rails Assets](https://www.shakacode.com/react-on-rails/docs/outdated/rails-assets/).
+If you'd like to understand how react_on_rails handles these bundled assets after asset precompilation and in production mode, check out: [Rails Assets](./rails-assets.md).

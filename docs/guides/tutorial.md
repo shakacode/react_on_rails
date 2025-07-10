@@ -330,8 +330,8 @@ versus with server rendering:
 
 For more details on server rendering, see:
 
-- [Client vs. Server Rendering](https://www.shakacode.com/react-on-rails/docs/guides/client-vs-server-rendering/)
-- [React Server Rendering](https://www.shakacode.com/react-on-rails/docs/guides/react-server-rendering/)
+- [Client vs. Server Rendering](./client-vs-server-rendering.md)
+- [React Server Rendering](./react-server-rendering.md)
 
 ## Moving from the Rails default `/app/javascript` to the recommended `/client` structure
 

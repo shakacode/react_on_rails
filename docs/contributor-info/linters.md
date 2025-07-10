@@ -1,6 +1,6 @@
 # Linters
 
-These linters support the [ShakaCode Style Guidelines](https://www.shakacode.com/react-on-rails/docs/misc/style/)
+These linters support the [ShakaCode Style Guidelines](../misc/style.md)
 
 ## Autofix!
 
