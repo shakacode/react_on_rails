@@ -61,7 +61,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: spec/dummy/vendor/bundle
-          key: spec-dummy-gem-cache-${{ hashFiles('spec/dummy/Gemfile.lock') }}-oldest
+          key: dummy-app-gem-cache-${{ hashFiles('spec/dummy/Gemfile.lock') }}-oldest
+      - run: ls vendor/bundle/ruby/
+      - run: ls vendor/bundle/ruby/3.4.4/
       - run: ls vendor/bundle/ruby/3.4.4/gems
       - run: ls spec/dummy/vendor/bundle/ruby/3.4.4/gems
       - name: Install Ruby Gems for dummy app
