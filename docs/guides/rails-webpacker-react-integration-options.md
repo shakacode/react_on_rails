@@ -132,10 +132,7 @@ You can see an example commit of adding this [here](https://github.com/shakacode
 
    //plugins
    if (isWebpackDevServer) {
-     environment.plugins.append(
-       'ReactRefreshWebpackPlugin',
-       new ReactRefreshWebpackPlugin({}),
-     );
+     environment.plugins.append('ReactRefreshWebpackPlugin', new ReactRefreshWebpackPlugin({}));
    }
    ```
 
