@@ -63,7 +63,7 @@ if (typeof window !== 'undefined') {
   global.ReadableStreamDefaultReader = ReadableStreamDefaultReader;
 }
 
-global.console.log("All calls to console have been disabled in jest.setup.js")
+global.console.log('All calls to console have been disabled in jest.setup.js');
 
 global.console = {
   log: jest.fn(),
@@ -71,4 +71,4 @@ global.console = {
   warn: jest.fn(),
   info: jest.fn(),
   debug: jest.fn(),
-}
+};
