@@ -52,7 +52,7 @@ jobs:
         run: cd spec/dummy && yarn install --no-progress --no-emoji --frozen-lockfile
       - name: Install Ruby Gems for package
         run: bundle check --path=vendor/bundle || bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
-      - run: ls vendor/bundle/gems
+      - run: ls vendor/bundle
       - name: Lint Ruby
         run: bundle exec rubocop
       - name: Install Node modules with Yarn for dummy app
@@ -63,6 +63,7 @@ jobs:
           path: spec/dummy/vendor/bundle
           key: spec-dummy-gem-cache-${{ hashFiles('spec/dummy/Gemfile.lock') }}-oldest
       - run: ls spec/dummy/vendor/bundle
+      - run: ls vendor/bundle/gems
       - name: Install Ruby Gems for dummy app
         run: |
           cd spec/dummy
@@ -70,5 +71,6 @@ jobs:
           if ! bundle check --path=vendor/bundle; then
             bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3 --frozen
           fi
+      - run: ls spec/dummy/vendor/bundle
       - run: ls vendor/bundle/gems
       - run: ls spec/dummy/vendor/bundle/gems
