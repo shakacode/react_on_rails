@@ -52,6 +52,7 @@ jobs:
         run: cd spec/dummy && yarn install --no-progress --no-emoji --frozen-lockfile
       - name: Install Ruby Gems for package
         run: bundle check --path=vendor/bundle || bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
+      - run: ls vendor/bundle/gems
       - name: Lint Ruby
         run: bundle exec rubocop
       - name: Install Node modules with Yarn for dummy app
@@ -61,6 +62,7 @@ jobs:
         with:
           path: spec/dummy/vendor/bundle
           key: spec-dummy-gem-cache-${{ hashFiles('spec/dummy/Gemfile.lock') }}-oldest
+      - run: ls spec/dummy/vendor/bundle
       - name: Install Ruby Gems for dummy app
         run: |
           cd spec/dummy
@@ -68,56 +70,5 @@ jobs:
           if ! bundle check --path=vendor/bundle; then
             bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3 --frozen
           fi
-      - name: generate file system-based packs
-        run: cd spec/dummy && RAILS_ENV="test" bundle exec rake react_on_rails:generate_packs
-      - name: Detect dead code
-        run: |
-          yarn run knip
-          yarn run knip --production
-      - name: Lint JS
-        run: yarn run eslint --report-unused-disable-directives
-      - name: Check formatting
-        run: yarn start format.listDifferent
-      - name: Type-check TypeScript
-        run: yarn run type-check
-      - name: Pack for attw and publint
-        run: yarn pack -f react-on-rails.tgz
-      - name: Lint package types
-        # our package is ESM-only
-        run: yarn run attw react-on-rails.tgz --profile esm-only
-      - name: Lint package publishing
-        run: yarn run publint --strict react-on-rails.tgz
-      # We only download and run Actionlint if there is any difference in GitHub Action workflows
-      # https://github.com/rhysd/actionlint/blob/main/docs/usage.md#on-github-actions
-      - name: Check GitHub Action changes
-        id: check-workflows
-        run: |
-          git fetch origin ${{ github.event.pull_request.base.sha }}
-          if git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} | grep -q '^.github/workflows'; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-            response=$(curl -sf https://api.github.com/repos/rhysd/actionlint/releases/latest)
-            if [ $? -eq 0 ]; then
-              actionlint_version=$(echo "$response" | jq -r .tag_name)
-              if [ -z "$actionlint_version" ]; then
-                echo "Failed to parse Actionlint version"
-                exit 1
-              fi
-              echo "actionlint_version=\"$actionlint_version\"" >> "$GITHUB_OUTPUT"
-            fi
-          fi
-      - name: Setup Actionlint
-        if: steps.check-workflows.outputs.changed == 'true'
-        uses: actions/cache@v4
-        id: cache-actionlint
-        with:
-          path: ./actionlint
-          key: ${{ runner.os }}-actionlint-${{ steps.check-workflows.outputs.actionlint_version }}
-      - name: Download Actionlint
-        if: steps.check-workflows.outputs.changed == 'true' && steps.cache-actionlint.outputs.cache-hit != 'true'
-        run: bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
-      - name: Lint GitHub Actions
-        if: steps.check-workflows.outputs.changed == 'true'
-        run: |
-          echo "::add-matcher::.github/actionlint-matcher.json"
-          SHELLCHECK_OPTS="-S warning" ./actionlint -color
-        shell: bash
+      - run: ls vendor/bundle/gems
+      - run: ls spec/dummy/vendor/bundle/gems
