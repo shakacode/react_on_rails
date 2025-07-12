@@ -39,7 +39,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: vendor/bundle
-          key: package-app-gem-cache-${{ hashFiles('Gemfile.lock') }}-newest
+          key: package-app-gem-cache-${{ hashFiles('Gemfile.lock') }}-lint
       - name: Install Node modules with Yarn for renderer package
         run: |
           yarn install --no-progress --no-emoji --frozen-lockfile
@@ -60,7 +60,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: spec/dummy/vendor/bundle
-          key: dummy-app-gem-cache-${{ hashFiles('spec/dummy/Gemfile.lock') }}-newest
+          key: dummy-app-gem-cache-${{ hashFiles('spec/dummy/Gemfile.lock') }}-lint
       - name: Install Ruby Gems for dummy app
         run: |
           cd spec/dummy
