@@ -62,3 +62,11 @@ if (typeof window !== 'undefined') {
   global.ReadableStream = ReadableStream;
   global.ReadableStreamDefaultReader = ReadableStreamDefaultReader;
 }
+
+global.console = {
+  log: jest.fn(),
+  error: jest.fn(),
+  warn: jest.fn(),
+  info: jest.fn(),
+  debug: jest.fn(),
+};
