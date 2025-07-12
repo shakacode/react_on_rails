@@ -15,7 +15,7 @@ describe('isRenderFunction', () => {
       },
     });
 
-    expect(true).toBe(false);
+    expect(isRenderFunction(es5Component)).toBe(false);
   });
 
   it('returns false for a ES6 React class', () => {
