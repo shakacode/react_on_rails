@@ -1,10 +1,6 @@
 import * as React from 'react';
 import * as ReactDOMClient from 'react-dom/client';
-import {
-  ReactComponentOrRenderFunction,
-  RenderFunction,
-  assertRailsContextWithComponentSpecificMetadata,
-} from '../types/index.ts';
+import { ReactComponentOrRenderFunction, RenderFunction } from '../types/index.ts';
 import isRenderFunction from '../isRenderFunction.ts';
 import { ensureReactUseAvailable } from '../reactApis.cts';
 import { createRSCProvider } from '../RSCProvider.tsx';
@@ -53,11 +49,12 @@ const wrapServerComponentRenderer = (componentOrRenderFunction: ReactComponentOr
       throw new Error(`RSCClientRoot: No DOM node found for id: ${domNodeId}`);
     }
 
-    assertRailsContextWithComponentSpecificMetadata(railsContext);
+    if (!railsContext) {
+      throw new Error('RSCClientRoot: No railsContext provided');
+    }
 
     const RSCProvider = createRSCProvider({
-      railsContext,
-      getServerComponent: getReactServerComponent,
+      getServerComponent: getReactServerComponent(domNodeId, railsContext),
     });
 
     const root = (

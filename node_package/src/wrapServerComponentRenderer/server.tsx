@@ -3,7 +3,7 @@ import type { RenderFunction, ReactComponentOrRenderFunction } from '../types/in
 import getReactServerComponent from '../getReactServerComponent.server.ts';
 import { createRSCProvider } from '../RSCProvider.tsx';
 import isRenderFunction from '../isRenderFunction.ts';
-import { assertRailsContextWithServerComponentCapabilities } from '../types/index.ts';
+import { assertRailsContextWithServerStreamingCapabilities } from '../types/index.ts';
 
 /**
  * Wraps a client component with the necessary RSC context and handling for server-side operations.
@@ -30,7 +30,7 @@ const wrapServerComponentRenderer = (componentOrRenderFunction: ReactComponentOr
   }
 
   const wrapper: RenderFunction = async (props, railsContext) => {
-    assertRailsContextWithServerComponentCapabilities(railsContext);
+    assertRailsContextWithServerStreamingCapabilities(railsContext);
 
     const Component = isRenderFunction(componentOrRenderFunction)
       ? await componentOrRenderFunction(props, railsContext)
@@ -41,8 +41,7 @@ const wrapServerComponentRenderer = (componentOrRenderFunction: ReactComponentOr
     }
 
     const RSCProvider = createRSCProvider({
-      railsContext,
-      getServerComponent: getReactServerComponent,
+      getServerComponent: getReactServerComponent(railsContext),
     });
 
     return () => (

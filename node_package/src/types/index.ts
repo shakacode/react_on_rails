@@ -36,15 +36,6 @@ export type RailsContext = {
   search: string | null;
   httpAcceptLanguage: string;
   rscPayloadGenerationUrlPath?: string;
-  componentSpecificMetadata?: {
-    // The renderRequestId serves as a unique identifier for each render request.
-    // We cannot rely solely on nodeDomId, as it should be unique for each component on the page,
-    // but the server can render the same page multiple times concurrently for different users.
-    // Therefore, we need an additional unique identifier that can be used both on the client and server.
-    // This ID can also be used to associate specific data with a particular rendered component
-    // on either the server or client.
-    renderRequestId: string;
-  };
 } & (
   | {
       serverSide: false;
@@ -60,52 +51,57 @@ export type RailsContext = {
       serverSideRSCPayloadParameters?: unknown;
       reactClientManifestFileName?: string;
       reactServerClientManifestFileName?: string;
+      getRSCPayloadStream: (componentName: string, props: unknown) => Promise<NodeJS.ReadableStream>;
     }
 );
 
-export type RailsContextWithComponentSpecificMetadata = RailsContext & {
-  componentSpecificMetadata: {
-    renderRequestId: string;
-  };
-};
-
-export type RailsContextWithServerComponentCapabilities = RailsContextWithComponentSpecificMetadata & {
+export type RailsContextWithServerComponentMetadata = RailsContext & {
   serverSide: true;
   serverSideRSCPayloadParameters?: unknown;
   reactClientManifestFileName: string;
   reactServerClientManifestFileName: string;
 };
 
-export const assertRailsContextWithComponentSpecificMetadata: (
+export type RailsContextWithServerStreamingCapabilities = RailsContextWithServerComponentMetadata & {
+  getRSCPayloadStream: (componentName: string, props: unknown) => Promise<NodeJS.ReadableStream>;
+  addPostSSRHook: (hook: () => void) => void;
+};
+
+const throwRailsContextMissingEntries = (missingEntries: string) => {
+  throw new Error(
+    `Rails context does not have server side ${missingEntries}.\n\n` +
+      'Please ensure:\n' +
+      '1. You are using a compatible version of react_on_rails_pro\n' +
+      '2. Server components support is enabled by setting:\n' +
+      '   ReactOnRailsPro.configuration.enable_rsc_support = true',
+  );
+};
+
+export const assertRailsContextWithServerComponentMetadata: (
   context: RailsContext | undefined,
-) => asserts context is RailsContextWithComponentSpecificMetadata = (
+) => asserts context is RailsContextWithServerComponentMetadata = (
   context: RailsContext | undefined,
-): asserts context is RailsContextWithComponentSpecificMetadata => {
-  if (!context || !('componentSpecificMetadata' in context)) {
-    throw new Error(
-      'Rails context does not have component specific metadata. Please ensure you are using a compatible version of react_on_rails_pro',
+): asserts context is RailsContextWithServerComponentMetadata => {
+  if (
+    !context ||
+    !('reactClientManifestFileName' in context) ||
+    !('reactServerClientManifestFileName' in context)
+  ) {
+    throwRailsContextMissingEntries(
+      'server side RSC payload parameters, reactClientManifestFileName, and reactServerClientManifestFileName',
     );
   }
 };
 
-export const assertRailsContextWithServerComponentCapabilities: (
+export const assertRailsContextWithServerStreamingCapabilities: (
   context: RailsContext | undefined,
-) => asserts context is RailsContextWithServerComponentCapabilities = (
+) => asserts context is RailsContextWithServerStreamingCapabilities = (
   context: RailsContext | undefined,
-): asserts context is RailsContextWithServerComponentCapabilities => {
-  if (
-    !context ||
-    !('reactClientManifestFileName' in context) ||
-    !('reactServerClientManifestFileName' in context) ||
-    !('componentSpecificMetadata' in context)
-  ) {
-    throw new Error(
-      'Rails context does not have server side RSC payload parameters.\n\n' +
-        'Please ensure:\n' +
-        '1. You are using a compatible version of react_on_rails_pro\n' +
-        '2. Server components support is enabled by setting:\n' +
-        '   ReactOnRailsPro.configuration.enable_rsc_support = true',
-    );
+): asserts context is RailsContextWithServerStreamingCapabilities => {
+  assertRailsContextWithServerComponentMetadata(context);
+
+  if (!('getRSCPayloadStream' in context) || !('addPostSSRHook' in context)) {
+    throwRailsContextMissingEntries('getRSCPayloadStream and addPostSSRHook functions');
   }
 };
 
@@ -228,7 +224,7 @@ export interface RenderParams extends Params {
 }
 
 export interface RSCRenderParams extends Omit<RenderParams, 'railsContext'> {
-  railsContext: RailsContextWithServerComponentCapabilities;
+  railsContext: RailsContextWithServerStreamingCapabilities;
   reactClientManifestFileName: string;
 }
 
@@ -346,7 +342,6 @@ export interface ReactOnRails {
    * Adds a post SSR hook to be called after the SSR has completed.
    * @param hook - The hook to be called after the SSR has completed.
    */
-  addPostSSRHook(railsContext: RailsContextWithServerComponentCapabilities, hook: () => void): void;
 }
 
 export type RSCPayloadStreamInfo = {
@@ -465,47 +460,6 @@ export interface ReactOnRailsInternal extends ReactOnRails {
    * Indicates if the RSC bundle is being used.
    */
   isRSCBundle: boolean;
-
-  // These functions are intended for use in Node.js environments only. They should be used on the server side and excluded from client-side bundles to reduce bundle size.
-  /**
-   * Generates a ReadableStream for a given component's RSC payload.
-   * @param componentName - The name of the component.
-   * @param props - The properties to pass to the component.
-   * @param railsContext - The Rails context of the current rendering request.
-   * @returns A promise that resolves to a NodeJS.ReadableStream.
-   */
-  getRSCPayloadStream?: (
-    componentName: string,
-    props: unknown,
-    railsContext: RailsContextWithServerComponentCapabilities,
-  ) => Promise<NodeJS.ReadableStream>;
-
-  /**
-   * Retrieves all React Server Component (RSC) payload streams generated for a specific rendering request.
-   * @param railsContext - The Rails context of the current rendering request.
-   * @returns An array of objects, each containing the component name and its corresponding NodeJS.ReadableStream.
-   */
-  getRSCPayloadStreams?: (railsContext: RailsContextWithServerComponentCapabilities) => {
-    componentName: string;
-    props: unknown;
-    stream: NodeJS.ReadableStream;
-  }[];
-
-  /**
-   * Registers a callback to be called when an RSC payload stream is generated for a specific rendering request.
-   * @param railsContext - The Rails context of the current rendering request.
-   * @param callback - The callback to be called when an RSC payload stream is generated.
-   */
-  onRSCPayloadGenerated?: (
-    railsContext: RailsContextWithServerComponentCapabilities,
-    callback: RSCPayloadCallback,
-  ) => void;
-
-  /**
-   * Clears all RSC payload streams generated for the rendering request of the given Rails context.
-   * @param railsContext - The Rails context of the current rendering request.
-   */
-  clearRSCPayloadStreams?: (railsContext: RailsContextWithServerComponentCapabilities) => void;
 }
 
 export type RenderStateHtml = FinalHtmlResult | Promise<FinalHtmlResult>;

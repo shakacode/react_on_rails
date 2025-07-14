@@ -15,17 +15,9 @@ module ReactOnRails
       def initialize(react_component_name: required("react_component_name"), options: required("options"))
         @react_component_name = react_component_name.camelize
         @options = options
-        # The render_request_id serves as a unique identifier for each render request.
-        # We cannot rely solely on dom_id, as it should be unique for each component on the page,
-        # but the server can render the same page multiple times concurrently for different users.
-        # Therefore, we need an additional unique identifier that can be used both on the client and server.
-        # This ID can also be used to associate specific data with a particular rendered component
-        # on either the server or client.
-        # This ID is only present if RSC support is enabled because it's only used in that case.
-        @render_request_id = self.class.generate_request_id if ReactOnRails::Utils.rsc_support_enabled?
       end
 
-      attr_reader :react_component_name, :render_request_id
+      attr_reader :react_component_name
 
       def throw_js_errors
         options.fetch(:throw_js_errors, false)

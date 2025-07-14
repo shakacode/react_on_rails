@@ -10,7 +10,7 @@ import ReactOnRails from '../src/ReactOnRails.node.ts';
 
 const AsyncContent = async ({ throwAsyncError }) => {
   await new Promise((resolve) => {
-    setTimeout(resolve, 10);
+    setTimeout(resolve, 50);
   });
   if (throwAsyncError) {
     throw new Error('Async Error');
