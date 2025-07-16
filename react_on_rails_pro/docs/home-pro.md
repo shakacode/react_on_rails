@@ -87,7 +87,7 @@ Such fragment caching saves CPU work for your web server and greatly reduces the
 4. Creating the HTML string containing the props and the server-rendered JavaScript code.
 
 Note, even without server rendering (without step 3 above), fragment caching is still effective.
-See [Caching](https://www.shakacode.com/react-on-rails-pro/docs/caching/) for more additional details.
+See [Caching](./caching.md) for more additional details.
 
 ## React On Rails Pro Node React Render
 The "React on Rails Pro Node React Renderer" provides more efficient React Server Side Rendering on a standalone Node JS server.
@@ -105,10 +105,10 @@ To limit the load on the renderer server or embedded ExecJS, caching of React re
 Due to poor performance and crashes due to memory leaks, the rolling restart of node workers was thus added as an option to the core rendering product. This option is cheap insurance against the renderer getting too slow from a memory leak due to a bug in some newly deployed JavaScript code.
 
 ### Docs
-See the [Node React Render Docs](https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/basics/).
+See the [Node React Render Docs](./node-renderer/basics.md).
 
 ## Other Utility Methods
-See the [Ruby API](https://www.shakacode.com/react-on-rails-pro/docs/ruby-api/).
+See the [Ruby API](./ruby-api.md).
 
 # Testimonials
 
@@ -142,5 +142,5 @@ For more info, email [justin@shakacode.com](mailto:justin@shakacode.com).
 
 # References
 
-* [Caching](https://www.shakacode.com/react-on-rails-pro/docs/caching/)
-* [Rails Configuration](https://www.shakacode.com/react-on-rails-pro/docs/configuration/)
+* [Caching](./caching.md)
+* [Rails Configuration](./configuration.md)

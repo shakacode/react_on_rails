@@ -132,7 +132,8 @@ For a deeper dive into selective hydration, see our [Selective Hydration in Stre
 ### 1. Enable RSC Support
 
 Add to your Rails initializer, it makes the magic happen 🪄:
-```ruby:config/initializers/react_on_rails_pro.rb
+```ruby
+# config/initializers/react_on_rails_pro.rb
 ReactOnRailsPro.configure do |config|
   config.enable_rsc_support = true
 end
@@ -141,7 +142,8 @@ end
 ### 2. Update Webpack Configuration
 
 Create RSC bundle and make it use the RSC loader:
-```javascript:config/webpack/rscWebpackConfig.mjs
+```javascript
+// config/webpack/rscWebpackConfig.mjs
 const rscConfig = serverWebpackConfig();
 
 // Configure RSC entry point
@@ -164,11 +166,13 @@ rules.forEach((rule) => {
 
 ### 3. Gradual Component Migration
 
-1. **Mark Entry Points as Client Components**
+#### 1. Mark Entry Points as Client Components
+
 Adding the `'use client'` directive to entry points maintains existing functionality while allowing for incremental migration of individual components to server components.
 This approach ensures a smooth transition without disrupting the application's current behavior.
 
-```jsx:app/components/App.jsx
+```jsx
+// app/components/App.jsx
 'use client';
 
 export default function App() {
@@ -176,17 +180,18 @@ export default function App() {
 }
 ```
 
-2. **Identify Server Component Candidates:**
+#### 2. Identify Server Component Candidates:
 - Data fetching components
 - Non-interactive UI
 - Static content sections
 - Layout components
 
-3. **Progressive Migration Pattern (Top-Down Approach)**
+#### 3. Progressive Migration Pattern (Top-Down Approach):
 
 Start by converting layout and container components at the top of your component tree to server components, moving any interactive logic down to child components. This "top-down" approach maximizes the benefits of RSC.
 
-```jsx:app/components/Layout.jsx
+```jsx
+// app/components/Layout.jsx
 // Remove 'use client' - This becomes a server component
 // Move any state/effects to child components first
 export default function Layout({ children }) {
@@ -203,7 +208,8 @@ export default function Layout({ children }) {
 }
 ```
 
-```jsx:app/components/InteractiveWidget.jsx
+```jsx
+// app/components/InteractiveWidget.jsx
 'use client'; // Keep client directive for interactive components
 
 export default function InteractiveWidget() {
@@ -212,8 +218,10 @@ export default function InteractiveWidget() {
 }
 ```
 
-4. **Convert Lazy-Loaded Entry Points:**
-```jsx:app/components/LazyLoadedSection.jsx
+#### 4. Convert Lazy-Loaded Entry Points:
+
+```jsx
+// app/components/LazyLoadedSection.jsx
 // Remove lazy loading wrapper
 // Convert to async server component
 async function LazyLoadedSection() {

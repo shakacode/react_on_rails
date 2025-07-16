@@ -343,8 +343,8 @@ As you can see, server components are not registered using the `ReactOnRails.reg
 As you can see at [How React Server Components work](how-react-server-components-work.md):
 - Server components are rendered on the client using the rsc payload not the component itself.
 
-And as you can see at [React Server Components Rendering Flow](react-server-components-rendering-flow.md):
-- In the future, the server bundle will use the rsc payload to render the server component on the server side as well.
+And as you can see at [React Server Components Rendering Flow](./rendering-flow.md):
+- In the future, the server bundle will use the RSC payload to render the server component on the server side as well.
 
 The `rscPayloadGenerationUrlPath` option will be explained in detail later in this document. For now, just know that it specifies the base URL path for React Server Component requests.
 
@@ -444,5 +444,5 @@ The RSC payload format and how React processes it is explained in detail in the 
 
 ## Next Steps
 
-Now that you understand the basics of React Server Components, you can proceed to the next article: [Add Stream and Interactivity to RSC Page](add-stream-and-interactivity-to-rsc-page.md) to learn how to enhance your RSC page with streaming capabilities and client-side interactivity.
+Now that you understand the basics of React Server Components, you can proceed to the next article: [Add Streaming and Interactivity to RSC Page](./add-streaming-and-interactivity.md) to learn how to enhance your RSC page with streaming capabilities and client-side interactivity.
 

@@ -1,8 +1,8 @@
 # SSR React Server Components
 
 Before reading this document, please read:
-1. [Create React Server Component without SSR](./create-react-server-component-without-ssr.md)
-2. [Add Stream and Interactivity to RSC Page](./add-stream-and-interactivity-to-rsc-page.md)
+1. [Create React Server Component without SSR](./create-without-ssr.md)
+2. [Add Streaming and Interactivity to RSC Page](./add-streaming-and-interactivity.md)
 
 These documents provide essential background on React Server Components and how they work without Server Side Rendering (SSR).
 
@@ -27,7 +27,7 @@ The server did not finish this Suspense boundary: The server used "renderToStrin
 
 This error occurs because the `react_component` helper uses React's `renderToString` function, which renders the React page synchronously in a single pass. This approach isn't suitable for React Server Components, which can contain asynchronous operations and need progressive streaming of content.
 
-Instead, we need to use the streaming capabilities provided by React on Rails Pro, as detailed in the [streaming server rendering documentation](./streaming-server-rendering.md). These helpers internally use React's `renderToPipeableStream` API, which supports:
+Instead, we need to use the streaming capabilities provided by React on Rails Pro, as detailed in the [streaming server rendering documentation](../streaming-server-rendering.md). These helpers internally use React's `renderToPipeableStream` API, which supports:
 
 1. Server-side rendering of async components
 2. Progressive streaming of HTML chunks to the client as components finish rendering
@@ -37,42 +37,33 @@ To enable streaming SSR for React Server Components, we need to:
 
 1. Create a new view called `react_server_component_ssr.html.erb` with the following content:
 
-```erb
-# app/views/pages/react_server_component_ssr.html.erb
-<%= stream_react_component("ReactServerComponentPage",
-    id: "ReactServerComponentPage-react-component-0") %>
+    ```erb
+    # app/views/pages/react_server_component_ssr.html.erb
+    <%= stream_react_component("ReactServerComponentPage",
+        id: "ReactServerComponentPage-react-component-0") %>
+    
+    <h1>React Server Component with SSR</h1>
+    ```
 
-<h1>React Server Component with SSR</h1>
-```
+2. Ensure our controller includes `ReactOnRailsPro::Stream` and use the `stream_view_containing_react_components` helper to render the view:
 
-2. Ensure our controller includes the necessary streaming modules
+    ```ruby
+    # app/controllers/pages_controller.rb
+    class PagesController < ApplicationController
+      include ReactOnRailsPro::Stream
+    
+      def react_server_component_ssr
+        stream_view_containing_react_components(template: "pages/react_server_component_ssr")
+      end
+    end
+    ```
 
-```ruby
-# app/controllers/pages_controller.rb
-class PagesController < ApplicationController
-  include React::ServerRendering::Streaming
-end
-```
+3. Add the route to `config/routes.rb`:
 
-3. Use the `stream_view_containing_react_components` helper to render the view
-
-```ruby
-# app/controllers/pages_controller.rb
-class PagesController < ApplicationController
-  include ReactOnRailsPro::Stream
-
-  def react_server_component_ssr
-    stream_view_containing_react_components(template: "pages/react_server_component_ssr")
-  end
-end
-```
-
-4. Add the route to `config/routes.rb`:
-
-```ruby
-# config/routes.rb
-get "/react_server_component_ssr", to: "pages#react_server_component_ssr"
-```
+    ```ruby
+    # config/routes.rb
+    get "/react_server_component_ssr", to: "pages#react_server_component_ssr"
+    ```
 
 Now, when you visit the page, you should see the entire React Server Component page rendered in the browser. And if you viewed the page source, you should see the HTML being streamed to the browser.
 

@@ -1,6 +1,6 @@
-# Add Stream and Interactivity to RSC Page
+# Add Streaming and Interactivity to RSC Page
 
-Before reading this document, please read the [Create React Server Component without SSR](create-react-server-component-without-ssr.md) document.
+Before reading this document, please read the [Create React Server Component without SSR](./create-without-ssr.md) document.
 
 ## Make the React Server Component Page Progressively Load
 React Server Components support progressive loading, which means they can be built as asynchronous functions that resolve and render after the initial HTML is sent to the client. This enables a better user experience by:
@@ -15,7 +15,6 @@ Let's create an `async` React Server Component that will be progressively loaded
 
 ```js
 // app/javascript/components/Posts.jsx
-
 import React from 'react';
 import fetch from 'node-fetch';
 import _ from 'lodash';
@@ -54,7 +53,6 @@ Let's add the Posts component to the React Server Component Page.
 
 ```js
 // app/javascript/packs/components/ReactServerComponentPage.jsx
-
 import React from 'react';
 import ReactServerComponent from '../../components/ReactServerComponent';
 import Posts from '../../components/Posts';
@@ -135,7 +133,6 @@ Now, let's use the `ToggleContainer` component to wrap the post image.
 
 ```js
 // app/javascript/components/Posts.jsx
-
 import ToggleContainer from './ToggleContainer';
 
 const Posts = () => {
@@ -190,4 +187,4 @@ For more details on this architecture, see React's [Server Components documentat
 
 ## Next Steps
 
-Now that you understand how to add streaming and interactivity to React Server Components, you can proceed to the next article: [SSR React Server Components](ssr-react-server-components.md) to learn how to enable server-side rendering (SSR) for your React Server Components.
+Now that you understand how to add streaming and interactivity to React Server Components, you can proceed to the next article: [SSR React Server Components](./server-side-rendering.md) to learn how to enable server-side rendering (SSR) for your React Server Components.

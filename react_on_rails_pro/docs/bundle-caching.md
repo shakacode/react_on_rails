@@ -104,7 +104,7 @@ A much better approach than accessing `process.env` is to use the
 `config/initializers/react_on_rails.rb` setting for the`config.rendering_extension` to always
 pass some values into the rendering props.
 
-https://www.shakacode.com/react-on-rails/docs/basics/render-functions-and-railscontext/#customization-of-the-railscontext
+See [our railsContext docs](https://www.shakacode.com/react-on-rails/docs/basics/render-functions-and-railscontext/#customization-of-the-railscontext) for more details.
 
 Also, if your webpack build process depends on any ENV values, then you will also need to add those
 to return value of the `cache_keys` method.
