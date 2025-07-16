@@ -26,11 +26,11 @@ For example, configure `config/initializers/react_on_rails` to set the name for 
 config.components_subdirectory = "ror_components"
 ```
 
-Now all React components inside the directories called `ror_components` will automatically be registered for usage with [`react_component`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component) and [`react_component_hash`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component_hash) helper methods provided by React on Rails.
+Now all React components inside the directories called `ror_components` will automatically be registered for usage with [`react_component`](../api/view-helpers-api.md#react_component) and [`react_component_hash`](../api/view-helpers-api.md#react_component_hash) helper methods provided by React on Rails.
 
 ### Configure `auto_load_bundle` Option
 
-For automated component registry, [`react_component`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component) and [`react_component_hash`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component_hash) view helper method tries to load generated bundle for component from the generated directory automatically per `auto_load_bundle` option. `auto_load_bundle` option in `config/initializers/react_on_rails` configures the default value that will be passed to component helpers. The default is `false`, and the parameter can be passed explicitly for each call.
+For automated component registry, [`react_component`](../api/view-helpers-api.md#react_component) and [`react_component_hash`](../api/view-helpers-api.md#react_component_hash) view helper method tries to load generated bundle for component from the generated directory automatically per `auto_load_bundle` option. `auto_load_bundle` option in `config/initializers/react_on_rails` configures the default value that will be passed to component helpers. The default is `false`, and the parameter can be passed explicitly for each call.
 
 You can change the value in `config/initializers/react_on_rails` by updating it as follows:
 
@@ -186,7 +186,7 @@ For example, if you wanted to utilize our file-system based entrypoint generatio
       <%= react_component("BarComponentTwo", {}) %>
       ```
 
-      If a component uses multiple HTML strings for server rendering, the [`react_component_hash`](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/#react_component_hash) view helper can be used on the Rails view, as illustrated below.
+      If a component uses multiple HTML strings for server rendering, the [`react_component_hash`](../api/view-helpers-api.md#react_component_hash) view helper can be used on the Rails view, as illustrated below.
 
       ```erb
       <% foo_component_one_data = react_component_hash(
