@@ -42,7 +42,7 @@ Any task in client/package.json that starts the node-renderer
 
 ### Modifying Precompile Task
 
-_Not necessary if you are using [bundle caching](https://www.shakacode.com/react-on-rails-pro/docs/bundle-caching/) as doing so will result in the below being done automatically._
+_Not necessary if you are using [bundle caching](../bundle-caching.md) as doing so will result in the below being done automatically._
 
 To avoid the initial round trip to get a bundle on the renderer, you can do something like this to copy the file during precompile.
 

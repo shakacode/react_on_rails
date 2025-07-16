@@ -4,7 +4,7 @@ React Server Components (RSC) enable server-side component execution with client
 
 ## Bundling Process
 
-We showed in the [Create a React Server Component without SSR](create-react-server-component-without-ssr.md) article how to bundle React Server Components. During bundling, we used:
+We showed in the [Create a React Server Component without SSR](./create-without-ssr.md) article how to bundle React Server Components. During bundling, we used:
 
 ### RSC Webpack Loader
 
@@ -94,7 +94,7 @@ CLIENT_BUNDLE_ONLY=true bin/shakapacker
 
 Then, you can find the `react-client-manifest.json` file in the `public/webpack/development` or `public/webpack/production` directory, depending on the environment you are building for.
 
-Let's search for the client component `ToggleContainer` that we built before in [Add Stream and Interactivity to RSC Page](./add-stream-and-interactivity-to-rsc-page.md) article. You will find the following entry in the `react-client-manifest.json` file:
+Let's search for the client component `ToggleContainer` that we built before in [Add Streaming and Interactivity to RSC Page](./add-streaming-and-interactivity.md) article. You will find the following entry in the `react-client-manifest.json` file:
 
 ```json
 "file:///path/to/app/javascript/components/ToggleContainer.jsx": {
@@ -160,7 +160,7 @@ end
 When you navigate to the `http://localhost:3000/react_server_component_page_rsc_payload` page, you will see the RSC payload of the `ReactServerComponentPage` component. You will find multiple JSON objects in the response body. Each represents a chunk of the RSC payload.
 
 ```json
- {
+{
   "html":"<RSC Payload>",
   "consoleReplayScript":"",
   "hasErrors":false,
@@ -240,4 +240,4 @@ end
 
 ## Next Steps
 
-To learn more about how React Server Components are rendered in React on Rails Pro, including the rendering flow, bundle types, and upcoming improvements, see [React Server Components Rendering Flow](react-server-components-rendering-flow.md).
+To learn more about how React Server Components are rendered in React on Rails Pro, including the rendering flow, bundle types, and upcoming improvements, see [React Server Components Rendering Flow](./rendering-flow.md).

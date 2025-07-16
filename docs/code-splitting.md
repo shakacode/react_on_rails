@@ -5,7 +5,7 @@ by ShakaCode
 
 # Deprecated
 
-**Please, see [our new documentation on how to setup code splitting with loadable components](https://www.shakacode.com/react-on-rails-pro/docs/code-splitting-loadable-components/).**
+**Please, see [our new documentation on how to setup code splitting with loadable components](./code-splitting-loadable-components.md).**
 
 # Introduction
 

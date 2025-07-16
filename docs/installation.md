@@ -53,7 +53,7 @@ Note, you should probably use an ENV value for the token so that you don't check
 
 ## Rails Configuration
 You don't need to create an initializer if you are satisfied with the default as described in 
-[Configuration](https://www.shakacode.com/react-on-rails-pro/docs/configuration/)
+[Configuration](./configuration.md)
 
 # Node Package
 Note, you only need to install the Node Package if you are using the standalone node renderer, `NodeRenderer`.
@@ -164,7 +164,7 @@ or edit package.json directly
 ```                     
 
 ### Configuration
-See [NodeRenderer JavaScript Configuration](https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/js-configuration/).
+See [NodeRenderer JavaScript Configuration](./node-renderer/js-configuration.md).
 
 #### Webpack Configuration
 Set your server bundle webpack configuration to use a target of `node` per the [Webpack docs](https://webpack.js.org/concepts/targets/#usage).

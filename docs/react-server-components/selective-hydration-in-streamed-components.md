@@ -15,7 +15,7 @@ This approach significantly improves both perceived and actual performance by ma
 
 ## Try Selective Hydration with React Server Component Page
 
-Let's try selective hydration with the React Server Component Page we created in the [SSR React Server Components](./ssr-react-server-components.md).
+Let's try selective hydration with the React Server Component Page we created in the [SSR React Server Components](./server-side-rendering.md).
 
 Let's add a component that is very slow to load into the page.
 
