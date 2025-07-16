@@ -85,7 +85,7 @@ To enable the HMR functionality, you have to use `./bin/shakapacker-dev-server`
    }
    ```
 
-   We added `overlay.sockPort` option in `ReactRefreshWebpackPlugin` to match the webpack-dev-server port specified in `config/shakapacker.yml`. This makes SockJS works properly and fixes this error in browser console: `GET http://localhost:[port]/sockjs-node/info?t=[xxxxxxxxxx] 404 (Not Found)`.
+   We added `overlay.sockPort` option in `ReactRefreshWebpackPlugin` to match the webpack-dev-server port specified in `config/shakapacker.yml`. This makes SockJS works properly and fixes this error in browser console: `GET http://localhost:[port]/sockjs-node/info?t=[xxxxxxxxxx] 404 (Not Found)`. When using `ReactRefreshWebpackPlugin` with `v0.6.0` and newer, `overlay.sockPort` is [no longer supported](https://github.com/pmmmwh/react-refresh-webpack-plugin/pull/850) and should be omitted from the configurations.
 
 4. Add the react-refresh plugin in `babel.config.js`
 
