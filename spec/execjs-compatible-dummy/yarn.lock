@@ -810,14 +810,6 @@
     "@babel/plugin-transform-react-jsx-development" "^7.25.9"
     "@babel/plugin-transform-react-pure-annotations" "^7.25.9"
 
-"@babel/runtime-corejs3@^7.12.5":
-  version "7.27.0"
-  resolved "https://registry.yarnpkg.com/@babel/runtime-corejs3/-/runtime-corejs3-7.27.0.tgz#c766df350ec7a2caf3ed64e3659b100954589413"
-  integrity sha512-UWjX6t+v+0ckwZ50Y5ShZLnlk95pP5MyW/pon9tiYzl3+18pkTHTFNTKr7rQbfRXPkowt2QAn30o1b6oswszew==
-  dependencies:
-    core-js-pure "^3.30.2"
-    regenerator-runtime "^0.14.0"
-
 "@babel/runtime@7", "@babel/runtime@^7.12.5", "@babel/runtime@^7.8.4":
   version "7.27.0"
   resolved "https://registry.yarnpkg.com/@babel/runtime/-/runtime-7.27.0.tgz#fbee7cf97c709518ecc1f590984481d5460d4762"
@@ -1741,7 +1733,7 @@ core-js-compat@^3.40.0:
   dependencies:
     browserslist "^4.24.4"
 
-core-js-pure@^3.23.3, core-js-pure@^3.30.2:
+core-js-pure@^3.23.3:
   version "3.37.1"
   resolved "https://registry.yarnpkg.com/core-js-pure/-/core-js-pure-3.37.1.tgz#2b4b34281f54db06c9a9a5bd60105046900553bd"
   integrity sha512-J/r5JTHSmzTxbiYYrzXg9w1VpqrYt+gexenBE9pugeyhwPZTAEJddyiReJWsLO6uNQ8xJZFbod6XC7KKwatCiA==
@@ -3373,12 +3365,10 @@ react-is@^16.13.1:
   resolved "https://registry.yarnpkg.com/react-is/-/react-is-16.13.1.tgz#789729a4dc36de2999dc156dd6c1d9c18cea56a4"
   integrity sha512-24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ==
 
-react-on-rails@14.1.0:
-  version "14.1.0"
-  resolved "https://registry.npmjs.org/react-on-rails/-/react-on-rails-14.1.0.tgz#ed83662c6f9511acb06229500af57003d47c1044"
-  integrity sha512-B7Bn6Hpld6Sz7VnsUbfz6g9AkguNfJq+TUfLGkB1O3+GkK6RdAMSWPnnzPTBVEzJL2IyIPEqxj0OVtkeQkL7qQ==
-  dependencies:
-    "@babel/runtime-corejs3" "^7.12.5"
+react-on-rails@15.0.0-rc.1:
+  version "15.0.0-rc.1"
+  resolved "https://registry.yarnpkg.com/react-on-rails/-/react-on-rails-15.0.0-rc.1.tgz#d8fe7c260f24dcad9ed373ac8f8b28cf3ddd89cb"
+  integrity sha512-px2UheLn1U2t1ubO7lGkmg44m4IAIYJJHC8BAivWCvPEpluag8VpDD7pt4miG63HosiSK6muqnkFZ3KwyyKfsg==
 
 react-refresh@^0.14.2:
   version "0.14.2"
