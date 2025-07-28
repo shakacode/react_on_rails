@@ -25,7 +25,6 @@ describe ReactOnRailsProHelper, type: :helper do
     allow(self).to receive(:request) {
       RequestDetails.new("http://foobar.com/development", { "HTTP_ACCEPT_LANGUAGE" => "en" })
     }
-    allow(ReactOnRails::ReactComponent::RenderOptions).to receive(:generate_request_id).and_return("123")
   end
 
   let(:hash) do
@@ -180,6 +179,110 @@ describe ReactOnRailsProHelper, type: :helper do
     end
   end
 
+  describe "caching react_component", :caching do
+    shared_examples "prerender caching behavior" do |enable_rsc_support:|
+      around do |example|
+        original_enable_rsc_support = ReactOnRailsPro.configuration.enable_rsc_support
+        ReactOnRailsPro.configuration.enable_rsc_support = enable_rsc_support
+
+        example.run
+      ensure
+        ReactOnRailsPro.configuration.enable_rsc_support = original_enable_rsc_support
+      end
+
+      context "when config.prerender_caching is true" do
+        around do |example|
+          original_prerender_caching = ReactOnRailsPro.configuration.prerender_caching
+          ReactOnRailsPro.configuration.prerender_caching = true
+
+          example.run
+        ensure
+          ReactOnRailsPro.configuration.prerender_caching = original_prerender_caching
+        end
+
+        it "caches the content" do
+          props = { a: 1, b: 2 }
+
+          render_result = react_component("RandomValue", props: props, prerender: true)
+          # Ensure that the component is rendered correctly
+          expect(render_result).to include("RandomValue:")
+
+          expect(cache_data.keys.count).to eq(1)
+        end
+
+        it "doesn't rerender the component after the first render" do
+          props = { a: 1, b: 2 }
+
+          first_render_result = react_component("RandomValue", props: props, prerender: true)
+          second_render_result = react_component("RandomValue", props: props, prerender: true)
+          expect(first_render_result).to include("RandomValue:")
+          expect(second_render_result).to include("RandomValue:")
+
+          expect(cache_data.keys.count).to eq(1)
+          # The first render will contain the rails context
+          # So, we can't use `eq` to compare the results
+          # We can use `include` to check if the second render result is included in the first render result
+          expect(first_render_result).to include(second_render_result)
+        end
+
+        it "rerender the component if the props are different" do
+          props = { a: 1, b: 2 }
+          props2 = { a: 2, b: 3 }
+
+          first_render_result = react_component("RandomValue", props: props, prerender: true)
+          second_render_result = react_component("RandomValue", props: props2, prerender: true)
+
+          expect(first_render_result).to include("RandomValue:")
+          expect(second_render_result).to include("RandomValue:")
+
+          expect(cache_data.keys.count).to eq(2)
+          expect(first_render_result).not_to include(second_render_result)
+        end
+      end
+
+      context "when config.prerender_caching is false" do
+        around do |example|
+          original_prerender_caching = ReactOnRailsPro.configuration.prerender_caching
+          ReactOnRailsPro.configuration.prerender_caching = false
+
+          example.run
+        ensure
+          ReactOnRailsPro.configuration.prerender_caching = original_prerender_caching
+        end
+
+        it "doesn't cache the content" do
+          props = { a: 1, b: 2 }
+
+          render_result = react_component("RandomValue", props: props, prerender: true)
+          expect(render_result).to include("RandomValue:")
+
+          expect(cache_data.keys.count).to eq(0)
+        end
+
+        it "rerenders the component even if the props are the same" do
+          props = { a: 1, b: 2 }
+
+          first_render_result = react_component("RandomValue", props: props, prerender: true)
+          second_render_result = react_component("RandomValue", props: props, prerender: true)
+
+          expect(first_render_result).to include("RandomValue:")
+          expect(second_render_result).to include("RandomValue:")
+
+          expect(cache_data.keys.count).to eq(0)
+          expect(first_render_result).not_to include(second_render_result)
+        end
+      end
+    end
+
+    context "with RSC support enabled" do
+      include_examples "prerender caching behavior", enable_rsc_support: true
+    end
+
+    context "with RSC support disabled" do
+      include_examples "prerender caching behavior", enable_rsc_support: false
+    end
+  end
+
   describe "html_streaming_react_component" do
     include StreamingTestHelpers
 
@@ -209,7 +312,6 @@ describe ReactOnRailsProHelper, type: :helper do
           data-trace="true"
           data-dom-id="TestingStreamableComponent-react-component-0"
           data-force-load="true"
-          data-render-request-id="123"
         >{"helloWorldData":{"name":"Mr. Server Side Rendering"}}</script>
       SCRIPT
     end

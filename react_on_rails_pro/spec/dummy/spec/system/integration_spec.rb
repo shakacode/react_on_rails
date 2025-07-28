@@ -735,11 +735,11 @@ describe "Pages/async_on_server_sync_on_client", :js do
   end
 
   it "progressively renders the page content" do
-    rendering_stages_count = 0
+    rendering_stages = []
     navigate_with_streaming "/async_on_server_sync_on_client" do |content|
       # The first stage when all components are still being rendered on the server
       if content.include?("Loading Suspense Boundary3")
-        rendering_stages_count += 1
+        rendering_stages << 1
         expect(async_component).to have_text("Loading Suspense Boundary3")
         expect(async_component).to have_text("Loading Suspense Boundary2")
         expect(async_component).to have_text("Loading Suspense Boundary1")
@@ -750,7 +750,7 @@ describe "Pages/async_on_server_sync_on_client", :js do
         expect(async_component).not_to have_text("Async Component 1 from Suspense Boundary3")
       # The second stage when the Suspense Boundary3 (with 1000ms delay) is rendered on the server
       elsif content.include?("Async Component 1 from Suspense Boundary3")
-        rendering_stages_count += 1
+        rendering_stages << 2
         expect(async_component).to have_text("Async Component 1 from Suspense Boundary3")
         expect(async_component).not_to have_text("Post 1")
         expect(async_component).not_to have_text("Async Component 1 from Suspense Boundary1")
@@ -758,7 +758,7 @@ describe "Pages/async_on_server_sync_on_client", :js do
         expect(async_component).not_to have_text("Loading Suspense Boundary3")
       # The third stage when the Suspense Boundary2 (with 3000ms delay) is rendered on the server
       elsif content.include?("Async Component 1 from Suspense Boundary2")
-        rendering_stages_count += 1
+        rendering_stages << 3
         expect(async_component).to have_text("Async Component 1 from Suspense Boundary3")
         expect(async_component).to have_text("Post 1")
         expect(async_component).to have_text("Async Component 1 from Suspense Boundary1")
@@ -774,11 +774,11 @@ describe "Pages/async_on_server_sync_on_client", :js do
         expect(page).not_to have_text("Content 1")
       end
     end
-    expect(rendering_stages_count).to be 3
+    expect(rendering_stages).to eq([1, 2, 3])
   end
 
   it "doesn't hydrate client components until they are rendered on the server" do
-    rendering_stages_count = 0
+    rendering_stages = []
     component_logs = []
 
     navigate_with_streaming "/async_on_server_sync_on_client" do |content|
@@ -786,25 +786,25 @@ describe "Pages/async_on_server_sync_on_client", :js do
 
       # The first stage when all components are still being rendered on the server
       if content.include?("<div>Loading Suspense Boundary3</div>")
-        rendering_stages_count += 1
+        rendering_stages << 1
         expect(component_logs).not_to include(async_component_rendered_message(0, 0))
         expect(component_logs).not_to include(async_component_rendered_message(1, 0))
         expect(component_logs).not_to include(async_component_rendered_message(2, 0))
       # The second stage when the Suspense Boundary3 (with 1000ms delay) is rendered on the server
       elsif content.include?("<div>Async Component 1 from Suspense Boundary3 (1000ms server side delay)</div>")
-        rendering_stages_count += 1
+        rendering_stages << 2
         expect(component_logs).to include("AsyncContent rendered")
         expect(component_logs).to include("AsyncContent has been mounted")
         expect(component_logs).not_to include(async_component_rendered_message(1, 0))
       # The third stage when the Suspense Boundary2 (with 3000ms delay) is rendered on the server
       elsif content.include?("<div>Async Component 1 from Suspense Boundary2 (3000ms server side delay)</div>")
-        rendering_stages_count += 1
+        rendering_stages << 3
         expect(component_logs).to include(async_component_rendered_message(1, 0))
         expect(component_logs).to include(async_component_rendered_message(2, 0))
       end
     end
 
-    expect(rendering_stages_count).to be 3
+    expect(rendering_stages).to eq([1, 2, 3])
   end
 
   it "hydrates the client component inside server component before the full page is loaded" do
