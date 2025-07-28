@@ -70,7 +70,6 @@ describe('serverRenderRSCReactComponent', () => {
         serverSide: true,
         reactClientManifestFileName: 'react-client-manifest.json',
         reactServerClientManifestFileName: 'react-server-client-manifest.json',
-        componentSpecificMetadata: { renderRequestId: '123' },
         renderingReturnsPromises: true,
       },
     });

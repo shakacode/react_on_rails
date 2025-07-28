@@ -63,5 +63,5 @@ end
 
 gem "shakapacker", "= 8.0"
 
-gem "react_on_rails", "15.0.0.rc.1"
+gem "react_on_rails", "15.0.0.rc.2"
 gem "react_on_rails_pro", path: "../.."

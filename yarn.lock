@@ -2558,7 +2558,7 @@ bl@^4.1.0:
     inherits "^2.0.4"
     readable-stream "^3.4.0"
 
-body-parser@^1.20.1, "body-parser@npm:empty-npm-package@1.0.0", express@^4.18.2, "express@npm:empty-npm-package@1.0.0":
+body-parser@^1.20.1, "body-parser@npm:empty-npm-package@1.0.0":
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/empty-npm-package/-/empty-npm-package-1.0.0.tgz#fda29eb6de5efa391f73d578697853af55f6793a"
   integrity sha512-q4Mq/+XO7UNDdMiPpR/LIBIW1Zl4V0Z6UT9aKGqIAnBCtCb3lvZJM1KbDbdzdC8fKflwflModfjR29Nt0EpcwA==
@@ -3917,6 +3917,11 @@ expect@^29.0.0, expect@^29.7.0:
     jest-matcher-utils "^29.7.0"
     jest-message-util "^29.7.0"
     jest-util "^29.7.0"
+
+express@^4.18.2, "express@npm:empty-npm-package@1.0.0":
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/empty-npm-package/-/empty-npm-package-1.0.0.tgz#fda29eb6de5efa391f73d578697853af55f6793a"
+  integrity sha512-q4Mq/+XO7UNDdMiPpR/LIBIW1Zl4V0Z6UT9aKGqIAnBCtCb3lvZJM1KbDbdzdC8fKflwflModfjR29Nt0EpcwA==
 
 external-editor@^3.1.0:
   version "3.1.0"
@@ -6838,10 +6843,10 @@ react-is@^18.0.0:
   resolved "https://registry.yarnpkg.com/react-is/-/react-is-18.3.1.tgz#e83557dc12eae63a99e003a46388b1dcbb44db7e"
   integrity sha512-/LLMVyas0ljjAtoYiPqYiL8VWXzUUdThrmU5+n20DZv+a+ClRoevUzw5JxU+Ieh5/c87ytoTBV9G1FiKfNJdmg==
 
-react-on-rails@15.0.0-rc.1:
-  version "15.0.0-rc.1"
-  resolved "https://registry.yarnpkg.com/react-on-rails/-/react-on-rails-15.0.0-rc.1.tgz#d8fe7c260f24dcad9ed373ac8f8b28cf3ddd89cb"
-  integrity sha512-px2UheLn1U2t1ubO7lGkmg44m4IAIYJJHC8BAivWCvPEpluag8VpDD7pt4miG63HosiSK6muqnkFZ3KwyyKfsg==
+react-on-rails@15.0.0-rc.2:
+  version "15.0.0-rc.2"
+  resolved "https://registry.yarnpkg.com/react-on-rails/-/react-on-rails-15.0.0-rc.2.tgz#183c61749f5ef08aa2421a8a5d498a99eb16ca1b"
+  integrity sha512-LEsDqLXVlgS4DDI7VBxZYnNUQZp1Apf1solN1ZW9Tgd7IfR+f3zLoBHSn2OiEtLQKliLWpBNc1NXkeFJs4QsKQ==
 
 readable-stream@^2.2.2:
   version "2.3.8"

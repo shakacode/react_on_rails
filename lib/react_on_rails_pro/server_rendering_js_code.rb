@@ -47,15 +47,6 @@ module ReactOnRailsPro
         JS
       end
 
-      def add_component_specific_metadata(render_options)
-        # If RSC support is not enabled, no render request id is available
-        return "" unless ReactOnRailsPro.configuration.enable_rsc_support && render_options.render_request_id
-
-        <<-JS
-          railsContext.componentSpecificMetadata = {renderRequestId: '#{render_options.render_request_id}'};
-        JS
-      end
-
       # Main rendering function that generates JavaScript code for server-side rendering
       # @param props_string [String] JSON string of props to pass to the React component
       # @param rails_context [String] JSON string of Rails context data
@@ -88,7 +79,6 @@ module ReactOnRailsPro
         <<-JS
         (function(componentName = '#{react_component_name}', props = undefined) {
           var railsContext = #{rails_context};
-          #{add_component_specific_metadata(render_options)}
           #{rsc_params}
           #{generate_rsc_payload_js_function(render_options)}
           #{ssr_pre_hook_js}
