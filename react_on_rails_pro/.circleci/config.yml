@@ -301,11 +301,17 @@ jobs:
             while ! curl -s http://localhost:3000 > /dev/null; do sleep 1; done
       - run:
           name: Run rspec tests
+          working_directory: spec/dummy
           command: |
-            cd spec/dummy && RAILS_ENV=test bundle exec rspec \
-                                              --format RspecJunitFormatter \
-                                              --out ~/rspec/rspec.xml \
-                                              --format documentation
+            circleci tests glob "spec/**/*_spec.rb" |
+            circleci tests run --command="xargs bundle exec rspec \
+                              --profile 10 \
+                              --format progress \
+                              --format RspecJunitFormatter \
+                              --out ~/rspec/rspec.xml \
+                              --format documentation" \
+                              --verbose \
+                              --split-by=timings
       - store_test_results:
           path: ~/rspec
       - store_artifacts:
