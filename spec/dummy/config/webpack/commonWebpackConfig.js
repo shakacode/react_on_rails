@@ -1,5 +1,6 @@
 // Common configuration applying to client and server configuration
-const { generateWebpackConfig, merge } = require('shakapacker');
+const { generateWebpackConfig, merge, config } = require('shakapacker');
+const { dirname } = require("path")
 
 const baseClientWebpackConfig = generateWebpackConfig();
 
@@ -46,6 +47,36 @@ baseClientWebpackConfig.plugins.push(
 );
 
 baseClientWebpackConfig.module.rules.push(exposeJQuery, jqueryUjsLoader);
+
+const fileRule = baseClientWebpackConfig.module.rules.find((rule) => rule.test.test(".svg"));
+
+fileRule.generator = {
+  filename: (pathData) => {
+    const path = dirname(pathData.filename);
+    console.log(`path: ${path}`);
+    const stripPaths = [...(config.additional_paths || []), config.source_path];
+
+    const selectedStripPath = stripPaths.find((includePath) =>
+      path.startsWith(includePath),
+    );
+
+    let processedPath = path.replace(`${selectedStripPath}`, "");
+    console.log(`processedPath: ${processedPath}`);
+
+    // Strip pnpm-specific path segments if they exist
+    // Pattern: .pnpm/package-name@version/node_modules/
+    processedPath = processedPath.replace(
+      /\.pnpm\/[^@]+@[^/]+\/node_modules\//,
+      "",
+    );
+    console.log(`processedPath: ${processedPath}`);
+
+    const folders = processedPath.split("/").filter(Boolean);
+
+    const foldersWithStatic = ["static", ...folders].join("/");
+    return `${foldersWithStatic}/[name]-[hash][ext][query]`;
+  },
+};
 
 const commonWebpackConfig = () => merge({}, baseClientWebpackConfig, commonOptions, aliasConfig);
 
