@@ -5231,9 +5231,10 @@ react-is@^18.0.0:
   resolved "https://registry.yarnpkg.com/react-is/-/react-is-18.2.0.tgz#199431eeaaa2e09f86427efbb4f1473edb47609b"
   integrity sha512-xWGDIW6x921xtzPkhiULtthJHoJvBbF3q26fzloPCK0hsvxtPVelvftw3zjbHWSkR2km9Z+4uxbDDK/6Zw9B8w==
 
-"react-on-rails@link:.yalc/react-on-rails":
-  version "0.0.0"
-  uid ""
+react-on-rails@14.2.1:
+  version "14.2.1"
+  resolved "https://registry.yarnpkg.com/react-on-rails/-/react-on-rails-14.2.1.tgz#e3072f21bb76a45de789fc78046d2bf0d9496878"
+  integrity sha512-1a7RCDzhM2/oAZChnJMcYDV023Gl6nwa5SAS+NW13jIpkigihiRw2ecYAFSjQq2BfCnASDw2z1ElmfTXhrYagw==
 
 react-redux@^8.0.2:
   version "8.0.2"
