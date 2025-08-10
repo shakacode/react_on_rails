@@ -19,6 +19,10 @@ import authenticate from './worker/authHandler';
 import { handleRenderRequest, type ProvidedNewBundle } from './worker/handleRenderRequest';
 import handleGracefulShutdown from './worker/handleGracefulShutdown';
 import {
+  handleIncrementalRenderRequest,
+  type IncrementalRenderInitialRequest,
+} from './worker/handleIncrementalRenderRequest';
+import {
   errorResponseResult,
   formatExceptionMessage,
   copyUploadedAssets,
@@ -163,6 +167,12 @@ export default function run(config: Partial<Config>) {
     },
   });
 
+  // Ensure NDJSON bodies are not buffered and are available as a stream immediately
+  app.addContentTypeParser('application/x-ndjson', (req, payload, done) => {
+    // Pass through the raw stream; the route will consume req.raw
+    done(null, payload);
+  });
+
   const isProtocolVersionMatch = async (req: FastifyRequest, res: FastifyReply) => {
     // Check protocol version
     const protocolVersionCheckingResult = checkProtocolVersion(req);
@@ -270,6 +280,149 @@ export default function run(config: Partial<Config>) {
       errorReporter.message(`Unhandled top level error: ${exceptionMessage}`);
       await setResponse(errorResponseResult(exceptionMessage), res);
     }
+  });
+
+  // Streaming NDJSON incremental render endpoint
+  app.post<{
+    Params: { bundleTimestamp: string; renderRequestDigest: string };
+  }>('/bundles/:bundleTimestamp/incremental-render/:renderRequestDigest', async (req, res) => {
+    // Perform protocol + auth checks as early as possible. For protocol check,
+    // we need the first NDJSON object; thus defer protocol/auth until first chunk is parsed.
+    // However, immediately set headers appropriate for a streaming response.
+
+    // Ensure reply uses chunked transfer for streaming output
+    res.header('Content-Type', 'application/json; charset=utf-8');
+    res.header('Cache-Control', 'no-cache, no-store, max-age=0, must-revalidate');
+    res.status(200);
+
+    const { bundleTimestamp } = req.params;
+
+    // Stream parser state
+    let sink: Awaited<ReturnType<typeof handleIncrementalRenderRequest>> | null = null;
+    let firstObjectHandled = false;
+    let buffered = '';
+    let isResponseFinished = false;
+
+    const abortWithError = async (err: unknown) => {
+      try {
+        sink?.abort(err);
+      } catch {
+        // ignore
+      }
+      try {
+        await setResponse(
+          errorResponseResult(
+            formatExceptionMessage(
+              'IncrementalRender',
+              err,
+              'Error while handling incremental render request',
+            ),
+          ),
+          res,
+        );
+        isResponseFinished = true;
+      } catch {
+        // ignore
+      }
+    };
+
+    const handleLine = async (line: string) => {
+      if (!line.trim()) return;
+      let obj: unknown;
+      try {
+        obj = JSON.parse(line);
+      } catch (_e) {
+        await abortWithError(new Error(`Invalid NDJSON line: ${line}`));
+        return;
+      }
+
+      if (!firstObjectHandled) {
+        firstObjectHandled = true;
+
+        // Build a temporary FastifyRequest shape for protocol/auth check
+        const tempReqBody = typeof obj === 'object' && obj !== null ? (obj as Record<string, unknown>) : {};
+
+        // Protocol check
+        const protoResult = checkProtocolVersion({ ...req, body: tempReqBody } as unknown as FastifyRequest);
+        if (typeof protoResult === 'object') {
+          await setResponse(protoResult, res);
+          isResponseFinished = true;
+          return;
+        }
+
+        // Auth check
+        const authResult = authenticate({ ...req, body: tempReqBody } as unknown as FastifyRequest);
+        if (typeof authResult === 'object') {
+          await setResponse(authResult, res);
+          isResponseFinished = true;
+          return;
+        }
+
+        // Note: Bundle and asset uploads are not supported in NDJSON streaming endpoints
+        // since NDJSON cannot contain binary file data. Use the /upload-assets endpoint for file uploads.
+
+        const dependencyBundleTimestamps = extractBodyArrayField(
+          tempReqBody as WithBodyArrayField<Record<string, unknown>, 'dependencyBundleTimestamps'>,
+          'dependencyBundleTimestamps',
+        );
+
+        const initial: IncrementalRenderInitialRequest = {
+          renderingRequest: String((tempReqBody as { renderingRequest?: string }).renderingRequest ?? ''),
+          bundleTimestamp,
+          dependencyBundleTimestamps,
+        };
+
+        try {
+          sink = await handleIncrementalRenderRequest({ initial, reply: res });
+        } catch (err) {
+          await abortWithError(err);
+        }
+      } else {
+        try {
+          sink?.add(obj);
+        } catch (err) {
+          await abortWithError(err);
+        }
+      }
+    };
+
+    // Handle request stream line-by-line (NDJSON)
+    const source = req.raw as unknown as NodeJS.ReadableStream;
+    source.setEncoding('utf8');
+    source.on('data', (chunk: string) => {
+      buffered += chunk;
+      const lines = buffered.split(/\r?\n/);
+      buffered = lines.pop() ?? '';
+      // Process all complete lines immediately
+      void (async () => {
+        for (const ln of lines) {
+          // Process sequentially; don't await inside forEach listeners
+          // eslint-disable-next-line no-await-in-loop
+          await handleLine(ln);
+        }
+      })();
+    });
+    source.on('end', () => {
+      void (async () => {
+        if (buffered) {
+          await handleLine(buffered);
+          buffered = '';
+        }
+        try {
+          sink?.end();
+        } catch (err) {
+          await abortWithError(err);
+        }
+        if (!isResponseFinished) {
+          res.raw.end();
+          isResponseFinished = true;
+        }
+        // Do not call setResponse here; the handler controls the reply lifecycle
+      })();
+    });
+    source.on('error', (err: unknown) => {
+      void abortWithError(err);
+    });
   });
 
   // There can be additional files that might be required at the runtime.
