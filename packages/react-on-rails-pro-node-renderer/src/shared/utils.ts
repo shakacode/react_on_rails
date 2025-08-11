@@ -8,6 +8,7 @@ import * as errorReporter from './errorReporter.js';
 import { getConfig } from './configBuilder.js';
 import log from './log.js';
 import type { RenderResult } from '../worker/vm.js';
+import fileExistsAsync from './fileExistsAsync.js';
 
 export const TRUNCATION_FILLER = '\n... TRUNCATED ...\n';
 
@@ -168,4 +169,30 @@ export function getRequestBundleFilePath(bundleTimestamp: string | number) {
 export function getAssetPath(bundleTimestamp: string | number, filename: string) {
   const bundleDirectory = getBundleDirectory(bundleTimestamp);
   return path.join(bundleDirectory, filename);
+}
+
+export async function validateBundlesExist(
+  bundleTimestamp: string | number,
+  dependencyBundleTimestamps?: (string | number)[],
+): Promise<ResponseResult | null> {
+  const missingBundles = (
+    await Promise.all(
+      [...(dependencyBundleTimestamps ?? []), bundleTimestamp].map(async (timestamp) => {
+        const bundleFilePath = getRequestBundleFilePath(timestamp);
+        const fileExists = await fileExistsAsync(bundleFilePath);
+        return fileExists ? null : timestamp;
+      }),
+    )
+  ).filter((timestamp) => timestamp !== null);
+
+  if (missingBundles.length > 0) {
+    const missingBundlesText = missingBundles.length > 1 ? 'bundles' : 'bundle';
+    log.info(`No saved ${missingBundlesText}: ${missingBundles.join(', ')}`);
+    return {
+      headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
+      status: 410,
+      data: 'No bundle uploaded',
+    };
+  }
+  return null;
 }
