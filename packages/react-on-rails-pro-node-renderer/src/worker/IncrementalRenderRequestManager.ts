@@ -1,4 +1,5 @@
 import { FastifyRequest, RouteGenericInterface } from 'fastify';
+import type { ResponseResult } from '../shared/utils';
 
 /**
  * Manages the state and processing of incremental render requests.
@@ -8,13 +9,16 @@ export class IncrementalRenderRequestManager {
   private buffered = '';
   private responseFinished = false;
   private firstObjectHandled = false;
+  private firstObjectProcessingComplete = false;
   private pendingOperations = new Set<Promise<void>>();
   private isShuttingDown = false;
+  private isListening = false;
 
   constructor(
     private readonly onRenderRequestReceived: (data: unknown) => Promise<void>,
     private readonly onUpdateReceived: (data: unknown) => Promise<void>,
     private readonly onRequestEnded: () => Promise<void>,
+    private readonly onError: (errorResponse: ResponseResult) => Promise<void>,
   ) {
     // Constructor parameters are automatically assigned to private readonly properties
   }
@@ -24,12 +28,15 @@ export class IncrementalRenderRequestManager {
    * Returns a promise that resolves when the request is complete or rejects on error
    */
   startListening<P extends RouteGenericInterface>(req: FastifyRequest<P>): Promise<void> {
+    this.isListening = true;
     return new Promise<void>((resolve, reject) => {
       const source = req.raw;
       source.setEncoding('utf8');
 
       // Set up stream event handlers
       source.on('data', (chunk: string) => {
+        if (!this.isListening) return; // Stop processing if error occurred
+
         // Create and track the operation immediately to prevent race conditions
         const operation = (async () => {
           try {
@@ -49,6 +56,8 @@ export class IncrementalRenderRequestManager {
       });
 
       source.on('end', () => {
+        if (!this.isListening) return; // Stop processing if error occurred
+
         void (async () => {
           try {
             await this.handleRequestEnd();
@@ -66,9 +75,27 @@ export class IncrementalRenderRequestManager {
   }
 
   /**
+   * Stop listening to new chunks and handle error response
+   */
+  async handleError(errorResponse: ResponseResult): Promise<void> {
+    this.isListening = false;
+    this.isShuttingDown = true;
+
+    // Wait for any pending operations to complete
+    if (this.pendingOperations.size > 0) {
+      await Promise.all(this.pendingOperations);
+    }
+
+    // Call the error callback
+    await this.onError(errorResponse);
+  }
+
+  /**
    * Process incoming data chunks and parse NDJSON lines
    */
   private async processDataChunk(chunk: string): Promise<void> {
+    if (!this.isListening) return; // Stop processing if error occurred
+
     this.buffered += chunk;
 
     const lines = this.buffered.split(/\r?\n/);
@@ -87,7 +114,7 @@ export class IncrementalRenderRequestManager {
    * Process a single NDJSON line
    */
   private async processLine(line: string): Promise<void> {
-    if (this.isShuttingDown) {
+    if (!this.isListening || this.isShuttingDown) {
       return;
     }
 
@@ -102,8 +129,9 @@ export class IncrementalRenderRequestManager {
       // First object - render request
       this.firstObjectHandled = true;
       await this.onRenderRequestReceived(obj);
-    } else {
-      // Subsequent objects - updates
+      this.firstObjectProcessingComplete = true;
+    } else if (this.firstObjectProcessingComplete) {
+      // Subsequent objects - updates (only if first object processing is complete)
       await this.onUpdateReceived(obj);
     }
   }
