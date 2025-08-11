@@ -23,6 +23,7 @@ import {
   isErrorRenderResult,
   getRequestBundleFilePath,
   deleteUploadedAssets,
+  validateBundlesExist,
 } from '../shared/utils';
 import { getConfig } from '../shared/configBuilder';
 import * as errorReporter from '../shared/errorReporter';
@@ -222,24 +223,9 @@ export async function handleRenderRequest({
     }
 
     // Check if the bundle exists:
-    const missingBundles = (
-      await Promise.all(
-        [...(dependencyBundleTimestamps ?? []), bundleTimestamp].map(async (timestamp) => {
-          const bundleFilePath = getRequestBundleFilePath(timestamp);
-          const fileExists = await fileExistsAsync(bundleFilePath);
-          return fileExists ? null : timestamp;
-        }),
-      )
-    ).filter((timestamp) => timestamp !== null);
-
-    if (missingBundles.length > 0) {
-      const missingBundlesText = missingBundles.length > 1 ? 'bundles' : 'bundle';
-      log.info(`No saved ${missingBundlesText}: ${missingBundles.join(', ')}`);
-      return {
-        headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
-        status: 410,
-        data: 'No bundle uploaded',
-      };
+    const missingBundleError = await validateBundlesExist(bundleTimestamp, dependencyBundleTimestamps);
+    if (missingBundleError) {
+      return missingBundleError;
     }
 
     // The bundle exists, but the VM has not yet been created.
