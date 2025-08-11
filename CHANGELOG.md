@@ -16,8 +16,13 @@ You can find the **package** version numbers from this repo's tags and below in 
 ## [Unreleased]
 *Add changes in master not yet tagged.*
 
+## [4.0.0-rc.15] - 2025-08-11
+
 ### Fixed
 - Fixed an issue where, when React Server Components (RSC) support was disabled, the Node Renderer unnecessarily requested bundles on every render. Now, bundles are only requested when actually needed, improving performance and reducing redundant network traffic. [PR 545](https://github.com/shakacode/react_on_rails_pro/pull/545) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+### Changed
+- Upgraded HTTPX dependency from 1.3.4 to ~> 1.5 (currently 1.5.1). [PR 520](https://github.com/shakacode/react_on_rails_pro/pull/520) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 ## [4.0.0-rc.14] - 2025-06-22
 
@@ -392,7 +397,8 @@ Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52
 - advanced error handling
 
 [HEAD compared to 3.2.1]: https://github.com/shakacode/react_on_rails_pro/compare/3.2.1...HEAD
-[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/4.0.0-rc-11...HEAD
+[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/4.0.0-rc-15...HEAD
+[4.0.0-rc.15]: https://github.com/shakacode/react_on_rails_pro/compare/4.0.0-rc.14...4.0.0-rc.15
 [4.0.0.rc.11]: https://github.com/shakacode/react_on_rails_pro/compare/4.0.0-rc.9...4.0.0-rc.11
 [4.0.0.rc.9]: https://github.com/shakacode/react_on_rails_pro/compare/4.0.0-rc.6...4.0.0-rc.9
 [4.0.0.rc.6]: https://github.com/shakacode/react_on_rails_pro/compare/3.2.1...4.0.0-rc.6

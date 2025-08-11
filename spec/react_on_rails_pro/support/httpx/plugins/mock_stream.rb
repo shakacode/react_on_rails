@@ -33,6 +33,9 @@ module HTTPX
         end
 
         def send(request)
+          # Do not produce a new response if this request already finished.
+          return if request.response&.finished?
+
           request_uri = request.uri.to_s
           mock = find_mock(request_uri)
           validate_mock!(request_uri, request.verb, mock)
@@ -54,7 +57,6 @@ module HTTPX
         def setup_response(request, status)
           response = create_response(request, status)
           request.response = response
-          request.emit(:response, response)
           response
         end
 
@@ -65,8 +67,26 @@ module HTTPX
           request_data[:request] = request
           response = setup_response(request, status)
 
-          yielder = ->(value) { response << value }
-          mock_block.call(yielder, request)
+          # For streaming responses, handle the chunks properly
+          if request.stream
+            # Stream the response chunks via the stream callback
+            yielder = lambda { |value|
+              # Call the stream's on_chunk method to deliver chunks
+              request.stream.on_chunk(value)
+            }
+            mock_block.call(yielder, request)
+          else
+            # For non-streaming responses, collect all chunks and write them to response body
+            chunks = []
+            yielder = ->(value) { chunks << value }
+            mock_block.call(yielder, request)
+
+            # Write all chunks to the response body
+            chunks.each { |chunk| response << chunk }
+          end
+          # Mark the response as finished after all chunks are yielded
+          response.finish!
+          request.emit(:response, response)
 
           update_mock_count(pattern, responses, current_mock, count)
         end
