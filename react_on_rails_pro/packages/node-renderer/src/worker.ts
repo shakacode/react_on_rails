@@ -22,6 +22,7 @@ import {
   handleIncrementalRenderRequest,
   type IncrementalRenderInitialRequest,
 } from './worker/handleIncrementalRenderRequest';
+import { IncrementalRenderRequestManager } from './worker/IncrementalRenderRequestManager';
 import {
   errorResponseResult,
   formatExceptionMessage,
@@ -33,6 +34,7 @@ import {
   getAssetPath,
   getBundleDirectory,
   deleteUploadedAssets,
+  validateBundlesExist,
 } from './shared/utils';
 import * as errorReporter from './shared/errorReporter';
 import { lock, unlock } from './shared/locks';
@@ -286,59 +288,33 @@ export default function run(config: Partial<Config>) {
   app.post<{
     Params: { bundleTimestamp: string; renderRequestDigest: string };
   }>('/bundles/:bundleTimestamp/incremental-render/:renderRequestDigest', async (req, res) => {
+    const { bundleTimestamp } = req.params;
+
     // Perform protocol + auth checks as early as possible. For protocol check,
     // we need the first NDJSON object; thus defer protocol/auth until first chunk is parsed.
-    // However, immediately set headers appropriate for a streaming response.
-
-    // Ensure reply uses chunked transfer for streaming output
-    res.header('Content-Type', 'application/json; charset=utf-8');
-    res.header('Cache-Control', 'no-cache, no-store, max-age=0, must-revalidate');
-    res.status(200);
-
-    const { bundleTimestamp } = req.params;
+    // Headers and status will be set after validation passes to avoid premature 200 status.
 
     // Stream parser state
     let sink: Awaited<ReturnType<typeof handleIncrementalRenderRequest>> | null = null;
-    let firstObjectHandled = false;
-    let buffered = '';
     let isResponseFinished = false;
 
     const abortWithError = async (err: unknown) => {
       try {
         sink?.abort(err);
       } catch {
-        // ignore
+        // Ignore abort errors
       }
-      try {
-        await setResponse(
-          errorResponseResult(
-            formatExceptionMessage(
-              'IncrementalRender',
-              err,
-              'Error while handling incremental render request',
-            ),
-          ),
-          res,
-        );
-        isResponseFinished = true;
-      } catch {
-        // ignore
-      }
+      const errorResponse = errorResponseResult(
+        formatExceptionMessage('IncrementalRender', err, 'Error while handling incremental render request'),
+      );
+      await setResponse(errorResponse, res);
+      isResponseFinished = true;
     };
 
-    const handleLine = async (line: string) => {
-      if (!line.trim()) return;
-      let obj: unknown;
-      try {
-        obj = JSON.parse(line);
-      } catch (_e) {
-        await abortWithError(new Error(`Invalid NDJSON line: ${line}`));
-        return;
-      }
-
-      if (!firstObjectHandled) {
-        firstObjectHandled = true;
-
+    // Create the request manager with callbacks
+    const requestManager = new IncrementalRenderRequestManager(
+      // onRenderRequestReceived - handles the first object with validation
+      async (obj: unknown) => {
         // Build a temporary FastifyRequest shape for protocol/auth check
         const tempReqBody = typeof obj === 'object' && obj !== null ? (obj as Record<string, unknown>) : {};
 
@@ -358,14 +334,24 @@ export default function run(config: Partial<Config>) {
           return;
         }
 
-        // Note: Bundle and asset uploads are not supported in NDJSON streaming endpoints
-        // since NDJSON cannot contain binary file data. Use the /upload-assets endpoint for file uploads.
-
+        // Bundle validation
         const dependencyBundleTimestamps = extractBodyArrayField(
           tempReqBody as WithBodyArrayField<Record<string, unknown>, 'dependencyBundleTimestamps'>,
           'dependencyBundleTimestamps',
         );
+        const missingBundleError = await validateBundlesExist(bundleTimestamp, dependencyBundleTimestamps);
+        if (missingBundleError) {
+          await setResponse(missingBundleError, res);
+          isResponseFinished = true;
+          return;
+        }
 
+        // All validation passed - set success headers and status
+        res.header('Content-Type', 'application/json; charset=utf-8');
+        res.header('Cache-Control', 'no-cache, no-store, max-age=0, must-revalidate');
+        res.status(200);
+
+        // Create initial request and get sink
         const initial: IncrementalRenderInitialRequest = {
           renderingRequest: String((tempReqBody as { renderingRequest?: string }).renderingRequest ?? ''),
           bundleTimestamp,
@@ -377,52 +363,40 @@ export default function run(config: Partial<Config>) {
         } catch (err) {
           await abortWithError(err);
         }
-      } else {
+      },
+
+      // onUpdateReceived - handles subsequent objects
+      async (obj: unknown) => {
         try {
           sink?.add(obj);
         } catch (err) {
           await abortWithError(err);
         }
-      }
-    };
+      },
 
-    // Handle request stream line-by-line (NDJSON)
-    const source = req.raw as unknown as NodeJS.ReadableStream;
-    source.setEncoding('utf8');
-    source.on('data', (chunk: string) => {
-      buffered += chunk;
-      const lines = buffered.split(/\r?\n/);
-      buffered = lines.pop() ?? '';
-      // Process all complete lines immediately
-      void (async () => {
-        for (const ln of lines) {
-          // Process sequentially; don't await inside forEach listeners
-          // eslint-disable-next-line no-await-in-loop
-          await handleLine(ln);
-        }
-      })();
-    });
-    source.on('end', () => {
-      void (async () => {
-        if (buffered) {
-          await handleLine(buffered);
-          buffered = '';
-        }
+      // onRequestEnded - handles stream completion
+      async () => {
         try {
           sink?.end();
         } catch (err) {
           await abortWithError(err);
+          return;
         }
+
+        // End response if not already finished
         if (!isResponseFinished) {
           res.raw.end();
           isResponseFinished = true;
         }
-        // Do not call setResponse here; the handler controls the reply lifecycle
-      })();
-    });
-    source.on('error', (err: unknown) => {
-      void abortWithError(err);
-    });
+      },
+    );
+
+    // Start the request manager to handle all streaming
+    try {
+      await requestManager.startListening(req);
+    } catch (err) {
+      await abortWithError(err);
+    }
   });
 
   // There can be additional files that might be required at the runtime.
