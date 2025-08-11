@@ -214,7 +214,7 @@ export async function handleRenderRequest({
     }
 
     // If gem has posted updated bundle:
-    if (providedNewBundles) {
+    if (providedNewBundles && providedNewBundles.length > 0) {
       const result = await handleNewBundlesProvided(renderingRequest, providedNewBundles, assetsToCopy);
       if (result) {
         return result;
