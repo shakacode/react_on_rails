@@ -16,6 +16,9 @@ You can find the **package** version numbers from this repo's tags and below in 
 ## [Unreleased]
 *Add changes in master not yet tagged.*
 
+### Fixed
+- Fixed an issue where, when React Server Components (RSC) support was disabled, the Node Renderer unnecessarily requested bundles on every render. Now, bundles are only requested when actually needed, improving performance and reducing redundant network traffic. [PR 545](https://github.com/shakacode/react_on_rails_pro/pull/545) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 ## [4.0.0-rc.14] - 2025-06-22
 
 ### Improved
