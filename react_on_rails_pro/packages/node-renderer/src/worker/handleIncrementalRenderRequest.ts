@@ -1,5 +1,5 @@
-import type { FastifyReply } from './types';
 import type { ResponseResult } from '../shared/utils';
+import { Readable } from 'stream';
 
 export type IncrementalRenderSink = {
   /** Called for every subsequent NDJSON object after the first one */
@@ -16,29 +16,40 @@ export type IncrementalRenderInitialRequest = {
   dependencyBundleTimestamps?: Array<string | number>;
 };
 
+export type IncrementalRenderResult = {
+  response: ResponseResult;
+  sink: IncrementalRenderSink;
+};
+
 /**
  * Starts handling an incremental render request. This function is intended to:
  * - Initialize any resources needed to process the render
- * - Potentially start sending a streaming response via FastifyReply
- * - Return a sink that the HTTP endpoint will use to push additional NDJSON
- *   chunks as they arrive
+ * - Return both a stream that will be sent to the client and a sink for incoming chunks
  *
  * NOTE: This is intentionally left unimplemented. Tests should mock this.
  */
-export function handleIncrementalRenderRequest(_params: {
-  initial: IncrementalRenderInitialRequest;
-  reply: FastifyReply;
-}): Promise<IncrementalRenderSink> {
+export function handleIncrementalRenderRequest(initial: IncrementalRenderInitialRequest): Promise<IncrementalRenderResult> {
   // Empty placeholder implementation. Real logic will be added later.
   return Promise.resolve({
-    add: () => {
-      /* no-op */
-    },
-    end: () => {
-      /* no-op */
-    },
-    abort: () => {
-      /* no-op */
+    response: {
+      status: 200,
+      headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
+      stream: new Readable({
+        read() {
+          // No-op for now
+        },
+      }),
+    } as ResponseResult,
+    sink: {
+      add: () => {
+        /* no-op */
+      },
+      end: () => {
+        /* no-op */
+      },
+      abort: () => {
+        /* no-op */
+      },
     },
   });
 }
