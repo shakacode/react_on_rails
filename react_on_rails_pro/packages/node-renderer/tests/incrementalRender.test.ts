@@ -5,6 +5,7 @@ import worker, { disableHttp2 } from '../src/worker';
 import packageJson from '../src/shared/packageJson';
 import * as incremental from '../src/worker/handleIncrementalRenderRequest';
 import { createVmBundle, BUNDLE_TIMESTAMP } from './helper';
+import type { ResponseResult } from '../src/shared/utils';
 
 // Disable HTTP/2 for testing like other tests do
 disableHttp2();
@@ -47,10 +48,21 @@ describe('incremental render NDJSON endpoint', () => {
       abort: sinkAbort,
     };
 
-    const sinkPromise = Promise.resolve(sink);
+    const mockResponse: ResponseResult = {
+      status: 200,
+      headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
+      data: 'mock response',
+    };
+
+    const mockResult: incremental.IncrementalRenderResult = {
+      response: mockResponse,
+      sink,
+    };
+
+    const resultPromise = Promise.resolve(mockResult);
     const handleSpy = jest
       .spyOn(incremental, 'handleIncrementalRenderRequest')
-      .mockImplementation(() => sinkPromise);
+      .mockImplementation(() => resultPromise);
 
     const addr = app.server.address();
     const host = typeof addr === 'object' && addr ? addr.address : '127.0.0.1';
