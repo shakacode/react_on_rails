@@ -91,7 +91,7 @@ module ReactOnRailsPro
 
     def process_response_chunks(stream_response, error_body)
       loop_response_lines(stream_response) do |chunk|
-        if !stream_response.respond_to?(:status) || stream_response.status >= 400
+        if stream_response.is_a?(HTTPX::ErrorResponse) || stream_response.status >= 400
           error_body << chunk
           next
         end
