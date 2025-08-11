@@ -1,19 +1,21 @@
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
-import buildApp, { disableHttp2 } from '../src/worker';
+import worker, { disableHttp2 } from '../src/worker';
 import packageJson from '../src/shared/packageJson';
 import * as incremental from '../src/worker/handleIncrementalRenderRequest';
+import { createVmBundle, BUNDLE_TIMESTAMP } from './helper';
 
 // Disable HTTP/2 for testing like other tests do
 disableHttp2();
 
 describe('incremental render NDJSON endpoint', () => {
-  const BUNDLE_PATH = path.join(__dirname, 'tmp', 'incremental-node-renderer-bundles');
+  const TEST_NAME = 'incrementalRender';
+  const BUNDLE_PATH = path.join(__dirname, 'tmp', TEST_NAME);
   if (!fs.existsSync(BUNDLE_PATH)) {
     fs.mkdirSync(BUNDLE_PATH, { recursive: true });
   }
-  const app = buildApp({
+  const app = worker({
     bundlePath: BUNDLE_PATH,
     password: 'myPassword1',
     // Keep HTTP logs quiet for tests
@@ -30,6 +32,9 @@ describe('incremental render NDJSON endpoint', () => {
   });
 
   test('calls handleIncrementalRenderRequest immediately after first chunk and processes each subsequent chunk immediately', async () => {
+    // Create a bundle for this test
+    await createVmBundle(TEST_NAME);
+
     const sinkAddCalls: unknown[] = [];
     const sinkEnd = jest.fn();
     const sinkAbort = jest.fn();
@@ -51,7 +56,7 @@ describe('incremental render NDJSON endpoint', () => {
     const host = typeof addr === 'object' && addr ? addr.address : '127.0.0.1';
     const port = typeof addr === 'object' && addr ? addr.port : 0;
 
-    const SERVER_BUNDLE_TIMESTAMP = '99999-incremental';
+    const SERVER_BUNDLE_TIMESTAMP = String(BUNDLE_TIMESTAMP);
 
     // Create the HTTP request
     const req = http.request({
@@ -143,5 +148,62 @@ describe('incremental render NDJSON endpoint', () => {
     // Verify stream lifecycle methods were called correctly
     expect(sinkEnd).toHaveBeenCalledTimes(1);
     expect(sinkAbort).not.toHaveBeenCalled();
+  });
+
+  test('returns 410 error when bundle is missing', async () => {
+    const addr = app.server.address();
+    const host = typeof addr === 'object' && addr ? addr.address : '127.0.0.1';
+    const port = typeof addr === 'object' && addr ? addr.port : 0;
+
+    const MISSING_BUNDLE_TIMESTAMP = 'non-existent-bundle-123';
+
+    // Create the HTTP request with a non-existent bundle
+    const req = http.request({
+      hostname: host,
+      port,
+      path: `/bundles/${MISSING_BUNDLE_TIMESTAMP}/incremental-render/abc123`,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-ndjson',
+      },
+    });
+    req.setNoDelay(true);
+
+    // Set up promise to capture the response
+    const responsePromise = new Promise<{ statusCode: number; data: string }>((resolve, reject) => {
+      req.on('response', (res) => {
+        let data = '';
+        res.on('data', (chunk: string) => {
+          data += chunk;
+        });
+        res.on('end', () => {
+          resolve({ statusCode: res.statusCode || 0, data });
+        });
+        res.on('error', (e) => {
+          reject(e);
+        });
+      });
+      req.on('error', (e) => {
+        reject(e);
+      });
+    });
+
+    // Write first object with auth data
+    const initialObj = {
+      gemVersion: packageJson.version,
+      protocolVersion: packageJson.protocolVersion,
+      password: 'myPassword1',
+      renderingRequest: 'ReactOnRails.dummy',
+      dependencyBundleTimestamps: [MISSING_BUNDLE_TIMESTAMP],
+    };
+    req.write(`${JSON.stringify(initialObj)}\n`);
+    req.end();
+
+    // Wait for the response
+    const response = await responsePromise;
+
+    // Verify that we get a 410 error
+    expect(response.statusCode).toBe(410);
+    expect(response.data).toContain('No bundle uploaded');
   });
 });
