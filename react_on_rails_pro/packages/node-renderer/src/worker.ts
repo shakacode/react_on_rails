@@ -295,20 +295,13 @@ export default function run(config: Partial<Config>) {
     // Headers and status will be set after validation passes to avoid premature 200 status.
 
     // Stream parser state
-    let sink: Awaited<ReturnType<typeof handleIncrementalRenderRequest>> | null = null;
-    let isResponseFinished = false;
+    let renderResult: Awaited<ReturnType<typeof handleIncrementalRenderRequest>> | null = null;
 
     const abortWithError = async (err: unknown) => {
-      try {
-        sink?.abort(err);
-      } catch {
-        // Ignore abort errors
-      }
       const errorResponse = errorResponseResult(
         formatExceptionMessage('IncrementalRender', err, 'Error while handling incremental render request'),
       );
-      await setResponse(errorResponse, res);
-      isResponseFinished = true;
+      await requestManager.handleError(errorResponse);
     };
 
     // Create the request manager with callbacks
@@ -321,16 +314,14 @@ export default function run(config: Partial<Config>) {
         // Protocol check
         const protoResult = checkProtocolVersion({ ...req, body: tempReqBody } as unknown as FastifyRequest);
         if (typeof protoResult === 'object') {
-          await setResponse(protoResult, res);
-          isResponseFinished = true;
+          await requestManager.handleError(protoResult);
           return;
         }
 
         // Auth check
         const authResult = authenticate({ ...req, body: tempReqBody } as unknown as FastifyRequest);
         if (typeof authResult === 'object') {
-          await setResponse(authResult, res);
-          isResponseFinished = true;
+          await requestManager.handleError(authResult);
           return;
         }
 
@@ -341,17 +332,11 @@ export default function run(config: Partial<Config>) {
         );
         const missingBundleError = await validateBundlesExist(bundleTimestamp, dependencyBundleTimestamps);
         if (missingBundleError) {
-          await setResponse(missingBundleError, res);
-          isResponseFinished = true;
+          await requestManager.handleError(missingBundleError);
           return;
         }
 
-        // All validation passed - set success headers and status
-        res.header('Content-Type', 'application/json; charset=utf-8');
-        res.header('Cache-Control', 'no-cache, no-store, max-age=0, must-revalidate');
-        res.status(200);
-
-        // Create initial request and get sink
+        // All validation passed - get response stream
         const initial: IncrementalRenderInitialRequest = {
           renderingRequest: String((tempReqBody as { renderingRequest?: string }).renderingRequest ?? ''),
           bundleTimestamp,
@@ -359,7 +344,8 @@ export default function run(config: Partial<Config>) {
         };
 
         try {
-          sink = await handleIncrementalRenderRequest({ initial, reply: res });
+          renderResult = await handleIncrementalRenderRequest(initial);
+          await setResponse(renderResult.response, res);
         } catch (err) {
           await abortWithError(err);
         }
@@ -367,8 +353,13 @@ export default function run(config: Partial<Config>) {
 
       // onUpdateReceived - handles subsequent objects
       async (obj: unknown) => {
+        // Only process updates if we have a render result
+        if (!renderResult) {
+          return;
+        }
+
         try {
-          sink?.add(obj);
+          renderResult.sink.add(obj);
         } catch (err) {
           await abortWithError(err);
         }
@@ -377,17 +368,15 @@ export default function run(config: Partial<Config>) {
       // onRequestEnded - handles stream completion
       async () => {
         try {
-          sink?.end();
+          renderResult?.sink.end();
         } catch (err) {
           await abortWithError(err);
-          return;
         }
+      },
 
-        // End response if not already finished
-        if (!isResponseFinished) {
-          res.raw.end();
-          isResponseFinished = true;
-        }
+      // onError - handles error responses
+      async (errorResponse: ResponseResult) => {
+        await setResponse(errorResponse, res);
       },
     );
 
