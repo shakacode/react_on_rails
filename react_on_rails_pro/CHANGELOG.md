@@ -11,7 +11,7 @@ You can find the **package** version numbers from this repo's tags and below in 
 
 ----
 
-[HEAD compared to 3.2.1]: Click to see all changes compared to the last 3.x version. See the [4.0 Release Notes](https://github.com/shakacode/react_on_rails_pro/blob/master/docs/release-notes/4.0.md).
+[HEAD compared to 3.3.1]: Click to see all changes compared to the last 3.x version. See the [4.0 Release Notes](https://github.com/shakacode/react_on_rails_pro/blob/master/docs/release-notes/4.0.md).
 
 ## [Unreleased]
 *Add changes in master not yet tagged.*
@@ -58,24 +58,9 @@ You can find the **package** version numbers from this repo's tags and below in 
 
 - Specify exact httpx version until the bug there is fixed [PR #496](https://github.com/shakacode/react_on_rails_pro/pull/496) by  [alexeyr-ci](https://github.com/alexeyr-ci)
 
-- Make bundle hash environment aware. [PR 512](https://github.com/shakacode/react_on_rails_pro/pull/512) by [judahmeek](https://github.com/judahmeek).
-
-### Fixed
-- Enabled `queueMicrotask` use in server bundle to support React 19. [PR 505](https://github.com/shakacode/react_on_rails_pro/pull/505) by [alexeyr-ci](https://github.com/alexeyr-ci).
-
 ### Changed
 - Renamed `includeTimerPolyfills` configuration option to `stubTimers`. [PR 506](https://github.com/shakacode/react_on_rails_pro/pull/506) by [alexeyr-ci](https://github.com/alexeyr-ci).
 - Fail immediately on detecting obsolete config options to prevent unexpected misconfigurations. [PR 506](https://github.com/shakacode/react_on_rails_pro/pull/506) by [alexeyr-ci](https://github.com/alexeyr-ci).
-
-### Fixed
-- Enabled `queueMicrotask` use in server bundle to support React 19. [PR 505](https://github.com/shakacode/react_on_rails_pro/pull/505) by [alexeyr-ci](https://github.com/alexeyr-ci).
-
-
-
-## 4.0.0.rc.10 - 2025-01-06
-
-### Fixed
-- Enable use as a `git:` dependency. [PR 490](https://github.com/shakacode/react_on_rails_pro/pull/490) by [alexeyr-ci](https://github.com/alexeyr-ci).
 
 ## [4.0.0.rc.9] - 2024-12-05
 
@@ -113,9 +98,20 @@ You can find the **package** version numbers from this repo's tags and below in 
 - Made default bundle paths in node-renderer and Rails consistent [PR 399](https://github.com/shakacode/react_on_rails_pro/pull/399) by [alexeyr-ci](https://github.com/alexeyr-ci).
 
 ### Changed
-- Converted JS code to TS [PR 386](https://github.com/shakacode/react_on_rails_pro/pull/386) and [PR 389](https://github.com/shakacode/react_on_rails_pro/pull/389) by [alexeyr-ci](https://github.com/alexeyr-ci).
 - Support Shakapacker 8.0.0, Modified webpack configurations to use shakapacker instead of webpacker. This drops support for shakapacker 6.X [PR 415](https://github.com/shakacode/react_on_rails_pro/pull/415) by [rameziophobia](https://github.com/rameziophobia).
 - Converted the node-renderer worker from Express to Fastify [PR 398](https://github.com/shakacode/react_on_rails_pro/pull/398) by [alexeyr-ci](https://github.com/alexeyr-ci).
+
+## [3.3.1] - 2025-08-11
+
+### Changed
+- Converted JS code to TS [PR 386](https://github.com/shakacode/react_on_rails_pro/pull/386) and [PR 389](https://github.com/shakacode/react_on_rails_pro/pull/389) by [alexeyr-ci](https://github.com/alexeyr-ci).
+
+### Fixed
+- Removed file size limit for assets and bundles. [PR 459](https://github.com/shakacode/react_on_rails_pro/pull/459) by [alexeyr-ci](https://github.com/alexeyr-ci).
+- Enabled use as a `git:` dependency. [PR 490](https://github.com/shakacode/react_on_rails_pro/pull/490) by [alexeyr-ci](https://github.com/alexeyr-ci).
+- Enabled `queueMicrotask` use in server bundle to support React 19. [PR 505](https://github.com/shakacode/react_on_rails_pro/pull/505) by [alexeyr-ci](https://github.com/alexeyr-ci).
+- Made bundle hash environment aware. [PR 512](https://github.com/shakacode/react_on_rails_pro/pull/512) by [judahmeek](https://github.com/judahmeek).
+- Made compatible with Ruby 3.4. [PR 541](https://github.com/shakacode/react_on_rails_pro/pull/541) by [alexeyr-ci2](https://github.com/alexeyr-ci2).
 
 ## [3.2.1] - 2023-06-07
 Fixed release, supports Ruby 2.7.5.
@@ -396,13 +392,14 @@ Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52
 - support for javascript evaluation caching
 - advanced error handling
 
-[HEAD compared to 3.2.1]: https://github.com/shakacode/react_on_rails_pro/compare/3.2.1...HEAD
+[HEAD compared to 3.2.1]: https://github.com/shakacode/react_on_rails_pro/compare/3.3.1...HEAD
 [Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/4.0.0-rc-15...HEAD
 [4.0.0-rc.15]: https://github.com/shakacode/react_on_rails_pro/compare/4.0.0-rc.14...4.0.0-rc.15
 [4.0.0.rc.11]: https://github.com/shakacode/react_on_rails_pro/compare/4.0.0-rc.9...4.0.0-rc.11
 [4.0.0.rc.9]: https://github.com/shakacode/react_on_rails_pro/compare/4.0.0-rc.6...4.0.0-rc.9
-[4.0.0.rc.6]: https://github.com/shakacode/react_on_rails_pro/compare/3.2.1...4.0.0-rc.6
-[3.2.1]: https://github.com/shakacode/react_on_rails_pro/compare/3.10...3.2.1
+[4.0.0.rc.6]: https://github.com/shakacode/react_on_rails_pro/compare/3.3.1...4.0.0-rc.6
+[3.3.1]: https://github.com/shakacode/react_on_rails_pro/compare/3.2.1...3.3.1
+[3.2.1]: https://github.com/shakacode/react_on_rails_pro/compare/3.1.2...3.2.1
 [3.1.2]: https://github.com/shakacode/react_on_rails_pro/compare/3.1.0...3.1.2
 [3.1.0]: https://github.com/shakacode/react_on_rails_pro/compare/3.0.1...3.1.0
 [3.0.1]: https://github.com/shakacode/react_on_rails_pro/compare/3.0.0...3.0.1
