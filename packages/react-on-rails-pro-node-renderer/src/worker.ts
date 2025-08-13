@@ -297,13 +297,6 @@ export default function run(config: Partial<Config>) {
     // Stream parser state
     let renderResult: Awaited<ReturnType<typeof handleIncrementalRenderRequest>> | null = null;
 
-    const abortWithError = async (err: unknown) => {
-      const errorResponse = errorResponseResult(
-        formatExceptionMessage('IncrementalRender', err, 'Error while handling incremental render request'),
-      );
-      await requestManager.handleError(errorResponse);
-    };
-
     // Create the request manager with callbacks
     const requestManager = new IncrementalRenderRequestManager(
       // onRenderRequestReceived - handles the first object with validation
@@ -314,15 +307,19 @@ export default function run(config: Partial<Config>) {
         // Protocol check
         const protoResult = checkProtocolVersion({ ...req, body: tempReqBody } as unknown as FastifyRequest);
         if (typeof protoResult === 'object') {
-          await requestManager.handleError(protoResult);
-          return;
+          return {
+            response: protoResult,
+            shouldContinue: false,
+          };
         }
 
         // Auth check
         const authResult = authenticate({ ...req, body: tempReqBody } as unknown as FastifyRequest);
         if (typeof authResult === 'object') {
-          await requestManager.handleError(authResult);
-          return;
+          return {
+            response: authResult,
+            shouldContinue: false,
+          };
         }
 
         // Bundle validation
@@ -332,8 +329,10 @@ export default function run(config: Partial<Config>) {
         );
         const missingBundleError = await validateBundlesExist(bundleTimestamp, dependencyBundleTimestamps);
         if (missingBundleError) {
-          await requestManager.handleError(missingBundleError);
-          return;
+          return {
+            response: missingBundleError,
+            shouldContinue: false,
+          };
         }
 
         // All validation passed - get response stream
@@ -345,9 +344,18 @@ export default function run(config: Partial<Config>) {
 
         try {
           renderResult = await handleIncrementalRenderRequest(initial);
-          await setResponse(renderResult.response, res);
+          return {
+            response: renderResult.response,
+            shouldContinue: true,
+          };
         } catch (err) {
-          await abortWithError(err);
+          const errorResponse = errorResponseResult(
+            formatExceptionMessage('IncrementalRender', err, 'Error while handling incremental render request'),
+          );
+          return {
+            response: errorResponse,
+            shouldContinue: false,
+          };
         }
       },
 
@@ -361,30 +369,37 @@ export default function run(config: Partial<Config>) {
         try {
           renderResult.sink.add(obj);
         } catch (err) {
-          await abortWithError(err);
+          // Log error but don't stop processing
+          log.error({ err, msg: 'Error processing update chunk' });
         }
       },
 
       // onRequestEnded - handles stream completion
       async () => {
         try {
-          renderResult?.sink.end();
+          if (renderResult) {
+            renderResult.sink.end();
+          }
         } catch (err) {
-          await abortWithError(err);
+          log.error({ err, msg: 'Error ending render sink' });
         }
       },
 
-      // onError - handles error responses
-      async (errorResponse: ResponseResult) => {
-        await setResponse(errorResponse, res);
+      // onResponseStart - handles starting the response
+      async (response: ResponseResult) => {
+        await setResponse(response, res);
       },
     );
 
-    // Start the request manager to handle all streaming
     try {
+      // Start listening to the request stream
       await requestManager.startListening(req);
     } catch (err) {
-      await abortWithError(err);
+      // If an error occurred during stream processing, send error response
+      const errorResponse = errorResponseResult(
+        formatExceptionMessage('IncrementalRender', err, 'Error while processing incremental render stream'),
+      );
+      await setResponse(errorResponse, res);
     }
   });
 
