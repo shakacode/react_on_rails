@@ -10,22 +10,14 @@ enum ManagerState {
   LISTENING = 'listening',
   // After the first object is received
   PROCESSING = 'processing',
-  // After the request is finished and pending operations are still running
-  SHUTTING_DOWN = 'shutting_down',
-  // After the request is finished and all pending operations are complete,
-  // and the request is closed
+  // After the request is finished and all chunks are processed
   STOPPED = 'stopped',
 }
 
-/**
- * Manages the state and processing of incremental render requests.
- * Handles NDJSON streaming, line parsing, and coordinates callback execution.
- */
 export class IncrementalRenderRequestManager {
   private buffered = '';
-  private responseFinished = false;
   private state = ManagerState.LISTENING;
-  private pendingOperations?: Promise<void>;
+  private firstObjectProcessed = false;
 
   constructor(
     private readonly onRenderRequestReceived: (data: unknown) => Promise<RenderRequestResult>,
@@ -37,8 +29,7 @@ export class IncrementalRenderRequestManager {
   }
 
   /**
-   * Start listening to the request stream and handle all events
-   * Returns a promise that resolves when the request is complete or rejects on error
+   * Start listening to the request stream
    */
   startListening(req: {
     raw: {
@@ -59,32 +50,21 @@ export class IncrementalRenderRequestManager {
 
       // Set up stream event handlers
       source.on('data', (chunk: string) => {
-        if (!this.isRunning()) {
-          return;
-        }
+        if (this.state === ManagerState.STOPPED) return;
 
-        // Create and track the operation immediately to prevent race conditions
-        const executeOperation = async () => {
-          try {
-            await this.processDataChunk(chunk);
-          } catch (err) {
-            handleError(err);
-          }
-        };
+        // Simply buffer the data
+        this.buffered += chunk;
 
-        if (this.pendingOperations) {
-          this.pendingOperations = this.pendingOperations.then(() => {
-            return executeOperation();
-          });
-        } else {
-          this.pendingOperations = executeOperation();
+        // Process the buffer if we haven't processed the first object yet
+        if (!this.firstObjectProcessed) {
+          void this.processBuffer();
         }
       });
 
       source.on('end', () => {
         void (async () => {
           try {
-            await this.handleRequestEnd(true);
+            await this.handleRequestEnd();
             resolve();
           } catch (err) {
             handleError(err);
@@ -99,31 +79,42 @@ export class IncrementalRenderRequestManager {
   }
 
   /**
-   * Process incoming data chunks and parse NDJSON lines
+   * Process the buffered data line by line
    */
-  private async processDataChunk(chunk: string): Promise<void> {
-    if (!this.isRunning()) {
-      return;
+  private async processBuffer(): Promise<void> {
+    if (this.state === ManagerState.STOPPED) return;
+
+    const lines = this.buffered.split('\n');
+
+    // Keep the last line if it's incomplete
+    if (lines[lines.length - 1] === '') {
+      lines.pop();
+    } else {
+      // Last line is incomplete, keep it in buffer
+      this.buffered = lines.pop() || '';
     }
 
-    this.buffered += chunk;
-
-    const lines = this.buffered.split(/\r?\n/);
-    this.buffered = lines.pop() ?? '';
-
-    // Process complete lines immediately
+    // Process complete lines
     for (const line of lines) {
-      if (line.trim()) {
+      if (this.state === ManagerState.STOPPED) return;
+
+      try {
         // eslint-disable-next-line no-await-in-loop
         await this.processLine(line);
+      } catch (err) {
+        console.error('Error processing line:', err);
+        this.state = ManagerState.STOPPED;
+        return;
       }
     }
   }
 
   /**
-   * Process a single NDJSON line
+   * Process a single line from the buffer
    */
   private async processLine(line: string): Promise<void> {
+    if (this.state === ManagerState.STOPPED) return;
+
     let obj: unknown;
     try {
       obj = JSON.parse(line);
@@ -134,18 +125,25 @@ export class IncrementalRenderRequestManager {
     if (this.state === ManagerState.LISTENING) {
       // First object - render request
       this.state = ManagerState.PROCESSING;
+      this.firstObjectProcessed = true;
 
-      const result = await this.onRenderRequestReceived(obj);
+      try {
+        const result = await this.onRenderRequestReceived(obj);
+        await this.onResponseStart(result.response);
 
-      // Send the response immediately
-      await this.onResponseStart(result.response);
-
-      // Check if we should continue processing
-      if (!result.shouldContinue) {
-        await this.handleRequestEnd(false);
+        // Check if we should continue processing
+        if (!result.shouldContinue) {
+          // Stop immediately without processing rest of chunks
+          this.state = ManagerState.STOPPED;
+          await this.onRequestEnded();
+        }
+      } catch (err) {
+        this.state = ManagerState.STOPPED;
+        await this.onRequestEnded();
+        throw err;
       }
-    } else if (this.state === ManagerState.PROCESSING) {
-      // Subsequent objects - updates (only if we're still processing)
+    } else {
+      // We're in PROCESSING state, handle as update
       await this.onUpdateReceived(obj);
     }
   }
@@ -153,33 +151,21 @@ export class IncrementalRenderRequestManager {
   /**
    * Handle the end of the request stream
    */
-  private async handleRequestEnd(waitUntilAllPendingOperations: boolean): Promise<void> {
-    // Only proceed if we haven't already stopped
-    if (!this.isRunning()) {
-      return;
-    }
+  private async handleRequestEnd(): Promise<void> {
+    if (this.state === ManagerState.STOPPED) return;
 
-    if (waitUntilAllPendingOperations) {
-      this.state = ManagerState.SHUTTING_DOWN;
-
-      // Wait for all pending operations to complete
-      if (this.pendingOperations) {
-        await this.pendingOperations;
-      }
-
-      // Process any remaining buffered content
-      if (this.buffered.trim()) {
-        await this.processLine(this.buffered);
-        this.buffered = '';
-      }
+    // Process any remaining buffered content
+    if (this.buffered.trim()) {
+      await this.processBuffer();
     }
 
     this.state = ManagerState.STOPPED;
+
     // Call the end callback
     await this.onRequestEnded();
   }
 
   private isRunning(): boolean {
-    return [ManagerState.LISTENING, ManagerState.PROCESSING].includes(this.state);
+    return this.state !== ManagerState.STOPPED;
   }
 }
