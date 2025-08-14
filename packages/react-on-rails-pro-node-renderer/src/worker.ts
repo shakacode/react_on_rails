@@ -22,7 +22,7 @@ import {
   handleIncrementalRenderRequest,
   type IncrementalRenderInitialRequest,
 } from './worker/handleIncrementalRenderRequest.js';
-import { IncrementalRenderRequestManager } from './worker/IncrementalRenderRequestManager.js';
+import { handleIncrementalRenderStream } from './worker/handleIncrementalRenderStream.js';
 import {
   errorResponseResult,
   formatExceptionMessage,
@@ -297,103 +297,103 @@ export default function run(config: Partial<Config>) {
     // Stream parser state
     let renderResult: Awaited<ReturnType<typeof handleIncrementalRenderRequest>> | null = null;
 
-    // Create the request manager with callbacks
-    const requestManager = new IncrementalRenderRequestManager(
-      // onRenderRequestReceived - handles the first object with validation
-      async (obj: unknown) => {
-        // Build a temporary FastifyRequest shape for protocol/auth check
-        const tempReqBody = typeof obj === 'object' && obj !== null ? (obj as Record<string, unknown>) : {};
-
-        // Protocol check
-        const protoResult = checkProtocolVersion({ ...req, body: tempReqBody } as unknown as FastifyRequest);
-        if (typeof protoResult === 'object') {
-          return {
-            response: protoResult,
-            shouldContinue: false,
-          };
-        }
-
-        // Auth check
-        const authResult = authenticate({ ...req, body: tempReqBody } as unknown as FastifyRequest);
-        if (typeof authResult === 'object') {
-          return {
-            response: authResult,
-            shouldContinue: false,
-          };
-        }
-
-        // Bundle validation
-        const dependencyBundleTimestamps = extractBodyArrayField(
-          tempReqBody as WithBodyArrayField<Record<string, unknown>, 'dependencyBundleTimestamps'>,
-          'dependencyBundleTimestamps',
-        );
-        const missingBundleError = await validateBundlesExist(bundleTimestamp, dependencyBundleTimestamps);
-        if (missingBundleError) {
-          return {
-            response: missingBundleError,
-            shouldContinue: false,
-          };
-        }
-
-        // All validation passed - get response stream
-        const initial: IncrementalRenderInitialRequest = {
-          renderingRequest: String((tempReqBody as { renderingRequest?: string }).renderingRequest ?? ''),
-          bundleTimestamp,
-          dependencyBundleTimestamps,
-        };
-
-        try {
-          renderResult = await handleIncrementalRenderRequest(initial);
-          return {
-            response: renderResult.response,
-            shouldContinue: true,
-          };
-        } catch (err) {
-          const errorResponse = errorResponseResult(
-            formatExceptionMessage('IncrementalRender', err, 'Error while handling incremental render request'),
-          );
-          return {
-            response: errorResponse,
-            shouldContinue: false,
-          };
-        }
-      },
-
-      // onUpdateReceived - handles subsequent objects
-      async (obj: unknown) => {
-        // Only process updates if we have a render result
-        if (!renderResult) {
-          return;
-        }
-
-        try {
-          renderResult.sink.add(obj);
-        } catch (err) {
-          // Log error but don't stop processing
-          log.error({ err, msg: 'Error processing update chunk' });
-        }
-      },
-
-      // onRequestEnded - handles stream completion
-      async () => {
-        try {
-          if (renderResult) {
-            renderResult.sink.end();
-          }
-        } catch (err) {
-          log.error({ err, msg: 'Error ending render sink' });
-        }
-      },
-
-      // onResponseStart - handles starting the response
-      async (response: ResponseResult) => {
-        await setResponse(response, res);
-      },
-    );
-
     try {
-      // Start listening to the request stream
-      await requestManager.startListening(req);
+      // Handle the incremental render stream
+      await handleIncrementalRenderStream({
+        request: req,
+        onRenderRequestReceived: async (obj: unknown) => {
+          // Build a temporary FastifyRequest shape for protocol/auth check
+          const tempReqBody = typeof obj === 'object' && obj !== null ? (obj as Record<string, unknown>) : {};
+
+          // Protocol check
+          const protoResult = checkProtocolVersion({ ...req, body: tempReqBody } as unknown as FastifyRequest);
+          if (typeof protoResult === 'object') {
+            return {
+              response: protoResult,
+              shouldContinue: false,
+            };
+          }
+
+          // Auth check
+          const authResult = authenticate({ ...req, body: tempReqBody } as unknown as FastifyRequest);
+          if (typeof authResult === 'object') {
+            return {
+              response: authResult,
+              shouldContinue: false,
+            };
+          }
+
+          // Bundle validation
+          const dependencyBundleTimestamps = extractBodyArrayField(
+            tempReqBody as WithBodyArrayField<Record<string, unknown>, 'dependencyBundleTimestamps'>,
+            'dependencyBundleTimestamps',
+          );
+          const missingBundleError = await validateBundlesExist(bundleTimestamp, dependencyBundleTimestamps);
+          if (missingBundleError) {
+            return {
+              response: missingBundleError,
+              shouldContinue: false,
+            };
+          }
+
+          // All validation passed - get response stream
+          const initial: IncrementalRenderInitialRequest = {
+            renderingRequest: String((tempReqBody as { renderingRequest?: string }).renderingRequest ?? ''),
+            bundleTimestamp,
+            dependencyBundleTimestamps,
+          };
+
+          try {
+            renderResult = await handleIncrementalRenderRequest(initial);
+            return {
+              response: renderResult.response,
+              shouldContinue: true,
+            };
+          } catch (err) {
+            const errorResponse = errorResponseResult(
+              formatExceptionMessage(
+                'IncrementalRender',
+                err,
+                'Error while handling incremental render request',
+              ),
+            );
+            return {
+              response: errorResponse,
+              shouldContinue: false,
+            };
+          }
+        },
+
+        onUpdateReceived: (obj: unknown) => {
+          // Only process updates if we have a render result
+          if (!renderResult) {
+            return undefined;
+          }
+
+          try {
+            renderResult.sink.add(obj);
+          } catch (err) {
+            // Log error but don't stop processing
+            log.error({ err, msg: 'Error processing update chunk' });
+          }
+          return undefined;
+        },
+
+        onResponseStart: async (response: ResponseResult) => {
+          await setResponse(response, res);
+        },
+
+        onRequestEnded: () => {
+          try {
+            if (renderResult) {
+              renderResult.sink.end();
+            }
+          } catch (err) {
+            log.error({ err, msg: 'Error ending render sink' });
+          }
+          return undefined;
+        },
+      });
     } catch (err) {
       // If an error occurred during stream processing, send error response
       const errorResponse = errorResponseResult(
