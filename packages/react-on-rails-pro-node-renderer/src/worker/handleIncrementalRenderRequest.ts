@@ -1,5 +1,5 @@
-import type { ResponseResult } from '../shared/utils';
 import { Readable } from 'stream';
+import type { ResponseResult } from '../shared/utils';
 
 export type IncrementalRenderSink = {
   /** Called for every subsequent NDJSON object after the first one */
