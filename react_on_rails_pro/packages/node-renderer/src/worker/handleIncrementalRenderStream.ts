@@ -1,5 +1,6 @@
 import { StringDecoder } from 'string_decoder';
 import type { ResponseResult } from '../shared/utils';
+import * as errorReporter from '../shared/errorReporter';
 
 /**
  * Result interface for render request callbacks
@@ -52,24 +53,51 @@ export async function handleIncrementalRenderStream(
           try {
             parsed = JSON.parse(rawObject);
           } catch (err) {
-            throw new Error(`Invalid JSON chunk: ${err instanceof Error ? err.message : String(err)}`);
+            const errorMessage = `Invalid JSON chunk: ${err instanceof Error ? err.message : String(err)}`;
+
+            if (!hasReceivedFirstObject) {
+              // Error in first chunk - throw error to stop processing
+              throw new Error(errorMessage);
+            } else {
+              // Error in subsequent chunks - log and report but continue processing
+              const reportedMessage = `JSON parsing error in update chunk: ${err instanceof Error ? err.message : String(err)}`;
+              console.error(reportedMessage);
+              errorReporter.message(reportedMessage);
+              // Skip this malformed chunk and continue with next ones
+              continue;
+            }
           }
 
           if (!hasReceivedFirstObject) {
             hasReceivedFirstObject = true;
-            // eslint-disable-next-line no-await-in-loop
-            const result = await onRenderRequestReceived(parsed);
-            const { response, shouldContinue: continueFlag } = result;
+            try {
+              // eslint-disable-next-line no-await-in-loop
+              const result = await onRenderRequestReceived(parsed);
+              const { response, shouldContinue: continueFlag } = result;
 
-            // eslint-disable-next-line no-await-in-loop
-            await onResponseStart(response);
+              // eslint-disable-next-line no-await-in-loop
+              await onResponseStart(response);
 
-            if (!continueFlag) {
-              return;
+              if (!continueFlag) {
+                return;
+              }
+            } catch (err) {
+              // Error in first chunk processing - throw error to stop processing
+              const error = err instanceof Error ? err : new Error(String(err));
+              error.message = `Error processing initial render request: ${error.message}`;
+              throw error;
             }
           } else {
-            // eslint-disable-next-line no-await-in-loop
-            await onUpdateReceived(parsed);
+            try {
+              // eslint-disable-next-line no-await-in-loop
+              await onUpdateReceived(parsed);
+            } catch (err) {
+              // Error in update chunk processing - log and report but continue processing
+              const errorMessage = `Error processing update chunk: ${err instanceof Error ? err.message : String(err)}`;
+              console.error(errorMessage);
+              errorReporter.message(errorMessage);
+              // Continue processing other chunks
+            }
           }
         }
       }
