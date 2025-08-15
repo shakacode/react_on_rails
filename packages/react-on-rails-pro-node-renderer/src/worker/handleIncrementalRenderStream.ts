@@ -90,6 +90,7 @@ export async function handleIncrementalRenderStream(
           } else {
             try {
               // eslint-disable-next-line no-await-in-loop
+              console.log('onUpdateReceived', parsed);
               await onUpdateReceived(parsed);
             } catch (err) {
               // Error in update chunk processing - log and report but continue processing
@@ -102,6 +103,7 @@ export async function handleIncrementalRenderStream(
         }
       }
     }
+    console.log('handleIncrementalRenderStream done');
   } catch (err) {
     const error = err instanceof Error ? err : new Error(String(err));
     // Update the error message in place to retain the original stack trace, rather than creating a new error object
@@ -110,5 +112,7 @@ export async function handleIncrementalRenderStream(
   }
 
   // Stream ended normally
-  await onRequestEnded();
+  console.log('onRequestEnded');
+  void onRequestEnded();
+  console.log('onRequestEnded done');
 }
