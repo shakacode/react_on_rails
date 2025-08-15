@@ -76,7 +76,7 @@ export async function handleIncrementalRenderStream(
               const { response, shouldContinue: continueFlag } = result;
 
               // eslint-disable-next-line no-await-in-loop
-              await onResponseStart(response);
+              void onResponseStart(response);
 
               if (!continueFlag) {
                 return;

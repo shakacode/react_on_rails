@@ -144,4 +144,48 @@ export function readRenderingRequest(projectName: string, commit: string, reques
   return fs.readFileSync(path.resolve(__dirname, renderingRequestRelativePath), 'utf8');
 }
 
+/**
+ * Custom waitFor function that retries an expect statement until it passes or timeout is reached
+ * @param expectFn - Function containing Jest expect statements
+ * @param options - Configuration options
+ * @param options.timeout - Maximum time to wait in milliseconds (default: 1000)
+ * @param options.interval - Time between retries in milliseconds (default: 10)
+ * @param options.message - Custom error message when timeout is reached
+ */
+export const waitFor = async (
+  expectFn: () => void,
+  options: {
+    timeout?: number;
+    interval?: number;
+    message?: string;
+  } = {},
+): Promise<void> => {
+  const { timeout = 1000, interval = 10, message } = options;
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < timeout) {
+    try {
+      expectFn();
+      // If we get here, the expect passed, so we can return
+      return;
+    } catch (error) {
+      // Expect failed, continue retrying
+      if (Date.now() - startTime >= timeout) {
+        // Timeout reached, re-throw the last error
+        throw error;
+      }
+    }
+
+    // Wait before next retry
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, interval);
+    });
+  }
+
+  // Timeout reached, throw error with descriptive message
+  const defaultMessage = `Expect condition not met within ${timeout}ms`;
+  throw new Error(message || defaultMessage);
+};
+
 setConfig('helper');
