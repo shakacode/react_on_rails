@@ -162,6 +162,7 @@ export const waitFor = async (
 ): Promise<void> => {
   const { timeout = 1000, interval = 10, message } = options;
   const startTime = Date.now();
+  let lastError: Error | null = null;
 
   while (Date.now() - startTime < timeout) {
     try {
@@ -169,6 +170,7 @@ export const waitFor = async (
       // If we get here, the expect passed, so we can return
       return;
     } catch (error) {
+      lastError = error as Error;
       // Expect failed, continue retrying
       if (Date.now() - startTime >= timeout) {
         // Timeout reached, re-throw the last error
@@ -185,7 +187,7 @@ export const waitFor = async (
 
   // Timeout reached, throw error with descriptive message
   const defaultMessage = `Expect condition not met within ${timeout}ms`;
-  throw new Error(message || defaultMessage);
+  throw new Error(message || defaultMessage + (lastError ? `\nLast error: ${lastError.message}` : ''));
 };
 
 setConfig('helper');

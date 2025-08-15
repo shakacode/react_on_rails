@@ -210,18 +210,18 @@ describe('incremental render NDJSON endpoint', () => {
    * Helper function to create streaming response promise
    */
   const createStreamingResponsePromise = (req: http.ClientRequest) => {
-    return new Promise<{ statusCode: number; streamedData: string[] }>((resolve, reject) => {
-      const streamedChunks: string[] = [];
-
+    const receivedChunks: string[] = [];
+    
+    const promise = new Promise<{ statusCode: number; streamedData: string[] }>((resolve, reject) => {
       req.on('response', (res) => {
         res.on('data', (chunk: Buffer) => {
           const chunkStr = chunk.toString();
-          streamedChunks.push(chunkStr);
+          receivedChunks.push(chunkStr);
         });
         res.on('end', () => {
           resolve({
             statusCode: res.statusCode || 0,
-            streamedData: streamedChunks,
+            streamedData: [...receivedChunks], // Return a copy
           });
         });
         res.on('error', (e) => {
@@ -232,6 +232,8 @@ describe('incremental render NDJSON endpoint', () => {
         reject(e);
       });
     });
+
+    return { promise, receivedChunks };
   };
 
   beforeAll(async () => {
@@ -544,7 +546,7 @@ describe('incremental render NDJSON endpoint', () => {
     const req = createHttpRequest(SERVER_BUNDLE_TIMESTAMP);
 
     // Set up promise to capture the streaming response
-    const responsePromise = createStreamingResponsePromise(req);
+    const { promise } = createStreamingResponsePromise(req);
 
     // Write first object (valid JSON)
     const initialObj = createInitialObject(SERVER_BUNDLE_TIMESTAMP);
@@ -575,7 +577,7 @@ describe('incremental render NDJSON endpoint', () => {
     req.end();
 
     // Wait for the request to complete and capture the streaming response
-    const response = await responsePromise;
+    const response = await promise;
 
     // Verify the response status
     expect(response.statusCode).toBe(200);
@@ -598,6 +600,103 @@ describe('incremental render NDJSON endpoint', () => {
     // Verify that the mock was called correctly
     expect(handleSpy).toHaveBeenCalledTimes(1);
 
+    await waitFor(() => {
+      expect(sink.end).toHaveBeenCalled();
+    });
+  });
+
+  test('echo server - processes each chunk and immediately streams it back', async () => {
+    const { responseStream, sinkAdd, sink, handleSpy, SERVER_BUNDLE_TIMESTAMP } =
+      await createStreamingTestSetup();
+
+    // Create the HTTP request
+    const req = createHttpRequest(SERVER_BUNDLE_TIMESTAMP);
+
+    // Set up promise to capture the streaming response
+    const { promise, receivedChunks } = createStreamingResponsePromise(req);
+
+    // Write first object (valid JSON)
+    const initialObj = createInitialObject(SERVER_BUNDLE_TIMESTAMP);
+    req.write(`${JSON.stringify(initialObj)}\n`);
+
+    // Wait for the server to process the first object and set up the response
+    await waitFor(() => {
+      expect(handleSpy).toHaveBeenCalledTimes(1);
+    });
+
+    // Verify handleIncrementalRenderRequest was called
+    expect(handleSpy).toHaveBeenCalledTimes(1);
+
+    // Send chunks one by one and verify immediate processing and echoing
+    const chunksToSend = [
+      { type: 'update', data: 'chunk1' },
+      { type: 'update', data: 'chunk2' },
+      { type: 'update', data: 'chunk3' },
+      { type: 'update', data: 'chunk4' },
+    ];
+
+    // Process each chunk and immediately echo it back
+    for (let i = 0; i < chunksToSend.length; i += 1) {
+      const chunk = chunksToSend[i];
+      
+      // Send the chunk
+      req.write(`${JSON.stringify(chunk)}\n`);
+
+      // Wait for the chunk to be processed
+      // eslint-disable-next-line no-await-in-loop
+      await waitFor(() => {
+        expect(sinkAdd).toHaveBeenCalledWith(chunk);
+      });
+
+      // Immediately echo the chunk back through the stream
+      const echoResponse = `processed ${JSON.stringify(chunk)}`;
+      responseStream.push(echoResponse);
+
+      // Wait for the echo response to be received by the client
+      // eslint-disable-next-line no-await-in-loop
+      await waitFor(() => {
+        expect(receivedChunks[i]).toEqual(echoResponse);
+      });
+
+      // Wait a moment to ensure the echo is sent
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 10);
+      });
+    }
+
+    // End the stream to signal no more data
+    responseStream.push(null);
+
+    // End the request
+    req.end();
+
+    // Wait for the request to complete and capture the streaming response
+    const response = await promise;
+
+    // Verify the response status
+    expect(response.statusCode).toBe(200);
+
+    // Verify that we received echo responses for each chunk
+    expect(response.streamedData).toHaveLength(chunksToSend.length);
+
+    // Verify that each chunk was echoed back correctly
+    chunksToSend.forEach((chunk, index) => {
+      const expectedEcho = `processed ${JSON.stringify(chunk)}`;
+      const receivedEcho = response.streamedData[index];
+      expect(receivedEcho).toEqual(expectedEcho);
+    });
+
+    // Verify that all request chunks were processed
+    expect(sinkAdd).toHaveBeenCalledTimes(chunksToSend.length);
+    chunksToSend.forEach((chunk, index) => {
+      expect(sinkAdd).toHaveBeenNthCalledWith(index + 1, chunk);
+    });
+
+    // Verify that the mock was called correctly
+    expect(handleSpy).toHaveBeenCalledTimes(1);
+
+    // Verify that the sink.end was called
     await waitFor(() => {
       expect(sink.end).toHaveBeenCalled();
     });
