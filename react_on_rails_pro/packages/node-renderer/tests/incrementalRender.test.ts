@@ -160,7 +160,6 @@ describe('incremental render NDJSON endpoint', () => {
 
     const sink: incremental.IncrementalRenderSink = {
       add: (chunk) => {
-        console.log('Sink.add called with chunk:', chunk);
         processedChunks.push(chunk);
         sinkAdd(chunk);
       },
@@ -224,11 +223,9 @@ describe('incremental render NDJSON endpoint', () => {
       req.on('response', (res) => {
         res.on('data', (chunk: Buffer) => {
           const chunkStr = chunk.toString();
-          console.log('Client received chunk:', chunkStr);
           streamedChunks.push(chunkStr);
         });
         res.on('end', () => {
-          console.log('Client response ended, total chunks received:', streamedChunks.length);
           resolve({
             statusCode: res.statusCode || 0,
             streamedData: streamedChunks,
@@ -250,13 +247,11 @@ describe('incremental render NDJSON endpoint', () => {
   });
 
   afterAll(async () => {
-    console.log('afterAll');
     await app.close();
-    console.log('afterAll done');
   });
 
   test('calls handleIncrementalRenderRequest immediately after first chunk and processes each subsequent chunk immediately', async () => {
-    const { sink, sinkAddCalls, sinkEnd, sinkAbort, handleSpy, SERVER_BUNDLE_TIMESTAMP } =
+    const { sinkAddCalls, sinkEnd, sinkAbort, handleSpy, SERVER_BUNDLE_TIMESTAMP } =
       await createBasicTestSetup();
 
     // Create the HTTP request
@@ -434,7 +429,6 @@ describe('incremental render NDJSON endpoint', () => {
       expect(sinkEnd).toHaveBeenCalledTimes(1);
       expect(sinkAbort).not.toHaveBeenCalled();
     });
-    console.log('sinkAddCalls');
   });
 
   test('handles empty lines gracefully in the stream', async () => {
@@ -559,7 +553,6 @@ describe('incremental render NDJSON endpoint', () => {
 
     // Write first object (valid JSON)
     const initialObj = createInitialObject(SERVER_BUNDLE_TIMESTAMP);
-    console.log('Sending initial chunk:', initialObj);
     req.write(`${JSON.stringify(initialObj)}\n`);
 
     // Wait for the server to process the first object and set up the response
@@ -584,13 +577,10 @@ describe('incremental render NDJSON endpoint', () => {
     });
 
     // End the request
-    console.log('Ending request');
     req.end();
 
     // Wait for the request to complete and capture the streaming response
-    console.log('Waiting for response');
     const response = await responsePromise;
-    console.log('Response:', response);
 
     // Verify the response status
     expect(response.statusCode).toBe(200);
@@ -607,10 +597,8 @@ describe('incremental render NDJSON endpoint', () => {
     // Verify that all request chunks were processed
     expect(processedChunks).toEqual(chunksToSend);
 
-    console.log('handleSpy');
     // Verify that the mock was called correctly
     expect(handleSpy).toHaveBeenCalledTimes(1);
-    console.log('handleSpy done');
 
     await waitFor(() => {
       expect(sink.end).toHaveBeenCalled();
