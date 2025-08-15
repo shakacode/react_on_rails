@@ -5,7 +5,6 @@
  * @module worker/handleRenderRequest
  */
 
-import cluster from 'cluster';
 import path from 'path';
 import { mkdir } from 'fs/promises';
 import { lock, unlock } from '../shared/locks';
@@ -19,15 +18,17 @@ import {
   copyUploadedAssets,
   ResponseResult,
   moveUploadedAsset,
-  isReadableStream,
-  isErrorRenderResult,
   getRequestBundleFilePath,
   deleteUploadedAssets,
-  validateBundlesExist,
 } from '../shared/utils';
 import { getConfig } from '../shared/configBuilder';
-import * as errorReporter from '../shared/errorReporter';
-import { buildVM, hasVMContextForBundle, runInVM } from './vm';
+import { hasVMContextForBundle } from './vm';
+import {
+  validateAndGetBundlePaths,
+  buildVMsForBundles,
+  executeRenderInVM,
+  createRenderErrorResponse,
+} from './sharedRenderUtils';
 
 export type ProvidedNewBundle = {
   timestamp: string | number;
@@ -39,36 +40,15 @@ async function prepareResult(
   bundleFilePathPerTimestamp: string,
 ): Promise<ResponseResult> {
   try {
-    const result = await runInVM(renderingRequest, bundleFilePathPerTimestamp, cluster);
+    const executionResult = await executeRenderInVM(renderingRequest, bundleFilePathPerTimestamp);
 
-    let exceptionMessage = null;
-    if (!result) {
-      const error = new Error('INVALID NIL or NULL result for rendering');
-      exceptionMessage = formatExceptionMessage(renderingRequest, error, 'INVALID result for prepareResult');
-    } else if (isErrorRenderResult(result)) {
-      ({ exceptionMessage } = result);
+    if (!executionResult.success || !executionResult.result) {
+      return executionResult.error || errorResponseResult('Unknown error during render execution');
     }
 
-    if (exceptionMessage) {
-      return errorResponseResult(exceptionMessage);
-    }
-
-    if (isReadableStream(result)) {
-      return {
-        headers: { 'Cache-Control': 'public, max-age=31536000' },
-        status: 200,
-        stream: result,
-      };
-    }
-
-    return {
-      headers: { 'Cache-Control': 'public, max-age=31536000' },
-      status: 200,
-      data: result,
-    };
+    return executionResult.result;
   } catch (err) {
-    const exceptionMessage = formatExceptionMessage(renderingRequest, err, 'Unknown error calling runInVM');
-    return errorResponseResult(exceptionMessage);
+    return createRenderErrorResponse(renderingRequest, err, 'Unknown error calling runInVM');
   }
 }
 
@@ -193,7 +173,6 @@ export async function handleRenderRequest({
   assetsToCopy?: Asset[] | null;
 }): Promise<ResponseResult> {
   try {
-    // const bundleFilePathPerTimestamp = getRequestBundleFilePath(bundleTimestamp);
     const allBundleFilePaths = Array.from(
       new Set([...(dependencyBundleTimestamps ?? []), bundleTimestamp].map(getRequestBundleFilePath)),
     );
@@ -222,25 +201,27 @@ export async function handleRenderRequest({
       }
     }
 
-    // Check if the bundle exists:
-    const missingBundleError = await validateBundlesExist(bundleTimestamp, dependencyBundleTimestamps);
-    if (missingBundleError) {
-      return missingBundleError;
+    // Validate bundles and get paths
+    const validationResult = await validateAndGetBundlePaths(bundleTimestamp, dependencyBundleTimestamps);
+    if (!validationResult.success || !validationResult.bundleFilePath) {
+      return validationResult.error || errorResponseResult('Bundle validation failed');
     }
 
-    // The bundle exists, but the VM has not yet been created.
-    // Another worker must have written it or it was saved during deployment.
-    log.info('Bundle %s exists. Building VM for worker %s.', entryBundleFilePath, workerIdLabel());
-    await Promise.all(allBundleFilePaths.map((bundleFilePath) => buildVM(bundleFilePath)));
+    // Build VMs
+    const vmBuildResult = await buildVMsForBundles(
+      validationResult.bundleFilePath,
+      validationResult.dependencyBundleFilePaths || [],
+    );
+    if (!vmBuildResult.success) {
+      return vmBuildResult.error || errorResponseResult('VM building failed');
+    }
 
     return await prepareResult(renderingRequest, entryBundleFilePath);
   } catch (error) {
-    const msg = formatExceptionMessage(
+    return createRenderErrorResponse(
       renderingRequest,
       error,
       'Caught top level error in handleRenderRequest',
     );
-    errorReporter.message(msg);
-    return Promise.reject(error as Error);
   }
 }
