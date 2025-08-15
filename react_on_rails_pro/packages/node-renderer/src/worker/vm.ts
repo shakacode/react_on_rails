@@ -8,6 +8,7 @@ import path from 'path';
 import vm from 'vm';
 import m from 'module';
 import cluster from 'cluster';
+import { EventEmitter } from 'events';
 import type { Readable } from 'stream';
 import { ReadableStream } from 'stream/web';
 import { promisify, TextEncoder } from 'util';
@@ -106,11 +107,13 @@ function manageVMPoolSize() {
  * @param renderingRequest JS Code to execute for SSR
  * @param filePath
  * @param vmCluster
+ * @param updateEmitter Optional EventEmitter for incremental rendering updates
  */
 export async function runInVM(
   renderingRequest: string,
   filePath: string,
   vmCluster?: typeof cluster,
+  updateEmitter?: EventEmitter,
 ): Promise<RenderResult> {
   const { serverBundleCachePath } = getConfig();
 
@@ -132,6 +135,11 @@ export async function runInVM(
 
     const { context, sharedConsoleHistory } = vmContext;
 
+    // Add updateEmitter to context if provided for incremental rendering
+    if (updateEmitter) {
+      context.updateEmitter = updateEmitter;
+    }
+
     if (log.level === 'debug') {
       // worker is nullable in the primary process
       const workerId = vmCluster?.worker?.id;
@@ -148,6 +156,10 @@ ${smartTrim(renderingRequest)}`);
         return vm.runInContext(renderingRequest, context) as RenderCodeResult;
       } finally {
         context.renderingRequest = undefined;
+        // Clean up updateEmitter from context after execution
+        if (updateEmitter) {
+          delete context.updateEmitter;
+        }
       }
     });
 
