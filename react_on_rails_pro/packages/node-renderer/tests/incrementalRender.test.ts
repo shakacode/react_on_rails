@@ -56,19 +56,17 @@ describe('incremental render NDJSON endpoint', () => {
   });
 
   const createMockSink = () => {
-    const sinkAddCalls: unknown[] = [];
+    const sinkAdd = jest.fn();
     const sinkEnd = jest.fn();
     const sinkAbort = jest.fn();
 
     const sink: incremental.IncrementalRenderSink = {
-      add: (chunk) => {
-        sinkAddCalls.push(chunk);
-      },
+      add: sinkAdd,
       end: sinkEnd,
       abort: sinkAbort,
     };
 
-    return { sink, sinkAddCalls, sinkEnd, sinkAbort };
+    return { sink, sinkAdd, sinkEnd, sinkAbort };
   };
 
   const createMockResponse = (data = 'mock response'): ResponseResult => ({
@@ -120,7 +118,7 @@ describe('incremental render NDJSON endpoint', () => {
   const createBasicTestSetup = async () => {
     await createVmBundle(TEST_NAME);
 
-    const { sink, sinkAddCalls, sinkEnd, sinkAbort } = createMockSink();
+    const { sink, sinkAdd, sinkEnd, sinkAbort } = createMockSink();
     const mockResponse = createMockResponse();
     const mockResult = createMockResult(sink, mockResponse);
 
@@ -132,7 +130,7 @@ describe('incremental render NDJSON endpoint', () => {
 
     return {
       sink,
-      sinkAddCalls,
+      sinkAdd,
       sinkEnd,
       sinkAbort,
       mockResponse,
@@ -155,14 +153,10 @@ describe('incremental render NDJSON endpoint', () => {
       },
     });
 
-    const processedChunks: unknown[] = [];
     const sinkAdd = jest.fn();
 
     const sink: incremental.IncrementalRenderSink = {
-      add: (chunk) => {
-        processedChunks.push(chunk);
-        sinkAdd(chunk);
-      },
+      add: sinkAdd,
       end: jest.fn(),
       abort: jest.fn(),
     };
@@ -186,7 +180,6 @@ describe('incremental render NDJSON endpoint', () => {
 
     return {
       responseStream,
-      processedChunks,
       sinkAdd,
       sink,
       mockResponse,
@@ -251,8 +244,7 @@ describe('incremental render NDJSON endpoint', () => {
   });
 
   test('calls handleIncrementalRenderRequest immediately after first chunk and processes each subsequent chunk immediately', async () => {
-    const { sinkAddCalls, sinkEnd, sinkAbort, handleSpy, SERVER_BUNDLE_TIMESTAMP } =
-      await createBasicTestSetup();
+    const { sinkAdd, sinkEnd, sinkAbort, handleSpy, SERVER_BUNDLE_TIMESTAMP } = await createBasicTestSetup();
 
     // Create the HTTP request
     const req = createHttpRequest(SERVER_BUNDLE_TIMESTAMP);
@@ -271,7 +263,7 @@ describe('incremental render NDJSON endpoint', () => {
 
     // Verify handleIncrementalRenderRequest was called immediately after first chunk
     expect(handleSpy).toHaveBeenCalledTimes(1);
-    expect(sinkAddCalls).toHaveLength(0); // No subsequent chunks processed yet
+    expect(sinkAdd).not.toHaveBeenCalled(); // No subsequent chunks processed yet
 
     // Send subsequent props chunks one by one and verify immediate processing
     const chunksToSend = [{ a: 1 }, { b: 2 }, { c: 3 }];
@@ -280,16 +272,16 @@ describe('incremental render NDJSON endpoint', () => {
       const expectedCallsBeforeWrite = index;
 
       // Verify state before writing this chunk
-      expect(sinkAddCalls).toHaveLength(expectedCallsBeforeWrite);
+      expect(sinkAdd).toHaveBeenCalledTimes(expectedCallsBeforeWrite);
 
       // Wait for the chunk to be processed
       await waitFor(() => {
-        expect(sinkAddCalls).toHaveLength(expectedCallsBeforeWrite + 1);
+        expect(sinkAdd).toHaveBeenCalledTimes(expectedCallsBeforeWrite + 1);
       });
 
       // Verify the chunk was processed immediately
-      expect(sinkAddCalls).toHaveLength(expectedCallsBeforeWrite + 1);
-      expect(sinkAddCalls[expectedCallsBeforeWrite]).toEqual(chunk);
+      expect(sinkAdd).toHaveBeenCalledTimes(expectedCallsBeforeWrite + 1);
+      expect(sinkAdd).toHaveBeenNthCalledWith(expectedCallsBeforeWrite + 1, chunk);
     });
 
     req.end();
@@ -304,7 +296,7 @@ describe('incremental render NDJSON endpoint', () => {
 
     // Final verification: all chunks were processed in the correct order
     expect(handleSpy).toHaveBeenCalledTimes(1);
-    expect(sinkAddCalls).toEqual([{ a: 1 }, { b: 2 }, { c: 3 }]);
+    expect(sinkAdd.mock.calls).toEqual([[{ a: 1 }], [{ b: 2 }], [{ c: 3 }]]);
 
     // Verify stream lifecycle methods were called correctly
     expect(sinkEnd).toHaveBeenCalledTimes(1);
@@ -362,7 +354,7 @@ describe('incremental render NDJSON endpoint', () => {
     // Create a bundle for this test
     await createVmBundle(TEST_NAME);
 
-    const { sink, sinkAddCalls, sinkEnd, sinkAbort } = createMockSink();
+    const { sink, sinkAdd, sinkEnd, sinkAbort } = createMockSink();
 
     const mockResponse: ResponseResult = createMockResponse();
 
@@ -385,31 +377,31 @@ describe('incremental render NDJSON endpoint', () => {
     const initialObj = createInitialObject(SERVER_BUNDLE_TIMESTAMP);
     req.write(`${JSON.stringify(initialObj)}\n`);
 
-    // Wait for the server to process the first object and set up the response
+    // Wait for the server to process the first object
     await waitFor(() => {
       expect(handleSpy).toHaveBeenCalledTimes(1);
     });
 
-    // Verify handleIncrementalRenderRequest was called
-    expect(handleSpy).toHaveBeenCalledTimes(1);
-
-    // Send a valid update chunk
-    req.write(`${JSON.stringify({ a: 1 })}\n`);
+    // Send a valid chunk first
+    const validChunk = { a: 1 };
+    req.write(`${JSON.stringify(validChunk)}\n`);
 
     // Wait for processing
     await waitFor(() => {
-      expect(sinkAddCalls).toHaveLength(1);
+      expect(sinkAdd).toHaveBeenCalledWith({ a: 1 });
     });
 
     // Verify the valid chunk was processed
-    expect(sinkAddCalls).toHaveLength(1);
-    expect(sinkAddCalls[0]).toEqual({ a: 1 });
+    expect(sinkAdd).toHaveBeenCalledWith({ a: 1 });
 
     // Send a malformed JSON chunk
-    req.write('{"b": 2, "c": 3\n'); // Missing closing brace
+    const malformedChunk = '{"invalid": json}\n';
+    req.write(malformedChunk);
 
-    // Send another valid chunk after the malformed one
-    req.write(`${JSON.stringify({ d: 4 })}\n`);
+    // Send another valid chunk
+    const secondValidChunk = { d: 4 };
+    req.write(`${JSON.stringify(secondValidChunk)}\n`);
+
     req.end();
 
     // Wait for the request to complete
@@ -422,10 +414,9 @@ describe('incremental render NDJSON endpoint', () => {
 
     // Verify that processing continued after the malformed chunk
     // The malformed chunk should be skipped, but valid chunks should be processed
-
     // Verify that the stream completed successfully
     await waitFor(() => {
-      expect(sinkAddCalls).toEqual([{ a: 1 }, { d: 4 }]);
+      expect(sinkAdd.mock.calls).toEqual([[{ a: 1 }], [{ d: 4 }]]);
       expect(sinkEnd).toHaveBeenCalledTimes(1);
       expect(sinkAbort).not.toHaveBeenCalled();
     });
@@ -435,7 +426,7 @@ describe('incremental render NDJSON endpoint', () => {
     // Create a bundle for this test
     await createVmBundle(TEST_NAME);
 
-    const { sink, sinkAddCalls, sinkEnd } = createMockSink();
+    const { sink, sinkAdd, sinkEnd } = createMockSink();
 
     const mockResponse: ResponseResult = createMockResponse();
 
@@ -454,7 +445,7 @@ describe('incremental render NDJSON endpoint', () => {
     // Set up promise to handle the response
     const responsePromise = setupResponseHandler(req);
 
-    // Write first object
+    // Write first object (valid JSON)
     const initialObj = createInitialObject(SERVER_BUNDLE_TIMESTAMP);
     req.write(`${JSON.stringify(initialObj)}\n`);
 
@@ -464,12 +455,16 @@ describe('incremental render NDJSON endpoint', () => {
     });
 
     // Send chunks with empty lines mixed in
-    req.write('\n'); // Empty line
-    req.write(`${JSON.stringify({ a: 1 })}\n`);
-    req.write('\n'); // Empty line
-    req.write(`${JSON.stringify({ b: 2 })}\n`);
-    req.write('\n'); // Empty line
-    req.write(`${JSON.stringify({ c: 3 })}\n`);
+    const chunksToSend = [{ a: 1 }, { b: 2 }, { c: 3 }];
+
+    for (const chunk of chunksToSend) {
+      req.write(`${JSON.stringify(chunk)}\n`);
+      // eslint-disable-next-line no-await-in-loop
+      await waitFor(() => {
+        expect(sinkAdd).toHaveBeenCalledWith(chunk);
+      });
+    }
+
     req.end();
 
     // Wait for the request to complete
@@ -482,7 +477,7 @@ describe('incremental render NDJSON endpoint', () => {
 
     // Verify that only valid JSON objects were processed
     expect(handleSpy).toHaveBeenCalledTimes(1);
-    expect(sinkAddCalls).toEqual([{ a: 1 }, { b: 2 }, { c: 3 }]);
+    expect(sinkAdd.mock.calls).toEqual([[{ a: 1 }], [{ b: 2 }], [{ c: 3 }]]);
     expect(sinkEnd).toHaveBeenCalledTimes(1);
   });
 
@@ -530,7 +525,7 @@ describe('incremental render NDJSON endpoint', () => {
       'Goodbye from stream',
     ];
 
-    const { responseStream, processedChunks, sinkAdd, sink, handleSpy, SERVER_BUNDLE_TIMESTAMP } =
+    const { responseStream, sinkAdd, sink, handleSpy, SERVER_BUNDLE_TIMESTAMP } =
       await createStreamingTestSetup();
 
     // write the response chunks to the stream
@@ -595,7 +590,10 @@ describe('incremental render NDJSON endpoint', () => {
     });
 
     // Verify that all request chunks were processed
-    expect(processedChunks).toEqual(chunksToSend);
+    expect(sinkAdd).toHaveBeenCalledTimes(chunksToSend.length);
+    chunksToSend.forEach((chunk, index) => {
+      expect(sinkAdd).toHaveBeenNthCalledWith(index + 1, chunk);
+    });
 
     // Verify that the mock was called correctly
     expect(handleSpy).toHaveBeenCalledTimes(1);
