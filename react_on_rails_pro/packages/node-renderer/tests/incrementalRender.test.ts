@@ -130,7 +130,9 @@ describe('incremental render NDJSON endpoint', () => {
   });
 
   afterAll(async () => {
+    console.log('afterAll');
     await app.close();
+    console.log('afterAll done');
   });
 
   test('calls handleIncrementalRenderRequest immediately after first chunk and processes each subsequent chunk immediately', async () => {
@@ -400,5 +402,162 @@ describe('incremental render NDJSON endpoint', () => {
         responseText?.includes('auth') ||
         responseText?.includes('unauthorized'),
     ).toBe(true);
+  });
+
+  test('streaming response - client receives all streamed chunks in real-time', async () => {
+    // Create a bundle for this test
+    await createVmBundle(TEST_NAME);
+
+    const responseChunks = [
+      'Hello from stream',
+      'Chunk 1',
+      'Chunk 2',
+      'Chunk 3',
+      'Chunk 4',
+      'Chunk 5',
+      'Goodbye from stream',
+    ];
+
+    // Create a readable stream that yields chunks every 10ms
+    const { Readable } = await import('stream');
+    let responseStreamInitialized = false;
+    const responseStream = new Readable({
+      read() {
+        if (responseStreamInitialized) {
+          return;
+        }
+
+        responseStreamInitialized = true;
+        let chunkIndex = 0;
+        const intervalId = setInterval(() => {
+          if (chunkIndex < responseChunks.length) {
+            console.log('Pushing response chunk:', responseChunks[chunkIndex]);
+            this.push(responseChunks[chunkIndex]);
+            chunkIndex += 1;
+          } else {
+            clearInterval(intervalId);
+            console.log('Ending response stream');
+            this.push(null);
+          }
+        }, 10);
+      },
+    });
+
+    // Track processed chunks to verify immediate processing
+    const processedChunks: unknown[] = [];
+
+    // Create a sink that records processed chunks
+    const sink: incremental.IncrementalRenderSink = {
+      add: (chunk) => {
+        console.log('Sink.add called with chunk:', chunk);
+        processedChunks.push(chunk);
+      },
+      end: jest.fn(),
+      abort: jest.fn(),
+    };
+
+    // Create a response with the streaming response
+    const mockResponse: ResponseResult = {
+      status: 200,
+      headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
+      stream: responseStream,
+    };
+
+    const mockResult: incremental.IncrementalRenderResult = {
+      response: mockResponse,
+      sink,
+    };
+
+    const resultPromise = Promise.resolve(mockResult);
+    const handleSpy = jest
+      .spyOn(incremental, 'handleIncrementalRenderRequest')
+      .mockImplementation(() => resultPromise);
+
+    const SERVER_BUNDLE_TIMESTAMP = String(BUNDLE_TIMESTAMP);
+
+    // Create the HTTP request
+    const req = createHttpRequest(SERVER_BUNDLE_TIMESTAMP);
+
+    // Set up promise to capture the streaming response
+    const responsePromise = new Promise<{ statusCode: number; streamedData: string[] }>((resolve, reject) => {
+      const streamedChunks: string[] = [];
+
+      req.on('response', (res) => {
+        res.on('data', (chunk: Buffer) => {
+          // Capture each chunk of the streaming response
+          const chunkStr = chunk.toString();
+          console.log('Client received chunk:', chunkStr);
+          streamedChunks.push(chunkStr);
+        });
+        res.on('end', () => {
+          console.log('Client response ended, total chunks received:', streamedChunks.length);
+          resolve({
+            statusCode: res.statusCode || 0,
+            streamedData: streamedChunks,
+          });
+        });
+        res.on('error', (e) => {
+          reject(e);
+        });
+      });
+      req.on('error', (e) => {
+        reject(e);
+      });
+    });
+
+    // Write first object (valid JSON)
+    const initialObj = createInitialObject(SERVER_BUNDLE_TIMESTAMP);
+    console.log('Sending initial chunk:', initialObj);
+    req.write(`${JSON.stringify(initialObj)}\n`);
+
+    // Wait for the server to process the first object and set up the response
+    await waitForProcessing(100);
+
+    // Verify handleIncrementalRenderRequest was called
+    expect(handleSpy).toHaveBeenCalledTimes(1);
+
+    // Send a few chunks to trigger processing
+    const chunksToSend = [
+      { type: 'update', data: 'chunk1' },
+      { type: 'update', data: 'chunk2' },
+      { type: 'update', data: 'chunk3' },
+    ];
+
+    for (const chunk of chunksToSend) {
+      req.write(`${JSON.stringify(chunk)}\n`);
+      // eslint-disable-next-line no-await-in-loop
+      await waitForProcessing(10);
+    }
+
+    // End the request
+    console.log('Ending request');
+    req.end();
+
+    // Wait for the request to complete and capture the streaming response
+    console.log('Waiting for response');
+    const response = await responsePromise;
+    console.log('Response:', response);
+
+    // Verify the response status
+    expect(response.statusCode).toBe(200);
+
+    // Verify that we received all the streamed chunks
+    expect(response.streamedData).toHaveLength(responseChunks.length);
+
+    // Verify that each chunk was received in order
+    responseChunks.forEach((expectedChunk, index) => {
+      const receivedChunk = response.streamedData[index];
+      expect(receivedChunk).toContain(expectedChunk);
+    });
+
+    // Verify that all request chunks were processed
+    expect(processedChunks).toEqual(chunksToSend);
+
+    console.log('handleSpy');
+    // Verify that the mock was called correctly
+    expect(handleSpy).toHaveBeenCalledTimes(1);
+    console.log('handleSpy done');
+
+    await waitForSinkEnd();
   });
 });

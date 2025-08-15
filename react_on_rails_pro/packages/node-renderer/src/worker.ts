@@ -80,7 +80,9 @@ const setResponse = async (result: ResponseResult, res: FastifyReply) => {
   setHeaders(headers, res);
   res.status(status);
   if (stream) {
+    console.log('Sending stream');
     await res.send(stream);
+    console.log('Stream sent');
   } else {
     res.send(data);
   }
@@ -391,6 +393,7 @@ export default function run(config: Partial<Config>) {
           return undefined;
         },
       });
+      console.log('handleIncrementalRenderStream done 1');
     } catch (err) {
       // If an error occurred during stream processing, send error response
       const errorResponse = errorResponseResult(
@@ -398,6 +401,7 @@ export default function run(config: Partial<Config>) {
       );
       await setResponse(errorResponse, res);
     }
+    console.log('handleIncrementalRenderStream done 2');
   });
 
   // There can be additional files that might be required at the runtime.
