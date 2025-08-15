@@ -4,7 +4,7 @@ import path from 'path';
 import worker, { disableHttp2 } from '../src/worker';
 import packageJson from '../src/shared/packageJson';
 import * as incremental from '../src/worker/handleIncrementalRenderRequest';
-import { createVmBundle, BUNDLE_TIMESTAMP } from './helper';
+import { createVmBundle, BUNDLE_TIMESTAMP, waitFor } from './helper';
 import type { ResponseResult } from '../src/shared/utils';
 
 // Disable HTTP/2 for testing like other tests do
@@ -114,16 +114,6 @@ describe('incremental render NDJSON endpoint', () => {
     });
   };
 
-  const waitForProcessing = (ms = 50) =>
-    new Promise<void>((resolve) => {
-      setTimeout(resolve, ms);
-    });
-
-  const waitForSinkEnd = (ms = 10) =>
-    new Promise<void>((resolve) => {
-      setTimeout(resolve, ms);
-    });
-
   beforeAll(async () => {
     await app.ready();
     await app.listen({ port: 0 });
@@ -162,8 +152,10 @@ describe('incremental render NDJSON endpoint', () => {
     const initialObj = createInitialObject(SERVER_BUNDLE_TIMESTAMP);
     req.write(`${JSON.stringify(initialObj)}\n`);
 
-    // Wait a brief moment for the server to process the first object
-    await waitForProcessing();
+    // Wait for the server to process the first object
+    await waitFor(() => {
+      expect(handleSpy).toHaveBeenCalledTimes(1);
+    });
 
     // Verify handleIncrementalRenderRequest was called immediately after first chunk
     expect(handleSpy).toHaveBeenCalledTimes(1);
@@ -182,9 +174,11 @@ describe('incremental render NDJSON endpoint', () => {
       // Write the chunk
       req.write(`${JSON.stringify(chunk)}\n`);
 
-      // Wait a brief moment for processing
+      // Wait for the chunk to be processed
       // eslint-disable-next-line no-await-in-loop
-      await waitForProcessing();
+      await waitFor(() => {
+        expect(sinkAddCalls).toHaveLength(expectedCallsBeforeWrite + 1);
+      });
 
       // Verify the chunk was processed immediately
       expect(sinkAddCalls).toHaveLength(expectedCallsBeforeWrite + 1);
@@ -197,7 +191,9 @@ describe('incremental render NDJSON endpoint', () => {
     await responsePromise;
 
     // Wait for the sink.end to be called
-    await waitForSinkEnd();
+    await waitFor(() => {
+      expect(sinkEnd).toHaveBeenCalledTimes(1);
+    });
 
     // Final verification: all chunks were processed in the correct order
     expect(handleSpy).toHaveBeenCalledTimes(1);
@@ -282,8 +278,10 @@ describe('incremental render NDJSON endpoint', () => {
     const initialObj = createInitialObject(SERVER_BUNDLE_TIMESTAMP);
     req.write(`${JSON.stringify(initialObj)}\n`);
 
-    // Wait a brief moment for the server to process the first object
-    await waitForProcessing();
+    // Wait for the server to process the first object and set up the response
+    await waitFor(() => {
+      expect(handleSpy).toHaveBeenCalledTimes(1);
+    });
 
     // Verify handleIncrementalRenderRequest was called
     expect(handleSpy).toHaveBeenCalledTimes(1);
@@ -292,7 +290,9 @@ describe('incremental render NDJSON endpoint', () => {
     req.write(`${JSON.stringify({ a: 1 })}\n`);
 
     // Wait for processing
-    await waitForProcessing();
+    await waitFor(() => {
+      expect(sinkAddCalls).toHaveLength(1);
+    });
 
     // Verify the valid chunk was processed
     expect(sinkAddCalls).toHaveLength(1);
@@ -309,15 +309,20 @@ describe('incremental render NDJSON endpoint', () => {
     await responsePromise;
 
     // Wait for the sink.end to be called
-    await waitForSinkEnd();
+    await waitFor(() => {
+      expect(sinkEnd).toHaveBeenCalledTimes(1);
+    });
 
     // Verify that processing continued after the malformed chunk
     // The malformed chunk should be skipped, but valid chunks should be processed
-    expect(sinkAddCalls).toEqual([{ a: 1 }, { d: 4 }]);
 
     // Verify that the stream completed successfully
-    expect(sinkEnd).toHaveBeenCalledTimes(1);
-    expect(sinkAbort).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(sinkAddCalls).toEqual([{ a: 1 }, { d: 4 }]);
+      expect(sinkEnd).toHaveBeenCalledTimes(1);
+      expect(sinkAbort).not.toHaveBeenCalled();
+    });
+    console.log('sinkAddCalls');
   });
 
   test('handles empty lines gracefully in the stream', async () => {
@@ -348,7 +353,9 @@ describe('incremental render NDJSON endpoint', () => {
     req.write(`${JSON.stringify(initialObj)}\n`);
 
     // Wait for processing
-    await waitForProcessing();
+    await waitFor(() => {
+      expect(handleSpy).toHaveBeenCalledTimes(1);
+    });
 
     // Send chunks with empty lines mixed in
     req.write('\n'); // Empty line
@@ -363,7 +370,9 @@ describe('incremental render NDJSON endpoint', () => {
     await responsePromise;
 
     // Wait for the sink.end to be called
-    await waitForSinkEnd();
+    await waitFor(() => {
+      expect(sinkEnd).toHaveBeenCalledTimes(1);
+    });
 
     // Verify that only valid JSON objects were processed
     expect(handleSpy).toHaveBeenCalledTimes(1);
@@ -446,11 +455,13 @@ describe('incremental render NDJSON endpoint', () => {
     // Track processed chunks to verify immediate processing
     const processedChunks: unknown[] = [];
 
+    const sinkAdd = jest.fn();
     // Create a sink that records processed chunks
     const sink: incremental.IncrementalRenderSink = {
       add: (chunk) => {
         console.log('Sink.add called with chunk:', chunk);
         processedChunks.push(chunk);
+        sinkAdd(chunk);
       },
       end: jest.fn(),
       abort: jest.fn(),
@@ -511,7 +522,9 @@ describe('incremental render NDJSON endpoint', () => {
     req.write(`${JSON.stringify(initialObj)}\n`);
 
     // Wait for the server to process the first object and set up the response
-    await waitForProcessing(100);
+    await waitFor(() => {
+      expect(handleSpy).toHaveBeenCalledTimes(1);
+    });
 
     // Verify handleIncrementalRenderRequest was called
     expect(handleSpy).toHaveBeenCalledTimes(1);
@@ -526,7 +539,9 @@ describe('incremental render NDJSON endpoint', () => {
     for (const chunk of chunksToSend) {
       req.write(`${JSON.stringify(chunk)}\n`);
       // eslint-disable-next-line no-await-in-loop
-      await waitForProcessing(10);
+      await waitFor(() => {
+        expect(sinkAdd).toHaveBeenCalledWith(chunk);
+      });
     }
 
     // End the request
@@ -558,6 +573,8 @@ describe('incremental render NDJSON endpoint', () => {
     expect(handleSpy).toHaveBeenCalledTimes(1);
     console.log('handleSpy done');
 
-    await waitForSinkEnd();
+    await waitFor(() => {
+      expect(sink.end).toHaveBeenCalled();
+    });
   });
 });
