@@ -211,7 +211,7 @@ describe('incremental render NDJSON endpoint', () => {
    */
   const createStreamingResponsePromise = (req: http.ClientRequest) => {
     const receivedChunks: string[] = [];
-    
+
     const promise = new Promise<{ statusCode: number; streamedData: string[] }>((resolve, reject) => {
       req.on('response', (res) => {
         res.on('data', (chunk: Buffer) => {
@@ -235,6 +235,10 @@ describe('incremental render NDJSON endpoint', () => {
 
     return { promise, receivedChunks };
   };
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   beforeAll(async () => {
     await app.ready();

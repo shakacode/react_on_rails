@@ -1,5 +1,5 @@
-import { Readable } from 'stream';
 import type { ResponseResult } from '../shared/utils';
+import { handleRenderRequest } from './handleRenderRequest';
 
 export type IncrementalRenderSink = {
   /** Called for every subsequent NDJSON object after the first one */
@@ -13,7 +13,7 @@ export type IncrementalRenderSink = {
 export type IncrementalRenderInitialRequest = {
   renderingRequest: string;
   bundleTimestamp: string | number;
-  dependencyBundleTimestamps?: Array<string | number>;
+  dependencyBundleTimestamps?: string[] | number[];
 };
 
 export type IncrementalRenderResult = {
@@ -22,36 +22,64 @@ export type IncrementalRenderResult = {
 };
 
 /**
- * Starts handling an incremental render request. This function is intended to:
- * - Initialize any resources needed to process the render
- * - Return both a stream that will be sent to the client and a sink for incoming chunks
- *
- * NOTE: This is intentionally left unimplemented. Tests should mock this.
+ * Starts handling an incremental render request. This function:
+ * - Calls handleRenderRequest internally to handle all validation and VM execution
+ * - Returns the result from handleRenderRequest directly
+ * - Provides a sink for future incremental updates (to be implemented in next commit)
  */
-export function handleIncrementalRenderRequest(initial: IncrementalRenderInitialRequest): Promise<IncrementalRenderResult> {
-  // Empty placeholder implementation. Real logic will be added later.
-  return Promise.resolve({
-    response: {
-      status: 200,
-      headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
-      stream: new Readable({
-        read() {
-          // No-op for now
+export async function handleIncrementalRenderRequest(
+  initial: IncrementalRenderInitialRequest,
+): Promise<IncrementalRenderResult> {
+  const { renderingRequest, bundleTimestamp, dependencyBundleTimestamps } = initial;
+
+  try {
+    // Call handleRenderRequest internally to handle all validation and VM execution
+    const renderResult = await handleRenderRequest({
+      renderingRequest,
+      bundleTimestamp,
+      dependencyBundleTimestamps,
+      providedNewBundles: undefined,
+      assetsToCopy: undefined,
+    });
+
+    // Return the result directly with a placeholder sink
+    return {
+      response: renderResult,
+      sink: {
+        add: () => {
+          /* no-op - will be implemented in next commit */
         },
-      }),
-    } as ResponseResult,
-    sink: {
-      add: () => {
-        /* no-op */
+        end: () => {
+          /* no-op - will be implemented in next commit */
+        },
+        abort: () => {
+          /* no-op - will be implemented in next commit */
+        },
       },
-      end: () => {
-        /* no-op */
+    };
+  } catch (error) {
+    // Handle any unexpected errors
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    return {
+      response: {
+        status: 500,
+        headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
+        data: errorMessage,
       },
-      abort: () => {
-        /* no-op */
+      sink: {
+        add: () => {
+          /* no-op */
+        },
+        end: () => {
+          /* no-op */
+        },
+        abort: () => {
+          /* no-op */
+        },
       },
-    },
-  });
+    };
+  }
 }
 
 export type { ResponseResult };
