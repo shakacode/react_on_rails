@@ -34,7 +34,6 @@ import {
   getAssetPath,
   getBundleDirectory,
   deleteUploadedAssets,
-  validateBundlesExist,
 } from './shared/utils';
 import * as errorReporter from './shared/errorReporter';
 import { lock, unlock } from './shared/locks';
@@ -290,10 +289,6 @@ export default function run(config: Partial<Config>) {
   }>('/bundles/:bundleTimestamp/incremental-render/:renderRequestDigest', async (req, res) => {
     const { bundleTimestamp } = req.params;
 
-    // Perform protocol + auth checks as early as possible. For protocol check,
-    // we need the first NDJSON object; thus defer protocol/auth until first chunk is parsed.
-    // Headers and status will be set after validation passes to avoid premature 200 status.
-
     // Stream parser state
     let renderResult: Awaited<ReturnType<typeof handleIncrementalRenderRequest>> | null = null;
 
@@ -306,7 +301,10 @@ export default function run(config: Partial<Config>) {
           const tempReqBody = typeof obj === 'object' && obj !== null ? (obj as Record<string, unknown>) : {};
 
           // Protocol check
-          const protoResult = checkProtocolVersion({ ...req, body: tempReqBody } as unknown as FastifyRequest);
+          const protoResult = checkProtocolVersion({
+            ...req,
+            body: tempReqBody,
+          } as unknown as FastifyRequest);
           if (typeof protoResult === 'object') {
             return {
               response: protoResult,
@@ -315,7 +313,10 @@ export default function run(config: Partial<Config>) {
           }
 
           // Auth check
-          const authResult = authenticate({ ...req, body: tempReqBody } as unknown as FastifyRequest);
+          const authResult = authenticate({
+            ...req,
+            body: tempReqBody,
+          } as unknown as FastifyRequest);
           if (typeof authResult === 'object') {
             return {
               response: authResult,
@@ -323,20 +324,12 @@ export default function run(config: Partial<Config>) {
             };
           }
 
-          // Bundle validation
+          // Extract data for incremental render request
           const dependencyBundleTimestamps = extractBodyArrayField(
             tempReqBody as WithBodyArrayField<Record<string, unknown>, 'dependencyBundleTimestamps'>,
             'dependencyBundleTimestamps',
           );
-          const missingBundleError = await validateBundlesExist(bundleTimestamp, dependencyBundleTimestamps);
-          if (missingBundleError) {
-            return {
-              response: missingBundleError,
-              shouldContinue: false,
-            };
-          }
 
-          // All validation passed - get response stream
           const initial: IncrementalRenderInitialRequest = {
             renderingRequest: String((tempReqBody as { renderingRequest?: string }).renderingRequest ?? ''),
             bundleTimestamp,
