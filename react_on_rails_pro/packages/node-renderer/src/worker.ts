@@ -34,11 +34,11 @@ import {
   getAssetPath,
   getBundleDirectory,
   deleteUploadedAssets,
+  validateBundlesExist,
 } from './shared/utils';
 import * as errorReporter from './shared/errorReporter';
 import { lock, unlock } from './shared/locks';
 import { startSsrRequestOptions, trace } from './shared/tracing';
-import { validateAndGetBundlePaths } from './worker/sharedRenderUtils';
 
 // Uncomment the below for testing timeouts:
 // import { delay } from './shared/utils';
@@ -323,16 +323,15 @@ export default function run(config: Partial<Config>) {
             };
           }
 
-          // Bundle validation using shared utility
+          // Bundle validation
           const dependencyBundleTimestamps = extractBodyArrayField(
             tempReqBody as WithBodyArrayField<Record<string, unknown>, 'dependencyBundleTimestamps'>,
             'dependencyBundleTimestamps',
           );
-          
-          const validationResult = await validateAndGetBundlePaths(bundleTimestamp, dependencyBundleTimestamps);
-          if (!validationResult.success) {
+          const missingBundleError = await validateBundlesExist(bundleTimestamp, dependencyBundleTimestamps);
+          if (missingBundleError) {
             return {
-              response: validationResult.error!,
+              response: missingBundleError,
               shouldContinue: false,
             };
           }
