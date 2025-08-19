@@ -13,9 +13,8 @@ import log, { sharedLoggerOptions } from './shared/log.js';
 import packageJson from './shared/packageJson.js';
 import { buildConfig, Config, getConfig } from './shared/configBuilder.js';
 import fileExistsAsync from './shared/fileExistsAsync.js';
-import type { FastifyInstance, FastifyReply, FastifyRequest } from './worker/types.js';
-import checkProtocolVersion from './worker/checkProtocolVersionHandler.js';
-import authenticate from './worker/authHandler.js';
+import type { FastifyInstance, FastifyReply } from './worker/types.js';
+import { performRequestPrechecks } from './worker/requestPrechecks.js';
 import { handleRenderRequest, type ProvidedNewBundle } from './worker/handleRenderRequest.js';
 import handleGracefulShutdown from './worker/handleGracefulShutdown.js';
 import {
@@ -174,42 +173,6 @@ export default function run(config: Partial<Config>) {
     done(null, payload);
   });
 
-  const isProtocolVersionMatch = async (req: FastifyRequest, res: FastifyReply) => {
-    // Check protocol version
-    const protocolVersionCheckingResult = checkProtocolVersion(req);
-
-    if (typeof protocolVersionCheckingResult === 'object') {
-      await setResponse(protocolVersionCheckingResult, res);
-      return false;
-    }
-
-    return true;
-  };
-
-  const isAuthenticated = async (req: FastifyRequest, res: FastifyReply) => {
-    // Authenticate Ruby client
-    const authResult = authenticate(req);
-
-    if (typeof authResult === 'object') {
-      await setResponse(authResult, res);
-      return false;
-    }
-
-    return true;
-  };
-
-  const requestPrechecks = async (req: FastifyRequest, res: FastifyReply) => {
-    if (!(await isProtocolVersionMatch(req, res))) {
-      return false;
-    }
-
-    if (!(await isAuthenticated(req, res))) {
-      return false;
-    }
-
-    return true;
-  };
-
   // See https://github.com/shakacode/react_on_rails_pro/issues/119 for why
   // the digest is part of the request URL. Yes, it's not used here, but the
   // server logs might show it to distinguish different requests.
@@ -223,7 +186,9 @@ export default function run(config: Partial<Config>) {
     // Can't infer from the route like Express can
     Params: { bundleTimestamp: string; renderRequestDigest: string };
   }>('/bundles/:bundleTimestamp/render/:renderRequestDigest', async (req, res) => {
-    if (!(await requestPrechecks(req, res))) {
+    const precheckResult = performRequestPrechecks(req.body);
+    if (precheckResult) {
+      await setResponse(precheckResult, res);
       return;
     }
 
@@ -300,26 +265,11 @@ export default function run(config: Partial<Config>) {
           // Build a temporary FastifyRequest shape for protocol/auth check
           const tempReqBody = typeof obj === 'object' && obj !== null ? (obj as Record<string, unknown>) : {};
 
-          // Protocol check
-          const protoResult = checkProtocolVersion({
-            ...req,
-            body: tempReqBody,
-          } as unknown as FastifyRequest);
-          if (typeof protoResult === 'object') {
+          // Perform request prechecks
+          const precheckResult = performRequestPrechecks(tempReqBody);
+          if (precheckResult) {
             return {
-              response: protoResult,
-              shouldContinue: false,
-            };
-          }
-
-          // Auth check
-          const authResult = authenticate({
-            ...req,
-            body: tempReqBody,
-          } as unknown as FastifyRequest);
-          if (typeof authResult === 'object') {
-            return {
-              response: authResult,
+              response: precheckResult,
               shouldContinue: false,
             };
           }
@@ -401,7 +351,9 @@ export default function run(config: Partial<Config>) {
   app.post<{
     Body: WithBodyArrayField<Record<string, Asset>, 'targetBundles'>;
   }>('/upload-assets', async (req, res) => {
-    if (!(await requestPrechecks(req, res))) {
+    const precheckResult = performRequestPrechecks(req.body);
+    if (precheckResult) {
+      await setResponse(precheckResult, res);
       return;
     }
     let lockAcquired = false;
@@ -500,7 +452,9 @@ export default function run(config: Partial<Config>) {
     Querystring: { filename: string };
     Body: WithBodyArrayField<Record<string, unknown>, 'targetBundles'>;
   }>('/asset-exists', async (req, res) => {
-    if (!(await isAuthenticated(req, res))) {
+    const precheckResult = performRequestPrechecks(req.body);
+    if (precheckResult) {
+      await setResponse(precheckResult, res);
       return;
     }
 
