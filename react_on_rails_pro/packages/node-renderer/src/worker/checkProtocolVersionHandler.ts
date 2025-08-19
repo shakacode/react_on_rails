@@ -2,7 +2,6 @@
  * Logic for checking protocol version.
  * @module worker/checkProtocVersionHandler
  */
-import type { FastifyRequest } from './types';
 import packageJson from '../shared/packageJson';
 import log from '../shared/log';
 
@@ -41,8 +40,8 @@ interface RequestBody {
   railsEnv?: string;
 }
 
-export = function checkProtocolVersion(req: FastifyRequest) {
-  const { protocolVersion: reqProtocolVersion, gemVersion, railsEnv } = req.body as RequestBody;
+export function checkProtocolVersion(body: RequestBody) {
+  const { protocolVersion: reqProtocolVersion, gemVersion, railsEnv } = body;
 
   // Check protocol version
   if (reqProtocolVersion !== packageJson.protocolVersion) {
@@ -52,7 +51,7 @@ export = function checkProtocolVersion(req: FastifyRequest) {
       data: `Unsupported renderer protocol version ${
         reqProtocolVersion
           ? `request protocol ${reqProtocolVersion}`
-          : `MISSING with body ${JSON.stringify(req.body)}`
+          : `MISSING with body ${JSON.stringify(body)}`
       } does not match installed renderer protocol ${packageJson.protocolVersion} for version ${packageJson.version}.
 Update either the renderer or the Rails server`,
     };
@@ -108,4 +107,4 @@ Update either the gem or the node renderer package to match versions.`,
   }
 
   return undefined;
-};
+}

@@ -6,13 +6,16 @@
  */
 // TODO: Replace with fastify-basic-auth per https://github.com/shakacode/react_on_rails_pro/issues/110
 
-import type { FastifyRequest } from './types';
 import { getConfig } from '../shared/configBuilder';
 
-export = function authenticate(req: FastifyRequest) {
+export interface AuthBody {
+  password?: string;
+}
+
+export function authenticate(body: AuthBody) {
   const { password } = getConfig();
 
-  if (password && password !== (req.body as { password?: string }).password) {
+  if (password && password !== body.password) {
     return {
       headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
       status: 401,
@@ -21,4 +24,4 @@ export = function authenticate(req: FastifyRequest) {
   }
 
   return undefined;
-};
+}
