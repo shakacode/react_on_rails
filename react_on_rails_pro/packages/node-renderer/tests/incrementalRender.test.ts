@@ -642,7 +642,7 @@ describe('incremental render NDJSON endpoint', () => {
     // Process each chunk and immediately echo it back
     for (let i = 0; i < chunksToSend.length; i += 1) {
       const chunk = chunksToSend[i];
-      
+
       // Send the chunk
       req.write(`${JSON.stringify(chunk)}\n`);
 

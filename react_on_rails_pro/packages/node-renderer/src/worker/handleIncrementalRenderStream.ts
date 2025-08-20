@@ -18,9 +18,9 @@ export interface IncrementalRenderStreamHandlerOptions {
     raw: NodeJS.ReadableStream | { [Symbol.asyncIterator](): AsyncIterator<Buffer> };
   };
   onRenderRequestReceived: (renderRequest: unknown) => Promise<RenderRequestResult> | RenderRequestResult;
-  onResponseStart: (response: ResponseResult) => Promise<void> | undefined;
-  onUpdateReceived: (updateData: unknown) => Promise<void> | undefined;
-  onRequestEnded: () => Promise<void> | undefined;
+  onResponseStart: (response: ResponseResult) => Promise<void> | void;
+  onUpdateReceived: (updateData: unknown) => Promise<void> | void;
+  onRequestEnded: () => Promise<void> | void;
 }
 
 /**
@@ -64,6 +64,7 @@ export async function handleIncrementalRenderStream(
               console.error(reportedMessage);
               errorReporter.message(reportedMessage);
               // Skip this malformed chunk and continue with next ones
+              // eslint-disable-next-line no-continue
               continue;
             }
           }
