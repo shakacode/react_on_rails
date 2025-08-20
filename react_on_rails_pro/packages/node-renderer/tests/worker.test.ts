@@ -1,5 +1,6 @@
 import formAutoContent from 'form-auto-content';
 import fs from 'fs';
+import path from 'path';
 import querystring from 'querystring';
 import { createReadStream } from 'fs-extra';
 import worker, { disableHttp2 } from '../src/worker';
@@ -318,5 +319,65 @@ describe('worker', () => {
     expect(fs.existsSync(assetPathOther(testName, bundleHash))).toBe(true);
     expect(fs.existsSync(assetPath(testName, bundleHashOther))).toBe(true);
     expect(fs.existsSync(assetPathOther(testName, bundleHashOther))).toBe(true);
+  });
+
+  test('post /upload-assets with bundles and assets', async () => {
+    const bundleHash = 'some-bundle-hash';
+    const secondaryBundleHash = 'secondary-bundle-hash';
+
+    const app = worker({
+      bundlePath: bundlePathForTest(),
+      password: 'my_password',
+    });
+
+    const form = formAutoContent({
+      gemVersion,
+      protocolVersion,
+      password: 'my_password',
+      targetBundles: [bundleHash, secondaryBundleHash],
+      [`bundle_${bundleHash}`]: createReadStream(getFixtureBundle()),
+      [`bundle_${secondaryBundleHash}`]: createReadStream(getFixtureSecondaryBundle()),
+      asset1: createReadStream(getFixtureAsset()),
+      asset2: createReadStream(getOtherFixtureAsset()),
+    });
+
+    const res = await app.inject().post(`/upload-assets`).payload(form.payload).headers(form.headers).end();
+    expect(res.statusCode).toBe(200);
+
+    // Verify assets are copied to both bundle directories
+    expect(fs.existsSync(assetPath(testName, bundleHash))).toBe(true);
+    expect(fs.existsSync(assetPathOther(testName, bundleHash))).toBe(true);
+    expect(fs.existsSync(assetPath(testName, secondaryBundleHash))).toBe(true);
+    expect(fs.existsSync(assetPathOther(testName, secondaryBundleHash))).toBe(true);
+
+    // Verify bundles are placed in their correct directories
+    const bundle1Path = path.join(bundlePathForTest(), bundleHash, `${bundleHash}.js`);
+    const bundle2Path = path.join(bundlePathForTest(), secondaryBundleHash, `${secondaryBundleHash}.js`);
+    expect(fs.existsSync(bundle1Path)).toBe(true);
+    expect(fs.existsSync(bundle2Path)).toBe(true);
+  });
+
+  test('post /upload-assets with only bundles (no assets)', async () => {
+    const bundleHash = 'bundle-only-hash';
+
+    const app = worker({
+      bundlePath: bundlePathForTest(),
+      password: 'my_password',
+    });
+
+    const form = formAutoContent({
+      gemVersion,
+      protocolVersion,
+      password: 'my_password',
+      targetBundles: [bundleHash],
+      [`bundle_${bundleHash}`]: createReadStream(getFixtureBundle()),
+    });
+
+    const res = await app.inject().post(`/upload-assets`).payload(form.payload).headers(form.headers).end();
+    expect(res.statusCode).toBe(200);
+
+    // Verify bundle is placed in the correct directory
+    const bundleFilePath = path.join(bundlePathForTest(), bundleHash, `${bundleHash}.js`);
+    expect(fs.existsSync(bundleFilePath)).toBe(true);
   });
 });
