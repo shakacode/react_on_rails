@@ -504,6 +504,26 @@ describe('worker', () => {
     const bundle2Path = path.join(serverBundleCachePathForTest(), secondaryBundleHash, `${secondaryBundleHash}.js`);
     expect(fs.existsSync(bundle1Path)).toBe(true);
     expect(fs.existsSync(bundle2Path)).toBe(true);
+
+    // Verify the directory structure is correct
+    const bundle1Dir = path.join(bundlePathForTest(), bundleHash);
+    const bundle2Dir = path.join(bundlePathForTest(), secondaryBundleHash);
+
+    // Each bundle directory should contain: 1 bundle file + 2 assets = 3 files total
+    const bundle1Files = fs.readdirSync(bundle1Dir);
+    const bundle2Files = fs.readdirSync(bundle2Dir);
+
+    expect(bundle1Files).toHaveLength(3); // bundle file + 2 assets
+    expect(bundle2Files).toHaveLength(3); // bundle file + 2 assets
+
+    // Verify the specific files exist in each directory
+    expect(bundle1Files).toContain(`${bundleHash}.js`);
+    expect(bundle1Files).toContain('loadable-stats.json');
+    expect(bundle1Files).toContain('loadable-stats-other.json');
+
+    expect(bundle2Files).toContain(`${secondaryBundleHash}.js`);
+    expect(bundle2Files).toContain('loadable-stats.json');
+    expect(bundle2Files).toContain('loadable-stats-other.json');
   });
 
   test('post /upload-assets with only bundles (no assets)', async () => {
@@ -528,5 +548,128 @@ describe('worker', () => {
     // Verify bundle is placed in the correct directory
     const bundleFilePath = path.join(serverBundleCachePathForTest(), bundleHash, `${bundleHash}.js`);
     expect(fs.existsSync(bundleFilePath)).toBe(true);
+
+    // Verify the directory structure is correct
+    const bundleDir = path.join(bundlePathForTest(), bundleHash);
+    const files = fs.readdirSync(bundleDir);
+
+    // Should only contain the bundle file, no assets
+    expect(files).toHaveLength(1);
+    expect(files[0]).toBe(`${bundleHash}.js`);
+
+    // Verify no asset files were accidentally copied
+    expect(files).not.toContain('loadable-stats.json');
+    expect(files).not.toContain('loadable-stats-other.json');
+  });
+
+  test('post /upload-assets with no assets and no bundles (empty request)', async () => {
+    const bundleHash = 'empty-request-hash';
+
+    const app = worker({
+      bundlePath: bundlePathForTest(),
+      password: 'my_password',
+    });
+
+    const form = formAutoContent({
+      gemVersion,
+      protocolVersion,
+      password: 'my_password',
+      targetBundles: [bundleHash],
+      // No assets or bundles uploaded
+    });
+
+    const res = await app.inject().post(`/upload-assets`).payload(form.payload).headers(form.headers).end();
+    expect(res.statusCode).toBe(200);
+
+    // Verify bundle directory is created
+    const bundleDirectory = path.join(bundlePathForTest(), bundleHash);
+    expect(fs.existsSync(bundleDirectory)).toBe(true);
+
+    // Verify no files were copied (since none were uploaded)
+    const files = fs.readdirSync(bundleDirectory);
+    expect(files).toHaveLength(0);
+  });
+
+  test('post /upload-assets with duplicate bundle hash silently skips overwrite and returns 200', async () => {
+    const bundleHash = 'duplicate-bundle-hash';
+
+    const app = worker({
+      bundlePath: bundlePathForTest(),
+      password: 'my_password',
+    });
+
+    // First upload with bundle
+    const form1 = formAutoContent({
+      gemVersion,
+      protocolVersion,
+      password: 'my_password',
+      targetBundles: [bundleHash],
+      [`bundle_${bundleHash}`]: createReadStream(getFixtureBundle()),
+    });
+
+    const res1 = await app
+      .inject()
+      .post(`/upload-assets`)
+      .payload(form1.payload)
+      .headers(form1.headers)
+      .end();
+    expect(res1.statusCode).toBe(200);
+    expect(res1.body).toBe(''); // Empty body on success
+
+    // Verify first bundle was created correctly
+    const bundleDir = path.join(bundlePathForTest(), bundleHash);
+    expect(fs.existsSync(bundleDir)).toBe(true);
+    const bundleFilePath = path.join(bundleDir, `${bundleHash}.js`);
+    expect(fs.existsSync(bundleFilePath)).toBe(true);
+
+    // Get file stats to verify it's the first bundle
+    const firstBundleStats = fs.statSync(bundleFilePath);
+    const firstBundleSize = firstBundleStats.size;
+    const firstBundleModTime = firstBundleStats.mtime.getTime();
+
+    // Second upload with the same bundle hash but different content
+    // This logs: "File exists when trying to overwrite bundle... Assuming bundle written by other thread"
+    // Then silently skips the overwrite operation and returns 200 success
+    const form2 = formAutoContent({
+      gemVersion,
+      protocolVersion,
+      password: 'my_password',
+      targetBundles: [bundleHash],
+      [`bundle_${bundleHash}`]: createReadStream(getFixtureSecondaryBundle()), // Different content
+    });
+
+    const res2 = await app
+      .inject()
+      .post(`/upload-assets`)
+      .payload(form2.payload)
+      .headers(form2.headers)
+      .end();
+    expect(res2.statusCode).toBe(200); // Still returns 200 success (no error)
+    expect(res2.body).toBe(''); // Empty body, no error message returned to client
+
+    // Verify the bundle directory still exists
+    expect(fs.existsSync(bundleDir)).toBe(true);
+
+    // Verify the bundle file still exists
+    expect(fs.existsSync(bundleFilePath)).toBe(true);
+
+    // Verify the file was NOT overwritten (original bundle is preserved)
+    const secondBundleStats = fs.statSync(bundleFilePath);
+    const secondBundleSize = secondBundleStats.size;
+    const secondBundleModTime = secondBundleStats.mtime.getTime();
+
+    // The file size should be the same as the first upload (no overwrite occurred)
+    expect(secondBundleSize).toBe(firstBundleSize);
+
+    // The modification time should be the same (file wasn't touched)
+    expect(secondBundleModTime).toBe(firstBundleModTime);
+
+    // Verify the directory only contains one file (the original bundle)
+    const files = fs.readdirSync(bundleDir);
+    expect(files).toHaveLength(1);
+    expect(files[0]).toBe(`${bundleHash}.js`);
+
+    // Verify the original content is preserved (62 bytes from bundle.js, not 84 from secondary-bundle.js)
+    expect(secondBundleSize).toBe(62); // Size of getFixtureBundle(), not getFixtureSecondaryBundle()
   });
 });
