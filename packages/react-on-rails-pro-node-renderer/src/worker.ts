@@ -15,6 +15,7 @@ import { buildConfig, Config, getConfig } from './shared/configBuilder.js';
 import fileExistsAsync from './shared/fileExistsAsync.js';
 import type { FastifyInstance, FastifyReply } from './worker/types.js';
 import { performRequestPrechecks } from './worker/requestPrechecks.js';
+import { type AuthBody, authenticate } from './worker/authHandler.js';
 import { handleRenderRequest, type ProvidedNewBundle } from './worker/handleRenderRequest.js';
 import handleGracefulShutdown from './worker/handleGracefulShutdown.js';
 import {
@@ -452,9 +453,9 @@ export default function run(config: Partial<Config>) {
     Querystring: { filename: string };
     Body: WithBodyArrayField<Record<string, unknown>, 'targetBundles'>;
   }>('/asset-exists', async (req, res) => {
-    const precheckResult = performRequestPrechecks(req.body);
-    if (precheckResult) {
-      await setResponse(precheckResult, res);
+    const authResult = authenticate(req.body as AuthBody);
+    if (authResult) {
+      await setResponse(authResult, res);
       return;
     }
 
