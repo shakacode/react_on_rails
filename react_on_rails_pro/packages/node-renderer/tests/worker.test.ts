@@ -672,4 +672,50 @@ describe('worker', () => {
     // Verify the original content is preserved (62 bytes from bundle.js, not 84 from secondary-bundle.js)
     expect(secondBundleSize).toBe(62); // Size of getFixtureBundle(), not getFixtureSecondaryBundle()
   });
+
+  test('post /upload-assets with bundles placed in their own hash directories, not targetBundles directories', async () => {
+    const bundleHash = 'actual-bundle-hash';
+    const targetBundleHash = 'target-bundle-hash'; // Different from actual bundle hash
+
+    const app = worker({
+      bundlePath: bundlePathForTest(),
+      password: 'my_password',
+    });
+
+    const form = formAutoContent({
+      gemVersion,
+      protocolVersion,
+      password: 'my_password',
+      targetBundles: [targetBundleHash], // This should NOT affect where the bundle is placed
+      [`bundle_${bundleHash}`]: createReadStream(getFixtureBundle()), // Bundle with its own hash
+    });
+
+    const res = await app.inject().post(`/upload-assets`).payload(form.payload).headers(form.headers).end();
+    expect(res.statusCode).toBe(200);
+
+    // Verify the bundle was placed in its OWN hash directory, not the targetBundles directory
+    const actualBundleDir = path.join(bundlePathForTest(), bundleHash);
+    const targetBundleDir = path.join(bundlePathForTest(), targetBundleHash);
+
+    // Bundle should exist in its own hash directory
+    expect(fs.existsSync(actualBundleDir)).toBe(true);
+    const bundleFilePath = path.join(actualBundleDir, `${bundleHash}.js`);
+    expect(fs.existsSync(bundleFilePath)).toBe(true);
+
+    // Target bundle directory should also exist (created for assets)
+    expect(fs.existsSync(targetBundleDir)).toBe(true);
+
+    // But the bundle file should NOT be in the target bundle directory
+    const targetBundleFilePath = path.join(targetBundleDir, `${bundleHash}.js`);
+    expect(fs.existsSync(targetBundleFilePath)).toBe(false);
+
+    // Verify the bundle is in the correct location with correct name
+    const files = fs.readdirSync(actualBundleDir);
+    expect(files).toHaveLength(1);
+    expect(files[0]).toBe(`${bundleHash}.js`);
+
+    // Verify the target bundle directory is empty (no assets uploaded)
+    const targetFiles = fs.readdirSync(targetBundleDir);
+    expect(targetFiles).toHaveLength(0);
+  });
 });
