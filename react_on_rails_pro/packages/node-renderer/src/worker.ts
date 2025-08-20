@@ -16,7 +16,11 @@ import fileExistsAsync from './shared/fileExistsAsync';
 import type { FastifyInstance, FastifyReply } from './worker/types';
 import { performRequestPrechecks } from './worker/requestPrechecks';
 import { AuthBody, authenticate } from './worker/authHandler';
-import { handleRenderRequest, type ProvidedNewBundle } from './worker/handleRenderRequest';
+import {
+  handleRenderRequest,
+  type ProvidedNewBundle,
+  handleNewBundlesProvided,
+} from './worker/handleRenderRequest';
 import handleGracefulShutdown from './worker/handleGracefulShutdown';
 import {
   handleIncrementalRenderRequest,
@@ -357,7 +361,20 @@ export default function run(config: Partial<Config>) {
     }
     let lockAcquired = false;
     let lockfileName: string | undefined;
-    const assets: Asset[] = Object.values(req.body).filter(isAsset);
+    const assets: Asset[] = [];
+
+    // Extract bundles that start with 'bundle_' prefix
+    const bundles: Array<{ timestamp: string; bundle: Asset }> = [];
+    Object.entries(req.body).forEach(([key, value]) => {
+      if (isAsset(value)) {
+        if (key.startsWith('bundle_')) {
+          const timestamp = key.replace('bundle_', '');
+          bundles.push({ timestamp, bundle: value });
+        } else {
+          assets.push(value);
+        }
+      }
+    });
 
     // Handle targetBundles as either a string or an array
     const targetBundles = extractBodyArrayField(req.body, 'targetBundles');
@@ -369,7 +386,9 @@ export default function run(config: Partial<Config>) {
     }
 
     const assetsDescription = JSON.stringify(assets.map((asset) => asset.filename));
-    const taskDescription = `Uploading files ${assetsDescription} to bundle directories: ${targetBundles.join(', ')}`;
+    const bundlesDescription =
+      bundles.length > 0 ? ` and bundles ${JSON.stringify(bundles.map((b) => b.bundle.filename))}` : '';
+    const taskDescription = `Uploading files ${assetsDescription}${bundlesDescription} to bundle directories: ${targetBundles.join(', ')}`;
 
     try {
       const { lockfileName: name, wasLockAcquired, errorMessage } = await lock('transferring-assets');
@@ -408,7 +427,24 @@ export default function run(config: Partial<Config>) {
 
           await Promise.all(assetCopyPromises);
 
-          // Delete assets from uploads directory
+          // Handle bundles using the existing logic from handleRenderRequest
+          if (bundles.length > 0) {
+            const providedNewBundles = bundles.map(({ timestamp, bundle }) => ({
+              timestamp,
+              bundle,
+            }));
+
+            // Use the existing bundle handling logic
+            // Note: handleNewBundlesProvided will handle deleting the uploaded bundle files
+            // Pass null for assetsToCopy since we handle assets separately in this endpoint
+            const bundleResult = await handleNewBundlesProvided('upload-assets', providedNewBundles, null);
+            if (bundleResult) {
+              await setResponse(bundleResult, res);
+              return;
+            }
+          }
+
+          // Delete assets from uploads directory (bundles are already handled by handleNewBundlesProvided)
           await deleteUploadedAssets(assets);
 
           await setResponse(
@@ -419,7 +455,7 @@ export default function run(config: Partial<Config>) {
             res,
           );
         } catch (err) {
-          const msg = 'ERROR when trying to copy assets';
+          const msg = 'ERROR when trying to copy assets and bundles';
           const message = `${msg}. ${err}. Task: ${taskDescription}`;
           log.error({
             msg,
