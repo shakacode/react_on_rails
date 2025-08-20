@@ -311,7 +311,7 @@ export default function run(config: Partial<Config>) {
         onUpdateReceived: (obj: unknown) => {
           // Only process updates if we have a render result
           if (!renderResult) {
-            return undefined;
+            return;
           }
 
           try {
@@ -320,7 +320,6 @@ export default function run(config: Partial<Config>) {
             // Log error but don't stop processing
             log.error({ err, msg: 'Error processing update chunk' });
           }
-          return undefined;
         },
 
         onResponseStart: async (response: ResponseResult) => {
@@ -335,7 +334,6 @@ export default function run(config: Partial<Config>) {
           } catch (err) {
             log.error({ err, msg: 'Error ending render sink' });
           }
-          return undefined;
         },
       });
     } catch (err) {
