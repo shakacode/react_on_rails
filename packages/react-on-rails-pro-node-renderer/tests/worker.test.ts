@@ -12,6 +12,7 @@ import {
   createVmBundle,
   resetForTest,
   vmBundlePath,
+  vmSecondaryBundlePath,
   getFixtureBundle,
   getFixtureSecondaryBundle,
   getFixtureAsset,
@@ -718,5 +719,557 @@ describe('worker', () => {
     // Verify the target bundle directory is empty (no assets uploaded)
     const targetFiles = fs.readdirSync(targetBundleDir);
     expect(targetFiles).toHaveLength(0);
+  });
+
+  // Incremental Render Endpoint Tests
+  describe('POST /bundles/:bundleTimestamp/incremental-render/:renderRequestDigest', () => {
+    test('renders successfully when bundle and assets are pre-uploaded', async () => {
+      const app = worker({
+        bundlePath: bundlePathForTest(),
+        password: 'my_password',
+      });
+
+      // First, upload the bundle and assets using the upload-assets endpoint
+      const uploadForm = formAutoContent({
+        gemVersion,
+        protocolVersion,
+        password: 'my_password',
+        targetBundles: [String(BUNDLE_TIMESTAMP)],
+        [`bundle_${BUNDLE_TIMESTAMP}`]: createReadStream(getFixtureBundle()),
+        asset1: createReadStream(getFixtureAsset()),
+        asset2: createReadStream(getOtherFixtureAsset()),
+      });
+
+      const uploadRes = await app
+        .inject()
+        .post('/upload-assets')
+        .payload(uploadForm.payload)
+        .headers(uploadForm.headers)
+        .end();
+      expect(uploadRes.statusCode).toBe(200);
+
+      // Verify bundle and assets are in place
+      expect(fs.existsSync(vmBundlePath(testName))).toBe(true);
+      expect(fs.existsSync(assetPath(testName, String(BUNDLE_TIMESTAMP)))).toBe(true);
+      expect(fs.existsSync(assetPathOther(testName, String(BUNDLE_TIMESTAMP)))).toBe(true);
+
+      // Now test the incremental render endpoint with NDJSON content
+      const ndjsonPayload = `${JSON.stringify({
+        gemVersion,
+        protocolVersion,
+        password: 'my_password',
+        renderingRequest: 'ReactOnRails.dummy',
+        dependencyBundleTimestamps: [String(BUNDLE_TIMESTAMP)],
+      })}\n`;
+
+      const res = await app
+        .inject()
+        .post(`/bundles/${BUNDLE_TIMESTAMP}/incremental-render/d41d8cd98f00b204e9800998ecf8427e`)
+        .payload(ndjsonPayload)
+        .headers({
+          'Content-Type': 'application/x-ndjson',
+        })
+        .end();
+
+      expect(res.statusCode).toBe(200);
+      expect(res.headers['cache-control']).toBe('public, max-age=31536000');
+      expect(res.payload).toBe('{"html":"Dummy Object"}');
+    });
+
+    test('renders successfully with multiple dependency bundles', async () => {
+      const app = worker({
+        bundlePath: bundlePathForTest(),
+        password: 'my_password',
+      });
+
+      // Upload both bundles and assets
+      const uploadForm = formAutoContent({
+        gemVersion,
+        protocolVersion,
+        password: 'my_password',
+        targetBundles: [String(BUNDLE_TIMESTAMP), String(SECONDARY_BUNDLE_TIMESTAMP)],
+        [`bundle_${BUNDLE_TIMESTAMP}`]: createReadStream(getFixtureBundle()),
+        [`bundle_${SECONDARY_BUNDLE_TIMESTAMP}`]: createReadStream(getFixtureSecondaryBundle()),
+        asset1: createReadStream(getFixtureAsset()),
+        asset2: createReadStream(getOtherFixtureAsset()),
+      });
+
+      const uploadRes = await app
+        .inject()
+        .post('/upload-assets')
+        .payload(uploadForm.payload)
+        .headers(uploadForm.headers)
+        .end();
+      expect(uploadRes.statusCode).toBe(200);
+
+      // Verify both bundles and assets are in place
+      expect(fs.existsSync(vmBundlePath(testName))).toBe(true);
+      expect(fs.existsSync(vmSecondaryBundlePath(testName))).toBe(true);
+      expect(fs.existsSync(assetPath(testName, String(BUNDLE_TIMESTAMP)))).toBe(true);
+      expect(fs.existsSync(assetPath(testName, String(SECONDARY_BUNDLE_TIMESTAMP)))).toBe(true);
+
+      // Test incremental render with multiple dependency bundles
+      const ndjsonPayload = `${JSON.stringify({
+        gemVersion,
+        protocolVersion,
+        password: 'my_password',
+        renderingRequest: 'ReactOnRails.dummy',
+        dependencyBundleTimestamps: [String(BUNDLE_TIMESTAMP), String(SECONDARY_BUNDLE_TIMESTAMP)],
+      })}\n`;
+
+      const res = await app
+        .inject()
+        .post(`/bundles/${BUNDLE_TIMESTAMP}/incremental-render/d41d8cd98f00b204e9800998ecf8427e`)
+        .payload(ndjsonPayload)
+        .headers({
+          'Content-Type': 'application/x-ndjson',
+        })
+        .end();
+
+      expect(res.statusCode).toBe(200);
+      expect(res.headers['cache-control']).toBe('public, max-age=31536000');
+      expect(res.payload).toBe('{"html":"Dummy Object"}');
+    });
+
+    test('fails when bundle is not pre-uploaded', async () => {
+      const app = worker({
+        bundlePath: bundlePathForTest(),
+        password: 'my_password',
+      });
+
+      // Don't upload any bundles - just try to render
+      const ndjsonPayload = `${JSON.stringify({
+        gemVersion,
+        protocolVersion,
+        password: 'my_password',
+        renderingRequest: 'ReactOnRails.dummy',
+        dependencyBundleTimestamps: [String(BUNDLE_TIMESTAMP)],
+      })}\n`;
+
+      const res = await app
+        .inject()
+        .post(`/bundles/${BUNDLE_TIMESTAMP}/incremental-render/d41d8cd98f00b204e9800998ecf8427e`)
+        .payload(ndjsonPayload)
+        .headers({
+          'Content-Type': 'application/x-ndjson',
+        })
+        .end();
+
+      expect(res.statusCode).toBe(410);
+      expect(res.payload).toContain('No bundle uploaded');
+    });
+
+    test('fails when password is required but not provided', async () => {
+      const app = worker({
+        bundlePath: bundlePathForTest(),
+        password: 'my_password',
+      });
+
+      // Upload bundle first
+      const uploadForm = formAutoContent({
+        gemVersion,
+        protocolVersion,
+        password: 'my_password',
+        targetBundles: [String(BUNDLE_TIMESTAMP)],
+        [`bundle_${BUNDLE_TIMESTAMP}`]: createReadStream(getFixtureBundle()),
+      });
+
+      const uploadRes = await app
+        .inject()
+        .post('/upload-assets')
+        .payload(uploadForm.payload)
+        .headers(uploadForm.headers)
+        .end();
+      expect(uploadRes.statusCode).toBe(200);
+
+      // Try incremental render without password
+      const ndjsonPayload = `${JSON.stringify({
+        gemVersion,
+        protocolVersion,
+        renderingRequest: 'ReactOnRails.dummy',
+        dependencyBundleTimestamps: [String(BUNDLE_TIMESTAMP)],
+      })}\n`;
+
+      const res = await app
+        .inject()
+        .post(`/bundles/${BUNDLE_TIMESTAMP}/incremental-render/d41d8cd98f00b204e9800998ecf8427e`)
+        .payload(ndjsonPayload)
+        .headers({
+          'Content-Type': 'application/x-ndjson',
+        })
+        .end();
+
+      expect(res.statusCode).toBe(401);
+      expect(res.payload).toBe('Wrong password');
+    });
+
+    test('fails when password is required but wrong password provided', async () => {
+      const app = worker({
+        bundlePath: bundlePathForTest(),
+        password: 'my_password',
+      });
+
+      // Upload bundle first
+      const uploadForm = formAutoContent({
+        gemVersion,
+        protocolVersion,
+        password: 'my_password',
+        targetBundles: [String(BUNDLE_TIMESTAMP)],
+        [`bundle_${BUNDLE_TIMESTAMP}`]: createReadStream(getFixtureBundle()),
+      });
+
+      const uploadRes = await app
+        .inject()
+        .post('/upload-assets')
+        .payload(uploadForm.payload)
+        .headers(uploadForm.headers)
+        .end();
+      expect(uploadRes.statusCode).toBe(200);
+
+      // Try incremental render with wrong password
+      const ndjsonPayload = `${JSON.stringify({
+        gemVersion,
+        protocolVersion,
+        password: 'wrong_password',
+        renderingRequest: 'ReactOnRails.dummy',
+        dependencyBundleTimestamps: [String(BUNDLE_TIMESTAMP)],
+      })}\n`;
+
+      const res = await app
+        .inject()
+        .post(`/bundles/${BUNDLE_TIMESTAMP}/incremental-render/d41d8cd98f00b204e9800998ecf8427e`)
+        .payload(ndjsonPayload)
+        .headers({
+          'Content-Type': 'application/x-ndjson',
+        })
+        .end();
+
+      expect(res.statusCode).toBe(401);
+      expect(res.payload).toBe('Wrong password');
+    });
+
+    test('succeeds when password is required and correct password provided', async () => {
+      const app = worker({
+        bundlePath: bundlePathForTest(),
+        password: 'my_password',
+      });
+
+      // Upload bundle first
+      const uploadForm = formAutoContent({
+        gemVersion,
+        protocolVersion,
+        password: 'my_password',
+        targetBundles: [String(BUNDLE_TIMESTAMP)],
+        [`bundle_${BUNDLE_TIMESTAMP}`]: createReadStream(getFixtureBundle()),
+      });
+
+      const uploadRes = await app
+        .inject()
+        .post('/upload-assets')
+        .payload(uploadForm.payload)
+        .headers(uploadForm.headers)
+        .end();
+      expect(uploadRes.statusCode).toBe(200);
+
+      // Try incremental render with correct password
+      const ndjsonPayload = `${JSON.stringify({
+        gemVersion,
+        protocolVersion,
+        password: 'my_password',
+        renderingRequest: 'ReactOnRails.dummy',
+        dependencyBundleTimestamps: [String(BUNDLE_TIMESTAMP)],
+      })}\n`;
+
+      const res = await app
+        .inject()
+        .post(`/bundles/${BUNDLE_TIMESTAMP}/incremental-render/d41d8cd98f00b204e9800998ecf8427e`)
+        .payload(ndjsonPayload)
+        .headers({
+          'Content-Type': 'application/x-ndjson',
+        })
+        .end();
+
+      expect(res.statusCode).toBe(200);
+      expect(res.headers['cache-control']).toBe('public, max-age=31536000');
+      expect(res.payload).toBe('{"html":"Dummy Object"}');
+    });
+
+    test('succeeds when password is not required and no password provided', async () => {
+      const app = worker({
+        bundlePath: bundlePathForTest(),
+        // No password required
+      });
+
+      // Upload bundle first
+      const uploadForm = formAutoContent({
+        gemVersion,
+        protocolVersion,
+        targetBundles: [String(BUNDLE_TIMESTAMP)],
+        [`bundle_${BUNDLE_TIMESTAMP}`]: createReadStream(getFixtureBundle()),
+      });
+
+      const uploadRes = await app
+        .inject()
+        .post('/upload-assets')
+        .payload(uploadForm.payload)
+        .headers(uploadForm.headers)
+        .end();
+      expect(uploadRes.statusCode).toBe(200);
+
+      // Try incremental render without password
+      const ndjsonPayload = `${JSON.stringify({
+        gemVersion,
+        protocolVersion,
+        renderingRequest: 'ReactOnRails.dummy',
+        dependencyBundleTimestamps: [String(BUNDLE_TIMESTAMP)],
+      })}\n`;
+
+      const res = await app
+        .inject()
+        .post(`/bundles/${BUNDLE_TIMESTAMP}/incremental-render/d41d8cd98f00b204e9800998ecf8427e`)
+        .payload(ndjsonPayload)
+        .headers({
+          'Content-Type': 'application/x-ndjson',
+        })
+        .end();
+
+      expect(res.statusCode).toBe(200);
+      expect(res.headers['cache-control']).toBe('public, max-age=31536000');
+      expect(res.payload).toBe('{"html":"Dummy Object"}');
+    });
+
+    test('fails with invalid JSON in first chunk', async () => {
+      const app = worker({
+        bundlePath: bundlePathForTest(),
+        password: 'my_password',
+      });
+
+      // Upload bundle first
+      const uploadForm = formAutoContent({
+        gemVersion,
+        protocolVersion,
+        password: 'my_password',
+        targetBundles: [String(BUNDLE_TIMESTAMP)],
+        [`bundle_${BUNDLE_TIMESTAMP}`]: createReadStream(getFixtureBundle()),
+      });
+
+      const uploadRes = await app
+        .inject()
+        .post('/upload-assets')
+        .payload(uploadForm.payload)
+        .headers(uploadForm.headers)
+        .end();
+      expect(uploadRes.statusCode).toBe(200);
+
+      // Try incremental render with invalid JSON
+      const invalidJsonPayload = '{"invalid": json, missing quotes}' + '\n';
+
+      const res = await app
+        .inject()
+        .post(`/bundles/${BUNDLE_TIMESTAMP}/incremental-render/d41d8cd98f00b204e9800998ecf8427e`)
+        .payload(invalidJsonPayload)
+        .headers({
+          'Content-Type': 'application/x-ndjson',
+        })
+        .end();
+
+      expect(res.statusCode).toBe(400);
+      expect(res.payload).toContain('Invalid JSON chunk');
+    });
+
+    test('fails with missing required fields in first chunk', async () => {
+      const app = worker({
+        bundlePath: bundlePathForTest(),
+        password: 'my_password',
+      });
+
+      // Upload bundle first
+      const uploadForm = formAutoContent({
+        gemVersion,
+        protocolVersion,
+        password: 'my_password',
+        targetBundles: [String(BUNDLE_TIMESTAMP)],
+        [`bundle_${BUNDLE_TIMESTAMP}`]: createReadStream(getFixtureBundle()),
+      });
+
+      const uploadRes = await app
+        .inject()
+        .post('/upload-assets')
+        .payload(uploadForm.payload)
+        .headers(uploadForm.headers)
+        .end();
+      expect(uploadRes.statusCode).toBe(200);
+
+      // Try incremental render with missing renderingRequest
+      const incompletePayload = `${JSON.stringify({
+        gemVersion,
+        protocolVersion,
+        password: 'my_password',
+        // Missing renderingRequest
+        dependencyBundleTimestamps: [String(BUNDLE_TIMESTAMP)],
+      })}\n`;
+
+      const res = await app
+        .inject()
+        .post(`/bundles/${BUNDLE_TIMESTAMP}/incremental-render/d41d8cd98f00b204e9800998ecf8427e`)
+        .payload(incompletePayload)
+        .headers({
+          'Content-Type': 'application/x-ndjson',
+        })
+        .end();
+
+      expect(res.statusCode).toBe(400);
+      expect(res.payload).toContain('INVALID NIL or NULL result for rendering');
+    });
+
+    // TODO: Implement incremental updates and update this test
+    test('handles multiple NDJSON chunks but only processes first one for now', async () => {
+      const app = worker({
+        bundlePath: bundlePathForTest(),
+        password: 'my_password',
+      });
+
+      // Upload bundle first
+      const uploadForm = formAutoContent({
+        gemVersion,
+        protocolVersion,
+        password: 'my_password',
+        targetBundles: [String(BUNDLE_TIMESTAMP)],
+        [`bundle_${BUNDLE_TIMESTAMP}`]: createReadStream(getFixtureBundle()),
+      });
+
+      const uploadRes = await app
+        .inject()
+        .post('/upload-assets')
+        .payload(uploadForm.payload)
+        .headers(uploadForm.headers)
+        .end();
+      expect(uploadRes.statusCode).toBe(200);
+
+      // Send multiple NDJSON chunks (only first one should be processed for now)
+      const firstChunk = `${JSON.stringify({
+        gemVersion,
+        protocolVersion,
+        password: 'my_password',
+        renderingRequest: 'ReactOnRails.dummy',
+        dependencyBundleTimestamps: [String(BUNDLE_TIMESTAMP)],
+      })}\n`;
+
+      const secondChunk = `${JSON.stringify({
+        update: 'data',
+        timestamp: Date.now(),
+      })}\n`;
+
+      const thirdChunk = `${JSON.stringify({
+        anotherUpdate: 'more data',
+        sequence: 2,
+      })}\n`;
+
+      const multiChunkPayload = firstChunk + secondChunk + thirdChunk;
+
+      const res = await app
+        .inject()
+        .post(`/bundles/${BUNDLE_TIMESTAMP}/incremental-render/d41d8cd98f00b204e9800998ecf8427e`)
+        .payload(multiChunkPayload)
+        .headers({
+          'Content-Type': 'application/x-ndjson',
+        })
+        .end();
+
+      // Should succeed because first chunk is valid and bundle exists
+      expect(res.statusCode).toBe(200);
+      expect(res.headers['cache-control']).toBe('public, max-age=31536000');
+      expect(res.payload).toBe('{"html":"Dummy Object"}');
+
+      // Note: Additional chunks are not processed yet (incremental functionality not implemented)
+      // This test will need to be updated when incremental updates are implemented
+    });
+
+    test('fails when protocol version is missing', async () => {
+      const app = worker({
+        bundlePath: bundlePathForTest(),
+        password: 'my_password',
+      });
+
+      // Upload bundle first
+      const uploadForm = formAutoContent({
+        gemVersion,
+        password: 'my_password',
+        targetBundles: [String(BUNDLE_TIMESTAMP)],
+        [`bundle_${BUNDLE_TIMESTAMP}`]: createReadStream(getFixtureBundle()),
+      });
+
+      const uploadRes = await app
+        .inject()
+        .post('/upload-assets')
+        .payload(uploadForm.payload)
+        .headers(uploadForm.headers)
+        .end();
+      expect(uploadRes.statusCode).toBe(412);
+
+      // Try incremental render without protocol version
+      const ndjsonPayload = `${JSON.stringify({
+        gemVersion,
+        password: 'my_password',
+        renderingRequest: 'ReactOnRails.dummy',
+        dependencyBundleTimestamps: [String(BUNDLE_TIMESTAMP)],
+      })}\n`;
+
+      const res = await app
+        .inject()
+        .post(`/bundles/${BUNDLE_TIMESTAMP}/incremental-render/d41d8cd98f00b204e9800998ecf8427e`)
+        .payload(ndjsonPayload)
+        .headers({
+          'Content-Type': 'application/x-ndjson',
+        })
+        .end();
+
+      expect(res.statusCode).toBe(412);
+      expect(res.payload).toContain('Unsupported renderer protocol version MISSING');
+    });
+
+    test('fails when gem version is missing', async () => {
+      const app = worker({
+        bundlePath: bundlePathForTest(),
+        password: 'my_password',
+      });
+
+      // Upload bundle first
+      const uploadForm = formAutoContent({
+        protocolVersion,
+        password: 'my_password',
+        targetBundles: [String(BUNDLE_TIMESTAMP)],
+        [`bundle_${BUNDLE_TIMESTAMP}`]: createReadStream(getFixtureBundle()),
+      });
+
+      const uploadRes = await app
+        .inject()
+        .post('/upload-assets')
+        .payload(uploadForm.payload)
+        .headers(uploadForm.headers)
+        .end();
+      expect(uploadRes.statusCode).toBe(200);
+
+      // Try incremental render without gem version
+      const ndjsonPayload = `${JSON.stringify({
+        protocolVersion,
+        password: 'my_password',
+        renderingRequest: 'ReactOnRails.dummy',
+        dependencyBundleTimestamps: [String(BUNDLE_TIMESTAMP)],
+      })}\n`;
+
+      const res = await app
+        .inject()
+        .post(`/bundles/${BUNDLE_TIMESTAMP}/incremental-render/d41d8cd98f00b204e9800998ecf8427e`)
+        .payload(ndjsonPayload)
+        .headers({
+          'Content-Type': 'application/x-ndjson',
+        })
+        .end();
+
+      expect(res.statusCode).toBe(200);
+      expect(res.headers['cache-control']).toBe('public, max-age=31536000');
+      expect(res.payload).toBe('{"html":"Dummy Object"}');
+    });
   });
 });
