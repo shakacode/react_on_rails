@@ -16,6 +16,9 @@ You can find the **package** version numbers from this repo's tags and below in 
 ## [Unreleased]
 *Add changes in master not yet tagged.*
 
+### Changed (Breaking)
+- `config.prerender_caching`, which controls caching for non-streaming components, now also controls caching for streamed components. To disable caching for an individual render, pass `internal_option(:skip_prerender_cache)`.
+
 ## [4.0.0-rc.15] - 2025-08-11
 
 ### Fixed
