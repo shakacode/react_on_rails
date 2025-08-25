@@ -80,9 +80,9 @@ This optimization is particularly impactful for:
 ## 🚀 Enhanced Performance Infrastructure
 
 ### Fastify-Based Node Renderer
-- **3x faster** Node renderer based on Fastify instead of Express
+- **Faster Node renderer** based on Fastify instead of Express
 - **HTTP/2 Cleartext** communication between Rails and Node renderer
-- **Multiplexing and connection reuse** for significantly better performance
+- **Multiplexing and connection reuse** for significantly better performance when deployed separately
 - **No code changes required** - automatic performance boost
 
 ### Optimized Script Loading Strategies
