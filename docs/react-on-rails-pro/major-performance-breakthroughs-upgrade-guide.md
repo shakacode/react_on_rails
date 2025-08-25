@@ -63,16 +63,18 @@ SSR Streaming sends HTML to the browser in chunks as it's generated, enabling pr
 - **No More Defer Needed**: The previous need for `defer` to prevent race conditions has been eliminated
 
 This optimization is particularly impactful for:
+
 - **Streamed pages** where content loads progressively
 - **Large pages** with many components
 - **Slow network conditions** where every millisecond counts
 - **Modern web apps** requiring fast interactivity
 
-*Performance improvement visualization:*
+_Performance improvement visualization:_
 
 ![Performance comparison showing early hydration improvement](https://github.com/user-attachments/assets/ae33fe14-42f1-4cc1-bde3-9c5bb570cdbf)
 
-*The image above demonstrates the dramatic performance improvement:*
+_The image above demonstrates the dramatic performance improvement:_
+
 - **Left (Before)**: Hydration didn't start until the full page load completed, causing a huge delay before hydration
 - **Right (After)**: Hydration starts immediately as soon as components are available, without waiting for full page load
 - **Result**: Components now become interactive much faster, eliminating the previous race condition delays
@@ -80,12 +82,14 @@ This optimization is particularly impactful for:
 ## 🚀 Enhanced Performance Infrastructure
 
 ### Fastify-Based Node Renderer
+
 - **Faster Node renderer** based on Fastify instead of Express
 - **HTTP/2 Cleartext** communication between Rails and Node renderer
 - **Multiplexing and connection reuse** for significantly better performance when deployed separately
 - **No code changes required** - automatic performance boost
 
 ### Optimized Script Loading Strategies
+
 - New `generated_component_packs_loading_strategy` configuration
 - **Async loading by default** for Shakapacker ≥ 8.2.0 (optimal performance)
 - **Smart hydration timing** that works perfectly with streaming HTML
@@ -114,4 +118,4 @@ Adopting these features in React on Rails Pro v4 and React on Rails v15 will hel
 Let's make your apps faster—together.
 
 **ShakaCode Team**
-*Building the future of Rails + React performance*
+_Building the future of Rails + React performance_
