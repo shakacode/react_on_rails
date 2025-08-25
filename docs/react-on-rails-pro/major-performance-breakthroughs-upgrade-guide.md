@@ -4,8 +4,6 @@
 
 ---
 
-June 24, 2025
-
 We're thrilled to announce a major update: [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/) v4 and [React on Rails](https://github.com/shakacode/react_on_rails) v15 now deliver **unprecedented performance improvements** that will transform your applications. These updates introduce multiple breakthrough technologies that work together to deliver the fastest possible user experience.
 
 ## 🎯 What This Means for Your Applications
