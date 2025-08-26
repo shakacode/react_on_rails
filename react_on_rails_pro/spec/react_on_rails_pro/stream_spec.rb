@@ -388,6 +388,20 @@ describe "Controller streaming (concurrent vs sequential)" do
     end
   end
 
+  class SlowResponseStream < TestResponseStream
+    attr_reader :timestamps
+    def initialize(delay: 0.05)
+      super()
+      @delay = delay
+      @timestamps = []
+    end
+    def write(data)
+      sleep(@delay)
+      @timestamps << Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      super
+    end
+  end
+
   class TestController
     include ReactOnRailsPro::Stream
     attr_reader :response
@@ -408,6 +422,13 @@ describe "Controller streaming (concurrent vs sequential)" do
         @rorp_rendering_fibers << fiber
       end
       ["TEMPLATE\n", *initial_chunks].join
+    end
+  end
+
+  class SlowWriterController < TestController
+    def initialize(streams)
+      @streams = streams
+      @response = OpenStruct.new(stream: SlowResponseStream.new(delay: 0.05))
     end
   end
 
@@ -471,5 +492,29 @@ describe "Controller streaming (concurrent vs sequential)" do
     joined = writes.join
     expect(joined).to include("<!-- stream error:")
     expect(joined).to include("O2\n")
+  end
+
+  it "applies backpressure: writer delay spaces out queued writes" do
+    # Force capacity=1 via stubbing Async::Semaphore.new for this example.
+    allow(Async::Semaphore).to receive(:new).and_wrap_original do |m, _permits|
+      m.call(1)
+    end
+
+    # Stream emits three chunks quickly; first is inline in template, next two go through queue.
+    fast = TestStream.new(chunks_with_delays: [[0.0, "C1\n"], [0.0, "C2\n"], [0.0, "C3\n"]])
+    original = ReactOnRailsPro.configuration.concurrent_stream_drain
+    ReactOnRailsPro.configuration.concurrent_stream_drain = true
+
+    controller = SlowWriterController.new([fast])
+    controller.stream_view_containing_react_components(template: "ignored")
+    timestamps = controller.response.stream.timestamps
+
+    # We expect at least two writes via writer (C2, C3). With capacity=1 and a 50ms write delay,
+    # the gap between the two writer writes should be >= ~50ms.
+    expect(timestamps.length).to be >= 2
+    gap = timestamps[1] - timestamps[0]
+    expect(gap).to be >= 0.045
+  ensure
+    ReactOnRailsPro.configuration.concurrent_stream_drain = original
   end
 end
