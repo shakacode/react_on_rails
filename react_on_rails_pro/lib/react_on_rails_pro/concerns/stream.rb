@@ -82,7 +82,13 @@ module ReactOnRailsPro
         response.stream.close if close_stream_at_end
       else
         @rorp_rendering_fibers.each_with_index do |fiber, idx|
-          while (chunk = fiber.resume)
+          loop do
+            begin
+              chunk = fiber.resume
+            rescue FiberError
+              break
+            end
+            break unless chunk
             Rails.logger.info { "[ReactOnRailsPro] stream write (mode=sequential) idx=#{idx} bytes=#{chunk.bytesize}" } if ReactOnRailsPro.configuration.tracing
             response.stream.write(chunk)
           end
