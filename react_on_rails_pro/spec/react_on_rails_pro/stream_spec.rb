@@ -343,3 +343,133 @@ RSpec.describe "Streaming API" do
     end
   end
 end
+
+describe "Controller streaming (concurrent vs sequential)" do
+  # Lightweight fakes mirroring controller concern behavior without HTTPX.
+  class TestStream
+    def initialize(chunks_with_delays:, raise_after: nil)
+      @chunks_with_delays = chunks_with_delays
+      @raise_after = raise_after
+    end
+
+    def each_chunk
+      return enum_for(:each_chunk) unless block_given?
+
+      count = 0
+      @chunks_with_delays.each do |(delay, data)|
+        begin
+          require "async"
+          task = Async::Task.current
+          task ? task.sleep(delay) : sleep(delay)
+        rescue StandardError
+          sleep(delay)
+        end
+        yield data
+        count += 1
+        raise "Fake error" if @raise_after && count >= @raise_after
+      end
+    end
+  end
+
+  class TestResponseStream
+    attr_reader :writes
+    def initialize
+      @writes = []
+      @closed = false
+    end
+    def write(data)
+      @writes << data
+    end
+    def close
+      @closed = true
+    end
+    def closed?
+      @closed
+    end
+  end
+
+  class TestController
+    include ReactOnRailsPro::Stream
+    attr_reader :response
+    def initialize(streams)
+      @streams = streams
+      @response = OpenStruct.new(stream: TestResponseStream.new)
+    end
+    def render_to_string(template:, **_opts)
+      @rorp_rendering_fibers ||= []
+      initial_chunks = []
+      @streams.each do |s|
+        fiber = Fiber.new do
+          s.each_chunk do |chunk|
+            Fiber.yield chunk
+          end
+        end
+        initial_chunks << fiber.resume
+        @rorp_rendering_fibers << fiber
+      end
+      ["TEMPLATE\n", *initial_chunks].join
+    end
+  end
+
+  let(:a_stream) { TestStream.new(chunks_with_delays: [[0.30, "A1\n"], [0.90, "A2\n"]]) }
+  let(:b_stream) { TestStream.new(chunks_with_delays: [[0.10, "B1\n"], [0.10, "B2\n"], [0.20, "B3\n"]]) }
+
+  def run_and_collect(streams:, concurrent:)
+    original = ReactOnRailsPro.configuration.concurrent_stream_drain
+    ReactOnRailsPro.configuration.concurrent_stream_drain = concurrent
+    controller = TestController.new(streams)
+    controller.stream_view_containing_react_components(template: "ignored")
+    [controller.response.stream.writes, controller.response.stream.closed?]
+  ensure
+    ReactOnRailsPro.configuration.concurrent_stream_drain = original
+  end
+
+  it "gates by config (sequential vs concurrent)" do
+    writes_seq, closed_seq = run_and_collect(streams: [a_stream, b_stream], concurrent: false)
+    writes_conc, closed_conc = run_and_collect(streams: [a_stream, b_stream], concurrent: true)
+
+    expect(writes_seq.first).to start_with("TEMPLATE")
+    expect(writes_conc.first).to start_with("TEMPLATE")
+
+    joined_seq = writes_seq.drop(1).join
+    joined_conc = writes_conc.drop(1).join
+
+    expect(joined_seq).to match(/A2.*B2.*B3/m)
+    expect(joined_conc).to match(/B2.*A2/m)
+
+    expect(closed_seq).to be true
+    expect(closed_conc).to be true
+  end
+
+  it "preserves per-component order" do
+    multi_a = TestStream.new(chunks_with_delays: [[0.05, "X1\n"], [0.05, "X2\n"], [0.05, "X3\n"]])
+    multi_b = TestStream.new(chunks_with_delays: [[0.01, "Y1\n"], [0.02, "Y2\n"]])
+    writes, _ = run_and_collect(streams: [multi_a, multi_b], concurrent: true)
+    joined = writes.join
+    # X1 is inline in template; ensure X2 before X3 in remaining output.
+    expect(joined).to match(/X2.*X3/m)
+  end
+
+  it "handles zero fibers" do
+    writes, closed = run_and_collect(streams: [], concurrent: true)
+    expect(writes).to eq(["TEMPLATE\n"])
+    expect(closed).to be true
+  end
+
+  it "handles one fiber same as before" do
+    single = TestStream.new(chunks_with_delays: [[0.05, "S1\n"], [0.05, "S2\n"]])
+    writes_seq, _ = run_and_collect(streams: [single], concurrent: false)
+    writes_conc, _ = run_and_collect(streams: [single], concurrent: true)
+    expect(writes_seq.join).to include("S2\n")
+    expect(writes_conc.join).to include("S2\n")
+  end
+
+  it "continues other producers when one errors" do
+    erring = TestStream.new(chunks_with_delays: [[0.01, "E1\n"]], raise_after: 1)
+    ok     = TestStream.new(chunks_with_delays: [[0.01, "O1\n"], [0.02, "O2\n"]])
+    writes, _ = run_and_collect(streams: [erring, ok], concurrent: true)
+    joined = writes.join
+    expect(joined).to include("<!-- stream error:")
+    expect(joined).to include("O2\n")
+  end
+end
