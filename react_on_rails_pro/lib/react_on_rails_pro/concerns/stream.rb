@@ -39,71 +39,94 @@ module ReactOnRailsPro
       response.stream.write(template_string)
 
       if ReactOnRailsPro.configuration.concurrent_stream_drain
-        require "async"
-        require "async/queue"
-        require "async/semaphore"
-
-        Sync do |parent|
-          queue = Async::Queue.new
-          semaphore = Async::Semaphore.new(64)
-          remaining = @rorp_rendering_fibers.size
-
-          unless remaining.zero?
-            tasks = []
-            @rorp_rendering_fibers.each_with_index do |fiber, idx|
-              tasks << parent.async do
-                begin
-                  while (chunk = fiber.resume)
-                    semaphore.acquire { queue.enqueue([idx, chunk]) }
-                  end
-                rescue StandardError => e
-                  semaphore.acquire { queue.enqueue([idx, "<!-- stream error: #{e.class}: #{e.message} -->"]) } # minimal signal
-                ensure
-                  queue.enqueue([idx, :__done__])
-                end
-              end
-            end
-
-            writer = parent.async do
-              loop do
-                _idx, item = queue.dequeue
-                if item == :__done__
-                  remaining -= 1
-                  break if remaining.zero?
-                  next
-                end
-                Rails.logger.info { "[ReactOnRailsPro] stream write (mode=concurrent) idx=#{_idx} bytes=#{item.bytesize}" } if ReactOnRailsPro.configuration.tracing
-                begin
-                  response.stream.write(item)
-                rescue IOError, ActionController::Live::ClientDisconnected
-                  # Client disconnected: stop early.
-                  break
-                ensure
-                  semaphore.release
-                end
-              end
-            end
-
-            tasks.each(&:wait)
-            writer.wait
-          end
-        end
-        response.stream.close if close_stream_at_end
+        drain_streams_concurrently
       else
-        @rorp_rendering_fibers.each_with_index do |fiber, idx|
-          loop do
-            begin
-              chunk = fiber.resume
-            rescue FiberError
-              break
-            end
-            break unless chunk
-            Rails.logger.info { "[ReactOnRailsPro] stream write (mode=sequential) idx=#{idx} bytes=#{chunk.bytesize}" } if ReactOnRailsPro.configuration.tracing
-            response.stream.write(chunk)
+        drain_streams_sequentially
+      end
+      response.stream.close if close_stream_at_end
+    end
+
+    private
+
+    def drain_streams_concurrently
+      require "async"
+      require "async/queue"
+      require "async/semaphore"
+
+      Sync do |parent|
+        queue = Async::Queue.new
+        semaphore = Async::Semaphore.new(64)
+        remaining = @rorp_rendering_fibers.size
+
+        return if remaining.zero?
+
+        tasks = build_producer_tasks(parent: parent, queue: queue, semaphore: semaphore)
+        writer = build_writer_task(parent: parent, queue: queue, semaphore: semaphore, remaining: remaining)
+
+        tasks.each(&:wait)
+        writer.wait
+      end
+    end
+
+    def build_producer_tasks(parent:, queue:, semaphore:)
+      @rorp_rendering_fibers.each_with_index.map do |fiber, idx|
+        parent.async do
+          while (chunk = fiber.resume)
+            semaphore.acquire { queue.enqueue([idx, chunk]) }
+          end
+        rescue StandardError => e
+          error_msg = "<!-- stream error: #{e.class}: #{e.message} -->"
+          semaphore.acquire { queue.enqueue([idx, error_msg]) } # minimal signal
+        ensure
+          queue.enqueue([idx, :__done__])
+        end
+      end
+    end
+
+    def build_writer_task(parent:, queue:, semaphore:, remaining:)
+      parent.async do
+        remaining_count = remaining
+        loop do
+          idx_from_queue, item = queue.dequeue
+          if item == :__done__
+            remaining_count -= 1
+            break if remaining_count.zero?
+
+            next
+          end
+          log_stream_write(mode: :concurrent, idx: idx_from_queue, bytesize: item.bytesize)
+          begin
+            response.stream.write(item)
+          rescue IOError, ActionController::Live::ClientDisconnected
+            break
+          ensure
+            semaphore.release
           end
         end
-        response.stream.close if close_stream_at_end
       end
+    end
+
+    def drain_streams_sequentially
+      @rorp_rendering_fibers.each_with_index do |fiber, idx|
+        loop do
+          begin
+            chunk = fiber.resume
+          rescue FiberError
+            break
+          end
+          break unless chunk
+
+          log_stream_write(mode: :sequential, idx: idx, bytesize: chunk.bytesize)
+          response.stream.write(chunk)
+        end
+      end
+    end
+
+    def log_stream_write(mode:, idx:, bytesize:)
+      return unless ReactOnRailsPro.configuration.tracing
+
+      message = "[ReactOnRailsPro] stream write (mode=#{mode}) idx=#{idx} bytes=#{bytesize}"
+      Rails.logger.info { message }
     end
   end
 end
