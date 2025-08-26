@@ -38,12 +38,57 @@ module ReactOnRailsPro
       # So we strip extra newlines from the template string and add a single newline
       response.stream.write(template_string)
 
-      @rorp_rendering_fibers.each do |fiber|
-        while (chunk = fiber.resume)
-          response.stream.write(chunk)
+      if ReactOnRailsPro.configuration.concurrent_stream_drain
+        require "async"
+        require "async/queue"
+
+        Sync do |parent|
+          queue = Async::Queue.new
+          remaining = @rorp_rendering_fibers.size
+
+          unless remaining.zero?
+            tasks = []
+            @rorp_rendering_fibers.each_with_index do |fiber, idx|
+              tasks << parent.async do
+                begin
+                  while (chunk = fiber.resume)
+                    queue.enqueue([idx, chunk])
+                  end
+                rescue StandardError => e
+                  queue.enqueue([idx, "<!-- rorp stream error: #{e.class}: #{e.message} -->"]) # minimal signal
+                ensure
+                  queue.enqueue([idx, :__done__])
+                end
+              end
+            end
+
+            writer = parent.async do
+              loop do
+                _idx, item = queue.dequeue
+                if item == :__done__
+                  remaining -= 1
+                  break if remaining.zero?
+                  next
+                end
+                Rails.logger.info { "[ReactOnRailsPro] stream write (mode=concurrent) idx=#{_idx} bytes=#{item.bytesize}" } if ReactOnRailsPro.configuration.tracing
+                response.stream.write(item)
+              end
+            end
+
+            tasks.each(&:wait)
+            writer.wait
+          end
         end
+        response.stream.close if close_stream_at_end
+      else
+        @rorp_rendering_fibers.each_with_index do |fiber, idx|
+          while (chunk = fiber.resume)
+            Rails.logger.info { "[ReactOnRailsPro] stream write (mode=sequential) idx=#{idx} bytes=#{chunk.bytesize}" } if ReactOnRailsPro.configuration.tracing
+            response.stream.write(chunk)
+          end
+        end
+        response.stream.close if close_stream_at_end
       end
-      response.stream.close if close_stream_at_end
     end
   end
 end
