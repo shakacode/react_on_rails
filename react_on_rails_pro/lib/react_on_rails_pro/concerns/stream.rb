@@ -41,9 +41,11 @@ module ReactOnRailsPro
       if ReactOnRailsPro.configuration.concurrent_stream_drain
         require "async"
         require "async/queue"
+        require "async/semaphore"
 
         Sync do |parent|
           queue = Async::Queue.new
+          semaphore = Async::Semaphore.new(64)
           remaining = @rorp_rendering_fibers.size
 
           unless remaining.zero?
@@ -52,10 +54,10 @@ module ReactOnRailsPro
               tasks << parent.async do
                 begin
                   while (chunk = fiber.resume)
-                    queue.enqueue([idx, chunk])
+                    semaphore.acquire { queue.enqueue([idx, chunk]) }
                   end
                 rescue StandardError => e
-                  queue.enqueue([idx, "<!-- rorp stream error: #{e.class}: #{e.message} -->"]) # minimal signal
+                  semaphore.acquire { queue.enqueue([idx, "<!-- stream error: #{e.class}: #{e.message} -->"]) } # minimal signal
                 ensure
                   queue.enqueue([idx, :__done__])
                 end
@@ -71,7 +73,14 @@ module ReactOnRailsPro
                   next
                 end
                 Rails.logger.info { "[ReactOnRailsPro] stream write (mode=concurrent) idx=#{_idx} bytes=#{item.bytesize}" } if ReactOnRailsPro.configuration.tracing
-                response.stream.write(item)
+                begin
+                  response.stream.write(item)
+                rescue IOError, ActionController::Live::ClientDisconnected
+                  # Client disconnected: stop early.
+                  break
+                ensure
+                  semaphore.release
+                end
               end
             end
 
