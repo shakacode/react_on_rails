@@ -81,7 +81,8 @@ module ReactOnRailsPro
                    renderer_request_retry_limit: nil, throw_js_errors: nil, ssr_timeout: nil,
                    profile_server_rendering_js_code: nil, raise_non_shell_server_rendering_errors: nil,
                    enable_rsc_support: nil, rsc_payload_generation_url_path: nil,
-                   rsc_bundle_js_file: nil, react_client_manifest_file: nil, react_server_client_manifest_file: nil,
+                   rsc_bundle_js_file: nil, react_client_manifest_file: nil,
+                   react_server_client_manifest_file: nil,
                    concurrent_stream_drain: DEFAULT_CONCURRENT_STREAM_DRAIN)
       self.renderer_url = renderer_url
       self.renderer_password = renderer_password
