@@ -53,12 +53,12 @@ module ReactOnRailsPro
       require "async/queue"
       require "async/semaphore"
 
+      remaining = @rorp_rendering_fibers.size
+      return if remaining.zero?
+
       Sync do |parent|
         queue = Async::Queue.new
         semaphore = Async::Semaphore.new(64)
-        remaining = @rorp_rendering_fibers.size
-
-        return if remaining.zero?
 
         tasks = build_producer_tasks(parent: parent, queue: queue, semaphore: semaphore)
         writer = build_writer_task(parent: parent, queue: queue, semaphore: semaphore, remaining: remaining)
@@ -94,7 +94,7 @@ module ReactOnRailsPro
 
             next
           end
-          log_stream_write(mode: :concurrent, idx: idx_from_queue, bytesize: item.bytesize)
+          log_stream_write(mode: :concurrent, idx: idx_from_queue, bytesize: safe_bytesize(item))
           begin
             response.stream.write(item)
           rescue IOError, ActionController::Live::ClientDisconnected
@@ -116,7 +116,7 @@ module ReactOnRailsPro
           end
           break unless chunk
 
-          log_stream_write(mode: :sequential, idx: idx, bytesize: chunk.bytesize)
+          log_stream_write(mode: :sequential, idx: idx, bytesize: safe_bytesize(chunk))
           response.stream.write(chunk)
         end
       end
@@ -127,6 +127,10 @@ module ReactOnRailsPro
 
       message = "[ReactOnRailsPro] stream write (mode=#{mode}) idx=#{idx} bytes=#{bytesize}"
       Rails.logger.info { message }
+    end
+
+    def safe_bytesize(obj)
+      obj.respond_to?(:bytesize) ? obj.bytesize : obj.to_s.bytesize
     end
   end
 end
