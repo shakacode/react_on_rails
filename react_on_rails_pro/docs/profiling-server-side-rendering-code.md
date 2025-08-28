@@ -107,9 +107,9 @@ To see the renderer behavior while there are many requests coming to it, you can
 1. Then, you can analyze the renderer behavior of each request as stated in `Profile Analysis` section.
 
 ### ExecJS
-React on Rails Pro support profiling with ExecJS starting from version **4.0.0-rc.1**. You will need to do more work to profile exec js if you are using an older version.
+React on Rails Pro supports profiling with ExecJS starting from version **4.0.0**. You will need to do more work to profile ExecJS if you are using an older version.
 
-If you are using **v4.0.0-rc.1** or later, you can enable profiler by setting the `profile_server_rendering_js_code` config by adding the following line to ReactOnRails initializer.
+If you are using **v4.0.0** or later, you can enable the profiler by setting the `profile_server_rendering_js_code` config by adding the following line to the ReactOnRails initializer.
 
 ```ruby
 config.profile_server_rendering_js_code = true
