@@ -5,7 +5,7 @@ git_source(:github) { |repo| "https://github.com/#{repo}.git" }
 
 ruby '3.3.7'
 
-gem "react_on_rails", "15.0.0.rc.2" # keep in sync with package.json files
+gem "react_on_rails", "15.0.0" # keep in sync with package.json files
 
 # For local development
 # Add the following line to the Gemfile.local file

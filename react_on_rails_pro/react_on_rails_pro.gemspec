@@ -32,7 +32,7 @@ Gem::Specification.new do |s|
   s.add_runtime_dependency "execjs", "~> 2.9"
   s.add_runtime_dependency "httpx", "~> 1.5"
   s.add_runtime_dependency "rainbow"
-  s.add_runtime_dependency "react_on_rails", ">= 14.1.0"
+  s.add_runtime_dependency "react_on_rails", ">= 15.0.0"
   s.add_development_dependency "bundler"
   s.add_development_dependency "commonmarker"
   s.add_development_dependency "gem-release"

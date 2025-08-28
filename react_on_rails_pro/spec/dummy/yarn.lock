@@ -5353,10 +5353,10 @@ react-on-rails-rsc@^19.0.2:
     neo-async "^2.6.1"
     webpack-sources "^3.2.0"
 
-react-on-rails@15.0.0-rc.2:
-  version "15.0.0-rc.2"
-  resolved "https://registry.yarnpkg.com/react-on-rails/-/react-on-rails-15.0.0-rc.2.tgz#183c61749f5ef08aa2421a8a5d498a99eb16ca1b"
-  integrity sha512-LEsDqLXVlgS4DDI7VBxZYnNUQZp1Apf1solN1ZW9Tgd7IfR+f3zLoBHSn2OiEtLQKliLWpBNc1NXkeFJs4QsKQ==
+react-on-rails@15.0.0:
+  version "15.0.0"
+  resolved "https://registry.yarnpkg.com/react-on-rails/-/react-on-rails-15.0.0.tgz#8edc78670129394cd92293842ae88c62d4cb030b"
+  integrity sha512-Uht8HWm8ZVN8OeDz03b3YLtprzHXhFTw7hb0jl8IpOjbig91DBuurBVxr4tfuymuemGwdjhQpscho33Cnw9Atg==
 
 react-proptypes@^1.0.0:
   version "1.0.0"
