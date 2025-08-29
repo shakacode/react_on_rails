@@ -58,7 +58,10 @@ module ReactOnRailsPro
 
       Sync do |parent|
         queue = Async::Queue.new
-        semaphore = Async::Semaphore.new(64)
+        capacity = ReactOnRailsPro.configuration.concurrent_stream_queue_capacity
+        # Clamp capacity to minimum of 1 to prevent invalid semaphore initialization
+        capacity = 1 if capacity && capacity < 1
+        semaphore = Async::Semaphore.new(capacity || Configuration::DEFAULT_CONCURRENT_STREAM_QUEUE_CAPACITY)
 
         tasks = build_producer_tasks(parent: parent, queue: queue, semaphore: semaphore)
         writer = build_writer_task(parent: parent, queue: queue, semaphore: semaphore, remaining: remaining)
