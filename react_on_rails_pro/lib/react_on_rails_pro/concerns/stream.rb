@@ -38,12 +38,15 @@ module ReactOnRailsPro
       # So we strip extra newlines from the template string and add a single newline
       response.stream.write(template_string)
 
-      if ReactOnRailsPro.configuration.concurrent_stream_drain
-        drain_streams_concurrently
-      else
-        drain_streams_sequentially
+      begin
+        if ReactOnRailsPro.configuration.concurrent_stream_drain
+          drain_streams_concurrently
+        else
+          drain_streams_sequentially
+        end
+      ensure
+        response.stream.close if close_stream_at_end
       end
-      response.stream.close if close_stream_at_end
     end
 
     private
@@ -65,20 +68,29 @@ module ReactOnRailsPro
         writer = build_writer_task(parent: parent, queue: queue, semaphore: semaphore)
         tasks = build_producer_tasks(parent: parent, queue: queue, semaphore: semaphore)
 
+        # This structure ensures that even if a producer task fails, we always
+        # signal the writer to stop and then wait for it to finish draining
+        # any remaining items from the queue before propagating the error.
         begin
           tasks.each(&:wait)
         ensure
           # `close` signals end-of-stream; when writer tries to dequeue, it will get nil, so it will exit.
           queue.close
+          writer.wait
         end
-        writer.wait
       end
     end
 
     def build_producer_tasks(parent:, queue:, semaphore:)
       @rorp_rendering_fibers.each_with_index.map do |fiber, idx|
         parent.async do
-          while (chunk = fiber.resume)
+          loop do
+            begin
+              chunk = fiber.resume
+            rescue FiberError
+              break
+            end
+            break unless chunk
             # We use `acquire` and not `async` to create backpressure.
             # A simple comparison:
             # - `acquire`: Blocks this fiber until a permit is free -> forces backpressure.
@@ -86,9 +98,6 @@ module ReactOnRailsPro
             #              by buffering all chunks in memory.
             semaphore.acquire { queue.enqueue([idx, chunk]) }
           end
-        rescue StandardError => e
-          error_msg = "<!-- stream error: #{e.class}: #{e.message} -->"
-          semaphore.acquire { queue.enqueue([idx, error_msg]) } # minimal signal
         end
       end
     end

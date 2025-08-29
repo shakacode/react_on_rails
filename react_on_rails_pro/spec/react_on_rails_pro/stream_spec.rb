@@ -495,13 +495,19 @@ RSpec.describe "Streaming API" do
       expect(writes_conc.join).to include("S2\n")
     end
 
-    it "continues other producers when one errors" do
+    it "fails the request when a producer errors", :aggregate_failures do
       erring = TestStream.new(chunks_with_delays: [[0.01, "E1\n"]], raise_after: 1)
       ok     = TestStream.new(chunks_with_delays: [[0.01, "O1\n"], [0.02, "O2\n"]])
-      writes, = run_and_collect(streams: [erring, ok], concurrent: true)
-      joined = writes.join
-      expect(joined).to include("<!-- stream error:")
-      expect(joined).to include("O2\n")
+      # This test intentionally causes an unhandled exception in a producer task,
+      # which the `async` gem logs to stderr. We silence these expected warnings
+      # by manually redirecting stderr to a null device for this block.
+      original_stderr = $stderr
+      $stderr = File.open(IO::NULL, 'w')
+      begin
+        expect { run_and_collect(streams: [erring, ok], concurrent: true) }.to raise_error(RuntimeError, "Fake error")
+      ensure
+        $stderr = original_stderr
+      end
     end
 
     it "applies backpressure: writer delay spaces out queued writes" do
