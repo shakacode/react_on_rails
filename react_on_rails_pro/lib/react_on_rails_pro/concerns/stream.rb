@@ -53,8 +53,7 @@ module ReactOnRailsPro
       require "async/queue"
       require "async/semaphore"
 
-      remaining = @rorp_rendering_fibers.size
-      return if remaining.zero?
+      return if @rorp_rendering_fibers.empty?
 
       Sync do |parent|
         queue = Async::Queue.new
@@ -63,10 +62,15 @@ module ReactOnRailsPro
         capacity = 1 if capacity && capacity < 1
         semaphore = Async::Semaphore.new(capacity || Configuration::DEFAULT_CONCURRENT_STREAM_QUEUE_CAPACITY)
 
+        writer = build_writer_task(parent: parent, queue: queue, semaphore: semaphore)
         tasks = build_producer_tasks(parent: parent, queue: queue, semaphore: semaphore)
-        writer = build_writer_task(parent: parent, queue: queue, semaphore: semaphore, remaining: remaining)
 
-        tasks.each(&:wait)
+        begin
+          tasks.each(&:wait)
+        ensure
+          # `close` signals end-of-stream; when writer tries to dequeue, it will get nil, so it will exit.
+          queue.close
+        end
         writer.wait
       end
     end
@@ -85,23 +89,16 @@ module ReactOnRailsPro
         rescue StandardError => e
           error_msg = "<!-- stream error: #{e.class}: #{e.message} -->"
           semaphore.acquire { queue.enqueue([idx, error_msg]) } # minimal signal
-        ensure
-          queue.enqueue([idx, :__done__])
         end
       end
     end
 
-    def build_writer_task(parent:, queue:, semaphore:, remaining:)
+    def build_writer_task(parent:, queue:, semaphore:)
       parent.async do
-        remaining_count = remaining
         loop do
-          idx_from_queue, item = queue.dequeue
-          if item == :__done__
-            remaining_count -= 1
-            break if remaining_count.zero?
-
-            next
-          end
+          pair = queue.dequeue
+          break if pair.nil?
+          idx_from_queue, item = pair
           log_stream_write(mode: :concurrent, idx: idx_from_queue, bytesize: safe_bytesize(item))
           begin
             response.stream.write(item)
