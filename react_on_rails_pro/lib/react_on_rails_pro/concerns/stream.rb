@@ -75,6 +75,11 @@ module ReactOnRailsPro
       @rorp_rendering_fibers.each_with_index.map do |fiber, idx|
         parent.async do
           while (chunk = fiber.resume)
+            # We use `acquire` and not `async` to create backpressure.
+            # A simple comparison:
+            # - `acquire`: Blocks this fiber until a permit is free -> forces backpressure.
+            # - `async`:   Schedules the work and continues immediately -> defeats backpressure
+            #              by buffering all chunks in memory.
             semaphore.acquire { queue.enqueue([idx, chunk]) }
           end
         rescue StandardError => e
