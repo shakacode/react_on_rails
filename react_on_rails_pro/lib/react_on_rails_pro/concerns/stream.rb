@@ -91,6 +91,7 @@ module ReactOnRailsPro
               break
             end
             break unless chunk
+
             # We use `acquire` and not `async` to create backpressure.
             # A simple comparison:
             # - `acquire`: Blocks this fiber until a permit is free -> forces backpressure.
@@ -107,6 +108,7 @@ module ReactOnRailsPro
         loop do
           pair = queue.dequeue
           break if pair.nil?
+
           idx_from_queue, item = pair
           log_stream_write(mode: :concurrent, idx: idx_from_queue, bytesize: safe_bytesize(item))
           begin
