@@ -23,63 +23,37 @@ After a release, please make sure to run `bundle exec rake update_changelog`. Th
 
 Changes since the last non-beta release.
 
-#### Fixed
-
-- Enable support for ReactRefreshWebpackPlugin v0.6.0 by adding conditional logic regarding configuration. [PR 1748](https://github.com/shakacode/react_on_rails/pull/1748) by [judahmeek](https://github.com/judahmeek).
-
-- Replace RenderOptions.renderRequestId and use local trackers instead. This change should only be relevant to ReactOnRails Pro users. [PR 1745](https://github.com/shakacode/react_on_rails/pull/1745) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-
-- Fixed invalid warnings about non-exact versions when using a pre-release version of React on Rails, as well as missing warnings when using different pre-release versions of the gem and the Node package. [PR 1742](https://github.com/shakacode/react_on_rails/pull/1742) by [alexeyr-ci2](https://github.com/alexeyr-ci2).
-
-### [15.0.0-rc.1] - 2025-06-18
-
-#### Improved
-
-- Ensured that the RSC payload is injected after the component's HTML markup to improve the performance of the RSC payload injection. [PR 1738](https://github.com/shakacode/react_on_rails/pull/1738) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-
-### [15.0.0-rc.0] - 2025-06-16
-
-#### Improved
-
-- Improved RSC rendering flow by eliminating double rendering of server components and reducing the number of HTTP requests.
-- Updated communication protocol between Node Renderer and Rails to version 2.0.0 which supports the ability to upload multiple bundles at once.
-- Added `RSCRoute` component to enable seamless server-side rendering of React Server Components. This component automatically handles RSC payload injection and hydration, allowing server components to be rendered directly within client components while maintaining optimal performance.
-
-[PR 1696](https://github.com/shakacode/react_on_rails/pull/1696) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-
-#### Added
-
-- Configuration option `generated_component_packs_loading_strategy` to control how generated component packs are loaded. It supports `sync`, `async`, and `defer` strategies. [PR 1712](https://github.com/shakacode/react_on_rails/pull/1712) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-
-- Support for returning React component from async render-function. [PR 1720](https://github.com/shakacode/react_on_rails/pull/1720) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+### [15.0.0] - 2025-08-28
+See [Release Notes](docs/release-notes/15.0.0.md) for full details.
 
 ### Removed (Breaking Changes)
-
 - Deprecated `defer_generated_component_packs` configuration option. You should use `generated_component_packs_loading_strategy` instead. [PR 1712](https://github.com/shakacode/react_on_rails/pull/1712) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- The package is ESM-only now. Please see [Release Notes](docs/release-notes/15.0.0.md#esm-only-package) for more details.
+- `ReactOnRails.reactOnRailsPageLoaded` is now an async function
+- `force_load` configuration now defaults to `true`
+- `defer_generated_component_packs` configuration now defaults to `false`
 
-### Changed
+#### Fixed
+- Enable support for ReactRefreshWebpackPlugin v0.6.0 by adding conditional logic regarding configuration. [PR 1748](https://github.com/shakacode/react_on_rails/pull/1748) by [judahmeek](https://github.com/judahmeek).
+- Replace RenderOptions.renderRequestId and use local trackers instead. This change should only be relevant to ReactOnRails Pro users. [PR 1745](https://github.com/shakacode/react_on_rails/pull/1745) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- Fixed invalid warnings about non-exact versions when using a pre-release version of React on Rails, as well as missing warnings when using different pre-release versions of the gem and the Node package. [PR 1742](https://github.com/shakacode/react_on_rails/pull/1742) by [alexeyr-ci2](https://github.com/alexeyr-ci2).
 
-- **Breaking change**: The package is ESM-only now. Please see [Release Notes](docs/release-notes/15.0.0.md#esm-only-package) for more details.
+#### Improved
+- Ensured that the RSC payload is injected after the component's HTML markup to improve the performance of the RSC payload injection. [PR 1738](https://github.com/shakacode/react_on_rails/pull/1738) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- Improved RSC rendering flow by eliminating double rendering of server components and reducing the number of HTTP requests.
+- Updated communication protocol between Node Renderer and Rails to version 2.0.0 which supports the ability to upload multiple bundles at once.
+- Added `RSCRoute` component to enable seamless server-side rendering of React Server Components. This component automatically handles RSC payload injection and hydration, allowing server components to be rendered directly within client components while maintaining optimal performance. [PR 1696](https://github.com/shakacode/react_on_rails/pull/1696) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 - The global context is now accessed using `globalThis`. [PR 1727](https://github.com/shakacode/react_on_rails/pull/1727) by [alexeyr-ci2](https://github.com/alexeyr-ci2).
 - Generated client packs now import from `react-on-rails/client` instead of `react-on-rails`. [PR 1706](https://github.com/shakacode/react_on_rails/pull/1706) by [alexeyr-ci](https://github.com/alexeyr-ci).
   - The "optimization opportunity" message when importing the server-side `react-on-rails` instead of `react-on-rails/client` in browsers is now a warning for two reasons:
     - Make it more prominent
     - Include a stack trace when clicked
 
-### [15.0.0-alpha.2] - 2025-03-07
-
-See [Release Notes](docs/release-notes/15.0.0.md) for full details.
-
 #### Added
-
+- Configuration option `generated_component_packs_loading_strategy` to control how generated component packs are loaded. It supports `sync`, `async`, and `defer` strategies. [PR 1712](https://github.com/shakacode/react_on_rails/pull/1712) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- Support for returning React component from async render-function. [PR 1720](https://github.com/shakacode/react_on_rails/pull/1720) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 - React Server Components Support (Pro Feature) [PR 1644](https://github.com/shakacode/react_on_rails/pull/1644) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 - Improved component and store hydration performance [PR 1656](https://github.com/shakacode/react_on_rails/pull/1656) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-
-#### Breaking Changes
-
-- `ReactOnRails.reactOnRailsPageLoaded` is now an async function
-- `force_load` configuration now defaults to `true`
-- `defer_generated_component_packs` configuration now defaults to `false`
 
 ### [14.2.0] - 2025-03-03
 
@@ -1577,8 +1551,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/15.0.0-alpha.2...master
-[15.0.0-alpha.2]: https://github.com/shakacode/react_on_rails/compare/14.2.0...15.0.0-alpha.2
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/15.0.0...master
+[15.0.0]: https://github.com/shakacode/react_on_rails/compare/14.2.0...15.0.0
 [14.2.0]: https://github.com/shakacode/react_on_rails/compare/14.1.1...14.2.0
 [14.1.1]: https://github.com/shakacode/react_on_rails/compare/14.1.0...14.1.1
 [14.1.0]: https://github.com/shakacode/react_on_rails/compare/14.0.5...14.1.0
