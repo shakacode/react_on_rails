@@ -146,7 +146,9 @@ The tricky part is to figure out which bundles to load on any Rails view. [Shaka
 
 File-system-based automated pack generation simplifies this process with a new option for the view helpers.
 
-For example, if you wanted to utilize our file-system based entrypoint generation for `FooComponentOne` and `BarComponentOne`, but not `BarComponentTwo` (for whatever reason), then...
+> Note: In the Background examples above, we used `BarComponentTwo`. In the Solution below, we refer to the same component as `SpecialComponentNotToAutoLoadBundle` to emphasize that it is excluded from auto-loading. You do not need to rename your files.
+
+For example, if you wanted to utilize our file-system based entrypoint generation for `FooComponentOne` and `BarComponentOne`, but not `SpecialComponentNotToAutoLoadBundle` (formerly `BarComponentTwo`) (for whatever reason), then...
 
 1. Remove generated entrypoints from parameters passed directly to `javascript_pack_tag` and `stylesheet_pack_tag`.
 2. Remove generated entrypoints from parameters passed directly to `append_javascript_pack_tag` and `append_stylesheet_pack_tag`.
@@ -154,8 +156,8 @@ For example, if you wanted to utilize our file-system based entrypoint generatio
    Your layout would now contain:
 
    ```erb
-   <%= javascript_pack_tag('BarComponentTwo') %>
-   <%= stylesheet_pack_tag('BarComponentTwo') %>
+   <%= javascript_pack_tag('SpecialComponentNotToAutoLoadBundle') %>
+   <%= stylesheet_pack_tag('SpecialComponentNotToAutoLoadBundle') %>
    ```
 
 3. Create a directory structure where the components that you want to be auto-generated are within `ReactOnRails.configuration.components_subdirectory`, which should be a subdirectory of `Shakapacker.config.source_path`:
@@ -163,7 +165,7 @@ For example, if you wanted to utilize our file-system based entrypoint generatio
    ```text
    app/javascript:
      └── packs:
-     │   └── BarComponentTwo.jsx  # Internally uses ReactOnRails.register
+     │   └── SpecialComponentNotToAutoLoadBundle.jsx  # Internally uses ReactOnRails.register
      └── src:
      │   └── Foo
      │   │ └── ...
@@ -174,16 +176,16 @@ For example, if you wanted to utilize our file-system based entrypoint generatio
      │   │ └── ror_components          # configured as `components_subdirectory`
      │   │   │ └── BarComponentOne.jsx
      │   │ └── something_else
-     │   │   │ └── BarComponentTwo.jsx
+     │   │   │ └── SpecialComponentNotToAutoLoadBundle.jsx
    ```
 
    4. You no longer need to register the React components within the `ReactOnRails.configuration.components_subdirectory` nor directly add their bundles. For example, you can have a Rails view using three components:
 
       ```erb
-      <% append_javascript_pack('BarComponentTwo') %>
+      <% append_javascript_pack('SpecialComponentNotToAutoLoadBundle') %>
       <%= react_component("FooComponentOne", {}, auto_load_bundle: true) %>
       <%= react_component("BarComponentOne", {}, auto_load_bundle: true) %>
-      <%= react_component("BarComponentTwo", {}) %>
+      <%= react_component("SpecialComponentNotToAutoLoadBundle", {}) %>
       ```
 
       If a component uses multiple HTML strings for server rendering, the [`react_component_hash`](../api/view-helpers-api.md#react_component_hash) view helper can be used on the Rails view, as illustrated below.
