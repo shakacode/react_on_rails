@@ -73,6 +73,7 @@ import './../generated/server-bundle-generated.js';
 ```
 
 We recommend committing this import statement to your version control system.
+
 > Example (dummy app): see the server bundle entrypoint import.
 > [Dummy server-bundle.js](https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/packs/server-bundle.js)
 
@@ -219,7 +220,7 @@ For example, if you wanted to utilize our file-system based entrypoint generatio
 
 ### Server Rendering and Client Rendering Components
 
-If server rendering is enabled, the component will be registered for usage both in server and client rendering. To have separate definitions for client and server rendering, name the component files `ComponentName.server.jsx` and `ComponentName.client.jsx`. The `ComponentName.server.jsx` file will be used for server rendering and the `ComponentName.client.jsx` file for client rendering. If you don't want the component rendered on the server, you should only have the `ComponentName.client.jsx` file. 
+If server rendering is enabled, the component will be registered for usage both in server and client rendering. To have separate definitions for client and server rendering, name the component files `ComponentName.server.jsx` and `ComponentName.client.jsx`. The `ComponentName.server.jsx` file will be used for server rendering and the `ComponentName.client.jsx` file for client rendering. If you don't want the component rendered on the server, you should only have the `ComponentName.client.jsx` file.
 
 > Example (dummy app): paired files such as [`ReduxApp.client.jsx`](https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReduxApp.client.jsx) and [`ReduxApp.server.jsx`](https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReduxApp.server.jsx), and [`RouterApp.client.jsx`](https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/RouterApp.client.jsx) and [`RouterApp.server.jsx`](https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/RouterApp.server.jsx).
 
