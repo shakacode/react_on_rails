@@ -17,6 +17,9 @@ default:
 
 For more details, see [Configuration and Code](https://github.com/shakacode/shakapacker#configuration-and-code) section in [shakapacker](https://github.com/shakacode/shakapacker/).
 
+> Example (dummy app): `nested_entries: true` with a different `source_path: client/app`. See `config/shakapacker.yml` in the dummy app.
+> [Dummy shakapacker.yml](https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/config/shakapacker.yml)
+
 ### Configure Components Subdirectory
 
 `components_subdirectory` is the name of the matched directories containing components that will be automatically registered for use by the view helpers.
@@ -28,6 +31,9 @@ config.components_subdirectory = "ror_components"
 
 Now all React components inside the directories called `ror_components` will automatically be registered for usage with [`react_component`](../api/view-helpers-api.md#react_component) and [`react_component_hash`](../api/view-helpers-api.md#react_component_hash) helper methods provided by React on Rails.
 
+> Example (dummy app): the configured components subdirectory is named `startup` instead of `ror_components`.
+> [Dummy initializer](https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/config/initializers/react_on_rails.rb)
+
 ### Configure `auto_load_bundle` Option
 
 For automated component registry, [`react_component`](../api/view-helpers-api.md#react_component) and [`react_component_hash`](../api/view-helpers-api.md#react_component_hash) view helper method tries to load generated bundle for component from the generated directory automatically per `auto_load_bundle` option. `auto_load_bundle` option in `config/initializers/react_on_rails` configures the default value that will be passed to component helpers. The default is `false`, and the parameter can be passed explicitly for each call.
@@ -37,6 +43,9 @@ You can change the value in `config/initializers/react_on_rails` by updating it 
 ```rb
 config.auto_load_bundle = true
 ```
+
+> Example (dummy app): `auto_load_bundle` is set to `true` in the same initializer.
+> [Dummy initializer](https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/config/initializers/react_on_rails.rb)
 
 ### Location of generated files
 
@@ -64,6 +73,8 @@ import './../generated/server-bundle-generated.js';
 ```
 
 We recommend committing this import statement to your version control system.
+> Example (dummy app): see the server bundle entrypoint import.
+> [Dummy server-bundle.js](https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/packs/server-bundle.js)
 
 ## Usage
 
@@ -208,7 +219,9 @@ For example, if you wanted to utilize our file-system based entrypoint generatio
 
 ### Server Rendering and Client Rendering Components
 
-If server rendering is enabled, the component will be registered for usage both in server and client rendering. To have separate definitions for client and server rendering, name the component files `ComponentName.server.jsx` and `ComponentName.client.jsx`. The `ComponentName.server.jsx` file will be used for server rendering and the `ComponentName.client.jsx` file for client rendering. If you don't want the component rendered on the server, you should only have the `ComponentName.client.jsx` file.
+If server rendering is enabled, the component will be registered for usage both in server and client rendering. To have separate definitions for client and server rendering, name the component files `ComponentName.server.jsx` and `ComponentName.client.jsx`. The `ComponentName.server.jsx` file will be used for server rendering and the `ComponentName.client.jsx` file for client rendering. If you don't want the component rendered on the server, you should only have the `ComponentName.client.jsx` file. 
+
+> Example (dummy app): paired files such as [`ReduxApp.client.jsx`](https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReduxApp.client.jsx) and [`ReduxApp.server.jsx`](https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReduxApp.server.jsx), and [`RouterApp.client.jsx`](https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/RouterApp.client.jsx) and [`RouterApp.server.jsx`](https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/RouterApp.server.jsx).
 
 Once generated, all server entrypoints will be imported into a file named `[ReactOnRails.configuration.server_bundle_js_file]-generated.js`, which in turn will be imported into a source file named the same as `ReactOnRails.configuration.server_bundle_js_file`. If your server bundling logic is such that your server bundle source entrypoint is not named the same as your `ReactOnRails.configuration.server_bundle_js_file` and changing it would be difficult, please let us know.
 
