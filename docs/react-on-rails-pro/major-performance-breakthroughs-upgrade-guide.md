@@ -71,7 +71,7 @@ This optimization is particularly impactful for:
 
 _Performance improvement visualization:_
 
-![Performance comparison showing early hydration improvement](https://github.com/user-attachments/assets/ae33fe14-42f1-4cc1-bde3-9c5bb570cdbf)
+![Performance comparison showing early hydration improvement](../assets/early-hydration-performance-comparison.jpg)
 
 _The image above demonstrates the dramatic performance improvement:_
 
