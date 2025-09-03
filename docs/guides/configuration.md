@@ -213,9 +213,23 @@ ReactOnRails.configure do |config|
   # config.server_bundle_js_file for the filename.
   config.make_generated_server_bundle_the_entrypoint = false
 
-  # Default is false
-  # Set this to true to have `defer: true` added to your `append_javascript_pack` calls for generated entrypoints.
-  config.defer_generated_component_packs = false
+  # Configuration for how generated component packs are loaded.
+  # Options: :sync, :async, :defer
+  # - :sync (default for Shakapacker < 8.2.0): Loads scripts synchronously
+  # - :async (default for Shakapacker ≥ 8.2.0): Loads scripts asynchronously for better performance
+  # - :defer: Defers script execution until after page load
+  config.generated_component_packs_loading_strategy = :async
+
+  # DEPRECATED: Use `generated_component_packs_loading_strategy` instead.
+  # Migration: `defer_generated_component_packs: true` → `generated_component_packs_loading_strategy: :defer`
+  # Migration: `defer_generated_component_packs: false` → `generated_component_packs_loading_strategy: :sync`
+  # See [15.0.0 Release Notes](docs/release-notes/15.0.0.md) for more details.
+  # config.defer_generated_component_packs = false
+
+  # Default is true
+  # When true, components hydrate immediately as soon as their server-rendered HTML reaches the client,
+  # without waiting for the full page load. This improves time-to-interactive performance.
+  config.force_load = true
 
   ################################################################################
   # I18N OPTIONS
