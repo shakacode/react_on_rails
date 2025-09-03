@@ -24,21 +24,35 @@ After a release, please make sure to run `bundle exec rake update_changelog`. Th
 Changes since the last non-beta release.
 
 ### [15.0.0] - 2025-08-28
+
 See [Release Notes](docs/release-notes/15.0.0.md) for full details.
 
 ### Removed (Breaking Changes)
-- Deprecated `defer_generated_component_packs` configuration option. You should use `generated_component_packs_loading_strategy` instead. [PR 1712](https://github.com/shakacode/react_on_rails/pull/1712) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-- The package is ESM-only now. Please see [Release Notes](docs/release-notes/15.0.0.md#esm-only-package) for more details.
-- `ReactOnRails.reactOnRailsPageLoaded` is now an async function
-- `force_load` configuration now defaults to `true`
-- `defer_generated_component_packs` configuration now defaults to `false`
+
+- Deprecated `defer_generated_component_packs` configuration option. You should use `generated_component_packs_loading_strategy` instead.
+  - Migration:
+    - `defer_generated_component_packs: true` → `generated_component_packs_loading_strategy: :defer`
+    - `defer_generated_component_packs: false` → `generated_component_packs_loading_strategy: :sync`
+    - For best performance, use `generated_component_packs_loading_strategy: :async`
+  - [PR 1712](https://github.com/shakacode/react_on_rails/pull/1712) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- The package is ESM-only now. Migration:
+  - If using `require('react-on-rails')`, upgrade to Node v20.19.0+ or change to `import`.
+  - For TypeScript errors, upgrade to TypeScript 5.8+ and set `module` to `nodenext`.
+- `ReactOnRails.reactOnRailsPageLoaded` is now an async function. Migration:
+  - Add `await` when calling this function: `await ReactOnRails.reactOnRailsPageLoaded()`.
+- `force_load` configuration now defaults to `true`. Migration:
+  - Set `force_load: false` in your config if you want the previous behavior.
+
+For detailed migration instructions, see the [15.0.0 Release Notes](docs/release-notes/15.0.0.md).
 
 #### Fixed
+
 - Enable support for ReactRefreshWebpackPlugin v0.6.0 by adding conditional logic regarding configuration. [PR 1748](https://github.com/shakacode/react_on_rails/pull/1748) by [judahmeek](https://github.com/judahmeek).
 - Replace RenderOptions.renderRequestId and use local trackers instead. This change should only be relevant to ReactOnRails Pro users. [PR 1745](https://github.com/shakacode/react_on_rails/pull/1745) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 - Fixed invalid warnings about non-exact versions when using a pre-release version of React on Rails, as well as missing warnings when using different pre-release versions of the gem and the Node package. [PR 1742](https://github.com/shakacode/react_on_rails/pull/1742) by [alexeyr-ci2](https://github.com/alexeyr-ci2).
 
 #### Improved
+
 - Ensured that the RSC payload is injected after the component's HTML markup to improve the performance of the RSC payload injection. [PR 1738](https://github.com/shakacode/react_on_rails/pull/1738) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 - Improved RSC rendering flow by eliminating double rendering of server components and reducing the number of HTTP requests.
 - Updated communication protocol between Node Renderer and Rails to version 2.0.0 which supports the ability to upload multiple bundles at once.
@@ -50,6 +64,7 @@ See [Release Notes](docs/release-notes/15.0.0.md) for full details.
     - Include a stack trace when clicked
 
 #### Added
+
 - Configuration option `generated_component_packs_loading_strategy` to control how generated component packs are loaded. It supports `sync`, `async`, and `defer` strategies. [PR 1712](https://github.com/shakacode/react_on_rails/pull/1712) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 - Support for returning React component from async render-function. [PR 1720](https://github.com/shakacode/react_on_rails/pull/1720) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 - React Server Components Support (Pro Feature) [PR 1644](https://github.com/shakacode/react_on_rails/pull/1644) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
