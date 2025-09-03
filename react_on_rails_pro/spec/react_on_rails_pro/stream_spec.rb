@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "async"
+require "async/queue"
 require_relative "spec_helper"
 
 # Test helper classes for streaming specs
@@ -67,6 +69,34 @@ end
 
 ResponseStruct = Struct.new(:stream)
 
+class SimpleTestController
+  include ReactOnRailsPro::Stream
+
+  # @param initial_response [String] The initial response to be streamed
+  # @param component_queues [Array<Async::Queue>] The queues for each component
+  def initialize(initial_response: "Template", component_queues: [])
+    @initial_response = initial_response
+    @component_queues = component_queues
+  end
+
+  attr_reader :response
+
+  def render_to_string(**_opts)
+    @rorp_rendering_fibers = @component_queues.map do |queue|
+      Fiber.new do
+        loop do
+          chunk = queue.dequeue
+          break if chunk.nil?
+
+          Fiber.yield chunk
+        end
+      end
+    end
+
+    @initial_response
+  end
+end
+
 class TestController
   include ReactOnRailsPro::Stream
 
@@ -128,6 +158,51 @@ RSpec.describe "Streaming API" do
 
   before do
     clear_stream_mocks
+  end
+
+  it "streams components concurrently" do
+    original_concurrent_stream_drain = ReactOnRailsPro.configuration.concurrent_stream_drain
+    ReactOnRailsPro.configuration.concurrent_stream_drain = true
+    component_queues = [Async::Queue.new, Async::Queue.new]
+    controller = SimpleTestController.new(initial_response: "Template", component_queues: component_queues)
+
+    mocked_response = instance_double(ActionController::Live::Response)
+    mocked_stream = instance_double(ActionController::Live::Buffer)
+    allow(mocked_response).to receive(:stream).and_return(mocked_stream)
+    allow(mocked_stream).to receive(:write)
+    allow(mocked_stream).to receive(:close)
+    allow(controller).to receive(:response).and_return(mocked_response)
+
+    Sync do |parent|
+      parent.async do
+        controller.stream_view_containing_react_components(template: "ignored")
+      end
+
+      expect(mocked_stream).to have_received(:write).once.with("Template")
+
+      component_queues[1].enqueue("Component 2")
+      sleep 0.1 # Wait for the writer to dequeue the chunk
+      expect(mocked_stream).to have_received(:write).with("Component 2")
+
+      component_queues[0].enqueue("Component 1")
+      sleep 0.1
+      expect(mocked_stream).to have_received(:write).with("Component 1")
+
+      component_queues[0].enqueue("Component 1-1")
+      sleep 0.1
+      expect(mocked_stream).to have_received(:write).with("Component 1-1")
+
+      component_queues[1].enqueue("Component 2-1")
+      component_queues[0].enqueue("Component 1-2")
+
+      sleep 0.1
+      expect(mocked_stream).to have_received(:write).with("Component 2-1")
+      expect(mocked_stream).to have_received(:write).with("Component 1-2")
+
+      component_queues.each(&:close)
+    ensure
+      ReactOnRailsPro.configuration.concurrent_stream_drain = original_concurrent_stream_drain
+    end
   end
 
   it "yields chunk immediately" do
