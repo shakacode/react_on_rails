@@ -28,48 +28,49 @@ function runPageUnloadedCallbacks(): void {
   });
 }
 
-function setupTurbolinksEventListeners(): void {
+function setupPageNavigationListeners(): void {
   // Install listeners when running on the client (browser).
-  // We must do this check for turbolinks AFTER the document is loaded because we load the
+  // We must check for navigation libraries AFTER the document is loaded because we load the
   // Webpack bundles first.
-  if ((!turbolinksInstalled() || !turbolinksSupported()) && !turboInstalled()) {
-    debugTurbolinks('NOT USING TURBOLINKS: calling reactOnRailsPageLoaded');
+  const hasNavigationLibrary = (turbolinksInstalled() && turbolinksSupported()) || turboInstalled();
+  if (!hasNavigationLibrary) {
+    debugTurbolinks('NO NAVIGATION LIBRARY: running page loaded callbacks immediately');
     runPageLoadedCallbacks();
     return;
   }
 
   if (turboInstalled()) {
-    debugTurbolinks('USING TURBO: document added event listeners turbo:before-render and turbo:render.');
+    debugTurbolinks('TURBO DETECTED: adding event listeners for turbo:before-render and turbo:render.');
     document.addEventListener('turbo:before-render', runPageUnloadedCallbacks);
     document.addEventListener('turbo:render', runPageLoadedCallbacks);
     runPageLoadedCallbacks();
   } else if (turbolinksVersion5()) {
     debugTurbolinks(
-      'USING TURBOLINKS 5: document added event listeners turbolinks:before-render and turbolinks:render.',
+      'TURBOLINKS 5 DETECTED: adding event listeners for turbolinks:before-render and turbolinks:render.',
     );
     document.addEventListener('turbolinks:before-render', runPageUnloadedCallbacks);
     document.addEventListener('turbolinks:render', runPageLoadedCallbacks);
     runPageLoadedCallbacks();
   } else {
-    debugTurbolinks('USING TURBOLINKS 2: document added event listeners page:before-unload and page:change.');
+    debugTurbolinks('TURBOLINKS 2 DETECTED: adding event listeners for page:before-unload and page:change.');
     document.addEventListener('page:before-unload', runPageUnloadedCallbacks);
     document.addEventListener('page:change', runPageLoadedCallbacks);
   }
 }
 
-let isEventListenerInitialized = false;
+let isPageLifecycleInitialized = false;
 function initializePageEventListeners(): void {
   if (typeof window === 'undefined') return;
 
-  if (isEventListenerInitialized) {
+  if (isPageLifecycleInitialized) {
     return;
   }
-  isEventListenerInitialized = true;
+  isPageLifecycleInitialized = true;
 
   if (document.readyState === 'complete') {
-    setupTurbolinksEventListeners();
+    setupPageNavigationListeners();
   } else {
-    document.addEventListener('DOMContentLoaded', setupTurbolinksEventListeners);
+    document.addEventListener('DOMContentLoaded', setupPageNavigationListeners);
   }
 }
 
