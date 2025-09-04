@@ -1,13 +1,38 @@
 # Getting Started
 
-Note, the best way to understand how to use ReactOnRails is to study a few simple examples. You can do a quick demo setup, either on your existing app or on a new Rails app.
+> **💡 Looking for the fastest way to get started?** Try our **[15-Minute Quick Start Guide](./quick-start/README.md)** instead.
 
-This documentation assumes the usage of ReactOnRails with Shakapacker 7. For installation on Shakapacker 6, check [tips for usage with Shakapacker 6](./additional-details/tips-for-usage-with-sp6.md) first.
+## Choose Your Starting Point
 
-1. Do the quick [tutorial](./guides/tutorial.md).
-2. Add React on Rails to an existing Rails app per [the instructions](./guides/installation-into-an-existing-rails-app.md).
-3. Look at [spec/dummy](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy), a simple, no DB example.
-4. Look at [github.com/shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial); it's a full-featured example live at [www.reactrails.com](http://reactrails.com).
+The best way to understand React on Rails depends on your situation:
+
+### 🚀 **New to React on Rails?**
+
+**→ [15-Minute Quick Start](./quick-start/README.md)** - Get your first component working fast
+
+### 📱 **Have an existing Rails app?**
+
+**→ [Add to Existing App](./guides/installation-into-an-existing-rails-app.md)** - Integrate React on Rails
+
+### 📚 **Want comprehensive tutorial?**
+
+**→ [Complete Tutorial](./guides/tutorial.md)** - Step-by-step with Redux and routing
+
+### 👀 **Learn by example?**
+
+- **[Spec/Dummy](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy)** - Simple example in this repo
+- **[Live Demo](https://reactrails.com)** with **[source code](https://github.com/shakacode/react-webpack-rails-tutorial)**
+
+---
+
+## System Requirements
+
+✅ **Rails 7+** (Rails 5+ supported)  
+✅ **Ruby 3.0+** (Ruby 2.7+ supported)  
+✅ **Node.js 18+**  
+✅ **Shakapacker 7** (or Shakapacker 6 with [special setup](./additional-details/tips-for-usage-with-sp6.md))
+
+> **Don't have Shakapacker?** It's the modern replacement for Webpacker and required for React on Rails.
 
 ## Basic Installation
 
