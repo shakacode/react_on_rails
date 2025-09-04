@@ -2,7 +2,16 @@
   "permissions": {
     "allow": [
       "Bash(find:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git push:*)",
+      "Bash(rails new:*)",
+      "Bash(bundle:*)",
+      "Bash(rails:*)",
+      "Bash(git init:*)",
+      "Bash(git commit:*)",
+      "Bash(npm install:*)",
+      "Bash(bin/shakapacker:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": []
