@@ -16,26 +16,23 @@
 [![Build Rspec Tests](https://github.com/shakacode/react_on_rails/actions/workflows/rspec-package-specs.yml/badge.svg)](https://github.com/shakacode/react_on_rails/actions/workflows/rspec-package-specs.yml)
 [![Linting](https://github.com/shakacode/react_on_rails/actions/workflows/lint-js-and-ruby.yml/badge.svg)](https://github.com/shakacode/react_on_rails/actions/workflows/lint-js-and-ruby.yml)
 
-# News
+# ⚡ What's New
 
-**🚀 React on Rails v16.0 Released!** Major modernization with ESM support, enhanced React Server Components, and streamlined configuration.
-
-- **ESM-only package**: Modern module system with better tree-shaking and performance
-- **React Server Components**: Improved rendering flow and new `RSCRoute` component for seamless SSR
-- **Performance improvements**: New async loading strategies and optimized bundle generation
-- **Webpacker removal**: Streamlined for Shakapacker-only support (>= 6.0)
-- [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/) supports the latest features of React 18, including [React Server Components](https://react.dev/reference/rsc/server-components) and [streaming](https://react.dev/reference/react-dom/server/renderToPipeableStream). Contact [Justin Gordon](mailto:justin@shakacode.com) for more information.
-- ShakaCode now maintains the official successor to `rails/webpacker`, [`shakapacker`](https://github.com/shakacode/shakapacker).
+🚀 **React 18 & Server Components** - [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/) now supports React Server Components and streaming SSR
+🔧 **Shakapacker Integration** - We maintain the official [`shakapacker`](https://github.com/shakacode/shakapacker) successor to Webpacker
+🎯 **Rails 7 Ready** - Full support for the latest Rails and modern React patterns
 
 ---
 
 _These are the docs for React on Rails 16. To see the older docs and code: [v14](https://github.com/shakacode/react_on_rails/tree/14.0.0), [v13](https://github.com/shakacode/react_on_rails/tree/13.4.0), [v12](https://github.com/shakacode/react_on_rails/tree/12.6.0), and [v11](https://github.com/shakacode/react_on_rails/tree/11.3.0)._
 
-# About
+# 🎯 About React on Rails
 
-React on Rails integrates Rails with (server rendering of) [React](https://github.com/facebook/react).
+**Seamlessly integrate React components into your Rails application** with server-side rendering, hot reloading, and automatic bundle optimization.
 
-This project is maintained by [ShakaCode](https://www.shakacode.com).
+> **"The easiest way to add React to Rails"** - Thousands of developers rely on React on Rails for production applications.
+
+This project is maintained by [ShakaCode](https://www.shakacode.com) with ❤️ from the Rails and React communities.
 
 ## ShakaCode Upgrade Support
 
@@ -93,30 +90,34 @@ We did this for Popmenu, [lowering Heroku costs 20-25% while getting a 73% decre
 
 If you're interested, read more about [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/) and [book a call](https://meetings.hubspot.com/justingordon/30-minute-consultation).
 
-# Documentation
+# 📚 Quick Start
 
-See the documentation at **[shakacode.com/react-on-rails/docs](https://www.shakacode.com/react-on-rails/docs/)** and [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/).
+**New to React on Rails?** Get up and running in minutes:
+
+🚀 **[15-Minute Quick Start](https://www.shakacode.com/react-on-rails/docs/quick-start/)** - Your first React component
+📖 **[Complete Documentation](https://www.shakacode.com/react-on-rails/docs/)** - Comprehensive guides and API reference
+🎮 **[Live Demo](https://reactrails.com)** - See it in action with [source code](https://github.com/shakacode/react-webpack-rails-tutorial)
 
 ## Project Objective
 
 To provide a high-performance framework for integrating Ruby on Rails with React, especially regarding React Server-Side Rendering for better SEO and improved performance.
 
-## Features and Why React on Rails?
+## ✨ Why React on Rails?
 
-Given that `shakacode/shakapacker` gem already provides basic React integration, why would you use "React on Rails"?
+While Shakapacker provides basic React integration, React on Rails gives you **production-ready features**:
 
-1. **Modern ESM-only package** with optimized tree-shaking for smaller bundle sizes and better performance.
-1. **Advanced loading strategies** with `sync`, `async`, and `defer` options for optimal performance based on your needs.
-1. **Automatic configuration** of what bundles are added to the page based on what React components are on the page. This results in faster browser loading time via smaller bundle sizes.
-1. **Keep up with the latest changes** in different versions of React. React 18+ is fully supported with enhanced React Server Components.
-1. **Easy prop passing** directly from your Rails view to your React components rather than having your Rails view load and then make a separate request to your API.
-   Tight integration with [shakapacker](https://github.com/shakacode/shakapacker).
-1. **Server-Side Rendering (SSR)** with enhanced React Server Components support, often used for SEO crawler indexing and UX performance.
-1. **[Automated optimized entry-point creation and bundle inclusion](https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation/)** when placing a component on a page. With this feature, you no longer need to configure `javascript_pack_tags` and `stylesheet_pack_tags` on your layouts based on what's shown. "It just works!"
-1. **[Redux](https://redux.js.org/) and [React Router](https://reactrouter.com/) integration** with server-side-rendering.
-1. **[Internationalization (I18n) and (localization)](https://www.shakacode.com/react-on-rails/docs/guides/i18n)** support.
-1. **Supportive community**. This [web search shows how live public sites are using React on Rails](https://publicwww.com/websites/%22react-on-rails%22++-undeveloped.com+depth%3Aall/).
-1. **[ReScript Support](https://github.com/shakacode/rescript-react-on-rails-example)**.
+| Feature | Benefit |
+|---------|---------|
+| 🎯 **Smart Bundle Loading** | Automatic bundle optimization based on components used |
+| ⚡ **Server-Side Rendering** | Better SEO and faster perceived loading |
+| 🔥 **Hot Module Replacement** | Instant feedback during development |
+| 📦 **Easy Props Passing** | Direct Rails → React data flow without API calls |
+| 🗺️ **Router Integration** | [React Router](https://reactrouter.com/) with SSR support |
+| 🏪 **State Management** | [Redux](https://redux.js.org/) integration out of the box |
+| 🌍 **Internationalization** | [I18n support](https://www.shakacode.com/react-on-rails/docs/guides/i18n) for global apps |
+| 🎨 **Modern React** | React 18+ with Hooks and latest patterns |
+
+> **Trusted by thousands** - See [real production sites](https://publicwww.com/websites/%22react-on-rails%22++-undeveloped.com+depth%3Aall/) using React on Rails
 
 See [Rails/Shakapacker React Integration Options](https://www.shakacode.com/react-on-rails/docs/guides/rails-webpacker-react-integration-options) for comparisons to other gems.
 
@@ -140,21 +141,25 @@ _Requires creating a free account._
 - Node.js >= 20 (CI tested: 20 - 22)
 - A JavaScript package manager (npm, yarn, pnpm, or bun)
 
-# 🆘 Get Help & Support
+# 🆘 Support & Community
 
-**Need immediate help?** Here are your options, ordered by response time:
+## Get Help
 
-- 🚀 **Professional Support**: [react_on_rails@shakacode.com](mailto:react_on_rails@shakacode.com) - Fastest resolution for bugs, upgrades, and consulting
-- 💬 **React + Rails Slack**: [Join our community](https://invite.reactrails.com) - Chat with other developers
-- 🆓 **GitHub Issues**: [Report bugs](https://github.com/shakacode/react_on_rails/issues) - Community support
-- 📖 **Discussions**: [Ask questions](https://github.com/shakacode/react_on_rails/discussions) - General help
+💬 **[Join React + Rails Slack](https://join.slack.com/t/reactrails/shared_invite/zt-38oicm9d0-OO0V~bdg4aYNuZuUbRFSXg)** - Real-time community support
+🗣️ **[GitHub Discussions](https://github.com/shakacode/react_on_rails/discussions)** - Ask questions, share ideas
+🏛️ **[ShakaCode Forum](https://forum.shakacode.com)** - Technical discussions
 
-**Additional Resources:**
+## Stay Updated
 
-- [**Subscribe**](https://app.mailerlite.com/webforms/landing/l1d9x5) for announcements of new releases and tutorials
-- **[forum.shakacode.com](https://forum.shakacode.com)** - Development discussions
-- **[@railsonmaui on Twitter](https://twitter.com/railsonmaui)** - Updates and tips
-- [Projects using React on Rails](https://github.com/shakacode/react_on_rails/tree/master/PROJECTS.md) - Submit yours!
+📧 **[Subscribe to updates](https://app.mailerlite.com/webforms/landing/l1d9x5)** - New releases and tutorials
+🐦 **[Follow @railsonmaui](https://twitter.com/railsonmaui)** - Latest news and tips
+📰 **[Read our blog](https://blog.shakacode.com)** - In-depth articles and case studies
+
+## Community
+
+⭐ **Star this repo** to show support and help others discover React on Rails
+🏢 **[Production users](PROJECTS.md)** - See who's using React on Rails
+🙏 **[Community kudos](KUDOS.md)** - Thank you to our contributors
 
 ## Contributing
 
