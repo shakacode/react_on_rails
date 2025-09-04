@@ -108,14 +108,16 @@ While Shakapacker provides basic React integration, React on Rails gives you **p
 
 | Feature | Benefit |
 |---------|---------|
-| 🎯 **Smart Bundle Loading** | Automatic bundle optimization based on components used |
-| ⚡ **Server-Side Rendering** | Better SEO and faster perceived loading |
-| 🔥 **Hot Module Replacement** | Instant feedback during development |
-| 📦 **Easy Props Passing** | Direct Rails → React data flow without API calls |
+| 🎯 **Smart Bundle Loading** | [Automated bundle optimization](https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation/) based on components used - no more manual `javascript_pack_tags` configuration |
+| ⚡ **Server-Side Rendering** | Enhanced React Server Components support for better SEO and UX performance |
+| 🚀 **Advanced Loading** | `sync`, `async`, and `defer` options for optimal performance based on your needs |
+| 🔥 **Hot Module Replacement** | Instant feedback during development with tight [Shakapacker](https://github.com/shakacode/shakapacker) integration |
+| 📦 **Easy Props Passing** | Direct Rails → React data flow without separate API calls |
 | 🗺️ **Router Integration** | [React Router](https://reactrouter.com/) with SSR support |
-| 🏪 **State Management** | [Redux](https://redux.js.org/) integration out of the box |
-| 🌍 **Internationalization** | [I18n support](https://www.shakacode.com/react-on-rails/docs/guides/i18n) for global apps |
-| 🎨 **Modern React** | React 18+ with Hooks and latest patterns |
+| 🏪 **State Management** | [Redux](https://redux.js.org/) integration with server-side rendering |
+| 🌍 **Internationalization** | [I18n and localization support](https://www.shakacode.com/react-on-rails/docs/guides/i18n) for global apps |
+| 🎨 **Modern React** | React 18+ with enhanced React Server Components and latest patterns |
+| 🦄 **ReScript Support** | [ReScript integration](https://github.com/shakacode/rescript-react-on-rails-example) for type-safe development |
 
 > **Trusted by thousands** - See [real production sites](https://publicwww.com/websites/%22react-on-rails%22++-undeveloped.com+depth%3Aall/) using React on Rails
 
