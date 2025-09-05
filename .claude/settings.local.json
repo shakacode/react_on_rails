@@ -12,7 +12,13 @@
       "Bash(npm install:*)",
       "Bash(bin/shakapacker:*)",
       "Bash(git checkout:*)",
-      "Bash(git rebase:*)"
+      "Bash(git rebase:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(yarn run lint)",
+      "Bash(yarn run prettier:*)",
+      "Bash(test:*)",
+      "Bash(rake lint)",
+      "Bash(yarn run:*)"
     ],
     "deny": [],
     "ask": []
