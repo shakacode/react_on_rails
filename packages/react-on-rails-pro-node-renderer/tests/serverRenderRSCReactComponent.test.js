@@ -1,7 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import { Readable } from 'stream';
-import { buildVM, getVMContext, resetVM } from '../src/worker/vm';
+import { buildExecutionContext, resetVM } from '../src/worker/vm';
 import { getConfig } from '../src/shared/configBuilder';
 
 const SimpleWorkingComponent = () => 'hello';
@@ -65,8 +65,8 @@ describe('serverRenderRSCReactComponent', () => {
   // The serverRenderRSCReactComponent function should only be called when the bundle is compiled with the `react-server` condition.
   // Therefore, we cannot call it directly in the test files. Instead, we run the RSC bundle through the VM and call the method from there.
   const getReactOnRailsRSCObject = async () => {
-    // Use the copied rsc-bundle.js file from temp directory
-    const vmContext = await buildVM(tempRscBundlePath);
+    const executionContext = await buildExecutionContext([tempRscBundlePath], /* buildVmsIfNeeded */ true);
+    const vmContext = executionContext.getVMContext(tempRscBundlePath);
     const { ReactOnRails, React } = vmContext.context;
 
     function SuspensedComponentWithAsyncError() {
