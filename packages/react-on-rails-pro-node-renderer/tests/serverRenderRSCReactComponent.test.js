@@ -66,8 +66,7 @@ describe('serverRenderRSCReactComponent', () => {
   // Therefore, we cannot call it directly in the test files. Instead, we run the RSC bundle through the VM and call the method from there.
   const getReactOnRailsRSCObject = async () => {
     // Use the copied rsc-bundle.js file from temp directory
-    await buildVM(tempRscBundlePath);
-    const vmContext = getVMContext(tempRscBundlePath);
+    const vmContext = await buildVM(tempRscBundlePath);
     const { ReactOnRails, React } = vmContext.context;
 
     function SuspensedComponentWithAsyncError() {
