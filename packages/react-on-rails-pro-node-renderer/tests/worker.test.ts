@@ -507,8 +507,8 @@ describe('worker', () => {
     expect(fs.existsSync(bundle2Path)).toBe(true);
 
     // Verify the directory structure is correct
-    const bundle1Dir = path.join(bundlePathForTest(), bundleHash);
-    const bundle2Dir = path.join(bundlePathForTest(), secondaryBundleHash);
+    const bundle1Dir = path.join(serverBundleCachePathForTest(), bundleHash);
+    const bundle2Dir = path.join(serverBundleCachePathForTest(), secondaryBundleHash);
 
     // Each bundle directory should contain: 1 bundle file + 2 assets = 3 files total
     const bundle1Files = fs.readdirSync(bundle1Dir);
@@ -551,7 +551,7 @@ describe('worker', () => {
     expect(fs.existsSync(bundleFilePath)).toBe(true);
 
     // Verify the directory structure is correct
-    const bundleDir = path.join(bundlePathForTest(), bundleHash);
+    const bundleDir = path.join(serverBundleCachePathForTest(), bundleHash);
     const files = fs.readdirSync(bundleDir);
 
     // Should only contain the bundle file, no assets
@@ -567,7 +567,7 @@ describe('worker', () => {
     const bundleHash = 'empty-request-hash';
 
     const app = worker({
-      bundlePath: bundlePathForTest(),
+      serverBundleCachePath: serverBundleCachePathForTest(),
       password: 'my_password',
     });
 
@@ -583,7 +583,7 @@ describe('worker', () => {
     expect(res.statusCode).toBe(200);
 
     // Verify bundle directory is created
-    const bundleDirectory = path.join(bundlePathForTest(), bundleHash);
+    const bundleDirectory = path.join(serverBundleCachePathForTest(), bundleHash);
     expect(fs.existsSync(bundleDirectory)).toBe(true);
 
     // Verify no files were copied (since none were uploaded)
@@ -595,7 +595,7 @@ describe('worker', () => {
     const bundleHash = 'duplicate-bundle-hash';
 
     const app = worker({
-      bundlePath: bundlePathForTest(),
+      serverBundleCachePath: serverBundleCachePathForTest(),
       password: 'my_password',
     });
 
@@ -618,7 +618,7 @@ describe('worker', () => {
     expect(res1.body).toBe(''); // Empty body on success
 
     // Verify first bundle was created correctly
-    const bundleDir = path.join(bundlePathForTest(), bundleHash);
+    const bundleDir = path.join(serverBundleCachePathForTest(), bundleHash);
     expect(fs.existsSync(bundleDir)).toBe(true);
     const bundleFilePath = path.join(bundleDir, `${bundleHash}.js`);
     expect(fs.existsSync(bundleFilePath)).toBe(true);
@@ -679,7 +679,7 @@ describe('worker', () => {
     const targetBundleHash = 'target-bundle-hash'; // Different from actual bundle hash
 
     const app = worker({
-      bundlePath: bundlePathForTest(),
+      serverBundleCachePath: serverBundleCachePathForTest(),
       password: 'my_password',
     });
 
@@ -695,8 +695,8 @@ describe('worker', () => {
     expect(res.statusCode).toBe(200);
 
     // Verify the bundle was placed in its OWN hash directory, not the targetBundles directory
-    const actualBundleDir = path.join(bundlePathForTest(), bundleHash);
-    const targetBundleDir = path.join(bundlePathForTest(), targetBundleHash);
+    const actualBundleDir = path.join(serverBundleCachePathForTest(), bundleHash);
+    const targetBundleDir = path.join(serverBundleCachePathForTest(), targetBundleHash);
 
     // Bundle should exist in its own hash directory
     expect(fs.existsSync(actualBundleDir)).toBe(true);
@@ -725,7 +725,7 @@ describe('worker', () => {
     // Helper functions to reduce code duplication
     const createWorkerApp = (password = 'my_password') =>
       worker({
-        bundlePath: bundlePathForTest(),
+        serverBundleCachePath: serverBundleCachePathForTest(),
         password,
       });
 
