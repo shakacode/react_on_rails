@@ -149,7 +149,7 @@ _Requires creating a free account._
 
 💬 **[Join React + Rails Slack](https://join.slack.com/t/reactrails/shared_invite/zt-38oicm9d0-OO0V~bdg4aYNuZuUbRFSXg)** - Real-time community support  
 🗣️ **[GitHub Discussions](https://github.com/shakacode/react_on_rails/discussions)** - Ask questions, share ideas  
-🏛️ **[ShakaCode Forum](https://forum.shakacode.com)** - Technical discussions  
+🏛️ **[ShakaCode Forum](https://forum.shakacode.com)** - Technical discussions
 
 ## Stay Updated
 

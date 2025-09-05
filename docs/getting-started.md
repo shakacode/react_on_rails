@@ -7,15 +7,19 @@
 The best way to understand React on Rails depends on your situation:
 
 ### 🚀 **New to React on Rails?**
+
 **→ [15-Minute Quick Start](./quick-start/README.md)** - Get your first component working fast
 
-### 📱 **Have an existing Rails app?**  
+### 📱 **Have an existing Rails app?**
+
 **→ [Add to Existing App](./guides/installation-into-an-existing-rails-app.md)** - Integrate React on Rails
 
 ### 📚 **Want comprehensive tutorial?**
+
 **→ [Complete Tutorial](./guides/tutorial.md)** - Step-by-step with Redux and routing
 
 ### 👀 **Learn by example?**
+
 - **[Spec/Dummy](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy)** - Simple example in this repo
 - **[Live Demo](https://reactrails.com)** with **[source code](https://github.com/shakacode/react-webpack-rails-tutorial)**
 
