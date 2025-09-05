@@ -6,13 +6,13 @@ Having issues with React on Rails? This guide covers the most common problems an
 
 ### Is your issue with...?
 
-| Problem Area | Quick Check | Go to Section |
-|--------------|-------------|---------------|
-| **Installation** | Generator fails or components don't appear | [Installation Issues](#installation-issues) |
-| **Compilation** | Webpack errors, build failures | [Build Issues](#build-issues) |
-| **Runtime** | Components not rendering, JavaScript errors | [Runtime Issues](#runtime-issues) |
-| **Server Rendering** | SSR not working, hydration mismatches | [SSR Issues](#server-side-rendering-issues) |
-| **Performance** | Slow builds, large bundles, memory issues | [Performance Issues](#performance-issues) |
+| Problem Area         | Quick Check                                 | Go to Section                               |
+| -------------------- | ------------------------------------------- | ------------------------------------------- |
+| **Installation**     | Generator fails or components don't appear  | [Installation Issues](#installation-issues) |
+| **Compilation**      | Webpack errors, build failures              | [Build Issues](#build-issues)               |
+| **Runtime**          | Components not rendering, JavaScript errors | [Runtime Issues](#runtime-issues)           |
+| **Server Rendering** | SSR not working, hydration mismatches       | [SSR Issues](#server-side-rendering-issues) |
+| **Performance**      | Slow builds, large bundles, memory issues   | [Performance Issues](#performance-issues)   |
 
 ## 🚨 Installation Issues
 
@@ -21,6 +21,7 @@ Having issues with React on Rails? This guide covers the most common problems an
 **Error:** `You have uncommitted changes. Please commit or stash them.`
 
 **Solution:**
+
 ```bash
 git add .
 git commit -m "Add react_on_rails gem"
@@ -29,11 +30,12 @@ bin/rails generate react_on_rails:install
 
 **Why:** The generator needs clean git state to show you exactly what it changed.
 
-### "Shakapacker not found" 
+### "Shakapacker not found"
 
 **Error:** `Could not find gem 'shakapacker'`
 
 **Solution:**
+
 ```bash
 bundle add shakapacker --strict
 bin/rails shakapacker:install
@@ -46,6 +48,7 @@ bin/rails shakapacker:install
 **Error:** `Yarn executable was not detected` or `Node.js not found`
 
 **Solution:**
+
 - Install Node.js 18+ from [nodejs.org](https://nodejs.org)
 - Install Yarn: `npm install -g yarn`
 - Or use system package manager: `brew install node yarn`
@@ -57,6 +60,7 @@ bin/rails shakapacker:install
 **Error in browser console or webpack output**
 
 **Solution:**
+
 ```bash
 # Make sure the NPM package is installed
 yarn add react-on-rails
@@ -77,6 +81,7 @@ yalc add react-on-rails
 3. **Incorrect imports** (check file paths and extensions)
 
 **Debug steps:**
+
 ```bash
 # Run webpack directly to see detailed errors
 bin/webpack
@@ -89,6 +94,7 @@ bin/webpack --mode development
 **Error:** JavaScript runtime not available
 
 **Solution:**
+
 ```bash
 # Add to your Gemfile
 gem 'execjs'
@@ -105,7 +111,9 @@ export EXECJS_RUNTIME=Node
 **Symptoms:** Empty div or no output where component should be
 
 **Check list:**
+
 1. **Component registered?**
+
    ```javascript
    import ReactOnRails from 'react-on-rails';
    import MyComponent from './MyComponent';
@@ -113,6 +121,7 @@ export EXECJS_RUNTIME=Node
    ```
 
 2. **Bundle included in view?**
+
    ```erb
    <%= javascript_pack_tag 'my-bundle' %>
    <%= react_component('MyComponent') %>
@@ -130,6 +139,7 @@ export EXECJS_RUNTIME=Node
 **Error during server-side rendering**
 
 **Solution:** Check your component for browser-only code:
+
 ```javascript
 // ❌ Bad - will break SSR
 const width = window.innerWidth;
@@ -149,11 +159,13 @@ useEffect(() => {
 **Symptoms:** Component shows initial props but doesn't update
 
 **Common causes:**
+
 1. **Caching** - Rails fragment caching may cache React components
 2. **Turbo/Turbolinks** - Page navigation isn't re-initializing React
 3. **Development mode** - Hot reloading not working
 
 **Solutions:**
+
 ```erb
 <!-- Disable caching for development -->
 <% unless Rails.env.development? %>
@@ -170,12 +182,15 @@ useEffect(() => {
 ### "Server rendering not working"
 
 **Check:**
+
 1. **Prerender enabled?**
+
    ```erb
    <%= react_component('MyComponent', props: @props, prerender: true) %>
    ```
 
 2. **JavaScript runtime available?**
+
    ```bash
    # Add to Gemfile if missing
    gem 'mini_racer'
@@ -188,11 +203,13 @@ useEffect(() => {
 **Symptoms:** React warnings about server/client content differences
 
 **Common causes:**
+
 - Different props between server and client render
 - Browser-only code affecting initial render
 - Date/time differences between server and client
 
 **Debug:**
+
 ```javascript
 // Add this to see what props are being used
 console.log('Server props:', props);
@@ -204,7 +221,9 @@ console.log('Client render time:', new Date());
 ### "Slow webpack builds"
 
 **Solutions:**
+
 1. **Enable caching:**
+
    ```yaml
    # config/shakapacker.yml
    development:
@@ -212,6 +231,7 @@ console.log('Client render time:', new Date());
    ```
 
 2. **Use webpack-dev-server:**
+
    ```bash
    ./bin/dev  # Uses Procfile.dev with webpack-dev-server
    ```
@@ -225,13 +245,16 @@ console.log('Client render time:', new Date());
 ### "Large bundle sizes"
 
 **Solutions:**
+
 1. **Code splitting:**
+
    ```javascript
    // Use dynamic imports
    const MyComponent = lazy(() => import('./MyComponent'));
    ```
 
 2. **Check bundle analysis:**
+
    ```bash
    ANALYZE=true bin/webpack
    ```
@@ -269,7 +292,8 @@ console.log(ReactOnRails.getComponents());
 
 ## 🆘 Still Stuck?
 
-### Before asking for help, gather this info:
+### Before asking for help, gather this info
+
 - React on Rails version (`bundle list react_on_rails`)
 - Rails version (`rails -v`)
 - Ruby version (`ruby -v`)
@@ -277,12 +301,14 @@ console.log(ReactOnRails.getComponents());
 - Error messages (full stack trace)
 - Relevant code snippets
 
-### Get community help:
+### Get community help
+
 - **[GitHub Issues](https://github.com/shakacode/react_on_rails/issues)** - Bug reports and feature requests
 - **[GitHub Discussions](https://github.com/shakacode/react_on_rails/discussions)** - Questions and help
 - **[React + Rails Slack](https://reactrails.slack.com)** - Real-time community support
 
-### Professional support:
+### Professional support
+
 - **[ShakaCode](https://www.shakacode.com)** offers consulting and support services
 - **[React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/)** includes priority support
 
