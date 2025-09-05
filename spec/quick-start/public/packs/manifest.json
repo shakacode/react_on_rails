@@ -4,10 +4,7 @@
   "entrypoints": {
     "application": {
       "assets": {
-        "js": [
-          "/packs/js/runtime.js",
-          "/packs/js/application.js"
-        ]
+        "js": ["/packs/js/runtime.js", "/packs/js/application.js"]
       }
     },
     "hello-world-bundle": {
@@ -17,9 +14,7 @@
           "/packs/js/vendors-node_modules_prop-types_index_js-node_modules_react-on-rails_node_package_lib_ReactOn-093821.js",
           "/packs/js/hello-world-bundle.js"
         ],
-        "css": [
-          "/packs/css/hello-world-bundle.css"
-        ]
+        "css": ["/packs/css/hello-world-bundle.css"]
       }
     }
   },

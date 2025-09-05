@@ -67,16 +67,16 @@ To provide a high-performance framework for integrating Ruby on Rails with React
 
 While Shakapacker provides basic React integration, React on Rails gives you **production-ready features**:
 
-| Feature | Benefit |
-|---------|---------|
-| 🎯 **Smart Bundle Loading** | Automatic bundle optimization based on components used |  
-| ⚡ **Server-Side Rendering** | Better SEO and faster perceived loading |
-| 🔥 **Hot Module Replacement** | Instant feedback during development |
-| 📦 **Easy Props Passing** | Direct Rails → React data flow without API calls |
-| 🗺️ **Router Integration** | [React Router](https://reactrouter.com/) with SSR support |
-| 🏪 **State Management** | [Redux](https://redux.js.org/) integration out of the box |
-| 🌍 **Internationalization** | [I18n support](https://www.shakacode.com/react-on-rails/docs/guides/i18n) for global apps |
-| 🎨 **Modern React** | React 18+ with Hooks and latest patterns |
+| Feature                       | Benefit                                                                                   |
+| ----------------------------- | ----------------------------------------------------------------------------------------- |
+| 🎯 **Smart Bundle Loading**   | Automatic bundle optimization based on components used                                    |
+| ⚡ **Server-Side Rendering**  | Better SEO and faster perceived loading                                                   |
+| 🔥 **Hot Module Replacement** | Instant feedback during development                                                       |
+| 📦 **Easy Props Passing**     | Direct Rails → React data flow without API calls                                          |
+| 🗺️ **Router Integration**     | [React Router](https://reactrouter.com/) with SSR support                                 |
+| 🏪 **State Management**       | [Redux](https://redux.js.org/) integration out of the box                                 |
+| 🌍 **Internationalization**   | [I18n support](https://www.shakacode.com/react-on-rails/docs/guides/i18n) for global apps |
+| 🎨 **Modern React**           | React 18+ with Hooks and latest patterns                                                  |
 
 > **Trusted by thousands** - See [real production sites](https://publicwww.com/websites/%22react-on-rails%22++-undeveloped.com+depth%3Aall/) using React on Rails
 
@@ -104,7 +104,7 @@ Ruby on Rails >=5, rails/webpacker >= 4.2 or shakapacker > 6, Ruby >= 3.0.0
 
 💬 **[Join React + Rails Slack](https://join.slack.com/t/reactrails/shared_invite/zt-38oicm9d0-OO0V~bdg4aYNuZuUbRFSXg)** - Real-time community support  
 🗣️ **[GitHub Discussions](https://github.com/shakacode/react_on_rails/discussions)** - Ask questions, share ideas  
-🏛️ **[ShakaCode Forum](https://forum.shakacode.com)** - Technical discussions  
+🏛️ **[ShakaCode Forum](https://forum.shakacode.com)** - Technical discussions
 
 ## Stay Updated
 
