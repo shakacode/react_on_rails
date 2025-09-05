@@ -27,7 +27,7 @@ import {
 } from '../shared/utils';
 import { getConfig } from '../shared/configBuilder';
 import * as errorReporter from '../shared/errorReporter';
-import { buildVM, hasVMContextForBundle, runInVM } from './vm';
+import { buildExecutionContext, ExecutionContext, VMContextNotFoundError } from './vm';
 
 export type ProvidedNewBundle = {
   timestamp: string | number;
@@ -37,9 +37,10 @@ export type ProvidedNewBundle = {
 async function prepareResult(
   renderingRequest: string,
   bundleFilePathPerTimestamp: string,
+  executionContext: ExecutionContext,
 ): Promise<ResponseResult> {
   try {
-    const result = await runInVM(renderingRequest, bundleFilePathPerTimestamp, cluster);
+    const result = await executionContext.runInVM(renderingRequest, bundleFilePathPerTimestamp, cluster);
 
     let exceptionMessage = null;
     if (!result) {
@@ -209,9 +210,15 @@ export async function handleRenderRequest({
       };
     }
 
-    // If the current VM has the correct bundle and is ready
-    if (allBundleFilePaths.every((bundleFilePath) => hasVMContextForBundle(bundleFilePath))) {
-      return await prepareResult(renderingRequest, entryBundleFilePath);
+    try {
+      const executionContext = await buildExecutionContext(allBundleFilePaths, /* buildVmsIfNeeded */ false);
+      return await prepareResult(renderingRequest, entryBundleFilePath, executionContext);
+    } catch (e) {
+      // Ignore VMContextNotFoundError, it means the bundle does not exist.
+      // The following code will handle this case.
+      if (!(e instanceof VMContextNotFoundError)) {
+        throw e;
+      }
     }
 
     // If gem has posted updated bundle:
@@ -230,10 +237,13 @@ export async function handleRenderRequest({
 
     // The bundle exists, but the VM has not yet been created.
     // Another worker must have written it or it was saved during deployment.
-    log.info('Bundle %s exists. Building VM for worker %s.', entryBundleFilePath, workerIdLabel());
-    await Promise.all(allBundleFilePaths.map((bundleFilePath) => buildVM(bundleFilePath)));
-
-    return await prepareResult(renderingRequest, entryBundleFilePath);
+    log.info(
+      'Bundle %s exists. Building ExecutionContext for worker %s.',
+      entryBundleFilePath,
+      workerIdLabel(),
+    );
+    const executionContext = await buildExecutionContext(allBundleFilePaths, /* buildVmsIfNeeded */ true);
+    return await prepareResult(renderingRequest, entryBundleFilePath, executionContext);
   } catch (error) {
     const msg = formatExceptionMessage(
       renderingRequest,

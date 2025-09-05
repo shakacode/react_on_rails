@@ -4,7 +4,7 @@ import path from 'path';
 import fsPromises from 'fs/promises';
 import fs from 'fs';
 import fsExtra from 'fs-extra';
-import { buildVM, resetVM } from '../src/worker/vm';
+import { buildExecutionContext, resetVM } from '../src/worker/vm';
 import { buildConfig } from '../src/shared/configBuilder';
 
 export const mkdirAsync = fsPromises.mkdir;
@@ -59,12 +59,12 @@ export function vmSecondaryBundlePath(testName: string) {
 
 export async function createVmBundle(testName: string) {
   await safeCopyFileAsync(getFixtureBundle(), vmBundlePath(testName));
-  await buildVM(vmBundlePath(testName));
+  await buildExecutionContext([vmBundlePath(testName)], /* buildVmsIfNeeded */ true);
 }
 
 export async function createSecondaryVmBundle(testName: string) {
   await safeCopyFileAsync(getFixtureSecondaryBundle(), vmSecondaryBundlePath(testName));
-  await buildVM(vmSecondaryBundlePath(testName));
+  await buildExecutionContext([vmSecondaryBundlePath(testName)], /* buildVmsIfNeeded */ true);
 }
 
 export function lockfilePath(testName: string) {
