@@ -39,7 +39,7 @@ interface VMContext {
 const vmContexts = new Map<string, VMContext>();
 
 // Track VM creation promises to handle concurrent buildVM requests
-const vmCreationPromises = new Map<string, Promise<boolean>>();
+const vmCreationPromises = new Map<string, Promise<VMContext>>();
 
 /**
  * Returns all bundle paths that have a VM context
@@ -178,10 +178,10 @@ ${smartTrim(result)}`);
   }
 }
 
-export async function buildVM(filePath: string) {
+export async function buildVM(filePath: string): Promise<VMContext> {
   // Return existing promise if VM is already being created
   if (vmCreationPromises.has(filePath)) {
-    return vmCreationPromises.get(filePath);
+    return vmCreationPromises.get(filePath) as Promise<VMContext>;
   }
 
   // Check if VM for this bundle already exists
@@ -189,7 +189,7 @@ export async function buildVM(filePath: string) {
   if (vmContext) {
     // Update last used time when accessing existing VM
     vmContext.lastUsed = Date.now();
-    return Promise.resolve(true);
+    return Promise.resolve(vmContext);
   }
 
   // Create a new promise for this VM creation
@@ -306,11 +306,12 @@ export async function buildVM(filePath: string) {
       }
 
       // Only now, after VM is fully initialized, store the context
-      vmContexts.set(filePath, {
+      const newVmContext: VMContext = {
         context,
         sharedConsoleHistory,
         lastUsed: Date.now(),
-      });
+      };
+      vmContexts.set(filePath, newVmContext);
 
       // Manage pool size after adding new VM
       manageVMPoolSize();
@@ -331,7 +332,7 @@ export async function buildVM(filePath: string) {
         );
       }
 
-      return true;
+      return newVmContext;
     } catch (error) {
       log.error('Caught Error when creating context in buildVM, %O', error);
       errorReporter.error(error as Error);

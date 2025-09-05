@@ -59,12 +59,12 @@ export function vmSecondaryBundlePath(testName: string) {
 
 export async function createVmBundle(testName: string) {
   await safeCopyFileAsync(getFixtureBundle(), vmBundlePath(testName));
-  return buildVM(vmBundlePath(testName));
+  await buildVM(vmBundlePath(testName));
 }
 
 export async function createSecondaryVmBundle(testName: string) {
   await safeCopyFileAsync(getFixtureSecondaryBundle(), vmSecondaryBundlePath(testName));
-  return buildVM(vmSecondaryBundlePath(testName));
+  await buildVM(vmSecondaryBundlePath(testName));
 }
 
 export function lockfilePath(testName: string) {
