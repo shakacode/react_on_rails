@@ -11,29 +11,49 @@ gem search shakapacker --remote
 
 # Or use specific versions from these commands in your Gemfile:
 # Latest stable versions as of Jan 2025:
-# react_on_rails ~> 14.2
-# shakapacker ~> 8.1
+# react_on_rails ~> 15.0
+# shakapacker ~> 8.3
 ```
 
 **⚠️ Version Flexibility:** These instructions use `~> X.Y` which allows patch updates. Always check for latest versions before starting a new project.
+
+## 🚨 **CRITICAL: Installation Order Matters**
+
+**ALWAYS install Shakapacker FIRST, then React on Rails. Here's why:**
+
+1. **React on Rails generator requires `package.json`** to add JavaScript dependencies
+2. **Rails with `--skip-javascript` doesn't create `package.json`**  
+3. **Shakapacker creates `package.json`** and JavaScript tooling foundation
+4. **Wrong order = "package.json not found" error**
+
+**✅ Correct Order:**
+```
+Shakapacker → package.json created → React on Rails → success
+```
+
+**❌ Wrong Order:**
+```
+React on Rails → no package.json → ERROR: package.json not found
+```
 
 ---
 
 ## 🆕 Scenario 1: New Rails App with React on Rails
 
 ```bash
-# Create new Rails app with essential gems
+# Create new Rails app
 rails new myapp --skip-javascript --database=postgresql
 cd myapp
 
-# Add React on Rails to Gemfile (latest versions)
-echo 'gem "react_on_rails", "~> 14.2"' >> Gemfile
-echo 'gem "shakapacker", "~> 8.1"' >> Gemfile
+# STEP 1: Add Shakapacker first (creates package.json)
+echo 'gem "shakapacker", "~> 8.3"' >> Gemfile
 bundle install
+bundle exec rails shakapacker:install
 
-# Install React on Rails with Node dependencies
+# STEP 2: Add React on Rails (requires package.json to exist)
+echo 'gem "react_on_rails", "~> 15.0"' >> Gemfile
+bundle install
 rails generate react_on_rails:install
-yarn install
 
 # Start development servers
 bin/dev
@@ -54,22 +74,19 @@ bin/dev
 # Navigate to existing Rails app root
 cd /path/to/existing/app
 
-# Add gems to Gemfile (before final 'end')
-cat >> Gemfile << 'EOF'
-
-# React on Rails
-gem "react_on_rails", "~> 14.2"
-gem "shakapacker", "~> 8.1"
-EOF
-
-# Install gems
+# STEP 1: Add Shakapacker first (creates package.json if missing)
+echo 'gem "shakapacker", "~> 8.3"' >> Gemfile
 bundle install
 
-# Install React on Rails (will not overwrite existing files)
-rails generate react_on_rails:install --ignore-existing-files
+# Check if package.json exists, create if missing
+if [ ! -f "package.json" ]; then
+  bundle exec rails shakapacker:install
+fi
 
-# Install Node dependencies  
-yarn install
+# STEP 2: Add React on Rails (requires package.json to exist)
+echo 'gem "react_on_rails", "~> 15.0"' >> Gemfile
+bundle install
+rails generate react_on_rails:install --ignore-existing-files
 
 # Add React component to existing view
 # Replace <view-name> with your actual view file
@@ -84,7 +101,7 @@ bin/dev
 
 **⚠️ Pre-flight Checks:**
 - Rails app has `bin/dev` or similar dev script
-- `package.json` exists (if not, run `yarn init -y` first)
+- Shakapacker will create `package.json` if it doesn't exist
 - No existing React setup conflicts
 
 **✅ Success Check:** React component renders in your chosen view
@@ -101,17 +118,6 @@ cd /path/to/vite/ruby/app
 sed -i.bak '/gem.*vite_rails/d' Gemfile
 sed -i.bak '/gem.*vite_ruby/d' Gemfile
 
-# Add React on Rails gems to Gemfile
-cat >> Gemfile << 'EOF'
-
-# React on Rails (replacing Vite)
-gem "react_on_rails", "~> 14.2" 
-gem "shakapacker", "~> 8.1"
-EOF
-
-# Install new gems
-bundle install
-
 # Backup existing Vite config
 mv vite.config.* vite.config.backup 2>/dev/null || true
 
@@ -119,7 +125,14 @@ mv vite.config.* vite.config.backup 2>/dev/null || true
 rm -rf config/vite.json
 rm -rf bin/vite*
 
-# Install React on Rails
+# STEP 1: Add Shakapacker first (creates package.json)
+echo 'gem "shakapacker", "~> 8.3"' >> Gemfile
+bundle install
+bundle exec rails shakapacker:install --force
+
+# STEP 2: Add React on Rails (requires package.json to exist)
+echo 'gem "react_on_rails", "~> 15.0"' >> Gemfile
+bundle install
 rails generate react_on_rails:install --force
 
 # Migrate existing React components
@@ -210,7 +223,7 @@ app/
 
 ### Version Requirements
 - Rails 7+ (Rails 8 supported), Ruby 3.0+ (Ruby 3.2+ for Rails 8), Node 20+ LTS, Yarn
-- react_on_rails ~> 14.2+, shakapacker ~> 8.1+
+- react_on_rails ~> 15.0+, shakapacker ~> 8.3+
 - **Note**: Use `bundle info react_on_rails` to check latest available version
 
 ---
