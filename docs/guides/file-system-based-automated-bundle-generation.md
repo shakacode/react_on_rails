@@ -194,9 +194,10 @@ For example, if you wanted to utilize our file-system based entrypoint generatio
    4. You no longer need to register the React components within the `ReactOnRails.configuration.components_subdirectory` nor directly add their bundles. For example, you can have a Rails view using three components:
 
       ```erb
-      <% append_javascript_pack_tag('SpecialComponentNotToAutoLoadBundle') %>
       <%= react_component("FooComponentOne", {}, auto_load_bundle: true) %>
       <%= react_component("BarComponentOne", {}, auto_load_bundle: true) %>
+
+      <% append_javascript_pack_tag('SpecialComponentNotToAutoLoadBundle') %>
       <%= react_component("SpecialComponentNotToAutoLoadBundle", {}) %>
       ```
 
