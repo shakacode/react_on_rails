@@ -35,7 +35,7 @@ From [How to Write a Git Commit Message](http://chris.beams.io/posts/git-commit/
 
 When making doc changes, we want the change to work on both the gitbook and the regular github site. The issue is that non-doc files will not go to the gitbook site, so doc references to non doc files must use the github URL.
 
-### Links to other docs:
+### Links to other docs
 
 - When making references to source code files, use a full GitHub URL, for example:
   `[spec/dummy/config/initializers/react_on_rails.rb](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/config/initializers/react_on_rails.rb)`

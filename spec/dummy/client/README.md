@@ -27,7 +27,7 @@ yarn global add npm-check-updates
 ```
 
 ```bash
-# Make sure you are in the `client` directory, then run:
+# Make sure you are in the `client` directory, then run
 cd client
 npm-check-updates -u -a
 yarn
