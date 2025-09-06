@@ -18,7 +18,9 @@
       "Bash(yarn run prettier:*)",
       "Bash(test:*)",
       "Bash(rake lint)",
-      "Bash(yarn run:*)"
+      "Bash(yarn run:*)",
+      "WebFetch(domain:vite-ruby.netlify.app)",
+      "WebSearch"
     ],
     "deny": [],
     "ask": []
