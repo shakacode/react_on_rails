@@ -19,7 +19,13 @@
       "Bash(rake lint)",
       "Bash(yarn run:*)",
       "WebFetch(domain:vite-ruby.netlify.app)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(gem install:*)",
+      "Bash(gem search:*)",
+      "Bash(git reset:*)",
+      "Read(//Users/justin/shakacode/react-on-rails/**)",
+      "Bash(./bin/dev)",
+      "Bash(node:*)"
     ],
     "deny": [],
     "ask": []
