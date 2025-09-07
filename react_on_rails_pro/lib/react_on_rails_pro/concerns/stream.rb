@@ -105,8 +105,7 @@ module ReactOnRailsPro
           pair = queue.dequeue
           break if pair.nil?
 
-          idx_from_queue, item = pair
-          log_stream_write(mode: :concurrent, idx: idx_from_queue, bytesize: safe_bytesize(item))
+          _idx_from_queue, item = pair
           begin
             response.stream.write(item)
           rescue IOError, ActionController::Live::ClientDisconnected
@@ -116,17 +115,6 @@ module ReactOnRailsPro
           end
         end
       end
-    end
-
-    def log_stream_write(mode:, idx:, bytesize:)
-      return unless ReactOnRailsPro.configuration.tracing
-
-      message = "[ReactOnRailsPro] stream write (mode=#{mode}) idx=#{idx} bytes=#{bytesize}"
-      Rails.logger.info { message }
-    end
-
-    def safe_bytesize(obj)
-      obj.respond_to?(:bytesize) ? obj.bytesize : obj.to_s.bytesize
     end
   end
 end
