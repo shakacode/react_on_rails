@@ -372,14 +372,6 @@ RSpec.describe "Streaming API" do
   end
 
   describe "Component streaming concurrency" do
-    def with_concurrent_stream_drain(enabled)
-      original = ReactOnRailsPro.configuration.concurrent_stream_drain
-      ReactOnRailsPro.configuration.concurrent_stream_drain = enabled
-      yield
-    ensure
-      ReactOnRailsPro.configuration.concurrent_stream_drain = original
-    end
-
     def run_stream(controller, template: "ignored")
       Sync do |parent|
         parent.async { controller.stream_view_containing_react_components(template: template) }
@@ -401,75 +393,42 @@ RSpec.describe "Streaming API" do
       [component_queues, controller, mocked_stream]
     end
 
-    it "processes components concurrently vs sequentially" do
-      seq_queues, seq_controller, seq_stream = setup_stream_test
+    it "streams components concurrently" do
+      queues, controller, stream = setup_stream_test
 
-      with_concurrent_stream_drain(false) do
-        run_stream(seq_controller) do |_parent|
-          seq_queues[0].enqueue("A1")
-          seq_queues[0].enqueue("A2")
-          seq_queues[0].close
+      run_stream(controller) do |_parent|
+        queues[1].enqueue("B1")
+        sleep 0.05
+        expect(stream).to have_received(:write).with("B1")
 
-          seq_queues[1].enqueue("B1")
-          seq_queues[1].enqueue("B2")
-          seq_queues[1].close
+        queues[0].enqueue("A1")
+        sleep 0.05
+        expect(stream).to have_received(:write).with("A1")
 
-          sleep 0.1
-        end
+        queues[1].enqueue("B2")
+        queues[1].close
+        sleep 0.05
+
+        queues[0].enqueue("A2")
+        queues[0].close
+        sleep 0.1
       end
-
-      # Verify sequential behavior: all A chunks processed before B chunks start
-      expect(seq_stream).to have_received(:write).with("TEMPLATE")
-      expect(seq_stream).to have_received(:write).with("A1") 
-      expect(seq_stream).to have_received(:write).with("A2")
-      expect(seq_stream).to have_received(:write).with("B1")
-      expect(seq_stream).to have_received(:write).with("B2")
-
-      conc_queues, conc_controller, conc_stream = setup_stream_test
-
-      with_concurrent_stream_drain(true) do
-        run_stream(conc_controller) do |_parent|
-          conc_queues[1].enqueue("B1")
-          sleep 0.05
-          expect(conc_stream).to have_received(:write).with("B1")
-
-          conc_queues[0].enqueue("A1")
-          sleep 0.05
-          expect(conc_stream).to have_received(:write).with("A1")
-
-          conc_queues[1].enqueue("B2")
-          conc_queues[1].close
-          sleep 0.05
-
-          conc_queues[0].enqueue("A2")
-          conc_queues[0].close
-          sleep 0.1
-        end
-      end
-
-    # Verify concurrent behavior: components can process interleaved
-    expect(conc_stream).to have_received(:write).with("B1")
-    expect(conc_stream).to have_received(:write).with("A1") 
-    expect(conc_stream).to have_received(:write).with("B2")
-    expect(conc_stream).to have_received(:write).with("A2")
     end
 
     it "maintains per-component ordering" do
       queues, controller, stream = setup_stream_test
 
-      with_concurrent_stream_drain(true) do
-        run_stream(controller) do |_parent|
-          queues[0].enqueue("X1")
-          queues[0].enqueue("X2")
-          queues[0].enqueue("X3")
-          queues[0].close
+      run_stream(controller) do |_parent|
+        queues[0].enqueue("X1")
+        queues[0].enqueue("X2")
+        queues[0].enqueue("X3")
+        queues[0].close
 
-          queues[1].enqueue("Y1")
-          queues[1].enqueue("Y2")
-          queues[1].close
+        queues[1].enqueue("Y1")
+        queues[1].enqueue("Y2")
+        queues[1].close
 
-          sleep 0.2
-        end
+        sleep 0.2
       end
 
       # Verify all chunks were written
@@ -483,10 +442,8 @@ RSpec.describe "Streaming API" do
     it "handles empty component list" do
       queues, controller, stream = setup_stream_test(component_count: 0)
 
-      with_concurrent_stream_drain(true) do
-        run_stream(controller) do |_parent|
-          sleep 0.1
-        end
+      run_stream(controller) do |_parent|
+        sleep 0.1
       end
 
       expect(stream).to have_received(:write).with("TEMPLATE")
@@ -496,14 +453,12 @@ RSpec.describe "Streaming API" do
     it "handles single component" do
       queues, controller, stream = setup_stream_test(component_count: 1)
 
-      with_concurrent_stream_drain(true) do
-        run_stream(controller) do |_parent|
-          queues[0].enqueue("Single1")
-          queues[0].enqueue("Single2")
-          queues[0].close
+      run_stream(controller) do |_parent|
+        queues[0].enqueue("Single1")
+        queues[0].enqueue("Single2")
+        queues[0].close
 
-          sleep 0.1
-        end
+        sleep 0.1
       end
 
       expect(stream).to have_received(:write).with("Single1")
@@ -519,13 +474,11 @@ RSpec.describe "Streaming API" do
         sleep 0.05
       end
 
-      with_concurrent_stream_drain(true) do
-        run_stream(controller) do |_parent|
-          5.times { |i| queues[0].enqueue("Chunk#{i}") }
-          queues[0].close
+      run_stream(controller) do |_parent|
+        5.times { |i| queues[0].enqueue("Chunk#{i}") }
+        queues[0].close
 
-          sleep 1
-        end
+        sleep 1
       end
 
       expect(write_timestamps.length).to be >= 2
