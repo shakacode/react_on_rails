@@ -1,6 +1,10 @@
 # Licensing Overview
 
-- **React on Rails (core)** is licensed under **MIT**. See: `LICENSE.md`
-- **React on Rails Pro** is **commercial, source-available**. See: `REACT-ON-RAILS-PRO-LICENSE.md`
+This repository uses a dual-licensing model:
 
-Educational / demo use of Pro is free under the Pro license. **Any production use by any org (including non-profits) requires a paid subscription.**
+- [LICENSE.md](../LICENSE.md) – **MIT** license for the core React on Rails library  
+- [REACT-ON-RAILS-PRO-LICENSE.md](../REACT-ON-RAILS-PRO-LICENSE.md) – **commercial license** for React on Rails Pro  
+
+**Summary**  
+- Core (MIT) → free and open-source for any use  
+- Pro → free for non-commercial/educational/demo use; **paid subscription required for any Production Use** (including non-profits)  
