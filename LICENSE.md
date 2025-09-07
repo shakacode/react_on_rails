@@ -1,3 +1,10 @@
+# Licensing
+
+- Core: MIT (this file)
+- Pro: see REACT-ON-RAILS-PRO-LICENSE.md
+
+---
+
 # The MIT License (MIT)
 
 Copyright (c) 2017, 2018 Justin Gordon and ShakaCode, http://www.shakacode.com
