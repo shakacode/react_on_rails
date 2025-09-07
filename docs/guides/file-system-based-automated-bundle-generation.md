@@ -466,11 +466,28 @@ Now when you visit your pages, React on Rails automatically:
 - Registers components without manual `ReactOnRails.register()` calls
 - Enables optimal bundle splitting and caching
 
-**Bundle sizes in this example:**
-- HelloWorld: ~50KB (lightweight)
-- HeavyMarkdownEditor: ~2.7MB (heavy with 58+ dependencies)
+**Bundle sizes in this example (measured from browser dev tools):**
+- **HelloWorld**: 1.1MB total resources (50KB component-specific code + shared React runtime)
+  - HelloWorld.js: 10.0 kB
+  - HelloWorld.css: 2.5 kB  
+  - Shared runtime: ~1.1MB (React, webpack runtime)
+- **HeavyMarkdownEditor**: 2.2MB total resources (2.7MB with markdown libraries)
+  - HeavyMarkdownEditor.js: 26.5 kB
+  - HeavyMarkdownEditor.css: 5.5 kB
+  - Markdown libraries: 1,081 kB additional
+  - Shared runtime: ~1.1MB (React, webpack runtime)
 
-Each page loads only what it needs!
+**Bundle splitting benefit**: Each page loads only its required components - the HelloWorld page doesn't load the heavy markdown libraries, saving ~1.1MB (50% reduction)!
+
+#### Performance Screenshots
+
+**HelloWorld (Lightweight Component):**
+![HelloWorld Bundle Analysis](../images/bundle-splitting-hello-world.png)
+
+**HeavyMarkdownEditor (Heavy Component):**
+![HeavyMarkdownEditor Bundle Analysis](../images/bundle-splitting-heavy-markdown.png)
+
+*Screenshots show browser dev tools network analysis demonstrating the dramatic difference in bundle sizes and load times between the two components.*
 
 ### Server Rendering and Client Rendering Components
 
@@ -505,11 +522,19 @@ As of version 13.3.4, bundles inside directories that match `config.components_s
 
 **Problem**: Components load but CSS styles are missing or delayed.
 
+**Important**: FOUC (Flash of Unstyled Content) **only occurs with HMR (Hot Module Replacement)**. Static and production modes work perfectly without FOUC.
+
 **Solutions**:
-- **Development with HMR**: FOUC is expected. Use `bin/dev static` mode for development without FOUC
-- **Production**: Ensure CSS extraction is working by checking for `.css` files in `public/packs/css/generated/`
-- **Layout**: Verify your layout includes empty `<%= stylesheet_pack_tag %>` placeholder
-- Check that CSS files are properly imported in your components: `import styles from './Component.module.css';`
+- **Development with HMR** (`./bin/dev`): FOUC is expected behavior due to dynamic CSS injection - **not a bug**
+- **Development static** (`./bin/dev static`): No FOUC - CSS is extracted to separate files like production
+- **Production** (`./bin/dev prod`): No FOUC - CSS is extracted and optimized
+- **Layout**: Verify your layout includes empty `<%= stylesheet_pack_tag %>` placeholder for CSS injection
+- **Component imports**: Check that CSS files are properly imported: `import styles from './Component.module.css';`
+
+**Key insight**: Choose your development mode based on your current needs:
+- Use HMR for fastest development (accept FOUC)
+- Use static mode when testing styling without FOUC
+- Use production mode for final testing
 
 #### 3. "document is not defined" errors during SSR
 
