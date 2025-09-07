@@ -440,7 +440,7 @@ RSpec.describe "Streaming API" do
     end
 
     it "handles empty component list" do
-      queues, controller, stream = setup_stream_test(component_count: 0)
+      _queues, controller, stream = setup_stream_test(component_count: 0)
 
       run_stream(controller) do |_parent|
         sleep 0.1
@@ -469,7 +469,7 @@ RSpec.describe "Streaming API" do
       queues, controller, stream = setup_stream_test(component_count: 1)
 
       write_timestamps = []
-      allow(stream).to receive(:write) do |data|
+      allow(stream).to receive(:write) do |_data|
         write_timestamps << Process.clock_gettime(Process::CLOCK_MONOTONIC)
         sleep 0.05
       end
