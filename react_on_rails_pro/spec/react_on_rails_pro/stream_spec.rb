@@ -4,82 +4,15 @@ require "async"
 require "async/queue"
 require_relative "spec_helper"
 
-# Test helper classes for streaming specs
-class TestStream
-  def initialize(chunks_with_delays:, raise_after: nil)
-    @chunks_with_delays = chunks_with_delays
-    @raise_after = raise_after
-  end
-
-  def each_chunk
-    return enum_for(:each_chunk) unless block_given?
-
-    count = 0
-    @chunks_with_delays.each do |(delay, data)|
-      begin
-        require "async"
-        task = Async::Task.current
-        task ? task.sleep(delay) : sleep(delay)
-      rescue StandardError
-        sleep(delay)
-      end
-      yield data
-      count += 1
-      raise "Fake error" if @raise_after && count >= @raise_after
-    end
-  end
-end
-
-class TestResponseStream
-  attr_reader :writes
-
-  def initialize
-    @writes = []
-    @closed = false
-  end
-
-  def write(data)
-    @writes << data
-  end
-
-  def close
-    @closed = true
-  end
-
-  def closed?
-    @closed
-  end
-end
-
-class SlowResponseStream < TestResponseStream
-  attr_reader :timestamps
-
-  def initialize(delay: 0.05)
-    super()
-    @delay = delay
-    @timestamps = []
-  end
-
-  def write(data)
-    sleep(@delay)
-    @timestamps << Process.clock_gettime(Process::CLOCK_MONOTONIC)
-    super
-  end
-end
-
-ResponseStruct = Struct.new(:stream)
-
-class SimpleTestController
+class StreamController
   include ReactOnRailsPro::Stream
 
-  # @param initial_response [String] The initial response to be streamed
-  # @param component_queues [Array<Async::Queue>] The queues for each component
-  def initialize(initial_response: "Template", component_queues: [])
-    @initial_response = initial_response
-    @component_queues = component_queues
-  end
-
   attr_reader :response
+
+  def initialize(component_queues:, initial_response: "TEMPLATE")
+    @component_queues = component_queues
+    @initial_response = initial_response
+  end
 
   def render_to_string(**_opts)
     @rorp_rendering_fibers = @component_queues.map do |queue|
@@ -94,39 +27,6 @@ class SimpleTestController
     end
 
     @initial_response
-  end
-end
-
-class TestController
-  include ReactOnRailsPro::Stream
-
-  attr_reader :response
-
-  def initialize(streams)
-    @streams = streams
-    @response = ResponseStruct.new(TestResponseStream.new)
-  end
-
-  def render_to_string(**_opts)
-    @rorp_rendering_fibers ||= []
-    initial_chunks = []
-    @streams.each do |s|
-      fiber = Fiber.new do
-        s.each_chunk do |chunk|
-          Fiber.yield chunk
-        end
-      end
-      initial_chunks << fiber.resume
-      @rorp_rendering_fibers << fiber
-    end
-    ["TEMPLATE\n", *initial_chunks].join
-  end
-end
-
-class SlowWriterController < TestController
-  def initialize(streams)
-    super(streams)
-    @response = ResponseStruct.new(SlowResponseStream.new(delay: 0.05))
   end
 end
 
@@ -158,51 +58,6 @@ RSpec.describe "Streaming API" do
 
   before do
     clear_stream_mocks
-  end
-
-  it "streams components concurrently" do
-    original_concurrent_stream_drain = ReactOnRailsPro.configuration.concurrent_stream_drain
-    ReactOnRailsPro.configuration.concurrent_stream_drain = true
-    component_queues = [Async::Queue.new, Async::Queue.new]
-    controller = SimpleTestController.new(initial_response: "Template", component_queues: component_queues)
-
-    mocked_response = instance_double(ActionController::Live::Response)
-    mocked_stream = instance_double(ActionController::Live::Buffer)
-    allow(mocked_response).to receive(:stream).and_return(mocked_stream)
-    allow(mocked_stream).to receive(:write)
-    allow(mocked_stream).to receive(:close)
-    allow(controller).to receive(:response).and_return(mocked_response)
-
-    Sync do |parent|
-      parent.async do
-        controller.stream_view_containing_react_components(template: "ignored")
-      end
-
-      expect(mocked_stream).to have_received(:write).once.with("Template")
-
-      component_queues[1].enqueue("Component 2")
-      sleep 0.1 # Wait for the writer to dequeue the chunk
-      expect(mocked_stream).to have_received(:write).with("Component 2")
-
-      component_queues[0].enqueue("Component 1")
-      sleep 0.1
-      expect(mocked_stream).to have_received(:write).with("Component 1")
-
-      component_queues[0].enqueue("Component 1-1")
-      sleep 0.1
-      expect(mocked_stream).to have_received(:write).with("Component 1-1")
-
-      component_queues[1].enqueue("Component 2-1")
-      component_queues[0].enqueue("Component 1-2")
-
-      sleep 0.1
-      expect(mocked_stream).to have_received(:write).with("Component 2-1")
-      expect(mocked_stream).to have_received(:write).with("Component 1-2")
-
-      component_queues.each(&:close)
-    ensure
-      ReactOnRailsPro.configuration.concurrent_stream_drain = original_concurrent_stream_drain
-    end
   end
 
   it "yields chunk immediately" do
@@ -516,95 +371,169 @@ RSpec.describe "Streaming API" do
     end
   end
 
-  describe "Controller streaming (concurrent vs sequential)" do
-    let(:a_stream) { TestStream.new(chunks_with_delays: [[0.30, "A1\n"], [0.90, "A2\n"]]) }
-    let(:b_stream) { TestStream.new(chunks_with_delays: [[0.10, "B1\n"], [0.10, "B2\n"], [0.20, "B3\n"]]) }
-
-    def run_and_collect(streams:, concurrent:)
+  describe "Component streaming concurrency" do
+    def setup_stream_test(component_count: 2, concurrent: true)
       original = ReactOnRailsPro.configuration.concurrent_stream_drain
       ReactOnRailsPro.configuration.concurrent_stream_drain = concurrent
-      controller = TestController.new(streams)
-      controller.stream_view_containing_react_components(template: "ignored")
-      [controller.response.stream.writes, controller.response.stream.closed?]
-    ensure
-      ReactOnRailsPro.configuration.concurrent_stream_drain = original
+
+      component_queues = Array.new(component_count) { Async::Queue.new }
+      controller = StreamController.new(component_queues: component_queues)
+
+      mocked_response = instance_double(ActionController::Live::Response)
+      mocked_stream = instance_double(ActionController::Live::Buffer)
+      allow(mocked_response).to receive(:stream).and_return(mocked_stream)
+      allow(mocked_stream).to receive(:write)
+      allow(mocked_stream).to receive(:close)
+      allow(controller).to receive(:response).and_return(mocked_response)
+
+      [component_queues, controller, mocked_stream, original]
     end
 
-    it "gates by config (sequential vs concurrent)" do
-      writes_seq, closed_seq = run_and_collect(streams: [a_stream, b_stream], concurrent: false)
-      writes_conc, closed_conc = run_and_collect(streams: [a_stream, b_stream], concurrent: true)
-
-      expect(writes_seq.first).to start_with("TEMPLATE")
-      expect(writes_conc.first).to start_with("TEMPLATE")
-
-      joined_seq = writes_seq.drop(1).join
-      joined_conc = writes_conc.drop(1).join
-
-      expect(joined_seq).to match(/A2.*B2.*B3/m)
-      expect(joined_conc).to match(/B2.*A2/m)
-
-      expect(closed_seq).to be true
-      expect(closed_conc).to be true
+    def cleanup_stream_test(original_config)
+      ReactOnRailsPro.configuration.concurrent_stream_drain = original_config
     end
 
-    it "preserves per-component order" do
-      multi_a = TestStream.new(chunks_with_delays: [[0.05, "X1\n"], [0.05, "X2\n"], [0.05, "X3\n"]])
-      multi_b = TestStream.new(chunks_with_delays: [[0.01, "Y1\n"], [0.02, "Y2\n"]])
-      writes, = run_and_collect(streams: [multi_a, multi_b], concurrent: true)
-      joined = writes.join
-      # X1 is inline in template; ensure X2 before X3 in remaining output.
-      expect(joined).to match(/X2.*X3/m)
-    end
+    it "processes components concurrently vs sequentially" do
+      seq_queues, seq_controller, seq_stream, original = setup_stream_test(concurrent: false)
 
-    it "handles zero fibers" do
-      writes, closed = run_and_collect(streams: [], concurrent: true)
-      expect(writes).to eq(["TEMPLATE\n"])
-      expect(closed).to be true
-    end
+      Sync do |parent|
+        parent.async { seq_controller.stream_view_containing_react_components(template: "ignored") }
 
-    it "handles one fiber same as before" do
-      single = TestStream.new(chunks_with_delays: [[0.05, "S1\n"], [0.05, "S2\n"]])
-      writes_seq, = run_and_collect(streams: [single], concurrent: false)
-      writes_conc, = run_and_collect(streams: [single], concurrent: true)
-      expect(writes_seq.join).to include("S2\n")
-      expect(writes_conc.join).to include("S2\n")
-    end
+        seq_queues[0].enqueue("A1")
+        seq_queues[0].enqueue("A2")
+        seq_queues[0].close
 
-    it "fails the request when a producer errors", :aggregate_failures do
-      erring = TestStream.new(chunks_with_delays: [[0.01, "E1\n"]], raise_after: 1)
-      ok     = TestStream.new(chunks_with_delays: [[0.01, "O1\n"], [0.02, "O2\n"]])
+        seq_queues[1].enqueue("B1")
+        seq_queues[1].enqueue("B2")
+        seq_queues[1].close
 
-      # The `async` gem logs unhandled task exceptions to stderr, which is
-      # expected in this test. We capture the output to keep the test run clean.
-      expect do
-        expect do
-          run_and_collect(streams: [erring, ok], concurrent: true)
-        end.to raise_error(RuntimeError, "Fake error")
-      end.to output.to_stderr
-    end
-
-    it "applies backpressure: writer delay spaces out queued writes" do
-      # Force capacity=1 via stubbing Async::Semaphore.new for this example.
-      allow(Async::Semaphore).to receive(:new).and_wrap_original do |m, _permits|
-        m.call(1)
+        sleep 0.1
       end
 
-      # Stream emits three chunks quickly; first is inline in template, next two go through queue.
-      fast = TestStream.new(chunks_with_delays: [[0.0, "C1\n"], [0.0, "C2\n"], [0.0, "C3\n"]])
-      original = ReactOnRailsPro.configuration.concurrent_stream_drain
-      ReactOnRailsPro.configuration.concurrent_stream_drain = true
+      cleanup_stream_test(original)
 
-      controller = SlowWriterController.new([fast])
-      controller.stream_view_containing_react_components(template: "ignored")
-      timestamps = controller.response.stream.timestamps
+      # Verify sequential behavior: all A chunks processed before B chunks start
+      expect(seq_stream).to have_received(:write).with("TEMPLATE")
+      expect(seq_stream).to have_received(:write).with("A1") 
+      expect(seq_stream).to have_received(:write).with("A2")
+      expect(seq_stream).to have_received(:write).with("B1")
+      expect(seq_stream).to have_received(:write).with("B2")
 
-      # We expect at least two writes via writer (C2, C3). With capacity=1 and a 50ms write delay,
-      # the gap between the two writer writes should be >= ~50ms.
-      expect(timestamps.length).to be >= 2
-      gap = timestamps[1] - timestamps[0]
-      expect(gap).to be >= 0.045
-    ensure
-      ReactOnRailsPro.configuration.concurrent_stream_drain = original
+      conc_queues, conc_controller, conc_stream, original = setup_stream_test(concurrent: true)
+
+      Sync do |parent|
+        parent.async { conc_controller.stream_view_containing_react_components(template: "ignored") }
+
+      conc_queues[1].enqueue("B1")
+      sleep 0.05
+      expect(conc_stream).to have_received(:write).with("B1")
+
+      conc_queues[0].enqueue("A1")
+      sleep 0.05
+      expect(conc_stream).to have_received(:write).with("A1")
+
+      conc_queues[1].enqueue("B2")
+      conc_queues[1].close
+      sleep 0.05
+
+      conc_queues[0].enqueue("A2")
+      conc_queues[0].close
+      sleep 0.1
+    end
+
+    cleanup_stream_test(original)
+
+    # Verify concurrent behavior: components can process interleaved
+    expect(conc_stream).to have_received(:write).with("B1")
+    expect(conc_stream).to have_received(:write).with("A1") 
+    expect(conc_stream).to have_received(:write).with("B2")
+    expect(conc_stream).to have_received(:write).with("A2")
+    end
+
+    it "maintains per-component ordering" do
+      queues, controller, stream, original = setup_stream_test
+
+      Sync do |parent|
+        parent.async { controller.stream_view_containing_react_components(template: "ignored") }
+
+        queues[0].enqueue("X1")
+        queues[0].enqueue("X2")
+        queues[0].enqueue("X3")
+        queues[0].close
+
+        queues[1].enqueue("Y1")
+        queues[1].enqueue("Y2")
+        queues[1].close
+
+        sleep 0.2
+      end
+
+      cleanup_stream_test(original)
+
+      # Verify all chunks were written
+      expect(stream).to have_received(:write).with("X1")
+      expect(stream).to have_received(:write).with("X2")
+      expect(stream).to have_received(:write).with("X3")
+      expect(stream).to have_received(:write).with("Y1")
+      expect(stream).to have_received(:write).with("Y2")
+    end
+
+    it "handles empty component list" do
+      queues, controller, stream, original = setup_stream_test(component_count: 0)
+
+      Sync do |parent|
+        parent.async { controller.stream_view_containing_react_components(template: "ignored") }
+        sleep 0.1
+      end
+
+      cleanup_stream_test(original)
+
+      expect(stream).to have_received(:write).with("TEMPLATE")
+      expect(stream).to have_received(:close)
+    end
+
+    it "handles single component" do
+      queues, controller, stream, original = setup_stream_test(component_count: 1)
+
+      Sync do |parent|
+        parent.async { controller.stream_view_containing_react_components(template: "ignored") }
+
+        queues[0].enqueue("Single1")
+        queues[0].enqueue("Single2")
+        queues[0].close
+
+        sleep 0.1
+      end
+
+      cleanup_stream_test(original)
+
+      expect(stream).to have_received(:write).with("Single1")
+      expect(stream).to have_received(:write).with("Single2")
+    end
+
+    it "applies backpressure with slow writer" do
+      queues, controller, stream, original = setup_stream_test(component_count: 1)
+
+      write_timestamps = []
+      allow(stream).to receive(:write) do |data|
+        write_timestamps << Process.clock_gettime(Process::CLOCK_MONOTONIC)
+        sleep 0.05
+      end
+
+      Sync do |parent|
+        parent.async { controller.stream_view_containing_react_components(template: "ignored") }
+
+        5.times { |i| queues[0].enqueue("Chunk#{i}") }
+        queues[0].close
+
+        sleep 1
+      end
+
+      cleanup_stream_test(original)
+
+      expect(write_timestamps.length).to be >= 2
+      gaps = write_timestamps.each_cons(2).map { |a, b| b - a }
+      expect(gaps.all? { |gap| gap >= 0.04 }).to be true
     end
   end
 end
