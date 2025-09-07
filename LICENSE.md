@@ -1,7 +1,7 @@
 # Licensing
 
-- **Core**: MIT (this file)  
-- **Pro**: see [REACT-ON-RAILS-PRO-LICENSE.md](./REACT-ON-RAILS-PRO-LICENSE.md)  
+- **Core**: MIT (this file)
+- **Pro**: see [REACT-ON-RAILS-PRO-LICENSE.md](./REACT-ON-RAILS-PRO-LICENSE.md)
 
 ---
 
