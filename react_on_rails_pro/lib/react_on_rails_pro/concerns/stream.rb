@@ -39,11 +39,7 @@ module ReactOnRailsPro
       response.stream.write(template_string)
 
       begin
-        if ReactOnRailsPro.configuration.concurrent_stream_drain
-          drain_streams_concurrently
-        else
-          drain_streams_sequentially
-        end
+        drain_streams_concurrently
       ensure
         response.stream.close if close_stream_at_end
       end
@@ -118,22 +114,6 @@ module ReactOnRailsPro
           ensure
             semaphore.release
           end
-        end
-      end
-    end
-
-    def drain_streams_sequentially
-      @rorp_rendering_fibers.each_with_index do |fiber, idx|
-        loop do
-          begin
-            chunk = fiber.resume
-          rescue FiberError
-            break
-          end
-          break unless chunk
-
-          log_stream_write(mode: :sequential, idx: idx, bytesize: safe_bytesize(chunk))
-          response.stream.write(chunk)
         end
       end
     end
