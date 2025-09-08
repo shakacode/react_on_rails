@@ -56,7 +56,7 @@ module ReactOnRailsPro
       Sync do |parent|
         # To avoid memory bloat, we use a limited queue to buffer chunks in memory.
         buffer_size = ReactOnRailsPro.configuration.concurrent_component_streaming_buffer_size
-        queue = Async::LimitedQueue.new(size: buffer_size)
+        queue = Async::LimitedQueue.new(buffer_size)
 
         writer = build_writer_task(parent: parent, queue: queue)
         tasks = build_producer_tasks(parent: parent, queue: queue)
