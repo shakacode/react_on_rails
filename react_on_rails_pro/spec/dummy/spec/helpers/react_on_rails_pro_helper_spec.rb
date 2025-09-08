@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "async"
+require "async/queue"
 require "rails_helper"
 require "support/script_tag_utils"
 
@@ -303,7 +305,7 @@ describe ReactOnRailsProHelper do
         { html: "<div>Chunk 3: Final content</div>", consoleReplayScript: "" }
       ]
     end
-    let(:chunks_read) { [] }
+    let(:chunks_read) { Async::Queue.new }
     let(:react_component_specification_tag) do
       <<-SCRIPT.strip_heredoc
         <script type="application/json"
@@ -336,7 +338,7 @@ describe ReactOnRailsProHelper do
       end
       clear_stream_mocks
 
-      chunks_read.clear
+      chunks_read.dequeue until chunks_read.empty?
       mock_streaming_response(%r{http://localhost:3800/bundles/[a-f0-9]{32}-test/render/[a-f0-9]{32}}, 200,
                               count: count) do |yielder|
         mock_chunks.each do |chunk|
@@ -362,7 +364,7 @@ describe ReactOnRailsProHelper do
         expect(initial_result).to include(react_component_div_with_initial_chunk)
         expect(initial_result).to include(chunks.first[:consoleReplayScript])
         expect(initial_result).not_to include("More content", "Final content")
-        expect(chunks_read.count).to eq(1)
+        expect(chunks_read.size).to eq(1)
       end
 
       it "creates a fiber to read subsequent chunks" do
@@ -378,16 +380,16 @@ describe ReactOnRailsProHelper do
           /#{Regexp.escape(chunks[1][:html])}\s+#{Regexp.escape(chunks[1][:consoleReplayScript])}/
         )
         expect(second_result).not_to include("Stream React Server Components", "Final content")
-        expect(chunks_read.count).to eq(2)
+        expect(chunks_read.size).to eq(2)
 
         third_result = fiber.resume
         expect(third_result).to eq(chunks[2][:html].to_s)
         expect(third_result).not_to include("Stream React Server Components", "More content")
-        expect(chunks_read.count).to eq(3)
+        expect(chunks_read.size).to eq(3)
 
         expect(fiber.resume).to be_nil
         expect(fiber).not_to be_alive
-        expect(chunks_read.count).to eq(chunks.count)
+        expect(chunks_read.size).to eq(chunks.count)
       end
 
       it "does not trim whitespaces from html" do
@@ -429,7 +431,7 @@ describe ReactOnRailsProHelper do
         allow(mocked_stream).to receive(:write) do |chunk|
           written_chunks << chunk
           # Ensures that any chunk received is written immediately to the stream
-          expect(written_chunks.count).to eq(chunks_read.count) # rubocop:disable RSpec/ExpectInHook
+          expect(written_chunks.count).to eq(chunks_read.size) # rubocop:disable RSpec/ExpectInHook
         end
         allow(mocked_stream).to receive(:close)
         mocked_response = instance_double(ActionDispatch::Response)
@@ -441,7 +443,7 @@ describe ReactOnRailsProHelper do
       it "writes the chunk to stream as soon as it is received" do
         stream_view_containing_react_components(template: template_path)
         expect(self).to have_received(:render_to_string).once.with(template: template_path)
-        expect(chunks_read.count).to eq(chunks.count)
+        expect(chunks_read.size).to eq(chunks.count)
         expect(written_chunks.count).to eq(chunks.count)
         expect(mocked_stream).to have_received(:write).exactly(chunks.count).times
         expect(mocked_stream).to have_received(:close)
@@ -546,7 +548,7 @@ describe ReactOnRailsProHelper do
 
       def reset_stream_buffers
         written_chunks.clear
-        chunks_read.clear
+        chunks_read.dequeue until chunks_read.empty?
       end
 
       def run_stream
@@ -563,7 +565,7 @@ describe ReactOnRailsProHelper do
 
         # First render (MISS → write-through)
         first_run_chunks = run_stream
-        expect(chunks_read.count).to eq(chunks.count)
+        expect(chunks_read.size).to eq(chunks.count)
         expect(first_run_chunks.first).to include("<h1>Header Rendered In View</h1>")
 
         # Second render (HIT → served from cache, no Node call; no new HTTPX chunks)
@@ -571,7 +573,7 @@ describe ReactOnRailsProHelper do
         # Reset rails context flag to simulate a fresh request lifecycle
         @rendered_rails_context = nil
         second_run_chunks = run_stream
-        expect(chunks_read.count).to eq(0)
+        expect(chunks_read.size).to eq(0)
         expect(second_run_chunks).to eq(first_run_chunks)
       end
 
@@ -584,7 +586,7 @@ describe ReactOnRailsProHelper do
 
         # First render
         run_stream
-        first_call_count = chunks_read.count
+        first_call_count = chunks_read.size
         expect(first_call_count).to eq(chunks.count)
 
         # Second render (still goes to Node)
@@ -592,7 +594,7 @@ describe ReactOnRailsProHelper do
         run_stream
         reset_stream_buffers
         run_stream
-        expect(chunks_read.count).to eq(chunks.count)
+        expect(chunks_read.size).to eq(chunks.count)
       end
 
       it "invalidates cache when props change" do
@@ -634,13 +636,13 @@ describe ReactOnRailsProHelper do
         # With if: false, caching should be disabled - both calls hit Node renderer
         render_with_cached_stream(if: false)
         first_run_chunks = run_stream
-        expect(chunks_read.count).to eq(chunks.count)
+        expect(chunks_read.size).to eq(chunks.count)
 
         reset_stream_buffers
         @rendered_rails_context = nil
         render_with_cached_stream(if: false)
         second_run_chunks = run_stream
-        expect(chunks_read.count).to eq(chunks.count) # Both calls went to Node
+        expect(chunks_read.size).to eq(chunks.count) # Both calls went to Node
 
         expect(second_run_chunks).to eq(first_run_chunks) # Same template/props, same result
       end
