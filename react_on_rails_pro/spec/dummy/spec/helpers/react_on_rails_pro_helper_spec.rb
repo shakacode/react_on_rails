@@ -343,7 +343,10 @@ describe ReactOnRailsProHelper do
       mock_streaming_response(%r{http://localhost:3800/bundles/[a-f0-9]{32}-test/render/[a-f0-9]{32}}, 200,
                               count: count) do |yielder|
         if mock_chunks.is_a?(Async::Queue)
-          while (chunk = mock_chunks.dequeue)
+          loop do
+            chunk = mock_chunks.dequeue
+            break if chunk.nil?
+
             chunks_read << chunk
             yielder.call("#{chunk.to_json}\n")
           end
