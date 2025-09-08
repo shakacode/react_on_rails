@@ -78,11 +78,7 @@ module ReactOnRailsPro
       @rorp_rendering_fibers.each_with_index.map do |fiber, idx|
         parent.async do
           loop do
-            begin
-              chunk = fiber.resume
-            rescue FiberError
-              break
-            end
+            chunk = fiber.resume
             break unless chunk
 
             # Will be blocked if the queue is full until a chunk is dequeued
@@ -99,11 +95,7 @@ module ReactOnRailsPro
           break if pair.nil?
 
           _idx_from_queue, item = pair
-          begin
-            response.stream.write(item)
-          rescue IOError, ActionController::Live::ClientDisconnected
-            break
-          end
+          response.stream.write(item)
         end
       end
     end
