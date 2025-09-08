@@ -289,6 +289,7 @@ describe ReactOnRailsProHelper, type: :helper do
     let(:component_name) { "TestingStreamableComponent" }
     let(:props) { { helloWorldData: { name: "Mr. Server Side Rendering" } } }
     let(:component_options) { { prerender: true, trace: true, id: "#{component_name}-react-component-0" } }
+    let(:template_path) { "fake/path/because/render_to_string&response/are/mocked" }
     let(:chunks) do
       [
         { html: "<div>Chunk 1: Stream React Server Components</div>",
@@ -326,7 +327,7 @@ describe ReactOnRailsProHelper, type: :helper do
       HTML
     end
 
-    def mock_request_and_response(mock_chunks = chunks)
+    def mock_request_and_response(mock_chunks = chunks, count: 1)
       # Reset connection instance variables to ensure clean state for tests
       ReactOnRailsPro::Request.instance_variable_set(:@connection, nil)
       original_httpx_plugin = HTTPX.method(:plugin)
@@ -336,7 +337,8 @@ describe ReactOnRailsProHelper, type: :helper do
       clear_stream_mocks
 
       chunks_read.clear
-      mock_streaming_response(%r{http://localhost:3800/bundles/[a-f0-9]{32}-test/render/[a-f0-9]{32}}, 200) do |yielder|
+      mock_streaming_response(%r{http://localhost:3800/bundles/[a-f0-9]{32}-test/render/[a-f0-9]{32}}, 200,
+                              count: count) do |yielder|
         mock_chunks.each do |chunk|
           chunks_read << chunk
           yielder.call("#{chunk.to_json}\n")
@@ -437,8 +439,8 @@ describe ReactOnRailsProHelper, type: :helper do
       end
 
       it "writes the chunk to stream as soon as it is received" do
-        stream_view_containing_react_components(template: "path/to/your/template")
-        expect(self).to have_received(:render_to_string).once.with(template: "path/to/your/template")
+        stream_view_containing_react_components(template: template_path)
+        expect(self).to have_received(:render_to_string).once.with(template: template_path)
         expect(chunks_read.count).to eq(chunks.count)
         expect(written_chunks.count).to eq(chunks.count)
         expect(mocked_stream).to have_received(:write).exactly(chunks.count).times
@@ -446,7 +448,7 @@ describe ReactOnRailsProHelper, type: :helper do
       end
 
       it "prepends the rails context to the first chunk only" do
-        stream_view_containing_react_components(template: "path/to/your/template")
+        stream_view_containing_react_components(template: template_path)
         initial_result = written_chunks.first
         expect(initial_result).to script_tag_be_included(rails_context_tag)
 
@@ -462,7 +464,7 @@ describe ReactOnRailsProHelper, type: :helper do
       end
 
       it "prepends the component specification tag to the first chunk only" do
-        stream_view_containing_react_components(template: "path/to/your/template")
+        stream_view_containing_react_components(template: template_path)
         initial_result = written_chunks.first
         expect(initial_result).to script_tag_be_included(react_component_specification_tag)
 
@@ -473,12 +475,223 @@ describe ReactOnRailsProHelper, type: :helper do
       end
 
       it "renders the rails view content in the first chunk" do
-        stream_view_containing_react_components(template: "path/to/your/template")
+        stream_view_containing_react_components(template: template_path)
         initial_result = written_chunks.first
         expect(initial_result).to include("<h1>Header Rendered In View</h1>")
         written_chunks[1..].each do |chunk|
           expect(chunk).not_to include("<h1>Header Rendered In View</h1>")
         end
+      end
+    end
+
+    describe "#cached_stream_react_component", :caching do # rubocop:disable RSpec/MultipleMemoizedHelpers
+      let(:mocked_stream) { instance_double(ActionController::Live::Buffer) }
+      let(:written_chunks) { [] }
+
+      around do |example|
+        original_prerender_caching = ReactOnRailsPro.configuration.prerender_caching
+        ReactOnRailsPro.configuration.prerender_caching = true
+        Rails.cache.clear
+        example.run
+      ensure
+        ReactOnRailsPro.configuration.prerender_caching = original_prerender_caching
+        Rails.cache.clear
+      end
+
+      before do
+        written_chunks.clear
+        allow(mocked_stream).to receive(:write) { |chunk| written_chunks << chunk }
+        allow(mocked_stream).to receive(:close)
+        mocked_response = instance_double(ActionDispatch::Response)
+        allow(mocked_response).to receive(:stream).and_return(mocked_stream)
+        allow(self).to receive(:response).and_return(mocked_response)
+      end
+
+      def render_with_cached_stream(**opts)
+        stub_render_with_cached_stream(
+          cache_key: ["stream-cache-spec", component_name],
+          props: props,
+          **opts
+        )
+      end
+
+      def render_with_cached_stream_changed_props(**opts)
+        stub_render_with_cached_stream(
+          cache_key: ["stream-cache-spec", component_name, "changed"],
+          props: props.merge(extra: "changed"),
+          **opts
+        )
+      end
+
+      def stub_render_with_cached_stream(cache_key:, props:, **opts)
+        allow(self).to receive(:render_to_string) do
+          render_result = cached_stream_react_component(
+            component_name,
+            cache_key: cache_key,
+            id: "#{component_name}-react-component-0",
+            trace: true,
+            cache_options: { expires_in: 60 },
+            **opts
+          ) do
+            props
+          end
+          <<-HTML
+            <div>
+              <h1>Header Rendered In View</h1>
+              #{render_result}
+            </div>
+          HTML
+        end
+      end
+
+      def reset_stream_buffers
+        written_chunks.clear
+        chunks_read.clear
+      end
+
+      def run_stream
+        stream_view_containing_react_components(template: template_path)
+        written_chunks.dup
+      end
+
+      it "serves MISS then HIT with identical chunks and no second Node call" do
+        mock_request_and_response
+        render_with_cached_stream
+
+        expect(Rails.cache)
+          .to receive(:write).with(anything, kind_of(Array), hash_including(expires_in: 60)).and_call_original
+
+        # First render (MISS → write-through)
+        first_run_chunks = run_stream
+        expect(chunks_read.count).to eq(chunks.count)
+        expect(first_run_chunks.first).to include("<h1>Header Rendered In View</h1>")
+
+        # Second render (HIT → served from cache, no Node call; no new HTTPX chunks)
+        reset_stream_buffers
+        # Reset rails context flag to simulate a fresh request lifecycle
+        @rendered_rails_context = nil
+        second_run_chunks = run_stream
+        expect(chunks_read.count).to eq(0)
+        expect(second_run_chunks).to eq(first_run_chunks)
+      end
+
+      it "respects skip_prerender_cache and does not write or hit cache" do
+        mock_request_and_response(count: 3)
+        # Disable view-level caching for this run via conditional
+        render_with_cached_stream(if: false)
+
+        expect(Rails.cache).not_to receive(:write)
+
+        # First render
+        run_stream
+        first_call_count = chunks_read.count
+        expect(first_call_count).to eq(chunks.count)
+
+        # Second render (still goes to Node)
+        reset_stream_buffers
+        run_stream
+        reset_stream_buffers
+        run_stream
+        expect(chunks_read.count).to eq(chunks.count)
+      end
+
+      it "invalidates cache when props change" do
+        # First run with base props
+        mock_request_and_response(count: 2)
+        render_with_cached_stream
+        first_run_chunks = run_stream
+
+        # Second run with different props triggers MISS
+        reset_stream_buffers
+        render_with_cached_stream_changed_props
+        second_run_chunks = run_stream
+
+        expect(second_run_chunks).not_to eq(first_run_chunks)
+      end
+
+      it "doesn't call the props block on cache HIT" do
+        mock_request_and_response
+        render_with_cached_stream
+
+        # Prime the cache
+        run_stream
+        reset_stream_buffers
+
+        # Second call should not yield the block
+        expect do |props_block|
+          stub_render_with_cached_stream(
+            cache_key: ["stream-cache-spec", component_name],
+            props: props,
+            &props_block
+          )
+          run_stream
+        end.not_to yield_control
+      end
+
+      it "respects conditional caching with :if option" do
+        mock_request_and_response(count: 2)
+
+        # With if: false, caching should be disabled - both calls hit Node renderer
+        render_with_cached_stream(if: false)
+        first_run_chunks = run_stream
+        expect(chunks_read.count).to eq(chunks.count)
+
+        reset_stream_buffers
+        @rendered_rails_context = nil
+        render_with_cached_stream(if: false)
+        second_run_chunks = run_stream
+        expect(chunks_read.count).to eq(chunks.count) # Both calls went to Node
+
+        expect(second_run_chunks).to eq(first_run_chunks) # Same template/props, same result
+      end
+    end
+
+    describe "cached_stream_react_component integration with RandomValue", :caching do
+      around do |example|
+        original_prerender_caching = ReactOnRailsPro.configuration.prerender_caching
+        ReactOnRailsPro.configuration.prerender_caching = true
+        Rails.cache.clear
+        example.run
+      ensure
+        ReactOnRailsPro.configuration.prerender_caching = original_prerender_caching
+        Rails.cache.clear
+      end
+
+      # we need this setup because we can't use the helper outside of stream_view_containing_react_components
+      def render_cached_random_value(cache_key)
+        # Streaming helpers require this context normally provided by stream_view_containing_react_components
+        @rorp_rendering_fibers = []
+
+        result = cached_stream_react_component("RandomValue", cache_key: cache_key,
+                                                              id: "RandomValue-react-component-0") do
+          { a: 1, b: 2 }
+        end
+
+        # Complete the streaming lifecycle to trigger cache writes
+        @rorp_rendering_fibers.each { |fiber| fiber.resume while fiber.alive? } # rubocop:disable RSpec/InstanceVariable
+
+        result
+      end
+
+      it "serves same RandomValue on cache HIT with identical cache key" do
+        first_result = render_cached_random_value("stable_key")
+        first_random_value = first_result[/RandomValue:\s*<!--\s*-->([\d.]+)/, 1]
+        expect(first_random_value).to be_present
+
+        second_result = render_cached_random_value("stable_key")
+        second_random_value = second_result[/RandomValue:\s*<!--\s*-->([\d.]+)/, 1]
+
+        expect(second_random_value).to eq(first_random_value)
+      end
+
+      it "serves different values on cache MISS with different cache keys" do
+        first_result = render_cached_random_value("key_one")
+        first_random_value = first_result[/RandomValue:\s*<!--\s*-->([\d.]+)/, 1]
+
+        second_result = render_cached_random_value("key_two")
+        second_random_value = second_result[/RandomValue:\s*<!--\s*-->([\d.]+)/, 1]
+
+        expect(second_random_value).not_to eq(first_random_value)
       end
     end
   end

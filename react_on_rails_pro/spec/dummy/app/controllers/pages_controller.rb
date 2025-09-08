@@ -41,6 +41,10 @@ class PagesController < ApplicationController
     stream_view_containing_react_components(template: "/pages/stream_async_components_for_testing")
   end
 
+  def cached_stream_async_components_for_testing
+    stream_view_containing_react_components(template: "/pages/cached_stream_async_components_for_testing")
+  end
+
   def rsc_posts_page_over_http
     stream_view_containing_react_components(template: "/pages/rsc_posts_page_over_http")
   end

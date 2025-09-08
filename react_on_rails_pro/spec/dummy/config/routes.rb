@@ -23,6 +23,8 @@ Rails.application.routes.draw do
   get "stream_async_components" => "pages#stream_async_components", as: :stream_async_components
   get "stream_async_components_for_testing" => "pages#stream_async_components_for_testing",
       as: :stream_async_components_for_testing
+  get "cached_stream_async_components_for_testing" => "pages#cached_stream_async_components_for_testing",
+      as: :cached_stream_async_components_for_testing
   get "stream_async_components_for_testing_client_render" => "pages#stream_async_components_for_testing_client_render",
       as: :stream_async_components_for_testing_client_render
   get "rsc_posts_page_over_http" => "pages#rsc_posts_page_over_http", as: :rsc_posts_page_over_http

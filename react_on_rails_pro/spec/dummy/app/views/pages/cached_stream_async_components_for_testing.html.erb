@@ -1,0 +1,18 @@
+<%# Cached variant of the test page for streaming components %>
+<%
+  throw_sync = params[:throwSyncError]
+  throw_async = params[:throwAsyncError]
+%>
+<%= cached_stream_react_component(
+  "AsyncComponentsTreeForTesting",
+  cache_key: ["AsyncComponentsTreeForTesting", throw_sync, throw_async],
+  trace: true,
+  id: "AsyncComponentsTreeForTesting-react-component-0",
+) do
+  @app_props_server_render.merge(params.permit(:throwSyncError, :throwAsyncError))
+end %>
+<hr/>
+
+<h1>React Rails Server Streaming Server Rendered Async React Components Tree For Testing (Cached)</h1>
+
+
