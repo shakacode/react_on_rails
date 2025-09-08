@@ -213,7 +213,8 @@ module ReactOnRailsPro
       return if concurrent_component_streaming_buffer_size.is_a?(Numeric) &&
                 concurrent_component_streaming_buffer_size.positive?
 
-      raise ReactOnRailsPro::Error, "config.concurrent_component_streaming_buffer_size must be set and must be a positive number"
+      raise ReactOnRailsPro::Error,
+            "config.concurrent_component_streaming_buffer_size must be set and must be a positive number"
     end
 
     def setup_renderer_password
