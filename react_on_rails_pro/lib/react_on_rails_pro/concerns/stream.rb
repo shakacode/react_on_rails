@@ -49,20 +49,17 @@ module ReactOnRailsPro
 
     def drain_streams_concurrently
       require "async"
-      require "async/queue"
-      require "async/semaphore"
+      require "async/limited_queue"
 
       return if @rorp_rendering_fibers.empty?
 
       Sync do |parent|
-        queue = Async::Queue.new
-        capacity = ReactOnRailsPro.configuration.concurrent_stream_queue_capacity
-        # Clamp capacity to minimum of 1 to prevent invalid semaphore initialization
-        capacity = 1 if capacity && capacity < 1
-        semaphore = Async::Semaphore.new(capacity || Configuration::DEFAULT_CONCURRENT_STREAM_QUEUE_CAPACITY)
+        # To avoid memory bloat, we use a limited queue to buffer chunks in memory.
+        buffer_size = ReactOnRailsPro.configuration.concurrent_component_streaming_buffer_size
+        queue = Async::LimitedQueue.new(size: buffer_size)
 
-        writer = build_writer_task(parent: parent, queue: queue, semaphore: semaphore)
-        tasks = build_producer_tasks(parent: parent, queue: queue, semaphore: semaphore)
+        writer = build_writer_task(parent: parent, queue: queue)
+        tasks = build_producer_tasks(parent: parent, queue: queue)
 
         # This structure ensures that even if a producer task fails, we always
         # signal the writer to stop and then wait for it to finish draining
@@ -77,7 +74,7 @@ module ReactOnRailsPro
       end
     end
 
-    def build_producer_tasks(parent:, queue:, semaphore:)
+    def build_producer_tasks(parent:, queue:)
       @rorp_rendering_fibers.each_with_index.map do |fiber, idx|
         parent.async do
           loop do
@@ -88,18 +85,14 @@ module ReactOnRailsPro
             end
             break unless chunk
 
-            # We use `acquire` and not `async` to create backpressure.
-            # A simple comparison:
-            # - `acquire`: Blocks this fiber until a permit is free -> forces backpressure.
-            # - `async`:   Schedules the work and continues immediately -> defeats backpressure
-            #              by buffering all chunks in memory.
-            semaphore.acquire { queue.enqueue([idx, chunk]) }
+            # Will be blocked if the queue is full until a chunk is dequeued
+            queue.enqueue([idx, chunk])
           end
         end
       end
     end
 
-    def build_writer_task(parent:, queue:, semaphore:)
+    def build_writer_task(parent:, queue:)
       parent.async do
         loop do
           pair = queue.dequeue
@@ -110,8 +103,6 @@ module ReactOnRailsPro
             response.stream.write(item)
           rescue IOError, ActionController::Live::ClientDisconnected
             break
-          ensure
-            semaphore.release
           end
         end
       end
