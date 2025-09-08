@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "async"
+require "async/queue"
 require "rails_helper"
 require "support/script_tag_utils"
 
@@ -327,6 +329,7 @@ describe ReactOnRailsProHelper do
       HTML
     end
 
+    # Mock chunks can be Async::Queue or Array
     def mock_request_and_response(mock_chunks = chunks, count: 1)
       # Reset connection instance variables to ensure clean state for tests
       ReactOnRailsPro::Request.instance_variable_set(:@connection, nil)
@@ -340,9 +343,16 @@ describe ReactOnRailsProHelper do
       chunks_read.clear
       mock_streaming_response(%r{http://localhost:3800/bundles/[a-f0-9]{32}-test/render/[a-f0-9]{32}}, 200,
                               count: count) do |yielder|
-        mock_chunks.each do |chunk|
-          chunks_read << chunk
-          yielder.call("#{chunk.to_json}\n")
+        if mock_chunks.is_a?(Async::Queue)
+          while (chunk = mock_chunks.dequeue)
+            chunks_read << chunk
+            yielder.call("#{chunk.to_json}\n")
+          end
+        else
+          mock_chunks.each do |chunk|
+            chunks_read << chunk
+            yielder.call("#{chunk.to_json}\n")
+          end
         end
       end
     end
@@ -412,6 +422,7 @@ describe ReactOnRailsProHelper do
     describe "stream_view_containing_react_components" do # rubocop:disable RSpec/MultipleMemoizedHelpers
       let(:mocked_stream) { instance_double(ActionController::Live::Buffer) }
       let(:written_chunks) { [] }
+      let(:chunks_queue) { Async::Queue.new }
 
       before do
         written_chunks.clear
@@ -429,18 +440,55 @@ describe ReactOnRailsProHelper do
 
         allow(mocked_stream).to receive(:write) do |chunk|
           written_chunks << chunk
-          # Ensures that any chunk received is written immediately to the stream
-          expect(written_chunks.count).to eq(chunks_read.count) # rubocop:disable RSpec/ExpectInHook
         end
         allow(mocked_stream).to receive(:close)
         mocked_response = instance_double(ActionDispatch::Response)
         allow(mocked_response).to receive(:stream).and_return(mocked_stream)
         allow(self).to receive(:response).and_return(mocked_response)
-        mock_request_and_response
+        mock_request_and_response(chunks_queue)
+      end
+
+      def run_stream
+        queue = chunks_queue
+        Sync do |parent|
+          parent.async do
+            stream_view_containing_react_components(template: template_path)
+          end
+
+          writer = Object.new
+          chunks_to_write = chunks.dup
+          writer.define_singleton_method(:write_next_chunk) do
+            chunk = chunks_to_write.shift
+            if chunk.nil?
+              queue.close
+              parent.sleep 0.05
+              return nil
+            end
+
+            queue.enqueue(chunk)
+            parent.sleep 0.05
+            chunk
+          end
+          writer.define_singleton_method(:write_rest_of_chunks) do
+            while (chunk = chunks_to_write.shift)
+              queue.enqueue(chunk)
+            end
+            parent.sleep 0.1
+          end
+          yield(writer)
+        end
       end
 
       it "writes the chunk to stream as soon as it is received" do
-        stream_view_containing_react_components(template: template_path)
+        run_stream do |writer|
+          expect(self).to have_received(:render_to_string)
+
+          while writer.write_next_chunk
+            # Ensures that any chunk received is written immediately to the stream
+            expect(written_chunks.count).to eq(chunks_read.count)
+          end
+        end
+
         expect(self).to have_received(:render_to_string).once.with(template: template_path)
         expect(chunks_read.count).to eq(chunks.count)
         expect(written_chunks.count).to eq(chunks.count)
