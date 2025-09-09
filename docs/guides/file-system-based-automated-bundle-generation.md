@@ -230,7 +230,7 @@ When using `auto_load_bundle: true`, your Rails layout needs to include empty pa
     <!-- Your regular head content -->
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
-    
+
     <!-- Empty pack tags - React on Rails injects component CSS/JS here -->
     <%= stylesheet_pack_tag %>
     <%= javascript_pack_tag %>
@@ -252,12 +252,14 @@ When using `auto_load_bundle: true`, your Rails layout needs to include empty pa
 **Example with multiple components:**
 
 If your view contains:
+
 ```erb
 <%= react_component("HelloWorld", @hello_world_props, auto_load_bundle: true) %>
 <%= react_component("HeavyMarkdownEditor", @editor_props, auto_load_bundle: true) %>
 ```
 
 React on Rails automatically generates HTML equivalent to:
+
 ```erb
 <!-- In <head> where <%= stylesheet_pack_tag %> appears -->
 <%= stylesheet_pack_tag "generated/HelloWorld" %>
@@ -284,7 +286,7 @@ default: &default
   source_entry_path: packs
   public_root_path: public
   public_output_path: packs
-  nested_entries: true  # Required for auto-generation
+  nested_entries: true # Required for auto-generation
   cache_manifest: false
 ```
 
@@ -312,7 +314,7 @@ app/javascript/
     │   └── ror_components/                 # Auto-registration directory
     │       └── HelloWorld.jsx              # React component
     └── HeavyMarkdownEditor/
-        ├── HeavyMarkdownEditor.module.css  # Component styles  
+        ├── HeavyMarkdownEditor.module.css  # Component styles
         └── ror_components/                 # Auto-registration directory
             └── HeavyMarkdownEditor.jsx     # React component
 ```
@@ -351,7 +353,7 @@ const HeavyMarkdownEditor = ({ initialContent = '# Hello\n\nStart editing!' }) =
     const loadMarkdown = async () => {
       const [{ default: ReactMarkdown }, { default: remarkGfm }] = await Promise.all([
         import('react-markdown'),
-        import('remark-gfm')
+        import('remark-gfm'),
       ]);
       setReactMarkdown(() => ReactMarkdown);
       setRemarkGfm(() => remarkGfm);
@@ -367,11 +369,7 @@ const HeavyMarkdownEditor = ({ initialContent = '# Hello\n\nStart editing!' }) =
     <div className={styles.editor}>
       <div className={styles.input}>
         <h3>Markdown Input:</h3>
-        <textarea 
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          className={styles.textarea}
-        />
+        <textarea value={content} onChange={(e) => setContent(e.target.value)} className={styles.textarea} />
       </div>
       <div className={styles.output}>
         <h3>Preview:</h3>
@@ -421,7 +419,7 @@ class HelloWorldController < ApplicationController
   end
 
   def editor
-    @editor_props = { 
+    @editor_props = {
       initialContent: "# Welcome to the Heavy Editor\n\nThis component demonstrates:\n- Dynamic imports for SSR\n- Bundle splitting\n- Automatic CSS loading"
     }
   end
@@ -449,6 +447,7 @@ bundle exec rake react_on_rails:generate_packs
 ```
 
 This creates:
+
 - `app/javascript/packs/generated/HelloWorld.js`
 - `app/javascript/packs/generated/HeavyMarkdownEditor.js`
 
@@ -462,14 +461,16 @@ This creates:
 ### 9. Start the Server
 
 Now when you visit your pages, React on Rails automatically:
+
 - Loads only the CSS and JS needed for components on each page
 - Registers components without manual `ReactOnRails.register()` calls
 - Enables optimal bundle splitting and caching
 
 **Bundle sizes in this example (measured from browser dev tools):**
+
 - **HelloWorld**: 1.1MB total resources (50KB component-specific code + shared React runtime)
   - HelloWorld.js: 10.0 kB
-  - HelloWorld.css: 2.5 kB  
+  - HelloWorld.css: 2.5 kB
   - Shared runtime: ~1.1MB (React, webpack runtime)
 - **HeavyMarkdownEditor**: 2.2MB total resources (2.7MB with markdown libraries)
   - HeavyMarkdownEditor.js: 26.5 kB
@@ -487,7 +488,7 @@ Now when you visit your pages, React on Rails automatically:
 **HeavyMarkdownEditor (Heavy Component):**
 ![HeavyMarkdownEditor Bundle Analysis](../images/bundle-splitting-heavy-markdown.png)
 
-*Screenshots show browser dev tools network analysis demonstrating the dramatic difference in bundle sizes and load times between the two components.*
+_Screenshots show browser dev tools network analysis demonstrating the dramatic difference in bundle sizes and load times between the two components._
 
 ### Server Rendering and Client Rendering Components
 
@@ -513,6 +514,7 @@ As of version 13.3.4, bundles inside directories that match `config.components_s
 **Problem**: `react_component` helper throws "Component not found" error.
 
 **Solutions**:
+
 - Ensure your component is in a `ror_components` directory (or your configured `components_subdirectory`)
 - Run `rake react_on_rails:generate_packs` to generate the component bundles
 - Check that your component exports a default export: `export default MyComponent;`
@@ -525,6 +527,7 @@ As of version 13.3.4, bundles inside directories that match `config.components_s
 **Important**: FOUC (Flash of Unstyled Content) **only occurs with HMR (Hot Module Replacement)**. Static and production modes work perfectly without FOUC.
 
 **Solutions**:
+
 - **Development with HMR** (`./bin/dev`): FOUC is expected behavior due to dynamic CSS injection - **not a bug**
 - **Development static** (`./bin/dev static`): No FOUC - CSS is extracted to separate files like production
 - **Production** (`./bin/dev prod`): No FOUC - CSS is extracted and optimized
@@ -532,6 +535,7 @@ As of version 13.3.4, bundles inside directories that match `config.components_s
 - **Component imports**: Check that CSS files are properly imported: `import styles from './Component.module.css';`
 
 **Key insight**: Choose your development mode based on your current needs:
+
 - Use HMR for fastest development (accept FOUC)
 - Use static mode when testing styling without FOUC
 - Use production mode for final testing
@@ -541,6 +545,7 @@ As of version 13.3.4, bundles inside directories that match `config.components_s
 **Problem**: Server-side rendering fails with browser-only API access.
 
 **Solutions**:
+
 - Use dynamic imports for browser-only libraries:
   ```jsx
   useEffect(() => {
@@ -559,6 +564,7 @@ As of version 13.3.4, bundles inside directories that match `config.components_s
 **Problem**: Running `rake react_on_rails:generate_packs` doesn't create files.
 
 **Solutions**:
+
 - Verify `nested_entries: true` in `shakapacker.yml`
 - Check that `components_subdirectory` is correctly configured
 - Ensure components are in the right directory structure: `src/ComponentName/ror_components/ComponentName.jsx`
@@ -569,6 +575,7 @@ As of version 13.3.4, bundles inside directories that match `config.components_s
 **Problem**: Manually specified `javascript_pack_tag` or `stylesheet_pack_tag` break.
 
 **Solutions**:
+
 - Remove specific pack names from manual pack tags: use `<%= javascript_pack_tag %>` instead of `<%= javascript_pack_tag 'specific-bundle' %>`
 - Remove manual `append_javascript_pack_tag` calls - `react_component` with `auto_load_bundle: true` handles this automatically
 - Delete any client bundle entry files (e.g., `client-bundle.js`) that manually register components
@@ -578,6 +585,7 @@ As of version 13.3.4, bundles inside directories that match `config.components_s
 **Problem**: Large bundles loading when not needed.
 
 **Solutions**:
+
 - Use component-level bundle splitting - each page loads only needed components
 - Implement dynamic imports for heavy dependencies
 - Check bundle analysis with `RAILS_ENV=production NODE_ENV=production bundle exec rails assets:precompile` and examine generated bundle sizes
@@ -588,6 +596,7 @@ As of version 13.3.4, bundles inside directories that match `config.components_s
 **Problem**: Works in development but fails in production.
 
 **Solutions**:
+
 - **CSS**: Production extracts CSS to separate files, development might inline it
 - **Source maps**: Check if source maps are causing issues in production
 - **Minification**: Some code might break during minification - check console for errors
@@ -598,6 +607,7 @@ As of version 13.3.4, bundles inside directories that match `config.components_s
 **Problem**: React on Rails installation fails or behaves unexpectedly.
 
 **Solutions**:
+
 - **Correct order**: Always install Shakapacker BEFORE React on Rails
   ```bash
   bundle add shakapacker

@@ -347,5 +347,3 @@ A fully working demo of React on Rails v15 on Rails 8, showcasing server-side re
 
 📚 Part of the [React on Rails Demo Series](https://github.com/shakacode?tab=repositories&q=react_on_rails-demo)
 ```
-
-
