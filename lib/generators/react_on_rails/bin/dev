@@ -10,11 +10,11 @@ end
 def generate_packs
   puts "Generating React on Rails packs..."
   system "bundle exec rake react_on_rails:generate_packs"
-  
-  unless $?.success?
-    puts "Pack generation failed"
-    exit 1
-  end
+
+  return if $CHILD_STATUS.success?
+
+  puts "Pack generation failed"
+  exit 1
 end
 
 def run_production_like
@@ -27,22 +27,22 @@ def run_production_like
   puts ""
   puts "Access at: http://localhost:3001"
   puts ""
-  
+
   # Generate React on Rails packs first
   generate_packs
-  
+
   # Precompile assets in production mode
   puts "Precompiling assets..."
   system "RAILS_ENV=production NODE_ENV=production bundle exec rails assets:precompile"
-  
-  if $?.success?
+
+  if $CHILD_STATUS.success?
     puts "Assets precompiled successfully"
     puts "Starting Rails server in production mode..."
     puts ""
     puts "Press Ctrl+C to stop the server"
     puts "To clean up: rm -rf public/packs && bin/dev"
     puts ""
-    
+
     # Start Rails in production mode
     system "RAILS_ENV=production bundle exec rails server -p 3001"
   else
@@ -61,10 +61,10 @@ def run_static_development
   puts ""
   puts "Access at: http://localhost:3000"
   puts ""
-  
+
   # Generate React on Rails packs first
   generate_packs
-  
+
   if installed? "overmind"
     system "overmind start -f Procfile.dev-static"
   elsif installed? "foreman"
@@ -86,7 +86,7 @@ end
 
 def run_development(process)
   generate_packs
-  
+
   system "#{process} start -f Procfile.dev"
 rescue Errno::ENOENT
   warn <<~MSG
@@ -104,14 +104,14 @@ elsif ARGV[0] == "static"
 elsif ARGV[0] == "help" || ARGV[0] == "--help" || ARGV[0] == "-h"
   puts <<~HELP
     Usage: bin/dev [command]
-    
+
     Commands:
       (none) / hmr        Start development server with HMR (default)
       static              Start development server with static assets (no HMR, no FOUC)
       production-assets   Start with production-optimized assets (no HMR)
       prod                Alias for production-assets
       help                Show this help message
-      
+    #{'  '}
     HMR Development mode (default):
     - Hot Module Replacement (HMR) enabled
     - Automatic React on Rails pack generation
@@ -119,7 +119,7 @@ elsif ARGV[0] == "help" || ARGV[0] == "--help" || ARGV[0] == "-h"
     - May have Flash of Unstyled Content (FOUC)
     - Fast recompilation
     - Access at: http://localhost:3000
-    
+
     Static development mode:
     - No HMR (static assets with auto-recompilation)
     - Automatic React on Rails pack generation
@@ -127,7 +127,7 @@ elsif ARGV[0] == "help" || ARGV[0] == "--help" || ARGV[0] == "-h"
     - Development environment (faster builds than production)
     - Source maps for debugging
     - Access at: http://localhost:3000
-    
+
     Production-like mode:
     - Automatic React on Rails pack generation
     - Optimized, minified bundles
