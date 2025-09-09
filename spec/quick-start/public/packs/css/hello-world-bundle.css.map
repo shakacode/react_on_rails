@@ -1,1 +1,0 @@
-{"version":3,"file":"css/hello-world-bundle.css","mappings":";;;AAAA;AACA;AACA;AACA","sources":["webpack://app/./app/javascript/bundles/HelloWorld/components/HelloWorld.module.css"],"sourcesContent":[".bright {\n  color: green;\n  font-weight: bold;\n}\n"],"names":[],"sourceRoot":""}

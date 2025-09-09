@@ -63,3 +63,6 @@ generated
 
 # Test applications directory
 /test-apps/
+
+# Quick start example directory
+/spec/quick-start/
