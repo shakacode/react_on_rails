@@ -190,7 +190,7 @@ export async function handleRenderRequest({
   dependencyBundleTimestamps?: string[] | number[];
   providedNewBundles?: ProvidedNewBundle[] | null;
   assetsToCopy?: Asset[] | null;
-}): Promise<ResponseResult> {
+}): Promise<{ response: ResponseResult; executionContext?: ExecutionContext }> {
   try {
     // const bundleFilePathPerTimestamp = getRequestBundleFilePath(bundleTimestamp);
     const allBundleFilePaths = Array.from(
@@ -202,15 +202,20 @@ export async function handleRenderRequest({
 
     if (allBundleFilePaths.length > maxVMPoolSize) {
       return {
-        headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
-        status: 410,
-        data: `Too many bundles uploaded. The maximum allowed is ${maxVMPoolSize}. Please reduce the number of bundles or increase maxVMPoolSize in your configuration.`,
+        response: {
+          headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
+          status: 410,
+          data: `Too many bundles uploaded. The maximum allowed is ${maxVMPoolSize}. Please reduce the number of bundles or increase maxVMPoolSize in your configuration.`,
+        },
       };
     }
 
     try {
       const executionContext = await buildExecutionContext(allBundleFilePaths, /* buildVmsIfNeeded */ false);
-      return await prepareResult(renderingRequest, entryBundleFilePath, executionContext);
+      return {
+        response: await prepareResult(renderingRequest, entryBundleFilePath, executionContext),
+        executionContext,
+      };
     } catch (e) {
       // Ignore VMContextNotFoundError, it means the bundle does not exist.
       // The following code will handle this case.
@@ -223,14 +228,14 @@ export async function handleRenderRequest({
     if (providedNewBundles && providedNewBundles.length > 0) {
       const result = await handleNewBundlesProvided(renderingRequest, providedNewBundles, assetsToCopy);
       if (result) {
-        return result;
+        return { response: result };
       }
     }
 
     // Check if the bundle exists:
     const missingBundleError = await validateBundlesExist(bundleTimestamp, dependencyBundleTimestamps);
     if (missingBundleError) {
-      return missingBundleError;
+      return { response: missingBundleError };
     }
 
     // The bundle exists, but the VM has not yet been created.
@@ -241,7 +246,10 @@ export async function handleRenderRequest({
       workerIdLabel(),
     );
     const executionContext = await buildExecutionContext(allBundleFilePaths, /* buildVmsIfNeeded */ true);
-    return await prepareResult(renderingRequest, entryBundleFilePath, executionContext);
+    return {
+      response: await prepareResult(renderingRequest, entryBundleFilePath, executionContext),
+      executionContext,
+    };
   } catch (error) {
     const msg = formatExceptionMessage(
       renderingRequest,
