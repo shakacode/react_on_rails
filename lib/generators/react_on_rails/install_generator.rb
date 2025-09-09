@@ -27,6 +27,7 @@ module ReactOnRails
 
       def run_generators
         if installation_prerequisites_met? || options.ignore_warnings?
+          ensure_shakapacker_installed
           invoke_generators
           add_bin_scripts
           add_post_install_message
@@ -95,6 +96,27 @@ module ReactOnRails
 
       def add_post_install_message
         GeneratorMessages.add_info(GeneratorMessages.helpful_message_after_installation)
+      end
+
+      def ensure_shakapacker_installed
+        return if shakapacker_installed?
+
+        GeneratorMessages.add_info("Shakapacker not detected. Installing Shakapacker...")
+        
+        result = system("rails shakapacker:install")
+        unless result
+          GeneratorMessages.add_error("Failed to install Shakapacker automatically. Please run 'rails shakapacker:install' manually.")
+          return
+        end
+
+        GeneratorMessages.add_info("Shakapacker installed successfully!")
+      end
+
+      def shakapacker_installed?
+        Gem::Specification.find_by_name("shakapacker")
+        true
+      rescue Gem::MissingSpecError
+        false
       end
 
       def using_shakapacker_7_or_above?
