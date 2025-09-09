@@ -25,6 +25,7 @@ import handleGracefulShutdown from './worker/handleGracefulShutdown.js';
 import {
   handleIncrementalRenderRequest,
   type IncrementalRenderInitialRequest,
+  type IncrementalRenderSink,
 } from './worker/handleIncrementalRenderRequest.js';
 import { handleIncrementalRenderStream } from './worker/handleIncrementalRenderStream.js';
 import {
@@ -260,7 +261,7 @@ export default function run(config: Partial<Config>) {
     const { bundleTimestamp } = req.params;
 
     // Stream parser state
-    let renderResult: Awaited<ReturnType<typeof handleIncrementalRenderRequest>> | null = null;
+    let incrementalSink: IncrementalRenderSink | undefined;
 
     try {
       // Handle the incremental render stream
@@ -292,10 +293,12 @@ export default function run(config: Partial<Config>) {
           };
 
           try {
-            renderResult = await handleIncrementalRenderRequest(initial);
+            const { response, sink } = await handleIncrementalRenderRequest(initial);
+            incrementalSink = sink;
+
             return {
-              response: renderResult.response,
-              shouldContinue: true,
+              response,
+              shouldContinue: !!incrementalSink,
             };
           } catch (err) {
             const errorResponse = errorResponseResult(
@@ -313,13 +316,13 @@ export default function run(config: Partial<Config>) {
         },
 
         onUpdateReceived: (obj: unknown) => {
-          // Only process updates if we have a render result
-          if (!renderResult) {
+          if (!incrementalSink) {
+            log.error({ msg: 'Unexpected update chunk received after rendering was aborted', obj });
             return;
           }
 
           try {
-            renderResult.sink.add(obj);
+            incrementalSink.add(obj);
           } catch (err) {
             // Log error but don't stop processing
             log.error({ err, msg: 'Error processing update chunk' });
@@ -331,13 +334,7 @@ export default function run(config: Partial<Config>) {
         },
 
         onRequestEnded: () => {
-          try {
-            if (renderResult) {
-              renderResult.sink.end();
-            }
-          } catch (err) {
-            log.error({ err, msg: 'Error ending render sink' });
-          }
+          // Do nothing
         },
       });
     } catch (err) {
