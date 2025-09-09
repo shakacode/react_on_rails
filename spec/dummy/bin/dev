@@ -6,4 +6,14 @@ then
   gem install foreman
 fi
 
+# Generate React on Rails packs before starting development server
+echo "📦 Generating React on Rails packs..."
+bundle exec rake react_on_rails:generate_packs
+
+if [ $? -ne 0 ]; then
+  echo "❌ Pack generation failed"
+  exit 1
+fi
+
+echo "🚀 Starting development server..."
 foreman start -f Procfile.dev

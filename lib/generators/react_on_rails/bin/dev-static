@@ -8,6 +8,16 @@ rescue Errno::ENOENT
 end
 
 def run(process)
+  # Generate React on Rails packs before starting development server  
+  puts "📦 Generating React on Rails packs..."
+  system "bundle exec rake react_on_rails:generate_packs"
+  
+  unless $?.success?
+    puts "❌ Pack generation failed"
+    exit 1
+  end
+  
+  puts "🚀 Starting development server with static assets..."
   system "#{process} start -f Procfile.dev-static"
 rescue Errno::ENOENT
   warn <<~MSG
