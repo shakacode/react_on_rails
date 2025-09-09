@@ -273,3 +273,79 @@ Run `docker-compose build tests` to build the tests container. Run `docker-compo
 What do project maintainers do? What sort of work is involved? [sstephenson](https://github.com/sstephenson) wrote in the [turbolinks](https://github.com/turbolinks/turbolinks) repo:
 
 > [Why this is not still fully merged?](https://github.com/turbolinks/turbolinks/pull/124#issuecomment-239826060)
+
+# 📦 Demo Naming and README Standards
+
+To keep our React on Rails demos clear, discoverable, and SEO-friendly, all demo repos follow a standardized naming and documentation structure.
+
+---
+
+## ✅ Repository Naming Convention
+
+Use the format:
+
+```
+react_on_rails-demo-v[REACT_ON_RAILS_VERSION]-[key-topics]
+```
+
+**Examples:**
+
+- `react_on_rails-demo-v15-ssr-auto-registration-bundle-splitting`
+- `react_on_rails-demo-v15-react-server-components`
+- `react_on_rails-demo-v15-typescript-setup`
+- `react_on_rails-demo-v15-cypress-setup`
+
+**Why this format?**
+
+- Clear versioning and purpose
+- Easy to discover in GitHub, search engines, and documentation
+- Consistent prefix for grouping demos together
+
+---
+
+## 📝 README Title Format
+
+```
+# React on Rails Demo: [Topics] with v[VERSION] and Rails [VERSION]
+```
+
+**Example:**
+
+```
+# React on Rails Demo: SSR, Auto-Registration & Bundle Splitting with v15 and Rails 8
+```
+
+---
+
+## 📄 README Description Template
+
+```
+A fully working demo of React on Rails v[VERSION] on Rails [VERSION], showcasing [topics].
+
+✅ Includes:
+- [Topic 1]
+- [Topic 2]
+- [Topic 3]
+
+📂 Repo name: `react_on_rails-demo-v[VERSION]-[topics]`
+
+📚 Part of the [React on Rails Demo Series](https://github.com/shakacode?tab=repositories&q=react_on_rails-demo)
+```
+
+**Example:**
+
+```
+A fully working demo of React on Rails v15 on Rails 8, showcasing server-side rendering, file-system-based auto-registration, and intelligent bundle splitting.
+
+✅ Includes:
+- Server-Side Rendering (SSR)
+- Auto-discovered components based on file structure
+- Lightweight vs. heavy component splitting
+- Fix for “package.json not found” install bug
+
+📂 Repo name: `react_on_rails-demo-v15-ssr-auto-registration-bundle-splitting`
+
+📚 Part of the [React on Rails Demo Series](https://github.com/shakacode?tab=repositories&q=react_on_rails-demo)
+```
+
+
