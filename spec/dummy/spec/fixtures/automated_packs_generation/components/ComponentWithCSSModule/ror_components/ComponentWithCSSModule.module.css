@@ -1,0 +1,9 @@
+/* CSS Module for testing */
+.container {
+  padding: 1rem;
+}
+
+.title {
+  font-size: 2rem;
+  font-weight: bold;
+}

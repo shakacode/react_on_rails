@@ -6,6 +6,7 @@ module ReactOnRails
   # rubocop:disable Metrics/ClassLength
   class PacksGenerator
     CONTAINS_CLIENT_OR_SERVER_REGEX = /\.(server|client)($|\.)/
+    COMPONENT_EXTENSIONS = /\.(jsx?|tsx?)$/
     MINIMUM_SHAKAPACKER_VERSION = "6.5.1"
 
     def self.instance
@@ -228,14 +229,20 @@ module ReactOnRails
       paths.to_h { |path| [component_name(path), path] }
     end
 
+    def filter_component_files(paths)
+      paths.grep(COMPONENT_EXTENSIONS)
+    end
+
     def common_component_to_path
       common_components_paths = Dir.glob("#{components_search_path}/*").grep_v(CONTAINS_CLIENT_OR_SERVER_REGEX)
-      component_name_to_path(common_components_paths)
+      filtered_paths = filter_component_files(common_components_paths)
+      component_name_to_path(filtered_paths)
     end
 
     def client_component_to_path
       client_render_components_paths = Dir.glob("#{components_search_path}/*.client.*")
-      client_specific_components = component_name_to_path(client_render_components_paths)
+      filtered_client_paths = filter_component_files(client_render_components_paths)
+      client_specific_components = component_name_to_path(filtered_client_paths)
 
       duplicate_components = common_component_to_path.slice(*client_specific_components.keys)
       duplicate_components.each_key { |component| raise_client_component_overrides_common(component) }
@@ -245,7 +252,8 @@ module ReactOnRails
 
     def server_component_to_path
       server_render_components_paths = Dir.glob("#{components_search_path}/*.server.*")
-      server_specific_components = component_name_to_path(server_render_components_paths)
+      filtered_server_paths = filter_component_files(server_render_components_paths)
+      server_specific_components = component_name_to_path(filtered_server_paths)
 
       duplicate_components = common_component_to_path.slice(*server_specific_components.keys)
       duplicate_components.each_key { |component| raise_server_component_overrides_common(component) }
