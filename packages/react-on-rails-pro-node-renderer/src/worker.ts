@@ -236,7 +236,7 @@ export default function run(config: Partial<Config>) {
             providedNewBundles,
             assetsToCopy,
           });
-          await setResponse(result, res);
+          await setResponse(result.response, res);
         } catch (err) {
           const exceptionMessage = formatExceptionMessage(
             renderingRequest,
