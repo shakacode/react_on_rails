@@ -57,16 +57,12 @@ describe('incremental render NDJSON endpoint', () => {
 
   const createMockSink = () => {
     const sinkAdd = jest.fn();
-    const sinkEnd = jest.fn();
-    const sinkAbort = jest.fn();
 
     const sink: incremental.IncrementalRenderSink = {
       add: sinkAdd,
-      end: sinkEnd,
-      abort: sinkAbort,
     };
 
-    return { sink, sinkAdd, sinkEnd, sinkAbort };
+    return { sink, sinkAdd };
   };
 
   const createMockResponse = (data = 'mock response'): ResponseResult => ({
@@ -118,7 +114,7 @@ describe('incremental render NDJSON endpoint', () => {
   const createBasicTestSetup = async () => {
     await createVmBundle(TEST_NAME);
 
-    const { sink, sinkAdd, sinkEnd, sinkAbort } = createMockSink();
+    const { sink, sinkAdd } = createMockSink();
     const mockResponse = createMockResponse();
     const mockResult = createMockResult(sink, mockResponse);
 
@@ -131,8 +127,6 @@ describe('incremental render NDJSON endpoint', () => {
     return {
       sink,
       sinkAdd,
-      sinkEnd,
-      sinkAbort,
       mockResponse,
       mockResult,
       handleSpy,
@@ -157,8 +151,6 @@ describe('incremental render NDJSON endpoint', () => {
 
     const sink: incremental.IncrementalRenderSink = {
       add: sinkAdd,
-      end: jest.fn(),
-      abort: jest.fn(),
     };
 
     const mockResponse: ResponseResult = {
@@ -250,7 +242,7 @@ describe('incremental render NDJSON endpoint', () => {
   });
 
   test('calls handleIncrementalRenderRequest immediately after first chunk and processes each subsequent chunk immediately', async () => {
-    const { sinkAdd, sinkEnd, sinkAbort, handleSpy, SERVER_BUNDLE_TIMESTAMP } = await createBasicTestSetup();
+    const { sinkAdd, handleSpy, SERVER_BUNDLE_TIMESTAMP } = await createBasicTestSetup();
 
     // Create the HTTP request
     const req = createHttpRequest(SERVER_BUNDLE_TIMESTAMP);
@@ -295,18 +287,9 @@ describe('incremental render NDJSON endpoint', () => {
     // Wait for the request to complete
     await responsePromise;
 
-    // Wait for the sink.end to be called
-    await waitFor(() => {
-      expect(sinkEnd).toHaveBeenCalledTimes(1);
-    });
-
     // Final verification: all chunks were processed in the correct order
     expect(handleSpy).toHaveBeenCalledTimes(1);
     expect(sinkAdd.mock.calls).toEqual([[{ a: 1 }], [{ b: 2 }], [{ c: 3 }]]);
-
-    // Verify stream lifecycle methods were called correctly
-    expect(sinkEnd).toHaveBeenCalledTimes(1);
-    expect(sinkAbort).not.toHaveBeenCalled();
   });
 
   test('returns 410 error when bundle is missing', async () => {
@@ -360,7 +343,7 @@ describe('incremental render NDJSON endpoint', () => {
     // Create a bundle for this test
     await createVmBundle(TEST_NAME);
 
-    const { sink, sinkAdd, sinkEnd, sinkAbort } = createMockSink();
+    const { sink, sinkAdd } = createMockSink();
 
     const mockResponse: ResponseResult = createMockResponse();
 
@@ -413,18 +396,11 @@ describe('incremental render NDJSON endpoint', () => {
     // Wait for the request to complete
     await responsePromise;
 
-    // Wait for the sink.end to be called
-    await waitFor(() => {
-      expect(sinkEnd).toHaveBeenCalledTimes(1);
-    });
-
     // Verify that processing continued after the malformed chunk
     // The malformed chunk should be skipped, but valid chunks should be processed
     // Verify that the stream completed successfully
     await waitFor(() => {
       expect(sinkAdd.mock.calls).toEqual([[{ a: 1 }], [{ d: 4 }]]);
-      expect(sinkEnd).toHaveBeenCalledTimes(1);
-      expect(sinkAbort).not.toHaveBeenCalled();
     });
   });
 
@@ -432,7 +408,7 @@ describe('incremental render NDJSON endpoint', () => {
     // Create a bundle for this test
     await createVmBundle(TEST_NAME);
 
-    const { sink, sinkAdd, sinkEnd } = createMockSink();
+    const { sink, sinkAdd } = createMockSink();
 
     const mockResponse: ResponseResult = createMockResponse();
 
@@ -476,15 +452,9 @@ describe('incremental render NDJSON endpoint', () => {
     // Wait for the request to complete
     await responsePromise;
 
-    // Wait for the sink.end to be called
-    await waitFor(() => {
-      expect(sinkEnd).toHaveBeenCalledTimes(1);
-    });
-
     // Verify that only valid JSON objects were processed
     expect(handleSpy).toHaveBeenCalledTimes(1);
     expect(sinkAdd.mock.calls).toEqual([[{ a: 1 }], [{ b: 2 }], [{ c: 3 }]]);
-    expect(sinkEnd).toHaveBeenCalledTimes(1);
   });
 
   test('throws error when first chunk processing fails (e.g., authentication)', async () => {
@@ -531,8 +501,7 @@ describe('incremental render NDJSON endpoint', () => {
       'Goodbye from stream',
     ];
 
-    const { responseStream, sinkAdd, sink, handleSpy, SERVER_BUNDLE_TIMESTAMP } =
-      await createStreamingTestSetup();
+    const { responseStream, sinkAdd, handleSpy, SERVER_BUNDLE_TIMESTAMP } = await createStreamingTestSetup();
 
     // write the response chunks to the stream
     let sentChunkIndex = 0;
@@ -603,15 +572,10 @@ describe('incremental render NDJSON endpoint', () => {
 
     // Verify that the mock was called correctly
     expect(handleSpy).toHaveBeenCalledTimes(1);
-
-    await waitFor(() => {
-      expect(sink.end).toHaveBeenCalled();
-    });
   });
 
   test('echo server - processes each chunk and immediately streams it back', async () => {
-    const { responseStream, sinkAdd, sink, handleSpy, SERVER_BUNDLE_TIMESTAMP } =
-      await createStreamingTestSetup();
+    const { responseStream, sinkAdd, handleSpy, SERVER_BUNDLE_TIMESTAMP } = await createStreamingTestSetup();
 
     // Create the HTTP request
     const req = createHttpRequest(SERVER_BUNDLE_TIMESTAMP);
@@ -699,10 +663,5 @@ describe('incremental render NDJSON endpoint', () => {
 
     // Verify that the mock was called correctly
     expect(handleSpy).toHaveBeenCalledTimes(1);
-
-    // Verify that the sink.end was called
-    await waitFor(() => {
-      expect(sink.end).toHaveBeenCalled();
-    });
   });
 });
