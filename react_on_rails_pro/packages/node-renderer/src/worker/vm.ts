@@ -342,7 +342,7 @@ export async function buildExecutionContext(
         context.sharedExecutionContext = sharedExecutionContext;
         context.runOnOtherBundle = (bundleTimestamp: string | number, newRenderingRequest: string) => {
           const otherBundleFilePath = getRequestBundleFilePath(bundleTimestamp);
-          return runInVM(otherBundleFilePath, newRenderingRequest, vmCluster);
+          return runInVM(newRenderingRequest, otherBundleFilePath, vmCluster);
         };
 
         try {

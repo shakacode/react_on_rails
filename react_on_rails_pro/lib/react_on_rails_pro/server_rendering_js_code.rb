@@ -36,6 +36,7 @@ module ReactOnRailsPro
           renderingRequest,
           rscBundleHash: '#{ReactOnRailsPro::Utils.rsc_bundle_hash}',
         }
+        const runOnOtherBundle = globalThis.runOnOtherBundle;
         if (typeof generateRSCPayload !== 'function') {
           globalThis.generateRSCPayload = function generateRSCPayload(componentName, props, railsContext) {
             const { renderingRequest, rscBundleHash } = railsContext.serverSideRSCPayloadParameters;

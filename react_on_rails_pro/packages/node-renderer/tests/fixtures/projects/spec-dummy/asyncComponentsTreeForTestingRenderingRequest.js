@@ -8,6 +8,7 @@
     rscBundleHash: '88888-test',
   }
 
+  const runOnOtherBundle = globalThis.runOnOtherBundle;
   if (typeof generateRSCPayload !== 'function') {
     globalThis.generateRSCPayload = function generateRSCPayload(componentName, props, railsContext) {
       const { renderingRequest, rscBundleHash } = railsContext.serverSideRSCPayloadParameters;
