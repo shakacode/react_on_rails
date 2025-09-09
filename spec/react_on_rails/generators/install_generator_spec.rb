@@ -134,20 +134,23 @@ describe InstallGenerator, type: :generator do
   context "when detecting Shakapacker installation" do
     let(:install_generator) { described_class.new }
 
-    context "shakapacker_installed?" do
+    context "when testing shakapacker_installed?" do
       specify "when Shakapacker gem is installed" do
-        mock_gem = double("gem_spec", version: double("version", segments: [7, 0, 0]))
+        mock_version = instance_double(Gem::Version, segments: [7, 0, 0])
+        mock_gem = instance_double(Gem::Specification, version: mock_version)
         allow(Gem::Specification).to receive(:find_by_name).with("shakapacker").and_return(mock_gem)
         expect(install_generator.send(:shakapacker_installed?)).to be true
       end
 
       specify "when Shakapacker gem is not installed" do
-        allow(Gem::Specification).to receive(:find_by_name).with("shakapacker").and_raise(Gem::MissingSpecError.new("gem", "spec"))
+        allow(Gem::Specification).to receive(:find_by_name).with("shakapacker").and_raise(Gem::MissingSpecError.new(
+                                                                                            "gem", "spec"
+                                                                                          ))
         expect(install_generator.send(:shakapacker_installed?)).to be false
       end
     end
 
-    context "ensure_shakapacker_installed" do
+    context "when testing ensure_shakapacker_installed" do
       specify "when Shakapacker is already installed" do
         allow(install_generator).to receive(:shakapacker_installed?).and_return(true)
         expect(install_generator).not_to receive(:system)
@@ -166,7 +169,9 @@ describe InstallGenerator, type: :generator do
         allow(install_generator).to receive(:shakapacker_installed?).and_return(false)
         allow(install_generator).to receive(:system).with("rails shakapacker:install").and_return(false)
         expect(GeneratorMessages).to receive(:add_info).with("Shakapacker not detected. Installing Shakapacker...")
-        expect(GeneratorMessages).to receive(:add_error).with("Failed to install Shakapacker automatically. Please run 'rails shakapacker:install' manually.")
+        expect(GeneratorMessages).to receive(:add_error)
+          .with("Failed to install Shakapacker automatically. " \
+                "Please run 'rails shakapacker:install' manually.")
         install_generator.send(:ensure_shakapacker_installed)
       end
     end
