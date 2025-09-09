@@ -49,10 +49,10 @@ ReactOnRails.configure do |config|
   ################################################################################
   # `components_subdirectory`  is the name of the matching directories that contain automatically registered components
   # for use in the Rails views. The default is nil, you can enable the feature by updating it in the next line.
-  # config.components_subdirectory = "ror_components"
+  config.components_subdirectory = "ror_components"
   #
   # For automated component registry, `render_component` view helper method tries to load bundle for component from
   # generated directory. default is false, you can pass option at the time of individual usage or update the default
   # in the following line
-  config.auto_load_bundle = false
+  config.auto_load_bundle = true
 end
