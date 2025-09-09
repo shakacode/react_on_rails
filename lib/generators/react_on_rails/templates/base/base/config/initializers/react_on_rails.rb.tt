@@ -54,5 +54,5 @@ ReactOnRails.configure do |config|
   # For automated component registry, `render_component` view helper method tries to load bundle for component from
   # generated directory. default is false, you can pass option at the time of individual usage or update the default
   # in the following line
-  config.auto_load_bundle = true
+  config.auto_load_bundle = false
 end
