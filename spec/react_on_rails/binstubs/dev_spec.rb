@@ -16,9 +16,35 @@ RSpec.describe "bin/dev script" do
     $stdout = original_stdout
   end
 
+  it "includes pack generation function" do
+    script_content = File.read(script_path)
+    expect(script_content).to include("def generate_packs")
+    expect(script_content).to include("bundle exec rake react_on_rails:generate_packs")
+  end
+
+  it "supports static development mode" do
+    script_content = File.read(script_path)
+    expect(script_content).to include("run_static_development")
+    expect(script_content).to include("Procfile.dev-static")
+  end
+
+  it "supports production-like mode" do
+    script_content = File.read(script_path)
+    expect(script_content).to include("run_production_like")
+    expect(script_content).to include("RAILS_ENV=production NODE_ENV=production bundle exec rails assets:precompile")
+    expect(script_content).to include("rails server -p 3001")
+  end
+
+  it "supports help command" do
+    script_content = File.read(script_path)
+    expect(script_content).to include('ARGV[0] == "help" || ARGV[0] == "--help" || ARGV[0] == "-h"')
+    expect(script_content).to include("Usage: bin/dev [command]")
+  end
+
   it "with Overmind installed, uses Overmind" do
     allow(IO).to receive(:popen).with("overmind -v").and_return("Some truthy result")
 
+    expect_any_instance_of(Kernel).to receive(:system).with("bundle exec rake react_on_rails:generate_packs").and_return(true)
     expect_any_instance_of(Kernel).to receive(:system).with("overmind start -f Procfile.dev")
 
     load script_path
@@ -28,6 +54,7 @@ RSpec.describe "bin/dev script" do
     allow(IO).to receive(:popen).with("overmind -v").and_raise(Errno::ENOENT)
     allow(IO).to receive(:popen).with("foreman -v").and_return("Some truthy result")
 
+    expect_any_instance_of(Kernel).to receive(:system).with("bundle exec rake react_on_rails:generate_packs").and_return(true)
     expect_any_instance_of(Kernel).to receive(:system).with("foreman start -f Procfile.dev")
 
     load script_path
@@ -49,6 +76,7 @@ RSpec.describe "bin/dev script" do
   it "With Overmind and without Procfile, exits with error message" do
     allow(IO).to receive(:popen).with("overmind -v").and_return("Some truthy result")
 
+    allow_any_instance_of(Kernel).to receive(:system).with("bundle exec rake react_on_rails:generate_packs").and_return(true)
     allow_any_instance_of(Kernel)
       .to receive(:system)
       .with("overmind start -f Procfile.dev")

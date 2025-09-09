@@ -1,9 +1,157 @@
-#!/usr/bin/env bash
+#!/usr/bin/env ruby
+# frozen_string_literal: true
 
-if ! command -v foreman &> /dev/null
-then
-  echo "Installing foreman..."
-  gem install foreman
-fi
+def installed?(process)
+  IO.popen "#{process} -v"
+rescue Errno::ENOENT
+  false
+end
 
-foreman start -f Procfile.dev
+def generate_packs
+  puts "Generating React on Rails packs..."
+  system "bundle exec rake react_on_rails:generate_packs"
+  
+  unless $?.success?
+    puts "Pack generation failed"
+    exit 1
+  end
+end
+
+def run_production_like
+  puts "Starting production-like development server..."
+  puts "   - Generating React on Rails packs"
+  puts "   - Precompiling assets with production optimizations"
+  puts "   - Running Rails server on port 3001"
+  puts "   - No HMR (Hot Module Replacement)"
+  puts "   - CSS extracted to separate files (no FOUC)"
+  puts ""
+  puts "Access at: http://localhost:3001"
+  puts ""
+  
+  # Generate React on Rails packs first
+  generate_packs
+  
+  # Precompile assets in production mode
+  puts "Precompiling assets..."
+  system "RAILS_ENV=production NODE_ENV=production bundle exec rails assets:precompile"
+  
+  if $?.success?
+    puts "Assets precompiled successfully"
+    puts "Starting Rails server in production mode..."
+    puts ""
+    puts "Press Ctrl+C to stop the server"
+    puts "To clean up: rm -rf public/packs && bin/dev"
+    puts ""
+    
+    # Start Rails in production mode
+    system "RAILS_ENV=production bundle exec rails server -p 3001"
+  else
+    puts "Asset precompilation failed"
+    exit 1
+  end
+end
+
+def run_static_development
+  puts "Starting development server with static assets..."
+  puts "   - Generating React on Rails packs"
+  puts "   - Using shakapacker --watch (no HMR)"
+  puts "   - CSS extracted to separate files (no FOUC)"
+  puts "   - Development environment (source maps, faster builds)"
+  puts "   - Auto-recompiles on file changes"
+  puts ""
+  puts "Access at: http://localhost:3000"
+  puts ""
+  
+  # Generate React on Rails packs first
+  generate_packs
+  
+  if installed? "overmind"
+    system "overmind start -f Procfile.dev-static"
+  elsif installed? "foreman"
+    system "foreman start -f Procfile.dev-static"
+  else
+    warn <<~MSG
+      NOTICE:
+      For this script to run, you need either 'overmind' or 'foreman' installed on your machine. Please try this script after installing one of them.
+    MSG
+    exit!
+  end
+rescue Errno::ENOENT
+  warn <<~MSG
+    ERROR:
+    Please ensure `Procfile.dev-static` exists in your project!
+  MSG
+  exit!
+end
+
+def run_development(process)
+  generate_packs
+  
+  system "#{process} start -f Procfile.dev"
+rescue Errno::ENOENT
+  warn <<~MSG
+    ERROR:
+    Please ensure `Procfile.dev` exists in your project!
+  MSG
+  exit!
+end
+
+# Check for arguments
+if ARGV[0] == "production-assets" || ARGV[0] == "prod"
+  run_production_like
+elsif ARGV[0] == "static"
+  run_static_development
+elsif ARGV[0] == "help" || ARGV[0] == "--help" || ARGV[0] == "-h"
+  puts <<~HELP
+    Usage: bin/dev [command]
+    
+    Commands:
+      (none) / hmr        Start development server with HMR (default)
+      static              Start development server with static assets (no HMR, no FOUC)
+      production-assets   Start with production-optimized assets (no HMR)
+      prod                Alias for production-assets
+      help                Show this help message
+      
+    HMR Development mode (default):
+    - Hot Module Replacement (HMR) enabled
+    - Automatic React on Rails pack generation
+    - Source maps for debugging
+    - May have Flash of Unstyled Content (FOUC)
+    - Fast recompilation
+    - Access at: http://localhost:3000
+    
+    Static development mode:
+    - No HMR (static assets with auto-recompilation)
+    - Automatic React on Rails pack generation
+    - CSS extracted to separate files (no FOUC)
+    - Development environment (faster builds than production)
+    - Source maps for debugging
+    - Access at: http://localhost:3000
+    
+    Production-like mode:
+    - Automatic React on Rails pack generation
+    - Optimized, minified bundles
+    - Extracted CSS files (no FOUC)
+    - No HMR (static assets)
+    - Slower recompilation
+    - Access at: http://localhost:3001
+  HELP
+elsif ARGV[0] == "hmr" || ARGV[0].nil?
+  # Default development mode (HMR)
+  if installed? "overmind"
+    run_development "overmind"
+  elsif installed? "foreman"
+    run_development "foreman"
+  else
+    warn <<~MSG
+      NOTICE:
+      For this script to run, you need either 'overmind' or 'foreman' installed on your machine. Please try this script after installing one of them.
+    MSG
+    exit!
+  end
+else
+  # Unknown argument
+  puts "Unknown argument: #{ARGV[0]}"
+  puts "Run 'bin/dev help' for usage information"
+  exit 1
+end
