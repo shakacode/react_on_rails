@@ -134,7 +134,7 @@ Then run the server with one of the following options:
 ```bash
 ./bin/dev # For HMR
 # or
-./bin/dev-static # Without HMR, statically creating the bundles
+./bin/dev static # Without HMR, statically creating the bundles
 ```
 
 Visit [http://localhost:3000/hello_world](http://localhost:3000/hello_world) and see your **React On Rails** app running!

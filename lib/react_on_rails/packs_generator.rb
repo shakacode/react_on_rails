@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "fileutils"
+require "set"
 
 module ReactOnRails
   # rubocop:disable Metrics/ClassLength
@@ -17,6 +18,10 @@ module ReactOnRails
       return unless ReactOnRails.configuration.auto_load_bundle
 
       add_generated_pack_to_server_bundle
+      
+      # Clean any non-generated files from directories
+      clean_non_generated_files_with_feedback
+      
       are_generated_files_present_and_up_to_date = Dir.exist?(generated_packs_directory_path) &&
                                                    File.exist?(generated_server_bundle_file_path) &&
                                                    !stale_or_missing_packs?
@@ -186,6 +191,56 @@ module ReactOnRails
       "#{generated_nonentrypoints_path}/#{generated_server_bundle_file_name}.js"
     end
 
+    def clean_non_generated_files_with_feedback
+      directories_to_clean = [
+        generated_packs_directory_path,
+        generated_server_bundle_directory_path
+      ].compact.uniq
+
+      # Get expected generated files
+      expected_pack_files = Set.new
+      common_component_to_path.each_value { |path| expected_pack_files << generated_pack_path(path) }
+      client_component_to_path.each_value { |path| expected_pack_files << generated_pack_path(path) }
+      
+      expected_server_bundle = generated_server_bundle_file_path if ReactOnRails.configuration.server_bundle_js_file.present?
+
+      puts Rainbow("🧹 Cleaning non-generated files...").yellow
+
+      deleted_files_count = 0
+      directories_to_clean.each do |dir_path|
+        next unless Dir.exist?(dir_path)
+
+        # Find all existing files
+        existing_files = Dir.glob("#{dir_path}/**/*").select { |f| File.file?(f) }
+        
+        # Identify files that shouldn't exist
+        unexpected_files = existing_files.reject do |file|
+          if dir_path == generated_server_bundle_directory_path
+            file == expected_server_bundle
+          else
+            expected_pack_files.include?(file)
+          end
+        end
+
+        if unexpected_files.any?
+          puts Rainbow("   Deleting #{unexpected_files.length} unexpected files from #{dir_path}:").cyan
+          unexpected_files.each do |file|
+            puts Rainbow("     - #{File.basename(file)}").blue
+            File.delete(file)
+          end
+          deleted_files_count += unexpected_files.length
+        else
+          puts Rainbow("   No unexpected files found in #{dir_path}").cyan
+        end
+      end
+
+      if deleted_files_count > 0
+        puts Rainbow("🗑️  Deleted #{deleted_files_count} unexpected files total").red
+      else
+        puts Rainbow("✨ No unexpected files to delete").green
+      end
+    end
+
     def clean_generated_directories_with_feedback
       directories_to_clean = [
         generated_packs_directory_path,
@@ -194,32 +249,38 @@ module ReactOnRails
 
       puts Rainbow("🧹 Cleaning generated directories...").yellow
 
-      deleted_files_count = 0
-      directories_to_clean.each do |dir_path|
-        if Dir.exist?(dir_path)
-          # List files before deletion
-          files = Dir.glob("#{dir_path}/**/*").select { |f| File.file?(f) }
-          if files.any?
-            puts Rainbow("   Deleting #{files.length} files from #{dir_path}:").cyan
-            files.each { |file| puts Rainbow("     - #{File.basename(file)}").blue }
-            deleted_files_count += files.length
-          else
-            puts Rainbow("   Directory #{dir_path} is already empty").cyan
-          end
+      total_deleted = directories_to_clean.sum { |dir_path| clean_directory_with_feedback(dir_path) }
 
-          FileUtils.rm_rf(dir_path)
-          FileUtils.mkdir_p(dir_path)
-        else
-          puts Rainbow("   Directory #{dir_path} does not exist, creating...").cyan
-          FileUtils.mkdir_p(dir_path)
-        end
-      end
-
-      if deleted_files_count > 0
-        puts Rainbow("🗑️  Deleted #{deleted_files_count} generated files total").red
+      if total_deleted.positive?
+        puts Rainbow("🗑️  Deleted #{total_deleted} generated files total").red
       else
         puts Rainbow("✨ No files to delete, directories are clean").green
       end
+    end
+
+    def clean_directory_with_feedback(dir_path)
+      return create_directory_with_feedback(dir_path) unless Dir.exist?(dir_path)
+
+      files = Dir.glob("#{dir_path}/**/*").select { |f| File.file?(f) }
+      
+      if files.any?
+        puts Rainbow("   Deleting #{files.length} files from #{dir_path}:").cyan
+        files.each { |file| puts Rainbow("     - #{File.basename(file)}").blue }
+        FileUtils.rm_rf(dir_path)
+        FileUtils.mkdir_p(dir_path)
+        files.length
+      else
+        puts Rainbow("   Directory #{dir_path} is already empty").cyan
+        FileUtils.rm_rf(dir_path)
+        FileUtils.mkdir_p(dir_path)
+        0
+      end
+    end
+
+    def create_directory_with_feedback(dir_path)
+      puts Rainbow("   Directory #{dir_path} does not exist, creating...").cyan
+      FileUtils.mkdir_p(dir_path)
+      0
     end
 
     def server_bundle_entrypoint

@@ -5,6 +5,7 @@ This guide provides specific guidelines for AI coding agents (like Claude Code) 
 ## Quick Reference Commands
 
 ### Essential Commands
+
 ```bash
 # Install dependencies
 bundle && yarn
@@ -13,7 +14,7 @@ bundle && yarn
 bundle exec rspec                    # All tests (from project root)
 cd spec/dummy && bundle exec rspec   # Dummy app tests only
 
-# Linting & Formatting  
+# Linting & Formatting
 bundle exec rubocop                  # Ruby linting
 bundle exec rubocop [file_path]     # Lint specific file
 # Note: yarn format requires local setup, format manually
@@ -23,6 +24,7 @@ cd spec/dummy && foreman start       # Start dummy app with webpack
 ```
 
 ### CI Compliance Checklist
+
 - [ ] `bundle exec rubocop` passes with no offenses
 - [ ] All RSpec tests pass
 - [ ] No trailing whitespace
@@ -32,7 +34,9 @@ cd spec/dummy && foreman start       # Start dummy app with webpack
 ## Development Patterns for AI Contributors
 
 ### 1. Task Management
+
 Always use TodoWrite tool for multi-step tasks to:
+
 - Track progress transparently
 - Show the user what's being worked on
 - Ensure no steps are forgotten
@@ -40,15 +44,17 @@ Always use TodoWrite tool for multi-step tasks to:
 
 ```markdown
 Example workflow:
+
 1. Analyze the problem
 2. Create test cases
-3. Implement the fix  
+3. Implement the fix
 4. Run tests
 5. Fix linting issues
 6. Update documentation
 ```
 
 ### 2. Test-Driven Development
+
 When fixing bugs or adding features:
 
 1. **Create failing tests first** that reproduce the issue
@@ -57,6 +63,7 @@ When fixing bugs or adding features:
 4. **Verify all existing tests still pass**
 
 ### 3. File Processing Guidelines
+
 When working with file generation or processing:
 
 - **Filter by extension**: Only process relevant files (e.g., `.js/.jsx/.ts/.tsx` for React components)
@@ -64,6 +71,7 @@ When working with file generation or processing:
 - **Handle edge cases**: CSS modules, config files, etc. should be excluded appropriately
 
 Example from CSS module fix:
+
 ```ruby
 COMPONENT_EXTENSIONS = /\.(jsx?|tsx?)$/
 
@@ -77,15 +85,17 @@ end
 ### Common Fixes
 
 1. **Trailing Whitespace**
+
    ```ruby
    # Bad
-   let(:value) { "test" }    
-   
-   # Good  
+   let(:value) { "test" }
+
+   # Good
    let(:value) { "test" }
    ```
 
 2. **Line Length (120 chars max)**
+
    ```ruby
    # Bad
    expect { eval(pack_content.gsub(/import.*from.*['"];/, "").gsub(/ReactOnRails\.register.*/, "")) }.not_to raise_error
@@ -97,11 +107,12 @@ end
    ```
 
 3. **Named Subjects (RSpec)**
+
    ```ruby
    # Bad
    describe "#method_name" do
      subject { instance.method_name(arg) }
-     
+
      it "does something" do
        expect(subject).to eq "result"
      end
@@ -110,7 +121,7 @@ end
    # Good
    describe "#method_name" do
      subject(:method_result) { instance.method_name(arg) }
-     
+
      it "does something" do
        expect(method_result).to eq "result"
      end
@@ -118,6 +129,7 @@ end
    ```
 
 4. **Security/Eval Violations**
+
    ```ruby
    # Bad
    expect { eval(dangerous_code) }.not_to raise_error
@@ -130,6 +142,7 @@ end
    ```
 
 ### RuboCop Workflow
+
 1. Run `bundle exec rubocop [file]` to see violations
 2. Fix violations manually or with auto-correct where safe
 3. Re-run to verify fixes
@@ -138,15 +151,16 @@ end
 ## Testing Best Practices
 
 ### Test Structure
+
 ```ruby
 describe "FeatureName" do
   context "when condition A" do
     let(:setup) { create_test_condition }
-    
+
     before do
       # Setup code
     end
-    
+
     it "does expected behavior" do
       # Arrange, Act, Assert
     end
@@ -155,11 +169,13 @@ end
 ```
 
 ### Test Fixtures
+
 - Create realistic test data that represents edge cases
 - Use descriptive names for fixtures and variables
 - Clean up after tests (handled by RSpec automatically in most cases)
 
 ### CSS Module Testing Example
+
 ```ruby
 # Create test fixtures
 Write.create("ComponentWithCSSModule.module.css", css_content)
@@ -175,6 +191,7 @@ end
 ## Git & PR Workflow
 
 ### Branch Management
+
 ```bash
 git checkout -b fix/descriptive-name
 # Make changes
@@ -189,11 +206,12 @@ git push -u origin fix/descriptive-name
 ```
 
 ### Commit Message Format
+
 ```
 Brief description of the change
 
 - Detailed bullet points of what changed
-- Why the change was needed  
+- Why the change was needed
 - Any breaking changes or considerations
 
 Fixes #issue_number
@@ -204,7 +222,9 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 ```
 
 ### PR Creation
+
 Use `gh pr create` with:
+
 - Clear title referencing the issue
 - Comprehensive description with summary and test plan
 - Link to the issue being fixed
@@ -213,21 +233,25 @@ Use `gh pr create` with:
 ## Common Pitfalls & Solutions
 
 ### 1. File Path Issues
+
 - Always use absolute paths in tools
 - Check current working directory with `pwd`
 - Use proper path joining methods
 
 ### 2. Test Environment
+
 - Run tests from correct directory (often project root)
 - Understand the difference between gem tests vs dummy app tests
 - Clean up test artifacts appropriately
 
 ### 3. Dependency Management
+
 - Don't assume packages are installed globally
 - Use `bundle exec` for Ruby commands
 - Verify setup with `bundle && yarn` when needed
 
 ### 4. RuboCop Configuration
+
 - Different rules may apply to different directories
 - Use `bundle exec rubocop` (not global rubocop)
 - Check `.rubocop.yml` files for project-specific rules
@@ -248,7 +272,7 @@ Use `gh pr create` with:
    - Ensure fix doesn't break existing functionality
    - Follow existing code patterns
 
-4. **Verify Solution** 
+4. **Verify Solution**
    - All new tests pass
    - All existing tests still pass
    - RuboCop compliance maintained
@@ -257,6 +281,7 @@ Use `gh pr create` with:
 ## IDE Configuration for AI Context
 
 When analyzing codebases, ignore these directories to avoid confusion:
+
 - `/coverage`, `/tmp`, `/gen-examples`
 - `/node_package/lib`, `/node_modules`
 - `/spec/dummy/app/assets/webpack`
@@ -266,7 +291,7 @@ When analyzing codebases, ignore these directories to avoid confusion:
 ## Communication with Human Maintainers
 
 - Be transparent about AI-generated changes
-- Explain reasoning behind implementation choices  
+- Explain reasoning behind implementation choices
 - Ask for clarification when requirements are ambiguous
 - Provide comprehensive commit messages and PR descriptions
 - Include test plans and verification steps
