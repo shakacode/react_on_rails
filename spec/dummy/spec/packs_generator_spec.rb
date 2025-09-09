@@ -448,12 +448,12 @@ module ReactOnRails
       it "generates a pack with valid JavaScript variable names" do
         expect(File.exist?(component_pack)).to be(true)
         pack_content = File.read(component_pack)
-        
+
         # Check that the generated pack content is valid JavaScript
         expect(pack_content).to include("import ReactOnRails from 'react-on-rails/client';")
         expect(pack_content).to include("import #{component_name} from")
         expect(pack_content).to include("ReactOnRails.register({#{component_name}});")
-        
+
         # Verify that variable names don't contain dots (invalid in JS)
         expect(pack_content).not_to match(/ComponentWithCSSModule\.module/)
         expect(pack_content).not_to match(/import .+\.module/)
@@ -461,9 +461,13 @@ module ReactOnRails
 
       it "generates valid JavaScript that can be parsed without syntax errors" do
         pack_content = File.read(component_pack)
-        
+
         # This would fail if the generated JavaScript has syntax errors
-        expect { eval(pack_content.gsub(/import.*from.*['"];/, "").gsub(/ReactOnRails\.register.*/, "")) }.not_to raise_error
+        # rubocop:disable Security/Eval
+        sanitized_content = pack_content.gsub(/import.*from.*['"];/, "")
+                                        .gsub(/ReactOnRails\.register.*/, "")
+        expect { eval(sanitized_content) }.not_to raise_error
+        # rubocop:enable Security/Eval
       end
     end
 
@@ -691,7 +695,7 @@ module ReactOnRails
     end
 
     describe "#component_name" do
-      subject { described_class.instance.send(:component_name, file_path) }
+      subject(:component_name) { described_class.instance.send(:component_name, file_path) }
 
       context "with regular component file" do
         let(:file_path) { "/path/to/MyComponent.jsx" }
@@ -717,7 +721,7 @@ module ReactOnRails
         # CSS modules should still work with component_name method, but they
         # should not be processed as React components by the generator
         it "returns name with dot for CSS modules" do
-          expect(subject).to eq "HeavyMarkdownEditor.module"
+          expect(component_name).to eq "HeavyMarkdownEditor.module"
         end
       end
 
