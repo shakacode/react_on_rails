@@ -11,7 +11,7 @@ RSpec.describe "bin/dev script" do
 
     # Suppress output
     allow_any_instance_of(Kernel).to receive(:puts)
-    
+
     expect { load script_path }.not_to raise_error
 
     # Restore original ARGV
