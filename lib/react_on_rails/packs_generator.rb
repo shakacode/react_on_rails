@@ -18,10 +18,10 @@ module ReactOnRails
       return unless ReactOnRails.configuration.auto_load_bundle
 
       add_generated_pack_to_server_bundle
-      
+
       # Clean any non-generated files from directories
       clean_non_generated_files_with_feedback
-      
+
       are_generated_files_present_and_up_to_date = Dir.exist?(generated_packs_directory_path) &&
                                                    File.exist?(generated_server_bundle_file_path) &&
                                                    !stale_or_missing_packs?
@@ -192,50 +192,66 @@ module ReactOnRails
     end
 
     def clean_non_generated_files_with_feedback
-      directories_to_clean = [
-        generated_packs_directory_path,
-        generated_server_bundle_directory_path
-      ].compact.uniq
-
-      # Get expected generated files
-      expected_pack_files = Set.new
-      common_component_to_path.each_value { |path| expected_pack_files << generated_pack_path(path) }
-      client_component_to_path.each_value { |path| expected_pack_files << generated_pack_path(path) }
-      
-      expected_server_bundle = generated_server_bundle_file_path if ReactOnRails.configuration.server_bundle_js_file.present?
+      directories_to_clean = [generated_packs_directory_path, generated_server_bundle_directory_path].compact.uniq
+      expected_files = build_expected_files_set
 
       puts Rainbow("🧹 Cleaning non-generated files...").yellow
 
-      deleted_files_count = 0
-      directories_to_clean.each do |dir_path|
-        next unless Dir.exist?(dir_path)
-
-        # Find all existing files
-        existing_files = Dir.glob("#{dir_path}/**/*").select { |f| File.file?(f) }
-        
-        # Identify files that shouldn't exist
-        unexpected_files = existing_files.reject do |file|
-          if dir_path == generated_server_bundle_directory_path
-            file == expected_server_bundle
-          else
-            expected_pack_files.include?(file)
-          end
-        end
-
-        if unexpected_files.any?
-          puts Rainbow("   Deleting #{unexpected_files.length} unexpected files from #{dir_path}:").cyan
-          unexpected_files.each do |file|
-            puts Rainbow("     - #{File.basename(file)}").blue
-            File.delete(file)
-          end
-          deleted_files_count += unexpected_files.length
-        else
-          puts Rainbow("   No unexpected files found in #{dir_path}").cyan
-        end
+      total_deleted = directories_to_clean.sum do |dir_path|
+        clean_unexpected_files_from_directory(dir_path, expected_files)
       end
 
-      if deleted_files_count > 0
-        puts Rainbow("🗑️  Deleted #{deleted_files_count} unexpected files total").red
+      display_cleanup_summary(total_deleted)
+    end
+
+    def build_expected_files_set
+      expected_pack_files = Set.new
+      common_component_to_path.each_value { |path| expected_pack_files << generated_pack_path(path) }
+      client_component_to_path.each_value { |path| expected_pack_files << generated_pack_path(path) }
+
+      if ReactOnRails.configuration.server_bundle_js_file.present?
+        expected_server_bundle = generated_server_bundle_file_path
+      end
+
+      { pack_files: expected_pack_files, server_bundle: expected_server_bundle }
+    end
+
+    def clean_unexpected_files_from_directory(dir_path, expected_files)
+      return 0 unless Dir.exist?(dir_path)
+
+      existing_files = Dir.glob("#{dir_path}/**/*").select { |f| File.file?(f) }
+      unexpected_files = find_unexpected_files(existing_files, dir_path, expected_files)
+
+      if unexpected_files.any?
+        delete_unexpected_files(unexpected_files, dir_path)
+        unexpected_files.length
+      else
+        puts Rainbow("   No unexpected files found in #{dir_path}").cyan
+        0
+      end
+    end
+
+    def find_unexpected_files(existing_files, dir_path, expected_files)
+      existing_files.reject do |file|
+        if dir_path == generated_server_bundle_directory_path
+          file == expected_files[:server_bundle]
+        else
+          expected_files[:pack_files].include?(file)
+        end
+      end
+    end
+
+    def delete_unexpected_files(unexpected_files, dir_path)
+      puts Rainbow("   Deleting #{unexpected_files.length} unexpected files from #{dir_path}:").cyan
+      unexpected_files.each do |file|
+        puts Rainbow("     - #{File.basename(file)}").blue
+        File.delete(file)
+      end
+    end
+
+    def display_cleanup_summary(total_deleted)
+      if total_deleted.positive?
+        puts Rainbow("🗑️  Deleted #{total_deleted} unexpected files total").red
       else
         puts Rainbow("✨ No unexpected files to delete").green
       end
@@ -262,7 +278,7 @@ module ReactOnRails
       return create_directory_with_feedback(dir_path) unless Dir.exist?(dir_path)
 
       files = Dir.glob("#{dir_path}/**/*").select { |f| File.file?(f) }
-      
+
       if files.any?
         puts Rainbow("   Deleting #{files.length} files from #{dir_path}:").cyan
         files.each { |file| puts Rainbow("     - #{File.basename(file)}").blue }
