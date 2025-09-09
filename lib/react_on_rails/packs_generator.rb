@@ -21,9 +21,12 @@ module ReactOnRails
                                                    File.exist?(generated_server_bundle_file_path) &&
                                                    !stale_or_missing_packs?
 
-      return if are_generated_files_present_and_up_to_date
+      if are_generated_files_present_and_up_to_date
+        puts Rainbow("✅ Generated packs are up to date, no regeneration needed").green
+        return
+      end
 
-      clean_generated_packs_directory
+      clean_generated_directories_with_feedback
       generate_packs
     end
 
@@ -183,9 +186,40 @@ module ReactOnRails
       "#{generated_nonentrypoints_path}/#{generated_server_bundle_file_name}.js"
     end
 
-    def clean_generated_packs_directory
-      FileUtils.rm_rf(generated_packs_directory_path)
-      FileUtils.mkdir_p(generated_packs_directory_path)
+    def clean_generated_directories_with_feedback
+      directories_to_clean = [
+        generated_packs_directory_path,
+        generated_server_bundle_directory_path
+      ].compact.uniq
+
+      puts Rainbow("🧹 Cleaning generated directories...").yellow
+
+      deleted_files_count = 0
+      directories_to_clean.each do |dir_path|
+        if Dir.exist?(dir_path)
+          # List files before deletion
+          files = Dir.glob("#{dir_path}/**/*").select { |f| File.file?(f) }
+          if files.any?
+            puts Rainbow("   Deleting #{files.length} files from #{dir_path}:").cyan
+            files.each { |file| puts Rainbow("     - #{File.basename(file)}").blue }
+            deleted_files_count += files.length
+          else
+            puts Rainbow("   Directory #{dir_path} is already empty").cyan
+          end
+
+          FileUtils.rm_rf(dir_path)
+          FileUtils.mkdir_p(dir_path)
+        else
+          puts Rainbow("   Directory #{dir_path} does not exist, creating...").cyan
+          FileUtils.mkdir_p(dir_path)
+        end
+      end
+
+      if deleted_files_count > 0
+        puts Rainbow("🗑️  Deleted #{deleted_files_count} generated files total").red
+      else
+        puts Rainbow("✨ No files to delete, directories are clean").green
+      end
     end
 
     def server_bundle_entrypoint
@@ -197,6 +231,13 @@ module ReactOnRails
       source_entry_path = ReactOnRails::PackerUtils.packer_source_entry_path
 
       "#{source_entry_path}/generated"
+    end
+
+    def generated_server_bundle_directory_path
+      return nil if ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint
+
+      source_entrypoint_parent = Pathname(ReactOnRails::PackerUtils.packer_source_entry_path).parent
+      "#{source_entrypoint_parent}/generated"
     end
 
     def relative_component_path_from_generated_pack(ror_component_path)
