@@ -2,7 +2,7 @@
 
 const { devServer, inliningCss } = require('shakapacker');
 
-const webpackConfig = require('./webpackConfig');
+const webpackConfig = require('./serverClientOrBoth');
 
 const developmentEnvOnly = (clientWebpackConfig, _serverWebpackConfig) => {
   // plugins
