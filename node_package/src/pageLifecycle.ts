@@ -67,7 +67,7 @@ function initializePageEventListeners(): void {
   }
   isPageLifecycleInitialized = true;
 
-  if (document.readyState === 'complete') {
+  if (document.readyState !== 'loading') {
     setupPageNavigationListeners();
   } else {
     document.addEventListener('DOMContentLoaded', setupPageNavigationListeners);
