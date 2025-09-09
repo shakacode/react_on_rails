@@ -102,10 +102,11 @@ module ReactOnRails
         return if shakapacker_installed?
 
         GeneratorMessages.add_info("Shakapacker not detected. Installing Shakapacker...")
-        
+
         result = system("rails shakapacker:install")
         unless result
-          GeneratorMessages.add_error("Failed to install Shakapacker automatically. Please run 'rails shakapacker:install' manually.")
+          GeneratorMessages.add_error("Failed to install Shakapacker automatically. " \
+                                      "Please run 'rails shakapacker:install' manually.")
           return
         end
 

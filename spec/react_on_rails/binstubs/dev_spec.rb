@@ -20,7 +20,8 @@ RSpec.describe "bin/dev script" do
     # Mock ARGV to simulate no arguments (default HMR mode)
     stub_const("ARGV", [])
     # Mock pack generation
-    allow_any_instance_of(Kernel).to receive(:system).with("bundle exec rake react_on_rails:generate_packs").and_return(true)
+    allow_any_instance_of(Kernel).to receive(:system)
+      .with("bundle exec rake react_on_rails:generate_packs").and_return(true)
   end
 
   it "includes pack generation function" do
@@ -51,7 +52,7 @@ RSpec.describe "bin/dev script" do
   it "with Overmind installed, uses Overmind" do
     setup_script_execution
     allow(IO).to receive(:popen).with("overmind -v").and_return("Some truthy result")
-    expect_any_instance_of(Kernel).to receive(:system).with("overmind start -f Procfile.dev").and_return(true)
+    expect_any_instance_of(Kernel).to receive(:system).with("overmind start -f Procfile.dev")
 
     load script_path
   end
@@ -60,7 +61,7 @@ RSpec.describe "bin/dev script" do
     setup_script_execution
     allow(IO).to receive(:popen).with("overmind -v").and_raise(Errno::ENOENT)
     allow(IO).to receive(:popen).with("foreman -v").and_return("Some truthy result")
-    expect_any_instance_of(Kernel).to receive(:system).with("foreman start -f Procfile.dev").and_return(true)
+    expect_any_instance_of(Kernel).to receive(:system).with("foreman start -f Procfile.dev")
 
     load script_path
   end
