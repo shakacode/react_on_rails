@@ -38,6 +38,7 @@ You may need to check [the instructions for installing into an existing Rails ap
    ```
 
 3. Start the app:
+
    - Run `./bin/dev` for HMR
    - Run `./bin/dev static` for statically created bundles (no HMR)
 
