@@ -33,7 +33,7 @@ RSpec.describe "bin/dev script" do
   it "supports static development mode" do
     script_content = File.read(script_path)
     expect(script_content).to include("run_static_development")
-    expect(script_content).to include("Procfile.dev-static")
+    expect(script_content).to include("Procfile.dev-static-assets")
   end
 
   it "supports production-like mode" do

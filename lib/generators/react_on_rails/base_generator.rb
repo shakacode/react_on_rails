@@ -29,10 +29,12 @@ module ReactOnRails
       def copy_base_files
         base_path = "base/base/"
         base_files = %w[app/controllers/hello_world_controller.rb
-                        app/views/layouts/hello_world.html.erb]
-        base_templates = %w[config/initializers/react_on_rails.rb
-                            Procfile.dev
-                            Procfile.dev-static]
+                        app/views/layouts/hello_world.html.erb
+                        Procfile.dev
+                        Procfile.dev-static
+                        Procfile.dev-static-assets
+                        Procfile.dev-prod-assets]
+        base_templates = %w[config/initializers/react_on_rails.rb]
         base_files.each { |file| copy_file("#{base_path}#{file}", file) }
         base_templates.each do |file|
           template("#{base_path}/#{file}.tt", file, { packer_type: ReactOnRails::PackerUtils.packer_type })
