@@ -62,15 +62,7 @@ module ReactOnRails
       # js(.coffee) are not checked by this method, but instead produce warning messages
       # and allow the build to continue
       def installation_prerequisites_met?
-        !(missing_node? || missing_npm? || ReactOnRails::GitUtils.uncommitted_changes?(GeneratorMessages))
-      end
-
-      def missing_npm?
-        return false unless ReactOnRails::Utils.running_on_windows? ? `where npm`.blank? : `which npm`.blank?
-
-        error = "npm is required. Please install it before continuing. https://docs.npmjs.com/downloading-and-installing-node-js-and-npm"
-        GeneratorMessages.add_error(error)
-        true
+        !(missing_node? || ReactOnRails::GitUtils.uncommitted_changes?(GeneratorMessages))
       end
 
       def missing_node?

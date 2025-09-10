@@ -75,12 +75,6 @@ describe InstallGenerator, type: :generator do
       allow(install_generator).to receive(:`).with("which node").and_return("/path/to/bin")
       expect(install_generator.send(:missing_node?)).to be false
     end
-
-    specify "when npm is exist" do
-      stub_const("RUBY_PLATFORM", "linux")
-      allow(install_generator).to receive(:`).with("which npm").and_return("/path/to/bin")
-      expect(install_generator.send(:missing_npm?)).to be false
-    end
   end
 
   context "when detecting missing bin-files on *nix" do
@@ -90,12 +84,6 @@ describe InstallGenerator, type: :generator do
       stub_const("RUBY_PLATFORM", "linux")
       allow(install_generator).to receive(:`).with("which node").and_return("")
       expect(install_generator.send(:missing_node?)).to be true
-    end
-
-    specify "when npm is missing" do
-      stub_const("RUBY_PLATFORM", "linux")
-      allow(install_generator).to receive(:`).with("which npm").and_return("")
-      expect(install_generator.send(:missing_npm?)).to be true
     end
   end
 
@@ -107,12 +95,6 @@ describe InstallGenerator, type: :generator do
       allow(install_generator).to receive(:`).with("where node").and_return("/path/to/bin")
       expect(install_generator.send(:missing_node?)).to be false
     end
-
-    specify "when npm is exist" do
-      stub_const("RUBY_PLATFORM", "mswin")
-      allow(install_generator).to receive(:`).with("where npm").and_return("/path/to/bin")
-      expect(install_generator.send(:missing_npm?)).to be false
-    end
   end
 
   context "when detecting missing bin-files on windows" do
@@ -122,12 +104,6 @@ describe InstallGenerator, type: :generator do
       stub_const("RUBY_PLATFORM", "mswin")
       allow(install_generator).to receive(:`).with("where node").and_return("")
       expect(install_generator.send(:missing_node?)).to be true
-    end
-
-    specify "when npm is missing" do
-      stub_const("RUBY_PLATFORM", "mswin")
-      allow(install_generator).to receive(:`).with("where npm").and_return("")
-      expect(install_generator.send(:missing_npm?)).to be true
     end
   end
 
