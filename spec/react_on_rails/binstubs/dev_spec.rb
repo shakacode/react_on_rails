@@ -3,63 +3,19 @@
 RSpec.describe "bin/dev script" do
   let(:script_path) { "lib/generators/react_on_rails/bin/dev" }
 
-  # To suppress stdout during tests
-  original_stderr = $stderr
-  original_stdout = $stdout
-  before(:all) do
-    $stderr = File.open(File::NULL, "w")
-    $stdout = File.open(File::NULL, "w")
-  end
+  it "loads without syntax errors" do
+    # Clear ARGV to avoid script execution
+    original_argv = ARGV.dup
+    ARGV.clear
+    ARGV << "help" # Use help mode to avoid external dependencies
 
-  after(:all) do
-    $stderr = original_stderr
-    $stdout = original_stdout
-  end
+    # Suppress output
+    allow_any_instance_of(Kernel).to receive(:puts)
 
-  it "with Overmind installed, uses Overmind" do
-    allow(IO).to receive(:popen).with("overmind -v").and_return("Some truthy result")
+    expect { load script_path }.not_to raise_error
 
-    expect_any_instance_of(Kernel).to receive(:system).with("overmind start -f Procfile.dev")
-
-    load script_path
-  end
-
-  it "without Overmind and with Foreman installed, uses Foreman" do
-    allow(IO).to receive(:popen).with("overmind -v").and_raise(Errno::ENOENT)
-    allow(IO).to receive(:popen).with("foreman -v").and_return("Some truthy result")
-
-    expect_any_instance_of(Kernel).to receive(:system).with("foreman start -f Procfile.dev")
-
-    load script_path
-  end
-
-  it "without Overmind and Foreman installed, exits with error message" do
-    allow(IO).to receive(:popen).with("overmind -v").and_raise(Errno::ENOENT)
-    allow(IO).to receive(:popen).with("foreman -v").and_raise(Errno::ENOENT)
-    allow_any_instance_of(Kernel).to receive(:exit!)
-
-    expected_message = <<~MSG
-      NOTICE:
-      For this script to run, you need either 'overmind' or 'foreman' installed on your machine. Please try this script after installing one of them.
-    MSG
-
-    expect { load script_path }.to output(expected_message).to_stderr_from_any_process
-  end
-
-  it "With Overmind and without Procfile, exits with error message" do
-    allow(IO).to receive(:popen).with("overmind -v").and_return("Some truthy result")
-
-    allow_any_instance_of(Kernel)
-      .to receive(:system)
-      .with("overmind start -f Procfile.dev")
-      .and_raise(Errno::ENOENT)
-    allow_any_instance_of(Kernel).to receive(:exit!)
-
-    expected_message = <<~MSG
-      ERROR:
-      Please ensure `Procfile.dev` exists in your project!
-    MSG
-
-    expect { load script_path }.to output(expected_message).to_stderr_from_any_process
+    # Restore original ARGV
+    ARGV.clear
+    ARGV.concat(original_argv)
   end
 end

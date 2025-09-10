@@ -435,6 +435,42 @@ module ReactOnRails
       end
     end
 
+    context "when component with CSS module" do
+      let(:component_name) { "ComponentWithCSSModule" }
+      let(:component_pack) { "#{generated_directory}/#{component_name}.js" }
+
+      before do
+        stub_packer_source_path(component_name: component_name,
+                                packer_source_path: packer_source_path)
+        described_class.instance.generate_packs_if_stale
+      end
+
+      it "generates a pack with valid JavaScript variable names" do
+        expect(File.exist?(component_pack)).to be(true)
+        pack_content = File.read(component_pack)
+
+        # Check that the generated pack content is valid JavaScript
+        expect(pack_content).to include("import ReactOnRails from 'react-on-rails/client';")
+        expect(pack_content).to include("import #{component_name} from")
+        expect(pack_content).to include("ReactOnRails.register({#{component_name}});")
+
+        # Verify that variable names don't contain dots (invalid in JS)
+        expect(pack_content).not_to match(/ComponentWithCSSModule\.module/)
+        expect(pack_content).not_to match(/import .+\.module/)
+      end
+
+      it "generates valid JavaScript that can be parsed without syntax errors" do
+        pack_content = File.read(component_pack)
+
+        # This would fail if the generated JavaScript has syntax errors
+        # rubocop:disable Security/Eval
+        sanitized_content = pack_content.gsub(/import.*from.*['"];/, "")
+                                        .gsub(/ReactOnRails\.register.*/, "")
+        expect { eval(sanitized_content) }.not_to raise_error
+        # rubocop:enable Security/Eval
+      end
+    end
+
     def generated_server_bundle_file_path
       described_class.instance.send(:generated_server_bundle_file_path)
     end
@@ -655,6 +691,44 @@ module ReactOnRails
 
           it { is_expected.to eq "const x = 1;" }
         end
+      end
+    end
+
+    describe "#component_name" do
+      subject(:component_name) { described_class.instance.send(:component_name, file_path) }
+
+      context "with regular component file" do
+        let(:file_path) { "/path/to/MyComponent.jsx" }
+
+        it { is_expected.to eq "MyComponent" }
+      end
+
+      context "with client component file" do
+        let(:file_path) { "/path/to/MyComponent.client.jsx" }
+
+        it { is_expected.to eq "MyComponent" }
+      end
+
+      context "with server component file" do
+        let(:file_path) { "/path/to/MyComponent.server.jsx" }
+
+        it { is_expected.to eq "MyComponent" }
+      end
+
+      context "with CSS module file" do
+        let(:file_path) { "/path/to/HeavyMarkdownEditor.module.css" }
+
+        # CSS modules should still work with component_name method, but they
+        # should not be processed as React components by the generator
+        it "returns name with dot for CSS modules" do
+          expect(component_name).to eq "HeavyMarkdownEditor.module"
+        end
+      end
+
+      context "with TypeScript component file" do
+        let(:file_path) { "/path/to/MyComponent.tsx" }
+
+        it { is_expected.to eq "MyComponent" }
       end
     end
 
