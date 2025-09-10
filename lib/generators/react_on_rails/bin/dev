@@ -68,9 +68,9 @@ def run_static_development
   generate_packs
 
   if installed? "overmind"
-    system "overmind start -f Procfile.dev-static"
+    system "overmind start -f Procfile.dev-static-assets"
   elsif installed? "foreman"
-    system "foreman start -f Procfile.dev-static"
+    system "foreman start -f Procfile.dev-static-assets"
   else
     warn <<~MSG
       NOTICE:
@@ -81,7 +81,7 @@ def run_static_development
 rescue Errno::ENOENT
   warn <<~MSG
     ERROR:
-    Please ensure `Procfile.dev-static` exists in your project!
+    Please ensure `Procfile.dev-static-assets` exists in your project!
   MSG
   exit!
 end
