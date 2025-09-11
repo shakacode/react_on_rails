@@ -7,6 +7,8 @@ default: &default
   public_output_path: packs
   cache_path: tmp/shakapacker
   webpack_compile_output: true
+  
+  # Enable nested entry points for auto-registration
   nested_entries: true
 
   # Additional paths webpack should lookup modules
@@ -23,9 +25,9 @@ development:
 
   # Reference: https://webpack.js.org/configuration/dev-server/
   dev_server:
-    https: false
     host: localhost
     port: 3035
+    server: http
     # Hot Module Replacement updates modules while the application is running without a full reload
     hmr: true
     client:
