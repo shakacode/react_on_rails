@@ -18,13 +18,13 @@ module ReactOnRails
         base_files = %w[app/javascript/bundles/HelloWorld/components/HelloWorld.jsx
                         app/javascript/bundles/HelloWorld/components/HelloWorld.module.css]
         base_files.each { |file| copy_file("#{base_js_path}/#{file}", file) }
-        
+
         # Also copy to new auto-registration structure for server-side rendering compatibility
         copy_file("#{base_js_path}/app/javascript/bundles/HelloWorld/components/HelloWorld.jsx",
                   "app/javascript/src/HelloWorld/ror_components/HelloWorld.jsx")
         copy_file("#{base_js_path}/app/javascript/bundles/HelloWorld/components/HelloWorld.module.css",
                   "app/javascript/src/HelloWorld/HelloWorld.module.css")
-        
+
         # Fix CSS import path in the ror_components version
         ror_component_file = "app/javascript/src/HelloWorld/ror_components/HelloWorld.jsx"
         gsub_file(ror_component_file, "./HelloWorld.module.css", "../HelloWorld.module.css")
