@@ -24,6 +24,10 @@ module ReactOnRails
                   "app/javascript/src/HelloWorld/ror_components/HelloWorld.jsx")
         copy_file("#{base_js_path}/app/javascript/bundles/HelloWorld/components/HelloWorld.module.css",
                   "app/javascript/src/HelloWorld/HelloWorld.module.css")
+        
+        ror_component_file = "app/javascript/src/HelloWorld/ror_components/HelloWorld.jsx"
+        gsub_file(ror_component_file, "../store/helloWorldStore", "../../../bundles/HelloWorld/store/helloWorldStore")
+        gsub_file(ror_component_file, "../containers/HelloWorldContainer", "../../../bundles/HelloWorld/containers/HelloWorldContainer")
       end
 
       def copy_base_redux_files
