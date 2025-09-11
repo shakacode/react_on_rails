@@ -47,7 +47,7 @@ module ReactOnRails
         base_path = "base/base"
         base_js_path = "#{base_path}/app/javascript"
         config = {
-          component_name: "HelloWorldApp",
+          component_name: "HelloWorld",
           app_relative_path: "../bundles/HelloWorld/startup/HelloWorldApp"
         }
 
