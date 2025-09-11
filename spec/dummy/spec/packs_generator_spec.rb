@@ -438,6 +438,7 @@ module ReactOnRails
     context "when component with CSS module" do
       let(:component_name) { "ComponentWithCSSModule" }
       let(:component_pack) { "#{generated_directory}/#{component_name}.js" }
+      let(:css_module_pack_glob_pattern) { "#{generated_directory}/#{component_name}.module*" }
 
       before do
         stub_packer_source_path(component_name: component_name,
@@ -468,6 +469,15 @@ module ReactOnRails
                                         .gsub(/ReactOnRails\.register.*/, "")
         expect { eval(sanitized_content) }.not_to raise_error
         # rubocop:enable Security/Eval
+      end
+
+      it "does not generate a pack for a CSS module file" do
+        expect(Dir.glob(css_module_pack_glob_pattern)).to be_empty
+      end
+
+      it "only generates the js pack" do
+        generated_files = Dir.entries(generated_directory).reject { |f| f.start_with?(".") }
+        expect(generated_files).to eq([File.basename(component_pack)])
       end
     end
 
