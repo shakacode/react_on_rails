@@ -12,19 +12,17 @@ module ReactOnRails
 
       def copy_base_files
         base_js_path = "base/base"
-        base_files = %w[app/javascript/bundles/HelloWorld/components/HelloWorld.jsx]
+        base_files = %w[app/javascript/src/HelloWorld/ror_components/HelloWorld.jsx]
         base_files.each { |file| copy_file("#{base_js_path}/#{file}", file) }
       end
 
       def create_appropriate_templates
         base_path = "base/base"
         config = {
-          component_name: "HelloWorld",
-          app_relative_path: "../bundles/HelloWorld/components/HelloWorld"
+          component_name: "HelloWorld"
         }
 
-        template("#{base_path}/app/javascript/packs/registration.js.tt",
-                 "app/javascript/packs/hello-world-bundle.js", config)
+        # Only create the view template - no manual bundle needed for auto registration
         template("#{base_path}/app/views/hello_world/index.html.erb.tt",
                  "app/views/hello_world/index.html.erb", config)
       end
