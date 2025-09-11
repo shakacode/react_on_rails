@@ -22,8 +22,8 @@ module ReactOnRails
       end
 
       def create_react_directories
-        dirs = %w[components]
-        dirs.each { |name| empty_directory("app/javascript/bundles/HelloWorld/#{name}") }
+        # Create auto-registration directory structure
+        empty_directory("app/javascript/src/HelloWorld/ror_components")
       end
 
       def copy_base_files
@@ -44,8 +44,8 @@ module ReactOnRails
       def copy_js_bundle_files
         base_path = "base/base/"
         base_files = %w[app/javascript/packs/server-bundle.js
-                        app/javascript/bundles/HelloWorld/components/HelloWorldServer.js
-                        app/javascript/bundles/HelloWorld/components/HelloWorld.module.css]
+                        app/javascript/src/HelloWorld/HelloWorldServer.js
+                        app/javascript/src/HelloWorld/HelloWorld.module.css]
         base_files.each { |file| copy_file("#{base_path}#{file}", file) }
       end
 
@@ -60,7 +60,7 @@ module ReactOnRails
                         config/webpack/production.js
                         config/webpack/serverWebpackConfig.js
                         config/webpack/webpack.config.js
-                        config/webpack/webpackConfig.js]
+                        config/webpack/generateWebpackConfigs.js]
         config = {
           message: "// The source code including full typescript support is available at:"
         }
@@ -112,6 +112,22 @@ module ReactOnRails
                                    "@pmmmwh/react-refresh-webpack-plugin",
                                    "react-refresh"
                                  ], type: :dev)
+      end
+
+      def update_gitignore_for_auto_registration
+        gitignore_path = File.join(destination_root, ".gitignore")
+        return unless File.exist?(gitignore_path)
+
+        gitignore_content = File.read(gitignore_path)
+        return if gitignore_content.include?("**/generated/**")
+
+        append_to_file ".gitignore" do
+          <<~GITIGNORE
+
+            # Generated React on Rails packs
+            **/generated/**
+          GITIGNORE
+        end
       end
 
       def append_to_spec_rails_helper
