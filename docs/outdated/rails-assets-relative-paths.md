@@ -123,7 +123,7 @@ If you've read this far, you probably have a grip on everything. If you didn't, 
 - Add assets directory in `client/app/`, and place whatever you would like in there
 - Import or Require these files in your JSX and use them all you want!
 
-### Here's a full example of a webpack.config.js configured with file-loader to load images:
+### Here's a full example of a webpack.config.js configured with file-loader to load images
 
 ```javascript
 const webpack = require('webpack');

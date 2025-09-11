@@ -143,13 +143,13 @@ The `react_component` helper renders a single React component in your view.
 
 This helper accepts render-functions that return React components, objects with a `renderedHtml` property, or promises that resolve to React components, or strings.
 
-#### When to use:
+#### When to use
 
 - When you need to render a single component
 - When you're rendering client-side only
 - When your render function returns a single HTML string
 
-#### Not suitable for:
+#### Not suitable for
 
 - When your render function returns an object with multiple HTML strings
 - When you need to insert content in different parts of the page, such as meta tags & style tags
@@ -177,19 +177,19 @@ The `react_component_hash` helper is used when your render function returns an o
 
 This helper accepts render-functions that return objects with a `renderedHtml` property containing `componentHtml` and any other necessary properties. It also supports promises that resolve to a server-side hash.
 
-#### When to use:
+#### When to use
 
 - When your render function returns multiple HTML strings in an object
 - When you need to insert rendered content in different parts of your page
 - For SEO-related rendering like meta tags and title tags
 - When working with libraries like React Helmet
 
-#### Not suitable for:
+#### Not suitable for
 
 - Simple component rendering
 - Client-side only rendering (always uses server rendering)
 
-#### Requirements:
+#### Requirements
 
 - The render function MUST return an object
 - The object MUST include a `componentHtml` key

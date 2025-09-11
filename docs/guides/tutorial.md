@@ -22,7 +22,7 @@ By the time you read this, the latest may have changed. Be sure to check the ver
 - [https://rubygems.org/gems/react_on_rails](https://rubygems.org/gems/react_on_rails)
 - [https://www.npmjs.com/package/react-on-rails](https://www.npmjs.com/package/react-on-rails)
 
-# Table of Content:
+# Table of Content
 
 - [Installation](#installation)
   - [Setting up your environment](#setting-up-your-environment)
@@ -170,7 +170,7 @@ heroku buildpacks:set heroku/ruby
 heroku buildpacks:add --index 1 heroku/nodejs
 ```
 
-## Swap out sqlite for postgres:
+## Swap out sqlite for postgres
 
 Heroku requires your app to use Postgresql. If you have not set up your app
 with Postgresql, you need to change your app settings to use this database.
