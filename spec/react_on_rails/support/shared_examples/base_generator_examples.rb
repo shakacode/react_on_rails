@@ -11,17 +11,19 @@ shared_examples "base_generator" do
   end
 
   it "creates react directories" do
-    dirs = %w[components]
-    dirs.each { |dirname| assert_directory "app/javascript/bundles/HelloWorld/#{dirname}" }
+    # Auto-registration structure is always created
+    assert_directory "app/javascript/src/HelloWorld/ror_components"
   end
 
   it "copies react files" do
     %w[app/controllers/hello_world_controller.rb
-       app/javascript/bundles/HelloWorld/components/HelloWorld.jsx
        config/initializers/react_on_rails.rb
        Procfile.dev
        Procfile.dev-static
        Procfile.dev-static-assets
        Procfile.dev-prod-assets].each { |file| assert_file(file) }
+       
+    # Auto-registration component is always created
+    assert_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.jsx"
   end
 end
