@@ -22,7 +22,7 @@ shared_examples "base_generator" do
        Procfile.dev-static
        Procfile.dev-static-assets
        Procfile.dev-prod-assets].each { |file| assert_file(file) }
-       
+
     # Auto-registration component is always created
     assert_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.jsx"
   end
