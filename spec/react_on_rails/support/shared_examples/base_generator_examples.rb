@@ -19,7 +19,6 @@ shared_examples "base_generator" do
     %w[app/controllers/hello_world_controller.rb
        config/initializers/react_on_rails.rb
        Procfile.dev
-       Procfile.dev-static
        Procfile.dev-static-assets
        Procfile.dev-prod-assets].each { |file| assert_file(file) }
 

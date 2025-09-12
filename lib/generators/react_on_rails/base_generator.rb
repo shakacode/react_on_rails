@@ -31,7 +31,6 @@ module ReactOnRails
         base_files = %w[app/controllers/hello_world_controller.rb
                         app/views/layouts/hello_world.html.erb
                         Procfile.dev
-                        Procfile.dev-static
                         Procfile.dev-static-assets
                         Procfile.dev-prod-assets]
         base_templates = %w[config/initializers/react_on_rails.rb]
