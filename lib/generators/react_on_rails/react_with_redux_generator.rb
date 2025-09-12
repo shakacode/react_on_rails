@@ -20,14 +20,17 @@ module ReactOnRails
         base_files.each { |file| copy_file("#{base_js_path}/#{file}", file) }
 
         # Also copy Redux-connected component to auto-registration structure
-        copy_file("#{base_js_path}/app/javascript/bundles/HelloWorld/startup/HelloWorldApp.jsx",
-                  "app/javascript/src/HelloWorld/ror_components/HelloWorld.jsx")
+        copy_file("#{base_js_path}/app/javascript/bundles/HelloWorld/startup/HelloWorldApp.client.jsx",
+                  "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.jsx")
+        copy_file("#{base_js_path}/app/javascript/bundles/HelloWorld/startup/HelloWorldApp.server.jsx",
+                  "app/javascript/src/HelloWorld/ror_components/HelloWorld.server.jsx")
         copy_file("#{base_js_path}/app/javascript/bundles/HelloWorld/components/HelloWorld.module.css",
                   "app/javascript/src/HelloWorld/HelloWorld.module.css")
 
-        ror_component_file = "app/javascript/src/HelloWorld/ror_components/HelloWorld.jsx"
-        gsub_file(ror_component_file, "../store/helloWorldStore", "../../../bundles/HelloWorld/store/helloWorldStore")
-        gsub_file(ror_component_file, "../containers/HelloWorldContainer",
+        # Update import paths in client component
+        ror_client_file = "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.jsx"
+        gsub_file(ror_client_file, "../store/helloWorldStore", "../../../bundles/HelloWorld/store/helloWorldStore")
+        gsub_file(ror_client_file, "../containers/HelloWorldContainer",
                   "../../../bundles/HelloWorld/containers/HelloWorldContainer")
       end
 
@@ -38,7 +41,8 @@ module ReactOnRails
            constants/helloWorldConstants.js
            reducers/helloWorldReducer.js
            store/helloWorldStore.js
-           startup/HelloWorldApp.jsx].each do |file|
+           startup/HelloWorldApp.client.jsx
+           startup/HelloWorldApp.server.jsx].each do |file|
              copy_file("#{base_hello_world_path}/#{file}",
                        "app/javascript/bundles/HelloWorld/#{file}")
            end
@@ -49,7 +53,7 @@ module ReactOnRails
         base_js_path = "#{base_path}/app/javascript"
         config = {
           component_name: "HelloWorld",
-          app_relative_path: "../bundles/HelloWorld/startup/HelloWorldApp"
+          app_relative_path: "../bundles/HelloWorld/startup/HelloWorldApp.client"
         }
 
         template("#{base_js_path}/packs/registration.js.tt", "app/javascript/packs/hello-world-bundle.js", config)
