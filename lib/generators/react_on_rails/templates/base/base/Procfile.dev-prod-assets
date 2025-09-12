@@ -1,0 +1,8 @@
+# Procfile for development with production assets 
+# Uses production-optimized, precompiled assets with development environment
+# Uncomment additional processes as needed for your app
+
+rails: bundle exec rails s -p 3001
+# sidekiq: bundle exec sidekiq -C config/sidekiq.yml
+# redis: redis-server
+# mailcatcher: mailcatcher --foreground

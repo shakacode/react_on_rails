@@ -13,7 +13,8 @@ module ReactOnRails
         puts "Change spelling to webpacker v7"
         files = %w[
           Procfile.dev
-          Procfile.dev-static
+          Procfile.dev-static-assets
+          Procfile.dev-prod-assets
           config/shakapacker.yml
           config/initializers/react_on_rails.rb
         ]

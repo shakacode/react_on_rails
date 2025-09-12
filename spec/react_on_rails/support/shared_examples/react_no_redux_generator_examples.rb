@@ -2,9 +2,8 @@
 
 shared_examples "no_redux_generator" do
   it "creates appropriate templates" do
-    assert_file("app/javascript/packs/hello-world-bundle.js") do |contents|
-      expect(contents).to match("import HelloWorld from '../bundles/HelloWorld/components/HelloWorld';")
-    end
+    # No manual bundle for non-Redux (auto-registration only)
+    assert_no_file("app/javascript/packs/hello-world-bundle.js")
 
     assert_file("app/views/hello_world/index.html.erb") do |contents|
       expect(contents).to match(/"HelloWorld"/)

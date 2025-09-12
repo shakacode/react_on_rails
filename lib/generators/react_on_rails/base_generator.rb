@@ -22,17 +22,18 @@ module ReactOnRails
       end
 
       def create_react_directories
-        dirs = %w[components]
-        dirs.each { |name| empty_directory("app/javascript/bundles/HelloWorld/#{name}") }
+        # Create auto-registration directory structure
+        empty_directory("app/javascript/src/HelloWorld/ror_components")
       end
 
       def copy_base_files
         base_path = "base/base/"
         base_files = %w[app/controllers/hello_world_controller.rb
-                        app/views/layouts/hello_world.html.erb]
-        base_templates = %w[config/initializers/react_on_rails.rb
-                            Procfile.dev
-                            Procfile.dev-static]
+                        app/views/layouts/hello_world.html.erb
+                        Procfile.dev
+                        Procfile.dev-static-assets
+                        Procfile.dev-prod-assets]
+        base_templates = %w[config/initializers/react_on_rails.rb]
         base_files.each { |file| copy_file("#{base_path}#{file}", file) }
         base_templates.each do |file|
           template("#{base_path}/#{file}.tt", file, { packer_type: ReactOnRails::PackerUtils.packer_type })
@@ -42,8 +43,7 @@ module ReactOnRails
       def copy_js_bundle_files
         base_path = "base/base/"
         base_files = %w[app/javascript/packs/server-bundle.js
-                        app/javascript/bundles/HelloWorld/components/HelloWorldServer.js
-                        app/javascript/bundles/HelloWorld/components/HelloWorld.module.css]
+                        app/javascript/src/HelloWorld/HelloWorld.module.css]
         base_files.each { |file| copy_file("#{base_path}#{file}", file) }
       end
 
@@ -58,7 +58,7 @@ module ReactOnRails
                         config/webpack/production.js
                         config/webpack/serverWebpackConfig.js
                         config/webpack/webpack.config.js
-                        config/webpack/webpackConfig.js]
+                        config/webpack/generateWebpackConfigs.js]
         config = {
           message: "// The source code including full typescript support is available at:"
         }
@@ -110,6 +110,22 @@ module ReactOnRails
                                    "@pmmmwh/react-refresh-webpack-plugin",
                                    "react-refresh"
                                  ], type: :dev)
+      end
+
+      def update_gitignore_for_auto_registration
+        gitignore_path = File.join(destination_root, ".gitignore")
+        return unless File.exist?(gitignore_path)
+
+        gitignore_content = File.read(gitignore_path)
+        return if gitignore_content.include?("**/generated/**")
+
+        append_to_file ".gitignore" do
+          <<~GITIGNORE
+
+            # Generated React on Rails packs
+            **/generated/**
+          GITIGNORE
+        end
       end
 
       def append_to_spec_rails_helper

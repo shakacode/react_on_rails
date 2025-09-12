@@ -61,7 +61,7 @@ module GeneratorMessages
           - To server render, change this line app/views/hello_world/index.html.erb to
             `prerender: true` to see server rendering (right click on page and select "view source").
 
-              <%= react_component("HelloWorldApp", props: @hello_world_props, prerender: true) %>
+              <%= react_component("HelloWorld", props: @hello_world_props, prerender: true) %>
 
         Alternative steps to run the app:
 
