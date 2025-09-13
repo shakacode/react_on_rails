@@ -1,3 +1,5 @@
+/* Copyright (c) 2015–2025 ShakaCode, LLC
+   SPDX-License-Identifier: MIT */
 /**
  * Custom error type for when there's an issue fetching or rendering a server component.
  * This error includes information about the server component and the original error that occurred.

@@ -1,3 +1,5 @@
+/* Copyright (c) 2015–2025 ShakaCode, LLC
+   SPDX-License-Identifier: MIT */
 import { BundleManifest } from 'react-on-rails-rsc';
 import { buildServerRenderer } from 'react-on-rails-rsc/server.node';
 import { Readable } from 'stream';

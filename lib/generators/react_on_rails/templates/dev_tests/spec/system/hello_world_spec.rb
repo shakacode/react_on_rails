@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+# Copyright (c) 2015–2025 ShakaCode, LLC
+# SPDX-License-Identifier: MIT
+
 require_relative "../rails_helper"
 
 describe "Hello World", :js do

@@ -1,3 +1,5 @@
+/* Copyright (c) 2015–2025 ShakaCode, LLC
+   SPDX-License-Identifier: MIT */
 import * as React from 'react';
 import * as ReactDOMClient from 'react-dom/client';
 import { ReactComponentOrRenderFunction, RenderFunction } from '../types/index.ts';

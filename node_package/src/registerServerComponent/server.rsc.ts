@@ -1,3 +1,5 @@
+/* Copyright (c) 2015–2025 ShakaCode, LLC
+   SPDX-License-Identifier: MIT */
 import ReactOnRails from '../ReactOnRails.client.ts';
 import { ReactComponent, RenderFunction } from '../types/index.ts';
 
