@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { globalIgnores } from 'eslint/config';
 import jest from 'eslint-plugin-jest';
+import licenseHeader from 'eslint-plugin-license-header';
 import prettierRecommended from 'eslint-plugin-prettier/recommended';
 import testingLibrary from 'eslint-plugin-testing-library';
 import globals from 'globals';
@@ -50,6 +51,24 @@ const config = tsEslint.config([
   },
   js.configs.recommended,
   compat.extends('eslint-config-shakacode'),
+  {
+    files: [
+      'node_package/src/**/*.ts',
+      'node_package/src/**/*.tsx',
+    ],
+    plugins: {
+      'license-header': licenseHeader as any,
+    },
+    rules: {
+      'license-header/header': [
+        'error',
+        [
+          '/* Copyright (c) 2015–2025 ShakaCode, LLC',
+          '   SPDX-License-Identifier: MIT */',
+        ],
+      ],
+    },
+  },
   {
     languageOptions: {
       globals: {
