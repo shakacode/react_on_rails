@@ -1,5 +1,6 @@
 /* Copyright (c) 2015–2025 ShakaCode, LLC
    SPDX-License-Identifier: MIT */
+
 // Override the fetch function to make it easier to test
 // The default fetch implementation in jest returns Node's Readable stream
 // In jest.setup.js, we configure this fetch to return a web-standard ReadableStream instead,

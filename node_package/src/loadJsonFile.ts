@@ -1,5 +1,6 @@
 /* Copyright (c) 2015–2025 ShakaCode, LLC
    SPDX-License-Identifier: MIT */
+
 import * as path from 'path';
 import * as fs from 'fs/promises';
 

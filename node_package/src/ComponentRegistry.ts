@@ -1,5 +1,6 @@
 /* Copyright (c) 2015–2025 ShakaCode, LLC
    SPDX-License-Identifier: MIT */
+
 import { type RegisteredComponent, type ReactComponentOrRenderFunction } from './types/index.ts';
 import isRenderFunction from './isRenderFunction.ts';
 import CallbackRegistry from './CallbackRegistry.ts';

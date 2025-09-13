@@ -1,5 +1,6 @@
 /* Copyright (c) 2015–2025 ShakaCode, LLC
    SPDX-License-Identifier: MIT */
+
 import * as React from 'react';
 import type { RenderFunction, ReactComponentOrRenderFunction } from '../types/index.ts';
 import getReactServerComponent from '../getReactServerComponent.server.ts';

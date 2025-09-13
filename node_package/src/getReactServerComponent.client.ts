@@ -1,5 +1,6 @@
 /* Copyright (c) 2015–2025 ShakaCode, LLC
    SPDX-License-Identifier: MIT */
+
 import * as React from 'react';
 import { createFromReadableStream } from 'react-on-rails-rsc/client.browser';
 import { createRSCPayloadKey, fetch, wrapInNewPromise, extractErrorMessage } from './utils.ts';

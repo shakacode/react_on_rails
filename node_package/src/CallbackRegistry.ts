@@ -1,5 +1,6 @@
 /* Copyright (c) 2015–2025 ShakaCode, LLC
    SPDX-License-Identifier: MIT */
+
 import { ItemRegistrationCallback } from './types/index.ts';
 import { onPageLoaded, onPageUnloaded } from './pageLifecycle.ts';
 import { getRailsContext } from './context.ts';

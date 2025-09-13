@@ -1,5 +1,6 @@
 /* Copyright (c) 2015–2025 ShakaCode, LLC
    SPDX-License-Identifier: MIT */
+
 import handleError from './handleError.ts';
 import serverRenderReactComponent from './serverRenderReactComponent.ts';
 import type { RenderParams, RenderResult, ErrorOptions } from './types/index.ts';

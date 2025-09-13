@@ -1,5 +1,6 @@
 /* Copyright (c) 2015–2025 ShakaCode, LLC
    SPDX-License-Identifier: MIT */
+
 // See discussion:
 // https://discuss.reactjs.org/t/how-to-determine-if-js-object-is-react-component/2825/2
 import { ReactComponentOrRenderFunction, RenderFunction } from './types/index.ts';
