@@ -1,4 +1,7 @@
 # frozen_string_literal: true
+# Copyright (c) 2015–2025 ShakaCode, LLC
+# SPDX-License-Identifier: MIT
+
 
 # This file is copied to spec/ when you run "rails generate rspec:install"
 ENV["RAILS_ENV"] ||= "test"

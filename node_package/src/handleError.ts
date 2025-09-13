@@ -1,3 +1,5 @@
+/* Copyright (c) 2015–2025 ShakaCode, LLC
+   SPDX-License-Identifier: MIT */
 import * as React from 'react';
 import { renderToString } from './ReactDOMServer.cts';
 import type { ErrorOptions } from './types/index.ts';

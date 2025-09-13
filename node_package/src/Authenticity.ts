@@ -1,3 +1,5 @@
+/* Copyright (c) 2015–2025 ShakaCode, LLC
+   SPDX-License-Identifier: MIT */
 import type { AuthenticityHeaders } from './types/index.ts';
 
 export function authenticityToken(): string | null {

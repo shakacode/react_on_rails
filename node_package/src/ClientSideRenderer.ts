@@ -1,3 +1,5 @@
+/* Copyright (c) 2015–2025 ShakaCode, LLC
+   SPDX-License-Identifier: MIT */
 /* eslint-disable max-classes-per-file */
 
 import type { ReactElement } from 'react';

@@ -1,3 +1,5 @@
+/* Copyright (c) 2015–2025 ShakaCode, LLC
+   SPDX-License-Identifier: MIT */
 import CallbackRegistry from './CallbackRegistry.ts';
 import type { Store, StoreGenerator } from './types/index.ts';
 
