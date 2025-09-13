@@ -1,7 +1,7 @@
 # frozen_string_literal: true
+
 # Copyright (c) 2015–2025 ShakaCode, LLC
 # SPDX-License-Identifier: MIT
-
 
 # You can replace this implementation with your own for use by the
 # ReactOnRails::TestHelper.ensure_assets_compiled helper
