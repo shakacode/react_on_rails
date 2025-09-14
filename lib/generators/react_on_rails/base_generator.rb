@@ -22,8 +22,11 @@ module ReactOnRails
       end
 
       def create_react_directories
-        # Create auto-registration directory structure
-        empty_directory("app/javascript/src/HelloWorld/ror_components")
+        # Create auto-registration directory structure for non-Redux components only
+        # Redux components handle their own directory structure
+        unless options.redux?
+          empty_directory("app/javascript/src/HelloWorld/ror_components")
+        end
       end
 
       def copy_base_files
@@ -42,8 +45,14 @@ module ReactOnRails
 
       def copy_js_bundle_files
         base_path = "base/base/"
-        base_files = %w[app/javascript/packs/server-bundle.js
-                        app/javascript/src/HelloWorld/HelloWorld.module.css]
+        base_files = %w[app/javascript/packs/server-bundle.js]
+        
+        # Only copy HelloWorld.module.css for non-Redux components
+        # Redux components handle their own CSS files
+        unless options.redux?
+          base_files << "app/javascript/src/HelloWorld/HelloWorld.module.css"
+        end
+        
         base_files.each { |file| copy_file("#{base_path}#{file}", file) }
       end
 
