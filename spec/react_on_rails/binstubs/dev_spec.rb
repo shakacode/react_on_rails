@@ -19,11 +19,19 @@ RSpec.describe "bin/dev script" do
   def setup_script_execution
     # Mock ARGV to simulate no arguments (default HMR mode)
     stub_const("ARGV", [])
-    # Mock pack generation
-    allow_any_instance_of(Kernel).to receive(:system)
-      .with("bundle exec rake react_on_rails:generate_packs").and_return(true)
+    # Mock pack generation and allow other system calls
+    allow_any_instance_of(Kernel).to receive(:system).and_return(true)
   end
 
+  def setup_script_execution_for_tool_tests
+    setup_script_execution
+    # For tool selection tests, we don't care about file existence - just tool logic
+    allow(File).to receive(:exist?).with("Procfile.dev").and_return(true)
+    # Mock exit to prevent test termination
+    allow_any_instance_of(Kernel).to receive(:exit)
+  end
+
+  # These tests just check script content - no execution needed
   it "includes pack generation function" do
     script_content = File.read(script_path)
     expect(script_content).to include("def generate_packs")
@@ -50,18 +58,18 @@ RSpec.describe "bin/dev script" do
   end
 
   it "with Overmind installed, uses Overmind" do
-    setup_script_execution
+    setup_script_execution_for_tool_tests
     allow(IO).to receive(:popen).with("overmind -v").and_return("Some truthy result")
-    expect_any_instance_of(Kernel).to receive(:system).with("overmind start -f Procfile.dev")
+    expect_any_instance_of(Kernel).to receive(:system).with("overmind start -f Procfile.dev").and_return(true)
 
     load script_path
   end
 
   it "without Overmind and with Foreman installed, uses Foreman" do
-    setup_script_execution
+    setup_script_execution_for_tool_tests
     allow(IO).to receive(:popen).with("overmind -v").and_raise(Errno::ENOENT)
     allow(IO).to receive(:popen).with("foreman -v").and_return("Some truthy result")
-    expect_any_instance_of(Kernel).to receive(:system).with("foreman start -f Procfile.dev")
+    expect_any_instance_of(Kernel).to receive(:system).with("foreman start -f Procfile.dev").and_return(true)
 
     load script_path
   end
@@ -70,7 +78,7 @@ RSpec.describe "bin/dev script" do
     setup_script_execution
     allow(IO).to receive(:popen).with("overmind -v").and_raise(Errno::ENOENT)
     allow(IO).to receive(:popen).with("foreman -v").and_raise(Errno::ENOENT)
-    allow_any_instance_of(Kernel).to receive(:exit!)
+    allow_any_instance_of(Kernel).to receive(:exit)
 
     expected_message = <<~MSG
       NOTICE:
@@ -83,11 +91,8 @@ RSpec.describe "bin/dev script" do
   it "With Overmind and without Procfile, exits with error message" do
     setup_script_execution
     allow(IO).to receive(:popen).with("overmind -v").and_return("Some truthy result")
-    allow_any_instance_of(Kernel)
-      .to receive(:system)
-      .with("overmind start -f Procfile.dev")
-      .and_raise(Errno::ENOENT)
-    allow_any_instance_of(Kernel).to receive(:exit!)
+    allow(File).to receive(:exist?).with("Procfile.dev").and_return(false)
+    allow_any_instance_of(Kernel).to receive(:exit)
 
     expected_message = <<~MSG
       ERROR:
