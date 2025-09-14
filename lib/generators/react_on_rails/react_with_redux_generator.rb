@@ -62,13 +62,6 @@ module ReactOnRails
         run "yarn add redux react-redux"
       end
 
-      def cleanup_base_generator_files
-        # Remove files created by base generator since Redux uses different structure
-        remove_file "app/javascript/src/HelloWorld/HelloWorld.module.css"
-        remove_dir "app/javascript/src/HelloWorld/ror_components" if Dir.exist?("app/javascript/src/HelloWorld/ror_components") && Dir.empty?("app/javascript/src/HelloWorld/ror_components")
-        remove_dir "app/javascript/src/HelloWorld" if Dir.exist?("app/javascript/src/HelloWorld") && Dir.entries("app/javascript/src/HelloWorld").size <= 2 # only . and ..
-      end
-
       def add_redux_specific_messages
         # Override the generic messages with Redux-specific instructions
         require_relative "generator_messages"
