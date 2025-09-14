@@ -11,7 +11,7 @@ module ReactOnRails
       def create_redux_directories
         # Create auto-registration directory structure for Redux
         empty_directory("app/javascript/src/HelloWorldApp/ror_components")
-        
+
         # Create Redux support directories within the component directory
         dirs = %w[actions constants containers reducers store]
         dirs.each { |name| empty_directory("app/javascript/src/HelloWorldApp/#{name}") }
@@ -19,7 +19,7 @@ module ReactOnRails
 
       def copy_base_files
         base_js_path = "redux/base"
-        
+
         # Copy Redux-connected component to auto-registration structure
         copy_file("#{base_js_path}/app/javascript/bundles/HelloWorld/startup/HelloWorldApp.client.jsx",
                   "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.jsx")
