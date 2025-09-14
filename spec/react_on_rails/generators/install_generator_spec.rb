@@ -17,14 +17,14 @@ describe InstallGenerator, type: :generator do
   context "with --redux" do
     before(:all) { run_generator_test_with_args(%w[--redux], package_json: true) }
 
-    include_examples "base_generator", application_js: true
+    include_examples "base_generator_common", application_js: true
     include_examples "react_with_redux_generator"
   end
 
   context "with -R" do
     before(:all) { run_generator_test_with_args(%w[-R], package_json: true) }
 
-    include_examples "base_generator", application_js: true
+    include_examples "base_generator_common", application_js: true
     include_examples "react_with_redux_generator"
   end
 
