@@ -2,25 +2,25 @@
 
 shared_examples "react_with_redux_generator" do
   it "creates redux directories" do
-    %w[actions constants reducers store].each { |dir| assert_directory("app/javascript/bundles/HelloWorld/#{dir}") }
+    assert_directory "app/javascript/src/HelloWorldApp/ror_components"
+    %w[actions constants containers reducers store].each do |dir|
+      assert_directory("app/javascript/src/HelloWorldApp/#{dir}")
+    end
   end
 
   it "creates appropriate templates" do
-    assert_file("app/javascript/packs/hello-world-bundle.js") do |contents|
-      expect(contents).to match("import HelloWorld from '../bundles/HelloWorld/startup/HelloWorldApp.client';")
-    end
     assert_file("app/views/hello_world/index.html.erb") do |contents|
-      expect(contents).to match(/"HelloWorld"/)
+      expect(contents).to match(/"HelloWorldApp"/)
     end
   end
 
   it "copies base redux files" do
-    %w[app/javascript/bundles/HelloWorld/actions/helloWorldActionCreators.js
-       app/javascript/bundles/HelloWorld/containers/HelloWorldContainer.js
-       app/javascript/bundles/HelloWorld/constants/helloWorldConstants.js
-       app/javascript/bundles/HelloWorld/reducers/helloWorldReducer.js
-       app/javascript/bundles/HelloWorld/store/helloWorldStore.js
-       app/javascript/bundles/HelloWorld/startup/HelloWorldApp.client.jsx
-       app/javascript/bundles/HelloWorld/startup/HelloWorldApp.server.jsx].each { |file| assert_file(file) }
+    %w[app/javascript/src/HelloWorldApp/actions/helloWorldActionCreators.js
+       app/javascript/src/HelloWorldApp/containers/HelloWorldContainer.js
+       app/javascript/src/HelloWorldApp/constants/helloWorldConstants.js
+       app/javascript/src/HelloWorldApp/reducers/helloWorldReducer.js
+       app/javascript/src/HelloWorldApp/store/helloWorldStore.js
+       app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.jsx
+       app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.server.jsx].each { |file| assert_file(file) }
   end
 end
