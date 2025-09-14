@@ -38,7 +38,7 @@ module GeneratorMessages
       @output = []
     end
 
-    def helpful_message_after_installation
+    def helpful_message_after_installation(component_name: "HelloWorld")
       <<~MSG
 
         What to do next:
@@ -46,9 +46,10 @@ module GeneratorMessages
           - See the documentation on https://github.com/shakacode/shakapacker#webpack-configuration
             for how to customize the default webpack configuration.
 
-          - Include your webpack assets to your application layout.
+          - No manual pack tags needed with auto-registration! Your layout should use empty pack tags:
 
-              <%= javascript_pack_tag 'hello-world-bundle' %>
+              <%= javascript_pack_tag %>
+              <%= stylesheet_pack_tag %>
 
           - To start Rails server run:
 
@@ -61,7 +62,7 @@ module GeneratorMessages
           - To server render, change this line app/views/hello_world/index.html.erb to
             `prerender: true` to see server rendering (right click on page and select "view source").
 
-              <%= react_component("HelloWorld", props: @hello_world_props, prerender: true) %>
+              <%= react_component("#{component_name}", props: @hello_world_props, prerender: true) %>
 
         Alternative steps to run the app:
 
