@@ -67,35 +67,41 @@ def run_static_development
   # Generate React on Rails packs first
   generate_packs
 
-  if installed? "overmind"
-    system "overmind start -f Procfile.dev-static-assets"
-  elsif installed? "foreman"
-    system "foreman start -f Procfile.dev-static-assets"
+  procfile = "Procfile.dev-static-assets"
+  unless File.exist?(procfile)
+    warn <<~MSG
+      ERROR:
+      Please ensure `#{procfile}` exists in your project!
+    MSG
+    exit 1
+  end
+
+  if installed?("overmind")
+    system "overmind start -f #{procfile}"
+  elsif installed?("foreman")
+    system "foreman start -f #{procfile}"
   else
     warn <<~MSG
       NOTICE:
       For this script to run, you need either 'overmind' or 'foreman' installed on your machine. Please try this script after installing one of them.
     MSG
-    exit!
+    exit 1
   end
-rescue Errno::ENOENT
-  warn <<~MSG
-    ERROR:
-    Please ensure `Procfile.dev-static-assets` exists in your project!
-  MSG
-  exit!
 end
 
 def run_development(process)
   generate_packs
 
-  system "#{process} start -f Procfile.dev"
-rescue Errno::ENOENT
-  warn <<~MSG
-    ERROR:
-    Please ensure `Procfile.dev` exists in your project!
-  MSG
-  exit!
+  procfile = "Procfile.dev"
+  unless File.exist?(procfile)
+    warn <<~MSG
+      ERROR:
+      Please ensure `#{procfile}` exists in your project!
+    MSG
+    exit 1
+  end
+
+  system "#{process} start -f #{procfile}"
 end
 
 # Check for arguments
@@ -149,7 +155,7 @@ elsif ARGV[0] == "hmr" || ARGV[0].nil?
       NOTICE:
       For this script to run, you need either 'overmind' or 'foreman' installed on your machine. Please try this script after installing one of them.
     MSG
-    exit!
+    exit 1
   end
 else
   # Unknown argument
