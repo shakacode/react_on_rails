@@ -60,7 +60,7 @@ RSpec.describe "bin/dev script" do
   it "with Overmind installed, uses Overmind" do
     setup_script_execution_for_tool_tests
     allow(IO).to receive(:popen).with("overmind -v").and_return("Some truthy result")
-    expect_any_instance_of(Kernel).to receive(:system).with("overmind start -f Procfile.dev").and_return(true)
+    expect_any_instance_of(Kernel).to receive(:system).with("overmind start -f Procfile.dev")
 
     load script_path
   end
@@ -69,7 +69,7 @@ RSpec.describe "bin/dev script" do
     setup_script_execution_for_tool_tests
     allow(IO).to receive(:popen).with("overmind -v").and_raise(Errno::ENOENT)
     allow(IO).to receive(:popen).with("foreman -v").and_return("Some truthy result")
-    expect_any_instance_of(Kernel).to receive(:system).with("foreman start -f Procfile.dev").and_return(true)
+    expect_any_instance_of(Kernel).to receive(:system).with("foreman start -f Procfile.dev")
 
     load script_path
   end
