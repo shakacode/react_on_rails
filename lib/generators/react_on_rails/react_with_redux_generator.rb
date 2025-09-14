@@ -13,7 +13,7 @@ module ReactOnRails
         empty_directory("app/javascript/src/HelloWorldApp/ror_components")
 
         # Create Redux support directories within the component directory
-        dirs = %w[actions constants containers reducers store]
+        dirs = %w[actions constants containers reducers store components]
         dirs.each { |name| empty_directory("app/javascript/src/HelloWorldApp/#{name}") }
       end
 
@@ -26,7 +26,7 @@ module ReactOnRails
         copy_file("#{base_js_path}/app/javascript/bundles/HelloWorld/startup/HelloWorldApp.server.jsx",
                   "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.server.jsx")
         copy_file("#{base_js_path}/app/javascript/bundles/HelloWorld/components/HelloWorld.module.css",
-                  "app/javascript/src/HelloWorldApp/HelloWorldApp.module.css")
+                  "app/javascript/src/HelloWorldApp/components/HelloWorld.module.css")
 
         # Update import paths in client component
         ror_client_file = "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.jsx"
@@ -41,7 +41,8 @@ module ReactOnRails
            containers/HelloWorldContainer.js
            constants/helloWorldConstants.js
            reducers/helloWorldReducer.js
-           store/helloWorldStore.js].each do |file|
+           store/helloWorldStore.js
+           components/HelloWorld.jsx].each do |file|
              copy_file("#{base_hello_world_path}/#{file}",
                        "app/javascript/src/HelloWorldApp/#{file}")
            end
