@@ -214,6 +214,7 @@ module ReactOnRails
 
         if defined?(ScoutApm)
           include ScoutApm::Tracer
+
           instrument_method :exec_server_render_js, type: "ReactOnRails", name: "ExecJs React Server Rendering"
         end
 

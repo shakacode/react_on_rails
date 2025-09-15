@@ -12,8 +12,6 @@ describe "Hello World", :js do
   end
 end
 
-private
-
 def name_input
   page.first("input")
 end

@@ -7,6 +7,7 @@ module ReactOnRails
   module Generators
     class ReactNoReduxGenerator < Rails::Generators::Base
       include GeneratorHelper
+
       Rails::Generators.hide_namespace(namespace)
       source_root(File.expand_path("templates", __dir__))
 
