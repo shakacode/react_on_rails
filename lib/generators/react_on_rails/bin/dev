@@ -19,18 +19,51 @@ def generate_packs
   exit 1
 end
 
-def run_production_like
-  puts "🏭 Starting production-like development server..."
-  puts "   - Generating React on Rails packs"
-  puts "   - Precompiling assets with production optimizations"
-  puts "   - Running Rails server on port 3001"
-  puts "   - No HMR (Hot Module Replacement)"
-  puts "   - CSS extracted to separate files (no FOUC)"
-  puts ""
-  puts "💡 Access at: http://localhost:3001"
-  puts ""
+def ensure_procfile(procfile)
+  return if File.exist?(procfile)
 
-  # Generate React on Rails packs first
+  warn <<~MSG
+    ERROR:
+    Please ensure `#{procfile}` exists in your project!
+  MSG
+  exit 1
+end
+
+def run_with_process_manager(procfile)
+  if installed?("overmind")
+    system "overmind start -f #{procfile}"
+  elsif installed?("foreman")
+    system "foreman start -f #{procfile}"
+  else
+    warn <<~MSG
+      NOTICE:
+      For this script to run, you need either 'overmind' or 'foreman' installed on your machine. Please try this script after installing one of them.
+    MSG
+    exit 1
+  end
+end
+
+def print_server_info(title, features, port = 3000)
+  puts "#{title}"
+  features.each { |feature| puts "   - #{feature}" }
+  puts ""
+  puts "💡 Access at: http://localhost:#{port}"
+  puts ""
+end
+
+def run_production_like
+  print_server_info(
+    "🏭 Starting production-like development server...",
+    [
+      "Generating React on Rails packs",
+      "Precompiling assets with production optimizations",
+      "Running Rails server on port 3001",
+      "No HMR (Hot Module Replacement)",
+      "CSS extracted to separate files (no FOUC)"
+    ],
+    3001
+  )
+
   generate_packs
 
   # Precompile assets in production mode
@@ -54,62 +87,68 @@ def run_production_like
 end
 
 def run_static_development
-  puts "⚡ Starting development server with static assets..."
-  puts "   - Generating React on Rails packs"
-  puts "   - Using shakapacker --watch (no HMR)"
-  puts "   - CSS extracted to separate files (no FOUC)"
-  puts "   - Development environment (source maps, faster builds)"
-  puts "   - Auto-recompiles on file changes"
-  puts ""
-  puts "💡 Access at: http://localhost:3000"
-  puts ""
+  print_server_info(
+    "⚡ Starting development server with static assets...",
+    [
+      "Generating React on Rails packs",
+      "Using shakapacker --watch (no HMR)",
+      "CSS extracted to separate files (no FOUC)",
+      "Development environment (source maps, faster builds)",
+      "Auto-recompiles on file changes"
+    ]
+  )
 
-  # Generate React on Rails packs first
   generate_packs
 
   procfile = "Procfile.dev-static-assets"
-  unless File.exist?(procfile)
-    warn <<~MSG
-      ERROR:
-      Please ensure `#{procfile}` exists in your project!
-    MSG
-    exit 1
-  end
-
-  if installed?("overmind")
-    system "overmind start -f #{procfile}"
-  elsif installed?("foreman")
-    system "foreman start -f #{procfile}"
-  else
-    warn <<~MSG
-      NOTICE:
-      For this script to run, you need either 'overmind' or 'foreman' installed on your machine. Please try this script after installing one of them.
-    MSG
-    exit 1
-  end
+  ensure_procfile(procfile)
+  run_with_process_manager(procfile)
 end
 
-def run_development(process)
+def run_development
   generate_packs
 
   procfile = "Procfile.dev"
-  unless File.exist?(procfile)
-    warn <<~MSG
-      ERROR:
-      Please ensure `#{procfile}` exists in your project!
-    MSG
-    exit 1
-  end
-
-  system "#{process} start -f #{procfile}"
+  ensure_procfile(procfile)
+  run_with_process_manager(procfile)
 end
 
-# Check for arguments
-if ARGV[0] == "production-assets" || ARGV[0] == "prod"
-  run_production_like
-elsif ARGV[0] == "static"
-  run_static_development
-elsif ARGV[0] == "help" || ARGV[0] == "--help" || ARGV[0] == "-h"
+def kill_processes
+  puts "🔪 Killing all development processes..."
+  puts ""
+
+  processes = {
+    "rails" => "Rails server",
+    "node.*react[-_]on[-_]rails" => "React on Rails Node processes",
+    "overmind" => "Overmind process manager",
+    "foreman" => "Foreman process manager",
+    "ruby.*puma" => "Puma server",
+    "webpack-dev-server" => "Webpack dev server",
+    "bin/shakapacker-dev-server" => "Shakapacker dev server"
+  }
+
+  killed_any = false
+
+  processes.each do |pattern, description|
+    pids = `pgrep -f "#{pattern}" 2>/dev/null`.split("\n").map(&:to_i).reject { |pid| pid == Process.pid }
+
+    if pids.any?
+      puts "   ☠️  Killing #{description} (PIDs: #{pids.join(', ')})"
+      pids.each { |pid| Process.kill("TERM", pid) rescue nil }
+      killed_any = true
+    end
+  end
+
+  if killed_any
+    puts ""
+    puts "✅ All processes terminated"
+    puts "💡 You can now run 'bin/dev' for a clean start"
+  else
+    puts "   ℹ️  No development processes found running"
+  end
+end
+
+def show_help
   puts <<~HELP
     Usage: bin/dev [command]
 
@@ -118,6 +157,7 @@ elsif ARGV[0] == "help" || ARGV[0] == "--help" || ARGV[0] == "-h"
       static              Start development server with static assets (no HMR, no FOUC)
       production-assets   Start with production-optimized assets (no HMR)
       prod                Alias for production-assets
+      kill                Kill all development processes for a clean start
       help                Show this help message
     #{'  '}
     HMR Development mode (default):
@@ -144,21 +184,21 @@ elsif ARGV[0] == "help" || ARGV[0] == "--help" || ARGV[0] == "-h"
     • Slower recompilation
     • Access at: http://localhost:3001
   HELP
-elsif ARGV[0] == "hmr" || ARGV[0].nil?
-  # Default development mode (HMR)
-  if installed? "overmind"
-    run_development "overmind"
-  elsif installed? "foreman"
-    run_development "foreman"
-  else
-    warn <<~MSG
-      NOTICE:
-      For this script to run, you need either 'overmind' or 'foreman' installed on your machine. Please try this script after installing one of them.
-    MSG
-    exit 1
-  end
+end
+
+# Main execution
+case ARGV[0]
+when "production-assets", "prod"
+  run_production_like
+when "static"
+  run_static_development
+when "kill"
+  kill_processes
+when "help", "--help", "-h"
+  show_help
+when "hmr", nil
+  run_development
 else
-  # Unknown argument
   puts "Unknown argument: #{ARGV[0]}"
   puts "Run 'bin/dev help' for usage information"
   exit 1
