@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "react_on_rails/dev"
+
 RSpec.describe "bin/dev script" do
   let(:script_path) { "lib/generators/react_on_rails/bin/dev" }
 
@@ -40,12 +42,12 @@ RSpec.describe "bin/dev script" do
 
   it "supports static development mode" do
     script_content = File.read(script_path)
-    expect(script_content).to include("ReactOnRails::Dev::ServerManager.start(:static)")
+    expect(script_content).to include("ReactOnRails::Dev::ServerManager.start(:static")
   end
 
   it "supports production-like mode" do
     script_content = File.read(script_path)
-    expect(script_content).to include("ReactOnRails::Dev::ServerManager.start(:production_like)")
+    expect(script_content).to include("ReactOnRails::Dev::ServerManager.start(:production_like")
   end
 
   it "supports help command" do
@@ -67,7 +69,7 @@ RSpec.describe "bin/dev script" do
     allow_any_instance_of(Kernel).to receive(:require).with("bundler/setup").and_return(true)
     allow_any_instance_of(Kernel).to receive(:require).with("react_on_rails/dev").and_return(true)
 
-    expect(ReactOnRails::Dev::ServerManager).to receive(:start).with(:development)
+    expect(ReactOnRails::Dev::ServerManager).to receive(:start).with(:development, "Procfile.dev", verbose: false)
 
     load script_path
   end
