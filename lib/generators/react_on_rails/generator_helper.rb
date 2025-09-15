@@ -1,11 +1,42 @@
 # frozen_string_literal: true
 
-require "package_json"
 require "rainbow"
+require "json"
 
 module GeneratorHelper
   def package_json
-    @package_json ||= PackageJson.read
+    # Lazy load package_json gem only when actually needed for dependency management
+    begin
+      require "package_json" unless defined?(PackageJson)
+      @package_json ||= PackageJson.read
+    rescue LoadError
+      puts "Warning: package_json gem not available. This is expected before Shakapacker installation."
+      puts "Dependencies will be installed using the default package manager after Shakapacker setup."
+      return nil
+    rescue => e
+      puts "Warning: Could not read package.json: #{e.message}"
+      puts "This is normal before Shakapacker creates the package.json file."
+      return nil
+    end
+  end
+
+  # Safe wrapper for package_json operations
+  def add_npm_dependencies(packages, dev: false)
+    pj = package_json
+    return false unless pj
+
+    begin
+      if dev
+        pj.manager.add(packages, type: :dev)
+      else
+        pj.manager.add(packages)
+      end
+      true
+    rescue => e
+      puts "Warning: Could not add packages via package_json gem: #{e.message}"
+      puts "Will fall back to direct npm commands."
+      false
+    end
   end
 
   # Takes a relative path from the destination root, such as `.gitignore` or `app/assets/javascripts/application.js`
