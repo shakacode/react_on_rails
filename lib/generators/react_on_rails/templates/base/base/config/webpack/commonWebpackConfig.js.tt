@@ -12,6 +12,30 @@ const commonOptions = {
 };
 
 // Copy the object using merge b/c the baseClientWebpackConfig and commonOptions are mutable globals
-const commonWebpackConfig = () => merge({}, baseClientWebpackConfig, commonOptions);
+const commonWebpackConfig = () => {
+  const config = merge({}, baseClientWebpackConfig, commonOptions);
+
+  // Ensure CSS loader is properly configured
+  if (!config.module) {
+    config.module = {};
+  }
+  if (!config.module.rules) {
+    config.module.rules = [];
+  }
+
+  // Add CSS loader rule if not already present
+  const hasCssRule = config.module.rules.some(rule =>
+    rule.test && rule.test.toString().includes('css')
+  );
+
+  if (!hasCssRule) {
+    config.module.rules.push({
+      test: /\.css$/i,
+      use: ['style-loader', 'css-loader'],
+    });
+  }
+
+  return config;
+};
 
 module.exports = commonWebpackConfig;
