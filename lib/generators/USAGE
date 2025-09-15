@@ -1,7 +1,8 @@
 Description:
 
-The react_on_rails:install generator integrates Webpack with Rails with ease. You
-can pass the redux option if you'd like to have redux setup for you automatically.
+The react_on_rails:install generator integrates a React frontend, including SSR, with Rails.
+
+If shakapacker is not installed, it will be installed.
 
 * Redux (Optional)
 
