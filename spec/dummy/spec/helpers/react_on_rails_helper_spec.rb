@@ -23,9 +23,7 @@ describe ReactOnRailsHelper do
     }
 
     allow(ReactOnRails::Utils).to receive_messages(
-      react_on_rails_pro?: true,
-      react_on_rails_pro_version: "4.0.0",
-      rsc_support_enabled?: false
+      react_on_rails_pro_licence_valid?: true
     )
   end
 
@@ -388,7 +386,7 @@ typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('Ap
         subject(:react_app) { react_component("App", props: props, force_load: true) }
 
         before do
-          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro_licence_valid?).and_return(false)
         end
 
         it { is_expected.to include(badge_html_string) }
@@ -403,7 +401,7 @@ typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('Ap
         subject(:react_app) { react_component("App", props: props) }
 
         before do
-          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro_licence_valid?).and_return(false)
         end
 
         around do |example|
@@ -419,7 +417,7 @@ typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('Ap
         subject(:react_app) { react_component("App", props: props, force_load: false) }
 
         before do
-          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro_licence_valid?).and_return(false)
         end
 
         it { is_expected.not_to include(badge_html_string) }
@@ -435,8 +433,7 @@ typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('Ap
 
         before do
           allow(ReactOnRails::Utils).to receive_messages(
-            react_on_rails_pro?: true,
-            react_on_rails_pro_version: "4.0.0"
+            react_on_rails_pro_licence_valid?: true
           )
         end
 
@@ -482,7 +479,7 @@ typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('Ap
         subject(:react_app) { react_component_hash("App", props: props, force_load: true) }
 
         before do
-          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro_licence_valid?).and_return(false)
         end
 
         it "adds badge to componentHtml" do
@@ -495,8 +492,7 @@ typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('Ap
 
         before do
           allow(ReactOnRails::Utils).to receive_messages(
-            react_on_rails_pro?: true,
-            react_on_rails_pro_version: "4.0.0"
+            react_on_rails_pro_licence_valid?: true
           )
         end
 
@@ -541,7 +537,7 @@ typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('Ap
         subject(:store) { redux_store("reduxStore", props: props, force_load: true) }
 
         before do
-          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro_licence_valid?).and_return(false)
         end
 
         it { is_expected.to include(badge_html_string) }
@@ -556,7 +552,7 @@ typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('Ap
         subject(:store) { redux_store("reduxStore", props: props, force_load: false) }
 
         before do
-          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro_licence_valid?).and_return(false)
         end
 
         it { is_expected.not_to include(badge_html_string) }
@@ -567,8 +563,7 @@ typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('Ap
 
         before do
           allow(ReactOnRails::Utils).to receive_messages(
-            react_on_rails_pro?: true,
-            react_on_rails_pro_version: "4.0.0"
+            react_on_rails_pro_licence_valid?: true
           )
         end
 

@@ -7,7 +7,7 @@ require "active_support"
 require "active_support/core_ext/string"
 
 module ReactOnRails
-  module Utils
+  module Utils # rubocop:disable Metrics/ModuleLength
     TRUNCATION_FILLER = "\n... TRUNCATED #{
       Rainbow('To see the full output, set FULL_TEXT_ERRORS=true.').red
     } ...\n".freeze
@@ -211,6 +211,21 @@ module ReactOnRails
                                     else
                                       ""
                                     end
+    end
+
+    def self.react_on_rails_pro_licence_valid?
+      return @react_on_rails_pro_licence_valid if defined?(@react_on_rails_pro_licence_valid)
+
+      @react_on_rails_pro_licence_valid = begin
+        return false unless react_on_rails_pro?
+
+        # Maintain compatibility with legacy versions of React on Rails Pro:
+        # Earlier releases did not require license validation, as they were distributed as private gems.
+        # This check ensures that the method works correctly regardless of the installed version.
+        return true unless ReactOnRailsPro::Utils.respond_to?(:licence_valid?)
+
+        ReactOnRailsPro::Utils.licence_valid?
+      end
     end
 
     def self.rsc_support_enabled?

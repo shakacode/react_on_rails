@@ -448,8 +448,8 @@ module ReactOnRails
     # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
 
     def pro_warning_badge_if_needed(force_load)
-      return "".html_safe if !force_load && !ReactOnRails.configuration.force_load
-      return "".html_safe if ReactOnRails::Utils.react_on_rails_pro?
+      return "".html_safe unless force_load
+      return "".html_safe if ReactOnRails::Utils.react_on_rails_pro_licence_valid?
 
       warning_message = "[REACT ON RAILS] The 'force_load' feature requires a React on Rails Pro license. " \
                         "Please visit https://shakacode.com/react-on-rails-pro to learn more."
