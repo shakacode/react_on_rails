@@ -49,9 +49,8 @@ module ReactOnRails
           ref_time = Time.current - 1.minute
           FileUtils.touch(translations_path, mtime: ref_time)
 
-          update_time = Time.current
           described_class.new
-          expect(update_time).to be > File.mtime(translations_path)
+          expect(File.mtime(translations_path)).to eq(ref_time)
         end
       end
     end
