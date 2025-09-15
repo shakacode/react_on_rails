@@ -11,9 +11,19 @@ module ReactOnRails
       return false if git_installed && status&.empty?
 
       error = if git_installed
-                "You have uncommitted code. Please commit or stash your changes before continuing"
+                <<~MSG.strip
+                  You have uncommitted changes. Please commit or stash them before continuing.
+
+                  The React on Rails generator creates many new files and it's important to keep
+                  your existing changes separate from the generated code for easier review.
+                MSG
               else
-                "You do not have Git installed. Please install Git, and commit your changes before continuing"
+                <<~MSG.strip
+                  Git is not installed. Please install Git and commit your changes before continuing.
+
+                  The React on Rails generator creates many new files and version control helps
+                  track what was generated versus your existing code.
+                MSG
               end
       message_handler.add_error(error)
       true
