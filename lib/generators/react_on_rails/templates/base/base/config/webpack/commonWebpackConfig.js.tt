@@ -22,8 +22,9 @@ const commonOptions = {
   },
 };
 
-// Only add CSS module rules if the required loaders are available
+// Add CSS module rules - either with proper loaders or fallback
 if (cssLoaderAvailable && MiniCssExtractPlugin) {
+  // Full CSS modules support when loaders are available
   commonOptions.module = {
     rules: [
       {
@@ -39,6 +40,19 @@ if (cssLoaderAvailable && MiniCssExtractPlugin) {
             },
           },
         ],
+      },
+    ],
+  };
+} else {
+  // Fallback: ignore CSS files when loaders aren't available (for testing)
+  commonOptions.module = {
+    rules: [
+      {
+        test: /\.module\.css$/i,
+        type: 'asset/resource',
+        generator: {
+          emit: false,
+        },
       },
     ],
   };
