@@ -76,118 +76,6 @@ module ReactOnRails
         copy_webpack_main_config(base_path, config)
       end
 
-      private
-
-      def copy_webpack_main_config(base_path, config)
-        webpack_config_path = "config/webpack/webpack.config.js"
-
-        if File.exist?(webpack_config_path)
-          existing_content = File.read(webpack_config_path)
-
-          # Check if it's the standard Shakapacker config that we can safely replace
-          if standard_shakapacker_config?(existing_content)
-            # Remove the file first to avoid conflict prompt, then recreate it
-            remove_file(webpack_config_path, verbose: false)
-            # Show what we're doing
-            puts "   #{set_color('replace', :green)}  #{webpack_config_path} " \
-                 "(auto-upgrading from standard Shakapacker to React on Rails config)"
-            template("#{base_path}/#{webpack_config_path}.tt", webpack_config_path, config)
-          elsif react_on_rails_config?(existing_content)
-            puts "   #{set_color('identical', :blue)}  #{webpack_config_path} " \
-                 "(already React on Rails compatible)"
-            # Skip - don't need to do anything
-          else
-            handle_custom_webpack_config(base_path, config, webpack_config_path)
-          end
-        else
-          # File doesn't exist, create it
-          template("#{base_path}/#{webpack_config_path}.tt", webpack_config_path, config)
-        end
-      end
-
-      def handle_custom_webpack_config(base_path, config, webpack_config_path)
-        # Custom config - ask user
-        puts "\n#{set_color('NOTICE:', :yellow)} Your webpack.config.js appears to be customized."
-        puts "React on Rails needs to replace it with an environment-specific loader."
-        puts "Your current config will be backed up to webpack.config.js.backup"
-
-        if yes?("Replace webpack.config.js with React on Rails version? (Y/n)")
-          # Create backup
-          backup_path = "#{webpack_config_path}.backup"
-          copy_file(webpack_config_path, backup_path)
-          puts "   #{set_color('create', :green)}  #{backup_path} (backup of your custom config)"
-
-          template("#{base_path}/#{webpack_config_path}.tt", webpack_config_path, config)
-        else
-          puts "   #{set_color('skip', :yellow)}  #{webpack_config_path}"
-          puts "   #{set_color('WARNING:', :red)} React on Rails may not work correctly " \
-               "without the environment-specific webpack config"
-        end
-      end
-
-      def standard_shakapacker_config?(content)
-        # Get the expected default config based on Shakapacker version
-        expected_configs = shakapacker_default_configs
-
-        # Check if the content matches any of the known default configurations
-        expected_configs.any? { |config| content_matches_template?(content, config) }
-      end
-
-      def content_matches_template?(content, template)
-        # Normalize whitespace and compare
-        normalize_config_content(content) == normalize_config_content(template)
-      end
-
-      def normalize_config_content(content)
-        # Remove comments, normalize whitespace, and clean up for comparison
-        content.gsub(%r{//.*$}, "")                    # Remove single-line comments
-               .gsub(%r{/\*.*?\*/}m, "")               # Remove multi-line comments
-               .gsub(/\s+/, " ")                       # Normalize whitespace
-               .strip
-      end
-
-      def shakapacker_default_configs
-        configs = []
-
-        # Shakapacker v7+ (generateWebpackConfig function)
-        configs << <<~CONFIG
-          // See the shakacode/shakapacker README and docs directory for advice on customizing your webpackConfig.
-          const { generateWebpackConfig } = require('shakapacker')
-
-          const webpackConfig = generateWebpackConfig()
-
-          module.exports = webpackConfig
-        CONFIG
-
-        # Shakapacker v6 (webpackConfig object)
-        configs << <<~CONFIG
-          const { webpackConfig } = require('shakapacker')
-
-          // See the shakacode/shakapacker README and docs directory for advice on customizing your webpackConfig.
-
-          module.exports = webpackConfig
-        CONFIG
-
-        # Also check without comments for variations
-        configs << <<~CONFIG
-          const { generateWebpackConfig } = require('shakapacker')
-          const webpackConfig = generateWebpackConfig()
-          module.exports = webpackConfig
-        CONFIG
-
-        configs << <<~CONFIG
-          const { webpackConfig } = require('shakapacker')
-          module.exports = webpackConfig
-        CONFIG
-
-        configs
-      end
-
-      def react_on_rails_config?(content)
-        # Check if it already has React on Rails environment-specific loading
-        content.include?("envSpecificConfig") || content.include?("env.nodeEnv")
-      end
-
       def copy_packer_config
         puts "Adding Shakapacker #{ReactOnRails::PackerUtils.shakapacker_version} config"
         base_path = "base/base/"
@@ -303,6 +191,118 @@ module ReactOnRails
             )
           end
         end
+      end
+
+      private
+
+      def copy_webpack_main_config(base_path, config)
+        webpack_config_path = "config/webpack/webpack.config.js"
+
+        if File.exist?(webpack_config_path)
+          existing_content = File.read(webpack_config_path)
+
+          # Check if it's the standard Shakapacker config that we can safely replace
+          if standard_shakapacker_config?(existing_content)
+            # Remove the file first to avoid conflict prompt, then recreate it
+            remove_file(webpack_config_path, verbose: false)
+            # Show what we're doing
+            puts "   #{set_color('replace', :green)}  #{webpack_config_path} " \
+                 "(auto-upgrading from standard Shakapacker to React on Rails config)"
+            template("#{base_path}/#{webpack_config_path}.tt", webpack_config_path, config)
+          elsif react_on_rails_config?(existing_content)
+            puts "   #{set_color('identical', :blue)}  #{webpack_config_path} " \
+                 "(already React on Rails compatible)"
+            # Skip - don't need to do anything
+          else
+            handle_custom_webpack_config(base_path, config, webpack_config_path)
+          end
+        else
+          # File doesn't exist, create it
+          template("#{base_path}/#{webpack_config_path}.tt", webpack_config_path, config)
+        end
+      end
+
+      def handle_custom_webpack_config(base_path, config, webpack_config_path)
+        # Custom config - ask user
+        puts "\n#{set_color('NOTICE:', :yellow)} Your webpack.config.js appears to be customized."
+        puts "React on Rails needs to replace it with an environment-specific loader."
+        puts "Your current config will be backed up to webpack.config.js.backup"
+
+        if yes?("Replace webpack.config.js with React on Rails version? (Y/n)")
+          # Create backup
+          backup_path = "#{webpack_config_path}.backup"
+          copy_file(webpack_config_path, backup_path)
+          puts "   #{set_color('create', :green)}  #{backup_path} (backup of your custom config)"
+
+          template("#{base_path}/#{webpack_config_path}.tt", webpack_config_path, config)
+        else
+          puts "   #{set_color('skip', :yellow)}  #{webpack_config_path}"
+          puts "   #{set_color('WARNING:', :red)} React on Rails may not work correctly " \
+               "without the environment-specific webpack config"
+        end
+      end
+
+      def standard_shakapacker_config?(content)
+        # Get the expected default config based on Shakapacker version
+        expected_configs = shakapacker_default_configs
+
+        # Check if the content matches any of the known default configurations
+        expected_configs.any? { |config| content_matches_template?(content, config) }
+      end
+
+      def content_matches_template?(content, template)
+        # Normalize whitespace and compare
+        normalize_config_content(content) == normalize_config_content(template)
+      end
+
+      def normalize_config_content(content)
+        # Remove comments, normalize whitespace, and clean up for comparison
+        content.gsub(%r{//.*$}, "")                    # Remove single-line comments
+               .gsub(%r{/\*.*?\*/}m, "")               # Remove multi-line comments
+               .gsub(/\s+/, " ")                       # Normalize whitespace
+               .strip
+      end
+
+      def shakapacker_default_configs
+        configs = []
+
+        # Shakapacker v7+ (generateWebpackConfig function)
+        configs << <<~CONFIG
+          // See the shakacode/shakapacker README and docs directory for advice on customizing your webpackConfig.
+          const { generateWebpackConfig } = require('shakapacker')
+
+          const webpackConfig = generateWebpackConfig()
+
+          module.exports = webpackConfig
+        CONFIG
+
+        # Shakapacker v6 (webpackConfig object)
+        configs << <<~CONFIG
+          const { webpackConfig } = require('shakapacker')
+
+          // See the shakacode/shakapacker README and docs directory for advice on customizing your webpackConfig.
+
+          module.exports = webpackConfig
+        CONFIG
+
+        # Also check without comments for variations
+        configs << <<~CONFIG
+          const { generateWebpackConfig } = require('shakapacker')
+          const webpackConfig = generateWebpackConfig()
+          module.exports = webpackConfig
+        CONFIG
+
+        configs << <<~CONFIG
+          const { webpackConfig } = require('shakapacker')
+          module.exports = webpackConfig
+        CONFIG
+
+        configs
+      end
+
+      def react_on_rails_config?(content)
+        # Check if it already has React on Rails environment-specific loading
+        content.include?("envSpecificConfig") || content.include?("env.nodeEnv")
       end
 
       CONFIGURE_RSPEC_TO_COMPILE_ASSETS = <<-STR.strip_heredoc
