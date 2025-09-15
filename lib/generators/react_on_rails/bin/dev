@@ -24,27 +24,21 @@ begin
 rescue LoadError
   # Fallback for when gem is not yet installed
   puts "Loading ReactOnRails development tools..."
-  require_relative "../../../react_on_rails/dev"
+  require_relative "../../lib/react_on_rails/dev"
 end
-
-# Check for verbose flag
-verbose = ARGV.include?("--verbose") || ARGV.include?("-v")
 
 # Main execution
 case ARGV[0]
 when "production-assets", "prod"
-  ReactOnRails::Dev::ServerManager.start(:production_like, verbose: verbose)
+  ReactOnRails::Dev::ServerManager.start(:production_like)
 when "static"
-  ReactOnRails::Dev::ServerManager.start(:static, "Procfile.dev-static-assets", verbose: verbose)
+  ReactOnRails::Dev::ServerManager.start(:static, "Procfile.dev-static-assets")
 when "kill"
   ReactOnRails::Dev::ServerManager.kill_processes
 when "help", "--help", "-h"
   ReactOnRails::Dev::ServerManager.show_help
 when "hmr", nil
-  ReactOnRails::Dev::ServerManager.start(:development, "Procfile.dev", verbose: verbose)
-when "--verbose", "-v"
-  # Handle the case where verbose is the only argument
-  ReactOnRails::Dev::ServerManager.start(:development, "Procfile.dev", verbose: true)
+  ReactOnRails::Dev::ServerManager.start(:development, "Procfile.dev")
 else
   puts "Unknown argument: #{ARGV[0]}"
   puts "Run 'bin/dev help' for usage information"

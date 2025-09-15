@@ -35,7 +35,6 @@ module ReactOnRails
         base_path = "base/base/"
         base_files = %w[app/controllers/hello_world_controller.rb
                         app/views/layouts/hello_world.html.erb
-                        bin/dev
                         Procfile.dev
                         Procfile.dev-static-assets
                         Procfile.dev-prod-assets]
