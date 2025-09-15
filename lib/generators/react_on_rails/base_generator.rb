@@ -159,7 +159,7 @@ module ReactOnRails
                                ["react-on-rails"]
                              end
 
-        puts "Adding React on Rails"
+        puts "Installing React on Rails package..."
         return if add_npm_dependencies(react_on_rails_pkg)
 
         puts "Using direct npm commands as fallback"
@@ -167,7 +167,7 @@ module ReactOnRails
       end
 
       def add_react_dependencies
-        puts "Adding React dependencies"
+        puts "Installing React dependencies..."
         react_deps = %w[
           react
           react-dom
@@ -180,7 +180,7 @@ module ReactOnRails
       end
 
       def add_css_dependencies
-        puts "Adding CSS handlers"
+        puts "Installing CSS handling dependencies..."
         css_deps = %w[
           css-loader
           css-minimizer-webpack-plugin
@@ -191,7 +191,7 @@ module ReactOnRails
       end
 
       def add_dev_dependencies
-        puts "Adding dev dependencies"
+        puts "Installing development dependencies..."
         dev_deps = %w[
           @pmmmwh/react-refresh-webpack-plugin
           react-refresh

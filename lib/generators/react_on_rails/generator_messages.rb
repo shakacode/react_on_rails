@@ -138,6 +138,13 @@ module GeneratorMessages
     end
 
     def shakapacker_installed?
+      # Check if shakapacker is in the Gemfile (more reliable for just-installed gems)
+      if File.exist?("Gemfile")
+        gemfile_content = File.read("Gemfile")
+        return true if gemfile_content.match?(/gem\s+['"]shakapacker['"]/)
+      end
+
+      # Fallback to gem specification check
       Gem::Specification.find_by_name("shakapacker")
       true
     rescue Gem::LoadError
