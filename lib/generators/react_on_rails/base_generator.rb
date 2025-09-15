@@ -238,6 +238,9 @@ module ReactOnRails
       def install_js_dependencies
         puts "Installing JavaScript dependencies"
         run "yarn install"
+      rescue => e
+        puts "Error installing JavaScript dependencies: #{e.message}"
+        raise
       end
 
       def update_gitignore_for_auto_registration
