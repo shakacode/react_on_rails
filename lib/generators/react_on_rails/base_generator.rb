@@ -49,9 +49,9 @@ module ReactOnRails
         base_path = "base/base/"
         base_files = %w[app/javascript/packs/server-bundle.js]
 
-        # Only copy HelloWorld.module.css for non-Redux components
+        # Only copy HelloWorld.css for non-Redux components
         # Redux components handle their own CSS files
-        base_files << "app/javascript/src/HelloWorld/HelloWorld.module.css" unless options.redux?
+        base_files << "app/javascript/src/HelloWorld/HelloWorld.css" unless options.redux?
 
         base_files.each { |file| copy_file("#{base_path}#{file}", file) }
       end
