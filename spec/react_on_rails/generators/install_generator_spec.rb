@@ -137,7 +137,8 @@ describe InstallGenerator, type: :generator do
       specify "when Shakapacker is not installed and install succeeds" do
         allow(install_generator).to receive(:shakapacker_installed?).and_return(false)
         allow(install_generator).to receive(:system).with("bundle", "add", "shakapacker").and_return(true)
-        allow(install_generator).to receive(:system).with("bundle", "exec", "rails", "shakapacker:install").and_return(true)
+        allow(install_generator).to receive(:system).with("bundle", "exec", "rails",
+                                                          "shakapacker:install").and_return(true)
         expect(GeneratorMessages).to receive(:add_info).with(<<~MSG.strip)
           Shakapacker gem not found in your Gemfile.
           React on Rails requires Shakapacker for webpack integration.
@@ -167,7 +168,8 @@ describe InstallGenerator, type: :generator do
       specify "when Shakapacker is not installed and shakapacker:install fails" do
         allow(install_generator).to receive(:shakapacker_installed?).and_return(false)
         allow(install_generator).to receive(:system).with("bundle", "add", "shakapacker").and_return(true)
-        allow(install_generator).to receive(:system).with("bundle", "exec", "rails", "shakapacker:install").and_return(false)
+        allow(install_generator).to receive(:system).with("bundle", "exec", "rails",
+                                                          "shakapacker:install").and_return(false)
         expect(GeneratorMessages).to receive(:add_info).with(<<~MSG.strip)
           Shakapacker gem not found in your Gemfile.
           React on Rails requires Shakapacker for webpack integration.

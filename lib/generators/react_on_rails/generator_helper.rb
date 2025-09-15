@@ -6,18 +6,17 @@ require "json"
 module GeneratorHelper
   def package_json
     # Lazy load package_json gem only when actually needed for dependency management
-    begin
-      require "package_json" unless defined?(PackageJson)
-      @package_json ||= PackageJson.read
-    rescue LoadError
-      puts "Warning: package_json gem not available. This is expected before Shakapacker installation."
-      puts "Dependencies will be installed using the default package manager after Shakapacker setup."
-      return nil
-    rescue => e
-      puts "Warning: Could not read package.json: #{e.message}"
-      puts "This is normal before Shakapacker creates the package.json file."
-      return nil
-    end
+
+    require "package_json" unless defined?(PackageJson)
+    @package_json ||= PackageJson.read
+  rescue LoadError
+    puts "Warning: package_json gem not available. This is expected before Shakapacker installation."
+    puts "Dependencies will be installed using the default package manager after Shakapacker setup."
+    nil
+  rescue StandardError => e
+    puts "Warning: Could not read package.json: #{e.message}"
+    puts "This is normal before Shakapacker creates the package.json file."
+    nil
   end
 
   # Safe wrapper for package_json operations
@@ -32,7 +31,7 @@ module GeneratorHelper
         pj.manager.add(packages)
       end
       true
-    rescue => e
+    rescue StandardError => e
       puts "Warning: Could not add packages via package_json gem: #{e.message}"
       puts "Will fall back to direct npm commands."
       false
