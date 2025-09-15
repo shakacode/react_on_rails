@@ -39,6 +39,6 @@ RSpec.configure do |config|
         err_msg.include?("This version of ChromeDriver has not been tested with Chrome version")
     end
 
-    raise("JavaScript error(s) on the page:\n\n#{clean_errors.join("\n")}") if clean_errors.present?
+    raise("JavaScript error#{"s" if clean_errors.length > 0} on the page:\n\n#{clean_errors.join("\n")}") if clean_errors.present?
   end
 end
