@@ -6,11 +6,17 @@ module ReactOnRails
   module Dev
     class PackGenerator
       class << self
-        def generate
-          puts "📦 Generating React on Rails packs..."
-          system "bundle exec rake react_on_rails:generate_packs"
+        def generate(verbose: false)
+          if verbose
+            puts "📦 Generating React on Rails packs..."
+            success = system "bundle exec rake react_on_rails:generate_packs"
+          else
+            print "📦 Generating packs... "
+            success = system "bundle exec rake react_on_rails:generate_packs > /dev/null 2>&1"
+            puts success ? "✅" : "❌"
+          end
 
-          return if $CHILD_STATUS.success?
+          return if success
 
           puts "❌ Pack generation failed"
           exit 1
