@@ -44,15 +44,13 @@ if (cssLoaderAvailable && MiniCssExtractPlugin) {
     ],
   };
 } else {
-  // Fallback: ignore CSS files when loaders aren't available (for testing)
+  // Fallback: provide identity object for CSS modules (for testing)
   commonOptions.module = {
     rules: [
       {
         test: /\.module\.css$/i,
-        type: 'asset/resource',
-        generator: {
-          emit: false,
-        },
+        type: 'javascript/auto',
+        loader: 'data:text/javascript,module.exports=new Proxy({},{get:function(target,prop){return prop==="default"?this:prop}})',
       },
     ],
   };
