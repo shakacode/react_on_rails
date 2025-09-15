@@ -62,6 +62,7 @@ module GeneratorMessages
                 1. Start the app:
                    ./bin/dev              # HMR (Hot Module Replacement) mode
                    ./bin/dev static       # Static bundles (no HMR, faster initial load)
+                   ./bin/dev prod         # Production-like mode for testing
                    ./bin/dev help         # See all available options
         #{process_manager_section}
 

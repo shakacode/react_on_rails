@@ -5,49 +5,56 @@ module ReactOnRails
     class FileManager
       class << self
         def cleanup_stale_files
+          socket_cleanup = cleanup_overmind_sockets
+          pid_cleanup = cleanup_rails_pid_file
+
+          socket_cleanup || pid_cleanup
+        end
+
+        private
+
+        def cleanup_overmind_sockets
+          return false if overmind_running?
+
+          socket_files = [".overmind.sock", "tmp/sockets/overmind.sock"]
           cleaned_any = false
 
-          # Check for stale overmind socket files
-          socket_files = [".overmind.sock", "tmp/sockets/overmind.sock"]
-
-          # Only clean up if overmind is not actually running
-          overmind_pids = `pgrep -f "overmind" 2>/dev/null`.split("\n").map(&:to_i)
-
-          if overmind_pids.empty?
-            socket_files.each do |socket_file|
-              next unless File.exist?(socket_file)
-
-              puts "   🧹 Cleaning up stale socket: #{socket_file}"
-              begin
-                File.delete(socket_file)
-              rescue StandardError
-                nil
-              end
-              cleaned_any = true
-            end
-          end
-
-          # Check for stale Rails server.pid file
-          server_pid_file = "tmp/pids/server.pid"
-          if File.exist?(server_pid_file)
-            pid = File.read(server_pid_file).to_i
-            # Check if process is actually running
-            begin
-              Process.kill(0, pid)
-              # Process exists, don't clean up
-            rescue Errno::ESRCH
-              # Process doesn't exist, clean up stale pid file
-              puts "   🧹 Cleaning up stale Rails pid file: #{server_pid_file}"
-              begin
-                File.delete(server_pid_file)
-              rescue StandardError
-                nil
-              end
-              cleaned_any = true
-            end
+          socket_files.each do |socket_file|
+            cleaned_any = true if remove_file_if_exists(socket_file, "stale socket")
           end
 
           cleaned_any
+        end
+
+        def cleanup_rails_pid_file
+          server_pid_file = "tmp/pids/server.pid"
+          return false unless File.exist?(server_pid_file)
+
+          pid = File.read(server_pid_file).to_i
+          return false if process_running?(pid)
+
+          remove_file_if_exists(server_pid_file, "stale Rails pid file")
+        end
+
+        def overmind_running?
+          !`pgrep -f "overmind" 2>/dev/null`.split("\n").empty?
+        end
+
+        def process_running?(pid)
+          Process.kill(0, pid)
+          true
+        rescue Errno::ESRCH
+          false
+        end
+
+        def remove_file_if_exists(file_path, description)
+          return false unless File.exist?(file_path)
+
+          puts "   🧹 Cleaning up #{description}: #{file_path}"
+          File.delete(file_path)
+          true
+        rescue StandardError
+          false
         end
       end
     end
