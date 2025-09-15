@@ -120,11 +120,61 @@ module ReactOnRails
       end
 
       def standard_shakapacker_config?(content)
-        # Check if it's the standard Shakapacker config
-        content.include?("generateWebpackConfig") &&
-          content.include?("shakapacker") &&
-          !content.include?("envSpecificConfig") &&
-          !content.include?("env.nodeEnv")
+        # Get the expected default config based on Shakapacker version
+        expected_configs = shakapacker_default_configs
+
+        # Check if the content matches any of the known default configurations
+        expected_configs.any? { |config| content_matches_template?(content, config) }
+      end
+
+      def content_matches_template?(content, template)
+        # Normalize whitespace and compare
+        normalize_config_content(content) == normalize_config_content(template)
+      end
+
+      def normalize_config_content(content)
+        # Remove comments, normalize whitespace, and clean up for comparison
+        content.gsub(%r{//.*$}, "")                    # Remove single-line comments
+               .gsub(%r{/\*.*?\*/}m, "")               # Remove multi-line comments
+               .gsub(/\s+/, " ")                       # Normalize whitespace
+               .strip
+      end
+
+      def shakapacker_default_configs
+        configs = []
+
+        # Shakapacker v7+ (generateWebpackConfig function)
+        configs << <<~CONFIG
+          // See the shakacode/shakapacker README and docs directory for advice on customizing your webpackConfig.
+          const { generateWebpackConfig } = require('shakapacker')
+
+          const webpackConfig = generateWebpackConfig()
+
+          module.exports = webpackConfig
+        CONFIG
+
+        # Shakapacker v6 (webpackConfig object)
+        configs << <<~CONFIG
+          const { webpackConfig } = require('shakapacker')
+
+          // See the shakacode/shakapacker README and docs directory for advice on customizing your webpackConfig.
+
+          module.exports = webpackConfig
+        CONFIG
+
+        # Also check without comments for variations
+        configs << <<~CONFIG
+          const { generateWebpackConfig } = require('shakapacker')
+          const webpackConfig = generateWebpackConfig()
+          module.exports = webpackConfig
+        CONFIG
+
+        configs << <<~CONFIG
+          const { webpackConfig } = require('shakapacker')
+          module.exports = webpackConfig
+        CONFIG
+
+        configs
       end
 
       def react_on_rails_config?(content)
