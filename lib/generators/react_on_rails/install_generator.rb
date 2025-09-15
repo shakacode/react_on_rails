@@ -100,11 +100,7 @@ module ReactOnRails
       def ensure_shakapacker_installed
         return true if shakapacker_installed?
 
-        GeneratorMessages.add_info(<<~MSG.strip)
-          Shakapacker gem not found in your Gemfile.
-          React on Rails requires Shakapacker for webpack integration.
-          Adding 'shakapacker' gem to your Gemfile and running installation...
-        MSG
+        puts "Installing Shakapacker (required for webpack integration)..."
 
         added = system("bundle", "add", "shakapacker")
         unless added
@@ -124,7 +120,7 @@ module ReactOnRails
           return false
         end
 
-        GeneratorMessages.add_info("Shakapacker installed successfully!")
+        puts "Shakapacker installed successfully!"
         true
       end
 
