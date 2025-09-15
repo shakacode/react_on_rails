@@ -23,24 +23,24 @@ module ReactOnRails
       end
 
       def rename_config_file
-        if File.exist?("config/shakapacker.yml")
-          puts "Rename to config/webpacker.yml"
-          puts "Renaming shakapacker.yml into webpacker.yml"
-          FileUtils.mv("config/shakapacker.yml", "config/webpacker.yml")
-        end
+        return unless File.exist?("config/shakapacker.yml")
+
+        puts "Rename to config/webpacker.yml"
+        puts "Renaming shakapacker.yml into webpacker.yml"
+        FileUtils.mv("config/shakapacker.yml", "config/webpacker.yml")
       end
 
       def modify_requiring_webpack_config_in_js
         file = "config/webpack/commonWebpackConfig.js"
-        if File.exist?(file)
-          puts "Update commonWebpackConfig.js to follow the Shakapacker v6 interface"
-          gsub_file(file, "const baseClientWebpackConfig = generateWebpackConfig();\n\n", "")
-          gsub_file(
-            file,
-            "const { generateWebpackConfig, merge } = require('shakapacker');",
-            "const { webpackConfig: baseClientWebpackConfig, merge } = require('shakapacker');"
-          )
-        end
+        return unless File.exist?(file)
+
+        puts "Update commonWebpackConfig.js to follow the Shakapacker v6 interface"
+        gsub_file(file, "const baseClientWebpackConfig = generateWebpackConfig();\n\n", "")
+        gsub_file(
+          file,
+          "const { generateWebpackConfig, merge } = require('shakapacker');",
+          "const { webpackConfig: baseClientWebpackConfig, merge } = require('shakapacker');"
+        )
       end
     end
   end
