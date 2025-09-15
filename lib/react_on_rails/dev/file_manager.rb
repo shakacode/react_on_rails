@@ -55,14 +55,12 @@ module ReactOnRails
         def process_running?(pid)
           Process.kill(0, pid)
           true
-        rescue Errno::ESRCH
+        rescue Errno::ESRCH, ArgumentError, RangeError
+          # Process doesn't exist or invalid PID
           false
         rescue Errno::EPERM
           # Process exists but we don't have permission to signal it
           true
-        rescue ArgumentError, RangeError
-          # Invalid PID (negative, too large, wrong type)
-          false
         end
 
         def remove_file_if_exists(file_path, description)

@@ -129,10 +129,9 @@ module ReactOnRails
           run "yarn install"
         elsif File.exist?(File.join(destination_root, "pnpm-lock.yaml"))
           run "pnpm install"
-        elsif File.exist?(File.join(destination_root, "package-lock.json"))
-          run "npm install"
-        elsif File.exist?(File.join(destination_root, "package.json"))
-          # Default to npm if no lock file exists but package.json does
+        elsif File.exist?(File.join(destination_root, "package-lock.json")) ||
+              File.exist?(File.join(destination_root, "package.json"))
+          # Use npm for package-lock.json or as default fallback
           run "npm install"
         end
       end

@@ -5,7 +5,7 @@ module ReactOnRails
     class ProcessManager
       class << self
         def installed?(process)
-          IO.popen([process, "-v"]) { |io| io.close }
+          IO.popen([process, "-v"], &:close)
           true
         rescue Errno::ENOENT
           false
@@ -48,11 +48,11 @@ module ReactOnRails
 
         def valid_procfile_path?(procfile)
           # Reject paths with shell metacharacters
-          return false if procfile.match?(/[;&|`$(){}[\]<>]/)
+          return false if procfile.match?(/[;&|`$(){}\[\]<>]/)
 
           # Ensure it's a readable file
           File.readable?(procfile)
-        rescue
+        rescue StandardError
           false
         end
       end

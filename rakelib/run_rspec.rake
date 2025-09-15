@@ -122,10 +122,10 @@ def run_tests_in(dir, options = {})
 
   # Build environment variables as an array for proper spacing
   env_tokens = []
-  env_tokens << options.fetch(:env_vars, '').strip unless options.fetch(:env_vars, '').strip.empty?
+  env_tokens << options.fetch(:env_vars, "").strip unless options.fetch(:env_vars, "").strip.empty?
   env_tokens << "TEST_ENV_COMMAND_NAME=\"#{command_name}\""
   env_tokens << "COVERAGE=true" if ENV["USE_COVERALLS"]
 
-  env_vars = env_tokens.join(' ')
+  env_vars = env_tokens.join(" ")
   sh_in_dir(path.realpath, "#{env_vars} bundle exec rspec #{rspec_args}")
 end
