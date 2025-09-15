@@ -26,7 +26,8 @@ RSpec.configure do |config|
       err_msg.include?("Timed out receiving message from renderer: 0.100") ||
         err_msg.include?("SharedArrayBuffer will require cross-origin isolation") ||
         err_msg.include?("You are currently using minified code outside of NODE_ENV === \\\"production\\\"") ||
-        err_msg.include?("This version of ChromeDriver has not been tested with Chrome version")
+        err_msg.include?("This version of ChromeDriver has not been tested with Chrome version") ||
+        err_msg.include?("The 'force_load' feature is being used without a React on Rails Pro license")
     end
 
     raise("Java Script Error(s) on the page:\n\n#{clean_errors.join("\n")}") if clean_errors.present?
