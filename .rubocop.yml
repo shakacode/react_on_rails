@@ -67,25 +67,18 @@ Lint/SuppressedException:
 
 Metrics/AbcSize:
   Max: 28
-  Exclude:
-    - 'lib/react_on_rails/dev/server_manager.rb'  # Process management complexity justified
 
 Metrics/CyclomaticComplexity:
   Max: 7
-  Exclude:
-    - 'lib/react_on_rails/dev/file_manager.rb'  # File cleanup logic complexity justified
-    - 'lib/react_on_rails/dev/server_manager.rb'  # Process management complexity justified
 
 Metrics/PerceivedComplexity:
   Max: 10
-  Exclude:
-    - 'lib/react_on_rails/dev/server_manager.rb'  # Process management complexity justified
 
 Metrics/ClassLength:
   Max: 150
   Exclude:
     - 'lib/generators/react_on_rails/base_generator.rb'  # Generator complexity justified
-    - 'lib/react_on_rails/dev/server_manager.rb'  # Dev tool complexity justified
+    - 'lib/react_on_rails/dev/server_manager.rb'  # Dev tool with multiple help methods
 
 Metrics/ParameterLists:
   Max: 5
@@ -93,8 +86,6 @@ Metrics/ParameterLists:
 
 Metrics/MethodLength:
   Max: 41
-  Exclude:
-    - 'lib/react_on_rails/dev/server_manager.rb'  # Process management methods justified
 
 Metrics/ModuleLength:
   Max: 180
@@ -159,3 +150,4 @@ RSpec/InstanceVariable:
 RSpec/StubbedMock:
   Exclude:
     - 'spec/react_on_rails/dev/**/*_spec.rb'  # Dev module tests use mixed stub/mock patterns
+
