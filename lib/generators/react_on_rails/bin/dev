@@ -139,9 +139,19 @@ def kill_processes
     end
   end
 
+  # Clean up socket files
+  socket_files = [".overmind.sock", "tmp/sockets/overmind.sock"]
+  socket_files.each do |socket_file|
+    if File.exist?(socket_file)
+      puts "   🧹 Removing #{socket_file}"
+      File.delete(socket_file) rescue nil
+      killed_any = true
+    end
+  end
+
   if killed_any
     puts ""
-    puts "✅ All processes terminated"
+    puts "✅ All processes terminated and sockets cleaned"
     puts "💡 You can now run 'bin/dev' for a clean start"
   else
     puts "   ℹ️  No development processes found running"
