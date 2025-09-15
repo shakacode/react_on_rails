@@ -6,16 +6,16 @@ module ReactOnRails
   module Dev
     class ServerManager
       class << self
-        def start(mode = :development, procfile = nil)
+        def start(mode = :development, procfile = nil, verbose: false)
           case mode
           when :production_like
-            run_production_like
+            run_production_like(_verbose: verbose)
           when :static
             procfile ||= "Procfile.dev-static-assets"
-            run_static_development(procfile)
+            run_static_development(procfile, verbose: verbose)
           when :development, :hmr
             procfile ||= "Procfile.dev"
-            run_development(procfile)
+            run_development(procfile, verbose: verbose)
           else
             raise ArgumentError, "Unknown mode: #{mode}"
           end
@@ -81,7 +81,7 @@ module ReactOnRails
 
         def show_help
           puts <<~HELP
-              Usage: bin/dev [command]
+              Usage: bin/dev [command] [options]
 
               Commands and their Procfiles:
                 (none) / hmr        Start development server with HMR (default)
@@ -96,6 +96,9 @@ module ReactOnRails
 
                 kill                Kill all development processes for a clean start
                 help                Show this help message
+
+              Options:
+                --verbose, -v       Enable verbose output for pack generation
             #{'  '}
               🔧 CUSTOMIZATION:
               Each mode uses a specific Procfile that you can customize for your application:
@@ -137,7 +140,7 @@ module ReactOnRails
 
         private
 
-        def run_production_like
+        def run_production_like(_verbose: false)
           procfile = "Procfile.dev-prod-assets"
 
           print_procfile_info(procfile)
@@ -153,13 +156,11 @@ module ReactOnRails
             3001
           )
 
-          PackGenerator.generate
-
-          # Precompile assets in production mode
+          # Precompile assets in production mode (includes pack generation automatically)
           puts "🔨 Precompiling assets..."
-          system "RAILS_ENV=production NODE_ENV=production bundle exec rails assets:precompile"
+          success = system "RAILS_ENV=production NODE_ENV=production bundle exec rails assets:precompile"
 
-          if $CHILD_STATUS.success?
+          if success
             puts "✅ Assets precompiled successfully"
             ProcessManager.ensure_procfile(procfile)
             ProcessManager.run_with_process_manager(procfile)
@@ -169,7 +170,7 @@ module ReactOnRails
           end
         end
 
-        def run_static_development(procfile)
+        def run_static_development(procfile, verbose: false)
           print_procfile_info(procfile)
           print_server_info(
             "⚡ Starting development server with static assets...",
@@ -182,14 +183,14 @@ module ReactOnRails
             ]
           )
 
-          PackGenerator.generate
+          PackGenerator.generate(verbose: verbose)
           ProcessManager.ensure_procfile(procfile)
           ProcessManager.run_with_process_manager(procfile)
         end
 
-        def run_development(procfile)
+        def run_development(procfile, verbose: false)
           print_procfile_info(procfile)
-          PackGenerator.generate
+          PackGenerator.generate(verbose: verbose)
           ProcessManager.ensure_procfile(procfile)
           ProcessManager.run_with_process_manager(procfile)
         end
@@ -207,22 +208,22 @@ module ReactOnRails
           port = procfile == "Procfile.dev-prod-assets" ? 3001 : 3000
 
           box_width = 60
-          border = "┌" + ("─" * (box_width - 2)) + "┐"
-          bottom = "└" + ("─" * (box_width - 2)) + "┘"
+          border = "┌#{'─' * (box_width - 2)}┐"
+          bottom = "└#{'─' * (box_width - 2)}┘"
 
           procfile_line = "│ 📋 Using Procfile: #{procfile}"
           padding = box_width - procfile_line.length - 2
-          procfile_line += (" " * padding) + "│"
+          procfile_line += "#{' ' * padding}│"
 
           access_line = "│ 💡 Access at: http://localhost:#{port}"
           padding = box_width - access_line.length - 2
-          access_line += (" " * padding) + "│"
+          access_line += "#{' ' * padding}│"
 
           customize_line = "│ 🔧 Customize this file for your app's needs"
           padding = box_width - customize_line.length - 2
-          customize_line += (" " * padding) + "│"
+          customize_line += "#{' ' * padding}│"
 
-          empty_line = "│" + (" " * (box_width - 2)) + "│"
+          empty_line = "│#{' ' * (box_width - 2)}│"
 
           puts ""
           puts border

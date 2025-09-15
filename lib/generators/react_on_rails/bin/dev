@@ -27,18 +27,24 @@ rescue LoadError
   require_relative "../../../react_on_rails/dev"
 end
 
+# Check for verbose flag
+verbose = ARGV.include?("--verbose") || ARGV.include?("-v")
+
 # Main execution
 case ARGV[0]
 when "production-assets", "prod"
-  ReactOnRails::Dev::ServerManager.start(:production_like)
+  ReactOnRails::Dev::ServerManager.start(:production_like, verbose: verbose)
 when "static"
-  ReactOnRails::Dev::ServerManager.start(:static, "Procfile.dev-static-assets")
+  ReactOnRails::Dev::ServerManager.start(:static, "Procfile.dev-static-assets", verbose: verbose)
 when "kill"
   ReactOnRails::Dev::ServerManager.kill_processes
 when "help", "--help", "-h"
   ReactOnRails::Dev::ServerManager.show_help
 when "hmr", nil
-  ReactOnRails::Dev::ServerManager.start(:development, "Procfile.dev")
+  ReactOnRails::Dev::ServerManager.start(:development, "Procfile.dev", verbose: verbose)
+when "--verbose", "-v"
+  # Handle the case where verbose is the only argument
+  ReactOnRails::Dev::ServerManager.start(:development, "Procfile.dev", verbose: true)
 else
   puts "Unknown argument: #{ARGV[0]}"
   puts "Run 'bin/dev help' for usage information"
