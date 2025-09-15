@@ -69,7 +69,7 @@ RSpec.describe "bin/dev script" do
     allow_any_instance_of(Kernel).to receive(:require).with("bundler/setup").and_return(true)
     allow_any_instance_of(Kernel).to receive(:require).with("react_on_rails/dev").and_return(true)
 
-    expect(ReactOnRails::Dev::ServerManager).to receive(:start).with(:development, "Procfile.dev", verbose: false)
+    expect(ReactOnRails::Dev::ServerManager).to receive(:start).with(:development, "Procfile.dev")
 
     load script_path
   end
