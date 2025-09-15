@@ -21,6 +21,12 @@ describe ReactOnRailsHelper do
         { "HTTP_ACCEPT_LANGUAGE" => "en" }
       )
     }
+
+    allow(ReactOnRails::Utils).to receive_messages(
+      react_on_rails_pro?: true,
+      react_on_rails_pro_version: "4.0.0",
+      rsc_support_enabled?: false
+    )
   end
 
   let(:hash) do
@@ -370,10 +376,139 @@ typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('Ap
         it { is_expected.to include force_load_script }
       end
     end
+
+    describe "with Pro license warning" do
+      let(:badge_html_string) { "React On Rails Pro Required" }
+
+      before do
+        allow(Rails.logger).to receive(:warn)
+      end
+
+      context "when Pro license is NOT installed and force_load is true" do
+        subject(:react_app) { react_component("App", props: props, force_load: true) }
+
+        before do
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+        end
+
+        it { is_expected.to include(badge_html_string) }
+
+        it "logs a warning" do
+          react_app
+          expect(Rails.logger).to have_received(:warn).with(a_string_matching(/The 'force_load' feature requires/))
+        end
+      end
+
+      context "when Pro license is NOT installed and global force_load is true" do
+        subject(:react_app) { react_component("App", props: props) }
+
+        before do
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+        end
+
+        around do |example|
+          ReactOnRails.configure { |config| config.force_load = true }
+          example.run
+          ReactOnRails.configure { |config| config.force_load = false }
+        end
+
+        it { is_expected.to include(badge_html_string) }
+      end
+
+      context "when Pro license is NOT installed and force_load is false" do
+        subject(:react_app) { react_component("App", props: props, force_load: false) }
+
+        before do
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+        end
+
+        it { is_expected.not_to include(badge_html_string) }
+
+        it "does not log a warning" do
+          react_app
+          expect(Rails.logger).not_to have_received(:warn)
+        end
+      end
+
+      context "when Pro license IS installed and force_load is true" do
+        subject(:react_app) { react_component("App", props: props, force_load: true) }
+
+        before do
+          allow(ReactOnRails::Utils).to receive_messages(
+            react_on_rails_pro?: true,
+            react_on_rails_pro_version: "4.0.0"
+          )
+        end
+
+        it { is_expected.not_to include(badge_html_string) }
+
+        it "does not log a warning" do
+          react_app
+          expect(Rails.logger).not_to have_received(:warn)
+        end
+      end
+    end
+  end
+
+  describe "#react_component_hash" do
+    subject(:react_app) { react_component_hash("App", props: props) }
+
+    let(:props) { { name: "My Test Name" } }
+
+    before do
+      allow(SecureRandom).to receive(:uuid).and_return(0)
+      allow(ReactOnRails::ServerRenderingPool).to receive(:server_render_js_with_console_logging).and_return(
+        "html" => { "componentHtml" => "<div>Test</div>", "title" => "Test Title" },
+        "consoleReplayScript" => ""
+      )
+      allow(ReactOnRails::ServerRenderingJsCode).to receive(:js_code_renderer)
+        .and_return(ReactOnRails::ServerRenderingJsCode)
+    end
+
+    it "returns a hash with component and other keys" do
+      expect(react_app).to be_a(Hash)
+      expect(react_app).to have_key("componentHtml")
+      expect(react_app).to have_key("title")
+    end
+
+    context "with Pro license warning" do
+      let(:badge_html_string) { "React On Rails Pro Required" }
+
+      before do
+        allow(Rails.logger).to receive(:warn)
+      end
+
+      context "when Pro license is NOT installed and force_load is true" do
+        subject(:react_app) { react_component_hash("App", props: props, force_load: true) }
+
+        before do
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+        end
+
+        it "adds badge to componentHtml" do
+          expect(react_app["componentHtml"]).to include(badge_html_string)
+        end
+      end
+
+      context "when Pro license IS installed and force_load is true" do
+        subject(:react_app) { react_component_hash("App", props: props, force_load: true) }
+
+        before do
+          allow(ReactOnRails::Utils).to receive_messages(
+            react_on_rails_pro?: true,
+            react_on_rails_pro_version: "4.0.0"
+          )
+        end
+
+        it "does not add badge to componentHtml" do
+          expect(react_app["componentHtml"]).not_to include(badge_html_string)
+        end
+      end
+    end
   end
 
   describe "#redux_store" do
-    subject(:store) { redux_store("reduxStore", props: props) }
+    subject(:store) { redux_store("reduxStore", props: props, force_load: true) }
 
     let(:props) do
       { name: "My Test Name" }
@@ -394,6 +529,52 @@ typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('Ap
     it {
       expect(expect(store).target).to script_tag_be_included(react_store_script)
     }
+
+    context "with Pro license warning" do
+      let(:badge_html_string) { "React On Rails Pro Required" }
+
+      before do
+        allow(Rails.logger).to receive(:warn)
+      end
+
+      context "when Pro license is NOT installed and force_load is true" do
+        subject(:store) { redux_store("reduxStore", props: props, force_load: true) }
+
+        before do
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+        end
+
+        it { is_expected.to include(badge_html_string) }
+
+        it "logs a warning" do
+          store
+          expect(Rails.logger).to have_received(:warn).with(a_string_matching(/The 'force_load' feature requires/))
+        end
+      end
+
+      context "when Pro license is NOT installed and force_load is false" do
+        subject(:store) { redux_store("reduxStore", props: props, force_load: false) }
+
+        before do
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+        end
+
+        it { is_expected.not_to include(badge_html_string) }
+      end
+
+      context "when Pro license IS installed and force_load is true" do
+        subject(:store) { redux_store("reduxStore", props: props, force_load: true) }
+
+        before do
+          allow(ReactOnRails::Utils).to receive_messages(
+            react_on_rails_pro?: true,
+            react_on_rails_pro_version: "4.0.0"
+          )
+        end
+
+        it { is_expected.not_to include(badge_html_string) }
+      end
+    end
   end
 
   describe "#server_render_js", :js, type: :system do
