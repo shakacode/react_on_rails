@@ -100,7 +100,7 @@ module ReactOnRails
       def ensure_shakapacker_installed
         return true if shakapacker_installed?
 
-        puts "Installing Shakapacker (required for webpack integration)..."
+        puts "Installing Shakapacker (required for React on Rails)..."
 
         added = system("bundle", "add", "shakapacker")
         unless added
