@@ -44,16 +44,16 @@ if (cssLoaderAvailable && MiniCssExtractPlugin) {
     ],
   };
 } else {
-  // Fallback: provide identity object for CSS modules (for testing)
-  commonOptions.module = {
-    rules: [
-      {
-        test: /\.module\.css$/i,
-        type: 'javascript/auto',
-        loader: 'data:text/javascript,module.exports=new Proxy({},{get:function(target,prop){return prop==="default"?this:prop}})',
-      },
-    ],
-  };
+  // Fallback: replace CSS module imports with a mock module (for testing)
+  const webpack = require('webpack');
+
+  commonOptions.plugins = commonOptions.plugins || [];
+  commonOptions.plugins.push(
+    new webpack.NormalModuleReplacementPlugin(
+      /\.module\.css$/,
+      'data:text/javascript,module.exports = new Proxy({}, {get: function(target, prop) {return prop === "default" ? this : prop;}})'
+    )
+  );
 }
 
 // Copy the object using merge b/c the baseClientWebpackConfig and commonOptions are mutable globals
