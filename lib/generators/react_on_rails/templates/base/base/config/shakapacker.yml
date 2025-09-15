@@ -42,7 +42,7 @@ default: &default
   # Raises an error if there is a mismatch in the shakapacker gem and npm package being used
   ensure_consistent_versioning: true
 
-  # Select whether the compiler will use SHA digest ('digest' option) or most most recent modified timestamp ('mtime') to determine freshness
+  # Select whether the compiler will use SHA digest ('digest' option) or most recent modified timestamp ('mtime') to determine freshness
   compiler_strategy: digest
 
   # Select whether the compiler will always use a content hash and not just in production
@@ -71,7 +71,7 @@ development:
     # Hot Module Replacement updates modules while the application is running without a full reload
     # Used instead of the `hot` key in https://webpack.js.org/configuration/dev-server/#devserverhot
     hmr: false
-    # If HMR is on, CSS will by inlined by delivering it as part of the script payload via style-loader. Be sure
+    # If HMR is on, CSS will be inlined by delivering it as part of the script payload via style-loader. Be sure
     # that you add style-loader to your project dependencies.
     #
     # If you want to instead deliver CSS via <link> with the mini-css-extract-plugin, set inline_css to false.
@@ -114,7 +114,7 @@ production:
   # Production depends on precompilation of packs prior to booting for performance.
   compile: false
 
-  # Use content hash for naming assets. Cannot be overridden by for production.
+  # Use content hash for naming assets. Cannot be overridden in production.
   useContentHash: true
 
   # Cache manifest.json for performance
