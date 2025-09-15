@@ -51,7 +51,21 @@ if (cssLoaderAvailable && MiniCssExtractPlugin) {
   commonOptions.plugins.push(
     new webpack.NormalModuleReplacementPlugin(
       /\.module\.css$/,
-      'data:text/javascript,module.exports = new Proxy({}, {get: function(target, prop) {return prop === "default" ? this : prop;}})'
+      'data:text/javascript,' + encodeURIComponent(`
+        // For import * as styles, we need to export specific named exports
+        // Since we don't know the class names, we can't use Proxy with import *
+        // Instead, export common CSS class names and a default
+        export const bright = "bright";
+        export const dark = "dark";
+        export const container = "container";
+        export const title = "title";
+        export const button = "button";
+        export const input = "input";
+        export const form = "form";
+
+        const styles = { bright: "bright", dark: "dark", container: "container", title: "title", button: "button", input: "input", form: "form" };
+        export default styles;
+      `)
     )
   );
 }
