@@ -33,9 +33,7 @@ module ReactOnRails
 
       def run_generators
         if installation_prerequisites_met? || options.ignore_warnings?
-          unless options.skip_shakapacker_install?
-            return unless ensure_shakapacker_installed
-          end
+          return if !options.skip_shakapacker_install? && !ensure_shakapacker_installed
 
           invoke_generators
           add_bin_scripts

@@ -88,54 +88,10 @@ module ReactOnRails
       end
 
       def add_js_dependencies
-        major_minor_patch_only = /\A\d+\.\d+\.\d+\z/
-
-        # Try to use package_json gem first, fall back to direct npm commands
-        react_on_rails_pkg = if ReactOnRails::VERSION.match?(major_minor_patch_only)
-                                ["react-on-rails@#{ReactOnRails::VERSION}"]
-                              else
-                                puts "Adding the latest react-on-rails NPM module. Double check this is correct in package.json"
-                                ["react-on-rails"]
-                              end
-
-        puts "Adding React on Rails"
-        unless add_npm_dependencies(react_on_rails_pkg)
-          puts "Using direct npm commands as fallback"
-          run "npm install #{react_on_rails_pkg.join(' ')}"
-        end
-
-        puts "Adding React dependencies"
-        react_deps = %w[
-          react
-          react-dom
-          @babel/preset-react
-          prop-types
-          babel-plugin-transform-react-remove-prop-types
-          babel-plugin-macros
-        ]
-        unless add_npm_dependencies(react_deps)
-          run "npm install #{react_deps.join(' ')}"
-        end
-
-        puts "Adding CSS handlers"
-        css_deps = %w[
-          css-loader
-          css-minimizer-webpack-plugin
-          mini-css-extract-plugin
-          style-loader
-        ]
-        unless add_npm_dependencies(css_deps)
-          run "npm install #{css_deps.join(' ')}"
-        end
-
-        puts "Adding dev dependencies"
-        dev_deps = %w[
-          @pmmmwh/react-refresh-webpack-plugin
-          react-refresh
-        ]
-        unless add_npm_dependencies(dev_deps, dev: true)
-          run "npm install --save-dev #{dev_deps.join(' ')}"
-        end
+        add_react_on_rails_package
+        add_react_dependencies
+        add_css_dependencies
+        add_dev_dependencies
       end
 
       def install_js_dependencies
@@ -189,6 +145,60 @@ module ReactOnRails
             )
           end
         end
+      end
+
+      def add_react_on_rails_package
+        major_minor_patch_only = /\A\d+\.\d+\.\d+\z/
+
+        # Try to use package_json gem first, fall back to direct npm commands
+        react_on_rails_pkg = if ReactOnRails::VERSION.match?(major_minor_patch_only)
+                               ["react-on-rails@#{ReactOnRails::VERSION}"]
+                             else
+                               puts "Adding the latest react-on-rails NPM module. " \
+                                    "Double check this is correct in package.json"
+                               ["react-on-rails"]
+                             end
+
+        puts "Adding React on Rails"
+        return if add_npm_dependencies(react_on_rails_pkg)
+
+        puts "Using direct npm commands as fallback"
+        run "npm install #{react_on_rails_pkg.join(' ')}"
+      end
+
+      def add_react_dependencies
+        puts "Adding React dependencies"
+        react_deps = %w[
+          react
+          react-dom
+          @babel/preset-react
+          prop-types
+          babel-plugin-transform-react-remove-prop-types
+          babel-plugin-macros
+        ]
+        run "npm install #{react_deps.join(' ')}" unless add_npm_dependencies(react_deps)
+      end
+
+      def add_css_dependencies
+        puts "Adding CSS handlers"
+        css_deps = %w[
+          css-loader
+          css-minimizer-webpack-plugin
+          mini-css-extract-plugin
+          style-loader
+        ]
+        run "npm install #{css_deps.join(' ')}" unless add_npm_dependencies(css_deps)
+      end
+
+      def add_dev_dependencies
+        puts "Adding dev dependencies"
+        dev_deps = %w[
+          @pmmmwh/react-refresh-webpack-plugin
+          react-refresh
+        ]
+        return if add_npm_dependencies(dev_deps, dev: true)
+
+        run "npm install --save-dev #{dev_deps.join(' ')}"
       end
 
       private
