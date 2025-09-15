@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "../spec_helper"
+
 RSpec.describe ReactOnRails::Dev::ProcessManager do
   # Suppress stdout/stderr during tests
   before(:all) do
