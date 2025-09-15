@@ -89,37 +89,53 @@ module ReactOnRails
 
       def add_js_dependencies
         major_minor_patch_only = /\A\d+\.\d+\.\d+\z/
-        if ReactOnRails::VERSION.match?(major_minor_patch_only)
-          package_json.manager.add(["react-on-rails@#{ReactOnRails::VERSION}"])
-        else
-          # otherwise add latest
-          puts "Adding the latest react-on-rails NPM module. Double check this is correct in package.json"
-          package_json.manager.add(["react-on-rails"])
+
+        # Try to use package_json gem first, fall back to direct npm commands
+        react_on_rails_pkg = if ReactOnRails::VERSION.match?(major_minor_patch_only)
+                                ["react-on-rails@#{ReactOnRails::VERSION}"]
+                              else
+                                puts "Adding the latest react-on-rails NPM module. Double check this is correct in package.json"
+                                ["react-on-rails"]
+                              end
+
+        puts "Adding React on Rails"
+        unless add_npm_dependencies(react_on_rails_pkg)
+          puts "Using direct npm commands as fallback"
+          run "npm install #{react_on_rails_pkg.join(' ')}"
         end
 
         puts "Adding React dependencies"
-        package_json.manager.add([
-                                   "react",
-                                   "react-dom",
-                                   "@babel/preset-react",
-                                   "prop-types",
-                                   "babel-plugin-transform-react-remove-prop-types",
-                                   "babel-plugin-macros"
-                                 ])
+        react_deps = %w[
+          react
+          react-dom
+          @babel/preset-react
+          prop-types
+          babel-plugin-transform-react-remove-prop-types
+          babel-plugin-macros
+        ]
+        unless add_npm_dependencies(react_deps)
+          run "npm install #{react_deps.join(' ')}"
+        end
 
         puts "Adding CSS handlers"
-        package_json.manager.add(%w[
-                                   css-loader
-                                   css-minimizer-webpack-plugin
-                                   mini-css-extract-plugin
-                                   style-loader
-                                 ])
+        css_deps = %w[
+          css-loader
+          css-minimizer-webpack-plugin
+          mini-css-extract-plugin
+          style-loader
+        ]
+        unless add_npm_dependencies(css_deps)
+          run "npm install #{css_deps.join(' ')}"
+        end
 
         puts "Adding dev dependencies"
-        package_json.manager.add([
-                                   "@pmmmwh/react-refresh-webpack-plugin",
-                                   "react-refresh"
-                                 ], type: :dev)
+        dev_deps = %w[
+          @pmmmwh/react-refresh-webpack-plugin
+          react-refresh
+        ]
+        unless add_npm_dependencies(dev_deps, dev: true)
+          run "npm install --save-dev #{dev_deps.join(' ')}"
+        end
       end
 
       def install_js_dependencies
