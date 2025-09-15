@@ -54,12 +54,11 @@ module ReactOnRails
     # random_dom_id can be set to override the default from the config/initializers. That's only
     # used if you have multiple instance of the same component on the Rails view.
     def react_component(component_name, options = {})
-      badge = pro_warning_badge_if_needed(render_options.force_load)
-      render_options.set_option(:force_load, false) unless support_pro_features?
       internal_result = internal_react_component(component_name, options)
       server_rendered_html = internal_result[:result]["html"]
       console_script = internal_result[:result]["consoleReplayScript"]
       render_options = internal_result[:render_options]
+      badge = pro_warning_badge_if_needed(internal_result[:force_load_requested])
 
       case server_rendered_html
       when String
@@ -211,13 +210,12 @@ module ReactOnRails
     #
     def react_component_hash(component_name, options = {})
       options[:prerender] = true
-      badge = pro_warning_badge_if_needed(render_options.force_load)
-      render_options.set_option(:force_load, false) unless support_pro_features?
 
       internal_result = internal_react_component(component_name, options)
       server_rendered_html = internal_result[:result]["html"]
       console_script = internal_result[:result]["consoleReplayScript"]
       render_options = internal_result[:render_options]
+      badge = pro_warning_badge_if_needed(internal_result[:force_load_requested])
 
       if server_rendered_html.is_a?(String) && internal_result[:result]["hasErrors"]
         server_rendered_html = { COMPONENT_HTML_KEY => internal_result[:result]["html"] }
@@ -674,6 +672,9 @@ module ReactOnRails
       # server has already rendered the HTML.
 
       render_options = create_render_options(react_component_name, options)
+      # Capture the originally requested value so we can show a badge while still disabling the feature.
+      force_load_requested = render_options.force_load
+      render_options.set_option(:force_load, false) unless support_pro_features?
 
       # Setup the page_loaded_js, which is the same regardless of prerendering or not!
       # The reason is that React is smart about not doing extra work if the server rendering did its job.
@@ -703,7 +704,8 @@ typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('#{
       {
         render_options: render_options,
         tag: component_specification_tag,
-        result: result
+        result: result,
+        force_load_requested: force_load_requested
       }
     end
 
