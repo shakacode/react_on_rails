@@ -64,13 +64,16 @@ def run_static_development
   puts "💡 Access at: http://localhost:3000"
   puts ""
 
-  # Generate React on Rails packs first
+  run_procfile "dev-static"
+end
+
+def run_procfile(extension)
   generate_packs
 
   if installed? "overmind"
-    system "overmind start -f Procfile.dev-static"
+    system "overmind start -f Procfile.#{extension}"
   elsif installed? "foreman"
-    system "foreman start -f Procfile.dev-static"
+    system "foreman start -f Procfile.#{extension}"
   else
     warn <<~MSG
       NOTICE:
@@ -81,19 +84,7 @@ def run_static_development
 rescue Errno::ENOENT
   warn <<~MSG
     ERROR:
-    Please ensure `Procfile.dev-static` exists in your project!
-  MSG
-  exit!
-end
-
-def run_development(process)
-  generate_packs
-
-  system "#{process} start -f Procfile.dev"
-rescue Errno::ENOENT
-  warn <<~MSG
-    ERROR:
-    Please ensure `Procfile.dev` exists in your project!
+    Please ensure `Procfile.#{extension}` exists in your project!
   MSG
   exit!
 end
@@ -113,7 +104,7 @@ elsif ARGV[0] == "help" || ARGV[0] == "--help" || ARGV[0] == "-h"
       production-assets   Start with production-optimized assets (no HMR)
       prod                Alias for production-assets
       help                Show this help message
-    #{'  '}
+
     HMR Development mode (default):
     • Hot Module Replacement (HMR) enabled
     • Automatic React on Rails pack generation
@@ -140,17 +131,7 @@ elsif ARGV[0] == "help" || ARGV[0] == "--help" || ARGV[0] == "-h"
   HELP
 elsif ARGV[0] == "hmr" || ARGV[0].nil?
   # Default development mode (HMR)
-  if installed? "overmind"
-    run_development "overmind"
-  elsif installed? "foreman"
-    run_development "foreman"
-  else
-    warn <<~MSG
-      NOTICE:
-      For this script to run, you need either 'overmind' or 'foreman' installed on your machine. Please try this script after installing one of them.
-    MSG
-    exit!
-  end
+  run_procfile "dev"
 else
   # Unknown argument
   puts "Unknown argument: #{ARGV[0]}"
