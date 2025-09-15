@@ -1,6 +1,5 @@
 import PropTypes from 'prop-types';
 import React, { useState } from 'react';
-import './HelloWorld.css';
 
 const HelloWorld = (props) => {
   const [name, setName] = useState(props.name);
