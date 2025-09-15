@@ -75,8 +75,8 @@
     "typescript-eslint": "^8.35.0"
   },
   "peerDependencies": {
-    "react": ">= 16",
-    "react-dom": ">= 16",
+    "react": ">= 18",
+    "react-dom": ">= 18",
     "react-on-rails-rsc": "19.0.2"
   },
   "peerDependenciesMeta": {

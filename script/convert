@@ -32,10 +32,10 @@ gsub_file_content("../package.json", %r{"@testing-library/[^"]*": "[^"]*",}, "")
 gsub_file_content("../package.json", /,(\s*})/, "\\1")
 
 # Switch to the oldest supported React version
-gsub_file_content("../package.json", /"react": "[^"]*",/, '"react": "16.14.0",')
-gsub_file_content("../package.json", /"react-dom": "[^"]*",/, '"react-dom": "16.14.0",')
-gsub_file_content("../spec/dummy/package.json", /"react": "[^"]*",/, '"react": "16.14.0",')
-gsub_file_content("../spec/dummy/package.json", /"react-dom": "[^"]*",/, '"react-dom": "16.14.0",')
+gsub_file_content("../package.json", /"react": "[^"]*",/, '"react": "18.0.0",')
+gsub_file_content("../package.json", /"react-dom": "[^"]*",/, '"react-dom": "18.0.0",')
+gsub_file_content("../spec/dummy/package.json", /"react": "[^"]*",/, '"react": "18.0.0",')
+gsub_file_content("../spec/dummy/package.json", /"react-dom": "[^"]*",/, '"react-dom": "18.0.0",')
 gsub_file_content(
   "../package.json",
   "jest node_package/tests",
@@ -46,10 +46,6 @@ gsub_file_content("../tsconfig.json", "react-jsx", "react")
 gsub_file_content("../spec/dummy/babel.config.js", "runtime: 'automatic'", "runtime: 'classic'")
 # https://rescript-lang.org/docs/react/latest/migrate-react#configuration
 gsub_file_content("../spec/dummy/rescript.json", '"version": 4', '"version": 4, "mode": "classic"')
-# Find all files under app-react16 and replace the React 19 versions
-Dir.glob(File.expand_path("../spec/dummy/**/app-react16/**/*.*", __dir__)).each do |file|
-  move(file, file.gsub("-react16", ""))
-end
 
 gsub_file_content("../spec/dummy/config/webpack/commonWebpackConfig.js", /generateWebpackConfig(\(\))?/,
                   "webpackConfig")

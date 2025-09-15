@@ -1,11 +1,16 @@
 import type { ReactElement } from 'react';
-import type { RenderReturnType } from './types/index.ts';
-import { reactHydrate, reactRender } from './reactApis.cts';
+import { createRoot, hydrateRoot, Root } from 'react-dom/client';
 
 export default function reactHydrateOrRender(
   domNode: Element,
   reactElement: ReactElement,
   hydrate: boolean,
-): RenderReturnType {
-  return hydrate ? reactHydrate(domNode, reactElement) : reactRender(domNode, reactElement);
+): Root {
+  if (hydrate) {
+    return hydrateRoot(domNode, reactElement);
+  }
+
+  const root = createRoot(domNode);
+  root.render(reactElement);
+  return root;
 }

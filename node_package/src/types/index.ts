@@ -1,6 +1,7 @@
 /// <reference types="react/experimental" />
 
-import type { ReactElement, ReactNode, Component, ComponentType } from 'react';
+import type { ReactElement, ComponentType } from 'react';
+import type { Root } from 'react-dom/client';
 import type { PipeableStream } from 'react-dom/server';
 import type { Readable } from 'stream';
 
@@ -258,15 +259,6 @@ export interface RSCPayloadChunk extends RenderResult {
   html: string;
 }
 
-// from react-dom 18
-export interface Root {
-  render(children: ReactNode): void;
-  unmount(): void;
-}
-
-// eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- inherited from React 16/17, can't avoid here
-export type RenderReturnType = void | Element | Component | Root;
-
 export interface ReactOnRailsOptions {
   /** Gives you debugging messages on Turbolinks events. */
   traceTurbolinks?: boolean;
@@ -316,9 +308,9 @@ export interface ReactOnRails {
    * @param domNode
    * @param reactElement
    * @param hydrate if true will perform hydration, if false will render
-   * @returns {Root|ReactComponent|ReactElement|null}
+   * @returns {Root}
    */
-  reactHydrateOrRender(domNode: Element, reactElement: ReactElement, hydrate: boolean): RenderReturnType;
+  reactHydrateOrRender(domNode: Element, reactElement: ReactElement, hydrate: boolean): Root;
   /**
    * Allow directly calling the page loaded script in case the default events that trigger React
    * rendering are not sufficient, such as when loading JavaScript asynchronously with TurboLinks.
@@ -401,11 +393,9 @@ export interface ReactOnRailsInternal extends ReactOnRails {
    * @param props Props to pass to your component
    * @param domNodeId HTML ID of the node the component will be rendered at
    * @param [hydrate=false] Pass truthy to update server rendered HTML. Default is falsy
-   * @returns {Root|ReactComponent|ReactElement} Under React 18+: the created React root
-   *   (see "What is a root?" in https://github.com/reactwg/react-18/discussions/5).
-   *   Under React 16/17: Reference to your component's backing instance or `null` for stateless components.
+   * @returns {Root} The created React root
    */
-  render(name: string, props: Record<string, string>, domNodeId: string, hydrate?: boolean): RenderReturnType;
+  render(name: string, props: Record<string, string>, domNodeId: string, hydrate?: boolean): Root;
   /**
    * Get the component that you registered
    * @returns {name, component, renderFunction, isRenderer}
