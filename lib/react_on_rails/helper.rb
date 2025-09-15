@@ -54,12 +54,12 @@ module ReactOnRails
     # random_dom_id can be set to override the default from the config/initializers. That's only
     # used if you have multiple instance of the same component on the Rails view.
     def react_component(component_name, options = {})
+      badge = pro_warning_badge_if_needed(render_options.force_load)
+      render_options.set_option(:force_load, false) unless support_pro_features?
       internal_result = internal_react_component(component_name, options)
       server_rendered_html = internal_result[:result]["html"]
       console_script = internal_result[:result]["consoleReplayScript"]
       render_options = internal_result[:render_options]
-      badge = pro_warning_badge_if_needed(render_options.force_load)
-      render_options.set_option(:force_load, false) unless support_pro_features?
 
       case server_rendered_html
       when String
@@ -211,12 +211,13 @@ module ReactOnRails
     #
     def react_component_hash(component_name, options = {})
       options[:prerender] = true
+      badge = pro_warning_badge_if_needed(render_options.force_load)
+      render_options.set_option(:force_load, false) unless support_pro_features?
+
       internal_result = internal_react_component(component_name, options)
       server_rendered_html = internal_result[:result]["html"]
       console_script = internal_result[:result]["consoleReplayScript"]
       render_options = internal_result[:render_options]
-      badge = pro_warning_badge_if_needed(render_options.force_load)
-      render_options.set_option(:force_load, false) unless support_pro_features?
 
       if server_rendered_html.is_a?(String) && internal_result[:result]["hasErrors"]
         server_rendered_html = { COMPONENT_HTML_KEY => internal_result[:result]["html"] }
