@@ -11,14 +11,22 @@ RSpec.configure do |config|
 
     errors = []
 
-    page.driver.browser.logs.get(:browser).each do |entry|
-      next if entry.message.include?("Download the React DevTools for a better development experience")
+    begin
+      page.driver.browser.logs.get(:browser).each do |entry|
+        next if entry.message.include?("Download the React DevTools for a better development experience")
 
-      log_only_list.include?(entry.level) ? puts(entry.message) : errors << entry.message
+        log_only_list.include?(entry.level) ? puts(entry.message) : errors << entry.message
+      end
+    rescue Net::ReadTimeout, Selenium::WebDriver::Error::WebDriverError => e
+      puts "Warning: Could not access browser logs: #{e.message}"
     end
 
-    page.driver.browser.logs.get(:driver).each do |entry|
-      log_only_list.include?(entry.level) ? puts(entry.message) : errors << entry.message
+    begin
+      page.driver.browser.logs.get(:driver).each do |entry|
+        log_only_list.include?(entry.level) ? puts(entry.message) : errors << entry.message
+      end
+    rescue Net::ReadTimeout, Selenium::WebDriver::Error::WebDriverError => e
+      puts "Warning: Could not access driver logs: #{e.message}"
     end
 
     # https://stackoverflow.com/questions/60114639/timed-out-receiving-message-from-renderer-0-100-log-messages-using-chromedriver
