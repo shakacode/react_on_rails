@@ -59,6 +59,7 @@ module ReactOnRails
       console_script = internal_result[:result]["consoleReplayScript"]
       render_options = internal_result[:render_options]
       badge = pro_warning_badge_if_needed(render_options.force_load)
+      render_options.set_option(:force_load, false) unless support_pro_features?
 
       case server_rendered_html
       when String
@@ -215,6 +216,7 @@ module ReactOnRails
       console_script = internal_result[:result]["consoleReplayScript"]
       render_options = internal_result[:render_options]
       badge = pro_warning_badge_if_needed(render_options.force_load)
+      render_options.set_option(:force_load, false) unless support_pro_features?
 
       if server_rendered_html.is_a?(String) && internal_result[:result]["hasErrors"]
         server_rendered_html = { COMPONENT_HTML_KEY => internal_result[:result]["html"] }
@@ -257,6 +259,7 @@ module ReactOnRails
     def redux_store(store_name, props: {}, defer: false, force_load: nil)
       force_load = ReactOnRails.configuration.force_load if force_load.nil?
       badge = pro_warning_badge_if_needed(force_load)
+      force_load = false unless support_pro_features?
 
       redux_store_data = { store_name: store_name,
                            props: props,
@@ -447,9 +450,13 @@ module ReactOnRails
 
     # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
 
+    def support_pro_features?
+      ReactOnRails::Utils.react_on_rails_pro_licence_valid?
+    end
+
     def pro_warning_badge_if_needed(force_load)
       return "".html_safe unless force_load
-      return "".html_safe if ReactOnRails::Utils.react_on_rails_pro_licence_valid?
+      return "".html_safe if support_pro_features?
 
       warning_message = "[REACT ON RAILS] The 'force_load' feature requires a React on Rails Pro license. " \
                         "Please visit https://shakacode.com/react-on-rails-pro to learn more."

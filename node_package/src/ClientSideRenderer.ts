@@ -11,6 +11,7 @@ import reactHydrateOrRender from './reactHydrateOrRender.ts';
 import { debugTurbolinks } from './turbolinksUtils.ts';
 import * as StoreRegistry from './StoreRegistry.ts';
 import * as ComponentRegistry from './ComponentRegistry.ts';
+import { onPageLoaded } from './pageLifecycle.ts';
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
 
@@ -78,6 +79,20 @@ class ComponentRenderer {
    * delegates to a renderer registered by the user.
    */
   private async render(el: Element, railsContext: RailsContext): Promise<void> {
+    const isComponentForceLoaded = el.getAttribute('data-force-load') === 'true';
+    if (!railsContext.rorPro && (isComponentForceLoaded || document.readyState === 'loading')) {
+      console.warn(
+        "[REACT ON RAILS] The 'force_load' feature is being used without a React on Rails Pro license. " +
+          "That's not allowed. " +
+          'Please visit https://shakacode.com/react-on-rails-pro to get a license.',
+      );
+
+      // Wait for the page to be loaded before continuing
+      await new Promise<void>((resolve) => {
+        onPageLoaded(resolve);
+      });
+    }
+
     // This must match lib/react_on_rails/helper.rb
     const name = el.getAttribute('data-component-name') || '';
     const { domNodeId } = this;
