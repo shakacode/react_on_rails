@@ -9,7 +9,7 @@ Usage:
   rails generate react_on_rails:install [options]
 
 Options:
-  -R, [--redux], [--no-redux]                      # Install Redux gems and Redux version of Hello World Example. Default: false
+  -R, [--redux], [--no-redux]                      # Install Redux package and Redux version of Hello World Example. Default: false
       [--ignore-warnings], [--no-ignore-warnings]  # Skip warnings. Default: false
 
 Runtime options:
