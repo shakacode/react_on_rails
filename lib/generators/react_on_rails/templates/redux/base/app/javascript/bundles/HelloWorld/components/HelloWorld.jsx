@@ -1,6 +1,6 @@
 import PropTypes from 'prop-types';
 import React from 'react';
-import * as style from './HelloWorld.module.css';
+import './HelloWorld.css';
 
 const HelloWorld = ({ name, updateName }) => (
   <div>
@@ -10,7 +10,7 @@ const HelloWorld = ({ name, updateName }) => (
     </h3>
     <hr />
     <form>
-      <label className={style.bright} htmlFor="name">
+      <label className="bright" htmlFor="name">
         Say hello to:
         <input id="name" type="text" value={name} onChange={(e) => updateName(e.target.value)} />
       </label>
