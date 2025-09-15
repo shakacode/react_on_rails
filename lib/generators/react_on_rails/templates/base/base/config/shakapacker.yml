@@ -1,46 +1,99 @@
 # Note: You must restart bin/shakapacker-dev-server for changes to take effect
+# This file contains the defaults used by shakapacker.
 
 default: &default
   source_path: app/javascript
+
+  # You can have a subdirectory of the source_path, like 'packs' (recommended).
+  # Alternatively, you can use '/' to use the whole source_path directory.
+  # Notice that this is a relative path to source_path
   source_entry_path: packs
+
+  # If nested_entries is true, then we'll pick up subdirectories within the source_entry_path.
+  # You cannot set this option to true if you set source_entry_path to '/'
+  nested_entries: true
+
+  #  While using a File-System-based automated bundle generation feature, miscellaneous warnings suggesting css order
+  #  conflicts may arise due to the mini-css-extract-plugin. For projects where css ordering has been mitigated through
+  #  consistent use of scoping or naming conventions, the css order warnings can be disabled by setting
+  #  css_extract_ignore_order_warnings to true
+  css_extract_ignore_order_warnings: false
+
   public_root_path: public
   public_output_path: packs
   cache_path: tmp/shakapacker
   webpack_compile_output: true
+  # See https://github.com/shakacode/shakapacker#deployment
+  shakapacker_precompile: true
 
-  # Enable nested entry points for auto-registration
-  nested_entries: true
+  # Location for manifest.json, defaults to {public_output_path}/manifest.json if unset
+  # manifest_path: public/packs/manifest.json
 
-  # Additional paths webpack should lookup modules
+  # Additional paths webpack should look up modules
   # ['app/assets', 'engine/foo/app/assets']
   additional_paths: []
 
   # Reload manifest.json on all requests so we reload latest compiled packs
   cache_manifest: false
 
+  # Select loader to use, available options are 'babel' (default), 'swc' or 'esbuild'
+  webpack_loader: 'babel'
+
+  # Raises an error if there is a mismatch in the shakapacker gem and npm package being used
+  ensure_consistent_versioning: true
+
+  # Select whether the compiler will use SHA digest ('digest' option) or most most recent modified timestamp ('mtime') to determine freshness
+  compiler_strategy: digest
+
+  # Select whether the compiler will always use a content hash and not just in production
+  # Don't use contentHash except for production for performance
+  # https://webpack.js.org/guides/build-performance/#avoid-production-specific-tooling
+  useContentHash: false
+
+  # Setting the asset host here will override Rails.application.config.asset_host.
+  # Here, you can set different asset_host per environment. Note that
+  # SHAKAPACKER_ASSET_HOST will override both configurations.
+  # asset_host: custom-path
+
 development:
   <<: *default
-  # This is false since we're running `bin/shakapacker -w` in Procfile.dev-static
-  compile: false
+  compile: true
+  compiler_strategy: mtime
 
   # Reference: https://webpack.js.org/configuration/dev-server/
+  # Keys not described there are documented inline and in https://github.com/shakacode/shakapacker/
   dev_server:
+    # For running dev server with https, set `server: https`.
+    # server: https
+
     host: localhost
     port: 3035
-    server: http
     # Hot Module Replacement updates modules while the application is running without a full reload
-    hmr: true
+    # Used instead of the `hot` key in https://webpack.js.org/configuration/dev-server/#devserverhot
+    hmr: false
+    # If HMR is on, CSS will by inlined by delivering it as part of the script payload via style-loader. Be sure
+    # that you add style-loader to your project dependencies.
+    #
+    # If you want to instead deliver CSS via <link> with the mini-css-extract-plugin, set inline_css to false.
+    # In that case, style-loader is not needed as a dependency.
+    #
+    # mini-css-extract-plugin is a required dependency in both cases.
+    inline_css: true
+    # Defaults to the inverse of hmr. Uncomment to manually set this.
+    # live_reload: true
     client:
       # Should we show a full-screen overlay in the browser when there are compiler errors or warnings?
       overlay: true
       # May also be a string
       # webSocketURL:
-      #  hostname: "0.0.0.0"
-      #  pathname: "/ws"
+      #  hostname: '0.0.0.0'
+      #  pathname: '/ws'
       #  port: 8080
+    # Should we use gzip compression?
     compress: true
     # Note that apps that do not check the host are vulnerable to DNS rebinding attacks
-    allowed_hosts: ['localhost']
+    allowed_hosts: 'auto'
+    # Shows progress and colorizes output of bin/shakapacker[-dev-server]
     pretty: true
     headers:
       'Access-Control-Allow-Origin': '*'
@@ -60,6 +113,9 @@ production:
 
   # Production depends on precompilation of packs prior to booting for performance.
   compile: false
+
+  # Use content hash for naming assets. Cannot be overridden by for production.
+  useContentHash: true
 
   # Cache manifest.json for performance
   cache_manifest: true
