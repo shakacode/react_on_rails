@@ -64,12 +64,72 @@ module ReactOnRails
                         config/webpack/development.js
                         config/webpack/production.js
                         config/webpack/serverWebpackConfig.js
-                        config/webpack/webpack.config.js
                         config/webpack/generateWebpackConfigs.js]
         config = {
           message: "// The source code including full typescript support is available at:"
         }
         base_files.each { |file| template("#{base_path}/#{file}.tt", file, config) }
+
+        # Handle webpack.config.js separately with smart replacement
+        copy_webpack_main_config(base_path, config)
+      end
+
+      private
+
+      def copy_webpack_main_config(base_path, config)
+        webpack_config_path = "config/webpack/webpack.config.js"
+
+        if File.exist?(webpack_config_path)
+          existing_content = File.read(webpack_config_path)
+
+          # Check if it's the standard Shakapacker config that we can safely replace
+          if standard_shakapacker_config?(existing_content)
+            puts "   #{set_color('replace', :yellow)}  #{webpack_config_path} " \
+                 "(upgrading from standard Shakapacker config)"
+            template("#{base_path}/#{webpack_config_path}.tt", webpack_config_path, config)
+          elsif react_on_rails_config?(existing_content)
+            puts "   #{set_color('identical', :blue)}  #{webpack_config_path} " \
+                 "(already React on Rails compatible)"
+          else
+            handle_custom_webpack_config(base_path, config, webpack_config_path)
+          end
+        else
+          # File doesn't exist, create it
+          template("#{base_path}/#{webpack_config_path}.tt", webpack_config_path, config)
+        end
+      end
+
+      def handle_custom_webpack_config(base_path, config, webpack_config_path)
+        # Custom config - ask user
+        puts "\n#{set_color('NOTICE:', :yellow)} Your webpack.config.js appears to be customized."
+        puts "React on Rails needs to replace it with an environment-specific loader."
+        puts "Your current config will be backed up to webpack.config.js.backup"
+
+        if yes?("Replace webpack.config.js with React on Rails version? (Y/n)")
+          # Create backup
+          backup_path = "#{webpack_config_path}.backup"
+          copy_file(webpack_config_path, backup_path)
+          puts "   #{set_color('create', :green)}  #{backup_path} (backup of your custom config)"
+
+          template("#{base_path}/#{webpack_config_path}.tt", webpack_config_path, config)
+        else
+          puts "   #{set_color('skip', :yellow)}  #{webpack_config_path}"
+          puts "   #{set_color('WARNING:', :red)} React on Rails may not work correctly " \
+               "without the environment-specific webpack config"
+        end
+      end
+
+      def standard_shakapacker_config?(content)
+        # Check if it's the standard Shakapacker config
+        content.include?("generateWebpackConfig") &&
+          content.include?("shakapacker") &&
+          !content.include?("envSpecificConfig") &&
+          !content.include?("env.nodeEnv")
+      end
+
+      def react_on_rails_config?(content)
+        # Check if it already has React on Rails environment-specific loading
+        content.include?("envSpecificConfig") || content.include?("env.nodeEnv")
       end
 
       def copy_packer_config
@@ -169,8 +229,6 @@ module ReactOnRails
           # This will use the defaults of :js and :server_rendering meta tags
           ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
       STR
-
-      private
 
       # From https://github.com/rails/rails/blob/4c940b2dbfb457f67c6250b720f63501d74a45fd/railties/lib/rails/generators/rails/app/app_generator.rb
       def app_name
