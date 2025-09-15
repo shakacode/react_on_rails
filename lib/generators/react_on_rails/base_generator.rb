@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "rails/generators"
+require "fileutils"
 require_relative "generator_messages"
 require_relative "generator_helper"
 module ReactOnRails
@@ -214,8 +215,10 @@ module ReactOnRails
         if yes?("Replace webpack.config.js with React on Rails version? (Y/n)")
           # Create backup
           backup_path = "#{webpack_config_path}.backup"
-          copy_file(webpack_config_path, backup_path)
-          puts "   #{set_color('create', :green)}  #{backup_path} (backup of your custom config)"
+          if File.exist?(webpack_config_path)
+            FileUtils.cp(webpack_config_path, backup_path)
+            puts "   #{set_color('create', :green)}  #{backup_path} (backup of your custom config)"
+          end
 
           template("#{base_path}/#{webpack_config_path}.tt", webpack_config_path, config)
         else
