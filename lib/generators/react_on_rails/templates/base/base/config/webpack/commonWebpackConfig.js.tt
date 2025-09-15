@@ -2,6 +2,7 @@
 
 // Common configuration applying to client and server configuration
 const { generateWebpackConfig, merge } = require('shakapacker');
+const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 
 const baseClientWebpackConfig = generateWebpackConfig();
 
@@ -14,19 +15,16 @@ const commonOptions = {
       {
         test: /\.module\.css$/i,
         use: [
-          'style-loader',
+          process.env.NODE_ENV === 'development' ? 'style-loader' : MiniCssExtractPlugin.loader,
           {
             loader: 'css-loader',
             options: {
-              modules: true,
+              modules: {
+                localIdentName: '[name]__[local]__[hash:base64:5]',
+              },
             },
           },
         ],
-      },
-      {
-        test: /\.css$/i,
-        exclude: /\.module\.css$/i,
-        use: ['style-loader', 'css-loader'],
       },
     ],
   },
