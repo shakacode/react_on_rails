@@ -88,53 +88,41 @@ module ReactOnRails
       end
 
       def add_js_dependencies
-        puts "=== DEBUG: add_js_dependencies method called ==="
-
-        begin
-          major_minor_patch_only = /\A\d+\.\d+\.\d+\z/
-          if ReactOnRails::VERSION.match?(major_minor_patch_only)
-            puts "Adding react-on-rails@#{ReactOnRails::VERSION}"
-            package_json.manager.add(["react-on-rails@#{ReactOnRails::VERSION}"])
-          else
-            # otherwise add latest
-            puts "Adding the latest react-on-rails NPM module. Double check this is correct in package.json"
-            package_json.manager.add(["react-on-rails"])
-          end
-
-          puts "Adding React dependencies"
-          package_json.manager.add([
-                                     "react",
-                                     "react-dom",
-                                     "@babel/preset-react",
-                                     "prop-types",
-                                     "babel-plugin-transform-react-remove-prop-types",
-                                     "babel-plugin-macros"
-                                   ])
-
-          puts "Adding CSS handlers"
-          package_json.manager.add(%w[
-                                     css-loader
-                                     css-minimizer-webpack-plugin
-                                     mini-css-extract-plugin
-                                     style-loader
-                                   ])
-
-          puts "Adding dev dependencies"
-          package_json.manager.add([
-                                     "@pmmmwh/react-refresh-webpack-plugin",
-                                     "react-refresh"
-                                   ], type: :dev)
-          puts "=== DEBUG: add_js_dependencies completed successfully ==="
-        rescue => e
-          puts "=== ERROR in add_js_dependencies: #{e.message} ==="
-          puts "=== ERROR backtrace: #{e.backtrace.first(3).join(', ')} ==="
-          raise
+        major_minor_patch_only = /\A\d+\.\d+\.\d+\z/
+        if ReactOnRails::VERSION.match?(major_minor_patch_only)
+          package_json.manager.add(["react-on-rails@#{ReactOnRails::VERSION}"])
+        else
+          # otherwise add latest
+          puts "Adding the latest react-on-rails NPM module. Double check this is correct in package.json"
+          package_json.manager.add(["react-on-rails"])
         end
+
+        puts "Adding React dependencies"
+        package_json.manager.add([
+                                   "react",
+                                   "react-dom",
+                                   "@babel/preset-react",
+                                   "prop-types",
+                                   "babel-plugin-transform-react-remove-prop-types",
+                                   "babel-plugin-macros"
+                                 ])
+
+        puts "Adding CSS handlers"
+        package_json.manager.add(%w[
+                                   css-loader
+                                   css-minimizer-webpack-plugin
+                                   mini-css-extract-plugin
+                                   style-loader
+                                 ])
+
+        puts "Adding dev dependencies"
+        package_json.manager.add([
+                                   "@pmmmwh/react-refresh-webpack-plugin",
+                                   "react-refresh"
+                                 ], type: :dev)
       end
 
       def install_js_dependencies
-        puts "Installing JavaScript dependencies"
-
         # Detect which package manager to use
         if File.exist?(File.join(destination_root, "yarn.lock"))
           run "yarn install"
@@ -145,12 +133,7 @@ module ReactOnRails
         elsif File.exist?(File.join(destination_root, "package.json"))
           # Default to npm if no lock file exists but package.json does
           run "npm install"
-        else
-          puts "No package.json found, skipping JavaScript dependency installation"
         end
-      rescue => e
-        puts "Error installing JavaScript dependencies: #{e.message}"
-        raise
       end
 
       def update_gitignore_for_auto_registration
