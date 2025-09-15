@@ -25,7 +25,13 @@ module ReactOnRails
           puts "🔪 Killing all development processes..."
           puts ""
 
-          processes = {
+          killed_any = kill_running_processes || cleanup_socket_files
+
+          print_kill_summary(killed_any)
+        end
+
+        def development_processes
+          {
             "rails" => "Rails server",
             "node.*react[-_]on[-_]rails" => "React on Rails Node processes",
             "overmind" => "Overmind process manager",
@@ -34,42 +40,53 @@ module ReactOnRails
             "webpack-dev-server" => "Webpack dev server",
             "bin/shakapacker-dev-server" => "Shakapacker dev server"
           }
+        end
 
+        def kill_running_processes
           killed_any = false
 
-          processes.each do |pattern, description|
-            pids = `pgrep -f "#{pattern}" 2>/dev/null`.split("\n").map(&:to_i).reject { |pid| pid == Process.pid }
-
+          development_processes.each do |pattern, description|
+            pids = find_process_pids(pattern)
             next unless pids.any?
 
             puts "   ☠️  Killing #{description} (PIDs: #{pids.join(', ')})"
-            pids.each do |pid|
-              Process.kill("TERM", pid)
-            rescue StandardError
-              nil
-            end
+            terminate_processes(pids)
             killed_any = true
           end
 
-          # Clean up socket and pid files
-          cleanup_files = [
-            ".overmind.sock",
-            "tmp/sockets/overmind.sock",
-            "tmp/pids/server.pid"
-          ]
+          killed_any
+        end
 
-          cleanup_files.each do |file|
+        def find_process_pids(pattern)
+          `pgrep -f "#{pattern}" 2>/dev/null`.split("\n").map(&:to_i).reject { |pid| pid == Process.pid }
+        end
+
+        def terminate_processes(pids)
+          pids.each do |pid|
+            Process.kill("TERM", pid)
+          rescue StandardError
+            nil
+          end
+        end
+
+        def cleanup_socket_files
+          files = [".overmind.sock", "tmp/sockets/overmind.sock", "tmp/pids/server.pid"]
+          killed_any = false
+
+          files.each do |file|
             next unless File.exist?(file)
 
             puts "   🧹 Removing #{file}"
-            begin
-              File.delete(file)
-            rescue StandardError
-              nil
-            end
+            File.delete(file)
             killed_any = true
+          rescue StandardError
+            nil
           end
 
+          killed_any
+        end
+
+        def print_kill_summary(killed_any)
           if killed_any
             puts ""
             puts "✅ All processes terminated and sockets cleaned"
@@ -80,65 +97,91 @@ module ReactOnRails
         end
 
         def show_help
-          puts <<~HELP
-              Usage: bin/dev [command] [options]
-
-              Commands and their Procfiles:
-                (none) / hmr        Start development server with HMR (default)
-                                    → Uses: Procfile.dev
-
-                static              Start development server with static assets (no HMR, no FOUC)
-                                    → Uses: Procfile.dev-static-assets
-
-                production-assets   Start with production-optimized assets (no HMR)
-                prod                Alias for production-assets
-                                    → Uses: Procfile.dev-prod-assets
-
-                kill                Kill all development processes for a clean start
-                help                Show this help message
-
-              Options:
-                --verbose, -v       Enable verbose output for pack generation
-            #{'  '}
-              🔧 CUSTOMIZATION:
-              Each mode uses a specific Procfile that you can customize for your application:
-
-              • Procfile.dev                 - HMR development with webpack-dev-server
-              • Procfile.dev-static-assets   - Static development with webpack --watch
-              • Procfile.dev-prod-assets     - Production-optimized assets (port 3001)
-
-              Edit these files to customize the development environment for your needs.
-            #{'  '}
-              HMR Development mode (default) - Procfile.dev:
-              • Hot Module Replacement (HMR) enabled
-              • React on Rails pack generation before Procfile start
-              • Webpack dev server for fast recompilation
-              • Source maps for debugging
-              • May have Flash of Unstyled Content (FOUC)
-              • Fast recompilation
-              • Access at: http://localhost:3000
-
-              Static development mode - Procfile.dev-static-assets:
-              • No HMR (static assets with auto-recompilation)
-              • React on Rails pack generation before Procfile start
-              • Webpack watch mode for auto-recompilation
-              • CSS extracted to separate files (no FOUC)
-              • Development environment (faster builds than production)
-              • Source maps for debugging
-              • Access at: http://localhost:3000
-
-              Production-assets mode - Procfile.dev-prod-assets:
-              • React on Rails pack generation before Procfile start
-              • Asset precompilation with production optimizations
-              • Optimized, minified bundles
-              • Extracted CSS files (no FOUC)
-              • No HMR (static assets)
-              • Slower recompilation
-              • Access at: http://localhost:3001
-          HELP
+          puts help_usage
+          puts ""
+          puts help_commands
+          puts ""
+          puts help_options
+          puts ""
+          puts help_customization
+          puts ""
+          puts help_mode_details
         end
 
         private
+
+        def help_usage
+          "Usage: bin/dev [command] [options]"
+        end
+
+        def help_commands
+          <<~COMMANDS
+            Commands and their Procfiles:
+              (none) / hmr        Start development server with HMR (default)
+                                  → Uses: Procfile.dev
+
+              static              Start development server with static assets (no HMR, no FOUC)
+                                  → Uses: Procfile.dev-static-assets
+
+              production-assets   Start with production-optimized assets (no HMR)
+              prod                Alias for production-assets
+                                  → Uses: Procfile.dev-prod-assets
+
+              kill                Kill all development processes for a clean start
+              help                Show this help message
+          COMMANDS
+        end
+
+        def help_options
+          <<~OPTIONS
+            Options:
+              --verbose, -v       Enable verbose output for pack generation
+          OPTIONS
+        end
+
+        def help_customization
+          <<~CUSTOMIZATION
+            🔧 CUSTOMIZATION:
+            Each mode uses a specific Procfile that you can customize for your application:
+
+            • Procfile.dev                 - HMR development with webpack-dev-server
+            • Procfile.dev-static-assets   - Static development with webpack --watch
+            • Procfile.dev-prod-assets     - Production-optimized assets (port 3001)
+
+            Edit these files to customize the development environment for your needs.
+          CUSTOMIZATION
+        end
+
+        def help_mode_details
+          <<~MODES
+            HMR Development mode (default) - Procfile.dev:
+            • Hot Module Replacement (HMR) enabled
+            • React on Rails pack generation before Procfile start
+            • Webpack dev server for fast recompilation
+            • Source maps for debugging
+            • May have Flash of Unstyled Content (FOUC)
+            • Fast recompilation
+            • Access at: http://localhost:3000
+
+            Static development mode - Procfile.dev-static-assets:
+            • No HMR (static assets with auto-recompilation)
+            • React on Rails pack generation before Procfile start
+            • Webpack watch mode for auto-recompilation
+            • CSS extracted to separate files (no FOUC)
+            • Development environment (faster builds than production)
+            • Source maps for debugging
+            • Access at: http://localhost:3000
+
+            Production-assets mode - Procfile.dev-prod-assets:
+            • React on Rails pack generation before Procfile start
+            • Asset precompilation with production optimizations
+            • Optimized, minified bundles
+            • Extracted CSS files (no FOUC)
+            • No HMR (static assets)
+            • Slower recompilation
+            • Access at: http://localhost:3001
+          MODES
+        end
 
         def run_production_like(_verbose: false)
           procfile = "Procfile.dev-prod-assets"
@@ -204,36 +247,40 @@ module ReactOnRails
         end
 
         def print_procfile_info(procfile)
-          # Determine port based on procfile
-          port = procfile == "Procfile.dev-prod-assets" ? 3001 : 3000
-
+          port = procfile_port(procfile)
           box_width = 60
-          border = "┌#{'─' * (box_width - 2)}┐"
-          bottom = "└#{'─' * (box_width - 2)}┘"
-
-          procfile_line = "│ 📋 Using Procfile: #{procfile}"
-          padding = box_width - procfile_line.length - 2
-          procfile_line += "#{' ' * padding}│"
-
-          access_line = "│ 💡 Access at: http://localhost:#{port}"
-          padding = box_width - access_line.length - 2
-          access_line += "#{' ' * padding}│"
-
-          customize_line = "│ 🔧 Customize this file for your app's needs"
-          padding = box_width - customize_line.length - 2
-          customize_line += "#{' ' * padding}│"
-
-          empty_line = "│#{' ' * (box_width - 2)}│"
 
           puts ""
-          puts border
-          puts empty_line
-          puts procfile_line
-          puts access_line
-          puts customize_line
-          puts empty_line
-          puts bottom
+          puts box_border(box_width)
+          puts box_empty_line(box_width)
+          puts format_box_line("📋 Using Procfile: #{procfile}", box_width)
+          puts format_box_line("🔧 Customize this file for your app's needs", box_width)
+          puts format_box_line("💡 Access at: http://localhost:#{port}", box_width)
+          puts box_empty_line(box_width)
+          puts box_bottom(box_width)
           puts ""
+        end
+
+        def procfile_port(procfile)
+          procfile == "Procfile.dev-prod-assets" ? 3001 : 3000
+        end
+
+        def box_border(width)
+          "┌#{'─' * (width - 2)}┐"
+        end
+
+        def box_bottom(width)
+          "└#{'─' * (width - 2)}┘"
+        end
+
+        def box_empty_line(width)
+          "│#{' ' * (width - 2)}│"
+        end
+
+        def format_box_line(content, box_width)
+          line = "│ #{content}"
+          padding = box_width - line.length - 2
+          line + "#{' ' * padding}│"
         end
       end
     end
