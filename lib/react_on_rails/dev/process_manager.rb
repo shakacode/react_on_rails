@@ -5,7 +5,8 @@ module ReactOnRails
     class ProcessManager
       class << self
         def installed?(process)
-          IO.popen "#{process} -v"
+          IO.popen([process, "-v"]) { |io| io.close }
+          true
         rescue Errno::ENOENT
           false
         end
@@ -21,13 +22,19 @@ module ReactOnRails
         end
 
         def run_with_process_manager(procfile)
+          # Validate procfile path for security
+          unless valid_procfile_path?(procfile)
+            warn "ERROR: Invalid procfile path: #{procfile}"
+            exit 1
+          end
+
           # Clean up stale files before starting
           FileManager.cleanup_stale_files
 
           if installed?("overmind")
-            system "overmind start -f #{procfile}"
+            system("overmind", "start", "-f", procfile)
           elsif installed?("foreman")
-            system "foreman start -f #{procfile}"
+            system("foreman", "start", "-f", procfile)
           else
             warn <<~MSG
               NOTICE:
@@ -35,6 +42,18 @@ module ReactOnRails
             MSG
             exit 1
           end
+        end
+
+        private
+
+        def valid_procfile_path?(procfile)
+          # Reject paths with shell metacharacters
+          return false if procfile.match?(/[;&|`$(){}[\]<>]/)
+
+          # Ensure it's a readable file
+          File.readable?(procfile)
+        rescue
+          false
         end
       end
     end

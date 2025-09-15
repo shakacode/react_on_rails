@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../spec_helper"
+require "react_on_rails/dev/file_manager"
 
 RSpec.describe ReactOnRails::Dev::FileManager do
   # Suppress stdout/stderr during tests
@@ -18,12 +19,12 @@ RSpec.describe ReactOnRails::Dev::FileManager do
 
   describe ".cleanup_stale_files" do
     before do
-      allow_any_instance_of(Kernel).to receive(:`).and_return("")
+      allow(Kernel).to receive(:`).and_return("")
     end
 
     context "when overmind is not running" do
       before do
-        allow_any_instance_of(Kernel).to receive(:`).with("pgrep -f \"overmind\" 2>/dev/null").and_return("")
+        allow(Kernel).to receive(:`).with("pgrep -f \"overmind\" 2>/dev/null").and_return("")
       end
 
       it "removes stale overmind socket files" do
@@ -47,7 +48,7 @@ RSpec.describe ReactOnRails::Dev::FileManager do
 
     context "when overmind is running" do
       before do
-        allow_any_instance_of(Kernel).to receive(:`).with("pgrep -f \"overmind\" 2>/dev/null").and_return("1234")
+        allow(Kernel).to receive(:`).with("pgrep -f \"overmind\" 2>/dev/null").and_return("1234")
         allow(File).to receive(:exist?).and_return(false)
       end
 
@@ -61,7 +62,7 @@ RSpec.describe ReactOnRails::Dev::FileManager do
 
     context "when Rails server pid file exists" do
       before do
-        allow_any_instance_of(Kernel).to receive(:`).with("pgrep -f \"overmind\" 2>/dev/null").and_return("")
+        allow(Kernel).to receive(:`).with("pgrep -f \"overmind\" 2>/dev/null").and_return("")
         allow(File).to receive(:exist?).with(".overmind.sock").and_return(false)
         allow(File).to receive(:exist?).with("tmp/sockets/overmind.sock").and_return(false)
         allow(File).to receive(:exist?).with("tmp/pids/server.pid").and_return(true)
