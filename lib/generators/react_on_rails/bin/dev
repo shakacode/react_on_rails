@@ -29,7 +29,9 @@ def ensure_procfile(procfile)
   exit 1
 end
 
-def cleanup_stale_sockets
+def cleanup_stale_files
+  cleaned_any = false
+
   # Check for stale overmind socket files
   socket_files = [".overmind.sock", "tmp/sockets/overmind.sock"]
 
@@ -41,14 +43,33 @@ def cleanup_stale_sockets
       if File.exist?(socket_file)
         puts "   🧹 Cleaning up stale socket: #{socket_file}"
         File.delete(socket_file) rescue nil
+        cleaned_any = true
       end
     end
   end
+
+  # Check for stale Rails server.pid file
+  server_pid_file = "tmp/pids/server.pid"
+  if File.exist?(server_pid_file)
+    pid = File.read(server_pid_file).to_i
+    # Check if process is actually running
+    begin
+      Process.kill(0, pid)
+      # Process exists, don't clean up
+    rescue Errno::ESRCH
+      # Process doesn't exist, clean up stale pid file
+      puts "   🧹 Cleaning up stale Rails pid file: #{server_pid_file}"
+      File.delete(server_pid_file) rescue nil
+      cleaned_any = true
+    end
+  end
+
+  cleaned_any
 end
 
 def run_with_process_manager(procfile)
-  # Clean up stale sockets before starting
-  cleanup_stale_sockets
+  # Clean up stale files before starting
+  cleanup_stale_files
 
   if installed?("overmind")
     system "overmind start -f #{procfile}"
@@ -159,12 +180,17 @@ def kill_processes
     end
   end
 
-  # Clean up socket files
-  socket_files = [".overmind.sock", "tmp/sockets/overmind.sock"]
-  socket_files.each do |socket_file|
-    if File.exist?(socket_file)
-      puts "   🧹 Removing #{socket_file}"
-      File.delete(socket_file) rescue nil
+  # Clean up socket and pid files
+  cleanup_files = [
+    ".overmind.sock",
+    "tmp/sockets/overmind.sock",
+    "tmp/pids/server.pid"
+  ]
+
+  cleanup_files.each do |file|
+    if File.exist?(file)
+      puts "   🧹 Removing #{file}"
+      File.delete(file) rescue nil
       killed_any = true
     end
   end
