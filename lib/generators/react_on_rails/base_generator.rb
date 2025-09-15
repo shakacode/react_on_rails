@@ -235,6 +235,11 @@ module ReactOnRails
                                  ], type: :dev)
       end
 
+      def install_js_dependencies
+        puts "Installing JavaScript dependencies"
+        run "yarn install"
+      end
+
       def update_gitignore_for_auto_registration
         gitignore_path = File.join(destination_root, ".gitignore")
         return unless File.exist?(gitignore_path)
