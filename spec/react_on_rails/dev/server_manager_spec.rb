@@ -52,7 +52,8 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     end
 
     it "starts production-like mode" do
-      expect_any_instance_of(Kernel).to receive(:system).with("RAILS_ENV=production NODE_ENV=production bundle exec rails assets:precompile").and_return(true)
+      command = "RAILS_ENV=production NODE_ENV=production bundle exec rails assets:precompile"
+      expect_any_instance_of(Kernel).to receive(:system).with(command).and_return(true)
       expect(ReactOnRails::Dev::ProcessManager).to receive(:ensure_procfile).with("Procfile.dev-prod-assets")
       expect(ReactOnRails::Dev::ProcessManager).to receive(:run_with_process_manager).with("Procfile.dev-prod-assets")
 
@@ -73,12 +74,14 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     it "attempts to kill development processes" do
       # Mock all the pgrep patterns used in kill_processes
       allow_any_instance_of(Kernel).to receive(:`).with("pgrep -f \"rails\" 2>/dev/null").and_return("1234\n5678")
-      allow_any_instance_of(Kernel).to receive(:`).with("pgrep -f \"node.*react[-_]on[-_]rails\" 2>/dev/null").and_return("2345")
+      pgrep_cmd = "pgrep -f \"node.*react[-_]on[-_]rails\" 2>/dev/null"
+      allow_any_instance_of(Kernel).to receive(:`).with(pgrep_cmd).and_return("2345")
       allow_any_instance_of(Kernel).to receive(:`).with("pgrep -f \"overmind\" 2>/dev/null").and_return("")
       allow_any_instance_of(Kernel).to receive(:`).with("pgrep -f \"foreman\" 2>/dev/null").and_return("")
       allow_any_instance_of(Kernel).to receive(:`).with("pgrep -f \"ruby.*puma\" 2>/dev/null").and_return("")
       allow_any_instance_of(Kernel).to receive(:`).with("pgrep -f \"webpack-dev-server\" 2>/dev/null").and_return("")
-      allow_any_instance_of(Kernel).to receive(:`).with("pgrep -f \"bin/shakapacker-dev-server\" 2>/dev/null").and_return("")
+      shakapacker_cmd = "pgrep -f \"bin/shakapacker-dev-server\" 2>/dev/null"
+      allow_any_instance_of(Kernel).to receive(:`).with(shakapacker_cmd).and_return("")
 
       allow(Process).to receive(:pid).and_return(9999) # Current process PID
       expect(Process).to receive(:kill).with("TERM", 1234)
