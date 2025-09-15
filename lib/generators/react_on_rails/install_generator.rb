@@ -121,7 +121,7 @@ module ReactOnRails
       def shakapacker_installed?
         Gem::Specification.find_by_name("shakapacker")
         true
-      rescue Gem::MissingSpecError, Gem::LoadError
+      rescue Gem::LoadError
         false
       end
 
