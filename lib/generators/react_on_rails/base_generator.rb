@@ -16,7 +16,7 @@ module ReactOnRails
       class_option :redux,
                    type: :boolean,
                    default: false,
-                   desc: "Install Redux gems and Redux version of Hello World Example",
+                   desc: "Install Redux package and Redux version of Hello World Example",
                    aliases: "-R"
 
       def add_hello_world_route
