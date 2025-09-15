@@ -2,7 +2,17 @@
 
 // Common configuration applying to client and server configuration
 const { generateWebpackConfig, merge } = require('shakapacker');
-const MiniCssExtractPlugin = require('mini-css-extract-plugin');
+
+// Try to load CSS plugins, but gracefully handle if they're not installed
+let MiniCssExtractPlugin;
+let cssLoaderAvailable = true;
+try {
+  MiniCssExtractPlugin = require('mini-css-extract-plugin');
+  require.resolve('css-loader');
+  require.resolve('style-loader');
+} catch (error) {
+  cssLoaderAvailable = false;
+}
 
 const baseClientWebpackConfig = generateWebpackConfig();
 
@@ -10,7 +20,11 @@ const commonOptions = {
   resolve: {
     extensions: ['.css', '.ts', '.tsx'],
   },
-  module: {
+};
+
+// Only add CSS module rules if the required loaders are available
+if (cssLoaderAvailable && MiniCssExtractPlugin) {
+  commonOptions.module = {
     rules: [
       {
         test: /\.module\.css$/i,
@@ -27,8 +41,8 @@ const commonOptions = {
         ],
       },
     ],
-  },
-};
+  };
+}
 
 // Copy the object using merge b/c the baseClientWebpackConfig and commonOptions are mutable globals
 const commonWebpackConfig = () => merge({}, baseClientWebpackConfig, commonOptions);
