@@ -84,12 +84,16 @@ module ReactOnRails
 
           # Check if it's the standard Shakapacker config that we can safely replace
           if standard_shakapacker_config?(existing_content)
-            puts "   #{set_color('replace', :yellow)}  #{webpack_config_path} " \
-                 "(upgrading from standard Shakapacker config)"
+            # Remove the file first to avoid conflict prompt, then recreate it
+            remove_file(webpack_config_path, verbose: false)
+            # Show what we're doing
+            puts "   #{set_color('replace', :green)}  #{webpack_config_path} " \
+                 "(auto-upgrading from standard Shakapacker to React on Rails config)"
             template("#{base_path}/#{webpack_config_path}.tt", webpack_config_path, config)
           elsif react_on_rails_config?(existing_content)
             puts "   #{set_color('identical', :blue)}  #{webpack_config_path} " \
                  "(already React on Rails compatible)"
+            # Skip - don't need to do anything
           else
             handle_custom_webpack_config(base_path, config, webpack_config_path)
           end
