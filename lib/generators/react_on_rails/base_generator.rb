@@ -7,6 +7,7 @@ module ReactOnRails
   module Generators
     class BaseGenerator < Rails::Generators::Base
       include GeneratorHelper
+
       Rails::Generators.hide_namespace(namespace)
       source_root(File.expand_path("templates", __dir__))
 
@@ -33,6 +34,7 @@ module ReactOnRails
         base_path = "base/base/"
         base_files = %w[app/controllers/hello_world_controller.rb
                         app/views/layouts/hello_world.html.erb
+                        bin/dev
                         Procfile.dev
                         Procfile.dev-static-assets
                         Procfile.dev-prod-assets]
@@ -258,7 +260,6 @@ module ReactOnRails
           if File.exist?(spec_helper)
             add_configure_rspec_to_compile_assets(spec_helper)
           else
-            # rubocop:disable Layout/EmptyLinesAroundArguments
             GeneratorMessages.add_info(
               <<-MSG.strip_heredoc
 
@@ -271,8 +272,6 @@ module ReactOnRails
               ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
               MSG
             )
-            # rubocop:enable Layout/EmptyLinesAroundArguments
-
           end
         end
       end

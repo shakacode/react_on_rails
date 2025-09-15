@@ -346,7 +346,7 @@ module ReactOnRails
 
       html = result["html"]
       console_log_script = result["consoleLogScript"]
-      raw("#{html}#{render_options.replay_console ? console_log_script : ''}")
+      raw("#{html}#{console_log_script if render_options.replay_console}")
     rescue ExecJS::ProgramError => err
       raise ReactOnRails::PrerenderError.new(component_name: "N/A (server_render_js called)",
                                              err: err,
@@ -413,7 +413,7 @@ module ReactOnRails
           result.merge!(
             # URL settings
             href: uri.to_s,
-            location: "#{uri.path}#{uri.query.present? ? "?#{uri.query}" : ''}",
+            location: "#{uri.path}#{"?#{uri.query}" if uri.query.present?}",
             scheme: uri.scheme, # http
             host: uri.host, # foo.com
             port: uri.port,
@@ -857,6 +857,7 @@ typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('#{
 
     if defined?(ScoutApm)
       include ScoutApm::Tracer
+
       instrument_method :react_component, type: "ReactOnRails", name: "react_component"
       instrument_method :react_component_hash, type: "ReactOnRails", name: "react_component_hash"
     end

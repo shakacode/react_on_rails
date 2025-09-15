@@ -10,6 +10,7 @@ module ReactOnRails
   module TestHelper
     class WebpackAssetsStatusChecker
       include Utils::Required
+
       # source_path is typically configured in the (shaka/web)packer.yml file
       # for `source_path`
       # or for legacy React on Rails, it's /client, where all client files go
