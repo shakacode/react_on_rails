@@ -29,7 +29,27 @@ def ensure_procfile(procfile)
   exit 1
 end
 
+def cleanup_stale_sockets
+  # Check for stale overmind socket files
+  socket_files = [".overmind.sock", "tmp/sockets/overmind.sock"]
+
+  # Only clean up if overmind is not actually running
+  overmind_pids = `pgrep -f "overmind" 2>/dev/null`.split("\n").map(&:to_i)
+
+  if overmind_pids.empty?
+    socket_files.each do |socket_file|
+      if File.exist?(socket_file)
+        puts "   🧹 Cleaning up stale socket: #{socket_file}"
+        File.delete(socket_file) rescue nil
+      end
+    end
+  end
+end
+
 def run_with_process_manager(procfile)
+  # Clean up stale sockets before starting
+  cleanup_stale_sockets
+
   if installed?("overmind")
     system "overmind start -f #{procfile}"
   elsif installed?("foreman")
