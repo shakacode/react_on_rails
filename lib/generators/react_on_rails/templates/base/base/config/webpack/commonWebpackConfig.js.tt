@@ -9,14 +9,6 @@ const commonOptions = {
   resolve: {
     extensions: ['.css', '.ts', '.tsx'],
   },
-  module: {
-    rules: [
-      {
-        test: /\.css$/i,
-        use: ['style-loader', 'css-loader'],
-      },
-    ],
-  },
 };
 
 // Copy the object using merge b/c the baseClientWebpackConfig and commonOptions are mutable globals
