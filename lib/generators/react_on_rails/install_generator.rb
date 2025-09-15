@@ -25,9 +25,17 @@ module ReactOnRails
                    default: false,
                    desc: "Skip warnings. Default: false"
 
+      # --skip-shakapacker-install
+      class_option :skip_shakapacker_install,
+                   type: :boolean,
+                   default: false,
+                   desc: "Skip automatic Shakapacker installation. Default: false"
+
       def run_generators
         if installation_prerequisites_met? || options.ignore_warnings?
-          return unless ensure_shakapacker_installed
+          unless options.skip_shakapacker_install?
+            return unless ensure_shakapacker_installed
+          end
 
           invoke_generators
           add_bin_scripts
@@ -94,7 +102,11 @@ module ReactOnRails
       def ensure_shakapacker_installed
         return true if shakapacker_installed?
 
-        GeneratorMessages.add_info("Shakapacker not detected. Installing Shakapacker...")
+        GeneratorMessages.add_info(<<~MSG.strip)
+          Shakapacker gem not found in your Gemfile.
+          React on Rails requires Shakapacker for webpack integration.
+          Adding 'shakapacker' gem to your Gemfile and running installation...
+        MSG
 
         added = system("bundle", "add", "shakapacker")
         unless added
