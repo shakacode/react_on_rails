@@ -67,15 +67,25 @@ Lint/SuppressedException:
 
 Metrics/AbcSize:
   Max: 28
+  Exclude:
+    - 'lib/react_on_rails/dev/server_manager.rb'  # Process management complexity justified
 
 Metrics/CyclomaticComplexity:
   Max: 7
+  Exclude:
+    - 'lib/react_on_rails/dev/file_manager.rb'  # File cleanup logic complexity justified
+    - 'lib/react_on_rails/dev/server_manager.rb'  # Process management complexity justified
 
 Metrics/PerceivedComplexity:
   Max: 10
+  Exclude:
+    - 'lib/react_on_rails/dev/server_manager.rb'  # Process management complexity justified
 
 Metrics/ClassLength:
   Max: 150
+  Exclude:
+    - 'lib/generators/react_on_rails/base_generator.rb'  # Generator complexity justified
+    - 'lib/react_on_rails/dev/server_manager.rb'  # Dev tool complexity justified
 
 Metrics/ParameterLists:
   Max: 5
@@ -83,6 +93,8 @@ Metrics/ParameterLists:
 
 Metrics/MethodLength:
   Max: 41
+  Exclude:
+    - 'lib/react_on_rails/dev/server_manager.rb'  # Process management methods justified
 
 Metrics/ModuleLength:
   Max: 180
@@ -96,6 +108,7 @@ RSpec/AnyInstance:
     - 'spec/react_on_rails/locales_to_js_spec.rb'
     - 'spec/react_on_rails/binstubs/dev_spec.rb'
     - 'spec/react_on_rails/binstubs/dev_static_spec.rb'
+    - 'spec/react_on_rails/dev/**/*_spec.rb'  # Dev module tests require system mocking
 
 RSpec/DescribeClass:
   Enabled: false
@@ -115,6 +128,7 @@ RSpec/BeforeAfterAll:
     - 'spec/react_on_rails/generators/install_generator_spec.rb'
     - 'spec/react_on_rails/binstubs/dev_spec.rb'
     - 'spec/react_on_rails/binstubs/dev_static_spec.rb'
+    - 'spec/react_on_rails/dev/**/*_spec.rb'  # Dev module tests require global setup
 
 RSpec/MessageChain:
   Enabled: false
@@ -137,3 +151,11 @@ RSpec/NoExpectationExample:
   AllowedPatterns:
     - ^expect_
     - ^assert_
+
+RSpec/InstanceVariable:
+  Exclude:
+    - 'spec/react_on_rails/dev/**/*_spec.rb'  # Dev module tests require global variable management
+
+RSpec/StubbedMock:
+  Exclude:
+    - 'spec/react_on_rails/dev/**/*_spec.rb'  # Dev module tests use mixed stub/mock patterns
