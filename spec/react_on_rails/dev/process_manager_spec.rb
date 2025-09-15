@@ -19,7 +19,7 @@ RSpec.describe ReactOnRails::Dev::ProcessManager do
   describe ".installed?" do
     it "returns true when process is available" do
       allow(IO).to receive(:popen).with("overmind -v").and_return("Some version info")
-      expect(described_class.installed?("overmind")).to be_truthy
+      expect(described_class).to be_installed("overmind")
     end
 
     it "returns false when process is not available" do

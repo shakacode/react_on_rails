@@ -262,7 +262,6 @@ module ReactOnRails
           else
             GeneratorMessages.add_info(
               <<-MSG.strip_heredoc
-
               We did not find a spec/rails_helper.rb or spec/spec_helper.rb to add
               the React on Rails Test helper, which ensures that if we are running
               js tests, then we are using latest webpack assets. You can later add
