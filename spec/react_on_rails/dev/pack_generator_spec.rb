@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "spec_helper"
-
 RSpec.describe ReactOnRails::Dev::PackGenerator do
   # Suppress stdout/stderr during tests
   before(:all) do
