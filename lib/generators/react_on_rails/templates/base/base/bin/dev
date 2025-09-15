@@ -24,7 +24,7 @@ begin
 rescue LoadError
   # Fallback for when gem is not yet installed
   puts "Loading ReactOnRails development tools..."
-  require_relative "../../../react_on_rails/dev"
+  require_relative "../../lib/react_on_rails/dev"
 end
 
 # Main execution

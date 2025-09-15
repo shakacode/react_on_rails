@@ -5,7 +5,7 @@ require_relative "version"
 module ReactOnRails
   class VersionSyntaxConverter
     def rubygem_to_npm(rubygem_version = ReactOnRails::VERSION)
-      regex_match = rubygem_version.match(/(\d+\.\d+\.\d+)[.\-]?(.+)?/)
+      regex_match = rubygem_version.match(/(\d+\.\d+\.\d+)[.-]?(.+)?/)
       return "#{regex_match[1]}-#{regex_match[2]}" if regex_match[2]
 
       regex_match[1].to_s

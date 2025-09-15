@@ -39,37 +39,60 @@ module GeneratorMessages
     end
 
     def helpful_message_after_installation(component_name: "HelloWorld")
+      process_manager = detect_process_manager
+      process_manager_section = if process_manager
+                                  "\n                   #{Rainbow("#{process_manager} detected ✓").green}"
+                                else
+                                  <<~INSTALL
+
+                                    ⚠️  No process manager detected. Install one:
+                                    #{Rainbow('brew install overmind').yellow.bold}  # Recommended
+                                    #{Rainbow('gem install foreman').yellow}   # Alternative
+                                  INSTALL
+                                end
+
       <<~MSG
 
-        What to do next:
+                ╔════════════════════════════════════════════════════════════════════════╗
+                ║  🎉 React on Rails Successfully Installed!                             ║
+                ╚════════════════════════════════════════════════════════════════════════╝
 
-          - See the documentation on https://github.com/shakacode/shakapacker#webpack-configuration
-            for how to customize the default webpack configuration.
+                📋 QUICK START:
+                ─────────────────────────────────────────────────────────────────────────
+                1. Start the app:
+                   ./bin/dev              # HMR (Hot Module Replacement) mode
+                   ./bin/dev static       # Static bundles (no HMR, faster initial load)
+                   ./bin/dev help         # See all available options
+        #{process_manager_section}
 
-          - No manual pack tags needed with auto-registration! Your layout should use empty pack tags:
+                2. Visit: http://localhost:3000/hello_world
 
-              <%= javascript_pack_tag %>
-              <%= stylesheet_pack_tag %>
+                ✨ KEY FEATURES:
+                ─────────────────────────────────────────────────────────────────────────
+                • Auto-registration enabled - Your layout only needs:
+                  <%= javascript_pack_tag %>
+                  <%= stylesheet_pack_tag %>
 
-          - To start Rails server run:
+                • Server-side rendering - Enable it in app/views/hello_world/index.html.erb:
+                  <%= react_component("#{component_name}", props: @hello_world_props, prerender: true) %>
 
-              ./bin/dev # Running with HMR
+                📚 LEARN MORE:
+                ─────────────────────────────────────────────────────────────────────────
+                • Documentation: https://www.shakacode.com/react-on-rails/docs/
+                • Webpack customization: https://github.com/shakacode/shakapacker#webpack-configuration
 
-            or
-
-              ./bin/dev static # Running with statically created bundles, without HMR
-
-          - To server render, change this line app/views/hello_world/index.html.erb to
-            `prerender: true` to see server rendering (right click on page and select "view source").
-
-              <%= react_component("#{component_name}", props: @hello_world_props, prerender: true) %>
-
-        Alternative steps to run the app:
-
-          - We recommend using Procfile.dev with foreman, overmind, or a similar program. Alternately, you can run each of the processes listed in Procfile.dev in a separate tab in your terminal.
-
-          - Visit http://localhost:3000/hello_world and see your React On Rails app running!
+                💡 TIP: Run 'bin/dev help' for development server options
       MSG
+    end
+
+    private
+
+    def detect_process_manager
+      if system("which overmind > /dev/null 2>&1")
+        "overmind"
+      elsif system("which foreman > /dev/null 2>&1")
+        "foreman"
+      end
     end
   end
 end

@@ -18,7 +18,6 @@ module ReactOnRails
         react_component_name: nil,
         render_options: nil
       )
-
         config_server_bundle_js = ReactOnRails.configuration.server_bundle_js_file
 
         if render_options.prerender == true && config_server_bundle_js.blank?

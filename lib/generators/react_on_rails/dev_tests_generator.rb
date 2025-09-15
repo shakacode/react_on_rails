@@ -7,6 +7,7 @@ module ReactOnRails
   module Generators
     class DevTestsGenerator < Rails::Generators::Base
       include GeneratorHelper
+
       Rails::Generators.hide_namespace(namespace)
       source_root(File.expand_path("templates/dev_tests", __dir__))
 

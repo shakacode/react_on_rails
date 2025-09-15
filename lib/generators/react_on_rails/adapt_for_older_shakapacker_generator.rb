@@ -7,6 +7,7 @@ module ReactOnRails
   module Generators
     class AdaptForOlderShakapackerGenerator < Rails::Generators::Base
       include GeneratorHelper
+
       Rails::Generators.hide_namespace(namespace)
 
       def change_spelling_to_webpacker

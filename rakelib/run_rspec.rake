@@ -10,6 +10,7 @@ require_relative "example_type"
 # rubocop:disable Metrics/BlockLength
 namespace :run_rspec do
   include ReactOnRails::TaskHelpers
+
   # Loads data from examples_config.yml and instantiates corresponding ExampleType objects
   examples_config_file = File.expand_path("examples_config.yml", __dir__)
   examples_config = symbolize_keys(YAML.safe_load_file(examples_config_file))
@@ -97,8 +98,6 @@ DESC
 desc msg
 task run_rspec: ["run_rspec:run_rspec"]
 
-private
-
 def calc_path(dir)
   if dir.is_a?(String)
     if dir.start_with?(File::SEPARATOR)
@@ -120,7 +119,7 @@ def run_tests_in(dir, options = {})
 
   command_name = options.fetch(:command_name, path.basename)
   rspec_args = options.fetch(:rspec_args, "")
-  env_vars = +"#{options.fetch(:env_vars, '')} TEST_ENV_COMMAND_NAME=\"#{command_name}\""
+  env_vars = "#{options.fetch(:env_vars, '')} TEST_ENV_COMMAND_NAME=\"#{command_name}\""
   env_vars << "COVERAGE=true" if ENV["USE_COVERALLS"]
   sh_in_dir(path.realpath, "#{env_vars} bundle exec rspec #{rspec_args}")
 end
