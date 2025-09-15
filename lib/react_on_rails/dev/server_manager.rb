@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "English"
+require "open3"
 
 module ReactOnRails
   module Dev
@@ -58,7 +59,11 @@ module ReactOnRails
         end
 
         def find_process_pids(pattern)
-          `pgrep -f "#{pattern}" 2>/dev/null`.split("\n").map(&:to_i).reject { |pid| pid == Process.pid }
+          stdout, _status = Open3.capture2("pgrep", "-f", pattern, err: File::NULL)
+          stdout.split("\n").map(&:to_i).reject { |pid| pid == Process.pid }
+        rescue Errno::ENOENT
+          # pgrep command not found
+          []
         end
 
         def terminate_processes(pids)

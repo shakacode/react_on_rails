@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../spec_helper"
+require "react_on_rails/dev/process_manager"
 
 RSpec.describe ReactOnRails::Dev::ProcessManager do
   # Suppress stdout/stderr during tests

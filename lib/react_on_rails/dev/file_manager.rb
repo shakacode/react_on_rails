@@ -30,7 +30,19 @@ module ReactOnRails
           server_pid_file = "tmp/pids/server.pid"
           return false unless File.exist?(server_pid_file)
 
-          pid = File.read(server_pid_file).to_i
+          pid_content = File.read(server_pid_file).strip
+          begin
+            pid = Integer(pid_content)
+            # PIDs must be > 1 (0 is kernel, 1 is init)
+            if pid <= 1
+              remove_file_if_exists(server_pid_file, "stale Rails pid file")
+              return true
+            end
+          rescue ArgumentError, TypeError
+            remove_file_if_exists(server_pid_file, "stale Rails pid file")
+            return true
+          end
+
           return false if process_running?(pid)
 
           remove_file_if_exists(server_pid_file, "stale Rails pid file")
@@ -44,6 +56,12 @@ module ReactOnRails
           Process.kill(0, pid)
           true
         rescue Errno::ESRCH
+          false
+        rescue Errno::EPERM
+          # Process exists but we don't have permission to signal it
+          true
+        rescue ArgumentError, RangeError
+          # Invalid PID (negative, too large, wrong type)
           false
         end
 

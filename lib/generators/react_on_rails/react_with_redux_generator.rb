@@ -59,8 +59,8 @@ module ReactOnRails
                  "app/views/hello_world/index.html.erb", config)
       end
 
-      def add_redux_yarn_dependencies
-        run "yarn add redux react-redux"
+      def add_redux_npm_dependencies
+        run "npm install redux react-redux"
       end
 
       def add_redux_specific_messages
