@@ -2,17 +2,7 @@
 
 // Common configuration applying to client and server configuration
 const { generateWebpackConfig, merge } = require('shakapacker');
-
-// Try to load CSS plugins, but gracefully handle if they're not installed
-let MiniCssExtractPlugin;
-let cssLoaderAvailable = true;
-try {
-  MiniCssExtractPlugin = require('mini-css-extract-plugin');
-  require.resolve('css-loader');
-  require.resolve('style-loader');
-} catch (error) {
-  cssLoaderAvailable = false;
-}
+const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 
 const baseClientWebpackConfig = generateWebpackConfig();
 
@@ -20,12 +10,7 @@ const commonOptions = {
   resolve: {
     extensions: ['.css', '.ts', '.tsx'],
   },
-};
-
-// Add CSS module rules - either with proper loaders or fallback
-if (cssLoaderAvailable && MiniCssExtractPlugin) {
-  // Full CSS modules support when loaders are available
-  commonOptions.module = {
+  module: {
     rules: [
       {
         test: /\.module\.css$/i,
@@ -42,33 +27,8 @@ if (cssLoaderAvailable && MiniCssExtractPlugin) {
         ],
       },
     ],
-  };
-} else {
-  // Fallback: replace CSS module imports with a mock module (for testing)
-  const webpack = require('webpack');
-
-  commonOptions.plugins = commonOptions.plugins || [];
-  commonOptions.plugins.push(
-    new webpack.NormalModuleReplacementPlugin(
-      /\.module\.css$/,
-      'data:text/javascript,' + encodeURIComponent(`
-        // For import * as styles, we need to export specific named exports
-        // Since we don't know the class names, we can't use Proxy with import *
-        // Instead, export common CSS class names and a default
-        export const bright = "bright";
-        export const dark = "dark";
-        export const container = "container";
-        export const title = "title";
-        export const button = "button";
-        export const input = "input";
-        export const form = "form";
-
-        const styles = { bright: "bright", dark: "dark", container: "container", title: "title", button: "button", input: "input", form: "form" };
-        export default styles;
-      `)
-    )
-  );
-}
+  },
+};
 
 // Copy the object using merge b/c the baseClientWebpackConfig and commonOptions are mutable globals
 const commonWebpackConfig = () => merge({}, baseClientWebpackConfig, commonOptions);
