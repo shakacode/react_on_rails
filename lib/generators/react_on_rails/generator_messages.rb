@@ -42,6 +42,7 @@ module GeneratorMessages
       process_manager_section = build_process_manager_section
       shakapacker_section = build_shakapacker_section
       webpacker_warning = build_webpacker_warning
+      testing_section = build_testing_section
       package_manager = detect_package_manager
 
       <<~MSG
@@ -78,7 +79,7 @@ module GeneratorMessages
                 • Documentation: https://www.shakacode.com/react-on-rails/docs/
                 • Webpack customization: https://github.com/shakacode/shakapacker#webpack-configuration
 
-                💡 TIP: Run 'bin/dev help' for development server options#{webpacker_warning}
+                💡 TIP: Run 'bin/dev help' for development server options#{testing_section}#{webpacker_warning}
       MSG
     end
 
@@ -127,6 +128,24 @@ module GeneratorMessages
         #{Rainbow('Need help upgrading?').yellow} Contact: #{Rainbow('react_on_rails@shakacode.com').cyan}
         (Maintainers of React on Rails)
       WARNING
+    end
+
+    def build_testing_section
+      # Check if we have any spec files to determine if testing setup is needed
+      has_spec_files = File.exist?("spec/rails_helper.rb") || File.exist?("spec/spec_helper.rb")
+
+      return "" if has_spec_files
+
+      <<~TESTING
+
+
+                🧪 TESTING SETUP (Optional):
+                ─────────────────────────────────────────────────────────────────────────
+                For JavaScript testing with asset compilation, add this to your RSpec config:
+
+                # In spec/rails_helper.rb or spec/spec_helper.rb:
+                ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+      TESTING
     end
 
     def detect_process_manager

@@ -132,17 +132,7 @@ module ReactOnRails
           if File.exist?(spec_helper)
             add_configure_rspec_to_compile_assets(spec_helper)
           else
-            GeneratorMessages.add_info(
-              <<-MSG.strip_heredoc
-              We did not find a spec/rails_helper.rb or spec/spec_helper.rb to add
-              the React on Rails Test helper, which ensures that if we are running
-              js tests, then we are using latest webpack assets. You can later add
-              this to your rspec config:
-
-              # This will use the defaults of :js and :server_rendering meta tags
-              ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
-              MSG
-            )
+            # Test helper setup instructions are now included in the post-install message
           end
         end
       end
