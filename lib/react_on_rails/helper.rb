@@ -58,15 +58,17 @@ module ReactOnRails
       server_rendered_html = internal_result[:result]["html"]
       console_script = internal_result[:result]["consoleReplayScript"]
       render_options = internal_result[:render_options]
+      badge = pro_warning_badge_if_needed(render_options.force_load)
 
       case server_rendered_html
       when String
-        build_react_component_result_for_server_rendered_string(
+        html = build_react_component_result_for_server_rendered_string(
           server_rendered_html: server_rendered_html,
           component_specification_tag: internal_result[:tag],
           console_script: console_script,
           render_options: render_options
         )
+        (badge + html).html_safe
       when Hash
         msg = <<~MSG
           Use react_component_hash (not react_component) to return a Hash to your ruby view code. See
@@ -212,18 +214,21 @@ module ReactOnRails
       server_rendered_html = internal_result[:result]["html"]
       console_script = internal_result[:result]["consoleReplayScript"]
       render_options = internal_result[:render_options]
+      badge = pro_warning_badge_if_needed(render_options.force_load)
 
       if server_rendered_html.is_a?(String) && internal_result[:result]["hasErrors"]
         server_rendered_html = { COMPONENT_HTML_KEY => internal_result[:result]["html"] }
       end
 
       if server_rendered_html.is_a?(Hash)
-        build_react_component_result_for_server_rendered_hash(
+        result = build_react_component_result_for_server_rendered_hash(
           server_rendered_html: server_rendered_html,
           component_specification_tag: internal_result[:tag],
           console_script: console_script,
           render_options: render_options
         )
+        result[COMPONENT_HTML_KEY] = badge + result[COMPONENT_HTML_KEY]
+        result
       else
         msg = <<~MSG
           Render-Function used by react_component_hash for #{component_name} is expected to return
@@ -251,6 +256,8 @@ module ReactOnRails
     #                        waiting for the page to load.
     def redux_store(store_name, props: {}, defer: false, force_load: nil)
       force_load = ReactOnRails.configuration.force_load if force_load.nil?
+      badge = pro_warning_badge_if_needed(force_load)
+
       redux_store_data = { store_name: store_name,
                            props: props,
                            force_load: force_load }
@@ -261,7 +268,7 @@ module ReactOnRails
       else
         registered_stores << redux_store_data
         result = render_redux_store_data(redux_store_data)
-        prepend_render_rails_context(result)
+        (badge + prepend_render_rails_context(result)).html_safe
       end
     end
 
@@ -440,7 +447,28 @@ module ReactOnRails
 
     # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
 
-    private
+    def pro_warning_badge_if_needed(force_load)
+      return "".html_safe unless force_load
+      return "".html_safe if ReactOnRails::Utils.react_on_rails_pro_licence_valid?
+
+      warning_message = "[REACT ON RAILS] The 'force_load' feature requires a React on Rails Pro license. " \
+                        "Please visit https://shakacode.com/react-on-rails-pro to learn more."
+      puts warning_message
+      Rails.logger.warn warning_message
+
+      tooltip_text = "The 'force_load' feature requires a React on Rails Pro license. Click to learn more."
+
+      badge_html = <<~HTML
+        <a href="https://shakacode.com/react-on-rails-pro" target="_blank" rel="noopener noreferrer" title="#{tooltip_text}">
+          <div style="position: fixed; top: 0; right: 0; width: 180px; height: 180px; overflow: hidden; z-index: 9999; pointer-events: none;">
+            <div style="position: absolute; top: 50px; right: -40px; transform: rotate(45deg); background-color: rgba(220, 53, 69, 0.85); color: white; padding: 7px 40px; text-align: center; font-weight: bold; font-family: sans-serif; font-size: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); pointer-events: auto;">
+              React On Rails Pro Required
+            </div>
+          </div>
+        </a>
+      HTML
+      badge_html.strip.html_safe
+    end
 
     def run_stream_inside_fiber
       unless ReactOnRails::Utils.react_on_rails_pro?
