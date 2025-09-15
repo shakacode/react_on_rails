@@ -130,25 +130,55 @@ describe InstallGenerator, type: :generator do
       specify "when Shakapacker is already installed" do
         allow(install_generator).to receive(:shakapacker_installed?).and_return(true)
         expect(install_generator).not_to receive(:system)
-        install_generator.send(:ensure_shakapacker_installed)
+        result = install_generator.send(:ensure_shakapacker_installed)
+        expect(result).to be true
       end
 
       specify "when Shakapacker is not installed and install succeeds" do
         allow(install_generator).to receive(:shakapacker_installed?).and_return(false)
-        allow(install_generator).to receive(:system).with("rails shakapacker:install").and_return(true)
-        expect(GeneratorMessages).to receive(:add_info).with("Shakapacker not detected. Installing Shakapacker...")
+        allow(install_generator).to receive(:system).with("bundle", "add", "shakapacker").and_return(true)
+        allow(install_generator).to receive(:system).with("bundle", "exec", "rails", "shakapacker:install").and_return(true)
+        expect(GeneratorMessages).to receive(:add_info).with(<<~MSG.strip)
+          Shakapacker gem not found in your Gemfile.
+          React on Rails requires Shakapacker for webpack integration.
+          Adding 'shakapacker' gem to your Gemfile and running installation...
+        MSG
         expect(GeneratorMessages).to receive(:add_info).with("Shakapacker installed successfully!")
-        install_generator.send(:ensure_shakapacker_installed)
+        result = install_generator.send(:ensure_shakapacker_installed)
+        expect(result).to be true
       end
 
-      specify "when Shakapacker is not installed and install fails" do
+      specify "when Shakapacker is not installed and bundle add fails" do
         allow(install_generator).to receive(:shakapacker_installed?).and_return(false)
-        allow(install_generator).to receive(:system).with("rails shakapacker:install").and_return(false)
-        expect(GeneratorMessages).to receive(:add_info).with("Shakapacker not detected. Installing Shakapacker...")
-        expect(GeneratorMessages).to receive(:add_error)
-          .with("Failed to install Shakapacker automatically. " \
-                "Please run 'rails shakapacker:install' manually.")
-        install_generator.send(:ensure_shakapacker_installed)
+        allow(install_generator).to receive(:system).with("bundle", "add", "shakapacker").and_return(false)
+        expect(GeneratorMessages).to receive(:add_info).with(<<~MSG.strip)
+          Shakapacker gem not found in your Gemfile.
+          React on Rails requires Shakapacker for webpack integration.
+          Adding 'shakapacker' gem to your Gemfile and running installation...
+        MSG
+        expect(GeneratorMessages).to receive(:add_error).with(<<~MSG.strip)
+          Failed to add Shakapacker to your Gemfile.
+          Please run 'bundle add shakapacker' manually and re-run the generator.
+        MSG
+        result = install_generator.send(:ensure_shakapacker_installed)
+        expect(result).to be false
+      end
+
+      specify "when Shakapacker is not installed and shakapacker:install fails" do
+        allow(install_generator).to receive(:shakapacker_installed?).and_return(false)
+        allow(install_generator).to receive(:system).with("bundle", "add", "shakapacker").and_return(true)
+        allow(install_generator).to receive(:system).with("bundle", "exec", "rails", "shakapacker:install").and_return(false)
+        expect(GeneratorMessages).to receive(:add_info).with(<<~MSG.strip)
+          Shakapacker gem not found in your Gemfile.
+          React on Rails requires Shakapacker for webpack integration.
+          Adding 'shakapacker' gem to your Gemfile and running installation...
+        MSG
+        expect(GeneratorMessages).to receive(:add_error).with(<<~MSG.strip)
+          Failed to install Shakapacker automatically.
+          Please run 'bundle exec rails shakapacker:install' manually.
+        MSG
+        result = install_generator.send(:ensure_shakapacker_installed)
+        expect(result).to be false
       end
     end
   end
