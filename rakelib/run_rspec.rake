@@ -119,7 +119,13 @@ def run_tests_in(dir, options = {})
 
   command_name = options.fetch(:command_name, path.basename)
   rspec_args = options.fetch(:rspec_args, "")
-  env_vars = "#{options.fetch(:env_vars, '')} TEST_ENV_COMMAND_NAME=\"#{command_name}\""
-  env_vars << "COVERAGE=true" if ENV["USE_COVERALLS"]
+
+  # Build environment variables as an array for proper spacing
+  env_tokens = []
+  env_tokens << options.fetch(:env_vars, '').strip unless options.fetch(:env_vars, '').strip.empty?
+  env_tokens << "TEST_ENV_COMMAND_NAME=\"#{command_name}\""
+  env_tokens << "COVERAGE=true" if ENV["USE_COVERALLS"]
+
+  env_vars = env_tokens.join(' ')
   sh_in_dir(path.realpath, "#{env_vars} bundle exec rspec #{rspec_args}")
 end
