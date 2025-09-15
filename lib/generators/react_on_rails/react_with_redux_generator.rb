@@ -25,8 +25,8 @@ module ReactOnRails
                   "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.jsx")
         copy_file("#{base_js_path}/app/javascript/bundles/HelloWorld/startup/HelloWorldApp.server.jsx",
                   "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.server.jsx")
-        copy_file("#{base_js_path}/app/javascript/bundles/HelloWorld/components/HelloWorld.css",
-                  "app/javascript/src/HelloWorldApp/components/HelloWorld.css")
+        copy_file("#{base_js_path}/app/javascript/bundles/HelloWorld/components/HelloWorld.module.css",
+                  "app/javascript/src/HelloWorldApp/components/HelloWorld.module.css")
 
         # Update import paths in client component
         ror_client_file = "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.jsx"
