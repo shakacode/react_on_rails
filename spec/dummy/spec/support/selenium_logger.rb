@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "net/protocol"
+
 RSpec.configure do |config|
   config.after(:each, :js) do |example|
     next unless %i[selenium_chrome selenium_chrome_headless].include?(Capybara.current_driver)
@@ -38,6 +40,6 @@ RSpec.configure do |config|
         err_msg.include?("The 'immediate_hydration' feature requires a React on Rails Pro license")
     end
 
-    raise("Java Script Error(s) on the page:\n\n#{clean_errors.join("\n")}") if clean_errors.present?
+    raise("JavaScript error(s) on the page:\n\n#{clean_errors.join("\n")}") if clean_errors.present?
   end
 end
