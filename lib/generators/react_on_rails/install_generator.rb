@@ -103,23 +103,23 @@ module ReactOnRails
         major_version = node_version[/v(\d+)/, 1]&.to_i
         return unless major_version
 
-        if major_version < 18
-          warning = <<~MSG.strip
-            ⚠️  Node.js version #{node_version} detected.
+        return unless major_version < 18
 
-            React on Rails recommends Node.js 18+ for best compatibility.
-            You may experience issues with older versions.
+        warning = <<~MSG.strip
+          ⚠️  Node.js version #{node_version} detected.
 
-            Consider upgrading: https://nodejs.org/en/
-          MSG
-          GeneratorMessages.add_warning(warning)
-        end
+          React on Rails recommends Node.js 18+ for best compatibility.
+          You may experience issues with older versions.
+
+          Consider upgrading: https://nodejs.org/en/
+        MSG
+        GeneratorMessages.add_warning(warning)
       end
 
       def ensure_shakapacker_installed
         return if File.exist?("bin/shakapacker") && File.exist?("bin/shakapacker-dev-server")
 
-        puts Rainbow("\n" + "=" * 80).cyan
+        puts Rainbow("\n#{'=' * 80}").cyan
         puts Rainbow("🔧 SHAKAPACKER SETUP").cyan.bold
         puts Rainbow("=" * 80).cyan
 
@@ -176,7 +176,7 @@ module ReactOnRails
         puts Rainbow("✅ Shakapacker installed successfully!").green
         puts Rainbow("=" * 80).cyan
         puts Rainbow("🚀 CONTINUING WITH REACT ON RAILS SETUP").cyan.bold
-        puts Rainbow("=" * 80).cyan + "\n"
+        puts "#{Rainbow('=' * 80).cyan}\n"
 
         # Create marker file so base generator can avoid copying shakapacker.yml
         File.write(".shakapacker_just_installed", "")

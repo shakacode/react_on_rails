@@ -106,5 +106,4 @@ describe InstallGenerator, type: :generator do
       expect(install_generator.send(:missing_node?)).to be true
     end
   end
-
 end

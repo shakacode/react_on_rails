@@ -133,11 +133,11 @@ module GeneratorMessages
       if File.exist?(".shakapacker_just_installed")
         <<~SHAKAPACKER
 
-                📦 SHAKAPACKER SETUP:
-                ─────────────────────────────────────────────────────────────────────────
-                #{Rainbow('✓ Added to Gemfile automatically').green}
-                #{Rainbow('✓ Installer ran successfully').green}
-                #{Rainbow('✓ Webpack integration configured').green}
+          📦 SHAKAPACKER SETUP:
+          ─────────────────────────────────────────────────────────────────────────
+          #{Rainbow('✓ Added to Gemfile automatically').green}
+          #{Rainbow('✓ Installer ran successfully').green}
+          #{Rainbow('✓ Webpack integration configured').green}
         SHAKAPACKER
       elsif File.exist?("bin/shakapacker") && File.exist?("bin/shakapacker-dev-server")
         "\n                📦 #{Rainbow('Shakapacker already configured ✓').green}"
