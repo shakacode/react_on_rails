@@ -65,6 +65,7 @@ See [Release Notes](docs/release-notes/16.0.0.md) for full details.
   - Maximum Node.js version: 22 (was 20)
   - Migration: Upgrade your Ruby and Node.js versions to supported ranges
 - **Install generator now validates prerequisites**:
+
   - Generator now requires at least one JavaScript package manager (npm, pnpm, yarn, or bun)
   - Generator uses `Thor::Error` exceptions instead of `exit(1)` for better error handling
   - Migration: Ensure you have a JavaScript package manager installed before running the generator
@@ -82,11 +83,8 @@ See [Release Notes](docs/release-notes/16.0.0.md) for full details.
   - Add `await` when calling this function: `await ReactOnRails.reactOnRailsPageLoaded()`.
 - **RENAMED**: `force_load` configuration renamed to `immediate_hydration` for better API clarity.
   - `immediate_hydration` now defaults to `false` and requires React on Rails Pro license.
-  - Migration:
-    - `config.force_load = true` → `config.immediate_hydration = true`
-    - `react_component(force_load: true)` → `react_component(immediate_hydration: true)`
-    - `redux_store(force_load: true)` → `redux_store(immediate_hydration: true)`
-For detailed migration instructions, see the [16.0.0 Release Notes](docs/release-notes/16.0.0.md).
+  - Migration: - `config.force_load = true` → `config.immediate_hydration = true` - `react_component(force_load: true)` → `react_component(immediate_hydration: true)` - `redux_store(force_load: true)` → `redux_store(immediate_hydration: true)`
+    For detailed migration instructions, see the [16.0.0 Release Notes](docs/release-notes/16.0.0.md).
 
 #### Fixed
 
