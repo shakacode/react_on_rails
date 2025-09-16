@@ -3,27 +3,18 @@
 module ReactOnRails
   module PackerUtils
     def self.using_packer?
-      using_shakapacker_const? || using_webpacker_const?
+      using_shakapacker_const?
     end
 
     def self.using_shakapacker_const?
       return @using_shakapacker_const if defined?(@using_shakapacker_const)
 
       @using_shakapacker_const = ReactOnRails::Utils.gem_available?("shakapacker") &&
-                                 shakapacker_version_requirement_met?("7.0.0")
-    end
-
-    def self.using_webpacker_const?
-      return @using_webpacker_const if defined?(@using_webpacker_const)
-
-      @using_webpacker_const = (ReactOnRails::Utils.gem_available?("shakapacker") &&
-                          shakapacker_version_as_array[0] <= 6) ||
-                               ReactOnRails::Utils.gem_available?("webpacker")
+                                 shakapacker_version_requirement_met?("8.2.0")
     end
 
     def self.packer_type
       return "shakapacker" if using_shakapacker_const?
-      return "webpacker" if using_webpacker_const?
 
       nil
     end
@@ -31,12 +22,8 @@ module ReactOnRails
     def self.packer
       return nil unless using_packer?
 
-      if using_shakapacker_const?
-        require "shakapacker"
-        return ::Shakapacker
-      end
-      require "webpacker"
-      ::Webpacker
+      require "shakapacker"
+      ::Shakapacker
     end
 
     def self.dev_server_running?
@@ -106,7 +93,6 @@ module ReactOnRails
     end
 
     def self.precompile?
-      return ::Webpacker.config.webpacker_precompile? if using_webpacker_const?
       return ::Shakapacker.config.shakapacker_precompile? if using_shakapacker_const?
 
       false

@@ -30,7 +30,6 @@ module ReactOnRails
 
       # We don't need to mock anything here because the shakapacker gem is already installed and will be used by default
       it "uses shakapacker" do
-        expect(ReactOnRails::PackerUtils.using_webpacker_const?).to be(false)
         expect(ReactOnRails::PackerUtils.using_shakapacker_const?).to be(true)
         expect(ReactOnRails::PackerUtils.packer_type).to eq("shakapacker")
         expect(ReactOnRails::PackerUtils.packer).to eq(::Shakapacker)
@@ -42,7 +41,6 @@ module ReactOnRails
         allow(ReactOnRails).to receive_message_chain(:configuration, :generated_assets_dir)
           .and_return("public/webpack/dev")
         allow(described_class).to receive(:gem_available?).with("shakapacker").and_return(false)
-        allow(described_class).to receive(:gem_available?).with("webpacker").and_return(false)
       end
 
       it "does not use packer" do
