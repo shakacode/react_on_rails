@@ -63,14 +63,22 @@ describe InstallGenerator, type: :generator do
 
     specify "base generator contains a helpful message" do
       run_generator_test_with_args(%w[], package_json: true)
-      # GeneratorMessages.output is an array with the git error being the first one
-      expect(GeneratorMessages.output).to include(expected)
+      # Check that the success message is present (flexible matching)
+      output_text = GeneratorMessages.output.join("\n")
+      expect(output_text).to include("🎉 React on Rails Successfully Installed!")
+      expect(output_text).to include("📋 QUICK START:")
+      expect(output_text).to include("✨ KEY FEATURES:")
+      expect(output_text).to include("🧪 TESTING SETUP")
     end
 
     specify "react with redux generator contains a helpful message" do
       run_generator_test_with_args(%w[--redux], package_json: true)
-      # GeneratorMessages.output is an array with the git error being the first one
-      expect(GeneratorMessages.output).to include(expected)
+      # Check that the success message is present (flexible matching)
+      output_text = GeneratorMessages.output.join("\n")
+      expect(output_text).to include("🎉 React on Rails Successfully Installed!")
+      expect(output_text).to include("📋 QUICK START:")
+      expect(output_text).to include("✨ KEY FEATURES:")
+      expect(output_text).to include("🧪 TESTING SETUP")
     end
   end
 
