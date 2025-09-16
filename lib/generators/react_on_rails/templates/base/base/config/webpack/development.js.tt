@@ -5,17 +5,15 @@ const { devServer, inliningCss } = require('shakapacker');
 const generateWebpackConfigs = require('./generateWebpackConfigs');
 
 const developmentEnvOnly = (clientWebpackConfig, _serverWebpackConfig) => {
-  // React Refresh (Fast Refresh) setup - only when using webpack-dev-server (HMR mode)
-  // This matches the babel plugin condition and prevents socket connection errors in static mode
-  if (inliningCss) {
-    // eslint-disable-next-line global-require
-    const ReactRefreshWebpackPlugin = require('@pmmmwh/react-refresh-webpack-plugin');
-    clientWebpackConfig.plugins.push(
-      new ReactRefreshWebpackPlugin({
-        // Use default overlay configuration for better compatibility
-      }),
-    );
-  }
+  // React Refresh (Fast Refresh) setup for development
+  // Always enabled in development - babel plugin controls when it's actually used
+  // eslint-disable-next-line global-require
+  const ReactRefreshWebpackPlugin = require('@pmmmwh/react-refresh-webpack-plugin');
+  clientWebpackConfig.plugins.push(
+    new ReactRefreshWebpackPlugin({
+      // Use default overlay configuration for better compatibility
+    }),
+  );
 };
 
 module.exports = generateWebpackConfigs(developmentEnvOnly);
