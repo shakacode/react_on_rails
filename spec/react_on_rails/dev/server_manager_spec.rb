@@ -76,12 +76,16 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     it "attempts to kill development processes" do
       # Mock Open3.capture2 calls that find_process_pids uses
       allow(Open3).to receive(:capture2).with("pgrep", "-f", "rails", err: File::NULL).and_return(["1234\n5678", nil])
-      allow(Open3).to receive(:capture2).with("pgrep", "-f", "node.*react[-_]on[-_]rails", err: File::NULL).and_return(["2345", nil])
+      allow(Open3).to receive(:capture2)
+        .with("pgrep", "-f", "node.*react[-_]on[-_]rails", err: File::NULL)
+        .and_return(["2345", nil])
       allow(Open3).to receive(:capture2).with("pgrep", "-f", "overmind", err: File::NULL).and_return(["", nil])
       allow(Open3).to receive(:capture2).with("pgrep", "-f", "foreman", err: File::NULL).and_return(["", nil])
       allow(Open3).to receive(:capture2).with("pgrep", "-f", "ruby.*puma", err: File::NULL).and_return(["", nil])
-      allow(Open3).to receive(:capture2).with("pgrep", "-f", "webpack-dev-server", err: File::NULL).and_return(["", nil])
-      allow(Open3).to receive(:capture2).with("pgrep", "-f", "bin/shakapacker-dev-server", err: File::NULL).and_return(["", nil])
+      allow(Open3).to receive(:capture2)
+        .with("pgrep", "-f", "webpack-dev-server", err: File::NULL).and_return(["", nil])
+      allow(Open3).to receive(:capture2)
+        .with("pgrep", "-f", "bin/shakapacker-dev-server", err: File::NULL).and_return(["", nil])
 
       allow(Process).to receive(:pid).and_return(9999) # Current process PID
       expect(Process).to receive(:kill).with("TERM", 1234)
