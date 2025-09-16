@@ -118,7 +118,7 @@ module ReactOnRails
       end
 
       def ensure_shakapacker_installed
-        return if shakapacker_binaries_exist?
+        return if shakapacker_configured?
 
         print_shakapacker_setup_banner
         ensure_shakapacker_in_gemfile
@@ -126,18 +126,13 @@ module ReactOnRails
         finalize_shakapacker_setup
       end
 
-      # Checks whether "shakapacker" is present in the *current bundle*,
-      # without loading it. Prioritizes Gemfile.lock (cheap + accurate),
-      # then Bundler's resolved specs, and finally a light Gemfile scan.
+      # Checks whether "shakapacker" is explicitly declared in this project's Gemfile.
+      # We only check the Gemfile text, not lockfile or dependencies, because
+      # shakapacker might be present as a dependency of react_on_rails but not
+      # properly configured for this specific Rails application.
       def shakapacker_in_gemfile?
         gem_name = "shakapacker"
-
-        return true if shakapacker_loaded_in_process?(gem_name)
-        return true if shakapacker_in_lockfile?(gem_name)
-        return true if shakapacker_in_bundler_specs?(gem_name)
-        return true if shakapacker_in_gemfile_text?(gem_name)
-
-        false
+        shakapacker_in_gemfile_text?(gem_name)
       end
 
       def add_bin_scripts
@@ -188,6 +183,13 @@ module ReactOnRails
 
       def shakapacker_binaries_exist?
         File.exist?("bin/shakapacker") && File.exist?("bin/shakapacker-dev-server")
+      end
+
+      def shakapacker_configured?
+        # Check for essential shakapacker configuration files and binaries
+        shakapacker_binaries_exist? &&
+          File.exist?("config/shakapacker.yml") &&
+          File.exist?("config/webpack/webpack.config.js")
       end
 
       def print_shakapacker_setup_banner
