@@ -11,7 +11,8 @@ module.exports = function (api) {
         '@babel/preset-react',
         {
           development: !isProductionEnv,
-          useBuiltIns: true
+          useBuiltIns: true,
+          runtime: 'automatic'
         }
       ]
     ].filter(Boolean),
