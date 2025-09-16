@@ -53,7 +53,8 @@ gsub_file_content(
 #   move(file, file.gsub("-react16", ""))
 # end
 
-gsub_file_content("../spec/dummy/config/webpack/commonWebpackConfig.js", /generateWebpackConfig(\(\))?/,
-                  "webpackConfig")
-
-gsub_file_content("../spec/dummy/config/webpack/webpack.config.js", /generateWebpackConfig(\(\))?/, "webpackConfig")
+# These replacements were incorrect - generateWebpackConfig() is the correct function from shakapacker
+# gsub_file_content("../spec/dummy/config/webpack/commonWebpackConfig.js", /generateWebpackConfig(\(\))?/,
+#                   "webpackConfig")
+#
+# gsub_file_content("../spec/dummy/config/webpack/webpack.config.js", /generateWebpackConfig(\(\))?/, "webpackConfig")
