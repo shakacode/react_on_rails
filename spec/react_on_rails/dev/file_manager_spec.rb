@@ -28,6 +28,7 @@ RSpec.describe ReactOnRails::Dev::FileManager do
       end
 
       it "removes stale overmind socket files" do
+        allow(File).to receive(:exist?).and_return(false)  # Default to false for any other files
         allow(File).to receive(:exist?).with(".overmind.sock").and_return(true)
         allow(File).to receive(:exist?).with("tmp/sockets/overmind.sock").and_return(false)
         allow(File).to receive(:exist?).with("tmp/pids/server.pid").and_return(false)
