@@ -104,15 +104,31 @@ module ReactOnRails
 
       def install_js_dependencies
         # Detect which package manager to use
-        if File.exist?(File.join(destination_root, "yarn.lock"))
-          run "yarn install"
-        elsif File.exist?(File.join(destination_root, "pnpm-lock.yaml"))
-          run "pnpm install"
-        elsif File.exist?(File.join(destination_root, "package-lock.json")) ||
-              File.exist?(File.join(destination_root, "package.json"))
-          # Use npm for package-lock.json or as default fallback
-          run "npm install"
+        success = if File.exist?(File.join(destination_root, "yarn.lock"))
+                    run "yarn install"
+                  elsif File.exist?(File.join(destination_root, "pnpm-lock.yaml"))
+                    run "pnpm install"
+                  elsif File.exist?(File.join(destination_root, "package-lock.json")) ||
+                        File.exist?(File.join(destination_root, "package.json"))
+                    # Use npm for package-lock.json or as default fallback
+                    run "npm install"
+                  else
+                    true # No package manager detected, skip
+                  end
+
+        unless success
+          GeneratorMessages.add_warning(<<~MSG.strip)
+            ⚠️  JavaScript dependencies installation failed.
+
+            This could be due to network issues or missing package manager.
+            You can install dependencies manually later by running:
+            • npm install (if using npm)
+            • yarn install (if using yarn)
+            • pnpm install (if using pnpm)
+          MSG
         end
+
+        success
       end
 
       def update_gitignore_for_auto_registration
@@ -157,7 +173,8 @@ module ReactOnRails
         return if add_npm_dependencies(react_on_rails_pkg)
 
         puts "Using direct npm commands as fallback"
-        run "npm install #{react_on_rails_pkg.join(' ')}"
+        success = run "npm install #{react_on_rails_pkg.join(' ')}"
+        handle_npm_failure("react-on-rails package", react_on_rails_pkg) unless success
       end
 
       def add_react_dependencies
@@ -170,7 +187,10 @@ module ReactOnRails
           babel-plugin-transform-react-remove-prop-types
           babel-plugin-macros
         ]
-        run "npm install #{react_deps.join(' ')}" unless add_npm_dependencies(react_deps)
+        unless add_npm_dependencies(react_deps)
+          success = run "npm install #{react_deps.join(' ')}"
+          handle_npm_failure("React dependencies", react_deps) unless success
+        end
       end
 
       def add_css_dependencies
@@ -181,7 +201,10 @@ module ReactOnRails
           mini-css-extract-plugin
           style-loader
         ]
-        run "npm install #{css_deps.join(' ')}" unless add_npm_dependencies(css_deps)
+        unless add_npm_dependencies(css_deps)
+          success = run "npm install #{css_deps.join(' ')}"
+          handle_npm_failure("CSS dependencies", css_deps) unless success
+        end
       end
 
       def add_dev_dependencies
@@ -192,7 +215,8 @@ module ReactOnRails
         ]
         return if add_npm_dependencies(dev_deps, dev: true)
 
-        run "npm install --save-dev #{dev_deps.join(' ')}"
+        success = run "npm install --save-dev #{dev_deps.join(' ')}"
+        handle_npm_failure("development dependencies", dev_deps, dev: true) unless success
       end
 
       CONFIGURE_RSPEC_TO_COMPILE_ASSETS = <<-STR.strip_heredoc
@@ -204,6 +228,20 @@ module ReactOnRails
       STR
 
       private
+
+      def handle_npm_failure(dependency_type, packages, dev: false)
+        install_command = dev ? "npm install --save-dev" : "npm install"
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Failed to install #{dependency_type}.
+
+          The following packages could not be installed automatically:
+          #{packages.map { |pkg| "  • #{pkg}" }.join("\n")}
+
+          This could be due to network issues or missing package manager.
+          You can install them manually later by running:
+            #{install_command} #{packages.join(' ')}
+        MSG
+      end
 
       def copy_webpack_main_config(base_path, config)
         webpack_config_path = "config/webpack/webpack.config.js"
