@@ -304,7 +304,13 @@ bin/dev
 - Visit the hello_world page in browser
 - Check browser console for "RENDERED HelloWorld to dom node" success message
 - Confirm React component is interactive (input field updates name display)
-- Use `bin/dev static` mode for cleanest console output during testing
+
+**Development Mode Console Output**:
+- `bin/dev` (HMR): Shows HMR warnings and resource preload warnings (expected)
+- `bin/dev static`: Shows only resource preload warnings (cleaner output)
+- `bin/dev prod`: Cleanest output with minimal warnings (production-like environment)
+
+**Note**: Resource preload warnings in development modes are normal and can be ignored. They occur because Shakapacker generates preload tags but scripts load asynchronously. Production mode eliminates most of these warnings.
 
 ### Linting
 
