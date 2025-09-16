@@ -62,7 +62,7 @@ module GeneratorMessages
                    ./bin/dev help         # See all available options
         #{process_manager_section}
 
-                3. Visit: #{Rainbow("http://localhost:3000/hello_world").cyan.underline}
+                3. Visit: http://localhost:3000/hello_world
         #{shakapacker_status}
                 ✨ KEY FEATURES:
                 ─────────────────────────────────────────────────────────────────────────
@@ -75,8 +75,8 @@ module GeneratorMessages
 
                 📚 LEARN MORE:
                 ─────────────────────────────────────────────────────────────────────────
-                • Documentation: #{Rainbow("https://www.shakacode.com/react-on-rails/docs/").cyan.underline}
-                • Webpack customization: #{Rainbow("https://github.com/shakacode/shakapacker#webpack-configuration").cyan.underline}
+                • Documentation: https://www.shakacode.com/react-on-rails/docs/
+                • Webpack customization: https://github.com/shakacode/shakapacker#webpack-configuration
 
                 💡 TIP: Run 'bin/dev help' for development server options and troubleshooting#{testing_section}
       MSG
