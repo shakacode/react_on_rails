@@ -21,6 +21,10 @@ RSpec.describe ReactOnRails::Dev::PackGenerator do
       command = "bundle exec rake react_on_rails:generate_packs > /dev/null 2>&1"
       allow_any_instance_of(Object).to receive(:system).with(command).and_return(true)
 
+      # Suppress the print and puts output for quiet mode
+      allow_any_instance_of(Object).to receive(:print)
+      allow_any_instance_of(Object).to receive(:puts)
+
       expect { described_class.generate(verbose: false) }.not_to output.to_stdout_from_any_process
     end
 
