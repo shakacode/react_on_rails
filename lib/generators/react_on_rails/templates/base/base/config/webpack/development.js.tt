@@ -13,11 +13,7 @@ const developmentEnvOnly = (clientWebpackConfig, _serverWebpackConfig) => {
   const ReactRefreshWebpackPlugin = require('@pmmmwh/react-refresh-webpack-plugin');
   clientWebpackConfig.plugins.push(
     new ReactRefreshWebpackPlugin({
-      // Show overlay for runtime errors during development
-      overlay: {
-        entry: require.resolve('@pmmmwh/react-refresh-webpack-plugin/client/ErrorOverlayEntry'),
-        module: require.resolve('@pmmmwh/react-refresh-webpack-plugin/client/ReactRefreshEntry'),
-      },
+      // Use default overlay configuration for better compatibility
     }),
   );
 };
