@@ -2,6 +2,7 @@
 
 require_relative "../spec_helper"
 require "react_on_rails/dev/server_manager"
+require "open3"
 
 RSpec.describe ReactOnRails::Dev::ServerManager do
   # Suppress stdout/stderr during tests
@@ -73,16 +74,14 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     end
 
     it "attempts to kill development processes" do
-      # Mock all the pgrep patterns used in kill_processes
-      allow_any_instance_of(Kernel).to receive(:`).with("pgrep -f \"rails\" 2>/dev/null").and_return("1234\n5678")
-      pgrep_cmd = "pgrep -f \"node.*react[-_]on[-_]rails\" 2>/dev/null"
-      allow_any_instance_of(Kernel).to receive(:`).with(pgrep_cmd).and_return("2345")
-      allow_any_instance_of(Kernel).to receive(:`).with("pgrep -f \"overmind\" 2>/dev/null").and_return("")
-      allow_any_instance_of(Kernel).to receive(:`).with("pgrep -f \"foreman\" 2>/dev/null").and_return("")
-      allow_any_instance_of(Kernel).to receive(:`).with("pgrep -f \"ruby.*puma\" 2>/dev/null").and_return("")
-      allow_any_instance_of(Kernel).to receive(:`).with("pgrep -f \"webpack-dev-server\" 2>/dev/null").and_return("")
-      shakapacker_cmd = "pgrep -f \"bin/shakapacker-dev-server\" 2>/dev/null"
-      allow_any_instance_of(Kernel).to receive(:`).with(shakapacker_cmd).and_return("")
+      # Mock Open3.capture2 calls that find_process_pids uses
+      allow(Open3).to receive(:capture2).with("pgrep", "-f", "rails", err: File::NULL).and_return(["1234\n5678", nil])
+      allow(Open3).to receive(:capture2).with("pgrep", "-f", "node.*react[-_]on[-_]rails", err: File::NULL).and_return(["2345", nil])
+      allow(Open3).to receive(:capture2).with("pgrep", "-f", "overmind", err: File::NULL).and_return(["", nil])
+      allow(Open3).to receive(:capture2).with("pgrep", "-f", "foreman", err: File::NULL).and_return(["", nil])
+      allow(Open3).to receive(:capture2).with("pgrep", "-f", "ruby.*puma", err: File::NULL).and_return(["", nil])
+      allow(Open3).to receive(:capture2).with("pgrep", "-f", "webpack-dev-server", err: File::NULL).and_return(["", nil])
+      allow(Open3).to receive(:capture2).with("pgrep", "-f", "bin/shakapacker-dev-server", err: File::NULL).and_return(["", nil])
 
       allow(Process).to receive(:pid).and_return(9999) # Current process PID
       expect(Process).to receive(:kill).with("TERM", 1234)
@@ -93,7 +92,12 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     end
 
     it "cleans up socket files when they exist" do
+      # Make sure no processes are found so cleanup_socket_files gets called
+      allow(Open3).to receive(:capture2).and_return(["", nil])
+
       allow(File).to receive(:exist?).with(".overmind.sock").and_return(true)
+      allow(File).to receive(:exist?).with("tmp/sockets/overmind.sock").and_return(false)
+      allow(File).to receive(:exist?).with("tmp/pids/server.pid").and_return(false)
       expect(File).to receive(:delete).with(".overmind.sock")
 
       described_class.kill_processes
