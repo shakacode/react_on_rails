@@ -9,7 +9,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
     replay_console
     raise_on_prerender_error
     random_dom_id
-    force_load
+    immediate_hydration
   ].freeze
 
   def the_attrs(react_component_name: "App", options: {})

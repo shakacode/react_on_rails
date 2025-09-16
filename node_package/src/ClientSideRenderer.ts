@@ -11,8 +11,12 @@ import reactHydrateOrRender from './reactHydrateOrRender.ts';
 import { debugTurbolinks } from './turbolinksUtils.ts';
 import * as StoreRegistry from './StoreRegistry.ts';
 import * as ComponentRegistry from './ComponentRegistry.ts';
+import { onPageLoaded } from './pageLifecycle.ts';
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
+const IMMEDIATE_HYDRATION_PRO_WARNING =
+  "[REACT ON RAILS] The 'immediate_hydration' feature requires a React on Rails Pro license. " +
+  'Please visit https://shakacode.com/react-on-rails-pro to get a license.';
 
 async function delegateToRenderer(
   componentObj: RegisteredComponent,
@@ -78,6 +82,21 @@ class ComponentRenderer {
    * delegates to a renderer registered by the user.
    */
   private async render(el: Element, railsContext: RailsContext): Promise<void> {
+    const isImmediateHydrationRequested = el.getAttribute('data-immediate-hydration') === 'true';
+    const hasProLicense = railsContext.rorPro;
+
+    // Handle immediate_hydration feature usage without Pro license
+    if (isImmediateHydrationRequested && !hasProLicense) {
+      console.warn(IMMEDIATE_HYDRATION_PRO_WARNING);
+
+      // Fallback to standard behavior: wait for page load before hydrating
+      if (document.readyState === 'loading') {
+        await new Promise<void>((resolve) => {
+          onPageLoaded(resolve);
+        });
+      }
+    }
+
     // This must match lib/react_on_rails/helper.rb
     const name = el.getAttribute('data-component-name') || '';
     const { domNodeId } = this;

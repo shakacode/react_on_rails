@@ -23,9 +23,9 @@ After a release, please make sure to run `bundle exec rake update_changelog`. Th
 
 Changes since the last non-beta release.
 
-### [15.0.0] - 2025-08-28
+### [16.0.0] - 2025-01-XX
 
-See [Release Notes](docs/release-notes/15.0.0.md) for full details.
+See [Release Notes](docs/release-notes/16.0.0.md) for full details.
 
 ### Removed (Breaking Changes)
 
@@ -40,10 +40,14 @@ See [Release Notes](docs/release-notes/15.0.0.md) for full details.
   - For TypeScript errors, upgrade to TypeScript 5.8+ and set `module` to `nodenext`.
 - `ReactOnRails.reactOnRailsPageLoaded` is now an async function. Migration:
   - Add `await` when calling this function: `await ReactOnRails.reactOnRailsPageLoaded()`.
-- `force_load` configuration now defaults to `true`. Migration:
-  - Set `force_load: false` in your config if you want the previous behavior.
+- **RENAMED**: `force_load` configuration renamed to `immediate_hydration` for better API clarity.
+  - `immediate_hydration` now defaults to `false` and requires React on Rails Pro license.
+  - Migration:
+    - `config.force_load = true` → `config.immediate_hydration = true`
+    - `react_component(force_load: true)` → `react_component(immediate_hydration: true)`
+    - `redux_store(force_load: true)` → `redux_store(immediate_hydration: true)`
 
-For detailed migration instructions, see the [15.0.0 Release Notes](docs/release-notes/15.0.0.md).
+For detailed migration instructions, see the [16.0.0 Release Notes](docs/release-notes/16.0.0.md).
 
 #### Fixed
 
@@ -69,6 +73,12 @@ For detailed migration instructions, see the [15.0.0 Release Notes](docs/release
 - Support for returning React component from async render-function. [PR 1720](https://github.com/shakacode/react_on_rails/pull/1720) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 - React Server Components Support (Pro Feature) [PR 1644](https://github.com/shakacode/react_on_rails/pull/1644) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 - Improved component and store hydration performance [PR 1656](https://github.com/shakacode/react_on_rails/pull/1656) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+### [15.0.0] - 2025-08-28 - RETRACTED
+
+**⚠️ This version has been retracted due to API design issues. Please upgrade directly to v16.0.0.**
+
+The `force_load` feature was incorrectly available without a Pro license and has been renamed to `immediate_hydration` for better clarity. All features from v15 are available in v16 with the corrected API.
 
 ### [14.2.0] - 2025-03-03
 
