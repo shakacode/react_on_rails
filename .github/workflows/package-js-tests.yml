@@ -10,7 +10,7 @@ jobs:
   build:
     strategy:
       matrix:
-        versions: ['oldest', 'newest']
+        node-version: ['20', '22']
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -19,7 +19,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.versions == 'oldest' && '16' || '20' }}
+          node-version: ${{ matrix.node-version }}
           cache: yarn
           cache-dependency-path: '**/yarn.lock'
       - name: Print system information
@@ -30,11 +30,11 @@ jobs:
           echo "Node version: "; node -v
           echo "Yarn version: "; yarn --version
       - name: run conversion script
-        if: matrix.versions == 'oldest'
+        if: matrix.node-version == '20'
         run: script/convert
       - name: Install Node modules with Yarn for renderer package
         run: |
-          yarn install --no-progress --no-emoji ${{ matrix.versions == 'newest' && '--frozen-lockfile' || '' }}
+          yarn install --no-progress --no-emoji ${{ matrix.node-version == '22' && '--frozen-lockfile' || '' }}
           sudo yarn global add yalc
       - name: Run JS unit tests for Renderer package
         run: yarn test

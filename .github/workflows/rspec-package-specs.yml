@@ -11,9 +11,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        versions: ['oldest', 'newest']
+        ruby-version: ['3.2', '3.4']
+        dependency-level: ['minimum', 'latest']
     env:
-      BUNDLE_FROZEN: ${{ matrix.versions == 'oldest' && 'false' || 'true' }}
+      BUNDLE_FROZEN: ${{ matrix.dependency-level == 'minimum' && 'false' || 'true' }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -22,7 +23,7 @@ jobs:
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: ${{ matrix.versions == 'oldest' && '3.0' || '3.3' }}
+          ruby-version: ${{ matrix.ruby-version }}
           bundler: 2.5.9
       - name: Print system information
         run: |
@@ -33,34 +34,34 @@ jobs:
           echo "Node version: "; node -v
           echo "Yarn version: "; yarn --version
           echo "Bundler version: "; bundle --version
-      - name: run conversion script to support shakapacker v6
-        if: matrix.versions == 'oldest'
+      - name: run conversion script to use minimum supported dependency versions
+        if: matrix.dependency-level == 'minimum'
         run: script/convert
       - name: Save root ruby gems to cache
         uses: actions/cache@v4
         with:
           path: vendor/bundle
-          key: package-app-gem-cache-${{ hashFiles('Gemfile.lock') }}-${{ matrix.versions }}
+          key: package-app-gem-cache-${{ hashFiles('Gemfile.lock') }}-${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
       - name: Install Ruby Gems for package
         run: bundle check --path=vendor/bundle || bundle  _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
       - name: Git Stuff
-        if: matrix.versions == 'oldest'
+        if: matrix.dependency-level == 'minimum'
         run: |
           git config user.email "you@example.com"
           git config user.name "Your Name"
           git commit -am "stop generators from complaining about uncommitted code"
-      - name: Set packer version environment variable
+      - name: Set dependency level environment variable
         run: |
-          echo "CI_PACKER_VERSION=${{ matrix.versions }}" >> $GITHUB_ENV
+          echo "CI_DEPENDENCY_LEVEL=${{ matrix.dependency-level }}" >> $GITHUB_ENV
       - name: Run rspec tests
         run: bundle exec rspec spec/react_on_rails
       - name: Store test results
         uses: actions/upload-artifact@v4
         with:
-          name: main-rspec-${{ github.run_id }}-${{ github.job }}-${{ matrix.versions }}
+          name: main-rspec-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
           path: ~/rspec
       - name: Store artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: main-test-log-${{ github.run_id }}-${{ github.job }}-${{ matrix.versions }}
+          name: main-test-log-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
           path: log/test.log
