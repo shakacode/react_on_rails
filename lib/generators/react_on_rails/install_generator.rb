@@ -25,16 +25,10 @@ module ReactOnRails
                    default: false,
                    desc: "Skip warnings. Default: false"
 
-      # --skip-shakapacker-install
-      class_option :skip_shakapacker_install,
-                   type: :boolean,
-                   default: false,
-                   desc: "Skip automatic Shakapacker installation. Default: false"
+      # Removed: --skip-shakapacker-install (Shakapacker is now a required dependency)
 
       def run_generators
         if installation_prerequisites_met? || options.ignore_warnings?
-          return if !options.skip_shakapacker_install? && !ensure_shakapacker_installed
-
           invoke_generators
           add_bin_scripts
           add_post_install_message
@@ -55,14 +49,13 @@ module ReactOnRails
       end
 
       def invoke_generators
+        ensure_shakapacker_installed
         invoke "react_on_rails:base"
         if options.redux?
           invoke "react_on_rails:react_with_redux"
         else
           invoke "react_on_rails:react_no_redux"
         end
-
-        invoke "react_on_rails:adapt_for_older_shakapacker" unless using_shakapacker_7_or_above?
       end
 
       # NOTE: other requirements for existing files such as .gitignore or application.
@@ -78,6 +71,58 @@ module ReactOnRails
         error = "** nodejs is required. Please install it before continuing. https://nodejs.org/en/"
         GeneratorMessages.add_error(error)
         true
+      end
+
+      def ensure_shakapacker_installed
+        return if File.exist?("bin/shakapacker") && File.exist?("bin/shakapacker-dev-server")
+
+        puts Rainbow("\n" + "=" * 80).cyan
+        puts Rainbow("🔧 SHAKAPACKER SETUP").cyan.bold
+        puts Rainbow("=" * 80).cyan
+
+        # Add Shakapacker to Gemfile if not present
+        unless shakapacker_in_gemfile?
+          puts Rainbow("📝 Adding Shakapacker to Gemfile...").yellow
+          success = system("bundle add shakapacker --strict")
+          unless success
+            GeneratorMessages.add_error("Failed to add Shakapacker to Gemfile. Please run 'bundle add shakapacker' manually.")
+            exit(1)
+          end
+          puts Rainbow("✅ Shakapacker added to Gemfile successfully!").green
+        end
+
+        # Install Shakapacker
+        puts Rainbow("⚙️  Installing Shakapacker (required for webpack integration)...").yellow
+        success = system("./bin/rails shakapacker:install")
+
+        unless success
+          error = <<~MSG.strip
+            ** Failed to install Shakapacker automatically.
+
+            Please run this command manually:
+
+                ./bin/rails shakapacker:install
+
+            Then re-run: rails generate react_on_rails:install
+          MSG
+          GeneratorMessages.add_error(error)
+          exit(1)
+        end
+
+        puts Rainbow("✅ Shakapacker installed successfully!").green
+        puts Rainbow("=" * 80).cyan
+        puts Rainbow("🚀 CONTINUING WITH REACT ON RAILS SETUP").cyan.bold
+        puts Rainbow("=" * 80).cyan + "\n"
+
+        # Create marker file so base generator can avoid copying shakapacker.yml
+        File.write(".shakapacker_just_installed", "")
+      end
+
+      def shakapacker_in_gemfile?
+        return false unless File.exist?("Gemfile")
+
+        gemfile_content = File.read("Gemfile")
+        gemfile_content.match?(/gem\s+['"]shakapacker['"]/)
       end
 
       def add_bin_scripts
@@ -97,47 +142,9 @@ module ReactOnRails
         GeneratorMessages.add_info(GeneratorMessages.helpful_message_after_installation)
       end
 
-      def ensure_shakapacker_installed
-        return true if shakapacker_installed?
+      # Removed: Shakapacker auto-installation logic (now explicit dependency)
 
-        puts "Installing Shakapacker (required for React on Rails)..."
-
-        added = system("bundle", "add", "shakapacker")
-        unless added
-          GeneratorMessages.add_error(<<~MSG.strip)
-            Failed to add Shakapacker to your Gemfile.
-            Please run 'bundle add shakapacker' manually and re-run the generator.
-          MSG
-          return false
-        end
-
-        installed = system("bundle", "exec", "rails", "shakapacker:install")
-        unless installed
-          GeneratorMessages.add_error(<<~MSG.strip)
-            Failed to install Shakapacker automatically.
-            Please run 'bundle exec rails shakapacker:install' manually.
-          MSG
-          return false
-        end
-
-        puts "Shakapacker installed successfully!"
-        true
-      end
-
-      def shakapacker_installed?
-        Gem::Specification.find_by_name("shakapacker")
-        true
-      rescue Gem::LoadError
-        false
-      end
-
-      def using_shakapacker_7_or_above?
-        shakapacker_gem = Gem::Specification.find_by_name("shakapacker")
-        shakapacker_gem.version.segments.first >= 7
-      rescue Gem::MissingSpecError
-        # In case using Webpacker
-        false
-      end
+      # Removed: Shakapacker 8+ is now required as explicit dependency
     end
   end
 end

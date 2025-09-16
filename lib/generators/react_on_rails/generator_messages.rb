@@ -40,10 +40,9 @@ module GeneratorMessages
 
     def helpful_message_after_installation(component_name: "HelloWorld")
       process_manager_section = build_process_manager_section
-      shakapacker_section = build_shakapacker_section
-      webpacker_warning = build_webpacker_warning
       testing_section = build_testing_section
       package_manager = detect_package_manager
+      shakapacker_status = build_shakapacker_status_section
 
       <<~MSG
 
@@ -61,10 +60,10 @@ module GeneratorMessages
                    ./bin/dev static       # Static bundles (no HMR, faster initial load)
                    ./bin/dev prod         # Production-like mode for testing
                    ./bin/dev help         # See all available options
-        #{process_manager_section}#{shakapacker_section}
+        #{process_manager_section}
 
                 3. Visit: http://localhost:3000/hello_world
-
+        #{shakapacker_status}
                 ✨ KEY FEATURES:
                 ─────────────────────────────────────────────────────────────────────────
                 • Auto-registration enabled - Your layout only needs:
@@ -79,7 +78,7 @@ module GeneratorMessages
                 • Documentation: https://www.shakacode.com/react-on-rails/docs/
                 • Webpack customization: https://github.com/shakacode/shakapacker#webpack-configuration
 
-                💡 TIP: Run 'bin/dev help' for development server options#{testing_section}#{webpacker_warning}
+                💡 TIP: Run 'bin/dev help' for development server options#{testing_section}
       MSG
     end
 
@@ -104,32 +103,6 @@ module GeneratorMessages
       end
     end
 
-    def build_shakapacker_section
-      if shakapacker_installed?
-        "\n                📦 Shakapacker integration: #{Rainbow('Ready ✓').green}"
-      else
-        "\n                📦 Shakapacker will be installed automatically when needed"
-      end
-    end
-
-    def build_webpacker_warning
-      return "" unless webpacker_installed?
-
-      <<~WARNING
-
-
-        #{Rainbow('⚠️  WEBPACKER DETECTED', :red, :bold)}
-        ─────────────────────────────────────────────────────────────────────────
-        Webpacker is deprecated. This generated code is designed for Shakapacker.
-
-        #{Rainbow('Recommended action:').yellow} Install Shakapacker:
-        #{Rainbow('bundle add shakapacker && bundle exec rails shakapacker:install').cyan}
-
-        #{Rainbow('Need help upgrading?').yellow} Contact: #{Rainbow('react_on_rails@shakacode.com').cyan}
-        (Maintainers of React on Rails)
-      WARNING
-    end
-
     def build_testing_section
       # Check if we have any spec files to determine if testing setup is needed
       has_spec_files = File.exist?("spec/rails_helper.rb") || File.exist?("spec/spec_helper.rb")
@@ -139,12 +112,12 @@ module GeneratorMessages
       <<~TESTING
 
 
-                🧪 TESTING SETUP (Optional):
-                ─────────────────────────────────────────────────────────────────────────
-                For JavaScript testing with asset compilation, add this to your RSpec config:
+🧪 TESTING SETUP (Optional):
+─────────────────────────────────────────────────────────────────────────
+For JavaScript testing with asset compilation, add this to your RSpec config:
 
-                # In spec/rails_helper.rb or spec/spec_helper.rb:
-                ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+# In spec/rails_helper.rb or spec/spec_helper.rb:
+ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
       TESTING
     end
 
@@ -156,25 +129,21 @@ module GeneratorMessages
       end
     end
 
-    def shakapacker_installed?
-      # Check if shakapacker is in the Gemfile (more reliable for just-installed gems)
-      if File.exist?("Gemfile")
-        gemfile_content = File.read("Gemfile")
-        return true if gemfile_content.match?(/gem\s+['"]shakapacker['"]/)
+    def build_shakapacker_status_section
+      if File.exist?(".shakapacker_just_installed")
+        <<~SHAKAPACKER
+
+                📦 SHAKAPACKER SETUP:
+                ─────────────────────────────────────────────────────────────────────────
+                #{Rainbow('✓ Added to Gemfile automatically').green}
+                #{Rainbow('✓ Installer ran successfully').green}
+                #{Rainbow('✓ Webpack integration configured').green}
+        SHAKAPACKER
+      elsif File.exist?("bin/shakapacker") && File.exist?("bin/shakapacker-dev-server")
+        "\n                📦 #{Rainbow('Shakapacker already configured ✓').green}"
+      else
+        "\n                📦 #{Rainbow('Shakapacker setup may be incomplete').yellow}"
       end
-
-      # Fallback to gem specification check
-      Gem::Specification.find_by_name("shakapacker")
-      true
-    rescue Gem::LoadError
-      false
-    end
-
-    def webpacker_installed?
-      Gem::Specification.find_by_name("webpacker")
-      true
-    rescue Gem::LoadError
-      false
     end
 
     def detect_package_manager

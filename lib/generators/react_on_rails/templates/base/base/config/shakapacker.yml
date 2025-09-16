@@ -55,6 +55,16 @@ default: &default
   # SHAKAPACKER_ASSET_HOST will override both configurations.
   # asset_host: custom-path
 
+  # Utilizing webpack-subresource-integrity plugin, will generate integrity hashes for all entries in manifest.json
+  # https://github.com/waysact/webpack-subresource-integrity/tree/main/webpack-subresource-integrity
+  integrity:
+    enabled: false
+    # Which cryptographic function(s) to use, for generating the integrity hash(es). Default sha-384. Other possible values sha256, sha512
+    hash_functions: ["sha384"]
+    # Default "anonymous". Other possible value "use-credentials"
+    # https://developer.mozilla.org/en-US/docs/Web/Security/Subresource_Integrity#cross-origin_resource_sharing_and_subresource_integrity
+    cross_origin: "anonymous"
+
 development:
   <<: *default
   compile: true
