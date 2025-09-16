@@ -55,6 +55,8 @@ describe InstallGenerator, type: :generator do
     end
 
     before do
+      # Clear any previous messages to ensure clean test state
+      GeneratorMessages.clear
       # Mock Shakapacker installation to succeed so we get the success message
       allow(File).to receive(:exist?).and_call_original
       allow(File).to receive(:exist?).with("bin/shakapacker").and_return(true)
@@ -68,6 +70,7 @@ describe InstallGenerator, type: :generator do
       expect(output_text).to include("🎉 React on Rails Successfully Installed!")
       expect(output_text).to include("📋 QUICK START:")
       expect(output_text).to include("✨ KEY FEATURES:")
+      expect(output_text).to match(/bundle && (npm|yarn|pnpm) install/)
       expect(output_text).to include("💡 TIP: Run 'bin/dev help'")
     end
 
@@ -78,6 +81,7 @@ describe InstallGenerator, type: :generator do
       expect(output_text).to include("🎉 React on Rails Successfully Installed!")
       expect(output_text).to include("📋 QUICK START:")
       expect(output_text).to include("✨ KEY FEATURES:")
+      expect(output_text).to match(/bundle && (npm|yarn|pnpm) install/)
       expect(output_text).to include("💡 TIP: Run 'bin/dev help'")
     end
   end
