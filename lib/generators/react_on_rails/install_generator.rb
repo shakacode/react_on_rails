@@ -186,7 +186,16 @@ module ReactOnRails
         return false unless File.exist?("Gemfile")
 
         gemfile_content = File.read("Gemfile")
-        gemfile_content.match?(/gem\s+['"]shakapacker['"]/)
+        return true if gemfile_content.match?(/gem\s+['"]shakapacker['"]/)
+
+        # Also check if shakapacker is already available in the current bundle
+        # This handles cases where it might be loaded from parent environments
+        begin
+          require "shakapacker"
+          true
+        rescue LoadError
+          false
+        end
       end
 
       def add_bin_scripts
