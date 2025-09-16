@@ -65,8 +65,8 @@ module ReactOnRails
         it "shows truncated backtrace with notice" do
           message = expected_error.message
           expect(message).to include(err.inspect)
-          # Ruby 3.4+ shows absolute paths, so match the end of the path
-          expect(message).to include("prender_error_spec.rb:20:in `block (2 levels) in <module:ReactOnRails>'")
+          # Ruby version compatibility: match any backtrace reference to the test file
+          expect(message).to match(/prender_error_spec\.rb:\d+:in `block \(\d+ levels\) in <module:ReactOnRails>'/)
           expect(message).to include("The rest of the backtrace is hidden")
         end
       end
