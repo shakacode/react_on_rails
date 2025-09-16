@@ -81,7 +81,7 @@ module ReactOnRails
         # Check for a temporary marker file that indicates fresh Shakapacker install
         if File.exist?(".shakapacker_just_installed")
           puts "Skipping Shakapacker config copy (already installed by Shakapacker installer)"
-          File.delete(".shakapacker_just_installed")  # Clean up marker
+          File.delete(".shakapacker_just_installed") # Clean up marker
           return
         end
 
@@ -137,11 +137,7 @@ module ReactOnRails
           add_configure_rspec_to_compile_assets(rails_helper)
         else
           spec_helper = File.join(destination_root, "spec/spec_helper.rb")
-          if File.exist?(spec_helper)
-            add_configure_rspec_to_compile_assets(spec_helper)
-          else
-            # Test helper setup instructions are now included in the post-install message
-          end
+          add_configure_rspec_to_compile_assets(spec_helper) if File.exist?(spec_helper)
         end
       end
 
@@ -198,6 +194,14 @@ module ReactOnRails
 
         run "npm install --save-dev #{dev_deps.join(' ')}"
       end
+
+      CONFIGURE_RSPEC_TO_COMPILE_ASSETS = <<-STR.strip_heredoc
+        RSpec.configure do |config|
+          # Ensure that if we are running js tests, we are using latest webpack assets
+          # This will use the defaults of :js and :server_rendering meta tags
+          ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+        end
+      STR
 
       private
 
@@ -312,13 +316,6 @@ module ReactOnRails
         # Check if it already has React on Rails environment-specific loading
         content.include?("envSpecificConfig") || content.include?("env.nodeEnv")
       end
-
-      CONFIGURE_RSPEC_TO_COMPILE_ASSETS = <<-STR.strip_heredoc
-        RSpec.configure do |config|
-          # Ensure that if we are running js tests, we are using latest webpack assets
-          # This will use the defaults of :js and :server_rendering meta tags
-          ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
-      STR
 
       # From https://github.com/rails/rails/blob/4c940b2dbfb457f67c6250b720f63501d74a45fd/railties/lib/rails/generators/rails/app/app_generator.rb
       def app_name
