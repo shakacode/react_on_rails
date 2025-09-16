@@ -31,6 +31,7 @@ Gem::Specification.new do |s|
   s.add_dependency "execjs", "~> 2.5"
   s.add_dependency "rails", ">= 5.2"
   s.add_dependency "rainbow", "~> 3.0"
+  s.add_dependency "shakapacker", "~> 8.0"
 
   s.add_development_dependency "gem-release"
   s.post_install_message = '

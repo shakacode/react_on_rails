@@ -6,17 +6,9 @@ require ReactOnRails::PackerUtils.packer_type
 # rubocop:disable Metrics/ModuleLength, Metrics/BlockLength
 module ReactOnRails
   RSpec.describe Utils do
-    # Github Actions already run rspec tests two times, once with shakapacker and once with webpacker.
-    # If rspec tests are run locally, we want to test both packers.
-    # If rspec tests are run in CI, we want to test the packer specified in the CI_PACKER_VERSION environment variable.
-    # Check script/convert and .github/workflows/rspec-package-specs.yml for more details.
-    packers_to_test = if ENV["CI_PACKER_VERSION"] == "oldest"
-                        ["webpacker"]
-                      elsif ENV["CI_PACKER_VERSION"] == "newest"
-                        ["shakapacker"]
-                      else
-                        %w[shakapacker webpacker]
-                      end
+    # Since React on Rails v15+ requires Shakapacker as an explicit dependency,
+    # we only test with Shakapacker
+    packers_to_test = ["shakapacker"]
 
     shared_context "with packer enabled" do
       before do
@@ -45,16 +37,6 @@ module ReactOnRails
       end
     end
 
-    shared_context "with webpacker enabled" do
-      include_context "with packer enabled"
-
-      it "uses webpacker" do
-        expect(ReactOnRails::PackerUtils.using_shakapacker_const?).to be(false)
-        expect(ReactOnRails::PackerUtils.using_webpacker_const?).to be(true)
-        expect(ReactOnRails::PackerUtils.packer_type).to eq("webpacker")
-        expect(ReactOnRails::PackerUtils.packer).to be_a(::Webpacker)
-      end
-    end
 
     shared_context "without packer enabled" do
       before do

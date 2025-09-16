@@ -51,7 +51,7 @@ module ReactOnRails
 
         # Only copy HelloWorld.module.css for non-Redux components
         # Redux components handle their own CSS files
-        base_files << "app/javascript/src/HelloWorld/HelloWorld.module.css" unless options.redux?
+        base_files << "app/javascript/src/HelloWorld/ror_components/HelloWorld.module.css" unless options.redux?
 
         base_files.each { |file| copy_file("#{base_path}#{file}", file) }
       end
@@ -77,6 +77,14 @@ module ReactOnRails
       end
 
       def copy_packer_config
+        # Skip copying if Shakapacker was just installed (to avoid conflicts)
+        # Check for a temporary marker file that indicates fresh Shakapacker install
+        if File.exist?(".shakapacker_just_installed")
+          puts "Skipping Shakapacker config copy (already installed by Shakapacker installer)"
+          File.delete(".shakapacker_just_installed")  # Clean up marker
+          return
+        end
+
         puts "Adding Shakapacker #{ReactOnRails::PackerUtils.shakapacker_version} config"
         base_path = "base/base/"
         config = "config/shakapacker.yml"
