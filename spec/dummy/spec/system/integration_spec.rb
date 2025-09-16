@@ -89,6 +89,12 @@ end
 describe "Turbolinks across pages", :js do
   subject { page }
 
+  around do |example|
+    ReactOnRails.configure { |config| config.immediate_hydration = true }
+    example.run
+    ReactOnRails.configure { |config| config.immediate_hydration = false }
+  end
+
   it "changes name in message according to input" do
     allow(ReactOnRails::Utils).to receive(:react_on_rails_pro_licence_valid?).and_return(true)
 
@@ -97,16 +103,16 @@ describe "Turbolinks across pages", :js do
     click_on "Hello World Component Server Rendered, with extra options"
     expect_change_text_in_dom_selector("#my-hello-world-id")
   end
+end
+
+describe "TurboStream send react component", :js do
+  subject { page }
 
   around do |example|
     ReactOnRails.configure { |config| config.immediate_hydration = true }
     example.run
     ReactOnRails.configure { |config| config.immediate_hydration = false }
   end
-end
-
-describe "TurboStream send react component", :js do
-  subject { page }
 
   it "force load hello-world component immediately" do
     allow(ReactOnRails::Utils).to receive(:react_on_rails_pro_licence_valid?).and_return(true)
@@ -114,12 +120,6 @@ describe "TurboStream send react component", :js do
     visit "/turbo_frame_tag_hello_world"
     click_on "send me hello-turbo-stream component"
     expect(page).to have_text "Hello, Mrs. Client Side Rendering From Turbo Stream!"
-  end
-
-  around do |example|
-    ReactOnRails.configure { |config| config.immediate_hydration = true }
-    example.run
-    ReactOnRails.configure { |config| config.immediate_hydration = false }
   end
 end
 
