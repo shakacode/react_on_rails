@@ -37,7 +37,6 @@ module ReactOnRails
       end
     end
 
-
     shared_context "without packer enabled" do
       before do
         allow(ReactOnRails).to receive_message_chain(:configuration, :generated_assets_dir)
