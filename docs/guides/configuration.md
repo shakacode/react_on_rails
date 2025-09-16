@@ -223,7 +223,7 @@ ReactOnRails.configure do |config|
   # DEPRECATED: Use `generated_component_packs_loading_strategy` instead.
   # Migration: `defer_generated_component_packs: true` → `generated_component_packs_loading_strategy: :defer`
   # Migration: `defer_generated_component_packs: false` → `generated_component_packs_loading_strategy: :sync`
-  # See [15.0.0 Release Notes](docs/release-notes/15.0.0.md) for more details.
+  # See [16.0.0 Release Notes](docs/release-notes/16.0.0.md) for more details.
   # config.defer_generated_component_packs = false
 
   # Default is false
