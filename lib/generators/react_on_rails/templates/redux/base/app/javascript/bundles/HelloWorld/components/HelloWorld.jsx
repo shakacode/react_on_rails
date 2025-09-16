@@ -1,4 +1,3 @@
-import PropTypes from 'prop-types';
 import React from 'react';
 
 const HelloWorld = ({ name, updateName }) => (
@@ -16,10 +15,5 @@ const HelloWorld = ({ name, updateName }) => (
     </form>
   </div>
 );
-
-HelloWorld.propTypes = {
-  name: PropTypes.string.isRequired,
-  updateName: PropTypes.func.isRequired,
-};
 
 export default HelloWorld;

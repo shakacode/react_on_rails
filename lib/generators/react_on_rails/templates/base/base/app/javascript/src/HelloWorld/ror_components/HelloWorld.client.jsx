@@ -1,4 +1,3 @@
-import PropTypes from 'prop-types';
 import React, { useState } from 'react';
 import * as style from './HelloWorld.module.css';
 
@@ -17,10 +16,6 @@ const HelloWorld = (props) => {
       </form>
     </div>
   );
-};
-
-HelloWorld.propTypes = {
-  name: PropTypes.string.isRequired, // this is passed from the Rails view
 };
 
 export default HelloWorld;
