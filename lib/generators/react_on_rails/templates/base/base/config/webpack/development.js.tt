@@ -5,26 +5,21 @@ const { devServer, inliningCss } = require('shakapacker');
 const generateWebpackConfigs = require('./generateWebpackConfigs');
 
 const developmentEnvOnly = (clientWebpackConfig, _serverWebpackConfig) => {
-  // plugins
-  if (inliningCss) {
-    // Note, when this is run, we're building the server and client bundles in separate processes.
-    // Thus, this plugin is not applied to the server bundle.
+  // React Refresh (Fast Refresh) setup for development
+  // Note: This plugin is applied to the client bundle only, not the server bundle
+  // This matches the babel plugin condition in babel.config.js (enabled for all development builds)
 
-    // React Refresh (Fast Refresh) setup for Hot Module Replacement
-    // This works in conjunction with the babel plugin in babel.config.js
-    // Both the webpack plugin and babel plugin are required for React Refresh to work
-    // eslint-disable-next-line global-require
-    const ReactRefreshWebpackPlugin = require('@pmmmwh/react-refresh-webpack-plugin');
-    clientWebpackConfig.plugins.push(
-      new ReactRefreshWebpackPlugin({
-        // Show overlay for runtime errors during development
-        overlay: {
-          entry: require.resolve('@pmmmwh/react-refresh-webpack-plugin/client/ErrorOverlayEntry'),
-          module: require.resolve('@pmmmwh/react-refresh-webpack-plugin/client/ReactRefreshEntry'),
-        },
-      }),
-    );
-  }
+  // eslint-disable-next-line global-require
+  const ReactRefreshWebpackPlugin = require('@pmmmwh/react-refresh-webpack-plugin');
+  clientWebpackConfig.plugins.push(
+    new ReactRefreshWebpackPlugin({
+      // Show overlay for runtime errors during development
+      overlay: {
+        entry: require.resolve('@pmmmwh/react-refresh-webpack-plugin/client/ErrorOverlayEntry'),
+        module: require.resolve('@pmmmwh/react-refresh-webpack-plugin/client/ReactRefreshEntry'),
+      },
+    }),
+  );
 };
 
 module.exports = generateWebpackConfigs(developmentEnvOnly);

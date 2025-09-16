@@ -16,10 +16,10 @@ module.exports = function (api) {
       ]
     ].filter(Boolean),
     plugins: [
-      // Enable React Refresh (Fast Refresh) in development when using webpack-dev-server
-      // This requires both the babel plugin and webpack plugin to be configured
-      // If you see "$RefreshSig$ is not defined" errors, ensure WEBPACK_DEV_SERVER env var is set
-      !isProductionEnv && process.env.WEBPACK_DEV_SERVER && 'react-refresh/babel',
+      // Enable React Refresh (Fast Refresh) in development
+      // This should match the webpack plugin condition in config/webpack/development.js
+      // Only enabled when not in production - works with both HMR and non-HMR development modes
+      !isProductionEnv && 'react-refresh/babel',
       isProductionEnv && ['babel-plugin-transform-react-remove-prop-types',
         {
           removeImport: true
