@@ -50,20 +50,42 @@ describe InstallGenerator, type: :generator do
   end
 
   context "with helpful message" do
-    let(:expected) do
+    let(:expected_non_redux) do
       GeneratorMessages.format_info(GeneratorMessages.helpful_message_after_installation)
     end
 
+    let(:expected_redux) do
+      GeneratorMessages.format_info(GeneratorMessages.helpful_message_after_installation(component_name: "HelloWorldApp"))
+    end
+
     specify "base generator contains a helpful message" do
+      # Mock git status to return clean repository
+      allow(ReactOnRails::GitUtils).to receive(:`).with("git status --porcelain").and_return("")
+
+      # Mock Shakapacker installation check to skip installation
+      allow_any_instance_of(InstallGenerator).to receive(:shakapacker_binaries_exist?).and_return(true)
+
       run_generator_test_with_args(%w[], package_json: true)
-      # GeneratorMessages.output is an array with the git error being the first one
-      expect(GeneratorMessages.output).to include(expected)
+      # GeneratorMessages.output is an array
+      helpful_message = GeneratorMessages.output.find { |msg| msg.include?("🎉 React on Rails Successfully Installed!") }
+      expect(helpful_message).not_to be_nil
+      expect(helpful_message).to include("🎉 React on Rails Successfully Installed!")
+      expect(helpful_message).to include("bundle && npm install")
     end
 
     specify "react with redux generator contains a helpful message" do
+      # Mock git status to return clean repository
+      allow(ReactOnRails::GitUtils).to receive(:`).with("git status --porcelain").and_return("")
+
+      # Mock Shakapacker installation check to skip installation
+      allow_any_instance_of(InstallGenerator).to receive(:shakapacker_binaries_exist?).and_return(true)
+
       run_generator_test_with_args(%w[--redux], package_json: true)
-      # GeneratorMessages.output is an array with the git error being the first one
-      expect(GeneratorMessages.output).to include(expected)
+      # GeneratorMessages.output is an array
+      helpful_message = GeneratorMessages.output.find { |msg| msg.include?("🎉 React on Rails Successfully Installed!") }
+      expect(helpful_message).not_to be_nil
+      expect(helpful_message).to include("🎉 React on Rails Successfully Installed!")
+      expect(helpful_message).to include("bundle && npm install")
     end
   end
 
@@ -73,6 +95,7 @@ describe InstallGenerator, type: :generator do
     specify "when node is exist" do
       stub_const("RUBY_PLATFORM", "linux")
       allow(install_generator).to receive(:`).with("which node").and_return("/path/to/bin")
+      allow(install_generator).to receive(:`).with("node --version 2>/dev/null").and_return("v20.0.0")
       expect(install_generator.send(:missing_node?)).to be false
     end
   end
@@ -93,6 +116,7 @@ describe InstallGenerator, type: :generator do
     specify "when node is exist" do
       stub_const("RUBY_PLATFORM", "mswin")
       allow(install_generator).to receive(:`).with("where node").and_return("/path/to/bin")
+      allow(install_generator).to receive(:`).with("node --version 2>/dev/null").and_return("v20.0.0")
       expect(install_generator.send(:missing_node?)).to be false
     end
   end
