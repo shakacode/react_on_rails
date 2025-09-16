@@ -33,7 +33,14 @@ module ReactOnRails
           add_bin_scripts
           add_post_install_message
         else
-          error = "react_on_rails generator prerequisites not met!"
+          error = <<~MSG.strip
+            🚫 React on Rails generator prerequisites not met!
+
+            Please resolve the issues listed above before continuing.
+            All prerequisites must be satisfied for a successful installation.
+
+            Use --ignore-warnings to bypass checks (not recommended).
+          MSG
           GeneratorMessages.add_error(error)
         end
       ensure
@@ -66,11 +73,47 @@ module ReactOnRails
       end
 
       def missing_node?
-        return false unless ReactOnRails::Utils.running_on_windows? ? `where node`.blank? : `which node`.blank?
+        node_missing = ReactOnRails::Utils.running_on_windows? ? `where node`.blank? : `which node`.blank?
 
-        error = "** nodejs is required. Please install it before continuing. https://nodejs.org/en/"
-        GeneratorMessages.add_error(error)
-        true
+        if node_missing
+          error = <<~MSG.strip
+            🚫 Node.js is required but not found on your system.
+
+            Please install Node.js before continuing:
+            • Download from: https://nodejs.org/en/
+            • Recommended: Use a version manager like nvm, fnm, or volta
+            • Minimum required version: Node.js 18+
+
+            After installation, restart your terminal and try again.
+          MSG
+          GeneratorMessages.add_error(error)
+          return true
+        end
+
+        # Check Node.js version if available
+        check_node_version
+        false
+      end
+
+      def check_node_version
+        node_version = `node --version 2>/dev/null`.strip
+        return if node_version.blank?
+
+        # Extract major version number (e.g., "v18.17.0" -> 18)
+        major_version = node_version[/v(\d+)/, 1]&.to_i
+        return unless major_version
+
+        if major_version < 18
+          warning = <<~MSG.strip
+            ⚠️  Node.js version #{node_version} detected.
+
+            React on Rails recommends Node.js 18+ for best compatibility.
+            You may experience issues with older versions.
+
+            Consider upgrading: https://nodejs.org/en/
+          MSG
+          GeneratorMessages.add_warning(warning)
+        end
       end
 
       def ensure_shakapacker_installed
@@ -85,7 +128,20 @@ module ReactOnRails
           puts Rainbow("📝 Adding Shakapacker to Gemfile...").yellow
           success = system("bundle add shakapacker --strict")
           unless success
-            GeneratorMessages.add_error("Failed to add Shakapacker to Gemfile. Please run 'bundle add shakapacker' manually.")
+            error = <<~MSG.strip
+              🚫 Failed to add Shakapacker to your Gemfile.
+
+              This could be due to:
+              • Bundle installation issues
+              • Network connectivity problems
+              • Gemfile permissions
+
+              Please try manually:
+                  bundle add shakapacker --strict
+
+              Then re-run: rails generate react_on_rails:install
+            MSG
+            GeneratorMessages.add_error(error)
             exit(1)
           end
           puts Rainbow("✅ Shakapacker added to Gemfile successfully!").green
@@ -97,13 +153,21 @@ module ReactOnRails
 
         unless success
           error = <<~MSG.strip
-            ** Failed to install Shakapacker automatically.
+            🚫 Failed to install Shakapacker automatically.
 
-            Please run this command manually:
+            This could be due to:
+            • Missing Node.js or npm/yarn
+            • Network connectivity issues
+            • Incomplete bundle installation
+            • Missing write permissions
 
-                ./bin/rails shakapacker:install
+            Troubleshooting steps:
+            1. Ensure Node.js is installed: node --version
+            2. Try manually: ./bin/rails shakapacker:install
+            3. Check for error output above
+            4. Re-run: rails generate react_on_rails:install
 
-            Then re-run: rails generate react_on_rails:install
+            Need help? Visit: https://github.com/shakacode/shakapacker/blob/main/docs/installation.md
           MSG
           GeneratorMessages.add_error(error)
           exit(1)

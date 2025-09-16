@@ -78,6 +78,14 @@ module GeneratorMessages
                 • Documentation: https://www.shakacode.com/react-on-rails/docs/
                 • Webpack customization: https://github.com/shakacode/shakapacker#webpack-configuration
 
+                🔧 TROUBLESHOOTING HMR (Hot Module Replacement):
+                ─────────────────────────────────────────────────────────────────────────
+                If you see "$RefreshSig$ is not defined" errors:
+                1. Ensure WEBPACK_DEV_SERVER environment variable is set (bin/dev does this automatically)
+                2. Check that both babel plugin and webpack plugin are configured in babel.config.js and config/webpack/development.js
+                3. Verify hmr: true in config/shakapacker.yml
+                4. Try restarting the development server
+
                 💡 TIP: Run 'bin/dev help' for development server options#{testing_section}
       MSG
     end
