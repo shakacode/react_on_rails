@@ -118,71 +118,12 @@ module ReactOnRails
       end
 
       def ensure_shakapacker_installed
-        return if File.exist?("bin/shakapacker") && File.exist?("bin/shakapacker-dev-server")
+        return if shakapacker_binaries_exist?
 
-        puts Rainbow("\n#{'=' * 80}").cyan
-        puts Rainbow("🔧 SHAKAPACKER SETUP").cyan.bold
-        puts Rainbow("=" * 80).cyan
-
-        # Add Shakapacker to Gemfile if not present
-        unless shakapacker_in_gemfile?
-          puts Rainbow("📝 Adding Shakapacker to Gemfile...").yellow
-          success = system("bundle add shakapacker --strict")
-          unless success
-            error = <<~MSG.strip
-              🚫 Failed to add Shakapacker to your Gemfile.
-
-              This could be due to:
-              • Bundle installation issues
-              • Network connectivity problems
-              • Gemfile permissions
-
-              Please try manually:
-                  bundle add shakapacker --strict
-
-              Then re-run: rails generate react_on_rails:install
-            MSG
-            GeneratorMessages.add_error(error)
-            raise Thor::Error, error unless options.ignore_warnings?
-            return
-          end
-          puts Rainbow("✅ Shakapacker added to Gemfile successfully!").green
-        end
-
-        # Install Shakapacker
-        puts Rainbow("⚙️  Installing Shakapacker (required for webpack integration)...").yellow
-        success = system("./bin/rails shakapacker:install")
-
-        unless success
-          error = <<~MSG.strip
-            🚫 Failed to install Shakapacker automatically.
-
-            This could be due to:
-            • Missing Node.js or npm/yarn
-            • Network connectivity issues
-            • Incomplete bundle installation
-            • Missing write permissions
-
-            Troubleshooting steps:
-            1. Ensure Node.js is installed: node --version
-            2. Try manually: ./bin/rails shakapacker:install
-            3. Check for error output above
-            4. Re-run: rails generate react_on_rails:install
-
-            Need help? Visit: https://github.com/shakacode/shakapacker/blob/main/docs/installation.md
-          MSG
-          GeneratorMessages.add_error(error)
-          raise Thor::Error, error unless options.ignore_warnings?
-          return
-        end
-
-        puts Rainbow("✅ Shakapacker installed successfully!").green
-        puts Rainbow("=" * 80).cyan
-        puts Rainbow("🚀 CONTINUING WITH REACT ON RAILS SETUP").cyan.bold
-        puts "#{Rainbow('=' * 80).cyan}\n"
-
-        # Create marker file so base generator can avoid copying shakapacker.yml
-        File.write(".shakapacker_just_installed", "")
+        print_shakapacker_setup_banner
+        ensure_shakapacker_in_gemfile
+        install_shakapacker
+        finalize_shakapacker_setup
       end
 
       # Checks whether "shakapacker" is present in the *current bundle*,
@@ -243,6 +184,88 @@ module ReactOnRails
 
       def cli_exists?(command)
         system("which #{command} > /dev/null 2>&1")
+      end
+
+      def shakapacker_binaries_exist?
+        File.exist?("bin/shakapacker") && File.exist?("bin/shakapacker-dev-server")
+      end
+
+      def print_shakapacker_setup_banner
+        puts Rainbow("\n#{'=' * 80}").cyan
+        puts Rainbow("🔧 SHAKAPACKER SETUP").cyan.bold
+        puts Rainbow("=" * 80).cyan
+      end
+
+      def ensure_shakapacker_in_gemfile
+        return if shakapacker_in_gemfile?
+
+        puts Rainbow("📝 Adding Shakapacker to Gemfile...").yellow
+        success = system("bundle add shakapacker --strict")
+        return if success
+
+        handle_shakapacker_gemfile_error
+      end
+
+      def install_shakapacker
+        puts Rainbow("⚙️  Installing Shakapacker (required for webpack integration)...").yellow
+        success = system("./bin/rails shakapacker:install")
+        return if success
+
+        handle_shakapacker_install_error
+      end
+
+      def finalize_shakapacker_setup
+        puts Rainbow("✅ Shakapacker installed successfully!").green
+        puts Rainbow("=" * 80).cyan
+        puts Rainbow("🚀 CONTINUING WITH REACT ON RAILS SETUP").cyan.bold
+        puts "#{Rainbow('=' * 80).cyan}\n"
+
+        # Create marker file so base generator can avoid copying shakapacker.yml
+        File.write(".shakapacker_just_installed", "")
+      end
+
+      def handle_shakapacker_gemfile_error
+        error = <<~MSG.strip
+          🚫 Failed to add Shakapacker to your Gemfile.
+
+          This could be due to:
+          • Bundle installation issues
+          • Network connectivity problems
+          • Gemfile permissions
+
+          Please try manually:
+              bundle add shakapacker --strict
+
+          Then re-run: rails generate react_on_rails:install
+        MSG
+        GeneratorMessages.add_error(error)
+        raise Thor::Error, error unless options.ignore_warnings?
+
+        return
+      end
+
+      def handle_shakapacker_install_error
+        error = <<~MSG.strip
+          🚫 Failed to install Shakapacker automatically.
+
+          This could be due to:
+          • Missing Node.js or npm/yarn
+          • Network connectivity issues
+          • Incomplete bundle installation
+          • Missing write permissions
+
+          Troubleshooting steps:
+          1. Ensure Node.js is installed: node --version
+          2. Try manually: ./bin/rails shakapacker:install
+          3. Check for error output above
+          4. Re-run: rails generate react_on_rails:install
+
+          Need help? Visit: https://github.com/shakacode/shakapacker/blob/main/docs/installation.md
+        MSG
+        GeneratorMessages.add_error(error)
+        raise Thor::Error, error unless options.ignore_warnings?
+
+        return
       end
 
       def missing_package_manager?

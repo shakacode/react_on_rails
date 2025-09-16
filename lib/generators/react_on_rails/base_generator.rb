@@ -187,10 +187,10 @@ module ReactOnRails
           babel-plugin-transform-react-remove-prop-types
           babel-plugin-macros
         ]
-        unless add_npm_dependencies(react_deps)
-          success = run "npm install #{react_deps.join(' ')}"
-          handle_npm_failure("React dependencies", react_deps) unless success
-        end
+        return if add_npm_dependencies(react_deps)
+
+        success = run "npm install #{react_deps.join(' ')}"
+        handle_npm_failure("React dependencies", react_deps) unless success
       end
 
       def add_css_dependencies
@@ -201,10 +201,10 @@ module ReactOnRails
           mini-css-extract-plugin
           style-loader
         ]
-        unless add_npm_dependencies(css_deps)
-          success = run "npm install #{css_deps.join(' ')}"
-          handle_npm_failure("CSS dependencies", css_deps) unless success
-        end
+        return if add_npm_dependencies(css_deps)
+
+        success = run "npm install #{css_deps.join(' ')}"
+        handle_npm_failure("CSS dependencies", css_deps) unless success
       end
 
       def add_dev_dependencies
