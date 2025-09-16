@@ -67,6 +67,8 @@ Lint/SuppressedException:
 
 Metrics/AbcSize:
   Max: 28
+  Exclude:
+    - 'lib/generators/react_on_rails/install_generator.rb'  # Generator setup methods require comprehensive error handling
 
 Metrics/CyclomaticComplexity:
   Max: 7
@@ -86,6 +88,8 @@ Metrics/ParameterLists:
 
 Metrics/MethodLength:
   Max: 41
+  Exclude:
+    - 'lib/generators/react_on_rails/install_generator.rb'  # Generator setup methods require comprehensive error handling
 
 Metrics/ModuleLength:
   Max: 180
