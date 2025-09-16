@@ -111,6 +111,8 @@ module ReactOnRails
           puts help_customization
           puts ""
           puts help_mode_details
+          puts ""
+          puts help_troubleshooting
         end
 
         private
@@ -286,6 +288,29 @@ module ReactOnRails
           line = "│ #{content}"
           padding = box_width - line.length - 2
           line + "#{' ' * padding}│"
+        end
+
+        def help_troubleshooting
+          <<~TROUBLESHOOTING
+            🔧 TROUBLESHOOTING:
+
+            React Refresh / HMR Issues:
+            If you see "$RefreshSig$ is not defined" errors:
+            1. Ensure WEBPACK_DEV_SERVER environment variable is set (bin/dev does this automatically)
+            2. Check that both babel plugin and webpack plugin are configured:
+               - babel.config.js: 'react-refresh/babel' plugin
+               - config/webpack/development.js: ReactRefreshWebpackPlugin
+            3. Verify hmr: true in config/shakapacker.yml
+            4. Try restarting the development server: bin/dev kill && bin/dev
+
+            General Issues:
+            • "Port already in use" → Run: bin/dev kill
+            • "Webpack compilation failed" → Check console for specific errors
+            • "Process manager not found" → Install: brew install overmind (or gem install foreman)
+            • "Assets not loading" → Verify Procfile.dev is present and check server logs
+
+            Need help? Visit: https://www.shakacode.com/react-on-rails/docs/
+          TROUBLESHOOTING
         end
       end
     end
