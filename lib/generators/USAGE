@@ -2,8 +2,6 @@ Description:
 
 The react_on_rails:install generator integrates a React frontend, including SSR, with Rails.
 
-If shakapacker is not installed, it will be installed.
-
 * Redux (Optional)
 
     Passing the --redux generator option causes the generated Hello World example
