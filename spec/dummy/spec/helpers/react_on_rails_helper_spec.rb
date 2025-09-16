@@ -25,6 +25,18 @@ describe ReactOnRailsHelper do
     allow(ReactOnRails::Utils).to receive_messages(
       react_on_rails_pro_licence_valid?: true
     )
+
+    # Configure immediate_hydration to true for tests since they expect that behavior
+    ReactOnRails.configure do |config|
+      config.immediate_hydration = true
+    end
+  end
+
+  after do
+    # Reset to default
+    ReactOnRails.configure do |config|
+      config.immediate_hydration = false
+    end
   end
 
   let(:hash) do
@@ -199,7 +211,7 @@ describe ReactOnRailsHelper do
         <script type="application/json" class="js-react-on-rails-component" \
         id="js-react-on-rails-component-App-react-component" \
         data-component-name="App" data-dom-id="App-react-component"
-        data-force-load="true">{"name":"My Test Name"}</script>
+        data-immediate-hydration="true">{"name":"My Test Name"}</script>
       SCRIPT
     end
 
@@ -208,7 +220,7 @@ describe ReactOnRailsHelper do
         <script type="application/json" class="js-react-on-rails-component" \
         id="js-react-on-rails-component-App-react-component" \
         data-component-name="App" data-dom-id="App-react-component"
-        data-force-load="true">{}</script>
+        data-immediate-hydration="true">{}</script>
       SCRIPT
     end
 
@@ -257,7 +269,7 @@ describe ReactOnRailsHelper do
           <script type="application/json" class="js-react-on-rails-component" \
           id="js-react-on-rails-component-App-react-component" \
           data-component-name="App" data-dom-id="App-react-component"
-          data-force-load="true">{"name":"My Test Name"}</script>
+          data-immediate-hydration="true">{"name":"My Test Name"}</script>
         SCRIPT
       end
 
@@ -273,7 +285,7 @@ describe ReactOnRailsHelper do
           <script type="application/json" class="js-react-on-rails-component" \
           id="js-react-on-rails-component-App-react-component-0" \
           data-component-name="App" data-dom-id="App-react-component-0"
-          data-force-load="true">{"name":"My Test Name"}</script>
+          data-immediate-hydration="true">{"name":"My Test Name"}</script>
         SCRIPT
       end
 
@@ -295,7 +307,7 @@ describe ReactOnRailsHelper do
           <script type="application/json" class="js-react-on-rails-component" \
           id="js-react-on-rails-component-App-react-component" \
           data-component-name="App" data-dom-id="App-react-component"
-          data-force-load="true">{"name":"My Test Name"}</script>
+          data-immediate-hydration="true">{"name":"My Test Name"}</script>
         SCRIPT
       end
 
@@ -313,7 +325,7 @@ describe ReactOnRailsHelper do
           <script type="application/json" class="js-react-on-rails-component" \
           id="js-react-on-rails-component-shaka_div" \
           data-component-name="App" data-dom-id="shaka_div"
-          data-force-load="true">{"name":"My Test Name"}</script>
+          data-immediate-hydration="true">{"name":"My Test Name"}</script>
         SCRIPT
       end
 
@@ -511,7 +523,7 @@ typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('Ap
     end
 
     let(:react_store_script) do
-      '<script type="application/json" data-js-react-on-rails-store="reduxStore" data-force-load="true">' \
+      '<script type="application/json" data-js-react-on-rails-store="reduxStore" data-immediate-hydration="true">' \
         '{"name":"My Test Name"}' \
         "</script>"
     end
