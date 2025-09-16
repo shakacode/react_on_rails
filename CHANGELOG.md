@@ -23,6 +23,33 @@ After a release, please make sure to run `bundle exec rake update_changelog`. Th
 
 Changes since the last non-beta release.
 
+#### Removed (Breaking Changes)
+
+- **Webpacker support completely removed**. Shakapacker 8.2+ is now required.
+  - Migration:
+    - Remove any `webpacker` gem references from your Gemfile
+    - Ensure `shakapacker` gem version 8.2.0 or higher is installed
+    - Replace any `bin/webpacker` commands with `bin/shakapacker`
+    - Update any webpacker configuration files to shakapacker equivalents
+  - Removed files: `rakelib/webpacker_examples.rake`, `lib/generators/react_on_rails/adapt_for_older_shakapacker_generator.rb`
+  - All webpacker compatibility code and tests have been removed
+- **CI/Development runtime requirements updated**:
+  - Minimum Ruby version: 3.2 (was 3.0)
+  - Maximum Ruby version: 3.4 (was 3.3)
+  - Minimum Node.js version: 20 (was 16)
+  - Maximum Node.js version: 22 (was 20)
+  - Migration: Upgrade your Ruby and Node.js versions to supported ranges
+- **Install generator now validates prerequisites**:
+  - Generator now requires at least one JavaScript package manager (npm, pnpm, yarn, or bun)
+  - Generator uses `Thor::Error` exceptions instead of `exit(1)` for better error handling
+  - Migration: Ensure you have a JavaScript package manager installed before running the generator
+
+#### Enhanced
+
+- Simplified CI matrix configuration with clear dependency level naming (`minimum`/`latest` instead of `oldest`/`newest`)
+- Improved error messages in install generator with clearer troubleshooting steps
+- Enhanced package manager detection with multi-strategy validation
+
 ### [15.0.0] - 2025-08-28
 
 See [Release Notes](docs/release-notes/15.0.0.md) for full details.
