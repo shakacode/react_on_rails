@@ -112,12 +112,12 @@ module GeneratorMessages
       <<~TESTING
 
 
-🧪 TESTING SETUP (Optional):
-─────────────────────────────────────────────────────────────────────────
-For JavaScript testing with asset compilation, add this to your RSpec config:
+                🧪 TESTING SETUP (Optional):
+                ─────────────────────────────────────────────────────────────────────────
+                For JavaScript testing with asset compilation, add this to your RSpec config:
 
-# In spec/rails_helper.rb or spec/spec_helper.rb:
-ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+                # In spec/rails_helper.rb or spec/spec_helper.rb:
+                ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
       TESTING
     end
 
