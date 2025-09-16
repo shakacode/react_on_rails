@@ -78,7 +78,6 @@ Metrics/ClassLength:
   Max: 150
   Exclude:
     - 'lib/generators/react_on_rails/base_generator.rb'  # Generator complexity justified
-    - 'lib/react_on_rails/dev/server_manager.rb'  # Dev tool with multiple help methods
 
 Metrics/ParameterLists:
   Max: 5
