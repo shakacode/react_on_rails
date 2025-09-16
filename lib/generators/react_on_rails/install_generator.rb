@@ -143,7 +143,8 @@ module ReactOnRails
               Then re-run: rails generate react_on_rails:install
             MSG
             GeneratorMessages.add_error(error)
-            raise Thor::Error, error
+            raise Thor::Error, error unless options.ignore_warnings?
+            return
           end
           puts Rainbow("✅ Shakapacker added to Gemfile successfully!").green
         end
@@ -171,7 +172,8 @@ module ReactOnRails
             Need help? Visit: https://github.com/shakacode/shakapacker/blob/main/docs/installation.md
           MSG
           GeneratorMessages.add_error(error)
-          raise Thor::Error, error
+          raise Thor::Error, error unless options.ignore_warnings?
+          return
         end
 
         puts Rainbow("✅ Shakapacker installed successfully!").green
