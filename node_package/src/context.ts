@@ -1,3 +1,6 @@
+/* Copyright (c) 2015–2025 ShakaCode, LLC
+   SPDX-License-Identifier: MIT */
+
 import type { ReactOnRailsInternal, RailsContext } from './types/index.ts';
 
 declare global {

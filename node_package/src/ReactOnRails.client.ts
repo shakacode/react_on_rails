@@ -1,3 +1,6 @@
+/* Copyright (c) 2015–2025 ShakaCode, LLC
+   SPDX-License-Identifier: MIT */
+
 import type { ReactElement } from 'react';
 import * as ClientStartup from './clientStartup.ts';
 import { renderOrHydrateComponent, hydrateStore } from './ClientSideRenderer.ts';

@@ -1,3 +1,6 @@
+/* Copyright (c) 2015–2025 ShakaCode, LLC
+   SPDX-License-Identifier: MIT */
+
 import * as React from 'react';
 import { useRSC } from './RSCProvider.tsx';
 import { ServerComponentFetchError } from './ServerComponentFetchError.ts';

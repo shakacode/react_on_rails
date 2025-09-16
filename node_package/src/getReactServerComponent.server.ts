@@ -1,3 +1,6 @@
+/* Copyright (c) 2015–2025 ShakaCode, LLC
+   SPDX-License-Identifier: MIT */
+
 import { BundleManifest } from 'react-on-rails-rsc';
 import { buildClientRenderer } from 'react-on-rails-rsc/client.node';
 import transformRSCStream from './transformRSCNodeStream.ts';

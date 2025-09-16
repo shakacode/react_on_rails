@@ -1,3 +1,6 @@
+/* Copyright (c) 2015–2025 ShakaCode, LLC
+   SPDX-License-Identifier: MIT */
+
 import { PassThrough } from 'stream';
 import { finished } from 'stream/promises';
 import { createRSCPayloadKey } from './utils.ts';

@@ -137,3 +137,14 @@ RSpec/NoExpectationExample:
   AllowedPatterns:
     - ^expect_
     - ^assert_
+
+Style/Copyright:
+  Enabled: true
+  Notice: '^# Copyright \(c\) \d{4}(–\d{4})? ShakaCode, LLC'
+  AutocorrectNotice: |
+    # Copyright (c) 2015–2025 ShakaCode, LLC
+    # SPDX-License-Identifier: MIT
+  Include:
+    - 'app/helpers/react_on_rails_helper.rb'
+    - 'lib/generators/react_on_rails/**/*.rb'
+    - 'lib/react_on_rails/**/*.rb'

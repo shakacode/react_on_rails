@@ -1,3 +1,6 @@
+/* Copyright (c) 2015–2025 ShakaCode, LLC
+   SPDX-License-Identifier: MIT */
+
 /// <reference types="react/experimental" />
 
 import type { ReactElement, ReactNode, Component, ComponentType } from 'react';

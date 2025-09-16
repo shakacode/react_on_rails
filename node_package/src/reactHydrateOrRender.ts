@@ -1,3 +1,6 @@
+/* Copyright (c) 2015–2025 ShakaCode, LLC
+   SPDX-License-Identifier: MIT */
+
 import type { ReactElement } from 'react';
 import type { RenderReturnType } from './types/index.ts';
 import { reactHydrate, reactRender } from './reactApis.cts';

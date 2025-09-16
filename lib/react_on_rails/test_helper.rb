@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+# Copyright (c) 2015–2025 ShakaCode, LLC
+# SPDX-License-Identifier: MIT
+
 module ReactOnRails
   module TestHelper
     # Because you will probably want to run RSpec tests that rely on compiled webpack assets

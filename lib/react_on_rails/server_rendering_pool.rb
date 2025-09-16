@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+# Copyright (c) 2015–2025 ShakaCode, LLC
+# SPDX-License-Identifier: MIT
+
 require "connection_pool"
 require_relative "server_rendering_pool/ruby_embedded_java_script"
 
