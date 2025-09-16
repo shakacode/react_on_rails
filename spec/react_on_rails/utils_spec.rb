@@ -465,7 +465,7 @@ module ReactOnRails
             s = { a: "1234567890" }
             result = described_class.smart_trim(s, 9)
             # Ruby 3.4+ changed hash syntax, so be flexible about the format
-            expect(result).to match(/\{(:a=|a: ")#{Regexp.escape(Utils::TRUNCATION_FILLER)}90"\}/)
+            expect(result).to match(/\{(:a=|a: ")#{Regexp.escape(Utils::TRUNCATION_FILLER)}90"\}/o)
           end
         end
       end
