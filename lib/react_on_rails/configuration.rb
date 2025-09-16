@@ -46,8 +46,8 @@ module ReactOnRails
       components_subdirectory: nil,
       make_generated_server_bundle_the_entrypoint: false,
       defer_generated_component_packs: false,
-      # forces the loading of React components
-      force_load: true,
+      # React on Rails Pro (licensed) feature - enables immediate hydration of React components
+      immediate_hydration: false,
       # Maximum time in milliseconds to wait for client-side component registration after page load.
       # If exceeded, an error will be thrown for server-side rendered components not registered on the client.
       # Set to 0 to disable the timeout and wait indefinitely for component registration.
@@ -67,7 +67,7 @@ module ReactOnRails
                   :server_render_method, :random_dom_id, :auto_load_bundle,
                   :same_bundle_for_client_and_server, :rendering_props_extension,
                   :make_generated_server_bundle_the_entrypoint,
-                  :generated_component_packs_loading_strategy, :force_load, :rsc_bundle_js_file,
+                  :generated_component_packs_loading_strategy, :immediate_hydration, :rsc_bundle_js_file,
                   :react_client_manifest_file, :react_server_client_manifest_file, :component_registry_timeout
 
     # rubocop:disable Metrics/AbcSize
@@ -83,7 +83,7 @@ module ReactOnRails
                    same_bundle_for_client_and_server: nil,
                    i18n_dir: nil, i18n_yml_dir: nil, i18n_output_format: nil, i18n_yml_safe_load_options: nil,
                    random_dom_id: nil, server_render_method: nil, rendering_props_extension: nil,
-                   components_subdirectory: nil, auto_load_bundle: nil, force_load: nil,
+                   components_subdirectory: nil, auto_load_bundle: nil, immediate_hydration: nil,
                    rsc_bundle_js_file: nil, react_client_manifest_file: nil, react_server_client_manifest_file: nil,
                    component_registry_timeout: nil)
       self.node_modules_location = node_modules_location.present? ? node_modules_location : Rails.root
@@ -128,7 +128,7 @@ module ReactOnRails
       self.auto_load_bundle = auto_load_bundle
       self.make_generated_server_bundle_the_entrypoint = make_generated_server_bundle_the_entrypoint
       self.defer_generated_component_packs = defer_generated_component_packs
-      self.force_load = force_load
+      self.immediate_hydration = immediate_hydration
       self.generated_component_packs_loading_strategy = generated_component_packs_loading_strategy
     end
     # rubocop:enable Metrics/AbcSize

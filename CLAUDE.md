@@ -15,6 +15,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - All linters: `rake lint` (runs ESLint and RuboCop)
   - ESLint only: `yarn run lint` or `rake lint:eslint`
   - RuboCop only: `rake lint:rubocop`
+- **Code Formatting**:
+  - Format code with Prettier: `yarn start format`
+  - Check formatting without fixing: `yarn start format.listDifferent`
 - **Build**: `yarn run build` (compiles TypeScript to JavaScript in node_package/lib)
 - **Type checking**: `yarn run type-check`
 

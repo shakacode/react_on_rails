@@ -223,13 +223,14 @@ ReactOnRails.configure do |config|
   # DEPRECATED: Use `generated_component_packs_loading_strategy` instead.
   # Migration: `defer_generated_component_packs: true` → `generated_component_packs_loading_strategy: :defer`
   # Migration: `defer_generated_component_packs: false` → `generated_component_packs_loading_strategy: :sync`
-  # See [15.0.0 Release Notes](docs/release-notes/15.0.0.md) for more details.
+  # See [16.0.0 Release Notes](docs/release-notes/16.0.0.md) for more details.
   # config.defer_generated_component_packs = false
 
-  # Default is true
-  # When true, components hydrate immediately as soon as their server-rendered HTML reaches the client,
-  # without waiting for the full page load. This improves time-to-interactive performance.
-  config.force_load = true
+  # Default is false
+  # React on Rails Pro (licensed) feature: When true, components hydrate immediately as soon as
+  # their server-rendered HTML reaches the client, without waiting for the full page load.
+  # This improves time-to-interactive performance.
+  config.immediate_hydration = false
 
   ################################################################################
   # I18N OPTIONS

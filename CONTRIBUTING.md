@@ -180,6 +180,42 @@ cd react_on_rails/
 yarn run check
 ```
 
+## Development Commands
+
+### Code Formatting
+
+To format JavaScript/TypeScript files with Prettier:
+
+```sh
+yarn start format
+```
+
+To check formatting without fixing:
+
+```sh
+yarn start format.listDifferent
+```
+
+### Linting
+
+Run all linters (ESLint and RuboCop):
+
+```sh
+rake lint
+```
+
+Run only RuboCop:
+
+```sh
+rake lint:rubocop
+```
+
+Run only ESLint:
+
+```sh
+yarn run lint
+```
+
 ### Starting the Dummy App
 
 To run the dummy app, it's **CRITICAL** to not just run `rails s`. You have to run `foreman start` with one of the Procfiles. If you don't do this, then `webpack` will not generate a new bundle, and you will be seriously confused when you change JavaScript and the app does not change. If you change the Webpack configs, then you need to restart Foreman. If you change the JS code for react-on-rails, you need to run `yarn run build` in the project root.
