@@ -182,20 +182,37 @@ module ReactOnRails
         File.write(".shakapacker_just_installed", "")
       end
 
+      # Checks whether "shakapacker" is present in the *current bundle*,
+      # without loading it. Prioritizes Gemfile.lock (cheap + accurate),
+      # then Bundler's resolved specs, and finally a light Gemfile scan.
       def shakapacker_in_gemfile?
-        return false unless File.exist?("Gemfile")
+        gem_name  = "shakapacker"
+        gemfile   = ENV["BUNDLE_GEMFILE"] || "Gemfile"
+        lockfile  = File.join(File.dirname(gemfile), "Gemfile.lock")
 
-        gemfile_content = File.read("Gemfile")
-        return true if gemfile_content.match?(/gem\s+['"]shakapacker['"]/)
+        # 1) Already loaded in this process?
+        return true if Gem.loaded_specs.key?(gem_name)
 
-        # Also check if shakapacker is already available in the current bundle
-        # This handles cases where it might be loaded from parent environments
-        begin
-          require "shakapacker"
-          true
-        rescue LoadError
-          false
+        # 2) Present in the lockfile? (handles git/path gems too)
+        if File.file?(lockfile)
+          # Lines look like: "    shakapacker (x.y.z)"
+          return true if File.foreach(lockfile).any? { |l| l.match?(/^\s{4}#{Regexp.escape(gem_name)}\s\(/) }
         end
+
+        # 3) Ask Bundler for resolved specs (doesn't require the gem code)
+        begin
+          require "bundler"
+          return true if Bundler.load.specs.any? { |s| s.name == gem_name }
+        rescue StandardError
+          # Fall through if Bundler isn't available or load fails
+        end
+
+        # 4) Fallback: direct Gemfile mention (not perfect, but cheap)
+        if File.file?(gemfile)
+          return true if File.foreach(gemfile).any? { |l| l.match?(/^\s*gem\s+['"]#{Regexp.escape(gem_name)}['"]/) }
+        end
+
+        false
       end
 
       def add_bin_scripts
