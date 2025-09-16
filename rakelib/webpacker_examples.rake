@@ -34,9 +34,9 @@ namespace :webpacker_examples do # rubocop:disable Metrics/BlockLength
       sh_in_dir(example_type.dir, "touch .gitignore")
       sh_in_dir(example_type.dir,
                 "echo \"gem 'react_on_rails', path: '#{relative_gem_root}'\" >> #{example_type.gemfile}")
-      sh_in_dir(example_type.dir, "echo \"gem 'shakapacker', '~> 6.6.0'\" >> #{example_type.gemfile}")
+      sh_in_dir(example_type.dir, "echo \"gem 'shakapacker', '~> 8.2.0'\" >> #{example_type.gemfile}")
       bundle_install_in(example_type.dir)
-      sh_in_dir(example_type.dir, "rake webpacker:install")
+      sh_in_dir(example_type.dir, "rake shakapacker:install")
       shell_commands = []
       env = "PACKAGE_JSON_FALLBACK_MANAGER=yarn_classic"
       options = example_type.generator_options
