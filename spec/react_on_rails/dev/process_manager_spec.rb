@@ -46,11 +46,12 @@ RSpec.describe ReactOnRails::Dev::ProcessManager do
     before do
       allow(ReactOnRails::Dev::FileManager).to receive(:cleanup_stale_files)
       allow_any_instance_of(Kernel).to receive(:system).and_return(true)
+      allow(File).to receive(:readable?).and_return(true)
     end
 
     it "uses overmind when available" do
       allow(described_class).to receive(:installed?).with("overmind").and_return(true)
-      expect_any_instance_of(Kernel).to receive(:system).with("overmind start -f Procfile.dev")
+      expect_any_instance_of(Kernel).to receive(:system).with("overmind", "start", "-f", "Procfile.dev")
 
       described_class.run_with_process_manager("Procfile.dev")
     end
@@ -58,7 +59,7 @@ RSpec.describe ReactOnRails::Dev::ProcessManager do
     it "uses foreman when overmind not available" do
       allow(described_class).to receive(:installed?).with("overmind").and_return(false)
       allow(described_class).to receive(:installed?).with("foreman").and_return(true)
-      expect_any_instance_of(Kernel).to receive(:system).with("foreman start -f Procfile.dev")
+      expect_any_instance_of(Kernel).to receive(:system).with("foreman", "start", "-f", "Procfile.dev")
 
       described_class.run_with_process_manager("Procfile.dev")
     end
