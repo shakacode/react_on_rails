@@ -70,7 +70,7 @@ module ReactOnRails
       # js(.coffee) are not checked by this method, but instead produce warning messages
       # and allow the build to continue
       def installation_prerequisites_met?
-        !(missing_node? || ReactOnRails::GitUtils.uncommitted_changes?(GeneratorMessages))
+        !(missing_node? || missing_package_manager? || ReactOnRails::GitUtils.uncommitted_changes?(GeneratorMessages))
       end
 
       def missing_node?
@@ -143,7 +143,7 @@ module ReactOnRails
               Then re-run: rails generate react_on_rails:install
             MSG
             GeneratorMessages.add_error(error)
-            exit(1)
+            raise Thor::Error, error
           end
           puts Rainbow("✅ Shakapacker added to Gemfile successfully!").green
         end
@@ -171,7 +171,7 @@ module ReactOnRails
             Need help? Visit: https://github.com/shakacode/shakapacker/blob/main/docs/installation.md
           MSG
           GeneratorMessages.add_error(error)
-          exit(1)
+          raise Thor::Error, error
         end
 
         puts Rainbow("✅ Shakapacker installed successfully!").green
@@ -237,6 +237,35 @@ module ReactOnRails
 
         File.file?(gemfile) &&
           File.foreach(gemfile).any? { |l| l.match?(/^\s*gem\s+['"]#{Regexp.escape(gem_name)}['"]/) }
+      end
+
+      def cli_exists?(command)
+        system("which #{command} > /dev/null 2>&1")
+      end
+
+      def missing_package_manager?
+        package_managers = %w[npm pnpm yarn bun]
+        missing = package_managers.none? { |pm| cli_exists?(pm) }
+
+        if missing
+          error = <<~MSG.strip
+            🚫 No JavaScript package manager found on your system.
+
+            React on Rails requires a JavaScript package manager to install dependencies.
+            Please install one of the following:
+
+            • npm: Usually comes with Node.js (https://nodejs.org/en/)
+            • yarn: npm install -g yarn (https://yarnpkg.com/)
+            • pnpm: npm install -g pnpm (https://pnpm.io/)
+            • bun: Install from https://bun.sh/
+
+            After installation, restart your terminal and try again.
+          MSG
+          GeneratorMessages.add_error(error)
+          return true
+        end
+
+        false
       end
 
       # Removed: Shakapacker auto-installation logic (now explicit dependency)
