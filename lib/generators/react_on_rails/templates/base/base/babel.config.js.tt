@@ -17,10 +17,9 @@ module.exports = function (api) {
       ]
     ].filter(Boolean),
     plugins: [
-      // Enable React Refresh (Fast Refresh) in development
-      // This should match the webpack plugin condition in config/webpack/development.js
-      // Only enabled when not in production - works with both HMR and non-HMR development modes
-      !isProductionEnv && 'react-refresh/babel',
+      // Enable React Refresh (Fast Refresh) only when webpack-dev-server is running (HMR mode)
+      // This prevents React Refresh from trying to connect when using static compilation
+      !isProductionEnv && process.env.WEBPACK_DEV_SERVER && 'react-refresh/babel',
       isProductionEnv && ['babel-plugin-transform-react-remove-prop-types',
         {
           removeImport: true
