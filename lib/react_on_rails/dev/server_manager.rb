@@ -297,11 +297,11 @@ module ReactOnRails
             React Refresh Issues:
             If you see "$RefreshSig$ is not defined" errors:
             1. Check that both babel plugin and webpack plugin are configured:
-               - babel.config.js: 'react-refresh/babel' plugin (enabled in development)
-               - config/webpack/development.js: ReactRefreshWebpackPlugin (enabled in development)
-            2. Ensure you're running in development mode (NODE_ENV=development)
+               - babel.config.js: 'react-refresh/babel' plugin (enabled when WEBPACK_DEV_SERVER=true)
+               - config/webpack/development.js: ReactRefreshWebpackPlugin (enabled when inliningCss=true)
+            2. Ensure you're running HMR mode: bin/dev (not bin/dev static)
             3. Try restarting the development server: bin/dev kill && bin/dev
-            4. Note: React Refresh works with both HMR enabled and disabled
+            4. Note: React Refresh only works in HMR mode, not static mode
 
             General Issues:
             • "Port already in use" → Run: bin/dev kill
