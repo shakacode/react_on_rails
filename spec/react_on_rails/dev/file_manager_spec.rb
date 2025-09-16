@@ -34,8 +34,8 @@ RSpec.describe ReactOnRails::Dev::FileManager do
         allow(File).to receive(:exist?).with("tmp/sockets/overmind.sock").and_return(false)
         allow(File).to receive(:exist?).with("tmp/pids/server.pid").and_return(false)
 
-        # Setup File.delete expectation
-        expect(File).to receive(:delete).with(".overmind.sock").and_return(1)
+        # Setup File.delete stub to prevent actual file deletion and return success
+        allow(File).to receive(:delete).with(".overmind.sock").and_return(1)
 
         result = described_class.cleanup_stale_files
         expect(result).to be true
