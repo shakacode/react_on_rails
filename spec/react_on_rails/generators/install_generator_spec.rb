@@ -73,6 +73,7 @@ describe InstallGenerator, type: :generator do
     specify "when node is exist" do
       stub_const("RUBY_PLATFORM", "linux")
       allow(install_generator).to receive(:`).with("which node").and_return("/path/to/bin")
+      allow(install_generator).to receive(:`).with("node --version 2>/dev/null").and_return("v20.0.0")
       expect(install_generator.send(:missing_node?)).to be false
     end
   end
@@ -93,6 +94,7 @@ describe InstallGenerator, type: :generator do
     specify "when node is exist" do
       stub_const("RUBY_PLATFORM", "mswin")
       allow(install_generator).to receive(:`).with("where node").and_return("/path/to/bin")
+      allow(install_generator).to receive(:`).with("node --version 2>/dev/null").and_return("v20.0.0")
       expect(install_generator.send(:missing_node?)).to be false
     end
   end
