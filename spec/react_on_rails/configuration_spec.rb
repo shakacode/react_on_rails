@@ -32,7 +32,7 @@ module ReactOnRails
           .and_return(packer_public_output_path)
       end
 
-      it "does not throw if the generated assets dir is blank with webpacker" do
+      it "does not throw if the generated assets dir is blank with shakapacker" do
         expect do
           ReactOnRails.configure do |config|
             config.generated_assets_dir = ""
@@ -76,45 +76,7 @@ module ReactOnRails
     end
 
     describe ".build_production_command" do
-      context "when using Shakapacker 6", if: ReactOnRails::PackerUtils.packer_type != "shakapacker" do
-        it "fails when \"shakapacker_precompile\" is truly and \"build_production_command\" is truly" do
-          allow(Webpacker).to receive_message_chain("config.webpacker_precompile?")
-            .and_return(true)
-          expect do
-            ReactOnRails.configure do |config|
-              config.build_production_command = "RAILS_ENV=production NODE_ENV=production bin/shakapacker"
-            end
-          end.to raise_error(ReactOnRails::Error, /webpacker_precompile: false/)
-        end
-
-        it "doesn't fail when \"shakapacker_precompile\" is falsy and \"build_production_command\" is truly" do
-          allow(Webpacker).to receive_message_chain("config.webpacker_precompile?")
-            .and_return(false)
-          expect do
-            ReactOnRails.configure do |config|
-              config.build_production_command = "RAILS_ENV=production NODE_ENV=production bin/shakapacker"
-            end
-          end.not_to raise_error
-        end
-
-        it "doesn't fail when \"shakapacker_precompile\" is truly and \"build_production_command\" is falsy" do
-          allow(Webpacker).to receive_message_chain("config.webpacker_precompile?")
-            .and_return(true)
-          expect do
-            ReactOnRails.configure {} # rubocop:disable-line Lint/EmptyBlock
-          end.not_to raise_error
-        end
-
-        it "doesn't fail when \"shakapacker_precompile\" is falsy and \"build_production_command\" is falsy" do
-          allow(Webpacker).to receive_message_chain("config.webpacker_precompile?")
-            .and_return(false)
-          expect do
-            ReactOnRails.configure {} # rubocop:disable-line Lint/EmptyBlock
-          end.not_to raise_error
-        end
-      end
-
-      context "when using Shakapacker 8", if: ReactOnRails::PackerUtils.packer_type == "shakapacker" do
+      context "when using Shakapacker 8" do
         it "fails when \"shakapacker_precompile\" is truly and \"build_production_command\" is truly" do
           allow(Shakapacker).to receive_message_chain("config.shakapacker_precompile?")
             .and_return(true)
