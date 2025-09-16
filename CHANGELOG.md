@@ -40,8 +40,8 @@ See [Release Notes](docs/release-notes/15.0.0.md) for full details.
   - For TypeScript errors, upgrade to TypeScript 5.8+ and set `module` to `nodenext`.
 - `ReactOnRails.reactOnRailsPageLoaded` is now an async function. Migration:
   - Add `await` when calling this function: `await ReactOnRails.reactOnRailsPageLoaded()`.
-- `force_load` configuration now defaults to `true`. Migration:
-  - Set `force_load: false` in your config if you want the previous behavior.
+- `immediate_hydration` configuration now defaults to `false`. Migration:
+  - Set `immediate_hydration: true` in your config if you want immediate hydration behavior.
 
 For detailed migration instructions, see the [15.0.0 Release Notes](docs/release-notes/15.0.0.md).
 

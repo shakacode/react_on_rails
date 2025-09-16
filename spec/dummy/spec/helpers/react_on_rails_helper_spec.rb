@@ -355,23 +355,23 @@ describe ReactOnRailsHelper do
       it { is_expected.to include '<div id="App-react-component-0"></div>' }
     end
 
-    describe "'force_load' tag option" do
-      let(:force_load_script) do
+    describe "'immediate_hydration' tag option" do
+      let(:immediate_hydration_script) do
         %(
 typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('App-react-component-0');
         ).html_safe
       end
 
-      context "with 'force_load' == false" do
-        subject { react_component("App", force_load: false) }
+      context "with 'immediate_hydration' == false" do
+        subject { react_component("App", immediate_hydration: false) }
 
-        it { is_expected.not_to include force_load_script }
+        it { is_expected.not_to include immediate_hydration_script }
       end
 
-      context "without 'force_load' tag option" do
+      context "without 'immediate_hydration' tag option" do
         subject { react_component("App") }
 
-        it { is_expected.to include force_load_script }
+        it { is_expected.to include immediate_hydration_script }
       end
     end
 
@@ -382,8 +382,8 @@ typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('Ap
         allow(Rails.logger).to receive(:warn)
       end
 
-      context "when Pro license is NOT installed and force_load is true" do
-        subject(:react_app) { react_component("App", props: props, force_load: true) }
+      context "when Pro license is NOT installed and immediate_hydration is true" do
+        subject(:react_app) { react_component("App", props: props, immediate_hydration: true) }
 
         before do
           allow(ReactOnRails::Utils).to receive(:react_on_rails_pro_licence_valid?).and_return(false)
@@ -393,11 +393,11 @@ typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('Ap
 
         it "logs a warning" do
           react_app
-          expect(Rails.logger).to have_received(:warn).with(a_string_matching(/The 'force_load' feature requires/))
+          expect(Rails.logger).to have_received(:warn).with(a_string_matching(/The 'immediate_hydration' feature requires/))
         end
       end
 
-      context "when Pro license is NOT installed and global force_load is true" do
+      context "when Pro license is NOT installed and global immediate_hydration is true" do
         subject(:react_app) { react_component("App", props: props) }
 
         before do
@@ -405,16 +405,16 @@ typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('Ap
         end
 
         around do |example|
-          ReactOnRails.configure { |config| config.force_load = true }
+          ReactOnRails.configure { |config| config.immediate_hydration = true }
           example.run
-          ReactOnRails.configure { |config| config.force_load = false }
+          ReactOnRails.configure { |config| config.immediate_hydration = false }
         end
 
         it { is_expected.to include(badge_html_string) }
       end
 
-      context "when Pro license is NOT installed and force_load is false" do
-        subject(:react_app) { react_component("App", props: props, force_load: false) }
+      context "when Pro license is NOT installed and immediate_hydration is false" do
+        subject(:react_app) { react_component("App", props: props, immediate_hydration: false) }
 
         before do
           allow(ReactOnRails::Utils).to receive(:react_on_rails_pro_licence_valid?).and_return(false)
@@ -428,8 +428,8 @@ typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('Ap
         end
       end
 
-      context "when Pro license IS installed and force_load is true" do
-        subject(:react_app) { react_component("App", props: props, force_load: true) }
+      context "when Pro license IS installed and immediate_hydration is true" do
+        subject(:react_app) { react_component("App", props: props, immediate_hydration: true) }
 
         before do
           allow(ReactOnRails::Utils).to receive_messages(
@@ -475,8 +475,8 @@ typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('Ap
         allow(Rails.logger).to receive(:warn)
       end
 
-      context "when Pro license is NOT installed and force_load is true" do
-        subject(:react_app) { react_component_hash("App", props: props, force_load: true) }
+      context "when Pro license is NOT installed and immediate_hydration is true" do
+        subject(:react_app) { react_component_hash("App", props: props, immediate_hydration: true) }
 
         before do
           allow(ReactOnRails::Utils).to receive(:react_on_rails_pro_licence_valid?).and_return(false)
@@ -487,8 +487,8 @@ typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('Ap
         end
       end
 
-      context "when Pro license IS installed and force_load is true" do
-        subject(:react_app) { react_component_hash("App", props: props, force_load: true) }
+      context "when Pro license IS installed and immediate_hydration is true" do
+        subject(:react_app) { react_component_hash("App", props: props, immediate_hydration: true) }
 
         before do
           allow(ReactOnRails::Utils).to receive_messages(
@@ -504,7 +504,7 @@ typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('Ap
   end
 
   describe "#redux_store" do
-    subject(:store) { redux_store("reduxStore", props: props, force_load: true) }
+    subject(:store) { redux_store("reduxStore", props: props, immediate_hydration: true) }
 
     let(:props) do
       { name: "My Test Name" }
@@ -533,8 +533,8 @@ typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('Ap
         allow(Rails.logger).to receive(:warn)
       end
 
-      context "when Pro license is NOT installed and force_load is true" do
-        subject(:store) { redux_store("reduxStore", props: props, force_load: true) }
+      context "when Pro license is NOT installed and immediate_hydration is true" do
+        subject(:store) { redux_store("reduxStore", props: props, immediate_hydration: true) }
 
         before do
           allow(ReactOnRails::Utils).to receive(:react_on_rails_pro_licence_valid?).and_return(false)
@@ -544,12 +544,12 @@ typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('Ap
 
         it "logs a warning" do
           store
-          expect(Rails.logger).to have_received(:warn).with(a_string_matching(/The 'force_load' feature requires/))
+          expect(Rails.logger).to have_received(:warn).with(a_string_matching(/The 'immediate_hydration' feature requires/))
         end
       end
 
-      context "when Pro license is NOT installed and force_load is false" do
-        subject(:store) { redux_store("reduxStore", props: props, force_load: false) }
+      context "when Pro license is NOT installed and immediate_hydration is false" do
+        subject(:store) { redux_store("reduxStore", props: props, immediate_hydration: false) }
 
         before do
           allow(ReactOnRails::Utils).to receive(:react_on_rails_pro_licence_valid?).and_return(false)
@@ -558,8 +558,8 @@ typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('Ap
         it { is_expected.not_to include(badge_html_string) }
       end
 
-      context "when Pro license IS installed and force_load is true" do
-        subject(:store) { redux_store("reduxStore", props: props, force_load: true) }
+      context "when Pro license IS installed and immediate_hydration is true" do
+        subject(:store) { redux_store("reduxStore", props: props, immediate_hydration: true) }
 
         before do
           allow(ReactOnRails::Utils).to receive_messages(
