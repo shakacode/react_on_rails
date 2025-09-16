@@ -208,7 +208,17 @@ module ReactOnRails
 
       def install_shakapacker
         puts Rainbow("⚙️  Installing Shakapacker (required for webpack integration)...").yellow
-        success = system("./bin/rails shakapacker:install")
+
+        # First run bundle install to make shakapacker available
+        puts Rainbow("📦 Running bundle install...").yellow
+        bundle_success = system("bundle install")
+        unless bundle_success
+          handle_shakapacker_install_error
+          return
+        end
+
+        # Then run the shakapacker installer
+        success = system("bundle exec rails shakapacker:install")
         return if success
 
         handle_shakapacker_install_error
@@ -254,9 +264,10 @@ module ReactOnRails
 
           Troubleshooting steps:
           1. Ensure Node.js is installed: node --version
-          2. Try manually: ./bin/rails shakapacker:install
-          3. Check for error output above
-          4. Re-run: rails generate react_on_rails:install
+          2. Run: bundle install
+          3. Try manually: bundle exec rails shakapacker:install
+          4. Check for error output above
+          5. Re-run: rails generate react_on_rails:install
 
           Need help? Visit: https://github.com/shakacode/shakapacker/blob/main/docs/installation.md
         MSG
