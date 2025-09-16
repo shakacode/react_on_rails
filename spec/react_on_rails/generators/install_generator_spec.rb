@@ -54,6 +54,13 @@ describe InstallGenerator, type: :generator do
       GeneratorMessages.format_info(GeneratorMessages.helpful_message_after_installation)
     end
 
+    before do
+      # Mock Shakapacker installation to succeed so we get the success message
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with("bin/shakapacker").and_return(true)
+      allow(File).to receive(:exist?).with("bin/shakapacker-dev-server").and_return(true)
+    end
+
     specify "base generator contains a helpful message" do
       run_generator_test_with_args(%w[], package_json: true)
       # GeneratorMessages.output is an array with the git error being the first one
