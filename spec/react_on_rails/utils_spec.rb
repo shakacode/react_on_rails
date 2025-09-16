@@ -463,9 +463,16 @@ module ReactOnRails
 
           it "trims handles a hash" do
             s = { a: "1234567890" }
-            expect(described_class.smart_trim(s, 9)).to eq(
-              "{:a=#{Utils::TRUNCATION_FILLER}890\"}"
-            )
+            result = described_class.smart_trim(s, 9)
+
+            # Ruby 3.4+ uses modern hash syntax: {a: "value"}
+            # Ruby 3.3 uses old syntax: {:a=>"value"}
+            expected_modern = "{a: #{Utils::TRUNCATION_FILLER}890\"}"
+            expected_legacy = "{:a=#{Utils::TRUNCATION_FILLER}890\"}"
+
+            expect(result).to satisfy("match either Ruby 3.3 or 3.4+ hash format") do |value|
+              value == expected_modern || value == expected_legacy
+            end
           end
         end
       end

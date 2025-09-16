@@ -65,9 +65,13 @@ module ReactOnRails
         it "shows truncated backtrace with notice" do
           message = expected_error.message
           expect(message).to include(err.inspect)
-          expect(message).to include(
-            "spec/react_on_rails/prender_error_spec.rb:20:in `block (2 levels) in <module:ReactOnRails>'"
-          )
+
+          # Ruby 3.4 includes class/module names in backtrace method names, but core pattern remains
+          # Ruby 3.3: "spec/react_on_rails/prender_error_spec.rb:20:in `block (2 levels) in <module:ReactOnRails>'"
+          # Ruby 3.4: "spec/react_on_rails/prender_error_spec.rb:20:in `SomeClass#block (2 levels) in <module:ReactOnRails>'"
+          expect(message).to include("spec/react_on_rails/prender_error_spec.rb:20")
+          expect(message).to include("block (2 levels) in <module:ReactOnRails>")
+
           expect(message).to include("The rest of the backtrace is hidden")
         end
       end
