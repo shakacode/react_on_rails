@@ -14,6 +14,9 @@ import * as ComponentRegistry from './ComponentRegistry.ts';
 import { onPageLoaded } from './pageLifecycle.ts';
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
+const IMMEDIATE_HYDRATION_PRO_WARNING =
+  "[REACT ON RAILS] The 'immediate_hydration' feature requires a React on Rails Pro license. " +
+  'Please visit https://shakacode.com/react-on-rails-pro to get a license.';
 
 async function delegateToRenderer(
   componentObj: RegisteredComponent,
@@ -79,18 +82,19 @@ class ComponentRenderer {
    * delegates to a renderer registered by the user.
    */
   private async render(el: Element, railsContext: RailsContext): Promise<void> {
-    const isComponentForceLoaded = el.getAttribute('data-force-load') === 'true';
-    if (!railsContext.rorPro && (isComponentForceLoaded || document.readyState === 'loading')) {
-      console.warn(
-        "[REACT ON RAILS] The 'force_load' feature is being used without a React on Rails Pro license. " +
-          "That's not allowed. " +
-          'Please visit https://shakacode.com/react-on-rails-pro to get a license.',
-      );
+    const isImmediateHydrationRequested = el.getAttribute('data-immediate-hydration') === 'true';
+    const hasProLicense = railsContext.rorPro;
 
-      // Wait for the page to be loaded before continuing
-      await new Promise<void>((resolve) => {
-        onPageLoaded(resolve);
-      });
+    // Handle immediate_hydration feature usage without Pro license
+    if (isImmediateHydrationRequested && !hasProLicense) {
+      console.warn(IMMEDIATE_HYDRATION_PRO_WARNING);
+
+      // Fallback to standard behavior: wait for page load before hydrating
+      if (document.readyState === 'loading') {
+        await new Promise<void>((resolve) => {
+          onPageLoaded(resolve);
+        });
+      }
     }
 
     // This must match lib/react_on_rails/helper.rb

@@ -103,7 +103,7 @@ document.addEventListener('turbolinks:load', function () {
 React on Rails 15 fixes both issues, so if you still have the listener it can be removed (and should be as `reactOnRailsPageLoaded()` is now async).
 
 > [!WARNING]
-> Do not use `force_load: false` with Turbolinks if you have async scripts.
+> Do not use `immediate_hydration: false` (React on Rails Pro licensed feature) with Turbolinks if you have async scripts.
 
 ## Troubleshooting
 

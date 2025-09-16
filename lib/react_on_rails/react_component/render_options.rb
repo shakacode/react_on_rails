@@ -95,8 +95,8 @@ module ReactOnRails
         retrieve_configuration_value_for(:logging_on_server)
       end
 
-      def force_load
-        retrieve_configuration_value_for(:force_load)
+      def immediate_hydration
+        retrieve_configuration_value_for(:immediate_hydration)
       end
 
       def to_s
