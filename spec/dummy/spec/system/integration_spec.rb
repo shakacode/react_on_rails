@@ -86,7 +86,7 @@ context "when Server Rendering with Options", :js do
   include_examples "React Component", "div#my-hello-world-id"
 end
 
-shared_context 'with pro features and immediate hydration' do
+shared_context "with pro features and immediate hydration" do
   before do
     allow(ReactOnRails::Utils).to receive(:react_on_rails_pro_licence_valid?).and_return(true)
   end
@@ -100,7 +100,8 @@ end
 
 describe "Turbolinks across pages", :js do
   subject { page }
-  include_context 'with pro features and immediate hydration'
+
+  include_context "with pro features and immediate hydration"
 
   it "changes name in message according to input" do
     visit "/client_side_hello_world"
@@ -112,7 +113,8 @@ end
 
 describe "TurboStream send react component", :js do
   subject { page }
-  include_context 'with pro features and immediate hydration'
+
+  include_context "with pro features and immediate hydration"
 
   it "force load hello-world component immediately" do
     visit "/turbo_frame_tag_hello_world"
