@@ -240,8 +240,6 @@ module ReactOnRails
         MSG
         GeneratorMessages.add_error(error)
         raise Thor::Error, error unless options.ignore_warnings?
-
-        return
       end
 
       def handle_shakapacker_install_error
@@ -264,8 +262,6 @@ module ReactOnRails
         MSG
         GeneratorMessages.add_error(error)
         raise Thor::Error, error unless options.ignore_warnings?
-
-        return
       end
 
       def missing_package_manager?
