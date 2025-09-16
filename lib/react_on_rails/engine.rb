@@ -10,8 +10,9 @@ module ReactOnRails
     end
 
     rake_tasks do
-      path = File.join(File.dirname(__FILE__), "..", "tasks", "*.rake")
-      Dir[path].each { |f| load f }
+      load File.expand_path("../tasks/generate_packs.rake", __dir__)
+      load File.expand_path("../tasks/assets.rake", __dir__)
+      load File.expand_path("../tasks/locale.rake", __dir__)
     end
   end
 end
