@@ -33,10 +33,8 @@ describe ReactOnRailsHelper do
   end
 
   after do
-    # Reset to default
-    ReactOnRails.configure do |config|
-      config.immediate_hydration = false
-    end
+    # Reset to default - avoid validation issues by setting directly
+    ReactOnRails.configuration.immediate_hydration = false
   end
 
   let(:hash) do
@@ -405,7 +403,8 @@ typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('Ap
 
         it "logs a warning" do
           react_app
-          expect(Rails.logger).to have_received(:warn).with(a_string_matching(/The 'immediate_hydration' feature requires/))
+          expect(Rails.logger).to have_received(:warn)
+            .with(a_string_matching(/The 'immediate_hydration' feature requires/))
         end
       end
 
@@ -556,7 +555,8 @@ typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('Ap
 
         it "logs a warning" do
           store
-          expect(Rails.logger).to have_received(:warn).with(a_string_matching(/The 'immediate_hydration' feature requires/))
+          expect(Rails.logger).to have_received(:warn)
+            .with(a_string_matching(/The 'immediate_hydration' feature requires/))
         end
       end
 
