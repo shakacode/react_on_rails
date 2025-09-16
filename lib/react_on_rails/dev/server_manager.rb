@@ -2,6 +2,7 @@
 
 require "English"
 require "open3"
+require "rainbow"
 
 module ReactOnRails
   module Dev
@@ -168,7 +169,7 @@ module ReactOnRails
             • Source maps for debugging
             • May have Flash of Unstyled Content (FOUC)
             • Fast recompilation
-            • Access at: http://localhost:3000
+            • Access at: http://localhost:3000/hello_world
 
             Static development mode - Procfile.dev-static-assets:
             • No HMR (static assets with auto-recompilation)
@@ -177,7 +178,7 @@ module ReactOnRails
             • CSS extracted to separate files (no FOUC)
             • Development environment (faster builds than production)
             • Source maps for debugging
-            • Access at: http://localhost:3000
+            • Access at: http://localhost:3000/hello_world
 
             Production-assets mode - Procfile.dev-prod-assets:
             • React on Rails pack generation before Procfile start
@@ -186,7 +187,7 @@ module ReactOnRails
             • Extracted CSS files (no FOUC)
             • No HMR (static assets)
             • Slower recompilation
-            • Access at: http://localhost:3001
+            • Access at: http://localhost:3001/hello_world
           MODES
         end
 
@@ -249,7 +250,8 @@ module ReactOnRails
           puts title
           features.each { |feature| puts "   - #{feature}" }
           puts ""
-          puts "💡 Access at: http://localhost:#{port}"
+          puts ""
+          puts "💡 Access at: #{Rainbow("http://localhost:#{port}/hello_world").cyan.underline}"
           puts ""
         end
 
@@ -262,7 +264,8 @@ module ReactOnRails
           puts box_empty_line(box_width)
           puts format_box_line("📋 Using Procfile: #{procfile}", box_width)
           puts format_box_line("🔧 Customize this file for your app's needs", box_width)
-          puts format_box_line("💡 Access at: http://localhost:#{port}", box_width)
+          puts box_empty_line(box_width)
+          puts format_box_line("💡 Access at: #{Rainbow("http://localhost:#{port}/hello_world").cyan.underline}", box_width)
           puts box_empty_line(box_width)
           puts box_bottom(box_width)
           puts ""
