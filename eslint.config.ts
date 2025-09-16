@@ -152,6 +152,8 @@ const config = tsEslint.config([
       'import/no-unresolved': 'off',
       // We have `const [name, setName] = useState(props.name)` so can't just destructure props
       'react/destructuring-assignment': 'off',
+      // React 19 doesn't need PropTypes - we're targeting modern React
+      'react/prop-types': 'off',
     },
   },
   {

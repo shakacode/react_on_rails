@@ -41,7 +41,7 @@ RSpec.describe ReactOnRails::Dev::FileManager do
         allow_any_instance_of(Object).to receive(:puts)
 
         result = described_class.cleanup_stale_files
-        expect(result).to be_truthy  # Accept any truthy value
+        expect(result).to be_truthy # Accept any truthy value
       end
 
       it "does not remove socket files when they don't exist" do
