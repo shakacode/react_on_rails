@@ -6,6 +6,7 @@ require_relative "generator_messages"
 
 module ReactOnRails
   module Generators
+    # rubocop:disable Metrics/ClassLength
     class InstallGenerator < Rails::Generators::Base
       include GeneratorHelper
 
@@ -186,31 +187,12 @@ module ReactOnRails
       # without loading it. Prioritizes Gemfile.lock (cheap + accurate),
       # then Bundler's resolved specs, and finally a light Gemfile scan.
       def shakapacker_in_gemfile?
-        gem_name  = "shakapacker"
-        gemfile   = ENV["BUNDLE_GEMFILE"] || "Gemfile"
-        lockfile  = File.join(File.dirname(gemfile), "Gemfile.lock")
+        gem_name = "shakapacker"
 
-        # 1) Already loaded in this process?
-        return true if Gem.loaded_specs.key?(gem_name)
-
-        # 2) Present in the lockfile? (handles git/path gems too)
-        if File.file?(lockfile)
-          # Lines look like: "    shakapacker (x.y.z)"
-          return true if File.foreach(lockfile).any? { |l| l.match?(/^\s{4}#{Regexp.escape(gem_name)}\s\(/) }
-        end
-
-        # 3) Ask Bundler for resolved specs (doesn't require the gem code)
-        begin
-          require "bundler"
-          return true if Bundler.load.specs.any? { |s| s.name == gem_name }
-        rescue StandardError
-          # Fall through if Bundler isn't available or load fails
-        end
-
-        # 4) Fallback: direct Gemfile mention (not perfect, but cheap)
-        if File.file?(gemfile)
-          return true if File.foreach(gemfile).any? { |l| l.match?(/^\s*gem\s+['"]#{Regexp.escape(gem_name)}['"]/) }
-        end
+        return true if shakapacker_loaded_in_process?(gem_name)
+        return true if shakapacker_in_lockfile?(gem_name)
+        return true if shakapacker_in_bundler_specs?(gem_name)
+        return true if shakapacker_in_gemfile_text?(gem_name)
 
         false
       end
@@ -232,9 +214,35 @@ module ReactOnRails
         GeneratorMessages.add_info(GeneratorMessages.helpful_message_after_installation)
       end
 
+      def shakapacker_loaded_in_process?(gem_name)
+        Gem.loaded_specs.key?(gem_name)
+      end
+
+      def shakapacker_in_lockfile?(gem_name)
+        gemfile = ENV["BUNDLE_GEMFILE"] || "Gemfile"
+        lockfile = File.join(File.dirname(gemfile), "Gemfile.lock")
+
+        File.file?(lockfile) && File.foreach(lockfile).any? { |l| l.match?(/^\s{4}#{Regexp.escape(gem_name)}\s\(/) }
+      end
+
+      def shakapacker_in_bundler_specs?(gem_name)
+        require "bundler"
+        Bundler.load.specs.any? { |s| s.name == gem_name }
+      rescue StandardError
+        false
+      end
+
+      def shakapacker_in_gemfile_text?(gem_name)
+        gemfile = ENV["BUNDLE_GEMFILE"] || "Gemfile"
+
+        File.file?(gemfile) &&
+          File.foreach(gemfile).any? { |l| l.match?(/^\s*gem\s+['"]#{Regexp.escape(gem_name)}['"]/) }
+      end
+
       # Removed: Shakapacker auto-installation logic (now explicit dependency)
 
       # Removed: Shakapacker 8+ is now required as explicit dependency
     end
+    # rubocop:enable Metrics/ClassLength
   end
 end
