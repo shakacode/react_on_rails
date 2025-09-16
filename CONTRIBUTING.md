@@ -268,6 +268,44 @@ The generators are covered by generator tests using Rails's generator testing he
 
 `rake run_rspec:shakapacker_examples_basic` is a great way to run tests on one generator. Once that works, you should run `rake run_rspec:shakapacker_examples`. Be aware that this will create a huge number of files under a `/gen-examples` directory. You should be sure to exclude this directory from your IDE and delete it once your testing is done.
 
+#### Testing Generator with Yalc for React Component Functionality
+
+When testing the install generator with new Rails apps, you need to use **yalc** for the JavaScript package to ensure React components work correctly. The Ruby gem path reference is insufficient for client-side rendering.
+
+**Problem**: Using only the gem path (`gem "react_on_rails", path: "../path"`) in a new Rails app results in React components not mounting on the client side, even though server-side rendering works fine.
+
+**Solution**: Use both gem path and yalc for complete testing:
+
+```ruby
+# In test app's Gemfile
+gem 'react_on_rails', path: '../relative/path/to/react_on_rails'
+```
+
+```bash
+# After running the install generator
+cd /path/to/react_on_rails
+npm run build
+npx yalc publish
+
+cd /path/to/test_app
+npx yalc add react-on-rails
+npm install
+
+# Restart development server
+bin/dev
+```
+
+**Why this is needed**:
+- The gem provides Rails integration and server-side rendering
+- Yalc provides the complete JavaScript client library needed for component mounting
+- Without yalc, you'll see empty divs where React components should render
+
+**Verification**:
+- Visit the hello_world page in browser
+- Check browser console for "RENDERED HelloWorld to dom node" success message
+- Confirm React component is interactive (input field updates name display)
+- Use `bin/dev static` mode for cleanest console output during testing
+
 ### Linting
 
 All linting is performed from the docker container for CI. You will need docker and docker-compose installed locally to lint code changes via the lint container. You can lint locally by running `npm run lint && npm run flow`
