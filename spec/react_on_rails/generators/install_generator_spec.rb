@@ -68,7 +68,7 @@ describe InstallGenerator, type: :generator do
       expect(output_text).to include("🎉 React on Rails Successfully Installed!")
       expect(output_text).to include("📋 QUICK START:")
       expect(output_text).to include("✨ KEY FEATURES:")
-      expect(output_text).to include("🧪 TESTING SETUP")
+      expect(output_text).to include("💡 TIP: Run 'bin/dev help'")
     end
 
     specify "react with redux generator contains a helpful message" do
@@ -78,7 +78,7 @@ describe InstallGenerator, type: :generator do
       expect(output_text).to include("🎉 React on Rails Successfully Installed!")
       expect(output_text).to include("📋 QUICK START:")
       expect(output_text).to include("✨ KEY FEATURES:")
-      expect(output_text).to include("🧪 TESTING SETUP")
+      expect(output_text).to include("💡 TIP: Run 'bin/dev help'")
     end
   end
 
