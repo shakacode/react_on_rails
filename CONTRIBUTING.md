@@ -79,17 +79,19 @@ yalc add react-on-rails
 The workflow is:
 
 1. Make changes to the node package.
-2. We need yalc to push and then run yarn:
+2. **CRITICAL**: Run yalc push to send updates to all linked apps:
 
 ```
 cd <top dir>
-# Will send the updates to other folders
+# Will send the updates to other folders - MUST DO THIS AFTER ANY CHANGES
 yalc push
 cd spec/dummy
 
 # Will update from yalc
 yarn
 ```
+
+**⚠️ Common Mistake**: Forgetting to run `yalc push` after making changes to React on Rails source code will result in test apps not receiving updates, making it appear that your changes have no effect.
 
 When you run `yalc push`, you'll get an informative message
 
@@ -388,18 +390,40 @@ gem 'react_on_rails', path: '../relative/path/to/react_on_rails'
 ```
 
 ```bash
-# After running the install generator
+# After running the install generator AND after making any changes to the React on Rails source code
 cd /path/to/react_on_rails
 npm run build
 npx yalc publish
+# CRITICAL: Push changes to all linked apps
+npx yalc push
 
 cd /path/to/test_app
-npx yalc add react-on-rails
 npm install
 
 # Restart development server
 bin/dev
 ```
+
+**⚠️ CRITICAL DEBUGGING NOTE:**
+Always run `yalc push` after making changes to React on Rails source code. Without this step, your test app won't receive the updated package, leading to confusing behavior where changes appear to have no effect.
+
+**Alternative to Yalc: npm pack (More Reliable)**
+For a more reliable alternative that exactly mimics real package installation:
+
+```bash
+# In react_on_rails directory
+npm run build
+npm pack  # Creates react-on-rails-15.0.0.tgz
+
+# In test app directory
+npm install ../path/to/react_on_rails/react-on-rails-15.0.0.tgz
+```
+
+This approach:
+- ✅ Exactly mimics real package installation
+- ✅ No symlink issues across different filesystems  
+- ✅ More reliable for CI/CD testing
+- ⚠️ Requires manual step after each change (can be scripted)
 
 **Why this is needed**:
 - The gem provides Rails integration and server-side rendering

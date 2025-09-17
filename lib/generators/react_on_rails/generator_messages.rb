@@ -50,6 +50,7 @@ module GeneratorMessages
         ║  🎉 React on Rails Successfully Installed!                             ║
         ╚════════════════════════════════════════════════════════════════════════╝
         #{process_manager_section}#{shakapacker_status}
+
         📋 QUICK START:
         ─────────────────────────────────────────────────────────────────────────
         1. Install dependencies:
@@ -86,10 +87,10 @@ module GeneratorMessages
       process_manager = detect_process_manager
       if process_manager
         if process_manager == "overmind"
-          "\n                   #{Rainbow("#{process_manager} detected ✓").green} " \
+          "\n📦 #{Rainbow("#{process_manager} detected ✓").green} " \
             "#{Rainbow('(Recommended for easier debugging)').blue}"
         else
-          "\n                   #{Rainbow("#{process_manager} detected ✓").green}"
+          "\n📦 #{Rainbow("#{process_manager} detected ✓").green}"
         end
       else
         <<~INSTALL
@@ -138,9 +139,9 @@ module GeneratorMessages
           #{Rainbow('✓ Webpack integration configured').green}
         SHAKAPACKER
       elsif File.exist?("bin/shakapacker") && File.exist?("bin/shakapacker-dev-server")
-        "\n                📦 #{Rainbow('Shakapacker already configured ✓').green}"
+        "\n📦 #{Rainbow('Shakapacker already configured ✓').green}"
       else
-        "\n                📦 #{Rainbow('Shakapacker setup may be incomplete').yellow}"
+        "\n📦 #{Rainbow('Shakapacker setup may be incomplete').yellow}"
       end
     end
 
