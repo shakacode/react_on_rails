@@ -27,10 +27,10 @@ Changes since the last non-beta release.
 
 #### Removed (Breaking Changes)
 
-- **Webpacker support completely removed**. Shakapacker 8.2+ is now required.
+- **Webpacker support completely removed**. Shakapacker >= 6.0 is now required.
   - Migration:
     - Remove any `webpacker` gem references from your Gemfile
-    - Ensure `shakapacker` gem version 8.2.0 or higher is installed
+    - Ensure `shakapacker` gem version 6.0 or higher is installed (8.0+ recommended)
     - Replace any `bin/webpacker` commands with `bin/shakapacker`
     - Update any webpacker configuration files to shakapacker equivalents
   - Removed files: `rakelib/webpacker_examples.rake`, `lib/generators/react_on_rails/adapt_for_older_shakapacker_generator.rb`
