@@ -43,6 +43,9 @@ Changes since the last non-beta release.
 - **Cleaner generated code**: Streamlined templates following modern React and TypeScript best practices
 - **Improved helper methods**: Added reusable `component_extension` helper for consistent file extension handling
 
+#### Added
+- **`react_on_rails:doctor` generator**: New diagnostic command to validate React on Rails setup and identify configuration issues. Provides comprehensive checks for environment prerequisites, dependencies, Rails integration, and Webpack configuration. Use `rails generate react_on_rails:doctor` to diagnose your setup, with optional `--verbose` flag for detailed output.
+
 ### [16.0.0] - 2025-09-16
 
 **React on Rails v16 is a major release that modernizes the library with ESM support, removes legacy Webpacker compatibility, and introduces significant performance improvements. This release builds on the foundation of v14 with enhanced RSC (React Server Components) support and streamlined configuration.**
