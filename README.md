@@ -62,6 +62,16 @@ rails generate react_on_rails:install
 - `shakapacker.yml` settings
 - other configuration files
 
+### Troubleshooting Setup Issues
+
+If you encounter issues during installation or after upgrading, use the doctor command to diagnose your setup:
+
+```bash
+rails generate react_on_rails:doctor
+```
+
+The doctor command checks your environment, dependencies, and configuration files to identify potential issues. Use `--verbose` for detailed output.
+
 For detailed upgrade instructions, see [upgrade guide documentation](docs/guides/upgrading-react-on-rails.md).
 
 ## React on Rails Pro
