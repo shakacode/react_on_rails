@@ -243,7 +243,7 @@ module ReactOnRails
           puts
         end
 
-        if @checker.has_warnings?
+        if @checker.warnings?
           puts Rainbow("Suggested Improvements:").yellow.bold
           puts "• Review warnings above for optimization opportunities"
           puts "• Consider updating packages to latest compatible versions"
