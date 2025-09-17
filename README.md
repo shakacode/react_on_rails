@@ -9,7 +9,7 @@
 
 ---
 
-[![License](https://img.shields.io/badge/license-mit-green.svg)](LICENSE.md)[![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails) [![npm version](https://badge.fury.io/js/react-on-rails.svg)](https://badge.fury.io/js/react-on-rails) [![Code Climate](https://codeclimate.com/github/shakacode/react_on_rails/badges/gpa.svg)](https://codeclimate.com/github/shakacode/react_on_rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master) [![](https://ruby-gem-downloads-badge.herokuapp.com/react_on_rails?type=total)](https://rubygems.org/gems/react_on_rails)
+[![License](https://img.shields.io/badge/license-mit-green.svg)](LICENSE.md)[![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails) [![npm version](https://badge.fury.io/js/react-on-rails.svg)](https://badge.fury.io/js/react-on-rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master) [![](https://ruby-gem-downloads-badge.herokuapp.com/react_on_rails?type=total)](https://rubygems.org/gems/react_on_rails)
 
 [![Build Main](https://github.com/shakacode/react_on_rails/actions/workflows/main.yml/badge.svg)](https://github.com/shakacode/react_on_rails/actions/workflows/main.yml)
 [![Build JS Tests](https://github.com/shakacode/react_on_rails/actions/workflows/package-js-tests.yml/badge.svg)](https://github.com/shakacode/react_on_rails/actions/workflows/package-js-tests.yml)
@@ -18,13 +18,18 @@
 
 # News
 
+**🚀 React on Rails v16.0 Released!** Major modernization with ESM support, enhanced React Server Components, and streamlined configuration.
+
+- **ESM-only package**: Modern module system with better tree-shaking and performance
+- **React Server Components**: Improved rendering flow and new `RSCRoute` component for seamless SSR
+- **Performance improvements**: New async loading strategies and optimized bundle generation
+- **Webpacker removal**: Streamlined for Shakapacker-only support (>= 6.0)
 - [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/) supports the latest features of React 18, including [React Server Components](https://react.dev/reference/rsc/server-components) and [streaming](https://react.dev/reference/react-dom/server/renderToPipeableStream). Contact [Justin Gordon](mailto:justin@shakacode.com) for more information.
 - ShakaCode now maintains the official successor to `rails/webpacker`, [`shakapacker`](https://github.com/shakacode/shakapacker).
-- Project is updated to support Rails 7 and Shakapacker v6+!
 
 ---
 
-_These are the docs for React on Rails 14. To see the older docs and code: [v13](https://github.com/shakacode/react_on_rails/tree/13.4.0), [v12](https://github.com/shakacode/react_on_rails/tree/12.6.0), and [v11](https://github.com/shakacode/react_on_rails/tree/11.3.0)._
+_These are the docs for React on Rails 16. To see the older docs and code: [v14](https://github.com/shakacode/react_on_rails/tree/14.0.0), [v13](https://github.com/shakacode/react_on_rails/tree/13.4.0), [v12](https://github.com/shakacode/react_on_rails/tree/12.6.0), and [v11](https://github.com/shakacode/react_on_rails/tree/11.3.0)._
 
 # About
 
@@ -44,14 +49,25 @@ If you think ShakaCode can help your project, [click here](https://meetings.hubs
 
 ## React on Rails Pro
 
-Are you interested in optimizing your Webpack setup for React on Rails, including code splitting with [React Router](https://reactrouter.com/) and [loadable-components](https://loadable-components.com/) with server-side rendering for SEO and hot-reloading for developers?
+Some features of React on Rails regarding performance require a React on Rails Pro subscription.
+
+Note: the subscription price is free for evaluation and non-production use.
+
+Notable new features include:
+* React Server Components
+* Streaming SSR
+* Loadable Components
+* Code Splitting with React Router
+
+React on Rails Pro is the best way to optimize your Webpack setup for React on Rails, including code splitting with [React Router](https://reactrouter.com/) and [loadable-components](https://loadable-components.com/) with server-side rendering for SEO and hot-reloading for developers.
+
 We did this for Popmenu, [lowering Heroku costs 20-25% while getting a 73% decrease in average response times](https://www.shakacode.com/recent-work/popmenu/). Several years later, Popmenu serves tens of millions of SSR requests daily with React on Rails Pro.
 
 If you're interested, read more about [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/) and [book a call](https://meetings.hubspot.com/justingordon/30-minute-consultation).
 
 # Documentation
 
-See the documentation at **[shakacode.com/react-on-rails/docs](https://www.shakacode.com/react-on-rails/docs/)**.
+See the documentation at **[shakacode.com/react-on-rails/docs](https://www.shakacode.com/react-on-rails/docs/)** and [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/).
 
 ## Project Objective
 
@@ -61,18 +77,20 @@ To provide a high-performance framework for integrating Ruby on Rails with React
 
 Given that `shakacode/shakapacker` gem already provides basic React integration, why would you use "React on Rails"?
 
-1. Automatic configuration of what bundles are added to the page based on what React components are on the page. This results in faster browser loading time via smaller bundle sizes.
-1. Keep up with the latest changes in different versions of React. React 18 is supported.
-1. Easy passing of props directly from your Rails view to your React components rather than having your Rails view load and then make a separate request to your API.
-   Tight integration with [shakapacker](https://github.com/shakacode/shakapacker) (or its predecessor [rails/webpacker](https://github.com/rails/webpacker)).
-1. Server-Side Rendering (SSR), often used for SEO crawler indexing and UX performance.
-1. [Automated optimized entry-point creation and bundle inclusion when placing a component on a page. With this feature, you no longer need to configure `javascript_pack_tags` and `stylesheet_pack_tags` on your layouts based on what’s shown. “It just works!”](https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation/)
-1. [Redux](https://redux.js.org/) and [React Router](https://reactrouter.com/) integration with server-side-rendering.
-1. [Internationalization (I18n) and (localization)](https://www.shakacode.com/react-on-rails/docs/guides/i18n)
-1. A supportive community. This [web search shows how live public sites are using React on Rails](https://publicwww.com/websites/%22react-on-rails%22++-undeveloped.com+depth%3Aall/).
-1. [ReScript Support](https://github.com/shakacode/rescript-react-on-rails-example).
+1. **Modern ESM-only package** with optimized tree-shaking for smaller bundle sizes and better performance.
+1. **Advanced loading strategies** with `sync`, `async`, and `defer` options for optimal performance based on your needs.
+1. **Automatic configuration** of what bundles are added to the page based on what React components are on the page. This results in faster browser loading time via smaller bundle sizes.
+1. **Keep up with the latest changes** in different versions of React. React 18+ is fully supported with enhanced React Server Components.
+1. **Easy prop passing** directly from your Rails view to your React components rather than having your Rails view load and then make a separate request to your API.
+   Tight integration with [shakapacker](https://github.com/shakacode/shakapacker).
+1. **Server-Side Rendering (SSR)** with enhanced React Server Components support, often used for SEO crawler indexing and UX performance.
+1. **[Automated optimized entry-point creation and bundle inclusion](https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation/)** when placing a component on a page. With this feature, you no longer need to configure `javascript_pack_tags` and `stylesheet_pack_tags` on your layouts based on what's shown. "It just works!"
+1. **[Redux](https://redux.js.org/) and [React Router](https://reactrouter.com/) integration** with server-side-rendering.
+1. **[Internationalization (I18n) and (localization)](https://www.shakacode.com/react-on-rails/docs/guides/i18n)** support.
+1. **Supportive community**. This [web search shows how live public sites are using React on Rails](https://publicwww.com/websites/%22react-on-rails%22++-undeveloped.com+depth%3Aall/).
+1. **[ReScript Support](https://github.com/shakacode/rescript-react-on-rails-example)**.
 
-See [Rails/Webpacker React Integration Options](https://www.shakacode.com/react-on-rails/docs/guides/rails-webpacker-react-integration-options) for comparisons to other gems.
+See [Rails/Shakapacker React Integration Options](https://www.shakacode.com/react-on-rails/docs/guides/rails-webpacker-react-integration-options) for comparisons to other gems.
 
 ## Online demo
 
@@ -88,7 +106,11 @@ _Requires creating a free account._
 
 ## Prerequisites
 
-Ruby on Rails >=5, rails/webpacker >= 4.2 or shakapacker > 6, Ruby >= 3.0.0
+- Ruby on Rails >= 5
+- Shakapacker >= 6.0 (Webpacker is no longer supported as of v16)
+- Ruby >= 3.2 (CI tested: 3.2 - 3.4)
+- Node.js >= 20 (CI tested: 20 - 22)
+- A JavaScript package manager (npm, yarn, pnpm, or bun)
 
 # Support
 

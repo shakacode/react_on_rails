@@ -23,86 +23,80 @@ After a release, please make sure to run `bundle exec rake update_changelog`. Th
 
 Changes since the last non-beta release.
 
-### [16.0.0] - 2025-01-XX
+### [16.0.0] - 2025-09-16
 
-#### Removed (Breaking Changes)
+**React on Rails v16 is a major release that modernizes the library with ESM support, removes legacy Webpacker compatibility, and introduces significant performance improvements. This release builds on the foundation of v14 with enhanced RSC (React Server Components) support and streamlined configuration.**
 
-- **Webpacker support completely removed**. Shakapacker >= 6.0 is now required.
-  - Migration:
-    - Remove any `webpacker` gem references from your Gemfile
-    - Ensure `shakapacker` gem version 6.0 or higher is installed (8.0+ recommended)
-    - Replace any `bin/webpacker` commands with `bin/shakapacker`
-    - Update any webpacker configuration files to shakapacker equivalents
-  - Removed files: `rakelib/webpacker_examples.rake`, `lib/generators/react_on_rails/adapt_for_older_shakapacker_generator.rb`
-  - All webpacker compatibility code and tests have been removed
-- **CI/Development runtime requirements updated**:
-  - _Note, this is just what CI tests_. You can use older versions of Ruby and Node.js, but you may run into issues.\*
-  - Minimum Ruby version: 3.2 (was 3.0)
-  - Maximum Ruby version: 3.4 (was 3.3)
-  - Minimum Node.js version: 20 (was 16)
-  - Maximum Node.js version: 22 (was 20)
-  - Migration: Upgrade your Ruby and Node.js versions to supported ranges
-- **Install generator now validates prerequisites**:
-  - Generator now requires at least one JavaScript package manager (npm, pnpm, yarn, or bun)
-  - Generator uses `Thor::Error` exceptions instead of `exit(1)` for better error handling
-  - Migration: Ensure you have a JavaScript package manager installed before running the generator
+See [Release Notes](docs/release-notes/16.0.0.md) for complete migration guide.
 
-#### Enhanced
+#### Major Enhancements
 
-- Simplified CI matrix configuration with clear dependency level naming (`minimum`/`latest` instead of `oldest`/`newest`)
-- Improved error messages in install generator with clearer troubleshooting steps
-- Enhanced package manager detection with multi-strategy validation
+**🚀 React Server Components (RSC) -- Requires React on Rails Pro**
+- **Enhanced RSC rendering flow**: Eliminated double rendering and reduced HTTP requests
+- **`RSCRoute` component**: Seamless server-side rendering with automatic payload injection and hydration [PR 1696](https://github.com/shakacode/react_on_rails/pull/1696) by [AbanoubGhadban](https://github.com/AbanoubGhadban)
+- **Optimized RSC payload injection**: Now injected after component HTML markup for better performance [PR 1738](https://github.com/shakacode/react_on_rails/pull/1738) by [AbanoubGhadban](https://github.com/AbanoubGhadban)
+- **Communication protocol v2.0.0**: Supports uploading multiple bundles at once for improved efficiency
 
-### [15.0.0] - 2025-08-28
+**⚡ Performance & Loading Strategy**
+- **New `generated_component_packs_loading_strategy`**: Choose from `sync`, `async`, or `defer` strategies [PR 1712](https://github.com/shakacode/react_on_rails/pull/1712) by [AbanoubGhadban](https://github.com/AbanoubGhadban)
+- **Async render function support**: Components can now return from async render functions [PR 1720](https://github.com/shakacode/react_on_rails/pull/1720) by [AbanoubGhadban](https://github.com/AbanoubGhadban)
+- **Optimized client imports**: Generated packs now import from `react-on-rails/client` for better tree-shaking [PR 1706](https://github.com/shakacode/react_on_rails/pull/1706) by [alexeyr-ci](https://github.com/alexeyr-ci)
 
-See [Release Notes](docs/release-notes/16.0.0.md) for full details.
+#### Developer Experience
 
-### Removed (Breaking Changes)
+- **Enhanced error messaging**: Clearer troubleshooting steps and prominent optimization warnings
+- **Modern global access**: Using `globalThis` instead of window/global detection [PR 1727](https://github.com/shakacode/react_on_rails/pull/1727) by [alexeyr-ci2](https://github.com/alexeyr-ci2)
+- **Simplified CI configuration**: Clear `minimum`/`latest` dependency naming instead of `oldest`/`newest`
+- **ReactRefreshWebpackPlugin v0.6.0 support**: Added conditional logic for proper configuration [PR 1748](https://github.com/shakacode/react_on_rails/pull/1748) by [judahmeek](https://github.com/judahmeek)
+- **Version validation improvements**: Fixed invalid warnings with pre-release versions [PR 1742](https://github.com/shakacode/react_on_rails/pull/1742) by [alexeyr-ci2](https://github.com/alexeyr-ci2)
 
-- Deprecated `defer_generated_component_packs` configuration option. You should use `generated_component_packs_loading_strategy` instead.
-  - Migration:
-    - `defer_generated_component_packs: true` → `generated_component_packs_loading_strategy: :defer`
-    - `defer_generated_component_packs: false` → `generated_component_packs_loading_strategy: :sync`
-    - For best performance, use `generated_component_packs_loading_strategy: :async`
-  - [PR 1712](https://github.com/shakacode/react_on_rails/pull/1712) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-- The package is ESM-only now. Migration:
-  - If using `require('react-on-rails')`, upgrade to Node v20.19.0+ or change to `import`.
-  - For TypeScript errors, upgrade to TypeScript 5.8+ and set `module` to `nodenext`.
-- `ReactOnRails.reactOnRailsPageLoaded` is now an async function. Migration:
-  - Add `await` when calling this function: `await ReactOnRails.reactOnRailsPageLoaded()`.
-- **RENAMED**: `force_load` configuration renamed to `immediate_hydration` for better API clarity.
-  - `immediate_hydration` now defaults to `false` and requires React on Rails Pro license.
-  - Migration:
-    - `config.force_load = true` → `config.immediate_hydration = true`
-    - `react_component(force_load: true)` → `react_component(immediate_hydration: true)`
-    - `redux_store(force_load: true)` → `redux_store(immediate_hydration: true)`
 
-For detailed migration instructions, see the [16.0.0 Release Notes](docs/release-notes/16.0.0.md).
+#### Breaking Changes
 
-#### Fixed
+**🔧 Webpacker Support Removed**
+- **Complete removal of Webpacker support**. Shakapacker >= 6.0 is now required.
+- Migration:
+  - Remove `webpacker` gem from your Gemfile
+  - Install `shakapacker` gem version 6.0+ (8.0+ recommended)
+  - Replace `bin/webpacker` commands with `bin/shakapacker`
+  - Update webpacker configuration files to shakapacker equivalents
+- Removed files: `rakelib/webpacker_examples.rake`, `lib/generators/react_on_rails/adapt_for_older_shakapacker_generator.rb`
 
-- Enable support for ReactRefreshWebpackPlugin v0.6.0 by adding conditional logic regarding configuration. [PR 1748](https://github.com/shakacode/react_on_rails/pull/1748) by [judahmeek](https://github.com/judahmeek).
-- Replace RenderOptions.renderRequestId and use local trackers instead. This change should only be relevant to ReactOnRails Pro users. [PR 1745](https://github.com/shakacode/react_on_rails/pull/1745) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-- Fixed invalid warnings about non-exact versions when using a pre-release version of React on Rails, as well as missing warnings when using different pre-release versions of the gem and the Node package. [PR 1742](https://github.com/shakacode/react_on_rails/pull/1742) by [alexeyr-ci2](https://github.com/alexeyr-ci2).
+**📦 Package System Modernization**
+- **ESM-only package**: CommonJS `require()` no longer supported
+- Migration:
+  - Replace `require('react-on-rails')` with `import ReactOnRails from 'react-on-rails'`
+  - For Node.js < 20.19.0, upgrade or use dynamic imports
+  - For TypeScript errors, upgrade to TypeScript 5.8+ and set `module: "nodenext"`
 
-#### Improved
+**⚡ Configuration API Changes**
+- **`defer_generated_component_packs` deprecated** → use `generated_component_packs_loading_strategy`
+- Migration:
+  - `defer_generated_component_packs: true` → `generated_component_packs_loading_strategy: :defer`
+  - `defer_generated_component_packs: false` → `generated_component_packs_loading_strategy: :sync`
+  - Recommended: `generated_component_packs_loading_strategy: :async` for best performance
 
-- Ensured that the RSC payload is injected after the component's HTML markup to improve the performance of the RSC payload injection. [PR 1738](https://github.com/shakacode/react_on_rails/pull/1738) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-- Improved RSC rendering flow by eliminating double rendering of server components and reducing the number of HTTP requests.
-- Updated communication protocol between Node Renderer and Rails to version 2.0.0 which supports the ability to upload multiple bundles at once.
-- Added `RSCRoute` component to enable seamless server-side rendering of React Server Components. This component automatically handles RSC payload injection and hydration, allowing server components to be rendered directly within client components while maintaining optimal performance. [PR 1696](https://github.com/shakacode/react_on_rails/pull/1696) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-- The global context is now accessed using `globalThis`. [PR 1727](https://github.com/shakacode/react_on_rails/pull/1727) by [alexeyr-ci2](https://github.com/alexeyr-ci2).
-- Generated client packs now import from `react-on-rails/client` instead of `react-on-rails`. [PR 1706](https://github.com/shakacode/react_on_rails/pull/1706) by [alexeyr-ci](https://github.com/alexeyr-ci).
-  - The "optimization opportunity" message when importing the server-side `react-on-rails` instead of `react-on-rails/client` in browsers is now a warning for two reasons:
-    - Make it more prominent
-    - Include a stack trace when clicked
+- **`force_load` renamed to `immediate_hydration`** for API clarity
+- Migration:
+  - `config.force_load = true` → `config.immediate_hydration = true`
+  - `react_component(force_load: true)` → `react_component(immediate_hydration: true)`
+  - `redux_store(force_load: true)` → `redux_store(immediate_hydration: true)`
+- Note: `immediate_hydration` requires React on Rails Pro license
 
-#### Added
+**🔄 Async API Changes**
+- **`ReactOnRails.reactOnRailsPageLoaded()` is now async**
+- Migration: Add `await` when calling: `await ReactOnRails.reactOnRailsPageLoaded()`
 
-- Configuration option `generated_component_packs_loading_strategy` to control how generated component packs are loaded. It supports `sync`, `async`, and `defer` strategies. [PR 1712](https://github.com/shakacode/react_on_rails/pull/1712) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-- Support for returning React component from async render-function. [PR 1720](https://github.com/shakacode/react_on_rails/pull/1720) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-- React Server Components Support (Pro Feature) [PR 1644](https://github.com/shakacode/react_on_rails/pull/1644) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-- Improved component and store hydration performance [PR 1656](https://github.com/shakacode/react_on_rails/pull/1656) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+**🏗️ Runtime Suggested Versions**
+- Ruby: 3.2 - 3.4 (was 3.0 - 3.3)
+- Node.js: 20 - 22 (was 16 - 20)
+- Note: These are CI-tested versions; older versions may work but aren't guaranteed
+
+**🎯 Generator Improvements**
+- Install generator now validates JavaScript package manager presence
+- Improved error handling with `Thor::Error` instead of `exit(1)`
+- Enhanced error messages with clearer troubleshooting steps
+
 
 ### [15.0.0] - 2025-08-28 - RETRACTED
 
@@ -1606,8 +1600,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/15.0.0...master
-[15.0.0]: https://github.com/shakacode/react_on_rails/compare/14.2.0...15.0.0
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/16.0.0...master
+[16.0.0]: https://github.com/shakacode/react_on_rails/compare/14.2.0...16.0.0
 [14.2.0]: https://github.com/shakacode/react_on_rails/compare/14.1.1...14.2.0
 [14.1.1]: https://github.com/shakacode/react_on_rails/compare/14.1.0...14.1.1
 [14.1.0]: https://github.com/shakacode/react_on_rails/compare/14.0.5...14.1.0
