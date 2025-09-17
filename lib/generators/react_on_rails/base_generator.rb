@@ -100,7 +100,10 @@ module ReactOnRails
         add_react_dependencies
         add_css_dependencies
         add_dev_dependencies
+        install_js_dependencies
       end
+
+      private
 
       def install_js_dependencies
         # Detect which package manager to use
