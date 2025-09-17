@@ -4,6 +4,7 @@ module ReactOnRails
   module Generators
     # SystemChecker provides validation methods for React on Rails setup
     # Used by both install and doctor generators
+    # rubocop:disable Metrics/ClassLength
     class SystemChecker
       attr_reader :messages
 
@@ -219,37 +220,12 @@ module ReactOnRails
       def check_react_dependencies
         return unless File.exist?("package.json")
 
-        required_deps = {
-          "react" => "React library",
-          "react-dom" => "React DOM library",
-          "@babel/preset-react" => "Babel React preset"
-        }
+        required_deps = required_react_dependencies
+        package_json = parse_package_json
+        return unless package_json
 
-        missing_deps = []
-
-        begin
-          package_json = JSON.parse(File.read("package.json"))
-          all_deps = package_json["dependencies"]&.merge(package_json["devDependencies"] || {}) || {}
-
-          required_deps.each do |dep, description|
-            if all_deps[dep]
-              add_success("✅ #{description} (#{dep}) is installed")
-            else
-              missing_deps << dep
-            end
-          end
-
-          if missing_deps.any?
-            add_warning(<<~MSG.strip)
-              ⚠️  Missing React dependencies: #{missing_deps.join(', ')}
-
-              Install them with:
-              npm install #{missing_deps.join(' ')}
-            MSG
-          end
-        rescue JSON::ParserError
-          add_warning("⚠️  Could not parse package.json to check React dependencies")
-        end
+        missing_deps = find_missing_dependencies(package_json, required_deps)
+        report_dependency_status(required_deps, missing_deps, package_json)
       end
 
       # Rails integration validation
@@ -394,6 +370,44 @@ module ReactOnRails
                .gsub(/\s+/, " ")                       # Normalize whitespace
                .strip
       end
+
+      def required_react_dependencies
+        {
+          "react" => "React library",
+          "react-dom" => "React DOM library",
+          "@babel/preset-react" => "Babel React preset"
+        }
+      end
+
+      def parse_package_json
+        JSON.parse(File.read("package.json"))
+      rescue JSON::ParserError
+        add_warning("⚠️  Could not parse package.json to check React dependencies")
+        nil
+      end
+
+      def find_missing_dependencies(package_json, required_deps)
+        all_deps = package_json["dependencies"]&.merge(package_json["devDependencies"] || {}) || {}
+        required_deps.keys.reject { |dep| all_deps[dep] }
+      end
+
+      def report_dependency_status(required_deps, missing_deps, package_json)
+        all_deps = package_json["dependencies"]&.merge(package_json["devDependencies"] || {}) || {}
+
+        required_deps.each do |dep, description|
+          add_success("✅ #{description} (#{dep}) is installed") if all_deps[dep]
+        end
+
+        return unless missing_deps.any?
+
+        add_warning(<<~MSG.strip)
+          ⚠️  Missing React dependencies: #{missing_deps.join(', ')}
+
+          Install them with:
+          npm install #{missing_deps.join(' ')}
+        MSG
+      end
     end
+    # rubocop:enable Metrics/ClassLength
   end
 end
