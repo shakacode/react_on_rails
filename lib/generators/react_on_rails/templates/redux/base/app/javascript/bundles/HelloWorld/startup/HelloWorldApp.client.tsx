@@ -1,12 +1,11 @@
 import React from 'react';
 import { Provider } from 'react-redux';
 
-import configureStore from '../store/helloWorldStore';
+import configureStore, { RailsProps } from '../store/helloWorldStore';
 import HelloWorldContainer from '../containers/HelloWorldContainer';
 
-interface HelloWorldAppProps {
-  name: string;
-}
+// Props interface matches what Rails will pass from the controller
+type HelloWorldAppProps = RailsProps;
 
 // See documentation for https://github.com/reactjs/react-redux.
 // This is how you get props from the Rails view into the redux store.
