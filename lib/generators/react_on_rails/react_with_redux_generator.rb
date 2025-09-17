@@ -8,6 +8,11 @@ module ReactOnRails
       Rails::Generators.hide_namespace(namespace)
       source_root(File.expand_path("templates", __dir__))
 
+      class_option :typescript,
+                   type: :boolean,
+                   default: false,
+                   desc: "Generate TypeScript files"
+
       def create_redux_directories
         # Create auto-registration directory structure for Redux
         empty_directory("app/javascript/src/HelloWorldApp/ror_components")
@@ -19,17 +24,18 @@ module ReactOnRails
 
       def copy_base_files
         base_js_path = "redux/base"
+        extension = options.typescript? ? "tsx" : "jsx"
 
         # Copy Redux-connected component to auto-registration structure
-        copy_file("#{base_js_path}/app/javascript/bundles/HelloWorld/startup/HelloWorldApp.client.jsx",
-                  "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.jsx")
-        copy_file("#{base_js_path}/app/javascript/bundles/HelloWorld/startup/HelloWorldApp.server.jsx",
-                  "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.server.jsx")
+        copy_file("#{base_js_path}/app/javascript/bundles/HelloWorld/startup/HelloWorldApp.client.#{extension}",
+                  "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.#{extension}")
+        copy_file("#{base_js_path}/app/javascript/bundles/HelloWorld/startup/HelloWorldApp.server.#{extension}",
+                  "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.server.#{extension}")
         copy_file("#{base_js_path}/app/javascript/bundles/HelloWorld/components/HelloWorld.module.css",
                   "app/javascript/src/HelloWorldApp/components/HelloWorld.module.css")
 
         # Update import paths in client component
-        ror_client_file = "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.jsx"
+        ror_client_file = "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.#{extension}"
         gsub_file(ror_client_file, "../store/helloWorldStore", "../store/helloWorldStore")
         gsub_file(ror_client_file, "../containers/HelloWorldContainer",
                   "../containers/HelloWorldContainer")
@@ -37,15 +43,21 @@ module ReactOnRails
 
       def copy_base_redux_files
         base_hello_world_path = "redux/base/app/javascript/bundles/HelloWorld"
+        component_extension = options.typescript? ? "tsx" : "jsx"
+
+        # Copy non-component files (keep as .js for now)
         %w[actions/helloWorldActionCreators.js
            containers/HelloWorldContainer.js
            constants/helloWorldConstants.js
            reducers/helloWorldReducer.js
-           store/helloWorldStore.js
-           components/HelloWorld.jsx].each do |file|
+           store/helloWorldStore.js].each do |file|
              copy_file("#{base_hello_world_path}/#{file}",
                        "app/javascript/src/HelloWorldApp/#{file}")
            end
+
+        # Copy component file with appropriate extension
+        copy_file("#{base_hello_world_path}/components/HelloWorld.#{component_extension}",
+                  "app/javascript/src/HelloWorldApp/components/HelloWorld.#{component_extension}")
       end
 
       def create_appropriate_templates
@@ -60,7 +72,11 @@ module ReactOnRails
       end
 
       def add_redux_npm_dependencies
-        run "npm install redux react-redux"
+        if options.typescript?
+          run "npm install redux react-redux @types/react-redux"
+        else
+          run "npm install redux react-redux"
+        end
       end
 
       def add_redux_specific_messages
