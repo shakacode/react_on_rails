@@ -50,13 +50,12 @@ task :release, %i[gem_version dry_run tools_install] do |_t, args|
 
   # Having the examples prevents publishing
   Rake::Task["shakapacker_examples:clobber"].invoke
-  Rake::Task["webpacker_examples:clobber"].invoke
   # Delete any react_on_rails.gemspec except the root one
   sh_in_dir(gem_root, "find . -mindepth 2 -name 'react_on_rails.gemspec' -delete")
 
   # See https://github.com/svenfuchs/gem-release
   sh_in_dir(gem_root, "git pull --rebase")
-  sh_in_dir(gem_root, "gem bump --no-commit #{gem_version.strip.empty? ? '' : %(--version #{gem_version})}")
+  sh_in_dir(gem_root, "gem bump --no-commit #{%(--version #{gem_version}) unless gem_version.strip.empty?}")
 
   # Update dummy app's Gemfile.lock
   bundle_install_in(dummy_app_dir)

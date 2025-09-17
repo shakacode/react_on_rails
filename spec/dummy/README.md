@@ -38,7 +38,7 @@ foreman start -f Procfile.dev
 ## Static Loading of Rails Assets
 
 ```sh
-foreman start -f Procfile.dev-static
+foreman start -f Procfile.dev-static-assets
 ```
 
 ## Creating Assets for Tests

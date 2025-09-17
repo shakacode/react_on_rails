@@ -79,17 +79,19 @@ yalc add react-on-rails
 The workflow is:
 
 1. Make changes to the node package.
-2. We need yalc to push and then run yarn:
+2. **CRITICAL**: Run yalc push to send updates to all linked apps:
 
 ```
 cd <top dir>
-# Will send the updates to other folders
+# Will send the updates to other folders - MUST DO THIS AFTER ANY CHANGES
 yalc push
 cd spec/dummy
 
 # Will update from yalc
 yarn
 ```
+
+**⚠️ Common Mistake**: Forgetting to run `yalc push` after making changes to React on Rails source code will result in test apps not receiving updates, making it appear that your changes have no effect.
 
 When you run `yalc push`, you'll get an informative message
 
@@ -246,7 +248,7 @@ gem 'react_on_rails', path: '../relative/path/to/react_on_rails'
 
 Then run `bundle`.
 
-The main installer can be run with `rails generate react_on_rails:install`
+The main installer can be run with `./bin/rails generate react_on_rails:install`
 
 Then use yalc to add the npm module.
 
@@ -267,6 +269,269 @@ yalc add react-on-rails
 The generators are covered by generator tests using Rails's generator testing helpers, but it never hurts to do a sanity check and explore the API. See [generator-testing.md](docs/contributor-info/generator-testing.md) for a script on how to run the generator on a fresh project.
 
 `rake run_rspec:shakapacker_examples_basic` is a great way to run tests on one generator. Once that works, you should run `rake run_rspec:shakapacker_examples`. Be aware that this will create a huge number of files under a `/gen-examples` directory. You should be sure to exclude this directory from your IDE and delete it once your testing is done.
+
+#### Manual Generator Testing Workflow
+
+For comprehensive testing of generator changes, use this manual testing workflow with dedicated test applications:
+
+**1. Set up test application with clean baseline:**
+
+```bash
+# Create a test Rails app
+mkdir -p {project_dir}/test-app
+cd {project_dir}/test-app
+rails new . --skip-javascript
+
+# Set up for testing the generator
+echo 'gem "react_on_rails", path: "../react_on_rails"' >> Gemfile
+yalc add react-on-rails
+
+# Create a clean baseline tag for testing
+git init && git add . && git commit -m "Initial commit"
+git tag generator_testing_base
+bundle install
+
+# Clean reset to baseline state
+git clean -fd && git reset --hard && git clean -fd
+```
+
+**2. Test generator commits systematically:**
+
+When testing specific generator improvements or fixes, test both Shakapacker scenarios:
+
+**Scenario A: No Shakapacker installed (fresh Rails app)**
+
+```bash
+# Reset to clean baseline before each test
+git clean -fd && git reset --hard generator_testing_base && git clean -fd
+
+# Ensure no Shakapacker in Gemfile (remove if present)
+# Edit Gemfile to update gem path: gem 'react_on_rails', path: '../path/to/main/repo'
+bundle install
+
+# Run generator - should install Shakapacker automatically
+./bin/rails generate react_on_rails:install
+
+# Verify Shakapacker was added to Gemfile and installed correctly
+```
+
+**Scenario B: Shakapacker already installed**
+
+```bash
+# Reset to clean baseline
+git clean -fd && git reset --hard generator_testing_base && git clean -fd
+
+# Add Shakapacker to Gemfile
+bundle add shakapacker --strict
+
+# Run Shakapacker installer first
+./bin/rails shakapacker:install
+
+# Edit Gemfile to update gem path: gem 'react_on_rails', path: '../path/to/main/repo'
+bundle install
+
+# Run generator - should detect existing Shakapacker
+./bin/rails generate react_on_rails:install
+
+# Verify generator adapts to existing Shakapacker setup
+```
+
+**3. Document testing results:**
+
+For each commit tested, document:
+
+- Generator execution success/failure for both scenarios
+- Shakapacker installation/detection behavior
+- Component rendering in browser
+- Console output and warnings
+- File generation differences between scenarios
+- Specific issues found
+
+This systematic approach ensures generator changes work correctly whether Shakapacker is pre-installed or needs to be installed by the generator.
+
+#### Testing Generator with Yalc for React Component Functionality
+
+When testing the install generator with new Rails apps, you need to use **yalc** for the JavaScript package to ensure React components work correctly. The Ruby gem path reference is insufficient for client-side rendering.
+
+**Problem**: Using only the gem path (`gem "react_on_rails", path: "../path"`) in a new Rails app results in React components not mounting on the client side, even though server-side rendering works fine.
+
+**Solution**: Use both gem path and yalc for complete testing:
+
+```ruby
+# In test app's Gemfile
+gem 'react_on_rails', path: '../relative/path/to/react_on_rails'
+```
+
+```bash
+# After running the install generator AND after making any changes to the React on Rails source code
+cd /path/to/react_on_rails
+npm run build
+npx yalc publish
+# CRITICAL: Push changes to all linked apps
+npx yalc push
+
+cd /path/to/test_app
+npm install
+
+# Restart development server
+bin/dev
+```
+
+**⚠️ CRITICAL DEBUGGING NOTE:**
+Always run `yalc push` after making changes to React on Rails source code. Without this step, your test app won't receive the updated package, leading to confusing behavior where changes appear to have no effect.
+
+**Alternative to Yalc: npm pack (More Reliable)**
+For a more reliable alternative that exactly mimics real package installation:
+
+```bash
+# In react_on_rails directory
+npm run build
+npm pack  # Creates react-on-rails-15.0.0.tgz
+
+# In test app directory
+npm install ../path/to/react_on_rails/react-on-rails-15.0.0.tgz
+```
+
+This approach:
+
+- ✅ Exactly mimics real package installation
+- ✅ No symlink issues across different filesystems
+- ✅ More reliable for CI/CD testing
+- ⚠️ Requires manual step after each change (can be scripted)
+
+**Why this is needed**:
+
+- The gem provides Rails integration and server-side rendering
+- Yalc provides the complete JavaScript client library needed for component mounting
+- Without yalc, you'll see empty divs where React components should render
+
+**Verification**:
+
+- Visit the hello_world page in browser
+- Check browser console for "RENDERED HelloWorld to dom node" success message
+- Confirm React component is interactive (input field updates name display)
+
+**Development Mode Console Output**:
+
+- `bin/dev` (HMR): Shows HMR warnings and resource preload warnings (expected)
+- `bin/dev static`: Shows only resource preload warnings (cleaner output)
+- `bin/dev prod`: Cleanest output with minimal warnings (production-like environment)
+
+**Note**: Resource preload warnings in development modes are normal and can be ignored. They occur because Shakapacker generates preload tags but scripts load asynchronously. Production mode eliminates most of these warnings.
+
+#### Generator Testing Troubleshooting
+
+**Common Issues and Solutions:**
+
+1. **React components not rendering (empty divs)**
+
+   - **Cause**: Missing yalc setup for JavaScript package
+   - **Solution**: Follow yalc setup steps above after running generator
+
+2. **Generator fails with Shakapacker errors**
+
+   - **Cause**: Conflicting Shakapacker versions or incomplete installation
+   - **Solution**: Clean reset and ensure consistent Shakapacker version across tests
+
+3. **Babel configuration conflicts during yalc development**
+
+   - **Cause**: Both `babel.config.js` and `package.json` "babel" section defining presets
+   - **Solution**: Remove "babel" section from `package.json`, keep only `babel.config.js`
+
+4. **"Package.json not found" errors**
+
+   - **Cause**: Generator trying to access non-existent package.json files
+   - **Solution**: Test with commits that fix this specific issue (e.g., bc69dcd0)
+
+5. **Port conflicts during testing**
+   - **Cause**: Multiple development servers running
+   - **Solution**: Run `bin/dev kill` before starting new test servers
+
+**Testing Best Practices:**
+
+- Always use the double clean command: `git clean -fd && git reset --hard && git clean -fd`
+- Test both Shakapacker scenarios for comprehensive coverage
+- Document exact error messages and steps to reproduce
+- Verify React component interactivity, not just rendering
+- Test all development modes: `bin/dev`, `bin/dev static`, `bin/dev prod`
+
+## Pre-Commit Requirements
+
+**CRITICAL**: Before committing any changes, always run the following commands to ensure code quality:
+
+```bash
+# Navigate to the main react_on_rails directory
+cd react_on_rails/
+
+# Run Prettier for JavaScript/TypeScript formatting
+yarn run format
+
+# Run ESLint for JavaScript/TypeScript linting
+yarn run lint
+
+# Run RuboCop for Ruby linting and formatting
+rake lint:rubocop
+
+# Or run all linters together
+rake lint
+```
+
+**Automated checks:**
+
+- Format all JavaScript/TypeScript files with Prettier
+- Check and fix linting issues with ESLint
+- Check and fix Ruby style issues with RuboCop
+- Ensure all tests pass before pushing
+
+**Tip**: Set up your IDE to run these automatically on save to catch issues early.
+
+## 🤖 Best Practices for AI Coding Agents
+
+**CRITICAL WORKFLOW** to prevent CI failures:
+
+### 1. **After Making Code Changes**
+
+```bash
+# Auto-fix all linting violations after code changes
+rake autofix
+```
+
+### 2. **Common AI Agent Mistakes**
+
+❌ **DON'T:**
+
+- Commit code that hasn't been linted locally
+- Ignore formatting rules when creating new files
+- Add manual formatting that conflicts with Prettier/RuboCop
+
+✅ **DO:**
+
+- Run `rake lint` after any code changes
+- Use `rake autofix` to automatically fix all linting violations
+- Create new files that follow existing patterns
+- Test locally before committing
+
+### 4. **Template File Best Practices**
+
+When creating new template files (`.jsx`, `.rb`, etc.):
+
+1. Copy existing template structure and patterns
+2. Run `yarn run eslint . --fix` immediately after creation
+3. Verify with `rake lint` before committing
+
+### 5. **RuboCop Complexity Issues**
+
+For methods with high ABC complexity (usually formatting/display methods):
+
+```ruby
+# rubocop:disable Metrics/AbcSize
+def complex_formatting_method
+  # ... method with lots of string interpolation/formatting
+end
+# rubocop:enable Metrics/AbcSize
+```
+
+**Remember**: Failing CI wastes time and resources. Always lint locally first!
 
 ### Linting
 

@@ -17,14 +17,14 @@ describe InstallGenerator, type: :generator do
   context "with --redux" do
     before(:all) { run_generator_test_with_args(%w[--redux], package_json: true) }
 
-    include_examples "base_generator", application_js: true
+    include_examples "base_generator_common", application_js: true
     include_examples "react_with_redux_generator"
   end
 
   context "with -R" do
     before(:all) { run_generator_test_with_args(%w[-R], package_json: true) }
 
-    include_examples "base_generator", application_js: true
+    include_examples "base_generator_common", application_js: true
     include_examples "react_with_redux_generator"
   end
 
@@ -54,16 +54,35 @@ describe InstallGenerator, type: :generator do
       GeneratorMessages.format_info(GeneratorMessages.helpful_message_after_installation)
     end
 
+    before do
+      # Clear any previous messages to ensure clean test state
+      GeneratorMessages.clear
+      # Mock Shakapacker installation to succeed so we get the success message
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with("bin/shakapacker").and_return(true)
+      allow(File).to receive(:exist?).with("bin/shakapacker-dev-server").and_return(true)
+    end
+
     specify "base generator contains a helpful message" do
       run_generator_test_with_args(%w[], package_json: true)
-      # GeneratorMessages.output is an array with the git error being the first one
-      expect(GeneratorMessages.output).to include(expected)
+      # Check that the success message is present (flexible matching)
+      output_text = GeneratorMessages.output.join("\n")
+      expect(output_text).to include("🎉 React on Rails Successfully Installed!")
+      expect(output_text).to include("📋 QUICK START:")
+      expect(output_text).to include("✨ KEY FEATURES:")
+      expect(output_text).to match(/bundle && (npm|yarn|pnpm) install/)
+      expect(output_text).to include("💡 TIP: Run 'bin/dev help'")
     end
 
     specify "react with redux generator contains a helpful message" do
       run_generator_test_with_args(%w[--redux], package_json: true)
-      # GeneratorMessages.output is an array with the git error being the first one
-      expect(GeneratorMessages.output).to include(expected)
+      # Check that the success message is present (flexible matching)
+      output_text = GeneratorMessages.output.join("\n")
+      expect(output_text).to include("🎉 React on Rails Successfully Installed!")
+      expect(output_text).to include("📋 QUICK START:")
+      expect(output_text).to include("✨ KEY FEATURES:")
+      expect(output_text).to match(/bundle && (npm|yarn|pnpm) install/)
+      expect(output_text).to include("💡 TIP: Run 'bin/dev help'")
     end
   end
 
@@ -73,13 +92,8 @@ describe InstallGenerator, type: :generator do
     specify "when node is exist" do
       stub_const("RUBY_PLATFORM", "linux")
       allow(install_generator).to receive(:`).with("which node").and_return("/path/to/bin")
+      allow(install_generator).to receive(:`).with("node --version 2>/dev/null").and_return("v20.0.0")
       expect(install_generator.send(:missing_node?)).to be false
-    end
-
-    specify "when npm is exist" do
-      stub_const("RUBY_PLATFORM", "linux")
-      allow(install_generator).to receive(:`).with("which yarn").and_return("/path/to/bin")
-      expect(install_generator.send(:missing_yarn?)).to be false
     end
   end
 
@@ -91,12 +105,6 @@ describe InstallGenerator, type: :generator do
       allow(install_generator).to receive(:`).with("which node").and_return("")
       expect(install_generator.send(:missing_node?)).to be true
     end
-
-    specify "when npm is missing" do
-      stub_const("RUBY_PLATFORM", "linux")
-      allow(install_generator).to receive(:`).with("which yarn").and_return("")
-      expect(install_generator.send(:missing_yarn?)).to be true
-    end
   end
 
   context "when detecting existing bin-files on windows" do
@@ -105,13 +113,8 @@ describe InstallGenerator, type: :generator do
     specify "when node is exist" do
       stub_const("RUBY_PLATFORM", "mswin")
       allow(install_generator).to receive(:`).with("where node").and_return("/path/to/bin")
+      allow(install_generator).to receive(:`).with("node --version 2>/dev/null").and_return("v20.0.0")
       expect(install_generator.send(:missing_node?)).to be false
-    end
-
-    specify "when npm is exist" do
-      stub_const("RUBY_PLATFORM", "mswin")
-      allow(install_generator).to receive(:`).with("where yarn").and_return("/path/to/bin")
-      expect(install_generator.send(:missing_yarn?)).to be false
     end
   end
 
@@ -122,12 +125,6 @@ describe InstallGenerator, type: :generator do
       stub_const("RUBY_PLATFORM", "mswin")
       allow(install_generator).to receive(:`).with("where node").and_return("")
       expect(install_generator.send(:missing_node?)).to be true
-    end
-
-    specify "when yarn is missing" do
-      stub_const("RUBY_PLATFORM", "mswin")
-      allow(install_generator).to receive(:`).with("where yarn").and_return("")
-      expect(install_generator.send(:missing_yarn?)).to be true
     end
   end
 end

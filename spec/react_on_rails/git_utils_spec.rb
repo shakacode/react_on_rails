@@ -11,7 +11,12 @@ module ReactOnRails
         it "returns true" do
           allow(described_class).to receive(:`).with("git status --porcelain").and_return("M file/path")
           expect(message_handler).to receive(:add_error)
-            .with("You have uncommitted code. Please commit or stash your changes before continuing")
+            .with(<<~MSG.strip)
+              You have uncommitted changes. Please commit or stash them before continuing.
+
+              The React on Rails generator creates many new files and it's important to keep
+              your existing changes separate from the generated code for easier review.
+            MSG
 
           expect(described_class.uncommitted_changes?(message_handler, git_installed: true)).to be(true)
         end
@@ -34,7 +39,12 @@ module ReactOnRails
         it "returns true" do
           allow(described_class).to receive(:`).with("git status --porcelain").and_return(nil)
           expect(message_handler).to receive(:add_error)
-            .with("You do not have Git installed. Please install Git, and commit your changes before continuing")
+            .with(<<~MSG.strip)
+              Git is not installed. Please install Git and commit your changes before continuing.
+
+              The React on Rails generator creates many new files and version control helps
+              track what was generated versus your existing code.
+            MSG
 
           expect(described_class.uncommitted_changes?(message_handler, git_installed: false)).to be(true)
         end

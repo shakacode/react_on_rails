@@ -13,7 +13,9 @@ spec/dummy/public
 **/*generated*
 *.res.js
 
-# Prettier doesn't understand ERB syntax in YAML files
+# Prettier doesn't understand ERB syntax in YAML files and can damage templates
 .rubocop.yml
+*.yml
+*.yaml
 # Intentionally invalid
 spec/react_on_rails/fixtures/i18n/locales_symbols/

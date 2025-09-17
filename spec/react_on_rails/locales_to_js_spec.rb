@@ -46,12 +46,13 @@ module ReactOnRails
         end
 
         it "doesn't update files" do
-          ref_time = Time.current - 1.minute
+          # Set JS files to be newer than YAML files to make them "up-to-date"
+          ref_time = Time.current + 1.minute
           FileUtils.touch(translations_path, mtime: ref_time)
+          FileUtils.touch(default_path, mtime: ref_time)
 
-          update_time = Time.current
           described_class.new
-          expect(update_time).to be > File.mtime(translations_path)
+          expect(File.mtime(translations_path)).to eq(ref_time)
         end
       end
     end

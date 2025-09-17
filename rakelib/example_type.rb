@@ -10,7 +10,7 @@ module ReactOnRails
   module TaskHelpers
     class ExampleType
       def self.all
-        @all ||= { webpacker_examples: [], shakapacker_examples: [] }
+        @all ||= { shakapacker_examples: [] }
       end
 
       attr_reader :packer_type, :name, :generator_options

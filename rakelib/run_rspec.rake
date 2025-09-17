@@ -10,12 +10,12 @@ require_relative "example_type"
 # rubocop:disable Metrics/BlockLength
 namespace :run_rspec do
   include ReactOnRails::TaskHelpers
+
   # Loads data from examples_config.yml and instantiates corresponding ExampleType objects
   examples_config_file = File.expand_path("examples_config.yml", __dir__)
   examples_config = symbolize_keys(YAML.safe_load_file(examples_config_file))
   examples_config[:example_type_data].each do |example_type_data|
     ExampleType.new(packer_type: "shakapacker_examples", **symbolize_keys(example_type_data))
-    ExampleType.new(packer_type: "webpacker_examples", **symbolize_keys(example_type_data))
   end
 
   spec_dummy_dir = File.join("spec", "dummy")
@@ -38,26 +38,12 @@ namespace :run_rspec do
   end
 
   # Dynamically define Rake tasks for each example app found in the examples directory
-  ExampleType.all[:webpacker_examples].each do |example_type|
-    puts "Creating #{example_type.rspec_task_name} task"
-    desc "Runs RSpec for #{example_type.name_pretty} only"
-    task example_type.rspec_task_name_short => example_type.gen_task_name do
-      run_tests_in(File.join(examples_dir, example_type.name)) # have to use relative path
-    end
-  end
-
-  # Dynamically define Rake tasks for each example app found in the examples directory
   ExampleType.all[:shakapacker_examples].each do |example_type|
     puts "Creating #{example_type.rspec_task_name} task"
     desc "Runs RSpec for #{example_type.name_pretty} only"
     task example_type.rspec_task_name_short => example_type.gen_task_name do
       run_tests_in(File.join(examples_dir, example_type.name)) # have to use relative path
     end
-  end
-
-  desc "Runs Rspec for webpacker example apps only"
-  task webpacker_examples: "webpacker_examples:gen_all" do
-    ExampleType.all[:webpacker_examples].each { |example_type| Rake::Task[example_type.rspec_task_name].invoke }
   end
 
   desc "Runs Rspec for shakapacker example apps only"
@@ -97,8 +83,6 @@ DESC
 desc msg
 task run_rspec: ["run_rspec:run_rspec"]
 
-private
-
 def calc_path(dir)
   if dir.is_a?(String)
     if dir.start_with?(File::SEPARATOR)
@@ -120,7 +104,13 @@ def run_tests_in(dir, options = {})
 
   command_name = options.fetch(:command_name, path.basename)
   rspec_args = options.fetch(:rspec_args, "")
-  env_vars = +"#{options.fetch(:env_vars, '')} TEST_ENV_COMMAND_NAME=\"#{command_name}\""
-  env_vars << "COVERAGE=true" if ENV["USE_COVERALLS"]
+
+  # Build environment variables as an array for proper spacing
+  env_tokens = []
+  env_tokens << options.fetch(:env_vars, "").strip unless options.fetch(:env_vars, "").strip.empty?
+  env_tokens << "TEST_ENV_COMMAND_NAME=\"#{command_name}\""
+  env_tokens << "COVERAGE=true" if ENV["USE_COVERALLS"]
+
+  env_vars = env_tokens.join(" ")
   sh_in_dir(path.realpath, "#{env_vars} bundle exec rspec #{rspec_args}")
 end
