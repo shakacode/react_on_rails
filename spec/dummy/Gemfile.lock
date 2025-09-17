@@ -1,13 +1,13 @@
 PATH
   remote: ../..
   specs:
-    react_on_rails (15.0.0)
+    react_on_rails (16.0.0)
       addressable
       connection_pool
       execjs (~> 2.5)
       rails (>= 5.2)
       rainbow (~> 3.0)
-      shakapacker (~> 8.0)
+      shakapacker (>= 6.0)
 
 GEM
   remote: https://rubygems.org/
