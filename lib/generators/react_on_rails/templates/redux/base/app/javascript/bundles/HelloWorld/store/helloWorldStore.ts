@@ -1,5 +1,7 @@
-import { createStore, Store } from 'redux';
-import helloWorldReducer, { HelloWorldState } from '../reducers/helloWorldReducer';
+import { createStore } from 'redux';
+import type { Store, PreloadedState } from 'redux';
+import helloWorldReducer from '../reducers/helloWorldReducer';
+import type { HelloWorldState } from '../reducers/helloWorldReducer';
 
 // Rails props interface - customize based on your Rails controller
 export interface RailsProps {
@@ -11,6 +13,6 @@ export interface RailsProps {
 export type HelloWorldStore = Store<HelloWorldState>;
 
 const configureStore = (railsProps: RailsProps): HelloWorldStore =>
-  createStore(helloWorldReducer, railsProps);
+  createStore(helloWorldReducer, railsProps as PreloadedState<HelloWorldState>);
 
 export default configureStore;

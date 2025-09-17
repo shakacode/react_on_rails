@@ -66,7 +66,10 @@ module ReactOnRails
 
       def invoke_generators
         ensure_shakapacker_installed
-        install_typescript_dependencies if options.typescript?
+        if options.typescript?
+          install_typescript_dependencies
+          create_css_module_types
+        end
         invoke "react_on_rails:base", [], { typescript: options.typescript? }
         if options.redux?
           invoke "react_on_rails:react_with_redux", [], { typescript: options.typescript? }
@@ -323,10 +326,6 @@ module ReactOnRails
       def install_typescript_dependencies
         puts Rainbow("📝 Installing TypeScript dependencies...").yellow
 
-        # Determine the package manager to use
-        package_manager = detect_package_manager
-        return unless package_manager
-
         # Install TypeScript and React type definitions
         typescript_packages = %w[
           typescript
@@ -335,10 +334,48 @@ module ReactOnRails
           @babel/preset-typescript
         ]
 
+        # Try using GeneratorHelper first (package manager agnostic)
         return if add_npm_dependencies(typescript_packages, dev: true)
 
+        # Fallback to npm if GeneratorHelper fails
         success = run "npm install --save-dev #{typescript_packages.join(' ')}"
-        handle_npm_failure("TypeScript dependencies", typescript_packages) unless success
+        unless success
+          warning = <<~MSG.strip
+            ⚠️  Failed to install TypeScript dependencies automatically.
+
+            Please run manually:
+                npm install --save-dev #{typescript_packages.join(' ')}
+          MSG
+          GeneratorMessages.add_warning(warning)
+        end
+      end
+
+      def create_css_module_types
+        puts Rainbow("📝 Creating CSS module type definitions...").yellow
+
+        # Ensure the types directory exists
+        FileUtils.mkdir_p("app/javascript/types")
+
+        css_module_types_content = <<~TS.strip
+          // TypeScript definitions for CSS modules
+          declare module "*.module.css" {
+            const classes: { [key: string]: string };
+            export default classes;
+          }
+
+          declare module "*.module.scss" {
+            const classes: { [key: string]: string };
+            export default classes;
+          }
+
+          declare module "*.module.sass" {
+            const classes: { [key: string]: string };
+            export default classes;
+          }
+        TS
+
+        File.write("app/javascript/types/css-modules.d.ts", css_module_types_content)
+        puts Rainbow("✅ Created CSS module type definitions").green
       end
 
       def create_typescript_config

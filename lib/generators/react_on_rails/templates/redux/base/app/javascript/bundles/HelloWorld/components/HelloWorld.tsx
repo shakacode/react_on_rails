@@ -1,6 +1,6 @@
 import React from 'react';
 import * as style from './HelloWorld.module.css';
-import { PropsFromRedux } from '../containers/HelloWorldContainer';
+import type { PropsFromRedux } from '../containers/HelloWorldContainer';
 
 // Component props are inferred from Redux container
 type HelloWorldProps = PropsFromRedux;

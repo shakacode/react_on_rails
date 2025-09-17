@@ -14,7 +14,8 @@ module ReactOnRails
       class_option :typescript,
                    type: :boolean,
                    default: false,
-                   desc: "Generate TypeScript files"
+                   desc: "Generate TypeScript files",
+                   aliases: "-T"
 
       def create_redux_directories
         # Create auto-registration directory structure for Redux
@@ -82,12 +83,6 @@ module ReactOnRails
         # Try using GeneratorHelper first (package manager agnostic)
         success = add_npm_dependencies(regular_packages)
 
-        # Add TypeScript types as dev dependency if TypeScript is enabled
-        if options.typescript?
-          types_success = add_npm_dependencies(%w[@types/react-redux], dev: true)
-          success &&= types_success
-        end
-
         # Fallback to package manager detection if GeneratorHelper fails
         return if success
 
@@ -95,10 +90,6 @@ module ReactOnRails
         return unless package_manager
 
         install_packages_with_fallback(regular_packages, dev: false, package_manager: package_manager)
-
-        return unless options.typescript?
-
-        install_packages_with_fallback(%w[@types/react-redux], dev: true, package_manager: package_manager)
       end
 
       private
@@ -120,6 +111,12 @@ module ReactOnRails
       end
 
       def build_install_command(package_manager, dev, packages_str)
+        # Security: Validate package manager to prevent command injection
+        allowed_package_managers = %w[npm yarn pnpm bun].freeze
+        unless allowed_package_managers.include?(package_manager)
+          raise ArgumentError, "Invalid package manager: #{package_manager}"
+        end
+
         commands = {
           "npm" => { dev: "npm install --save-dev", prod: "npm install" },
           "yarn" => { dev: "yarn add --dev", prod: "yarn add" },
