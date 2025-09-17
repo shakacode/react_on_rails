@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "rails/generators"
+require "json"
 require_relative "generator_helper"
 require_relative "generator_messages"
 
@@ -19,6 +20,13 @@ module ReactOnRails
                    default: false,
                    desc: "Install Redux package and Redux version of Hello World Example. Default: false",
                    aliases: "-R"
+
+      # --typescript
+      class_option :typescript,
+                   type: :boolean,
+                   default: false,
+                   desc: "Generate TypeScript files and install TypeScript dependencies. Default: false",
+                   aliases: "-T"
 
       # --ignore-warnings
       class_option :ignore_warnings,
@@ -58,11 +66,12 @@ module ReactOnRails
 
       def invoke_generators
         ensure_shakapacker_installed
-        invoke "react_on_rails:base"
+        install_typescript_dependencies if options.typescript?
+        invoke "react_on_rails:base", [], { typescript: options.typescript? }
         if options.redux?
-          invoke "react_on_rails:react_with_redux"
+          invoke "react_on_rails:react_with_redux", [], { typescript: options.typescript? }
         else
-          invoke "react_on_rails:react_no_redux"
+          invoke "react_on_rails:react_no_redux", [], { typescript: options.typescript? }
         end
       end
 
@@ -309,6 +318,126 @@ module ReactOnRails
         end
 
         false
+      end
+
+      def install_typescript_dependencies
+        puts Rainbow("📝 Installing TypeScript dependencies...").yellow
+
+        # Determine the package manager to use
+        package_manager = detect_package_manager
+        return unless package_manager
+
+        # Install TypeScript and React type definitions
+        typescript_packages = %w[
+          typescript
+          @types/react
+          @types/react-dom
+          @babel/preset-typescript
+        ]
+
+        install_command = case package_manager
+                         when "npm"
+                           "npm install --save-dev #{typescript_packages.join(' ')}"
+                         when "yarn"
+                           "yarn add --dev #{typescript_packages.join(' ')}"
+                         when "pnpm"
+                           "pnpm add --save-dev #{typescript_packages.join(' ')}"
+                         when "bun"
+                           "bun add --dev #{typescript_packages.join(' ')}"
+                         end
+
+        success = system(install_command)
+        unless success
+          warning = <<~MSG.strip
+            ⚠️  Failed to install TypeScript dependencies automatically.
+
+            Please run manually:
+                #{install_command}
+
+            TypeScript files will still be generated.
+          MSG
+          GeneratorMessages.add_warning(warning)
+        end
+
+        # Generate tsconfig.json
+        create_typescript_config
+
+        puts Rainbow("✅ TypeScript support configured").green
+        puts Rainbow("   Note: Shakapacker automatically detects @babel/preset-typescript").blue
+      end
+
+      def detect_package_manager
+        return "yarn" if File.exist?("yarn.lock")
+        return "pnpm" if File.exist?("pnpm-lock.yaml")
+        return "bun" if File.exist?("bun.lockb")
+        return "npm" if File.exist?("package-lock.json") || cli_exists?("npm")
+
+        nil
+      end
+
+      def create_typescript_config
+        tsconfig_content = {
+          "compilerOptions" => {
+            "target" => "es2018",
+            "lib" => ["dom", "dom.iterable", "es6"],
+            "allowJs" => true,
+            "skipLibCheck" => true,
+            "esModuleInterop" => true,
+            "allowSyntheticDefaultImports" => true,
+            "strict" => true,
+            "forceConsistentCasingInFileNames" => true,
+            "noFallthroughCasesInSwitch" => true,
+            "module" => "esnext",
+            "moduleResolution" => "node",
+            "resolveJsonModule" => true,
+            "isolatedModules" => true,
+            "noEmit" => true,
+            "jsx" => "react-jsx"
+          },
+          "include" => [
+            "app/javascript/**/*"
+          ],
+          "exclude" => [
+            "node_modules"
+          ]
+        }
+
+        File.write("tsconfig.json", JSON.pretty_generate(tsconfig_content))
+        puts Rainbow("✅ Created tsconfig.json").green
+      end
+
+      def configure_babel_for_typescript
+        # Install Babel TypeScript preset
+        package_manager = detect_package_manager
+        return unless package_manager
+
+        babel_typescript_package = "@babel/preset-typescript"
+
+        install_command = case package_manager
+                         when "npm"
+                           "npm install --save-dev #{babel_typescript_package}"
+                         when "yarn"
+                           "yarn add --dev #{babel_typescript_package}"
+                         when "pnpm"
+                           "pnpm add --save-dev #{babel_typescript_package}"
+                         when "bun"
+                           "bun add --dev #{babel_typescript_package}"
+                         end
+
+        puts Rainbow("📝 Installing Babel TypeScript preset...").yellow
+        success = system(install_command)
+        unless success
+          warning = <<~MSG.strip
+            ⚠️  Failed to install Babel TypeScript preset automatically.
+
+            Please run manually:
+                #{install_command}
+
+            TypeScript compilation may not work without this preset.
+          MSG
+          GeneratorMessages.add_warning(warning)
+          return
+        end
       end
 
       # Removed: Shakapacker auto-installation logic (now explicit dependency)
