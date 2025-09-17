@@ -502,6 +502,67 @@ rake lint
 
 **Tip**: Set up your IDE to run these automatically on save to catch issues early.
 
+## 🤖 Best Practices for AI Coding Agents
+
+**CRITICAL WORKFLOW** to prevent CI failures:
+
+### 1. **ALWAYS Lint Before Any Code Changes**
+```bash
+# First, check current state
+rake lint
+
+# If violations exist, auto-fix them first
+yarn run eslint . --fix  # Auto-fix JS/TS formatting
+bundle exec rubocop -A   # Auto-fix Ruby violations
+```
+
+### 2. **After Making Code Changes**
+```bash
+# MANDATORY: Run linters again
+rake lint
+
+# If any violations, auto-fix immediately
+yarn run eslint . --fix
+bundle exec rubocop -A
+
+# Verify everything passes
+rake lint
+```
+
+### 3. **Common AI Agent Mistakes**
+
+❌ **DON'T:**
+- Make code changes without running linters first
+- Commit code that hasn't been linted locally
+- Ignore formatting rules when creating new files
+- Add manual formatting that conflicts with Prettier/RuboCop
+
+✅ **DO:**
+- Run `rake lint` before AND after any code changes
+- Use auto-fix options (`--fix`, `-A`) to resolve violations
+- Create new files that follow existing patterns
+- Test locally before committing
+
+### 4. **Template File Best Practices**
+
+When creating new template files (`.jsx`, `.rb`, etc.):
+1. Copy existing template structure and patterns
+2. Run `yarn run eslint . --fix` immediately after creation
+3. Verify with `rake lint` before committing
+
+### 5. **RuboCop Complexity Issues**
+
+For methods with high ABC complexity (usually formatting/display methods):
+```ruby
+# rubocop:disable Metrics/AbcSize
+def complex_formatting_method
+  # ... method with lots of string interpolation/formatting
+end
+# rubocop:enable Metrics/AbcSize
+```
+
+**Remember**: Failing CI wastes time and resources. Always lint locally first!
+
 ### Linting
 
 All linting is performed from the docker container for CI. You will need docker and docker-compose installed locally to lint code changes via the lint container. You can lint locally by running `npm run lint && npm run flow`

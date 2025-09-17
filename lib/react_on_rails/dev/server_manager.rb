@@ -122,6 +122,7 @@ module ReactOnRails
           Rainbow("📋 Usage: bin/dev [command] [options]").bold
         end
 
+        # rubocop:disable Metrics/AbcSize
         def help_commands
           <<~COMMANDS
             #{Rainbow('🚀 COMMANDS:').cyan.bold}
@@ -139,6 +140,7 @@ module ReactOnRails
               #{Rainbow('help').blue.bold}                #{Rainbow('Show this help message').white}
           COMMANDS
         end
+        # rubocop:enable Metrics/AbcSize
 
         def help_options
           <<~OPTIONS
@@ -160,6 +162,7 @@ module ReactOnRails
           CUSTOMIZATION
         end
 
+        # rubocop:disable Metrics/AbcSize
         def help_mode_details
           <<~MODES
             #{Rainbow('🔥 HMR Development mode (default)').cyan.bold} - #{Rainbow('Procfile.dev').green}:
@@ -190,6 +193,7 @@ module ReactOnRails
             #{Rainbow('•').yellow} #{Rainbow('Access at:').white} #{Rainbow('http://localhost:3001/hello_world').cyan.underline}
           MODES
         end
+        # rubocop:enable Metrics/AbcSize
 
         def run_production_like(_verbose: false)
           procfile = "Procfile.dev-prod-assets"
@@ -296,6 +300,7 @@ module ReactOnRails
           line + "#{' ' * padding}│"
         end
 
+        # rubocop:disable Metrics/AbcSize
         def help_troubleshooting
           <<~TROUBLESHOOTING
             #{Rainbow('🔧 TROUBLESHOOTING:').cyan.bold}
@@ -318,6 +323,7 @@ module ReactOnRails
             #{Rainbow('📚 Need help? Visit:').blue.bold} #{Rainbow('https://www.shakacode.com/react-on-rails/docs/').cyan.underline}
           TROUBLESHOOTING
         end
+        # rubocop:enable Metrics/AbcSize
       end
     end
   end
