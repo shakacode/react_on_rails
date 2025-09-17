@@ -268,6 +268,112 @@ The generators are covered by generator tests using Rails's generator testing he
 
 `rake run_rspec:shakapacker_examples_basic` is a great way to run tests on one generator. Once that works, you should run `rake run_rspec:shakapacker_examples`. Be aware that this will create a huge number of files under a `/gen-examples` directory. You should be sure to exclude this directory from your IDE and delete it once your testing is done.
 
+#### Manual Generator Testing Workflow
+
+For comprehensive testing of generator changes, use this manual testing workflow with dedicated test applications:
+
+**1. Set up test application with clean baseline:**
+
+```bash
+# Navigate to test app directory (replace with your test app)
+cd ~/shakacode/react-on-rails/react_on_rails-test-apps/react-on-rails-tutorial-v15
+
+# Create a clean baseline tag for testing
+git tag generator_testing_base
+
+# Clean reset to baseline state
+git clean -fd && git reset --hard && git clean -fd
+```
+
+**2. Test generator commits systematically:**
+
+When testing specific generator improvements or fixes, test both Shakapacker scenarios:
+
+**Scenario A: No Shakapacker installed (fresh Rails app)**
+```bash
+# Reset to clean baseline before each test
+git clean -fd && git reset --hard generator_testing_base && git clean -fd
+
+# Ensure no Shakapacker in Gemfile (remove if present)
+# Edit Gemfile to update gem path: gem 'react_on_rails', path: '../path/to/main/repo'
+bundle install
+
+# Run generator - should install Shakapacker automatically
+rails generate react_on_rails:install
+
+# Verify Shakapacker was added to Gemfile and installed correctly
+```
+
+**Scenario B: Shakapacker already installed**
+```bash
+# Reset to clean baseline
+git clean -fd && git reset --hard generator_testing_base && git clean -fd
+
+# Ensure Shakapacker is in Gemfile
+echo 'gem "shakapacker", "~> 8.0"' >> Gemfile
+bundle install
+
+# Run Shakapacker installer first
+bundle exec rails shakapacker:install
+
+# Edit Gemfile to update gem path: gem 'react_on_rails', path: '../path/to/main/repo'
+bundle install
+
+# Run generator - should detect existing Shakapacker
+rails generate react_on_rails:install
+
+# Verify generator adapts to existing Shakapacker setup
+```
+
+**3. Document testing results:**
+
+For each commit tested, document:
+- Generator execution success/failure for both scenarios
+- Shakapacker installation/detection behavior
+- Component rendering in browser
+- Console output and warnings  
+- File generation differences between scenarios
+- Specific issues found
+
+This systematic approach ensures generator changes work correctly whether Shakapacker is pre-installed or needs to be installed by the generator.
+
+#### Testing Specific Generator Commits
+
+When testing specific commits that fix generator issues, follow this process:
+
+**Example: Testing commits 81c66fa and bc69dcd0**
+
+1. **Commit 81c66fa**: "Now automatically creates packs" - Test pack generation functionality
+2. **Commit bc69dcd0**: "Fix React on Rails v15 generator and restore colorized output" - Test generator fixes and output formatting
+
+**Testing workflow for each commit:**
+
+```bash
+# In main react_on_rails repository
+cd ~/shakacode/react-on-rails/react_on_rails
+git checkout <commit-hash>  # e.g., 81c66fa or bc69dcd0
+
+# In test application 
+cd ~/shakacode/react-on-rails/react_on_rails-test-apps/react-on-rails-tutorial-v15
+
+# Reset to clean baseline
+git clean -fd && git reset --hard generator_testing_base && git clean -fd
+
+# Update Gemfile to point to current commit
+# Edit: gem 'react_on_rails', path: '../../../react_on_rails'
+bundle install
+
+# Test both Shakapacker scenarios (A and B above)
+# Document results for this specific commit
+```
+
+**Expected outcomes to verify:**
+- Generator completes without errors
+- Shakapacker integration works correctly
+- React components render and are interactive
+- Development server starts successfully with `bin/dev`
+- Console output shows expected messages and minimal warnings
+
 #### Testing Generator with Yalc for React Component Functionality
 
 When testing the install generator with new Rails apps, you need to use **yalc** for the JavaScript package to ensure React components work correctly. The Ruby gem path reference is insufficient for client-side rendering.
@@ -311,6 +417,66 @@ bin/dev
 - `bin/dev prod`: Cleanest output with minimal warnings (production-like environment)
 
 **Note**: Resource preload warnings in development modes are normal and can be ignored. They occur because Shakapacker generates preload tags but scripts load asynchronously. Production mode eliminates most of these warnings.
+
+#### Generator Testing Troubleshooting
+
+**Common Issues and Solutions:**
+
+1. **React components not rendering (empty divs)**
+   - **Cause**: Missing yalc setup for JavaScript package
+   - **Solution**: Follow yalc setup steps above after running generator
+
+2. **Generator fails with Shakapacker errors**
+   - **Cause**: Conflicting Shakapacker versions or incomplete installation
+   - **Solution**: Clean reset and ensure consistent Shakapacker version across tests
+
+3. **Babel configuration conflicts during yalc development**
+   - **Cause**: Both `babel.config.js` and `package.json` "babel" section defining presets
+   - **Solution**: Remove "babel" section from `package.json`, keep only `babel.config.js`
+
+4. **"Package.json not found" errors**
+   - **Cause**: Generator trying to access non-existent package.json files
+   - **Solution**: Test with commits that fix this specific issue (e.g., bc69dcd0)
+
+5. **Port conflicts during testing**
+   - **Cause**: Multiple development servers running
+   - **Solution**: Run `bin/dev kill` before starting new test servers
+
+**Testing Best Practices:**
+- Always use the double clean command: `git clean -fd && git reset --hard && git clean -fd`
+- Test both Shakapacker scenarios for comprehensive coverage
+- Document exact error messages and steps to reproduce
+- Verify React component interactivity, not just rendering
+- Test all development modes: `bin/dev`, `bin/dev static`, `bin/dev prod`
+
+## Pre-Commit Requirements
+
+**CRITICAL**: Before committing any changes, always run the following commands to ensure code quality:
+
+```bash
+# Navigate to the main react_on_rails directory
+cd react_on_rails/
+
+# Run Prettier for JavaScript/TypeScript formatting
+yarn run format
+
+# Run ESLint for JavaScript/TypeScript linting
+yarn run lint
+
+# Run RuboCop for Ruby linting and formatting
+rake lint:rubocop
+
+# Or run all linters together
+rake lint
+```
+
+**Automated checks:**
+- Format all JavaScript/TypeScript files with Prettier
+- Check and fix linting issues with ESLint
+- Check and fix Ruby style issues with RuboCop
+- Ensure all tests pass before pushing
+
+**Tip**: Set up your IDE to run these automatically on save to catch issues early.
 
 ### Linting
 
