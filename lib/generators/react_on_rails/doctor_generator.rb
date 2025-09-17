@@ -39,7 +39,14 @@ end
 
 module ReactOnRails
   module Generators
+    # rubocop:disable Metrics/ClassLength, Metrics/AbcSize
     class DoctorGenerator < Rails::Generators::Base
+      MESSAGE_COLORS = {
+        error: :red,
+        warning: :yellow,
+        success: :green,
+        info: :blue
+      }.freeze
       source_root(File.expand_path(__dir__))
 
       desc "Diagnose React on Rails setup and configuration"
@@ -174,25 +181,42 @@ module ReactOnRails
       end
 
       def print_summary
+        print_summary_header
+        counts = calculate_message_counts
+        print_summary_message(counts)
+        print_detailed_results_if_needed(counts)
+      end
+
+      def print_summary_header
         puts Rainbow("DIAGNOSIS COMPLETE").cyan.bold
         puts Rainbow("=" * 80).cyan
         puts
+      end
 
-        error_count = @checker.messages.count { |msg| msg[:type] == :error }
-        warning_count = @checker.messages.count { |msg| msg[:type] == :warning }
-        success_count = @checker.messages.count { |msg| msg[:type] == :success }
+      def calculate_message_counts
+        {
+          error: @checker.messages.count { |msg| msg[:type] == :error },
+          warning: @checker.messages.count { |msg| msg[:type] == :warning },
+          success: @checker.messages.count { |msg| msg[:type] == :success }
+        }
+      end
 
-        if error_count == 0 && warning_count == 0
+      def print_summary_message(counts)
+        if counts[:error].zero? && counts[:warning].zero?
           puts Rainbow("🎉 Excellent! Your React on Rails setup looks perfect!").green.bold
-        elsif error_count == 0
-          puts Rainbow("✅ Good! Your setup is functional with #{warning_count} minor issue(s).").yellow
+        elsif counts[:error].zero?
+          puts Rainbow("✅ Good! Your setup is functional with #{counts[:warning]} minor issue(s).").yellow
         else
-          puts Rainbow("❌ Issues found: #{error_count} error(s), #{warning_count} warning(s)").red
+          puts Rainbow("❌ Issues found: #{counts[:error]} error(s), #{counts[:warning]} warning(s)").red
         end
 
-        puts Rainbow("📊 Summary: #{success_count} checks passed, #{warning_count} warnings, #{error_count} errors").blue
+        summary_text = "📊 Summary: #{counts[:success]} checks passed, " \
+                       "#{counts[:warning]} warnings, #{counts[:error]} errors"
+        puts Rainbow(summary_text).blue
+      end
 
-        return unless options[:verbose] || error_count > 0 || warning_count > 0
+      def print_detailed_results_if_needed(counts)
+        return unless options[:verbose] || counts[:error].positive? || counts[:warning].positive?
 
         puts "\nDetailed Results:"
         print_all_messages
@@ -200,12 +224,7 @@ module ReactOnRails
 
       def print_all_messages
         @checker.messages.each do |message|
-          color = case message[:type]
-                  when :error then :red
-                  when :warning then :yellow
-                  when :success then :green
-                  when :info then :blue
-                  end
+          color = MESSAGE_COLORS[message[:type]] || :blue
 
           puts Rainbow(message[:content]).send(color)
           puts
@@ -252,5 +271,6 @@ module ReactOnRails
         end
       end
     end
+    # rubocop:enable Metrics/ClassLength, Metrics/AbcSize
   end
 end

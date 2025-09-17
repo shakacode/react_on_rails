@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "spec_helper"
+require_relative "../../../react_on_rails/spec_helper"
 require "rails/generators"
 require_relative "../../../../lib/generators/react_on_rails/doctor_generator"
 
