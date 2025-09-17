@@ -46,39 +46,37 @@ module GeneratorMessages
 
       <<~MSG
 
-                ╔════════════════════════════════════════════════════════════════════════╗
-                ║  🎉 React on Rails Successfully Installed!                             ║
-                ╚════════════════════════════════════════════════════════════════════════╝
+        ╔════════════════════════════════════════════════════════════════════════╗
+        ║  🎉 React on Rails Successfully Installed!                             ║
+        ╚════════════════════════════════════════════════════════════════════════╝
+        #{process_manager_section}#{shakapacker_status}
+        📋 QUICK START:
+        ─────────────────────────────────────────────────────────────────────────
+        1. Install dependencies:
+           #{Rainbow("bundle && #{package_manager} install").cyan}
 
-                📋 QUICK START:
-                ─────────────────────────────────────────────────────────────────────────
-                1. Install dependencies:
-                   #{Rainbow("bundle && #{package_manager} install").cyan}
+        2. Start the app:
+           ./bin/dev              # HMR (Hot Module Replacement) mode
+           ./bin/dev static       # Static bundles (no HMR, faster initial load)
+           ./bin/dev prod         # Production-like mode for testing
+           ./bin/dev help         # See all available options
 
-                2. Start the app:
-                   ./bin/dev              # HMR (Hot Module Replacement) mode
-                   ./bin/dev static       # Static bundles (no HMR, faster initial load)
-                   ./bin/dev prod         # Production-like mode for testing
-                   ./bin/dev help         # See all available options
-        #{process_manager_section}
+        3. Visit: #{Rainbow('http://localhost:3000/hello_world').cyan.underline}
+        ✨ KEY FEATURES:
+        ─────────────────────────────────────────────────────────────────────────
+        • Auto-registration enabled - Your layout only needs:
+          <%= javascript_pack_tag %>
+          <%= stylesheet_pack_tag %>
 
-                3. Visit: http://localhost:3000/hello_world
-        #{shakapacker_status}
-                ✨ KEY FEATURES:
-                ─────────────────────────────────────────────────────────────────────────
-                • Auto-registration enabled - Your layout only needs:
-                  <%= javascript_pack_tag %>
-                  <%= stylesheet_pack_tag %>
+        • Server-side rendering - Enabled with prerender option in app/views/hello_world/index.html.erb:
+          <%= react_component("#{component_name}", props: @hello_world_props, prerender: true) %>
 
-                • Server-side rendering - Enable it in app/views/hello_world/index.html.erb:
-                  <%= react_component("#{component_name}", props: @hello_world_props, prerender: true) %>
+        📚 LEARN MORE:
+        ─────────────────────────────────────────────────────────────────────────
+        • Documentation: #{Rainbow('https://www.shakacode.com/react-on-rails/docs/').cyan.underline}
+        • Webpack customization: #{Rainbow('https://github.com/shakacode/shakapacker#webpack-configuration').cyan.underline}
 
-                📚 LEARN MORE:
-                ─────────────────────────────────────────────────────────────────────────
-                • Documentation: https://www.shakacode.com/react-on-rails/docs/
-                • Webpack customization: https://github.com/shakacode/shakapacker#webpack-configuration
-
-                💡 TIP: Run 'bin/dev help' for development server options and troubleshooting#{testing_section}
+        💡 TIP: Run 'bin/dev help' for development server options and troubleshooting#{testing_section}
       MSG
     end
 
@@ -112,12 +110,12 @@ module GeneratorMessages
       <<~TESTING
 
 
-                🧪 TESTING SETUP (Optional):
-                ─────────────────────────────────────────────────────────────────────────
-                For JavaScript testing with asset compilation, add this to your RSpec config:
+        🧪 TESTING SETUP (Optional):
+        ─────────────────────────────────────────────────────────────────────────
+        For JavaScript testing with asset compilation, add this to your RSpec config:
 
-                # In spec/rails_helper.rb or spec/spec_helper.rb:
-                ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+        # In spec/rails_helper.rb or spec/spec_helper.rb:
+        ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
       TESTING
     end
 

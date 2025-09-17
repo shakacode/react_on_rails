@@ -2,6 +2,7 @@
 
 require "English"
 require "open3"
+require "rainbow"
 
 module ReactOnRails
   module Dev
@@ -118,75 +119,75 @@ module ReactOnRails
         private
 
         def help_usage
-          "Usage: bin/dev [command] [options]"
+          Rainbow("📋 Usage: bin/dev [command] [options]").bold
         end
 
         def help_commands
           <<~COMMANDS
-            Commands and their Procfiles:
-              (none) / hmr        Start development server with HMR (default)
-                                  → Uses: Procfile.dev
+            #{Rainbow('🚀 COMMANDS:').cyan.bold}
+              #{Rainbow('(none) / hmr').green.bold}        #{Rainbow('Start development server with HMR (default)').white}
+                                  #{Rainbow('→ Uses:').yellow} Procfile.dev
 
-              static              Start development server with static assets (no HMR, no FOUC)
-                                  → Uses: Procfile.dev-static-assets
+              #{Rainbow('static').green.bold}              #{Rainbow('Start development server with static assets (no HMR, no FOUC)').white}
+                                  #{Rainbow('→ Uses:').yellow} Procfile.dev-static-assets
 
-              production-assets   Start with production-optimized assets (no HMR)
-              prod                Alias for production-assets
-                                  → Uses: Procfile.dev-prod-assets
+              #{Rainbow('production-assets').green.bold}   #{Rainbow('Start with production-optimized assets (no HMR)').white}
+              #{Rainbow('prod').green.bold}                #{Rainbow('Alias for production-assets').white}
+                                  #{Rainbow('→ Uses:').yellow} Procfile.dev-prod-assets
 
-              kill                Kill all development processes for a clean start
-              help                Show this help message
+              #{Rainbow('kill').red.bold}                #{Rainbow('Kill all development processes for a clean start').white}
+              #{Rainbow('help').blue.bold}                #{Rainbow('Show this help message').white}
           COMMANDS
         end
 
         def help_options
           <<~OPTIONS
-            Options:
-              --verbose, -v       Enable verbose output for pack generation
+            #{Rainbow('⚙️  OPTIONS:').cyan.bold}
+              #{Rainbow('--verbose, -v').green.bold}       #{Rainbow('Enable verbose output for pack generation').white}
           OPTIONS
         end
 
         def help_customization
           <<~CUSTOMIZATION
-            🔧 CUSTOMIZATION:
+            #{Rainbow('🔧 CUSTOMIZATION:').cyan.bold}
             Each mode uses a specific Procfile that you can customize for your application:
 
-            • Procfile.dev                 - HMR development with webpack-dev-server
-            • Procfile.dev-static-assets   - Static development with webpack --watch
-            • Procfile.dev-prod-assets     - Production-optimized assets (port 3001)
+            #{Rainbow('•').yellow} #{Rainbow('Procfile.dev').green.bold}                 - HMR development with webpack-dev-server
+            #{Rainbow('•').yellow} #{Rainbow('Procfile.dev-static-assets').green.bold}   - Static development with webpack --watch
+            #{Rainbow('•').yellow} #{Rainbow('Procfile.dev-prod-assets').green.bold}     - Production-optimized assets (port 3001)
 
-            Edit these files to customize the development environment for your needs.
+            #{Rainbow('Edit these files to customize the development environment for your needs.').white}
           CUSTOMIZATION
         end
 
         def help_mode_details
           <<~MODES
-            HMR Development mode (default) - Procfile.dev:
-            • Hot Module Replacement (HMR) enabled
-            • React on Rails pack generation before Procfile start
-            • Webpack dev server for fast recompilation
-            • Source maps for debugging
-            • May have Flash of Unstyled Content (FOUC)
-            • Fast recompilation
-            • Access at: http://localhost:3000
+            #{Rainbow('🔥 HMR Development mode (default)').cyan.bold} - #{Rainbow('Procfile.dev').green}:
+            #{Rainbow('•').yellow} #{Rainbow('Hot Module Replacement (HMR) enabled').white}
+            #{Rainbow('•').yellow} #{Rainbow('React on Rails pack generation before Procfile start').white}
+            #{Rainbow('•').yellow} #{Rainbow('Webpack dev server for fast recompilation').white}
+            #{Rainbow('•').yellow} #{Rainbow('Source maps for debugging').white}
+            #{Rainbow('•').yellow} #{Rainbow('May have Flash of Unstyled Content (FOUC)').white}
+            #{Rainbow('•').yellow} #{Rainbow('Fast recompilation').white}
+            #{Rainbow('•').yellow} #{Rainbow('Access at:').white} #{Rainbow('http://localhost:3000/hello_world').cyan.underline}
 
-            Static development mode - Procfile.dev-static-assets:
-            • No HMR (static assets with auto-recompilation)
-            • React on Rails pack generation before Procfile start
-            • Webpack watch mode for auto-recompilation
-            • CSS extracted to separate files (no FOUC)
-            • Development environment (faster builds than production)
-            • Source maps for debugging
-            • Access at: http://localhost:3000
+            #{Rainbow('📦 Static development mode').cyan.bold} - #{Rainbow('Procfile.dev-static-assets').green}:
+            #{Rainbow('•').yellow} #{Rainbow('No HMR (static assets with auto-recompilation)').white}
+            #{Rainbow('•').yellow} #{Rainbow('React on Rails pack generation before Procfile start').white}
+            #{Rainbow('•').yellow} #{Rainbow('Webpack watch mode for auto-recompilation').white}
+            #{Rainbow('•').yellow} #{Rainbow('CSS extracted to separate files (no FOUC)').white}
+            #{Rainbow('•').yellow} #{Rainbow('Development environment (faster builds than production)').white}
+            #{Rainbow('•').yellow} #{Rainbow('Source maps for debugging').white}
+            #{Rainbow('•').yellow} #{Rainbow('Access at:').white} #{Rainbow('http://localhost:3000/hello_world').cyan.underline}
 
-            Production-assets mode - Procfile.dev-prod-assets:
-            • React on Rails pack generation before Procfile start
-            • Asset precompilation with production optimizations
-            • Optimized, minified bundles
-            • Extracted CSS files (no FOUC)
-            • No HMR (static assets)
-            • Slower recompilation
-            • Access at: http://localhost:3001
+            #{Rainbow('🏭 Production-assets mode').cyan.bold} - #{Rainbow('Procfile.dev-prod-assets').green}:
+            #{Rainbow('•').yellow} #{Rainbow('React on Rails pack generation before Procfile start').white}
+            #{Rainbow('•').yellow} #{Rainbow('Asset precompilation with production optimizations').white}
+            #{Rainbow('•').yellow} #{Rainbow('Optimized, minified bundles').white}
+            #{Rainbow('•').yellow} #{Rainbow('Extracted CSS files (no FOUC)').white}
+            #{Rainbow('•').yellow} #{Rainbow('No HMR (static assets)').white}
+            #{Rainbow('•').yellow} #{Rainbow('Slower recompilation').white}
+            #{Rainbow('•').yellow} #{Rainbow('Access at:').white} #{Rainbow('http://localhost:3001/hello_world').cyan.underline}
           MODES
         end
 
@@ -249,7 +250,8 @@ module ReactOnRails
           puts title
           features.each { |feature| puts "   - #{feature}" }
           puts ""
-          puts "💡 Access at: http://localhost:#{port}"
+          puts ""
+          puts "💡 Access at: #{Rainbow("http://localhost:#{port}/hello_world").cyan.underline}"
           puts ""
         end
 
@@ -262,7 +264,9 @@ module ReactOnRails
           puts box_empty_line(box_width)
           puts format_box_line("📋 Using Procfile: #{procfile}", box_width)
           puts format_box_line("🔧 Customize this file for your app's needs", box_width)
-          puts format_box_line("💡 Access at: http://localhost:#{port}", box_width)
+          puts box_empty_line(box_width)
+          puts format_box_line("💡 Access at: #{Rainbow("http://localhost:#{port}/hello_world").cyan.underline}",
+                               box_width)
           puts box_empty_line(box_width)
           puts box_bottom(box_width)
           puts ""
@@ -286,30 +290,32 @@ module ReactOnRails
 
         def format_box_line(content, box_width)
           line = "│ #{content}"
-          padding = box_width - line.length - 2
+          # Use visual length for colored text
+          visual_length = Rainbow.uncolor(line).length
+          padding = box_width - visual_length - 2
           line + "#{' ' * padding}│"
         end
 
         def help_troubleshooting
           <<~TROUBLESHOOTING
-            🔧 TROUBLESHOOTING:
+            #{Rainbow('🔧 TROUBLESHOOTING:').cyan.bold}
 
-            React Refresh Issues:
-            If you see "$RefreshSig$ is not defined" errors:
-            1. Check that both babel plugin and webpack plugin are configured:
-               - babel.config.js: 'react-refresh/babel' plugin (enabled when WEBPACK_SERVE=true)
-               - config/webpack/development.js: ReactRefreshWebpackPlugin (enabled when WEBPACK_SERVE=true)
-            2. Ensure you're running HMR mode: bin/dev (not bin/dev static)
-            3. Try restarting the development server: bin/dev kill && bin/dev
-            4. Note: React Refresh only works in HMR mode, not static mode
+            #{Rainbow('⚛️  React Refresh Issues:').yellow.bold}
+            #{Rainbow('If you see "$RefreshSig$ is not defined" errors:').white}
+            #{Rainbow('1.').green} #{Rainbow('Check that both babel plugin and webpack plugin are configured:').white}
+               #{Rainbow('•').yellow} #{Rainbow('babel.config.js: \'react-refresh/babel\' plugin (enabled when WEBPACK_SERVE=true)').white}
+               #{Rainbow('•').yellow} #{Rainbow('config/webpack/development.js: ReactRefreshWebpackPlugin (enabled when WEBPACK_SERVE=true)').white}
+            #{Rainbow('2.').green} #{Rainbow('Ensure you\'re running HMR mode:').white} #{Rainbow('bin/dev').green.bold} #{Rainbow('(not').white} #{Rainbow('bin/dev static').red}#{Rainbow(')').white}
+            #{Rainbow('3.').green} #{Rainbow('Try restarting the development server:').white} #{Rainbow('bin/dev kill && bin/dev').green.bold}
+            #{Rainbow('4.').green} #{Rainbow('Note: React Refresh only works in HMR mode, not static mode').white}
 
-            General Issues:
-            • "Port already in use" → Run: bin/dev kill
-            • "Webpack compilation failed" → Check console for specific errors
-            • "Process manager not found" → Install: brew install overmind (or gem install foreman)
-            • "Assets not loading" → Verify Procfile.dev is present and check server logs
+            #{Rainbow('🚨 General Issues:').yellow.bold}
+            #{Rainbow('•').red} #{Rainbow('"Port already in use"').white} #{Rainbow('→ Run:').yellow} #{Rainbow('bin/dev kill').green.bold}
+            #{Rainbow('•').red} #{Rainbow('"Webpack compilation failed"').white} #{Rainbow('→ Check console for specific errors').white}
+            #{Rainbow('•').red} #{Rainbow('"Process manager not found"').white} #{Rainbow('→ Install:').yellow} #{Rainbow('brew install overmind').green.bold} #{Rainbow('(or').white} #{Rainbow('gem install foreman').green.bold}#{Rainbow(')').white}
+            #{Rainbow('•').red} #{Rainbow('"Assets not loading"').white} #{Rainbow('→ Verify Procfile.dev is present and check server logs').white}
 
-            Need help? Visit: https://www.shakacode.com/react-on-rails/docs/
+            #{Rainbow('📚 Need help? Visit:').blue.bold} #{Rainbow('https://www.shakacode.com/react-on-rails/docs/').cyan.underline}
           TROUBLESHOOTING
         end
       end

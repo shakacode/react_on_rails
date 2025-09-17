@@ -13,8 +13,8 @@ module ReactOnRails
 
       def copy_base_files
         base_js_path = "base/base"
-        base_files = %w[app/javascript/src/HelloWorld/ror_components/HelloWorld.client.jsx
-                        app/javascript/src/HelloWorld/ror_components/HelloWorld.server.jsx]
+        base_files = %w[app/javascript/src/HelloWorld/ror_components/HelloWorld.jsx
+                        app/javascript/src/HelloWorld/ror_components/HelloWorld.module.css]
         base_files.each { |file| copy_file("#{base_js_path}/#{file}", file) }
       end
 
