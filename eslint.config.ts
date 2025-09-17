@@ -44,8 +44,9 @@ const config = tsEslint.config([
     // fixtures
     '**/fixtures/',
     '**/.yalc/**/*',
-    // generator templates
-    '**/templates/**/*',
+    // generator templates - exclude TypeScript templates that need tsconfig.json
+    '**/templates/**/*.tsx',
+    '**/templates/**/*.ts',
   ]),
   {
     files: ['**/*.[jt]s', '**/*.[jt]sx', '**/*.[cm][jt]s'],

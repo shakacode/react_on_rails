@@ -44,15 +44,16 @@ module ReactOnRails
       def copy_base_redux_files
         base_hello_world_path = "redux/base/app/javascript/bundles/HelloWorld"
         component_extension = options.typescript? ? "tsx" : "jsx"
+        redux_extension = options.typescript? ? "ts" : "js"
 
-        # Copy non-component files (keep as .js for now)
-        %w[actions/helloWorldActionCreators.js
-           containers/HelloWorldContainer.js
-           constants/helloWorldConstants.js
-           reducers/helloWorldReducer.js
-           store/helloWorldStore.js].each do |file|
-             copy_file("#{base_hello_world_path}/#{file}",
-                       "app/javascript/src/HelloWorldApp/#{file}")
+        # Copy Redux infrastructure files with appropriate extension
+        %w[actions/helloWorldActionCreators
+           containers/HelloWorldContainer
+           constants/helloWorldConstants
+           reducers/helloWorldReducer
+           store/helloWorldStore].each do |file|
+             copy_file("#{base_hello_world_path}/#{file}.#{redux_extension}",
+                       "app/javascript/src/HelloWorldApp/#{file}.#{redux_extension}")
            end
 
         # Copy component file with appropriate extension
@@ -72,11 +73,59 @@ module ReactOnRails
       end
 
       def add_redux_npm_dependencies
+        # Add Redux dependencies as regular dependencies
+        regular_packages = %w[redux react-redux]
+
+        # Try using GeneratorHelper first (package manager agnostic)
+        success = add_npm_dependencies(regular_packages)
+
+        # Add TypeScript types as dev dependency if TypeScript is enabled
         if options.typescript?
-          run "npm install redux react-redux @types/react-redux"
-        else
-          run "npm install redux react-redux"
+          types_success = add_npm_dependencies(%w[@types/react-redux], dev: true)
+          success &&= types_success
         end
+
+        # Fallback to package manager detection if GeneratorHelper fails
+        return if success
+
+        package_manager = detect_package_manager
+        return unless package_manager
+
+        install_packages_with_fallback(regular_packages, dev: false, package_manager: package_manager)
+
+        return unless options.typescript?
+
+        install_packages_with_fallback(%w[@types/react-redux], dev: true, package_manager: package_manager)
+      end
+
+      private
+
+      def install_packages_with_fallback(packages, dev:, package_manager:)
+        packages_str = packages.join(" ")
+        install_command = build_install_command(package_manager, dev, packages_str)
+
+        success = system(install_command)
+        return if success
+
+        warning = <<~MSG.strip
+          ⚠️  Failed to install Redux dependencies automatically.
+
+          Please run manually:
+              #{install_command}
+        MSG
+        GeneratorMessages.add_warning(warning)
+      end
+
+      def build_install_command(package_manager, dev, packages_str)
+        commands = {
+          "npm" => { dev: "npm install --save-dev", prod: "npm install" },
+          "yarn" => { dev: "yarn add --dev", prod: "yarn add" },
+          "pnpm" => { dev: "pnpm add --save-dev", prod: "pnpm add" },
+          "bun" => { dev: "bun add --dev", prod: "bun add" }
+        }
+
+        command_type = dev ? :dev : :prod
+        "#{commands[package_manager][command_type]} #{packages_str}"
       end
 
       def add_redux_specific_messages
