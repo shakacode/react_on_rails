@@ -335,44 +335,10 @@ module ReactOnRails
           @babel/preset-typescript
         ]
 
-        install_command = case package_manager
-                          when "npm"
-                            "npm install --save-dev #{typescript_packages.join(' ')}"
-                          when "yarn"
-                            "yarn add --dev #{typescript_packages.join(' ')}"
-                          when "pnpm"
-                            "pnpm add --save-dev #{typescript_packages.join(' ')}"
-                          when "bun"
-                            "bun add --dev #{typescript_packages.join(' ')}"
-                          end
+        return if add_npm_dependencies(typescript_packages, dev: true)
 
-        success = system(install_command)
-        unless success
-          warning = <<~MSG.strip
-            ⚠️  Failed to install TypeScript dependencies automatically.
-
-            Please run manually:
-                #{install_command}
-
-            TypeScript files will still be generated.
-          MSG
-          GeneratorMessages.add_warning(warning)
-        end
-
-        # Generate tsconfig.json
-        create_typescript_config
-
-        puts Rainbow("✅ TypeScript support configured").green
-        puts Rainbow("   Note: Shakapacker automatically detects @babel/preset-typescript").blue
-      end
-
-      def detect_package_manager
-        return "yarn" if File.exist?("yarn.lock")
-        return "pnpm" if File.exist?("pnpm-lock.yaml")
-        return "bun" if File.exist?("bun.lockb")
-        return "npm" if File.exist?("package-lock.json") || cli_exists?("npm")
-
-        nil
+        success = run "npm install --save-dev #{typescript_packages.join(' ')}"
+        handle_npm_failure("TypeScript dependencies", typescript_packages) unless success
       end
 
       def create_typescript_config
