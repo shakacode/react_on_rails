@@ -406,40 +406,6 @@ module ReactOnRails
         puts Rainbow("✅ Created tsconfig.json").green
       end
 
-      def configure_babel_for_typescript
-        # Install Babel TypeScript preset
-        package_manager = detect_package_manager
-        return unless package_manager
-
-        babel_typescript_package = "@babel/preset-typescript"
-
-        install_command = case package_manager
-                          when "npm"
-                            "npm install --save-dev #{babel_typescript_package}"
-                          when "yarn"
-                            "yarn add --dev #{babel_typescript_package}"
-                          when "pnpm"
-                            "pnpm add --save-dev #{babel_typescript_package}"
-                          when "bun"
-                            "bun add --dev #{babel_typescript_package}"
-                          end
-
-        puts Rainbow("📝 Installing Babel TypeScript preset...").yellow
-        success = system(install_command)
-        return if success
-
-        warning = <<~MSG.strip
-          ⚠️  Failed to install Babel TypeScript preset automatically.
-
-          Please run manually:
-              #{install_command}
-
-          TypeScript compilation may not work without this preset.
-        MSG
-        GeneratorMessages.add_warning(warning)
-        nil
-      end
-
       # Removed: Shakapacker auto-installation logic (now explicit dependency)
 
       # Removed: Shakapacker 8+ is now required as explicit dependency

@@ -1,10 +1,9 @@
 import React from 'react';
 import * as style from './HelloWorld.module.css';
+import { PropsFromRedux } from '../containers/HelloWorldContainer';
 
-interface HelloWorldProps {
-  name: string;
-  updateName: (name: string) => void;
-}
+// Component props are inferred from Redux container
+type HelloWorldProps = PropsFromRedux;
 
 const HelloWorld: React.FC<HelloWorldProps> = ({ name, updateName }) => (
   <div>
