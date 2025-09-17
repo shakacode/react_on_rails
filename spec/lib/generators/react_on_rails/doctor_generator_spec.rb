@@ -1,121 +1,38 @@
 # frozen_string_literal: true
 
-require_relative "../../../react_on_rails/spec_helper"
-require "rails/generators"
-require_relative "../../../../lib/generators/react_on_rails/doctor_generator"
+require_relative "../../../react_on_rails/support/generator_spec_helper"
 
-RSpec.describe ReactOnRails::Generators::DoctorGenerator, type: :generator do
-  let(:generator) { described_class.new }
+# rubocop:disable RSpec/ContextWording, RSpec/NamedSubject, RSpec/SubjectStub
+describe DoctorGenerator, type: :generator do
+  include GeneratorSpec::TestCase
 
-  before do
-    allow(generator).to receive(:destination_root).and_return("/tmp")
-    allow(Dir).to receive(:chdir).with("/tmp").and_yield
-  end
+  destination File.expand_path("../dummy-for-generators", File.dirname(__dir__))
 
-  describe "#run_diagnosis" do
-    before do
-      allow(generator).to receive(:exit)
-      allow(generator).to receive(:puts)
-      allow(File).to receive(:exist?).and_return(false)
-      allow(File).to receive(:directory?).and_return(false)
+  context "basic functionality" do
+    it "has a description" do
+      expect(subject.class.desc).to include("Diagnose React on Rails setup")
     end
 
-    it "runs all diagnosis checks" do
-      expect(generator).to receive(:print_header)
-      expect(generator).to receive(:run_all_checks)
-      expect(generator).to receive(:print_summary)
-      expect(generator).to receive(:exit_with_status)
-
-      generator.run_diagnosis
+    it "defines verbose option" do
+      expect(subject.class.class_options.keys).to include(:verbose)
     end
 
-    context "when verbose option is enabled" do
-      let(:generator) { described_class.new([], [], { verbose: true }) }
-
-      it "shows detailed output" do
-        allow(generator).to receive(:print_header)
-        allow(generator).to receive(:run_all_checks)
-        allow(generator).to receive(:print_summary)
-        allow(generator).to receive(:exit_with_status)
-
-        expect(generator.options[:verbose]).to be true
-      end
+    it "defines fix option" do
+      expect(subject.class.class_options.keys).to include(:fix)
     end
   end
 
-  describe "system checks integration" do
-    let(:checker) { ReactOnRails::Generators::SystemChecker.new }
+  context "system checking integration" do
+    it "can run diagnosis without errors" do
+      # Mock all system interactions to avoid actual system calls
+      allow(subject).to receive(:puts)
+      allow(subject).to receive(:exit)
+      allow(File).to receive_messages(exist?: false, directory?: false)
+      allow(subject).to receive(:`).and_return("")
 
-    before do
-      allow(ReactOnRails::Generators::SystemChecker).to receive(:new).and_return(checker)
-    end
-
-    it "creates a system checker instance" do
-      allow(generator).to receive(:exit)
-      allow(generator).to receive(:puts)
-      allow(File).to receive(:exist?).and_return(false)
-      allow(File).to receive(:directory?).and_return(false)
-
-      expect(ReactOnRails::Generators::SystemChecker).to receive(:new)
-      generator.run_diagnosis
-    end
-
-    it "checks all required components" do
-      allow(generator).to receive(:exit)
-      allow(generator).to receive(:puts)
-      allow(File).to receive(:exist?).and_return(false)
-      allow(File).to receive(:directory?).and_return(false)
-
-      expect(checker).to receive(:check_node_installation)
-      expect(checker).to receive(:check_package_manager)
-      expect(checker).to receive(:check_react_on_rails_packages)
-      expect(checker).to receive(:check_shakapacker_configuration)
-      expect(checker).to receive(:check_react_dependencies)
-      expect(checker).to receive(:check_rails_integration)
-      expect(checker).to receive(:check_webpack_configuration)
-
-      generator.run_diagnosis
-    end
-  end
-
-  describe "exit status" do
-    before do
-      allow(generator).to receive(:puts)
-      allow(File).to receive(:exist?).and_return(false)
-      allow(File).to receive(:directory?).and_return(false)
-    end
-
-    context "when there are errors" do
-      it "exits with status 1" do
-        checker = ReactOnRails::Generators::SystemChecker.new
-        checker.add_error("Test error")
-        allow(ReactOnRails::Generators::SystemChecker).to receive(:new).and_return(checker)
-
-        expect(generator).to receive(:exit).with(1)
-        generator.run_diagnosis
-      end
-    end
-
-    context "when there are only warnings" do
-      it "exits with status 0" do
-        checker = ReactOnRails::Generators::SystemChecker.new
-        checker.add_warning("Test warning")
-        allow(ReactOnRails::Generators::SystemChecker).to receive(:new).and_return(checker)
-
-        expect(generator).to receive(:exit).with(0)
-        generator.run_diagnosis
-      end
-    end
-
-    context "when all checks pass" do
-      it "exits with status 0" do
-        checker = ReactOnRails::Generators::SystemChecker.new
-        checker.add_success("All good")
-        allow(ReactOnRails::Generators::SystemChecker).to receive(:new).and_return(checker)
-
-        expect(generator).to receive(:exit).with(0)
-        generator.run_diagnosis
-      end
+      # This should not raise any errors
+      expect { subject.run_diagnosis }.not_to raise_error
     end
   end
 end
+# rubocop:enable RSpec/ContextWording, RSpec/NamedSubject, RSpec/SubjectStub

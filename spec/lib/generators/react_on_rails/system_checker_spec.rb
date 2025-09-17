@@ -3,12 +3,13 @@
 require_relative "../../../react_on_rails/spec_helper"
 require_relative "../../../../lib/generators/react_on_rails/system_checker"
 
+# rubocop:disable RSpec/FilePath, RSpec/SpecFilePathFormat
 RSpec.describe ReactOnRails::Generators::SystemChecker do
   let(:checker) { described_class.new }
 
   describe "#initialize" do
     it "initializes with empty messages" do
-      expect(checker.messages).to be_empty
+      expect(checker.messages).to eq([])
     end
   end
 
@@ -84,7 +85,9 @@ RSpec.describe ReactOnRails::Generators::SystemChecker do
 
       it "adds a success message" do
         checker.check_node_version
-        expect(checker.messages.any? { |msg| msg[:type] == :success && msg[:content].include?("Node.js v18.17.0") }).to be true
+        expect(checker.messages.any? do |msg|
+                 msg[:type] == :success && msg[:content].include?("Node.js v18.17.0")
+               end).to be true
       end
     end
 
@@ -154,7 +157,9 @@ RSpec.describe ReactOnRails::Generators::SystemChecker do
       it "adds a success message and checks gemfile" do
         result = checker.check_shakapacker_configuration
         expect(result).to be true
-        expect(checker.messages.any? { |msg| msg[:type] == :success && msg[:content].include?("Shakapacker is properly configured") }).to be true
+        expect(checker.messages.any? do |msg|
+                 msg[:type] == :success && msg[:content].include?("Shakapacker is properly configured")
+               end).to be true
         expect(checker).to have_received(:check_shakapacker_in_gemfile)
       end
     end
@@ -170,7 +175,9 @@ RSpec.describe ReactOnRails::Generators::SystemChecker do
 
       it "adds a success message" do
         checker.check_react_on_rails_gem
-        expect(checker.messages.any? { |msg| msg[:type] == :success && msg[:content].include?("React on Rails gem 16.0.0") }).to be true
+        expect(checker.messages.any? do |msg|
+                 msg[:type] == :success && msg[:content].include?("React on Rails gem 16.0.0")
+               end).to be true
       end
     end
 
@@ -200,7 +207,9 @@ RSpec.describe ReactOnRails::Generators::SystemChecker do
 
       it "adds a success message" do
         checker.check_react_on_rails_npm_package
-        expect(checker.messages.any? { |msg| msg[:type] == :success && msg[:content].include?("react-on-rails NPM package") }).to be true
+        expect(checker.messages.any? do |msg|
+                 msg[:type] == :success && msg[:content].include?("react-on-rails NPM package")
+               end).to be true
       end
     end
 
@@ -274,3 +283,4 @@ RSpec.describe ReactOnRails::Generators::SystemChecker do
     end
   end
 end
+# rubocop:enable RSpec/FilePath, RSpec/SpecFilePathFormat
