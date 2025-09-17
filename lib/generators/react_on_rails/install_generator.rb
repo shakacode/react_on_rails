@@ -40,7 +40,9 @@ module ReactOnRails
         if installation_prerequisites_met? || options.ignore_warnings?
           invoke_generators
           add_bin_scripts
-          add_post_install_message
+          # Only add the post install message if not using Redux
+          # Redux generator handles its own messages
+          add_post_install_message unless options.redux?
         else
           error = <<~MSG.strip
             🚫 React on Rails generator prerequisites not met!
