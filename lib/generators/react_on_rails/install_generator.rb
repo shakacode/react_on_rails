@@ -336,15 +336,15 @@ module ReactOnRails
         ]
 
         install_command = case package_manager
-                         when "npm"
-                           "npm install --save-dev #{typescript_packages.join(' ')}"
-                         when "yarn"
-                           "yarn add --dev #{typescript_packages.join(' ')}"
-                         when "pnpm"
-                           "pnpm add --save-dev #{typescript_packages.join(' ')}"
-                         when "bun"
-                           "bun add --dev #{typescript_packages.join(' ')}"
-                         end
+                          when "npm"
+                            "npm install --save-dev #{typescript_packages.join(' ')}"
+                          when "yarn"
+                            "yarn add --dev #{typescript_packages.join(' ')}"
+                          when "pnpm"
+                            "pnpm add --save-dev #{typescript_packages.join(' ')}"
+                          when "bun"
+                            "bun add --dev #{typescript_packages.join(' ')}"
+                          end
 
         success = system(install_command)
         unless success
@@ -414,30 +414,30 @@ module ReactOnRails
         babel_typescript_package = "@babel/preset-typescript"
 
         install_command = case package_manager
-                         when "npm"
-                           "npm install --save-dev #{babel_typescript_package}"
-                         when "yarn"
-                           "yarn add --dev #{babel_typescript_package}"
-                         when "pnpm"
-                           "pnpm add --save-dev #{babel_typescript_package}"
-                         when "bun"
-                           "bun add --dev #{babel_typescript_package}"
-                         end
+                          when "npm"
+                            "npm install --save-dev #{babel_typescript_package}"
+                          when "yarn"
+                            "yarn add --dev #{babel_typescript_package}"
+                          when "pnpm"
+                            "pnpm add --save-dev #{babel_typescript_package}"
+                          when "bun"
+                            "bun add --dev #{babel_typescript_package}"
+                          end
 
         puts Rainbow("📝 Installing Babel TypeScript preset...").yellow
         success = system(install_command)
-        unless success
-          warning = <<~MSG.strip
-            ⚠️  Failed to install Babel TypeScript preset automatically.
+        return if success
 
-            Please run manually:
-                #{install_command}
+        warning = <<~MSG.strip
+          ⚠️  Failed to install Babel TypeScript preset automatically.
 
-            TypeScript compilation may not work without this preset.
-          MSG
-          GeneratorMessages.add_warning(warning)
-          return
-        end
+          Please run manually:
+              #{install_command}
+
+          TypeScript compilation may not work without this preset.
+        MSG
+        GeneratorMessages.add_warning(warning)
+        nil
       end
 
       # Removed: Shakapacker auto-installation logic (now explicit dependency)
