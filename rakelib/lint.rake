@@ -24,7 +24,18 @@ namespace :lint do
   task lint: %i[eslint rubocop] do
     puts "Completed all linting"
   end
+
+  desc "Auto-fix all linting violations"
+  task :autofix do
+    sh_in_dir(gem_root, "yarn run eslint . --fix")
+    sh_in_dir(gem_root, "yarn run prettier --write .")
+    sh_in_dir(gem_root, "bundle exec rubocop -A")
+    puts "Completed auto-fixing all linting violations"
+  end
 end
 
 desc "Runs all linters. Run `rake -D lint` to see all available lint options"
 task lint: ["lint:lint"]
+
+desc "Auto-fix all linting violations (eslint --fix, prettier --write, rubocop -A)"
+task autofix: ["lint:autofix"]

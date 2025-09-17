@@ -292,6 +292,7 @@ git clean -fd && git reset --hard && git clean -fd
 When testing specific generator improvements or fixes, test both Shakapacker scenarios:
 
 **Scenario A: No Shakapacker installed (fresh Rails app)**
+
 ```bash
 # Reset to clean baseline before each test
 git clean -fd && git reset --hard generator_testing_base && git clean -fd
@@ -307,6 +308,7 @@ rails generate react_on_rails:install
 ```
 
 **Scenario B: Shakapacker already installed**
+
 ```bash
 # Reset to clean baseline
 git clean -fd && git reset --hard generator_testing_base && git clean -fd
@@ -330,10 +332,11 @@ rails generate react_on_rails:install
 **3. Document testing results:**
 
 For each commit tested, document:
+
 - Generator execution success/failure for both scenarios
 - Shakapacker installation/detection behavior
 - Component rendering in browser
-- Console output and warnings  
+- Console output and warnings
 - File generation differences between scenarios
 - Specific issues found
 
@@ -355,7 +358,7 @@ When testing specific commits that fix generator issues, follow this process:
 cd ~/shakacode/react-on-rails/react_on_rails
 git checkout <commit-hash>  # e.g., 81c66fa or bc69dcd0
 
-# In test application 
+# In test application
 cd ~/shakacode/react-on-rails/react_on_rails-test-apps/react-on-rails-tutorial-v15
 
 # Reset to clean baseline
@@ -370,6 +373,7 @@ bundle install
 ```
 
 **Expected outcomes to verify:**
+
 - Generator completes without errors
 - Shakapacker integration works correctly
 - React components render and are interactive
@@ -420,22 +424,26 @@ npm install ../path/to/react_on_rails/react-on-rails-15.0.0.tgz
 ```
 
 This approach:
+
 - ✅ Exactly mimics real package installation
-- ✅ No symlink issues across different filesystems  
+- ✅ No symlink issues across different filesystems
 - ✅ More reliable for CI/CD testing
 - ⚠️ Requires manual step after each change (can be scripted)
 
 **Why this is needed**:
+
 - The gem provides Rails integration and server-side rendering
 - Yalc provides the complete JavaScript client library needed for component mounting
 - Without yalc, you'll see empty divs where React components should render
 
 **Verification**:
+
 - Visit the hello_world page in browser
 - Check browser console for "RENDERED HelloWorld to dom node" success message
 - Confirm React component is interactive (input field updates name display)
 
 **Development Mode Console Output**:
+
 - `bin/dev` (HMR): Shows HMR warnings and resource preload warnings (expected)
 - `bin/dev static`: Shows only resource preload warnings (cleaner output)
 - `bin/dev prod`: Cleanest output with minimal warnings (production-like environment)
@@ -447,18 +455,22 @@ This approach:
 **Common Issues and Solutions:**
 
 1. **React components not rendering (empty divs)**
+
    - **Cause**: Missing yalc setup for JavaScript package
    - **Solution**: Follow yalc setup steps above after running generator
 
 2. **Generator fails with Shakapacker errors**
+
    - **Cause**: Conflicting Shakapacker versions or incomplete installation
    - **Solution**: Clean reset and ensure consistent Shakapacker version across tests
 
 3. **Babel configuration conflicts during yalc development**
+
    - **Cause**: Both `babel.config.js` and `package.json` "babel" section defining presets
    - **Solution**: Remove "babel" section from `package.json`, keep only `babel.config.js`
 
 4. **"Package.json not found" errors**
+
    - **Cause**: Generator trying to access non-existent package.json files
    - **Solution**: Test with commits that fix this specific issue (e.g., bc69dcd0)
 
@@ -467,6 +479,7 @@ This approach:
    - **Solution**: Run `bin/dev kill` before starting new test servers
 
 **Testing Best Practices:**
+
 - Always use the double clean command: `git clean -fd && git reset --hard && git clean -fd`
 - Test both Shakapacker scenarios for comprehensive coverage
 - Document exact error messages and steps to reproduce
@@ -495,6 +508,7 @@ rake lint
 ```
 
 **Automated checks:**
+
 - Format all JavaScript/TypeScript files with Prettier
 - Check and fix linting issues with ESLint
 - Check and fix Ruby style issues with RuboCop
@@ -506,46 +520,38 @@ rake lint
 
 **CRITICAL WORKFLOW** to prevent CI failures:
 
-### 1. **ALWAYS Lint Before Any Code Changes**
-```bash
-# First, check current state
-rake lint
+### 1. **After Making Code Changes**
 
-# If violations exist, auto-fix them first
-yarn run eslint . --fix  # Auto-fix JS/TS formatting
-bundle exec rubocop -A   # Auto-fix Ruby violations
-```
-
-### 2. **After Making Code Changes**
 ```bash
-# MANDATORY: Run linters again
+# MANDATORY: Run linters after code changes
 rake lint
 
 # If any violations, auto-fix immediately
-yarn run eslint . --fix
-bundle exec rubocop -A
+rake autofix  # One command to run all auto-fixes
 
 # Verify everything passes
 rake lint
 ```
 
-### 3. **Common AI Agent Mistakes**
+### 2. **Common AI Agent Mistakes**
 
 ❌ **DON'T:**
-- Make code changes without running linters first
+
 - Commit code that hasn't been linted locally
 - Ignore formatting rules when creating new files
 - Add manual formatting that conflicts with Prettier/RuboCop
 
 ✅ **DO:**
-- Run `rake lint` before AND after any code changes
-- Use auto-fix options (`--fix`, `-A`) to resolve violations
+
+- Run `rake lint` after any code changes
+- Use `rake autofix` to automatically fix all linting violations
 - Create new files that follow existing patterns
 - Test locally before committing
 
 ### 4. **Template File Best Practices**
 
 When creating new template files (`.jsx`, `.rb`, etc.):
+
 1. Copy existing template structure and patterns
 2. Run `yarn run eslint . --fix` immediately after creation
 3. Verify with `rake lint` before committing
@@ -553,6 +559,7 @@ When creating new template files (`.jsx`, `.rb`, etc.):
 ### 5. **RuboCop Complexity Issues**
 
 For methods with high ABC complexity (usually formatting/display methods):
+
 ```ruby
 # rubocop:disable Metrics/AbcSize
 def complex_formatting_method

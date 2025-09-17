@@ -129,8 +129,10 @@ module GeneratorMessages
     end
 
     def build_shakapacker_status_section
+      version_warning = check_shakapacker_version_warning
+
       if File.exist?(".shakapacker_just_installed")
-        <<~SHAKAPACKER
+        base_message = <<~SHAKAPACKER
 
           📦 SHAKAPACKER SETUP:
           ─────────────────────────────────────────────────────────────────────────
@@ -138,11 +140,44 @@ module GeneratorMessages
           #{Rainbow('✓ Installer ran successfully').green}
           #{Rainbow('✓ Webpack integration configured').green}
         SHAKAPACKER
+        base_message + version_warning
       elsif File.exist?("bin/shakapacker") && File.exist?("bin/shakapacker-dev-server")
-        "\n📦 #{Rainbow('Shakapacker already configured ✓').green}"
+        "\n📦 #{Rainbow('Shakapacker already configured ✓').green}#{version_warning}"
       else
-        "\n📦 #{Rainbow('Shakapacker setup may be incomplete').yellow}"
+        "\n📦 #{Rainbow('Shakapacker setup may be incomplete').yellow}#{version_warning}"
       end
+    end
+
+    def check_shakapacker_version_warning
+      # Try to detect Shakapacker version from Gemfile.lock
+      return "" unless File.exist?("Gemfile.lock")
+
+      gemfile_lock_content = File.read("Gemfile.lock")
+      shakapacker_match = gemfile_lock_content.match(/shakapacker \((\d+\.\d+\.\d+)\)/)
+
+      return "" unless shakapacker_match
+
+      version = shakapacker_match[1]
+      major_version = version.split(".").first.to_i
+
+      if major_version < 8
+        <<~WARNING
+
+          ⚠️  #{Rainbow('IMPORTANT: Upgrade Recommended').yellow.bold}
+          ─────────────────────────────────────────────────────────────────────────
+          You are using Shakapacker #{version}. React on Rails v15+ works best with
+          Shakapacker 8.0+ for optimal Hot Module Replacement and build performance.
+
+          To upgrade: #{Rainbow('bundle update shakapacker').cyan}
+
+          Learn more: #{Rainbow('https://github.com/shakacode/shakapacker').cyan.underline}
+        WARNING
+      else
+        ""
+      end
+    rescue StandardError
+      # If version detection fails, don't show a warning to avoid noise
+      ""
     end
 
     def detect_package_manager

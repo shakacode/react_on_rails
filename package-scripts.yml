@@ -38,6 +38,10 @@ scripts:
       description: Check that all files were formatted using prettier.
       script: prettier --check .
 
+  autofix:
+    description: Auto-fix all linting violations (eslint --fix, prettier --write, rubocop -A).
+    script: rake autofix
+
   renderer:
     description: Starts the node renderer.
     script: node renderer.js

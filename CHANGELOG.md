@@ -36,7 +36,7 @@ Changes since the last non-beta release.
   - Removed files: `rakelib/webpacker_examples.rake`, `lib/generators/react_on_rails/adapt_for_older_shakapacker_generator.rb`
   - All webpacker compatibility code and tests have been removed
 - **CI/Development runtime requirements updated**:
-  - *Note, this is just what CI tests*. You can use older versions of Ruby and Node.js, but you may run into issues.*
+  - _Note, this is just what CI tests_. You can use older versions of Ruby and Node.js, but you may run into issues.\*
   - Minimum Ruby version: 3.2 (was 3.0)
   - Maximum Ruby version: 3.4 (was 3.3)
   - Minimum Node.js version: 20 (was 16)
