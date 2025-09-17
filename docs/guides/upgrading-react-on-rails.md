@@ -6,6 +6,87 @@ If you would like help in migrating between React on Rails versions or help with
 
 We specialize in helping companies to quickly and efficiently upgrade. The older versions use the Rails asset pipeline to package client assets. The current and recommended way is to use Webpack 4+ for asset preparation. You may also need help migrating from the `rails/webpacker`'s Webpack configuration to a better setup ready for Server Side Rendering.
 
+## General Upgrade Process
+
+After upgrading to any major version, always run the generator to get the latest defaults:
+
+```bash
+rails generate react_on_rails:install
+```
+
+**⚠️ Important**: Review generated changes carefully before applying to avoid overwriting custom configurations. The generator updates:
+
+- `bin/dev` (improved development workflow)
+- webpack configurations
+- `shakapacker.yml` settings
+- other configuration files
+
+## Upgrading to v16
+
+### Breaking Changes
+
+- **Webpacker support completely removed**. Shakapacker >= 6.0 is now required.
+- **Updated runtime requirements**:
+  - Minimum Ruby version: 3.2
+  - Minimum Node.js version: 20
+- **Install generator now validates prerequisites** and requires at least one JavaScript package manager
+
+### Migration Steps
+
+1. **Update Dependencies**
+
+   ```ruby
+   # Gemfile
+   gem "react_on_rails", "~> 16.0"
+   ```
+
+   ```json
+   // package.json
+   {
+     "dependencies": {
+       "react-on-rails": "^16.0.0"
+     }
+   }
+   ```
+
+2. **Install Updates**
+
+   ```bash
+   bundle update react_on_rails
+   npm install
+   ```
+
+3. **Run Generator**
+
+   ```bash
+   rails generate react_on_rails:install
+   ```
+
+4. **Review and Apply Changes**
+
+   - Check webpack configuration exports (function naming may have changed)
+   - Review `shakapacker.yml` settings
+   - Update `bin/dev` if needed
+
+5. **Test Your Application**
+
+   ```bash
+   # Test asset compilation
+   bundle exec rails assets:precompile
+
+   # Test development server
+   bin/dev
+
+   # Run your test suite
+   bundle exec rspec # or your test command
+   ```
+
+### Enhanced Features in v16
+
+- **Enhanced error handling** in `react_on_rails:generate_packs` task with detailed debugging guidance
+- **Improved development tooling** with better error messages and troubleshooting steps
+- **Better package manager detection** with multi-strategy validation
+
 ## Upgrading to v13
 
 ### Breaking Change

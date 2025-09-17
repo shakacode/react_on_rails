@@ -47,6 +47,23 @@ We also specialize in helping development teams lower infrastructure and CI cost
 
 If you think ShakaCode can help your project, [click here](https://meetings.hubspot.com/justingordon/30-minute-consultation) to book a call with [Justin Gordon](mailto:justin@shakacode.com), the creator of React on Rails.
 
+## Upgrading React on Rails
+
+After upgrading to a new major version, run the generator to get latest defaults:
+
+```bash
+rails generate react_on_rails:install
+```
+
+**Important**: Review changes carefully before applying to avoid overwriting custom configurations. The generator updates:
+
+- `bin/dev` (improved development workflow)
+- webpack configurations
+- `shakapacker.yml` settings
+- other configuration files
+
+For detailed upgrade instructions, see [upgrade guide documentation](docs/guides/upgrading-react-on-rails.md).
+
 ## React on Rails Pro
 
 Some features of React on Rails regarding performance require a React on Rails Pro subscription.
@@ -54,10 +71,11 @@ Some features of React on Rails regarding performance require a React on Rails P
 Note: the subscription price is free for evaluation and non-production use.
 
 Notable new features include:
-* React Server Components
-* Streaming SSR
-* Loadable Components
-* Code Splitting with React Router
+
+- React Server Components
+- Streaming SSR
+- Loadable Components
+- Code Splitting with React Router
 
 React on Rails Pro is the best way to optimize your Webpack setup for React on Rails, including code splitting with [React Router](https://reactrouter.com/) and [loadable-components](https://loadable-components.com/) with server-side rendering for SEO and hot-reloading for developers.
 

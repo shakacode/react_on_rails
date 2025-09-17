@@ -32,12 +32,14 @@ See [Release Notes](docs/release-notes/16.0.0.md) for complete migration guide.
 #### Major Enhancements
 
 **🚀 React Server Components (RSC) -- Requires React on Rails Pro**
+
 - **Enhanced RSC rendering flow**: Eliminated double rendering and reduced HTTP requests
 - **`RSCRoute` component**: Seamless server-side rendering with automatic payload injection and hydration [PR 1696](https://github.com/shakacode/react_on_rails/pull/1696) by [AbanoubGhadban](https://github.com/AbanoubGhadban)
 - **Optimized RSC payload injection**: Now injected after component HTML markup for better performance [PR 1738](https://github.com/shakacode/react_on_rails/pull/1738) by [AbanoubGhadban](https://github.com/AbanoubGhadban)
 - **Communication protocol v2.0.0**: Supports uploading multiple bundles at once for improved efficiency
 
 **⚡ Performance & Loading Strategy**
+
 - **New `generated_component_packs_loading_strategy`**: Choose from `sync`, `async`, or `defer` strategies [PR 1712](https://github.com/shakacode/react_on_rails/pull/1712) by [AbanoubGhadban](https://github.com/AbanoubGhadban)
 - **Async render function support**: Components can now return from async render functions [PR 1720](https://github.com/shakacode/react_on_rails/pull/1720) by [AbanoubGhadban](https://github.com/AbanoubGhadban)
 - **Optimized client imports**: Generated packs now import from `react-on-rails/client` for better tree-shaking [PR 1706](https://github.com/shakacode/react_on_rails/pull/1706) by [alexeyr-ci](https://github.com/alexeyr-ci)
@@ -50,10 +52,10 @@ See [Release Notes](docs/release-notes/16.0.0.md) for complete migration guide.
 - **ReactRefreshWebpackPlugin v0.6.0 support**: Added conditional logic for proper configuration [PR 1748](https://github.com/shakacode/react_on_rails/pull/1748) by [judahmeek](https://github.com/judahmeek)
 - **Version validation improvements**: Fixed invalid warnings with pre-release versions [PR 1742](https://github.com/shakacode/react_on_rails/pull/1742) by [alexeyr-ci2](https://github.com/alexeyr-ci2)
 
-
 #### Breaking Changes
 
 **🔧 Webpacker Support Removed**
+
 - **Complete removal of Webpacker support**. Shakapacker >= 6.0 is now required.
 - Migration:
   - Remove `webpacker` gem from your Gemfile
@@ -63,6 +65,7 @@ See [Release Notes](docs/release-notes/16.0.0.md) for complete migration guide.
 - Removed files: `rakelib/webpacker_examples.rake`, `lib/generators/react_on_rails/adapt_for_older_shakapacker_generator.rb`
 
 **📦 Package System Modernization**
+
 - **ESM-only package**: CommonJS `require()` no longer supported
 - Migration:
   - Replace `require('react-on-rails')` with `import ReactOnRails from 'react-on-rails'`
@@ -70,8 +73,10 @@ See [Release Notes](docs/release-notes/16.0.0.md) for complete migration guide.
   - For TypeScript errors, upgrade to TypeScript 5.8+ and set `module: "nodenext"`
 
 **⚡ Configuration API Changes**
+
 - **`defer_generated_component_packs` deprecated** → use `generated_component_packs_loading_strategy`
 - Migration:
+
   - `defer_generated_component_packs: true` → `generated_component_packs_loading_strategy: :defer`
   - `defer_generated_component_packs: false` → `generated_component_packs_loading_strategy: :sync`
   - Recommended: `generated_component_packs_loading_strategy: :async` for best performance
@@ -84,19 +89,21 @@ See [Release Notes](docs/release-notes/16.0.0.md) for complete migration guide.
 - Note: `immediate_hydration` requires React on Rails Pro license
 
 **🔄 Async API Changes**
+
 - **`ReactOnRails.reactOnRailsPageLoaded()` is now async**
 - Migration: Add `await` when calling: `await ReactOnRails.reactOnRailsPageLoaded()`
 
 **🏗️ Runtime Suggested Versions**
+
 - Ruby: 3.2 - 3.4 (was 3.0 - 3.3)
 - Node.js: 20 - 22 (was 16 - 20)
 - Note: These are CI-tested versions; older versions may work but aren't guaranteed
 
 **🎯 Generator Improvements**
+
 - Install generator now validates JavaScript package manager presence
 - Improved error handling with `Thor::Error` instead of `exit(1)`
 - Enhanced error messages with clearer troubleshooting steps
-
 
 ### [15.0.0] - 2025-08-28 - RETRACTED
 
