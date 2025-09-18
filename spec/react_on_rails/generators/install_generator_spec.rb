@@ -28,6 +28,96 @@ describe InstallGenerator, type: :generator do
     include_examples "react_with_redux_generator"
   end
 
+  context "with --typescript" do
+    before(:all) { run_generator_test_with_args(%w[--typescript], package_json: true) }
+
+    include_examples "base_generator_common", application_js: true
+    include_examples "no_redux_generator"
+
+    it "creates TypeScript component files with .tsx extension" do
+      assert_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.tsx"
+      assert_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.server.tsx"
+    end
+
+    it "creates tsconfig.json file" do
+      assert_file "tsconfig.json" do |content|
+        config = JSON.parse(content)
+        expect(config["compilerOptions"]["jsx"]).to eq("react-jsx")
+        expect(config["compilerOptions"]["strict"]).to be true
+        expect(config["include"]).to include("app/javascript/**/*")
+      end
+    end
+
+    it "TypeScript component includes proper typing" do
+      assert_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.tsx" do |content|
+        expect(content).to match(/interface HelloWorldProps/)
+        expect(content).to match(/React\.FC<HelloWorldProps>/)
+        expect(content).to match(/onChange=\{.*e.*=>.*setName\(e\.target\.value\).*\}/)
+      end
+    end
+  end
+
+  context "with -T" do
+    before(:all) { run_generator_test_with_args(%w[-T], package_json: true) }
+
+    include_examples "base_generator_common", application_js: true
+    include_examples "no_redux_generator"
+
+    it "creates TypeScript component files with .tsx extension" do
+      assert_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.tsx"
+      assert_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.server.tsx"
+    end
+  end
+
+  context "with --redux --typescript" do
+    before(:all) { run_generator_test_with_args(%w[--redux --typescript], package_json: true) }
+
+    include_examples "base_generator_common", application_js: true
+
+    it "creates redux directories" do
+      assert_directory "app/javascript/src/HelloWorldApp/ror_components"
+      %w[actions constants containers reducers store].each do |dir|
+        assert_directory("app/javascript/src/HelloWorldApp/#{dir}")
+      end
+    end
+
+    it "creates appropriate templates" do
+      assert_file("app/views/hello_world/index.html.erb") do |contents|
+        expect(contents).to match(/"HelloWorldApp"/)
+      end
+    end
+
+    it "copies base redux TypeScript files" do
+      %w[app/javascript/src/HelloWorldApp/actions/helloWorldActionCreators.ts
+         app/javascript/src/HelloWorldApp/containers/HelloWorldContainer.ts
+         app/javascript/src/HelloWorldApp/constants/helloWorldConstants.ts
+         app/javascript/src/HelloWorldApp/reducers/helloWorldReducer.ts
+         app/javascript/src/HelloWorldApp/store/helloWorldStore.ts
+         app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.tsx
+         app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.server.tsx].each { |file| assert_file(file) }
+    end
+
+    it "creates TypeScript Redux component files" do
+      assert_file "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.tsx"
+      assert_file "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.server.tsx"
+      assert_file "app/javascript/src/HelloWorldApp/components/HelloWorld.tsx"
+    end
+
+    it "TypeScript Redux component includes proper typing" do
+      assert_file "app/javascript/src/HelloWorldApp/components/HelloWorld.tsx" do |content|
+        expect(content).to match(/type HelloWorldProps = PropsFromRedux/)
+        expect(content).to match(/React\.FC<HelloWorldProps>/)
+      end
+    end
+
+    it "TypeScript Redux App includes proper typing" do
+      assert_file "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.tsx" do |content|
+        expect(content).to match(/interface HelloWorldAppProps/)
+        expect(content).to match(/FC<HelloWorldAppProps>/)
+      end
+    end
+  end
+
   context "without existing application.js or application.js.coffee file" do
     before(:all) { run_generator_test_with_args([], application_js: false, package_json: true) }
 

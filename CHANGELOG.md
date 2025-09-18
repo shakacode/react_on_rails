@@ -23,6 +23,26 @@ After a release, please make sure to run `bundle exec rake update_changelog`. Th
 
 Changes since the last non-beta release.
 
+#### Enhanced TypeScript Generator Support
+
+**🔧 Generator Improvements**
+
+- **Modern TypeScript patterns**: Generators now produce more idiomatic TypeScript code with improved type inference instead of explicit type annotations [PR 1786](https://github.com/shakacode/react_on_rails/pull/1786) by [justin808](https://github.com/justin808)
+- **Optimized tsconfig.json**: Updated compiler options to use `"moduleResolution": "bundler"` for better bundler compatibility
+- **Enhanced Redux TypeScript integration**: Improved type safety and modern React patterns (useMemo, type-only imports)
+- **Smart bin/dev defaults**: Generated `bin/dev` script now automatically navigates to `/hello_world` route for immediate component visibility
+
+**🔐 Security Enhancements**
+
+- **Fixed command injection vulnerabilities**: Replaced unsafe string interpolation in generator package installation commands with secure array-based system calls
+- **Improved input validation**: Enhanced package manager validation and argument sanitization across all generators
+
+**🎯 Developer Experience**
+
+- **Better component templates**: Removed unnecessary type annotations while maintaining type safety through TypeScript's inference
+- **Cleaner generated code**: Streamlined templates following modern React and TypeScript best practices
+- **Improved helper methods**: Added reusable `component_extension` helper for consistent file extension handling
+
 ### [16.0.0] - 2025-09-16
 
 **React on Rails v16 is a major release that modernizes the library with ESM support, removes legacy Webpacker compatibility, and introduces significant performance improvements. This release builds on the foundation of v14 with enhanced RSC (React Server Components) support and streamlined configuration.**

@@ -11,12 +11,24 @@ module ReactOnRails
       Rails::Generators.hide_namespace(namespace)
       source_root(File.expand_path("templates", __dir__))
 
+      class_option :typescript,
+                   type: :boolean,
+                   default: false,
+                   desc: "Generate TypeScript files"
+
       def copy_base_files
         base_js_path = "base/base"
-        base_files = %w[app/javascript/src/HelloWorld/ror_components/HelloWorld.client.jsx
-                        app/javascript/src/HelloWorld/ror_components/HelloWorld.server.jsx
-                        app/javascript/src/HelloWorld/ror_components/HelloWorld.module.css]
-        base_files.each { |file| copy_file("#{base_js_path}/#{file}", file) }
+
+        # Determine which component files to copy based on TypeScript option
+        component_files = [
+          "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.#{component_extension(options)}",
+          "app/javascript/src/HelloWorld/ror_components/HelloWorld.server.#{component_extension(options)}",
+          "app/javascript/src/HelloWorld/ror_components/HelloWorld.module.css"
+        ]
+
+        component_files.each do |file|
+          copy_file("#{base_js_path}/#{file}", file)
+        end
       end
 
       def create_appropriate_templates

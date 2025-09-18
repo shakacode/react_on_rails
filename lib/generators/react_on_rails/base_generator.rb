@@ -105,13 +105,13 @@ module ReactOnRails
       def install_js_dependencies
         # Detect which package manager to use
         success = if File.exist?(File.join(destination_root, "yarn.lock"))
-                    run "yarn install"
+                    system("yarn", "install")
                   elsif File.exist?(File.join(destination_root, "pnpm-lock.yaml"))
-                    run "pnpm install"
+                    system("pnpm", "install")
                   elsif File.exist?(File.join(destination_root, "package-lock.json")) ||
                         File.exist?(File.join(destination_root, "package.json"))
                     # Use npm for package-lock.json or as default fallback
-                    run "npm install"
+                    system("npm", "install")
                   else
                     true # No package manager detected, skip
                   end
@@ -173,7 +173,7 @@ module ReactOnRails
         return if add_npm_dependencies(react_on_rails_pkg)
 
         puts "Using direct npm commands as fallback"
-        success = run "npm install #{react_on_rails_pkg.join(' ')}"
+        success = system("npm", "install", *react_on_rails_pkg)
         handle_npm_failure("react-on-rails package", react_on_rails_pkg) unless success
       end
 
@@ -189,7 +189,7 @@ module ReactOnRails
         ]
         return if add_npm_dependencies(react_deps)
 
-        success = run "npm install #{react_deps.join(' ')}"
+        success = system("npm", "install", *react_deps)
         handle_npm_failure("React dependencies", react_deps) unless success
       end
 
@@ -203,7 +203,7 @@ module ReactOnRails
         ]
         return if add_npm_dependencies(css_deps)
 
-        success = run "npm install #{css_deps.join(' ')}"
+        success = system("npm", "install", *css_deps)
         handle_npm_failure("CSS dependencies", css_deps) unless success
       end
 
@@ -215,7 +215,7 @@ module ReactOnRails
         ]
         return if add_npm_dependencies(dev_deps, dev: true)
 
-        success = run "npm install --save-dev #{dev_deps.join(' ')}"
+        success = system("npm", "install", "--save-dev", *dev_deps)
         handle_npm_failure("development dependencies", dev_deps, dev: true) unless success
       end
 

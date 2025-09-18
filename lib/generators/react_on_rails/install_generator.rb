@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "rails/generators"
+require "json"
 require_relative "generator_helper"
 require_relative "generator_messages"
 
@@ -19,6 +20,13 @@ module ReactOnRails
                    default: false,
                    desc: "Install Redux package and Redux version of Hello World Example. Default: false",
                    aliases: "-R"
+
+      # --typescript
+      class_option :typescript,
+                   type: :boolean,
+                   default: false,
+                   desc: "Generate TypeScript files and install TypeScript dependencies. Default: false",
+                   aliases: "-T"
 
       # --ignore-warnings
       class_option :ignore_warnings,
@@ -58,11 +66,16 @@ module ReactOnRails
 
       def invoke_generators
         ensure_shakapacker_installed
-        invoke "react_on_rails:base"
+        if options.typescript?
+          install_typescript_dependencies
+          create_css_module_types
+          create_typescript_config
+        end
+        invoke "react_on_rails:base", [], { typescript: options.typescript? }
         if options.redux?
-          invoke "react_on_rails:react_with_redux"
+          invoke "react_on_rails:react_with_redux", [], { typescript: options.typescript? }
         else
-          invoke "react_on_rails:react_no_redux"
+          invoke "react_on_rails:react_no_redux", [], { typescript: options.typescript? }
         end
       end
 
@@ -311,10 +324,96 @@ module ReactOnRails
         false
       end
 
+      def install_typescript_dependencies
+        puts Rainbow("📝 Installing TypeScript dependencies...").yellow
+
+        # Install TypeScript and React type definitions
+        typescript_packages = %w[
+          typescript
+          @types/react
+          @types/react-dom
+          @babel/preset-typescript
+        ]
+
+        # Try using GeneratorHelper first (package manager agnostic)
+        return if add_npm_dependencies(typescript_packages, dev: true)
+
+        # Fallback to npm if GeneratorHelper fails
+        success = system("npm", "install", "--save-dev", *typescript_packages)
+        return if success
+
+        warning = <<~MSG.strip
+          ⚠️  Failed to install TypeScript dependencies automatically.
+
+          Please run manually:
+              npm install --save-dev #{typescript_packages.join(' ')}
+        MSG
+        GeneratorMessages.add_warning(warning)
+      end
+
+      def create_css_module_types
+        puts Rainbow("📝 Creating CSS module type definitions...").yellow
+
+        # Ensure the types directory exists
+        FileUtils.mkdir_p("app/javascript/types")
+
+        css_module_types_content = <<~TS.strip
+          // TypeScript definitions for CSS modules
+          declare module "*.module.css" {
+            const classes: { [key: string]: string };
+            export default classes;
+          }
+
+          declare module "*.module.scss" {
+            const classes: { [key: string]: string };
+            export default classes;
+          }
+
+          declare module "*.module.sass" {
+            const classes: { [key: string]: string };
+            export default classes;
+          }
+        TS
+
+        File.write("app/javascript/types/css-modules.d.ts", css_module_types_content)
+        puts Rainbow("✅ Created CSS module type definitions").green
+      end
+
+      def create_typescript_config
+        if File.exist?("tsconfig.json")
+          puts Rainbow("⚠️  tsconfig.json already exists, skipping creation").yellow
+          return
+        end
+
+        tsconfig_content = {
+          "compilerOptions" => {
+            "target" => "es2018",
+            "allowJs" => true,
+            "skipLibCheck" => true,
+            "strict" => true,
+            "noUncheckedIndexedAccess" => true,
+            "forceConsistentCasingInFileNames" => true,
+            "noFallthroughCasesInSwitch" => true,
+            "module" => "esnext",
+            "moduleResolution" => "bundler",
+            "resolveJsonModule" => true,
+            "isolatedModules" => true,
+            "noEmit" => true,
+            "jsx" => "react-jsx"
+          },
+          "include" => [
+            "app/javascript/**/*"
+          ]
+        }
+
+        File.write("tsconfig.json", JSON.pretty_generate(tsconfig_content))
+        puts Rainbow("✅ Created tsconfig.json").green
+      end
+
       # Removed: Shakapacker auto-installation logic (now explicit dependency)
 
       # Removed: Shakapacker 8+ is now required as explicit dependency
+      # rubocop:enable Metrics/ClassLength
     end
-    # rubocop:enable Metrics/ClassLength
   end
 end
