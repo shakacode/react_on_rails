@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+# rubocop:disable RSpec/VerifiedDoubles
+
 require_relative "../../react_on_rails/spec_helper"
 require_relative "../../../lib/react_on_rails/doctor"
 
@@ -27,8 +29,13 @@ RSpec.describe ReactOnRails::Doctor do
       allow(File).to receive_messages(exist?: false, directory?: false)
 
       # Mock the new server bundle path methods
-      allow(doctor).to receive_messages("`": "", determine_server_bundle_path: "app/javascript/packs/server-bundle.js",
-                                        server_bundle_filename: "server-bundle.js", npm_test_script?: false, yarn_test_script?: false)
+      allow(doctor).to receive_messages(
+        "`": "",
+        determine_server_bundle_path: "app/javascript/packs/server-bundle.js",
+        server_bundle_filename: "server-bundle.js",
+        npm_test_script?: false,
+        yarn_test_script?: false
+      )
 
       # Mock the checker to avoid actual system calls
       checker = instance_double(ReactOnRails::SystemChecker)
@@ -178,3 +185,5 @@ RSpec.describe ReactOnRails::Doctor do
     end
   end
 end
+
+# rubocop:enable RSpec/VerifiedDoubles
