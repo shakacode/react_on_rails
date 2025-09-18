@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require 'open3'
+require "open3"
 
 module ReactOnRails
   # SystemChecker provides validation methods for React on Rails setup
@@ -58,7 +58,7 @@ module ReactOnRails
     end
 
     def check_node_version
-      stdout, stderr, status = Open3.capture3('node', '--version')
+      stdout, stderr, status = Open3.capture3("node", "--version")
 
       # Use stdout if available, fallback to stderr if stdout is empty
       node_version = stdout.strip
@@ -447,6 +447,7 @@ module ReactOnRails
     end
     # rubocop:enable Metrics/CyclomaticComplexity
 
+    # rubocop:disable Metrics/CyclomaticComplexity
     def report_dependency_versions(package_json)
       all_deps = package_json["dependencies"]&.merge(package_json["devDependencies"] || {}) || {}
 
@@ -463,6 +464,7 @@ module ReactOnRails
         add_success("✅ React DOM #{react_dom_version}")
       end
     end
+    # rubocop:enable Metrics/CyclomaticComplexity
 
     def extract_major_minor_version(version_string)
       # Extract major.minor from version string like "8.1.0" or "7.2.1"

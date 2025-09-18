@@ -90,11 +90,11 @@ module ReactOnRails
         send(check_method)
 
         # Only print header if messages were added
-        if checker.messages.length > initial_message_count
-          print_section_header(section_name)
-          print_recent_messages(initial_message_count)
-          puts
-        end
+        next unless checker.messages.length > initial_message_count
+
+        print_section_header(section_name)
+        print_recent_messages(initial_message_count)
+        puts
       end
     end
 
@@ -104,7 +104,7 @@ module ReactOnRails
     end
 
     def print_recent_messages(start_index)
-      checker.messages[start_index..-1].each do |message|
+      checker.messages[start_index..].each do |message|
         color = MESSAGE_COLORS[message[:type]] || :blue
         puts Rainbow(message[:content]).send(color)
       end
@@ -317,7 +317,7 @@ module ReactOnRails
       puts Rainbow(summary_text).blue
     end
 
-    def print_detailed_results_if_needed(counts)
+    def print_detailed_results_if_needed(_counts)
       # Skip detailed results since messages are now printed under section headers
       # Only show detailed results in verbose mode for debugging
       return unless verbose
@@ -725,7 +725,7 @@ module ReactOnRails
       project_root = Dir.pwd
       if absolute_path.start_with?(project_root)
         # Remove project root and leading slash to make it relative
-        relative = absolute_path.sub(project_root, "").sub(/^\//, "")
+        relative = absolute_path.sub(project_root, "").sub(%r{^/}, "")
         relative.empty? ? "." : relative
       else
         absolute_path
