@@ -118,6 +118,24 @@ RSpec.describe ReactOnRails::Doctor do
         end
       end
 
+      context "when Shakapacker gem returns nested absolute paths" do
+        let(:rails_root) { "/Users/test/myapp" }
+        let(:shakapacker_config) { double(source_path: "#{rails_root}/client/app", source_entry_path: "#{rails_root}/client/app/packs") }
+
+        before do
+          shakapacker_module = double("Shakapacker", config: shakapacker_config)
+          stub_const("Shakapacker", shakapacker_module)
+          allow(doctor).to receive(:require).with("shakapacker").and_return(true)
+          allow(doctor).to receive(:get_server_bundle_filename).and_return("server-bundle.js")
+          allow(Dir).to receive(:pwd).and_return(rails_root)
+        end
+
+        it "handles nested absolute paths correctly" do
+          path = doctor.send(:determine_server_bundle_path)
+          expect(path).to eq("client/app/packs/server-bundle.js")
+        end
+      end
+
       context "when Shakapacker gem is not available" do
         before do
           allow(doctor).to receive(:require).with("shakapacker").and_raise(LoadError)
