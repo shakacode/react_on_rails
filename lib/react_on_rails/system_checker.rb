@@ -122,6 +122,7 @@ module ReactOnRails
 
       add_success("✅ Shakapacker is properly configured")
       check_shakapacker_in_gemfile
+      report_shakapacker_version
       true
     end
 
@@ -225,6 +226,7 @@ module ReactOnRails
 
       missing_deps = find_missing_dependencies(package_json, required_deps)
       report_dependency_status(required_deps, missing_deps, package_json)
+      report_dependency_versions(package_json)
     end
 
     # Rails integration validation
@@ -258,6 +260,7 @@ module ReactOnRails
       if File.exist?(webpack_config_path)
         add_success("✅ Webpack configuration exists")
         check_webpack_config_content
+        report_webpack_version
       else
         add_error(<<~MSG.strip)
           🚫 Webpack configuration not found.
@@ -369,6 +372,54 @@ module ReactOnRails
         Install them with:
         npm install #{missing_deps.join(' ')}
       MSG
+    end
+
+    def report_dependency_versions(package_json)
+      all_deps = package_json["dependencies"]&.merge(package_json["devDependencies"] || {}) || {}
+
+      version_deps = {
+        "react" => "React",
+        "react-dom" => "React DOM"
+      }
+
+      version_deps.each do |dep, name|
+        version = all_deps[dep]
+        if version
+          add_info("📦 #{name} version: #{version}")
+        end
+      end
+    end
+
+    def report_shakapacker_version
+      return unless File.exist?("Gemfile.lock")
+
+      begin
+        lockfile_content = File.read("Gemfile.lock")
+        # Parse shakapacker version from Gemfile.lock
+        shakapacker_match = lockfile_content.match(/^\s*shakapacker \(([^)]+)\)/)
+        if shakapacker_match
+          version = shakapacker_match[1]
+          add_info("📦 Shakapacker version: #{version}")
+        end
+      rescue StandardError
+        # Ignore errors in parsing Gemfile.lock
+      end
+    end
+
+    def report_webpack_version
+      return unless File.exist?("package.json")
+
+      begin
+        package_json = JSON.parse(File.read("package.json"))
+        all_deps = package_json["dependencies"]&.merge(package_json["devDependencies"] || {}) || {}
+
+        webpack_version = all_deps["webpack"]
+        if webpack_version
+          add_info("📦 Webpack version: #{webpack_version}")
+        end
+      rescue JSON::ParserError, StandardError
+        # Ignore errors in parsing package.json
+      end
     end
   end
   # rubocop:enable Metrics/ClassLength
