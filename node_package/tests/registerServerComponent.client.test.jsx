@@ -44,7 +44,7 @@ enableFetchMocks();
 
     expect(() => {
       // Re-import to trigger the check
-      jest.requireActual('../src/wrapServerComponentRenderer/client.tsx');
+      jest.requireActual('../src/pro/wrapServerComponentRenderer/client.tsx');
     }).toThrow('React.use is not defined');
   });
 
