@@ -124,15 +124,15 @@ module ReactOnRails
     end
 
     def check_javascript_bundles
-      server_bundle = "app/javascript/packs/server-bundle.js"
-      if File.exist?(server_bundle)
-        checker.add_success("✅ Server bundle file exists")
+      server_bundle_path = determine_server_bundle_path
+      if File.exist?(server_bundle_path)
+        checker.add_success("✅ Server bundle file exists at #{server_bundle_path}")
       else
         checker.add_warning(<<~MSG.strip)
-          ⚠️  Server bundle not found: #{server_bundle}
+          ⚠️  Server bundle not found: #{server_bundle_path}
 
           This is required for server-side rendering.
-          Run: rails generate react_on_rails:install
+          Check your Shakapacker configuration and ensure the bundle is compiled.
         MSG
       end
     end
@@ -244,6 +244,48 @@ module ReactOnRails
       puts "• Start development server: ./bin/dev (if using Procfile.dev)"
       puts "• Check React on Rails documentation: https://github.com/shakacode/react_on_rails"
       puts
+    end
+
+    def determine_server_bundle_path
+      # Try to read Shakapacker configuration
+      shakapacker_config = read_shakapacker_config
+      if shakapacker_config
+        source_path = shakapacker_config["source_path"] || "app/javascript"
+        source_entry_path = shakapacker_config["source_entry_path"] || "packs"
+        server_bundle_filename = get_server_bundle_filename
+
+        File.join(source_path, source_entry_path, server_bundle_filename)
+      else
+        # Fallback to default paths
+        server_bundle_filename = get_server_bundle_filename
+        "app/javascript/packs/#{server_bundle_filename}"
+      end
+    end
+
+    def read_shakapacker_config
+      config_path = "config/shakapacker.yml"
+      return nil unless File.exist?(config_path)
+
+      begin
+        require "yaml"
+        config = YAML.load_file(config_path)
+        config["default"] || config
+      rescue StandardError
+        nil
+      end
+    end
+
+    def get_server_bundle_filename
+      # Try to read from React on Rails initializer
+      initializer_path = "config/initializers/react_on_rails.rb"
+      if File.exist?(initializer_path)
+        content = File.read(initializer_path)
+        match = content.match(/config\.server_bundle_js_file\s*=\s*["']([^"']+)["']/)
+        return match[1] if match
+      end
+
+      # Default filename
+      "server-bundle.js"
     end
 
     def exit_with_status
