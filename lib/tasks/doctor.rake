@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../../rakelib/task_helpers"
+require_relative "../react_on_rails"
 require_relative "../react_on_rails/doctor"
 
 begin

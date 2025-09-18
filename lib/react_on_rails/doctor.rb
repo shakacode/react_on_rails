@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+require_relative "utils"
 require_relative "system_checker"
 
 begin
@@ -120,6 +121,7 @@ module ReactOnRails
     def check_development
       check_javascript_bundles
       check_procfile_dev
+      check_bin_dev_script
       check_gitignore
     end
 
@@ -138,21 +140,93 @@ module ReactOnRails
     end
 
     def check_procfile_dev
-      procfile_dev = "Procfile.dev"
-      if File.exist?(procfile_dev)
-        checker.add_success("✅ Procfile.dev exists for development")
-        check_procfile_content
+      check_procfiles
+    end
+
+    def check_procfiles
+      procfiles = {
+        "Procfile.dev" => {
+          description: "HMR development with webpack-dev-server",
+          required_for: "bin/dev (default/hmr mode)",
+          should_contain: ["shakapacker-dev-server", "rails server"]
+        },
+        "Procfile.dev-static-assets" => {
+          description: "Static development with webpack --watch",
+          required_for: "bin/dev static",
+          should_contain: ["shakapacker", "rails server"]
+        },
+        "Procfile.dev-prod-assets" => {
+          description: "Production-optimized assets development",
+          required_for: "bin/dev prod",
+          should_contain: ["rails server"]
+        }
+      }
+
+      procfiles.each do |filename, config|
+        check_individual_procfile(filename, config)
+      end
+
+      # Check if at least Procfile.dev exists
+      if File.exist?("Procfile.dev")
+        checker.add_success("✅ Essential Procfiles available for bin/dev script")
       else
-        checker.add_info("ℹ️  Procfile.dev not found (optional for development)")
+        checker.add_warning(<<~MSG.strip)
+          ⚠️  Procfile.dev missing - required for bin/dev development server
+          Run 'rails generate react_on_rails:install' to generate required Procfiles
+        MSG
       end
     end
 
-    def check_procfile_content
-      content = File.read("Procfile.dev")
-      if content.include?("shakapacker-dev-server")
-        checker.add_success("✅ Procfile.dev includes webpack dev server")
+    def check_individual_procfile(filename, config)
+      if File.exist?(filename)
+        checker.add_success("✅ #{filename} exists (#{config[:description]})")
+
+        content = File.read(filename)
+        config[:should_contain].each do |expected_content|
+          if content.include?(expected_content)
+            checker.add_success("  ✓ Contains #{expected_content}")
+          else
+            checker.add_info("  ℹ️  Could include #{expected_content} for #{config[:description]}")
+          end
+        end
       else
-        checker.add_info("ℹ️  Consider adding shakapacker-dev-server to Procfile.dev")
+        checker.add_info("ℹ️  #{filename} not found (needed for #{config[:required_for]})")
+      end
+    end
+
+    def check_bin_dev_script
+      bin_dev_path = "bin/dev"
+      if File.exist?(bin_dev_path)
+        checker.add_success("✅ bin/dev script exists")
+        check_bin_dev_content(bin_dev_path)
+      else
+        checker.add_warning(<<~MSG.strip)
+          ⚠️  bin/dev script missing
+          This script provides an enhanced development workflow with HMR, static, and production modes.
+          Run 'rails generate react_on_rails:install' to generate the script.
+        MSG
+      end
+    end
+
+    def check_bin_dev_content(bin_dev_path)
+      return unless File.exist?(bin_dev_path)
+
+      content = File.read(bin_dev_path)
+
+      # Check if it's using the new ReactOnRails::Dev::ServerManager
+      if content.include?("ReactOnRails::Dev::ServerManager")
+        checker.add_success("  ✓ Uses enhanced ReactOnRails development server")
+      elsif content.include?("foreman") || content.include?("overmind")
+        checker.add_info("  ℹ️  Using basic foreman/overmind - consider upgrading to ReactOnRails enhanced dev script")
+      else
+        checker.add_info("  ℹ️  Custom bin/dev script detected")
+      end
+
+      # Check if it's executable
+      if File.executable?(bin_dev_path)
+        checker.add_success("  ✓ Script is executable")
+      else
+        checker.add_warning("  ⚠️  Script is not executable - run 'chmod +x bin/dev'")
       end
     end
 
@@ -234,6 +308,22 @@ module ReactOnRails
       if checker.warnings?
         puts Rainbow("Suggested Improvements:").yellow.bold
         puts "• Review warnings above for optimization opportunities"
+
+        # Enhanced development workflow recommendations
+        unless File.exist?("bin/dev") && File.read("bin/dev").include?("ReactOnRails::Dev::ServerManager")
+          puts "• #{Rainbow('Upgrade to enhanced bin/dev script').yellow}:"
+          puts "  - Run #{Rainbow('rails generate react_on_rails:install').cyan} for latest development tools"
+          puts "  - Provides HMR, static, and production-like asset modes"
+          puts "  - Better error handling and debugging capabilities"
+        end
+
+        missing_procfiles = ["Procfile.dev-static-assets", "Procfile.dev-prod-assets"].reject { |f| File.exist?(f) }
+        unless missing_procfiles.empty?
+          puts "• #{Rainbow('Complete development workflow setup').yellow}:"
+          puts "  - Missing: #{missing_procfiles.join(', ')}"
+          puts "  - Run #{Rainbow('rails generate react_on_rails:install').cyan} to generate missing files"
+        end
+
         puts "• Consider updating packages to latest compatible versions"
         puts "• Check documentation for best practices"
         puts
@@ -260,9 +350,14 @@ module ReactOnRails
         puts "• Your setup is healthy! Consider these development workflow steps:"
       end
 
-      # Contextual suggestions based on what exists
-      if File.exist?("Procfile.dev")
-        puts "• Start development with: ./bin/dev"
+      # Enhanced contextual suggestions based on what exists
+      if File.exist?("bin/dev") && File.exist?("Procfile.dev")
+        puts "• Start development with HMR: #{Rainbow('./bin/dev').cyan}"
+        puts "• Try static mode: #{Rainbow('./bin/dev static').cyan}"
+        puts "• Test production assets: #{Rainbow('./bin/dev prod').cyan}"
+        puts "• See all options: #{Rainbow('./bin/dev help').cyan}"
+      elsif File.exist?("Procfile.dev")
+        puts "• Start development with: #{Rainbow('./bin/dev').cyan} (or foreman start -f Procfile.dev)"
       else
         puts "• Start Rails server: bin/rails server"
         puts "• Start webpack dev server: bin/shakapacker-dev-server (in separate terminal)"
