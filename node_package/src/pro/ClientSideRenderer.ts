@@ -1,7 +1,7 @@
 /* eslint-disable max-classes-per-file */
 
 import type { ReactElement } from 'react';
-import type { RailsContext, RegisteredComponent, RenderFunction, Root } from '../types/index';
+import type { RailsContext, RegisteredComponent, RenderFunction, Root } from '../types/index.ts';
 
 import { getRailsContext, resetRailsContext } from '../context.ts';
 import createReactOutput from '../createReactOutput.ts';

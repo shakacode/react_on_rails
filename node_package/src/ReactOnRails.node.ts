@@ -1,5 +1,5 @@
 import ReactOnRails from './ReactOnRails.full.ts';
-import streamServerRenderedReactComponent from './streamServerRenderedReactComponent.ts';
+import streamServerRenderedReactComponent from './pro/streamServerRenderedReactComponent.ts';
 
 ReactOnRails.streamServerRenderedReactComponent = streamServerRenderedReactComponent;
 

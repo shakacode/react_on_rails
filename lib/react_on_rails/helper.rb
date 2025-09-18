@@ -11,15 +11,14 @@ require "addressable/uri"
 require "react_on_rails/utils"
 require "react_on_rails/json_output"
 require "active_support/concern"
+require "react_on_rails/pro_features/helper"
 
 module ReactOnRails
   module Helper
     include ReactOnRails::Utils::Required
+    include ReactOnRails::ProFeatures::Helper
 
     COMPONENT_HTML_KEY = "componentHtml"
-    IMMEDIATE_HYDRATION_PRO_WARNING = "[REACT ON RAILS] The 'immediate_hydration' feature requires a " \
-                                      "React on Rails Pro license. " \
-                                      "Please visit https://shakacode.com/react-on-rails-pro to learn more."
 
     # react_component_name: can be a React function or class component or a "Render-Function".
     # "Render-Functions" differ from a React function in that they take two parameters, the
@@ -452,32 +451,6 @@ module ReactOnRails
 
     # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
 
-    # Checks if React on Rails Pro features are available
-    # @return [Boolean] true if Pro license is valid, false otherwise
-    def support_pro_features?
-      ReactOnRails::Utils.react_on_rails_pro_licence_valid?
-    end
-
-    def pro_warning_badge_if_needed(immediate_hydration)
-      return "".html_safe unless immediate_hydration
-      return "".html_safe if support_pro_features?
-
-      puts IMMEDIATE_HYDRATION_PRO_WARNING
-      Rails.logger.warn IMMEDIATE_HYDRATION_PRO_WARNING
-
-      tooltip_text = "The 'immediate_hydration' feature requires a React on Rails Pro license. Click to learn more."
-
-      badge_html = <<~HTML
-        <a href="https://shakacode.com/react-on-rails-pro" target="_blank" rel="noopener noreferrer" title="#{tooltip_text}">
-          <div style="position: fixed; top: 0; right: 0; width: 180px; height: 180px; overflow: hidden; z-index: 9999; pointer-events: none;">
-            <div style="position: absolute; top: 50px; right: -40px; transform: rotate(45deg); background-color: rgba(220, 53, 69, 0.85); color: white; padding: 7px 40px; text-align: center; font-weight: bold; font-family: sans-serif; font-size: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); pointer-events: auto;">
-              React On Rails Pro Required
-            </div>
-          </div>
-        </a>
-      HTML
-      badge_html.strip.html_safe
-    end
 
     def run_stream_inside_fiber
       unless ReactOnRails::Utils.react_on_rails_pro?
@@ -689,17 +662,9 @@ module ReactOnRails
                                                 "data-component-name" => render_options.react_component_name,
                                                 "data-trace" => (render_options.trace ? true : nil),
                                                 "data-dom-id" => render_options.dom_id,
-                                                "data-store-dependencies" => render_options.store_dependencies&.to_json,
-                                                "data-immediate-hydration" =>
-                                                  (render_options.immediate_hydration ? true : nil))
+                                                "data-store-dependencies" => render_options.store_dependencies&.to_json)
 
-      if render_options.immediate_hydration
-        component_specification_tag.concat(
-          content_tag(:script, %(
-typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('#{render_options.dom_id}');
-          ).html_safe)
-        )
-      end
+      component_specification_tag = apply_immediate_hydration_if_supported(component_specification_tag, render_options)
 
       load_pack_for_generated_component(react_component_name, render_options)
       # Create the HTML rendering part
@@ -717,18 +682,9 @@ typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('#{
       store_hydration_data = content_tag(:script,
                                          json_safe_and_pretty(redux_store_data[:props]).html_safe,
                                          type: "application/json",
-                                         "data-js-react-on-rails-store" => redux_store_data[:store_name].html_safe,
-                                         "data-immediate-hydration" =>
-                                           (redux_store_data[:immediate_hydration] ? true : nil))
+                                         "data-js-react-on-rails-store" => redux_store_data[:store_name].html_safe)
 
-      if redux_store_data[:immediate_hydration]
-        store_hydration_data.concat(
-          content_tag(:script, <<~JS.strip_heredoc.html_safe
-            typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsStoreLoaded('#{redux_store_data[:store_name]}');
-          JS
-          )
-        )
-      end
+      store_hydration_data = apply_store_immediate_hydration_if_supported(store_hydration_data, redux_store_data)
 
       prepend_render_rails_context(store_hydration_data)
     end
@@ -874,5 +830,3 @@ typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('#{
     end
   end
 end
-# rubocop:enable Metrics/ModuleLength
-# rubocop:enable Metrics/MethodLength

@@ -7,17 +7,17 @@ import {
   assertRailsContextWithServerStreamingCapabilities,
   StreamRenderState,
   StreamableComponentResult,
-} from './types/index.ts';
-import ReactOnRails from './ReactOnRails.full.ts';
-import handleError from './handleError.ts';
-import { convertToError } from './serverRenderUtils.ts';
+} from '../types/index.ts';
+import ReactOnRails from '../ReactOnRails.full.ts';
+import handleError from '../handleError.ts';
+import { convertToError } from '../serverRenderUtils.ts';
 
 import {
   streamServerRenderedComponent,
   StreamingTrackers,
   transformRenderStreamChunksToResultObject,
 } from './streamServerRenderedReactComponent.ts';
-import loadJsonFile from './loadJsonFile.ts';
+import loadJsonFile from '../loadJsonFile.ts';
 
 let serverRendererPromise: Promise<ReturnType<typeof buildServerRenderer>> | undefined;
 
@@ -93,5 +93,5 @@ ReactOnRails.serverRenderRSCReactComponent = (options: RSCRenderParams) => {
 
 ReactOnRails.isRSCBundle = true;
 
-export * from './types/index.ts';
+export * from '../types/index.ts';
 export default ReactOnRails;

@@ -1,7 +1,7 @@
 import * as React from 'react';
-import ReactOnRails from '../ReactOnRails.client.ts';
+import ReactOnRails from '../../ReactOnRails.client.ts';
 import RSCRoute from '../RSCRoute.tsx';
-import { ReactComponentOrRenderFunction } from '../types/index.ts';
+import { ReactComponentOrRenderFunction } from '../../types/index.ts';
 import wrapServerComponentRenderer from '../wrapServerComponentRenderer/client.tsx';
 
 /**
