@@ -27,6 +27,11 @@ RSpec.describe ReactOnRails::Doctor do
       allow(File).to receive_messages(exist?: false, directory?: false)
       allow(doctor).to receive(:`).and_return("")
 
+      # Mock the new server bundle path methods
+      allow(doctor).to receive(:determine_server_bundle_path).and_return("app/javascript/packs/server-bundle.js")
+      allow(doctor).to receive(:read_shakapacker_config).and_return(nil)
+      allow(doctor).to receive(:get_server_bundle_filename).and_return("server-bundle.js")
+
       # Mock the checker to avoid actual system calls
       checker = instance_double(ReactOnRails::SystemChecker)
       allow(ReactOnRails::SystemChecker).to receive(:new).and_return(checker)
@@ -71,6 +76,72 @@ RSpec.describe ReactOnRails::Doctor do
       expect(checker).to receive(:check_webpack_configuration)
 
       doctor.run_diagnosis
+    end
+  end
+
+  describe "server bundle path detection" do
+    let(:doctor) { described_class.new }
+
+    describe "#determine_server_bundle_path" do
+      context "when shakapacker.yml exists" do
+        let(:shakapacker_config) do
+          {
+            "source_path" => "client/app",
+            "source_entry_path" => "packs"
+          }
+        end
+
+        before do
+          allow(doctor).to receive(:read_shakapacker_config).and_return(shakapacker_config)
+          allow(doctor).to receive(:get_server_bundle_filename).and_return("server-bundle.js")
+        end
+
+        it "uses shakapacker configuration" do
+          path = doctor.send(:determine_server_bundle_path)
+          expect(path).to eq("client/app/packs/server-bundle.js")
+        end
+      end
+
+      context "when shakapacker.yml does not exist" do
+        before do
+          allow(doctor).to receive(:read_shakapacker_config).and_return(nil)
+          allow(doctor).to receive(:get_server_bundle_filename).and_return("server-bundle.js")
+        end
+
+        it "uses default path" do
+          path = doctor.send(:determine_server_bundle_path)
+          expect(path).to eq("app/javascript/packs/server-bundle.js")
+        end
+      end
+    end
+
+    describe "#get_server_bundle_filename" do
+      context "when react_on_rails.rb has custom filename" do
+        let(:initializer_content) do
+          'config.server_bundle_js_file = "custom-server-bundle.js"'
+        end
+
+        before do
+          allow(File).to receive(:exist?).with("config/initializers/react_on_rails.rb").and_return(true)
+          allow(File).to receive(:read).with("config/initializers/react_on_rails.rb").and_return(initializer_content)
+        end
+
+        it "extracts filename from initializer" do
+          filename = doctor.send(:get_server_bundle_filename)
+          expect(filename).to eq("custom-server-bundle.js")
+        end
+      end
+
+      context "when no custom filename is configured" do
+        before do
+          allow(File).to receive(:exist?).with("config/initializers/react_on_rails.rb").and_return(false)
+        end
+
+        it "returns default filename" do
+          filename = doctor.send(:get_server_bundle_filename)
+          expect(filename).to eq("server-bundle.js")
+        end
+      end
     end
   end
 end
