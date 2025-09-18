@@ -99,7 +99,14 @@ module ReactOnRails
         return false
       end
 
-      add_success("✅ Package managers available: #{available_managers.join(', ')}")
+      # Detect which package manager is actually being used
+      used_manager = detect_used_package_manager
+      if used_manager
+        add_success("✅ Package manager in use: #{used_manager}")
+      else
+        add_success("✅ Package managers available: #{available_managers.join(', ')}")
+        add_info("ℹ️  No lock file detected - run npm/yarn/pnpm install to establish which manager is used")
+      end
       true
     end
 
@@ -120,9 +127,8 @@ module ReactOnRails
         return false
       end
 
-      add_success("✅ Shakapacker is properly configured")
+      report_shakapacker_version_with_threshold
       check_shakapacker_in_gemfile
-      report_shakapacker_version
       true
     end
 
@@ -304,6 +310,19 @@ module ReactOnRails
       system("which #{command} > /dev/null 2>&1")
     end
 
+    def detect_used_package_manager
+      # Check for lock files to determine which package manager is being used
+      if File.exist?("yarn.lock")
+        "yarn"
+      elsif File.exist?("pnpm-lock.yaml")
+        "pnpm"
+      elsif File.exist?("bun.lockb")
+        "bun"
+      elsif File.exist?("package-lock.json")
+        "npm"
+      end
+    end
+
     def shakapacker_configured?
       File.exist?("bin/shakapacker") &&
         File.exist?("bin/shakapacker-dev-server") &&
@@ -423,15 +442,28 @@ module ReactOnRails
     def report_dependency_versions(package_json)
       all_deps = package_json["dependencies"]&.merge(package_json["devDependencies"] || {}) || {}
 
-      version_deps = {
-        "react" => "React",
-        "react-dom" => "React DOM"
-      }
+      react_version = all_deps["react"]
+      react_dom_version = all_deps["react-dom"]
 
-      version_deps.each do |dep, name|
-        version = all_deps[dep]
-        add_info("📦 #{name} version: #{version}") if version
+      if react_version && react_dom_version
+        add_success("✅ React #{react_version}, React DOM #{react_dom_version}")
+      elsif react_version
+        add_success("✅ React #{react_version}")
+        add_warning("⚠️  React DOM not found")
+      elsif react_dom_version
+        add_warning("⚠️  React not found")
+        add_success("✅ React DOM #{react_dom_version}")
       end
+    end
+
+    def extract_major_minor_version(version_string)
+      # Extract major.minor from version string like "8.1.0" or "7.2.1"
+      match = version_string.match(/^(\d+)\.(\d+)/)
+      return nil unless match
+
+      major = match[1].to_i
+      minor = match[2].to_i
+      major + (minor / 10.0)
     end
 
     def report_shakapacker_version
@@ -439,14 +471,42 @@ module ReactOnRails
 
       begin
         lockfile_content = File.read("Gemfile.lock")
-        # Parse shakapacker version from Gemfile.lock
-        shakapacker_match = lockfile_content.match(/^\s*shakapacker \(([^)]+)\)/)
+        # Parse exact installed version from Gemfile.lock GEM section
+        shakapacker_match = lockfile_content.match(/^\s{4}shakapacker \(([^)>=<~]+)\)/)
         if shakapacker_match
-          version = shakapacker_match[1]
+          version = shakapacker_match[1].strip
           add_info("📦 Shakapacker version: #{version}")
         end
       rescue StandardError
         # Ignore errors in parsing Gemfile.lock
+      end
+    end
+
+    def report_shakapacker_version_with_threshold
+      return unless File.exist?("Gemfile.lock")
+
+      begin
+        lockfile_content = File.read("Gemfile.lock")
+        # Look for the exact installed version in the GEM section, not the dependency requirement
+        # This matches "    shakapacker (8.0.0)" but not "      shakapacker (>= 6.0)"
+        shakapacker_match = lockfile_content.match(/^\s{4}shakapacker \(([^)>=<~]+)\)/)
+
+        if shakapacker_match
+          version = shakapacker_match[1].strip
+          major_minor = extract_major_minor_version(version)
+
+          if major_minor && major_minor >= 8.2
+            add_success("✅ Shakapacker #{version} (supports React on Rails auto-registration)")
+          elsif major_minor
+            add_warning("⚠️  Shakapacker #{version} - Version 8.2+ needed for React on Rails auto-registration")
+          else
+            add_success("✅ Shakapacker #{version}")
+          end
+        else
+          add_success("✅ Shakapacker is configured")
+        end
+      rescue StandardError
+        add_success("✅ Shakapacker is configured")
       end
     end
 
