@@ -9,7 +9,7 @@ import { isServerRenderHash } from './isServerRenderResult.ts';
 import { supportsHydrate, supportsRootApi, unmountComponentAtNode } from './reactApis.cts';
 import reactHydrateOrRender from './reactHydrateOrRender.ts';
 import { debugTurbolinks } from './turbolinksUtils.ts';
-import * as StoreRegistry from './StoreRegistry.ts';
+import * as StoreRegistry from './pro/StoreRegistry.ts';
 import * as ComponentRegistry from './pro/ComponentRegistry.ts';
 import { onPageLoaded } from './pageLifecycle.ts';
 

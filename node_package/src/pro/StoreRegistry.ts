@@ -1,5 +1,5 @@
-import CallbackRegistry from './pro/CallbackRegistry.ts';
-import type { Store, StoreGenerator } from './types/index.ts';
+import CallbackRegistry from './CallbackRegistry.ts';
+import type { Store, StoreGenerator } from '../types/index.ts';
 
 const storeGeneratorRegistry = new CallbackRegistry<StoreGenerator>('store generator');
 const hydratedStoreRegistry = new CallbackRegistry<Store>('hydrated store');
