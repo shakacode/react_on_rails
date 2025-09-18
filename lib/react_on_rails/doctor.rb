@@ -8,20 +8,22 @@ begin
   require "rainbow"
 rescue LoadError
   # Fallback if Rainbow is not available - define Kernel-level Rainbow method
+  # rubocop:disable Naming/MethodName
   def Rainbow(text)
     SimpleColorWrapper.new(text)
   end
+  # rubocop:enable Naming/MethodName
 
   class SimpleColorWrapper
     def initialize(text)
       @text = text
     end
 
-    def method_missing(method, *args)
+    def method_missing(_method, *_args)
       self
     end
 
-    def respond_to_missing?(method, include_private = false)
+    def respond_to_missing?(_method, _include_private = false)
       true
     end
 
@@ -331,6 +333,7 @@ module ReactOnRails
       checker.errors? || checker.warnings?
     end
 
+    # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
     def print_next_steps
       puts Rainbow("Next Steps:").blue.bold
 
@@ -373,6 +376,7 @@ module ReactOnRails
       puts "• Documentation: https://github.com/shakacode/react_on_rails"
       puts
     end
+    # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
     def npm_test_script?
       return false unless File.exist?("package.json")
@@ -398,7 +402,7 @@ module ReactOnRails
       # Get the source path relative to Rails root
       source_path = Shakapacker.config.source_path.to_s
       source_entry_path = Shakapacker.config.source_entry_path.to_s
-      server_bundle_filename = server_bundle_filename
+      bundle_filename = server_bundle_filename
       rails_root = Dir.pwd
 
       # Convert absolute paths to relative paths
@@ -416,11 +420,11 @@ module ReactOnRails
         source_entry_path = source_entry_path.sub("#{source_path}/", "")
       end
 
-      File.join(source_path, source_entry_path, server_bundle_filename)
-    rescue LoadError, NameError, StandardError
-      # Fallback to default paths if Shakapacker is not available or configured
-      server_bundle_filename = get_server_bundle_filename
-      "app/javascript/packs/#{server_bundle_filename}"
+      File.join(source_path, source_entry_path, bundle_filename)
+    rescue StandardError
+      # Handle missing Shakapacker gem or other configuration errors
+      bundle_filename = server_bundle_filename
+      "app/javascript/packs/#{bundle_filename}"
     end
 
     def server_bundle_filename
