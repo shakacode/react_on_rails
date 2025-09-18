@@ -67,10 +67,10 @@ rails generate react_on_rails:install
 If you encounter issues during installation or after upgrading, use the doctor command to diagnose your setup:
 
 ```bash
-rails generate react_on_rails:doctor
+rake react_on_rails:doctor
 ```
 
-The doctor command checks your environment, dependencies, and configuration files to identify potential issues. Use `--verbose` for detailed output.
+The doctor command checks your environment, dependencies, and configuration files to identify potential issues. Use `VERBOSE=true rake react_on_rails:doctor` for detailed output.
 
 For detailed upgrade instructions, see [upgrade guide documentation](docs/guides/upgrading-react-on-rails.md).
 
