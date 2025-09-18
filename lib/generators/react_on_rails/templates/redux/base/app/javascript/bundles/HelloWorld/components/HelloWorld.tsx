@@ -15,12 +15,7 @@ const HelloWorld: React.FC<HelloWorldProps> = ({ name, updateName }) => (
     <form>
       <label className={style.bright} htmlFor="name">
         Say hello to:
-        <input
-          id="name"
-          type="text"
-          value={name}
-          onChange={e => updateName(e.target.value)}
-        />
+        <input id="name" type="text" value={name} onChange={(e) => updateName(e.target.value)} />
       </label>
     </form>
   </div>
