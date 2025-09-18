@@ -146,6 +146,7 @@ module ReactOnRails
       check_react_on_rails_gem
       check_react_on_rails_npm_package
       check_package_version_sync
+      check_gemfile_version_patterns
     end
 
     def check_react_on_rails_gem
@@ -200,13 +201,14 @@ module ReactOnRails
 
         if clean_npm_version == gem_version
           add_success("✅ React on Rails gem and NPM package versions match (#{gem_version})")
+          check_version_patterns(npm_version, gem_version)
         else
           add_warning(<<~MSG.strip)
             ⚠️  Version mismatch detected:
             • Gem version: #{gem_version}
             • NPM version: #{npm_version}
 
-            Consider updating to matching versions for best compatibility.
+            Consider updating to exact, fixed matching versions of gem and npm package for best compatibility.
           MSG
         end
       rescue JSON::ParserError
@@ -372,6 +374,50 @@ module ReactOnRails
         Install them with:
         npm install #{missing_deps.join(' ')}
       MSG
+    end
+
+    def check_version_patterns(npm_version, gem_version)
+      # Check for version range patterns in package.json
+      if npm_version.match(/^[\^~]/)
+        pattern_type = npm_version[0] == '^' ? 'caret (^)' : 'tilde (~)'
+        add_warning(<<~MSG.strip)
+          ⚠️  NPM package uses #{pattern_type} version pattern: #{npm_version}
+
+          While versions match, consider using exact version "#{gem_version}" in package.json
+          for guaranteed compatibility with the React on Rails gem.
+        MSG
+      end
+    end
+
+    def check_gemfile_version_patterns
+      gemfile_path = ENV["BUNDLE_GEMFILE"] || "Gemfile"
+      return unless File.exist?(gemfile_path)
+
+      begin
+        gemfile_content = File.read(gemfile_path)
+        react_on_rails_line = gemfile_content.lines.find { |line| line.match(/^\s*gem\s+['"]react_on_rails['"]/) }
+
+        return unless react_on_rails_line
+
+        # Check for version patterns in Gemfile
+        if react_on_rails_line.match(/['"][~^]/)
+          add_warning(<<~MSG.strip)
+            ⚠️  Gemfile uses version pattern for react_on_rails gem.
+
+            Consider using exact version in Gemfile for guaranteed compatibility:
+            gem 'react_on_rails', '#{ReactOnRails::VERSION}'
+          MSG
+        elsif react_on_rails_line.match(/['>]=/)
+          add_warning(<<~MSG.strip)
+            ⚠️  Gemfile uses version range (>=) for react_on_rails gem.
+
+            Consider using exact version in Gemfile for guaranteed compatibility:
+            gem 'react_on_rails', '#{ReactOnRails::VERSION}'
+          MSG
+        end
+      rescue StandardError
+        # Ignore errors reading Gemfile
+      end
     end
 
     def report_dependency_versions(package_json)

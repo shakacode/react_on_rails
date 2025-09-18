@@ -313,21 +313,31 @@ module ReactOnRails
         source_entry_path = Shakapacker.config.source_entry_path.to_s
         server_bundle_filename = get_server_bundle_filename
 
+        # Debug info - remove after fixing
+        checker.add_info("🔍 Debug - Raw source_path: #{source_path}")
+        checker.add_info("🔍 Debug - Raw source_entry_path: #{source_entry_path}")
+        checker.add_info("🔍 Debug - Rails root (Dir.pwd): #{Dir.pwd}")
+
         # If source_path is absolute, make it relative to current directory
         if source_path.start_with?("/")
           # Convert absolute path to relative by removing the Rails root
           rails_root = Dir.pwd
           if source_path.start_with?(rails_root)
             source_path = source_path.sub("#{rails_root}/", "")
+            checker.add_info("🔍 Debug - Converted to relative: #{source_path}")
           else
             # If it's not under Rails root, just use the basename
             source_path = File.basename(source_path)
+            checker.add_info("🔍 Debug - Using basename: #{source_path}")
           end
         end
 
-        File.join(source_path, source_entry_path, server_bundle_filename)
-      rescue LoadError, NameError, StandardError
+        final_path = File.join(source_path, source_entry_path, server_bundle_filename)
+        checker.add_info("🔍 Debug - Final path: #{final_path}")
+        final_path
+      rescue LoadError, NameError, StandardError => e
         # Fallback to default paths if Shakapacker is not available or configured
+        checker.add_info("🔍 Debug - Shakapacker error: #{e.message}")
         server_bundle_filename = get_server_bundle_filename
         "app/javascript/packs/#{server_bundle_filename}"
       end
