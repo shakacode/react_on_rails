@@ -333,7 +333,7 @@ module ReactOnRails
     end
 
     def compile_command_conflict_message
-      packer_name = ReactOnRails::PackerUtils.packer_type&.upcase_first
+      packer_name = ReactOnRails::PackerUtils.packer_type.upcase_first
       packer_type = ReactOnRails::PackerUtils.packer_type
       <<~MSG
 
