@@ -2,6 +2,7 @@
 
 require "rails/generators"
 require_relative "generator_helper"
+require_relative "generator_messages"
 
 module ReactOnRails
   module Generators
@@ -82,7 +83,7 @@ module ReactOnRails
         # Fallback to package manager detection if GeneratorHelper fails
         return if success
 
-        package_manager = detect_package_manager
+        package_manager = GeneratorMessages.detect_package_manager
         return unless package_manager
 
         install_packages_with_fallback(regular_packages, dev: false, package_manager: package_manager)
@@ -126,7 +127,6 @@ module ReactOnRails
 
       def add_redux_specific_messages
         # Override the generic messages with Redux-specific instructions
-        require_relative "generator_messages"
         GeneratorMessages.output.clear
         GeneratorMessages.add_info(
           GeneratorMessages.helpful_message_after_installation(component_name: "HelloWorldApp", route: "hello_world")
