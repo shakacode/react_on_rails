@@ -73,17 +73,28 @@ module ReactOnRails
     def run_all_checks
       checks = [
         ["Environment Prerequisites", :check_environment],
+        ["React on Rails Versions", :check_react_on_rails_versions],
         ["React on Rails Packages", :check_packages],
         ["Dependencies", :check_dependencies],
+        ["Key Configuration Files", :check_key_files],
+        ["Configuration Analysis", :check_configuration_details],
+        ["bin/dev Launcher Setup", :check_bin_dev_launcher],
         ["Rails Integration", :check_rails],
         ["Webpack Configuration", :check_webpack],
+        ["Testing Setup", :check_testing_setup],
         ["Development Environment", :check_development]
       ]
 
       checks.each do |section_name, check_method|
-        print_section_header(section_name)
+        initial_message_count = checker.messages.length
         send(check_method)
-        puts
+
+        # Only print header if messages were added
+        if checker.messages.length > initial_message_count
+          print_section_header(section_name)
+          print_recent_messages(initial_message_count)
+          puts
+        end
       end
     end
 
@@ -92,9 +103,22 @@ module ReactOnRails
       puts Rainbow("-" * (section_name.length + 1)).blue
     end
 
+    def print_recent_messages(start_index)
+      checker.messages[start_index..-1].each do |message|
+        color = MESSAGE_COLORS[message[:type]] || :blue
+        puts Rainbow(message[:content]).send(color)
+      end
+    end
+
     def check_environment
       checker.check_node_installation
       checker.check_package_manager
+    end
+
+    def check_react_on_rails_versions
+      check_gem_version
+      check_npm_package_version
+      check_version_wildcards
     end
 
     def check_packages
@@ -112,6 +136,27 @@ module ReactOnRails
 
     def check_webpack
       checker.check_webpack_configuration
+    end
+
+    def check_key_files
+      check_key_configuration_files
+    end
+
+    def check_configuration_details
+      check_shakapacker_configuration_details
+      check_react_on_rails_configuration_details
+    end
+
+    def check_bin_dev_launcher
+      checker.add_info("🚀 bin/dev Launcher:")
+      check_bin_dev_launcher_setup
+
+      checker.add_info("\n📄 Launcher Procfiles:")
+      check_launcher_procfiles
+    end
+
+    def check_testing_setup
+      check_rspec_helper_setup
     end
 
     def check_development
@@ -177,13 +222,12 @@ module ReactOnRails
       if File.exist?(filename)
         checker.add_success("✅ #{filename} exists (#{config[:description]})")
 
+        # Only check for critical missing components, not optional suggestions
         content = File.read(filename)
-        config[:should_contain].each do |expected_content|
-          if content.include?(expected_content)
-            checker.add_success("  ✓ Contains #{expected_content}")
-          else
-            checker.add_info("  ℹ️  Could include #{expected_content} for #{config[:description]}")
-          end
+        if filename == "Procfile.dev" && !content.include?("shakapacker-dev-server")
+          checker.add_warning("  ⚠️  Missing shakapacker-dev-server for HMR development")
+        elsif filename == "Procfile.dev-static-assets" && !content.include?("shakapacker")
+          checker.add_warning("  ⚠️  Missing shakapacker for static asset compilation")
         end
       else
         checker.add_info("ℹ️  #{filename} not found (needed for #{config[:required_for]})")
@@ -274,9 +318,11 @@ module ReactOnRails
     end
 
     def print_detailed_results_if_needed(counts)
-      return unless verbose || counts[:error].positive? || counts[:warning].positive?
+      # Skip detailed results since messages are now printed under section headers
+      # Only show detailed results in verbose mode for debugging
+      return unless verbose
 
-      puts "\nDetailed Results:"
+      puts "\nDetailed Results (Verbose Mode):"
       print_all_messages
     end
 
@@ -378,6 +424,226 @@ module ReactOnRails
     end
     # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
+    def check_gem_version
+      gem_version = ReactOnRails::VERSION
+      checker.add_success("✅ React on Rails gem version: #{gem_version}")
+    rescue StandardError
+      checker.add_error("🚫 Unable to determine React on Rails gem version")
+    end
+
+    def check_npm_package_version
+      return unless File.exist?("package.json")
+
+      begin
+        package_json = JSON.parse(File.read("package.json"))
+        all_deps = package_json["dependencies"]&.merge(package_json["devDependencies"] || {}) || {}
+
+        npm_version = all_deps["react-on-rails"]
+        if npm_version
+          checker.add_success("✅ react-on-rails npm package version: #{npm_version}")
+        else
+          checker.add_warning("⚠️  react-on-rails npm package not found in package.json")
+        end
+      rescue JSON::ParserError
+        checker.add_error("🚫 Unable to parse package.json")
+      rescue StandardError
+        checker.add_error("🚫 Error reading package.json")
+      end
+    end
+
+    def check_version_wildcards
+      check_gem_wildcards
+      check_npm_wildcards
+    end
+
+    # rubocop:disable Metrics/CyclomaticComplexity
+    def check_gem_wildcards
+      gemfile_path = ENV["BUNDLE_GEMFILE"] || "Gemfile"
+      return unless File.exist?(gemfile_path)
+
+      begin
+        content = File.read(gemfile_path)
+        react_line = content.lines.find { |line| line.match(/^\s*gem\s+['"]react_on_rails['"]/) }
+
+        if react_line
+          if /['"][~^]/.match?(react_line)
+            checker.add_warning("⚠️  Gemfile uses wildcard version pattern (~, ^) for react_on_rails")
+          elsif />=\s*/.match?(react_line)
+            checker.add_warning("⚠️  Gemfile uses version range (>=) for react_on_rails")
+          else
+            checker.add_success("✅ Gemfile uses exact version for react_on_rails")
+          end
+        end
+      rescue StandardError
+        # Ignore errors reading Gemfile
+      end
+    end
+    # rubocop:enable Metrics/CyclomaticComplexity
+
+    # rubocop:disable Metrics/CyclomaticComplexity
+    def check_npm_wildcards
+      return unless File.exist?("package.json")
+
+      begin
+        package_json = JSON.parse(File.read("package.json"))
+        all_deps = package_json["dependencies"]&.merge(package_json["devDependencies"] || {}) || {}
+
+        npm_version = all_deps["react-on-rails"]
+        if npm_version
+          if /[~^]/.match?(npm_version)
+            checker.add_warning("⚠️  package.json uses wildcard version pattern (~, ^) for react-on-rails")
+          else
+            checker.add_success("✅ package.json uses exact version for react-on-rails")
+          end
+        end
+      rescue JSON::ParserError
+        # Ignore JSON parsing errors
+      rescue StandardError
+        # Ignore other errors
+      end
+    end
+    # rubocop:enable Metrics/CyclomaticComplexity
+
+    def check_key_configuration_files
+      files_to_check = {
+        "config/shakapacker.yml" => "Shakapacker configuration",
+        "config/initializers/react_on_rails.rb" => "React on Rails initializer",
+        "bin/shakapacker" => "Shakapacker binary",
+        "bin/shakapacker-dev-server" => "Shakapacker dev server binary",
+        "config/webpack/webpack.config.js" => "Webpack configuration"
+      }
+
+      files_to_check.each do |file_path, description|
+        if File.exist?(file_path)
+          checker.add_success("✅ #{description}: #{file_path}")
+        else
+          checker.add_warning("⚠️  Missing #{description}: #{file_path}")
+        end
+      end
+    end
+
+    def check_shakapacker_configuration_details
+      return unless File.exist?("config/shakapacker.yml")
+
+      # For now, just indicate that the configuration file exists
+      # TODO: Parse YAML directly or improve Shakapacker integration
+      checker.add_info("📋 Shakapacker Configuration:")
+      checker.add_info("  Configuration file: config/shakapacker.yml")
+      checker.add_info("  ℹ️  Run 'rake shakapacker:info' for detailed configuration")
+    end
+
+    def check_react_on_rails_configuration_details
+      config_path = "config/initializers/react_on_rails.rb"
+      return unless File.exist?(config_path)
+
+      begin
+        content = File.read(config_path)
+
+        checker.add_info("📋 React on Rails Configuration:")
+
+        # Extract key configuration values
+        config_patterns = {
+          "server_bundle_js_file" => /config\.server_bundle_js_file\s*=\s*["']([^"']+)["']/,
+          "prerender" => /config\.prerender\s*=\s*([^\s\n]+)/,
+          "trace" => /config\.trace\s*=\s*([^\s\n]+)/,
+          "development_mode" => /config\.development_mode\s*=\s*([^\s\n]+)/,
+          "logging_on_server" => /config\.logging_on_server\s*=\s*([^\s\n]+)/
+        }
+
+        config_patterns.each do |setting, pattern|
+          match = content.match(pattern)
+          checker.add_info("  #{setting}: #{match[1]}") if match
+        end
+      rescue StandardError => e
+        checker.add_warning("⚠️  Unable to read react_on_rails.rb: #{e.message}")
+      end
+    end
+
+    def check_bin_dev_launcher_setup
+      bin_dev_path = "bin/dev"
+
+      unless File.exist?(bin_dev_path)
+        checker.add_error("  🚫 bin/dev script not found")
+        return
+      end
+
+      content = File.read(bin_dev_path)
+
+      if content.include?("ReactOnRails::Dev::ServerManager")
+        checker.add_success("  ✅ bin/dev uses ReactOnRails Launcher (ReactOnRails::Dev::ServerManager)")
+      elsif content.include?("run_from_command_line")
+        checker.add_success("  ✅ bin/dev uses ReactOnRails Launcher (run_from_command_line)")
+      else
+        checker.add_warning("  ⚠️  bin/dev exists but doesn't use ReactOnRails Launcher")
+        checker.add_info("    💡 Consider upgrading: rails generate react_on_rails:install")
+      end
+    end
+
+    def check_launcher_procfiles
+      procfiles = {
+        "Procfile.dev" => "HMR development (bin/dev default)",
+        "Procfile.dev-static-assets" => "Static development (bin/dev static)",
+        "Procfile.dev-prod-assets" => "Production assets (bin/dev prod)"
+      }
+
+      missing_count = 0
+
+      procfiles.each do |filename, description|
+        if File.exist?(filename)
+          checker.add_success("  ✅ #{filename} - #{description}")
+        else
+          checker.add_warning("  ⚠️  Missing #{filename} - #{description}")
+          missing_count += 1
+        end
+      end
+
+      if missing_count.zero?
+        checker.add_success("  ✅ All Launcher Procfiles available")
+      else
+        checker.add_info("  💡 Run: rails generate react_on_rails:install")
+      end
+    end
+
+    # rubocop:disable Metrics/CyclomaticComplexity
+    def check_rspec_helper_setup
+      spec_helper_paths = [
+        "spec/rails_helper.rb",
+        "spec/spec_helper.rb"
+      ]
+
+      react_on_rails_test_helper_found = false
+
+      spec_helper_paths.each do |helper_path|
+        next unless File.exist?(helper_path)
+
+        content = File.read(helper_path)
+
+        unless content.include?("ReactOnRails::TestHelper") || content.include?("configure_rspec_to_compile_assets")
+          next
+        end
+
+        checker.add_success("✅ ReactOnRails RSpec helper configured in #{helper_path}")
+        react_on_rails_test_helper_found = true
+
+        # Check specific configurations
+        checker.add_success("  ✓ Assets compilation enabled for tests") if content.include?("ensure_assets_compiled")
+
+        checker.add_success("  ✓ RSpec configuration present") if content.include?("RSpec.configure")
+      end
+
+      return if react_on_rails_test_helper_found
+
+      if File.exist?("spec")
+        checker.add_warning("⚠️  ReactOnRails RSpec helper not found")
+        checker.add_info("  Add to spec/rails_helper.rb:")
+        checker.add_info("  require 'react_on_rails/test_helper'")
+        checker.add_info("  ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)")
+      else
+        checker.add_info("ℹ️  No RSpec directory found - skipping RSpec helper check")
+      end
+    end
+    # rubocop:enable Metrics/CyclomaticComplexity
+
     def npm_test_script?
       return false unless File.exist?("package.json")
 
@@ -450,6 +716,43 @@ module ReactOnRails
       else
         puts Rainbow("🎉 All checks passed! Your React on Rails setup is healthy.").green.bold
         exit(0)
+      end
+    end
+
+    def relativize_path(absolute_path)
+      return absolute_path unless absolute_path.is_a?(String)
+
+      project_root = Dir.pwd
+      if absolute_path.start_with?(project_root)
+        # Remove project root and leading slash to make it relative
+        relative = absolute_path.sub(project_root, "").sub(/^\//, "")
+        relative.empty? ? "." : relative
+      else
+        absolute_path
+      end
+    end
+
+    def safe_display_config_path(label, path_value)
+      return unless path_value
+
+      begin
+        # Convert to string and relativize
+        path_str = path_value.to_s
+        relative_path = relativize_path(path_str)
+        checker.add_info("  #{label}: #{relative_path}")
+      rescue StandardError => e
+        checker.add_info("  #{label}: <error reading path: #{e.message}>")
+      end
+    end
+
+    def safe_display_config_value(label, config, method_name)
+      return unless config.respond_to?(method_name)
+
+      begin
+        value = config.send(method_name)
+        checker.add_info("  #{label}: #{value}")
+      rescue StandardError => e
+        checker.add_info("  #{label}: <error reading value: #{e.message}>")
       end
     end
   end
