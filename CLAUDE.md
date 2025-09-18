@@ -88,3 +88,4 @@ Exclude these directories to prevent IDE slowdowns:
 - `/coverage`, `/tmp`, `/gen-examples`, `/node_package/lib`
 - `/node_modules`, `/spec/dummy/node_modules`, `/spec/dummy/tmp`
 - `/spec/dummy/app/assets/webpack`, `/spec/dummy/log`
+
