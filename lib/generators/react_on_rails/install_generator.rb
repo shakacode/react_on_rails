@@ -383,7 +383,6 @@ module ReactOnRails
         tsconfig_content = {
           "compilerOptions" => {
             "target" => "es2018",
-            "lib" => ["dom", "dom.iterable", "es6"],
             "allowJs" => true,
             "skipLibCheck" => true,
             "esModuleInterop" => true,
