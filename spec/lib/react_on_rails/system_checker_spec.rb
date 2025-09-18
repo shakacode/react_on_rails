@@ -280,4 +280,55 @@ RSpec.describe ReactOnRails::SystemChecker do
       end
     end
   end
+
+  describe "version reporting" do
+    describe "#report_dependency_versions" do
+      let(:package_json) do
+        {
+          "dependencies" => { "react" => "^18.2.0" },
+          "devDependencies" => { "react-dom" => "^18.2.0" }
+        }
+      end
+
+      it "reports React and React DOM versions" do
+        checker.send(:report_dependency_versions, package_json)
+
+        messages = checker.messages
+        expect(messages.any? { |msg| msg[:type] == :info && msg[:content].include?("React version: ^18.2.0") }).to be true
+        expect(messages.any? { |msg| msg[:type] == :info && msg[:content].include?("React DOM version: ^18.2.0") }).to be true
+      end
+    end
+
+    describe "#report_shakapacker_version" do
+      context "when Gemfile.lock exists with shakapacker" do
+        let(:gemfile_lock_content) do
+          <<~LOCK
+            GEM
+              remote: https://rubygems.org/
+              specs:
+                shakapacker (7.1.0)
+                  railties (>= 5.2)
+          LOCK
+        end
+
+        before do
+          allow(File).to receive(:exist?).with("Gemfile.lock").and_return(true)
+          allow(File).to receive(:read).with("Gemfile.lock").and_return(gemfile_lock_content)
+        end
+
+        it "reports shakapacker version" do
+          checker.send(:report_shakapacker_version)
+          expect(checker.messages.any? do |msg|
+            msg[:type] == :info && msg[:content].include?("Shakapacker version: 7.1.0")
+          end).to be true
+        end
+      end
+    end
+
+    describe "#report_webpack_version" do
+      it "can be called without errors" do
+        expect { checker.send(:report_webpack_version) }.not_to raise_error
+      end
+    end
+  end
 end
