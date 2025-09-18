@@ -7,15 +7,9 @@ require_relative "system_checker"
 begin
   require "rainbow"
 rescue LoadError
-  # Fallback if Rainbow is not available
-  class Rainbow
-    def self.method_missing(_method, text)
-      SimpleColorWrapper.new(text)
-    end
-
-    def self.respond_to_missing?(_method, _include_private = false)
-      true
-    end
+  # Fallback if Rainbow is not available - define Kernel-level Rainbow method
+  def Rainbow(text)
+    SimpleColorWrapper.new(text)
   end
 
   class SimpleColorWrapper
@@ -23,11 +17,11 @@ rescue LoadError
       @text = text
     end
 
-    def method_missing(_method, *_args)
+    def method_missing(method, *args)
       self
     end
 
-    def respond_to_missing?(_method, _include_private = false)
+    def respond_to_missing?(method, include_private = false)
       true
     end
 
@@ -366,12 +360,10 @@ module ReactOnRails
       # Test suggestions based on what's available
       test_suggestions = []
       test_suggestions << "bundle exec rspec" if File.exist?("spec")
-      test_suggestions << "npm test" if has_npm_test_script?
-      test_suggestions << "yarn test" if has_yarn_test_script?
+      test_suggestions << "npm test" if npm_test_script?
+      test_suggestions << "yarn test" if yarn_test_script?
 
-      if test_suggestions.any?
-        puts "• Run tests: #{test_suggestions.join(' or ')}"
-      end
+      puts "• Run tests: #{test_suggestions.join(' or ')}" if test_suggestions.any?
 
       # Build suggestions
       if checker.messages.any? { |msg| msg[:content].include?("server bundle") }
@@ -382,7 +374,7 @@ module ReactOnRails
       puts
     end
 
-    def has_npm_test_script?
+    def npm_test_script?
       return false unless File.exist?("package.json")
 
       begin
@@ -394,45 +386,44 @@ module ReactOnRails
       end
     end
 
-    def has_yarn_test_script?
-      has_npm_test_script? && system("which yarn > /dev/null 2>&1")
+    def yarn_test_script?
+      npm_test_script? && system("which yarn > /dev/null 2>&1")
     end
 
     def determine_server_bundle_path
       # Try to use Shakapacker gem API to get configuration
-      begin
-        require "shakapacker"
 
-        # Get the source path relative to Rails root
-        source_path = Shakapacker.config.source_path.to_s
-        source_entry_path = Shakapacker.config.source_entry_path.to_s
-        server_bundle_filename = get_server_bundle_filename
-        rails_root = Dir.pwd
+      require "shakapacker"
 
-        # Convert absolute paths to relative paths
-        if source_path.start_with?("/") && source_path.start_with?(rails_root)
-          source_path = source_path.sub("#{rails_root}/", "")
-        end
+      # Get the source path relative to Rails root
+      source_path = Shakapacker.config.source_path.to_s
+      source_entry_path = Shakapacker.config.source_entry_path.to_s
+      server_bundle_filename = server_bundle_filename
+      rails_root = Dir.pwd
 
-        if source_entry_path.start_with?("/") && source_entry_path.start_with?(rails_root)
-          source_entry_path = source_entry_path.sub("#{rails_root}/", "")
-        end
-
-        # If source_entry_path is already within source_path, just use the relative part
-        if source_entry_path.start_with?(source_path)
-          # Extract just the entry path part (e.g., "packs" from "client/app/packs")
-          source_entry_path = source_entry_path.sub("#{source_path}/", "")
-        end
-
-        File.join(source_path, source_entry_path, server_bundle_filename)
-      rescue LoadError, NameError, StandardError
-        # Fallback to default paths if Shakapacker is not available or configured
-        server_bundle_filename = get_server_bundle_filename
-        "app/javascript/packs/#{server_bundle_filename}"
+      # Convert absolute paths to relative paths
+      if source_path.start_with?("/") && source_path.start_with?(rails_root)
+        source_path = source_path.sub("#{rails_root}/", "")
       end
+
+      if source_entry_path.start_with?("/") && source_entry_path.start_with?(rails_root)
+        source_entry_path = source_entry_path.sub("#{rails_root}/", "")
+      end
+
+      # If source_entry_path is already within source_path, just use the relative part
+      if source_entry_path.start_with?(source_path)
+        # Extract just the entry path part (e.g., "packs" from "client/app/packs")
+        source_entry_path = source_entry_path.sub("#{source_path}/", "")
+      end
+
+      File.join(source_path, source_entry_path, server_bundle_filename)
+    rescue LoadError, NameError, StandardError
+      # Fallback to default paths if Shakapacker is not available or configured
+      server_bundle_filename = get_server_bundle_filename
+      "app/javascript/packs/#{server_bundle_filename}"
     end
 
-    def get_server_bundle_filename
+    def server_bundle_filename
       # Try to read from React on Rails initializer
       initializer_path = "config/initializers/react_on_rails.rb"
       if File.exist?(initializer_path)
