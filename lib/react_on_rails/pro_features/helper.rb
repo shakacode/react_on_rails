@@ -28,7 +28,7 @@ module ReactOnRails
         return component_specification_tag unless render_options.immediate_hydration && support_pro_features?
 
         # Add data attribute
-        component_specification_tag.gsub!(/\<script /, '<script data-immediate-hydration="true" ')
+        component_specification_tag.gsub!("<script ", '<script data-immediate-hydration="true" ')
 
         # Add immediate invocation script
         component_specification_tag.concat(
@@ -43,7 +43,7 @@ module ReactOnRails
         return store_hydration_data unless redux_store_data[:immediate_hydration] && support_pro_features?
 
         # Add data attribute
-        store_hydration_data.gsub!(/\<script /, '<script data-immediate-hydration="true" ')
+        store_hydration_data.gsub!("<script ", '<script data-immediate-hydration="true" ')
 
         # Add immediate invocation script
         store_hydration_data.concat(

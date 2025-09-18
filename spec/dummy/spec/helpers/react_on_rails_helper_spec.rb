@@ -368,7 +368,8 @@ describe ReactOnRailsHelper do
 
     describe "'immediate_hydration' tag option" do
       let(:immediate_hydration_script) do
-        %(typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('App-react-component-0');).html_safe
+        %(typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('App-react-component-0');)
+          .html_safe
       end
 
       context "with 'immediate_hydration' == false" do
