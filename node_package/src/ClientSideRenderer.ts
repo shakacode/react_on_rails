@@ -10,7 +10,7 @@ import { supportsHydrate, supportsRootApi, unmountComponentAtNode } from './reac
 import reactHydrateOrRender from './reactHydrateOrRender.ts';
 import { debugTurbolinks } from './turbolinksUtils.ts';
 import * as StoreRegistry from './StoreRegistry.ts';
-import * as ComponentRegistry from './ComponentRegistry.ts';
+import * as ComponentRegistry from './pro/ComponentRegistry.ts';
 import { onPageLoaded } from './pageLifecycle.ts';
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';

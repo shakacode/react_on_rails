@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react';
 import * as ClientStartup from './clientStartup.ts';
 import { renderOrHydrateComponent, hydrateStore } from './ClientSideRenderer.ts';
-import * as ComponentRegistry from './ComponentRegistry.ts';
+import * as ComponentRegistry from './pro/ComponentRegistry.ts';
 import * as StoreRegistry from './StoreRegistry.ts';
 import buildConsoleReplay from './buildConsoleReplay.ts';
 import createReactOutput from './createReactOutput.ts';

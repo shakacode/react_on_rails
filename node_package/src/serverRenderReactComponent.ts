@@ -1,7 +1,7 @@
 import * as React from 'react';
 import type { ReactElement } from 'react';
 
-import * as ComponentRegistry from './ComponentRegistry.ts';
+import * as ComponentRegistry from './pro/ComponentRegistry.ts';
 import createReactOutput from './createReactOutput.ts';
 import { isPromise, isServerRenderHash } from './isServerRenderResult.ts';
 import buildConsoleReplay from './buildConsoleReplay.ts';
