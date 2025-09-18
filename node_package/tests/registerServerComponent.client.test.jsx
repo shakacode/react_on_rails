@@ -11,8 +11,8 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { createNodeReadableStream, getNodeVersion } from './testUtils.js';
 import ReactOnRails from '../src/ReactOnRails.client.ts';
-import registerServerComponent from '../src/registerServerComponent/client.tsx';
-import { clear as clearComponentRegistry } from '../src/ComponentRegistry.ts';
+import registerServerComponent from '../src/pro/registerServerComponent/client.tsx';
+import { clear as clearComponentRegistry } from '../src/pro/ComponentRegistry.ts';
 
 enableFetchMocks();
 

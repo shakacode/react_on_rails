@@ -6,7 +6,7 @@
 import * as React from 'react';
 import * as createReactClass from 'create-react-class';
 
-import * as ComponentRegistry from '../src/ComponentRegistry.ts';
+import * as ComponentRegistry from '../src/pro/ComponentRegistry.ts';
 
 const onPageLoadedCallbacks = [];
 const onPageUnloadedCallbacks = [];
