@@ -451,7 +451,6 @@ module ReactOnRails
 
     # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
 
-
     def run_stream_inside_fiber
       unless ReactOnRails::Utils.react_on_rails_pro?
         raise ReactOnRails::Error,
@@ -830,3 +829,5 @@ module ReactOnRails
     end
   end
 end
+# rubocop:enable Metrics/ModuleLength
+# rubocop:enable Metrics/MethodLength
