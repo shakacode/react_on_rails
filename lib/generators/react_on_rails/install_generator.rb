@@ -69,6 +69,7 @@ module ReactOnRails
         if options.typescript?
           install_typescript_dependencies
           create_css_module_types
+          create_typescript_config
         end
         invoke "react_on_rails:base", [], { typescript: options.typescript? }
         if options.redux?
@@ -330,80 +331,80 @@ module ReactOnRails
 
         # Fallback to npm if GeneratorHelper fails
         success = run "npm install --save-dev #{typescript_packages.join(' ')}"
-        unless success
-          warning = <<~MSG.strip
-            ⚠️  Failed to install TypeScript dependencies automatically.
+        return if success
 
-            Please run manually:
-                npm install --save-dev #{typescript_packages.join(' ')}
-          MSG
-          GeneratorMessages.add_warning(warning)
-        end
+        warning = <<~MSG.strip
+          ⚠️  Failed to install TypeScript dependencies automatically.
+
+          Please run manually:
+              npm install --save-dev #{typescript_packages.join(' ')}
+        MSG
+        GeneratorMessages.add_warning(warning)
       end
+    end
 
-      def create_css_module_types
-        puts Rainbow("📝 Creating CSS module type definitions...").yellow
+    def create_css_module_types
+      puts Rainbow("📝 Creating CSS module type definitions...").yellow
 
-        # Ensure the types directory exists
-        FileUtils.mkdir_p("app/javascript/types")
+      # Ensure the types directory exists
+      FileUtils.mkdir_p("app/javascript/types")
 
-        css_module_types_content = <<~TS.strip
-          // TypeScript definitions for CSS modules
-          declare module "*.module.css" {
-            const classes: { [key: string]: string };
-            export default classes;
-          }
-
-          declare module "*.module.scss" {
-            const classes: { [key: string]: string };
-            export default classes;
-          }
-
-          declare module "*.module.sass" {
-            const classes: { [key: string]: string };
-            export default classes;
-          }
-        TS
-
-        File.write("app/javascript/types/css-modules.d.ts", css_module_types_content)
-        puts Rainbow("✅ Created CSS module type definitions").green
-      end
-
-      def create_typescript_config
-        tsconfig_content = {
-          "compilerOptions" => {
-            "target" => "es2018",
-            "lib" => ["dom", "dom.iterable", "es6"],
-            "allowJs" => true,
-            "skipLibCheck" => true,
-            "esModuleInterop" => true,
-            "allowSyntheticDefaultImports" => true,
-            "strict" => true,
-            "forceConsistentCasingInFileNames" => true,
-            "noFallthroughCasesInSwitch" => true,
-            "module" => "esnext",
-            "moduleResolution" => "node",
-            "resolveJsonModule" => true,
-            "isolatedModules" => true,
-            "noEmit" => true,
-            "jsx" => "react-jsx"
-          },
-          "include" => [
-            "app/javascript/**/*"
-          ],
-          "exclude" => [
-            "node_modules"
-          ]
+      css_module_types_content = <<~TS.strip
+        // TypeScript definitions for CSS modules
+        declare module "*.module.css" {
+          const classes: { [key: string]: string };
+          export default classes;
         }
 
-        File.write("tsconfig.json", JSON.pretty_generate(tsconfig_content))
-        puts Rainbow("✅ Created tsconfig.json").green
-      end
+        declare module "*.module.scss" {
+          const classes: { [key: string]: string };
+          export default classes;
+        }
 
-      # Removed: Shakapacker auto-installation logic (now explicit dependency)
+        declare module "*.module.sass" {
+          const classes: { [key: string]: string };
+          export default classes;
+        }
+      TS
 
-      # Removed: Shakapacker 8+ is now required as explicit dependency
+      File.write("app/javascript/types/css-modules.d.ts", css_module_types_content)
+      puts Rainbow("✅ Created CSS module type definitions").green
     end
+
+    def create_typescript_config
+      tsconfig_content = {
+        "compilerOptions" => {
+          "target" => "es2018",
+          "lib" => ["dom", "dom.iterable", "es6"],
+          "allowJs" => true,
+          "skipLibCheck" => true,
+          "esModuleInterop" => true,
+          "allowSyntheticDefaultImports" => true,
+          "strict" => true,
+          "forceConsistentCasingInFileNames" => true,
+          "noFallthroughCasesInSwitch" => true,
+          "module" => "esnext",
+          "moduleResolution" => "node",
+          "resolveJsonModule" => true,
+          "isolatedModules" => true,
+          "noEmit" => true,
+          "jsx" => "react-jsx"
+        },
+        "include" => [
+          "app/javascript/**/*"
+        ],
+        "exclude" => [
+          "node_modules"
+        ]
+      }
+
+      File.write("tsconfig.json", JSON.pretty_generate(tsconfig_content))
+      puts Rainbow("✅ Created tsconfig.json").green
+    end
+
+    # Removed: Shakapacker auto-installation logic (now explicit dependency)
+
+    # Removed: Shakapacker 8+ is now required as explicit dependency
     # rubocop:enable Metrics/ClassLength
   end
 end
