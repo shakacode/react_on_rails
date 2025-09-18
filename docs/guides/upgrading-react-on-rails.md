@@ -88,6 +88,7 @@ rails generate react_on_rails:install
 **Symptoms:** Webpack cannot find modules referenced in your configuration
 
 **Solutions:**
+
 1. Clear webpack cache: `rm -rf node_modules/.cache`
 2. Verify all ProvidePlugin modules exist
 3. Check webpack alias configuration

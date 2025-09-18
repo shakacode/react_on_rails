@@ -8,16 +8,16 @@ module ReactOnRails
   module Dev
     class ServerManager
       class << self
-        def start(mode = :development, procfile = nil, verbose: false)
+        def start(mode = :development, procfile = nil, verbose: false, route: nil)
           case mode
           when :production_like
-            run_production_like(_verbose: verbose)
+            run_production_like(_verbose: verbose, route: route)
           when :static
             procfile ||= "Procfile.dev-static-assets"
-            run_static_development(procfile, verbose: verbose)
+            run_static_development(procfile, verbose: verbose, route: route)
           when :development, :hmr
             procfile ||= "Procfile.dev"
-            run_development(procfile, verbose: verbose)
+            run_development(procfile, verbose: verbose, route: route)
           else
             raise ArgumentError, "Unknown mode: #{mode}"
           end
@@ -116,6 +116,46 @@ module ReactOnRails
           puts help_troubleshooting
         end
 
+        def run_from_command_line(args = ARGV)
+          require "optparse"
+
+          options = { route: nil }
+
+          OptionParser.new do |opts|
+            opts.banner = "Usage: dev [command] [options]"
+
+            opts.on("--route ROUTE", "Specify the route to display in URLs (default: root)") do |route|
+              options[:route] = route
+            end
+
+            opts.on("-h", "--help", "Prints this help") do
+              show_help
+              exit
+            end
+          end.parse!(args)
+
+          # Get the command (anything that's not parsed as an option)
+          command = args[0]
+
+          # Main execution
+          case command
+          when "production-assets", "prod"
+            start(:production_like, nil, verbose: false, route: options[:route])
+          when "static"
+            start(:static, "Procfile.dev-static-assets", verbose: false, route: options[:route])
+          when "kill"
+            kill_processes
+          when "help", "--help", "-h"
+            show_help
+          when "hmr", nil
+            start(:development, "Procfile.dev", verbose: false, route: options[:route])
+          else
+            puts "Unknown argument: #{command}"
+            puts "Run 'dev help' for usage information"
+            exit 1
+          end
+        end
+
         private
 
         def help_usage
@@ -172,7 +212,7 @@ module ReactOnRails
             #{Rainbow('•').yellow} #{Rainbow('Source maps for debugging').white}
             #{Rainbow('•').yellow} #{Rainbow('May have Flash of Unstyled Content (FOUC)').white}
             #{Rainbow('•').yellow} #{Rainbow('Fast recompilation').white}
-            #{Rainbow('•').yellow} #{Rainbow('Access at:').white} #{Rainbow('http://localhost:3000/hello_world').cyan.underline}
+            #{Rainbow('•').yellow} #{Rainbow('Access at:').white} #{Rainbow('http://localhost:3000/<route>').cyan.underline}
 
             #{Rainbow('📦 Static development mode').cyan.bold} - #{Rainbow('Procfile.dev-static-assets').green}:
             #{Rainbow('•').yellow} #{Rainbow('No HMR (static assets with auto-recompilation)').white}
@@ -181,7 +221,7 @@ module ReactOnRails
             #{Rainbow('•').yellow} #{Rainbow('CSS extracted to separate files (no FOUC)').white}
             #{Rainbow('•').yellow} #{Rainbow('Development environment (faster builds than production)').white}
             #{Rainbow('•').yellow} #{Rainbow('Source maps for debugging').white}
-            #{Rainbow('•').yellow} #{Rainbow('Access at:').white} #{Rainbow('http://localhost:3000/hello_world').cyan.underline}
+            #{Rainbow('•').yellow} #{Rainbow('Access at:').white} #{Rainbow('http://localhost:3000/<route>').cyan.underline}
 
             #{Rainbow('🏭 Production-assets mode').cyan.bold} - #{Rainbow('Procfile.dev-prod-assets').green}:
             #{Rainbow('•').yellow} #{Rainbow('React on Rails pack generation before Procfile start').white}
@@ -190,15 +230,15 @@ module ReactOnRails
             #{Rainbow('•').yellow} #{Rainbow('Extracted CSS files (no FOUC)').white}
             #{Rainbow('•').yellow} #{Rainbow('No HMR (static assets)').white}
             #{Rainbow('•').yellow} #{Rainbow('Slower recompilation').white}
-            #{Rainbow('•').yellow} #{Rainbow('Access at:').white} #{Rainbow('http://localhost:3001/hello_world').cyan.underline}
+            #{Rainbow('•').yellow} #{Rainbow('Access at:').white} #{Rainbow('http://localhost:3001/<route>').cyan.underline}
           MODES
         end
         # rubocop:enable Metrics/AbcSize
 
-        def run_production_like(_verbose: false)
+        def run_production_like(_verbose: false, route: nil)
           procfile = "Procfile.dev-prod-assets"
 
-          print_procfile_info(procfile)
+          print_procfile_info(procfile, route: route)
           print_server_info(
             "🏭 Starting production-like development server...",
             [
@@ -208,7 +248,8 @@ module ReactOnRails
               "No HMR (Hot Module Replacement)",
               "CSS extracted to separate files (no FOUC)"
             ],
-            3001
+            3001,
+            route: route
           )
 
           # Precompile assets in production mode (includes pack generation automatically)
@@ -221,12 +262,22 @@ module ReactOnRails
             ProcessManager.run_with_process_manager(procfile)
           else
             puts "❌ Asset precompilation failed"
+            puts ""
+            puts "#{Rainbow('💡 Common fixes:').yellow.bold}"
+            puts "#{Rainbow('•').yellow} #{Rainbow('Missing secret_key_base:').white} Run #{Rainbow('bin/rails credentials:edit').cyan}"
+            puts "#{Rainbow('•').yellow} #{Rainbow('Database issues:').white} Run #{Rainbow('bin/rails db:create db:migrate').cyan}"
+            puts "#{Rainbow('•').yellow} #{Rainbow('Missing dependencies:').white} Run #{Rainbow('bundle install && npm install').cyan}"
+            puts "#{Rainbow('•').yellow} #{Rainbow('Webpack errors:').white} Check the error output above for specific issues"
+            puts ""
+            puts "#{Rainbow('ℹ️  For development with production-like assets, try:').blue}"
+            puts "   #{Rainbow('bin/dev static').green}  # Static assets without production optimizations"
+            puts ""
             exit 1
           end
         end
 
-        def run_static_development(procfile, verbose: false)
-          print_procfile_info(procfile)
+        def run_static_development(procfile, verbose: false, route: nil)
+          print_procfile_info(procfile, route: route)
           print_server_info(
             "⚡ Starting development server with static assets...",
             [
@@ -235,7 +286,8 @@ module ReactOnRails
               "CSS extracted to separate files (no FOUC)",
               "Development environment (source maps, faster builds)",
               "Auto-recompiles on file changes"
-            ]
+            ],
+            route: route
           )
 
           PackGenerator.generate(verbose: verbose)
@@ -243,25 +295,27 @@ module ReactOnRails
           ProcessManager.run_with_process_manager(procfile)
         end
 
-        def run_development(procfile, verbose: false)
-          print_procfile_info(procfile)
+        def run_development(procfile, verbose: false, route: nil)
+          print_procfile_info(procfile, route: route)
           PackGenerator.generate(verbose: verbose)
           ProcessManager.ensure_procfile(procfile)
           ProcessManager.run_with_process_manager(procfile)
         end
 
-        def print_server_info(title, features, port = 3000)
+        def print_server_info(title, features, port = 3000, route: nil)
           puts title
           features.each { |feature| puts "   - #{feature}" }
           puts ""
           puts ""
-          puts "💡 Access at: #{Rainbow("http://localhost:#{port}/hello_world").cyan.underline}"
+          url = route ? "http://localhost:#{port}/#{route}" : "http://localhost:#{port}"
+          puts "💡 Access at: #{Rainbow(url).cyan.underline}"
           puts ""
         end
 
-        def print_procfile_info(procfile)
+        def print_procfile_info(procfile, route: nil)
           port = procfile_port(procfile)
           box_width = 60
+          url = route ? "http://localhost:#{port}/#{route}" : "http://localhost:#{port}"
 
           puts ""
           puts box_border(box_width)
@@ -269,7 +323,7 @@ module ReactOnRails
           puts format_box_line("📋 Using Procfile: #{procfile}", box_width)
           puts format_box_line("🔧 Customize this file for your app's needs", box_width)
           puts box_empty_line(box_width)
-          puts format_box_line("💡 Access at: #{Rainbow("http://localhost:#{port}/hello_world").cyan.underline}",
+          puts format_box_line("💡 Access at: #{Rainbow(url).cyan.underline}",
                                box_width)
           puts box_empty_line(box_width)
           puts box_bottom(box_width)

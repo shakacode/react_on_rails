@@ -175,7 +175,7 @@ module ReactOnRails
       end
 
       msg = <<~MSG
-        ReactOnRails: Your current version of #{ReactOnRails::PackerUtils.packer_type.upcase_first} \
+        ReactOnRails: Your current version of shakapacker \
         does not support async script loading,  which may cause performance issues. Please either:
         1. Use :sync or :defer loading strategy instead of :async
         2. Upgrade to Shakapacker v8.2.0 or above to enable async script loading
@@ -284,8 +284,10 @@ module ReactOnRails
       if ReactOnRails::PackerUtils.using_packer?
         packer_public_output_path = ReactOnRails::PackerUtils.packer_public_output_path
         # rubocop:disable Layout/LineLength
+        packer_name = ReactOnRails::PackerUtils.packer_type&.upcase_first
+
         Rails.logger.warn "Error configuring config/initializers/react_on_rails. Define neither the generated_assets_dirs nor " \
-                          "the generated_assets_dir when using #{ReactOnRails::PackerUtils.packer_type.upcase_first}. This is defined by " \
+                          "the generated_assets_dir when using #{packer_name}. This is defined by " \
                           "public_output_path specified in #{ReactOnRails::PackerUtils.packer_type}.yml = #{packer_public_output_path}."
         # rubocop:enable Layout/LineLength
         return
@@ -331,15 +333,17 @@ module ReactOnRails
     end
 
     def compile_command_conflict_message
+      packer_name = ReactOnRails::PackerUtils.packer_type&.upcase_first
+      packer_type = ReactOnRails::PackerUtils.packer_type
       <<~MSG
 
-        React on Rails and #{ReactOnRails::PackerUtils.packer_type.upcase_first} error in configuration!
+        React on Rails and #{packer_name} error in configuration!
         In order to use config/react_on_rails.rb config.build_production_command,
-        you must edit config/#{ReactOnRails::PackerUtils.packer_type}.yml to include this value in the default configuration:
-        '#{ReactOnRails::PackerUtils.packer_type}_precompile: false'
+        you must edit config/#{packer_type}.yml to include this value in the default configuration:
+        '#{packer_type}_precompile: false'
 
         Alternatively, remove the config/react_on_rails.rb config.build_production_command and the
-        default bin/#{ReactOnRails::PackerUtils.packer_type} script will be used for assets:precompile.
+        default bin/#{packer_type} script will be used for assets:precompile.
 
       MSG
     end

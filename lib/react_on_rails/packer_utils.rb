@@ -3,20 +3,11 @@
 module ReactOnRails
   module PackerUtils
     def self.using_packer?
-      using_shakapacker_const?
-    end
-
-    def self.using_shakapacker_const?
-      return @using_shakapacker_const if defined?(@using_shakapacker_const)
-
-      @using_shakapacker_const = ReactOnRails::Utils.gem_available?("shakapacker") &&
-                                 shakapacker_version_requirement_met?("8.2.0")
+      true
     end
 
     def self.packer_type
-      return "shakapacker" if using_shakapacker_const?
-
-      nil
+      "shakapacker"
     end
 
     def self.packer
@@ -93,9 +84,7 @@ module ReactOnRails
     end
 
     def self.precompile?
-      return ::Shakapacker.config.shakapacker_precompile? if using_shakapacker_const?
-
-      false
+      ::Shakapacker.config.shakapacker_precompile?
     end
 
     def self.packer_source_path
