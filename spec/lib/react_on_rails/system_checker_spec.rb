@@ -192,6 +192,70 @@ RSpec.describe ReactOnRails::SystemChecker do
     end
   end
 
+  describe "#check_version_patterns" do
+    it "warns about caret version patterns" do
+      checker.send(:check_version_patterns, "^16.0.0", "16.0.0")
+      expect(checker.warnings?).to be true
+      expect(checker.messages.last[:content]).to include("caret (^) version pattern")
+    end
+
+    it "warns about tilde version patterns" do
+      checker.send(:check_version_patterns, "~16.0.0", "16.0.0")
+      expect(checker.warnings?).to be true
+      expect(checker.messages.last[:content]).to include("tilde (~) version pattern")
+    end
+
+    it "does not warn about exact versions" do
+      initial_message_count = checker.messages.count
+      checker.send(:check_version_patterns, "16.0.0", "16.0.0")
+      expect(checker.messages.count).to eq(initial_message_count)
+    end
+  end
+
+  describe "#check_gemfile_version_patterns" do
+    context "when Gemfile has version patterns" do
+      let(:gemfile_content) do
+        <<~GEMFILE
+          gem 'rails', '~> 7.0'
+          gem 'react_on_rails', '~> 16.0'
+          gem 'other_gem'
+        GEMFILE
+      end
+
+      before do
+        allow(File).to receive(:exist?).with("Gemfile").and_return(true)
+        allow(File).to receive(:read).with("Gemfile").and_return(gemfile_content)
+        stub_const("ReactOnRails::VERSION", "16.0.0")
+      end
+
+      it "warns about tilde version patterns" do
+        checker.send(:check_gemfile_version_patterns)
+        expect(checker.warnings?).to be true
+        expect(checker.messages.last[:content]).to include("Gemfile uses version pattern")
+      end
+    end
+
+    context "when Gemfile has exact versions" do
+      let(:gemfile_content) do
+        <<~GEMFILE
+          gem 'rails', '7.0.0'
+          gem 'react_on_rails', '16.0.0'
+        GEMFILE
+      end
+
+      before do
+        allow(File).to receive(:exist?).with("Gemfile").and_return(true)
+        allow(File).to receive(:read).with("Gemfile").and_return(gemfile_content)
+      end
+
+      it "does not warn about exact versions" do
+        initial_message_count = checker.messages.count
+        checker.send(:check_gemfile_version_patterns)
+        expect(checker.messages.count).to eq(initial_message_count)
+      end
+    end
+  end
+
   describe "#check_react_on_rails_npm_package" do
     context "when package.json exists with react-on-rails" do
       let(:package_json_content) do
