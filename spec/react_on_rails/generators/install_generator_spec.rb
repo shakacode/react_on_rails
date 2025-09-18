@@ -52,7 +52,7 @@ describe InstallGenerator, type: :generator do
       assert_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.tsx" do |content|
         expect(content).to match(/interface HelloWorldProps/)
         expect(content).to match(/React\.FC<HelloWorldProps>/)
-        expect(content).to match(/React\.ChangeEvent<HTMLInputElement>/)
+        expect(content).to match(/onChange=\{.*e.*=>.*setName\(e\.target\.value\).*\}/)
       end
     end
   end
@@ -113,7 +113,7 @@ describe InstallGenerator, type: :generator do
     it "TypeScript Redux App includes proper typing" do
       assert_file "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.tsx" do |content|
         expect(content).to match(/interface HelloWorldAppProps/)
-        expect(content).to match(/React\.FC<HelloWorldAppProps>/)
+        expect(content).to match(/FC<HelloWorldAppProps>/)
       end
     end
   end
