@@ -392,7 +392,7 @@ module ReactOnRails
             "forceConsistentCasingInFileNames" => true,
             "noFallthroughCasesInSwitch" => true,
             "module" => "esnext",
-            "moduleResolution" => "node",
+            "moduleResolution" => "bundler",
             "resolveJsonModule" => true,
             "isolatedModules" => true,
             "noEmit" => true,
