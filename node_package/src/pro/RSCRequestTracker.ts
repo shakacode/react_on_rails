@@ -1,10 +1,10 @@
 import { PassThrough, Readable } from 'stream';
-import { extractErrorMessage } from './utils.ts';
+import { extractErrorMessage } from '../utils.ts';
 import {
   RSCPayloadStreamInfo,
   RSCPayloadCallback,
   RailsContextWithServerComponentMetadata,
-} from './types/index.ts';
+} from '../types/index.ts';
 
 /**
  * Global function provided by React on Rails Pro for generating RSC payloads.

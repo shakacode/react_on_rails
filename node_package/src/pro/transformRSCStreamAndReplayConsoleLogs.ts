@@ -1,4 +1,4 @@
-import { RSCPayloadChunk } from './types/index.ts';
+import { RSCPayloadChunk } from '../types/index.ts';
 
 /**
  * Transforms an RSC stream and replays console logs on the client.
