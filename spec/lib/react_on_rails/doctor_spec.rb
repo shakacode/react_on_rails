@@ -25,13 +25,10 @@ RSpec.describe ReactOnRails::Doctor do
 
       # Mock file system interactions
       allow(File).to receive_messages(exist?: false, directory?: false)
-      allow(doctor).to receive(:`).and_return("")
 
       # Mock the new server bundle path methods
-      allow(doctor).to receive(:determine_server_bundle_path).and_return("app/javascript/packs/server-bundle.js")
-      allow(doctor).to receive(:get_server_bundle_filename).and_return("server-bundle.js")
-      allow(doctor).to receive(:has_npm_test_script?).and_return(false)
-      allow(doctor).to receive(:has_yarn_test_script?).and_return(false)
+      allow(doctor).to receive_messages("`": "", determine_server_bundle_path: "app/javascript/packs/server-bundle.js",
+                                        get_server_bundle_filename: "server-bundle.js", has_npm_test_script?: false, has_yarn_test_script?: false)
 
       # Mock the checker to avoid actual system calls
       checker = instance_double(ReactOnRails::SystemChecker)
@@ -120,7 +117,9 @@ RSpec.describe ReactOnRails::Doctor do
 
       context "when Shakapacker gem returns nested absolute paths" do
         let(:rails_root) { "/Users/test/myapp" }
-        let(:shakapacker_config) { double(source_path: "#{rails_root}/client/app", source_entry_path: "#{rails_root}/client/app/packs") }
+        let(:shakapacker_config) do
+          double(source_path: "#{rails_root}/client/app", source_entry_path: "#{rails_root}/client/app/packs")
+        end
 
         before do
           shakapacker_module = double("Shakapacker", config: shakapacker_config)

@@ -358,8 +358,12 @@ RSpec.describe ReactOnRails::SystemChecker do
         checker.send(:report_dependency_versions, package_json)
 
         messages = checker.messages
-        expect(messages.any? { |msg| msg[:type] == :info && msg[:content].include?("React version: ^18.2.0") }).to be true
-        expect(messages.any? { |msg| msg[:type] == :info && msg[:content].include?("React DOM version: ^18.2.0") }).to be true
+        expect(messages.any? do |msg|
+                 msg[:type] == :info && msg[:content].include?("React version: ^18.2.0")
+               end).to be true
+        expect(messages.any? do |msg|
+                 msg[:type] == :info && msg[:content].include?("React DOM version: ^18.2.0")
+               end).to be true
       end
     end
 

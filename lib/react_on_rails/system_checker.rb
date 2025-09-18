@@ -255,7 +255,6 @@ module ReactOnRails
       end
     end
 
-
     # Webpack configuration validation
     def check_webpack_configuration
       webpack_config_path = "config/webpack/webpack.config.js"
@@ -290,7 +289,6 @@ module ReactOnRails
         add_info("ℹ️  Custom webpack config detected - ensure React on Rails compatibility")
       end
     end
-
 
     private
 
@@ -378,15 +376,15 @@ module ReactOnRails
 
     def check_version_patterns(npm_version, gem_version)
       # Check for version range patterns in package.json
-      if npm_version.match(/^[\^~]/)
-        pattern_type = npm_version[0] == '^' ? 'caret (^)' : 'tilde (~)'
-        add_warning(<<~MSG.strip)
-          ⚠️  NPM package uses #{pattern_type} version pattern: #{npm_version}
+      return unless /^[\^~]/.match?(npm_version)
 
-          While versions match, consider using exact version "#{gem_version}" in package.json
-          for guaranteed compatibility with the React on Rails gem.
-        MSG
-      end
+      pattern_type = npm_version[0] == "^" ? "caret (^)" : "tilde (~)"
+      add_warning(<<~MSG.strip)
+        ⚠️  NPM package uses #{pattern_type} version pattern: #{npm_version}
+
+        While versions match, consider using exact version "#{gem_version}" in package.json
+        for guaranteed compatibility with the React on Rails gem.
+      MSG
     end
 
     def check_gemfile_version_patterns
@@ -400,14 +398,14 @@ module ReactOnRails
         return unless react_on_rails_line
 
         # Check for version patterns in Gemfile
-        if react_on_rails_line.match(/['"][~^]/)
+        if /['"][~]/.match?(react_on_rails_line)
           add_warning(<<~MSG.strip)
             ⚠️  Gemfile uses version pattern for react_on_rails gem.
 
             Consider using exact version in Gemfile for guaranteed compatibility:
             gem 'react_on_rails', '#{ReactOnRails::VERSION}'
           MSG
-        elsif react_on_rails_line.match(/['>]=/)
+        elsif />=\s*/.match?(react_on_rails_line)
           add_warning(<<~MSG.strip)
             ⚠️  Gemfile uses version range (>=) for react_on_rails gem.
 
@@ -430,9 +428,7 @@ module ReactOnRails
 
       version_deps.each do |dep, name|
         version = all_deps[dep]
-        if version
-          add_info("📦 #{name} version: #{version}")
-        end
+        add_info("📦 #{name} version: #{version}") if version
       end
     end
 
@@ -460,11 +456,11 @@ module ReactOnRails
         all_deps = package_json["dependencies"]&.merge(package_json["devDependencies"] || {}) || {}
 
         webpack_version = all_deps["webpack"]
-        if webpack_version
-          add_info("📦 Webpack version: #{webpack_version}")
-        end
-      rescue JSON::ParserError, StandardError
-        # Ignore errors in parsing package.json
+        add_info("📦 Webpack version: #{webpack_version}") if webpack_version
+      rescue JSON::ParserError
+        # Handle JSON parsing errors
+      rescue StandardError
+        # Handle other file/access errors
       end
     end
   end
