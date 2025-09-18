@@ -254,22 +254,59 @@ module ReactOnRails
 
           # Precompile assets in production mode (includes pack generation automatically)
           puts "🔨 Precompiling assets..."
-          success = system "RAILS_ENV=production NODE_ENV=production bundle exec rails assets:precompile"
 
-          if success
+          # Capture both stdout and stderr
+          require "open3"
+          stdout, stderr, status = Open3.capture3("RAILS_ENV=production NODE_ENV=production bundle exec rails assets:precompile")
+
+          if status.success?
             puts "✅ Assets precompiled successfully"
             ProcessManager.ensure_procfile(procfile)
             ProcessManager.run_with_process_manager(procfile)
           else
             puts "❌ Asset precompilation failed"
             puts ""
+
+            # Display the actual error output
+            unless stderr.empty?
+              puts "#{Rainbow('🚨 Error Output:').red.bold}"
+              puts stderr
+              puts ""
+            end
+
+            unless stdout.empty? && stdout.strip != stderr.strip
+              puts "#{Rainbow('📋 Command Output:').yellow.bold}"
+              puts stdout
+              puts ""
+            end
+
             puts "#{Rainbow('💡 Common fixes:').yellow.bold}"
-            puts "#{Rainbow('•').yellow} #{Rainbow('Missing secret_key_base:').white} Run #{Rainbow('bin/rails credentials:edit').cyan}"
-            puts "#{Rainbow('•').yellow} #{Rainbow('Database issues:').white} Run #{Rainbow('bin/rails db:create db:migrate').cyan}"
-            puts "#{Rainbow('•').yellow} #{Rainbow('Missing dependencies:').white} Run #{Rainbow('bundle install && npm install').cyan}"
-            puts "#{Rainbow('•').yellow} #{Rainbow('Webpack errors:').white} Check the error output above for specific issues"
+
+            # Provide specific guidance based on error content
+            error_content = "#{stderr} #{stdout}".downcase
+
+            if error_content.include?("secret_key_base")
+              puts "#{Rainbow('•').yellow} #{Rainbow('Missing secret_key_base:').white.bold} Run #{Rainbow('bin/rails credentials:edit').cyan}"
+            end
+
+            if error_content.include?("database") || error_content.include?("relation") || error_content.include?("table")
+              puts "#{Rainbow('•').yellow} #{Rainbow('Database issues:').white.bold} Run #{Rainbow('bin/rails db:create db:migrate').cyan}"
+            end
+
+            if error_content.include?("gem") || error_content.include?("bundle") || error_content.include?("load error")
+              puts "#{Rainbow('•').yellow} #{Rainbow('Missing dependencies:').white.bold} Run #{Rainbow('bundle install && npm install').cyan}"
+            end
+
+            if error_content.include?("webpack") || error_content.include?("module") || error_content.include?("compilation")
+              puts "#{Rainbow('•').yellow} #{Rainbow('Webpack compilation:').white.bold} Check JavaScript/webpack errors above"
+            end
+
+            # Always show these general options
+            puts "#{Rainbow('•').yellow} #{Rainbow('General debugging:').white} Run with #{Rainbow('--trace').cyan} for full stack trace"
+            puts "#{Rainbow('•').yellow} #{Rainbow('Environment issues:').white} Check #{Rainbow('config/environments/production.rb').cyan}"
+
             puts ""
-            puts "#{Rainbow('ℹ️  For development with production-like assets, try:').blue}"
+            puts "#{Rainbow('ℹ️  Alternative for development:').blue}"
             puts "   #{Rainbow('bin/dev static').green}  # Static assets without production optimizations"
             puts ""
             exit 1
