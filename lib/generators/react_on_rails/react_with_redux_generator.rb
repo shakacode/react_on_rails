@@ -28,18 +28,18 @@ module ReactOnRails
 
       def copy_base_files
         base_js_path = "redux/base"
-        extension = options.typescript? ? "tsx" : "jsx"
+        ext = component_extension(options)
 
         # Copy Redux-connected component to auto-registration structure
-        copy_file("#{base_js_path}/app/javascript/bundles/HelloWorld/startup/HelloWorldApp.client.#{extension}",
-                  "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.#{extension}")
-        copy_file("#{base_js_path}/app/javascript/bundles/HelloWorld/startup/HelloWorldApp.server.#{extension}",
-                  "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.server.#{extension}")
+        copy_file("#{base_js_path}/app/javascript/bundles/HelloWorld/startup/HelloWorldApp.client.#{ext}",
+                  "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.#{ext}")
+        copy_file("#{base_js_path}/app/javascript/bundles/HelloWorld/startup/HelloWorldApp.server.#{ext}",
+                  "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.server.#{ext}")
         copy_file("#{base_js_path}/app/javascript/bundles/HelloWorld/components/HelloWorld.module.css",
                   "app/javascript/src/HelloWorldApp/components/HelloWorld.module.css")
 
         # Update import paths in client component
-        ror_client_file = "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.#{extension}"
+        ror_client_file = "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.#{ext}"
         gsub_file(ror_client_file, "../store/helloWorldStore", "../store/helloWorldStore")
         gsub_file(ror_client_file, "../containers/HelloWorldContainer",
                   "../containers/HelloWorldContainer")
@@ -47,22 +47,18 @@ module ReactOnRails
 
       def copy_base_redux_files
         base_hello_world_path = "redux/base/app/javascript/bundles/HelloWorld"
-        component_extension = options.typescript? ? "tsx" : "jsx"
         redux_extension = options.typescript? ? "ts" : "js"
 
         # Copy Redux infrastructure files with appropriate extension
-        %w[actions/helloWorldActionCreators
-           containers/HelloWorldContainer
-           constants/helloWorldConstants
-           reducers/helloWorldReducer
-           store/helloWorldStore].each do |file|
-             copy_file("#{base_hello_world_path}/#{file}.#{redux_extension}",
-                       "app/javascript/src/HelloWorldApp/#{file}.#{redux_extension}")
+        %W[actions/helloWorldActionCreators.#{redux_extension}
+           containers/HelloWorldContainer.#{redux_extension}
+           constants/helloWorldConstants.#{redux_extension}
+           reducers/helloWorldReducer.#{redux_extension}
+           store/helloWorldStore.#{redux_extension}
+           components/HelloWorld.#{component_extension(options)}].each do |file|
+             copy_file("#{base_hello_world_path}/#{file}",
+                       "app/javascript/src/HelloWorldApp/#{file}")
            end
-
-        # Copy component file with appropriate extension
-        copy_file("#{base_hello_world_path}/components/HelloWorld.#{component_extension}",
-                  "app/javascript/src/HelloWorldApp/components/HelloWorld.#{component_extension}")
       end
 
       def create_appropriate_templates

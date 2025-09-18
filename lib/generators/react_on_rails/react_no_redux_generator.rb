@@ -18,12 +18,11 @@ module ReactOnRails
 
       def copy_base_files
         base_js_path = "base/base"
-        extension = options.typescript? ? "tsx" : "jsx"
 
         # Determine which component files to copy based on TypeScript option
         component_files = [
-          "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.#{extension}",
-          "app/javascript/src/HelloWorld/ror_components/HelloWorld.server.#{extension}",
+          "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.#{component_extension(options)}",
+          "app/javascript/src/HelloWorld/ror_components/HelloWorld.server.#{component_extension(options)}",
           "app/javascript/src/HelloWorld/ror_components/HelloWorld.module.css"
         ]
 

@@ -91,4 +91,8 @@ module GeneratorHelper
   def add_documentation_reference(message, source)
     "#{message} \n#{source}"
   end
+
+  def component_extension(options)
+    options.typescript? ? "tsx" : "jsx"
+  end
 end
