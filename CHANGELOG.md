@@ -27,7 +27,7 @@ Changes since the last non-beta release.
 
 **🔧 Generator Improvements**
 
-- **Modern TypeScript patterns**: Generators now produce more idiomatic TypeScript code with improved type inference instead of explicit type annotations
+- **Modern TypeScript patterns**: Generators now produce more idiomatic TypeScript code with improved type inference instead of explicit type annotations [PR 1786](https://github.com/shakacode/react_on_rails/pull/1786) by [justin808](https://github.com/justin808)
 - **Optimized tsconfig.json**: Updated compiler options to use `"moduleResolution": "bundler"` for better bundler compatibility
 - **Enhanced Redux TypeScript integration**: Improved type safety and modern React patterns (useMemo, type-only imports)
 - **Smart bin/dev defaults**: Generated `bin/dev` script now automatically navigates to `/hello_world` route for immediate component visibility
