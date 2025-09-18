@@ -1,4 +1,4 @@
-import CallbackRegistry from './CallbackRegistry.ts';
+import CallbackRegistry from './pro/CallbackRegistry.ts';
 import type { Store, StoreGenerator } from './types/index.ts';
 
 const storeGeneratorRegistry = new CallbackRegistry<StoreGenerator>('store generator');

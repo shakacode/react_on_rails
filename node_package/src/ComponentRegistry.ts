@@ -1,6 +1,6 @@
 import { type RegisteredComponent, type ReactComponentOrRenderFunction } from './types/index.ts';
 import isRenderFunction from './isRenderFunction.ts';
-import CallbackRegistry from './CallbackRegistry.ts';
+import CallbackRegistry from './pro/CallbackRegistry.ts';
 
 const componentRegistry = new CallbackRegistry<RegisteredComponent>('component');
 
