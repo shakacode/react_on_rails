@@ -16,7 +16,7 @@ This guide provides structured instructions for AI coding agents working with Re
 ### Version Compatibility Matrix
 
 | react_on_rails | Shakapacker | Webpack | Node.js | Ruby |
-|----------------|-------------|---------|---------|------|
+| -------------- | ----------- | ------- | ------- | ---- |
 | v16.x          | >= 6.0      | v5      | 20-22   | 3.2+ |
 | v14.x          | >= 6.0      | v5      | 18-20   | 2.7+ |
 | v13.x          | >= 6.0      | v5      | 16-18   | 2.7+ |
@@ -206,12 +206,14 @@ fix_webpack_cache() {
 #### 1. Missing Routes File (js-routes gem)
 
 **Detection:**
+
 ```regex
 /Cannot read properties of undefined.*reading 'module'/
 /ProvidedDependencyTemplate\.apply/
 ```
 
 **Auto-fix:**
+
 ```bash
 bundle exec rails js:export
 ```
@@ -219,12 +221,14 @@ bundle exec rails js:export
 #### 2. ProvidePlugin Module Missing
 
 **Detection:**
+
 ```regex
 /Error: Can't resolve.*\$app/
 /Module not found.*utils\/routes/
 ```
 
 **Auto-fix:**
+
 ```bash
 # Check if file exists, generate if missing
 [ -f "app/javascript/utils/routes.js" ] || bundle exec rails js:export
@@ -236,12 +240,14 @@ grep -q "\$app" config/webpack/*.js || echo "⚠️  Missing webpack alias"
 #### 3. Version Incompatibility
 
 **Detection:**
+
 ```regex
 /webpack.*incompatible/
 /peer dep.*react-on-rails/
 ```
 
 **Auto-fix:**
+
 ```bash
 # Update to compatible versions
 npm install react-on-rails@^16.0.0
@@ -370,6 +376,7 @@ After successful upgrades, suggest:
 ### If Build Completely Breaks
 
 1. **Rollback immediately:**
+
    ```bash
    git checkout HEAD~1 -- Gemfile package.json Gemfile.lock package-lock.json
    bundle install
@@ -377,11 +384,13 @@ After successful upgrades, suggest:
    ```
 
 2. **Identify the issue:**
+
    ```bash
    npm run build 2>&1 | tee build-error.log
    ```
 
 3. **Apply targeted fixes:**
+
    - Missing routes: `rails js:export`
    - Cache issues: `rm -rf node_modules/.cache tmp/cache`
    - Dependencies: `bundle update && npm install`
@@ -391,6 +400,7 @@ After successful upgrades, suggest:
 ### If Rails Environment Unavailable
 
 Use minimal commands:
+
 ```bash
 # Skip database operations
 DATABASE_URL=sqlite3:tmp/minimal.db rails js:export

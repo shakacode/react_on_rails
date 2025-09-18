@@ -68,7 +68,7 @@ module ReactOnRails
         require_relative "generator_messages"
         GeneratorMessages.output.clear
         GeneratorMessages.add_info(
-          GeneratorMessages.helpful_message_after_installation(component_name: "HelloWorldApp")
+          GeneratorMessages.helpful_message_after_installation(component_name: "HelloWorldApp", route: "hello_world")
         )
       end
     end

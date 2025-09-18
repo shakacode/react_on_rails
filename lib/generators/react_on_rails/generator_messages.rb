@@ -38,7 +38,7 @@ module GeneratorMessages
       @output = []
     end
 
-    def helpful_message_after_installation(component_name: "HelloWorld")
+    def helpful_message_after_installation(component_name: "HelloWorld", route: "hello_world")
       process_manager_section = build_process_manager_section
       testing_section = build_testing_section
       package_manager = detect_package_manager
@@ -62,7 +62,7 @@ module GeneratorMessages
            ./bin/dev prod         # Production-like mode for testing
            ./bin/dev help         # See all available options
 
-        3. Visit: #{Rainbow('http://localhost:3000/hello_world').cyan.underline}
+        3. Visit: #{Rainbow(route ? "http://localhost:3000/#{route}" : 'http://localhost:3000').cyan.underline}
         ✨ KEY FEATURES:
         ─────────────────────────────────────────────────────────────────────────
         • Auto-registration enabled - Your layout only needs:

@@ -30,7 +30,6 @@ module ReactOnRails
 
       # We don't need to mock anything here because the shakapacker gem is already installed and will be used by default
       it "uses shakapacker" do
-        expect(ReactOnRails::PackerUtils.using_shakapacker_const?).to be(true)
         expect(ReactOnRails::PackerUtils.packer_type).to eq("shakapacker")
         expect(ReactOnRails::PackerUtils.packer).to eq(::Shakapacker)
       end

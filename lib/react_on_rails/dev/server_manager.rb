@@ -8,16 +8,16 @@ module ReactOnRails
   module Dev
     class ServerManager
       class << self
-        def start(mode = :development, procfile = nil, verbose: false)
+        def start(mode = :development, procfile = nil, verbose: false, route: nil, rails_env: nil)
           case mode
           when :production_like
-            run_production_like(_verbose: verbose)
+            run_production_like(_verbose: verbose, route: route, rails_env: rails_env)
           when :static
             procfile ||= "Procfile.dev-static-assets"
-            run_static_development(procfile, verbose: verbose)
+            run_static_development(procfile, verbose: verbose, route: route)
           when :development, :hmr
             procfile ||= "Procfile.dev"
-            run_development(procfile, verbose: verbose)
+            run_development(procfile, verbose: verbose, route: route)
           else
             raise ArgumentError, "Unknown mode: #{mode}"
           end
@@ -116,6 +116,50 @@ module ReactOnRails
           puts help_troubleshooting
         end
 
+        def run_from_command_line(args = ARGV)
+          require "optparse"
+
+          options = { route: nil, rails_env: nil }
+
+          OptionParser.new do |opts|
+            opts.banner = "Usage: dev [command] [options]"
+
+            opts.on("--route ROUTE", "Specify the route to display in URLs (default: root)") do |route|
+              options[:route] = route
+            end
+
+            opts.on("--rails-env ENV", "Override RAILS_ENV for assets:precompile step only (prod mode only)") do |env|
+              options[:rails_env] = env
+            end
+
+            opts.on("-h", "--help", "Prints this help") do
+              show_help
+              exit
+            end
+          end.parse!(args)
+
+          # Get the command (anything that's not parsed as an option)
+          command = args[0]
+
+          # Main execution
+          case command
+          when "production-assets", "prod"
+            start(:production_like, nil, verbose: false, route: options[:route], rails_env: options[:rails_env])
+          when "static"
+            start(:static, "Procfile.dev-static-assets", verbose: false, route: options[:route])
+          when "kill"
+            kill_processes
+          when "help", "--help", "-h"
+            show_help
+          when "hmr", nil
+            start(:development, "Procfile.dev", verbose: false, route: options[:route])
+          else
+            puts "Unknown argument: #{command}"
+            puts "Run 'dev help' for usage information"
+            exit 1
+          end
+        end
+
         private
 
         def help_usage
@@ -142,12 +186,21 @@ module ReactOnRails
         end
         # rubocop:enable Metrics/AbcSize
 
+        # rubocop:disable Metrics/AbcSize
         def help_options
           <<~OPTIONS
             #{Rainbow('⚙️  OPTIONS:').cyan.bold}
-              #{Rainbow('--verbose, -v').green.bold}       #{Rainbow('Enable verbose output for pack generation').white}
+              #{Rainbow('--route ROUTE').green.bold}        #{Rainbow('Specify route to display in URLs (default: root)').white}
+              #{Rainbow('--rails-env ENV').green.bold}      #{Rainbow('Override RAILS_ENV for assets:precompile step only (prod mode only)').white}
+              #{Rainbow('--verbose, -v').green.bold}        #{Rainbow('Enable verbose output for pack generation').white}
+
+            #{Rainbow('📝 EXAMPLES:').cyan.bold}
+              #{Rainbow('bin/dev prod').green.bold}                    #{Rainbow('# NODE_ENV=production, RAILS_ENV=development').white}
+              #{Rainbow('bin/dev prod --rails-env=production').green.bold}  #{Rainbow('# NODE_ENV=production, RAILS_ENV=production').white}
+              #{Rainbow('bin/dev prod --route=dashboard').green.bold}       #{Rainbow('# Custom route in URLs').white}
           OPTIONS
         end
+        # rubocop:enable Metrics/AbcSize
 
         def help_customization
           <<~CUSTOMIZATION
@@ -172,7 +225,7 @@ module ReactOnRails
             #{Rainbow('•').yellow} #{Rainbow('Source maps for debugging').white}
             #{Rainbow('•').yellow} #{Rainbow('May have Flash of Unstyled Content (FOUC)').white}
             #{Rainbow('•').yellow} #{Rainbow('Fast recompilation').white}
-            #{Rainbow('•').yellow} #{Rainbow('Access at:').white} #{Rainbow('http://localhost:3000/hello_world').cyan.underline}
+            #{Rainbow('•').yellow} #{Rainbow('Access at:').white} #{Rainbow('http://localhost:3000/<route>').cyan.underline}
 
             #{Rainbow('📦 Static development mode').cyan.bold} - #{Rainbow('Procfile.dev-static-assets').green}:
             #{Rainbow('•').yellow} #{Rainbow('No HMR (static assets with auto-recompilation)').white}
@@ -181,24 +234,26 @@ module ReactOnRails
             #{Rainbow('•').yellow} #{Rainbow('CSS extracted to separate files (no FOUC)').white}
             #{Rainbow('•').yellow} #{Rainbow('Development environment (faster builds than production)').white}
             #{Rainbow('•').yellow} #{Rainbow('Source maps for debugging').white}
-            #{Rainbow('•').yellow} #{Rainbow('Access at:').white} #{Rainbow('http://localhost:3000/hello_world').cyan.underline}
+            #{Rainbow('•').yellow} #{Rainbow('Access at:').white} #{Rainbow('http://localhost:3000/<route>').cyan.underline}
 
             #{Rainbow('🏭 Production-assets mode').cyan.bold} - #{Rainbow('Procfile.dev-prod-assets').green}:
             #{Rainbow('•').yellow} #{Rainbow('React on Rails pack generation before Procfile start').white}
-            #{Rainbow('•').yellow} #{Rainbow('Asset precompilation with production optimizations').white}
-            #{Rainbow('•').yellow} #{Rainbow('Optimized, minified bundles').white}
-            #{Rainbow('•').yellow} #{Rainbow('Extracted CSS files (no FOUC)').white}
+            #{Rainbow('•').yellow} #{Rainbow('Asset precompilation with NODE_ENV=production (webpack optimizations)').white}
+            #{Rainbow('•').yellow} #{Rainbow('RAILS_ENV=development by default for assets:precompile (avoids credentials)').white}
+            #{Rainbow('•').yellow} #{Rainbow('Use --rails-env=production for assets:precompile only (not server processes)').white}
+            #{Rainbow('•').yellow} #{Rainbow('Server processes controlled by Procfile.dev-prod-assets environment').white}
+            #{Rainbow('•').yellow} #{Rainbow('Optimized, minified bundles with CSS extraction').white}
             #{Rainbow('•').yellow} #{Rainbow('No HMR (static assets)').white}
-            #{Rainbow('•').yellow} #{Rainbow('Slower recompilation').white}
-            #{Rainbow('•').yellow} #{Rainbow('Access at:').white} #{Rainbow('http://localhost:3001/hello_world').cyan.underline}
+            #{Rainbow('•').yellow} #{Rainbow('Access at:').white} #{Rainbow('http://localhost:3001/<route>').cyan.underline}
           MODES
         end
         # rubocop:enable Metrics/AbcSize
 
-        def run_production_like(_verbose: false)
+        # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+        def run_production_like(_verbose: false, route: nil, rails_env: nil)
           procfile = "Procfile.dev-prod-assets"
 
-          print_procfile_info(procfile)
+          print_procfile_info(procfile, route: route)
           print_server_info(
             "🏭 Starting production-like development server...",
             [
@@ -208,25 +263,124 @@ module ReactOnRails
               "No HMR (Hot Module Replacement)",
               "CSS extracted to separate files (no FOUC)"
             ],
-            3001
+            3001,
+            route: route
           )
 
-          # Precompile assets in production mode (includes pack generation automatically)
-          puts "🔨 Precompiling assets..."
-          success = system "RAILS_ENV=production NODE_ENV=production bundle exec rails assets:precompile"
+          # Precompile assets with production webpack optimizations (includes pack generation automatically)
+          env = { "NODE_ENV" => "production" }
 
-          if success
+          # Validate and sanitize rails_env to prevent shell injection
+          if rails_env
+            unless rails_env.match?(/\A[a-z0-9_]+\z/i)
+              puts "❌ Invalid rails_env: '#{rails_env}'. Must contain only letters, numbers, and underscores."
+              exit 1
+            end
+            env["RAILS_ENV"] = rails_env
+          end
+
+          argv = ["bundle", "exec", "rails", "assets:precompile"]
+
+          puts "🔨 Precompiling assets with production webpack optimizations..."
+          puts ""
+
+          puts Rainbow("ℹ️  Asset Precompilation Environment:").blue
+          puts "   • NODE_ENV=production → Webpack optimizations (minification, compression)"
+          if rails_env
+            puts "   • RAILS_ENV=#{rails_env} → Custom Rails environment for assets:precompile only"
+            puts "   • Note: RAILS_ENV=production requires credentials, database setup, etc."
+            puts "   • Server processes will use environment from Procfile.dev-prod-assets"
+          else
+            puts "   • RAILS_ENV=development → Simpler Rails setup (no credentials needed)"
+            puts "   • Use --rails-env=production for assets:precompile step only"
+            puts "   • Server processes will use environment from Procfile.dev-prod-assets"
+            puts "   • Gets production webpack bundles without production Rails complexity"
+          end
+          puts ""
+
+          env_display = env.map { |k, v| "#{k}=#{v}" }.join(" ")
+          puts "#{Rainbow('💻 Running:').blue} #{env_display} #{argv.join(' ')}"
+          puts ""
+
+          # Capture both stdout and stderr
+          require "open3"
+          stdout, stderr, status = Open3.capture3(env, *argv)
+
+          if status.success?
             puts "✅ Assets precompiled successfully"
             ProcessManager.ensure_procfile(procfile)
             ProcessManager.run_with_process_manager(procfile)
           else
             puts "❌ Asset precompilation failed"
+            puts ""
+
+            # Combine and display all output
+            all_output = []
+            all_output << stdout unless stdout.empty?
+            all_output << stderr unless stderr.empty?
+
+            unless all_output.empty?
+              puts Rainbow("📋 Full Command Output:").red.bold
+              puts Rainbow("─" * 60).red
+              all_output.each { |output| puts output }
+              puts Rainbow("─" * 60).red
+              puts ""
+            end
+
+            puts Rainbow("🛠️  To debug this issue:").yellow.bold
+            command_display = "#{env_display} #{argv.join(' ')}"
+            puts "#{Rainbow('1.').cyan} #{Rainbow('Run the command separately to see detailed output:').white}"
+            puts "   #{Rainbow(command_display).cyan}"
+            puts ""
+            puts "#{Rainbow('2.').cyan} #{Rainbow('Add --trace for full stack trace:').white}"
+            puts "   #{Rainbow("#{command_display} --trace").cyan}"
+            puts ""
+            puts "#{Rainbow('3.').cyan} #{Rainbow('Or try with development webpack (faster, less optimized):').white}"
+            puts "   #{Rainbow('NODE_ENV=development bundle exec rails assets:precompile').cyan}"
+            puts ""
+
+            puts Rainbow("💡 Common fixes:").yellow.bold
+
+            # Provide specific guidance based on error content
+            error_content = "#{stderr} #{stdout}".downcase
+
+            if error_content.include?("secret_key_base")
+              puts "#{Rainbow('•').yellow} #{Rainbow('Missing secret_key_base:').white.bold} " \
+                   "Run #{Rainbow('bin/rails credentials:edit').cyan}"
+            end
+
+            if error_content.include?("database") || error_content.include?("relation") ||
+               error_content.include?("table")
+              puts "#{Rainbow('•').yellow} #{Rainbow('Database issues:').white.bold} " \
+                   "Run #{Rainbow('bin/rails db:create db:migrate').cyan}"
+            end
+
+            if error_content.include?("gem") || error_content.include?("bundle") || error_content.include?("load error")
+              puts "#{Rainbow('•').yellow} #{Rainbow('Missing dependencies:').white.bold} " \
+                   "Run #{Rainbow('bundle install && npm install').cyan}"
+            end
+
+            if error_content.include?("webpack") || error_content.include?("module") ||
+               error_content.include?("compilation")
+              puts "#{Rainbow('•').yellow} #{Rainbow('Webpack compilation:').white.bold} " \
+                   "Check JavaScript/webpack errors above"
+            end
+
+            # Always show these general options
+            puts "#{Rainbow('•').yellow} #{Rainbow('Environment config:').white} " \
+                 "Check #{Rainbow('config/environments/production.rb').cyan}"
+
+            puts ""
+            puts Rainbow("ℹ️  Alternative for development:").blue
+            puts "   #{Rainbow('bin/dev static').green}  # Static assets without production optimizations"
+            puts ""
             exit 1
           end
         end
+        # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 
-        def run_static_development(procfile, verbose: false)
-          print_procfile_info(procfile)
+        def run_static_development(procfile, verbose: false, route: nil)
+          print_procfile_info(procfile, route: route)
           print_server_info(
             "⚡ Starting development server with static assets...",
             [
@@ -235,7 +389,8 @@ module ReactOnRails
               "CSS extracted to separate files (no FOUC)",
               "Development environment (source maps, faster builds)",
               "Auto-recompiles on file changes"
-            ]
+            ],
+            route: route
           )
 
           PackGenerator.generate(verbose: verbose)
@@ -243,25 +398,27 @@ module ReactOnRails
           ProcessManager.run_with_process_manager(procfile)
         end
 
-        def run_development(procfile, verbose: false)
-          print_procfile_info(procfile)
+        def run_development(procfile, verbose: false, route: nil)
+          print_procfile_info(procfile, route: route)
           PackGenerator.generate(verbose: verbose)
           ProcessManager.ensure_procfile(procfile)
           ProcessManager.run_with_process_manager(procfile)
         end
 
-        def print_server_info(title, features, port = 3000)
+        def print_server_info(title, features, port = 3000, route: nil)
           puts title
           features.each { |feature| puts "   - #{feature}" }
           puts ""
           puts ""
-          puts "💡 Access at: #{Rainbow("http://localhost:#{port}/hello_world").cyan.underline}"
+          url = route ? "http://localhost:#{port}/#{route}" : "http://localhost:#{port}"
+          puts "💡 Access at: #{Rainbow(url).cyan.underline}"
           puts ""
         end
 
-        def print_procfile_info(procfile)
+        def print_procfile_info(procfile, route: nil)
           port = procfile_port(procfile)
           box_width = 60
+          url = route ? "http://localhost:#{port}/#{route}" : "http://localhost:#{port}"
 
           puts ""
           puts box_border(box_width)
@@ -269,7 +426,7 @@ module ReactOnRails
           puts format_box_line("📋 Using Procfile: #{procfile}", box_width)
           puts format_box_line("🔧 Customize this file for your app's needs", box_width)
           puts box_empty_line(box_width)
-          puts format_box_line("💡 Access at: #{Rainbow("http://localhost:#{port}/hello_world").cyan.underline}",
+          puts format_box_line("💡 Access at: #{Rainbow(url).cyan.underline}",
                                box_width)
           puts box_empty_line(box_width)
           puts box_bottom(box_width)

@@ -28,19 +28,4 @@ rescue LoadError
 end
 
 # Main execution
-case ARGV[0]
-when "production-assets", "prod"
-  ReactOnRails::Dev::ServerManager.start(:production_like)
-when "static"
-  ReactOnRails::Dev::ServerManager.start(:static, "Procfile.dev-static-assets")
-when "kill"
-  ReactOnRails::Dev::ServerManager.kill_processes
-when "help", "--help", "-h"
-  ReactOnRails::Dev::ServerManager.show_help
-when "hmr", nil
-  ReactOnRails::Dev::ServerManager.start(:development, "Procfile.dev")
-else
-  puts "Unknown argument: #{ARGV[0]}"
-  puts "Run 'bin/dev help' for usage information"
-  exit 1
-end
+ReactOnRails::Dev::ServerManager.run_from_command_line(ARGV)

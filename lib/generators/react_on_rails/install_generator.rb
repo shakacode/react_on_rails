@@ -136,11 +136,13 @@ module ReactOnRails
       end
 
       def add_bin_scripts
-        directory "#{__dir__}/bin", "bin"
+        # Copy bin scripts from templates
+        template_bin_path = "#{__dir__}/templates/base/base/bin"
+        directory template_bin_path, "bin"
 
         # Make these and only these files executable
         files_to_copy = []
-        Dir.chdir("#{__dir__}/bin") do
+        Dir.chdir(template_bin_path) do
           files_to_copy.concat(Dir.glob("*"))
         end
         files_to_become_executable = files_to_copy.map { |filename| "bin/#{filename}" }
@@ -149,7 +151,14 @@ module ReactOnRails
       end
 
       def add_post_install_message
-        GeneratorMessages.add_info(GeneratorMessages.helpful_message_after_installation)
+        # Determine what route will be created by the generator
+        route = "hello_world" # This is the hardcoded route from base_generator.rb
+        component_name = options.redux? ? "HelloWorldApp" : "HelloWorld"
+
+        GeneratorMessages.add_info(GeneratorMessages.helpful_message_after_installation(
+                                     component_name: component_name,
+                                     route: route
+                                   ))
       end
 
       def shakapacker_loaded_in_process?(gem_name)
