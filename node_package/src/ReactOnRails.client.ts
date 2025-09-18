@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import * as ClientStartup from './clientStartup.ts';
-import { renderOrHydrateComponent, hydrateStore } from './ClientSideRenderer.ts';
+import { renderOrHydrateComponent, hydrateStore } from './pro/ClientSideRenderer.ts';
 import * as ComponentRegistry from './pro/ComponentRegistry.ts';
 import * as StoreRegistry from './pro/StoreRegistry.ts';
 import buildConsoleReplay from './buildConsoleReplay.ts';
