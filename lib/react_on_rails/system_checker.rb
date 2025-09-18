@@ -387,6 +387,7 @@ module ReactOnRails
       MSG
     end
 
+    # rubocop:disable Metrics/CyclomaticComplexity
     def check_gemfile_version_patterns
       gemfile_path = ENV["BUNDLE_GEMFILE"] || "Gemfile"
       return unless File.exist?(gemfile_path)
@@ -417,6 +418,7 @@ module ReactOnRails
         # Ignore errors reading Gemfile
       end
     end
+    # rubocop:enable Metrics/CyclomaticComplexity
 
     def report_dependency_versions(package_json)
       all_deps = package_json["dependencies"]&.merge(package_json["devDependencies"] || {}) || {}

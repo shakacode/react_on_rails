@@ -28,7 +28,7 @@ RSpec.describe ReactOnRails::Doctor do
 
       # Mock the new server bundle path methods
       allow(doctor).to receive_messages("`": "", determine_server_bundle_path: "app/javascript/packs/server-bundle.js",
-                                        get_server_bundle_filename: "server-bundle.js", has_npm_test_script?: false, has_yarn_test_script?: false)
+                                        server_bundle_filename: "server-bundle.js", npm_test_script?: false, yarn_test_script?: false)
 
       # Mock the checker to avoid actual system calls
       checker = instance_double(ReactOnRails::SystemChecker)
