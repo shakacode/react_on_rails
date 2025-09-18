@@ -400,9 +400,6 @@ module ReactOnRails
           },
           "include" => [
             "app/javascript/**/*"
-          ],
-          "exclude" => [
-            "node_modules"
           ]
         }
 
