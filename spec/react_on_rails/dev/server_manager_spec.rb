@@ -54,13 +54,34 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     end
 
     it "starts production-like mode" do
-      command = "NODE_ENV=production bundle exec rails assets:precompile"
+      env = { "NODE_ENV" => "production" }
+      argv = ["bundle", "exec", "rails", "assets:precompile"]
       status_double = instance_double(Process::Status, success?: true)
-      expect(Open3).to receive(:capture3).with(command).and_return(["output", "", status_double])
+      expect(Open3).to receive(:capture3).with(env, *argv).and_return(["output", "", status_double])
       expect(ReactOnRails::Dev::ProcessManager).to receive(:ensure_procfile).with("Procfile.dev-prod-assets")
       expect(ReactOnRails::Dev::ProcessManager).to receive(:run_with_process_manager).with("Procfile.dev-prod-assets")
 
       described_class.start(:production_like)
+    end
+
+    it "starts production-like mode with custom rails_env" do
+      env = { "NODE_ENV" => "production", "RAILS_ENV" => "staging" }
+      argv = ["bundle", "exec", "rails", "assets:precompile"]
+      status_double = instance_double(Process::Status, success?: true)
+      expect(Open3).to receive(:capture3).with(env, *argv).and_return(["output", "", status_double])
+      expect(ReactOnRails::Dev::ProcessManager).to receive(:ensure_procfile).with("Procfile.dev-prod-assets")
+      expect(ReactOnRails::Dev::ProcessManager).to receive(:run_with_process_manager).with("Procfile.dev-prod-assets")
+
+      described_class.start(:production_like, nil, verbose: false, rails_env: "staging")
+    end
+
+    it "rejects invalid rails_env with shell injection characters" do
+      expect_any_instance_of(Kernel).to receive(:exit).with(1)
+      allow_any_instance_of(Kernel).to receive(:puts) # Allow other puts calls
+      error_pattern = /Invalid rails_env.*Must contain only letters, numbers, and underscores/
+      expect_any_instance_of(Kernel).to receive(:puts).with(error_pattern)
+
+      described_class.start(:production_like, nil, verbose: false, rails_env: "production; rm -rf /")
     end
 
     it "raises error for unknown mode" do

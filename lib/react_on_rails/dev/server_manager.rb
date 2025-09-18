@@ -268,9 +268,18 @@ module ReactOnRails
           )
 
           # Precompile assets with production webpack optimizations (includes pack generation automatically)
-          env_vars = ["NODE_ENV=production"]
-          env_vars << "RAILS_ENV=#{rails_env}" if rails_env
-          command = "#{env_vars.join(' ')} bundle exec rails assets:precompile"
+          env = { "NODE_ENV" => "production" }
+
+          # Validate and sanitize rails_env to prevent shell injection
+          if rails_env
+            unless rails_env.match?(/\A[a-z0-9_]+\z/i)
+              puts "❌ Invalid rails_env: '#{rails_env}'. Must contain only letters, numbers, and underscores."
+              exit 1
+            end
+            env["RAILS_ENV"] = rails_env
+          end
+
+          argv = ["bundle", "exec", "rails", "assets:precompile"]
 
           puts "🔨 Precompiling assets with production webpack optimizations..."
           puts ""
@@ -288,12 +297,14 @@ module ReactOnRails
             puts "   • Gets production webpack bundles without production Rails complexity"
           end
           puts ""
-          puts "#{Rainbow('💻 Running:').blue} #{command}"
+
+          env_display = env.map { |k, v| "#{k}=#{v}" }.join(" ")
+          puts "#{Rainbow('💻 Running:').blue} #{env_display} #{argv.join(' ')}"
           puts ""
 
           # Capture both stdout and stderr
           require "open3"
-          stdout, stderr, status = Open3.capture3(command)
+          stdout, stderr, status = Open3.capture3(env, *argv)
 
           if status.success?
             puts "✅ Assets precompiled successfully"
@@ -317,11 +328,12 @@ module ReactOnRails
             end
 
             puts Rainbow("🛠️  To debug this issue:").yellow.bold
+            command_display = "#{env_display} #{argv.join(' ')}"
             puts "#{Rainbow('1.').cyan} #{Rainbow('Run the command separately to see detailed output:').white}"
-            puts "   #{Rainbow(command).cyan}"
+            puts "   #{Rainbow(command_display).cyan}"
             puts ""
             puts "#{Rainbow('2.').cyan} #{Rainbow('Add --trace for full stack trace:').white}"
-            puts "   #{Rainbow("#{command} --trace").cyan}"
+            puts "   #{Rainbow("#{command_display} --trace").cyan}"
             puts ""
             puts "#{Rainbow('3.').cyan} #{Rainbow('Or try with development webpack (faster, less optimized):').white}"
             puts "   #{Rainbow('NODE_ENV=development bundle exec rails assets:precompile').cyan}"
