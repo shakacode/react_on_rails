@@ -55,7 +55,8 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
     it "starts production-like mode" do
       command = "NODE_ENV=production bundle exec rails assets:precompile"
-      expect(Open3).to receive(:capture3).with(command).and_return(["output", "", double(success?: true)])
+      status_double = instance_double(Process::Status, success?: true)
+      expect(Open3).to receive(:capture3).with(command).and_return(["output", "", status_double])
       expect(ReactOnRails::Dev::ProcessManager).to receive(:ensure_procfile).with("Procfile.dev-prod-assets")
       expect(ReactOnRails::Dev::ProcessManager).to receive(:run_with_process_manager).with("Procfile.dev-prod-assets")
 
