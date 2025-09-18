@@ -247,31 +247,18 @@ module ReactOnRails
     end
 
     def determine_server_bundle_path
-      # Try to read Shakapacker configuration
-      shakapacker_config = read_shakapacker_config
-      if shakapacker_config
-        source_path = shakapacker_config["source_path"] || "app/javascript"
-        source_entry_path = shakapacker_config["source_entry_path"] || "packs"
+      # Try to use Shakapacker gem API to get configuration
+      begin
+        require "shakapacker"
+        source_path = Shakapacker.config.source_path
+        source_entry_path = Shakapacker.config.source_entry_path
         server_bundle_filename = get_server_bundle_filename
 
         File.join(source_path, source_entry_path, server_bundle_filename)
-      else
-        # Fallback to default paths
+      rescue LoadError, NameError, StandardError
+        # Fallback to default paths if Shakapacker is not available or configured
         server_bundle_filename = get_server_bundle_filename
         "app/javascript/packs/#{server_bundle_filename}"
-      end
-    end
-
-    def read_shakapacker_config
-      config_path = "config/shakapacker.yml"
-      return nil unless File.exist?(config_path)
-
-      begin
-        require "yaml"
-        config = YAML.load_file(config_path)
-        config["default"] || config
-      rescue StandardError
-        nil
       end
     end
 
