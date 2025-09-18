@@ -29,7 +29,6 @@ RSpec.describe ReactOnRails::Doctor do
 
       # Mock the new server bundle path methods
       allow(doctor).to receive(:determine_server_bundle_path).and_return("app/javascript/packs/server-bundle.js")
-      allow(doctor).to receive(:read_shakapacker_config).and_return(nil)
       allow(doctor).to receive(:get_server_bundle_filename).and_return("server-bundle.js")
 
       # Mock the checker to avoid actual system calls
@@ -83,28 +82,25 @@ RSpec.describe ReactOnRails::Doctor do
     let(:doctor) { described_class.new }
 
     describe "#determine_server_bundle_path" do
-      context "when shakapacker.yml exists" do
-        let(:shakapacker_config) do
-          {
-            "source_path" => "client/app",
-            "source_entry_path" => "packs"
-          }
-        end
+      context "when Shakapacker gem is available" do
+        let(:shakapacker_config) { double(source_path: "client/app", source_entry_path: "packs") }
 
         before do
-          allow(doctor).to receive(:read_shakapacker_config).and_return(shakapacker_config)
+          shakapacker_module = double("Shakapacker", config: shakapacker_config)
+          stub_const("Shakapacker", shakapacker_module)
+          allow(doctor).to receive(:require).with("shakapacker").and_return(true)
           allow(doctor).to receive(:get_server_bundle_filename).and_return("server-bundle.js")
         end
 
-        it "uses shakapacker configuration" do
+        it "uses Shakapacker API configuration" do
           path = doctor.send(:determine_server_bundle_path)
           expect(path).to eq("client/app/packs/server-bundle.js")
         end
       end
 
-      context "when shakapacker.yml does not exist" do
+      context "when Shakapacker gem is not available" do
         before do
-          allow(doctor).to receive(:read_shakapacker_config).and_return(nil)
+          allow(doctor).to receive(:require).with("shakapacker").and_raise(LoadError)
           allow(doctor).to receive(:get_server_bundle_filename).and_return("server-bundle.js")
         end
 
