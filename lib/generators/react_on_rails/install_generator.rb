@@ -339,7 +339,7 @@ module ReactOnRails
         return if add_npm_dependencies(typescript_packages, dev: true)
 
         # Fallback to npm if GeneratorHelper fails
-        success = run "npm install --save-dev #{typescript_packages.join(' ')}"
+        success = system("npm", "install", "--save-dev", *typescript_packages)
         return if success
 
         warning = <<~MSG.strip

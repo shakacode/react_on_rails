@@ -92,12 +92,12 @@ module ReactOnRails
       private
 
       def install_packages_with_fallback(packages, dev:, package_manager:)
-        packages_str = packages.join(" ")
-        install_command = build_install_command(package_manager, dev, packages_str)
+        install_args = build_install_args(package_manager, dev, packages)
 
-        success = system(install_command)
+        success = system(*install_args)
         return if success
 
+        install_command = install_args.join(" ")
         warning = <<~MSG.strip
           ⚠️  Failed to install Redux dependencies automatically.
 
@@ -107,22 +107,30 @@ module ReactOnRails
         GeneratorMessages.add_warning(warning)
       end
 
-      def build_install_command(package_manager, dev, packages_str)
+      def build_install_args(package_manager, dev, packages)
         # Security: Validate package manager to prevent command injection
         allowed_package_managers = %w[npm yarn pnpm bun].freeze
         unless allowed_package_managers.include?(package_manager)
           raise ArgumentError, "Invalid package manager: #{package_manager}"
         end
 
-        commands = {
-          "npm" => { dev: "npm install --save-dev", prod: "npm install" },
-          "yarn" => { dev: "yarn add --dev", prod: "yarn add" },
-          "pnpm" => { dev: "pnpm add --save-dev", prod: "pnpm add" },
-          "bun" => { dev: "bun add --dev", prod: "bun add" }
+        base_commands = {
+          "npm" => %w[npm install],
+          "yarn" => %w[yarn add],
+          "pnpm" => %w[pnpm add],
+          "bun" => %w[bun add]
         }
 
-        command_type = dev ? :dev : :prod
-        "#{commands[package_manager][command_type]} #{packages_str}"
+        base_args = base_commands[package_manager].dup
+        base_args << dev_flag_for(package_manager) if dev
+        base_args + packages
+      end
+
+      def dev_flag_for(package_manager)
+        case package_manager
+        when "npm", "pnpm" then "--save-dev"
+        when "yarn", "bun" then "--dev"
+        end
       end
 
       def add_redux_specific_messages
