@@ -60,7 +60,7 @@ Changes since the last non-beta release.
 
 #### Added
 
-- **`react_on_rails:doctor` generator**: New diagnostic command to validate React on Rails setup and identify configuration issues. Provides comprehensive checks for environment prerequisites, dependencies, Rails integration, and Webpack configuration. Use `rails generate react_on_rails:doctor` to diagnose your setup, with optional `--verbose` flag for detailed output.
+- **`react_on_rails:doctor` rake task**: New diagnostic command to validate React on Rails setup and identify configuration issues. Provides comprehensive checks for environment prerequisites, dependencies, Rails integration, and Webpack configuration. Use `rake react_on_rails:doctor` to diagnose your setup, with optional `VERBOSE=true` for detailed output.
 
 ### [16.0.0] - 2025-09-16
 

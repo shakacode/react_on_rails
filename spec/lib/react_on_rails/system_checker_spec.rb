@@ -1,10 +1,8 @@
 # frozen_string_literal: true
 
-require_relative "../../../react_on_rails/spec_helper"
-require_relative "../../../../lib/generators/react_on_rails/system_checker"
-
-# rubocop:disable RSpec/FilePath, RSpec/SpecFilePathFormat
-RSpec.describe ReactOnRails::Generators::SystemChecker do
+require_relative "../../react_on_rails/spec_helper"
+require_relative "../../../lib/react_on_rails/system_checker"
+RSpec.describe ReactOnRails::SystemChecker do
   let(:checker) { described_class.new }
 
   describe "#initialize" do
@@ -283,4 +281,3 @@ RSpec.describe ReactOnRails::Generators::SystemChecker do
     end
   end
 end
-# rubocop:enable RSpec/FilePath, RSpec/SpecFilePathFormat
