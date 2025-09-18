@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'open3'
+
 module ReactOnRails
   # SystemChecker provides validation methods for React on Rails setup
   # Used by install generator and doctor rake task
@@ -56,8 +58,14 @@ module ReactOnRails
     end
 
     def check_node_version
-      node_version = `node --version 2>/dev/null`.strip
-      return if node_version.empty?
+      stdout, stderr, status = Open3.capture3('node', '--version')
+
+      # Use stdout if available, fallback to stderr if stdout is empty
+      node_version = stdout.strip
+      node_version = stderr.strip if node_version.empty?
+
+      # Return early if node is not found (non-zero status) or no output
+      return if !status.success? || node_version.empty?
 
       # Extract major version number (e.g., "v18.17.0" -> 18)
       major_version = node_version[/v(\d+)/, 1]&.to_i
