@@ -26,7 +26,7 @@ You may need to check [the instructions for installing into an existing Rails ap
    Please use [the latest version](https://rubygems.org/gems/react_on_rails) to ensure you get all the security patches and the best support.
 
    ```bash
-   bundle add react_on_rails --version=14.0.4 --strict
+   bundle add react_on_rails --version=16.0.0 --strict
    ```
 
    Commit this to git (or else you cannot run the generator in the next step unless you pass the option `--ignore-warnings`).

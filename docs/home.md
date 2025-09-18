@@ -13,7 +13,8 @@
 ## Changes and Upgrades
 
 1. [CHANGELOG.md](https://github.com/shakacode/react_on_rails/tree/master/CHANGELOG.md)
-2. [Upgrading React on Rails](./guides/upgrading-react-on-rails.md#upgrading-to-v12).
+2. [Upgrading React on Rails](./guides/upgrading-react-on-rails.md)
+3. [Troubleshooting Build Errors](./javascript/troubleshooting-build-errors.md)
 
 ## Example Apps
 

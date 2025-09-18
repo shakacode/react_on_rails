@@ -81,6 +81,19 @@ rails generate react_on_rails:install
    bundle exec rspec # or your test command
    ```
 
+### Common Upgrade Issues
+
+#### Build Fails with Module Resolution Errors
+
+**Symptoms:** Webpack cannot find modules referenced in your configuration
+
+**Solutions:**
+1. Clear webpack cache: `rm -rf node_modules/.cache`
+2. Verify all ProvidePlugin modules exist
+3. Check webpack alias configuration
+
+For troubleshooting build errors, see the [build errors guide](../javascript/troubleshooting-build-errors.md).
+
 ### Enhanced Features in v16
 
 - **Enhanced error handling** in `react_on_rails:generate_packs` task with detailed debugging guidance
