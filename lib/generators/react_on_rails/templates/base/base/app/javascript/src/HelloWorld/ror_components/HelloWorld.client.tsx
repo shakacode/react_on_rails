@@ -19,7 +19,7 @@ const HelloWorld: React.FC<HelloWorldProps> = (props) => {
             id="name"
             type="text"
             value={name}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)}
+            onChange={e => setName(e.target.value)}
           />
         </label>
       </form>
