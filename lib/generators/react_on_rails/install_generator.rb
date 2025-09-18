@@ -379,6 +379,7 @@ module ReactOnRails
             "esModuleInterop" => true,
             "allowSyntheticDefaultImports" => true,
             "strict" => true,
+            "noUncheckedIndexedAccess" => true,
             "forceConsistentCasingInFileNames" => true,
             "noFallthroughCasesInSwitch" => true,
             "module" => "esnext",
