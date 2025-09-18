@@ -18,14 +18,19 @@
 # 3. Extend ReactOnRails::Dev classes in your Rails app for advanced customization
 # 4. Use classes directly: ReactOnRails::Dev::ServerManager.start(:development, "Custom.procfile")
 
-begin
-  require "bundler/setup"
-  require "react_on_rails/dev"
-rescue LoadError
-  # Fallback for when gem is not yet installed
-  puts "Loading ReactOnRails development tools..."
-  require_relative "../../lib/react_on_rails/dev"
-end
+require "bundler/setup"
+require "react_on_rails/dev"
+
+# Default route configuration
+# This is set by the ReactOnRails installer to point to your generated component.
+# Change this to your preferred default route, or pass --route=<route> to override.
+DEFAULT_ROUTE = "hello_world"
 
 # Main execution
-ReactOnRails::Dev::ServerManager.run_from_command_line(ARGV)
+# Add the default route to ARGV if no --route option is provided
+argv_with_defaults = ARGV.dup
+unless argv_with_defaults.any? { |arg| arg.start_with?("--route") }
+  argv_with_defaults.push("--route", DEFAULT_ROUTE)
+end
+
+ReactOnRails::Dev::ServerManager.run_from_command_line(argv_with_defaults)
