@@ -6,7 +6,7 @@ interface HelloWorldProps {
 }
 
 const HelloWorld: React.FC<HelloWorldProps> = (props) => {
-  const [name, setName] = useState<string>(props.name);
+  const [name, setName] = useState(props.name);
 
   return (
     <div>
