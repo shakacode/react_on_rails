@@ -56,7 +56,7 @@ module ReactOnRails
       print_header
       run_all_checks
       print_summary
-      print_recommendations if @checker.errors? || @checker.warnings?
+      print_recommendations if should_show_recommendations?
 
       exit_with_status
     end
@@ -239,20 +239,91 @@ module ReactOnRails
         puts
       end
 
+      print_next_steps
+    end
+
+    def should_show_recommendations?
+      # Only show recommendations if there are actual issues or actionable improvements
+      checker.errors? || checker.warnings?
+    end
+
+    def print_next_steps
       puts Rainbow("Next Steps:").blue.bold
-      puts "• Run tests to verify everything works: bundle exec rspec"
-      puts "• Start development server: ./bin/dev (if using Procfile.dev)"
-      puts "• Check React on Rails documentation: https://github.com/shakacode/react_on_rails"
+
+      if checker.errors?
+        puts "• Fix critical errors above before proceeding"
+        puts "• Run doctor again to verify fixes: rake react_on_rails:doctor"
+      elsif checker.warnings?
+        puts "• Address warnings above for optimal setup"
+        puts "• Run doctor again to verify improvements: rake react_on_rails:doctor"
+      else
+        puts "• Your setup is healthy! Consider these development workflow steps:"
+      end
+
+      # Contextual suggestions based on what exists
+      if File.exist?("Procfile.dev")
+        puts "• Start development with: ./bin/dev"
+      else
+        puts "• Start Rails server: bin/rails server"
+        puts "• Start webpack dev server: bin/shakapacker-dev-server (in separate terminal)"
+      end
+
+      # Test suggestions based on what's available
+      test_suggestions = []
+      test_suggestions << "bundle exec rspec" if File.exist?("spec")
+      test_suggestions << "npm test" if has_npm_test_script?
+      test_suggestions << "yarn test" if has_yarn_test_script?
+
+      if test_suggestions.any?
+        puts "• Run tests: #{test_suggestions.join(' or ')}"
+      end
+
+      # Build suggestions
+      if checker.messages.any? { |msg| msg[:content].include?("server bundle") }
+        puts "• Build assets: bin/shakapacker or npm run build"
+      end
+
+      puts "• Documentation: https://github.com/shakacode/react_on_rails"
       puts
+    end
+
+    def has_npm_test_script?
+      return false unless File.exist?("package.json")
+
+      begin
+        package_json = JSON.parse(File.read("package.json"))
+        test_script = package_json.dig("scripts", "test")
+        test_script && !test_script.empty?
+      rescue StandardError
+        false
+      end
+    end
+
+    def has_yarn_test_script?
+      has_npm_test_script? && system("which yarn > /dev/null 2>&1")
     end
 
     def determine_server_bundle_path
       # Try to use Shakapacker gem API to get configuration
       begin
         require "shakapacker"
-        source_path = Shakapacker.config.source_path
-        source_entry_path = Shakapacker.config.source_entry_path
+
+        # Get the source path relative to Rails root
+        source_path = Shakapacker.config.source_path.to_s
+        source_entry_path = Shakapacker.config.source_entry_path.to_s
         server_bundle_filename = get_server_bundle_filename
+
+        # If source_path is absolute, make it relative to current directory
+        if source_path.start_with?("/")
+          # Convert absolute path to relative by removing the Rails root
+          rails_root = Dir.pwd
+          if source_path.start_with?(rails_root)
+            source_path = source_path.sub("#{rails_root}/", "")
+          else
+            # If it's not under Rails root, just use the basename
+            source_path = File.basename(source_path)
+          end
+        end
 
         File.join(source_path, source_entry_path, server_bundle_filename)
       rescue LoadError, NameError, StandardError

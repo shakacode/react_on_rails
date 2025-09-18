@@ -30,6 +30,8 @@ RSpec.describe ReactOnRails::Doctor do
       # Mock the new server bundle path methods
       allow(doctor).to receive(:determine_server_bundle_path).and_return("app/javascript/packs/server-bundle.js")
       allow(doctor).to receive(:get_server_bundle_filename).and_return("server-bundle.js")
+      allow(doctor).to receive(:has_npm_test_script?).and_return(false)
+      allow(doctor).to receive(:has_yarn_test_script?).and_return(false)
 
       # Mock the checker to avoid actual system calls
       checker = instance_double(ReactOnRails::SystemChecker)
@@ -82,7 +84,7 @@ RSpec.describe ReactOnRails::Doctor do
     let(:doctor) { described_class.new }
 
     describe "#determine_server_bundle_path" do
-      context "when Shakapacker gem is available" do
+      context "when Shakapacker gem is available with relative paths" do
         let(:shakapacker_config) { double(source_path: "client/app", source_entry_path: "packs") }
 
         before do
@@ -92,7 +94,25 @@ RSpec.describe ReactOnRails::Doctor do
           allow(doctor).to receive(:get_server_bundle_filename).and_return("server-bundle.js")
         end
 
-        it "uses Shakapacker API configuration" do
+        it "uses Shakapacker API configuration with relative paths" do
+          path = doctor.send(:determine_server_bundle_path)
+          expect(path).to eq("client/app/packs/server-bundle.js")
+        end
+      end
+
+      context "when Shakapacker gem is available with absolute paths" do
+        let(:rails_root) { "/Users/test/myapp" }
+        let(:shakapacker_config) { double(source_path: "#{rails_root}/client/app", source_entry_path: "packs") }
+
+        before do
+          shakapacker_module = double("Shakapacker", config: shakapacker_config)
+          stub_const("Shakapacker", shakapacker_module)
+          allow(doctor).to receive(:require).with("shakapacker").and_return(true)
+          allow(doctor).to receive(:get_server_bundle_filename).and_return("server-bundle.js")
+          allow(Dir).to receive(:pwd).and_return(rails_root)
+        end
+
+        it "converts absolute paths to relative paths" do
           path = doctor.send(:determine_server_bundle_path)
           expect(path).to eq("client/app/packs/server-bundle.js")
         end
