@@ -92,7 +92,7 @@ rails generate react_on_rails:install
 bundle install
 npm install
 
-# 5. Generate routes
+# 5. Generate routes (if using js-routes gem)
 bundle exec rails js:export
 
 # 6. Test
@@ -112,7 +112,7 @@ sed -i 's/"react-on-rails": "^14\./"react-on-rails": "^16./' package.json
 bundle update react_on_rails
 npm install
 
-# 3. Generate routes (critical)
+# 3. Generate routes (if using js-routes gem)
 bundle exec rails js:export
 
 # 4. Test build
@@ -175,10 +175,10 @@ detect_error_type() {
 ### Auto-fix Strategies
 
 ```bash
-# Auto-fix missing routes
+# Auto-fix missing routes (only if using js-routes gem)
 fix_missing_routes() {
   if [ ! -f "app/javascript/utils/routes.js" ]; then
-    echo "🔧 Generating missing routes file..."
+    echo "🔧 Generating missing routes file (js-routes gem)..."
     bundle exec rails js:export
     return $?
   fi
@@ -203,7 +203,7 @@ fix_webpack_cache() {
 
 ### Common Error Scenarios
 
-#### 1. Missing Routes File
+#### 1. Missing Routes File (js-routes gem)
 
 **Detection:**
 ```regex
@@ -288,9 +288,9 @@ else
   echo "❌ Build failed"
   echo "Running auto-fixes..."
 
-  # Auto-fix missing routes
+  # Auto-fix missing routes (only if using js-routes gem)
   if [ ! -f "app/javascript/utils/routes.js" ]; then
-    echo "🔧 Generating routes..."
+    echo "🔧 Generating routes (js-routes gem)..."
     bundle exec rails js:export
   fi
 

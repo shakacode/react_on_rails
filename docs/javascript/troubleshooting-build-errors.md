@@ -10,7 +10,9 @@ This guide covers common webpack build errors encountered when using react_on_ra
 - [Shakapacker Compatibility Issues](#shakapacker-compatibility-issues)
 - [For Coding Agents](#for-coding-agents)
 
-## Missing Routes File Error
+## Missing Routes File Error (js-routes gem)
+
+**Note:** This error only occurs if you're using the optional `js-routes` gem to access Rails routes in JavaScript.
 
 ### Error Message
 ```
@@ -20,9 +22,25 @@ TypeError: Cannot read properties of undefined (reading 'module')
 ```
 
 ### Root Cause
-This error typically occurs when webpack's `ProvidePlugin` cannot resolve a module reference. A common case is when the Rails routes file hasn't been generated for JavaScript consumption.
+This error occurs when:
+1. Your webpack config references Rails routes via ProvidePlugin
+2. The `js-routes` gem hasn't generated the JavaScript routes file
+3. You're using `js-routes` integration but missing the generated file
 
-### Solution
+### When You Need js-routes
+`js-routes` is **optional** and typically used when:
+- Rails-heavy apps with React components that need to navigate to Rails routes
+- Server-side rendered apps mixing Rails and React routing
+- Legacy Rails apps migrating ERB views to React
+- Apps using Rails routing patterns for RESTful APIs
+
+### When You DON'T Need js-routes
+Most modern React apps use:
+- Client-side routing (React Router) instead of Rails routes
+- Hardcoded API endpoints or environment variables
+- SPA (Single Page App) architecture with API-only Rails backend
+
+### Solution (if using js-routes)
 1. **Generate JavaScript routes file:**
    ```bash
    bundle exec rails js:export
@@ -33,34 +51,21 @@ This error typically occurs when webpack's `ProvidePlugin` cannot resolve a modu
    ls app/javascript/utils/routes.js
    ```
 
-3. **Check webpack configuration:**
-   Ensure your webpack config has the correct ProvidePlugin setup:
+3. **Check webpack configuration includes ProvidePlugin:**
    ```javascript
    new webpack.ProvidePlugin({
      Routes: "$app/utils/routes"
    })
    ```
 
-4. **Verify alias configuration:**
-   ```javascript
-   resolve: {
-     alias: {
-       $app: path.join(rootPath, "app/javascript"),
-     }
-   }
-   ```
-
-### Prevention
-- Always run `rails js:export` after initial setup
-- Include this step in your development setup documentation
-- Consider adding it to your `package.json` setup script:
-  ```json
-  {
-    "scripts": {
-      "setup": "bundle exec rails js:export && npm install"
-    }
-  }
-  ```
+### Alternative Solution (if NOT using js-routes)
+Remove the Routes ProvidePlugin from your webpack configuration:
+```javascript
+// Remove this line if you don't use js-routes
+new webpack.ProvidePlugin({
+  Routes: "$app/utils/routes"  // ← Remove this
+})
+```
 
 ## ProvidePlugin Module Resolution Errors
 
@@ -104,9 +109,9 @@ This error typically occurs when webpack's `ProvidePlugin` cannot resolve a modu
 ## Environment Setup Dependencies
 
 ### Rails Environment Required
-Some react_on_rails operations require a working Rails environment:
+Some operations require a working Rails environment:
 
-- `rails js:export` (generates routes)
+- `rails js:export` (generates routes - **only needed if using js-routes gem**)
 - Asset precompilation
 - Server-side rendering
 
