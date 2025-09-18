@@ -4,7 +4,7 @@ import {
   renderOrHydrateAllComponents,
   renderOrHydrateForceLoadedComponents,
   unmountAll,
-} from './ClientSideRenderer.ts';
+} from './pro/ClientSideRenderer.ts';
 import { onPageLoaded, onPageUnloaded } from './pageLifecycle.ts';
 import { debugTurbolinks } from './turbolinksUtils.ts';
 
