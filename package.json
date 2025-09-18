@@ -6,24 +6,24 @@
   "type": "module",
   "exports": {
     ".": {
-      "react-server": "./node_package/lib/ReactOnRailsRSC.js",
+      "react-server": "./node_package/lib/pro/ReactOnRailsRSC.js",
       "node": "./node_package/lib/ReactOnRails.node.js",
       "default": "./node_package/lib/ReactOnRails.full.js"
     },
     "./client": "./node_package/lib/ReactOnRails.client.js",
-    "./registerServerComponent/client": "./node_package/lib/registerServerComponent/client.js",
+    "./registerServerComponent/client": "./node_package/lib/pro/registerServerComponent/client.js",
     "./registerServerComponent/server": {
-      "react-server": "./node_package/lib/registerServerComponent/server.rsc.js",
-      "default": "./node_package/lib/registerServerComponent/server.js"
+      "react-server": "./node_package/lib/pro/registerServerComponent/server.rsc.js",
+      "default": "./node_package/lib/pro/registerServerComponent/server.js"
     },
-    "./wrapServerComponentRenderer/client": "./node_package/lib/wrapServerComponentRenderer/client.js",
+    "./wrapServerComponentRenderer/client": "./node_package/lib/pro/wrapServerComponentRenderer/client.js",
     "./wrapServerComponentRenderer/server": {
-      "react-server": "./node_package/lib/wrapServerComponentRenderer/server.rsc.js",
-      "default": "./node_package/lib/wrapServerComponentRenderer/server.js"
+      "react-server": "./node_package/lib/pro/wrapServerComponentRenderer/server.rsc.js",
+      "default": "./node_package/lib/pro/wrapServerComponentRenderer/server.js"
     },
-    "./RSCRoute": "./node_package/lib/RSCRoute.js",
-    "./RSCProvider": "./node_package/lib/RSCProvider.js",
-    "./ServerComponentFetchError": "./node_package/lib/ServerComponentFetchError.js"
+    "./RSCRoute": "./node_package/lib/pro/RSCRoute.js",
+    "./RSCProvider": "./node_package/lib/pro/RSCProvider.js",
+    "./ServerComponentFetchError": "./node_package/lib/pro/ServerComponentFetchError.js"
   },
   "directories": {
     "doc": "docs"
