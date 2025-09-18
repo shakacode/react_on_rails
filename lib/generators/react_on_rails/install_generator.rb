@@ -380,13 +380,16 @@ module ReactOnRails
       end
 
       def create_typescript_config
+        if File.exist?("tsconfig.json")
+          puts Rainbow("⚠️  tsconfig.json already exists, skipping creation").yellow
+          return
+        end
+
         tsconfig_content = {
           "compilerOptions" => {
             "target" => "es2018",
             "allowJs" => true,
             "skipLibCheck" => true,
-            "esModuleInterop" => true,
-            "allowSyntheticDefaultImports" => true,
             "strict" => true,
             "noUncheckedIndexedAccess" => true,
             "forceConsistentCasingInFileNames" => true,
