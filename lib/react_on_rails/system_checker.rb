@@ -283,8 +283,9 @@ module ReactOnRails
     end
 
     def suggest_webpack_inspection
-      add_info("💡 To inspect webpack configuration: bin/shakapacker --print-config")
+      add_info("💡 To debug webpack builds: bin/shakapacker --progress --verbose")
       add_info("💡 To analyze bundle size: ANALYZE=true bin/shakapacker")
+      add_info("💡 Configuration files: config/webpack/webpack.config.js, config/shakapacker.yml")
     end
 
     def check_webpack_config_content
