@@ -284,8 +284,27 @@ module ReactOnRails
 
     def suggest_webpack_inspection
       add_info("💡 To debug webpack builds: bin/shakapacker --progress --verbose")
-      add_info("💡 To analyze bundle size: ANALYZE=true bin/shakapacker")
-      add_info("💡 Configuration files: config/webpack/webpack.config.js, config/shakapacker.yml")
+
+      if bundle_analyzer_available?
+        add_info("💡 To analyze bundle size: ANALYZE=true bin/shakapacker (opens browser)")
+      else
+        add_info("💡 To analyze bundle size: npm install --save-dev webpack-bundle-analyzer, then ANALYZE=true bin/shakapacker")
+      end
+
+      add_info("💡 Generate stats file: bin/shakapacker --profile --json > webpack-stats.json")
+      add_info("💡 View stats online: upload webpack-stats.json to webpack.github.io/analyse")
+    end
+
+    def bundle_analyzer_available?
+      return false unless File.exist?("package.json")
+
+      begin
+        package_json = JSON.parse(File.read("package.json"))
+        all_deps = package_json["dependencies"]&.merge(package_json["devDependencies"] || {}) || {}
+        all_deps["webpack-bundle-analyzer"]
+      rescue StandardError
+        false
+      end
     end
 
     def check_webpack_config_content
