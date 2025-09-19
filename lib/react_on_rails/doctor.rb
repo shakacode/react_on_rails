@@ -68,6 +68,16 @@ module ReactOnRails
       puts Rainbow("Diagnosing your React on Rails setup...").cyan
       puts Rainbow("=" * 80).cyan
       puts
+      print_doctor_feature_info
+      puts
+    end
+
+    def print_doctor_feature_info
+      puts Rainbow("ℹ️  Doctor Feature Information:").blue
+      puts "   • This diagnostic tool is available in React on Rails v16.0.0+"
+      puts "   • For older versions, upgrade your gem to access this feature"
+      puts "   • Run: bundle update react_on_rails"
+      puts "   • Documentation: https://www.shakacode.com/react-on-rails/docs/"
     end
 
     def run_all_checks
@@ -75,7 +85,7 @@ module ReactOnRails
         ["Environment Prerequisites", :check_environment],
         ["React on Rails Versions", :check_react_on_rails_versions],
         ["React on Rails Packages", :check_packages],
-        ["Dependencies", :check_dependencies],
+        ["JavaScript Package Dependencies", :check_dependencies],
         ["Key Configuration Files", :check_key_files],
         ["Configuration Analysis", :check_configuration_details],
         ["bin/dev Launcher Setup", :check_bin_dev_launcher],
@@ -507,6 +517,7 @@ module ReactOnRails
       files_to_check = {
         "config/shakapacker.yml" => "Shakapacker configuration",
         "config/initializers/react_on_rails.rb" => "React on Rails initializer",
+        "bin/dev" => "Development server launcher",
         "bin/shakapacker" => "Shakapacker binary",
         "bin/shakapacker-dev-server" => "Shakapacker dev server binary",
         "config/webpack/webpack.config.js" => "Webpack configuration"
@@ -519,7 +530,75 @@ module ReactOnRails
           checker.add_warning("⚠️  Missing #{description}: #{file_path}")
         end
       end
+
+      check_layout_files
+      check_server_rendering_engine
     end
+
+    # rubocop:disable Metrics/CyclomaticComplexity
+    def check_layout_files
+      layout_files = Dir.glob("app/views/layouts/**/*.erb")
+      return if layout_files.empty?
+
+      checker.add_info("\n📄 Layout Files Analysis:")
+
+      layout_files.each do |layout_file|
+        next unless File.exist?(layout_file)
+
+        content = File.read(layout_file)
+        has_stylesheet = content.include?("stylesheet_pack_tag")
+        has_javascript = content.include?("javascript_pack_tag")
+
+        layout_name = File.basename(layout_file, ".html.erb")
+
+        if has_stylesheet && has_javascript
+          checker.add_info("  ✅ #{layout_name}: has both stylesheet_pack_tag and javascript_pack_tag")
+        elsif has_stylesheet
+          checker.add_warning("  ⚠️  #{layout_name}: has stylesheet_pack_tag but missing javascript_pack_tag")
+        elsif has_javascript
+          checker.add_warning("  ⚠️  #{layout_name}: has javascript_pack_tag but missing stylesheet_pack_tag")
+        else
+          checker.add_info("  ℹ️  #{layout_name}: no pack tags found")
+        end
+      end
+    end
+    # rubocop:enable Metrics/CyclomaticComplexity
+
+    # rubocop:disable Metrics/CyclomaticComplexity
+    def check_server_rendering_engine
+      return unless defined?(ReactOnRails)
+
+      checker.add_info("\n🖥️  Server Rendering Engine:")
+
+      begin
+        # Check if ExecJS is available and what runtime is being used
+        if defined?(ExecJS)
+          runtime_name = ExecJS.runtime.name if ExecJS.runtime
+          if runtime_name
+            checker.add_info("  ExecJS Runtime: #{runtime_name}")
+
+            # Provide more specific information about the runtime
+            case runtime_name
+            when /MiniRacer/
+              checker.add_info("    ℹ️  Using V8 via mini_racer gem (fast, isolated)")
+            when /Node/
+              checker.add_info("    ℹ️  Using Node.js runtime (requires Node.js)")
+            when /Duktape/
+              checker.add_info("    ℹ️  Using Duktape runtime (pure Ruby, slower)")
+            else
+              checker.add_info("    ℹ️  JavaScript runtime: #{runtime_name}")
+            end
+          else
+            checker.add_warning("  ⚠️  ExecJS runtime not detected")
+          end
+        else
+          checker.add_warning("  ⚠️  ExecJS not available")
+        end
+      rescue StandardError => e
+        checker.add_warning("  ⚠️  Could not determine server rendering engine: #{e.message}")
+      end
+    end
+    # rubocop:enable Metrics/CyclomaticComplexity
 
     # rubocop:disable Metrics/CyclomaticComplexity
     def check_shakapacker_configuration_details
@@ -538,8 +617,8 @@ module ReactOnRails
           lines.each do |line|
             next if line.empty?
 
-            # Show key configuration lines
-            checker.add_info("  #{line}") if line.match?(%r{^(Ruby|Rails|Shakapacker|Node|yarn|Is bin/shakapacker)})
+            # Show only Shakapacker-specific configuration lines, not general environment info
+            checker.add_info("  #{line}") if line.match?(%r{^Is bin/shakapacker})
           end
         else
           checker.add_info("  Configuration file: config/shakapacker.yml")
@@ -553,30 +632,320 @@ module ReactOnRails
     # rubocop:enable Metrics/CyclomaticComplexity
 
     def check_react_on_rails_configuration_details
+      check_react_on_rails_initializer
+      check_deprecated_configuration_settings
+      check_breaking_changes_warnings
+    end
+
+    def check_react_on_rails_initializer
       config_path = "config/initializers/react_on_rails.rb"
-      return unless File.exist?(config_path)
+
+      unless File.exist?(config_path)
+        checker.add_warning("⚠️  React on Rails configuration file not found: #{config_path}")
+        checker.add_info("💡 Run 'rails generate react_on_rails:install' to create configuration file")
+        return
+      end
 
       begin
         content = File.read(config_path)
 
         checker.add_info("📋 React on Rails Configuration:")
+        checker.add_info("📍 Documentation: https://www.shakacode.com/react-on-rails/docs/guides/configuration/")
 
-        # Extract key configuration values
-        config_patterns = {
-          "server_bundle_js_file" => /config\.server_bundle_js_file\s*=\s*["']([^"']+)["']/,
-          "prerender" => /config\.prerender\s*=\s*([^\s\n]+)/,
-          "trace" => /config\.trace\s*=\s*([^\s\n]+)/,
-          "development_mode" => /config\.development_mode\s*=\s*([^\s\n]+)/,
-          "logging_on_server" => /config\.logging_on_server\s*=\s*([^\s\n]+)/
-        }
-
-        config_patterns.each do |setting, pattern|
-          match = content.match(pattern)
-          checker.add_info("  #{setting}: #{match[1]}") if match
-        end
+        # Analyze configuration settings
+        analyze_server_rendering_config(content)
+        analyze_performance_config(content)
+        analyze_development_config(content)
+        analyze_i18n_config(content)
+        analyze_component_loading_config(content)
+        analyze_custom_extensions(content)
       rescue StandardError => e
         checker.add_warning("⚠️  Unable to read react_on_rails.rb: #{e.message}")
       end
+    end
+
+    def analyze_server_rendering_config(content)
+      checker.add_info("\n🖥️  Server Rendering:")
+
+      # Server bundle file
+      server_bundle_match = content.match(/config\.server_bundle_js_file\s*=\s*["']([^"']+)["']/)
+      if server_bundle_match
+        checker.add_info("  server_bundle_js_file: #{server_bundle_match[1]}")
+      else
+        checker.add_info("  server_bundle_js_file: server-bundle.js (default)")
+      end
+
+      # RSC bundle file (Pro feature)
+      rsc_bundle_match = content.match(/config\.rsc_bundle_js_file\s*=\s*["']([^"']+)["']/)
+      if rsc_bundle_match
+        checker.add_info("  rsc_bundle_js_file: #{rsc_bundle_match[1]} (React Server Components - Pro)")
+      end
+
+      # Prerender setting
+      prerender_match = content.match(/config\.prerender\s*=\s*([^\s\n,]+)/)
+      prerender_value = prerender_match ? prerender_match[1] : "false (default)"
+      checker.add_info("  prerender: #{prerender_value}")
+
+      # Server renderer pool settings
+      pool_size_match = content.match(/config\.server_renderer_pool_size\s*=\s*([^\s\n,]+)/)
+      checker.add_info("  server_renderer_pool_size: #{pool_size_match[1]}") if pool_size_match
+
+      timeout_match = content.match(/config\.server_renderer_timeout\s*=\s*([^\s\n,]+)/)
+      checker.add_info("  server_renderer_timeout: #{timeout_match[1]} seconds") if timeout_match
+
+      # Error handling
+      raise_on_error_match = content.match(/config\.raise_on_prerender_error\s*=\s*([^\s\n,]+)/)
+      return unless raise_on_error_match
+
+      checker.add_info("  raise_on_prerender_error: #{raise_on_error_match[1]}")
+    end
+    # rubocop:enable Metrics/AbcSize
+
+    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
+    def analyze_performance_config(content)
+      checker.add_info("\n⚡ Performance & Loading:")
+
+      # Component loading strategy
+      loading_strategy_match = content.match(/config\.generated_component_packs_loading_strategy\s*=\s*:([^\s\n,]+)/)
+      if loading_strategy_match
+        strategy = loading_strategy_match[1]
+        checker.add_info("  generated_component_packs_loading_strategy: :#{strategy}")
+
+        case strategy
+        when "async"
+          checker.add_info("    ℹ️  Async loading requires Shakapacker >= 8.2.0")
+        when "defer"
+          checker.add_info("    ℹ️  Deferred loading provides good performance balance")
+        when "sync"
+          checker.add_info("    ℹ️  Synchronous loading ensures immediate availability")
+        end
+      end
+
+      # Deprecated defer setting
+      defer_match = content.match(/config\.defer_generated_component_packs\s*=\s*([^\s\n,]+)/)
+      if defer_match
+        checker.add_warning("  ⚠️  defer_generated_component_packs: #{defer_match[1]} (DEPRECATED)")
+        checker.add_info("    💡 Use generated_component_packs_loading_strategy = :defer instead")
+      end
+
+      # Auto load bundle
+      auto_load_match = content.match(/config\.auto_load_bundle\s*=\s*([^\s\n,]+)/)
+      checker.add_info("  auto_load_bundle: #{auto_load_match[1]}") if auto_load_match
+
+      # Immediate hydration (Pro feature)
+      immediate_hydration_match = content.match(/config\.immediate_hydration\s*=\s*([^\s\n,]+)/)
+      if immediate_hydration_match
+        checker.add_info("  immediate_hydration: #{immediate_hydration_match[1]} (React on Rails Pro)")
+      end
+
+      # Component registry timeout
+      timeout_match = content.match(/config\.component_registry_timeout\s*=\s*([^\s\n,]+)/)
+      return unless timeout_match
+
+      checker.add_info("  component_registry_timeout: #{timeout_match[1]}ms")
+    end
+    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
+
+    # rubocop:disable Metrics/AbcSize
+    def analyze_development_config(content)
+      checker.add_info("\n🔧 Development & Debugging:")
+
+      # Development mode
+      dev_mode_match = content.match(/config\.development_mode\s*=\s*([^\s\n,]+)/)
+      if dev_mode_match
+        checker.add_info("  development_mode: #{dev_mode_match[1]}")
+      else
+        checker.add_info("  development_mode: Rails.env.development? (default)")
+      end
+
+      # Trace setting
+      trace_match = content.match(/config\.trace\s*=\s*([^\s\n,]+)/)
+      if trace_match
+        checker.add_info("  trace: #{trace_match[1]}")
+      else
+        checker.add_info("  trace: Rails.env.development? (default)")
+      end
+
+      # Logging
+      logging_match = content.match(/config\.logging_on_server\s*=\s*([^\s\n,]+)/)
+      logging_value = logging_match ? logging_match[1] : "true (default)"
+      checker.add_info("  logging_on_server: #{logging_value}")
+
+      # Console replay
+      replay_match = content.match(/config\.replay_console\s*=\s*([^\s\n,]+)/)
+      replay_value = replay_match ? replay_match[1] : "true (default)"
+      checker.add_info("  replay_console: #{replay_value}")
+
+      # Build commands
+      build_test_match = content.match(/config\.build_test_command\s*=\s*["']([^"']+)["']/)
+      checker.add_info("  build_test_command: #{build_test_match[1]}") if build_test_match
+
+      build_prod_match = content.match(/config\.build_production_command\s*=\s*["']([^"']+)["']/)
+      return unless build_prod_match
+
+      checker.add_info("  build_production_command: #{build_prod_match[1]}")
+    end
+    # rubocop:enable Metrics/AbcSize
+
+    def analyze_i18n_config(content)
+      i18n_configs = []
+
+      i18n_dir_match = content.match(/config\.i18n_dir\s*=\s*["']([^"']+)["']/)
+      i18n_configs << "i18n_dir: #{i18n_dir_match[1]}" if i18n_dir_match
+
+      i18n_yml_dir_match = content.match(/config\.i18n_yml_dir\s*=\s*["']([^"']+)["']/)
+      i18n_configs << "i18n_yml_dir: #{i18n_yml_dir_match[1]}" if i18n_yml_dir_match
+
+      i18n_format_match = content.match(/config\.i18n_output_format\s*=\s*["']([^"']+)["']/)
+      i18n_configs << "i18n_output_format: #{i18n_format_match[1]}" if i18n_format_match
+
+      return unless i18n_configs.any?
+
+      checker.add_info("\n🌍 Internationalization:")
+      i18n_configs.each { |config| checker.add_info("  #{config}") }
+    end
+
+    def analyze_component_loading_config(content)
+      component_configs = []
+
+      components_subdir_match = content.match(/config\.components_subdirectory\s*=\s*["']([^"']+)["']/)
+      if components_subdir_match
+        component_configs << "components_subdirectory: #{components_subdir_match[1]}"
+        checker.add_info("    ℹ️  File-system based component registry enabled")
+      end
+
+      same_bundle_match = content.match(/config\.same_bundle_for_client_and_server\s*=\s*([^\s\n,]+)/)
+      component_configs << "same_bundle_for_client_and_server: #{same_bundle_match[1]}" if same_bundle_match
+
+      random_dom_match = content.match(/config\.random_dom_id\s*=\s*([^\s\n,]+)/)
+      component_configs << "random_dom_id: #{random_dom_match[1]}" if random_dom_match
+
+      return unless component_configs.any?
+
+      checker.add_info("\n📦 Component Loading:")
+      component_configs.each { |config| checker.add_info("  #{config}") }
+    end
+
+    def analyze_custom_extensions(content)
+      # Check for rendering extension
+      if /config\.rendering_extension\s*=\s*([^\s\n,]+)/.match?(content)
+        checker.add_info("\n🔌 Custom Extensions:")
+        checker.add_info("  rendering_extension: Custom rendering logic detected")
+        checker.add_info("    ℹ️  See: https://www.shakacode.com/react-on-rails/docs/guides/rendering-extensions")
+      end
+
+      # Check for rendering props extension
+      if /config\.rendering_props_extension\s*=\s*([^\s\n,]+)/.match?(content)
+        checker.add_info("  rendering_props_extension: Custom props logic detected")
+      end
+
+      # Check for server render method
+      server_method_match = content.match(/config\.server_render_method\s*=\s*["']([^"']+)["']/)
+      return unless server_method_match
+
+      checker.add_info("  server_render_method: #{server_method_match[1]}")
+    end
+
+    def check_deprecated_configuration_settings
+      return unless File.exist?("config/initializers/react_on_rails.rb")
+
+      content = File.read("config/initializers/react_on_rails.rb")
+      deprecated_settings = []
+
+      # Check for deprecated settings
+      if content.include?("config.generated_assets_dirs")
+        deprecated_settings << "generated_assets_dirs (use generated_assets_dir)"
+      end
+      if content.include?("config.skip_display_none")
+        deprecated_settings << "skip_display_none (remove from configuration)"
+      end
+      if content.include?("config.defer_generated_component_packs")
+        deprecated_settings << "defer_generated_component_packs (use generated_component_packs_loading_strategy)"
+      end
+
+      return unless deprecated_settings.any?
+
+      checker.add_info("\n⚠️  Deprecated Configuration Settings:")
+      deprecated_settings.each do |setting|
+        checker.add_warning("  #{setting}")
+      end
+      checker.add_info("📖 Migration guide: https://www.shakacode.com/react-on-rails/docs/guides/upgrading-react-on-rails")
+    end
+
+    def check_breaking_changes_warnings
+      return unless defined?(ReactOnRails::VERSION)
+
+      # Parse version - handle pre-release versions like "16.0.0.beta.1"
+      current_version = ReactOnRails::VERSION.split(".").map(&:to_i)
+      major_version = current_version[0]
+
+      # Check for major version breaking changes
+      if major_version >= 16
+        check_v16_breaking_changes
+      elsif major_version >= 14
+        check_v14_breaking_changes
+      end
+    end
+
+    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+    def check_v16_breaking_changes
+      issues_found = []
+
+      # Check for Webpacker usage (breaking change: removed in v16)
+      if File.exist?("config/webpacker.yml") || File.exist?("bin/webpacker")
+        issues_found << "• Webpacker support removed - migrate to Shakapacker >= 6.0"
+      end
+
+      # Check for CommonJS require() usage (breaking change: ESM-only)
+      commonjs_files = []
+      begin
+        # Check JavaScript/TypeScript files for require() usage
+        js_files = Dir.glob(%w[app/javascript/**/*.{js,ts,jsx,tsx} client/**/*.{js,ts,jsx,tsx}])
+        js_files.each do |file|
+          next unless File.exist?(file)
+
+          content = File.read(file)
+          commonjs_files << file if content.match?(/require\s*\(\s*['"]react-on-rails['"]/)
+        end
+      rescue StandardError
+        # Ignore file read errors
+      end
+
+      unless commonjs_files.empty?
+        issues_found << "• CommonJS require() found - update to ESM imports"
+        issues_found << "  Files: #{commonjs_files.take(3).join(', ')}#{'...' if commonjs_files.length > 3}"
+      end
+
+      # Check Node.js version (recommendation, not breaking)
+      begin
+        stdout, _stderr, status = Open3.capture3("node", "--version")
+        if status.success?
+          node_version = stdout.strip.gsub(/^v/, "")
+          version_parts = node_version.split(".").map(&:to_i)
+          major = version_parts[0]
+          minor = version_parts[1] || 0
+
+          if major < 20 || (major == 20 && minor < 19)
+            issues_found << "• Node.js #{node_version} detected - v20.19.0+ recommended for full ESM support"
+          end
+        end
+      rescue StandardError
+        # Ignore version check errors
+      end
+
+      return if issues_found.empty?
+
+      checker.add_info("\n🚨 React on Rails v16+ Breaking Changes Detected:")
+      issues_found.each { |issue| checker.add_warning("  #{issue}") }
+      checker.add_info("📖 Full migration guide: https://www.shakacode.com/react-on-rails/docs/guides/upgrading-react-on-rails#upgrading-to-version-16")
+    end
+    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+
+    def check_v14_breaking_changes
+      checker.add_info("\n📋 React on Rails v14+ Notes:")
+      checker.add_info("  • Enhanced React Server Components (RSC) support available in Pro")
+      checker.add_info("  • Improved component loading strategies")
+      checker.add_info("  • Modern React patterns recommended")
     end
 
     def check_bin_dev_launcher_setup
@@ -776,5 +1145,5 @@ module ReactOnRails
       end
     end
   end
-  # rubocop:enable Metrics/ClassLength, Metrics/AbcSize
+  # rubocop:enable Metrics/ClassLength
 end
