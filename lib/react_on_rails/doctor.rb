@@ -116,13 +116,12 @@ module ReactOnRails
     end
 
     def check_react_on_rails_versions
-      check_gem_version
-      check_npm_package_version
+      # Use system_checker for comprehensive package validation instead of duplicating
+      checker.check_react_on_rails_packages
       check_version_wildcards
     end
 
     def check_packages
-      checker.check_react_on_rails_packages
       checker.check_shakapacker_configuration
     end
 
@@ -522,15 +521,36 @@ module ReactOnRails
       end
     end
 
+    # rubocop:disable Metrics/CyclomaticComplexity
     def check_shakapacker_configuration_details
       return unless File.exist?("config/shakapacker.yml")
 
-      # For now, just indicate that the configuration file exists
-      # TODO: Parse YAML directly or improve Shakapacker integration
       checker.add_info("📋 Shakapacker Configuration:")
-      checker.add_info("  Configuration file: config/shakapacker.yml")
-      checker.add_info("  ℹ️  Run 'rake shakapacker:info' for detailed configuration")
+
+      begin
+        # Run shakapacker:info to get detailed configuration
+        stdout, stderr, status = Open3.capture3("bundle", "exec", "rake", "shakapacker:info")
+
+        if status.success?
+          # Parse and display relevant info from shakapacker:info
+          lines = stdout.lines.map(&:strip)
+
+          lines.each do |line|
+            next if line.empty?
+
+            # Show key configuration lines
+            checker.add_info("  #{line}") if line.match?(%r{^(Ruby|Rails|Shakapacker|Node|yarn|Is bin/shakapacker)})
+          end
+        else
+          checker.add_info("  Configuration file: config/shakapacker.yml")
+          checker.add_warning("  ⚠️  Could not run 'rake shakapacker:info': #{stderr.strip}")
+        end
+      rescue StandardError => e
+        checker.add_info("  Configuration file: config/shakapacker.yml")
+        checker.add_warning("  ⚠️  Could not run 'rake shakapacker:info': #{e.message}")
+      end
     end
+    # rubocop:enable Metrics/CyclomaticComplexity
 
     def check_react_on_rails_configuration_details
       config_path = "config/initializers/react_on_rails.rb"

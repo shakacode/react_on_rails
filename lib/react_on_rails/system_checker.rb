@@ -110,7 +110,11 @@ module ReactOnRails
       # Detect which package manager is actually being used
       used_manager = detect_used_package_manager
       if used_manager
-        add_success("✅ Package manager in use: #{used_manager}")
+        version_info = get_package_manager_version(used_manager)
+        deprecation_note = get_deprecation_note(used_manager, version_info)
+        message = "✅ Package manager in use: #{used_manager} #{version_info}"
+        message += deprecation_note if deprecation_note
+        add_success(message)
       else
         add_success("✅ Package managers available: #{available_managers.join(', ')}")
         add_info("ℹ️  No lock file detected - run npm/yarn/pnpm install to establish which manager is used")
@@ -251,14 +255,6 @@ module ReactOnRails
       initializer_path = "config/initializers/react_on_rails.rb"
       if File.exist?(initializer_path)
         add_success("✅ React on Rails initializer exists")
-
-        # Check for common configuration
-        content = File.read(initializer_path)
-        if content.include?("config.server_bundle_js_file")
-          add_success("✅ Server bundle configuration found")
-        else
-          add_info("ℹ️  Consider configuring server_bundle_js_file in initializer")
-        end
       else
         add_warning(<<~MSG.strip)
           ⚠️  React on Rails initializer not found.
@@ -275,7 +271,7 @@ module ReactOnRails
       if File.exist?(webpack_config_path)
         add_success("✅ Webpack configuration exists")
         check_webpack_config_content
-        report_webpack_version
+        suggest_webpack_inspection
       else
         add_error(<<~MSG.strip)
           🚫 Webpack configuration not found.
@@ -284,6 +280,11 @@ module ReactOnRails
           Run: rails generate react_on_rails:install
         MSG
       end
+    end
+
+    def suggest_webpack_inspection
+      add_info("💡 To inspect webpack configuration: bin/shakapacker --print-config")
+      add_info("💡 To analyze bundle size: ANALYZE=true bin/shakapacker")
     end
 
     def check_webpack_config_content
@@ -328,6 +329,23 @@ module ReactOnRails
         "bun"
       elsif File.exist?("package-lock.json")
         "npm"
+      end
+    end
+
+    def get_package_manager_version(manager)
+      begin
+        stdout, _stderr, status = Open3.capture3(manager, "--version")
+        return stdout.strip if status.success? && !stdout.strip.empty?
+      rescue StandardError
+        # Ignore errors
+      end
+      "(version unknown)"
+    end
+
+    def get_deprecation_note(manager, version)
+      case manager
+      when "yarn"
+        " (Classic Yarn v1 - consider upgrading to Yarn Modern)" if /^1\./.match?(version)
       end
     end
 
