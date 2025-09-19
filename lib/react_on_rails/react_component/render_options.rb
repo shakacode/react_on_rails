@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "react_on_rails/utils"
+require "react_on_rails/pro/utils"
 
 module ReactOnRails
   module ReactComponent
@@ -14,10 +15,13 @@ module ReactOnRails
       # TODO: remove the required for named params
       def initialize(react_component_name: required("react_component_name"), options: required("options"))
         @react_component_name = react_component_name.camelize
-        @options = options
+
+        result = ReactOnRails::Pro::Utils.disable_pro_render_options_if_not_licensed(options)
+        @options = result[:raw_options]
+        @explicitly_disabled_pro_options = result[:explicitly_disabled_pro_options]
       end
 
-      attr_reader :react_component_name
+      attr_reader :react_component_name, :explicitly_disabled_pro_options
 
       def throw_js_errors
         options.fetch(:throw_js_errors, false)

@@ -60,7 +60,6 @@ module ReactOnRails
       server_rendered_html = internal_result[:result]["html"]
       console_script = internal_result[:result]["consoleReplayScript"]
       render_options = internal_result[:render_options]
-      badge = pro_warning_badge_if_needed(internal_result[:immediate_hydration_requested])
 
       case server_rendered_html
       when String
@@ -70,7 +69,7 @@ module ReactOnRails
           console_script: console_script,
           render_options: render_options
         )
-        (badge + html).html_safe
+        html.html_safe
       when Hash
         msg = <<~MSG
           Use react_component_hash (not react_component) to return a Hash to your ruby view code. See
@@ -217,7 +216,6 @@ module ReactOnRails
       server_rendered_html = internal_result[:result]["html"]
       console_script = internal_result[:result]["consoleReplayScript"]
       render_options = internal_result[:render_options]
-      badge = pro_warning_badge_if_needed(internal_result[:immediate_hydration_requested])
 
       if server_rendered_html.is_a?(String) && internal_result[:result]["hasErrors"]
         server_rendered_html = { COMPONENT_HTML_KEY => internal_result[:result]["html"] }
@@ -230,7 +228,7 @@ module ReactOnRails
           console_script: console_script,
           render_options: render_options
         )
-        result[COMPONENT_HTML_KEY] = badge + result[COMPONENT_HTML_KEY]
+        result[COMPONENT_HTML_KEY] = result[COMPONENT_HTML_KEY]
         result
       else
         msg = <<~MSG
@@ -259,8 +257,6 @@ module ReactOnRails
     #                        hydrate this store immediately instead of waiting for the page to load.
     def redux_store(store_name, props: {}, defer: false, immediate_hydration: nil)
       immediate_hydration = ReactOnRails.configuration.immediate_hydration if immediate_hydration.nil?
-      badge = pro_warning_badge_if_needed(immediate_hydration)
-      immediate_hydration = false unless support_pro_features?
 
       redux_store_data = { store_name: store_name,
                            props: props,
@@ -272,7 +268,7 @@ module ReactOnRails
       else
         registered_stores << redux_store_data
         result = render_redux_store_data(redux_store_data)
-        (badge + prepend_render_rails_context(result)).html_safe
+        (prepend_render_rails_context(result)).html_safe
       end
     end
 
@@ -647,23 +643,10 @@ module ReactOnRails
       # server has already rendered the HTML.
 
       render_options = create_render_options(react_component_name, options)
-      # Capture the originally requested value so we can show a badge while still disabling the feature.
-      immediate_hydration_requested = render_options.immediate_hydration
-      render_options.set_option(:immediate_hydration, false) unless support_pro_features?
 
       # Setup the page_loaded_js, which is the same regardless of prerendering or not!
       # The reason is that React is smart about not doing extra work if the server rendering did its job.
-      component_specification_tag = content_tag(:script,
-                                                json_safe_and_pretty(render_options.client_props).html_safe,
-                                                type: "application/json",
-                                                class: "js-react-on-rails-component",
-                                                id: "js-react-on-rails-component-#{render_options.dom_id}",
-                                                "data-component-name" => render_options.react_component_name,
-                                                "data-trace" => (render_options.trace ? true : nil),
-                                                "data-dom-id" => render_options.dom_id,
-                                                "data-store-dependencies" => render_options.store_dependencies&.to_json)
-
-      component_specification_tag = apply_immediate_hydration_if_supported(component_specification_tag, render_options)
+      component_specification_tag = generate_component_script(render_options)
 
       load_pack_for_generated_component(react_component_name, render_options)
       # Create the HTML rendering part
@@ -673,17 +656,11 @@ module ReactOnRails
         render_options: render_options,
         tag: component_specification_tag,
         result: result,
-        immediate_hydration_requested: immediate_hydration_requested
       }
     end
 
     def render_redux_store_data(redux_store_data)
-      store_hydration_data = content_tag(:script,
-                                         json_safe_and_pretty(redux_store_data[:props]).html_safe,
-                                         type: "application/json",
-                                         "data-js-react-on-rails-store" => redux_store_data[:store_name].html_safe)
-
-      store_hydration_data = apply_store_immediate_hydration_if_supported(store_hydration_data, redux_store_data)
+      store_hydration_data = generate_store_script(redux_store_data)
 
       prepend_render_rails_context(store_hydration_data)
     end
