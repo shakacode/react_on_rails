@@ -311,20 +311,8 @@ export async function hydrateStore(storeNameOrElement: string | Element) {
   await storeRenderer.waitUntilHydrated();
 }
 
-export const hydrateImmediateHydratedStores = () => {
-  const railsContext = getRailsContext();
-  const hasProLicense = railsContext?.rorPro;
-
-  if (!hasProLicense) {
-    console.warn(IMMEDIATE_HYDRATION_PRO_WARNING);
-    return Promise.resolve();
-  }
-
-  return forAllElementsAsync(
-    `[${REACT_ON_RAILS_STORE_ATTRIBUTE}][data-immediate-hydration="true"]`,
-    hydrateStore,
-  );
-};
+export const hydrateImmediateHydratedStores = () =>
+  forAllElementsAsync(`[${REACT_ON_RAILS_STORE_ATTRIBUTE}][data-immediate-hydration="true"]`, hydrateStore);
 
 export const hydrateAllStores = () =>
   forAllElementsAsync(`[${REACT_ON_RAILS_STORE_ATTRIBUTE}]`, hydrateStore);
