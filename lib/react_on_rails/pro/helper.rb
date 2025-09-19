@@ -34,7 +34,8 @@ module ReactOnRails
                                                   "data-component-name" => render_options.react_component_name,
                                                   "data-trace" => (render_options.trace ? true : nil),
                                                   "data-dom-id" => render_options.dom_id,
-                                                  "data-store-dependencies" => render_options.store_dependencies&.to_json,
+                                                  "data-store-dependencies" =>
+                                                    render_options.store_dependencies&.to_json,
                                                   "data-immediate-hydration" =>
                                                     (render_options.immediate_hydration ? true : nil))
 
@@ -112,7 +113,8 @@ module ReactOnRails
 
         feature_list = explicitly_disabled_pro_options.join(", ")
         feature_word = explicitly_disabled_pro_options.size == 1 ? "feature" : "features"
-        "The '#{feature_list}' #{feature_word} #{explicitly_disabled_pro_options.size == 1 ? 'requires' : 'require'} a " \
+        "The '#{feature_list}' #{feature_word} " \
+          "#{explicitly_disabled_pro_options.size == 1 ? 'requires' : 'require'} a " \
           "React on Rails Pro license. "
       end
     end
