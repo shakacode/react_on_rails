@@ -19,6 +19,11 @@ describe ReactOnRails::ReactComponent::RenderOptions do
     }
   end
 
+  # TODO: test pro features without license
+  before do
+    allow(ReactOnRails::Utils).to receive(:react_on_rails_pro_licence_valid?).and_return(true)
+  end
+
   it "works without raising error" do
     attrs = the_attrs
 
