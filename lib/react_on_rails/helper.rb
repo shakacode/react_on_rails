@@ -222,14 +222,13 @@ module ReactOnRails
       end
 
       if server_rendered_html.is_a?(Hash)
-        result = build_react_component_result_for_server_rendered_hash(
+        build_react_component_result_for_server_rendered_hash(
           server_rendered_html: server_rendered_html,
           component_specification_tag: internal_result[:tag],
           console_script: console_script,
           render_options: render_options
         )
-        result[COMPONENT_HTML_KEY] = result[COMPONENT_HTML_KEY]
-        result
+
       else
         msg = <<~MSG
           Render-Function used by react_component_hash for #{component_name} is expected to return
@@ -268,7 +267,7 @@ module ReactOnRails
       else
         registered_stores << redux_store_data
         result = render_redux_store_data(redux_store_data)
-        (prepend_render_rails_context(result)).html_safe
+        prepend_render_rails_context(result).html_safe
       end
     end
 
@@ -655,7 +654,7 @@ module ReactOnRails
       {
         render_options: render_options,
         tag: component_specification_tag,
-        result: result,
+        result: result
       }
     end
 
