@@ -6,21 +6,32 @@ const config: KnipConfig = {
     '.': {
       entry: [
         'node_package/src/ReactOnRails.node.ts!',
-        'node_package/src/ReactOnRailsRSC.ts!',
-        'node_package/src/registerServerComponent/client.tsx!',
-        'node_package/src/registerServerComponent/server.tsx!',
-        'node_package/src/registerServerComponent/server.rsc.ts!',
-        'node_package/src/wrapServerComponentRenderer/server.tsx!',
-        'node_package/src/wrapServerComponentRenderer/server.rsc.tsx!',
-        'node_package/src/RSCRoute.tsx!',
-        'node_package/src/ServerComponentFetchError.ts!',
+        'node_package/src/pro/ReactOnRailsRSC.ts!',
+        'node_package/src/pro/registerServerComponent/client.tsx!',
+        'node_package/src/pro/registerServerComponent/server.tsx!',
+        'node_package/src/pro/registerServerComponent/server.rsc.ts!',
+        'node_package/src/pro/wrapServerComponentRenderer/server.tsx!',
+        'node_package/src/pro/wrapServerComponentRenderer/server.rsc.tsx!',
+        'node_package/src/pro/RSCRoute.tsx!',
+        'node_package/src/pro/ServerComponentFetchError.ts!',
+        'node_package/src/pro/getReactServerComponent.server.ts!',
+        'node_package/src/pro/transformRSCNodeStream.ts!',
+        'node_package/src/loadJsonFile.ts!',
         'eslint.config.ts',
       ],
       project: ['node_package/src/**/*.[jt]s{x,}!', 'node_package/tests/**/*.[jt]s{x,}'],
       babel: {
         config: ['node_package/babel.config.js'],
       },
-      ignore: ['node_package/tests/emptyForTesting.js'],
+      ignore: [
+        'node_package/tests/emptyForTesting.js',
+        // Pro features exported for external consumption
+        'node_package/src/pro/streamServerRenderedReactComponent.ts:transformRenderStreamChunksToResultObject',
+        'node_package/src/pro/streamServerRenderedReactComponent.ts:streamServerRenderedComponent',
+        'node_package/src/pro/ServerComponentFetchError.ts:isServerComponentFetchError',
+        'node_package/src/pro/RSCRoute.tsx:RSCRouteProps',
+        'node_package/src/pro/streamServerRenderedReactComponent.ts:StreamingTrackers',
+      ],
       ignoreBinaries: [
         // Knip fails to detect it's declared in devDependencies
         'nps',
