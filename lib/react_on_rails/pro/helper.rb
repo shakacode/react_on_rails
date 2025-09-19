@@ -15,7 +15,7 @@
 #  */
 
 module ReactOnRails
-  module ProFeatures
+  module Pro
     module Helper
       IMMEDIATE_HYDRATION_PRO_WARNING = "[REACT ON RAILS] The 'immediate_hydration' feature requires a " \
                                         "React on Rails Pro license. " \

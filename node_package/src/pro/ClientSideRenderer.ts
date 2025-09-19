@@ -32,6 +32,10 @@ const IMMEDIATE_HYDRATION_PRO_WARNING =
   "[REACT ON RAILS] The 'immediate_hydration' feature requires a React on Rails Pro license. " +
   'Please visit https://shakacode.com/react-on-rails-pro to get a license.';
 
+const FORCE_LOADING_PRO_WARNING =
+  "[REACT ON RAILS] The 'force_loading' feature requires a React on Rails Pro license. " +
+  'Please visit https://shakacode.com/react-on-rails-pro to get a license.';
+
 async function delegateToRenderer(
   componentObj: RegisteredComponent,
   props: Record<string, unknown>,
@@ -73,7 +77,9 @@ class ComponentRenderer {
     this.domNodeId = domId;
     this.state = 'rendering';
     const el =
-      typeof domIdOrElement === 'string' ? document.querySelector(`[data-dom-id=${domId}]`) : domIdOrElement;
+      typeof domIdOrElement === 'string'
+        ? document.querySelector(`[data-dom-id="${CSS.escape(domId)}"]`)
+        : domIdOrElement;
     if (!el) return;
 
     const storeDependencies = el.getAttribute('data-store-dependencies');
@@ -294,7 +300,7 @@ export async function hydrateStore(storeNameOrElement: string | Element) {
   if (!storeRenderer) {
     const storeDataElement =
       typeof storeNameOrElement === 'string'
-        ? document.querySelector(`[${REACT_ON_RAILS_STORE_ATTRIBUTE}="${storeNameOrElement}"]`)
+        ? document.querySelector(`[${REACT_ON_RAILS_STORE_ATTRIBUTE}="${CSS.escape(storeNameOrElement)}"]`)
         : storeNameOrElement;
     if (!storeDataElement) {
       return;
@@ -306,8 +312,17 @@ export async function hydrateStore(storeNameOrElement: string | Element) {
   await storeRenderer.waitUntilHydrated();
 }
 
-export const hydrateForceLoadedStores = () =>
-  forAllElementsAsync(`[${REACT_ON_RAILS_STORE_ATTRIBUTE}][data-force-load="true"]`, hydrateStore);
+export const hydrateForceLoadedStores = () => {
+  const railsContext = getRailsContext();
+  const hasProLicense = railsContext?.rorPro;
+
+  if (!hasProLicense) {
+    console.warn(FORCE_LOADING_PRO_WARNING);
+    return Promise.resolve();
+  }
+
+  return forAllElementsAsync(`[${REACT_ON_RAILS_STORE_ATTRIBUTE}][data-force-load="true"]`, hydrateStore);
+};
 
 export const hydrateAllStores = () =>
   forAllElementsAsync(`[${REACT_ON_RAILS_STORE_ATTRIBUTE}]`, hydrateStore);
