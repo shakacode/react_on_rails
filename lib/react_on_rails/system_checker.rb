@@ -213,7 +213,7 @@ module ReactOnRails
 
         return unless npm_version && defined?(ReactOnRails::VERSION)
 
-        # Clean version strings for comparison (remove ^, ~, etc.)
+        # Clean version strings for comparison (remove ^, ~, =, etc.)
         clean_npm_version = npm_version.gsub(/[^0-9.]/, "")
         gem_version = ReactOnRails::VERSION
 
@@ -221,13 +221,28 @@ module ReactOnRails
           add_success("✅ React on Rails gem and NPM package versions match (#{gem_version})")
           check_version_patterns(npm_version, gem_version)
         else
-          add_warning(<<~MSG.strip)
-            ⚠️  Version mismatch detected:
-            • Gem version: #{gem_version}
-            • NPM version: #{npm_version}
+          # Check for major version differences
+          gem_major = gem_version.split(".")[0].to_i
+          npm_major = clean_npm_version.split(".")[0].to_i
 
-            Consider updating to exact, fixed matching versions of gem and npm package for best compatibility.
-          MSG
+          if gem_major != npm_major
+            add_error(<<~MSG.strip)
+              🚫 Major version mismatch detected:
+              • Gem version: #{gem_version} (major: #{gem_major})
+              • NPM version: #{npm_version} (major: #{npm_major})
+
+              Major version differences can cause serious compatibility issues.
+              Update both packages to use the same major version immediately.
+            MSG
+          else
+            add_warning(<<~MSG.strip)
+              ⚠️  Version mismatch detected:
+              • Gem version: #{gem_version}
+              • NPM version: #{npm_version}
+
+              Consider updating to exact, fixed matching versions of gem and npm package for best compatibility.
+            MSG
+          end
         end
       rescue JSON::ParserError
         # Ignore parsing errors, already handled elsewhere
@@ -240,12 +255,18 @@ module ReactOnRails
     def check_react_dependencies
       return unless File.exist?("package.json")
 
-      required_deps = required_react_dependencies
       package_json = parse_package_json
       return unless package_json
 
+      # Check core React dependencies
+      required_deps = required_react_dependencies
       missing_deps = find_missing_dependencies(package_json, required_deps)
       report_dependency_status(required_deps, missing_deps, package_json)
+
+      # Check additional build dependencies (informational)
+      check_build_dependencies(package_json)
+
+      # Report versions
       report_dependency_versions(package_json)
     end
 
@@ -283,16 +304,33 @@ module ReactOnRails
     end
 
     def suggest_webpack_inspection
-      add_info("💡 To debug webpack builds: bin/shakapacker --progress --verbose")
+      add_info("💡 To debug webpack builds:")
+      add_info("    bin/shakapacker --mode=development --progress")
+      add_info("    bin/shakapacker --mode=production --progress")
+      add_info("    bin/shakapacker --debug-shakapacker  # Debug Shakapacker configuration")
 
+      add_info("💡 Advanced webpack debugging:")
+      add_info("    1. Add 'debugger;' before 'module.exports' in config/webpack/webpack.config.js")
+      add_info("    2. Run: node --inspect-brk ./bin/shakapacker")
+      add_info("    3. Open Chrome DevTools to inspect config object")
+      add_info("    📖 See: https://github.com/shakacode/shakapacker/blob/main/docs/troubleshooting.md#debugging-your-webpack-config")
+
+      add_info("💡 To analyze bundle size:")
       if bundle_analyzer_available?
-        add_info("💡 To analyze bundle size: ANALYZE=true bin/shakapacker (opens browser)")
+        add_info("    ANALYZE=true bin/shakapacker")
+        add_info("    This opens webpack-bundle-analyzer in your browser")
       else
-        add_info("💡 To analyze bundle size: npm install --save-dev webpack-bundle-analyzer, then ANALYZE=true bin/shakapacker")
+        add_info("    1. yarn add --dev webpack-bundle-analyzer")
+        add_info("    2. Add to config/webpack/webpack.config.js:")
+        add_info("       const { BundleAnalyzerPlugin } = require('webpack-bundle-analyzer');")
+        add_info("       // Add to plugins array when process.env.ANALYZE")
+        add_info("    3. ANALYZE=true bin/shakapacker")
+        add_info("    Or use Shakapacker's built-in support if available")
       end
 
-      add_info("💡 Generate stats file: bin/shakapacker --profile --json > webpack-stats.json")
-      add_info("💡 View stats online: upload webpack-stats.json to webpack.github.io/analyse")
+      add_info("💡 Generate webpack stats for analysis:")
+      add_info("    bin/shakapacker --json > webpack-stats.json")
+      add_info("    Upload to webpack.github.io/analyse or webpack-bundle-analyzer.com")
     end
 
     def bundle_analyzer_available?
@@ -312,16 +350,21 @@ module ReactOnRails
       content = File.read(webpack_config_path)
 
       if react_on_rails_config?(content)
-        add_success("✅ Webpack config appears to be React on Rails compatible")
+        add_success("✅ Webpack config includes React on Rails environment configuration")
+        add_info("    ℹ️  Environment-specific configs detected for optimal React on Rails integration")
       elsif standard_shakapacker_config?(content)
         add_warning(<<~MSG.strip)
-          ⚠️  Webpack config appears to be standard Shakapacker.
+          ⚠️  Standard Shakapacker webpack config detected.
 
-          React on Rails works better with its environment-specific config.
-          Consider running: rails generate react_on_rails:install
+          React on Rails works better with environment-specific configuration.
+          Consider running: rails generate react_on_rails:install --force
+          This adds client and server environment configs for better performance.
         MSG
       else
-        add_info("ℹ️  Custom webpack config detected - ensure React on Rails compatibility")
+        add_info("ℹ️  Custom webpack config detected")
+        add_info("    💡 Ensure config supports both client and server rendering")
+        add_info("    💡 Verify React JSX transformation is configured")
+        add_info("    💡 Check that asset output paths match Rails expectations")
       end
     end
 
@@ -409,6 +452,48 @@ module ReactOnRails
         "@babel/preset-react" => "Babel React preset"
       }
     end
+
+    def additional_build_dependencies
+      {
+        "webpack" => "Webpack bundler",
+        "@babel/core" => "Babel compiler core",
+        "@babel/preset-env" => "Babel environment preset",
+        "css-loader" => "CSS loader for Webpack",
+        "style-loader" => "Style loader for Webpack",
+        "mini-css-extract-plugin" => "CSS extraction plugin",
+        "webpack-dev-server" => "Webpack development server"
+      }
+    end
+
+    # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+    def check_build_dependencies(package_json)
+      build_deps = additional_build_dependencies
+      all_deps = package_json["dependencies"]&.merge(package_json["devDependencies"] || {}) || {}
+
+      present_deps = []
+      missing_deps = []
+
+      build_deps.each do |package, description|
+        if all_deps[package]
+          present_deps << "#{description} (#{package})"
+        else
+          missing_deps << "#{description} (#{package})"
+        end
+      end
+
+      unless present_deps.empty?
+        short_list = present_deps.take(3).join(", ")
+        suffix = present_deps.length > 3 ? "..." : ""
+        add_info("✅ Build dependencies found: #{short_list}#{suffix}")
+      end
+
+      return if missing_deps.empty?
+
+      short_list = missing_deps.take(3).join(", ")
+      suffix = missing_deps.length > 3 ? "..." : ""
+      add_info("ℹ️  Optional build dependencies: #{short_list}#{suffix}")
+    end
+    # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
     def parse_package_json
       JSON.parse(File.read("package.json"))
