@@ -32,10 +32,6 @@ const IMMEDIATE_HYDRATION_PRO_WARNING =
   "[REACT ON RAILS] The 'immediate_hydration' feature requires a React on Rails Pro license. " +
   'Please visit https://shakacode.com/react-on-rails-pro to get a license.';
 
-const FORCE_LOADING_PRO_WARNING =
-  "[REACT ON RAILS] The 'force_loading' feature requires a React on Rails Pro license. " +
-  'Please visit https://shakacode.com/react-on-rails-pro to get a license.';
-
 async function delegateToRenderer(
   componentObj: RegisteredComponent,
   props: Record<string, unknown>,
@@ -277,8 +273,11 @@ async function forAllElementsAsync(
   await Promise.all(Array.from(els).map(callback));
 }
 
-export const renderOrHydrateForceLoadedComponents = () =>
-  forAllElementsAsync('.js-react-on-rails-component[data-force-load="true"]', renderOrHydrateComponent);
+export const renderOrHydrateImmediateHydratedComponents = () =>
+  forAllElementsAsync(
+    '.js-react-on-rails-component[data-immediate-hydration="true"]',
+    renderOrHydrateComponent,
+  );
 
 export const renderOrHydrateAllComponents = () =>
   forAllElementsAsync('.js-react-on-rails-component', renderOrHydrateComponent);
@@ -312,16 +311,19 @@ export async function hydrateStore(storeNameOrElement: string | Element) {
   await storeRenderer.waitUntilHydrated();
 }
 
-export const hydrateForceLoadedStores = () => {
+export const hydrateImmediateHydratedStores = () => {
   const railsContext = getRailsContext();
   const hasProLicense = railsContext?.rorPro;
 
   if (!hasProLicense) {
-    console.warn(FORCE_LOADING_PRO_WARNING);
+    console.warn(IMMEDIATE_HYDRATION_PRO_WARNING);
     return Promise.resolve();
   }
 
-  return forAllElementsAsync(`[${REACT_ON_RAILS_STORE_ATTRIBUTE}][data-force-load="true"]`, hydrateStore);
+  return forAllElementsAsync(
+    `[${REACT_ON_RAILS_STORE_ATTRIBUTE}][data-immediate-hydration="true"]`,
+    hydrateStore,
+  );
 };
 
 export const hydrateAllStores = () =>

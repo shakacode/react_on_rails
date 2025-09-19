@@ -1,8 +1,8 @@
 import {
   hydrateAllStores,
-  hydrateForceLoadedStores,
+  hydrateImmediateHydratedStores,
   renderOrHydrateAllComponents,
-  renderOrHydrateForceLoadedComponents,
+  renderOrHydrateImmediateHydratedComponents,
   unmountAll,
 } from './pro/ClientSideRenderer.ts';
 import { onPageLoaded, onPageUnloaded } from './pageLifecycle.ts';
@@ -36,8 +36,8 @@ export function clientStartup() {
   // Force loaded components and stores are rendered and hydrated immediately.
   // The hydration process can handle the concurrent hydration of components and stores,
   // so awaiting this isn't necessary.
-  void renderOrHydrateForceLoadedComponents();
-  void hydrateForceLoadedStores();
+  void renderOrHydrateImmediateHydratedComponents();
+  void hydrateImmediateHydratedStores();
 
   // Other components and stores are rendered and hydrated when the page is fully loaded
   onPageLoaded(reactOnRailsPageLoaded);

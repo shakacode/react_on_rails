@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { hydrateForceLoadedStores } from '../src/pro/ClientSideRenderer.ts';
+import { hydrateImmediateHydratedStores } from '../src/pro/ClientSideRenderer.ts';
 import { getRailsContext } from '../src/context.ts';
 
 // Mock the getRailsContext function
@@ -22,14 +22,14 @@ describe('Pro License Validation', () => {
     consoleSpy.mockRestore();
   });
 
-  describe('hydrateForceLoadedStores', () => {
+  describe('hydrateImmediateHydratedStores', () => {
     it('should warn and return early when no Pro license is detected', async () => {
       getRailsContext.mockReturnValue({ rorPro: false });
 
-      const result = await hydrateForceLoadedStores();
+      const result = await hydrateImmediateHydratedStores();
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        "[REACT ON RAILS] The 'force_loading' feature requires a React on Rails Pro license. " +
+        "[REACT ON RAILS] The 'immediate_hydration' feature requires a React on Rails Pro license. " +
           'Please visit https://shakacode.com/react-on-rails-pro to get a license.',
       );
       expect(result).toBeUndefined();
@@ -39,7 +39,7 @@ describe('Pro License Validation', () => {
       getRailsContext.mockReturnValue({ rorPro: true });
 
       // Test that it doesn't warn when license is valid (no force-load elements present)
-      const result = hydrateForceLoadedStores();
+      const result = hydrateImmediateHydratedStores();
 
       expect(consoleSpy).not.toHaveBeenCalled();
       expect(result).toBeDefined();
@@ -48,10 +48,10 @@ describe('Pro License Validation', () => {
     it('should return early when no rails context is available', async () => {
       getRailsContext.mockReturnValue(null);
 
-      const result = await hydrateForceLoadedStores();
+      const result = await hydrateImmediateHydratedStores();
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        "[REACT ON RAILS] The 'force_loading' feature requires a React on Rails Pro license. " +
+        "[REACT ON RAILS] The 'immediate_hydration' feature requires a React on Rails Pro license. " +
           'Please visit https://shakacode.com/react-on-rails-pro to get a license.',
       );
       expect(result).toBeUndefined();
