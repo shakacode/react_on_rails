@@ -203,7 +203,7 @@ module ReactOnRails
       add_warning("⚠️  Could not parse package.json")
     end
 
-    def check_package_version_sync
+    def check_package_version_sync # rubocop:disable Metrics/CyclomaticComplexity
       return unless File.exist?("package.json")
 
       begin
@@ -225,7 +225,7 @@ module ReactOnRails
           gem_major = gem_version.split(".")[0].to_i
           npm_major = clean_npm_version.split(".")[0].to_i
 
-          if gem_major != npm_major
+          if gem_major != npm_major # rubocop:disable Style/NegatedIfElseCondition
             add_error(<<~MSG.strip)
               🚫 Major version mismatch detected:
               • Gem version: #{gem_version} (major: #{gem_major})
@@ -311,7 +311,7 @@ module ReactOnRails
 
       add_info("💡 Advanced webpack debugging:")
       add_info("    1. Add 'debugger;' before 'module.exports' in config/webpack/webpack.config.js")
-      add_info("    2. Run: node --inspect-brk ./bin/shakapacker")
+      add_info("    2. Run: ./bin/shakapacker --debug-shakapacker")
       add_info("    3. Open Chrome DevTools to inspect config object")
       add_info("    📖 See: https://github.com/shakacode/shakapacker/blob/main/docs/troubleshooting.md#debugging-your-webpack-config")
 
@@ -371,15 +371,15 @@ module ReactOnRails
     private
 
     def node_missing?
-      if ReactOnRails::Utils.running_on_windows?
-        `where node 2>/dev/null`.strip.empty?
-      else
-        `which node 2>/dev/null`.strip.empty?
-      end
+      command = ReactOnRails::Utils.running_on_windows? ? "where" : "which"
+      _stdout, _stderr, status = Open3.capture3(command, "node")
+      !status.success?
     end
 
     def cli_exists?(command)
-      system("which #{command} > /dev/null 2>&1")
+      which_command = ReactOnRails::Utils.running_on_windows? ? "where" : "which"
+      _stdout, _stderr, status = Open3.capture3(which_command, command)
+      status.success?
     end
 
     def detect_used_package_manager
@@ -589,16 +589,6 @@ module ReactOnRails
     end
     # rubocop:enable Metrics/CyclomaticComplexity
 
-    def extract_major_minor_version(version_string)
-      # Extract major.minor from version string like "8.1.0" or "7.2.1"
-      match = version_string.match(/^(\d+)\.(\d+)/)
-      return nil unless match
-
-      major = match[1].to_i
-      minor = match[2].to_i
-      major + (minor / 10.0)
-    end
-
     def report_shakapacker_version
       return unless File.exist?("Gemfile.lock")
 
@@ -626,13 +616,19 @@ module ReactOnRails
 
         if shakapacker_match
           version = shakapacker_match[1].strip
-          major_minor = extract_major_minor_version(version)
 
-          if major_minor && major_minor >= 8.2
-            add_success("✅ Shakapacker #{version} (supports React on Rails auto-registration)")
-          elsif major_minor
-            add_warning("⚠️  Shakapacker #{version} - Version 8.2+ needed for React on Rails auto-registration")
-          else
+          begin
+            # Use proper semantic version comparison
+            version_obj = Gem::Version.new(version)
+            threshold_version = Gem::Version.new("8.2")
+
+            if version_obj >= threshold_version
+              add_success("✅ Shakapacker #{version} (supports React on Rails auto-registration)")
+            else
+              add_warning("⚠️  Shakapacker #{version} - Version 8.2+ needed for React on Rails auto-registration")
+            end
+          rescue ArgumentError
+            # Fallback for invalid version strings
             add_success("✅ Shakapacker #{version}")
           end
         else

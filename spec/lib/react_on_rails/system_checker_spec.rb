@@ -66,7 +66,8 @@ RSpec.describe ReactOnRails::SystemChecker do
   describe "#check_node_version" do
     context "when Node.js version is too old" do
       before do
-        allow(checker).to receive(:`).with("node --version 2>/dev/null").and_return("v16.14.0\n")
+        allow(Open3).to receive(:capture3).with("node", "--version")
+                    .and_return(["v16.14.0\n", "", instance_double(Process::Status, success?: true)])
       end
 
       it "adds a warning message" do
@@ -78,7 +79,8 @@ RSpec.describe ReactOnRails::SystemChecker do
 
     context "when Node.js version is compatible" do
       before do
-        allow(checker).to receive(:`).with("node --version 2>/dev/null").and_return("v18.17.0\n")
+        allow(Open3).to receive(:capture3).with("node", "--version")
+                    .and_return(["v18.17.0\n", "", instance_double(Process::Status, success?: true)])
       end
 
       it "adds a success message" do
@@ -91,7 +93,8 @@ RSpec.describe ReactOnRails::SystemChecker do
 
     context "when Node.js version cannot be determined" do
       before do
-        allow(checker).to receive(:`).with("node --version 2>/dev/null").and_return("")
+        allow(Open3).to receive(:capture3).with("node", "--version")
+                    .and_return(["", "", instance_double(Process::Status, success?: false)])
       end
 
       it "does not add any messages" do
@@ -122,12 +125,19 @@ RSpec.describe ReactOnRails::SystemChecker do
         allow(checker).to receive(:cli_exists?).with("yarn").and_return(true)
         allow(checker).to receive(:cli_exists?).with("pnpm").and_return(false)
         allow(checker).to receive(:cli_exists?).with("bun").and_return(false)
+        # Mock file existence checks for lock files so detect_used_package_manager returns nil
+        allow(File).to receive(:exist?).with("yarn.lock").and_return(false)
+        allow(File).to receive(:exist?).with("pnpm-lock.yaml").and_return(false)
+        allow(File).to receive(:exist?).with("bun.lockb").and_return(false)
+        allow(File).to receive(:exist?).with("package-lock.json").and_return(false)
       end
 
       it "adds a success message" do
         result = checker.check_package_manager
         expect(result).to be true
-        expect(checker.messages.any? { |msg| msg[:type] == :success && msg[:content].include?("npm, yarn") }).to be true
+        expect(checker.messages.any? do |msg|
+                 msg[:type] == :success && msg[:content].include?("Package managers available: npm, yarn")
+               end).to be true
       end
     end
   end
@@ -150,13 +160,17 @@ RSpec.describe ReactOnRails::SystemChecker do
       before do
         allow(checker).to receive(:shakapacker_configured?).and_return(true)
         allow(checker).to receive(:check_shakapacker_in_gemfile)
+        allow(File).to receive(:exist?).with("Gemfile.lock").and_return(true)
+        lockfile_content = %(GEM\n  remote: https://rubygems.org/\n  specs:\n) +
+                           %(    activesupport (7.1.3.2)\n    shakapacker (8.2.0)\n      activesupport (>= 5.2)\n)
+        allow(File).to receive(:read).with("Gemfile.lock").and_return(lockfile_content)
       end
 
       it "adds a success message and checks gemfile" do
         result = checker.check_shakapacker_configuration
         expect(result).to be true
         expect(checker.messages.any? do |msg|
-                 msg[:type] == :success && msg[:content].include?("Shakapacker is properly configured")
+                 msg[:type] == :success && msg[:content].include?("Shakapacker 8.2.0")
                end).to be true
         expect(checker).to have_received(:check_shakapacker_in_gemfile)
       end
@@ -223,8 +237,9 @@ RSpec.describe ReactOnRails::SystemChecker do
       end
 
       before do
-        allow(File).to receive(:exist?).with("Gemfile").and_return(true)
-        allow(File).to receive(:read).with("Gemfile").and_return(gemfile_content)
+        gemfile_path = ENV["BUNDLE_GEMFILE"] || "Gemfile"
+        allow(File).to receive(:exist?).with(gemfile_path).and_return(true)
+        allow(File).to receive(:read).with(gemfile_path).and_return(gemfile_content)
         stub_const("ReactOnRails::VERSION", "16.0.0")
       end
 
@@ -244,8 +259,9 @@ RSpec.describe ReactOnRails::SystemChecker do
       end
 
       before do
-        allow(File).to receive(:exist?).with("Gemfile").and_return(true)
-        allow(File).to receive(:read).with("Gemfile").and_return(gemfile_content)
+        gemfile_path = ENV["BUNDLE_GEMFILE"] || "Gemfile"
+        allow(File).to receive(:exist?).with(gemfile_path).and_return(true)
+        allow(File).to receive(:read).with(gemfile_path).and_return(gemfile_content)
       end
 
       it "does not warn about exact versions" do
@@ -308,12 +324,14 @@ RSpec.describe ReactOnRails::SystemChecker do
   describe "private methods" do
     describe "#cli_exists?" do
       it "returns true when command exists" do
-        allow(checker).to receive(:system).with("which npm > /dev/null 2>&1").and_return(true)
+        allow(Open3).to receive(:capture3).with("which", "npm")
+                    .and_return(["", "", instance_double(Process::Status, success?: true)])
         expect(checker.send(:cli_exists?, "npm")).to be true
       end
 
       it "returns false when command does not exist" do
-        allow(checker).to receive(:system).with("which nonexistent > /dev/null 2>&1").and_return(false)
+        allow(Open3).to receive(:capture3).with("which", "nonexistent")
+                    .and_return(["", "", instance_double(Process::Status, success?: false)])
         expect(checker.send(:cli_exists?, "nonexistent")).to be false
       end
     end
@@ -359,10 +377,7 @@ RSpec.describe ReactOnRails::SystemChecker do
 
         messages = checker.messages
         expect(messages.any? do |msg|
-                 msg[:type] == :info && msg[:content].include?("React version: ^18.2.0")
-               end).to be true
-        expect(messages.any? do |msg|
-                 msg[:type] == :info && msg[:content].include?("React DOM version: ^18.2.0")
+                 msg[:type] == :success && msg[:content].include?("React ^18.2.0, React DOM ^18.2.0")
                end).to be true
       end
     end
