@@ -160,6 +160,13 @@ const config = tsEslint.config([
     },
   },
   {
+    files: ['spec/dummy/**/*'],
+    rules: {
+      // The dummy app dependencies are managed separately and may not be installed
+      'import/no-unresolved': 'off',
+    },
+  },
+  {
     files: ['**/*.ts{x,}', '**/*.[cm]ts'],
 
     extends: tsEslint.configs.strictTypeChecked,
