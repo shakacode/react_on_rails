@@ -2,6 +2,16 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## ⚠️ CRITICAL REQUIREMENTS
+
+**BEFORE EVERY COMMIT/PUSH:**
+
+1. **ALWAYS run `bundle exec rubocop` and fix ALL violations**
+2. **ALWAYS ensure files end with a newline character**
+3. **NEVER push without running full lint check first**
+
+These requirements are non-negotiable. CI will fail if not followed.
+
 ## Development Commands
 
 ### Essential Commands
@@ -11,15 +21,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - Ruby tests: `rake run_rspec`
   - JavaScript tests: `yarn run test` or `rake js_tests`
   - All tests: `rake` (default task runs lint and all tests except examples)
-- **Linting**:
+- **Linting** (MANDATORY BEFORE EVERY COMMIT):
+  - **REQUIRED**: `bundle exec rubocop` - Must pass with zero offenses
   - All linters: `rake lint` (runs ESLint and RuboCop)
   - ESLint only: `yarn run lint` or `rake lint:eslint`
   - RuboCop only: `rake lint:rubocop`
 - **Code Formatting**:
-  - Format code with Prettier: `yarn start format`
+  - Format code with Prettier: `rake autofix`
   - Check formatting without fixing: `yarn start format.listDifferent`
 - **Build**: `yarn run build` (compiles TypeScript to JavaScript in node_package/lib)
 - **Type checking**: `yarn run type-check`
+- **⚠️ MANDATORY BEFORE GIT PUSH**: `bundle exec rubocop` and fix ALL violations + ensure trailing newlines
 
 ### Development Setup Commands
 

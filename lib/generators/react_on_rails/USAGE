@@ -1,0 +1,65 @@
+Description:
+    The `react_on_rails:doctor` generator diagnoses your React on Rails setup
+    and identifies potential configuration issues. It performs comprehensive
+    checks on your environment, dependencies, and configuration files.
+
+    This command is especially useful for:
+    • Troubleshooting setup issues
+    • Verifying installation after running react_on_rails:install
+    • Ensuring compatibility after upgrades
+    • Getting help with configuration problems
+
+Example:
+    # Basic diagnosis
+    rails generate react_on_rails:doctor
+
+    # Verbose output showing all checks
+    rails generate react_on_rails:doctor --verbose
+
+    # Show help
+    rails generate react_on_rails:doctor --help
+
+Checks performed:
+    Environment Prerequisites:
+    • Node.js installation and version compatibility
+    • JavaScript package manager availability (npm, yarn, pnpm, bun)
+    • Git working directory status
+
+    React on Rails Packages:
+    • React on Rails gem installation
+    • react-on-rails NPM package installation
+    • Version synchronization between gem and NPM package
+    • Shakapacker configuration and installation
+
+    Dependencies:
+    • React and React DOM installation
+    • Babel preset configuration
+    • Required development dependencies
+
+    Rails Integration:
+    • React on Rails initializer configuration
+    • Route and controller setup (Hello World example)
+    • View helper integration
+
+    Webpack Configuration:
+    • Webpack config file existence and structure
+    • React on Rails compatibility checks
+    • Environment-specific configuration validation
+
+    Development Environment:
+    • JavaScript bundle files
+    • Procfile.dev for development workflow
+    • .gitignore configuration for generated files
+
+Options:
+    --verbose, -v: Show detailed output for all checks, including successful ones
+    --fix, -f:     Attempt to fix simple issues automatically (planned feature)
+
+Exit codes:
+    0: All checks passed or only warnings found
+    1: Critical errors found that prevent React on Rails from working
+
+For more help:
+    • Documentation: https://github.com/shakacode/react_on_rails
+    • Issues: https://github.com/shakacode/react_on_rails/issues
+    • Discord: https://discord.gg/reactrails
