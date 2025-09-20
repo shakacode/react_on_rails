@@ -5,6 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## ⚠️ CRITICAL REQUIREMENTS
 
 **BEFORE EVERY COMMIT/PUSH:**
+
 1. **ALWAYS run `bundle exec rubocop` and fix ALL violations**
 2. **ALWAYS ensure files end with a newline character**
 3. **NEVER push without running full lint check first**
@@ -99,4 +100,3 @@ Exclude these directories to prevent IDE slowdowns:
 - `/coverage`, `/tmp`, `/gen-examples`, `/node_package/lib`
 - `/node_modules`, `/spec/dummy/node_modules`, `/spec/dummy/tmp`
 - `/spec/dummy/app/assets/webpack`, `/spec/dummy/log`
-
