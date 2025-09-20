@@ -1,0 +1,132 @@
+#!/bin/bash
+# Install Git hooks for React on Rails development
+# This script sets up pre-commit hooks to prevent CI failures
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+HOOKS_DIR="$REPO_ROOT/.git/hooks"
+
+echo "🪝 Installing Git hooks for React on Rails..."
+
+# Ensure hooks directory exists
+mkdir -p "$HOOKS_DIR"
+
+# Install pre-commit hook
+cat > "$HOOKS_DIR/pre-commit" << 'EOF'
+#!/bin/sh
+# Pre-commit hook to run linting and formatting on all branch changes vs master
+# This prevents CI failures by catching issues early on all modified files
+
+set -e
+
+echo "🔍 Running pre-commit checks on branch changes..."
+
+# Find the merge base with master to get all files changed in this branch
+MERGE_BASE=$(git merge-base HEAD origin/master 2>/dev/null || git merge-base HEAD master 2>/dev/null || echo "master")
+
+# Get all files changed in this branch (both staged and unstaged)
+BRANCH_FILES=$(git diff --name-only "$MERGE_BASE"...HEAD 2>/dev/null || true)
+UNSTAGED_FILES=$(git diff --name-only 2>/dev/null || true)
+
+# Combine and deduplicate files, filter out invalid entries
+ALL_CHANGED_FILES=$(echo -e "$BRANCH_FILES\n$UNSTAGED_FILES" | sort -u | grep -v '^$' | grep -v '^-' || true)
+
+if [ -z "$ALL_CHANGED_FILES" ]; then
+    echo "ℹ️  No changed files to check in this branch"
+    exit 0
+fi
+
+echo "📝 Files changed in this branch vs master:"
+echo "$ALL_CHANGED_FILES" | sed 's/^/  - /'
+
+# Track if any checks fail
+CHECKS_FAILED=0
+
+# Check Ruby files with RuboCop
+RUBY_FILES=$(echo "$ALL_CHANGED_FILES" | grep -E '\.(rb|rake)$' | grep -v '^$' || true)
+if [ -n "$RUBY_FILES" ]; then
+    echo ""
+    echo "🔍 Checking Ruby files with RuboCop..."
+    RUBY_FILES_LIST=$(echo "$RUBY_FILES" | tr '\n' ' ')
+    if ! bundle exec rubocop $RUBY_FILES_LIST; then
+        echo "❌ RuboCop check failed!"
+        echo "💡 Auto-fix: bundle exec rubocop $RUBY_FILES_LIST --auto-correct"
+        CHECKS_FAILED=1
+    else
+        echo "✅ RuboCop checks passed for Ruby files"
+    fi
+fi
+
+# Check JS/TS/JSON/MD files with Prettier
+PRETTIER_FILES=$(echo "$ALL_CHANGED_FILES" | grep -E '\.(js|jsx|ts|tsx|json|md|yml|yaml)$' | grep -v '^$' || true)
+if [ -n "$PRETTIER_FILES" ]; then
+    echo ""
+    echo "🔍 Checking formatting with Prettier..."
+    PRETTIER_FILES_LIST=$(echo "$PRETTIER_FILES" | tr '\n' ' ')
+    if ! yarn run prettier --check $PRETTIER_FILES_LIST 2>/dev/null; then
+        echo "❌ Prettier check failed!"
+        echo "💡 Auto-fix: yarn run prettier --write $PRETTIER_FILES_LIST"
+        CHECKS_FAILED=1
+    else
+        echo "✅ Prettier checks passed for JS/TS/MD files"
+    fi
+fi
+
+# Check for missing trailing newlines in tracked files
+echo ""
+echo "🔍 Checking for trailing newlines..."
+NEWLINE_ISSUES=""
+for file in $ALL_CHANGED_FILES; do
+    if [ -f "$file" ] && [ -s "$file" ]; then
+        if ! tail -c 1 "$file" | grep -q '^$'; then
+            echo "❌ Missing trailing newline: $file"
+            NEWLINE_ISSUES="$NEWLINE_ISSUES $file"
+            CHECKS_FAILED=1
+        fi
+    fi
+done
+
+if [ -z "$NEWLINE_ISSUES" ]; then
+    echo "✅ All files have proper trailing newlines"
+fi
+
+# Summary
+echo ""
+if [ $CHECKS_FAILED -eq 0 ]; then
+    echo "✅ All pre-commit checks passed!"
+    echo "📊 Checked $(echo "$ALL_CHANGED_FILES" | wc -l | tr -d ' ') files changed in this branch"
+    exit 0
+else
+    echo "❌ Pre-commit checks failed!"
+    echo "🛠️  Please fix the issues above and try committing again."
+    echo ""
+    echo "🚀 Quick fixes:"
+    if [ -n "$RUBY_FILES" ]; then
+        echo "  Ruby: bundle exec rubocop $(echo "$RUBY_FILES" | tr '\n' ' ') --auto-correct"
+    fi
+    if [ -n "$PRETTIER_FILES" ]; then
+        echo "  Format: yarn run prettier --write $(echo "$PRETTIER_FILES" | tr '\n' ' ')"
+    fi
+    if [ -n "$NEWLINE_ISSUES" ]; then
+        echo "  Newlines: Add trailing newline to:$NEWLINE_ISSUES"
+    fi
+    echo ""
+    echo "📊 Failed on $(echo "$ALL_CHANGED_FILES" | wc -l | tr -d ' ') files changed in this branch"
+    exit 1
+fi
+EOF
+
+# Make hook executable
+chmod +x "$HOOKS_DIR/pre-commit"
+
+echo "✅ Pre-commit hook installed successfully!"
+echo ""
+echo "🚀 The hook will now run automatically before each commit and check:"
+echo "  - RuboCop for Ruby files changed in your branch"
+echo "  - Prettier for JS/TS/JSON/MD files changed in your branch"
+echo "  - Trailing newlines for all changed files"
+echo ""
+echo "💡 To skip the hook temporarily: git commit --no-verify"
+echo "🔧 To uninstall: rm $HOOKS_DIR/pre-commit"
