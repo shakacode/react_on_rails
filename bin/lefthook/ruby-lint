@@ -10,7 +10,11 @@ if [ -z "$files" ]; then
   exit 0
 fi
 
-echo "🔍 RuboCop on $CONTEXT Ruby files:"
+if [ "$CONTEXT" = "all-changed" ]; then
+  echo "🔍 RuboCop on all changed Ruby files:"
+else
+  echo "🔍 RuboCop on $CONTEXT Ruby files:"
+fi
 printf "  %s\n" $files
 
 if ! bundle exec rubocop --force-exclusion --display-cop-names -- $files; then

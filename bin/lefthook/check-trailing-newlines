@@ -10,7 +10,11 @@ if [ -z "$files" ]; then
   exit 0
 fi
 
-echo "🔍 Checking trailing newlines on $CONTEXT files..."
+if [ "$CONTEXT" = "all-changed" ]; then
+  echo "🔍 Checking trailing newlines on all changed files..."
+else
+  echo "🔍 Checking trailing newlines on $CONTEXT files..."
+fi
 
 failed_files=""
 for file in $files; do

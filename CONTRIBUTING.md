@@ -7,15 +7,9 @@
 ## Prerequisites
 
 - [Yalc](https://github.com/whitecolor/yalc) must be installed globally for most local development.
-- **Git hooks setup** (REQUIRED for all contributors):
+- **Git hooks setup** (automatic during normal setup):
 
-```sh
-cd react_on_rails/
-bundle install
-bundle exec lefthook install
-```
-
-This sets up automatic linting that runs **only on files you changed** - making commits fast while preventing CI failures.
+Git hooks are installed automatically when you run the standard setup commands. They will run automatic linting on **all changed files (staged + unstaged + untracked)** - making commits fast while preventing CI failures.
 
 - After updating code via Git, to prepare all examples:
 
@@ -492,10 +486,10 @@ rake lint
 
 - Format JavaScript/TypeScript files with Prettier (on changed files only)
 - Check and fix linting issues with ESLint
-- Check and fix Ruby style issues with RuboCop (on changed files only)
+- Check and fix Ruby style issues with RuboCop (on all changed files)
 - Ensure trailing newlines on all files
 
-**Setup once**: `bundle exec lefthook install` (see Prerequisites above)
+**Setup**: Automatic during normal development setup
 
 ## 🤖 Best Practices for AI Coding Agents
 

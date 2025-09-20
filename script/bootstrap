@@ -30,4 +30,10 @@ if [ -f "Gemfile" ]; then
   bundle check --path vendor/gems 2>&1 >/dev/null || {
     bundle install --path vendor/gems --quiet --without production
   }
+
+  # Install Git hooks for code quality (development only)
+  if [ -f ".lefthook.yml" ] && [ -d ".git" ]; then
+    echo "==> Installing Git hooks for code quality…"
+    bundle exec lefthook install
+  fi
 fi

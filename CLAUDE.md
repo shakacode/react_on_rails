@@ -12,15 +12,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 These requirements are non-negotiable. CI will fail if not followed.
 
-**🚀 RECOMMENDED: Install Git hooks to automate these checks:**
+**🚀 AUTOMATIC: Git hooks are installed automatically during setup**
 
-```bash
-# Install Lefthook hooks (already included in Gemfile)
-bundle install
-bundle exec lefthook install
-```
-
-This will automatically run linting on **only the files you changed** before each commit - making it fast!
+Git hooks will automatically run linting on **all changed files (staged + unstaged + untracked)** before each commit - making it fast while preventing CI failures!
 
 **Note:** Git hooks are for React on Rails gem developers only, not for users who install the gem.
 
