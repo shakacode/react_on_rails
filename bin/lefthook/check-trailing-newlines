@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Check for trailing newlines on all changed files
+set -euo pipefail
+
+CONTEXT="${1:-staged}"
+files="$(bin/lefthook/get-changed-files "$CONTEXT" '.*')"
+
+if [ -z "$files" ]; then
+  echo "✅ No files to check for trailing newlines"
+  exit 0
+fi
+
+if [ "$CONTEXT" = "all-changed" ]; then
+  echo "🔍 Checking trailing newlines on all changed files..."
+else
+  echo "🔍 Checking trailing newlines on $CONTEXT files..."
+fi
+
+failed_files=""
+for file in $files; do
+  if [ -f "$file" ] && [ -s "$file" ]; then
+    if ! tail -c 1 "$file" | grep -q '^$'; then
+      echo "❌ Missing trailing newline: $file"
+      failed_files="$failed_files $file"
+    fi
+  fi
+done
+
+if [ -n "$failed_files" ]; then
+  echo ""
+  echo "❌ Trailing newline check failed!"
+  echo "💡 Add trailing newlines to:$failed_files"
+  echo "🔧 Quick fix: for file in$failed_files; do echo >> \"\$file\"; done"
+  echo "🚫 Skip hook: git commit --no-verify"
+  exit 1
+fi
+
+echo "✅ All files have proper trailing newlines"

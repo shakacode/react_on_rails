@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Format JS/TS/JSON/MD files with Prettier
+set -euo pipefail
+
+CONTEXT="${1:-staged}"
+files="$(bin/lefthook/get-changed-files "$CONTEXT" '\.(js|jsx|ts|tsx|json|md|yml|yaml)$')"
+
+if [ -z "$files" ]; then
+  echo "✅ No files to format with Prettier"
+  exit 0
+fi
+
+if [ "$CONTEXT" = "all-changed" ]; then
+  echo "💅 Prettier on all changed files:"
+else
+  echo "💅 Prettier on $CONTEXT files:"
+fi
+printf "  %s\n" $files
+
+yarn run prettier --write $files
+
+# Re-stage files if running on staged or all-changed context
+if [ "$CONTEXT" = "staged" ] || [ "$CONTEXT" = "all-changed" ]; then
+  echo $files | xargs -r git add
+  echo "✅ Re-staged formatted files"
+fi

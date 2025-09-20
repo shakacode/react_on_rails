@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Lint Ruby files with RuboCop
+set -euo pipefail
+
+CONTEXT="${1:-staged}"
+files="$(bin/lefthook/get-changed-files "$CONTEXT" '\.(rb|rake|ru)$')"
+
+if [ -z "$files" ]; then
+  echo "✅ No Ruby files to lint"
+  exit 0
+fi
+
+if [ "$CONTEXT" = "all-changed" ]; then
+  echo "🔍 RuboCop on all changed Ruby files:"
+else
+  echo "🔍 RuboCop on $CONTEXT Ruby files:"
+fi
+printf "  %s\n" $files
+
+if ! bundle exec rubocop --force-exclusion --display-cop-names -- $files; then
+  echo ""
+  echo "❌ RuboCop check failed!"
+  echo "💡 Auto-fix: bundle exec rubocop --auto-correct --force-exclusion -- $files"
+  echo "🚫 Skip hook: git commit --no-verify"
+  exit 1
+fi
+echo "✅ RuboCop checks passed for Ruby files"

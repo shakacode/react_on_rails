@@ -7,6 +7,10 @@
 ## Prerequisites
 
 - [Yalc](https://github.com/whitecolor/yalc) must be installed globally for most local development.
+- **Git hooks setup** (automatic during normal setup):
+
+Git hooks are installed automatically when you run the standard setup commands. They will run automatic linting on **all changed files (staged + unstaged + untracked)** - making commits fast while preventing CI failures.
+
 - After updating code via Git, to prepare all examples:
 
 ```sh
@@ -457,7 +461,9 @@ This approach:
 
 ## Pre-Commit Requirements
 
-**CRITICAL**: Before committing any changes, always run the following commands to ensure code quality:
+**AUTOMATED**: If you've set up Lefthook (see Prerequisites), linting runs automatically on changed files before each commit.
+
+**MANUAL OPTION**: If you need to run linting manually:
 
 ```bash
 # Navigate to the main react_on_rails directory
@@ -476,14 +482,14 @@ rake lint:rubocop
 rake lint
 ```
 
-**Automated checks:**
+**Git hooks automatically run:**
 
-- Format all JavaScript/TypeScript files with Prettier
+- Format JavaScript/TypeScript files with Prettier (on changed files only)
 - Check and fix linting issues with ESLint
-- Check and fix Ruby style issues with RuboCop
-- Ensure all tests pass before pushing
+- Check and fix Ruby style issues with RuboCop (on all changed files)
+- Ensure trailing newlines on all files
 
-**Tip**: Set up your IDE to run these automatically on save to catch issues early.
+**Setup**: Automatic during normal development setup
 
 ## 🤖 Best Practices for AI Coding Agents
 

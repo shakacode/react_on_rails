@@ -102,7 +102,8 @@
     "type-check": "yarn run tsc --noEmit --noErrorTruncation",
     "release:patch": "node_package/scripts/release patch",
     "release:minor": "node_package/scripts/release minor",
-    "release:major": "node_package/scripts/release major"
+    "release:major": "node_package/scripts/release major",
+    "postinstall": "test -f .lefthook.yml && test -d .git && command -v bundle >/dev/null 2>&1 && bundle exec lefthook install || true"
   },
   "repository": {
     "type": "git",

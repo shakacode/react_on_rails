@@ -12,6 +12,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 These requirements are non-negotiable. CI will fail if not followed.
 
+**🚀 AUTOMATIC: Git hooks are installed automatically during setup**
+
+Git hooks will automatically run linting on **all changed files (staged + unstaged + untracked)** before each commit - making it fast while preventing CI failures!
+
+**Note:** Git hooks are for React on Rails gem developers only, not for users who install the gem.
+
 ## Development Commands
 
 ### Essential Commands
