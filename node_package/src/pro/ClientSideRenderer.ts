@@ -1,17 +1,31 @@
+/*
+ * Copyright (c) 2025 Shakacode LLC
+ *
+ * This file is NOT licensed under the MIT (open source) license.
+ * It is part of the React on Rails Pro offering and is licensed separately.
+ *
+ * Unauthorized copying, modification, distribution, or use of this file,
+ * via any medium, is strictly prohibited without a valid license agreement
+ * from Shakacode LLC.
+ *
+ * For licensing terms, please see:
+ * https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md
+ */
+
 /* eslint-disable max-classes-per-file */
 
 import type { ReactElement } from 'react';
-import type { RailsContext, RegisteredComponent, RenderFunction, Root } from './types/index.ts';
+import type { RailsContext, RegisteredComponent, RenderFunction, Root } from '../types/index.ts';
 
-import { getRailsContext, resetRailsContext } from './context.ts';
-import createReactOutput from './createReactOutput.ts';
-import { isServerRenderHash } from './isServerRenderResult.ts';
-import { supportsHydrate, supportsRootApi, unmountComponentAtNode } from './reactApis.cts';
-import reactHydrateOrRender from './reactHydrateOrRender.ts';
-import { debugTurbolinks } from './turbolinksUtils.ts';
+import { getRailsContext, resetRailsContext } from '../context.ts';
+import createReactOutput from '../createReactOutput.ts';
+import { isServerRenderHash } from '../isServerRenderResult.ts';
+import { supportsHydrate, supportsRootApi, unmountComponentAtNode } from '../reactApis.cts';
+import reactHydrateOrRender from '../reactHydrateOrRender.ts';
+import { debugTurbolinks } from '../turbolinksUtils.ts';
 import * as StoreRegistry from './StoreRegistry.ts';
 import * as ComponentRegistry from './ComponentRegistry.ts';
-import { onPageLoaded } from './pageLifecycle.ts';
+import { onPageLoaded } from '../pageLifecycle.ts';
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
 const IMMEDIATE_HYDRATION_PRO_WARNING =
@@ -59,7 +73,9 @@ class ComponentRenderer {
     this.domNodeId = domId;
     this.state = 'rendering';
     const el =
-      typeof domIdOrElement === 'string' ? document.querySelector(`[data-dom-id=${domId}]`) : domIdOrElement;
+      typeof domIdOrElement === 'string'
+        ? document.querySelector(`[data-dom-id="${CSS.escape(domId)}"]`)
+        : domIdOrElement;
     if (!el) return;
 
     const storeDependencies = el.getAttribute('data-store-dependencies');
@@ -257,8 +273,11 @@ async function forAllElementsAsync(
   await Promise.all(Array.from(els).map(callback));
 }
 
-export const renderOrHydrateForceLoadedComponents = () =>
-  forAllElementsAsync('.js-react-on-rails-component[data-force-load="true"]', renderOrHydrateComponent);
+export const renderOrHydrateImmediateHydratedComponents = () =>
+  forAllElementsAsync(
+    '.js-react-on-rails-component[data-immediate-hydration="true"]',
+    renderOrHydrateComponent,
+  );
 
 export const renderOrHydrateAllComponents = () =>
   forAllElementsAsync('.js-react-on-rails-component', renderOrHydrateComponent);
@@ -280,7 +299,7 @@ export async function hydrateStore(storeNameOrElement: string | Element) {
   if (!storeRenderer) {
     const storeDataElement =
       typeof storeNameOrElement === 'string'
-        ? document.querySelector(`[${REACT_ON_RAILS_STORE_ATTRIBUTE}="${storeNameOrElement}"]`)
+        ? document.querySelector(`[${REACT_ON_RAILS_STORE_ATTRIBUTE}="${CSS.escape(storeNameOrElement)}"]`)
         : storeNameOrElement;
     if (!storeDataElement) {
       return;
@@ -292,8 +311,8 @@ export async function hydrateStore(storeNameOrElement: string | Element) {
   await storeRenderer.waitUntilHydrated();
 }
 
-export const hydrateForceLoadedStores = () =>
-  forAllElementsAsync(`[${REACT_ON_RAILS_STORE_ATTRIBUTE}][data-force-load="true"]`, hydrateStore);
+export const hydrateImmediateHydratedStores = () =>
+  forAllElementsAsync(`[${REACT_ON_RAILS_STORE_ATTRIBUTE}][data-immediate-hydration="true"]`, hydrateStore);
 
 export const hydrateAllStores = () =>
   forAllElementsAsync(`[${REACT_ON_RAILS_STORE_ATTRIBUTE}]`, hydrateStore);

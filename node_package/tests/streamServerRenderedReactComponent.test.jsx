@@ -4,8 +4,8 @@
 
 import * as React from 'react';
 import * as PropTypes from 'prop-types';
-import streamServerRenderedReactComponent from '../src/streamServerRenderedReactComponent.ts';
-import * as ComponentRegistry from '../src/ComponentRegistry.ts';
+import streamServerRenderedReactComponent from '../src/pro/streamServerRenderedReactComponent.ts';
+import * as ComponentRegistry from '../src/pro/ComponentRegistry.ts';
 import ReactOnRails from '../src/ReactOnRails.node.ts';
 
 const AsyncContent = async ({ throwAsyncError }) => {

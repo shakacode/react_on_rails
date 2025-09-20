@@ -23,6 +23,21 @@ After a release, please make sure to run `bundle exec rake update_changelog`. Th
 
 Changes since the last non-beta release.
 
+#### Pro License Structure Implementation
+
+**🔐 License Architecture**
+
+- **Core/Pro separation**: Moved Pro features into dedicated `lib/react_on_rails/pro/` and `node_package/src/pro/` directories with clear licensing boundaries [PR 1791](https://github.com/shakacode/react_on_rails/pull/1791) by [abanoubghadban](https://github.com/AbanoubGhadban)
+- **Runtime license validation**: Implemented Pro license gating with graceful fallback to core functionality when Pro license unavailable
+- **License documentation**: Added NOTICE files in Pro directories referencing canonical `REACT-ON-RAILS-PRO-LICENSE.md`
+- **Updated LICENSE.md**: Clearly distinguishes core MIT license from Pro-licensed directories
+
+**⚡ Pro Feature Enhancements**
+
+- **Immediate hydration**: Enhanced immediate hydration functionality with Pro license validation and warning badges
+- **Security improvements**: Hardened DOM selectors using `CSS.escape()` and proper JavaScript escaping for XSS protection
+- **Architecture refactoring**: Centralized Pro utilities and clean separation between core and Pro helper functionality
+
 #### Enhanced TypeScript Generator Support
 
 **🔧 Generator Improvements**

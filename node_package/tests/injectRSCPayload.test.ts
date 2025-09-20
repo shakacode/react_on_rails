@@ -1,7 +1,7 @@
 import { Readable, PassThrough } from 'stream';
 import { RailsContextWithServerStreamingCapabilities } from '../src/types/index.ts';
-import injectRSCPayload from '../src/injectRSCPayload.ts';
-import RSCRequestTracker from '../src/RSCRequestTracker.ts';
+import injectRSCPayload from '../src/pro/injectRSCPayload.ts';
+import RSCRequestTracker from '../src/pro/RSCRequestTracker.ts';
 
 // Shared utilities
 const createMockStream = (chunks: (string | Buffer)[] | { [key: number]: string | string[] }) => {

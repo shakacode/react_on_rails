@@ -42,12 +42,16 @@ class HelloWorldRehydratable extends React.Component {
     const { railsContext } = this.props;
 
     // Target all instances of the component in the DOM
-    const match = document.querySelectorAll(`[id^=${registeredComponentName}-react-component-]`);
+    const match = document.querySelectorAll(
+      `[id^="${CSS.escape(registeredComponentName)}-react-component-"]`,
+    );
     // Not all browsers support forEach on NodeList so we go with a classic for-loop
     for (let i = 0; i < match.length; i += 1) {
       const component = match[i];
       // Get component specification <script> tag
-      const componentSpecificationTag = document.querySelector(`script[data-dom-id=${component.id}]`);
+      const componentSpecificationTag = document.querySelector(
+        `script[data-dom-id="${CSS.escape(component.id)}"]`,
+      );
       // Read props from the component specification tag and merge railsContext
       const mergedProps = { ...JSON.parse(componentSpecificationTag.textContent), railsContext };
       // Hydrate

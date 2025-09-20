@@ -1,3 +1,17 @@
+/*
+ * Copyright (c) 2025 Shakacode LLC
+ *
+ * This file is NOT licensed under the MIT (open source) license.
+ * It is part of the React on Rails Pro offering and is licensed separately.
+ *
+ * Unauthorized copying, modification, distribution, or use of this file,
+ * via any medium, is strictly prohibited without a valid license agreement
+ * from Shakacode LLC.
+ *
+ * For licensing terms, please see:
+ * https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md
+ */
+
 import { BundleManifest } from 'react-on-rails-rsc';
 import { buildServerRenderer } from 'react-on-rails-rsc/server.node';
 import { Readable } from 'stream';
@@ -7,17 +21,17 @@ import {
   assertRailsContextWithServerStreamingCapabilities,
   StreamRenderState,
   StreamableComponentResult,
-} from './types/index.ts';
-import ReactOnRails from './ReactOnRails.full.ts';
-import handleError from './handleError.ts';
-import { convertToError } from './serverRenderUtils.ts';
+} from '../types/index.ts';
+import ReactOnRails from '../ReactOnRails.full.ts';
+import handleError from '../handleError.ts';
+import { convertToError } from '../serverRenderUtils.ts';
 
 import {
   streamServerRenderedComponent,
   StreamingTrackers,
   transformRenderStreamChunksToResultObject,
 } from './streamServerRenderedReactComponent.ts';
-import loadJsonFile from './loadJsonFile.ts';
+import loadJsonFile from '../loadJsonFile.ts';
 
 let serverRendererPromise: Promise<ReturnType<typeof buildServerRenderer>> | undefined;
 
@@ -93,5 +107,5 @@ ReactOnRails.serverRenderRSCReactComponent = (options: RSCRenderParams) => {
 
 ReactOnRails.isRSCBundle = true;
 
-export * from './types/index.ts';
+export * from '../types/index.ts';
 export default ReactOnRails;

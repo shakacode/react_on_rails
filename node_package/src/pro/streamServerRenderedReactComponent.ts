@@ -1,13 +1,27 @@
+/*
+ * Copyright (c) 2025 Shakacode LLC
+ *
+ * This file is NOT licensed under the MIT (open source) license.
+ * It is part of the React on Rails Pro offering and is licensed separately.
+ *
+ * Unauthorized copying, modification, distribution, or use of this file,
+ * via any medium, is strictly prohibited without a valid license agreement
+ * from Shakacode LLC.
+ *
+ * For licensing terms, please see:
+ * https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md
+ */
+
 import * as React from 'react';
 import { PassThrough, Readable } from 'stream';
 
 import * as ComponentRegistry from './ComponentRegistry.ts';
-import createReactOutput from './createReactOutput.ts';
-import { isPromise, isServerRenderHash } from './isServerRenderResult.ts';
-import buildConsoleReplay from './buildConsoleReplay.ts';
-import handleError from './handleError.ts';
-import { renderToPipeableStream } from './ReactDOMServer.cts';
-import { createResultObject, convertToError, validateComponent } from './serverRenderUtils.ts';
+import createReactOutput from '../createReactOutput.ts';
+import { isPromise, isServerRenderHash } from '../isServerRenderResult.ts';
+import buildConsoleReplay from '../buildConsoleReplay.ts';
+import handleError from '../handleError.ts';
+import { renderToPipeableStream } from '../ReactDOMServer.cts';
+import { createResultObject, convertToError, validateComponent } from '../serverRenderUtils.ts';
 import {
   assertRailsContextWithServerStreamingCapabilities,
   RenderParams,
@@ -16,7 +30,7 @@ import {
   PipeableOrReadableStream,
   RailsContextWithServerStreamingCapabilities,
   assertRailsContextWithServerComponentMetadata,
-} from './types/index.ts';
+} from '../types/index.ts';
 import injectRSCPayload from './injectRSCPayload.ts';
 import PostSSRHookTracker from './PostSSRHookTracker.ts';
 import RSCRequestTracker from './RSCRequestTracker.ts';
