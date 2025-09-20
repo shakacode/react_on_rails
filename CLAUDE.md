@@ -12,6 +12,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 These requirements are non-negotiable. CI will fail if not followed.
 
+**🚀 RECOMMENDED: Install Git hooks to automate these checks:**
+
+```bash
+./bin/install-git-hooks
+```
+
+This will automatically run linting on all files changed in your branch before each commit.
+
 ## Development Commands
 
 ### Essential Commands
