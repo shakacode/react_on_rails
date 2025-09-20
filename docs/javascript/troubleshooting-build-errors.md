@@ -15,6 +15,7 @@ This guide covers common webpack build errors encountered when using react_on_ra
 **Note:** This error only occurs if you're using the optional `js-routes` gem to access Rails routes in JavaScript.
 
 ### Error Message
+
 ```
 Cannot read properties of undefined (reading 'module')
 TypeError: Cannot read properties of undefined (reading 'module')
@@ -22,31 +23,40 @@ TypeError: Cannot read properties of undefined (reading 'module')
 ```
 
 ### Root Cause
+
 This error occurs when:
+
 1. Your webpack config references Rails routes via ProvidePlugin
 2. The `js-routes` gem hasn't generated the JavaScript routes file
 3. You're using `js-routes` integration but missing the generated file
 
 ### When You Need js-routes
+
 `js-routes` is **optional** and typically used when:
+
 - Rails-heavy apps with React components that need to navigate to Rails routes
 - Server-side rendered apps mixing Rails and React routing
 - Legacy Rails apps migrating ERB views to React
 - Apps using Rails routing patterns for RESTful APIs
 
 ### When You DON'T Need js-routes
+
 Most modern React apps use:
+
 - Client-side routing (React Router) instead of Rails routes
 - Hardcoded API endpoints or environment variables
 - SPA (Single Page App) architecture with API-only Rails backend
 
 ### Solution (if using js-routes)
+
 1. **Generate JavaScript routes file:**
+
    ```bash
    bundle exec rails js:export
    ```
 
 2. **Verify the routes file was created:**
+
    ```bash
    ls app/javascript/utils/routes.js
    ```
@@ -54,22 +64,25 @@ Most modern React apps use:
 3. **Check webpack configuration includes ProvidePlugin:**
    ```javascript
    new webpack.ProvidePlugin({
-     Routes: "$app/utils/routes"
-   })
+     Routes: '$app/utils/routes',
+   });
    ```
 
 ### Alternative Solution (if NOT using js-routes)
+
 Remove the Routes ProvidePlugin from your webpack configuration:
+
 ```javascript
 // Remove this line if you don't use js-routes
 new webpack.ProvidePlugin({
-  Routes: "$app/utils/routes"  // ← Remove this
-})
+  Routes: '$app/utils/routes', // ← Remove this
+});
 ```
 
 ## ProvidePlugin Module Resolution Errors
 
 ### Common Error Patterns
+
 - `Cannot read properties of undefined (reading 'module')`
 - `Module not found: Error: Can't resolve 'module_name'`
 - `ERROR in ./path/to/file.js: Cannot find name 'GlobalVariable'`
@@ -77,18 +90,21 @@ new webpack.ProvidePlugin({
 ### Debugging Steps
 
 1. **Check file existence:**
+
    ```bash
    find app/javascript -name "routes.*" -type f
    find app/javascript -name "*global*" -type f
    ```
 
 2. **Verify webpack aliases:**
+
    ```javascript
    // In your webpack config
    console.log('Webpack aliases:', config.resolve.alias);
    ```
 
 3. **Test module resolution:**
+
    ```bash
    # Run webpack with debug output
    bin/shakapacker --debug-shakapacker
@@ -109,6 +125,7 @@ new webpack.ProvidePlugin({
 ## Environment Setup Dependencies
 
 ### Rails Environment Required
+
 Some operations require a working Rails environment:
 
 - `rails js:export` (generates routes - **only needed if using js-routes gem**)
@@ -118,17 +135,20 @@ Some operations require a working Rails environment:
 ### Common Issues
 
 1. **Database Connection Errors:**
+
    ```
    MONGODB | Error checking localhost:27017: Connection refused
    ```
 
    **Solution:** These are usually warnings and don't prevent operation. To silence:
+
    ```bash
    # Run with minimal environment
    RAILS_ENV=development bundle exec rails js:export
    ```
 
 2. **Missing Dependencies:**
+
    ```
    sidekiq-pro is not installed
    ```
@@ -138,6 +158,7 @@ Some operations require a working Rails environment:
 ### Workarounds
 
 1. **Skip database initialization:**
+
    ```bash
    DATABASE_URL=sqlite3:tmp/db.sqlite3 rails js:export
    ```
@@ -152,7 +173,7 @@ Some operations require a working Rails environment:
 ### Version Compatibility Matrix
 
 | react_on_rails | Shakapacker | Webpack | Node.js |
-|----------------|-------------|---------|---------|
+| -------------- | ----------- | ------- | ------- |
 | v16.x          | >= 6.0      | v5      | 20-22   |
 | v14.x          | >= 6.0      | v5      | 18-20   |
 | v13.x          | >= 6.0      | v5      | 16-18   |
@@ -160,6 +181,7 @@ Some operations require a working Rails environment:
 ### Common Upgrade Issues
 
 1. **Webpacker to Shakapacker migration incomplete:**
+
    ```bash
    # Remove webpacker references
    grep -r "webpacker" config/
@@ -172,6 +194,7 @@ Some operations require a working Rails environment:
    ```
 
 ### Migration Steps
+
 1. Follow the [Shakapacker upgrade guide](https://github.com/shakacode/shakapacker/blob/main/docs/v6_upgrade.md)
 2. Update webpack configurations
 3. Regenerate configurations with `rails generate react_on_rails:install`
