@@ -23,6 +23,8 @@ After a release, please make sure to run `bundle exec rake update_changelog`. Th
 
 Changes since the last non-beta release.
 
+### [16.0.1-rc.0] - 2025-09-19
+
 #### Pro License Structure Implementation
 
 **🔐 License Architecture**
@@ -1646,7 +1648,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/16.0.0...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/16.0.1-rc.0...master
+[16.0.1-rc.0]: https://github.com/shakacode/react_on_rails/compare/16.0.0...16.0.1-rc.0
 [16.0.0]: https://github.com/shakacode/react_on_rails/compare/14.2.0...16.0.0
 [14.2.0]: https://github.com/shakacode/react_on_rails/compare/14.1.1...14.2.0
 [14.1.1]: https://github.com/shakacode/react_on_rails/compare/14.1.0...14.1.1
