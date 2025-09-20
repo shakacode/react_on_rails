@@ -38,6 +38,7 @@ group :development, :test do
   gem "rubocop-rspec", "~>2.26", require: false
   gem "scss_lint", require: false
   gem "spring", "~> 4.0"
+  gem "lefthook", require: false
 end
 
 group :test do

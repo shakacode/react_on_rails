@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Get changed files based on context (staged, branch, or all)
+set -euo pipefail
+
+CONTEXT="${1:-staged}"
+PATTERN="${2:-.*}"
+
+case "$CONTEXT" in
+  staged)
+    git diff --cached --name-only --diff-filter=ACM | grep -E "$PATTERN" || true
+    ;;
+  branch)
+    # Find base branch (prefer main over master)
+    base="origin/main"
+    git rev-parse --verify --quiet "$base" >/dev/null || base="origin/master"
+    git diff --name-only --diff-filter=ACM "$base"...HEAD | grep -E "$PATTERN" || true
+    ;;
+  *)
+    echo "Usage: $0 {staged|branch} [pattern]" >&2
+    exit 1
+    ;;
+esac

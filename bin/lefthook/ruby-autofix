@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Auto-fix Ruby files using rake autofix
+set -euo pipefail
+
+CONTEXT="${1:-staged}"
+files="$(bin/lefthook/get-changed-files "$CONTEXT" '\.(rb|rake|ru)$')"
+
+if [ -z "$files" ]; then
+  echo "✅ No Ruby files to autofix"
+  exit 0
+fi
+
+echo "🎨 Autofix on $CONTEXT Ruby files:"
+printf "  %s\n" $files
+
+bundle exec rake autofix
+
+# Re-stage files if running on staged context
+if [ "$CONTEXT" = "staged" ]; then
+  echo $files | xargs -r git add
+  echo "✅ Re-staged formatted files"
+fi

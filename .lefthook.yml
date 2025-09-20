@@ -1,0 +1,23 @@
+# .lefthook.yml
+# Fast pre-commit hooks that only check changed files
+# Install with: bundle exec lefthook install
+
+pre-commit:
+  parallel: true
+  commands:
+    autofix:
+      run: bin/lefthook/ruby-autofix staged
+
+    rubocop:
+      run: bin/lefthook/ruby-lint staged
+
+    prettier:
+      run: bin/lefthook/prettier-format staged
+
+    trailing-newlines:
+      run: bin/lefthook/check-trailing-newlines staged
+
+pre-push:
+  commands:
+    branch-lint:
+      run: bin/lefthook/ruby-lint branch
