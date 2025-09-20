@@ -9,7 +9,7 @@
 
 This license applies to all files within this repository, with the exception of the code located in the following directories, which are licensed separately under the React on Rails Pro License:
 
-- `lib/react_on_rails/pro_features/`
+- `lib/react_on_rails/pro/`
 - `node_package/src/pro/`
 
 Copyright (c) 2017, 2018 Justin Gordon and ShakaCode  
