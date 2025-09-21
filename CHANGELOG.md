@@ -23,6 +23,10 @@ After a release, please make sure to run `bundle exec rake update_changelog`. Th
 
 Changes since the last non-beta release.
 
+#### Bug Fixes
+
+- **Packs generator**: Fixed error when `server_bundle_js_file` configuration is empty (default). Added safety check to prevent attempting operations on invalid file paths when server-side rendering is not configured. [PR 1802](https://github.com/shakacode/react_on_rails/pull/1802)
+
 ### [16.0.1-rc.2] - 2025-09-20
 
 #### Bug Fixes
