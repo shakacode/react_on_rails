@@ -10,7 +10,7 @@ module ReactOnRails
       return @using_shakapacker_const if defined?(@using_shakapacker_const)
 
       @using_shakapacker_const = ReactOnRails::Utils.gem_available?("shakapacker") &&
-                                 shakapacker_version_requirement_met?("8.2.0")
+                                 shakapacker_version_requirement_met?("8.0.0")
     end
 
     def self.packer_type
@@ -54,6 +54,16 @@ module ReactOnRails
 
     def self.shakapacker_version_requirement_met?(required_version)
       Gem::Version.new(shakapacker_version) >= Gem::Version.new(required_version)
+    end
+
+    def self.supports_async_loading?
+      using_shakapacker_const? && shakapacker_version_requirement_met?("8.2.0")
+    end
+
+    def self.supports_auto_registration?
+      using_shakapacker_const? &&
+        packer.config.respond_to?(:nested_entries?) &&
+        shakapacker_version_requirement_met?("7.0.0")
     end
 
     # This returns either a URL for the webpack-dev-server, non-server bundle or

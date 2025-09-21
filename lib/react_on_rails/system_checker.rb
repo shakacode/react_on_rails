@@ -619,13 +619,13 @@ module ReactOnRails
 
           begin
             # Use proper semantic version comparison
-            version_obj = Gem::Version.new(version)
-            threshold_version = Gem::Version.new("8.2")
+            Gem::Version.new(version)
+            Gem::Version.new("8.2")
 
-            if version_obj >= threshold_version
+            if ReactOnRails::PackerUtils.supports_auto_registration?
               add_success("✅ Shakapacker #{version} (supports React on Rails auto-registration)")
             else
-              add_warning("⚠️  Shakapacker #{version} - Version 8.2+ needed for React on Rails auto-registration")
+              add_warning("⚠️  Shakapacker #{version} - Version 7.0+ needed for React on Rails auto-registration")
             end
           rescue ArgumentError
             # Fallback for invalid version strings
