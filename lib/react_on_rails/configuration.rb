@@ -315,10 +315,9 @@ module ReactOnRails
     end
 
     def compile_command_conflict_message
-      packer_name = "Shakapacker"
       <<~MSG
 
-        React on Rails and #{packer_name} error in configuration!
+        React on Rails and Shakapacker error in configuration!
         In order to use config/react_on_rails.rb config.build_production_command,
         you must edit config/shakapacker.yml to include this value in the default configuration:
         'shakapacker_precompile: false'
