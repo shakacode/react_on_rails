@@ -72,45 +72,83 @@ module ReactOnRails
     end
 
     def self.bundle_js_file_path(bundle_name)
-      # Either:
-      # 1. Using same bundle for both server and client, so server bundle will be hashed in manifest
-      # 2. Using a different bundle (different Webpack config), so file is not hashed, and
-      #    bundle_js_path will throw so the default path is used without a hash.
-      # 3. The third option of having the server bundle hashed and a different configuration than
-      #    the client bundle is not supported for 2 reasons:
-      #    a. The webpack manifest plugin would have a race condition where the same manifest.json
-      #       is edited by both the webpack-dev-server
-      #    b. There is no good reason to hash the server bundle name.
+      # Priority order depends on bundle type:
+      # SERVER BUNDLES (normal case): Try secure non-public locations first, then manifest, then legacy
+      # CLIENT BUNDLES (normal case): Try manifest first, then fallback locations
       if bundle_name == "manifest.json"
         # Default to the non-hashed name in the specified output directory, which, for legacy
         # React on Rails, this is the output directory picked up by the asset pipeline.
         # For Shakapacker, this is the public output path defined in the (shaka/web)packer.yml file.
         File.join(generated_assets_full_path, bundle_name)
       else
-        begin
-          ReactOnRails::PackerUtils.bundle_js_uri_from_packer(bundle_name)
-        rescue Shakapacker::Manifest::MissingEntryError
-          # When manifest lookup fails, try multiple fallback locations:
-          # 1. Environment-specific path (e.g., public/webpack/test)
-          # 2. Standard Shakapacker location (public/packs)
-          # 3. Generated assets path (for legacy setups)
-          fallback_locations = [
-            File.join(ReactOnRails::PackerUtils.packer_public_output_path, bundle_name),
-            File.join("public", "packs", bundle_name),
-            File.join(generated_assets_full_path, bundle_name)
-          ].uniq
-
-          # Return the first location where the bundle file actually exists
-          fallback_locations.each do |path|
-            expanded_path = File.expand_path(path)
-            return expanded_path if File.exist?(expanded_path)
-          end
-
-          # If none exist, return the environment-specific path (original behavior)
-          File.expand_path(fallback_locations.first)
-        end
+        bundle_js_file_path_with_packer(bundle_name)
       end
     end
+
+    def self.bundle_js_file_path_with_packer(bundle_name)
+      is_server_bundle = server_bundle?(bundle_name)
+
+      if is_server_bundle
+        # NORMAL CASE for server bundles: Try secure non-public locations first
+        secure_path = try_secure_server_locations(bundle_name)
+        return secure_path if secure_path
+      end
+
+      # For client bundles OR server bundle fallback: Try manifest lookup
+      begin
+        ReactOnRails::PackerUtils.bundle_js_uri_from_packer(bundle_name)
+      rescue Shakapacker::Manifest::MissingEntryError
+        handle_missing_manifest_entry(bundle_name, is_server_bundle)
+      end
+    end
+
+    def self.server_bundle?(bundle_name)
+      bundle_name == ReactOnRails.configuration.server_bundle_js_file ||
+        bundle_name == ReactOnRails.configuration.rsc_bundle_js_file
+    end
+
+    def self.try_secure_server_locations(bundle_name)
+      secure_server_locations = [
+        File.join("ssr-generated", bundle_name),
+        File.join("generated", "server-bundles", bundle_name)
+      ]
+
+      secure_server_locations.each do |path|
+        expanded_path = File.expand_path(path)
+        return expanded_path if File.exist?(expanded_path)
+      end
+
+      nil
+    end
+
+    def self.handle_missing_manifest_entry(bundle_name, is_server_bundle)
+      # When manifest lookup fails, try multiple fallback locations:
+      # 1. Environment-specific path (e.g., public/webpack/test)
+      # 2. Standard Shakapacker location (public/packs)
+      # 3. Generated assets path (for legacy setups)
+      fallback_locations = [
+        File.join(ReactOnRails::PackerUtils.packer_public_output_path, bundle_name),
+        File.join("public", "packs", bundle_name),
+        File.join(generated_assets_full_path, bundle_name)
+      ].uniq
+
+      # Return the first location where the bundle file actually exists
+      fallback_locations.each do |path|
+        expanded_path = File.expand_path(path)
+        return expanded_path if File.exist?(expanded_path)
+      end
+
+      # If none exist, return appropriate default based on bundle type
+      if is_server_bundle
+        # For server bundles, prefer secure location as final fallback
+        File.expand_path(File.join("ssr-generated", bundle_name))
+      else
+        # For client bundles, use environment-specific path (original behavior)
+        File.expand_path(fallback_locations.first)
+      end
+    end
+    private_class_method :bundle_js_file_path_with_packer, :server_bundle?, :try_secure_server_locations,
+                         :handle_missing_manifest_entry
 
     def self.server_bundle_js_file_path
       return @server_bundle_path if @server_bundle_path && !Rails.env.development?
