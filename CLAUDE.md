@@ -9,6 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 1. **ALWAYS run `bundle exec rubocop` and fix ALL violations**
 2. **ALWAYS ensure files end with a newline character**
 3. **NEVER push without running full lint check first**
+4. **ALWAYS let Prettier handle ALL formatting - never manually format**
 
 These requirements are non-negotiable. CI will fail if not followed.
 
@@ -32,6 +33,31 @@ These requirements are non-negotiable. CI will fail if not followed.
 - **Build**: `yarn run build` (compiles TypeScript to JavaScript in node_package/lib)
 - **Type checking**: `yarn run type-check`
 - **⚠️ MANDATORY BEFORE GIT PUSH**: `bundle exec rubocop` and fix ALL violations + ensure trailing newlines
+
+## ⚠️ FORMATTING RULES
+
+**Prettier is the SOLE authority for formatting. NEVER manually format code.**
+
+### Standard Workflow
+1. Make code changes
+2. Run `npx prettier --write <files>` or `rake autofix`
+3. Commit changes
+
+### Merge Conflict Resolution Workflow
+**CRITICAL**: When resolving merge conflicts, follow this exact sequence:
+
+1. **Resolve logical conflicts only** - don't worry about formatting
+2. **Add resolved files**: `git add <conflicted-files>`
+3. **Let Prettier format**: `npx prettier --write <conflicted-files>`
+4. **Add formatted files**: `git add <conflicted-files>` (if Prettier made changes)
+5. **Continue rebase/merge**: `git rebase --continue` or `git commit`
+
+**❌ NEVER manually format during conflict resolution** - this causes formatting wars between tools.
+
+### Debugging Formatting Issues
+- Check current formatting: `npx prettier --check .`
+- Fix all formatting: `npx prettier --write .`
+- If CI fails on formatting, always run Prettier, never manual fixes
 
 ### Development Setup Commands
 
