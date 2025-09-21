@@ -3,25 +3,18 @@
 module ReactOnRails
   module PackerUtils
     def self.using_packer?
-      using_shakapacker_const?
+      true # Always true since shakapacker >= 6.0 is required in gemspec
     end
 
     def self.using_shakapacker_const?
-      return @using_shakapacker_const if defined?(@using_shakapacker_const)
-
-      @using_shakapacker_const = ReactOnRails::Utils.gem_available?("shakapacker") &&
-                                 shakapacker_version_requirement_met?("8.0.0")
+      true # Always true since shakapacker >= 6.0 is required in gemspec
     end
 
     def self.packer_type
-      return "shakapacker" if using_shakapacker_const?
-
-      nil
+      "shakapacker"
     end
 
     def self.packer
-      return nil unless using_packer?
-
       require "shakapacker"
       ::Shakapacker
     end
@@ -38,7 +31,6 @@ module ReactOnRails
 
     def self.shakapacker_version
       return @shakapacker_version if defined?(@shakapacker_version)
-      return nil unless ReactOnRails::Utils.gem_available?("shakapacker")
 
       @shakapacker_version = Gem.loaded_specs["shakapacker"].version.to_s
     end
@@ -57,12 +49,11 @@ module ReactOnRails
     end
 
     def self.supports_async_loading?
-      using_shakapacker_const? && shakapacker_version_requirement_met?("8.2.0")
+      shakapacker_version_requirement_met?("8.2.0")
     end
 
     def self.supports_auto_registration?
-      using_shakapacker_const? &&
-        packer.config.respond_to?(:nested_entries?) &&
+      packer.config.respond_to?(:nested_entries?) &&
         shakapacker_version_requirement_met?("7.0.0")
     end
 

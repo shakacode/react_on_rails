@@ -78,22 +78,14 @@ module ReactOnRails
     end
 
     describe ".supports_async_loading?" do
-      it "returns true when using Shakapacker >= 8.2.0" do
-        allow(described_class).to receive(:using_shakapacker_const?).and_return(true)
+      it "returns true when Shakapacker >= 8.2.0" do
         allow(described_class).to receive(:shakapacker_version_requirement_met?).with("8.2.0").and_return(true)
 
         expect(described_class.supports_async_loading?).to be(true)
       end
 
-      it "returns false when using Shakapacker < 8.2.0" do
-        allow(described_class).to receive(:using_shakapacker_const?).and_return(true)
+      it "returns false when Shakapacker < 8.2.0" do
         allow(described_class).to receive(:shakapacker_version_requirement_met?).with("8.2.0").and_return(false)
-
-        expect(described_class.supports_async_loading?).to be(false)
-      end
-
-      it "returns false when not using Shakapacker" do
-        allow(described_class).to receive(:using_shakapacker_const?).and_return(false)
 
         expect(described_class.supports_async_loading?).to be(false)
       end
@@ -101,22 +93,20 @@ module ReactOnRails
 
     describe ".supports_auto_registration?" do
       let(:mock_config) { instance_double(Config) }
-      let(:mock_packer) { instance_double(Packer, config: mock_config) }
+      let(:mock_packer) { instance_double(Shakapacker, config: mock_config) }
 
       before do
         allow(described_class).to receive(:packer).and_return(mock_packer)
       end
 
-      it "returns true when using Shakapacker >= 7.0.0 with nested_entries support" do
-        allow(described_class).to receive(:using_shakapacker_const?).and_return(true)
+      it "returns true when Shakapacker >= 7.0.0 with nested_entries support" do
         allow(mock_config).to receive(:respond_to?).with(:nested_entries?).and_return(true)
         allow(described_class).to receive(:shakapacker_version_requirement_met?).with("7.0.0").and_return(true)
 
         expect(described_class.supports_auto_registration?).to be(true)
       end
 
-      it "returns false when using Shakapacker < 7.0.0" do
-        allow(described_class).to receive(:using_shakapacker_const?).and_return(true)
+      it "returns false when Shakapacker < 7.0.0" do
         allow(mock_config).to receive(:respond_to?).with(:nested_entries?).and_return(true)
         allow(described_class).to receive(:shakapacker_version_requirement_met?).with("7.0.0").and_return(false)
 
@@ -124,40 +114,10 @@ module ReactOnRails
       end
 
       it "returns false when nested_entries method is not available" do
-        allow(described_class).to receive(:using_shakapacker_const?).and_return(true)
         allow(mock_config).to receive(:respond_to?).with(:nested_entries?).and_return(false)
         allow(described_class).to receive(:shakapacker_version_requirement_met?).with("7.0.0").and_return(true)
 
         expect(described_class.supports_auto_registration?).to be(false)
-      end
-
-      it "returns false when not using Shakapacker" do
-        allow(described_class).to receive(:using_shakapacker_const?).and_return(false)
-
-        expect(described_class.supports_auto_registration?).to be(false)
-      end
-    end
-
-    describe ".using_shakapacker_const?" do
-      before do
-        # Clear memoized value to ensure tests are isolated
-        if described_class.instance_variable_defined?(:@using_shakapacker_const)
-          described_class.remove_instance_variable(:@using_shakapacker_const)
-        end
-      end
-
-      it "requires Shakapacker >= 8.0.0 instead of 8.2.0" do
-        allow(ReactOnRails::Utils).to receive(:gem_available?).with("shakapacker").and_return(true)
-        allow(described_class).to receive(:shakapacker_version_requirement_met?).with("8.0.0").and_return(true)
-
-        expect(described_class.using_shakapacker_const?).to be(true)
-      end
-
-      it "returns false when Shakapacker < 8.0.0" do
-        allow(ReactOnRails::Utils).to receive(:gem_available?).with("shakapacker").and_return(true)
-        allow(described_class).to receive(:shakapacker_version_requirement_met?).with("8.0.0").and_return(false)
-
-        expect(described_class.using_shakapacker_const?).to be(false)
       end
     end
   end
