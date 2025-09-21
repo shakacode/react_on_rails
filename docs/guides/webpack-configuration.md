@@ -4,7 +4,7 @@
 
 [Webpack](https://webpack.js.org) is the JavaScript npm package that prepares all your client-side assets. The Rails asset pipeline used to be the preferable way to prepare client-side assets.
 
-[Shakapacker](https://github.com/shakcode/shakapacker) (the official successor of [rails/webpacker](https://github.com/rails/webpacker)) is the Ruby gem that mainly gives us 2 things:
+[Shakapacker](https://github.com/shakacode/shakapacker) (the official successor of [rails/webpacker](https://github.com/rails/webpacker)) is the Ruby gem that mainly gives us 2 things:
 
 1. View helpers for placing the Webpack bundles on your Rails views. React on Rails depends on these view helpers.
 2. A layer of abstraction on top of Webpack customization. The base setup works great for the client-side Webpack configuration.
