@@ -66,7 +66,8 @@ task :release, %i[gem_version dry_run tools_install] do |_t, args|
   release_it_command << " #{npm_version}" unless npm_version.strip.empty?
   release_it_command << " --npm.publish --no-git.requireCleanWorkingDir"
   release_it_command << " --dry-run --verbose" if is_dry_run
-  sh_in_dir(gem_root, release_it_command)
+  # Disable lefthook pre-commit hooks during release to prevent file modifications
+  sh_in_dir(gem_root, "LEFTHOOK=0 #{release_it_command}")
 
   # Release the new gem version
 
