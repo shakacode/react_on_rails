@@ -92,7 +92,7 @@ module ReactOnRails
     end
 
     describe ".supports_auto_registration?" do
-      let(:mock_config) { instance_double(Config) }
+      let(:mock_config) { instance_double(Shakapacker::Config) }
       let(:mock_packer) { instance_double(Shakapacker, config: mock_config) }
 
       before do

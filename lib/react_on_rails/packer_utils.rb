@@ -2,26 +2,12 @@
 
 module ReactOnRails
   module PackerUtils
-    def self.using_packer?
-      true # Always true since shakapacker >= 6.0 is required in gemspec
-    end
-
-    def self.using_shakapacker_const?
-      true # Always true since shakapacker >= 6.0 is required in gemspec
-    end
-
-    def self.packer_type
-      "shakapacker"
-    end
-
     def self.packer
       require "shakapacker"
       ::Shakapacker
     end
 
     def self.dev_server_running?
-      return false unless using_packer?
-
       packer.dev_server.running?
     end
 
@@ -94,9 +80,7 @@ module ReactOnRails
     end
 
     def self.precompile?
-      return ::Shakapacker.config.shakapacker_precompile? if using_shakapacker_const?
-
-      false
+      ::Shakapacker.config.shakapacker_precompile?
     end
 
     def self.packer_source_path
@@ -124,12 +108,12 @@ module ReactOnRails
     end
 
     def self.check_manifest_not_cached
-      return unless using_packer? && packer.config.cache_manifest?
+      return unless packer.config.cache_manifest?
 
       msg = <<-MSG.strip_heredoc
           ERROR: you have enabled cache_manifest in the #{Rails.env} env when using the
           ReactOnRails::TestHelper.configure_rspec_to_compile_assets helper
-          To fix this: edit your config/#{packer_type}.yml file and set cache_manifest to false for test.
+          To fix this: edit your config/shakapacker.yml file and set cache_manifest to false for test.
       MSG
       puts wrap_message(msg)
       exit!
@@ -150,7 +134,7 @@ module ReactOnRails
     def self.raise_nested_entries_disabled
       msg = <<~MSG
         **ERROR** ReactOnRails: `nested_entries` is configured to be disabled in shakapacker. Please update \
-        config/#{packer_type}.yml to enable nested entries. for more information read
+        config/shakapacker.yml to enable nested entries. for more information read
         https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md#enable-nested_entries-for-shakapacker
       MSG
 

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "spec_helper"
-require ReactOnRails::PackerUtils.packer_type
+require "shakapacker"
 
 # rubocop:disable Metrics/ModuleLength
 
@@ -9,10 +9,8 @@ module ReactOnRails
   RSpec.describe Configuration do
     let(:existing_path) { Pathname.new(Dir.mktmpdir) }
     let(:not_existing_path) { "/path/to/#{SecureRandom.hex(4)}" }
-    let(:using_packer) { false }
 
     before do
-      allow(ReactOnRails::PackerUtils).to receive(:using_packer?).and_return(using_packer)
       ReactOnRails.instance_variable_set(:@configuration, nil)
     end
 
@@ -314,8 +312,7 @@ module ReactOnRails
     end
 
     it "checks that autobundling requirements are met if configuration options for autobundling are set" do
-      allow(ReactOnRails::PackerUtils).to receive_messages(using_packer?: true,
-                                                           shakapacker_version_requirement_met?: true,
+      allow(ReactOnRails::PackerUtils).to receive_messages(shakapacker_version_requirement_met?: true,
                                                            nested_entries?: true)
 
       ReactOnRails.configure do |config|
@@ -323,7 +320,6 @@ module ReactOnRails
         config.components_subdirectory = "something"
       end
 
-      expect(ReactOnRails::PackerUtils).to have_received(:using_packer?).thrice
       expect(ReactOnRails::PackerUtils).to have_received(:shakapacker_version_requirement_met?).twice
       expect(ReactOnRails::PackerUtils).to have_received(:nested_entries?)
     end

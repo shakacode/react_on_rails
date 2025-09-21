@@ -618,9 +618,8 @@ module ReactOnRails
           version = shakapacker_match[1].strip
 
           begin
-            # Use proper semantic version comparison
+            # Validate version string format
             Gem::Version.new(version)
-            Gem::Version.new("8.2")
 
             if ReactOnRails::PackerUtils.supports_auto_registration?
               add_success("✅ Shakapacker #{version} (supports React on Rails auto-registration)")

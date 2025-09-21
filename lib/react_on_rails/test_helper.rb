@@ -86,10 +86,9 @@ module ReactOnRails
           puts
           @printed_once = true
 
-          if ReactOnRails::PackerUtils.using_packer? &&
-             ReactOnRails::Utils.using_packer_source_path_is_not_defined_and_custom_node_modules?
+          if ReactOnRails::Utils.using_packer_source_path_is_not_defined_and_custom_node_modules?
             msg = <<-MSG.strip_heredoc
-              WARNING: Define config/#{ReactOnRails::PackerUtils.packer_type}.yml to include sourcePath to configure
+              WARNING: Define config/shakapacker.yml to include sourcePath to configure
               the location of your JavaScript source for React on Rails.
               Default location of #{source_path} is used.
             MSG

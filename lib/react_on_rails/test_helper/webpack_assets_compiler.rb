@@ -16,7 +16,7 @@ module ReactOnRails
 
             React on Rails is aborting your test run
 
-            If you wish to use the config/#{ReactOnRails::PackerUtils.packer_type}.yml compile option for tests
+            If you wish to use the config/shakapacker.yml compile option for tests
             them remove your call to the ReactOnRails test helper.
           MSG
           puts Rainbow(msg).red

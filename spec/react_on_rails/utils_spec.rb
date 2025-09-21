@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "spec_helper"
-require ReactOnRails::PackerUtils.packer_type
+require "shakapacker"
 
 # rubocop:disable Metrics/ModuleLength, Metrics/BlockLength
 module ReactOnRails
@@ -19,10 +19,6 @@ module ReactOnRails
         allow(ReactOnRails::PackerUtils.packer).to receive_message_chain("config.public_output_path")
           .and_return(packer_public_output_path)
       end
-
-      it "uses packer" do
-        expect(ReactOnRails::PackerUtils.using_packer?).to be(true)
-      end
     end
 
     shared_context "with shakapacker enabled" do
@@ -30,7 +26,6 @@ module ReactOnRails
 
       # We don't need to mock anything here because the shakapacker gem is already installed and will be used by default
       it "uses shakapacker" do
-        expect(ReactOnRails::PackerUtils.packer_type).to eq("shakapacker")
         expect(ReactOnRails::PackerUtils.packer).to eq(::Shakapacker)
       end
     end
@@ -43,8 +38,6 @@ module ReactOnRails
       end
 
       it "does not use packer" do
-        expect(ReactOnRails::PackerUtils.using_packer?).to be(false)
-        expect(ReactOnRails::PackerUtils.packer_type).to be_nil
         expect(ReactOnRails::PackerUtils.packer).to be_nil
       end
     end

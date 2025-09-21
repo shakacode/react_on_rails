@@ -25,10 +25,6 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
     end
 
     context "with Webpacker" do
-      before do
-        allow(ReactOnRails::PackerUtils).to receive(:using_packer?).and_return(true)
-      end
-
       context "when compiled assets with manifest exist and are up-to-date" do
         let(:fixture_dirname) { "assets_with_manifest_exist" }
 
@@ -85,10 +81,6 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
 
     context "without Webpacker" do
       let(:webpack_generated_files) { %w[client-bundle.js server-bundle.js] }
-
-      before do
-        allow(ReactOnRails::PackerUtils).to receive(:using_packer?).and_return(false)
-      end
 
       context "when compiled assets exist and are up-to-date" do
         let(:fixture_dirname) { "assets_exist" }
