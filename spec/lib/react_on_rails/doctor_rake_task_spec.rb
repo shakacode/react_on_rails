@@ -16,6 +16,12 @@ RSpec.describe "doctor rake task" do
       expect(Rake::Task.task_defined?("react_on_rails:doctor")).to be true
     end
 
+    it "can be loaded without requiring missing task_helpers" do
+      # This test ensures the rake file doesn't try to require excluded files
+      # that would cause LoadError in packaged gems
+      expect { load rake_file }.not_to raise_error
+    end
+
     it "can be invoked without errors" do
       # Mock the Doctor class to avoid actual diagnosis
       doctor_instance = instance_double(ReactOnRails::Doctor)

@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require_relative "../../rakelib/task_helpers"
 require_relative "../react_on_rails"
 require_relative "../react_on_rails/doctor"
 
@@ -38,8 +37,6 @@ rescue LoadError
 end
 
 namespace :react_on_rails do
-  include ReactOnRails::TaskHelpers
-
   desc "Diagnose React on Rails setup and configuration"
   task :doctor do
     verbose = ENV["VERBOSE"] == "true"
