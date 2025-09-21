@@ -57,6 +57,8 @@ module ReactOnRails
         MSG
 
         puts wrap_message(msg)
+        puts ""
+        puts extract_troubleshooting_section
 
         # Rspec catches exit without! in the exit callbacks
         exit!(1)
