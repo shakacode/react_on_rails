@@ -92,8 +92,8 @@ module ReactOnRails
     end
 
     describe ".supports_auto_registration?" do
-      let(:mock_config) { double("MockConfig") }
-      let(:mock_packer) { double("MockPacker", config: mock_config) }
+      let(:mock_config) { double("MockConfig") } # rubocop:disable RSpec/VerifiedDoubles
+      let(:mock_packer) { double("MockPacker", config: mock_config) } # rubocop:disable RSpec/VerifiedDoubles
 
       before do
         allow(described_class).to receive(:packer).and_return(mock_packer)

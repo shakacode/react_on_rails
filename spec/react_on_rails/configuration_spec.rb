@@ -282,7 +282,12 @@ module ReactOnRails
     end
 
     it "changes the configuration of the gem, such as setting the prerender option to false" do
+      test_path = File.expand_path("public/webpack/test")
+      allow(ReactOnRails::PackerUtils).to receive_message_chain("packer.config.public_output_path")
+        .and_return(Pathname.new(test_path))
+
       ReactOnRails.configure do |config|
+        config.generated_assets_dir = test_path
         config.server_bundle_js_file = "server.js"
         config.prerender = false
       end
@@ -292,7 +297,12 @@ module ReactOnRails
     end
 
     it "changes the configuration of the gem, such as setting the prerender option to true" do
+      test_path = File.expand_path("public/webpack/test")
+      allow(ReactOnRails::PackerUtils).to receive_message_chain("packer.config.public_output_path")
+        .and_return(Pathname.new(test_path))
+
       ReactOnRails.configure do |config|
+        config.generated_assets_dir = test_path
         config.server_bundle_js_file = "something.js"
         config.prerender = true
         config.random_dom_id = false
