@@ -1,0 +1,34 @@
+name: Check Markdown Links
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - '**.md'
+      - '.github/workflows/check-markdown-links.yml'
+  pull_request:
+    paths:
+      - '**.md'
+      - '.github/workflows/check-markdown-links.yml'
+  schedule:
+    # Run weekly on Monday at 8am UTC
+    - cron: '0 8 * * 1'
+  workflow_dispatch:
+
+jobs:
+  markdown-link-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check markdown links
+        uses: gaurav-nelson/github-action-markdown-link-check@v1
+        with:
+          use-quiet-mode: 'yes'
+          use-verbose-mode: 'no'
+          config-file: '.github/markdown-link-check-config.json'
+          folder-path: 'docs/'
+          file-extension: '.md'
+          max-depth: -1
+          check-modified-files-only: 'no'
+          base-branch: 'master'
