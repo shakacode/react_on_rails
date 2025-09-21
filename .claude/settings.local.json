@@ -26,7 +26,8 @@
       "Bash(git reset:*)",
       "Read(//Users/justin/shakacode/react-on-rails/**)",
       "Bash(./bin/dev)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(git cherry-pick:*)"
     ],
     "deny": [],
     "ask": []
