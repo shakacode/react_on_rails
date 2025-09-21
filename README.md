@@ -140,16 +140,22 @@ _Requires creating a free account._
 - Node.js >= 20 (CI tested: 20 - 22)
 - A JavaScript package manager (npm, yarn, pnpm, or bun)
 
-# Support
+<!-- TROUBLESHOOTING_LINKS_START -->
+# 🆘 Get Help & Support
 
-- [Click to join **React + Rails Slack**](https://join.slack.com/t/reactrails/shared_invite/zt-38oicm9d0-OO0V~bdg4aYNuZuUbRFSXg).
+**Need immediate help?** Here are your options, ordered by response time:
 
-- [**Subscribe**](https://app.mailerlite.com/webforms/landing/l1d9x5) for announcements of new releases of React on Rails and of our latest [blog articles](https://blog.shakacode.com) and tutorials.
-- [Discussions](https://github.com/shakacode/react_on_rails/discussions): Post your questions regarding React on Rails
-- **[forum.shakacode.com](https://forum.shakacode.com)**: Other discussions
-- **[@railsonmaui on Twitter](https://twitter.com/railsonmaui)**
-- _See [NEWS.md](https://github.com/shakacode/react_on_rails/tree/master/NEWS.md) for more notes over time._
-- See [Projects](https://github.com/shakacode/react_on_rails/tree/master/PROJECTS.md) using and [KUDOS](https://github.com/shakacode/react_on_rails/tree/master/KUDOS.md) for React on Rails. Please submit yours! Please edit either page or [email us](mailto:contact@shakacode.com) and we'll add your info. We also **love stars** as it helps us attract new users and contributors.
+- 🚀 **Professional Support**: [react_on_rails@shakacode.com](mailto:react_on_rails@shakacode.com) - Fastest resolution for bugs, upgrades, and consulting
+- 💬 **React + Rails Slack**: [Join our community](https://invite.reactrails.com) - Chat with other developers
+- 🆓 **GitHub Issues**: [Report bugs](https://github.com/shakacode/react_on_rails/issues) - Community support
+- 📖 **Discussions**: [Ask questions](https://github.com/shakacode/react_on_rails/discussions) - General help
+
+**Additional Resources:**
+- [**Subscribe**](https://app.mailerlite.com/webforms/landing/l1d9x5) for announcements of new releases and tutorials
+- **[forum.shakacode.com](https://forum.shakacode.com)** - Development discussions
+- **[@railsonmaui on Twitter](https://twitter.com/railsonmaui)** - Updates and tips
+- [Projects using React on Rails](https://github.com/shakacode/react_on_rails/tree/master/PROJECTS.md) - Submit yours!
+<!-- TROUBLESHOOTING_LINKS_END -->
 
 ## Contributing
 

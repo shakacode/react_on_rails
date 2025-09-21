@@ -278,5 +278,53 @@ module ReactOnRails
 
       puts "Prepended\n#{text_to_prepend}to #{file}."
     end
+
+    # Extract troubleshooting section from README.md for error messages
+    def self.extract_troubleshooting_section
+      readme_path = File.join(gem_root, "README.md")
+      return default_troubleshooting_section unless File.exist?(readme_path)
+
+      readme_content = File.read(readme_path)
+
+      # Extract content between the markers
+      start_marker = "<!-- TROUBLESHOOTING_LINKS_START -->"
+      end_marker = "<!-- TROUBLESHOOTING_LINKS_END -->"
+
+      if readme_content.include?(start_marker) && readme_content.include?(end_marker)
+        start_pos = readme_content.index(start_marker) + start_marker.length
+        end_pos = readme_content.index(end_marker)
+
+        extracted = readme_content[start_pos...end_pos].strip
+        # Convert markdown to terminal-friendly text
+        convert_markdown_to_terminal(extracted)
+      else
+        default_troubleshooting_section
+      end
+    rescue StandardError
+      default_troubleshooting_section
+    end
+
+    private_class_method def self.convert_markdown_to_terminal(markdown_text)
+      markdown_text
+        .gsub(/^#\s+(.+)$/, "\n📞 \\1") # Convert # headers
+        .gsub(/\*\*(.+?)\*\*/, "\\1")                      # Remove bold markdown
+        .gsub(/\[([^\]]+)\]\([^)]+\)/, "\\1")              # Convert links to just text
+        .gsub(/^-\s+/, "   • ")                            # Convert bullets
+        .gsub(/🚀\s+\*\*Professional Support\*\*/, "🚀 Professional Support") # Clean up specific formatting
+    end
+
+    private_class_method def self.default_troubleshooting_section
+      <<~DEFAULT
+        📞 Get Help & Support:
+           • 🚀 Professional Support: react_on_rails@shakacode.com (fastest resolution)
+           • 💬 React + Rails Slack: https://invite.reactrails.com
+           • 🆓 GitHub Issues: https://github.com/shakacode/react_on_rails/issues
+           • 📖 Discussions: https://github.com/shakacode/react_on_rails/discussions
+      DEFAULT
+    end
+
+    private_class_method def self.gem_root
+      File.expand_path("../..", __dir__)
+    end
   end
 end
