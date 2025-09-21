@@ -3,7 +3,7 @@
 require "rails_helper"
 require "support/script_tag_utils"
 
-Packer = Object.const_get(ReactOnRails::PackerUtils.packer_type.capitalize)
+Packer = Shakapacker
 
 class PlainReactOnRailsHelper
   include ReactOnRailsHelper

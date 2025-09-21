@@ -81,9 +81,7 @@ module ReactOnRails
       if ReactOnRails::PackerUtils.using_packer? && bundle_name != "manifest.json"
         begin
           ReactOnRails::PackerUtils.bundle_js_uri_from_packer(bundle_name)
-        rescue Object.const_get(
-          ReactOnRails::PackerUtils.packer_type.capitalize
-        )::Manifest::MissingEntryError
+        rescue Shakapacker::Manifest::MissingEntryError
           # When manifest lookup fails, try multiple fallback locations:
           # 1. Environment-specific path (e.g., public/webpack/test)
           # 2. Standard Shakapacker location (public/packs)

@@ -50,7 +50,7 @@ module ReactOnRails
     end
 
     def mock_bundle_in_manifest(bundle_name, hashed_bundle)
-      mock_manifest = instance_double(Object.const_get(ReactOnRails::PackerUtils.packer_type.capitalize)::Manifest)
+      mock_manifest = instance_double(Shakapacker::Manifest)
       allow(mock_manifest).to receive(:lookup!)
         .with(bundle_name)
         .and_return(hashed_bundle)
@@ -61,9 +61,7 @@ module ReactOnRails
     def mock_missing_manifest_entry(bundle_name)
       allow(ReactOnRails::PackerUtils.packer).to receive_message_chain("manifest.lookup!")
         .with(bundle_name)
-        .and_raise(Object.const_get(
-          ReactOnRails::PackerUtils.packer_type.capitalize
-        )::Manifest::MissingEntryError)
+        .and_raise(Shakapacker::Manifest::MissingEntryError)
     end
 
     def random_bundle_name
@@ -577,7 +575,7 @@ module ReactOnRails
           before do
             allow(ReactOnRails::PackerUtils.packer).to receive(:dev_server).and_return(
               instance_double(
-                Object.const_get(ReactOnRails::PackerUtils.packer_type.capitalize)::DevServer,
+                Shakapacker::DevServer,
                 running?: true,
                 protocol: "http",
                 host_with_port: "localhost:3035"
