@@ -90,10 +90,24 @@ module ReactOnRails
         begin
           ReactOnRails::PackerUtils.bundle_js_uri_from_packer(bundle_name)
         rescue Shakapacker::Manifest::MissingEntryError
-          File.expand_path(
-            File.join(ReactOnRails::PackerUtils.packer_public_output_path,
-                      bundle_name)
-          )
+          # When manifest lookup fails, try multiple fallback locations:
+          # 1. Environment-specific path (e.g., public/webpack/test)
+          # 2. Standard Shakapacker location (public/packs)
+          # 3. Generated assets path (for legacy setups)
+          fallback_locations = [
+            File.join(ReactOnRails::PackerUtils.packer_public_output_path, bundle_name),
+            File.join("public", "packs", bundle_name),
+            File.join(generated_assets_full_path, bundle_name)
+          ].uniq
+
+          # Return the first location where the bundle file actually exists
+          fallback_locations.each do |path|
+            expanded_path = File.expand_path(path)
+            return expanded_path if File.exist?(expanded_path)
+          end
+
+          # If none exist, return the environment-specific path (original behavior)
+          File.expand_path(fallback_locations.first)
         end
       end
     end

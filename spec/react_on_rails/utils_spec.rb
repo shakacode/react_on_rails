@@ -117,6 +117,32 @@ module ReactOnRails
 
               it { is_expected.to eq("#{packer_public_output_path}/manifest.json") }
             end
+
+            context "when file not in manifest and fallback to standard location" do
+              before do
+                mock_missing_manifest_entry("webpack-bundle.js")
+              end
+
+              let(:standard_path) { File.expand_path(File.join("public", "packs", "webpack-bundle.js")) }
+              let(:env_specific_path) { File.join(packer_public_output_path, "webpack-bundle.js") }
+
+              it "returns standard path when bundle exists there" do
+                allow(File).to receive(:exist?).and_call_original
+                allow(File).to receive(:exist?).with(File.expand_path(env_specific_path)).and_return(false)
+                allow(File).to receive(:exist?).with(standard_path).and_return(true)
+
+                result = described_class.bundle_js_file_path("webpack-bundle.js")
+                expect(result).to eq(standard_path)
+              end
+
+              it "returns environment-specific path when no bundle exists anywhere" do
+                allow(File).to receive(:exist?).and_call_original
+                allow(File).to receive(:exist?).and_return(false)
+
+                result = described_class.bundle_js_file_path("webpack-bundle.js")
+                expect(result).to eq(File.expand_path(env_specific_path))
+              end
+            end
           end
         end
       end
@@ -165,6 +191,42 @@ module ReactOnRails
               path = described_class.server_bundle_js_file_path
 
               expect(path).to end_with("public/webpack/development/#{server_bundle_name}")
+            end
+
+            context "with bundle file existing in standard location but not environment-specific location" do
+              it "returns the standard location path" do
+                server_bundle_name = "server-bundle.js"
+                mock_bundle_configs(server_bundle_name: server_bundle_name)
+                mock_missing_manifest_entry(server_bundle_name)
+
+                # Mock File.exist? to return false for environment-specific path but true for standard path
+                standard_path = File.expand_path(File.join("public", "packs", server_bundle_name))
+                env_specific_path = File.join(packer_public_output_path, server_bundle_name)
+
+                allow(File).to receive(:exist?).and_call_original
+                allow(File).to receive(:exist?).with(File.expand_path(env_specific_path)).and_return(false)
+                allow(File).to receive(:exist?).with(standard_path).and_return(true)
+
+                path = described_class.server_bundle_js_file_path
+
+                expect(path).to eq(standard_path)
+              end
+            end
+
+            context "with bundle file not existing in any fallback location" do
+              it "returns the environment-specific path as final fallback" do
+                server_bundle_name = "server-bundle.js"
+                mock_bundle_configs(server_bundle_name: server_bundle_name)
+                mock_missing_manifest_entry(server_bundle_name)
+
+                # Mock File.exist? to return false for all paths
+                allow(File).to receive(:exist?).and_call_original
+                allow(File).to receive(:exist?).and_return(false)
+
+                path = described_class.server_bundle_js_file_path
+
+                expect(path).to end_with("public/webpack/development/#{server_bundle_name}")
+              end
             end
           end
 
