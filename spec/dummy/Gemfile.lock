@@ -1,7 +1,7 @@
 PATH
   remote: ../..
   specs:
-    react_on_rails (16.0.1.rc.0)
+    react_on_rails (16.0.1.rc.1)
       addressable
       connection_pool
       execjs (~> 2.5)
@@ -159,6 +159,7 @@ GEM
     language_server-protocol (3.17.0.3)
     launchy (2.5.2)
       addressable (~> 2.8)
+    lefthook (1.13.1)
     listen (3.8.0)
       rb-fsevent (~> 0.10, >= 0.10.3)
       rb-inotify (~> 0.9, >= 0.9.10)
@@ -415,6 +416,7 @@ DEPENDENCIES
   jbuilder
   jquery-rails
   launchy
+  lefthook
   listen
   package_json
   pry
