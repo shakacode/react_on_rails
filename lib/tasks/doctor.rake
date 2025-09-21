@@ -37,7 +37,6 @@ rescue LoadError
 end
 
 namespace :react_on_rails do
-
   desc "Diagnose React on Rails setup and configuration"
   task :doctor do
     verbose = ENV["VERBOSE"] == "true"
