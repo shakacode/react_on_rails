@@ -41,7 +41,7 @@ module ReactOnRails
         base_templates = %w[config/initializers/react_on_rails.rb]
         base_files.each { |file| copy_file("#{base_path}#{file}", file) }
         base_templates.each do |file|
-          template("#{base_path}/#{file}.tt", file, { packer_type: "shakapacker" })
+          template("#{base_path}/#{file}.tt", file)
         end
       end
 
