@@ -164,6 +164,7 @@ module ReactOnRails
 
     def add_generated_pack_to_server_bundle
       return if ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint
+      return if ReactOnRails.configuration.server_bundle_js_file.empty?
 
       relative_path_to_generated_server_bundle = relative_path(server_bundle_entrypoint,
                                                                generated_server_bundle_file_path)
