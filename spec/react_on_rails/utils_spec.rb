@@ -103,6 +103,14 @@ module ReactOnRails
       end
 
       describe ".bundle_js_file_path" do
+        before do
+          # Mock configuration calls to avoid server bundle detection for regular client bundles
+          allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
+            .and_return("server-bundle.js")
+          allow(ReactOnRails).to receive_message_chain("configuration.rsc_bundle_js_file")
+            .and_return("rsc-bundle.js")
+        end
+
         subject do
           described_class.bundle_js_file_path("webpack-bundle.js")
         end
@@ -158,6 +166,64 @@ module ReactOnRails
                 expect(result).to eq(File.expand_path(env_specific_path))
               end
             end
+
+            context "with server bundle (SSR/RSC) file not in manifest" do
+              let(:server_bundle_name) { "server-bundle.js" }
+              let(:ssr_generated_path) { File.expand_path(File.join("ssr-generated", server_bundle_name)) }
+              let(:generated_server_path) do
+                File.expand_path(File.join("generated", "server-bundles", server_bundle_name))
+              end
+
+              before do
+                mock_missing_manifest_entry(server_bundle_name)
+                allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
+                  .and_return(server_bundle_name)
+              end
+
+              it "tries secure locations first for server bundles" do
+                allow(File).to receive(:exist?).and_call_original
+                allow(File).to receive(:exist?).with(ssr_generated_path).and_return(true)
+
+                result = described_class.bundle_js_file_path(server_bundle_name)
+                expect(result).to eq(ssr_generated_path)
+              end
+
+              it "tries generated/server-bundles as second secure location" do
+                allow(File).to receive(:exist?).and_call_original
+                allow(File).to receive(:exist?).with(ssr_generated_path).and_return(false)
+                allow(File).to receive(:exist?).with(generated_server_path).and_return(true)
+
+                result = described_class.bundle_js_file_path(server_bundle_name)
+                expect(result).to eq(generated_server_path)
+              end
+
+              it "falls back to ssr-generated location when no bundle exists anywhere" do
+                allow(File).to receive(:exist?).and_call_original
+                allow(File).to receive(:exist?).and_return(false)
+
+                result = described_class.bundle_js_file_path(server_bundle_name)
+                expect(result).to eq(ssr_generated_path)
+              end
+            end
+
+            context "with RSC bundle file not in manifest" do
+              let(:rsc_bundle_name) { "rsc-bundle.js" }
+              let(:ssr_generated_path) { File.expand_path(File.join("ssr-generated", rsc_bundle_name)) }
+
+              before do
+                mock_missing_manifest_entry(rsc_bundle_name)
+                allow(ReactOnRails).to receive_message_chain("configuration.rsc_bundle_js_file")
+                  .and_return(rsc_bundle_name)
+              end
+
+              it "treats RSC bundles as server bundles and tries secure locations first" do
+                allow(File).to receive(:exist?).and_call_original
+                allow(File).to receive(:exist?).with(ssr_generated_path).and_return(true)
+
+                result = described_class.bundle_js_file_path(rsc_bundle_name)
+                expect(result).to eq(ssr_generated_path)
+              end
+            end
           end
         end
 
@@ -204,14 +270,14 @@ module ReactOnRails
           include_context "with #{packer_type} enabled"
 
           context "with server file not in manifest", packer_type.to_sym do
-            it "returns the unhashed server path" do
+            it "returns the secure ssr-generated path for server bundles" do
               server_bundle_name = "server-bundle.js"
               mock_bundle_configs(server_bundle_name: server_bundle_name)
               mock_missing_manifest_entry(server_bundle_name)
 
               path = described_class.server_bundle_js_file_path
 
-              expect(path).to end_with("public/webpack/development/#{server_bundle_name}")
+              expect(path).to end_with("ssr-generated/#{server_bundle_name}")
             end
 
             context "with bundle file existing in standard location but not environment-specific location" do
@@ -235,7 +301,7 @@ module ReactOnRails
             end
 
             context "with bundle file not existing in any fallback location" do
-              it "returns the environment-specific path as final fallback" do
+              it "returns the secure ssr-generated path as final fallback for server bundles" do
                 server_bundle_name = "server-bundle.js"
                 mock_bundle_configs(server_bundle_name: server_bundle_name)
                 mock_missing_manifest_entry(server_bundle_name)
@@ -246,7 +312,7 @@ module ReactOnRails
 
                 path = described_class.server_bundle_js_file_path
 
-                expect(path).to end_with("public/webpack/development/#{server_bundle_name}")
+                expect(path).to end_with("ssr-generated/#{server_bundle_name}")
               end
             end
           end
@@ -303,14 +369,14 @@ module ReactOnRails
           include_context "with #{packer_type} enabled"
 
           context "with server file not in manifest", packer_type.to_sym do
-            it "returns the unhashed server path" do
+            it "returns the secure ssr-generated path for RSC bundles" do
               server_bundle_name = "rsc-bundle.js"
               mock_bundle_configs(rsc_bundle_name: server_bundle_name)
               mock_missing_manifest_entry(server_bundle_name)
 
               path = described_class.rsc_bundle_js_file_path
 
-              expect(path).to end_with("public/webpack/development/#{server_bundle_name}")
+              expect(path).to end_with("ssr-generated/#{server_bundle_name}")
             end
           end
 
