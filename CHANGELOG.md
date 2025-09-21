@@ -23,6 +23,10 @@ After a release, please make sure to run `bundle exec rake update_changelog`. Th
 
 Changes since the last non-beta release.
 
+#### Bug Fixes
+
+- **Doctor rake task**: Fixed LoadError in `rake react_on_rails:doctor` when using packaged gem. The task was trying to require excluded `rakelib/task_helpers` file. [PR 1795](https://github.com/shakacode/react_on_rails/pull/1795)
+
 ### [16.0.1-rc.0] - 2025-09-19
 
 #### Pro License Structure Implementation
