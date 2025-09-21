@@ -23,6 +23,8 @@ After a release, please make sure to run `bundle exec rake update_changelog`. Th
 
 Changes since the last non-beta release.
 
+### [16.0.1-rc.2] - 2025-09-20
+
 #### Bug Fixes
 
 - **Doctor rake task**: Fixed LoadError in `rake react_on_rails:doctor` when using packaged gem. The task was trying to require excluded `rakelib/task_helpers` file. [PR 1795](https://github.com/shakacode/react_on_rails/pull/1795)
@@ -1652,7 +1654,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/16.0.1-rc.0...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/16.0.1-rc.2...master
+[16.0.1-rc.2]: https://github.com/shakacode/react_on_rails/compare/16.0.1-rc.0...16.0.1-rc.2
 [16.0.1-rc.0]: https://github.com/shakacode/react_on_rails/compare/16.0.0...16.0.1-rc.0
 [16.0.0]: https://github.com/shakacode/react_on_rails/compare/14.2.0...16.0.0
 [14.2.0]: https://github.com/shakacode/react_on_rails/compare/14.1.1...14.2.0
