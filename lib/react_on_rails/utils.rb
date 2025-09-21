@@ -102,8 +102,9 @@ module ReactOnRails
     end
 
     def self.server_bundle?(bundle_name)
-      bundle_name == ReactOnRails.configuration.server_bundle_js_file ||
-        bundle_name == ReactOnRails.configuration.rsc_bundle_js_file
+      config = ReactOnRails.configuration
+      bundle_name == config.server_bundle_js_file ||
+        bundle_name == config.rsc_bundle_js_file
     end
 
     def self.try_secure_server_locations(bundle_name)
