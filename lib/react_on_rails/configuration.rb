@@ -199,9 +199,7 @@ module ReactOnRails
       return unless components_subdirectory.present?
 
       ReactOnRails::PackerUtils.raise_shakapacker_version_incompatible_for_autobundling unless
-        ReactOnRails::PackerUtils.shakapacker_version_requirement_met?(
-          ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION
-        )
+        ReactOnRails::PackerUtils.supports_auto_registration?
       ReactOnRails::PackerUtils.raise_nested_entries_disabled unless ReactOnRails::PackerUtils.nested_entries?
     end
 
