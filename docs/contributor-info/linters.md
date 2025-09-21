@@ -37,14 +37,13 @@ Autofixing is a **HUGE** time saver!
 
 ```bash
 # Check formatting
-npx prettier --check .
+yarn start format.listDifferent
 
-# Fix formatting
-npx prettier --write .
-
-# Or use project scripts
+# Fix formatting (includes all linters)
 rake autofix
-yarn start format.listDifferent  # check only
+
+# Or format only
+yarn start format
 ```
 
 ### Merge Conflict Resolution
@@ -52,9 +51,9 @@ yarn start format.listDifferent  # check only
 When resolving merge conflicts, **NEVER manually format**. Follow this sequence:
 
 1. Resolve logical conflicts only
-2. `git add <resolved-files>`
-3. `npx prettier --write <resolved-files>`
-4. `git add <resolved-files>` (if Prettier made changes)
+2. `git add .` (or specific files)
+3. `rake autofix` (fixes all formatting + linting)
+4. `git add .` (if autofix made changes)
 5. Continue with `git rebase --continue` or `git commit`
 
 **Why this matters**: Manual formatting during conflict resolution creates "formatting wars" between tools and leads to back-and-forth formatting changes in PRs.

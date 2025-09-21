@@ -356,9 +356,9 @@ git checkout HEAD~1 -- Gemfile package.json  # Rollback versions
 
 **Merge conflict resolution workflow:**
 1. Resolve logical conflicts only (ignore formatting)
-2. `git add <resolved-files>`
-3. `npx prettier --write <resolved-files>`
-4. `git add <resolved-files>` (if Prettier made changes)
+2. `git add .` (or specific files)
+3. `rake autofix` (fixes all formatting + linting)
+4. `git add .` (if autofix made changes)
 5. Continue rebase: `git rebase --continue`
 
 **Never manually format during conflict resolution** - this causes formatting wars.

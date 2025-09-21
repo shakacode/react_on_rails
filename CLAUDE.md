@@ -40,24 +40,24 @@ These requirements are non-negotiable. CI will fail if not followed.
 
 ### Standard Workflow
 1. Make code changes
-2. Run `npx prettier --write <files>` or `rake autofix`
+2. Run `rake autofix` or `yarn start format`
 3. Commit changes
 
 ### Merge Conflict Resolution Workflow
 **CRITICAL**: When resolving merge conflicts, follow this exact sequence:
 
 1. **Resolve logical conflicts only** - don't worry about formatting
-2. **Add resolved files**: `git add <conflicted-files>`
-3. **Let Prettier format**: `npx prettier --write <conflicted-files>`
-4. **Add formatted files**: `git add <conflicted-files>` (if Prettier made changes)
+2. **Add resolved files**: `git add .` (or specific files)
+3. **Auto-fix everything**: `rake autofix`
+4. **Add any formatting changes**: `git add .`
 5. **Continue rebase/merge**: `git rebase --continue` or `git commit`
 
 **❌ NEVER manually format during conflict resolution** - this causes formatting wars between tools.
 
 ### Debugging Formatting Issues
-- Check current formatting: `npx prettier --check .`
-- Fix all formatting: `npx prettier --write .`
-- If CI fails on formatting, always run Prettier, never manual fixes
+- Check current formatting: `yarn start format.listDifferent`
+- Fix all formatting: `rake autofix`
+- If CI fails on formatting, always run automated fixes, never manual fixes
 
 ### Development Setup Commands
 
