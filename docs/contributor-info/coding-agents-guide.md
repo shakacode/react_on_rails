@@ -350,7 +350,20 @@ git checkout HEAD~1 -- Gemfile package.json  # Rollback versions
 - Database warnings during `rails js:export` are usually non-fatal
 - Test builds don't require database connectivity
 
-### 6. Communication with Users
+### 6. Formatting Requirements
+
+**⚠️ CRITICAL**: Always use Prettier for formatting - never manually format code.
+
+**Merge conflict resolution workflow:**
+1. Resolve logical conflicts only (ignore formatting)
+2. `git add .` (or specific files)
+3. `rake autofix` (fixes all formatting + linting)
+4. `git add .` (if autofix made changes)
+5. Continue rebase: `git rebase --continue`
+
+**Never manually format during conflict resolution** - this causes formatting wars.
+
+### 7. Communication with Users
 
 When reporting status to users:
 
@@ -361,7 +374,7 @@ echo "⚠️  Note: Some TypeScript errors may be unrelated to react_on_rails"
 echo "🔗 Next steps: Test your application with 'bin/dev'"
 ```
 
-### 7. Documentation Updates
+### 8. Documentation Updates
 
 After successful upgrades, suggest:
 

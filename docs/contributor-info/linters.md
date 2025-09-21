@@ -27,6 +27,37 @@ npm run lint -- --fix
 
 Autofixing is a **HUGE** time saver!
 
+## Prettier
+
+[Prettier](https://prettier.io/) handles code formatting for JavaScript, TypeScript, CSS, and Markdown files.
+
+**⚠️ CRITICAL**: Prettier is the SOLE authority for formatting. Never manually format code.
+
+### Basic Usage
+
+```bash
+# Check formatting
+yarn start format.listDifferent
+
+# Fix formatting (includes all linters)
+rake autofix
+
+# Or format only
+yarn start format
+```
+
+### Merge Conflict Resolution
+
+When resolving merge conflicts, **NEVER manually format**. Follow this sequence:
+
+1. Resolve logical conflicts only
+2. `git add .` (or specific files)
+3. `rake autofix` (fixes all formatting + linting)
+4. `git add .` (if autofix made changes)
+5. Continue with `git rebase --continue` or `git commit`
+
+**Why this matters**: Manual formatting during conflict resolution creates "formatting wars" between tools and leads to back-and-forth formatting changes in PRs.
+
 ## ESLint
 
 See the [ESLint](https://eslint.org/) website for more information.
