@@ -85,7 +85,7 @@ module ReactOnRails
       end
 
       # Add help and support information
-      message << "\n#{Utils.extract_troubleshooting_section}\n"
+      message << "\n#{Utils.default_troubleshooting_section}\n"
 
       [backtrace, message]
     end

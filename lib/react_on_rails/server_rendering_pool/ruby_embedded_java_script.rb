@@ -77,7 +77,7 @@ module ReactOnRails
             if err.message.include?("ReferenceError: self is not defined")
               msg << "\nError indicates that you may have code-splitting incorrectly enabled.\n"
             end
-            msg << "\n#{Utils.extract_troubleshooting_section}\n"
+            msg << "\n#{Utils.default_troubleshooting_section}\n"
             raise ReactOnRails::Error, msg, err.backtrace
           end
 
@@ -123,7 +123,7 @@ module ReactOnRails
         rescue StandardError => e
           msg = "You specified server rendering JS file: #{server_js_file}, but it cannot be " \
                 "read. You may set the server_bundle_js_file in your configuration to be \"\" to " \
-                "avoid this warning.\nError is: #{e}\n\n#{Utils.extract_troubleshooting_section}"
+                "avoid this warning.\nError is: #{e}\n\n#{Utils.default_troubleshooting_section}"
           raise ReactOnRails::Error, msg
         end
 
@@ -151,7 +151,7 @@ module ReactOnRails
                   "See file #{file_name} to " \
                   "correlate line numbers of error. Error is\n\n#{e.message}" \
                   "\n\n#{e.backtrace.join("\n")}" \
-                  "\n\n#{Utils.extract_troubleshooting_section}"
+                  "\n\n#{Utils.default_troubleshooting_section}"
             Rails.logger.error(msg)
             trace_js_code_used("Error when compiling JavaScript code for the context.", base_js_code,
                                file_name, force: true)
@@ -229,7 +229,7 @@ module ReactOnRails
           encoding_type = match[:encoding]
           response.body.force_encoding(encoding_type)
         rescue StandardError => e
-          msg = "file_url_to_string #{url} failed\nError is: #{e}\n\n#{Utils.extract_troubleshooting_section}"
+          msg = "file_url_to_string #{url} failed\nError is: #{e}\n\n#{Utils.default_troubleshooting_section}"
           raise ReactOnRails::Error, msg
         end
 

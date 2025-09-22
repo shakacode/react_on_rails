@@ -141,7 +141,6 @@ _Requires creating a free account._
 - A JavaScript package manager (npm, yarn, pnpm, or bun)
 
 <!-- TROUBLESHOOTING_LINKS_START -->
-<!-- NOTE: Content between TROUBLESHOOTING_LINKS markers is dynamically extracted and displayed in error messages -->
 # 🆘 Get Help & Support
 
 **Need immediate help?** Here are your options, ordered by response time:
