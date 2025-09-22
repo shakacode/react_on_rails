@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 1. **ALWAYS run `bundle exec rubocop` and fix ALL violations**
 2. **ALWAYS ensure files end with a newline character**
 3. **NEVER push without running full lint check first**
-4. **ALWAYS let Prettier handle ALL formatting - never manually format**
+4. **ALWAYS let Prettier and RuboCop handle ALL formatting - never manually format**
 
 These requirements are non-negotiable. CI will fail if not followed.
 
@@ -39,10 +39,11 @@ Git hooks will automatically run linting on **all changed files (staged + unstag
 - **Build**: `yarn run build` (compiles TypeScript to JavaScript in node_package/lib)
 - **Type checking**: `yarn run type-check`
 - **⚠️ MANDATORY BEFORE GIT PUSH**: `bundle exec rubocop` and fix ALL violations + ensure trailing newlines
+- Never run `npm` commands, only equivalent Yarn Classic ones
 
 ## ⚠️ FORMATTING RULES
 
-**Prettier is the SOLE authority for formatting. NEVER manually format code.**
+**Prettier is the SOLE authority for formatting non-Ruby files, and RuboCop for formatting Ruby files. NEVER manually format code.**
 
 ### Standard Workflow
 1. Make code changes
@@ -120,10 +121,10 @@ This project maintains both a Ruby gem and an NPM package:
 ## Important Notes
 
 - Use `yalc` for local development when testing with external apps
-- The project supports both Webpacker and Shakapacker
 - Server-side rendering uses isolated Node.js processes
 - React Server Components support available in Pro version
 - Generated examples are in `gen-examples/` (ignored by git)
+- Only use `yarn` as the JS package manager, never `npm`
 
 ## IDE Configuration
 
