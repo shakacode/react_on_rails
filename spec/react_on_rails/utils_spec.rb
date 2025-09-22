@@ -11,13 +11,17 @@ module ReactOnRails
     packers_to_test = ["shakapacker"]
 
     shared_context "with packer enabled" do
+      let(:mock_packer) { instance_double(Shakapacker::Instance) }
+      let(:mock_config) { instance_double(Shakapacker::Configuration) }
+      let(:mock_dev_server) { instance_double(Shakapacker::DevServer) }
+
       before do
         allow(ReactOnRails).to receive_message_chain(:configuration, :generated_assets_dir)
           .and_return("")
-        allow(ReactOnRails::PackerUtils.packer).to receive_message_chain("dev_server.running?")
-          .and_return(false)
-        allow(ReactOnRails::PackerUtils.packer).to receive_message_chain("config.public_output_path")
-          .and_return(packer_public_output_path)
+        allow(ReactOnRails::PackerUtils).to receive(:packer).and_return(mock_packer)
+        allow(mock_packer).to receive_messages(dev_server: mock_dev_server, config: mock_config)
+        allow(mock_dev_server).to receive(:running?).and_return(false)
+        allow(mock_config).to receive(:public_output_path).and_return(packer_public_output_path)
       end
     end
 
@@ -26,6 +30,7 @@ module ReactOnRails
 
       # We don't need to mock anything here because the shakapacker gem is already installed and will be used by default
       it "uses shakapacker" do
+        allow(ReactOnRails::PackerUtils).to receive(:packer).and_return(::Shakapacker)
         expect(ReactOnRails::PackerUtils.packer).to eq(::Shakapacker)
       end
     end
@@ -43,7 +48,7 @@ module ReactOnRails
     end
 
     def mock_bundle_in_manifest(bundle_name, hashed_bundle)
-      mock_manifest = instance_double(Object.const_get(ReactOnRails::PackerUtils.packer_type.capitalize)::Manifest)
+      mock_manifest = instance_double(Shakapacker::Manifest)
       allow(mock_manifest).to receive(:lookup!)
         .with(bundle_name)
         .and_return(hashed_bundle)
@@ -54,9 +59,7 @@ module ReactOnRails
     def mock_missing_manifest_entry(bundle_name)
       allow(ReactOnRails::PackerUtils.packer).to receive_message_chain("manifest.lookup!")
         .with(bundle_name)
-        .and_raise(Object.const_get(
-          ReactOnRails::PackerUtils.packer_type.capitalize
-        )::Manifest::MissingEntryError)
+        .and_raise(Shakapacker::Manifest::MissingEntryError)
     end
 
     def random_bundle_name
@@ -508,7 +511,7 @@ module ReactOnRails
           before do
             allow(ReactOnRails::PackerUtils.packer).to receive(:dev_server).and_return(
               instance_double(
-                Object.const_get(ReactOnRails::PackerUtils.packer_type.capitalize)::DevServer,
+                Shakapacker::DevServer,
                 running?: true,
                 protocol: "http",
                 host_with_port: "localhost:3035"

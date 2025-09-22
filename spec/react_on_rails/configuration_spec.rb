@@ -185,6 +185,13 @@ module ReactOnRails
     end
 
     describe "RSC configuration options" do
+      before do
+        allow(ReactOnRails::PackerUtils).to receive_messages(
+          supports_auto_registration?: true,
+          nested_entries?: true
+        )
+      end
+
       it "has default values for RSC-related configuration options" do
         ReactOnRails.configure {} # rubocop:disable Lint/EmptyBlock
 
@@ -327,6 +334,11 @@ module ReactOnRails
     end
 
     it "calls raise_missing_components_subdirectory if auto_load_bundle = true & components_subdirectory is not set" do
+      allow(ReactOnRails::PackerUtils).to receive_messages(
+        supports_auto_registration?: true,
+        nested_entries?: true
+      )
+
       expect do
         ReactOnRails.configure do |config|
           config.auto_load_bundle = true
@@ -335,15 +347,18 @@ module ReactOnRails
     end
 
     it "checks that autobundling requirements are met if configuration options for autobundling are set" do
-      allow(ReactOnRails::PackerUtils).to receive_messages(shakapacker_version_requirement_met?: true,
-                                                           nested_entries?: true)
+      allow(ReactOnRails::PackerUtils).to receive_messages(
+        shakapacker_version_requirement_met?: true,
+        nested_entries?: true,
+        supports_auto_registration?: true
+      )
 
       ReactOnRails.configure do |config|
         config.auto_load_bundle = true
         config.components_subdirectory = "something"
       end
 
-      expect(ReactOnRails::PackerUtils).to have_received(:shakapacker_version_requirement_met?).twice
+      expect(ReactOnRails::PackerUtils).to have_received(:supports_auto_registration?)
       expect(ReactOnRails::PackerUtils).to have_received(:nested_entries?)
     end
 

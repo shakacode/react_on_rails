@@ -22,6 +22,11 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
     before do
       allow(ReactOnRails::PackerUtils).to receive(:check_manifest_not_cached).and_return(nil)
       allow(ReactOnRails::Utils).to receive(:generated_assets_full_path).and_return(generated_assets_full_path)
+      allow(ReactOnRails::PackerUtils).to receive_messages(
+        packer_public_output_path: generated_assets_full_path,
+        supports_auto_registration?: true,
+        nested_entries?: true
+      )
     end
 
     context "with Webpacker" do
@@ -81,6 +86,13 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
 
     context "without Webpacker" do
       let(:webpack_generated_files) { %w[client-bundle.js server-bundle.js] }
+
+      before do
+        allow(ReactOnRails::PackerUtils).to receive(:manifest_exists?).and_return(true)
+        allow(ReactOnRails::Utils).to receive(:bundle_js_file_path) do |bundle_name|
+          File.join(generated_assets_full_path, bundle_name)
+        end
+      end
 
       context "when compiled assets exist and are up-to-date" do
         let(:fixture_dirname) { "assets_exist" }
