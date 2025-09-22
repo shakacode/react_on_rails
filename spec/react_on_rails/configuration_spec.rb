@@ -313,6 +313,19 @@ module ReactOnRails
       expect(ReactOnRails.configuration.random_dom_id).to be(false)
     end
 
+    it "works without specifying generated_assets_dir when using Shakapacker" do
+      allow(ReactOnRails::PackerUtils).to receive_message_chain("packer.config.public_output_path")
+        .and_return(Pathname.new("/tmp/public/packs"))
+
+      expect do
+        ReactOnRails.configure do |config|
+          config.server_bundle_js_file = "server.js"
+        end
+      end.not_to raise_error
+
+      expect(ReactOnRails.configuration.generated_assets_dir).to be_blank
+    end
+
     it "calls raise_missing_components_subdirectory if auto_load_bundle = true & components_subdirectory is not set" do
       expect do
         ReactOnRails.configure do |config|
