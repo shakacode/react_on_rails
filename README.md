@@ -150,6 +150,7 @@ _Requires creating a free account._
 - 📖 **Discussions**: [Ask questions](https://github.com/shakacode/react_on_rails/discussions) - General help
 
 **Additional Resources:**
+
 - [**Subscribe**](https://app.mailerlite.com/webforms/landing/l1d9x5) for announcements of new releases and tutorials
 - **[forum.shakacode.com](https://forum.shakacode.com)** - Development discussions
 - **[@railsonmaui on Twitter](https://twitter.com/railsonmaui)** - Updates and tips
