@@ -53,7 +53,7 @@ module ReactOnRails
       # Set to 0 to disable the timeout and wait indefinitely for component registration.
       component_registry_timeout: DEFAULT_COMPONENT_REGISTRY_TIMEOUT,
       generated_component_packs_loading_strategy: nil,
-      server_bundle_output_path: "ssr-generated",
+      server_bundle_output_path: nil,
       enforce_secure_server_bundles: false
     )
   end
