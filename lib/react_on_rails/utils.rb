@@ -74,13 +74,13 @@ module ReactOnRails
       # Priority order depends on bundle type:
       # SERVER BUNDLES (normal case): Try secure non-public locations first, then manifest, then legacy
       # CLIENT BUNDLES (normal case): Try manifest first, then fallback locations
-      if ReactOnRails::PackerUtils.using_packer? && bundle_name != "manifest.json"
-        bundle_js_file_path_with_packer(bundle_name)
-      else
+      if bundle_name == "manifest.json"
         # Default to the non-hashed name in the specified output directory, which, for legacy
         # React on Rails, this is the output directory picked up by the asset pipeline.
         # For Shakapacker, this is the public output path defined in the (shaka/web)packer.yml file.
         File.join(generated_assets_full_path, bundle_name)
+      else
+        bundle_js_file_path_with_packer(bundle_name)
       end
     end
 
