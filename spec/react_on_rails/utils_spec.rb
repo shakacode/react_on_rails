@@ -76,8 +76,6 @@ module ReactOnRails
         .and_return(server_bundle_name)
       allow(ReactOnRails).to receive_message_chain("configuration.rsc_bundle_js_file")
         .and_return(rsc_bundle_name)
-      allow(ReactOnRails).to receive_message_chain("configuration.enforce_secure_server_bundles")
-        .and_return(false)
       allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
         .and_return(nil)
     end
@@ -145,27 +143,14 @@ module ReactOnRails
               it { is_expected.to eq("#{packer_public_output_path}/manifest.json") }
             end
 
-            context "when file not in manifest and fallback to standard location" do
+            context "when file not in manifest" do
               before do
                 mock_missing_manifest_entry("webpack-bundle.js")
               end
 
-              let(:standard_path) { File.expand_path(File.join("public", "packs", "webpack-bundle.js")) }
               let(:env_specific_path) { File.join(packer_public_output_path, "webpack-bundle.js") }
 
-              it "returns standard path when bundle exists there" do
-                allow(File).to receive(:exist?).and_call_original
-                allow(File).to receive(:exist?).with(File.expand_path(env_specific_path)).and_return(false)
-                allow(File).to receive(:exist?).with(standard_path).and_return(true)
-
-                result = described_class.bundle_js_file_path("webpack-bundle.js")
-                expect(result).to eq(standard_path)
-              end
-
-              it "returns environment-specific path when no bundle exists anywhere" do
-                allow(File).to receive(:exist?).and_call_original
-                allow(File).to receive(:exist?).and_return(false)
-
+              it "returns environment-specific path" do
                 result = described_class.bundle_js_file_path("webpack-bundle.js")
                 expect(result).to eq(File.expand_path(env_specific_path))
               end
@@ -174,43 +159,46 @@ module ReactOnRails
             context "with server bundle (SSR/RSC) file not in manifest" do
               let(:server_bundle_name) { "server-bundle.js" }
               let(:ssr_generated_path) { File.expand_path(File.join("ssr-generated", server_bundle_name)) }
-              let(:generated_server_path) do
-                File.expand_path(File.join("generated", "server-bundles", server_bundle_name))
+
+              context "with server_bundle_output_path configured" do
+                before do
+                  mock_missing_manifest_entry(server_bundle_name)
+                  allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
+                    .and_return(server_bundle_name)
+                  allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
+                    .and_return("ssr-generated")
+                end
+
+                it "tries configured location first for server bundles" do
+                  allow(File).to receive(:exist?).and_call_original
+                  allow(File).to receive(:exist?).with(ssr_generated_path).and_return(true)
+
+                  result = described_class.bundle_js_file_path(server_bundle_name)
+                  expect(result).to eq(ssr_generated_path)
+                end
+
+                it "falls back to configured path when no bundle exists" do
+                  allow(File).to receive(:exist?).and_call_original
+                  allow(File).to receive(:exist?).and_return(false)
+
+                  result = described_class.bundle_js_file_path(server_bundle_name)
+                  expect(result).to eq(ssr_generated_path)
+                end
               end
 
-              before do
-                mock_missing_manifest_entry(server_bundle_name)
-                allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
-                  .and_return(server_bundle_name)
-                allow(ReactOnRails).to receive_message_chain("configuration.enforce_secure_server_bundles")
-                  .and_return(false)
-                allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
-                  .and_return("ssr-generated")
-              end
+              context "without server_bundle_output_path configured" do
+                before do
+                  mock_missing_manifest_entry(server_bundle_name)
+                  allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
+                    .and_return(server_bundle_name)
+                  allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
+                    .and_return(nil)
+                end
 
-              it "tries secure locations first for server bundles" do
-                allow(File).to receive(:exist?).and_call_original
-                allow(File).to receive(:exist?).with(ssr_generated_path).and_return(true)
-
-                result = described_class.bundle_js_file_path(server_bundle_name)
-                expect(result).to eq(ssr_generated_path)
-              end
-
-              it "tries generated/server-bundles as second secure location" do
-                allow(File).to receive(:exist?).and_call_original
-                allow(File).to receive(:exist?).with(ssr_generated_path).and_return(false)
-                allow(File).to receive(:exist?).with(generated_server_path).and_return(true)
-
-                result = described_class.bundle_js_file_path(server_bundle_name)
-                expect(result).to eq(generated_server_path)
-              end
-
-              it "falls back to ssr-generated location when no bundle exists anywhere" do
-                allow(File).to receive(:exist?).and_call_original
-                allow(File).to receive(:exist?).and_return(false)
-
-                result = described_class.bundle_js_file_path(server_bundle_name)
-                expect(result).to eq(ssr_generated_path)
+                it "uses packer public output path" do
+                  result = described_class.bundle_js_file_path(server_bundle_name)
+                  expect(result).to eq(File.expand_path(File.join(packer_public_output_path, server_bundle_name)))
+                end
               end
             end
 
@@ -222,13 +210,11 @@ module ReactOnRails
                 mock_missing_manifest_entry(rsc_bundle_name)
                 allow(ReactOnRails).to receive_message_chain("configuration.rsc_bundle_js_file")
                   .and_return(rsc_bundle_name)
-                allow(ReactOnRails).to receive_message_chain("configuration.enforce_secure_server_bundles")
-                  .and_return(false)
                 allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
                   .and_return("ssr-generated")
               end
 
-              it "treats RSC bundles as server bundles and tries secure locations first" do
+              it "treats RSC bundles as server bundles and tries configured location first" do
                 allow(File).to receive(:exist?).and_call_original
                 allow(File).to receive(:exist?).with(ssr_generated_path).and_return(true)
 
