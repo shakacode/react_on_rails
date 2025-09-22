@@ -136,7 +136,6 @@ module ReactOnRails
       File.expand_path(File.join(ReactOnRails::PackerUtils.packer_public_output_path, bundle_name))
     end
 
-
     def self.server_bundle_js_file_path
       return @server_bundle_path if @server_bundle_path && !Rails.env.development?
 

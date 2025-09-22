@@ -462,6 +462,11 @@ module ReactOnRails
 
     describe "enforce_secure_server_bundles validation" do
       context "when enforce_secure_server_bundles is true" do
+        before do
+          # Mock Rails.root for tests that need path validation
+          allow(Rails).to receive(:root).and_return(Pathname.new("/test/app"))
+        end
+
         it "raises error when server_bundle_output_path is nil" do
           expect do
             ReactOnRails.configure do |config|

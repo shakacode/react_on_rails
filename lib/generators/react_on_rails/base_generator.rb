@@ -146,7 +146,7 @@ module ReactOnRails
         append_to_file ".gitignore" do
           lines = ["\n# Generated React on Rails packs"]
           lines.concat(additions)
-          lines.join("\n") + "\n"
+          "#{lines.join("\n")}\n"
         end
       end
 
