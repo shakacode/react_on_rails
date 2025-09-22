@@ -57,6 +57,8 @@ module ReactOnRails
         MSG
 
         puts wrap_message(msg)
+        puts ""
+        puts default_troubleshooting_section
 
         # Rspec catches exit without! in the exit callbacks
         exit!(1)
@@ -277,6 +279,16 @@ module ReactOnRails
       end
 
       puts "Prepended\n#{text_to_prepend}to #{file}."
+    end
+
+    def self.default_troubleshooting_section
+      <<~DEFAULT
+        📞 Get Help & Support:
+           • 🚀 Professional Support: react_on_rails@shakacode.com (fastest resolution)
+           • 💬 React + Rails Slack: https://invite.reactrails.com
+           • 🆓 GitHub Issues: https://github.com/shakacode/react_on_rails/issues
+           • 📖 Discussions: https://github.com/shakacode/react_on_rails/discussions
+      DEFAULT
     end
   end
 end

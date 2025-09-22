@@ -7,7 +7,12 @@ module ReactOnRails
     def initialize(parse_error:, json:)
       @json = json
       @original_error = parse_error
-      super(parse_error.message)
+      message = <<~MSG
+        #{parse_error.message}
+
+        #{Utils.default_troubleshooting_section}
+      MSG
+      super(message)
     end
 
     def to_honeybadger_context

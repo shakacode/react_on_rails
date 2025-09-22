@@ -123,6 +123,24 @@ namespace :react_on_rails do
     puts Rainbow("=" * 80).red
   end
 
+  def show_help_and_support
+    puts ""
+    troubleshooting_content = ReactOnRails::Utils.default_troubleshooting_section
+    # Display the troubleshooting content with color formatting
+    troubleshooting_content.split("\n").each do |line|
+      case line
+      when /^📞/
+        puts Rainbow(line).magenta.bold
+      when /^\s*•\s*🚀/
+        puts Rainbow(line).yellow
+      when /^\s*•/
+        puts Rainbow(line).cyan
+      else
+        puts Rainbow(line).white unless line.strip.empty?
+      end
+    end
+  end
+
   # rubocop:disable Metrics/AbcSize
   def handle_standard_error(error)
     puts ""
@@ -142,11 +160,7 @@ namespace :react_on_rails do
     puts Rainbow("   2. Check Rails logs: tail -f log/development.log").white
     puts Rainbow("   3. Verify all dependencies are installed: bundle install && npm install").white
     puts Rainbow("   4. Clear cache: rm -rf tmp/cache").white
-    puts ""
-    puts Rainbow("📞 GET HELP:").magenta.bold
-    puts Rainbow("   • Create an issue: https://github.com/shakacode/react_on_rails/issues").cyan
-    puts Rainbow("   • Community discussions: https://github.com/shakacode/react_on_rails/discussions").cyan
-    puts Rainbow("   • Professional support: https://www.shakacode.com/react-on-rails-pro").cyan
+    show_help_and_support
     puts Rainbow("=" * 80).red
   end
   # rubocop:enable Metrics/AbcSize
