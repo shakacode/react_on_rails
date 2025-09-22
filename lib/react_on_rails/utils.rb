@@ -84,19 +84,22 @@ module ReactOnRails
       end
     end
 
-    def self.bundle_js_file_path_with_packer(bundle_name)
+    private_class_method def self.bundle_js_file_path_with_packer(bundle_name)
       # Handle test scenarios where packer is mocked as unavailable
       return File.join(generated_assets_full_path, bundle_name) unless ReactOnRails::PackerUtils.using_packer?
 
       is_server_bundle = server_bundle?(bundle_name)
 
       if is_server_bundle
-        # NORMAL CASE for server bundles: Try secure non-public locations first
-        secure_path = try_secure_server_locations(bundle_name)
-        return secure_path if secure_path
+        # NORMAL CASE for server bundles: Try private non-public locations first
+        private_path = try_private_server_locations(bundle_name)
+        return private_path if private_path
+
+        # If enforcement is enabled and no private path found, skip manifest fallback
+        return handle_missing_manifest_entry(bundle_name, true) if enforce_secure_server_bundles?
       end
 
-      # For client bundles OR server bundle fallback: Try manifest lookup
+      # For client bundles OR server bundle fallback (when enforcement disabled): Try manifest lookup
       begin
         ReactOnRails::PackerUtils.bundle_js_uri_from_packer(bundle_name)
       rescue Shakapacker::Manifest::MissingEntryError
@@ -104,27 +107,35 @@ module ReactOnRails
       end
     end
 
-    def self.server_bundle?(bundle_name)
+    private_class_method def self.server_bundle?(bundle_name)
       config = ReactOnRails.configuration
       bundle_name == config.server_bundle_js_file ||
-        bundle_name == config.rsc_bundle_js_file
+      bundle_name == config.rsc_bundle_js_file
     end
 
-    def self.try_secure_server_locations(bundle_name)
-      secure_server_locations = [
-        File.join("ssr-generated", bundle_name),
-        File.join("generated", "server-bundles", bundle_name)
+    private_class_method def self.enforce_secure_server_bundles?
+      ReactOnRails.configuration.enforce_secure_server_bundles
+    end
+
+    private_class_method def self.try_private_server_locations(bundle_name)
+      config = ReactOnRails.configuration
+
+      # Build candidate locations, including configured output path
+      root_path = Rails.root || "."
+      candidates = [
+        File.join(root_path, "ssr-generated", bundle_name),
+        File.join(root_path, "generated", "server-bundles", bundle_name)
       ]
 
-      secure_server_locations.each do |path|
-        expanded_path = File.expand_path(path)
-        return expanded_path if File.exist?(expanded_path)
+      # Add configured server_bundle_output_path if present
+      if config.server_bundle_output_path.present?
+        candidates << File.join(root_path, config.server_bundle_output_path, bundle_name)
       end
 
-      nil
+      find_first_existing_path(candidates)
     end
 
-    def self.handle_missing_manifest_entry(bundle_name, is_server_bundle)
+    private_class_method def self.handle_missing_manifest_entry(bundle_name, is_server_bundle)
       # When manifest lookup fails, try multiple fallback locations:
       # 1. Environment-specific path (e.g., public/webpack/test)
       # 2. Standard Shakapacker location (public/packs)
@@ -136,22 +147,26 @@ module ReactOnRails
       ].uniq
 
       # Return the first location where the bundle file actually exists
-      fallback_locations.each do |path|
-        expanded_path = File.expand_path(path)
-        return expanded_path if File.exist?(expanded_path)
-      end
+      existing_path = find_first_existing_path(fallback_locations)
+      return existing_path if existing_path
 
       # If none exist, return appropriate default based on bundle type
       if is_server_bundle
-        # For server bundles, prefer secure location as final fallback
+        # For server bundles, prefer private location as final fallback
         File.expand_path(File.join("ssr-generated", bundle_name))
       else
         # For client bundles, use environment-specific path (original behavior)
         File.expand_path(fallback_locations.first)
       end
     end
-    private_class_method :bundle_js_file_path_with_packer, :server_bundle?, :try_secure_server_locations,
-                         :handle_missing_manifest_entry
+
+    private_class_method def self.find_first_existing_path(paths)
+      paths.each do |path|
+        expanded_path = File.expand_path(path)
+        return expanded_path if File.exist?(expanded_path)
+      end
+      nil
+    end
 
     def self.server_bundle_js_file_path
       return @server_bundle_path if @server_bundle_path && !Rails.env.development?
