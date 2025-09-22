@@ -30,7 +30,7 @@ ReactOnRails.configure do |config|
   # Set server_bundle_output_path to nil so bundles are read from public path
   # This ensures the dummy app uses the standard webpack output location
   config.server_bundle_output_path = nil
-  config.enforce_secure_server_bundles = false
+  config.enforce_private_server_bundles = false
 
   # Uncomment to test these
   # config.build_test_command = "yarn run build:test"

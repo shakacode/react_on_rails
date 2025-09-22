@@ -47,10 +47,10 @@ ReactOnRails.configure do |config|
   # This should match your webpack configuration for server bundles.
   config.server_bundle_output_path = "ssr-generated"
 
-  # Enforce that server bundles are only loaded from secure (non-public) directories.
+  # Enforce that server bundles are only loaded from private (non-public) directories.
   # When true, server bundles will only be loaded from the configured server_bundle_output_path.
   # This is recommended for production to prevent server-side code from being exposed.
-  config.enforce_secure_server_bundles = true
+  config.enforce_private_server_bundles = true
 
   ################################################################################
   ################################################################################

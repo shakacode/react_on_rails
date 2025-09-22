@@ -239,7 +239,7 @@ module ReactOnRails
           include_context "with #{packer_type} enabled"
 
           context "with server file not in manifest", packer_type.to_sym do
-            it "returns the secure ssr-generated path for server bundles" do
+            it "returns the private ssr-generated path for server bundles" do
               server_bundle_name = "server-bundle.js"
               mock_bundle_configs(server_bundle_name: server_bundle_name)
               mock_missing_manifest_entry(server_bundle_name)
@@ -327,7 +327,7 @@ module ReactOnRails
           include_context "with #{packer_type} enabled"
 
           context "with server file not in manifest", packer_type.to_sym do
-            it "returns the secure ssr-generated path for RSC bundles" do
+            it "returns the private ssr-generated path for RSC bundles" do
               server_bundle_name = "rsc-bundle.js"
               mock_bundle_configs(rsc_bundle_name: server_bundle_name)
               mock_missing_manifest_entry(server_bundle_name)

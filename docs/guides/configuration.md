@@ -134,10 +134,10 @@ ReactOnRails.configure do |config|
   # Default is nil (disabled). Set to "ssr-generated" or your preferred directory to enable.
   # config.server_bundle_output_path = "ssr-generated"
 
-  # When enabled, enforces that server bundles are only loaded from secure, designated locations
+  # When enabled, enforces that server bundles are only loaded from private, designated locations
   # to prevent potential security risks from loading untrusted server-side code.
   # Default is false for backward compatibility.
-  config.enforce_secure_server_bundles = false
+  config.enforce_private_server_bundles = false
 
   # `prerender` means server-side rendering
   # default is false. This is an option for view helpers `render_component` and `render_component_hash`.

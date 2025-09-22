@@ -460,8 +460,8 @@ module ReactOnRails
       end
     end
 
-    describe "enforce_secure_server_bundles validation" do
-      context "when enforce_secure_server_bundles is true" do
+    describe "enforce_private_server_bundles validation" do
+      context "when enforce_private_server_bundles is true" do
         before do
           # Mock Rails.root for tests that need path validation
           allow(Rails).to receive(:root).and_return(Pathname.new("/test/app"))
@@ -471,7 +471,7 @@ module ReactOnRails
           expect do
             ReactOnRails.configure do |config|
               config.server_bundle_output_path = nil
-              config.enforce_secure_server_bundles = true
+              config.enforce_private_server_bundles = true
             end
           end.to raise_error(ReactOnRails::Error, /server_bundle_output_path is nil/)
         end
@@ -480,7 +480,7 @@ module ReactOnRails
           expect do
             ReactOnRails.configure do |config|
               config.server_bundle_output_path = "public/server-bundles"
-              config.enforce_secure_server_bundles = true
+              config.enforce_private_server_bundles = true
             end
           end.to raise_error(ReactOnRails::Error, /is inside the public directory/)
         end
@@ -489,18 +489,18 @@ module ReactOnRails
           expect do
             ReactOnRails.configure do |config|
               config.server_bundle_output_path = "ssr-generated"
-              config.enforce_secure_server_bundles = true
+              config.enforce_private_server_bundles = true
             end
           end.not_to raise_error
         end
       end
 
-      context "when enforce_secure_server_bundles is false" do
+      context "when enforce_private_server_bundles is false" do
         it "allows server_bundle_output_path to be nil" do
           expect do
             ReactOnRails.configure do |config|
               config.server_bundle_output_path = nil
-              config.enforce_secure_server_bundles = false
+              config.enforce_private_server_bundles = false
             end
           end.not_to raise_error
         end
@@ -509,7 +509,7 @@ module ReactOnRails
           expect do
             ReactOnRails.configure do |config|
               config.server_bundle_output_path = "public/server-bundles"
-              config.enforce_secure_server_bundles = false
+              config.enforce_private_server_bundles = false
             end
           end.not_to raise_error
         end

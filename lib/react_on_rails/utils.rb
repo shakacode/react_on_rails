@@ -73,7 +73,7 @@ module ReactOnRails
 
     def self.bundle_js_file_path(bundle_name)
       # Priority order depends on bundle type:
-      # SERVER BUNDLES (normal case): Try secure non-public locations first, then manifest, then legacy
+      # SERVER BUNDLES (normal case): Try private non-public locations first, then manifest, then legacy
       # CLIENT BUNDLES (normal case): Try manifest first, then fallback locations
       if bundle_name == "manifest.json"
         # Default to the non-hashed name in the specified output directory, which, for legacy
