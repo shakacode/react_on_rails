@@ -30,6 +30,7 @@ cd spec/dummy && foreman start       # Start dummy app with webpack
 - [ ] No trailing whitespace
 - [ ] Line length ≤120 characters
 - [ ] Security violations properly scoped with disable comments
+- [ ] No `package-lock.json` or other non-Yarn lock files (except `Gemfile.lock`)
 
 ## Development Patterns for AI Contributors
 
