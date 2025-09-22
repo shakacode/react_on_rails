@@ -77,7 +77,7 @@ module ReactOnRails
       allow(ReactOnRails).to receive_message_chain("configuration.rsc_bundle_js_file")
         .and_return(rsc_bundle_name)
       allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
-        .and_return(nil)
+        .and_return("ssr-generated")
     end
 
     def mock_dev_server_running
@@ -278,23 +278,21 @@ module ReactOnRails
               expect(path).to end_with("ssr-generated/#{server_bundle_name}")
             end
 
-            context "with bundle file existing in standard location but not environment-specific location" do
-              it "returns the standard location path" do
+            context "with bundle file existing in ssr-generated location" do
+              it "returns the ssr-generated location path" do
                 server_bundle_name = "server-bundle.js"
                 mock_bundle_configs(server_bundle_name: server_bundle_name)
                 mock_missing_manifest_entry(server_bundle_name)
 
-                # Mock File.exist? to return false for environment-specific path but true for standard path
-                standard_path = File.expand_path(File.join("public", "packs", server_bundle_name))
-                env_specific_path = File.join(packer_public_output_path, server_bundle_name)
+                # Mock File.exist? to return true for ssr-generated path
+                ssr_generated_path = File.expand_path(File.join("ssr-generated", server_bundle_name))
 
                 allow(File).to receive(:exist?).and_call_original
-                allow(File).to receive(:exist?).with(File.expand_path(env_specific_path)).and_return(false)
-                allow(File).to receive(:exist?).with(standard_path).and_return(true)
+                allow(File).to receive(:exist?).with(ssr_generated_path).and_return(true)
 
                 path = described_class.server_bundle_js_file_path
 
-                expect(path).to eq(standard_path)
+                expect(path).to eq(ssr_generated_path)
               end
             end
 
