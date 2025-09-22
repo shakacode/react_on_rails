@@ -308,11 +308,10 @@ module ReactOnRails
 
     private_class_method def self.convert_markdown_to_terminal(markdown_text)
       markdown_text
-        .gsub(/^#\s+(.+)$/, "\n📞 \\1") # Convert # headers
-        .gsub(/\*\*(.+?)\*\*/, "\\1")                      # Remove bold markdown
-        .gsub(/\[([^\]]+)\]\([^)]+\)/, "\\1")              # Convert links to just text
-        .gsub(/^-\s+/, "   • ")                            # Convert bullets
-        .gsub(/🚀\s+\*\*Professional Support\*\*/, "🚀 Professional Support") # Clean up specific formatting
+        .gsub(/^#+\s+(.+)$/, "\n📞 \\1") # Convert H1-H6 headers
+        .gsub(/\*\*(.+?)\*\*/, "\\1") # Remove bold markdown
+        .gsub(/\[([^\]]+)\]\(([^)]+)\)/, "\\1: \\2") # Convert links to "text: url"
+        .gsub(/^-\s+/, "   • ") # Convert bullets
     end
 
     private_class_method def self.default_troubleshooting_section
