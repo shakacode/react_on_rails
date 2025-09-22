@@ -91,11 +91,11 @@ module ReactOnRails
 
       is_server_bundle = server_bundle?(bundle_name)
       config = ReactOnRails.configuration
+      root_path = Rails.root || "."
 
-      # If server bundle and server_bundle_output_path is configured, try that first
+      # If server bundle and server_bundle_output_path is configured, return that path directly
       if is_server_bundle && config.server_bundle_output_path.present?
-        server_path = try_server_bundle_output_path(bundle_name)
-        return server_path if server_path
+        return File.expand_path(File.join(root_path, config.server_bundle_output_path, bundle_name))
       end
 
       # Try manifest lookup for all bundles
@@ -112,15 +112,6 @@ module ReactOnRails
       bundle_name == config.rsc_bundle_js_file
     end
 
-    private_class_method def self.try_server_bundle_output_path(bundle_name)
-      config = ReactOnRails.configuration
-      root_path = Rails.root || "."
-
-      # Try the configured server_bundle_output_path
-      path = File.join(root_path, config.server_bundle_output_path, bundle_name)
-      expanded_path = File.expand_path(path)
-      File.exist?(expanded_path) ? expanded_path : nil
-    end
 
     private_class_method def self.handle_missing_manifest_entry(bundle_name, is_server_bundle)
       config = ReactOnRails.configuration
