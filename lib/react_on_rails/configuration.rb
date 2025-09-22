@@ -211,14 +211,17 @@ module ReactOnRails
       end
 
       # Check if server_bundle_output_path is inside public directory
+      # Skip validation if Rails.root is not available (e.g., in tests)
+      return unless defined?(Rails) && Rails.root
+
       public_path = Rails.root.join("public").to_s
       server_output_path = File.expand_path(server_bundle_output_path, Rails.root.to_s)
 
-      if server_output_path.start_with?(public_path)
-        raise ReactOnRails::Error, "enforce_secure_server_bundles is set to true, but " \
-                                   "server_bundle_output_path (#{server_bundle_output_path}) is inside " \
-                                   "the public directory. Please set it to a directory outside of public."
-      end
+      return unless server_output_path.start_with?(public_path)
+
+      raise ReactOnRails::Error, "enforce_secure_server_bundles is set to true, but " \
+                                 "server_bundle_output_path (#{server_bundle_output_path}) is inside " \
+                                 "the public directory. Please set it to a directory outside of public."
     end
 
     def check_autobundling_requirements
