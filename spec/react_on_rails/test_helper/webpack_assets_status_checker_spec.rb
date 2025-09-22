@@ -61,7 +61,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
         let(:fixture_dirname) { "assets_with_manifest_exist_server_bundle_separate" }
 
         before do
-          Packer = ReactOnRails::PackerUtils.packer # rubocop:disable Lint/ConstantDefinitionInBlock, RSpec/LeakyConstantDeclaration
+          Packer = Shakapacker # rubocop:disable Lint/ConstantDefinitionInBlock, RSpec/LeakyConstantDeclaration
           allow(ReactOnRails::PackerUtils).to receive_messages(
             manifest_exists?: true,
             packer_public_output_path: generated_assets_full_path
