@@ -61,6 +61,10 @@ module ReactOnRails
         .and_return(server_bundle_name)
       allow(ReactOnRails).to receive_message_chain("configuration.rsc_bundle_js_file")
         .and_return(rsc_bundle_name)
+      allow(ReactOnRails).to receive_message_chain("configuration.enforce_secure_server_bundles")
+        .and_return(false)
+      allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
+        .and_return(nil)
     end
 
     def mock_dev_server_running
@@ -163,6 +167,10 @@ module ReactOnRails
                 mock_missing_manifest_entry(server_bundle_name)
                 allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
                   .and_return(server_bundle_name)
+                allow(ReactOnRails).to receive_message_chain("configuration.enforce_secure_server_bundles")
+                  .and_return(false)
+                allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
+                  .and_return(nil)
               end
 
               it "tries secure locations first for server bundles" do
@@ -199,6 +207,10 @@ module ReactOnRails
                 mock_missing_manifest_entry(rsc_bundle_name)
                 allow(ReactOnRails).to receive_message_chain("configuration.rsc_bundle_js_file")
                   .and_return(rsc_bundle_name)
+                allow(ReactOnRails).to receive_message_chain("configuration.enforce_secure_server_bundles")
+                  .and_return(false)
+                allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
+                  .and_return(nil)
               end
 
               it "treats RSC bundles as server bundles and tries secure locations first" do
