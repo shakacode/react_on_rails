@@ -111,7 +111,6 @@ module ReactOnRails
       bundle_name == config.rsc_bundle_js_file
     end
 
-
     private_class_method def self.handle_missing_manifest_entry(bundle_name, is_server_bundle)
       config = ReactOnRails.configuration
       root_path = Rails.root || "."
