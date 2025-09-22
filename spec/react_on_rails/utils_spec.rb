@@ -170,7 +170,7 @@ module ReactOnRails
                 allow(ReactOnRails).to receive_message_chain("configuration.enforce_secure_server_bundles")
                   .and_return(false)
                 allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
-                  .and_return(nil)
+                  .and_return("ssr-generated")
               end
 
               it "tries secure locations first for server bundles" do
@@ -210,7 +210,7 @@ module ReactOnRails
                 allow(ReactOnRails).to receive_message_chain("configuration.enforce_secure_server_bundles")
                   .and_return(false)
                 allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
-                  .and_return(nil)
+                  .and_return("ssr-generated")
               end
 
               it "treats RSC bundles as server bundles and tries secure locations first" do

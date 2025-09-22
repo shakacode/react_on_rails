@@ -120,23 +120,29 @@ module ReactOnRails
 
     private_class_method def self.try_private_server_locations(bundle_name)
       config = ReactOnRails.configuration
-
-      # Build candidate locations, including configured output path
       root_path = Rails.root || "."
+
+      # Primary location from configuration (now defaults to "ssr-generated")
       candidates = [
-        File.join(root_path, "ssr-generated", bundle_name),
-        File.join(root_path, "generated", "server-bundles", bundle_name)
+        File.join(root_path, config.server_bundle_output_path, bundle_name)
       ]
 
-      # Add configured server_bundle_output_path if present
-      if config.server_bundle_output_path.present?
-        candidates << File.join(root_path, config.server_bundle_output_path, bundle_name)
-      end
+      # Add legacy fallback for backwards compatibility
+      candidates << File.join(root_path, "generated", "server-bundles", bundle_name)
 
       find_first_existing_path(candidates)
     end
 
     private_class_method def self.handle_missing_manifest_entry(bundle_name, is_server_bundle)
+      config = ReactOnRails.configuration
+      root_path = Rails.root || "."
+
+      # When enforcement is on for server bundles, only use private locations
+      if is_server_bundle && enforce_secure_server_bundles?
+        # Only try private locations, no public fallbacks
+        return File.expand_path(File.join(root_path, config.server_bundle_output_path, bundle_name))
+      end
+
       # When manifest lookup fails, try multiple fallback locations:
       # 1. Environment-specific path (e.g., public/webpack/test)
       # 2. Standard Shakapacker location (public/packs)
@@ -153,8 +159,8 @@ module ReactOnRails
 
       # If none exist, return appropriate default based on bundle type
       if is_server_bundle
-        # For server bundles, prefer private location as final fallback
-        File.expand_path(File.join("ssr-generated", bundle_name))
+        # For server bundles, use configured private location as final fallback
+        File.expand_path(File.join(root_path, config.server_bundle_output_path, bundle_name))
       else
         # For client bundles, use environment-specific path (original behavior)
         File.expand_path(fallback_locations.first)
