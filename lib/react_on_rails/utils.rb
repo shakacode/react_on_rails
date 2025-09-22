@@ -87,17 +87,15 @@ module ReactOnRails
       return File.join(generated_assets_full_path, bundle_name) unless ReactOnRails::PackerUtils.using_packer?
 
       is_server_bundle = server_bundle?(bundle_name)
+      config = ReactOnRails.configuration
 
-      if is_server_bundle
-        # NORMAL CASE for server bundles: Try private non-public locations first
-        private_path = try_private_server_locations(bundle_name)
-        return private_path if private_path
-
-        # If enforcement is enabled and no private path found, skip manifest fallback
-        return handle_missing_manifest_entry(bundle_name, true) if enforce_secure_server_bundles?
+      # If server bundle and server_bundle_output_path is configured, try that first
+      if is_server_bundle && config.server_bundle_output_path.present?
+        server_path = try_server_bundle_output_path(bundle_name)
+        return server_path if server_path
       end
 
-      # For client bundles OR server bundle fallback (when enforcement disabled): Try manifest lookup
+      # Try manifest lookup for all bundles
       begin
         ReactOnRails::PackerUtils.bundle_js_uri_from_packer(bundle_name)
       rescue Shakapacker::Manifest::MissingEntryError
@@ -111,66 +109,30 @@ module ReactOnRails
       bundle_name == config.rsc_bundle_js_file
     end
 
-    private_class_method def self.enforce_secure_server_bundles?
-      ReactOnRails.configuration.enforce_secure_server_bundles
-    end
-
-    private_class_method def self.try_private_server_locations(bundle_name)
+    private_class_method def self.try_server_bundle_output_path(bundle_name)
       config = ReactOnRails.configuration
       root_path = Rails.root || "."
 
-      # Primary location from configuration (now defaults to "ssr-generated")
-      candidates = [
-        File.join(root_path, config.server_bundle_output_path, bundle_name)
-      ]
-
-      # Add legacy fallback for backwards compatibility
-      candidates << File.join(root_path, "generated", "server-bundles", bundle_name)
-
-      find_first_existing_path(candidates)
+      # Try the configured server_bundle_output_path
+      path = File.join(root_path, config.server_bundle_output_path, bundle_name)
+      expanded_path = File.expand_path(path)
+      File.exist?(expanded_path) ? expanded_path : nil
     end
 
     private_class_method def self.handle_missing_manifest_entry(bundle_name, is_server_bundle)
       config = ReactOnRails.configuration
       root_path = Rails.root || "."
 
-      # When enforcement is on for server bundles, only use private locations
-      if is_server_bundle && enforce_secure_server_bundles?
-        # Only try private locations, no public fallbacks
+      # For server bundles with server_bundle_output_path configured, use that
+      if is_server_bundle && config.server_bundle_output_path.present?
         return File.expand_path(File.join(root_path, config.server_bundle_output_path, bundle_name))
       end
 
-      # When manifest lookup fails, try multiple fallback locations:
-      # 1. Environment-specific path (e.g., public/webpack/test)
-      # 2. Standard Shakapacker location (public/packs)
-      # 3. Generated assets path (for legacy setups)
-      fallback_locations = [
-        File.join(ReactOnRails::PackerUtils.packer_public_output_path, bundle_name),
-        File.join("public", "packs", bundle_name),
-        File.join(generated_assets_full_path, bundle_name)
-      ].uniq
-
-      # Return the first location where the bundle file actually exists
-      existing_path = find_first_existing_path(fallback_locations)
-      return existing_path if existing_path
-
-      # If none exist, return appropriate default based on bundle type
-      if is_server_bundle
-        # For server bundles, use configured private location as final fallback
-        File.expand_path(File.join(root_path, config.server_bundle_output_path, bundle_name))
-      else
-        # For client bundles, use environment-specific path (original behavior)
-        File.expand_path(fallback_locations.first)
-      end
+      # For client bundles and server bundles without special config, use packer's public path
+      # This returns the environment-specific path configured in shakapacker.yml
+      File.expand_path(File.join(ReactOnRails::PackerUtils.packer_public_output_path, bundle_name))
     end
 
-    private_class_method def self.find_first_existing_path(paths)
-      paths.each do |path|
-        expanded_path = File.expand_path(path)
-        return expanded_path if File.exist?(expanded_path)
-      end
-      nil
-    end
 
     def self.server_bundle_js_file_path
       return @server_bundle_path if @server_bundle_path && !Rails.env.development?

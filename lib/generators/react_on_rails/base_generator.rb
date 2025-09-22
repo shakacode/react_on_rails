@@ -136,14 +136,17 @@ module ReactOnRails
         return unless File.exist?(gitignore_path)
 
         gitignore_content = File.read(gitignore_path)
-        return if gitignore_content.include?("**/generated/**")
+
+        additions = []
+        additions << "**/generated/**" unless gitignore_content.include?("**/generated/**")
+        additions << "ssr-generated" unless gitignore_content.include?("ssr-generated")
+
+        return if additions.empty?
 
         append_to_file ".gitignore" do
-          <<~GITIGNORE
-
-            # Generated React on Rails packs
-            **/generated/**
-          GITIGNORE
+          lines = ["\n# Generated React on Rails packs"]
+          lines.concat(additions)
+          lines.join("\n") + "\n"
         end
       end
 
