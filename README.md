@@ -140,7 +140,6 @@ _Requires creating a free account._
 - Node.js >= 20 (CI tested: 20 - 22)
 - A JavaScript package manager (npm, yarn, pnpm, or bun)
 
-<!-- TROUBLESHOOTING_LINKS_START -->
 # 🆘 Get Help & Support
 
 **Need immediate help?** Here are your options, ordered by response time:
@@ -155,7 +154,6 @@ _Requires creating a free account._
 - **[forum.shakacode.com](https://forum.shakacode.com)** - Development discussions
 - **[@railsonmaui on Twitter](https://twitter.com/railsonmaui)** - Updates and tips
 - [Projects using React on Rails](https://github.com/shakacode/react_on_rails/tree/master/PROJECTS.md) - Submit yours!
-<!-- TROUBLESHOOTING_LINKS_END -->
 
 ## Contributing
 
@@ -168,6 +166,8 @@ ShakaCode is **[hiring passionate software engineers](http://www.shakacode.com/c
 # License
 
 The gem is available as open source under the terms of the [MIT License](https://github.com/shakacode/react_on_rails/tree/master/LICENSE.md).
+
+Note, some features are available only with a React on Rails Pro subscription. See [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/) for more information.
 
 # Supporters
 
