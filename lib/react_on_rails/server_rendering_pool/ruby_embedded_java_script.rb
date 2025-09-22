@@ -155,7 +155,7 @@ module ReactOnRails
             Rails.logger.error(msg)
             trace_js_code_used("Error when compiling JavaScript code for the context.", base_js_code,
                                file_name, force: true)
-            raise ReactOnRails::Error, msg
+            raise e
           end
         end
 

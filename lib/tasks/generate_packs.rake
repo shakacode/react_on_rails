@@ -125,7 +125,7 @@ namespace :react_on_rails do
 
   def show_help_and_support
     puts ""
-    troubleshooting_content = ReactOnRails::Utils.extract_troubleshooting_section
+    troubleshooting_content = ReactOnRails::Utils.default_troubleshooting_section
     # Display the troubleshooting content with color formatting
     troubleshooting_content.split("\n").each do |line|
       case line
