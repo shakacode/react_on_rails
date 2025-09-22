@@ -27,6 +27,11 @@ ReactOnRails.configure do |config|
   config.server_bundle_js_file = "server-bundle.js"
   config.random_dom_id = false # default is true
 
+  # Set server_bundle_output_path to nil so bundles are read from public path
+  # This ensures the dummy app uses the standard webpack output location
+  config.server_bundle_output_path = nil
+  config.enforce_secure_server_bundles = false
+
   # Uncomment to test these
   # config.build_test_command = "yarn run build:test"
   # config.build_production_command = "RAILS_ENV=production NODE_ENV=production bin/shakapacker"
