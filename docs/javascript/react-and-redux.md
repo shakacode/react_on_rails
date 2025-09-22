@@ -2,7 +2,7 @@
 
 ## Communication Between Components
 
-See [Communicate Between Components](https://web.archive.org/web/20160527122908/https://facebook.github.io/react/tips/communicate-between-components.html).
+See [Sharing State Between Components](https://react.dev/learn/sharing-state-between-components).
 
 # Redux Reducers
 

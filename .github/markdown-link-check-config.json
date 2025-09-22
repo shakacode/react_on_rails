@@ -8,6 +8,15 @@
     },
     {
       "pattern": "^mailto:"
+    },
+    {
+      "pattern": "^https://www\\.npmjs\\.(org|com)"
+    },
+    {
+      "pattern": "^https://your-shared-addr\\.c9users\\.io"
+    },
+    {
+      "pattern": "^https://hichee\\.com"
     }
   ],
   "replacementPatterns": [
