@@ -270,6 +270,9 @@ module ReactOnRails
             it "returns the correct path hashed server path" do
               packer = ::Shakapacker
               mock_bundle_configs(server_bundle_name: "webpack-bundle.js")
+              # Clear server_bundle_output_path to test manifest behavior
+              allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
+                .and_return(nil)
               allow(ReactOnRails).to receive_message_chain("configuration.same_bundle_for_client_and_server")
                 .and_return(true)
               mock_bundle_in_manifest("webpack-bundle.js", "webpack/development/webpack-bundle-123456.js")
@@ -284,6 +287,9 @@ module ReactOnRails
             context "with webpack-dev-server running, and same file used for server and client" do
               it "returns the correct path hashed server path" do
                 mock_bundle_configs(server_bundle_name: "webpack-bundle.js")
+                # Clear server_bundle_output_path to test manifest behavior
+                allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
+                  .and_return(nil)
                 allow(ReactOnRails).to receive_message_chain("configuration.same_bundle_for_client_and_server")
                   .and_return(true)
                 mock_dev_server_running
@@ -300,6 +306,9 @@ module ReactOnRails
                   packer_type.to_sym do
             it "returns the correct path hashed server path" do
               mock_bundle_configs(server_bundle_name: "server-bundle.js")
+              # Clear server_bundle_output_path to test manifest behavior
+              allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
+                .and_return(nil)
               allow(ReactOnRails).to receive_message_chain("configuration.same_bundle_for_client_and_server")
                 .and_return(false)
               mock_bundle_in_manifest("server-bundle.js", "webpack/development/server-bundle-123456.js")
@@ -333,6 +342,9 @@ module ReactOnRails
             it "returns the correct path hashed server path" do
               packer = ::Shakapacker
               mock_bundle_configs(rsc_bundle_name: "webpack-bundle.js")
+              # Clear server_bundle_output_path to test manifest behavior
+              allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
+                .and_return(nil)
               allow(ReactOnRails).to receive_message_chain("configuration.same_bundle_for_client_and_server")
                 .and_return(true)
               mock_bundle_in_manifest("webpack-bundle.js", "webpack/development/webpack-bundle-123456.js")
@@ -347,6 +359,9 @@ module ReactOnRails
             context "with webpack-dev-server running, and same file used for server and client" do
               it "returns the correct path hashed server path" do
                 mock_bundle_configs(rsc_bundle_name: "webpack-bundle.js")
+                # Clear server_bundle_output_path to test manifest behavior
+                allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
+                  .and_return(nil)
                 allow(ReactOnRails).to receive_message_chain("configuration.same_bundle_for_client_and_server")
                   .and_return(true)
                 mock_dev_server_running
@@ -363,6 +378,9 @@ module ReactOnRails
                   packer_type.to_sym do
             it "returns the correct path hashed server path" do
               mock_bundle_configs(rsc_bundle_name: "rsc-bundle.js")
+              # Clear server_bundle_output_path to test manifest behavior
+              allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
+                .and_return(nil)
               allow(ReactOnRails).to receive_message_chain("configuration.same_bundle_for_client_and_server")
                 .and_return(false)
               mock_bundle_in_manifest("rsc-bundle.js", "webpack/development/server-bundle-123456.js")
