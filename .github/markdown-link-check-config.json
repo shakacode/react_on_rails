@@ -17,6 +17,12 @@
     },
     {
       "pattern": "^https://hichee\\.com"
+    },
+    {
+      "pattern": "^https://github\\.com/shakacode/react-webpack-rails-tutorial/blob/master/config/webpacker\\.yml$"
+    },
+    {
+      "pattern": "^https://github\\.com/shakacode/react-webpack-rails-tutorial/blob/master/client/webpack\\.client\\.base\\.config\\.js"
     }
   ],
   "replacementPatterns": [

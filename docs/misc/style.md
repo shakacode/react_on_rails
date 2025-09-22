@@ -26,7 +26,7 @@ Follow these style guidelines per the linter configuration. Basically, lint your
 
 ### Git coding Standards
 
-- [Git Coding Standards](http://chlg.co/1GV2m9p)
+- [Git Coding Standards](https://git-scm.com/docs/CodingGuidelines)
 
 ### Sass Coding Standards
 
