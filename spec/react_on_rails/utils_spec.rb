@@ -169,17 +169,9 @@ module ReactOnRails
                     .and_return("ssr-generated")
                 end
 
-                it "tries configured location first for server bundles" do
-                  allow(File).to receive(:exist?).and_call_original
-                  allow(File).to receive(:exist?).with(ssr_generated_path).and_return(true)
-
-                  result = described_class.bundle_js_file_path(server_bundle_name)
-                  expect(result).to eq(ssr_generated_path)
-                end
-
-                it "falls back to configured path when no bundle exists" do
-                  allow(File).to receive(:exist?).and_call_original
-                  allow(File).to receive(:exist?).and_return(false)
+                it "returns configured path directly without checking existence" do
+                  # Should not check File.exist? - returns path immediately
+                  expect(File).not_to receive(:exist?)
 
                   result = described_class.bundle_js_file_path(server_bundle_name)
                   expect(result).to eq(ssr_generated_path)
@@ -214,9 +206,9 @@ module ReactOnRails
                   .and_return("ssr-generated")
               end
 
-              it "treats RSC bundles as server bundles and tries configured location first" do
-                allow(File).to receive(:exist?).and_call_original
-                allow(File).to receive(:exist?).with(ssr_generated_path).and_return(true)
+              it "treats RSC bundles as server bundles and returns configured path directly" do
+                # Should not check File.exist? - returns path immediately
+                expect(File).not_to receive(:exist?)
 
                 result = described_class.bundle_js_file_path(rsc_bundle_name)
                 expect(result).to eq(ssr_generated_path)
@@ -278,33 +270,15 @@ module ReactOnRails
               expect(path).to end_with("ssr-generated/#{server_bundle_name}")
             end
 
-            context "with bundle file existing in ssr-generated location" do
-              it "returns the ssr-generated location path" do
+            context "with server_bundle_output_path configured" do
+              it "returns the configured path directly without checking file existence" do
                 server_bundle_name = "server-bundle.js"
                 mock_bundle_configs(server_bundle_name: server_bundle_name)
-                mock_missing_manifest_entry(server_bundle_name)
 
-                # Mock File.exist? to return true for ssr-generated path
-                ssr_generated_path = File.expand_path(File.join("ssr-generated", server_bundle_name))
-
-                allow(File).to receive(:exist?).and_call_original
-                allow(File).to receive(:exist?).with(ssr_generated_path).and_return(true)
-
-                path = described_class.server_bundle_js_file_path
-
-                expect(path).to eq(ssr_generated_path)
-              end
-            end
-
-            context "with bundle file not existing in any fallback location" do
-              it "returns the secure ssr-generated path as final fallback for server bundles" do
-                server_bundle_name = "server-bundle.js"
-                mock_bundle_configs(server_bundle_name: server_bundle_name)
-                mock_missing_manifest_entry(server_bundle_name)
-
-                # Mock File.exist? to return false for all paths
-                allow(File).to receive(:exist?).and_call_original
-                allow(File).to receive(:exist?).and_return(false)
+                # Since server_bundle_output_path is configured, should return path immediately
+                # without trying manifest lookup
+                expect(ReactOnRails::PackerUtils.packer).not_to receive(:manifest)
+                expect(File).not_to receive(:exist?)
 
                 path = described_class.server_bundle_js_file_path
 
