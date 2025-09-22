@@ -24,7 +24,7 @@ If you open the HTML source of any web page using React on Rails, you'll see the
 1. A script tag containing the properties of the React component, such as the registered name and any props. A JavaScript function runs after the page loads, using this data to build and initialize your React components.
 1. Additional JavaScript is placed to console-log any messages, such as server rendering errors. Note: these server-side logs can be configured only to be sent to the server logs.
 
-You can see all this on the source for [reactrails.com](http://reactrails.com/)
+You can see all this on the source for [reactrails.com](https://reactrails.com/)
 
 ## Building the Bundles
 

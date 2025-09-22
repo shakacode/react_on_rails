@@ -7,7 +7,7 @@ This documentation assumes the usage of ReactOnRails with Shakapacker 7. For ins
 1. Do the quick [tutorial](./guides/tutorial.md).
 2. Add React on Rails to an existing Rails app per [the instructions](./guides/installation-into-an-existing-rails-app.md).
 3. Look at [spec/dummy](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy), a simple, no DB example.
-4. Look at [github.com/shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial); it's a full-featured example live at [reactrails.com](http://reactrails.com).
+4. Look at [github.com/shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial); it's a full-featured example live at [reactrails.com](https://reactrails.com).
 
 ## Basic Installation
 
