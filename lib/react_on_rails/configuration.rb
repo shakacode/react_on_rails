@@ -151,6 +151,7 @@ module ReactOnRails
       adjust_precompile_task
       check_component_registry_timeout
       validate_generated_component_packs_loading_strategy
+      validate_enforce_secure_server_bundles
     end
 
     private
@@ -197,6 +198,27 @@ module ReactOnRails
       return if %i[async defer sync].include?(generated_component_packs_loading_strategy)
 
       raise ReactOnRails::Error, "generated_component_packs_loading_strategy must be either :async, :defer, or :sync"
+    end
+
+    def validate_enforce_secure_server_bundles
+      return unless enforce_secure_server_bundles
+
+      # Check if server_bundle_output_path is nil
+      if server_bundle_output_path.nil?
+        raise ReactOnRails::Error, "enforce_secure_server_bundles is set to true, but " \
+                                   "server_bundle_output_path is nil. Please set server_bundle_output_path " \
+                                   "to a directory outside of the public directory."
+      end
+
+      # Check if server_bundle_output_path is inside public directory
+      public_path = Rails.root.join("public").to_s
+      server_output_path = File.expand_path(server_bundle_output_path, Rails.root.to_s)
+
+      if server_output_path.start_with?(public_path)
+        raise ReactOnRails::Error, "enforce_secure_server_bundles is set to true, but " \
+                                   "server_bundle_output_path (#{server_bundle_output_path}) is inside " \
+                                   "the public directory. Please set it to a directory outside of public."
+      end
     end
 
     def check_autobundling_requirements

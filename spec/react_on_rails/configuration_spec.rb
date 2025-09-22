@@ -459,6 +459,57 @@ module ReactOnRails
         end
       end
     end
+
+    describe "enforce_secure_server_bundles validation" do
+      context "when enforce_secure_server_bundles is true" do
+        it "raises error when server_bundle_output_path is nil" do
+          expect do
+            ReactOnRails.configure do |config|
+              config.server_bundle_output_path = nil
+              config.enforce_secure_server_bundles = true
+            end
+          end.to raise_error(ReactOnRails::Error, /server_bundle_output_path is nil/)
+        end
+
+        it "raises error when server_bundle_output_path is inside public directory" do
+          expect do
+            ReactOnRails.configure do |config|
+              config.server_bundle_output_path = "public/server-bundles"
+              config.enforce_secure_server_bundles = true
+            end
+          end.to raise_error(ReactOnRails::Error, /is inside the public directory/)
+        end
+
+        it "allows server_bundle_output_path outside public directory" do
+          expect do
+            ReactOnRails.configure do |config|
+              config.server_bundle_output_path = "ssr-generated"
+              config.enforce_secure_server_bundles = true
+            end
+          end.not_to raise_error
+        end
+      end
+
+      context "when enforce_secure_server_bundles is false" do
+        it "allows server_bundle_output_path to be nil" do
+          expect do
+            ReactOnRails.configure do |config|
+              config.server_bundle_output_path = nil
+              config.enforce_secure_server_bundles = false
+            end
+          end.not_to raise_error
+        end
+
+        it "allows server_bundle_output_path inside public directory" do
+          expect do
+            ReactOnRails.configure do |config|
+              config.server_bundle_output_path = "public/server-bundles"
+              config.enforce_secure_server_bundles = false
+            end
+          end.not_to raise_error
+        end
+      end
+    end
   end
 end
 
