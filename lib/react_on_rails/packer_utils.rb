@@ -5,13 +5,12 @@ module ReactOnRails
     def self.using_packer?
       return @using_packer if defined?(@using_packer)
 
+      # Shakapacker is required by gemspec, but tests may mock gem_available? to return false
       @using_packer = ReactOnRails::Utils.gem_available?("shakapacker")
     end
 
     def self.packer_type
-      return "shakapacker" if using_packer?
-
-      nil
+      using_packer? ? "shakapacker" : nil
     end
 
     def self.packer
@@ -88,9 +87,7 @@ module ReactOnRails
     end
 
     def self.precompile?
-      return ::Shakapacker.config.shakapacker_precompile? if using_packer?
-
-      false
+      using_packer? ? ::Shakapacker.config.shakapacker_precompile? : false
     end
 
     def self.packer_source_path
