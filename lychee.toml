@@ -1,0 +1,31 @@
+# Lychee configuration file
+# See: https://lychee.cli.rs/
+
+# Cache settings
+cache = true
+max_cache_age = "1d"
+
+# Request settings
+timeout = 20
+retry_wait_time = 2
+max_retries = 3
+
+# Follow redirects
+max_redirects = 10
+
+# Accept additional status codes as valid
+accept = ["100..=103", "200..=299", "301", "302"]
+
+# User agent to prevent bot blocking
+user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+
+# Headers for specific domains (like our current config)
+headers = [
+  "Accept: text/html"
+]
+
+# Include patterns (check all markdown files in docs folder)
+include_verbatim = true
+
+# Enable fragment checking for anchors
+include_fragments = true

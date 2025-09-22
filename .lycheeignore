@@ -1,0 +1,19 @@
+# Local development URLs
+^http://localhost
+^https://localhost
+
+# Email addresses
+^mailto:
+
+# NPM domains that block bots with 403 errors
+^https://www\.npmjs\.(org|com)
+
+# Example/placeholder URLs
+^https://your-shared-addr\.c9users\.io
+
+# Bot-blocked domains
+^https://hichee\.com
+
+# Historical/outdated tutorial links that no longer exist
+^https://github\.com/shakacode/react-webpack-rails-tutorial/blob/master/config/webpacker\.yml$
+^https://github\.com/shakacode/react-webpack-rails-tutorial/blob/master/client/webpack\.client\.base\.config\.js

@@ -1,0 +1,46 @@
+name: Check Documentation Links
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - '**.md'
+      - '.github/workflows/check-documentation-links.yml'
+      - '.lycheeignore'
+      - 'lychee.toml'
+  pull_request:
+    paths:
+      - '**.md'
+      - '.github/workflows/check-documentation-links.yml'
+      - '.lycheeignore'
+      - 'lychee.toml'
+  schedule:
+    # Run weekly on Monday at 8am UTC
+    - cron: '0 8 * * 1'
+  workflow_dispatch:
+
+jobs:
+  check-links:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Restore link checker cache
+        uses: actions/cache@v4
+        with:
+          path: .lycheecache
+          key: cache-links-${{ github.sha }}
+          restore-keys: cache-links-
+
+      - name: Check documentation links
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: >-
+            --config lychee.toml
+            --base .
+            --cache
+            --max-cache-age 1d
+            docs/
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
