@@ -44,7 +44,7 @@ const configureServer = () => {
 
   // Custom output for the server-bundle that matches the config in
   // config/initializers/react_on_rails.rb
-  // Server bundles are output to a secure directory (not public) for security
+  // Server bundles are output to a private directory (not public) for security
   serverWebpackConfig.output = {
     filename: 'server-bundle.js',
     globalObject: 'this',
