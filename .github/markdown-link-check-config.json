@@ -23,6 +23,9 @@
     },
     {
       "pattern": "^https://github\\.com/shakacode/react-webpack-rails-tutorial/blob/master/client/webpack\\.client\\.base\\.config\\.js"
+    },
+    {
+      "pattern": "^https://github\\.com/shakacode/react_on_rails/tree/master/lib/install/config/"
     }
   ],
   "replacementPatterns": [
