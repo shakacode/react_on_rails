@@ -45,29 +45,14 @@ module ReactOnRails
     end
 
     def self.supports_basic_pack_generation?
-      return false unless shakapacker_gem_available?
-
       shakapacker_version_requirement_met?(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION)
     end
 
     def self.supports_auto_registration?
-      return false unless shakapacker_gem_available?
-
       min_version = ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_REGISTRATION
       packer.config.respond_to?(:nested_entries?) && shakapacker_version_requirement_met?(min_version)
     rescue StandardError
       false
-    end
-
-    def self.shakapacker_gem_available?
-      return @shakapacker_gem_available if defined?(@shakapacker_gem_available)
-
-      @shakapacker_gem_available = begin
-        require "shakapacker"
-        true
-      rescue LoadError
-        false
-      end
     end
 
     # This returns either a URL for the webpack-dev-server, non-server bundle or
