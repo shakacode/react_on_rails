@@ -3,13 +3,9 @@
 module ReactOnRails
   module PackerUtils
     def self.packer
-      return @packer if defined?(@packer)
-
-      @packer = begin
+      @packer ||= begin
         require "shakapacker"
         ::Shakapacker
-      rescue LoadError => e
-        raise ReactOnRails::Error, "Shakapacker gem is required but not available. Please add 'shakapacker' to your Gemfile. Error: #{e.message}"
       end
     end
 
@@ -50,8 +46,8 @@ module ReactOnRails
     end
 
     def self.supports_auto_registration?
-      packer.config.respond_to?(:nested_entries?) &&
-        shakapacker_version_requirement_met?(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_REGISTRATION)
+      min_version = ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_REGISTRATION
+      packer.config.respond_to?(:nested_entries?) && shakapacker_version_requirement_met?(min_version)
     end
 
     # This returns either a URL for the webpack-dev-server, non-server bundle or

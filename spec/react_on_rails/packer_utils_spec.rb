@@ -149,10 +149,12 @@ module ReactOnRails
 
     it "ensures version requirements are logically consistent" do
       basic_version = Gem::Version.new(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION)
-      auto_reg_version = Gem::Version.new(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_REGISTRATION)
+      auto_reg_version = Gem::Version.new(
+        ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_REGISTRATION
+      )
 
       expect(auto_reg_version).to be >= basic_version,
-        "Auto-registration version should be >= basic pack generation version"
+                                  "Auto-registration version should be >= basic pack generation version"
     end
 
     it "validates version checks are cached properly" do

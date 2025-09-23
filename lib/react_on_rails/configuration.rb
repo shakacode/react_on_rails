@@ -290,9 +290,10 @@ module ReactOnRails
       return if generated_assets_dirs.blank?
 
       packer_public_output_path = ReactOnRails::PackerUtils.packer_public_output_path
-      Rails.logger.warn "You specified generated_assets_dirs in `config/initializers/react_on_rails.rb` with Shakapacker. " \
-                        "Remove this configuration as the output path is automatically determined by " \
-                        "`public_output_path` in shakapacker.yml (currently: #{packer_public_output_path})."
+      Rails.logger.warn "You specified generated_assets_dirs in `config/initializers/react_on_rails.rb` " \
+                        "with Shakapacker. Remove this configuration as the output path is automatically " \
+                        "determined by `public_output_path` in shakapacker.yml " \
+                        "(currently: #{packer_public_output_path})."
     end
 
     def ensure_webpack_generated_files_exists
