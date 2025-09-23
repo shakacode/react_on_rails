@@ -30,7 +30,7 @@ Changes since the last non-beta release.
 
 #### Code Cleanup
 
-- **PackerUtils abstraction removal**: Removed unnecessary `PackerUtils.packer` abstraction method and replaced all calls with direct `::Shakapacker` usage. This simplifies the codebase by eliminating an abstraction layer that was originally created to support multiple webpack tools but is no longer needed since we only support Shakapacker. All tests updated accordingly. [PR 1798](https://github.com/shakacode/react_on_rails/pull/1798)
+- **PackerUtils abstraction removal**: Removed unnecessary `PackerUtils.packer` abstraction method and replaced all calls with direct `::Shakapacker` usage. This simplifies the codebase by eliminating an abstraction layer that was originally created to support multiple webpack tools but is no longer needed since we only support Shakapacker. All tests updated accordingly. [PR 1798](https://github.com/shakacode/react_on_rails/pull/1798) by [claude-code](https://claude.ai/code)
 
 ### [16.0.1-rc.0] - 2025-09-19
 
