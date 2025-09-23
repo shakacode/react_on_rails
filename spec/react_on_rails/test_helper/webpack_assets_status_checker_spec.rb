@@ -62,6 +62,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
         let(:fixture_dirname) { "assets_with_manifest_exist_server_bundle_separate" }
 
         before do
+          stub_const("Packer", Shakapacker)
           allow(ReactOnRails::PackerUtils).to receive_messages(
             manifest_exists?: true,
             packer_public_output_path: generated_assets_full_path
