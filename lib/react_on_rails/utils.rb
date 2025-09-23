@@ -92,7 +92,13 @@ module ReactOnRails
 
       # If server bundle and server_bundle_output_path is configured, return that path directly
       if is_server_bundle && config.server_bundle_output_path.present?
-        return File.expand_path(File.join(root_path, config.server_bundle_output_path, bundle_name))
+        private_server_bundle_path = File.expand_path(File.join(root_path, config.server_bundle_output_path,
+                                                                bundle_name))
+
+        # Don't fall back to public directory if enforce_private_server_bundles is enabled
+        if config.enforce_private_server_bundles || File.exist?(private_server_bundle_path)
+          return private_server_bundle_path
+        end
       end
 
       # Try manifest lookup for all bundles
