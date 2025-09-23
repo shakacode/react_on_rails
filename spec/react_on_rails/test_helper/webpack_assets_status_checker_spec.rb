@@ -22,14 +22,13 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
     before do
       allow(ReactOnRails::PackerUtils).to receive(:check_manifest_not_cached).and_return(nil)
       allow(ReactOnRails::Utils).to receive(:generated_assets_full_path).and_return(generated_assets_full_path)
-      allow(ReactOnRails::PackerUtils).to receive_messages(
-        packer_public_output_path: generated_assets_full_path,
-        supports_autobundling?: true,
-        nested_entries?: true
-      )
     end
 
     context "with Webpacker" do
+      before do
+        allow(ReactOnRails::PackerUtils).to receive(:using_packer?).and_return(true)
+      end
+
       context "when compiled assets with manifest exist and are up-to-date" do
         let(:fixture_dirname) { "assets_with_manifest_exist" }
 
@@ -62,7 +61,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
         let(:fixture_dirname) { "assets_with_manifest_exist_server_bundle_separate" }
 
         before do
-          Packer = Shakapacker # rubocop:disable Lint/ConstantDefinitionInBlock, RSpec/LeakyConstantDeclaration
+          Packer = ReactOnRails::PackerUtils.packer # rubocop:disable Lint/ConstantDefinitionInBlock, RSpec/LeakyConstantDeclaration
           allow(ReactOnRails::PackerUtils).to receive_messages(
             manifest_exists?: true,
             packer_public_output_path: generated_assets_full_path
@@ -88,10 +87,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
       let(:webpack_generated_files) { %w[client-bundle.js server-bundle.js] }
 
       before do
-        allow(ReactOnRails::PackerUtils).to receive(:manifest_exists?).and_return(true)
-        allow(ReactOnRails::Utils).to receive(:bundle_js_file_path) do |bundle_name|
-          File.join(generated_assets_full_path, bundle_name)
-        end
+        allow(ReactOnRails::PackerUtils).to receive(:using_packer?).and_return(false)
       end
 
       context "when compiled assets exist and are up-to-date" do

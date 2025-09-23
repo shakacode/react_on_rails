@@ -41,7 +41,7 @@ module ReactOnRails
         base_templates = %w[config/initializers/react_on_rails.rb]
         base_files.each { |file| copy_file("#{base_path}#{file}", file) }
         base_templates.each do |file|
-          template("#{base_path}/#{file}.tt", file)
+          template("#{base_path}/#{file}.tt", file, { packer_type: ReactOnRails::PackerUtils.packer_type })
         end
       end
 
@@ -136,14 +136,17 @@ module ReactOnRails
         return unless File.exist?(gitignore_path)
 
         gitignore_content = File.read(gitignore_path)
-        return if gitignore_content.include?("**/generated/**")
+
+        additions = []
+        additions << "**/generated/**" unless gitignore_content.include?("**/generated/**")
+        additions << "ssr-generated" unless gitignore_content.include?("ssr-generated")
+
+        return if additions.empty?
 
         append_to_file ".gitignore" do
-          <<~GITIGNORE
-
-            # Generated React on Rails packs
-            **/generated/**
-          GITIGNORE
+          lines = ["\n# Generated React on Rails packs"]
+          lines.concat(additions)
+          "#{lines.join("\n")}\n"
         end
       end
 

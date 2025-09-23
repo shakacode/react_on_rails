@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+# rubocop:disable RSpec/VerifiedDoubles
+
 require_relative "../../react_on_rails/spec_helper"
 require_relative "../../../lib/react_on_rails/doctor"
 
@@ -87,15 +89,13 @@ RSpec.describe ReactOnRails::Doctor do
 
     describe "#determine_server_bundle_path" do
       context "when Shakapacker gem is available with relative paths" do
-        let(:shakapacker_config) do
-          instance_double(Shakapacker::Configuration, source_path: "client/app", source_entry_path: "packs")
-        end
+        let(:shakapacker_config) { double(source_path: "client/app", source_entry_path: "packs") }
 
         before do
-          shakapacker_module = instance_double(Shakapacker, config: shakapacker_config)
+          shakapacker_module = double("Shakapacker", config: shakapacker_config)
           stub_const("Shakapacker", shakapacker_module)
           allow(doctor).to receive(:require).with("shakapacker").and_return(true)
-          allow(doctor).to receive(:server_bundle_filename).and_return("server-bundle.js")
+          allow(doctor).to receive(:get_server_bundle_filename).and_return("server-bundle.js")
         end
 
         it "uses Shakapacker API configuration with relative paths" do
@@ -106,16 +106,13 @@ RSpec.describe ReactOnRails::Doctor do
 
       context "when Shakapacker gem is available with absolute paths" do
         let(:rails_root) { "/Users/test/myapp" }
-        let(:shakapacker_config) do
-          instance_double(Shakapacker::Configuration, source_path: "#{rails_root}/client/app",
-                                                      source_entry_path: "packs")
-        end
+        let(:shakapacker_config) { double(source_path: "#{rails_root}/client/app", source_entry_path: "packs") }
 
         before do
-          shakapacker_module = instance_double(Shakapacker, config: shakapacker_config)
+          shakapacker_module = double("Shakapacker", config: shakapacker_config)
           stub_const("Shakapacker", shakapacker_module)
           allow(doctor).to receive(:require).with("shakapacker").and_return(true)
-          allow(doctor).to receive(:server_bundle_filename).and_return("server-bundle.js")
+          allow(doctor).to receive(:get_server_bundle_filename).and_return("server-bundle.js")
           allow(Dir).to receive(:pwd).and_return(rails_root)
         end
 
@@ -128,15 +125,14 @@ RSpec.describe ReactOnRails::Doctor do
       context "when Shakapacker gem returns nested absolute paths" do
         let(:rails_root) { "/Users/test/myapp" }
         let(:shakapacker_config) do
-          instance_double(Shakapacker::Configuration, source_path: "#{rails_root}/client/app",
-                                                      source_entry_path: "#{rails_root}/client/app/packs")
+          double(source_path: "#{rails_root}/client/app", source_entry_path: "#{rails_root}/client/app/packs")
         end
 
         before do
-          shakapacker_module = instance_double(Shakapacker, config: shakapacker_config)
+          shakapacker_module = double("Shakapacker", config: shakapacker_config)
           stub_const("Shakapacker", shakapacker_module)
           allow(doctor).to receive(:require).with("shakapacker").and_return(true)
-          allow(doctor).to receive(:server_bundle_filename).and_return("server-bundle.js")
+          allow(doctor).to receive(:get_server_bundle_filename).and_return("server-bundle.js")
           allow(Dir).to receive(:pwd).and_return(rails_root)
         end
 
@@ -149,7 +145,7 @@ RSpec.describe ReactOnRails::Doctor do
       context "when Shakapacker gem is not available" do
         before do
           allow(doctor).to receive(:require).with("shakapacker").and_raise(LoadError)
-          allow(doctor).to receive(:server_bundle_filename).and_return("server-bundle.js")
+          allow(doctor).to receive(:get_server_bundle_filename).and_return("server-bundle.js")
         end
 
         it "uses default path" do
@@ -159,7 +155,7 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
-    describe "#server_bundle_filename" do
+    describe "#get_server_bundle_filename" do
       context "when react_on_rails.rb has custom filename" do
         let(:initializer_content) do
           'config.server_bundle_js_file = "custom-server-bundle.js"'
@@ -171,7 +167,7 @@ RSpec.describe ReactOnRails::Doctor do
         end
 
         it "extracts filename from initializer" do
-          filename = doctor.send(:server_bundle_filename)
+          filename = doctor.send(:get_server_bundle_filename)
           expect(filename).to eq("custom-server-bundle.js")
         end
       end
@@ -182,10 +178,12 @@ RSpec.describe ReactOnRails::Doctor do
         end
 
         it "returns default filename" do
-          filename = doctor.send(:server_bundle_filename)
+          filename = doctor.send(:get_server_bundle_filename)
           expect(filename).to eq("server-bundle.js")
         end
       end
     end
   end
 end
+
+# rubocop:enable RSpec/VerifiedDoubles
