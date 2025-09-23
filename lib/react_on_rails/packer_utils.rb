@@ -9,10 +9,6 @@ module ReactOnRails
       @using_packer = ReactOnRails::Utils.gem_available?("shakapacker")
     end
 
-    def self.packer_type
-      using_packer? ? "shakapacker" : nil
-    end
-
     def self.packer
       return nil unless using_packer?
 
@@ -120,7 +116,7 @@ module ReactOnRails
       msg = <<-MSG.strip_heredoc
           ERROR: you have enabled cache_manifest in the #{Rails.env} env when using the
           ReactOnRails::TestHelper.configure_rspec_to_compile_assets helper
-          To fix this: edit your config/#{packer_type}.yml file and set cache_manifest to false for test.
+          To fix this: edit your config/shakapacker.yml file and set cache_manifest to false for test.
       MSG
       puts wrap_message(msg)
       exit!
@@ -141,7 +137,7 @@ module ReactOnRails
     def self.raise_nested_entries_disabled
       msg = <<~MSG
         **ERROR** ReactOnRails: `nested_entries` is configured to be disabled in shakapacker. Please update \
-        config/#{packer_type}.yml to enable nested entries. for more information read
+        config/shakapacker.yml to enable nested entries. for more information read
         https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md#enable-nested_entries-for-shakapacker
       MSG
 
