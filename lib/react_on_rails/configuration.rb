@@ -186,7 +186,7 @@ module ReactOnRails
         1. Use :sync or :defer loading strategy instead of :async
         2. Upgrade to Shakapacker v8.2.0 or above to enable async script loading
       MSG
-      if PackerUtils.shakapacker_version_requirement_met?("8.2.0")
+      if ReactOnRails::PackerUtils.shakapacker_version_requirement_met?("8.2.0")
         self.generated_component_packs_loading_strategy ||= :async
       elsif generated_component_packs_loading_strategy.nil?
         Rails.logger.warn("**WARNING** #{msg}")
@@ -228,11 +228,8 @@ module ReactOnRails
       raise_missing_components_subdirectory if auto_load_bundle && !components_subdirectory.present?
       return unless components_subdirectory.present?
 
-      ReactOnRails::PackerUtils.raise_shakapacker_not_installed unless ReactOnRails::PackerUtils.using_packer?
       ReactOnRails::PackerUtils.raise_shakapacker_version_incompatible_for_autobundling unless
-        ReactOnRails::PackerUtils.shakapacker_version_requirement_met?(
-          ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION
-        )
+        ReactOnRails::PackerUtils.supports_autobundling?
       ReactOnRails::PackerUtils.raise_nested_entries_disabled unless ReactOnRails::PackerUtils.nested_entries?
     end
 
@@ -267,8 +264,6 @@ module ReactOnRails
     end
 
     def error_if_using_packer_and_generated_assets_dir_not_match_public_output_path
-      return unless ReactOnRails::PackerUtils.using_packer?
-
       return if generated_assets_dir.blank?
 
       packer_public_output_path = ReactOnRails::PackerUtils.packer_public_output_path
@@ -302,7 +297,7 @@ module ReactOnRails
     end
 
     def ensure_generated_assets_dir_present
-      return if generated_assets_dir.present? || ReactOnRails::PackerUtils.using_packer?
+      return if generated_assets_dir.present?
 
       self.generated_assets_dir = DEFAULT_GENERATED_ASSETS_DIR
       Rails.logger.warn "ReactOnRails: Set generated_assets_dir to default: #{DEFAULT_GENERATED_ASSETS_DIR}"
@@ -311,20 +306,13 @@ module ReactOnRails
     def configure_generated_assets_dirs_deprecation
       return if generated_assets_dirs.blank?
 
-      if ReactOnRails::PackerUtils.using_packer?
-        packer_public_output_path = ReactOnRails::PackerUtils.packer_public_output_path
-        # rubocop:disable Layout/LineLength
-        packer_name = "Shakapacker"
-
-        Rails.logger.warn "Error configuring config/initializers/react_on_rails. Define neither the generated_assets_dirs nor " \
-                          "the generated_assets_dir when using #{packer_name}. This is defined by " \
-                          "public_output_path specified in shakapacker.yml = #{packer_public_output_path}."
-        # rubocop:enable Layout/LineLength
-        return
-      end
-
-      Rails.logger.warn "[DEPRECATION] ReactOnRails: Use config.generated_assets_dir rather than " \
-                        "generated_assets_dirs"
+      # With Shakapacker always available:
+      packer_public_output_path = ReactOnRails::PackerUtils.packer_public_output_path
+      # rubocop:disable Layout/LineLength
+      Rails.logger.warn "Error configuring config/initializers/react_on_rails. Define neither the generated_assets_dirs nor " \
+                        "the generated_assets_dir when using Shakapacker. This is defined by " \
+                        "public_output_path specified in shakapacker.yml = #{packer_public_output_path}."
+      # rubocop:enable Layout/LineLength
       if generated_assets_dir.blank?
         self.generated_assets_dir = generated_assets_dirs
       else

@@ -31,8 +31,7 @@ module ReactOnRails
       end
 
       def stale_generated_files(files)
-        manifest_needed = ReactOnRails::PackerUtils.using_packer? &&
-                          !ReactOnRails::PackerUtils.manifest_exists?
+        manifest_needed = !ReactOnRails::PackerUtils.manifest_exists?
 
         return ["manifest.json"] if manifest_needed
 

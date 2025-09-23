@@ -24,11 +24,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
       allow(ReactOnRails::Utils).to receive(:generated_assets_full_path).and_return(generated_assets_full_path)
     end
 
-    context "with Webpacker" do
-      before do
-        allow(ReactOnRails::PackerUtils).to receive(:using_packer?).and_return(true)
-      end
-
+    context "with Shakapacker" do
       context "when compiled assets with manifest exist and are up-to-date" do
         let(:fixture_dirname) { "assets_with_manifest_exist" }
 
@@ -79,57 +75,6 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
         specify do
           expect(checker.stale_generated_webpack_files.first)
             .to match(/server-bundle\.js$/)
-        end
-      end
-    end
-
-    context "without Webpacker" do
-      let(:webpack_generated_files) { %w[client-bundle.js server-bundle.js] }
-
-      before do
-        allow(ReactOnRails::PackerUtils).to receive(:using_packer?).and_return(false)
-      end
-
-      context "when compiled assets exist and are up-to-date" do
-        let(:fixture_dirname) { "assets_exist" }
-
-        before do
-          touch_files_in_dir(generated_assets_full_path)
-        end
-
-        specify { expect(checker.stale_generated_webpack_files).to eq([]) }
-      end
-
-      context "when compiled assets don't exist" do
-        let(:fixture_dirname) { "assets_no_exist" }
-
-        specify do
-          expect(checker.stale_generated_webpack_files)
-            .to eq([client_bundle_js_file, server_bundle_js_file])
-        end
-      end
-
-      context "when only server-bundle.js exists" do
-        let(:fixture_dirname) { "assets_exist_only_server_bundle" }
-
-        before do
-          touch_files_in_dir(generated_assets_full_path)
-        end
-
-        specify do
-          expect(checker.stale_generated_webpack_files)
-            .to eq([client_bundle_js_file])
-        end
-      end
-
-      context "when assets exist but are outdated" do
-        let(:fixture_dirname) { "assets_outdated" }
-
-        before { touch_files_in_dir(source_path) }
-
-        specify do
-          expect(checker.stale_generated_webpack_files)
-            .to eq([client_bundle_js_file, server_bundle_js_file])
         end
       end
     end
