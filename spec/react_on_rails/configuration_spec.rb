@@ -78,6 +78,7 @@ module ReactOnRails
     describe ".build_production_command" do
       context "when using Shakapacker 8" do
         it "fails when \"shakapacker_precompile\" is truly and \"build_production_command\" is truly" do
+          allow(ReactOnRails::PackerUtils).to receive(:using_packer?).and_return(true)
           allow(Shakapacker).to receive_message_chain("config.shakapacker_precompile?")
             .and_return(true)
           expect do
@@ -88,6 +89,7 @@ module ReactOnRails
         end
 
         it "doesn't fail when \"shakapacker_precompile\" is falsy and \"build_production_command\" is truly" do
+          allow(ReactOnRails::PackerUtils).to receive(:using_packer?).and_return(true)
           allow(Shakapacker).to receive_message_chain("config.shakapacker_precompile?")
             .and_return(false)
           expect do
@@ -98,6 +100,7 @@ module ReactOnRails
         end
 
         it "doesn't fail when \"shakapacker_precompile\" is truly and \"build_production_command\" is falsy" do
+          allow(ReactOnRails::PackerUtils).to receive(:using_packer?).and_return(true)
           allow(Shakapacker).to receive_message_chain("config.shakapacker_precompile?")
             .and_return(true)
           expect do
@@ -106,6 +109,7 @@ module ReactOnRails
         end
 
         it "doesn't fail when \"shakapacker_precompile\" is falsy and \"build_production_command\" is falsy" do
+          allow(ReactOnRails::PackerUtils).to receive(:using_packer?).and_return(true)
           allow(Shakapacker).to receive_message_chain("config.shakapacker_precompile?")
             .and_return(false)
           expect do
