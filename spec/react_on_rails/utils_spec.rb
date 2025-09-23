@@ -256,7 +256,7 @@ module ReactOnRails
 
                 # Since server_bundle_output_path is configured, should return path immediately
                 # without trying manifest lookup
-                expect(ReactOnRails::PackerUtils.packer).not_to receive(:manifest)
+                expect(::Shakapacker).not_to receive(:manifest)
                 expect(File).not_to receive(:exist?)
 
                 path = described_class.server_bundle_js_file_path

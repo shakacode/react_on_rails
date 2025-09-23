@@ -86,9 +86,6 @@ module ReactOnRails
     end
 
     private_class_method def self.bundle_js_file_path_with_packer(bundle_name)
-      # Handle test scenarios where packer is mocked as unavailable
-      return File.join(generated_assets_full_path, bundle_name) unless ReactOnRails::PackerUtils.using_packer?
-
       is_server_bundle = server_bundle?(bundle_name)
       config = ReactOnRails.configuration
       root_path = Rails.root || "."
