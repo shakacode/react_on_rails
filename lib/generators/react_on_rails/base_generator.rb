@@ -24,7 +24,7 @@ module ReactOnRails
       end
 
       def create_react_directories
-        # Create auto-registration directory structure for non-Redux components only
+        # Create auto-bundling directory structure for non-Redux components only
         # Redux components handle their own directory structure
         return if options.redux?
 
