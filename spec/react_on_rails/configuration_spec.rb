@@ -459,6 +459,67 @@ module ReactOnRails
         end
       end
     end
+
+    describe "server bundle security configuration" do
+      before do
+        allow(Rails).to receive(:root).and_return(Pathname.new("/app"))
+      end
+
+      describe ".server_bundle_output_path" do
+        it "has default value of nil" do
+          ReactOnRails.configure {} # rubocop:disable Lint/EmptyBlock
+          expect(ReactOnRails.configuration.server_bundle_output_path).to be_nil
+        end
+
+        it "accepts custom path" do
+          ReactOnRails.configure do |config|
+            config.server_bundle_output_path = "app/assets/builds"
+          end
+          expect(ReactOnRails.configuration.server_bundle_output_path).to eq("app/assets/builds")
+        end
+      end
+
+      describe ".enforce_private_server_bundles" do
+        it "has default value of false" do
+          ReactOnRails.configure {} # rubocop:disable Lint/EmptyBlock
+          expect(ReactOnRails.configuration.enforce_private_server_bundles).to be(false)
+        end
+
+        it "accepts true value" do
+          ReactOnRails.configure do |config|
+            config.server_bundle_output_path = "app/assets/builds"
+            config.enforce_private_server_bundles = true
+          end
+          expect(ReactOnRails.configuration.enforce_private_server_bundles).to be(true)
+        end
+
+        it "raises error when enabled without server_bundle_output_path" do
+          expect do
+            ReactOnRails.configure do |config|
+              config.enforce_private_server_bundles = true
+            end
+          end.to raise_error(ReactOnRails::Error, /server_bundle_output_path is nil/)
+        end
+
+        it "raises error when server_bundle_output_path is inside public directory" do
+          expect do
+            ReactOnRails.configure do |config|
+              config.server_bundle_output_path = "public/webpack"
+              config.enforce_private_server_bundles = true
+            end
+          end.to raise_error(ReactOnRails::Error, /is inside the public directory/)
+        end
+
+        it "allows server_bundle_output_path outside public directory" do
+          expect do
+            ReactOnRails.configure do |config|
+              config.server_bundle_output_path = "app/assets/builds"
+              config.enforce_private_server_bundles = true
+            end
+          end.not_to raise_error
+        end
+      end
+    end
   end
 end
 

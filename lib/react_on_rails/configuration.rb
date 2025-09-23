@@ -52,7 +52,10 @@ module ReactOnRails
       # If exceeded, an error will be thrown for server-side rendered components not registered on the client.
       # Set to 0 to disable the timeout and wait indefinitely for component registration.
       component_registry_timeout: DEFAULT_COMPONENT_REGISTRY_TIMEOUT,
-      generated_component_packs_loading_strategy: nil
+      generated_component_packs_loading_strategy: nil,
+      # Server bundle security options
+      server_bundle_output_path: nil,
+      enforce_private_server_bundles: false
     )
   end
 
@@ -68,7 +71,8 @@ module ReactOnRails
                   :same_bundle_for_client_and_server, :rendering_props_extension,
                   :make_generated_server_bundle_the_entrypoint,
                   :generated_component_packs_loading_strategy, :immediate_hydration, :rsc_bundle_js_file,
-                  :react_client_manifest_file, :react_server_client_manifest_file, :component_registry_timeout
+                  :react_client_manifest_file, :react_server_client_manifest_file, :component_registry_timeout,
+                  :server_bundle_output_path, :enforce_private_server_bundles
 
     # rubocop:disable Metrics/AbcSize
     def initialize(node_modules_location: nil, server_bundle_js_file: nil, prerender: nil,
@@ -85,7 +89,7 @@ module ReactOnRails
                    random_dom_id: nil, server_render_method: nil, rendering_props_extension: nil,
                    components_subdirectory: nil, auto_load_bundle: nil, immediate_hydration: nil,
                    rsc_bundle_js_file: nil, react_client_manifest_file: nil, react_server_client_manifest_file: nil,
-                   component_registry_timeout: nil)
+                   component_registry_timeout: nil, server_bundle_output_path: nil, enforce_private_server_bundles: nil)
       self.node_modules_location = node_modules_location.present? ? node_modules_location : Rails.root
       self.generated_assets_dirs = generated_assets_dirs
       self.generated_assets_dir = generated_assets_dir
@@ -130,6 +134,8 @@ module ReactOnRails
       self.defer_generated_component_packs = defer_generated_component_packs
       self.immediate_hydration = immediate_hydration
       self.generated_component_packs_loading_strategy = generated_component_packs_loading_strategy
+      self.server_bundle_output_path = server_bundle_output_path
+      self.enforce_private_server_bundles = enforce_private_server_bundles
     end
     # rubocop:enable Metrics/AbcSize
 
@@ -146,6 +152,7 @@ module ReactOnRails
       adjust_precompile_task
       check_component_registry_timeout
       validate_generated_component_packs_loading_strategy
+      validate_enforce_private_server_bundles
     end
 
     private
@@ -192,6 +199,30 @@ module ReactOnRails
       return if %i[async defer sync].include?(generated_component_packs_loading_strategy)
 
       raise ReactOnRails::Error, "generated_component_packs_loading_strategy must be either :async, :defer, or :sync"
+    end
+
+    def validate_enforce_private_server_bundles
+      return unless enforce_private_server_bundles
+
+      # Check if server_bundle_output_path is nil
+      if server_bundle_output_path.nil?
+        raise ReactOnRails::Error, "enforce_private_server_bundles is set to true, but " \
+                                   "server_bundle_output_path is nil. Please set server_bundle_output_path " \
+                                   "to a directory outside of the public directory."
+      end
+
+      # Check if server_bundle_output_path is inside public directory
+      # Skip validation if Rails.root is not available (e.g., in tests)
+      return unless defined?(Rails) && Rails.root
+
+      public_path = Rails.root.join("public").to_s
+      server_output_path = File.expand_path(server_bundle_output_path, Rails.root.to_s)
+
+      return unless server_output_path.start_with?(public_path)
+
+      raise ReactOnRails::Error, "enforce_private_server_bundles is set to true, but " \
+                                 "server_bundle_output_path (#{server_bundle_output_path}) is inside " \
+                                 "the public directory. Please set it to a directory outside of public."
     end
 
     def check_autobundling_requirements

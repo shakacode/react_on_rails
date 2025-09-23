@@ -71,6 +71,17 @@ module ReactOnRails
     end
 
     def self.bundle_js_file_path(bundle_name)
+      # Check if this is a server bundle with configured output path - skip manifest lookup
+      if server_bundle?(bundle_name)
+        config = ReactOnRails.configuration
+        root_path = Rails.root || "."
+
+        # Use configured server_bundle_output_path if present
+        if config.server_bundle_output_path.present?
+          return File.expand_path(File.join(root_path, config.server_bundle_output_path, bundle_name))
+        end
+      end
+
       # Either:
       # 1. Using same bundle for both server and client, so server bundle will be hashed in manifest
       # 2. Using a different bundle (different Webpack config), so file is not hashed, and
@@ -84,15 +95,12 @@ module ReactOnRails
         # Default to the non-hashed name in the specified output directory, which, for legacy
         # React on Rails, this is the output directory picked up by the asset pipeline.
         # For Shakapacker, this is the public output path defined in the (shaka/web)packer.yml file.
-        File.join(generated_assets_full_path, bundle_name)
+        File.join(public_bundles_full_path, bundle_name)
       else
         begin
           ReactOnRails::PackerUtils.bundle_js_uri_from_packer(bundle_name)
         rescue Shakapacker::Manifest::MissingEntryError
-          File.expand_path(
-            File.join(ReactOnRails::PackerUtils.packer_public_output_path,
-                      bundle_name)
-          )
+          handle_missing_manifest_entry(bundle_name)
         end
       end
     end
@@ -165,8 +173,13 @@ module ReactOnRails
         ReactOnRails.configuration.node_modules_location.present?
     end
 
-    def self.generated_assets_full_path
+    def self.public_bundles_full_path
       ReactOnRails::PackerUtils.packer_public_output_path
+    end
+
+    # DEPRECATED: Use public_bundles_full_path for clarity about public vs private bundle paths
+    def self.generated_assets_full_path
+      public_bundles_full_path
     end
 
     def self.gem_available?(name)
@@ -274,5 +287,29 @@ module ReactOnRails
            • 📖 Discussions: https://github.com/shakacode/react_on_rails/discussions
       DEFAULT
     end
+
+    def self.server_bundle?(bundle_name)
+      bundle_name == ReactOnRails.configuration.server_bundle_js_file ||
+        bundle_name == ReactOnRails.configuration.rsc_bundle_js_file
+    end
+
+    def self.enforce_private_server_bundles?
+      ReactOnRails.configuration.enforce_private_server_bundles
+    end
+
+    def self.handle_missing_manifest_entry(bundle_name)
+      # For server bundles with enforcement enabled, don't fall back to public paths
+      if server_bundle?(bundle_name) && enforce_private_server_bundles?
+        raise Shakapacker::Manifest::MissingEntryError,
+              "Server bundle '#{bundle_name}' not found in manifest and " \
+              "enforce_private_server_bundles is enabled. " \
+              "Ensure server bundle is built and server_bundle_output_path is configured correctly."
+      end
+
+      # Default fallback to non-hashed path in public directory
+      File.join(public_bundles_full_path, bundle_name)
+    end
+
+    private_class_method :server_bundle?, :enforce_private_server_bundles?, :handle_missing_manifest_entry
   end
 end
