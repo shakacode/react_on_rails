@@ -10,7 +10,7 @@ module ReactOnRails
     COMPONENT_EXTENSIONS = /\.(jsx?|tsx?)$/
     MINIMUM_SHAKAPACKER_VERSION = "6.5.1"
     # Auto-registration requires nested_entries support which was added in 7.0.0
-    MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_REGISTRATION = "7.0.0"
+    MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_BUNDLING = "7.0.0"
 
     def self.instance
       @instance ||= PacksGenerator.new
@@ -166,7 +166,7 @@ module ReactOnRails
 
     def add_generated_pack_to_server_bundle
       return if ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint
-      return if ReactOnRails.configuration.server_bundle_js_file.empty?
+      return if ReactOnRails.configuration.server_bundle_js_file.blank?
 
       relative_path_to_generated_server_bundle = relative_path(server_bundle_entrypoint,
                                                                generated_server_bundle_file_path)

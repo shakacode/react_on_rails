@@ -622,10 +622,10 @@ module ReactOnRails
             Gem::Version.new(version)
 
             if ReactOnRails::PackerUtils.supports_autobundling?
-              add_success("✅ Shakapacker #{version} (supports React on Rails auto-registration)")
+              add_success("✅ Shakapacker #{version} (supports React on Rails auto-bundling)")
             else
               add_warning("⚠️  Shakapacker #{version} - Version 7.0+ with nested_entries support needed " \
-                          "for React on Rails auto-registration")
+                          "for React on Rails auto-bundling")
             end
           rescue ArgumentError
             # Fallback for invalid version strings

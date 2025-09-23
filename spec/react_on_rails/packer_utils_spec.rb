@@ -118,7 +118,7 @@ module ReactOnRails
       it "returns true when ::Shakapacker >= 7.0.0 with nested_entries support" do
         allow(mock_config).to receive(:respond_to?).with(:nested_entries?).and_return(true)
         allow(described_class).to receive(:shakapacker_version_requirement_met?)
-          .with(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_REGISTRATION).and_return(true)
+          .with(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_BUNDLING).and_return(true)
 
         expect(described_class.supports_autobundling?).to be(true)
       end
@@ -126,7 +126,7 @@ module ReactOnRails
       it "returns false when ::Shakapacker < 7.0.0" do
         allow(mock_config).to receive(:respond_to?).with(:nested_entries?).and_return(true)
         allow(described_class).to receive(:shakapacker_version_requirement_met?)
-          .with(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_REGISTRATION).and_return(false)
+          .with(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_BUNDLING).and_return(false)
 
         expect(described_class.supports_autobundling?).to be(false)
       end
@@ -134,7 +134,7 @@ module ReactOnRails
       it "returns false when nested_entries method is not available" do
         allow(mock_config).to receive(:respond_to?).with(:nested_entries?).and_return(false)
         allow(described_class).to receive(:shakapacker_version_requirement_met?)
-          .with(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_REGISTRATION).and_return(true)
+          .with(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_BUNDLING).and_return(true)
 
         expect(described_class.supports_autobundling?).to be(false)
       end
@@ -144,13 +144,13 @@ module ReactOnRails
   describe "version constants validation" do
     it "ensures MINIMUM_SHAKAPACKER_VERSION constants are properly defined" do
       expect(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION).to eq("6.5.1")
-      expect(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_REGISTRATION).to eq("7.0.0")
+      expect(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_BUNDLING).to eq("7.0.0")
     end
 
     it "ensures version requirements are logically consistent" do
       basic_version = Gem::Version.new(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION)
       auto_reg_version = Gem::Version.new(
-        ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_REGISTRATION
+        ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_BUNDLING
       )
 
       expect(auto_reg_version).to be >= basic_version,

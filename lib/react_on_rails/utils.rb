@@ -72,30 +72,70 @@ module ReactOnRails
     end
 
     def self.bundle_js_file_path(bundle_name)
-      # Either:
-      # 1. Using same bundle for both server and client, so server bundle will be hashed in manifest
-      # 2. Using a different bundle (different Webpack config), so file is not hashed, and
-      #    bundle_js_path will throw so the default path is used without a hash.
-      # 3. The third option of having the server bundle hashed and a different configuration than
-      #    the client bundle is not supported for 2 reasons:
-      #    a. The webpack manifest plugin would have a race condition where the same manifest.json
-      #       is edited by both the webpack-dev-server
-      #    b. There is no good reason to hash the server bundle name.
+      # Priority order depends on bundle type:
+      # SERVER BUNDLES (normal case): Try private non-public locations first, then manifest, then legacy
+      # CLIENT BUNDLES (normal case): Try manifest first, then fallback locations
       if bundle_name == "manifest.json"
         # Default to the non-hashed name in the specified output directory, which, for legacy
         # React on Rails, this is the output directory picked up by the asset pipeline.
         # For Shakapacker, this is the public output path defined in the (shaka/web)packer.yml file.
-        File.join(generated_assets_full_path, bundle_name)
+        File.join(public_bundles_full_path, bundle_name)
       else
-        begin
-          ReactOnRails::PackerUtils.bundle_js_uri_from_packer(bundle_name)
-        rescue Shakapacker::Manifest::MissingEntryError
-          File.expand_path(
-            File.join(ReactOnRails::PackerUtils.packer_public_output_path,
-                      bundle_name)
-          )
+        bundle_js_file_path_with_packer(bundle_name)
+      end
+    end
+
+    private_class_method def self.bundle_js_file_path_with_packer(bundle_name)
+      is_server_bundle = server_bundle?(bundle_name)
+      config = ReactOnRails.configuration
+      root_path = Rails.root || "."
+
+      # If server bundle and server_bundle_output_path is configured, return that path directly
+      if is_server_bundle && config.server_bundle_output_path.present?
+        private_server_bundle_path = File.expand_path(File.join(root_path, config.server_bundle_output_path,
+                                                                bundle_name))
+
+        # Don't fall back to public directory if enforce_private_server_bundles is enabled
+        if config.enforce_private_server_bundles || File.exist?(private_server_bundle_path)
+          return private_server_bundle_path
         end
       end
+
+      # Try manifest lookup for all bundles
+      begin
+        ReactOnRails::PackerUtils.bundle_js_uri_from_packer(bundle_name)
+      rescue Shakapacker::Manifest::MissingEntryError
+        handle_missing_manifest_entry(bundle_name, is_server_bundle)
+      end
+    end
+
+    private_class_method def self.server_bundle?(bundle_name)
+      config = ReactOnRails.configuration
+      bundle_name == config.server_bundle_js_file ||
+      bundle_name == config.rsc_bundle_js_file
+    end
+
+    private_class_method def self.handle_missing_manifest_entry(bundle_name, is_server_bundle)
+      config = ReactOnRails.configuration
+      root_path = Rails.root || "."
+
+      # For server bundles with server_bundle_output_path configured, use that
+      if is_server_bundle && config.server_bundle_output_path.present?
+        candidate_paths = [File.expand_path(File.join(root_path, config.server_bundle_output_path, bundle_name))]
+        unless config.enforce_private_server_bundles
+          candidate_paths << File.expand_path(File.join(ReactOnRails::PackerUtils.packer_public_output_path,
+                                                        bundle_name))
+        end
+
+        candidate_paths.each do |path|
+          return path if File.exist?(path)
+        end
+        return candidate_paths.first
+      end
+
+      # For client bundles and server bundles without special config, use packer's public path
+      # This returns the environment-specific path configured in shakapacker.yml
+      File.expand_path(File.join(ReactOnRails::PackerUtils.packer_public_output_path, bundle_name))
     end
 
     def self.server_bundle_js_file_path
@@ -130,7 +170,7 @@ module ReactOnRails
               "react_server_client_manifest_file is nil, ensure it is set in your configuration"
       end
 
-      @react_server_manifest_path = File.join(generated_assets_full_path, asset_name)
+      @react_server_manifest_path = File.join(public_bundles_full_path, asset_name)
     end
 
     def self.running_on_windows?
@@ -166,8 +206,13 @@ module ReactOnRails
         ReactOnRails.configuration.node_modules_location.present?
     end
 
-    def self.generated_assets_full_path
+    def self.public_bundles_full_path
       ReactOnRails::PackerUtils.packer_public_output_path
+    end
+
+    # DEPRECATED: Use public_bundles_full_path for clarity about public vs private bundle paths
+    def self.generated_assets_full_path
+      public_bundles_full_path
     end
 
     def self.gem_available?(name)

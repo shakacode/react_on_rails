@@ -61,6 +61,10 @@ module ReactOnRails
         .and_return(server_bundle_name)
       allow(ReactOnRails).to receive_message_chain("configuration.rsc_bundle_js_file")
         .and_return(rsc_bundle_name)
+      allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
+        .and_return("ssr-generated")
+      allow(ReactOnRails).to receive_message_chain("configuration.enforce_private_server_bundles")
+        .and_return(false)
     end
 
     def mock_dev_server_running
@@ -88,6 +92,14 @@ module ReactOnRails
       end
 
       describe ".bundle_js_file_path" do
+        before do
+          # Mock configuration calls to avoid server bundle detection for regular client bundles
+          allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
+            .and_return("server-bundle.js")
+          allow(ReactOnRails).to receive_message_chain("configuration.rsc_bundle_js_file")
+            .and_return("rsc-bundle.js")
+        end
+
         subject do
           described_class.bundle_js_file_path("webpack-bundle.js")
         end
@@ -116,6 +128,90 @@ module ReactOnRails
               end
 
               it { is_expected.to eq("#{packer_public_output_path}/manifest.json") }
+            end
+
+            context "when file not in manifest" do
+              before do
+                mock_missing_manifest_entry("webpack-bundle.js")
+              end
+
+              let(:env_specific_path) { File.join(packer_public_output_path, "webpack-bundle.js") }
+
+              it "returns environment-specific path" do
+                result = described_class.bundle_js_file_path("webpack-bundle.js")
+                expect(result).to eq(File.expand_path(env_specific_path))
+              end
+            end
+
+            context "with server bundle (SSR/RSC) file not in manifest" do
+              let(:server_bundle_name) { "server-bundle.js" }
+              let(:ssr_generated_path) { File.expand_path(File.join("ssr-generated", server_bundle_name)) }
+
+              context "with server_bundle_output_path configured" do
+                before do
+                  mock_missing_manifest_entry(server_bundle_name)
+                  allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
+                    .and_return(server_bundle_name)
+                  allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
+                    .and_return("ssr-generated")
+                  allow(ReactOnRails).to receive_message_chain("configuration.enforce_private_server_bundles")
+                    .and_return(false)
+                end
+
+                it "returns configured path directly without checking existence" do
+                  # When enforce_private_server_bundles is false, it will check File.exist?
+                  # for both private and public paths, but should still return the configured path
+                  public_path = File.expand_path(File.join(packer_public_output_path, server_bundle_name))
+                  allow(File).to receive(:exist?).with(ssr_generated_path).and_return(false)
+                  allow(File).to receive(:exist?).with(public_path).and_return(false)
+
+                  result = described_class.bundle_js_file_path(server_bundle_name)
+                  expect(result).to eq(ssr_generated_path)
+                end
+              end
+
+              context "without server_bundle_output_path configured" do
+                before do
+                  mock_missing_manifest_entry(server_bundle_name)
+                  allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
+                    .and_return(server_bundle_name)
+                  allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
+                    .and_return(nil)
+                  allow(ReactOnRails).to receive_message_chain("configuration.enforce_private_server_bundles")
+                    .and_return(false)
+                end
+
+                it "uses packer public output path" do
+                  result = described_class.bundle_js_file_path(server_bundle_name)
+                  expect(result).to eq(File.expand_path(File.join(packer_public_output_path, server_bundle_name)))
+                end
+              end
+            end
+
+            context "with RSC bundle file not in manifest" do
+              let(:rsc_bundle_name) { "rsc-bundle.js" }
+              let(:ssr_generated_path) { File.expand_path(File.join("ssr-generated", rsc_bundle_name)) }
+
+              before do
+                mock_missing_manifest_entry(rsc_bundle_name)
+                allow(ReactOnRails).to receive_message_chain("configuration.rsc_bundle_js_file")
+                  .and_return(rsc_bundle_name)
+                allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
+                  .and_return("ssr-generated")
+                allow(ReactOnRails).to receive_message_chain("configuration.enforce_private_server_bundles")
+                  .and_return(false)
+              end
+
+              it "treats RSC bundles as server bundles and returns configured path directly" do
+                # When enforce_private_server_bundles is false, it will check File.exist?
+                # for both private and public paths, but should still return the configured path
+                public_path = File.expand_path(File.join(packer_public_output_path, rsc_bundle_name))
+                allow(File).to receive(:exist?).with(ssr_generated_path).and_return(false)
+                allow(File).to receive(:exist?).with(public_path).and_return(false)
+
+                result = described_class.bundle_js_file_path(rsc_bundle_name)
+                expect(result).to eq(ssr_generated_path)
+              end
             end
           end
         end
@@ -157,25 +253,49 @@ module ReactOnRails
           include_context "with #{packer_type} enabled"
 
           context "with server file not in manifest", packer_type.to_sym do
-            it "returns the unhashed server path" do
+            it "returns the private ssr-generated path for server bundles" do
               server_bundle_name = "server-bundle.js"
               mock_bundle_configs(server_bundle_name: server_bundle_name)
               mock_missing_manifest_entry(server_bundle_name)
 
               path = described_class.server_bundle_js_file_path
 
-              expect(path).to end_with("public/webpack/development/#{server_bundle_name}")
+              expect(path).to end_with("ssr-generated/#{server_bundle_name}")
+            end
+
+            context "with server_bundle_output_path configured" do
+              it "returns the configured path directly without checking file existence" do
+                server_bundle_name = "server-bundle.js"
+                mock_bundle_configs(server_bundle_name: server_bundle_name)
+                mock_missing_manifest_entry(server_bundle_name)
+                # NOTE: mock_bundle_configs sets enforce_private_server_bundles to false
+
+                # Since server_bundle_output_path is configured, it will try manifest lookup first,
+                # then fall back to candidate paths. With enforce_private_server_bundles=false,
+                # it will check File.exist? for both private and public paths
+                ssr_generated_path = File.expand_path(File.join("ssr-generated", server_bundle_name))
+                public_path = File.expand_path(File.join(packer_public_output_path, server_bundle_name))
+                allow(File).to receive(:exist?).with(ssr_generated_path).and_return(false)
+                allow(File).to receive(:exist?).with(public_path).and_return(false)
+
+                path = described_class.server_bundle_js_file_path
+
+                expect(path).to end_with("ssr-generated/#{server_bundle_name}")
+              end
             end
           end
 
           context "with server file in the manifest, used for client", packer_type.to_sym do
             it "returns the correct path hashed server path" do
-              packer = ::Shakapacker
+              # Use Shakapacker directly instead of packer method
               mock_bundle_configs(server_bundle_name: "webpack-bundle.js")
+              # Clear server_bundle_output_path to test manifest behavior
+              allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
+                .and_return(nil)
               allow(ReactOnRails).to receive_message_chain("configuration.same_bundle_for_client_and_server")
                 .and_return(true)
               mock_bundle_in_manifest("webpack-bundle.js", "webpack/development/webpack-bundle-123456.js")
-              allow(packer).to receive_message_chain("dev_server.running?")
+              allow(Shakapacker).to receive_message_chain("dev_server.running?")
                 .and_return(false)
 
               path = described_class.server_bundle_js_file_path
@@ -186,6 +306,9 @@ module ReactOnRails
             context "with webpack-dev-server running, and same file used for server and client" do
               it "returns the correct path hashed server path" do
                 mock_bundle_configs(server_bundle_name: "webpack-bundle.js")
+                # Clear server_bundle_output_path to test manifest behavior
+                allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
+                  .and_return(nil)
                 allow(ReactOnRails).to receive_message_chain("configuration.same_bundle_for_client_and_server")
                   .and_return(true)
                 mock_dev_server_running
@@ -202,6 +325,9 @@ module ReactOnRails
                   packer_type.to_sym do
             it "returns the correct path hashed server path" do
               mock_bundle_configs(server_bundle_name: "server-bundle.js")
+              # Clear server_bundle_output_path to test manifest behavior
+              allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
+                .and_return(nil)
               allow(ReactOnRails).to receive_message_chain("configuration.same_bundle_for_client_and_server")
                 .and_return(false)
               mock_bundle_in_manifest("server-bundle.js", "webpack/development/server-bundle-123456.js")
@@ -220,25 +346,28 @@ module ReactOnRails
           include_context "with #{packer_type} enabled"
 
           context "with server file not in manifest", packer_type.to_sym do
-            it "returns the unhashed server path" do
+            it "returns the private ssr-generated path for RSC bundles" do
               server_bundle_name = "rsc-bundle.js"
               mock_bundle_configs(rsc_bundle_name: server_bundle_name)
               mock_missing_manifest_entry(server_bundle_name)
 
               path = described_class.rsc_bundle_js_file_path
 
-              expect(path).to end_with("public/webpack/development/#{server_bundle_name}")
+              expect(path).to end_with("ssr-generated/#{server_bundle_name}")
             end
           end
 
           context "with server file in the manifest, used for client", packer_type.to_sym do
             it "returns the correct path hashed server path" do
-              packer = ::Shakapacker
+              # Use Shakapacker directly instead of packer method
               mock_bundle_configs(rsc_bundle_name: "webpack-bundle.js")
+              # Clear server_bundle_output_path to test manifest behavior
+              allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
+                .and_return(nil)
               allow(ReactOnRails).to receive_message_chain("configuration.same_bundle_for_client_and_server")
                 .and_return(true)
               mock_bundle_in_manifest("webpack-bundle.js", "webpack/development/webpack-bundle-123456.js")
-              allow(packer).to receive_message_chain("dev_server.running?")
+              allow(Shakapacker).to receive_message_chain("dev_server.running?")
                 .and_return(false)
 
               path = described_class.rsc_bundle_js_file_path
@@ -249,6 +378,9 @@ module ReactOnRails
             context "with webpack-dev-server running, and same file used for server and client" do
               it "returns the correct path hashed server path" do
                 mock_bundle_configs(rsc_bundle_name: "webpack-bundle.js")
+                # Clear server_bundle_output_path to test manifest behavior
+                allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
+                  .and_return(nil)
                 allow(ReactOnRails).to receive_message_chain("configuration.same_bundle_for_client_and_server")
                   .and_return(true)
                 mock_dev_server_running
@@ -265,6 +397,9 @@ module ReactOnRails
                   packer_type.to_sym do
             it "returns the correct path hashed server path" do
               mock_bundle_configs(rsc_bundle_name: "rsc-bundle.js")
+              # Clear server_bundle_output_path to test manifest behavior
+              allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
+                .and_return(nil)
               allow(ReactOnRails).to receive_message_chain("configuration.same_bundle_for_client_and_server")
                 .and_return(false)
               mock_bundle_in_manifest("rsc-bundle.js", "webpack/development/server-bundle-123456.js")
@@ -534,7 +669,7 @@ module ReactOnRails
       context "when in development environment" do
         before do
           allow(Rails.env).to receive(:development?).and_return(true)
-          allow(described_class).to receive(:generated_assets_full_path)
+          allow(described_class).to receive(:public_bundles_full_path)
             .and_return("/path/to/generated/assets")
         end
 
@@ -554,7 +689,7 @@ module ReactOnRails
 
       context "when not in development environment" do
         before do
-          allow(described_class).to receive(:generated_assets_full_path)
+          allow(described_class).to receive(:public_bundles_full_path)
             .and_return("/path/to/generated/assets")
         end
 
@@ -574,7 +709,7 @@ module ReactOnRails
 
       context "with different manifest file names" do
         before do
-          allow(described_class).to receive(:generated_assets_full_path)
+          allow(described_class).to receive(:public_bundles_full_path)
             .and_return("/path/to/generated/assets")
         end
 
@@ -599,7 +734,7 @@ module ReactOnRails
         before do
           allow(ReactOnRails.configuration).to receive(:react_server_client_manifest_file)
             .and_return(nil)
-          allow(described_class).to receive(:generated_assets_full_path)
+          allow(described_class).to receive(:public_bundles_full_path)
             .and_return("/path/to/generated/assets")
         end
 

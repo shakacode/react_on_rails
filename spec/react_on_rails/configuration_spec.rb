@@ -12,6 +12,10 @@ module ReactOnRails
 
     before do
       ReactOnRails.instance_variable_set(:@configuration, nil)
+      # Mock PackerUtils to avoid Shakapacker dependency in tests
+      allow(Rails).to receive(:root).and_return(Pathname.new("/fake/rails/root")) unless Rails.root
+      allow(ReactOnRails::PackerUtils).to receive(:packer_public_output_path)
+        .and_return(File.expand_path(File.join(Rails.root, "public/packs")))
     end
 
     after do
@@ -21,13 +25,15 @@ module ReactOnRails
     describe "generated_assets_dir" do
       let(:using_packer) { true }
       let(:packer_public_output_path) do
-        File.expand_path(File.join(Rails.root, "public/webpack/dev"))
+        File.expand_path(File.join(Rails.root, "public/packs"))
       end
 
       before do
         allow(Rails).to receive(:root).and_return(File.expand_path("."))
         allow(::Shakapacker).to receive_message_chain("config.public_output_path")
           .and_return(Pathname.new(packer_public_output_path))
+        allow(ReactOnRails::PackerUtils).to receive(:packer_public_output_path)
+          .and_return(packer_public_output_path)
       end
 
       it "does not throw if the generated assets dir is blank with shakapacker" do
@@ -41,7 +47,7 @@ module ReactOnRails
       it "does not throw if the packer_public_output_path does match the generated assets dir" do
         expect do
           ReactOnRails.configure do |config|
-            config.generated_assets_dir = "public/webpack/dev"
+            config.generated_assets_dir = "public/packs"
           end
         end.not_to raise_error
       end
@@ -292,6 +298,8 @@ module ReactOnRails
       test_path = File.expand_path("public/webpack/test")
       allow(::Shakapacker).to receive_message_chain("config.public_output_path")
         .and_return(Pathname.new(test_path))
+      allow(ReactOnRails::PackerUtils).to receive(:packer_public_output_path)
+        .and_return(test_path)
 
       ReactOnRails.configure do |config|
         config.generated_assets_dir = test_path
@@ -307,6 +315,8 @@ module ReactOnRails
       test_path = File.expand_path("public/webpack/test")
       allow(::Shakapacker).to receive_message_chain("config.public_output_path")
         .and_return(Pathname.new(test_path))
+      allow(ReactOnRails::PackerUtils).to receive(:packer_public_output_path)
+        .and_return(test_path)
 
       ReactOnRails.configure do |config|
         config.generated_assets_dir = test_path
@@ -456,6 +466,62 @@ module ReactOnRails
               config.generated_component_packs_loading_strategy = :async
             end
           end.to raise_error(ReactOnRails::Error, /does not support async script loading/)
+        end
+      end
+    end
+
+    describe "enforce_private_server_bundles validation" do
+      context "when enforce_private_server_bundles is true" do
+        before do
+          # Mock Rails.root for tests that need path validation
+          allow(Rails).to receive(:root).and_return(Pathname.new("/test/app"))
+        end
+
+        it "raises error when server_bundle_output_path is nil" do
+          expect do
+            ReactOnRails.configure do |config|
+              config.server_bundle_output_path = nil
+              config.enforce_private_server_bundles = true
+            end
+          end.to raise_error(ReactOnRails::Error, /server_bundle_output_path is nil/)
+        end
+
+        it "raises error when server_bundle_output_path is inside public directory" do
+          expect do
+            ReactOnRails.configure do |config|
+              config.server_bundle_output_path = "public/server-bundles"
+              config.enforce_private_server_bundles = true
+            end
+          end.to raise_error(ReactOnRails::Error, /is inside the public directory/)
+        end
+
+        it "allows server_bundle_output_path outside public directory" do
+          expect do
+            ReactOnRails.configure do |config|
+              config.server_bundle_output_path = "ssr-generated"
+              config.enforce_private_server_bundles = true
+            end
+          end.not_to raise_error
+        end
+      end
+
+      context "when enforce_private_server_bundles is false" do
+        it "allows server_bundle_output_path to be nil" do
+          expect do
+            ReactOnRails.configure do |config|
+              config.server_bundle_output_path = nil
+              config.enforce_private_server_bundles = false
+            end
+          end.not_to raise_error
+        end
+
+        it "allows server_bundle_output_path inside public directory" do
+          expect do
+            ReactOnRails.configure do |config|
+              config.server_bundle_output_path = "public/server-bundles"
+              config.enforce_private_server_bundles = false
+            end
+          end.not_to raise_error
         end
       end
     end
