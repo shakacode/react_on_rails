@@ -100,7 +100,6 @@ module ReactOnRails
         add_react_dependencies
         add_css_dependencies
         add_dev_dependencies
-        install_js_dependencies
       end
 
       def update_gitignore_for_auto_registration
