@@ -95,9 +95,7 @@ module ReactOnRails
       if ReactOnRails::PackerUtils.using_packer? && bundle_name != "manifest.json"
         begin
           ReactOnRails::PackerUtils.bundle_js_uri_from_packer(bundle_name)
-        rescue Object.const_get(
-          ReactOnRails::PackerUtils.packer_type.capitalize
-        )::Manifest::MissingEntryError
+        rescue Shakapacker::Manifest::MissingEntryError
           handle_missing_manifest_entry(bundle_name)
         end
       else
