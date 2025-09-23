@@ -110,14 +110,21 @@ module ReactOnRails
 
     private_class_method def self.handle_missing_manifest_entry(bundle_name)
       # When manifest lookup fails, try multiple fallback locations:
-      # 1. Environment-specific path (e.g., public/webpack/test)
+      # Build fallback locations conditionally based on packer availability
+      fallback_locations = []
+
+      # 1. Environment-specific path (e.g., public/webpack/test) - only if using packer
+      if ReactOnRails::PackerUtils.using_packer?
+        fallback_locations << File.join(ReactOnRails::PackerUtils.packer_public_output_path, bundle_name)
+      end
+
       # 2. Standard Shakapacker location (public/packs)
+      fallback_locations << File.join("public", "packs", bundle_name)
+
       # 3. Generated assets path (for legacy setups)
-      fallback_locations = [
-        File.join(ReactOnRails::PackerUtils.packer_public_output_path, bundle_name),
-        File.join("public", "packs", bundle_name),
-        File.join(generated_assets_full_path, bundle_name)
-      ].uniq
+      fallback_locations << File.join(generated_assets_full_path, bundle_name)
+
+      fallback_locations.uniq!
 
       # Return the first location where the bundle file actually exists
       fallback_locations.each do |path|
