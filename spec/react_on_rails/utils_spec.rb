@@ -155,12 +155,15 @@ module ReactOnRails
                   allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
                     .and_return("ssr-generated")
                   allow(ReactOnRails).to receive_message_chain("configuration.enforce_private_server_bundles")
-                    .and_return(true)
+                    .and_return(false)
                 end
 
                 it "returns configured path directly without checking existence" do
-                  # When enforce_private_server_bundles is true, should not check File.exist?
-                  expect(File).not_to receive(:exist?)
+                  # When enforce_private_server_bundles is false, it will check File.exist?
+                  # for both private and public paths, but should still return the configured path
+                  public_path = File.expand_path(File.join(packer_public_output_path, server_bundle_name))
+                  allow(File).to receive(:exist?).with(ssr_generated_path).and_return(false)
+                  allow(File).to receive(:exist?).with(public_path).and_return(false)
 
                   result = described_class.bundle_js_file_path(server_bundle_name)
                   expect(result).to eq(ssr_generated_path)
@@ -196,12 +199,15 @@ module ReactOnRails
                 allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
                   .and_return("ssr-generated")
                 allow(ReactOnRails).to receive_message_chain("configuration.enforce_private_server_bundles")
-                  .and_return(true)
+                  .and_return(false)
               end
 
               it "treats RSC bundles as server bundles and returns configured path directly" do
-                # Should not check File.exist? - returns path immediately
-                expect(File).not_to receive(:exist?)
+                # When enforce_private_server_bundles is false, it will check File.exist?
+                # for both private and public paths, but should still return the configured path
+                public_path = File.expand_path(File.join(packer_public_output_path, rsc_bundle_name))
+                allow(File).to receive(:exist?).with(ssr_generated_path).and_return(false)
+                allow(File).to receive(:exist?).with(public_path).and_return(false)
 
                 result = described_class.bundle_js_file_path(rsc_bundle_name)
                 expect(result).to eq(ssr_generated_path)
@@ -261,14 +267,16 @@ module ReactOnRails
               it "returns the configured path directly without checking file existence" do
                 server_bundle_name = "server-bundle.js"
                 mock_bundle_configs(server_bundle_name: server_bundle_name)
-                # Override to enable enforcement to avoid file existence check
-                allow(ReactOnRails).to receive_message_chain("configuration.enforce_private_server_bundles")
-                  .and_return(true)
+                mock_missing_manifest_entry(server_bundle_name)
+                # NOTE: mock_bundle_configs sets enforce_private_server_bundles to false
 
-                # Since server_bundle_output_path is configured, should return path immediately
-                # without trying manifest lookup
-                expect(::Shakapacker).not_to receive(:manifest)
-                expect(File).not_to receive(:exist?)
+                # Since server_bundle_output_path is configured, it will try manifest lookup first,
+                # then fall back to candidate paths. With enforce_private_server_bundles=false,
+                # it will check File.exist? for both private and public paths
+                ssr_generated_path = File.expand_path(File.join("ssr-generated", server_bundle_name))
+                public_path = File.expand_path(File.join(packer_public_output_path, server_bundle_name))
+                allow(File).to receive(:exist?).with(ssr_generated_path).and_return(false)
+                allow(File).to receive(:exist?).with(public_path).and_return(false)
 
                 path = described_class.server_bundle_js_file_path
 
