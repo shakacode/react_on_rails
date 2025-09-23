@@ -37,7 +37,8 @@ module ReactOnRails
     end
 
     def self.shakapacker_version_requirement_met?(required_version)
-      Gem::Version.new(shakapacker_version) >= Gem::Version.new(required_version)
+      @version_checks ||= {}
+      @version_checks[required_version] ||= Gem::Version.new(shakapacker_version) >= Gem::Version.new(required_version)
     end
 
     def self.supports_async_loading?

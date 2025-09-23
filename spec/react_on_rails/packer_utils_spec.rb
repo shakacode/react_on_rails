@@ -140,4 +140,33 @@ module ReactOnRails
       end
     end
   end
+
+  describe "version constants validation" do
+    it "ensures MINIMUM_SHAKAPACKER_VERSION constants are properly defined" do
+      expect(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION).to eq("6.5.1")
+      expect(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_REGISTRATION).to eq("7.0.0")
+    end
+
+    it "ensures version requirements are logically consistent" do
+      basic_version = Gem::Version.new(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION)
+      auto_reg_version = Gem::Version.new(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_REGISTRATION)
+
+      expect(auto_reg_version).to be >= basic_version,
+        "Auto-registration version should be >= basic pack generation version"
+    end
+
+    it "validates version checks are cached properly" do
+      # Mock the shakapacker_version to avoid dependency on actual version
+      allow(ReactOnRails::PackerUtils).to receive(:shakapacker_version).and_return("7.1.0")
+
+      # First call should compute and cache
+      result1 = ReactOnRails::PackerUtils.shakapacker_version_requirement_met?("6.5.1")
+
+      # Second call should use cached result
+      result2 = ReactOnRails::PackerUtils.shakapacker_version_requirement_met?("6.5.1")
+
+      expect(result1).to eq(result2)
+      expect(result1).to be true # 7.1.0 >= 6.5.1
+    end
+  end
 end

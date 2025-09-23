@@ -26,7 +26,7 @@ Changes since the last non-beta release.
 #### Bug Fixes
 
 - **Doctor rake task**: Fixed LoadError in `rake react_on_rails:doctor` when using packaged gem. The task was trying to require excluded `rakelib/task_helpers` file. [PR 1795](https://github.com/shakacode/react_on_rails/pull/1795)
-- **Shakapacker version requirements**: Fixed inconsistent version requirements between basic pack generation (6.5.1+) and advanced auto-registration features (7.0.0+). Added backward compatibility for users on Shakapacker 6.5.1-6.9.x while providing clear upgrade guidance for advanced features. [PR 1798](https://github.com/shakacode/react_on_rails/pull/1798)
+- **Shakapacker version requirements**: Fixed inconsistent version requirements between basic pack generation (6.5.1+) and advanced auto-registration features (7.0.0+). Added backward compatibility for users on Shakapacker 6.5.1-6.9.x while providing clear upgrade guidance for advanced features. Added new constants `MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_REGISTRATION` and improved version checking performance with caching. [PR 1798](https://github.com/shakacode/react_on_rails/pull/1798)
 
 ### [16.0.1-rc.0] - 2025-09-19
 
