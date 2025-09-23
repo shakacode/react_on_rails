@@ -78,6 +78,8 @@ module ReactOnRails
         .and_return(rsc_bundle_name)
       allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
         .and_return("ssr-generated")
+      allow(ReactOnRails).to receive_message_chain("configuration.enforce_private_server_bundles")
+        .and_return(false)
     end
 
     def mock_dev_server_running
@@ -166,6 +168,33 @@ module ReactOnRails
 
                 result = described_class.bundle_js_file_path("webpack-bundle.js")
                 expect(result).to eq(File.expand_path(env_specific_path))
+              end
+            end
+
+            context "with enforce_private_server_bundles enabled" do
+              before do
+                mock_missing_manifest_entry("server-bundle.js")
+                allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
+                  .and_return("server-bundle.js")
+                allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
+                  .and_return("ssr-generated")
+                allow(ReactOnRails).to receive_message_chain("configuration.enforce_private_server_bundles")
+                  .and_return(true)
+              end
+
+              it "returns private path and does not fall back to public when enforcement is enabled" do
+                ssr_generated_path = File.expand_path(File.join(Rails.root.to_s, "ssr-generated", "server-bundle.js"))
+                public_packs_path = File.expand_path(File.join("public", "packs", "server-bundle.js"))
+
+                # Mock File.exist? so SSR-generated path returns false but public path returns true
+                allow(File).to receive(:exist?).and_call_original
+                allow(File).to receive(:exist?).with(ssr_generated_path).and_return(false)
+                allow(File).to receive(:exist?).with(public_packs_path).and_return(true)
+
+                result = described_class.bundle_js_file_path("server-bundle.js")
+
+                # Should return the private path even though it doesn't exist, not fall back to public
+                expect(result).to eq(ssr_generated_path)
               end
             end
           end

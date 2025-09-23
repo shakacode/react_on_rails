@@ -108,6 +108,9 @@ module ReactOnRails
     end
 
     private_class_method def self.handle_missing_manifest_entry(bundle_name)
+      # For server bundles with enforcement enabled, skip public path fallbacks
+      return server_bundle_private_path(bundle_name) if server_bundle?(bundle_name) && enforce_private_server_bundles?
+
       # When manifest lookup fails, try multiple fallback locations:
       # Build fallback locations conditionally based on packer availability
       fallback_locations = []
@@ -139,6 +142,17 @@ module ReactOnRails
       config = ReactOnRails.configuration
       bundle_name == config.server_bundle_js_file ||
       bundle_name == config.rsc_bundle_js_file
+    end
+
+    private_class_method def self.enforce_private_server_bundles?
+      ReactOnRails.configuration.enforce_private_server_bundles
+    end
+
+    private_class_method def self.server_bundle_private_path(bundle_name)
+      config = ReactOnRails.configuration
+      preferred_dir = config.server_bundle_output_path.presence || "ssr-generated"
+      root_path = Rails.root || "."
+      File.expand_path(File.join(root_path, preferred_dir, bundle_name))
     end
 
     def self.server_bundle_js_file_path
