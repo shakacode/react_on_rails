@@ -3,10 +3,14 @@
 module ReactOnRails
   module PackerUtils
     def self.packer
-      require "shakapacker"
-      ::Shakapacker
-    rescue LoadError => e
-      raise ReactOnRails::Error, "Shakapacker gem is required but not available. Please add 'shakapacker' to your Gemfile. Error: #{e.message}"
+      return @packer if defined?(@packer)
+
+      @packer = begin
+        require "shakapacker"
+        ::Shakapacker
+      rescue LoadError => e
+        raise ReactOnRails::Error, "Shakapacker gem is required but not available. Please add 'shakapacker' to your Gemfile. Error: #{e.message}"
+      end
     end
 
     def self.dev_server_running?
@@ -56,10 +60,14 @@ module ReactOnRails
     end
 
     def self.shakapacker_gem_available?
-      require "shakapacker"
-      true
-    rescue LoadError
-      false
+      return @shakapacker_gem_available if defined?(@shakapacker_gem_available)
+
+      @shakapacker_gem_available = begin
+        require "shakapacker"
+        true
+      rescue LoadError
+        false
+      end
     end
 
     # This returns either a URL for the webpack-dev-server, non-server bundle or
