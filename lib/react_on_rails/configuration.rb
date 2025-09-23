@@ -186,7 +186,7 @@ module ReactOnRails
         1. Use :sync or :defer loading strategy instead of :async
         2. Upgrade to Shakapacker v8.2.0 or above to enable async script loading
       MSG
-      if ReactOnRails::PackerUtils.shakapacker_version_requirement_met?("8.2.0")
+      if ReactOnRails::PackerUtils.supports_async_loading?
         self.generated_component_packs_loading_strategy ||= :async
       elsif generated_component_packs_loading_strategy.nil?
         Rails.logger.warn("**WARNING** #{msg}")

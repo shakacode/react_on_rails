@@ -33,6 +33,10 @@ module ReactOnRails
       shakapacker_version_requirement_met?(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION)
     end
 
+    def self.supports_async_loading?
+      shakapacker_version_requirement_met?("8.2.0")
+    end
+
     # This returns either a URL for the webpack-dev-server, non-server bundle or
     # the hashed server bundle if using the same bundle for the client.
     # Otherwise returns a file path.
