@@ -250,7 +250,7 @@ ReactOnRails.configure do |config|
   # auto-load the bundle for the generated component, to avoid having to specify the
   # bundle manually for each view with the component.
   ################################################################################
-  # components_subdirectory is the name of the subdirectory matched to detect and register components automatically
+  # components_subdirectory is the name of the subdirectory matched to detect components for auto-bundle-loading
   # The default is nil. You can enable the feature by updating it in the next line.
   config.components_subdirectory = nil
   # Change to a value like this example to enable this feature
