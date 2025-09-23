@@ -95,13 +95,6 @@ module ReactOnRails
         run "bundle"
       end
 
-      def add_js_dependencies
-        add_react_on_rails_package
-        add_react_dependencies
-        add_css_dependencies
-        add_dev_dependencies
-      end
-
       def update_gitignore_for_auto_registration
         gitignore_path = File.join(destination_root, ".gitignore")
         return unless File.exist?(gitignore_path)
@@ -126,6 +119,28 @@ module ReactOnRails
           spec_helper = File.join(destination_root, "spec/spec_helper.rb")
           add_configure_rspec_to_compile_assets(spec_helper) if File.exist?(spec_helper)
         end
+      end
+
+      CONFIGURE_RSPEC_TO_COMPILE_ASSETS = <<-STR.strip_heredoc
+        RSpec.configure do |config|
+          # Ensure that if we are running js tests, we are using latest webpack assets
+          # This will use the defaults of :js and :server_rendering meta tags
+          ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+        end
+      STR
+
+      private
+
+      def setup_js_dependencies
+        add_js_dependencies
+        install_js_dependencies
+      end
+
+      def add_js_dependencies
+        add_react_on_rails_package
+        add_react_dependencies
+        add_css_dependencies
+        add_dev_dependencies
       end
 
       def add_react_on_rails_package
@@ -218,16 +233,6 @@ module ReactOnRails
 
         success
       end
-
-      CONFIGURE_RSPEC_TO_COMPILE_ASSETS = <<-STR.strip_heredoc
-        RSpec.configure do |config|
-          # Ensure that if we are running js tests, we are using latest webpack assets
-          # This will use the defaults of :js and :server_rendering meta tags
-          ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
-        end
-      STR
-
-      private
 
       def handle_npm_failure(dependency_type, packages, dev: false)
         install_command = dev ? "npm install --save-dev" : "npm install"
