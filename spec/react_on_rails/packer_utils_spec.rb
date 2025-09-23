@@ -42,18 +42,18 @@ module ReactOnRails
 
       context "when dev server is running" do
         before do
-          allow(described_class.packer).to receive(:dev_server).and_return(
+          allow(::Shakapacker).to receive(:dev_server).and_return(
             instance_double(
-              ReactOnRails::PackerUtils.packer::DevServer,
+              ::Shakapacker::DevServer,
               running?: true,
               protocol: "http",
               host_with_port: "localhost:3035"
             )
           )
 
-          allow(described_class.packer).to receive_message_chain("config.public_output_path")
+          allow(::Shakapacker).to receive_message_chain("config.public_output_path")
             .and_return(Pathname.new(public_output_path))
-          allow(described_class.packer).to receive_message_chain("config.public_path")
+          allow(::Shakapacker).to receive_message_chain("config.public_path")
             .and_return(Pathname.new("/path/to/public"))
         end
 
@@ -65,8 +65,8 @@ module ReactOnRails
 
       context "when dev server is not running" do
         before do
-          allow(described_class.packer).to receive_message_chain("dev_server.running?").and_return(false)
-          allow(described_class.packer).to receive_message_chain("config.public_output_path")
+          allow(::Shakapacker).to receive_message_chain("dev_server.running?").and_return(false)
+          allow(::Shakapacker).to receive_message_chain("config.public_output_path")
             .and_return(Pathname.new(public_output_path))
         end
 
@@ -75,6 +75,100 @@ module ReactOnRails
           expect(described_class.asset_uri_from_packer(asset_name)).to eq(expected_path)
         end
       end
+    end
+
+    describe ".supports_async_loading?" do
+      it "returns true when ::Shakapacker >= 8.2.0" do
+        allow(described_class).to receive(:shakapacker_version_requirement_met?).with("8.2.0").and_return(true)
+
+        expect(described_class.supports_async_loading?).to be(true)
+      end
+
+      it "returns false when ::Shakapacker < 8.2.0" do
+        allow(described_class).to receive(:shakapacker_version_requirement_met?).with("8.2.0").and_return(false)
+
+        expect(described_class.supports_async_loading?).to be(false)
+      end
+    end
+
+    describe ".supports_basic_pack_generation?" do
+      it "returns true when ::Shakapacker >= 6.5.1" do
+        allow(described_class).to receive(:shakapacker_version_requirement_met?)
+          .with(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION).and_return(true)
+
+        expect(described_class.supports_basic_pack_generation?).to be(true)
+      end
+
+      it "returns false when ::Shakapacker < 6.5.1" do
+        allow(described_class).to receive(:shakapacker_version_requirement_met?)
+          .with(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION).and_return(false)
+
+        expect(described_class.supports_basic_pack_generation?).to be(false)
+      end
+    end
+
+    describe ".supports_autobundling?" do
+      let(:mock_config) { instance_double("::Shakapacker::Config") } # rubocop:disable RSpec/VerifiedDoubleReference
+      let(:mock_packer) { instance_double("::Shakapacker", config: mock_config) } # rubocop:disable RSpec/VerifiedDoubleReference
+
+      before do
+        allow(::Shakapacker).to receive(:config).and_return(mock_config)
+      end
+
+      it "returns true when ::Shakapacker >= 7.0.0 with nested_entries support" do
+        allow(mock_config).to receive(:respond_to?).with(:nested_entries?).and_return(true)
+        allow(described_class).to receive(:shakapacker_version_requirement_met?)
+          .with(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_REGISTRATION).and_return(true)
+
+        expect(described_class.supports_autobundling?).to be(true)
+      end
+
+      it "returns false when ::Shakapacker < 7.0.0" do
+        allow(mock_config).to receive(:respond_to?).with(:nested_entries?).and_return(true)
+        allow(described_class).to receive(:shakapacker_version_requirement_met?)
+          .with(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_REGISTRATION).and_return(false)
+
+        expect(described_class.supports_autobundling?).to be(false)
+      end
+
+      it "returns false when nested_entries method is not available" do
+        allow(mock_config).to receive(:respond_to?).with(:nested_entries?).and_return(false)
+        allow(described_class).to receive(:shakapacker_version_requirement_met?)
+          .with(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_REGISTRATION).and_return(true)
+
+        expect(described_class.supports_autobundling?).to be(false)
+      end
+    end
+  end
+
+  describe "version constants validation" do
+    it "ensures MINIMUM_SHAKAPACKER_VERSION constants are properly defined" do
+      expect(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION).to eq("6.5.1")
+      expect(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_REGISTRATION).to eq("7.0.0")
+    end
+
+    it "ensures version requirements are logically consistent" do
+      basic_version = Gem::Version.new(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION)
+      auto_reg_version = Gem::Version.new(
+        ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_REGISTRATION
+      )
+
+      expect(auto_reg_version).to be >= basic_version,
+                                  "Auto-registration version should be >= basic pack generation version"
+    end
+
+    it "validates version checks are cached properly" do
+      # Mock the shakapacker_version to avoid dependency on actual version
+      allow(ReactOnRails::PackerUtils).to receive(:shakapacker_version).and_return("7.1.0")
+
+      # First call should compute and cache
+      result1 = ReactOnRails::PackerUtils.shakapacker_version_requirement_met?("6.5.1")
+
+      # Second call should use cached result
+      result2 = ReactOnRails::PackerUtils.shakapacker_version_requirement_met?("6.5.1")
+
+      expect(result1).to eq(result2)
+      expect(result1).to be true # 7.1.0 >= 6.5.1
     end
   end
 end

@@ -3,8 +3,6 @@
 require "rails_helper"
 require "support/script_tag_utils"
 
-Packer = Object.const_get(ReactOnRails::PackerUtils.packer_type.capitalize)
-
 class PlainReactOnRailsHelper
   include ReactOnRailsHelper
   include ActionView::Helpers::TagHelper
@@ -12,7 +10,7 @@ end
 
 # rubocop:disable Metrics/BlockLength
 describe ReactOnRailsHelper do
-  include Packer::Helper
+  include Shakapacker::Helper
 
   before do
     allow(self).to receive(:request) {

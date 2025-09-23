@@ -1,27 +1,26 @@
 # frozen_string_literal: true
 
 require_relative "spec_helper"
-require ReactOnRails::PackerUtils.packer_type
+require "shakapacker"
 
 # rubocop:disable Metrics/ModuleLength, Metrics/BlockLength
 module ReactOnRails
   RSpec.describe Utils do
-    # Since React on Rails v15+ requires Shakapacker as an explicit dependency,
-    # we only test with Shakapacker
+    # Since React on Rails v15+ requires ::Shakapacker as an explicit dependency,
+    # we only test with ::Shakapacker
     packers_to_test = ["shakapacker"]
 
     shared_context "with packer enabled" do
+      let(:mock_packer) { instance_double(::Shakapacker::Instance) }
+      let(:mock_config) { instance_double(::Shakapacker::Configuration) }
+      let(:mock_dev_server) { instance_double(::Shakapacker::DevServer) }
+
       before do
         allow(ReactOnRails).to receive_message_chain(:configuration, :generated_assets_dir)
           .and_return("")
-        allow(ReactOnRails::PackerUtils.packer).to receive_message_chain("dev_server.running?")
-          .and_return(false)
-        allow(ReactOnRails::PackerUtils.packer).to receive_message_chain("config.public_output_path")
-          .and_return(packer_public_output_path)
-      end
-
-      it "uses packer" do
-        expect(ReactOnRails::PackerUtils.using_packer?).to be(true)
+        allow(::Shakapacker).to receive_messages(dev_server: mock_dev_server, config: mock_config)
+        allow(mock_dev_server).to receive(:running?).and_return(false)
+        allow(mock_config).to receive(:public_output_path).and_return(packer_public_output_path)
       end
     end
 
@@ -30,40 +29,24 @@ module ReactOnRails
 
       # We don't need to mock anything here because the shakapacker gem is already installed and will be used by default
       it "uses shakapacker" do
-        expect(ReactOnRails::PackerUtils.packer_type).to eq("shakapacker")
-        expect(ReactOnRails::PackerUtils.packer).to eq(::Shakapacker)
-      end
-    end
-
-    shared_context "without packer enabled" do
-      before do
-        allow(ReactOnRails).to receive_message_chain(:configuration, :generated_assets_dir)
-          .and_return("public/webpack/dev")
-        allow(described_class).to receive(:gem_available?).with("shakapacker").and_return(false)
-      end
-
-      it "does not use packer" do
-        expect(ReactOnRails::PackerUtils.using_packer?).to be(false)
-        expect(ReactOnRails::PackerUtils.packer_type).to be_nil
-        expect(ReactOnRails::PackerUtils.packer).to be_nil
+        # PackerUtils now uses ::Shakapacker directly
+        expect(::Shakapacker).to be_present
       end
     end
 
     def mock_bundle_in_manifest(bundle_name, hashed_bundle)
-      mock_manifest = instance_double(Object.const_get(ReactOnRails::PackerUtils.packer_type.capitalize)::Manifest)
+      mock_manifest = instance_double(::Shakapacker::Manifest)
       allow(mock_manifest).to receive(:lookup!)
         .with(bundle_name)
         .and_return(hashed_bundle)
 
-      allow(ReactOnRails::PackerUtils.packer).to receive(:manifest).and_return(mock_manifest)
+      allow(::Shakapacker).to receive(:manifest).and_return(mock_manifest)
     end
 
     def mock_missing_manifest_entry(bundle_name)
-      allow(ReactOnRails::PackerUtils.packer).to receive_message_chain("manifest.lookup!")
+      allow(::Shakapacker).to receive_message_chain("manifest.lookup!")
         .with(bundle_name)
-        .and_raise(Object.const_get(
-          ReactOnRails::PackerUtils.packer_type.capitalize
-        )::Manifest::MissingEntryError)
+        .and_raise(::Shakapacker::Manifest::MissingEntryError)
     end
 
     def random_bundle_name
@@ -81,11 +64,11 @@ module ReactOnRails
     end
 
     def mock_dev_server_running
-      allow(ReactOnRails::PackerUtils.packer).to receive_message_chain("dev_server.running?")
+      allow(::Shakapacker).to receive_message_chain("dev_server.running?")
         .and_return(true)
-      allow(ReactOnRails::PackerUtils.packer).to receive_message_chain("dev_server.protocol")
+      allow(::Shakapacker).to receive_message_chain("dev_server.protocol")
         .and_return("http")
-      allow(ReactOnRails::PackerUtils.packer).to receive_message_chain("dev_server.host_with_port")
+      allow(::Shakapacker).to receive_message_chain("dev_server.host_with_port")
         .and_return("localhost:3035")
     end
 
@@ -136,20 +119,14 @@ module ReactOnRails
             end
           end
         end
-
-        context "without a packer enabled" do
-          include_context "without packer enabled"
-
-          it { is_expected.to eq(File.expand_path(File.join(Rails.root, "public/webpack/dev/webpack-bundle.js"))) }
-        end
       end
 
       describe ".source_path_is_not_defined_and_custom_node_modules?" do
         it "returns false if node_modules is blank" do
           allow(ReactOnRails).to receive_message_chain("configuration.node_modules_location")
             .and_return("")
-          allow(ReactOnRails::PackerUtils).to receive_message_chain("packer.config.send").with(:data)
-                                                                                         .and_return({})
+          allow(::Shakapacker).to receive_message_chain("config.send").with(:data)
+                                                                      .and_return({})
 
           expect(described_class.using_packer_source_path_is_not_defined_and_custom_node_modules?).to be(false)
         end
@@ -157,7 +134,7 @@ module ReactOnRails
         it "returns false if source_path is defined in the config/webpacker.yml and node_modules defined" do
           allow(ReactOnRails).to receive_message_chain("configuration.node_modules_location")
             .and_return("client")
-          allow(ReactOnRails::PackerUtils).to receive_message_chain("packer.config.send")
+          allow(::Shakapacker).to receive_message_chain("config.send")
             .with(:data).and_return(source_path: "client/app")
 
           expect(described_class.using_packer_source_path_is_not_defined_and_custom_node_modules?).to be(false)
@@ -166,8 +143,8 @@ module ReactOnRails
         it "returns true if node_modules is not blank and the source_path is not defined in config/webpacker.yml" do
           allow(ReactOnRails).to receive_message_chain("configuration.node_modules_location")
             .and_return("node_modules")
-          allow(ReactOnRails::PackerUtils).to receive_message_chain("packer.config.send").with(:data)
-                                                                                         .and_return({})
+          allow(::Shakapacker).to receive_message_chain("config.send").with(:data)
+                                                                      .and_return({})
 
           expect(described_class.using_packer_source_path_is_not_defined_and_custom_node_modules?).to be(true)
         end
@@ -193,7 +170,7 @@ module ReactOnRails
 
           context "with server file in the manifest, used for client", packer_type.to_sym do
             it "returns the correct path hashed server path" do
-              packer = ReactOnRails::PackerUtils.packer
+              packer = ::Shakapacker
               mock_bundle_configs(server_bundle_name: "webpack-bundle.js")
               allow(ReactOnRails).to receive_message_chain("configuration.same_bundle_for_client_and_server")
                 .and_return(true)
@@ -256,7 +233,7 @@ module ReactOnRails
 
           context "with server file in the manifest, used for client", packer_type.to_sym do
             it "returns the correct path hashed server path" do
-              packer = ReactOnRails::PackerUtils.packer
+              packer = ::Shakapacker
               mock_bundle_configs(rsc_bundle_name: "webpack-bundle.js")
               allow(ReactOnRails).to receive_message_chain("configuration.same_bundle_for_client_and_server")
                 .and_return(true)
@@ -504,18 +481,17 @@ module ReactOnRails
         let(:public_output_path) { "/path/to/public/webpack/dev" }
 
         before do
-          allow(ReactOnRails::PackerUtils).to receive(:using_packer?).and_return(true)
-          allow(ReactOnRails::PackerUtils.packer).to receive_message_chain("config.public_output_path")
+          allow(::Shakapacker).to receive_message_chain("config.public_output_path")
             .and_return(Pathname.new(public_output_path))
-          allow(ReactOnRails::PackerUtils.packer).to receive_message_chain("config.public_path")
+          allow(::Shakapacker).to receive_message_chain("config.public_path")
             .and_return(Pathname.new("/path/to/public"))
         end
 
         context "when dev server is running" do
           before do
-            allow(ReactOnRails::PackerUtils.packer).to receive(:dev_server).and_return(
+            allow(::Shakapacker).to receive(:dev_server).and_return(
               instance_double(
-                Object.const_get(ReactOnRails::PackerUtils.packer_type.capitalize)::DevServer,
+                ::Shakapacker::DevServer,
                 running?: true,
                 protocol: "http",
                 host_with_port: "localhost:3035"
@@ -531,7 +507,7 @@ module ReactOnRails
 
         context "when dev server is not running" do
           before do
-            allow(ReactOnRails::PackerUtils.packer).to receive_message_chain("dev_server.running?")
+            allow(::Shakapacker).to receive_message_chain("dev_server.running?")
               .and_return(false)
           end
 
@@ -539,19 +515,6 @@ module ReactOnRails
             expected_path = File.join(public_output_path, "react-client-manifest.json")
             expect(described_class.react_client_manifest_file_path).to eq(expected_path)
           end
-        end
-      end
-
-      context "when not using packer" do
-        before do
-          allow(ReactOnRails::PackerUtils).to receive(:using_packer?).and_return(false)
-          allow(described_class).to receive(:generated_assets_full_path)
-            .and_return("/path/to/generated/assets")
-        end
-
-        it "returns joined path with generated_assets_full_path" do
-          expect(described_class.react_client_manifest_file_path)
-            .to eq("/path/to/generated/assets/react-client-manifest.json")
         end
       end
     end

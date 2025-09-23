@@ -195,6 +195,19 @@ ReactOnRails.configure do |config|
   # `render_component` and `render_component_hash` view helper methods can
   # auto-load the bundle for the generated component, to avoid having to specify the
   # bundle manually for each view with the component.
+  #
+  # SHAKAPACKER VERSION REQUIREMENTS:
+  # - Basic pack generation: Shakapacker 6.5.1+
+  # - Advanced auto-registration with nested entries: Shakapacker 7.0.0+
+  # - Async loading support: Shakapacker 8.2.0+
+  #
+  # Feature Compatibility Matrix:
+  # | Shakapacker Version | Basic Pack Generation | Auto-Registration | Nested Entries | Async Loading |
+  # |-------------------|----------------------|-------------------|----------------|---------------|
+  # | 6.5.1 - 6.9.x     | ✅ Yes                | ❌ No              | ❌ No           | ❌ No          |
+  # | 7.0.0 - 8.1.x     | ✅ Yes                | ✅ Yes             | ✅ Yes          | ❌ No          |
+  # | 8.2.0+            | ✅ Yes                | ✅ Yes             | ✅ Yes          | ✅ Yes         |
+  #
   ################################################################################
   # components_subdirectory is the name of the subdirectory matched to detect and register components automatically
   # The default is nil. You can enable the feature by updating it in the next line.
@@ -205,6 +218,8 @@ ReactOnRails.configure do |config|
   # Default is false.
   # The default can be overridden as an option in calls to view helpers
   # `render_component` and `render_component_hash`. You may set to true to change the default to auto loading.
+  # NOTE: Requires Shakapacker 6.5.1+ for basic functionality, 7.0.0+ for full auto-registration features.
+  # See version requirements matrix above for complete feature compatibility.
   config.auto_load_bundle = false
 
   # Default is false
