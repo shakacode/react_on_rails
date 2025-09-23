@@ -299,8 +299,11 @@ module ReactOnRails
     def ensure_generated_assets_dir_present
       return if generated_assets_dir.present?
 
-      self.generated_assets_dir = DEFAULT_GENERATED_ASSETS_DIR
-      Rails.logger.warn "ReactOnRails: Set generated_assets_dir to default: #{DEFAULT_GENERATED_ASSETS_DIR}"
+      # Don't set generated_assets_dir when using Shakapacker (it's deprecated and will cause an error)
+      packer_public_output_path = ReactOnRails::PackerUtils.packer_public_output_path
+      self.generated_assets_dir = packer_public_output_path.to_s
+      Rails.logger.warn "ReactOnRails: Set generated_assets_dir to match Shakapacker output: " \
+                        "#{packer_public_output_path}"
     end
 
     def configure_generated_assets_dirs_deprecation
