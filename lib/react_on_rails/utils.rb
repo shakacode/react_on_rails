@@ -103,7 +103,7 @@ module ReactOnRails
         # Default to the non-hashed name in the specified output directory, which, for legacy
         # React on Rails, this is the output directory picked up by the asset pipeline.
         # For Shakapacker, this is the public output path defined in the (shaka/web)packer.yml file.
-        File.join(public_assets_full_path, bundle_name)
+        File.join(public_bundles_full_path, bundle_name)
       end
     end
 
@@ -124,7 +124,7 @@ module ReactOnRails
       fallback_locations << File.join("public", "packs", bundle_name)
 
       # 3. Generated assets path (for legacy setups)
-      fallback_locations << File.join(public_assets_full_path, bundle_name)
+      fallback_locations << File.join(public_bundles_full_path, bundle_name)
 
       fallback_locations.uniq!
 
@@ -176,7 +176,7 @@ module ReactOnRails
       @react_client_manifest_path = if ReactOnRails::PackerUtils.using_packer?
                                       ReactOnRails::PackerUtils.asset_uri_from_packer(file_name)
                                     else
-                                      File.join(public_assets_full_path, file_name)
+                                      File.join(public_bundles_full_path, file_name)
                                     end
     end
 
@@ -191,7 +191,7 @@ module ReactOnRails
               "react_server_client_manifest_file is nil, ensure it is set in your configuration"
       end
 
-      @react_server_manifest_path = File.join(public_assets_full_path, asset_name)
+      @react_server_manifest_path = File.join(public_bundles_full_path, asset_name)
     end
 
     def self.running_on_windows?
@@ -233,7 +233,7 @@ module ReactOnRails
         ReactOnRails.configuration.node_modules_location.present?
     end
 
-    def self.public_assets_full_path
+    def self.public_bundles_full_path
       if ReactOnRails::PackerUtils.using_packer?
         ReactOnRails::PackerUtils.packer_public_output_path
       else
@@ -241,9 +241,9 @@ module ReactOnRails
       end
     end
 
-    # DEPRECATED: Use public_assets_full_path for clarity about public vs private asset paths
+    # DEPRECATED: Use public_bundles_full_path for clarity about public vs private bundle paths
     def self.generated_assets_full_path
-      public_assets_full_path
+      public_bundles_full_path
     end
 
     def self.gem_available?(name)
