@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require_relative "spec_helper"
-require ReactOnRails::PackerUtils.packer_type
 
 # rubocop:disable Metrics/ModuleLength
 
@@ -78,9 +77,7 @@ module ReactOnRails
     describe ".build_production_command" do
       context "when using Shakapacker 8" do
         it "fails when \"shakapacker_precompile\" is truly and \"build_production_command\" is truly" do
-          allow(ReactOnRails::PackerUtils).to receive(:using_packer?).and_return(true)
-          allow(Shakapacker).to receive_message_chain("config.shakapacker_precompile?")
-            .and_return(true)
+          allow(ReactOnRails::PackerUtils).to receive_messages(using_packer?: true, precompile?: true)
           expect do
             ReactOnRails.configure do |config|
               config.build_production_command = "RAILS_ENV=production NODE_ENV=production bin/shakapacker"
@@ -89,9 +86,7 @@ module ReactOnRails
         end
 
         it "doesn't fail when \"shakapacker_precompile\" is falsy and \"build_production_command\" is truly" do
-          allow(ReactOnRails::PackerUtils).to receive(:using_packer?).and_return(true)
-          allow(Shakapacker).to receive_message_chain("config.shakapacker_precompile?")
-            .and_return(false)
+          allow(ReactOnRails::PackerUtils).to receive_messages(using_packer?: true, precompile?: false)
           expect do
             ReactOnRails.configure do |config|
               config.build_production_command = "RAILS_ENV=production NODE_ENV=production bin/shakapacker"
@@ -100,18 +95,14 @@ module ReactOnRails
         end
 
         it "doesn't fail when \"shakapacker_precompile\" is truly and \"build_production_command\" is falsy" do
-          allow(ReactOnRails::PackerUtils).to receive(:using_packer?).and_return(true)
-          allow(Shakapacker).to receive_message_chain("config.shakapacker_precompile?")
-            .and_return(true)
+          allow(ReactOnRails::PackerUtils).to receive_messages(using_packer?: true, precompile?: true)
           expect do
             ReactOnRails.configure {} # rubocop:disable-line Lint/EmptyBlock
           end.not_to raise_error
         end
 
         it "doesn't fail when \"shakapacker_precompile\" is falsy and \"build_production_command\" is falsy" do
-          allow(ReactOnRails::PackerUtils).to receive(:using_packer?).and_return(true)
-          allow(Shakapacker).to receive_message_chain("config.shakapacker_precompile?")
-            .and_return(false)
+          allow(ReactOnRails::PackerUtils).to receive_messages(using_packer?: true, precompile?: false)
           expect do
             ReactOnRails.configure {} # rubocop:disable-line Lint/EmptyBlock
           end.not_to raise_error

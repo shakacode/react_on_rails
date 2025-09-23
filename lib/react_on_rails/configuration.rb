@@ -251,8 +251,8 @@ module ReactOnRails
         # We set it very big so that it is not used, and then clean just
         # removes files older than 1 hour.
         versions = 100_000
-        puts "Invoking task #{ReactOnRails::PackerUtils.packer_type}:clean from React on Rails"
-        Rake::Task["#{ReactOnRails::PackerUtils.packer_type}:clean"].invoke(versions)
+        puts "Invoking task shakapacker:clean from React on Rails"
+        Rake::Task["shakapacker:clean"].invoke(versions)
       }
 
       if Rake::Task.task_defined?("assets:precompile")
@@ -275,14 +275,14 @@ module ReactOnRails
 
       if File.expand_path(generated_assets_dir) == packer_public_output_path.to_s
         Rails.logger.warn("You specified generated_assets_dir in `config/initializers/react_on_rails.rb` " \
-                          "with #{ReactOnRails::PackerUtils.packer_type}. " \
+                          "with Shakapacker. " \
                           "Remove this line from your configuration file.")
       else
         msg = <<~MSG
-          Error configuring /config/initializers/react_on_rails.rb: You are using #{ReactOnRails::PackerUtils.packer_type}
+          Error configuring /config/initializers/react_on_rails.rb: You are using Shakapacker
           and your specified value for generated_assets_dir = #{generated_assets_dir}
           that does not match the value for public_output_path specified in
-          #{ReactOnRails::PackerUtils.packer_type}.yml = #{packer_public_output_path}. You should remove the configuration
+          shakapacker.yml = #{packer_public_output_path}. You should remove the configuration
           value for "generated_assets_dir" from your config/initializers/react_on_rails.rb file.
         MSG
         raise ReactOnRails::Error, msg
@@ -314,11 +314,11 @@ module ReactOnRails
       if ReactOnRails::PackerUtils.using_packer?
         packer_public_output_path = ReactOnRails::PackerUtils.packer_public_output_path
         # rubocop:disable Layout/LineLength
-        packer_name = ReactOnRails::PackerUtils.packer_type&.upcase_first
+        packer_name = "Shakapacker"
 
         Rails.logger.warn "Error configuring config/initializers/react_on_rails. Define neither the generated_assets_dirs nor " \
                           "the generated_assets_dir when using #{packer_name}. This is defined by " \
-                          "public_output_path specified in #{ReactOnRails::PackerUtils.packer_type}.yml = #{packer_public_output_path}."
+                          "public_output_path specified in shakapacker.yml = #{packer_public_output_path}."
         # rubocop:enable Layout/LineLength
         return
       end
@@ -363,17 +363,16 @@ module ReactOnRails
     end
 
     def compile_command_conflict_message
-      packer_name = ReactOnRails::PackerUtils.packer_type.upcase_first
-      packer_type = ReactOnRails::PackerUtils.packer_type
+      packer_name = "Shakapacker"
       <<~MSG
 
         React on Rails and #{packer_name} error in configuration!
         In order to use config/react_on_rails.rb config.build_production_command,
-        you must edit config/#{packer_type}.yml to include this value in the default configuration:
-        '#{packer_type}_precompile: false'
+        you must edit config/shakapacker.yml to include this value in the default configuration:
+        'shakapacker_precompile: false'
 
         Alternatively, remove the config/react_on_rails.rb config.build_production_command and the
-        default bin/#{packer_type} script will be used for assets:precompile.
+        default bin/shakapacker script will be used for assets:precompile.
 
       MSG
     end
