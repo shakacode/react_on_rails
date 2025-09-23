@@ -650,7 +650,7 @@ module ReactOnRails
       context "when in development environment" do
         before do
           allow(Rails.env).to receive(:development?).and_return(true)
-          allow(described_class).to receive(:generated_assets_full_path)
+          allow(described_class).to receive(:public_bundles_full_path)
             .and_return("/path/to/generated/assets")
         end
 
@@ -670,7 +670,7 @@ module ReactOnRails
 
       context "when not in development environment" do
         before do
-          allow(described_class).to receive(:generated_assets_full_path)
+          allow(described_class).to receive(:public_bundles_full_path)
             .and_return("/path/to/generated/assets")
         end
 
@@ -690,7 +690,7 @@ module ReactOnRails
 
       context "with different manifest file names" do
         before do
-          allow(described_class).to receive(:generated_assets_full_path)
+          allow(described_class).to receive(:public_bundles_full_path)
             .and_return("/path/to/generated/assets")
         end
 
@@ -715,7 +715,7 @@ module ReactOnRails
         before do
           allow(ReactOnRails.configuration).to receive(:react_server_client_manifest_file)
             .and_return(nil)
-          allow(described_class).to receive(:generated_assets_full_path)
+          allow(described_class).to receive(:public_bundles_full_path)
             .and_return("/path/to/generated/assets")
         end
 

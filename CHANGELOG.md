@@ -26,6 +26,7 @@ Changes since the last non-beta release.
 #### New Features
 
 - **Server Bundle Security**: Added new configuration options for enhanced server bundle security and organization:
+
   - `server_bundle_output_path`: Configurable directory (relative to the Rails root) for server bundle output (default: "ssr-generated"). If set to `nil`, the server bundle will be loaded from the same public directory as client bundles.
   - `enforce_private_server_bundles`: When enabled, ensures server bundles are only loaded from private directories outside the public folder (default: false for backward compatibility)
 
@@ -34,9 +35,16 @@ Changes since the last non-beta release.
   - If `server_bundle_output_path` is not set, the server bundle falls back to the client bundle directory (typically the public output path).
   - If `enforce_private_server_bundles` is enabled:
     - The server bundle will only be loaded from the private directory specified by `server_bundle_output_path`.
-    - If the bundle is not found there, it will *not* fall back to the public directory.
+    - If the bundle is not found there, it will _not_ fall back to the public directory.
   - If `enforce_private_server_bundles` is not enabled and the bundle is not found in the private directory, it will fall back to the public directory.
   - This logic ensures that, when strict enforcement is enabled, server bundles are never loaded from public directories, improving security and clarity of bundle resolution.
+
+#### API Improvements
+
+- **Method Naming Clarification**: Added `public_bundles_full_path` method to clarify bundle path handling:
+  - `public_bundles_full_path`: New method specifically for webpack bundles in public directories
+  - `generated_assets_full_path`: Now deprecated (backwards-compatible alias)
+  - This eliminates confusion between webpack bundles and general Rails public assets
 
 #### Security Enhancements
 
