@@ -254,11 +254,12 @@ module ReactOnRails
                           "Remove this line from your configuration file.")
       else
         msg = <<~MSG
-          Error configuring /config/initializers/react_on_rails.rb: You are using shakapacker
-          and your specified value for generated_assets_dir = #{generated_assets_dir}
-          that does not match the value for public_output_path specified in
-          shakapacker.yml = #{packer_public_output_path}. You should remove the configuration
-          value for "generated_assets_dir" from your config/initializers/react_on_rails.rb file.
+          Configuration mismatch in config/initializers/react_on_rails.rb:
+
+          Your generated_assets_dir setting (#{generated_assets_dir}) doesn't match
+          Shakapacker's public_output_path (#{packer_public_output_path}).
+
+          Remove the generated_assets_dir configuration and let Shakapacker manage the output path.
         MSG
         raise ReactOnRails::Error, msg
       end
@@ -289,13 +290,9 @@ module ReactOnRails
       return if generated_assets_dirs.blank?
 
       packer_public_output_path = ReactOnRails::PackerUtils.packer_public_output_path
-      # rubocop:disable Layout/LineLength
-      packer_name = "Shakapacker"
-
-      Rails.logger.warn "Error configuring config/initializers/react_on_rails. Define neither the generated_assets_dirs nor " \
-                        "the generated_assets_dir when using #{packer_name}. This is defined by " \
-                        "public_output_path specified in shakapacker.yml = #{packer_public_output_path}."
-      # rubocop:enable Layout/LineLength
+      Rails.logger.warn "You specified generated_assets_dirs in `config/initializers/react_on_rails.rb` with Shakapacker. " \
+                        "Remove this configuration as the output path is automatically determined by " \
+                        "`public_output_path` in shakapacker.yml (currently: #{packer_public_output_path})."
     end
 
     def ensure_webpack_generated_files_exists
