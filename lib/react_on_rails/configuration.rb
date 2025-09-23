@@ -308,14 +308,15 @@ module ReactOnRails
       packer_public_output_path = ReactOnRails::PackerUtils.packer_public_output_path
 
       msg = <<~MSG
-        ReactOnRails Configuration Error: The 'generated_assets_dirs' configuration option is no longer supported.
-        Since Shakapacker is now required, asset paths are automatically determined from your shakapacker.yml configuration.
+        ReactOnRails Configuration Warning: The 'generated_assets_dirs' configuration option is no longer supported.
+        Since Shakapacker is now required, public asset paths are automatically determined from your shakapacker.yml configuration.
         Please remove 'config.generated_assets_dirs' from your config/initializers/react_on_rails.rb file.
-        Assets will be loaded from: #{packer_public_output_path}
-        If you need to customize the output path, configure it in config/shakapacker.yml under 'public_output_path'.
+        Public assets will be loaded from: #{packer_public_output_path}
+        If you need to customize the public output path, configure it in config/shakapacker.yml under 'public_output_path'.
+        Note: Private server bundles are configured separately via server_bundle_output_path.
       MSG
 
-      raise ReactOnRails::Error, msg
+      Rails.logger.warn msg
     end
 
     def ensure_webpack_generated_files_exists
