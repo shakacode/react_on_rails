@@ -196,13 +196,13 @@ module ReactOnRails
       def install_js_dependencies
         # Detect which package manager to use
         success = if File.exist?(File.join(destination_root, "yarn.lock"))
-                    run "yarn install"
+                    system("yarn", "install")
                   elsif File.exist?(File.join(destination_root, "pnpm-lock.yaml"))
-                    run "pnpm install"
+                    system("pnpm", "install")
                   elsif File.exist?(File.join(destination_root, "package-lock.json")) ||
                         File.exist?(File.join(destination_root, "package.json"))
                     # Use npm for package-lock.json or as default fallback
-                    run "npm install"
+                    system("npm", "install")
                   else
                     true # No package manager detected, skip
                   end
