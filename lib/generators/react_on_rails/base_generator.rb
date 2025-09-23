@@ -128,8 +128,6 @@ module ReactOnRails
         end
       end
 
-      private
-
       def add_react_on_rails_package
         major_minor_patch_only = /\A\d+\.\d+\.\d+\z/
 
@@ -228,6 +226,8 @@ module ReactOnRails
           ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
         end
       STR
+
+      private
 
       def handle_npm_failure(dependency_type, packages, dev: false)
         install_command = dev ? "npm install --save-dev" : "npm install"
