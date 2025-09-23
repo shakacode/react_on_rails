@@ -624,7 +624,7 @@ module ReactOnRails
             if ReactOnRails::PackerUtils.supports_auto_registration?
               add_success("✅ Shakapacker #{version} (supports React on Rails auto-registration)")
             else
-              add_warning("⚠️  Shakapacker #{version} - Version 7.0+ needed for React on Rails auto-registration")
+              add_warning("⚠️  Shakapacker #{version} - Version 7.0+ needed for auto-registration (nested entries)")
             end
           rescue ArgumentError
             # Fallback for invalid version strings
