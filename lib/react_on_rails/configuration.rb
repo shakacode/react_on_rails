@@ -256,8 +256,7 @@ module ReactOnRails
         msg = <<~MSG
           Configuration mismatch in config/initializers/react_on_rails.rb:
 
-          Your generated_assets_dir setting (#{generated_assets_dir}) doesn't match
-          Shakapacker's public_output_path (#{packer_public_output_path}).
+          Your generated_assets_dir setting (#{generated_assets_dir}) does not match the value for public_output_path (#{packer_public_output_path}).
 
           Remove the generated_assets_dir configuration and let Shakapacker manage the output path.
         MSG
