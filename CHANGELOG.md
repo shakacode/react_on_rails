@@ -26,6 +26,7 @@ Changes since the last non-beta release.
 #### New Features
 
 - **Server Bundle Security**: Added new configuration options for enhanced server bundle security and organization:
+
   - `server_bundle_output_path`: Configurable directory for server bundle output (default: nil, uses fallback locations)
   - `enforce_private_server_bundles`: When enabled, ensures server bundles are only loaded from private directories outside the public folder (default: false for backward compatibility)
 
@@ -157,6 +158,7 @@ See [Release Notes](docs/release-notes/16.0.0.md) for complete migration guide.
 
 - **`defer_generated_component_packs` deprecated** → use `generated_component_packs_loading_strategy`
 - Migration:
+
   - `defer_generated_component_packs: true` → `generated_component_packs_loading_strategy: :defer`
   - `defer_generated_component_packs: false` → `generated_component_packs_loading_strategy: :sync`
   - Recommended: `generated_component_packs_loading_strategy: :async` for best performance
@@ -563,6 +565,7 @@ for details.
 - Removal of config.symlink_non_digested_assets_regex as it's no longer needed with rails/webpacker.
   If any business needs this, we can move the code to a separate gem.
 - Added configuration option `same_bundle_for_client_and_server` with default `false` because
+
   1. Production applications would typically have a server bundle that differs from the client bundle
   2. This change only affects trying to use HMR with react_on_rails with rails/webpacker.
 
@@ -1280,11 +1283,13 @@ No changes.
 - Added automatic compilation of assets at precompile is now done by ReactOnRails. Thus, you don't need to provide your own `assets.rake` file that does the precompilation.
   [#398](https://github.com/shakacode/react_on_rails/pull/398) by [robwise](https://github.com/robwise), [jbhatab](https://github.com/jbhatab), and [justin808](https://github.com/justin808).
 - **Migration to v6**
+
   - Do not run the generator again if you've already run it.
 
   - See [shakacode/react-webpack-rails-tutorial/pull/287](https://github.com/shakacode/react-webpack-rails-tutorial/pull/287) for an example of upgrading from v5.
 
   - To configure the asset compilation you can either
+
     1. Specify a `config/react_on_rails` setting for `build_production_command` to be nil to turn this feature off.
     2. Specify the script command you want to run to build your production assets, and remove your `assets.rake` file.
 
