@@ -90,8 +90,7 @@ module ReactOnRails
       end
 
       def add_redux_specific_messages
-        # Override the generic messages with Redux-specific instructions
-        GeneratorMessages.output.clear
+        # Append Redux-specific post-install instructions
         GeneratorMessages.add_info(
           GeneratorMessages.helpful_message_after_installation(component_name: "HelloWorldApp", route: "hello_world")
         )

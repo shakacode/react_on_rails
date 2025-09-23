@@ -83,8 +83,10 @@ module ReactOnRails
       end
 
       def setup_react_dependencies
+        @added_dependencies_to_package_json ||= false
+        @ran_direct_installs ||= false
         add_js_dependencies
-        install_js_dependencies
+        install_js_dependencies if @added_dependencies_to_package_json && !@ran_direct_installs
       end
 
       # NOTE: other requirements for existing files such as .gitignore or application.
@@ -438,10 +440,14 @@ module ReactOnRails
                              end
 
         puts "Installing React on Rails package..."
-        return if add_npm_dependencies(react_on_rails_pkg)
+        if add_npm_dependencies(react_on_rails_pkg)
+          @added_dependencies_to_package_json = true
+          return
+        end
 
         puts "Using direct npm commands as fallback"
         success = system("npm", "install", *react_on_rails_pkg)
+        @ran_direct_installs = true if success
         handle_npm_failure("react-on-rails package", react_on_rails_pkg) unless success
       end
 
@@ -455,9 +461,13 @@ module ReactOnRails
           babel-plugin-transform-react-remove-prop-types
           babel-plugin-macros
         ]
-        return if add_npm_dependencies(react_deps)
+        if add_npm_dependencies(react_deps)
+          @added_dependencies_to_package_json = true
+          return
+        end
 
         success = system("npm", "install", *react_deps)
+        @ran_direct_installs = true if success
         handle_npm_failure("React dependencies", react_deps) unless success
       end
 
@@ -469,9 +479,13 @@ module ReactOnRails
           mini-css-extract-plugin
           style-loader
         ]
-        return if add_npm_dependencies(css_deps)
+        if add_npm_dependencies(css_deps)
+          @added_dependencies_to_package_json = true
+          return
+        end
 
         success = system("npm", "install", *css_deps)
+        @ran_direct_installs = true if success
         handle_npm_failure("CSS dependencies", css_deps) unless success
       end
 
@@ -481,9 +495,13 @@ module ReactOnRails
           @pmmmwh/react-refresh-webpack-plugin
           react-refresh
         ]
-        return if add_npm_dependencies(dev_deps, dev: true)
+        if add_npm_dependencies(dev_deps, dev: true)
+          @added_dependencies_to_package_json = true
+          return
+        end
 
         success = system("npm", "install", "--save-dev", *dev_deps)
+        @ran_direct_installs = true if success
         handle_npm_failure("development dependencies", dev_deps, dev: true) unless success
       end
 
