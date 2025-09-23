@@ -8,10 +8,8 @@ module ReactOnRails
   RSpec.describe Configuration do
     let(:existing_path) { Pathname.new(Dir.mktmpdir) }
     let(:not_existing_path) { "/path/to/#{SecureRandom.hex(4)}" }
-    let(:using_packer) { false }
 
     before do
-      allow(ReactOnRails::PackerUtils).to receive(:using_packer?).and_return(using_packer)
       ReactOnRails.instance_variable_set(:@configuration, nil)
     end
 
@@ -77,7 +75,7 @@ module ReactOnRails
     describe ".build_production_command" do
       context "when using Shakapacker 8" do
         it "fails when \"shakapacker_precompile\" is truly and \"build_production_command\" is truly" do
-          allow(ReactOnRails::PackerUtils).to receive_messages(using_packer?: true, precompile?: true)
+          allow(ReactOnRails::PackerUtils).to receive_messages(precompile?: true)
           expect do
             ReactOnRails.configure do |config|
               config.build_production_command = "RAILS_ENV=production NODE_ENV=production bin/shakapacker"
@@ -86,7 +84,7 @@ module ReactOnRails
         end
 
         it "doesn't fail when \"shakapacker_precompile\" is falsy and \"build_production_command\" is truly" do
-          allow(ReactOnRails::PackerUtils).to receive_messages(using_packer?: true, precompile?: false)
+          allow(ReactOnRails::PackerUtils).to receive_messages(precompile?: false)
           expect do
             ReactOnRails.configure do |config|
               config.build_production_command = "RAILS_ENV=production NODE_ENV=production bin/shakapacker"
@@ -95,14 +93,14 @@ module ReactOnRails
         end
 
         it "doesn't fail when \"shakapacker_precompile\" is truly and \"build_production_command\" is falsy" do
-          allow(ReactOnRails::PackerUtils).to receive_messages(using_packer?: true, precompile?: true)
+          allow(ReactOnRails::PackerUtils).to receive_messages(precompile?: true)
           expect do
             ReactOnRails.configure {} # rubocop:disable-line Lint/EmptyBlock
           end.not_to raise_error
         end
 
         it "doesn't fail when \"shakapacker_precompile\" is falsy and \"build_production_command\" is falsy" do
-          allow(ReactOnRails::PackerUtils).to receive_messages(using_packer?: true, precompile?: false)
+          allow(ReactOnRails::PackerUtils).to receive_messages(precompile?: false)
           expect do
             ReactOnRails.configure {} # rubocop:disable-line Lint/EmptyBlock
           end.not_to raise_error
@@ -309,8 +307,7 @@ module ReactOnRails
     end
 
     it "checks that autobundling requirements are met if configuration options for autobundling are set" do
-      allow(ReactOnRails::PackerUtils).to receive_messages(using_packer?: true,
-                                                           shakapacker_version_requirement_met?: true,
+      allow(ReactOnRails::PackerUtils).to receive_messages(supports_autobundling?: true,
                                                            nested_entries?: true)
 
       ReactOnRails.configure do |config|
@@ -318,8 +315,7 @@ module ReactOnRails
         config.components_subdirectory = "something"
       end
 
-      expect(ReactOnRails::PackerUtils).to have_received(:using_packer?).thrice
-      expect(ReactOnRails::PackerUtils).to have_received(:shakapacker_version_requirement_met?).twice
+      expect(ReactOnRails::PackerUtils).to have_received(:supports_autobundling?)
       expect(ReactOnRails::PackerUtils).to have_received(:nested_entries?)
     end
 

@@ -51,6 +51,11 @@ Changes since the last non-beta release.
 
 - **Non-Packer Environment Compatibility**: Fixed potential NoMethodError when using bundle path resolution in environments without Shakapacker
 - **Server Bundle Detection**: Improved server bundle detection to work correctly with both `server_bundle_js_file` and `rsc_bundle_js_file` configurations
+- **Shakapacker version requirements**: Fixed inconsistent version requirements between basic pack generation (6.5.1+) and advanced auto-bundling features (7.0.0+). Added backward compatibility for users on Shakapacker 6.5.1-6.9.x while providing clear upgrade guidance for advanced features. Added new constants `MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_BUNDLING` and improved version checking performance with caching. [PR 1798](https://github.com/shakacode/react_on_rails/pull/1798)
+
+#### Code Cleanup
+
+- **PackerUtils abstraction removal**: Removed unnecessary `PackerUtils.packer` abstraction method and replaced all calls with direct `::Shakapacker` usage. This simplifies the codebase by eliminating an abstraction layer that was originally created to support multiple webpack tools but is no longer needed since we only support Shakapacker. All tests updated accordingly. [PR 1798](https://github.com/shakacode/react_on_rails/pull/1798) by [claude-code](https://claude.ai/code)
 
 ### [16.0.1-rc.2] - 2025-09-20
 

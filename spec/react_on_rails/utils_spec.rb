@@ -13,14 +13,15 @@ module ReactOnRails
       before do
         allow(ReactOnRails).to receive_message_chain(:configuration, :generated_assets_dir)
           .and_return("")
-        allow(ReactOnRails::PackerUtils.packer).to receive_message_chain("dev_server.running?")
+        allow(Shakapacker).to receive_message_chain("dev_server.running?")
           .and_return(false)
-        allow(ReactOnRails::PackerUtils.packer).to receive_message_chain("config.public_output_path")
+        allow(Shakapacker).to receive_message_chain("config.public_output_path")
           .and_return(packer_public_output_path)
       end
 
       it "uses packer" do
-        expect(ReactOnRails::PackerUtils.using_packer?).to be(true)
+        # Shakapacker is always available now, no need to test the packer method
+        expect(ReactOnRails::PackerUtils).not_to be_dev_server_running
       end
     end
 
@@ -29,20 +30,8 @@ module ReactOnRails
 
       # We don't need to mock anything here because the shakapacker gem is already installed and will be used by default
       it "uses shakapacker" do
-        expect(ReactOnRails::PackerUtils.packer).to eq(::Shakapacker)
-      end
-    end
-
-    shared_context "without packer enabled" do
-      before do
-        allow(ReactOnRails).to receive_message_chain(:configuration, :generated_assets_dir)
-          .and_return("public/webpack/dev")
-        allow(described_class).to receive(:gem_available?).with("shakapacker").and_return(false)
-      end
-
-      it "does not use packer" do
-        expect(ReactOnRails::PackerUtils.using_packer?).to be(false)
-        expect(ReactOnRails::PackerUtils.packer).to be_nil
+        # Shakapacker is always available now, no need to test the packer method
+        expect(ReactOnRails::PackerUtils).not_to be_dev_server_running
       end
     end
 
@@ -52,11 +41,11 @@ module ReactOnRails
         .with(bundle_name)
         .and_return(hashed_bundle)
 
-      allow(ReactOnRails::PackerUtils.packer).to receive(:manifest).and_return(mock_manifest)
+      allow(Shakapacker).to receive(:manifest).and_return(mock_manifest)
     end
 
     def mock_missing_manifest_entry(bundle_name)
-      allow(ReactOnRails::PackerUtils.packer).to receive_message_chain("manifest.lookup!")
+      allow(Shakapacker).to receive_message_chain("manifest.lookup!")
         .with(bundle_name)
         .and_raise(Shakapacker::Manifest::MissingEntryError)
     end
@@ -80,11 +69,11 @@ module ReactOnRails
     end
 
     def mock_dev_server_running
-      allow(ReactOnRails::PackerUtils.packer).to receive_message_chain("dev_server.running?")
+      allow(Shakapacker).to receive_message_chain("dev_server.running?")
         .and_return(true)
-      allow(ReactOnRails::PackerUtils.packer).to receive_message_chain("dev_server.protocol")
+      allow(Shakapacker).to receive_message_chain("dev_server.protocol")
         .and_return("http")
-      allow(ReactOnRails::PackerUtils.packer).to receive_message_chain("dev_server.host_with_port")
+      allow(Shakapacker).to receive_message_chain("dev_server.host_with_port")
         .and_return("localhost:3035")
     end
 
@@ -195,12 +184,6 @@ module ReactOnRails
               end
             end
           end
-        end
-
-        context "without a packer enabled" do
-          include_context "without packer enabled"
-
-          it { is_expected.to eq(File.expand_path(File.join(Rails.root, "public/webpack/dev/webpack-bundle.js"))) }
         end
       end
 
@@ -640,7 +623,6 @@ module ReactOnRails
         let(:public_output_path) { "/path/to/public/webpack/dev" }
 
         before do
-          allow(ReactOnRails::PackerUtils).to receive(:using_packer?).and_return(true)
           allow(ReactOnRails::PackerUtils.packer).to receive_message_chain("config.public_output_path")
             .and_return(Pathname.new(public_output_path))
           allow(ReactOnRails::PackerUtils.packer).to receive_message_chain("config.public_path")
@@ -675,19 +657,6 @@ module ReactOnRails
             expected_path = File.join(public_output_path, "react-client-manifest.json")
             expect(described_class.react_client_manifest_file_path).to eq(expected_path)
           end
-        end
-      end
-
-      context "when not using packer" do
-        before do
-          allow(ReactOnRails::PackerUtils).to receive(:using_packer?).and_return(false)
-          allow(described_class).to receive(:generated_assets_full_path)
-            .and_return("/path/to/generated/assets")
-        end
-
-        it "returns joined path with generated_assets_full_path" do
-          expect(described_class.react_client_manifest_file_path)
-            .to eq("/path/to/generated/assets/react-client-manifest.json")
         end
       end
     end
