@@ -26,8 +26,8 @@ module ReactOnRails
 
       before do
         allow(Rails).to receive(:root).and_return(File.expand_path("."))
-        allow(ReactOnRails::PackerUtils).to receive_message_chain("packer.config.public_output_path")
-          .and_return(packer_public_output_path)
+        allow(::Shakapacker).to receive_message_chain("config.public_output_path")
+          .and_return(Pathname.new(packer_public_output_path))
       end
 
       it "does not throw if the generated assets dir is blank with shakapacker" do
@@ -290,7 +290,7 @@ module ReactOnRails
 
     it "changes the configuration of the gem, such as setting the prerender option to false" do
       test_path = File.expand_path("public/webpack/test")
-      allow(ReactOnRails::PackerUtils).to receive_message_chain("packer.config.public_output_path")
+      allow(::Shakapacker).to receive_message_chain("config.public_output_path")
         .and_return(Pathname.new(test_path))
 
       ReactOnRails.configure do |config|
@@ -305,7 +305,7 @@ module ReactOnRails
 
     it "changes the configuration of the gem, such as setting the prerender option to true" do
       test_path = File.expand_path("public/webpack/test")
-      allow(ReactOnRails::PackerUtils).to receive_message_chain("packer.config.public_output_path")
+      allow(::Shakapacker).to receive_message_chain("config.public_output_path")
         .and_return(Pathname.new(test_path))
 
       ReactOnRails.configure do |config|
@@ -321,7 +321,7 @@ module ReactOnRails
     end
 
     it "works without specifying generated_assets_dir when using Shakapacker" do
-      allow(ReactOnRails::PackerUtils).to receive_message_chain("packer.config.public_output_path")
+      allow(::Shakapacker).to receive_message_chain("config.public_output_path")
         .and_return(Pathname.new("/tmp/public/packs"))
 
       expect do
