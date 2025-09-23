@@ -164,12 +164,6 @@ module ReactOnRails
                 allow(File).to receive(:exist?).and_call_original
                 allow(File).to receive(:exist?).and_return(false)
 
-              end
-
-              it "returns environment-specific path when no bundle exists anywhere" do
-                allow(File).to receive(:exist?).and_call_original
-                allow(File).to receive(:exist?).and_return(false)
-
                 result = described_class.bundle_js_file_path("webpack-bundle.js")
                 expect(result).to eq(File.expand_path(env_specific_path))
               end

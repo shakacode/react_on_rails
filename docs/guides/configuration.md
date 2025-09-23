@@ -131,11 +131,12 @@ ReactOnRails.configure do |config|
 
   # Directory where server bundles will be output during build process.
   # This allows organizing server-side rendering assets separately from client assets.
-  # Default is nil (disabled). Set to "ssr-generated" or your preferred directory to enable.
+  # Default is "ssr-generated". Set to your preferred directory path as needed.
   # config.server_bundle_output_path = "ssr-generated"
 
   # When enabled, enforces that server bundles are only loaded from private, designated locations
   # to prevent potential security risks from loading untrusted server-side code.
+  # When enabled, server_bundle_output_path must point to a private location outside the public directory.
   # Default is false for backward compatibility.
   config.enforce_private_server_bundles = false
 
