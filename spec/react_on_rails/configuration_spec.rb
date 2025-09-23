@@ -11,6 +11,9 @@ module ReactOnRails
 
     before do
       ReactOnRails.instance_variable_set(:@configuration, nil)
+      # Mock PackerUtils to avoid Shakapacker dependency in tests
+      allow(ReactOnRails::PackerUtils).to receive(:packer_public_output_path)
+        .and_return(File.expand_path(File.join(Rails.root, "public/packs")))
     end
 
     after do
@@ -25,7 +28,7 @@ module ReactOnRails
 
       before do
         allow(Rails).to receive(:root).and_return(File.expand_path("."))
-        allow(ReactOnRails::PackerUtils).to receive_message_chain("packer.config.public_output_path")
+        allow(ReactOnRails::PackerUtils).to receive(:packer_public_output_path)
           .and_return(packer_public_output_path)
       end
 
