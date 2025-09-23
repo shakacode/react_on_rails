@@ -306,20 +306,20 @@ module ReactOnRails
     def configure_generated_assets_dirs_deprecation
       return if generated_assets_dirs.blank?
 
-      # With Shakapacker always available:
       packer_public_output_path = ReactOnRails::PackerUtils.packer_public_output_path
-      # rubocop:disable Layout/LineLength
-      Rails.logger.warn "Error configuring config/initializers/react_on_rails. Define neither the generated_assets_dirs nor " \
-                        "the generated_assets_dir when using Shakapacker. This is defined by " \
-                        "public_output_path specified in shakapacker.yml = #{packer_public_output_path}."
-      # rubocop:enable Layout/LineLength
-      if generated_assets_dir.blank?
-        self.generated_assets_dir = generated_assets_dirs
-      else
-        Rails.logger.warn "[DEPRECATION] ReactOnRails. You have both generated_assets_dirs and " \
-                          "generated_assets_dir defined. Define ONLY generated_assets_dir if NOT using Shakapacker " \
-                          "and define neither if using Webpacker"
-      end
+
+      msg = <<~MSG
+        ReactOnRails Configuration Error: The 'generated_assets_dirs' configuration option is no longer supported.
+
+        Since Shakapacker is now required, asset paths are automatically determined from your shakapacker.yml configuration.
+
+        Please remove 'config.generated_assets_dirs' from your config/initializers/react_on_rails.rb file.
+        Assets will be loaded from: #{packer_public_output_path}
+
+        If you need to customize the output path, configure it in config/shakapacker.yml under 'public_output_path'.
+      MSG
+
+      raise ReactOnRails::Error, msg
     end
 
     def ensure_webpack_generated_files_exists

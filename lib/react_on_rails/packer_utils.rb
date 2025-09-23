@@ -26,15 +26,21 @@ module ReactOnRails
     end
 
     def self.shakapacker_version_requirement_met?(required_version)
-      Gem::Version.new(shakapacker_version) >= Gem::Version.new(required_version)
-    end
-
-    def self.supports_autobundling?
-      shakapacker_version_requirement_met?(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION)
+      @version_checks ||= {}
+      @version_checks[required_version] ||= Gem::Version.new(shakapacker_version) >= Gem::Version.new(required_version)
     end
 
     def self.supports_async_loading?
       shakapacker_version_requirement_met?("8.2.0")
+    end
+
+    def self.supports_basic_pack_generation?
+      shakapacker_version_requirement_met?(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION)
+    end
+
+    def self.supports_autobundling?
+      min_version = ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_BUNDLING
+      ::Shakapacker.config.respond_to?(:nested_entries?) && shakapacker_version_requirement_met?(min_version)
     end
 
     # This returns either a URL for the webpack-dev-server, non-server bundle or
@@ -137,9 +143,19 @@ module ReactOnRails
 
     def self.raise_shakapacker_version_incompatible_for_autobundling
       msg = <<~MSG
-        **ERROR** ReactOnRails: Please upgrade Shakapacker to version #{ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION} or \
-        above to use the automated bundle generation feature. The currently installed version is \
-        #{ReactOnRails::PackerUtils.shakapacker_version}.
+        **ERROR** ReactOnRails: Please upgrade ::Shakapacker to version #{ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_BUNDLING} or \
+        above to use the automated bundle generation feature (which requires nested_entries support). \
+        The currently installed version is #{ReactOnRails::PackerUtils.shakapacker_version}. \
+        Basic pack generation requires ::Shakapacker #{ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION} or above.
+      MSG
+
+      raise ReactOnRails::Error, msg
+    end
+
+    def self.raise_shakapacker_version_incompatible_for_basic_pack_generation
+      msg = <<~MSG
+        **ERROR** ReactOnRails: Please upgrade ::Shakapacker to version #{ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION} or \
+        above to use basic pack generation features. The currently installed version is #{ReactOnRails::PackerUtils.shakapacker_version}.
       MSG
 
       raise ReactOnRails::Error, msg
