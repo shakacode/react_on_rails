@@ -43,6 +43,11 @@ ReactOnRails.configure do |config|
   #
   config.server_bundle_js_file = "server-bundle.js"
 
+  # The location of the server bundle file defaults to the location of your client bundle file.
+  # However, you can change this location in your config/shakapacker.yml file, using Shakapacker v8.5.0 or greater
+  # If you are not using Shakapacker v8.5.0 or greater, then you can set the value here. v17 will probably remove configuration
+  # of the server_bundle_output_path.
+
   # Configure where server bundles are output. Defaults to "ssr-generated".
   # This should match your webpack configuration for server bundles.
   config.server_bundle_output_path = "ssr-generated"
