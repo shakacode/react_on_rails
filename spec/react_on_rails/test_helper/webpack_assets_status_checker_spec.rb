@@ -24,7 +24,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
       allow(ReactOnRails::Utils).to receive(:generated_assets_full_path).and_return(generated_assets_full_path)
       allow(ReactOnRails::PackerUtils).to receive_messages(
         packer_public_output_path: generated_assets_full_path,
-        supports_auto_registration?: true,
+        supports_autobundling?: true,
         nested_entries?: true
       )
     end

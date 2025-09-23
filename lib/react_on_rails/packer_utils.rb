@@ -45,7 +45,7 @@ module ReactOnRails
       shakapacker_version_requirement_met?(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION)
     end
 
-    def self.supports_auto_registration?
+    def self.supports_autobundling?
       min_version = ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_REGISTRATION
       packer.config.respond_to?(:nested_entries?) && shakapacker_version_requirement_met?(min_version)
     end

@@ -203,7 +203,7 @@ module ReactOnRails
         ReactOnRails::PackerUtils.supports_basic_pack_generation?
 
       # Additional checks for advanced features requiring nested entries
-      if ReactOnRails::PackerUtils.supports_auto_registration?
+      if ReactOnRails::PackerUtils.supports_autobundling?
         ReactOnRails::PackerUtils.raise_nested_entries_disabled unless ReactOnRails::PackerUtils.nested_entries?
       else
         # Warn users about missing advanced features but don't block basic functionality

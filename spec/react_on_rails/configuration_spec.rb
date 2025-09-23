@@ -187,7 +187,7 @@ module ReactOnRails
     describe "RSC configuration options" do
       before do
         allow(ReactOnRails::PackerUtils).to receive_messages(
-          supports_auto_registration?: true,
+          supports_autobundling?: true,
           nested_entries?: true
         )
       end
@@ -335,7 +335,7 @@ module ReactOnRails
 
     it "calls raise_missing_components_subdirectory if auto_load_bundle = true & components_subdirectory is not set" do
       allow(ReactOnRails::PackerUtils).to receive_messages(
-        supports_auto_registration?: true,
+        supports_autobundling?: true,
         nested_entries?: true
       )
 
@@ -350,7 +350,7 @@ module ReactOnRails
       allow(ReactOnRails::PackerUtils).to receive_messages(
         shakapacker_version_requirement_met?: true,
         nested_entries?: true,
-        supports_auto_registration?: true
+        supports_autobundling?: true
       )
 
       ReactOnRails.configure do |config|
@@ -358,7 +358,7 @@ module ReactOnRails
         config.components_subdirectory = "something"
       end
 
-      expect(ReactOnRails::PackerUtils).to have_received(:supports_auto_registration?)
+      expect(ReactOnRails::PackerUtils).to have_received(:supports_autobundling?)
       expect(ReactOnRails::PackerUtils).to have_received(:nested_entries?)
     end
 

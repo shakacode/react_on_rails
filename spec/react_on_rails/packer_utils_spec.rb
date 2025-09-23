@@ -107,7 +107,7 @@ module ReactOnRails
       end
     end
 
-    describe ".supports_auto_registration?" do
+    describe ".supports_autobundling?" do
       let(:mock_config) { instance_double("Shakapacker::Config") } # rubocop:disable RSpec/VerifiedDoubleReference
       let(:mock_packer) { instance_double("Shakapacker", config: mock_config) } # rubocop:disable RSpec/VerifiedDoubleReference
 
@@ -120,7 +120,7 @@ module ReactOnRails
         allow(described_class).to receive(:shakapacker_version_requirement_met?)
           .with(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_REGISTRATION).and_return(true)
 
-        expect(described_class.supports_auto_registration?).to be(true)
+        expect(described_class.supports_autobundling?).to be(true)
       end
 
       it "returns false when Shakapacker < 7.0.0" do
@@ -128,7 +128,7 @@ module ReactOnRails
         allow(described_class).to receive(:shakapacker_version_requirement_met?)
           .with(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_REGISTRATION).and_return(false)
 
-        expect(described_class.supports_auto_registration?).to be(false)
+        expect(described_class.supports_autobundling?).to be(false)
       end
 
       it "returns false when nested_entries method is not available" do
@@ -136,7 +136,7 @@ module ReactOnRails
         allow(described_class).to receive(:shakapacker_version_requirement_met?)
           .with(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_REGISTRATION).and_return(true)
 
-        expect(described_class.supports_auto_registration?).to be(false)
+        expect(described_class.supports_autobundling?).to be(false)
       end
     end
   end
