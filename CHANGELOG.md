@@ -23,6 +23,30 @@ After a release, please make sure to run `bundle exec rake update_changelog`. Th
 
 Changes since the last non-beta release.
 
+#### New Features
+
+- **Server Bundle Security**: Added new configuration options for enhanced server bundle security and organization:
+  - `server_bundle_output_path`: Configurable directory (relative to the Rails root) for server bundle output (default: "ssr-generated"). If set to `nil`, the server bundle will be loaded from the same public directory as client bundles.
+  - `enforce_private_server_bundles`: When enabled, ensures server bundles are only loaded from private directories outside the public folder (default: false for backward compatibility)
+
+- **Improved Bundle Path Resolution**: Bundle path resolution for server bundles now works as follows:
+  - If `server_bundle_output_path` is set, the server bundle is loaded from that directory.
+  - If `server_bundle_output_path` is not set, the server bundle falls back to the client bundle directory (typically the public output path).
+  - If `enforce_private_server_bundles` is enabled:
+    - The server bundle will only be loaded from the private directory specified by `server_bundle_output_path`.
+    - If the bundle is not found there, it will *not* fall back to the public directory.
+  - If `enforce_private_server_bundles` is not enabled and the bundle is not found in the private directory, it will fall back to the public directory.
+  - This logic ensures that, when strict enforcement is enabled, server bundles are never loaded from public directories, improving security and clarity of bundle resolution.
+
+#### Security Enhancements
+
+- **Private Server Bundle Enforcement**: When `enforce_private_server_bundles` is enabled, server bundles bypass public directory fallbacks and are only loaded from designated private locations
+- **Path Validation**: Added validation to ensure `server_bundle_output_path` points to private directories when enforcement is enabled
+
+#### Bug Fixes
+
+- **Non-Packer Environment Compatibility**: Fixed potential NoMethodError when using bundle path resolution in environments without Shakapacker
+
 ### [16.0.1-rc.2] - 2025-09-20
 
 #### Bug Fixes
