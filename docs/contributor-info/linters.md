@@ -10,7 +10,7 @@ If you haven't tried the autofix options for `eslint` and `rubocop`, you're seri
 2. **Rubocop:** Be sure to be in the correct directory where you have Ruby files, usually the top level of your Rails project.
 
 ```bash
-bundle exec rubocop -A
+bundle exec rubocop -a
 ```
 
 3. **ESLint:** Be sure to be in the correct directory where you have JS files.
