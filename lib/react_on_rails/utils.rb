@@ -123,7 +123,8 @@ module ReactOnRails
       if is_server_bundle && config.server_bundle_output_path.present?
         candidate_paths = [File.expand_path(File.join(root_path, config.server_bundle_output_path, bundle_name))]
         unless config.enforce_private_server_bundles
-          candidate_paths << File.expand_path(File.join(root_path, config.server_bundle_output_path, bundle_name))
+          candidate_paths << File.expand_path(File.join(ReactOnRails::PackerUtils.packer_public_output_path,
+                                                        bundle_name))
         end
 
         candidate_paths.each do |path|
