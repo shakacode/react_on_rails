@@ -23,6 +23,34 @@ After a release, please make sure to run `bundle exec rake update_changelog`. Th
 
 Changes since the last non-beta release.
 
+#### New Features
+
+- **Server Bundle Security**: Added new configuration options for enhanced server bundle security and organization:
+  - `server_bundle_output_path`: Configurable directory for server bundle output (default: nil, uses fallback locations)
+  - `enforce_private_server_bundles`: When enabled, ensures server bundles are only loaded from private directories outside the public folder (default: false for backward compatibility)
+
+- **Improved Bundle Path Resolution**: Enhanced bundle path resolution with better fallback logic that tries multiple locations when manifest lookup fails:
+  1. Environment-specific path (e.g., `public/webpack/test`)
+  2. Standard Shakapacker location (`public/packs`)
+  3. Generated assets path (for legacy setups)
+
+#### API Improvements
+
+- **Method Naming Clarification**: Added `public_bundles_full_path` method to clarify bundle path handling:
+  - `public_bundles_full_path`: New method specifically for webpack bundles in public directories
+  - `generated_assets_full_path`: Now deprecated (backwards-compatible alias)
+  - This eliminates confusion between webpack bundles and general Rails public assets
+
+#### Security Enhancements
+
+- **Private Server Bundle Enforcement**: When `enforce_private_server_bundles` is enabled, server bundles bypass public directory fallbacks and are only loaded from designated private locations
+- **Path Validation**: Added validation to ensure `server_bundle_output_path` points to private directories when enforcement is enabled
+
+#### Bug Fixes
+
+- **Non-Packer Environment Compatibility**: Fixed potential NoMethodError when using bundle path resolution in environments without Shakapacker
+- **Server Bundle Detection**: Improved server bundle detection to work correctly with both `server_bundle_js_file` and `rsc_bundle_js_file` configurations
+
 ### [16.0.1-rc.2] - 2025-09-20
 
 #### Bug Fixes
