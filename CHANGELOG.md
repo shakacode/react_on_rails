@@ -23,6 +23,10 @@ After a release, please make sure to run `bundle exec rake update_changelog`. Th
 
 Changes since the last non-beta release.
 
+#### Breaking Changes
+
+- **Removed `generated_assets_dirs` configuration**: The legacy `config.generated_assets_dirs` option is no longer supported and will raise an error if used. Since Shakapacker is now required, asset paths are automatically determined from `shakapacker.yml` configuration. Remove any `config.generated_assets_dirs` from your `config/initializers/react_on_rails.rb` file. Use `public_output_path` in `config/shakapacker.yml` to customize asset output location instead. [PR 1798](https://github.com/shakacode/react_on_rails/pull/1798)
+
 #### New Features
 
 - **Server Bundle Security**: Added new configuration options for enhanced server bundle security and organization:
