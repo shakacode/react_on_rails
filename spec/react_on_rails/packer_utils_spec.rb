@@ -108,8 +108,8 @@ module ReactOnRails
     end
 
     describe ".supports_auto_registration?" do
-      let(:mock_config) { instance_double(Shakapacker::Config) }
-      let(:mock_packer) { instance_double(Shakapacker, config: mock_config) }
+      let(:mock_config) { instance_double("Shakapacker::Config") } # rubocop:disable RSpec/VerifiedDoubleReference
+      let(:mock_packer) { instance_double("Shakapacker", config: mock_config) } # rubocop:disable RSpec/VerifiedDoubleReference
 
       before do
         allow(described_class).to receive(:packer).and_return(mock_packer)

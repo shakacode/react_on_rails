@@ -7,7 +7,7 @@ require "active_support"
 require "active_support/core_ext/string"
 
 module ReactOnRails
-  module Utils
+  module Utils # rubocop:disable Metrics/ModuleLength
     TRUNCATION_FILLER = "\n... TRUNCATED #{
       Rainbow('To see the full output, set FULL_TEXT_ERRORS=true.').red
     } ...\n".freeze
