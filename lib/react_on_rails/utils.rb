@@ -6,6 +6,7 @@ require "rainbow"
 require "active_support"
 require "active_support/core_ext/string"
 
+# rubocop:disable Metrics/ModuleLength
 module ReactOnRails
   module Utils
     TRUNCATION_FILLER = "\n... TRUNCATED #{
@@ -276,3 +277,4 @@ module ReactOnRails
     end
   end
 end
+# rubocop:enable Metrics/ModuleLength
