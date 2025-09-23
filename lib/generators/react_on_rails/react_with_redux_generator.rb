@@ -89,6 +89,14 @@ module ReactOnRails
         install_packages_with_fallback(regular_packages, dev: false, package_manager: package_manager)
       end
 
+      def add_redux_specific_messages
+        # Override the generic messages with Redux-specific instructions
+        GeneratorMessages.output.clear
+        GeneratorMessages.add_info(
+          GeneratorMessages.helpful_message_after_installation(component_name: "HelloWorldApp", route: "hello_world")
+        )
+      end
+
       private
 
       def install_packages_with_fallback(packages, dev:, package_manager:)
@@ -131,14 +139,6 @@ module ReactOnRails
         when "npm", "pnpm" then "--save-dev"
         when "yarn", "bun" then "--dev"
         end
-      end
-
-      def add_redux_specific_messages
-        # Override the generic messages with Redux-specific instructions
-        GeneratorMessages.output.clear
-        GeneratorMessages.add_info(
-          GeneratorMessages.helpful_message_after_installation(component_name: "HelloWorldApp", route: "hello_world")
-        )
       end
     end
   end

@@ -95,45 +95,6 @@ module ReactOnRails
         run "bundle"
       end
 
-      def add_js_dependencies
-        add_react_on_rails_package
-        add_react_dependencies
-        add_css_dependencies
-        add_dev_dependencies
-        install_js_dependencies
-      end
-
-      private
-
-      def install_js_dependencies
-        # Detect which package manager to use
-        success = if File.exist?(File.join(destination_root, "yarn.lock"))
-                    system("yarn", "install")
-                  elsif File.exist?(File.join(destination_root, "pnpm-lock.yaml"))
-                    system("pnpm", "install")
-                  elsif File.exist?(File.join(destination_root, "package-lock.json")) ||
-                        File.exist?(File.join(destination_root, "package.json"))
-                    # Use npm for package-lock.json or as default fallback
-                    system("npm", "install")
-                  else
-                    true # No package manager detected, skip
-                  end
-
-        unless success
-          GeneratorMessages.add_warning(<<~MSG.strip)
-            ⚠️  JavaScript dependencies installation failed.
-
-            This could be due to network issues or missing package manager.
-            You can install dependencies manually later by running:
-            • npm install (if using npm)
-            • yarn install (if using yarn)
-            • pnpm install (if using pnpm)
-          MSG
-        end
-
-        success
-      end
-
       def update_gitignore_for_auto_registration
         gitignore_path = File.join(destination_root, ".gitignore")
         return unless File.exist?(gitignore_path)
@@ -158,6 +119,28 @@ module ReactOnRails
           spec_helper = File.join(destination_root, "spec/spec_helper.rb")
           add_configure_rspec_to_compile_assets(spec_helper) if File.exist?(spec_helper)
         end
+      end
+
+      CONFIGURE_RSPEC_TO_COMPILE_ASSETS = <<-STR.strip_heredoc
+        RSpec.configure do |config|
+          # Ensure that if we are running js tests, we are using latest webpack assets
+          # This will use the defaults of :js and :server_rendering meta tags
+          ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+        end
+      STR
+
+      private
+
+      def setup_js_dependencies
+        add_js_dependencies
+        install_js_dependencies
+      end
+
+      def add_js_dependencies
+        add_react_on_rails_package
+        add_react_dependencies
+        add_css_dependencies
+        add_dev_dependencies
       end
 
       def add_react_on_rails_package
@@ -222,15 +205,34 @@ module ReactOnRails
         handle_npm_failure("development dependencies", dev_deps, dev: true) unless success
       end
 
-      CONFIGURE_RSPEC_TO_COMPILE_ASSETS = <<-STR.strip_heredoc
-        RSpec.configure do |config|
-          # Ensure that if we are running js tests, we are using latest webpack assets
-          # This will use the defaults of :js and :server_rendering meta tags
-          ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
-        end
-      STR
+      def install_js_dependencies
+        # Detect which package manager to use
+        success = if File.exist?(File.join(destination_root, "yarn.lock"))
+                    system("yarn", "install")
+                  elsif File.exist?(File.join(destination_root, "pnpm-lock.yaml"))
+                    system("pnpm", "install")
+                  elsif File.exist?(File.join(destination_root, "package-lock.json")) ||
+                        File.exist?(File.join(destination_root, "package.json"))
+                    # Use npm for package-lock.json or as default fallback
+                    system("npm", "install")
+                  else
+                    true # No package manager detected, skip
+                  end
 
-      private
+        unless success
+          GeneratorMessages.add_warning(<<~MSG.strip)
+            ⚠️  JavaScript dependencies installation failed.
+
+            This could be due to network issues or missing package manager.
+            You can install dependencies manually later by running:
+            • npm install (if using npm)
+            • yarn install (if using yarn)
+            • pnpm install (if using pnpm)
+          MSG
+        end
+
+        success
+      end
 
       def handle_npm_failure(dependency_type, packages, dev: false)
         install_command = dev ? "npm install --save-dev" : "npm install"
