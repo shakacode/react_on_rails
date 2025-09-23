@@ -72,6 +72,17 @@ module ReactOnRails
     end
 
     def self.bundle_js_file_path(bundle_name)
+      # Check if this is a server bundle with configured output path - skip manifest lookup
+      if server_bundle?(bundle_name)
+        config = ReactOnRails.configuration
+        root_path = Rails.root || "."
+
+        # Use configured server_bundle_output_path if present
+        if config.server_bundle_output_path.present?
+          return File.expand_path(File.join(root_path, config.server_bundle_output_path, bundle_name))
+        end
+      end
+
       # Either:
       # 1. Using same bundle for both server and client, so server bundle will be hashed in manifest
       # 2. Using a different bundle (different Webpack config), so file is not hashed, and
@@ -116,6 +127,12 @@ module ReactOnRails
 
       # If none exist, return the environment-specific path (original behavior)
       File.expand_path(fallback_locations.first)
+    end
+
+    private_class_method def self.server_bundle?(bundle_name)
+      config = ReactOnRails.configuration
+      bundle_name == config.server_bundle_js_file ||
+      bundle_name == config.rsc_bundle_js_file
     end
 
     def self.server_bundle_js_file_path
