@@ -24,8 +24,8 @@ ReactOnRails.configure do |config|
   # to automatically refresh your webpack assets on every test run.
   #
   # Alternately, you can remove the `ReactOnRails::TestHelper.configure_rspec_to_compile_assets`
-  # and set the config/shakapacker.yml option for test to true.
-  config.build_test_command = "RAILS_ENV=test bin/shakapacker"
+  # and set the config/<%= config[:packer_type] %>.yml option for test to true.
+  config.build_test_command = "RAILS_ENV=test bin/<%= config[:packer_type] %>"
 
   ################################################################################
   ################################################################################
@@ -42,6 +42,15 @@ ReactOnRails.configure do |config|
   # React components.
   #
   config.server_bundle_js_file = "server-bundle.js"
+
+  # Configure where server bundles are output. Defaults to "ssr-generated".
+  # This should match your webpack configuration for server bundles.
+  config.server_bundle_output_path = "ssr-generated"
+
+  # Enforce that server bundles are only loaded from private (non-public) directories.
+  # When true, server bundles will only be loaded from the configured server_bundle_output_path.
+  # This is recommended for production to prevent server-side code from being exposed.
+  config.enforce_private_server_bundles = true
 
   ################################################################################
   ################################################################################

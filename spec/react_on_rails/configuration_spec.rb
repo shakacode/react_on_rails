@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "spec_helper"
-require "shakapacker"
+require ReactOnRails::PackerUtils.packer_type
 
 # rubocop:disable Metrics/ModuleLength
 
@@ -9,8 +9,10 @@ module ReactOnRails
   RSpec.describe Configuration do
     let(:existing_path) { Pathname.new(Dir.mktmpdir) }
     let(:not_existing_path) { "/path/to/#{SecureRandom.hex(4)}" }
+    let(:using_packer) { false }
 
     before do
+      allow(ReactOnRails::PackerUtils).to receive(:using_packer?).and_return(using_packer)
       ReactOnRails.instance_variable_set(:@configuration, nil)
     end
 
@@ -26,8 +28,8 @@ module ReactOnRails
 
       before do
         allow(Rails).to receive(:root).and_return(File.expand_path("."))
-        allow(::Shakapacker).to receive_message_chain("config.public_output_path")
-          .and_return(Pathname.new(packer_public_output_path))
+        allow(ReactOnRails::PackerUtils).to receive_message_chain("packer.config.public_output_path")
+          .and_return(packer_public_output_path)
       end
 
       it "does not throw if the generated assets dir is blank with shakapacker" do
@@ -76,6 +78,7 @@ module ReactOnRails
     describe ".build_production_command" do
       context "when using Shakapacker 8" do
         it "fails when \"shakapacker_precompile\" is truly and \"build_production_command\" is truly" do
+          allow(ReactOnRails::PackerUtils).to receive(:using_packer?).and_return(true)
           allow(Shakapacker).to receive_message_chain("config.shakapacker_precompile?")
             .and_return(true)
           expect do
@@ -86,6 +89,7 @@ module ReactOnRails
         end
 
         it "doesn't fail when \"shakapacker_precompile\" is falsy and \"build_production_command\" is truly" do
+          allow(ReactOnRails::PackerUtils).to receive(:using_packer?).and_return(true)
           allow(Shakapacker).to receive_message_chain("config.shakapacker_precompile?")
             .and_return(false)
           expect do
@@ -96,6 +100,7 @@ module ReactOnRails
         end
 
         it "doesn't fail when \"shakapacker_precompile\" is truly and \"build_production_command\" is falsy" do
+          allow(ReactOnRails::PackerUtils).to receive(:using_packer?).and_return(true)
           allow(Shakapacker).to receive_message_chain("config.shakapacker_precompile?")
             .and_return(true)
           expect do
@@ -104,6 +109,7 @@ module ReactOnRails
         end
 
         it "doesn't fail when \"shakapacker_precompile\" is falsy and \"build_production_command\" is falsy" do
+          allow(ReactOnRails::PackerUtils).to receive(:using_packer?).and_return(true)
           allow(Shakapacker).to receive_message_chain("config.shakapacker_precompile?")
             .and_return(false)
           expect do
@@ -185,13 +191,6 @@ module ReactOnRails
     end
 
     describe "RSC configuration options" do
-      before do
-        allow(ReactOnRails::PackerUtils).to receive_messages(
-          supports_autobundling?: true,
-          nested_entries?: true
-        )
-      end
-
       it "has default values for RSC-related configuration options" do
         ReactOnRails.configure {} # rubocop:disable Lint/EmptyBlock
 
@@ -289,12 +288,7 @@ module ReactOnRails
     end
 
     it "changes the configuration of the gem, such as setting the prerender option to false" do
-      test_path = File.expand_path("public/webpack/test")
-      allow(::Shakapacker).to receive_message_chain("config.public_output_path")
-        .and_return(Pathname.new(test_path))
-
       ReactOnRails.configure do |config|
-        config.generated_assets_dir = test_path
         config.server_bundle_js_file = "server.js"
         config.prerender = false
       end
@@ -304,12 +298,7 @@ module ReactOnRails
     end
 
     it "changes the configuration of the gem, such as setting the prerender option to true" do
-      test_path = File.expand_path("public/webpack/test")
-      allow(::Shakapacker).to receive_message_chain("config.public_output_path")
-        .and_return(Pathname.new(test_path))
-
       ReactOnRails.configure do |config|
-        config.generated_assets_dir = test_path
         config.server_bundle_js_file = "something.js"
         config.prerender = true
         config.random_dom_id = false
@@ -320,25 +309,7 @@ module ReactOnRails
       expect(ReactOnRails.configuration.random_dom_id).to be(false)
     end
 
-    it "works without specifying generated_assets_dir when using Shakapacker" do
-      allow(::Shakapacker).to receive_message_chain("config.public_output_path")
-        .and_return(Pathname.new("/tmp/public/packs"))
-
-      expect do
-        ReactOnRails.configure do |config|
-          config.server_bundle_js_file = "server.js"
-        end
-      end.not_to raise_error
-
-      expect(ReactOnRails.configuration.generated_assets_dir).to be_blank
-    end
-
     it "calls raise_missing_components_subdirectory if auto_load_bundle = true & components_subdirectory is not set" do
-      allow(ReactOnRails::PackerUtils).to receive_messages(
-        supports_autobundling?: true,
-        nested_entries?: true
-      )
-
       expect do
         ReactOnRails.configure do |config|
           config.auto_load_bundle = true
@@ -347,18 +318,17 @@ module ReactOnRails
     end
 
     it "checks that autobundling requirements are met if configuration options for autobundling are set" do
-      allow(ReactOnRails::PackerUtils).to receive_messages(
-        shakapacker_version_requirement_met?: true,
-        nested_entries?: true,
-        supports_autobundling?: true
-      )
+      allow(ReactOnRails::PackerUtils).to receive_messages(using_packer?: true,
+                                                           shakapacker_version_requirement_met?: true,
+                                                           nested_entries?: true)
 
       ReactOnRails.configure do |config|
         config.auto_load_bundle = true
         config.components_subdirectory = "something"
       end
 
-      expect(ReactOnRails::PackerUtils).to have_received(:supports_autobundling?)
+      expect(ReactOnRails::PackerUtils).to have_received(:using_packer?).thrice
+      expect(ReactOnRails::PackerUtils).to have_received(:shakapacker_version_requirement_met?).twice
       expect(ReactOnRails::PackerUtils).to have_received(:nested_entries?)
     end
 
@@ -456,6 +426,62 @@ module ReactOnRails
               config.generated_component_packs_loading_strategy = :async
             end
           end.to raise_error(ReactOnRails::Error, /does not support async script loading/)
+        end
+      end
+    end
+
+    describe "enforce_private_server_bundles validation" do
+      context "when enforce_private_server_bundles is true" do
+        before do
+          # Mock Rails.root for tests that need path validation
+          allow(Rails).to receive(:root).and_return(Pathname.new("/test/app"))
+        end
+
+        it "raises error when server_bundle_output_path is nil" do
+          expect do
+            ReactOnRails.configure do |config|
+              config.server_bundle_output_path = nil
+              config.enforce_private_server_bundles = true
+            end
+          end.to raise_error(ReactOnRails::Error, /server_bundle_output_path is nil/)
+        end
+
+        it "raises error when server_bundle_output_path is inside public directory" do
+          expect do
+            ReactOnRails.configure do |config|
+              config.server_bundle_output_path = "public/server-bundles"
+              config.enforce_private_server_bundles = true
+            end
+          end.to raise_error(ReactOnRails::Error, /is inside the public directory/)
+        end
+
+        it "allows server_bundle_output_path outside public directory" do
+          expect do
+            ReactOnRails.configure do |config|
+              config.server_bundle_output_path = "ssr-generated"
+              config.enforce_private_server_bundles = true
+            end
+          end.not_to raise_error
+        end
+      end
+
+      context "when enforce_private_server_bundles is false" do
+        it "allows server_bundle_output_path to be nil" do
+          expect do
+            ReactOnRails.configure do |config|
+              config.server_bundle_output_path = nil
+              config.enforce_private_server_bundles = false
+            end
+          end.not_to raise_error
+        end
+
+        it "allows server_bundle_output_path inside public directory" do
+          expect do
+            ReactOnRails.configure do |config|
+              config.server_bundle_output_path = "public/server-bundles"
+              config.enforce_private_server_bundles = false
+            end
+          end.not_to raise_error
         end
       end
     end

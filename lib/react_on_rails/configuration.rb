@@ -52,7 +52,9 @@ module ReactOnRails
       # If exceeded, an error will be thrown for server-side rendered components not registered on the client.
       # Set to 0 to disable the timeout and wait indefinitely for component registration.
       component_registry_timeout: DEFAULT_COMPONENT_REGISTRY_TIMEOUT,
-      generated_component_packs_loading_strategy: nil
+      generated_component_packs_loading_strategy: nil,
+      server_bundle_output_path: nil,
+      enforce_private_server_bundles: false
     )
   end
 
@@ -68,7 +70,8 @@ module ReactOnRails
                   :same_bundle_for_client_and_server, :rendering_props_extension,
                   :make_generated_server_bundle_the_entrypoint,
                   :generated_component_packs_loading_strategy, :immediate_hydration, :rsc_bundle_js_file,
-                  :react_client_manifest_file, :react_server_client_manifest_file, :component_registry_timeout
+                  :react_client_manifest_file, :react_server_client_manifest_file, :component_registry_timeout,
+                  :server_bundle_output_path, :enforce_private_server_bundles
 
     # rubocop:disable Metrics/AbcSize
     def initialize(node_modules_location: nil, server_bundle_js_file: nil, prerender: nil,
@@ -85,7 +88,7 @@ module ReactOnRails
                    random_dom_id: nil, server_render_method: nil, rendering_props_extension: nil,
                    components_subdirectory: nil, auto_load_bundle: nil, immediate_hydration: nil,
                    rsc_bundle_js_file: nil, react_client_manifest_file: nil, react_server_client_manifest_file: nil,
-                   component_registry_timeout: nil)
+                   component_registry_timeout: nil, server_bundle_output_path: nil, enforce_private_server_bundles: nil)
       self.node_modules_location = node_modules_location.present? ? node_modules_location : Rails.root
       self.generated_assets_dirs = generated_assets_dirs
       self.generated_assets_dir = generated_assets_dir
@@ -130,6 +133,8 @@ module ReactOnRails
       self.defer_generated_component_packs = defer_generated_component_packs
       self.immediate_hydration = immediate_hydration
       self.generated_component_packs_loading_strategy = generated_component_packs_loading_strategy
+      self.server_bundle_output_path = server_bundle_output_path
+      self.enforce_private_server_bundles = enforce_private_server_bundles
     end
     # rubocop:enable Metrics/AbcSize
 
@@ -146,6 +151,7 @@ module ReactOnRails
       adjust_precompile_task
       check_component_registry_timeout
       validate_generated_component_packs_loading_strategy
+      validate_enforce_private_server_bundles
     end
 
     private
@@ -180,7 +186,7 @@ module ReactOnRails
         1. Use :sync or :defer loading strategy instead of :async
         2. Upgrade to Shakapacker v8.2.0 or above to enable async script loading
       MSG
-      if PackerUtils.supports_async_loading?
+      if PackerUtils.shakapacker_version_requirement_met?("8.2.0")
         self.generated_component_packs_loading_strategy ||= :async
       elsif generated_component_packs_loading_strategy.nil?
         Rails.logger.warn("**WARNING** #{msg}")
@@ -194,23 +200,40 @@ module ReactOnRails
       raise ReactOnRails::Error, "generated_component_packs_loading_strategy must be either :async, :defer, or :sync"
     end
 
+    def validate_enforce_private_server_bundles
+      return unless enforce_private_server_bundles
+
+      # Check if server_bundle_output_path is nil
+      if server_bundle_output_path.nil?
+        raise ReactOnRails::Error, "enforce_private_server_bundles is set to true, but " \
+                                   "server_bundle_output_path is nil. Please set server_bundle_output_path " \
+                                   "to a directory outside of the public directory."
+      end
+
+      # Check if server_bundle_output_path is inside public directory
+      # Skip validation if Rails.root is not available (e.g., in tests)
+      return unless defined?(Rails) && Rails.root
+
+      public_path = Rails.root.join("public").to_s
+      server_output_path = File.expand_path(server_bundle_output_path, Rails.root.to_s)
+
+      return unless server_output_path.start_with?(public_path)
+
+      raise ReactOnRails::Error, "enforce_private_server_bundles is set to true, but " \
+                                 "server_bundle_output_path (#{server_bundle_output_path}) is inside " \
+                                 "the public directory. Please set it to a directory outside of public."
+    end
+
     def check_autobundling_requirements
       raise_missing_components_subdirectory if auto_load_bundle && !components_subdirectory.present?
       return unless components_subdirectory.present?
 
-      # Check basic pack generation support for auto_load_bundle
-      ReactOnRails::PackerUtils.raise_shakapacker_version_incompatible_for_basic_pack_generation unless
-        ReactOnRails::PackerUtils.supports_basic_pack_generation?
-
-      # Additional checks for advanced features requiring nested entries
-      if ReactOnRails::PackerUtils.supports_autobundling?
-        ReactOnRails::PackerUtils.raise_nested_entries_disabled unless ReactOnRails::PackerUtils.nested_entries?
-      else
-        # Warn users about missing advanced features but don't block basic functionality
-        min_version = ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_REGISTRATION
-        Rails.logger.warn("React on Rails: Basic pack generation enabled. " \
-                          "Upgrade to Shakapacker #{min_version}+ for advanced auto-registration features.")
-      end
+      ReactOnRails::PackerUtils.raise_shakapacker_not_installed unless ReactOnRails::PackerUtils.using_packer?
+      ReactOnRails::PackerUtils.raise_shakapacker_version_incompatible_for_autobundling unless
+        ReactOnRails::PackerUtils.shakapacker_version_requirement_met?(
+          ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION
+        )
+      ReactOnRails::PackerUtils.raise_nested_entries_disabled unless ReactOnRails::PackerUtils.nested_entries?
     end
 
     def adjust_precompile_task
@@ -228,8 +251,8 @@ module ReactOnRails
         # We set it very big so that it is not used, and then clean just
         # removes files older than 1 hour.
         versions = 100_000
-        puts "Invoking task shakapacker:clean from React on Rails"
-        Rake::Task["shakapacker:clean"].invoke(versions)
+        puts "Invoking task #{ReactOnRails::PackerUtils.packer_type}:clean from React on Rails"
+        Rake::Task["#{ReactOnRails::PackerUtils.packer_type}:clean"].invoke(versions)
       }
 
       if Rake::Task.task_defined?("assets:precompile")
@@ -244,21 +267,23 @@ module ReactOnRails
     end
 
     def error_if_using_packer_and_generated_assets_dir_not_match_public_output_path
+      return unless ReactOnRails::PackerUtils.using_packer?
+
       return if generated_assets_dir.blank?
 
       packer_public_output_path = ReactOnRails::PackerUtils.packer_public_output_path
 
       if File.expand_path(generated_assets_dir) == packer_public_output_path.to_s
         Rails.logger.warn("You specified generated_assets_dir in `config/initializers/react_on_rails.rb` " \
-                          "with shakapacker. " \
+                          "with #{ReactOnRails::PackerUtils.packer_type}. " \
                           "Remove this line from your configuration file.")
       else
         msg = <<~MSG
-          Configuration mismatch in config/initializers/react_on_rails.rb:
-
-          Your generated_assets_dir setting (#{generated_assets_dir}) does not match the value for public_output_path (#{packer_public_output_path}).
-
-          Remove the generated_assets_dir configuration and let Shakapacker manage the output path.
+          Error configuring /config/initializers/react_on_rails.rb: You are using #{ReactOnRails::PackerUtils.packer_type}
+          and your specified value for generated_assets_dir = #{generated_assets_dir}
+          that does not match the value for public_output_path specified in
+          #{ReactOnRails::PackerUtils.packer_type}.yml = #{packer_public_output_path}. You should remove the configuration
+          value for "generated_assets_dir" from your config/initializers/react_on_rails.rb file.
         MSG
         raise ReactOnRails::Error, msg
       end
@@ -277,22 +302,36 @@ module ReactOnRails
     end
 
     def ensure_generated_assets_dir_present
-      return if generated_assets_dir.present?
+      return if generated_assets_dir.present? || ReactOnRails::PackerUtils.using_packer?
 
-      # When using Shakapacker, don't set a default generated_assets_dir since
-      # Shakapacker manages its own public_output_path configuration
-      # This prevents configuration mismatches between ReactOnRails and Shakapacker
-      Rails.logger.warn "ReactOnRails: No generated_assets_dir specified, using Shakapacker public_output_path"
+      self.generated_assets_dir = DEFAULT_GENERATED_ASSETS_DIR
+      Rails.logger.warn "ReactOnRails: Set generated_assets_dir to default: #{DEFAULT_GENERATED_ASSETS_DIR}"
     end
 
     def configure_generated_assets_dirs_deprecation
       return if generated_assets_dirs.blank?
 
-      packer_public_output_path = ReactOnRails::PackerUtils.packer_public_output_path
-      Rails.logger.warn "You specified generated_assets_dirs in `config/initializers/react_on_rails.rb` " \
-                        "with Shakapacker. Remove this configuration as the output path is automatically " \
-                        "determined by `public_output_path` in shakapacker.yml " \
-                        "(currently: #{packer_public_output_path})."
+      if ReactOnRails::PackerUtils.using_packer?
+        packer_public_output_path = ReactOnRails::PackerUtils.packer_public_output_path
+        # rubocop:disable Layout/LineLength
+        packer_name = ReactOnRails::PackerUtils.packer_type&.upcase_first
+
+        Rails.logger.warn "Error configuring config/initializers/react_on_rails. Define neither the generated_assets_dirs nor " \
+                          "the generated_assets_dir when using #{packer_name}. This is defined by " \
+                          "public_output_path specified in #{ReactOnRails::PackerUtils.packer_type}.yml = #{packer_public_output_path}."
+        # rubocop:enable Layout/LineLength
+        return
+      end
+
+      Rails.logger.warn "[DEPRECATION] ReactOnRails: Use config.generated_assets_dir rather than " \
+                        "generated_assets_dirs"
+      if generated_assets_dir.blank?
+        self.generated_assets_dir = generated_assets_dirs
+      else
+        Rails.logger.warn "[DEPRECATION] ReactOnRails. You have both generated_assets_dirs and " \
+                          "generated_assets_dir defined. Define ONLY generated_assets_dir if NOT using Shakapacker " \
+                          "and define neither if using Webpacker"
+      end
     end
 
     def ensure_webpack_generated_files_exists
@@ -324,15 +363,17 @@ module ReactOnRails
     end
 
     def compile_command_conflict_message
+      packer_name = ReactOnRails::PackerUtils.packer_type.upcase_first
+      packer_type = ReactOnRails::PackerUtils.packer_type
       <<~MSG
 
-        React on Rails and Shakapacker error in configuration!
+        React on Rails and #{packer_name} error in configuration!
         In order to use config/react_on_rails.rb config.build_production_command,
-        you must edit config/shakapacker.yml to include this value in the default configuration:
-        'shakapacker_precompile: false'
+        you must edit config/#{packer_type}.yml to include this value in the default configuration:
+        '#{packer_type}_precompile: false'
 
         Alternatively, remove the config/react_on_rails.rb config.build_production_command and the
-        default bin/shakapacker script will be used for assets:precompile.
+        default bin/#{packer_type} script will be used for assets:precompile.
 
       MSG
     end

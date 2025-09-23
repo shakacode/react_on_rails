@@ -8,7 +8,7 @@ require "active_support/core_ext/string"
 
 # rubocop:disable Metrics/ModuleLength
 module ReactOnRails
-  module Utils
+  module Utils # rubocop:disable Metrics/ModuleLength
     TRUNCATION_FILLER = "\n... TRUNCATED #{
       Rainbow('To see the full output, set FULL_TEXT_ERRORS=true.').red
     } ...\n".freeze
@@ -72,6 +72,17 @@ module ReactOnRails
     end
 
     def self.bundle_js_file_path(bundle_name)
+      # Check if this is a server bundle with configured output path - skip manifest lookup
+      if server_bundle?(bundle_name)
+        config = ReactOnRails.configuration
+        root_path = Rails.root || "."
+
+        # Use configured server_bundle_output_path if present
+        if config.server_bundle_output_path.present?
+          return File.expand_path(File.join(root_path, config.server_bundle_output_path, bundle_name))
+        end
+      end
+
       # Either:
       # 1. Using same bundle for both server and client, so server bundle will be hashed in manifest
       # 2. Using a different bundle (different Webpack config), so file is not hashed, and
@@ -81,21 +92,68 @@ module ReactOnRails
       #    a. The webpack manifest plugin would have a race condition where the same manifest.json
       #       is edited by both the webpack-dev-server
       #    b. There is no good reason to hash the server bundle name.
-      if bundle_name == "manifest.json"
+      if ReactOnRails::PackerUtils.using_packer? && bundle_name != "manifest.json"
+        begin
+          ReactOnRails::PackerUtils.bundle_js_uri_from_packer(bundle_name)
+        rescue Object.const_get(
+          ReactOnRails::PackerUtils.packer_type.capitalize
+        )::Manifest::MissingEntryError
+          handle_missing_manifest_entry(bundle_name)
+        end
+      else
         # Default to the non-hashed name in the specified output directory, which, for legacy
         # React on Rails, this is the output directory picked up by the asset pipeline.
         # For Shakapacker, this is the public output path defined in the (shaka/web)packer.yml file.
-        File.join(generated_assets_full_path, bundle_name)
-      else
-        begin
-          ReactOnRails::PackerUtils.bundle_js_uri_from_packer(bundle_name)
-        rescue Shakapacker::Manifest::MissingEntryError
-          File.expand_path(
-            File.join(ReactOnRails::PackerUtils.packer_public_output_path,
-                      bundle_name)
-          )
-        end
+        File.join(public_bundles_full_path, bundle_name)
       end
+    end
+
+    private_class_method def self.handle_missing_manifest_entry(bundle_name)
+      # For server bundles with enforcement enabled, skip public path fallbacks
+      return server_bundle_private_path(bundle_name) if server_bundle?(bundle_name) && enforce_private_server_bundles?
+
+      # When manifest lookup fails, try multiple fallback locations:
+      # Build fallback locations conditionally based on packer availability
+      fallback_locations = []
+
+      # 1. Environment-specific path (e.g., public/webpack/test) - only if using packer
+      if ReactOnRails::PackerUtils.using_packer?
+        fallback_locations << File.join(ReactOnRails::PackerUtils.packer_public_output_path, bundle_name)
+      end
+
+      # 2. Standard Shakapacker location (public/packs)
+      fallback_locations << File.join("public", "packs", bundle_name)
+
+      # 3. Generated assets path (for legacy setups)
+      fallback_locations << File.join(public_bundles_full_path, bundle_name)
+
+      fallback_locations.uniq!
+
+      # Return the first location where the bundle file actually exists
+      fallback_locations.each do |path|
+        expanded_path = File.expand_path(path)
+        return expanded_path if File.exist?(expanded_path)
+      end
+
+      # If none exist, return the environment-specific path (original behavior)
+      File.expand_path(fallback_locations.first)
+    end
+
+    private_class_method def self.server_bundle?(bundle_name)
+      config = ReactOnRails.configuration
+      bundle_name == config.server_bundle_js_file ||
+      bundle_name == config.rsc_bundle_js_file
+    end
+
+    private_class_method def self.enforce_private_server_bundles?
+      ReactOnRails.configuration.enforce_private_server_bundles
+    end
+
+    private_class_method def self.server_bundle_private_path(bundle_name)
+      config = ReactOnRails.configuration
+      preferred_dir = config.server_bundle_output_path.presence || "ssr-generated"
+      root_path = Rails.root || "."
+      File.expand_path(File.join(root_path, preferred_dir, bundle_name))
     end
 
     def self.server_bundle_js_file_path
@@ -116,7 +174,11 @@ module ReactOnRails
       return @react_client_manifest_path if @react_client_manifest_path && !Rails.env.development?
 
       file_name = ReactOnRails.configuration.react_client_manifest_file
-      @react_client_manifest_path = ReactOnRails::PackerUtils.asset_uri_from_packer(file_name)
+      @react_client_manifest_path = if ReactOnRails::PackerUtils.using_packer?
+                                      ReactOnRails::PackerUtils.asset_uri_from_packer(file_name)
+                                    else
+                                      File.join(public_bundles_full_path, file_name)
+                                    end
     end
 
     # React Server Manifest is generated by the server bundle.
@@ -130,7 +192,7 @@ module ReactOnRails
               "react_server_client_manifest_file is nil, ensure it is set in your configuration"
       end
 
-      @react_server_manifest_path = File.join(generated_assets_full_path, asset_name)
+      @react_server_manifest_path = File.join(public_bundles_full_path, asset_name)
     end
 
     def self.running_on_windows?
@@ -158,16 +220,31 @@ module ReactOnRails
     end
 
     def self.source_path
-      ReactOnRails::PackerUtils.packer_source_path
+      if ReactOnRails::PackerUtils.using_packer?
+        ReactOnRails::PackerUtils.packer_source_path
+      else
+        ReactOnRails.configuration.node_modules_location
+      end
     end
 
     def self.using_packer_source_path_is_not_defined_and_custom_node_modules?
+      return false unless ReactOnRails::PackerUtils.using_packer?
+
       !ReactOnRails::PackerUtils.packer_source_path_explicit? &&
         ReactOnRails.configuration.node_modules_location.present?
     end
 
+    def self.public_bundles_full_path
+      if ReactOnRails::PackerUtils.using_packer?
+        ReactOnRails::PackerUtils.packer_public_output_path
+      else
+        File.expand_path(ReactOnRails.configuration.generated_assets_dir)
+      end
+    end
+
+    # DEPRECATED: Use public_bundles_full_path for clarity about public vs private bundle paths
     def self.generated_assets_full_path
-      ReactOnRails::PackerUtils.packer_public_output_path
+      public_bundles_full_path
     end
 
     def self.gem_available?(name)

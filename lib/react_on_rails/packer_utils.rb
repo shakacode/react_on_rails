@@ -1,19 +1,38 @@
 # frozen_string_literal: true
 
-require "shakapacker"
-
 module ReactOnRails
   module PackerUtils
+    def self.using_packer?
+      return @using_packer if defined?(@using_packer)
+
+      # Shakapacker is required by gemspec, but tests may mock gem_available? to return false
+      @using_packer = ReactOnRails::Utils.gem_available?("shakapacker")
+    end
+
+    def self.packer_type
+      using_packer? ? "shakapacker" : nil
+    end
+
+    def self.packer
+      return nil unless using_packer?
+
+      require "shakapacker"
+      ::Shakapacker
+    end
+
     def self.dev_server_running?
-      Shakapacker.dev_server.running?
+      return false unless using_packer?
+
+      packer.dev_server.running?
     end
 
     def self.dev_server_url
-      "#{Shakapacker.dev_server.protocol}://#{Shakapacker.dev_server.host_with_port}"
+      "#{packer.dev_server.protocol}://#{packer.dev_server.host_with_port}"
     end
 
     def self.shakapacker_version
       return @shakapacker_version if defined?(@shakapacker_version)
+      return nil unless ReactOnRails::Utils.gem_available?("shakapacker")
 
       @shakapacker_version = Gem.loaded_specs["shakapacker"].version.to_s
     end
@@ -28,28 +47,14 @@ module ReactOnRails
     end
 
     def self.shakapacker_version_requirement_met?(required_version)
-      @version_checks ||= {}
-      @version_checks[required_version] ||= Gem::Version.new(shakapacker_version) >= Gem::Version.new(required_version)
-    end
-
-    def self.supports_async_loading?
-      shakapacker_version_requirement_met?("8.2.0")
-    end
-
-    def self.supports_basic_pack_generation?
-      shakapacker_version_requirement_met?(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION)
-    end
-
-    def self.supports_autobundling?
-      min_version = ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_REGISTRATION
-      ::Shakapacker.config.respond_to?(:nested_entries?) && shakapacker_version_requirement_met?(min_version)
+      Gem::Version.new(shakapacker_version) >= Gem::Version.new(required_version)
     end
 
     # This returns either a URL for the webpack-dev-server, non-server bundle or
     # the hashed server bundle if using the same bundle for the client.
     # Otherwise returns a file path.
     def self.bundle_js_uri_from_packer(bundle_name)
-      hashed_bundle_name = ::Shakapacker.manifest.lookup!(bundle_name)
+      hashed_bundle_name = packer.manifest.lookup!(bundle_name)
 
       # Support for hashing the server-bundle and having that built
       # the webpack-dev-server is provided by the config value
@@ -58,7 +63,7 @@ module ReactOnRails
       is_bundle_running_on_server = (bundle_name == ReactOnRails.configuration.server_bundle_js_file) ||
                                     (bundle_name == ReactOnRails.configuration.rsc_bundle_js_file)
 
-      if ::Shakapacker.dev_server.running? && (!is_bundle_running_on_server ||
+      if packer.dev_server.running? && (!is_bundle_running_on_server ||
         ReactOnRails.configuration.same_bundle_for_client_and_server)
         "#{dev_server_url}#{hashed_bundle_name}"
       else
@@ -67,7 +72,7 @@ module ReactOnRails
     end
 
     def self.public_output_uri_path
-      "#{::Shakapacker.config.public_output_path.relative_path_from(::Shakapacker.config.public_path)}/"
+      "#{packer.config.public_output_path.relative_path_from(packer.config.public_path)}/"
     end
 
     # The function doesn't ensure that the asset exists.
@@ -82,40 +87,40 @@ module ReactOnRails
     end
 
     def self.precompile?
-      ::Shakapacker.config.shakapacker_precompile?
+      using_packer? ? ::Shakapacker.config.shakapacker_precompile? : false
     end
 
     def self.packer_source_path
-      ::Shakapacker.config.source_path
+      packer.config.source_path
     end
 
     def self.packer_source_entry_path
-      ::Shakapacker.config.source_entry_path
+      packer.config.source_entry_path
     end
 
     def self.nested_entries?
-      ::Shakapacker.config.nested_entries?
+      packer.config.nested_entries?
     end
 
     def self.packer_public_output_path
-      ::Shakapacker.config.public_output_path.to_s
+      packer.config.public_output_path.to_s
     end
 
     def self.manifest_exists?
-      ::Shakapacker.config.public_manifest_path.exist?
+      packer.config.public_manifest_path.exist?
     end
 
     def self.packer_source_path_explicit?
-      ::Shakapacker.config.send(:data)[:source_path].present?
+      packer.config.send(:data)[:source_path].present?
     end
 
     def self.check_manifest_not_cached
-      return unless ::Shakapacker.config.cache_manifest?
+      return unless using_packer? && packer.config.cache_manifest?
 
       msg = <<-MSG.strip_heredoc
           ERROR: you have enabled cache_manifest in the #{Rails.env} env when using the
           ReactOnRails::TestHelper.configure_rspec_to_compile_assets helper
-          To fix this: edit your config/shaka::Shakapacker.yml file and set cache_manifest to false for test.
+          To fix this: edit your config/#{packer_type}.yml file and set cache_manifest to false for test.
       MSG
       puts wrap_message(msg)
       exit!
@@ -135,8 +140,8 @@ module ReactOnRails
 
     def self.raise_nested_entries_disabled
       msg = <<~MSG
-        **ERROR** ReactOnRails: `nested_entries` is configured to be disabled in shaka::Shakapacker. Please update \
-        config/shaka::Shakapacker.yml to enable nested entries. for more information read
+        **ERROR** ReactOnRails: `nested_entries` is configured to be disabled in shakapacker. Please update \
+        config/#{packer_type}.yml to enable nested entries. for more information read
         https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md#enable-nested_entries-for-shakapacker
       MSG
 
@@ -145,19 +150,9 @@ module ReactOnRails
 
     def self.raise_shakapacker_version_incompatible_for_autobundling
       msg = <<~MSG
-        **ERROR** ReactOnRails: Please upgrade ::Shakapacker to version #{ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_REGISTRATION} or \
-        above to use the automated bundle generation feature (which requires nested_entries support). \
-        The currently installed version is #{ReactOnRails::PackerUtils.shakapacker_version}. \
-        Basic pack generation requires ::Shakapacker #{ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION} or above.
-      MSG
-
-      raise ReactOnRails::Error, msg
-    end
-
-    def self.raise_shakapacker_version_incompatible_for_basic_pack_generation
-      msg = <<~MSG
-        **ERROR** ReactOnRails: Please upgrade ::Shakapacker to version #{ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION} or \
-        above to use basic pack generation features. The currently installed version is #{ReactOnRails::PackerUtils.shakapacker_version}.
+        **ERROR** ReactOnRails: Please upgrade Shakapacker to version #{ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION} or \
+        above to use the automated bundle generation feature. The currently installed version is \
+        #{ReactOnRails::PackerUtils.shakapacker_version}.
       MSG
 
       raise ReactOnRails::Error, msg
@@ -165,7 +160,7 @@ module ReactOnRails
 
     def self.raise_shakapacker_not_installed
       msg = <<~MSG
-        **ERROR** ReactOnRails: Missing ::Shakapacker gem. Please upgrade to use ::Shakapacker \
+        **ERROR** ReactOnRails: Missing Shakapacker gem. Please upgrade to use Shakapacker \
         #{ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION} or above to use the \
         automated bundle generation feature.
       MSG
