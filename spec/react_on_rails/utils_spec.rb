@@ -63,6 +63,8 @@ module ReactOnRails
         .and_return(rsc_bundle_name)
       allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
         .and_return("ssr-generated")
+      allow(ReactOnRails).to receive_message_chain("configuration.enforce_private_server_bundles")
+        .and_return(false)
     end
 
     def mock_dev_server_running
@@ -152,10 +154,12 @@ module ReactOnRails
                     .and_return(server_bundle_name)
                   allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
                     .and_return("ssr-generated")
+                  allow(ReactOnRails).to receive_message_chain("configuration.enforce_private_server_bundles")
+                    .and_return(true)
                 end
 
                 it "returns configured path directly without checking existence" do
-                  # Should not check File.exist? - returns path immediately
+                  # When enforce_private_server_bundles is true, should not check File.exist?
                   expect(File).not_to receive(:exist?)
 
                   result = described_class.bundle_js_file_path(server_bundle_name)
@@ -170,6 +174,8 @@ module ReactOnRails
                     .and_return(server_bundle_name)
                   allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
                     .and_return(nil)
+                  allow(ReactOnRails).to receive_message_chain("configuration.enforce_private_server_bundles")
+                    .and_return(false)
                 end
 
                 it "uses packer public output path" do
@@ -189,6 +195,8 @@ module ReactOnRails
                   .and_return(rsc_bundle_name)
                 allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
                   .and_return("ssr-generated")
+                allow(ReactOnRails).to receive_message_chain("configuration.enforce_private_server_bundles")
+                  .and_return(true)
               end
 
               it "treats RSC bundles as server bundles and returns configured path directly" do
@@ -253,6 +261,9 @@ module ReactOnRails
               it "returns the configured path directly without checking file existence" do
                 server_bundle_name = "server-bundle.js"
                 mock_bundle_configs(server_bundle_name: server_bundle_name)
+                # Override to enable enforcement to avoid file existence check
+                allow(ReactOnRails).to receive_message_chain("configuration.enforce_private_server_bundles")
+                  .and_return(true)
 
                 # Since server_bundle_output_path is configured, should return path immediately
                 # without trying manifest lookup

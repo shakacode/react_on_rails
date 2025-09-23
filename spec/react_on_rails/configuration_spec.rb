@@ -25,13 +25,15 @@ module ReactOnRails
     describe "generated_assets_dir" do
       let(:using_packer) { true }
       let(:packer_public_output_path) do
-        File.expand_path(File.join(Rails.root, "public/webpack/dev"))
+        File.expand_path(File.join(Rails.root, "public/packs"))
       end
 
       before do
         allow(Rails).to receive(:root).and_return(File.expand_path("."))
         allow(::Shakapacker).to receive_message_chain("config.public_output_path")
           .and_return(Pathname.new(packer_public_output_path))
+        allow(ReactOnRails::PackerUtils).to receive(:packer_public_output_path)
+          .and_return(packer_public_output_path)
       end
 
       it "does not throw if the generated assets dir is blank with shakapacker" do
@@ -45,7 +47,7 @@ module ReactOnRails
       it "does not throw if the packer_public_output_path does match the generated assets dir" do
         expect do
           ReactOnRails.configure do |config|
-            config.generated_assets_dir = "public/webpack/dev"
+            config.generated_assets_dir = "public/packs"
           end
         end.not_to raise_error
       end
@@ -296,6 +298,8 @@ module ReactOnRails
       test_path = File.expand_path("public/webpack/test")
       allow(::Shakapacker).to receive_message_chain("config.public_output_path")
         .and_return(Pathname.new(test_path))
+      allow(ReactOnRails::PackerUtils).to receive(:packer_public_output_path)
+        .and_return(test_path)
 
       ReactOnRails.configure do |config|
         config.generated_assets_dir = test_path
@@ -311,6 +315,8 @@ module ReactOnRails
       test_path = File.expand_path("public/webpack/test")
       allow(::Shakapacker).to receive_message_chain("config.public_output_path")
         .and_return(Pathname.new(test_path))
+      allow(ReactOnRails::PackerUtils).to receive(:packer_public_output_path)
+        .and_return(test_path)
 
       ReactOnRails.configure do |config|
         config.generated_assets_dir = test_path
