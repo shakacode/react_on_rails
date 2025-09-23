@@ -176,7 +176,7 @@ module ReactOnRails
       @react_client_manifest_path = if ReactOnRails::PackerUtils.using_packer?
                                       ReactOnRails::PackerUtils.asset_uri_from_packer(file_name)
                                     else
-                                      File.join(public_bundles_full_path, file_name)
+                                      File.join(generated_assets_full_path, file_name)
                                     end
     end
 
@@ -191,7 +191,7 @@ module ReactOnRails
               "react_server_client_manifest_file is nil, ensure it is set in your configuration"
       end
 
-      @react_server_manifest_path = File.join(public_bundles_full_path, asset_name)
+      @react_server_manifest_path = File.join(generated_assets_full_path, asset_name)
     end
 
     def self.running_on_windows?
