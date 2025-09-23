@@ -244,6 +244,9 @@ module ReactOnRails
               it "returns the standard location path" do
                 server_bundle_name = "server-bundle.js"
                 mock_bundle_configs(server_bundle_name: server_bundle_name)
+                # Override server_bundle_output_path to test fallback behavior
+                allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
+                  .and_return(nil)
                 mock_missing_manifest_entry(server_bundle_name)
 
                 # Mock File.exist? to return false for environment-specific path but true for standard path
@@ -264,6 +267,9 @@ module ReactOnRails
               it "returns the environment-specific path as final fallback" do
                 server_bundle_name = "server-bundle.js"
                 mock_bundle_configs(server_bundle_name: server_bundle_name)
+                # Override server_bundle_output_path to test fallback behavior
+                allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
+                  .and_return(nil)
                 mock_missing_manifest_entry(server_bundle_name)
 
                 # Mock File.exist? to return false for all paths
