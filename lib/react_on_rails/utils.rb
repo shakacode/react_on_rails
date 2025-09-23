@@ -103,7 +103,7 @@ module ReactOnRails
         # Default to the non-hashed name in the specified output directory, which, for legacy
         # React on Rails, this is the output directory picked up by the asset pipeline.
         # For Shakapacker, this is the public output path defined in the (shaka/web)packer.yml file.
-        File.join(public_bundles_full_path, bundle_name)
+        File.join(generated_assets_full_path, bundle_name)
       end
     end
 
