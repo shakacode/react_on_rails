@@ -121,7 +121,15 @@ module ReactOnRails
 
       # For server bundles with server_bundle_output_path configured, use that
       if is_server_bundle && config.server_bundle_output_path.present?
-        return File.expand_path(File.join(root_path, config.server_bundle_output_path, bundle_name))
+        candidate_paths = [File.expand_path(File.join(root_path, config.server_bundle_output_path, bundle_name))]
+        unless config.enforce_private_server_bundles
+          candidate_paths << File.expand_path(File.join(root_path, config.server_bundle_output_path, bundle_name))
+        end
+
+        candidate_paths.each do |path|
+          return path if File.exist?(path)
+        end
+        return candidate_paths.first
       end
 
       # For client bundles and server bundles without special config, use packer's public path
