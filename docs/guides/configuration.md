@@ -254,7 +254,7 @@ ReactOnRails.configure do |config|
   # | 8.2.0+            | ✅ Yes                | ✅ Yes             | ✅ Yes          | ✅ Yes         |
   #
   ################################################################################
-  # components_subdirectory is the name of the subdirectory matched to detect components for auto-bundle-loading
+  # components_subdirectory is the name of the subdirectory matched to detect and register components automatically
   # The default is nil. You can enable the feature by updating it in the next line.
   config.components_subdirectory = nil
   # Change to a value like this example to enable this feature

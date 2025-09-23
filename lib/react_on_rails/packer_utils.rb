@@ -41,7 +41,7 @@ module ReactOnRails
     end
 
     def self.supports_autobundling?
-      min_version = ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_REGISTRATION
+      min_version = ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_BUNDLING
       ::Shakapacker.config.respond_to?(:nested_entries?) && shakapacker_version_requirement_met?(min_version)
     end
 
@@ -115,7 +115,7 @@ module ReactOnRails
       msg = <<-MSG.strip_heredoc
           ERROR: you have enabled cache_manifest in the #{Rails.env} env when using the
           ReactOnRails::TestHelper.configure_rspec_to_compile_assets helper
-          To fix this: edit your config/shaka::Shakapacker.yml file and set cache_manifest to false for test.
+          To fix this: edit your config/shakapacker.yml file and set cache_manifest to false for test.
       MSG
       puts wrap_message(msg)
       exit!
@@ -135,8 +135,8 @@ module ReactOnRails
 
     def self.raise_nested_entries_disabled
       msg = <<~MSG
-        **ERROR** ReactOnRails: `nested_entries` is configured to be disabled in shaka::Shakapacker. Please update \
-        config/shaka::Shakapacker.yml to enable nested entries. for more information read
+        **ERROR** ReactOnRails: `nested_entries` is configured to be disabled in shakapacker. Please update \
+        config/shakapacker.yml to enable nested entries. for more information read
         https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md#enable-nested_entries-for-shakapacker
       MSG
 
@@ -145,7 +145,7 @@ module ReactOnRails
 
     def self.raise_shakapacker_version_incompatible_for_autobundling
       msg = <<~MSG
-        **ERROR** ReactOnRails: Please upgrade ::Shakapacker to version #{ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_REGISTRATION} or \
+        **ERROR** ReactOnRails: Please upgrade ::Shakapacker to version #{ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_BUNDLING} or \
         above to use the automated bundle generation feature (which requires nested_entries support). \
         The currently installed version is #{ReactOnRails::PackerUtils.shakapacker_version}. \
         Basic pack generation requires ::Shakapacker #{ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION} or above.
@@ -158,16 +158,6 @@ module ReactOnRails
       msg = <<~MSG
         **ERROR** ReactOnRails: Please upgrade ::Shakapacker to version #{ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION} or \
         above to use basic pack generation features. The currently installed version is #{ReactOnRails::PackerUtils.shakapacker_version}.
-      MSG
-
-      raise ReactOnRails::Error, msg
-    end
-
-    def self.raise_shakapacker_not_installed
-      msg = <<~MSG
-        **ERROR** ReactOnRails: Missing ::Shakapacker gem. Please upgrade to use ::Shakapacker \
-        #{ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION} or above to use the \
-        automated bundle generation feature.
       MSG
 
       raise ReactOnRails::Error, msg
