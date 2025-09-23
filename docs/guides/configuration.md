@@ -136,27 +136,18 @@ ReactOnRails.configure do |config|
   # Directory where server bundles will be output during build process.
   # This allows organizing server-side rendering assets separately from client assets.
   #
-  # Default is nil, which uses standard fallback locations in this priority order:
-  #   1. Environment-specific path (e.g., public/webpack/test)
-  #   2. Standard Shakapacker location (public/packs)
-  #   3. Generated assets path (for legacy setups)
+  # IMPORTANT: The default of nil will change to "ssr-generated" in the next major version.
+  # A warning will be shown if this is left as nil.
   #
-  # Example configurations:
-  # config.server_bundle_output_path = "ssr-generated"     # Private directory (recommended)
-  # config.server_bundle_output_path = "app/assets/builds" # Custom private location
-  # config.server_bundle_output_path = nil                 # Use fallback locations (default)
-  config.server_bundle_output_path = nil
+  # Recommended configuration:
+  config.server_bundle_output_path = "ssr-generated"
 
   # When enabled, enforces that server bundles are only loaded from private, designated locations
   # to prevent potential security risks from loading untrusted server-side code.
   #
-  # SECURITY IMPORTANT: When enabled, server bundles bypass public directory fallbacks
-  # and are only loaded from the configured server_bundle_output_path.
-  #
   # Requirements when enabled:
-  #   - server_bundle_output_path must be set to a non-nil value
-  #   - server_bundle_output_path must point to a location outside the public directory
-  #   - Recommended for production environments where security is critical
+  #   - server_bundle_output_path must be set (cannot be nil)
+  #   - server_bundle_output_path must point outside the public directory
   #
   # Default is false for backward compatibility.
   config.enforce_private_server_bundles = false
