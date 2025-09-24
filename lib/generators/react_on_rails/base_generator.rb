@@ -109,10 +109,6 @@ module ReactOnRails
         run "bundle"
       end
 
-      def add_js_dependencies
-        setup_js_dependencies
-      end
-
       def update_gitignore_for_auto_registration
         gitignore_path = File.join(destination_root, ".gitignore")
         return unless File.exist?(gitignore_path)

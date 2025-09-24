@@ -27,8 +27,10 @@ describe "Message Deduplication", type: :generator do
 
         # Count occurrences of the success message
         success_count = output_text.scan("🎉 React on Rails Successfully Installed!").count
-        expect(success_count).to eq(1),
-                                 "Expected success message to appear exactly once, but appeared #{success_count} times"
+        expect(success_count).to(
+          eq(1),
+          "Expected success message to appear exactly once, but appeared #{success_count} times"
+        )
 
         # Ensure post-install message components are present
         expect(output_text).to include("📋 QUICK START:")
@@ -59,14 +61,17 @@ describe "Message Deduplication", type: :generator do
   end
 
   describe "NPM install execution" do
-    let(:install_generator) { InstallGenerator.new }
+    let(:install_generator) { ReactOnRails::Generators::InstallGenerator.new }
 
     before do
       # Mock the system to track NPM install calls
+      allow(install_generator).to receive_messages(
+        system: true,
+        add_npm_dependencies: false,
+        destination_root: "/test/path"
+      )
       allow(File).to receive(:exist?).and_return(false)
-      allow(File).to receive(:exist?).with(File.join(anything, "package.json")).and_return(true)
-      allow(install_generator).to receive_messages(system: true, add_npm_dependencies: false,
-                                                   destination_root: "/test/path")
+      allow(File).to receive(:exist?).with(a_string_matching(/package\.json$/)).and_return(true)
 
       # Initialize instance variables
       install_generator.instance_variable_set(:@added_dependencies_to_package_json, false)
@@ -105,15 +110,13 @@ describe "Message Deduplication", type: :generator do
 
   describe "JS dependency method organization" do
     it "uses the shared JsDependencyManager module in base_generator" do
-      expect(ReactOnRails::Generators::BaseGenerator.ancestors).to(
-        include(ReactOnRails::Generators::JsDependencyManager)
-      )
+      expect(ReactOnRails::Generators::BaseGenerator.ancestors)
+        .to include(ReactOnRails::Generators::JsDependencyManager)
     end
 
     it "uses the shared JsDependencyManager module in install_generator" do
-      expect(ReactOnRails::Generators::InstallGenerator.ancestors).to(
-        include(ReactOnRails::Generators::JsDependencyManager)
-      )
+      expect(ReactOnRails::Generators::InstallGenerator.ancestors)
+        .to include(ReactOnRails::Generators::JsDependencyManager)
     end
 
     it "does not duplicate JS dependency methods between generators" do
@@ -124,15 +127,13 @@ describe "Message Deduplication", type: :generator do
       shared_methods = %i[setup_js_dependencies add_js_dependencies install_js_dependencies]
 
       shared_methods.each do |method|
-        expect(base_generator).to respond_to(method, true)
-        expect(install_generator).to respond_to(method, true)
-
-        # The methods should come from the same module
-        base_method = base_generator.method(method)
-        install_method = install_generator.method(method)
-
-        expect(base_method.owner).to eq(ReactOnRails::Generators::JsDependencyManager)
-        expect(install_method.owner).to eq(ReactOnRails::Generators::JsDependencyManager)
+        expect(base_generator.respond_to?(method, true)).to be(true)
+        expect(install_generator.respond_to?(method, true)).to be(true)
+        # Verify the methods are defined by the shared module
+        expect(ReactOnRails::Generators::BaseGenerator.instance_method(method).owner)
+          .to eq(ReactOnRails::Generators::JsDependencyManager)
+        expect(ReactOnRails::Generators::InstallGenerator.instance_method(method).owner)
+          .to eq(ReactOnRails::Generators::JsDependencyManager)
       end
     end
   end
