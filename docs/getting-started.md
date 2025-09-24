@@ -28,9 +28,9 @@ The best way to understand React on Rails depends on your situation:
 ## System Requirements
 
 ✅ **🚨 React on Rails 16.0+** (this guide covers modern features)
-✅ **🚨 Shakapacker 7+** (required for React on Rails 16)
-✅ **Rails 7+** (Rails 5+ supported)
-✅ **Ruby 3.0+** (Ruby 2.7+ supported)
+✅ **🚨 Shakapacker 6+** (7+ recommended for React on Rails 16)
+✅ **Rails 7+** (Rails 5.2+ supported)
+✅ **Ruby 3.0+** (required)
 ✅ **Node.js 18+**
 
 > **Don't have Shakapacker?** It's the modern replacement for Webpacker and required for React on Rails.
@@ -165,7 +165,7 @@ The generator set up the following:
 2. Rails integration for rendering this component in a Rails view
 3. Webpack configuration for building your JavaScript bundle
 
-![Basic Hello World Example](../images/bundle-splitting-hello-world.png)
+![Basic Hello World Example](./images/bundle-splitting-hello-world.png)
 
 #### Different Server-Side Rendering Code (and a Server-Specific Bundle)
 

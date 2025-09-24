@@ -20,7 +20,7 @@ Check out the [ngReact](https://github.com/ngReact/ngReact) package. This packag
 
 ## StoryBook
 
-We love using [StoryBook](https://getstorybook.io/) to create a simple testing and inspection area of new React components as we migrate them over from AngularJS Components.
+We love using [Storybook](https://storybook.js.org/) to create a simple testing and inspection area of new React components as we migrate them over from AngularJS Components.
 
 ## Overall Approach?
 

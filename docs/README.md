@@ -26,7 +26,7 @@ Perfect if you're new to React on Rails
 
 Jump to what you need
 
-- **[Installation Guide](./guides/installation.md)** - Detailed setup
+- **[Installation Guide](./guides/installation-into-an-existing-rails-app.md)** - Detailed setup
 - **[API Reference](./api/README.md)** - Quick lookup
 - **[Advanced Features](./guides/advanced/README.md)** - SSR, Redux, Router
 
@@ -68,22 +68,22 @@ Find guidance for your specific scenario:
 ### Development
 
 - **[Hot Module Replacement](./guides/hmr-and-hot-reloading-with-the-webpack-dev-server.md)** - Fast development workflow
-- **[Testing](./guides/development/testing.md)** - Testing React components
-- **[Debugging](./guides/development/debugging.md)** - Common debugging techniques
+- **[Testing](./guides/rspec-configuration.md)** - Testing React components
+- **[Debugging](./javascript/troubleshooting-build-errors.md)** - Common debugging techniques
 
 ### Deployment & Performance
 
 - **[Deployment](./guides/deployment.md)** - Production deployment guide
-- **[Performance](./guides/performance/README.md)** - Optimization techniques
-- **[Bundle Optimization](./guides/performance/webpack-bundle-optimization.md)** - Reduce bundle size
+- **[Performance](./guides/webpack-configuration.md)** - Optimization techniques
+- **[Bundle Optimization](./guides/webpack-configuration.md)** - Reduce bundle size
 
 ## 🆘 Need Help?
 
 ### Quick Solutions
 
 - **[Troubleshooting Guide](./troubleshooting/README.md)** - Common issues and solutions
-- **[FAQ](./troubleshooting/faq.md)** - Frequently asked questions
-- **[Error Messages](./troubleshooting/error-messages.md)** - Decode error messages
+- **[FAQ](./troubleshooting/README.md)** - Frequently asked questions
+- **[Error Messages](./javascript/troubleshooting-build-errors.md)** - Decode error messages
 
 ### Community Support
 
@@ -110,7 +110,7 @@ Find guidance for your specific scenario:
 
 - [View Helpers API](./api/view-helpers-api.md)
 - [Redux Store API](./api/redux-store-api.md)
-- [Configuration API](./api/configuration-api.md)
+- [JavaScript API](./api/javascript-api.md)
 
 ### Guides
 
@@ -122,37 +122,37 @@ Find guidance for your specific scenario:
 
 #### Core Features
 
-- [Server-Side Rendering](./guides/fundamentals/server-rendering.md)
-- [Component Registration](./guides/fundamentals/component-registration.md)
+- [Server-Side Rendering](./guides/react-server-rendering.md)
+- [Component Registration](./guides/render-functions-and-railscontext.md)
 - [Props and RailsContext](./guides/render-functions-and-railscontext.md)
 
 #### State Management
 
-- [Redux Integration](./guides/state-management/redux.md)
-- [Context API](./guides/state-management/context-api.md)
+- [Redux Integration](./javascript/react-and-redux.md)
+- [Context API](./guides/render-functions-and-railscontext.md)
 
 #### Routing
 
-- [React Router Setup](./guides/routing/react-router.md)
-- [Server-Side Routing](./guides/routing/server-side-routing.md)
+- [React Router Setup](./javascript/react-router.md)
+- [Server-Side Routing](./guides/react-server-rendering.md)
 
 #### Advanced Topics
 
 - [Webpack Configuration](./guides/webpack-configuration.md)
 - [Code Splitting](./javascript/code-splitting.md)
-- [Performance Optimization](./guides/performance/README.md)
+- [Performance Optimization](./guides/webpack-configuration.md)
 
 #### Development
 
-- [Hot Module Replacement](./guides/development/hot-reloading.md)
-- [Testing Components](./guides/development/testing.md)
-- [Debugging](./guides/development/debugging.md)
+- [Hot Module Replacement](./guides/hmr-and-hot-reloading-with-the-webpack-dev-server.md)
+- [Testing Components](./guides/rspec-configuration.md)
+- [Debugging](./javascript/troubleshooting-build-errors.md)
 
 #### Deployment
 
-- [Production Setup](./guides/deployment/README.md)
-- [Heroku Deployment](./guides/deployment/heroku-deployment.md)
-- [Docker Setup](./guides/deployment/docker.md)
+- [Production Setup](./guides/deployment.md)
+- [Heroku Deployment](./guides/deployment.md)
+- [Docker Setup](./guides/deployment.md)
 
 ### Migration Guides
 
@@ -162,11 +162,11 @@ Find guidance for your specific scenario:
 ### Troubleshooting
 
 - [Common Issues](./troubleshooting/README.md)
-- [Error Messages](./troubleshooting/error-messages.md)
-- [Performance Issues](./troubleshooting/performance.md)
+- [Error Messages](./javascript/troubleshooting-build-errors.md)
+- [Performance Issues](./javascript/troubleshooting-build-errors.md)
 
 ### Contributing
 
 - [Contributing Guide](../CONTRIBUTING.md)
-- [Development Setup](./contributor-info/development.md)
-- [Pull Request Guidelines](./contributor-info/pull-requests.md)
+- [Development Setup](../CONTRIBUTING.md)
+- [Pull Request Guidelines](../CONTRIBUTING.md)

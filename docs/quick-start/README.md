@@ -9,9 +9,9 @@ This guide will have you rendering React components in your Rails app as quickly
 Before starting, make sure you have:
 
 - **🚨 React on Rails 16.0+** (this guide)
-- **🚨 Shakapacker 7+** (required for React on Rails 16)
-- **Rails 7+** application (Rails 5+ supported)
-- **Ruby 3.0+** (Ruby 2.7+ supported)
+- **🚨 Shakapacker 6+** (7+ recommended for React on Rails 16)
+- **Rails 7+** application (Rails 5.2+ supported)
+- **Ruby 3.0+** (required)
 - **Node.js 18+** and **Yarn**
 - **Basic familiarity** with React and Rails
 
@@ -161,18 +161,18 @@ Now that you have React on Rails working, here's what to explore next:
 
 1. **[Basic Configuration](../getting-started.md)** - Understand the setup
 2. **[View Helpers API](../api/view-helpers-api.md)** - Learn all the options for `react_component`
-3. **[Hot Module Replacement](../guides/development/hot-reloading.md)** - Optimize your dev workflow
+3. **[Hot Module Replacement](../guides/hmr-and-hot-reloading-with-the-webpack-dev-server.md)** - Optimize your dev workflow
 
 ### Dive Deeper
 
 1. **[Complete Tutorial](../guides/tutorial.md)** - Build a full app with Redux
-2. **[Server-Side Rendering](../guides/fundamentals/server-rendering.md)** - Optimize for SEO and performance
-3. **[Production Deployment](../guides/deployment/README.md)** - Deploy to production
+2. **[Server-Side Rendering](../guides/react-server-rendering.md)** - Optimize for SEO and performance
+3. **[Production Deployment](../guides/deployment.md)** - Deploy to production
 
 ### Advanced Features
 
-1. **[Redux Integration](../guides/state-management/redux.md)** - Manage application state
-2. **[React Router](../guides/routing/react-router.md)** - Client-side routing
+1. **[Redux Integration](../javascript/react-and-redux.md)** - Manage application state
+2. **[React Router](../javascript/react-router.md)** - Client-side routing
 3. **[Code Splitting](../javascript/code-splitting.md)** - Optimize bundle size
 
 ## 🆘 Need Help?
