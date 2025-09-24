@@ -76,15 +76,17 @@ module ReactOnRails
                                "react-on-rails"
                              end
 
+        packages_array = [react_on_rails_pkg]
+
         puts "Installing React on Rails package..."
-        if add_js_dependency(react_on_rails_pkg)
+        if add_js_dependencies_batch(packages_array)
           @added_dependencies_to_package_json = true
         else
           # Fallback to direct npm install
           puts "Using direct npm commands as fallback"
-          success = system("npm", "install", react_on_rails_pkg)
+          success = system("npm", "install", *packages_array)
           @ran_direct_installs = true if success
-          handle_npm_failure("react-on-rails package", [react_on_rails_pkg]) unless success
+          handle_npm_failure("react-on-rails package", packages_array) unless success
         end
       end
 
