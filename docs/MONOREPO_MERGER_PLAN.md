@@ -1,7 +1,7 @@
 # React on Rails Monorepo Merger Plan
 
 **Version:** 1.0
-**Date:** 2025-01-24
+**Date:** 2025-09-24
 **Status:** Planning Phase
 **GitHub Issue:** [#1765](https://github.com/shakacode/react_on_rails/issues/1765)
 
