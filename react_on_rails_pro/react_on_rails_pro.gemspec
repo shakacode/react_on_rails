@@ -13,6 +13,7 @@ Gem::Specification.new do |s|
   s.summary       = "Rails with react server rendering with webpack. Performance helpers"
   s.description   = "See README.md"
   s.homepage      = "https://github.com/shakacode/react_on_rails_pro"
+  s.license       = "UNLICENSED"
   s.metadata["rubygems_mfa_required"] = "true"
 
   s.files         = `git ls-files -z`.split("\x0")
