@@ -32,9 +32,8 @@ Jump to what you need
 
 ### 🏗️ **Migrating from Other Solutions**
 
-- **[From react-rails](./guides/migration/from-react-rails.md)**
-- **[From Webpacker](./guides/migration/from-webpacker.md)**
-- **[From custom setup](./guides/migration/from-custom.md)**
+- **[From react-rails](./additional-details/migrating-from-react-rails.md)** - Switch from the react-rails gem
+- **[Upgrading React on Rails](./guides/upgrading-react-on-rails.md)** - Version upgrade guide
 
 ## 🎯 Popular Use Cases
 
@@ -158,8 +157,7 @@ Find guidance for your specific scenario:
 ### Migration Guides
 
 - [Upgrading React on Rails](./guides/upgrading-react-on-rails.md)
-- [From Webpacker to Shakapacker](./guides/migration/webpacker-to-shakapacker.md)
-- [From react-rails](./guides/migration/from-react-rails.md)
+- [From react-rails gem](./additional-details/migrating-from-react-rails.md)
 
 ### Troubleshooting
 

@@ -27,10 +27,11 @@ The best way to understand React on Rails depends on your situation:
 
 ## System Requirements
 
+✅ **🚨 React on Rails 16.0+** (this guide covers modern features)
+✅ **🚨 Shakapacker 7+** (required for React on Rails 16)
 ✅ **Rails 7+** (Rails 5+ supported)
 ✅ **Ruby 3.0+** (Ruby 2.7+ supported)
 ✅ **Node.js 18+**
-✅ **Shakapacker 7** (or Shakapacker 6 with [special setup](./additional-details/tips-for-usage-with-sp6.md))
 
 > **Don't have Shakapacker?** It's the modern replacement for Webpacker and required for React on Rails.
 

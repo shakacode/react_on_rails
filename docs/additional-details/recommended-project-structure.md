@@ -19,7 +19,7 @@ you should consider keeping your codebase mostly consistent with the defaults fo
 
 1. Move the directory:
 
-```sh
+```bash
 mv app/javascript client
 ```
 

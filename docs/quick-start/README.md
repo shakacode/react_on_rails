@@ -8,8 +8,10 @@ This guide will have you rendering React components in your Rails app as quickly
 
 Before starting, make sure you have:
 
-- **Rails 7+** application
-- **Ruby 3.0+**
+- **🚨 React on Rails 16.0+** (this guide)
+- **🚨 Shakapacker 7+** (required for React on Rails 16)
+- **Rails 7+** application (Rails 5+ supported)
+- **Ruby 3.0+** (Ruby 2.7+ supported)
 - **Node.js 18+** and **Yarn**
 - **Basic familiarity** with React and Rails
 
@@ -132,9 +134,11 @@ Note, your layout needs to include this in the <head>:
 That's it! React on Rails will automatically:
 
 - ✅ Find your component in any directory named `ror_components` (configurable)
-- ✅ Create the webpack bundle
-- ✅ Register the component
-- ✅ Include the JavaScript on the page
+- ✅ Create optimized webpack bundles with code splitting
+- ✅ Register the component for immediate use
+- ✅ Include only necessary JavaScript on each page (reduces bundle size)
+
+> **🚀 Performance Tip:** Auto-bundling automatically optimizes your JavaScript delivery by only loading components used on each page, significantly reducing initial bundle size compared to manual bundling.
 
 Restart your server and visit the page - you should see your interactive counter!
 
