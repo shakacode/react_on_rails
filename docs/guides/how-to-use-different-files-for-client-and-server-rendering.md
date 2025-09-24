@@ -28,7 +28,7 @@ Note that the only difference is in the imports.
 
 Per [Webpack Docs](https://webpack.js.org/configuration/resolve/#resolve-alias).
 
-### 1. Update `webpack/set-resolve.js` to have a different resolution for the exact file:
+### 1. Update `webpack/set-resolve.js` to have a different resolution for the exact file
 
 ```js
 function setResolve(builderConfig, webpackConfig) {
@@ -55,9 +55,9 @@ Then you have this import:
 import SomeJsFile from 'SomeJsFile';
 ```
 
-### 2. Use a different resolution for the right directory of client or server files:
+### 2. Use a different resolution for the right directory of client or server files
 
-#### a. Update `webpack/set-resolve.js` to have something like:
+#### a. Update `webpack/set-resolve.js` to have something like
 
 ```js
 function setResolve(builderConfig, webpackConfig) {
@@ -80,7 +80,7 @@ function setResolve(builderConfig, webpackConfig) {
 
 #### b. Add different versions of the file to the `bundles/variant/ClientOnly` and `bundles/variant/ServerOnly` directories
 
-#### c. Use the `variant` in import in a file that can be used both for client and server rendering:
+#### c. Use the `variant` in import in a file that can be used both for client and server rendering
 
 ```js
 import SomeJsFile from 'variant/SomeJsFile';
