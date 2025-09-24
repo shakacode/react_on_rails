@@ -1,5 +1,17 @@
 # Tips for Contributors
 
+**🏗️ Important: Monorepo Merger in Progress**
+
+We are currently working on merging the `react_on_rails` and `react_on_rails_pro` repositories into a unified monorepo. This will provide better development experience while maintaining separate package identities and licensing. See [docs/MONOREPO_MERGER_PLAN_REF.md](./docs/MONOREPO_MERGER_PLAN_REF.md) for details.
+
+During this transition:
+
+- Continue contributing to the current structure
+- License compliance remains critical - ensure no Pro code enters MIT-licensed areas
+- Major structural changes may be coordinated with the merger plan
+
+---
+
 - [docs/contributor-info/Releasing](./docs/contributor-info/releasing.md) for instructions on releasing.
 - [docs/contributor-info/pull-requests](./docs/contributor-info/pull-requests.md)
 - See other docs in [docs/contributor-info](./docs/contributor-info)
