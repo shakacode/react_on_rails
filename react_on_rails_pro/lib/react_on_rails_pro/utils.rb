@@ -108,7 +108,7 @@ module ReactOnRailsPro
       @rsc_bundle_hash = calc_bundle_hash(server_rsc_bundle_js_file_path)
     end
 
-    # Returns the hashed file name when using webpacker. Useful for creating cache keys.
+    # Returns the hashed file name when using Shakapacker. Useful for creating cache keys.
     def self.bundle_file_name(bundle_name)
       # bundle_js_uri_from_packer can return a file path or a HTTP URL (for files served from the dev server)
       # Pathname can handle both cases
@@ -117,8 +117,8 @@ module ReactOnRailsPro
       pathname.basename.to_s
     end
 
-    # Returns the hashed file name of the server bundle when using webpacker.
-    # Necessary fragment-caching keys.
+    # Returns the hashed file name of the server bundle when using Shakapacker.
+    # Necessary for fragment-caching keys.
     def self.server_bundle_file_name
       return @server_bundle_hash if @server_bundle_hash && !Rails.env.development?
 
