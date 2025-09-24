@@ -1,7 +1,7 @@
 PATH
   remote: ../..
   specs:
-    react_on_rails (16.0.1.rc.4)
+    react_on_rails (16.1.0)
       addressable
       connection_pool
       execjs (~> 2.5)
@@ -193,6 +193,7 @@ GEM
     nokogiri (1.18.10)
       mini_portile2 (~> 2.8.2)
       racc (~> 1.4)
+    ostruct (0.6.3)
     package_json (0.1.0)
     parallel (1.24.0)
     parser (3.3.0.2)
@@ -406,6 +407,7 @@ PLATFORMS
 
 DEPENDENCIES
   amazing_print
+  benchmark
   bootsnap
   capybara
   capybara-screenshot
@@ -418,6 +420,8 @@ DEPENDENCIES
   launchy
   lefthook
   listen
+  logger
+  ostruct
   package_json
   pry
   pry-byebug
