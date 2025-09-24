@@ -6,13 +6,13 @@ Having issues with React on Rails? This guide covers the most common problems an
 
 ### Is your issue with...?
 
-| Problem Area         | Quick Check                                 | Go to Section                               |
-| -------------------- | ------------------------------------------- | ------------------------------------------- |
-| **Installation**     | Generator fails or components don't appear  | [Installation Issues](#installation-issues) |
-| **Compilation**      | Webpack errors, build failures              | [Build Issues](#build-issues)               |
-| **Runtime**          | Components not rendering, JavaScript errors | [Runtime Issues](#runtime-issues)           |
-| **Server Rendering** | SSR not working, hydration mismatches       | [SSR Issues](#server-side-rendering-issues) |
-| **Performance**      | Slow builds, large bundles, memory issues   | [Performance Issues](#performance-issues)   |
+| Problem Area         | Quick Check                                 | Go to Section                                |
+| -------------------- | ------------------------------------------- | -------------------------------------------- |
+| **Installation**     | Generator fails or components don't appear  | [Installation Issues](#-installation-issues) |
+| **Compilation**      | Webpack errors, build failures              | [Build Issues](#-build-issues)               |
+| **Runtime**          | Components not rendering, JavaScript errors | [Runtime Issues](#-runtime-issues)           |
+| **Server Rendering** | SSR not working, hydration mismatches       | [SSR Issues](#-server-side-rendering-issues) |
+| **Performance**      | Slow builds, large bundles, memory issues   | [Performance Issues](#-performance-issues)   |
 
 ## 🚨 Installation Issues
 
