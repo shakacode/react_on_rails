@@ -23,102 +23,74 @@ After a release, please make sure to run `bundle exec rake update_changelog`. Th
 
 Changes since the last non-beta release.
 
-### [16.0.1-rc.4] - 2025-09-23
-
-#### Breaking Changes
-
-- **Removed `generated_assets_dirs` configuration**: The legacy `config.generated_assets_dirs` option is no longer supported and will raise an error if used. Since Shakapacker is now required, asset paths are automatically determined from `shakapacker.yml` configuration. Remove any `config.generated_assets_dirs` from your `config/initializers/react_on_rails.rb` file. Use `public_output_path` in `config/shakapacker.yml` to customize asset output location instead. [PR 1798](https://github.com/shakacode/react_on_rails/pull/1798)
+### [16.1.0] - 2025-09-23
 
 #### New Features
 
 - **Server Bundle Security**: Added new configuration options for enhanced server bundle security and organization:
 
-  - `server_bundle_output_path`: Configurable directory (relative to the Rails root) for server bundle output (default: "ssr-generated"). If set to `nil`, the server bundle will be loaded from the same public directory as client bundles.
-  - `enforce_private_server_bundles`: When enabled, ensures server bundles are only loaded from private directories outside the public folder (default: false for backward compatibility)
+  - `server_bundle_output_path`: Configurable directory (relative to the Rails root) for server bundle output (default: "ssr-generated"). If set to `nil`, the server bundle will be loaded from the same public directory as client bundles. [PR 1798](https://github.com/shakacode/react_on_rails/pull/1798) by [justin808](https://github.com/justin808)
+  - `enforce_private_server_bundles`: When enabled, ensures server bundles are only loaded from private directories outside the public folder (default: false for backward compatibility) [PR 1798](https://github.com/shakacode/react_on_rails/pull/1798) by [justin808](https://github.com/justin808)
 
 - **Improved Bundle Path Resolution**: Bundle path resolution for server bundles now works as follows:
+
   - If `server_bundle_output_path` is set, the server bundle is loaded from that directory.
   - If `server_bundle_output_path` is not set, the server bundle falls back to the client bundle directory (typically the public output path).
   - If `enforce_private_server_bundles` is enabled:
     - The server bundle will only be loaded from the private directory specified by `server_bundle_output_path`.
     - If the bundle is not found there, it will _not_ fall back to the public directory.
   - If `enforce_private_server_bundles` is not enabled and the bundle is not found in the private directory, it will fall back to the public directory.
-  - This logic ensures that, when strict enforcement is enabled, server bundles are never loaded from public directories, improving security and clarity of bundle resolution.
+  - This logic ensures that, when strict enforcement is enabled, server bundles are never loaded from public directories, improving security and clarity of bundle resolution. [PR 1798](https://github.com/shakacode/react_on_rails/pull/1798) by [justin808](https://github.com/justin808)
+
+- **`react_on_rails:doctor` rake task**: New diagnostic command to validate React on Rails setup and identify configuration issues. Provides comprehensive checks for environment prerequisites, dependencies, Rails integration, and Webpack configuration. Use `rake react_on_rails:doctor` to diagnose your setup, with optional `VERBOSE=true` for detailed output. [PR 1791](https://github.com/shakacode/react_on_rails/pull/1791) by [AbanoubGhadban](https://github.com/AbanoubGhadban)
+
+#### Deprecations
+
+- **Deprecated `generated_assets_dirs` configuration**: The legacy `config.generated_assets_dirs` option is now deprecated and will show a deprecation warning if used. Since Shakapacker is now required, asset paths are automatically determined from `shakapacker.yml` configuration. Remove any `config.generated_assets_dirs` from your `config/initializers/react_on_rails.rb` file. Use `public_output_path` in `config/shakapacker.yml` to customize asset output location instead. [PR 1798](https://github.com/shakacode/react_on_rails/pull/1798) by [justin808](https://github.com/justin808)
 
 #### API Improvements
 
 - **Method Naming Clarification**: Added `public_bundles_full_path` method to clarify bundle path handling:
   - `public_bundles_full_path`: New method specifically for webpack bundles in public directories
   - `generated_assets_full_path`: Now deprecated (backwards-compatible alias)
-  - This eliminates confusion between webpack bundles and general Rails public assets
+  - This eliminates confusion between webpack bundles and general Rails public assets [PR 1798](https://github.com/shakacode/react_on_rails/pull/1798) by [justin808](https://github.com/justin808)
 
 #### Security Enhancements
 
-- **Private Server Bundle Enforcement**: When `enforce_private_server_bundles` is enabled, server bundles bypass public directory fallbacks and are only loaded from designated private locations
-- **Path Validation**: Added validation to ensure `server_bundle_output_path` points to private directories when enforcement is enabled
+- **Private Server Bundle Enforcement**: When `enforce_private_server_bundles` is enabled, server bundles bypass public directory fallbacks and are only loaded from designated private locations [PR 1798](https://github.com/shakacode/react_on_rails/pull/1798) by [justin808](https://github.com/justin808)
+- **Path Validation**: Added validation to ensure `server_bundle_output_path` points to private directories when enforcement is enabled [PR 1798](https://github.com/shakacode/react_on_rails/pull/1798) by [justin808](https://github.com/justin808)
+- **Fixed command injection vulnerabilities**: Replaced unsafe string interpolation in generator package installation commands with secure array-based system calls [PR 1786](https://github.com/shakacode/react_on_rails/pull/1786) by [justin808](https://github.com/justin808)
+- **Improved input validation**: Enhanced package manager validation and argument sanitization across all generators [PR 1786](https://github.com/shakacode/react_on_rails/pull/1786) by [justin808](https://github.com/justin808)
+- **Hardened DOM selectors**: Using `CSS.escape()` and proper JavaScript escaping for XSS protection [PR 1791](https://github.com/shakacode/react_on_rails/pull/1791) by [AbanoubGhadban](https://github.com/AbanoubGhadban)
 
-#### Bug Fixes
+#### Pro License Features
 
-- **Non-Packer Environment Compatibility**: Fixed potential NoMethodError when using bundle path resolution in environments without Shakapacker
-- **Shakapacker version requirements**: Fixed inconsistent version requirements between basic pack generation (6.5.1+) and advanced auto-bundling features (7.0.0+). Added backward compatibility for users on Shakapacker 6.5.1-6.9.x while providing clear upgrade guidance for advanced features. Added new constants `MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_BUNDLING` and improved version checking performance with caching. [PR 1798](https://github.com/shakacode/react_on_rails/pull/1798)
+- **Core/Pro separation**: Moved Pro features into dedicated `lib/react_on_rails/pro/` and `node_package/src/pro/` directories with clear licensing boundaries [PR 1791](https://github.com/shakacode/react_on_rails/pull/1791) by [AbanoubGhadban](https://github.com/AbanoubGhadban)
+- **Runtime license validation**: Implemented Pro license gating with graceful fallback to core functionality when Pro license unavailable [PR 1791](https://github.com/shakacode/react_on_rails/pull/1791) by [AbanoubGhadban](https://github.com/AbanoubGhadban)
+- **Enhanced immediate hydration**: Improved immediate hydration functionality with Pro license validation and warning badges [PR 1791](https://github.com/shakacode/react_on_rails/pull/1791) by [AbanoubGhadban](https://github.com/AbanoubGhadban)
+- **License documentation**: Added NOTICE files in Pro directories referencing canonical `REACT-ON-RAILS-PRO-LICENSE.md` [PR 1791](https://github.com/shakacode/react_on_rails/pull/1791) by [AbanoubGhadban](https://github.com/AbanoubGhadban)
 
-### [16.0.1-rc.2] - 2025-09-20
-
-#### Bug Fixes
-
-- **Packs generator**: Fixed error when `server_bundle_js_file` configuration is empty (default). Added safety check to prevent attempting operations on invalid file paths when server-side rendering is not configured. [PR 1802](https://github.com/shakacode/react_on_rails/pull/1802)
-
-### [16.0.1-rc.2] - 2025-09-20
-
-#### Bug Fixes
-
-- **Doctor rake task**: Fixed LoadError in `rake react_on_rails:doctor` when using packaged gem. The task was trying to require excluded `rakelib/task_helpers` file. [PR 1795](https://github.com/shakacode/react_on_rails/pull/1795)
-- **Shakapacker version requirements**: Fixed inconsistent version requirements between basic pack generation (6.5.1+) and advanced auto-registration features (7.0.0+). Added backward compatibility for users on Shakapacker 6.5.1-6.9.x while providing clear upgrade guidance for advanced features. Added new constants `MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_REGISTRATION` and improved version checking performance with caching. [PR 1798](https://github.com/shakacode/react_on_rails/pull/1798)
-
-#### Code Cleanup
-
-- **PackerUtils abstraction removal**: Removed unnecessary `PackerUtils.packer` abstraction method and replaced all calls with direct `::Shakapacker` usage. This simplifies the codebase by eliminating an abstraction layer that was originally created to support multiple webpack tools but is no longer needed since we only support Shakapacker. All tests updated accordingly. [PR 1798](https://github.com/shakacode/react_on_rails/pull/1798) by [claude-code](https://claude.ai/code)
-
-### [16.0.1-rc.0] - 2025-09-19
-
-#### Pro License Structure Implementation
-
-**🔐 License Architecture**
-
-- **Core/Pro separation**: Moved Pro features into dedicated `lib/react_on_rails/pro/` and `node_package/src/pro/` directories with clear licensing boundaries [PR 1791](https://github.com/shakacode/react_on_rails/pull/1791) by [abanoubghadban](https://github.com/AbanoubGhadban)
-- **Runtime license validation**: Implemented Pro license gating with graceful fallback to core functionality when Pro license unavailable
-- **License documentation**: Added NOTICE files in Pro directories referencing canonical `REACT-ON-RAILS-PRO-LICENSE.md`
-- **Updated LICENSE.md**: Clearly distinguishes core MIT license from Pro-licensed directories
-
-**⚡ Pro Feature Enhancements**
-
-- **Immediate hydration**: Enhanced immediate hydration functionality with Pro license validation and warning badges
-- **Security improvements**: Hardened DOM selectors using `CSS.escape()` and proper JavaScript escaping for XSS protection
-- **Architecture refactoring**: Centralized Pro utilities and clean separation between core and Pro helper functionality
-
-#### Enhanced TypeScript Generator Support
-
-**🔧 Generator Improvements**
+#### Generator Improvements
 
 - **Modern TypeScript patterns**: Generators now produce more idiomatic TypeScript code with improved type inference instead of explicit type annotations [PR 1786](https://github.com/shakacode/react_on_rails/pull/1786) by [justin808](https://github.com/justin808)
-- **Optimized tsconfig.json**: Updated compiler options to use `"moduleResolution": "bundler"` for better bundler compatibility
-- **Enhanced Redux TypeScript integration**: Improved type safety and modern React patterns (useMemo, type-only imports)
-- **Smart bin/dev defaults**: Generated `bin/dev` script now automatically navigates to `/hello_world` route for immediate component visibility
+- **Optimized tsconfig.json**: Updated compiler options to use `"moduleResolution": "bundler"` for better bundler compatibility [PR 1786](https://github.com/shakacode/react_on_rails/pull/1786) by [justin808](https://github.com/justin808)
+- **Enhanced Redux TypeScript integration**: Improved type safety and modern React patterns (useMemo, type-only imports) [PR 1786](https://github.com/shakacode/react_on_rails/pull/1786) by [justin808](https://github.com/justin808)
+- **Smart bin/dev defaults**: Generated `bin/dev` script now automatically navigates to `/hello_world` route for immediate component visibility [PR 1786](https://github.com/shakacode/react_on_rails/pull/1786) by [justin808](https://github.com/justin808)
+- **Better component templates**: Removed unnecessary type annotations while maintaining type safety through TypeScript's inference [PR 1786](https://github.com/shakacode/react_on_rails/pull/1786) by [justin808](https://github.com/justin808)
+- **Cleaner generated code**: Streamlined templates following modern React and TypeScript best practices [PR 1786](https://github.com/shakacode/react_on_rails/pull/1786) by [justin808](https://github.com/justin808)
+- **Improved helper methods**: Added reusable `component_extension` helper for consistent file extension handling [PR 1786](https://github.com/shakacode/react_on_rails/pull/1786) by [justin808](https://github.com/justin808)
 
-**🔐 Security Enhancements**
+#### Bug Fixes
 
-- **Fixed command injection vulnerabilities**: Replaced unsafe string interpolation in generator package installation commands with secure array-based system calls
-- **Improved input validation**: Enhanced package manager validation and argument sanitization across all generators
+- **Doctor rake task**: Fixed LoadError in `rake react_on_rails:doctor` when using packaged gem. The task was trying to require excluded `rakelib/task_helpers` file. [PR 1795](https://github.com/shakacode/react_on_rails/pull/1795) by [justin808](https://github.com/justin808)
+- **Packs generator**: Fixed error when `server_bundle_js_file` configuration is empty (default). Added safety check to prevent attempting operations on invalid file paths when server-side rendering is not configured. [PR 1802](https://github.com/shakacode/react_on_rails/pull/1802) by [justin808](https://github.com/justin808)
+- **Non-Packer Environment Compatibility**: Fixed potential NoMethodError when using bundle path resolution in environments without Shakapacker [PR 1798](https://github.com/shakacode/react_on_rails/pull/1798) by [justin808](https://github.com/justin808)
+- **Shakapacker version requirements**: Fixed inconsistent version requirements between basic pack generation (6.5.1+) and advanced auto-bundling features (7.0.0+). Added backward compatibility for users on Shakapacker 6.5.1-6.9.x while providing clear upgrade guidance for advanced features. Added new constants `MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_BUNDLING` and improved version checking performance with caching. [PR 1798](https://github.com/shakacode/react_on_rails/pull/1798) by [justin808](https://github.com/justin808)
 
-**🎯 Developer Experience**
+#### Code Improvements
 
-- **Better component templates**: Removed unnecessary type annotations while maintaining type safety through TypeScript's inference
-- **Cleaner generated code**: Streamlined templates following modern React and TypeScript best practices
-- **Improved helper methods**: Added reusable `component_extension` helper for consistent file extension handling
-
-#### Added
-
-- **`react_on_rails:doctor` rake task**: New diagnostic command to validate React on Rails setup and identify configuration issues. Provides comprehensive checks for environment prerequisites, dependencies, Rails integration, and Webpack configuration. Use `rake react_on_rails:doctor` to diagnose your setup, with optional `VERBOSE=true` for detailed output.
+- **PackerUtils abstraction removal**: Removed unnecessary `PackerUtils.packer` abstraction method and replaced all calls with direct `::Shakapacker` usage. This simplifies the codebase by eliminating an abstraction layer that was originally created to support multiple webpack tools but is no longer needed since we only support Shakapacker. All tests updated accordingly. [PR 1798](https://github.com/shakacode/react_on_rails/pull/1798) by [claude-code](https://claude.ai/code)
+- **Architecture refactoring**: Centralized Pro utilities and clean separation between core and Pro helper functionality [PR 1791](https://github.com/shakacode/react_on_rails/pull/1791) by [AbanoubGhadban](https://github.com/AbanoubGhadban)
 
 ### [16.0.0] - 2025-09-16
 
