@@ -69,19 +69,24 @@ task :release, %i[gem_version dry_run tools_install] do |_t, args|
   # Disable lefthook pre-commit hooks during release to prevent file modifications
   sh_in_dir(gem_root, "LEFTHOOK=0 #{release_it_command}")
 
+  # Commit the Gemfile.lock changes made by release-it before gem release
+  unless is_dry_run
+    sh_in_dir(gem_root, "git add Gemfile.lock")
+    sh_in_dir(gem_root, "git commit -m 'Update Gemfile.lock for version #{gem_version}'")
+  end
+
   # Release the new gem version
 
   puts "Carefully add your OTP for Rubygems. If you get an error, run 'gem release' again."
   sh_in_dir(gem_root, "gem release") unless is_dry_run
 
   msg = <<~MSG
-    Once you have successfully published, run these commands to update Gemfile.lock and CHANGELOG.md:
+    Once you have successfully published, run these commands to update CHANGELOG.md:
 
-    bundle install
     bundle exec rake update_changelog
     cd #{dummy_app_dir}; bundle update react_on_rails
     cd #{gem_root}
-    git commit -a -m 'Update Gemfile.lock and CHANGELOG.md'
+    git commit -a -m 'Update CHANGELOG.md and spec/dummy Gemfile.lock'
     git push
   MSG
   puts msg
