@@ -23,6 +23,8 @@ After a release, please make sure to run `bundle exec rake update_changelog`. Th
 
 Changes since the last non-beta release.
 
+### [16.0.1-rc.4] - 2025-09-23
+
 #### Breaking Changes
 
 - **Removed `generated_assets_dirs` configuration**: The legacy `config.generated_assets_dirs` option is no longer supported and will raise an error if used. Since Shakapacker is now required, asset paths are automatically determined from `shakapacker.yml` configuration. Remove any `config.generated_assets_dirs` from your `config/initializers/react_on_rails.rb` file. Use `public_output_path` in `config/shakapacker.yml` to customize asset output location instead. [PR 1798](https://github.com/shakacode/react_on_rails/pull/1798)
@@ -1702,7 +1704,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/16.0.1-rc.2...master
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/16.0.1-rc.4...master
+[16.0.1-rc.4]: https://github.com/shakacode/react_on_rails/compare/16.0.1-rc.2...16.0.1-rc.4
 [16.0.1-rc.2]: https://github.com/shakacode/react_on_rails/compare/16.0.1-rc.0...16.0.1-rc.2
 [16.0.1-rc.0]: https://github.com/shakacode/react_on_rails/compare/16.0.0...16.0.1-rc.0
 [16.0.0]: https://github.com/shakacode/react_on_rails/compare/14.2.0...16.0.0
