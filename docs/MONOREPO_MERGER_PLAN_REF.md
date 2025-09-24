@@ -2,7 +2,7 @@
 
 The complete React on Rails Monorepo Merger Plan is located at:
 
-**[docs/MONOREPO_MERGER_PLAN.md](/mnt/ssd/react_on_rails_workspace/react_on_rails/docs/MONOREPO_MERGER_PLAN.md)**
+**[docs/MONOREPO_MERGER_PLAN.md](./MONOREPO_MERGER_PLAN.md)**
 
 This plan outlines the 7-phase implementation for merging the `react_on_rails` and `react_on_rails_pro` repositories into a unified monorepo while maintaining:
 
