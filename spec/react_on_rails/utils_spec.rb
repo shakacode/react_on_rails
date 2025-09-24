@@ -146,8 +146,9 @@ module ReactOnRails
             context "with server bundle (SSR/RSC) file not in manifest" do
               let(:server_bundle_name) { "server-bundle.js" }
               let(:ssr_generated_path) { File.expand_path(File.join("ssr-generated", server_bundle_name)) }
+              let(:public_path) { File.expand_path(File.join(packer_public_output_path, server_bundle_name)) }
 
-              context "with server_bundle_output_path configured" do
+              context "with server_bundle_output_path configured and enforce_private_server_bundles=false" do
                 before do
                   mock_missing_manifest_entry(server_bundle_name)
                   allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
@@ -158,15 +159,63 @@ module ReactOnRails
                     .and_return(false)
                 end
 
-                it "returns configured path directly without checking existence" do
-                  # When enforce_private_server_bundles is false, it will check File.exist?
-                  # for both private and public paths, but should still return the configured path
-                  public_path = File.expand_path(File.join(packer_public_output_path, server_bundle_name))
+                it "returns private path when it exists even if public path also exists" do
+                  allow(File).to receive(:exist?).with(ssr_generated_path).and_return(true)
+                  allow(File).to receive(:exist?).with(public_path).and_return(true)
+
+                  result = described_class.bundle_js_file_path(server_bundle_name)
+                  expect(result).to eq(ssr_generated_path)
+                end
+
+                it "returns public path when private path does not exist and public path exists" do
+                  allow(File).to receive(:exist?).with(ssr_generated_path).and_return(false)
+                  allow(File).to receive(:exist?).with(public_path).and_return(true)
+
+                  result = described_class.bundle_js_file_path(server_bundle_name)
+                  expect(result).to eq(public_path)
+                end
+
+                it "returns configured path if both private and public paths do not exist" do
                   allow(File).to receive(:exist?).with(ssr_generated_path).and_return(false)
                   allow(File).to receive(:exist?).with(public_path).and_return(false)
 
                   result = described_class.bundle_js_file_path(server_bundle_name)
                   expect(result).to eq(ssr_generated_path)
+                end
+              end
+
+              context "with server_bundle_output_path configured and enforce_private_server_bundles=true" do
+                before do
+                  mock_missing_manifest_entry(server_bundle_name)
+                  allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
+                    .and_return(server_bundle_name)
+                  allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
+                    .and_return("ssr-generated")
+                  allow(ReactOnRails).to receive_message_chain("configuration.enforce_private_server_bundles")
+                    .and_return(true)
+                end
+
+                # It should always return the ssr_generated_path, regardless of which files exist
+                file_states_combinations = [
+                  { ssr_exists: true, public_exists: true },
+                  { ssr_exists: true, public_exists: false },
+                  { ssr_exists: false, public_exists: true },
+                  { ssr_exists: false, public_exists: false }
+                ]
+                file_states_combinations.each do |file_states|
+                  it "returns private path when enforce_private_server_bundles=true " \
+                     "(ssr_exists=#{file_states[:ssr_exists]}, " \
+                     "public_exists=#{file_states[:public_exists]})" do
+                    allow(File).to receive(:exist?)
+                      .with(ssr_generated_path)
+                      .and_return(file_states[:ssr_exists])
+                    allow(File).to receive(:exist?)
+                      .with(public_path)
+                      .and_return(file_states[:public_exists])
+
+                    result = described_class.bundle_js_file_path(server_bundle_name)
+                    expect(result).to eq(ssr_generated_path)
+                  end
                 end
               end
 
@@ -190,27 +239,65 @@ module ReactOnRails
 
             context "with RSC bundle file not in manifest" do
               let(:rsc_bundle_name) { "rsc-bundle.js" }
+              let(:public_path) { File.expand_path(File.join(packer_public_output_path, rsc_bundle_name)) }
               let(:ssr_generated_path) { File.expand_path(File.join("ssr-generated", rsc_bundle_name)) }
 
-              before do
-                mock_missing_manifest_entry(rsc_bundle_name)
-                allow(ReactOnRails).to receive_message_chain("configuration.rsc_bundle_js_file")
-                  .and_return(rsc_bundle_name)
-                allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
-                  .and_return("ssr-generated")
-                allow(ReactOnRails).to receive_message_chain("configuration.enforce_private_server_bundles")
-                  .and_return(false)
+              context "with enforce_private_server_bundles=false" do
+                before do
+                  mock_missing_manifest_entry(rsc_bundle_name)
+                  allow(ReactOnRails).to receive_message_chain("configuration.rsc_bundle_js_file")
+                    .and_return(rsc_bundle_name)
+                  allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
+                    .and_return("ssr-generated")
+                  allow(ReactOnRails).to receive_message_chain("configuration.enforce_private_server_bundles")
+                    .and_return(false)
+                end
+
+                it "returns private path when it exists even if public path also exists" do
+                  allow(File).to receive(:exist?).with(ssr_generated_path).and_return(true)
+                  expect(File).not_to receive(:exist?).with(public_path)
+
+                  result = described_class.bundle_js_file_path(rsc_bundle_name)
+                  expect(result).to eq(ssr_generated_path)
+                end
+
+                it "fallbacks to public path when private path does not exist and public path exists" do
+                  allow(File).to receive(:exist?).with(ssr_generated_path).and_return(false)
+                  allow(File).to receive(:exist?).with(public_path).and_return(true)
+
+                  result = described_class.bundle_js_file_path(rsc_bundle_name)
+                  expect(result).to eq(public_path)
+                end
+
+                it "returns configured path if both private and public paths do not exist" do
+                  allow(File).to receive(:exist?).with(ssr_generated_path).and_return(false)
+                  allow(File).to receive(:exist?).with(public_path).and_return(false)
+
+                  result = described_class.bundle_js_file_path(rsc_bundle_name)
+                  expect(result).to eq(ssr_generated_path)
+                end
               end
 
-              it "treats RSC bundles as server bundles and returns configured path directly" do
-                # When enforce_private_server_bundles is false, it will check File.exist?
-                # for both private and public paths, but should still return the configured path
-                public_path = File.expand_path(File.join(packer_public_output_path, rsc_bundle_name))
-                allow(File).to receive(:exist?).with(ssr_generated_path).and_return(false)
-                allow(File).to receive(:exist?).with(public_path).and_return(false)
+              context "with enforce_private_server_bundles=true" do
+                before do
+                  mock_missing_manifest_entry(rsc_bundle_name)
+                  allow(ReactOnRails).to receive_message_chain("configuration.rsc_bundle_js_file")
+                    .and_return(rsc_bundle_name)
+                  allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
+                    .and_return("ssr-generated")
+                  allow(ReactOnRails).to receive_message_chain("configuration.enforce_private_server_bundles")
+                    .and_return(true)
+                end
 
-                result = described_class.bundle_js_file_path(rsc_bundle_name)
-                expect(result).to eq(ssr_generated_path)
+                it "enforces private RSC bundles and never checks public directory" do
+                  public_path = File.expand_path(File.join(packer_public_output_path, rsc_bundle_name))
+
+                  # Should not check public path when enforcement is enabled
+                  expect(File).not_to receive(:exist?).with(public_path)
+
+                  result = described_class.bundle_js_file_path(rsc_bundle_name)
+                  expect(result).to eq(ssr_generated_path)
+                end
               end
             end
           end
@@ -263,7 +350,7 @@ module ReactOnRails
               expect(path).to end_with("ssr-generated/#{server_bundle_name}")
             end
 
-            context "with server_bundle_output_path configured" do
+            context "with server_bundle_output_path configured and enforce_private_server_bundles=false" do
               it "returns the configured path directly without checking file existence" do
                 server_bundle_name = "server-bundle.js"
                 mock_bundle_configs(server_bundle_name: server_bundle_name)
@@ -280,6 +367,26 @@ module ReactOnRails
 
                 path = described_class.server_bundle_js_file_path
 
+                expect(path).to end_with("ssr-generated/#{server_bundle_name}")
+              end
+            end
+
+            context "with server_bundle_output_path configured and enforce_private_server_bundles=true" do
+              it "returns the private path without checking public directories" do
+                server_bundle_name = "server-bundle.js"
+                mock_missing_manifest_entry(server_bundle_name)
+                allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
+                  .and_return(server_bundle_name)
+                allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
+                  .and_return("ssr-generated")
+                allow(ReactOnRails).to receive_message_chain("configuration.enforce_private_server_bundles")
+                  .and_return(true)
+
+                # Should not check public paths when enforcement is enabled
+                public_path = File.expand_path(File.join(packer_public_output_path, server_bundle_name))
+                expect(File).not_to receive(:exist?).with(public_path)
+
+                path = described_class.server_bundle_js_file_path
                 expect(path).to end_with("ssr-generated/#{server_bundle_name}")
               end
             end
@@ -346,14 +453,38 @@ module ReactOnRails
           include_context "with #{packer_type} enabled"
 
           context "with server file not in manifest", packer_type.to_sym do
-            it "returns the private ssr-generated path for RSC bundles" do
-              server_bundle_name = "rsc-bundle.js"
-              mock_bundle_configs(rsc_bundle_name: server_bundle_name)
-              mock_missing_manifest_entry(server_bundle_name)
+            context "with enforce_private_server_bundles=false" do
+              it "returns the private ssr-generated path for RSC bundles" do
+                server_bundle_name = "rsc-bundle.js"
+                mock_bundle_configs(rsc_bundle_name: server_bundle_name)
+                mock_missing_manifest_entry(server_bundle_name)
 
-              path = described_class.rsc_bundle_js_file_path
+                path = described_class.rsc_bundle_js_file_path
 
-              expect(path).to end_with("ssr-generated/#{server_bundle_name}")
+                expect(path).to end_with("ssr-generated/#{server_bundle_name}")
+              end
+            end
+
+            context "with enforce_private_server_bundles=true" do
+              it "returns the private ssr-generated path for RSC bundles without checking public paths" do
+                server_bundle_name = "rsc-bundle.js"
+                mock_missing_manifest_entry(server_bundle_name)
+                allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
+                  .and_return("server-bundle.js") # Different from RSC bundle name
+                allow(ReactOnRails).to receive_message_chain("configuration.rsc_bundle_js_file")
+                  .and_return(server_bundle_name)
+                allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
+                  .and_return("ssr-generated")
+                allow(ReactOnRails).to receive_message_chain("configuration.enforce_private_server_bundles")
+                  .and_return(true)
+
+                # Should not check public paths when enforcement is enabled
+                public_path = File.expand_path(File.join(packer_public_output_path, server_bundle_name))
+                expect(File).not_to receive(:exist?).with(public_path)
+
+                path = described_class.rsc_bundle_js_file_path
+                expect(path).to end_with("ssr-generated/#{server_bundle_name}")
+              end
             end
           end
 
