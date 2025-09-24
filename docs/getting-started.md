@@ -61,11 +61,8 @@ cd PROJECT_NAME
 
 2. Run the install generator:
 
-   ``bash
+   ```bash
    bundle exec rails generate react_on_rails:install
-
-   ```
-
    ```
 
 Start the app:
@@ -137,11 +134,11 @@ With `auto_load_bundle: true`, and by placing your "exposed" components in the a
 - Automatically registers it for use.
 - Eliminates the need for manual pack configuration.
 
-See [Auto-Bundling: File-System-Based Automated Bundle Generation][./guides/auto-bundling-file-system-based-automated-bundle-generation.md]
+See [Auto-Bundling: File-System-Based Automated Bundle Generation](./guides/auto-bundling-file-system-based-automated-bundle-generation.md)
 
 Exposing your component in this way allows you to reference the component from a Rails view. You can expose as many components as you like, but their names must be unique. See below for the details of how you expose your components via the React on Rails Webpack configuration. You may call `ReactOnRails.register` many times.
 
-- `@some_props` can be either a hash or JSON string. This is an optional argument assuming you do not need to pass any options (if you want to pass options, such as `prerender: true`, but you do not want to pass any properties, simply pass an empty hash `{}`). This will make the data available in your component:
+- `@some_props` can be either a hash or JSON string. This is an optional argument assuming you do not need to pass any options (if you want to pass options, such as `prerender: true`, but you do not want to pass any properties, simply pass an empty hash `{}`). **Props are automatically sanitized by React on Rails for security.** This will make the data available in your component:
 
 - This is what your HelloWorld.js file might contain. The railsContext is always available for any parameters that you _always_ want available for your React components. It has _nothing_ to do with the concept of the [React Context](https://react.dev/reference/react/useContext). See [Render-Functions and the RailsContext](./guides/render-functions-and-railscontext.md) for more details on this topic.
 

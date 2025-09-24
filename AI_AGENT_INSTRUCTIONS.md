@@ -21,7 +21,7 @@ rails new myapp --skip-javascript --database=postgresql
 cd myapp
 
 # Use latest version
-bundle add react_on_rails --version 16.0.1 --strict
+bundle add react_on_rails --strict
 
 bin/rails generate react_on_rails:install
 
@@ -40,7 +40,7 @@ bin/dev
 ```bash
 cd /path/to/existing/app
 # Use latest version
-bundle add react_on_rails --version 16.0.1 --strict
+bundle add react_on_rails --strict
 
 bin/rails generate react_on_rails:install
 
@@ -58,6 +58,6 @@ bin/dev
 
 ## 🛠️ Common Troubleshooting Commands
 
-- Always run `bin/dev` to test setup, and check browser console for any JavaScript errors.\*
+- Always run `bin/dev` to test setup, and check browser console for any JavaScript errors
 - `bin/dev kill` stops other conflicting processes
 - `bin/rake react_on_rails:doctor` for helpful information

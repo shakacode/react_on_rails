@@ -15,7 +15,7 @@ Before starting, make sure you have:
 
 > 💡 **Don't have a Rails app?** Run `rails new my_react_app` first.
 
-## 📦 Step 2: Install React on Rails (3 minutes)
+## 📦 Step 1: Install React on Rails (3 minutes)
 
 Add the React on Rails gem and run its installer:
 
@@ -38,7 +38,7 @@ Take a look at the files created by the generator.
 - A sample controller and view
 - Webpack configuration
 
-## 🎯 Step 3: Start the Development Server (1 minute)
+## 🎯 Step 2: Start the Development Server (1 minute)
 
 Start both Rails and the Webpack dev server:
 
@@ -51,7 +51,7 @@ This starts both:
 - Rails server on `http://localhost:3000`
 - Webpack dev server for hot reloading
 
-## 🎨 Step 4: See Your Component (2 minutes)
+## 🎨 Step 3: See Your Component (2 minutes)
 
 Open your browser and navigate to:
 
@@ -63,7 +63,7 @@ You should see a page with a React component saying "Hello World"!
 
 🎉 **Congratulations!** You have React running in your Rails app.
 
-## 🔧 Step 5: Edit Your Component (2 minutes)
+## 🔧 Step 4: Edit Your Component (2 minutes)
 
 Let's make a quick change to see hot reloading in action:
 
@@ -72,7 +72,7 @@ Let's make a quick change to see hot reloading in action:
 3. Save the file
 4. Watch your browser automatically refresh
 
-## 🚀 Step 6: Add Components to Existing Views (5 minutes)
+## 🚀 Step 5: Add Components to Existing Views (5 minutes)
 
 Now let's add a React component to one of your existing Rails views:
 
@@ -80,7 +80,7 @@ Now let's add a React component to one of your existing Rails views:
 
 ```bash
 # Create a new component directory
-mkdir -p app/javacript/src/SimpleCounter/components
+mkdir -p app/javascript/src/SimpleCounter/ror_components
 
 # Create the component file
 touch app/javascript/src/SimpleCounter/ror_components/SimpleCounter.jsx

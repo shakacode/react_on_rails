@@ -8,7 +8,7 @@ New to React on Rails? Start here for the fastest path to success:
 
 **→ [15-Minute Quick Start Guide](./quick-start/README.md)**
 
-Already have Rails + Shakapacker? **→ [Add React on Rails in 5 minutes](./quick-start/existing-app.md)**
+Already have Rails + Shakapacker? **→ [Add to existing app guide](./guides/installation-into-an-existing-rails-app.md)**
 
 ## 📚 Learning Paths
 
@@ -40,14 +40,14 @@ Jump to what you need
 
 Find guidance for your specific scenario:
 
-| I want to...                        | Go here                                                 |
-| ----------------------------------- | ------------------------------------------------------- |
-| **Add React to existing Rails app** | [Installation Guide](./guides/installation.md)          |
-| **Enable server-side rendering**    | [SSR Guide](./guides/fundamentals/server-rendering.md)  |
-| **Set up hot reloading**            | [HMR Setup](./guides/development/hot-reloading.md)      |
-| **Use Redux with Rails**            | [Redux Integration](./guides/state-management/redux.md) |
-| **Deploy to production**            | [Deployment Guide](./guides/deployment/README.md)       |
-| **Troubleshoot issues**             | [Troubleshooting](./troubleshooting/README.md)          |
+| I want to...                        | Go here                                                                    |
+| ----------------------------------- | -------------------------------------------------------------------------- |
+| **Add React to existing Rails app** | [Installation Guide](./guides/installation-into-an-existing-rails-app.md)  |
+| **Enable server-side rendering**    | [SSR Guide](./guides/react-server-rendering.md)                            |
+| **Set up hot reloading**            | [HMR Setup](./guides/hmr-and-hot-reloading-with-the-webpack-dev-server.md) |
+| **Use Redux with Rails**            | [Redux Integration](./javascript/react-and-redux.md)                       |
+| **Deploy to production**            | [Deployment Guide](./guides/deployment.md)                                 |
+| **Troubleshoot issues**             | [Troubleshooting](./troubleshooting/README.md)                             |
 
 ## 📖 Complete Documentation
 
@@ -60,21 +60,21 @@ Find guidance for your specific scenario:
 
 ### Features
 
-- **[Server-Side Rendering](./guides/fundamentals/server-rendering.md)** - SSR setup and optimization
+- **[Server-Side Rendering](./guides/react-server-rendering.md)** - SSR setup and optimization
 - **[Auto-Bundling](./guides/auto-bundling-file-system-based-automated-bundle-generation.md)** - Automatic bundle generation
-- **[Redux Integration](./guides/state-management/redux.md)** - State management with Redux
-- **[React Router](./guides/routing/react-router.md)** - Client-side routing
+- **[Redux Integration](./javascript/react-and-redux.md)** - State management with Redux
+- **[React Router](./javascript/react-router.md)** - Client-side routing
 - **[Internationalization](./guides/i18n.md)** - I18n support
 
 ### Development
 
-- **[Hot Module Replacement](./guides/development/hot-reloading.md)** - Fast development workflow
+- **[Hot Module Replacement](./guides/hmr-and-hot-reloading-with-the-webpack-dev-server.md)** - Fast development workflow
 - **[Testing](./guides/development/testing.md)** - Testing React components
 - **[Debugging](./guides/development/debugging.md)** - Common debugging techniques
 
 ### Deployment & Performance
 
-- **[Deployment](./guides/deployment/README.md)** - Production deployment guide
+- **[Deployment](./guides/deployment.md)** - Production deployment guide
 - **[Performance](./guides/performance/README.md)** - Optimization techniques
 - **[Bundle Optimization](./guides/performance/webpack-bundle-optimization.md)** - Reduce bundle size
 
