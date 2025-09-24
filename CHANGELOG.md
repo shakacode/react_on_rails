@@ -1676,10 +1676,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/16.0.1-rc.4...master
-[16.0.1-rc.4]: https://github.com/shakacode/react_on_rails/compare/16.0.1-rc.2...16.0.1-rc.4
-[16.0.1-rc.2]: https://github.com/shakacode/react_on_rails/compare/16.0.1-rc.0...16.0.1-rc.2
-[16.0.1-rc.0]: https://github.com/shakacode/react_on_rails/compare/16.0.0...16.0.1-rc.0
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/16.1.0...master
+[16.1.0]: https://github.com/shakacode/react_on_rails/compare/16.0.0...16.1.0
 [16.0.0]: https://github.com/shakacode/react_on_rails/compare/14.2.0...16.0.0
 [14.2.0]: https://github.com/shakacode/react_on_rails/compare/14.1.1...14.2.0
 [14.1.1]: https://github.com/shakacode/react_on_rails/compare/14.1.0...14.1.1
