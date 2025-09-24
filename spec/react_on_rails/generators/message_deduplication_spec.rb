@@ -19,6 +19,9 @@ describe "Message Deduplication", type: :generator do
       allow(File).to receive(:exist?).with("bin/shakapacker-dev-server").and_return(true)
       allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(true)
       allow(File).to receive(:exist?).with("config/webpack/webpack.config.js").and_return(true)
+      # Mock file reading for webpack config - use call_original first, then specific mock
+      allow(File).to receive(:read).and_call_original
+      allow(File).to receive(:read).with("config/webpack/webpack.config.js").and_return("// mock webpack config")
     end
 
     context "with non-Redux installation" do
@@ -81,24 +84,51 @@ describe "Message Deduplication", type: :generator do
 
     context "when using package_json gem" do
       before do
-        allow(install_generator).to receive(:add_npm_dependencies).and_return(true)
-        allow(install_generator).to receive(:package_json_available?).and_return(true)
-        allow(install_generator).to receive(:package_json).and_return(nil)
+        # Mock package_json gem to be available and working
+        manager_double = double("manager", install: true)
+        allow(manager_double).to receive(:add).with(anything).and_return(true)
+        allow(manager_double).to receive(:add).with(anything, type: :dev).and_return(true)
+
+        package_json_double = double("package_json", manager: manager_double)
+
+        allow(install_generator).to receive_messages(
+          add_npm_dependencies: true, # Used by batch operations
+          package_json_available?: true,
+          package_json: package_json_double
+        )
       end
 
       it "does not run duplicate install commands" do
-        # The method should try to use package_json gem's manager.install but since we mock it as nil,
-        # it will fall back to detect_and_run_package_manager_install which calls system("npm", "install")
-        expect(install_generator).to receive(:system).with("npm", "install").once.and_return(true)
+        # When package_json gem works properly, it should:
+        # 1. Use add_npm_dependencies (mocked to return true)
+        # 2. Use package_json.manager.install (mocked to return true)
+        # 3. NOT call system() commands at all since package_json gem handles everything
+
+        expect(install_generator).not_to receive(:system)
 
         # Run the dependency setup
         install_generator.send(:setup_js_dependencies)
+
+        # Verify state was set correctly
+        expect(install_generator.instance_variable_get(:@added_dependencies_to_package_json)).to be true
+        expect(install_generator.instance_variable_get(:@ran_direct_installs)).to be false
       end
     end
 
     context "when falling back to direct npm commands" do
       before do
-        allow(install_generator).to receive(:add_npm_dependencies).and_return(false)
+        allow(install_generator).to receive_messages(add_npm_dependencies: false, package_json_available?: false,
+                                                     package_json: nil)
+        # Mock File.exist? to not detect any lock files, forcing npm as default
+        allow(File).to receive(:exist?).and_call_original
+        allow(File).to receive(:exist?).with(File.join(install_generator.destination_root,
+                                                       "yarn.lock")).and_return(false)
+        allow(File).to receive(:exist?).with(File.join(install_generator.destination_root,
+                                                       "pnpm-lock.yaml")).and_return(false)
+        allow(File).to receive(:exist?).with(File.join(install_generator.destination_root,
+                                                       "package-lock.json")).and_return(false)
+        allow(File).to receive(:exist?).with(File.join(install_generator.destination_root,
+                                                       "package.json")).and_return(true)
       end
 
       it "does not run the bulk install after direct installs" do
