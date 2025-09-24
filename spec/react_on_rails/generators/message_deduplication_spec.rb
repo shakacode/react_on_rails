@@ -118,10 +118,10 @@ describe "Message Deduplication", type: :generator do
                                                        "package.json")).and_return(true)
       end
 
-      it "does not run the bulk install after direct installs" do
-        # Expect individual package installs but no bulk install
+      it "runs individual installs plus final install" do
+        # Expect individual package installs plus one final bulk install
         expect(install_generator).to receive(:system).with("npm", "install", anything).at_least(:once).and_return(true)
-        expect(install_generator).not_to receive(:system).with("npm", "install")
+        expect(install_generator).to receive(:system).with("npm", "install").once.and_return(true)
 
         # Run the dependency setup
         install_generator.send(:setup_js_dependencies)
