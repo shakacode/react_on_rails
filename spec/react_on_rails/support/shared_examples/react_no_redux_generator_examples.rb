@@ -2,7 +2,7 @@
 
 shared_examples "no_redux_generator" do
   it "creates appropriate templates" do
-    # No manual bundle for non-Redux (auto-registration only)
+    # No manual bundle for non-Redux (auto-bundling only)
     assert_no_file("app/javascript/packs/hello-world-bundle.js")
 
     assert_file("app/views/hello_world/index.html.erb") do |contents|

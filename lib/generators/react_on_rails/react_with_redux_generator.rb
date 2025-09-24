@@ -68,7 +68,7 @@ module ReactOnRails
           component_name: "HelloWorldApp"
         }
 
-        # Only create the view template - no manual bundle needed for auto registration
+        # Only create the view template - no manual bundle needed for auto-bundling
         template("#{base_path}/app/views/hello_world/index.html.erb.tt",
                  "app/views/hello_world/index.html.erb", config)
       end
