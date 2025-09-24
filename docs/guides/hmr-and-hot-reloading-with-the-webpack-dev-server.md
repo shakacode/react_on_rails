@@ -32,13 +32,9 @@ config.same_bundle_for_client_and_server = true
 `dev_server.hmr` maps to [devServer.hot](https://webpack.js.org/configuration/dev-server/#devserverhot).
 This must be false if you're using the webpack-dev-server for client and server bundles.
 
-`dev_server.inline` maps to [devServer.inline](https://webpack.js.org/configuration/dev-server/#devserverinline).
-This must also be false.
-
-If you don't configure these two to false, you'll see errors like:
+If you don't configure HMR to false, you'll see errors like:
 
 - `ReferenceError: window is not defined` (if `hmr` is true)
-- `TypeError: Cannot read property 'prototype' of undefined` (if `inline` is true)
 
 # Client-Side rendering with HMR using react-refresh-webpack-plugin
 
@@ -46,7 +42,7 @@ If you don't configure these two to false, you'll see errors like:
 
 To enable the HMR functionality, you have to use `./bin/shakapacker-dev-server`
 
-1. In `config/shakapacker.yml` set `hmr` and `inline` `dev_server` properties to true.
+1. In `config/shakapacker.yml` set `hmr` `dev_server` property to true.
 
    ```yaml
    dev_server:
@@ -55,8 +51,6 @@ To enable the HMR functionality, you have to use `./bin/shakapacker-dev-server`
      port: 3035
      public: localhost:3035
      hmr: true
-     # Inline should be set to true if using HMR
-     inline: true
    ```
 
 2. Add react-refresh packages:
@@ -100,7 +94,7 @@ To enable the HMR functionality, you have to use `./bin/shakapacker-dev-server`
 That's it :).
 Now the browser should reflect changes in `.js` and `.css` files without reloading.
 
-If for some reason the plugin doesn't work, you can revert the changes and leave only devServer `hmr`/`inline` set to true, affecting only CSS files.
+If for some reason the plugin doesn't work, you can revert the changes and leave only devServer `hmr` set to true, affecting only CSS files.
 
 These plugins are working and tested with
 
