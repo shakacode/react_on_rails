@@ -1,1 +1,0 @@
-gem "react_on_rails", github: "shakacode/react_on_rails", branch: "abanoubghadban/restrict-usage-of-pro-features-to-rorp-licence"
