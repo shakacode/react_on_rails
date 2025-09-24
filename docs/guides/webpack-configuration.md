@@ -1,4 +1,4 @@
-# Webpack Configuration: custom setup for Webpack or Shakapacker?
+# Webpack Configuration - Custom Setup for Webpack or Shakapacker?
 
 ## Webpack vs. Shakapacker
 
@@ -20,13 +20,13 @@ Version 9 of React on Rails added support for the Shakapacker (`rails/webpacker`
 
 A key decision in your use React on Rails is whether you go with the Shakapacker default setup or the traditional React on Rails setup of putting all your client side files under the `/client` directory. While there are technically 2 independent choices involved, the directory structure and the mechanism of Webpack configuration, for simplicity sake we'll assume that these choices go together.
 
-## Option 1: Default Generator Setup: Shakapacker app/javascript
+## Option 1: Default Generator Setup - Shakapacker app/javascript
 
 Typical Shakapacker apps have a standard directory structure as documented [here](https://github.com/shakacode/shakapacker/blob/master/README.md#configuration-and-code). If you follow [the basic tutorial](./tutorial.md), you will see this pattern in action. In order to customize the Webpack configuration, consult [Webpack Tips](../javascript/webpack.md).
 
 The _advantage_ of using Shakapacker to configure Webpack is that there is very little code needed to get started, and you don't need to understand really anything about Webpack customization.
 
-## Option 2: Traditional React on Rails using the /client directory
+## Option 2: Traditional React on Rails - Using the /client Directory
 
 Until version 9, all React on Rails apps used the `/client` directory for configuring React on Rails in terms of the configuration of Webpack and location of your JavaScript and Webpack files, including the `node_modules` directory. Version 9 changed the default to `/` for the `node_modules` location using this value in `config/initializers/react_on_rails.rb`: `config.node_modules_location`.
 

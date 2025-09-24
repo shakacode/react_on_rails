@@ -13,7 +13,7 @@ heroku buildpacks:add --index 1 heroku/nodejs
 
 For more information, see [Using Multiple Buildpacks for an App](https://devcenter.heroku.com/articles/using-multiple-buildpacks-for-an-app)
 
-## assets:precompile
+## Assets Precompile
 
 ### Shakapacker Webpack configuration
 

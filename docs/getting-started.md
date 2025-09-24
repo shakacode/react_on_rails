@@ -170,7 +170,7 @@ Another way is to use a separate Webpack configuration file that can use a diffe
 
 For details on techniques to use different code for client and server rendering, see: [How to use different versions of a file for client and server rendering](https://forum.shakacode.com/t/how-to-use-different-versions-of-a-file-for-client-and-server-rendering/1352). (_Requires creating a free account._)
 
-## Specifying Your React Components: Register directly or use render-functions
+## Specifying Your React Components
 
 You have two ways to specify your React components. You can either register the React component (either function or class component) directly, or you can create a function that returns a React component, which we using the name of a "render-function". Creating a render-function allows you to:
 

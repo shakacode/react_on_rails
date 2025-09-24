@@ -14,7 +14,7 @@ Now we could always just place these assets in our `app/assets/` directory like 
 
 So how do we get around this? And find the relative paths to our assets without hardcoding the paths?
 
-## The Solution: The lowdown on Webpack's url-loader & file-loader, outputPaths and publicPaths
+## The Solution - Understanding Webpack's url-loader & file-loader
 
 Loaders are an incredibly useful part of Webpack. Simply put, they allow you to load and bundle different types of sources/files (you can load anything from images, CSS, to CoffeeScript).
 
@@ -109,7 +109,7 @@ export default class MyImageBox extends React.Component {
 
 Note: **Any assets in our `client/` directory that are not imported/required for use in our JSX files will NOT be bundled and outputted by Webpack.**
 
-## Summary: Welcome people who are tired of reading
+## Summary
 
 If you've read this far, you probably have a grip on everything. If you didn't, and want a condensed version, here you go:
 
