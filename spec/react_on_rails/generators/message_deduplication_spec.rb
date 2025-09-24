@@ -7,6 +7,7 @@ describe "Message Deduplication", type: :generator do
   include GeneratorSpec::TestCase
 
   destination File.expand_path("../dummy-for-generators", __dir__)
+  tests ReactOnRails::Generators::InstallGenerator
 
   describe "Post-install message handling" do
     before do
@@ -81,10 +82,13 @@ describe "Message Deduplication", type: :generator do
     context "when using package_json gem" do
       before do
         allow(install_generator).to receive(:add_npm_dependencies).and_return(true)
+        allow(install_generator).to receive(:package_json_available?).and_return(true)
+        allow(install_generator).to receive(:package_json).and_return(nil)
       end
 
       it "does not run duplicate install commands" do
-        # Setup expectation that system should be called only once for the final install
+        # The method should try to use package_json gem's manager.install but since we mock it as nil,
+        # it will fall back to detect_and_run_package_manager_install which calls system("npm", "install")
         expect(install_generator).to receive(:system).with("npm", "install").once.and_return(true)
 
         # Run the dependency setup
