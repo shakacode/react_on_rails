@@ -1,4 +1,4 @@
-# File-System-Based Automated Bundle Generation
+# Auto-Bundling: File-System-Based Automated Bundle Generation
 
 To use the automated bundle generation feature introduced in React on Rails v13.1.0, please upgrade to use [Shakapacker v6.5.1](https://github.com/shakacode/shakapacker/tree/v6.5.1) at least. If you are currently using Webpacker, please follow the migration steps available [v6 upgrade](https://github.com/shakacode/shakapacker/blob/master/docs/v6_upgrade.md). Then upgrade to Shakapacker 7 using [v7 upgrade](https://github.com/shakacode/shakapacker/blob/master/docs/v7_upgrade.md) guide.
 
@@ -602,20 +602,6 @@ As of version 13.3.4, bundles inside directories that match `config.components_s
 - **Minification**: Some code might break during minification - check console for errors
 - **Environment**: Use `bin/dev prod` to test production-like assets locally
 
-#### 8. Installation order issues
-
-**Problem**: React on Rails installation fails or behaves unexpectedly.
-
-**Solutions**:
-
-- **Correct order**: Always install Shakapacker BEFORE React on Rails
-  ```bash
-  bundle add shakapacker
-  rails shakapacker:install
-  bundle add react_on_rails
-  rails generate react_on_rails:install
-  ```
-- If you installed in wrong order, uninstall and reinstall in correct sequence
 
 ### Debug Mode
 
