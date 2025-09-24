@@ -54,8 +54,7 @@ module ReactOnRails
         @added_dependencies_to_package_json ||= false
         @ran_direct_installs ||= false
         add_js_dependencies
-        # Only run final install if package_json gem was used and no direct installs ran
-        install_js_dependencies if @added_dependencies_to_package_json && !@ran_direct_installs
+        install_js_dependencies
       end
 
       def add_js_dependencies
@@ -76,17 +75,15 @@ module ReactOnRails
                                "react-on-rails"
                              end
 
-        packages_array = [react_on_rails_pkg]
-
         puts "Installing React on Rails package..."
-        if add_js_dependencies_batch(packages_array)
+        if add_js_dependency(react_on_rails_pkg)
           @added_dependencies_to_package_json = true
         else
           # Fallback to direct npm install
           puts "Using direct npm commands as fallback"
-          success = system("npm", "install", *packages_array)
+          success = system("npm", "install", react_on_rails_pkg)
           @ran_direct_installs = true if success
-          handle_npm_failure("react-on-rails package", packages_array) unless success
+          handle_npm_failure("react-on-rails package", [react_on_rails_pkg]) unless success
         end
       end
 
