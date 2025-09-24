@@ -72,7 +72,12 @@ task :release, %i[gem_version dry_run tools_install] do |_t, args|
   # Commit the Gemfile.lock changes made by release-it before gem release
   unless is_dry_run
     sh_in_dir(gem_root, "git add Gemfile.lock")
-    sh_in_dir(gem_root, "git commit -m 'Update Gemfile.lock for version #{gem_version}'")
+    # Only commit if there are staged changes
+    if `cd #{gem_root} && git diff --cached --quiet; echo $?`.strip == "0"
+      puts "No Gemfile.lock changes to commit"
+    else
+      sh_in_dir(gem_root, "git commit -m 'Update Gemfile.lock for version #{gem_version}'")
+    end
   end
 
   # Release the new gem version
