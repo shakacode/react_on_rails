@@ -79,12 +79,11 @@ describe "Message Deduplication", type: :generator do
 
       # Initialize instance variables
       install_generator.instance_variable_set(:@added_dependencies_to_package_json, false)
-      install_generator.instance_variable_set(:@ran_direct_installs, false)
     end
 
-    context "when using package_json gem" do
+    context "when using package_json gem (always available via shakapacker)" do
       before do
-        # Simply mock that the individual package_json gem methods succeed
+        # Mock that the package_json gem methods succeed
         allow(install_generator).to receive_messages(add_js_dependency: true, add_js_dependencies_batch: true,
                                                      install_js_dependencies: true)
       end
@@ -98,33 +97,6 @@ describe "Message Deduplication", type: :generator do
 
         # Verify state was set correctly to indicate package_json was used
         expect(install_generator.instance_variable_get(:@added_dependencies_to_package_json)).to be true
-        expect(install_generator.instance_variable_get(:@ran_direct_installs)).to be false
-      end
-    end
-
-    context "when falling back to direct npm commands" do
-      before do
-        allow(install_generator).to receive_messages(add_npm_dependencies: false, package_json_available?: false,
-                                                     package_json: nil)
-        # Mock File.exist? to not detect any lock files, forcing npm as default
-        allow(File).to receive(:exist?).and_call_original
-        allow(File).to receive(:exist?).with(File.join(install_generator.destination_root,
-                                                       "yarn.lock")).and_return(false)
-        allow(File).to receive(:exist?).with(File.join(install_generator.destination_root,
-                                                       "pnpm-lock.yaml")).and_return(false)
-        allow(File).to receive(:exist?).with(File.join(install_generator.destination_root,
-                                                       "package-lock.json")).and_return(false)
-        allow(File).to receive(:exist?).with(File.join(install_generator.destination_root,
-                                                       "package.json")).and_return(true)
-      end
-
-      it "runs individual installs plus final install" do
-        # Expect individual package installs plus one final bulk install
-        expect(install_generator).to receive(:system).with("npm", "install", anything).at_least(:once).and_return(true)
-        expect(install_generator).to receive(:system).with("npm", "install").once.and_return(true)
-
-        # Run the dependency setup
-        install_generator.send(:setup_js_dependencies)
       end
     end
   end
