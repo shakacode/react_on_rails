@@ -602,7 +602,6 @@ As of version 13.3.4, bundles inside directories that match `config.components_s
 - **Minification**: Some code might break during minification - check console for errors
 - **Environment**: Use `bin/dev prod` to test production-like assets locally
 
-
 ### Debug Mode
 
 To debug auto-loading behavior, temporarily add logging to see what bundles are being loaded:
