@@ -113,10 +113,12 @@ module ReactOnRails
         return false unless pj
 
         begin
+          # Ensure package is in array format for package_json gem
+          packages_array = [package]
           if dev
-            pj.manager.add(package, type: :dev)
+            pj.manager.add(packages_array, type: :dev)
           else
-            pj.manager.add(package)
+            pj.manager.add(packages_array)
           end
           true
         rescue StandardError => e
