@@ -112,7 +112,8 @@ module ReactOnRails
     private_class_method def self.server_bundle?(bundle_name)
       config = ReactOnRails.configuration
       bundle_name == config.server_bundle_js_file ||
-      bundle_name == config.rsc_bundle_js_file
+      bundle_name == config.rsc_bundle_js_file ||
+      bundle_name == config.react_server_client_manifest_file
     end
 
     private_class_method def self.handle_missing_manifest_entry(bundle_name, is_server_bundle)
@@ -170,7 +171,7 @@ module ReactOnRails
               "react_server_client_manifest_file is nil, ensure it is set in your configuration"
       end
 
-      @react_server_manifest_path = File.join(public_bundles_full_path, asset_name)
+      @react_server_manifest_path = bundle_js_file_path(asset_name)
     end
 
     def self.running_on_windows?
