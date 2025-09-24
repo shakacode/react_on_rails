@@ -7,7 +7,47 @@ module ReactOnRails
     # Shared module for managing JavaScript dependencies across generators
     # This module provides common functionality for adding and installing
     # JS dependencies to avoid code duplication between generators.
+    #
+    # == Required Instance Variables
+    # Including classes must support these instance variables:
+    # - @added_dependencies_to_package_json: Boolean tracking if package_json gem was used
+    # - @ran_direct_installs: Boolean tracking if direct npm/yarn commands were run
+    #
+    # == Required Methods
+    # Including classes must include GeneratorHelper module which provides:
+    # - add_npm_dependencies(packages, dev: false): Add packages via package_json gem
+    # - package_json: Access to PackageJson instance
+    # - destination_root: Generator destination directory
+    # - system(*args): Execute system commands
+    #
+    # == Usage
+    # Include this module in generator classes and call setup_js_dependencies
+    # to handle all JS dependency installation with automatic fallbacks.
     module JsDependencyManager
+      # Core React dependencies required for React on Rails
+      REACT_DEPENDENCIES = %w[
+        react
+        react-dom
+        @babel/preset-react
+        prop-types
+        babel-plugin-transform-react-remove-prop-types
+        babel-plugin-macros
+      ].freeze
+
+      # CSS processing dependencies for webpack
+      CSS_DEPENDENCIES = %w[
+        css-loader
+        css-minimizer-webpack-plugin
+        mini-css-extract-plugin
+        style-loader
+      ].freeze
+
+      # Development-only dependencies for hot reloading
+      DEV_DEPENDENCIES = %w[
+        @pmmmwh/react-refresh-webpack-plugin
+        react-refresh
+      ].freeze
+
       private
 
       def setup_js_dependencies
@@ -50,58 +90,40 @@ module ReactOnRails
 
       def add_react_dependencies
         puts "Installing React dependencies..."
-        react_deps = %w[
-          react
-          react-dom
-          @babel/preset-react
-          prop-types
-          babel-plugin-transform-react-remove-prop-types
-          babel-plugin-macros
-        ]
 
-        if add_js_dependencies_batch(react_deps)
+        if add_js_dependencies_batch(REACT_DEPENDENCIES)
           @added_dependencies_to_package_json = true
         else
           # Fallback to direct npm install
-          success = system("npm", "install", *react_deps)
+          success = system("npm", "install", *REACT_DEPENDENCIES)
           @ran_direct_installs = true if success
-          handle_npm_failure("React dependencies", react_deps) unless success
+          handle_npm_failure("React dependencies", REACT_DEPENDENCIES) unless success
         end
       end
 
       def add_css_dependencies
         puts "Installing CSS handling dependencies..."
-        css_deps = %w[
-          css-loader
-          css-minimizer-webpack-plugin
-          mini-css-extract-plugin
-          style-loader
-        ]
 
-        if add_js_dependencies_batch(css_deps)
+        if add_js_dependencies_batch(CSS_DEPENDENCIES)
           @added_dependencies_to_package_json = true
         else
           # Fallback to direct npm install
-          success = system("npm", "install", *css_deps)
+          success = system("npm", "install", *CSS_DEPENDENCIES)
           @ran_direct_installs = true if success
-          handle_npm_failure("CSS dependencies", css_deps) unless success
+          handle_npm_failure("CSS dependencies", CSS_DEPENDENCIES) unless success
         end
       end
 
       def add_dev_dependencies
         puts "Installing development dependencies..."
-        dev_deps = %w[
-          @pmmmwh/react-refresh-webpack-plugin
-          react-refresh
-        ]
 
-        if add_js_dependencies_batch(dev_deps, dev: true)
+        if add_js_dependencies_batch(DEV_DEPENDENCIES, dev: true)
           @added_dependencies_to_package_json = true
         else
           # Fallback to direct npm install
-          success = system("npm", "install", "--save-dev", *dev_deps)
+          success = system("npm", "install", "--save-dev", *DEV_DEPENDENCIES)
           @ran_direct_installs = true if success
-          handle_npm_failure("development dependencies", dev_deps, dev: true) unless success
+          handle_npm_failure("development dependencies", DEV_DEPENDENCIES, dev: true) unless success
         end
       end
 
