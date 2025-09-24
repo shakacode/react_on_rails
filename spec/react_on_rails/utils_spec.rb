@@ -98,6 +98,8 @@ module ReactOnRails
             .and_return("server-bundle.js")
           allow(ReactOnRails).to receive_message_chain("configuration.rsc_bundle_js_file")
             .and_return("rsc-bundle.js")
+          allow(ReactOnRails).to receive_message_chain("configuration.react_server_client_manifest_file")
+            .and_return("react-server-client-manifest.json")
         end
 
         subject do
@@ -786,10 +788,11 @@ module ReactOnRails
     end
 
     describe ".react_server_client_manifest_file_path" do
+      let(:asset_name) { "react-server-client-manifest.json" }
+
       before do
         described_class.instance_variable_set(:@react_server_manifest_path, nil)
-        allow(ReactOnRails.configuration).to receive(:react_server_client_manifest_file)
-          .and_return("react-server-client-manifest.json")
+        allow(ReactOnRails.configuration).to receive(:react_server_client_manifest_file).and_return(asset_name)
         allow(Rails.env).to receive(:development?).and_return(false)
       end
 
@@ -797,79 +800,38 @@ module ReactOnRails
         described_class.instance_variable_set(:@react_server_manifest_path, nil)
       end
 
-      context "when in development environment" do
-        before do
-          allow(Rails.env).to receive(:development?).and_return(true)
-          allow(described_class).to receive(:public_bundles_full_path)
-            .and_return("/path/to/generated/assets")
-        end
-
-        it "does not use cached path" do
-          # Call once to potentially set the cached path
-          described_class.react_server_client_manifest_file_path
-
-          # Change the configuration value
-          allow(ReactOnRails.configuration).to receive(:react_server_client_manifest_file)
-            .and_return("changed-manifest.json")
-
-          # Should use the new value
-          expect(described_class.react_server_client_manifest_file_path)
-            .to eq("/path/to/generated/assets/changed-manifest.json")
-        end
+      it "calls bundle_js_file_path with the correct asset name and returns its value" do
+        allow(described_class).to receive(:bundle_js_file_path).with(asset_name).and_return("/some/path/#{asset_name}")
+        result = described_class.react_server_client_manifest_file_path
+        expect(described_class).to have_received(:bundle_js_file_path).with(asset_name)
+        expect(result).to eq("/some/path/#{asset_name}")
       end
 
-      context "when not in development environment" do
-        before do
-          allow(described_class).to receive(:public_bundles_full_path)
-            .and_return("/path/to/generated/assets")
-        end
-
-        it "caches the path" do
-          # Call once to set the cached path
-          expected_path = "/path/to/generated/assets/react-server-client-manifest.json"
-          expect(described_class.react_server_client_manifest_file_path).to eq(expected_path)
-
-          # Change the configuration value
-          allow(ReactOnRails.configuration).to receive(:react_server_client_manifest_file)
-            .and_return("changed-manifest.json")
-
-          # Should still use the cached path
-          expect(described_class.react_server_client_manifest_file_path).to eq(expected_path)
-        end
+      it "caches the path when not in development" do
+        allow(described_class).to receive(:bundle_js_file_path).with(asset_name).and_return("/some/path/#{asset_name}")
+        result1 = described_class.react_server_client_manifest_file_path
+        result2 = described_class.react_server_client_manifest_file_path
+        expect(described_class).to have_received(:bundle_js_file_path).once.with(asset_name)
+        expect(result1).to eq("/some/path/#{asset_name}")
+        expect(result2).to eq("/some/path/#{asset_name}")
       end
 
-      context "with different manifest file names" do
-        before do
-          allow(described_class).to receive(:public_bundles_full_path)
-            .and_return("/path/to/generated/assets")
-        end
-
-        it "returns the correct path for default manifest name" do
-          allow(ReactOnRails.configuration).to receive(:react_server_client_manifest_file)
-            .and_return("react-server-client-manifest.json")
-
-          expect(described_class.react_server_client_manifest_file_path)
-            .to eq("/path/to/generated/assets/react-server-client-manifest.json")
-        end
-
-        it "returns the correct path for custom manifest name" do
-          allow(ReactOnRails.configuration).to receive(:react_server_client_manifest_file)
-            .and_return("custom-server-client-manifest.json")
-
-          expect(described_class.react_server_client_manifest_file_path)
-            .to eq("/path/to/generated/assets/custom-server-client-manifest.json")
-        end
+      it "does not cache the path in development" do
+        allow(Rails.env).to receive(:development?).and_return(true)
+        allow(described_class).to receive(:bundle_js_file_path).with(asset_name).and_return("/some/path/#{asset_name}")
+        result1 = described_class.react_server_client_manifest_file_path
+        result2 = described_class.react_server_client_manifest_file_path
+        expect(described_class).to have_received(:bundle_js_file_path).twice.with(asset_name)
+        expect(result1).to eq("/some/path/#{asset_name}")
+        expect(result2).to eq("/some/path/#{asset_name}")
       end
 
-      context "with nil manifest file name" do
+      context "when manifest file name is nil" do
         before do
-          allow(ReactOnRails.configuration).to receive(:react_server_client_manifest_file)
-            .and_return(nil)
-          allow(described_class).to receive(:public_bundles_full_path)
-            .and_return("/path/to/generated/assets")
+          allow(ReactOnRails.configuration).to receive(:react_server_client_manifest_file).and_return(nil)
         end
 
-        it "raises an error when the manifest file name is nil" do
+        it "raises an error" do
           expect { described_class.react_server_client_manifest_file_path }
             .to raise_error(ReactOnRails::Error, /react_server_client_manifest_file is nil/)
         end
