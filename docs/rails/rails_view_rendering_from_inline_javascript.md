@@ -1,6 +1,6 @@
 # Using ReactOnRails in JavaScript
 
-You can easily render React components in your JavaScript with `render` method that returns a [reference to the component](https://facebook.github.io/react/docs/more-about-refs.html) (virtual DOM element).
+You can easily render React components in your JavaScript with `render` method that returns a [reference to the component](https://react.dev/reference/react-dom/render#returns) (virtual DOM element).
 
 ```js
 /**

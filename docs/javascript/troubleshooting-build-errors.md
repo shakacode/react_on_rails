@@ -4,7 +4,7 @@ This guide covers common webpack build errors encountered when using react_on_ra
 
 ## Table of Contents
 
-- [Missing Routes File Error](#missing-routes-file-error)
+- [Missing Routes File Error](#missing-routes-file-error-js-routes-gem)
 - [ProvidePlugin Module Resolution Errors](#provideplugin-module-resolution-errors)
 - [Environment Setup Dependencies](#environment-setup-dependencies)
 - [Shakapacker Compatibility Issues](#shakapacker-compatibility-issues)

@@ -121,12 +121,10 @@ There's an implemented example of code splitting in the `spec/dummy` folder of t
 
 See:
 
-- [spec/dummy/client/app/startup/client-bundle.js](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/startup/client-bundle.js)
+- [spec/dummy/client/app/packs/client-bundle.js](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/packs/client-bundle.js)
 - [spec/dummy/client/app/packs/server-bundle.js](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/packs/server-bundle.js)
-- [spec/dummy/client/app/startup/DeferredRenderAppClient](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/startup/DeferredRenderAppClient.jsx) # Code splitting implemented here
-- [spec/dummy/client/app/startup/DeferredRenderAppServer.jsx](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/startup/DeferredRenderAppServer.jsx)
-- [spec/dummy/client/app/components/DeferredRender.jsx](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/components/DeferredRender.jsx)
-- [spec/dummy/client/app/components/DeferredRenderAsyncPage.jsx](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/components/DeferredRenderAsyncPage.jsx)
+
+_Note: The DeferredRender example components referenced in older versions of this document have been removed as this code splitting approach is outdated._
 
 ### Comparison of Server vs. Client Code
 

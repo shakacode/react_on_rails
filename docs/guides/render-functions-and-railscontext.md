@@ -8,7 +8,7 @@ use shared Redux stores, you get two params passed to your function that creates
 1. `props`: Props that you pass in the view helper of either `react_component` or `redux_store`
 2. `railsContext`: Rails contextual information, such as the current pathname. You can customize
    this in your config file. **Note**: The `railsContext` is not related to the concept of a
-   ["context" for React components](https://facebook.github.io/react/docs/context.html#how-to-use-context).
+   ["context" for React components](https://react.dev/reference/react/useContext).
 
 These parameters (`props` and `railsContext`) will be the same for client- and server-side rendering,
 except for the property `railsContext.serverSide` which tells you which one it is.

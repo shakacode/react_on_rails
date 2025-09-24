@@ -59,7 +59,7 @@ yield
 ...
 ```
 
-Components should be created as [stateless function(al) components](https://facebook.github.io/react/docs/reusable-components.html#stateless-functions). Since you can pass in initial props via the helper `redux_store`, you do not need to pass any props directly to the component. Instead, the component hydrates by connecting to the store.
+Components should be created as [function components](https://react.dev/learn/your-first-component#defining-a-component). Since you can pass in initial props via the helper `redux_store`, you do not need to pass any props directly to the component. Instead, the component hydrates by connecting to the store.
 
 **\_comments.html.erb**
 

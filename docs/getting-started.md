@@ -7,7 +7,7 @@ This documentation assumes the usage of ReactOnRails with Shakapacker 7. For ins
 1. Do the quick [tutorial](./guides/tutorial.md).
 2. Add React on Rails to an existing Rails app per [the instructions](./guides/installation-into-an-existing-rails-app.md).
 3. Look at [spec/dummy](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy), a simple, no DB example.
-4. Look at [github.com/shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial); it's a full-featured example live at [www.reactrails.com](http://reactrails.com).
+4. Look at [github.com/shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial); it's a full-featured example live at [reactrails.com](https://reactrails.com).
 
 ## Basic Installation
 
@@ -104,7 +104,7 @@ issue.
     <%= react_component("HelloWorld", props: { name: "Stranger" }) %>
   ```
 
-- This is what your HelloWorld.js file might contain. The railsContext is always available for any parameters that you _always_ want available for your React components. It has _nothing_ to do with the concept of the [React Context](https://reactjs.org/docs/context.html). See [Render-Functions and the RailsContext](./guides/render-functions-and-railscontext.md) for more details on this topic.
+- This is what your HelloWorld.js file might contain. The railsContext is always available for any parameters that you _always_ want available for your React components. It has _nothing_ to do with the concept of the [React Context](https://react.dev/reference/react/useContext). See [Render-Functions and the RailsContext](./guides/render-functions-and-railscontext.md) for more details on this topic.
 
   ```js
   import React from 'react';

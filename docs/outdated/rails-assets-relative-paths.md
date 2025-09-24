@@ -48,7 +48,7 @@ query: {
 },
 ```
 
-Both examples above do the exact same thing, just using different syntaxes. For the rest of this doc we will be using the JSON object style. For more information about Webpack loaders, read [this](https://webpack.github.io/docs/using-loaders.html).
+Both examples above do the exact same thing, just using different syntaxes. For the rest of this doc we will be using the JSON object style. For more information about Webpack loaders, read [this](https://webpack.js.org/concepts/loaders/).
 
 _For the sake of this doc, we're also going to add a `resolve["alias"]` inside our webpack.config to make it easier to include our assets in our jsx files. In `resolve["alias"]`, simply add:_
 

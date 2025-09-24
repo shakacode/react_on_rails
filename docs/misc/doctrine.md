@@ -16,7 +16,7 @@ Besides the project objective, let's stick with the "Rails Doctrine" and keep th
 
 The React on Rails setup provides several key components related to front-end developer happiness:
 
-1. [Hot reloading of both JavaScript and CSS](https://gaearon.github.io/react-hot-loader/), using the [webpack-dev-server](https://webpack.github.io/docs/webpack-dev-server.html) package. This works for both using an [Express server](http://expressjs.com/) to load stubs for the ajax requests, as well as using a live Rails server. **Oh yes**, your Rails server can do hot reloading!
+1. [Hot reloading of both JavaScript and CSS](https://gaearon.github.io/react-hot-loader/), using the [webpack-dev-server](https://webpack.js.org/configuration/dev-server/) package. This works for both using an [Express server](http://expressjs.com/) to load stubs for the ajax requests, as well as using a live Rails server. **Oh yes**, your Rails server can do hot reloading!
 2. [CSS modules](https://github.com/css-modules/webpack-demo) which remove the madness of a global namespace for CSS. We organize our CSS (Sass, actually) right next to our JavaScript React component files. This means no more creating long class names to ensure that CSS picks up the right styles.
 3. [ES6 JavaScript](http://es6-features.org/#Constants) is a great language for client side coding, much more so than Ruby due to the asynchronous nature of UI programming.
 4. JavaScript libraries and tooling work better in the native node way, rather than via some aspect of Sprockets and the Rails Asset Pipeline. We find way less frustration this way, especially from being able to get the latest advances with the rest of the JavaScript community. Why complicated beautiful JavaScript tooling Rails asset pipeline complexity?
