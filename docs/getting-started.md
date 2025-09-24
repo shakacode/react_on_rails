@@ -1,13 +1,39 @@
 # Getting Started
 
-Note, the best way to understand how to use ReactOnRails is to study a few simple examples. You can do a quick demo setup, either on your existing app or on a new Rails app.
+> **💡 Looking for the fastest way to get started?** Try our **[15-Minute Quick Start Guide](./quick-start/README.md)** instead.
 
-This documentation assumes the usage of ReactOnRails with Shakapacker 7. For installation on Shakapacker 6, check [tips for usage with Shakapacker 6](./additional-details/tips-for-usage-with-sp6.md) first.
+## Choose Your Starting Point
 
-1. Do the quick [tutorial](./guides/tutorial.md).
-2. Add React on Rails to an existing Rails app per [the instructions](./guides/installation-into-an-existing-rails-app.md).
-3. Look at [spec/dummy](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy), a simple, no DB example.
-4. Look at [github.com/shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial); it's a full-featured example live at [reactrails.com](https://reactrails.com).
+The best way to understand React on Rails depends on your situation:
+
+### 🚀 **New to React on Rails?**
+
+**→ [15-Minute Quick Start](./quick-start/README.md)** - Get your first component working fast
+
+### 📱 **Have an existing Rails app?**
+
+**→ [Add to Existing App](./guides/installation-into-an-existing-rails-app.md)** - Integrate React on Rails
+
+### 📚 **Want comprehensive tutorial?**
+
+**→ [Complete Tutorial](./guides/tutorial.md)** - Step-by-step with Redux and routing
+
+### 👀 **Learn by example?**
+
+- **[Spec/Dummy](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy)** - Simple example in this repo
+- **[Live Demo](https://reactrails.com)** with **[source code](https://github.com/shakacode/react-webpack-rails-tutorial)**
+
+---
+
+## System Requirements
+
+✅ **🚨 React on Rails 16.0+** (this guide covers modern features)
+✅ **🚨 Shakapacker 6+** (7+ recommended for React on Rails 16)
+✅ **Rails 7+** (Rails 5.2+ supported)
+✅ **Ruby 3.0+** (required)
+✅ **Node.js 18+**
+
+> **Don't have Shakapacker?** It's the modern replacement for Webpacker and required for React on Rails.
 
 ## Basic Installation
 
@@ -16,11 +42,9 @@ You need a Rails application with Shakapacker installed and configured on it. Ch
 ```bash
 rails new PROJECT_NAME --skip-javascript
 cd PROJECT_NAME
-bundle add shakapacker --strict
-rails shakapacker:install
 ```
 
-You may need to check [the instructions for installing into an existing Rails app](./guides/installation-into-an-existing-rails-app.md) if you have an already working Rails application.
+## React on Rails Installation
 
 1. Add the `react_on_rails` gem to Gemfile:
    Please use [the latest version](https://rubygems.org/gems/react_on_rails) to ensure you get all the security patches and the best support.
@@ -31,39 +55,24 @@ You may need to check [the instructions for installing into an existing Rails ap
 
    Commit this to git (or else you cannot run the generator in the next step unless you pass the option `--ignore-warnings`).
 
+   ```bash
+   git add -A
+   git commit -m "Initial commit"
+   ```
+
 2. Run the install generator:
 
    ```bash
-   rails generate react_on_rails:install
+   bundle exec rails generate react_on_rails:install
    ```
 
-3. Start the app:
+Start the app:
 
-   - Run `./bin/dev` for HMR
-   - Run `./bin/dev static` for statically created bundles (no HMR)
-
-4. Visit http://localhost:3000/hello_world.
-
-### Turning on server rendering
-
-With the code from running the React on Rails generator above:
-
-1. Edit `app/views/hello_world/index.html.erb` and set the `prerender` option to `true`.
-
-   You may need to use `Node` as your js runtime environment by setting `EXECJS_RUNTIME=Node` into your environment variables.
-
-2. Refresh the page.
-
-Below is the line where you turn server rendering on by setting `prerender` to true:
-
-```erb
-<%= react_component("HelloWorld", props: @hello_world_props, prerender: true) %>
+```bash
+bin/dev help
+bin/dev # start with hmr
+bin/dev static #
 ```
-
-Note, if you got an error in your console regarding "ReferenceError: window is not defined",
-then you need to edit `config/shakapacker.yml` and set `hmr: false` and `inline: false`.
-See [rails/webpacker PR 2644](https://github.com/rails/webpacker/pull/2644) for a fix for this
-issue.
 
 ## Basic Usage
 
@@ -75,11 +84,11 @@ issue.
 
 ## Including your React Component on your Rails Views
 
-- React components are rendered via your Rails Views. Here's an ERB sample:
+Once installation is complete, you can render a React component in any Rails view using the `react_component` helper method.
 
-  ```erb
-  <%= react_component("HelloWorld", props: @some_props) %>
-  ```
+```erb
+<%= react_component("HelloWorld", props: @some_props) %>
+```
 
 - **Server-Side Rendering**: Your React component is first rendered into HTML on the server. Use the **prerender** option:
 
@@ -87,22 +96,50 @@ issue.
   <%= react_component("HelloWorld", props: @some_props, prerender: true) %>
   ```
 
-- The `component_name` parameter is a string matching the name you used to expose your React component globally. So, in the above examples, if you had a React component named "HelloWorld", you would register it with the following lines:
+`@component_name` is a string and corresponds to the name you used to globally expose your React component.
 
-  ```js
-  import ReactOnRails from 'react-on-rails';
-  import HelloWorld from './HelloWorld';
-  ReactOnRails.register({ HelloWorld });
-  ```
+## Auto-Bundling (includes Auto-Registration)
 
-  Exposing your component in this way allows you to reference the component from a Rails view. You can expose as many components as you like, but their names must be unique. See below for the details of how you expose your components via the React on Rails Webpack configuration. You may call `ReactOnRails.register` many times.
+React on Rails supports **Auto-Bundling**, which automatically creates the webpack bundle _and_ registers your React components. This means you don’t have to manually configure packs or call `ReactOnRails.register(...)`.
 
-- `@some_props` can be either a hash or JSON string. This is an optional argument assuming you do not need to pass any options (if you want to pass options, such as `prerender: true`, but you do not want to pass any properties, simply pass an empty hash `{}`). This will make the data available in your component:
+---
 
-  ```erb
-    # Rails View
-    <%= react_component("HelloWorld", props: { name: "Stranger" }) %>
-  ```
+### Manual Registration (traditional way)
+
+```js
+// packs/hello-world-bundle.js
+import ReactOnRails from 'react-on-rails';
+import HelloWorld from '../components/HelloWorld';
+
+ReactOnRails.register({ HelloWorld });
+```
+
+```erb
+<%= react_component("HelloWorld", @hello_world_props) %>
+```
+
+Here you must both configure the pack entry (`hello-world-bundle.js`) and register the component.
+
+---
+
+### Auto-Bundling (with Auto-Registration)
+
+```erb
+<%= react_component("HelloWorld", @hello_world_props, auto_load_bundle: true) %>
+<%= react_component("HeavyMarkdownEditor", @editor_props, auto_load_bundle: true) %>
+```
+
+With `auto_load_bundle: true`, and by placing your "exposed" components in the appropriate directories, React on Rails:
+
+- Automatically finds and bundles your component.
+- Automatically registers it for use.
+- Eliminates the need for manual pack configuration.
+
+See [Auto-Bundling: File-System-Based Automated Bundle Generation](./guides/auto-bundling-file-system-based-automated-bundle-generation.md)
+
+Exposing your component in this way allows you to reference the component from a Rails view. You can expose as many components as you like, but their names must be unique. See below for the details of how you expose your components via the React on Rails Webpack configuration. You may call `ReactOnRails.register` many times.
+
+- `@some_props` can be either a hash or JSON string. This is an optional argument assuming you do not need to pass any options (if you want to pass options, such as `prerender: true`, but you do not want to pass any properties, simply pass an empty hash `{}`). **Props are automatically sanitized by React on Rails for security.** This will make the data available in your component:
 
 - This is what your HelloWorld.js file might contain. The railsContext is always available for any parameters that you _always_ want available for your React components. It has _nothing_ to do with the concept of the [React Context](https://react.dev/reference/react/useContext). See [Render-Functions and the RailsContext](./guides/render-functions-and-railscontext.md) for more details on this topic.
 
@@ -120,22 +157,15 @@ issue.
   };
   ```
 
-See the [View Helpers API](./api/view-helpers-api.md) for more details on `react_component` and its sibling function `react_component_hash`.
+## What Happens Next?
 
-## Globally Exposing Your React Components
+The generator set up the following:
 
-For the React on Rails view helper `react_component` to use your React components, you will have to **register** them in your JavaScript code.
+1. Component directory: `app/javascript/bundles/HelloWorld`
+2. Rails integration for rendering this component in a Rails view
+3. Webpack configuration for building your JavaScript bundle
 
-Use modules just as you would when using Webpack and React without Rails. The difference is that instead of mounting React components directly to an element using `React.render`, you **register your components to ReactOnRails and then mount them with helpers inside of your Rails views**.
-
-This is how to expose a component to the `react_component` view helper.
-
-```javascript
-// app/javascript/packs/hello-world-bundle.js
-import HelloWorld from '../components/HelloWorld';
-import ReactOnRails from 'react-on-rails';
-ReactOnRails.register({ HelloWorld });
-```
+![Basic Hello World Example](./images/bundle-splitting-hello-world.png)
 
 #### Different Server-Side Rendering Code (and a Server-Specific Bundle)
 
@@ -145,7 +175,7 @@ Another way is to use a separate Webpack configuration file that can use a diffe
 
 For details on techniques to use different code for client and server rendering, see: [How to use different versions of a file for client and server rendering](https://forum.shakacode.com/t/how-to-use-different-versions-of-a-file-for-client-and-server-rendering/1352). (_Requires creating a free account._)
 
-## Specifying Your React Components: Register directly or use render-functions
+## Specifying Your React Components
 
 You have two ways to specify your React components. You can either register the React component (either function or class component) directly, or you can create a function that returns a React component, which we using the name of a "render-function". Creating a render-function allows you to:
 
@@ -200,3 +230,24 @@ For details on using react_component_hash with react-helmet, see [our react-helm
 
 React on Rails provides an option for automatic conversions of Rails `*.yml` locale files into `*.json` or `*.js`.
 See the [How to add I18n](./guides/i18n.md) for a summary of adding I18n.
+
+## More Reading
+
+Depending on your goals, here's a progression of what to do next:
+
+1. **[View Helpers API](./api/view-helpers-api.md)** - for more options of the `react_component` method.
+2. **[Tutorial](./guides/tutorial.md)** - Comprehensive walkthrough of features with a real app.
+3. **[Configuration](./guides/configuration.md)** - Details on every possible option you can configure.
+4. **[Migration Guide](./guides/upgrading-react-on-rails.md)** - Upgrade advice for each version.
+
+---
+
+## Additional Resources
+
+### Rails/React Integration Options
+
+- **[Rails + Webpack Comparison](./guides/rails-webpacker-react-integration-options.md)**
+
+### JavaScript/TypeScript Module System
+
+- See the official [Shakapacker documentation](https://github.com/shakacode/shakapacker) for more details regarding this topic.

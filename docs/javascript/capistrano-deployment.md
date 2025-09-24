@@ -12,7 +12,7 @@ end
 
 Then run Bundler to ensure Capistrano is downloaded and installed:
 
-```sh
+```bash
 bundle install
 ```
 

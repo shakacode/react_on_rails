@@ -142,7 +142,7 @@ You can see an example commit of adding this [here](https://github.com/shakacode
 
 1. Add the `react-hot-loader` and ` @hot-loader/react-dom` npm packages.
 
-   ```sh
+   ```bash
    yarn add --dev react-hot-loader @hot-loader/react-dom
    ```
 
