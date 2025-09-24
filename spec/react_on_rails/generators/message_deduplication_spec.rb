@@ -84,32 +84,19 @@ describe "Message Deduplication", type: :generator do
 
     context "when using package_json gem" do
       before do
-        # Mock package_json gem to be available and working
-        manager_double = double("manager", install: true)
-        allow(manager_double).to receive(:add).with(anything).and_return(true)
-        allow(manager_double).to receive(:add).with(anything, type: :dev).and_return(true)
-
-        package_json_double = double("package_json", manager: manager_double)
-
-        allow(install_generator).to receive_messages(
-          add_npm_dependencies: true, # Used by batch operations
-          package_json_available?: true,
-          package_json: package_json_double
-        )
+        # Simply mock that the individual package_json gem methods succeed
+        allow(install_generator).to receive_messages(add_js_dependency: true, add_js_dependencies_batch: true,
+                                                     install_js_dependencies: true)
       end
 
       it "does not run duplicate install commands" do
-        # When package_json gem works properly, it should:
-        # 1. Use add_npm_dependencies (mocked to return true)
-        # 2. Use package_json.manager.install (mocked to return true)
-        # 3. NOT call system() commands at all since package_json gem handles everything
-
+        # When package_json gem methods work, it should NOT call system() commands
         expect(install_generator).not_to receive(:system)
 
         # Run the dependency setup
         install_generator.send(:setup_js_dependencies)
 
-        # Verify state was set correctly
+        # Verify state was set correctly to indicate package_json was used
         expect(install_generator.instance_variable_get(:@added_dependencies_to_package_json)).to be true
         expect(install_generator.instance_variable_get(:@ran_direct_installs)).to be false
       end
