@@ -38,6 +38,9 @@
     "webpack-cli": "4",
     "webpack-merge": "5"
   },
+  "scripts": {
+    "preinstall": "cd ../../.. && yarn && yalc publish && cd ../react_on_rails_pro/spec/execjs-compatible-dummy && yalc add --link react-on-rails"
+  },
   "devDependencies": {
     "@pmmmwh/react-refresh-webpack-plugin": "^0.5.15",
     "react-refresh": "^0.14.2",
