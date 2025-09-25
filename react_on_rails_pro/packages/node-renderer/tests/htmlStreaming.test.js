@@ -43,7 +43,8 @@ const createForm = ({ project = 'spec-dummy', commit = '', props = {}, throwJsEr
   }
   form.append('renderingRequest', renderingRequestCode);
 
-  const testBundlesDirectory = path.join(__dirname, '../../../spec/dummy/public/webpack/test');
+  const testBundlesDirectory = path.join(__dirname, '../../../spec/dummy/ssr-generated');
+  const testClientBundlesDirectory = path.join(__dirname, '../../../spec/dummy/public/webpack/test');
   const bundlePath = path.join(testBundlesDirectory, 'server-bundle.js');
   form.append(`bundle_${SERVER_BUNDLE_TIMESTAMP}`, fs.createReadStream(bundlePath), {
     contentType: 'text/javascript',
@@ -54,7 +55,7 @@ const createForm = ({ project = 'spec-dummy', commit = '', props = {}, throwJsEr
     contentType: 'text/javascript',
     filename: 'rsc-bundle.js',
   });
-  const clientManifestPath = path.join(testBundlesDirectory, 'react-client-manifest.json');
+  const clientManifestPath = path.join(testClientBundlesDirectory, 'react-client-manifest.json');
   form.append('asset1', fs.createReadStream(clientManifestPath), {
     contentType: 'application/json',
     filename: 'react-client-manifest.json',

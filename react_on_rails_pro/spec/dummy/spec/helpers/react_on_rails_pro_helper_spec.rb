@@ -312,7 +312,7 @@ describe ReactOnRailsProHelper, type: :helper do
           data-component-name="TestingStreamableComponent"
           data-trace="true"
           data-dom-id="TestingStreamableComponent-react-component-0"
-          data-force-load="true"
+          data-immediate-hydration="true"
         >{"helloWorldData":{"name":"Mr. Server Side Rendering"}}</script>
       SCRIPT
     end
