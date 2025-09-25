@@ -18,10 +18,6 @@ The following directories and all their contents are licensed under the **MIT Li
 
 ### Pro Licensed Code
 
-```text
-SPDX-License-Identifier: LicenseRef-Proprietary
-```
-
 The following directories and all their contents are licensed under the **React on Rails Pro License**:
 
 - `lib/react_on_rails/pro/`
