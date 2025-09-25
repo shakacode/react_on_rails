@@ -39,6 +39,8 @@ const config: KnipConfig = {
         'react_on_rails_pro/**',
       ],
       ignoreBinaries: [
+        // Knip fails to detect it's declared in devDependencies
+        'nps',
         // local scripts
         'node_package/scripts/.*',
       ],
@@ -90,6 +92,8 @@ const config: KnipConfig = {
         'bin/.*',
       ],
       ignoreDependencies: [
+        // Knip thinks it can be a devDependency, but it's supposed to be in dependencies.
+        '@babel/runtime',
         // There's no ReScript plugin for Knip
         '@rescript/react',
         // The Babel plugin fails to detect it
