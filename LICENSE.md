@@ -26,6 +26,7 @@ The following directories and all their contents are licensed under the **React 
 
 - `lib/react_on_rails/pro/`
 - `node_package/src/pro/`
+- `node_package/lib/pro/`
 
 See [REACT-ON-RAILS-PRO-LICENSE.md](./REACT-ON-RAILS-PRO-LICENSE.md) for complete Pro license terms.
 
