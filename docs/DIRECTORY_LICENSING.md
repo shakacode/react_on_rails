@@ -19,7 +19,12 @@ react_on_rails/
 └── [all other directories]       # MIT
 ```
 
-**Exception:** The `node_package/src/pro/` directory contains actual Pro implementation code with license validation. The code is included in the package but requires a valid Pro license to function.
+**Exception:** The `node_package/src/pro/` directory contains Pro implementation code licensed under the React on Rails Pro License. This code is included in the package but requires a valid Pro license to use.
+
+**Important Distinction:**
+- **MIT-licensed interface files** (outside `pro/` directories) can be freely modified under MIT terms
+- **Using those modifications to access Pro features** without a license violates the Pro License
+- **Pro-licensed files** (inside `pro/` directories) require a Pro license to use in any way
 
 ### react_on_rails_pro Repository - Pro Licensed
 
