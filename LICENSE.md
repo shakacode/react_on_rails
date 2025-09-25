@@ -13,6 +13,7 @@ The following directories and all their contents are licensed under the **MIT Li
 
 - `lib/react_on_rails/` (excluding `lib/react_on_rails/pro/`)
 - `node_package/src/` (excluding `node_package/src/pro/`)
+- `node_package/lib/` (excluding `node_package/lib/pro/`)
 - All other directories in this repository not explicitly listed as Pro-licensed
 
 ### Pro Licensed Code
