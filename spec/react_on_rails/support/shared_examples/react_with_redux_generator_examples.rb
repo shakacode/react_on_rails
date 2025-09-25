@@ -23,4 +23,9 @@ shared_examples "react_with_redux_generator" do
        app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.jsx
        app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.server.jsx].each { |file| assert_file(file) }
   end
+
+  it "does not create non-Redux HelloWorld ror_components directory" do
+    assert_no_directory "app/javascript/src/HelloWorld/ror_components"
+    assert_no_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.module.css"
+  end
 end
