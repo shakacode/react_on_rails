@@ -85,7 +85,7 @@
     "nps": "^5.9.12",
     "pino-pretty": "^13.0.0",
     "prettier": "^3.2.5",
-    "react-on-rails": "file:../",
+    "react-on-rails": "link:.yalc/react-on-rails",
     "redis": "^5.0.1",
     "release-it": "^17.6.0",
     "sentry-testkit": "^5.0.6",
@@ -114,8 +114,9 @@
     "packages/node-renderer/dist"
   ],
   "scripts": {
+    "preinstall": "yarn run link-source && yalc add --link react-on-rails",
     "postinstall": "test -f post-yarn-install.local && ./post-yarn-install.local || true",
-    "link-source": "cd ../ && yarn && yarn run build && cd node_package && yalc publish && cd ../react_on_rails_pro && yarn && yarn run nps build && yalc publish",
+    "link-source": "cd ../ && yarn && yalc publish",
     "test": "nps test",
     "prepack": "nps build.prepack",
     "prepare": "nps build.prepack",

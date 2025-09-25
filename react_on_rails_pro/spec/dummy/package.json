@@ -96,7 +96,7 @@
     "test": "yarn run build:test && yarn run lint && rspec",
     "lint": "cd ../.. && nps lint",
     "preinstall": "yarn run link-source && yalc add --link react-on-rails && yalc add --link @shakacode-tools/react-on-rails-pro-node-renderer",
-    "link-source": "cd ../../../ && yarn && yarn run build && cd node_package && yalc publish && cd ../react_on_rails_pro && yarn && yarn run nps build && yalc publish",
+    "link-source": "cd ../.. && yarn && yarn run nps build && yalc publish",
     "postinstall": "test -f post-yarn-install.local && ./post-yarn-install.local || true",
     "build:test": "rm -rf public/webpack/test && rm -rf ssr-generated && RAILS_ENV=test NODE_ENV=test bin/shakapacker",
     "build:dev": "rm -rf public/webpack/development && rm -rf ssr-generated && RAILS_ENV=development NODE_ENV=development bin/shakapacker",
