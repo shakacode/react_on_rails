@@ -17,6 +17,17 @@ PATH
       rainbow
       react_on_rails (>= 16.0.0)
 
+PATH
+  remote: ../../..
+  specs:
+    react_on_rails (16.1.1)
+      addressable
+      connection_pool
+      execjs (~> 2.5)
+      rails (>= 5.2)
+      rainbow (~> 3.0)
+      shakapacker (>= 6.0)
+
 GEM
   remote: https://rubygems.org/
   specs:
@@ -315,13 +326,6 @@ GEM
       ffi (~> 1.0)
     rdoc (6.12.0)
       psych (>= 4.0.0)
-    react_on_rails (16.1.1)
-      addressable
-      connection_pool
-      execjs (~> 2.5)
-      rails (>= 5.2)
-      rainbow (~> 3.0)
-      shakapacker (>= 6.0)
     redis (5.4.0)
       redis-client (>= 0.22.0)
     redis-client (0.24.0)
@@ -517,7 +521,7 @@ DEPENDENCIES
   pry-theme
   puma (~> 6)
   rails (~> 7.1)
-  react_on_rails (= 16.1.1)
+  react_on_rails!
   react_on_rails_pro!
   redis
   rspec-rails

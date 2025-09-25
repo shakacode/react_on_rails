@@ -125,13 +125,35 @@ aliases:
         echo -e "\nInstalled $(google-chrome --version)"
       fi
 
+  # Build core React on Rails package for pro package to use
+  - &build-core-package
+    name: Build core React on Rails package
+    command: |
+      yarn install --frozen-lockfile --no-progress --no-emoji
+      yarn run build
+
 jobs:
+  # Build core React on Rails package
+  build-core-package:
+    docker:
+      - image: &docker_image cimg/ruby:3.3.7-browsers
+    steps:
+      - checkout
+      - run: *print-system-info
+      - run: *build-core-package
+      - persist_to_workspace:
+          root: .
+          paths:
+            - node_package/lib
+
   # Lint all
   lint-js-and-ruby:
     docker:
       - image: &docker_image cimg/ruby:3.3.7-browsers
     steps:
       - checkout
+      - attach_workspace:
+          at: .
       - run: *print-system-info
       - restore_cache: *restore-package-node-modules-cache
       - restore_cache: *restore-package-gem-cache
@@ -158,6 +180,8 @@ jobs:
       - image: *docker_image
     steps:
       - checkout
+      - attach_workspace:
+          at: .
       - run: *print-system-info
       - restore_cache: *restore-package-node-modules-cache
       - run: *install-package-node-modules
@@ -173,6 +197,8 @@ jobs:
       - image: *docker_image
     steps:
       - checkout
+      - attach_workspace:
+          at: .
       - run: *print-system-info
       - restore_cache: *restore-dummy-app-node-modules-cache
       - run: *install-package-node-modules
@@ -189,6 +215,8 @@ jobs:
       - image: *docker_image
     steps:
       - checkout
+      - attach_workspace:
+          at: .
       - run: *print-system-info
       - restore_cache: *restore-package-gem-cache
       - run: *install-package-ruby-gems
@@ -204,6 +232,8 @@ jobs:
       - image: *docker_image
     steps:
       - checkout
+      - attach_workspace:
+          at: .
       - run: *print-system-info
       - restore_cache: *restore-dummy-app-gem-cache
       - run: *install-dummy-app-ruby-gems
@@ -221,6 +251,8 @@ jobs:
       - image: *docker_image
     steps:
       - checkout
+      - attach_workspace:
+          at: .
       - run: *print-system-info
       - restore_cache: *restore-package-node-modules-cache
       - restore_cache: *restore-dummy-app-node-modules-cache
@@ -246,6 +278,8 @@ jobs:
       - image: *docker_image
     steps:
       - checkout
+      - attach_workspace:
+          at: .
       - run: *print-system-info
       - restore_cache: *restore-package-node-modules-cache
       - run: rm -rf react_on_rails_pro/spec/dummy/public/webpack
@@ -268,6 +302,8 @@ jobs:
       - image: *docker_image
     steps:
       - checkout
+      - attach_workspace:
+          at: .
       - run: *print-system-info
       - restore_cache: *restore-package-gem-cache
       - run: *install-package-ruby-gems
@@ -291,6 +327,8 @@ jobs:
       - image: *docker_image
     steps:
       - checkout
+      - attach_workspace:
+          at: .
       - run: *print-system-info
       - restore_cache: *restore-package-gem-cache
       - restore_cache: *restore-package-node-modules-cache
@@ -347,30 +385,42 @@ workflows:
   version: 2
   build-and-test:
     jobs:
-      - install-package-node-packages
-      - install-package-ruby-gems
+      - build-core-package
+      - install-package-node-packages:
+          requires:
+            - build-core-package
+      - install-package-ruby-gems:
+          requires:
+            - build-core-package
       - install-dummy-app-node-packages:
           requires:
             - install-package-node-packages
-      - install-dummy-app-ruby-gems
+      - install-dummy-app-ruby-gems:
+          requires:
+            - build-core-package
       - lint-js-and-ruby:
           requires:
+            - build-core-package
             - install-package-node-packages
             - install-package-ruby-gems
             - install-dummy-app-node-packages
       - build-dummy-app-webpack-test-bundles:
           requires:
+            - build-core-package
             - install-package-node-packages
             - install-dummy-app-node-packages
             - install-dummy-app-ruby-gems
       - package-js-tests:
           requires:
+            - build-core-package
             - install-package-node-packages
             - build-dummy-app-webpack-test-bundles
       - rspec-package-specs:
           requires:
+            - build-core-package
             - install-package-ruby-gems
       - rspec-dummy-app-node-renderer:
           requires:
+            - build-core-package
             - install-package-ruby-gems
             - build-dummy-app-webpack-test-bundles
