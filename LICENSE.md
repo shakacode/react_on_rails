@@ -1,16 +1,38 @@
 # Licensing
 
-- **Core**: MIT (this file)
-- **Pro**: see [REACT-ON-RAILS-PRO-LICENSE.md](./REACT-ON-RAILS-PRO-LICENSE.md)
+This repository contains code under two different licenses:
 
----
+- **Core**: MIT License (applies to most files)
+- **Pro**: React on Rails Pro License (applies to specific directories)
 
-## MIT License for Core React on Rails
+## License Scope
 
-This license applies to all files within this repository, with the exception of the code located in the following directories, which are licensed separately under the React on Rails Pro License:
+### MIT Licensed Code
+
+The following directories and all their contents are licensed under the **MIT License** (see full text below):
+
+- `lib/react_on_rails/` (excluding `lib/react_on_rails/pro/`)
+- `node_package/src/` (excluding `node_package/src/pro/`)
+- `node_package/lib/` (excluding `node_package/lib/pro/`)
+- All other directories in this repository not explicitly listed as Pro-licensed
+
+### Pro Licensed Code
+
+The following directories and all their contents are licensed under the **React on Rails Pro License**:
 
 - `lib/react_on_rails/pro/`
 - `node_package/src/pro/`
+- `node_package/lib/pro/`
+
+See [REACT-ON-RAILS-PRO-LICENSE.md](./REACT-ON-RAILS-PRO-LICENSE.md) for complete Pro license terms.
+
+**Important:** Pro-licensed code is included in this package but requires a valid React on Rails Pro subscription to use. Using Pro features without a valid license violates the React on Rails Pro License.
+
+---
+
+## MIT License
+
+This license applies to all MIT-licensed code as defined above.
 
 Copyright (c) 2017, 2018 Justin Gordon and ShakaCode  
 Copyright (c) 2015–2025 ShakaCode, LLC
@@ -41,7 +63,22 @@ SOFTWARE.
 
 ## React on Rails Pro License
 
-The code in the directories listed above is part of the React on Rails Pro framework and is licensed under the React on Rails Pro License.
-
-You can find the full text of the license agreement here:
+For Pro-licensed code (as defined in the "License Scope" section above), see:
 [REACT-ON-RAILS-PRO-LICENSE.md](./REACT-ON-RAILS-PRO-LICENSE.md)
+
+**Key Points:**
+
+- Pro features require a valid React on Rails Pro subscription for production use
+- Free use is permitted for educational, personal, and non-production purposes
+- Modifying MIT-licensed interface files is permitted under MIT terms
+- However, using those modifications to access Pro features without a valid license violates the Pro License
+
+### License Validation Mechanisms
+
+**License validation mechanisms** include but are not limited to:
+
+- Runtime checks for valid Pro subscriptions
+- Authentication systems in `lib/react_on_rails/utils.rb` and Pro TypeScript modules
+- The `react_on_rails_pro?` method and `rorPro` field generation
+
+While MIT-licensed code may be modified under MIT terms, using such modifications to access Pro features without a valid license violates the React on Rails Pro License.

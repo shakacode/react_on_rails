@@ -95,7 +95,7 @@ react_on_rails/ (monorepo root)
 
 **A:** We maintain two separate repositories:
 
-- **react_on_rails** (MIT) - Core functionality, completely free except pro directories as stated in LICENSE.md
+- **react_on_rails** (MIT + Pro) - Core functionality is MIT-licensed and completely free. Pro features (in `pro/` directories) are Pro-licensed and require a subscription for production use
 - **react_on_rails_pro** (Pro License) - Advanced features, subscription required for production
 
 ### Q: What requires a Pro subscription?
@@ -109,6 +109,14 @@ react_on_rails/ (monorepo root)
 - Premium support and consultation
 
 See [REACT-ON-RAILS-PRO-LICENSE.md](../REACT-ON-RAILS-PRO-LICENSE.md) for complete Pro license terms.
+
+### Q: Can I modify the MIT-licensed interface files?
+
+**A:** Yes! Under the MIT license, you can freely modify any MIT-licensed files (those outside `pro/` directories). However:
+
+- **Permitted:** Modifying MIT-licensed code for your own purposes
+- **Not Permitted:** Using those modifications to access Pro features without a valid license
+- **Distinction:** The MIT license grants you modification rights, but the Pro License restricts unauthorized use of Pro features
 
 ### Q: Can I try Pro features for free?
 
