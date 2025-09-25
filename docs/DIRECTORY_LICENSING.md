@@ -25,7 +25,7 @@ react_on_rails/
 
 - **MIT-licensed interface files** (outside `pro/` directories) can be freely modified under MIT terms
 - **Using those modifications to access Pro features** without a license violates the Pro License
-- **Pro-licensed files** (inside `pro/` directories) require a Pro license to use in any way
+- **Pro-licensed files** (inside `pro/` directories) require a Pro license to use in any way. Note, ShakaCode offers FREE licenses for educational and demonstration purposes.
 
 ### react_on_rails_pro Repository - Pro Licensed
 
