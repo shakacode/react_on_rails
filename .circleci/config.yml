@@ -224,6 +224,7 @@ jobs:
           key: v4-dummy-app-webpack-bundle-{{ .Revision }}
           paths:
             - spec/dummy/public/webpack/test
+            - spec/dummy/ssr-generated
 
   # Run JS unit tests for Renderer package.
   package-js-tests:
@@ -234,6 +235,7 @@ jobs:
       - run: *print-system-info
       - restore_cache: *restore-package-node-modules-cache
       - run: rm -rf spec/dummy/public/webpack
+      - run: rm -rf spec/dummy/ssr-generated
       - restore_cache: *restore-dummy-app-webpack-bundle-cache
       - run: *install-package-node-modules
       # https://circleci.com/docs/collect-test-data/#jest
@@ -279,6 +281,7 @@ jobs:
       - restore_cache: *restore-dummy-app-node-modules-cache
       - restore_cache: *restore-dummy-app-gem-cache
       - run: rm -rf spec/dummy/public/webpack
+      - run: rm -rf spec/dummy/ssr-generated
       - restore_cache: *restore-dummy-app-webpack-bundle-cache
       - run: *install-dummy-app-ruby-gems
       - run: *install-package-node-modules

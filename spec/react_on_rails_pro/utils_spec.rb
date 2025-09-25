@@ -12,7 +12,6 @@ module ReactOnRailsPro
             .and_return("public/webpack/production")
           allow(Shakapacker).to receive_message_chain("config.public_output_path")
             .and_return("public/webpack/production")
-          allow(ReactOnRails::PackerUtils).to receive(:using_packer?).and_return(true)
         end
 
         describe ".bundle_file_name" do

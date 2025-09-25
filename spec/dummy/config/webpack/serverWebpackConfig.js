@@ -1,7 +1,7 @@
 /* eslint-disable no-param-reassign */
-const { config } = require('shakapacker');
 const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
 const webpack = require('webpack');
+const path = require('path');
 const commonWebpackConfig = require('./commonWebpackConfig');
 
 function extractLoader(rule, loaderName) {
@@ -65,8 +65,8 @@ const configureServer = (rscBundle = false) => {
     globalObject: 'this',
     // If using the React on Rails Pro node server renderer, uncomment the next line
     libraryTarget: 'commonjs2',
-    path: config.outputPath,
-    publicPath: config.publicPath,
+    path: path.resolve(__dirname, '../../ssr-generated'),
+    // No publicPath needed since server bundles are not served via web
     // https://webpack.js.org/configuration/output/#outputglobalobject
   };
 

@@ -1,4 +1,5 @@
 import path from 'path';
+import fs from 'fs';
 import { Readable } from 'stream';
 import { buildVM, getVMContext, resetVM } from '../src/worker/vm';
 import { getConfig } from '../src/shared/configBuilder';
@@ -17,6 +18,36 @@ const ComponentWithAsyncError = async () => {
 };
 
 describe('serverRenderRSCReactComponent', () => {
+  let tempDir;
+  let tempRscBundlePath;
+  let tempManifestPath;
+
+  beforeAll(async () => {
+    // Create temporary directory
+    tempDir = path.join(process.cwd(), 'tmp/node-renderer-bundles-test/testing-bundle');
+    fs.mkdirSync(tempDir, { recursive: true });
+
+    // Copy rsc-bundle.js to temp directory
+    const originalRscBundlePath = path.join(__dirname, '../../../spec/dummy/ssr-generated/rsc-bundle.js');
+    tempRscBundlePath = path.join(tempDir, 'rsc-bundle.js');
+    fs.copyFileSync(originalRscBundlePath, tempRscBundlePath);
+
+    // Copy react-client-manifest.json to temp directory
+    const originalManifestPath = path.join(
+      __dirname,
+      '../../../spec/dummy/public/webpack/test/react-client-manifest.json',
+    );
+    tempManifestPath = path.join(tempDir, 'react-client-manifest.json');
+    fs.copyFileSync(originalManifestPath, tempManifestPath);
+  });
+
+  afterAll(async () => {
+    // Clean up temporary directory
+    if (tempDir && fs.existsSync(tempDir)) {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   beforeEach(async () => {
     const config = getConfig();
     config.supportModules = true;
@@ -31,10 +62,9 @@ describe('serverRenderRSCReactComponent', () => {
   // The serverRenderRSCReactComponent function should only be called when the bundle is compiled with the `react-server` condition.
   // Therefore, we cannot call it directly in the test files. Instead, we run the RSC bundle through the VM and call the method from there.
   const getReactOnRailsRSCObject = async () => {
-    const testBundlesDirectory = path.join(__dirname, '../../../spec/dummy/public/webpack/test');
-    const rscBundlePath = path.join(testBundlesDirectory, 'rsc-bundle.js');
-    await buildVM(rscBundlePath);
-    const vmContext = getVMContext(rscBundlePath);
+    // Use the copied rsc-bundle.js file from temp directory
+    await buildVM(tempRscBundlePath);
+    const vmContext = getVMContext(tempRscBundlePath);
     const { ReactOnRails, React } = vmContext.context;
 
     function SuspensedComponentWithAsyncError() {
@@ -68,7 +98,7 @@ describe('serverRenderRSCReactComponent', () => {
       throwJsErrors,
       railsContext: {
         serverSide: true,
-        reactClientManifestFileName: 'react-client-manifest.json',
+        reactClientManifestFileName: path.basename(tempManifestPath),
         reactServerClientManifestFileName: 'react-server-client-manifest.json',
         renderingReturnsPromises: true,
       },
