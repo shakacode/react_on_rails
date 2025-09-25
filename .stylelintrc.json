@@ -1,0 +1,28 @@
+{
+  "extends": "stylelint-config-standard-scss",
+  "rules": {
+    "color-keyword": null,
+    "color-hex-length": "long",
+    "color-hex-case": "upper",
+    "selector-id-pattern": null,
+    "number-leading-zero": "always",
+    "scss/at-rule-no-unknown": [true, {
+      "ignoreAtRules": ["include", "mixin", "each", "if", "else", "for", "while", "function", "return", "use", "forward"]
+    }],
+    "selector-class-pattern": null,
+    "custom-property-pattern": null,
+    "keyframes-name-pattern": null,
+    "scss/percent-placeholder-pattern": null,
+    "scss/dollar-variable-pattern": null,
+    "scss/at-function-pattern": null,
+    "scss/at-mixin-pattern": null,
+    "import-notation": null
+  },
+  "ignoreFiles": [
+    "spec/dummy/app/assets/stylesheets/application.css",
+    "**/*.js",
+    "**/*.jsx",
+    "**/*.ts",
+    "**/*.tsx"
+  ]
+}
