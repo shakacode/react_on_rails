@@ -115,6 +115,7 @@
   ],
   "scripts": {
     "postinstall": "test -f post-yarn-install.local && ./post-yarn-install.local || true",
+    "link-source": "cd ../ && yarn && yarn run build && cd node_package && yalc publish && cd ../react_on_rails_pro && yarn && yarn run nps build && yalc publish",
     "test": "nps test",
     "prepack": "nps build.prepack",
     "prepare": "nps build.prepack",
