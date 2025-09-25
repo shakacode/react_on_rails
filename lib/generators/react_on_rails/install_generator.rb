@@ -73,7 +73,7 @@ module ReactOnRails
           create_css_module_types
           create_typescript_config
         end
-        invoke "react_on_rails:base", [], { typescript: options.typescript? }
+        invoke "react_on_rails:base", [], { typescript: options.typescript?, redux: options.redux? }
         if options.redux?
           invoke "react_on_rails:react_with_redux", [], { typescript: options.typescript? }
         else
