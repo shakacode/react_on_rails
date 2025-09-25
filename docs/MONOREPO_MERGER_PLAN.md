@@ -170,15 +170,15 @@ git subtree add --prefix=react_on_rails_pro pro-origin/main --squash
 
 **Tasks:**
 
-- [ ] Execute git subtree merge into `react_on_rails_pro/` directory
-- [ ] **CRITICAL: Update CI to run tests for both packages**
-- [ ] Keep GitHub Actions for core package tests
-- [ ] Keep CircleCI for pro package tests (temporarily)
-- [ ] Update root scripts to test both packages
-- [ ] Ensure both packages build independently
-- [ ] Update root LICENSE.md to list `react_on_rails_pro/` as Pro-licensed
-- [ ] Verify all pro files remain under `react_on_rails_pro/` directory
-- [ ] Update .gitignore if needed
+- [x] Execute git subtree merge into `react_on_rails_pro/` directory
+- [x] **CRITICAL: Update CI to run tests for both packages**
+- [x] Keep GitHub Actions for core package tests
+- [x] Keep CircleCI for pro package tests (temporarily)
+- [x] Update root scripts to test both packages
+- [x] Ensure both packages build independently
+- [x] Update root LICENSE.md to list `react_on_rails_pro/` as Pro-licensed
+- [x] Verify all pro files remain under `react_on_rails_pro/` directory
+- [x] Update .gitignore if needed
 
 **Expected Directory Structure After Merge:**
 
@@ -209,6 +209,21 @@ react_on_rails/ (root)
 
 All other files are licensed under MIT License.
 ```
+
+### Post-Merge CI Fixes Required
+
+After the initial merge, the following CI adjustments may be needed:
+
+- [ ] Fix any path-related issues in GitHub Actions workflows
+- [ ] Update any hardcoded references to file paths in CI scripts
+- [ ] Ensure core package tests still pass with pro directory present
+- [ ] Verify CircleCI configuration works in new directory structure
+- [ ] Fix any build script path issues
+- [ ] Update any test fixtures or references that assume single-repo structure
+- [ ] Resolve any dependency conflicts between core and pro packages
+- [ ] Fix any linting issues related to new directory structure
+- [ ] Update any documentation generation that depends on file paths
+- [ ] Ensure all CI caches work correctly with new structure
 
 **Success Criteria:** ✅ **ALL CI jobs pass for both core and pro packages independently**
 
