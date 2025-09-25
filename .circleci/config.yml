@@ -1,5 +1,8 @@
 version: 2
 
+# Monorepo CircleCI config for React on Rails Pro package
+# Updated to work from root directory with pro package in react_on_rails_pro/
+
 aliases:
   # Print critical data and executables versions.
   - &print-system-info
@@ -13,38 +16,45 @@ aliases:
              echo "Yarn version: "; yarn --version
              echo "Bundler version: "; bundle --version
   - &lint-js
-    name: Linting of JS
+    name: Linting of JS (Pro package only)
+    working_directory: react_on_rails_pro
     command: yarn run nps eslint
 
   - &lint-ruby
-    name: Linting of Ruby
+    name: Linting of Ruby (Pro package only)
+    working_directory: react_on_rails_pro
     command: bundle exec rubocop
 
   - &format
-    name: Check formatting
+    name: Check formatting (Pro package only)
+    working_directory: react_on_rails_pro
     command: yarn run nps format.listDifferent
 
   - &typescript-check
-    name: Check TypeScript
+    name: Check TypeScript (Pro package only)
+    working_directory: react_on_rails_pro
     command: yarn run nps check-typescript
 
   # Install/update Node modules for renderer package unless existing set of modules is satisfying Yarn.
   - &install-package-node-modules
-    name: Install Node modules with Yarn for renderer package
+    name: Install Node modules with Yarn for pro renderer package
+    working_directory: react_on_rails_pro
     command: |
       sudo yarn global add yalc
       yarn install --frozen-lockfile --no-progress --no-emoji
 
   # Install/update Node modules for dummy app unless existing set of modules is satisfying Yarn.
   - &install-dummy-app-node-modules
-    name: Install Node modules with Yarn for dummy app
+    name: Install Node modules with Yarn for pro dummy app
+    working_directory: react_on_rails_pro
     command: |
       cd spec/dummy
       yarn install --frozen-lockfile --no-progress --no-emoji
 
   # Install ruby gems unless existing set of gems is satisfying bundler.
   - &install-dummy-app-ruby-gems
-    name: Install Ruby Gems for dummy app
+    name: Install Ruby Gems for pro dummy app
+    working_directory: react_on_rails_pro
     command: |
       gem install bundler -v "2.5.4"
       echo "Bundler version: "; bundle --version
@@ -53,14 +63,16 @@ aliases:
       cd spec/dummy && bundle lock --add-platform 'x86_64-linux' && bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
 
   - &generate-dummy-app-packs
-    name: Generate file-system based entrypoints
+    name: Generate file-system based entrypoints (Pro)
+    working_directory: react_on_rails_pro
     command: |
       cd spec/dummy
       bundle exec rake react_on_rails:generate_packs
 
   # Install ruby gems unless existing set of gems is satisfying bundler.
   - &install-package-ruby-gems
-    name: Install Ruby Gems for package
+    name: Install Ruby Gems for pro package
+    working_directory: react_on_rails_pro
     command: |
       gem install bundler -v "2.5.4"
       echo "Bundler version: "; bundle --version
@@ -70,32 +82,32 @@ aliases:
 
   # Restore node_modules dir from cache using yarn.lock checksum as a key.
   - &restore-package-node-modules-cache
-    name: Restore cached node_modules directory
+    name: Restore cached node_modules directory (Pro)
     keys:
-      - v4-package-node-modules-cache-{{ checksum "yarn.lock" }}
+      - v4-pro-package-node-modules-cache-{{ checksum "react_on_rails_pro/yarn.lock" }}
 
   # Restore spec/dummy/node_modules dir from cache using yarn.lock checksum as a key.
   - &restore-dummy-app-node-modules-cache
-    name: Restore cached spec/dummy/node_modules directory
+    name: Restore cached spec/dummy/node_modules directory (Pro)
     keys:
-      - v4-dummy-app-node-modules-cache-{{ checksum "spec/dummy/yarn.lock" }}
+      - v4-pro-dummy-app-node-modules-cache-{{ checksum "react_on_rails_pro/spec/dummy/yarn.lock" }}
 
   # Restore vendor/bundle dir from cache using Gemfile.lock checksum as a key.
   - &restore-dummy-app-gem-cache
-    name: Restore cached Ruby Gems for dummy app
+    name: Restore cached Ruby Gems for pro dummy app
     keys:
-      - v4-dummy-app-gem-cache-{{ checksum "spec/dummy/Gemfile.lock" }}
+      - v4-pro-dummy-app-gem-cache-{{ checksum "react_on_rails_pro/spec/dummy/Gemfile.lock" }}
 
   # Restore vendor/bundle dir from cache using react_on_rails_pro.gemspec checksum as a key.
   - &restore-package-gem-cache
-    name: Restore cached Ruby Gems for package
+    name: Restore cached Ruby Gems for pro package
     keys:
-      - v4-package-app-gem-cache-{{ checksum "react_on_rails_pro.gemspec" }}
+      - v4-pro-package-app-gem-cache-{{ checksum "react_on_rails_pro/react_on_rails_pro.gemspec" }}
 
   # Restore webpack bundles for dummy app from cache
   - &restore-dummy-app-webpack-bundle-cache
-    name: Restore cached webpack bundles for dummy app
-    key: v4-dummy-app-webpack-bundle-{{ .Revision }}
+    name: Restore cached webpack bundles for pro dummy app
+    key: v4-pro-dummy-app-webpack-bundle-{{ .Revision }}
 
     # NOTE: Sometimes CI generated docker images are not updated in time to keep up with the minimum required
     # by chromedriver versions of Chrome. Just bump here Chrome version if chromedriver raises errors
@@ -129,7 +141,8 @@ jobs:
       - run: *install-dummy-app-ruby-gems
       - run: *install-dummy-app-node-modules
       - run:
-          name: Install Node modules with Yarn for ExecJS dummy app
+          name: Install Node modules with Yarn for ExecJS dummy app (Pro)
+          working_directory: react_on_rails_pro
           command: |
             cd spec/execjs-compatible-dummy
             yarn install --frozen-lockfile --no-progress --no-emoji
@@ -149,10 +162,10 @@ jobs:
       - restore_cache: *restore-package-node-modules-cache
       - run: *install-package-node-modules
       - save_cache:
-          name: Save root node_modules to cache
-          key: v4-package-node-modules-cache-{{ checksum "yarn.lock" }}
+          name: Save pro root node_modules to cache
+          key: v4-pro-package-node-modules-cache-{{ checksum "react_on_rails_pro/yarn.lock" }}
           paths:
-            - node_modules
+            - react_on_rails_pro/node_modules
 
   # Install Node modules for dummy app with Yarn and save them to cache.
   install-dummy-app-node-packages:
@@ -165,10 +178,10 @@ jobs:
       - run: *install-package-node-modules
       - run: *install-dummy-app-node-modules
       - save_cache:
-          name: Save spec/dummy/node_modules to cache
-          key: v4-dummy-app-node-modules-cache-{{ checksum "spec/dummy/yarn.lock" }}
+          name: Save pro spec/dummy/node_modules to cache
+          key: v4-pro-dummy-app-node-modules-cache-{{ checksum "react_on_rails_pro/spec/dummy/yarn.lock" }}
           paths:
-            - spec/dummy/node_modules
+            - react_on_rails_pro/spec/dummy/node_modules
 
   # Install Ruby gems for package with Bundler and save them to cache.
   install-package-ruby-gems:
@@ -180,10 +193,10 @@ jobs:
       - restore_cache: *restore-package-gem-cache
       - run: *install-package-ruby-gems
       - save_cache:
-          name: Save dummy app ruby gems to cache
-          key: v4-package-app-gem-cache-{{ checksum "react_on_rails_pro.gemspec" }}
+          name: Save pro package ruby gems to cache
+          key: v4-pro-package-app-gem-cache-{{ checksum "react_on_rails_pro/react_on_rails_pro.gemspec" }}
           paths:
-            - vendor/bundle
+            - react_on_rails_pro/vendor/bundle
 
   # Install Ruby gems for dummy app with Bundler and save them to cache.
   install-dummy-app-ruby-gems:
@@ -195,10 +208,10 @@ jobs:
       - restore_cache: *restore-dummy-app-gem-cache
       - run: *install-dummy-app-ruby-gems
       - save_cache:
-          name: Save dummy app ruby gems to cache
-          key: v4-dummy-app-gem-cache-{{ checksum "spec/dummy/Gemfile.lock" }}
+          name: Save pro dummy app ruby gems to cache
+          key: v4-pro-dummy-app-gem-cache-{{ checksum "react_on_rails_pro/spec/dummy/Gemfile.lock" }}
           paths:
-            - spec/dummy/vendor/bundle
+            - react_on_rails_pro/spec/dummy/vendor/bundle
 
   # Build client and server bundles for dummy app with Webpack and save them to cache.
   # NOTE: keeping around this cache in case we have multiple rspec suites in the future to tests
@@ -217,14 +230,15 @@ jobs:
       - run: *install-dummy-app-ruby-gems
       - run: *generate-dummy-app-packs
       - run:
-          name: Build test bundles for dummy app
+          name: Build test bundles for pro dummy app
+          working_directory: react_on_rails_pro
           command: cd spec/dummy && yarn run build:test
       - save_cache:
           name: Save test webpack bundles to cache (for build number checksum used by rspec job)
-          key: v4-dummy-app-webpack-bundle-{{ .Revision }}
+          key: v4-pro-dummy-app-webpack-bundle-{{ .Revision }}
           paths:
-            - spec/dummy/public/webpack/test
-            - spec/dummy/ssr-generated
+            - react_on_rails_pro/spec/dummy/public/webpack/test
+            - react_on_rails_pro/spec/dummy/ssr-generated
 
   # Run JS unit tests for Renderer package.
   package-js-tests:
@@ -234,13 +248,14 @@ jobs:
       - checkout
       - run: *print-system-info
       - restore_cache: *restore-package-node-modules-cache
-      - run: rm -rf spec/dummy/public/webpack
-      - run: rm -rf spec/dummy/ssr-generated
+      - run: rm -rf react_on_rails_pro/spec/dummy/public/webpack
+      - run: rm -rf react_on_rails_pro/spec/dummy/ssr-generated
       - restore_cache: *restore-dummy-app-webpack-bundle-cache
       - run: *install-package-node-modules
       # https://circleci.com/docs/collect-test-data/#jest
       - run:
-          name: Run JS unit tests for Renderer package
+          name: Run JS unit tests for Pro Renderer package
+          working_directory: react_on_rails_pro
           command: yarn run nps test.ci
           environment:
             JEST_JUNIT_OUTPUT_DIR: ./jest
@@ -257,13 +272,14 @@ jobs:
       - restore_cache: *restore-package-gem-cache
       - run: *install-package-ruby-gems
       - run:
-          name: Run rspec tests
+          name: Run rspec tests (Pro package)
+          working_directory: react_on_rails_pro
           command: |
             bundle exec rspec spec/react_on_rails_pro
       - store_test_results:
           path: ~/rspec
       - store_artifacts:
-          path: log/test.log
+          path: react_on_rails_pro/log/test.log
 
   # Start Renderer and run RSpec test suite for dummy app.
   # NOTES:
@@ -280,22 +296,25 @@ jobs:
       - restore_cache: *restore-package-node-modules-cache
       - restore_cache: *restore-dummy-app-node-modules-cache
       - restore_cache: *restore-dummy-app-gem-cache
-      - run: rm -rf spec/dummy/public/webpack
-      - run: rm -rf spec/dummy/ssr-generated
+      - run: rm -rf react_on_rails_pro/spec/dummy/public/webpack
+      - run: rm -rf react_on_rails_pro/spec/dummy/ssr-generated
       - restore_cache: *restore-dummy-app-webpack-bundle-cache
       - run: *install-dummy-app-ruby-gems
       - run: *install-package-node-modules
       - run: *install-latest-chrome
       - run: *install-dummy-app-node-modules
       - run:
-          name: Generate file-system based entrypoints
+          name: Generate file-system based entrypoints (Pro)
+          working_directory: react_on_rails_pro
           command: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
       - run:
-          name: Run Node renderer in a background
+          name: Run Pro Node renderer in a background
+          working_directory: react_on_rails_pro
           command: cd spec/dummy && yarn run node-renderer
           background: true
       - run:
-          name: run rails server in background
+          name: run rails server in background (Pro dummy app)
+          working_directory: react_on_rails_pro
           command: cd spec/dummy && RAILS_ENV=test rails server
           background: true
       - run:
@@ -303,8 +322,8 @@ jobs:
           command: |
             while ! curl -s http://localhost:3000 > /dev/null; do sleep 1; done
       - run:
-          name: Run rspec tests
-          working_directory: spec/dummy
+          name: Run rspec tests (Pro dummy app)
+          working_directory: react_on_rails_pro/spec/dummy
           command: |
             circleci tests glob "spec/**/*_spec.rb" |
             circleci tests run --command="xargs bundle exec rspec \
@@ -318,11 +337,11 @@ jobs:
       - store_test_results:
           path: ~/rspec
       - store_artifacts:
-          path: spec/dummy/tmp/screenshots
+          path: react_on_rails_pro/spec/dummy/tmp/screenshots
       - store_artifacts:
-          path: spec/dummy/log/test.log
+          path: react_on_rails_pro/spec/dummy/log/test.log
       - store_artifacts:
-          path: spec/dummy/yarn-error.log
+          path: react_on_rails_pro/spec/dummy/yarn-error.log
 
 workflows:
   version: 2

@@ -28,6 +28,7 @@ AllCops:
     - 'coverage/**/*'
     - 'gen-examples/examples/**/*'
     - 'node_modules/**/*'
+    - 'react_on_rails_pro/**/*'  # Exclude pro package (has its own linting)
     - 'spec/dummy/bin/*'
     - 'spec/fixtures/**/*'
     - 'spec/react_on_rails/dummy-for-generators/**/*'

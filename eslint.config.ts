@@ -20,6 +20,8 @@ const config = tsEslint.config([
   globalIgnores([
     // compiled code
     'node_package/lib/',
+    // pro package (has its own linting)
+    'react_on_rails_pro/',
     // used for tests only
     'spec/react_on_rails/dummy-for-generators',
     // temporary and generated files
