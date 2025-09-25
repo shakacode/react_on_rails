@@ -1,0 +1,53 @@
+<h1 class="page-header">Loadable components</h1>
+<% loadable_app = react_component_hash(
+  "Loadable",
+  props: { title: "This is a Loadable Component!" },
+  prerender: true,
+  trace: true,
+  id: "LoadableComponent-react-component-0")
+%>
+<% content_for :head do %>
+  <%= loadable_app["linkTags"] %>
+  <%= loadable_app["scriptTags"] %>
+  <%= loadable_app["styleTags"] %>
+<% end %>
+
+<h2 class="section-header">
+  Server code
+</h2>
+<pre><code class="language-jsx">
+<%=ApplicationHelper::include_code "loadable/loadable-server.imports-loadable.jsx" %>
+</code></pre>
+
+<h2 class="section-header">
+  Client code
+</h2>
+<pre><code class="language-jsx">
+<%= ApplicationHelper::include_code "loadable/loadable-client.imports-loadable.js" %>
+</code></pre>
+
+<h1 class="section-header">React Rails Server Rendering of Loadable Component</h1>
+<pre><code class="language-ruby">
+<%%
+  loadable_app = react_component_hash(
+    "Loadable",
+    props: { title: "This is a Loadable Component!" },
+    prerender: true,
+    trace: true,
+    id: "LoadableComponent-react-component-0"
+  )
+%>
+
+<%%= content_for :head do %>
+  <%%= loadable_app["linkTags"] %>
+  <%%= loadable_app["scriptTags"] %>
+  <%%= loadable_app["styleTags"] %>
+<%% end %> %>
+
+<%%= loadable_app["componentHtml"] %>
+</code></pre>
+
+<h2 class="section-header">
+  Result
+</h2>
+<%= loadable_app["componentHtml"] %>

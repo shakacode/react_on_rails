@@ -1,0 +1,68 @@
+<h2 class="page-header">
+  This page demonstrates the use of apollo client during server rendering.
+</h2>
+
+<div class="section-header">
+  Result
+</div>
+
+<% result = react_component_hash(
+  "ApolloGraphQLApp",
+  prerender: true,
+  trace: true,
+  props: {
+    # since _dummy_session is a http only cookie, it shouldn't be passed to the FE javascript code
+    ssrOnlyProps: {
+      csrf: form_authenticity_token,
+      sessionCookie: cookies["_dummy_session"]
+    }
+}) %>
+<%= result["componentHtml"] %>
+
+<% content_for :head do %>
+  <%= result["apolloStateTag"] %>
+<% end %>
+
+<div class="section-header">
+  Server render function
+</div>
+
+<pre><code class="language-jsx">
+<%= File.read(Rails.root.join "client/app/ror-auto-load-components/ApolloGraphQLApp.server.jsx") %>
+</code></pre>
+
+<div class="section-header">
+  Client render-function
+</div>
+<pre><code class="language-jsx">
+<%= File.read(Rails.root.join "client/app/ror-auto-load-components/ApolloGraphQLApp.client.jsx") %>
+</code></pre>
+
+<div class="section-header">
+  Helper method call in the view:
+</div>
+
+<pre><code class="language-ruby">
+<%%=
+result = react_component_hash(
+  "ApolloGraphQLApp",
+  prerender: true,
+  trace: true,
+  # since _dummy_session is a http only cookie, it shouldn't be passed to the FE javascript code
+  ssrOnlyProps: {
+    csrf: form_authenticity_token,
+    sessionCookie: cookies["_dummy_session"]
+  }
+)
+%>
+</code></pre>
+
+
+Don't forget to insert the <b>apolloStateTag</b> field in the document <b>head</b> to enable hydration
+
+<pre><code class="language-ruby">
+<%%= content_for :head do %>
+  <%%= result["apolloStateTag"] %>
+<%% end %>
+</code></pre>
+

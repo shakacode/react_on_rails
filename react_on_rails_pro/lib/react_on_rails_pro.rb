@@ -1,0 +1,21 @@
+# frozen_string_literal: true
+
+require "rails"
+
+require "react_on_rails_pro/request"
+require "react_on_rails_pro/version"
+require "react_on_rails_pro/constants"
+require "react_on_rails_pro/engine"
+require "react_on_rails_pro/error"
+require "react_on_rails_pro/utils"
+require "react_on_rails_pro/configuration"
+require "react_on_rails_pro/cache"
+require "react_on_rails_pro/stream_cache"
+require "react_on_rails_pro/server_rendering_pool/pro_rendering"
+require "react_on_rails_pro/server_rendering_pool/node_rendering_pool"
+require "react_on_rails_pro/server_rendering_js_code"
+require "react_on_rails_pro/assets_precompile"
+require "react_on_rails_pro/prepare_node_renderer_bundles"
+require "react_on_rails_pro/concerns/stream"
+require "react_on_rails_pro/concerns/rsc_payload_renderer"
+require "react_on_rails_pro/routes"

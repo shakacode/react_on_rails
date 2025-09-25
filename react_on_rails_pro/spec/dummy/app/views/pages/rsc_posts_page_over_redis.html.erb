@@ -1,0 +1,13 @@
+<%= stream_react_component("RSCPostsPageOverRedis", 
+    props: @app_props_server_render.merge(
+      artificialDelay: params[:artificial_delay] || 0, 
+      postsCount: params[:posts_count] || 2,
+      requestId: @request_id
+    ), 
+    prerender: true, 
+    trace: true, 
+    id: "RSCPostsPageOverRedis-react-component-0") %>
+<hr/>
+
+<p>Artificial delay: <%= params[:artificial_delay] %></p>
+<h1>React Rails Server Streaming Server Rendered RSC Components</h1>

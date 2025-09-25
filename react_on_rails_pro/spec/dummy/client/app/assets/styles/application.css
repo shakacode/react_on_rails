@@ -1,0 +1,56 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    code {
+        @apply p-0;
+    }
+}
+
+@layer components {
+
+    .active {
+        @apply text-red-700;
+    }
+
+    .page-header {
+        @apply text-3xl font-bold text-black;
+    }
+
+    .section-header {
+        @apply text-red-700 text-2xl mt-5 mb-2;
+    }
+
+    .section-subheader {
+        @apply text-red-700 text-xl mt-5 mb-2;
+    }
+
+    code {
+        @apply text-red-700;
+        background-color: #f5f2f0;
+    }
+
+    a {
+        @apply text-blue-700;
+    }
+
+    .menu {
+        @apply ml-4;
+        list-style-type: disc;
+    }
+
+    .menu li {
+        @apply hover:text-red-700
+    }
+
+    .list {
+        @apply ml-4;
+        list-style-type: disc;
+    }
+
+    .log-section {
+        @apply pt-5 pb-5;
+        background-color: #f5f2f0;
+    }
+}

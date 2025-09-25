@@ -1,0 +1,77 @@
+# Keep in sync with https://github.com/shakacode/react_on_rails/blob/master/Gemfile.development_dependencies
+# frozen_string_literal: true
+
+git_source(:github) { |repo| "https://github.com/#{repo}.git" }
+
+ruby '3.3.7'
+
+gem "react_on_rails", "16.1.1"
+
+# For local development
+# Add the following line to the Gemfile.local file
+# gem "react_on_rails", path: "../react_on_rails"
+
+gem "shakapacker", "8.0.0"
+gem "bootsnap", require: false
+gem "rails", "~> 7.1"
+gem "puma", "~> 6"
+
+# Build JSON APIs with ease. Read more: https://github.com/rails/jbuilder
+gem "jbuilder"
+
+gem "pg"
+
+# Turbolinks makes following links in your web application faster. Read more: https://github.com/rails/turbolinks
+gem "turbolinks"
+gem "sqlite3", "~> 1.4"
+gem "uglifier"
+gem "jquery-rails"
+gem "sprockets"
+gem "sass-rails"
+
+gem "net-http"
+gem "net-smtp"
+gem "net-imap"
+
+gem "amazing_print"
+
+group :development do
+  # Access an interactive console on exception pages or by calling 'console' anywhere in the code.
+  gem 'web-console'
+  gem 'listen'
+  # Spring speeds up development by keeping your application running in the background. Read more: https://github.com/rails/spring
+  gem 'spring'
+  gem 'spring-watcher-listen'
+end
+
+group :development, :test do
+  gem 'faker'
+  gem 'graphiql-rails'
+  gem 'pry', '>= 0.14.1' # Console with powerful introspection capabilities
+  # Need to use master of pry-byebug to use latest pry version
+  gem 'pry-byebug', github: 'shakacode/pry-byebug' # Integrates pry with byebug
+  gem 'pry-doc' # Provide MRI Core documentation
+  gem 'pry-rails' # Causes rails console to open pry. `DISABLE_PRY_RAILS=1 rails c` can still open with IRB
+  gem 'pry-theme' # An easy way to customize Pry colors via theme files
+
+  gem "rubocop", "1.36.0", require: false
+  gem 'rubocop-performance', "1.15.0", require: false
+  gem 'rubocop-rspec', "2.13.2", require: false
+  gem "scss_lint", require: false
+  gem 'fakefs', require: 'fakefs/safe'
+end
+
+group :test do
+  gem "capybara", ">= 3.38.0"
+  gem "capybara-screenshot"
+  gem "coveralls", require: false
+  gem "equivalent-xml"
+  gem "generator_spec"
+  gem "launchy"
+  gem "rspec_junit_formatter"
+  gem "rspec-rails"
+  gem "rspec-retry"
+  gem "selenium-webdriver", "4.9.0"
+  gem "webmock"
+  gem "webdrivers", "5.3.0"
+end

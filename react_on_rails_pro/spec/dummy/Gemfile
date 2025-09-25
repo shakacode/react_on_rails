@@ -1,0 +1,14 @@
+# frozen_string_literal: true
+
+source "https://rubygems.org"
+
+ENV["SPEC_DUMMY"] = "yes"
+eval_gemfile File.expand_path("../../Gemfile.loader", __dir__)
+
+gem "react_on_rails_pro", path: "../.."
+
+gem "graphql"
+gem "prism-rails"
+gem "redis"
+
+gem "csso-rails", "~> 1.0"
