@@ -12,7 +12,8 @@ namespace :lint do
 
   desc "Run stylelint as shell"
   task :scss do
-    sh_in_dir(gem_root, "yarn run stylelint \"spec/dummy/app/assets/stylesheets/**/*.scss\" \"spec/dummy/client/**/*.scss\"")
+    sh_in_dir(gem_root,
+              "yarn run stylelint \"spec/dummy/app/assets/stylesheets/**/*.scss\" \"spec/dummy/client/**/*.scss\"")
   end
 
   desc "Run eslint as shell"
@@ -29,7 +30,9 @@ namespace :lint do
   task :autofix do
     sh_in_dir(gem_root, "yarn run eslint . --fix")
     sh_in_dir(gem_root, "yarn run prettier --write .")
-    sh_in_dir(gem_root, "yarn run stylelint \"spec/dummy/app/assets/stylesheets/**/*.scss\" \"spec/dummy/client/**/*.scss\" --fix")
+    scss_paths = "\"spec/dummy/app/assets/stylesheets/**/*.scss\" \"spec/dummy/client/**/*.scss\""
+    stylelint_cmd = "yarn run stylelint #{scss_paths} --fix"
+    sh_in_dir(gem_root, stylelint_cmd)
     sh_in_dir(gem_root, "bundle exec rubocop -A")
     puts "Completed auto-fixing all linting violations"
   end

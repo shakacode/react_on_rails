@@ -1,14 +1,27 @@
 {
   "extends": "stylelint-config-standard-scss",
   "rules": {
-    "color-keyword": null,
+    "color-named": null,
     "color-hex-length": "long",
-    "color-hex-case": "upper",
     "selector-id-pattern": null,
-    "number-leading-zero": "always",
-    "scss/at-rule-no-unknown": [true, {
-      "ignoreAtRules": ["include", "mixin", "each", "if", "else", "for", "while", "function", "return", "use", "forward"]
-    }],
+    "scss/at-rule-no-unknown": [
+      true,
+      {
+        "ignoreAtRules": [
+          "include",
+          "mixin",
+          "each",
+          "if",
+          "else",
+          "for",
+          "while",
+          "function",
+          "return",
+          "use",
+          "forward"
+        ]
+      }
+    ],
     "selector-class-pattern": null,
     "custom-property-pattern": null,
     "keyframes-name-pattern": null,
@@ -16,7 +29,12 @@
     "scss/dollar-variable-pattern": null,
     "scss/at-function-pattern": null,
     "scss/at-mixin-pattern": null,
-    "import-notation": null
+    "import-notation": null,
+    "at-rule-empty-line-before": null,
+    "font-family-name-quotes": null,
+    "rule-empty-line-before": null,
+    "scss/dollar-variable-empty-line-before": null,
+    "function-url-quotes": null
   },
   "ignoreFiles": [
     "spec/dummy/app/assets/stylesheets/application.css",
