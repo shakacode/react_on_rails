@@ -3,6 +3,25 @@
 - **Core**: MIT (this file)
 - **Pro**: see [REACT-ON-RAILS-PRO-LICENSE.md](./REACT-ON-RAILS-PRO-LICENSE.md)
 
+## LicenseRef-Proprietary
+
+```
+SPDX-License-Identifier: LicenseRef-Proprietary
+```
+
+The proprietary portions of this software are licensed under the React on Rails Pro License. See [REACT-ON-RAILS-PRO-LICENSE.md](./REACT-ON-RAILS-PRO-LICENSE.md) for complete terms.
+
+**Proprietary directories:**
+
+- `lib/react_on_rails/pro/`
+- `node_package/src/pro/`
+
+**Usage restrictions:**
+
+- Pro features require a valid React on Rails Pro subscription
+- Any attempt to circumvent license validation is prohibited
+- See REACT-ON-RAILS-PRO-LICENSE.md for full terms and conditions
+
 ---
 
 ## MIT License for Core React on Rails
