@@ -118,7 +118,7 @@
     "Rails"
   ],
   "author": "justin.gordon@gmail.com",
-  "license": "MIT",
+  "license": "(MIT AND Proprietary)",
   "bugs": {
     "url": "https://github.com/shakacode/react_on_rails/issues"
   },

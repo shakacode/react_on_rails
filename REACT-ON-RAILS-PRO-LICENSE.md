@@ -1,6 +1,6 @@
 # ShakaCode React on Rails Pro – End User License Agreement (EULA)
 
-_Version 2.0 — 2025-09-06_  
+_Version 2.1 — 2025-09-25_  
 © 2015–2025 ShakaCode, LLC. All rights reserved.
 
 ---
@@ -51,7 +51,11 @@ The Organization shall not:
 
 1. redistribute or resell the Software or derivatives;
 2. remove, obfuscate, or disable required attribution;
-3. use the Software to build a directly competing product exposing substantially similar functionality.
+3. use the Software to build a directly competing product exposing substantially similar functionality;
+4. **circumvent, bypass, modify, disable, or tamper with any license validation mechanisms, license checks, or authentication systems;**
+5. **reverse engineer, decompile, or disassemble the Software for the purpose of circumventing license restrictions;**
+6. **create, use, or distribute any tools, scripts, patches, or modifications designed to enable unauthorized use of Pro features;**
+7. **attempt to access or use Pro features without a valid, active subscription.**
 
 ---
 
@@ -84,6 +88,9 @@ While subscribed, the Organization receives software updates and reasonable supp
 ## 9. Verification / Audit
 
 If ShakaCode reasonably suspects non-compliance, the Organization will cooperate in good faith to verify compliance, including enabling inspection for attribution presence and providing a usage statement. ShakaCode will use commercially reasonable efforts to minimize disruption.
+
+**9.1 Detailed Audits**  
+ShakaCode or a certified auditor acting on its behalf may, upon reasonable request and at ShakaCode’s expense, audit the Organization’s use of the Software to verify compliance with this Agreement. Audits may be conducted by mail, electronically, or by in-person visits during regular business hours and shall minimize disruption to the Organization’s business. If the audit reveals a material unauthorized use, the Organization shall reimburse ShakaCode for reasonable audit costs.
 
 ---
 
@@ -118,12 +125,43 @@ Direct damages are limited to amounts paid in the 12 months preceding the claim.
 
 ---
 
-## 15. Governing Law; Venue
+## 15. Indemnification
 
-Choose one: **State of Hawaii**, USA. Exclusive jurisdiction and venue lie in the courts located therein.
+The Organization agrees to defend, indemnify, and hold harmless ShakaCode and its affiliates from any claims, losses, damages, liabilities, costs, or expenses (including legal fees) arising out of the Organization’s use of the Software or breach of this Agreement.
 
 ---
 
-## 16. Entire Agreement; Order of Precedence
+## 16. Export Compliance
+
+The Organization agrees to comply with all applicable export laws and regulations, including restrictions on export, re-export, or redistribution of the Software.
+
+---
+
+## 17. Attorneys’ Fees and Costs
+
+In any enforcement or legal action arising under this Agreement, the prevailing party shall be entitled to recover reasonable attorneys’ fees and costs.
+
+---
+
+## 18. Governing Law; Venue
+
+This Agreement is governed by the laws of the **State of Hawaii**, USA. Exclusive jurisdiction and venue lie in the courts located therein.
+
+---
+
+## 19. Miscellaneous
+
+- **19.1 Severability**  
+  If any provision is held invalid or unenforceable, the remainder shall continue in full force.
+
+- **19.2 Waiver**  
+  Failure to enforce any provision is not a waiver of rights.
+
+- **19.3 Assignment**  
+  The Organization may not assign this Agreement without prior written consent.
+
+---
+
+## 20. Entire Agreement; Order of Precedence
 
 This EULA and any order (pricing/term) are the entire agreement. If there is a conflict, the order controls.

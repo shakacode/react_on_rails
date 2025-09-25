@@ -95,7 +95,7 @@ react_on_rails/ (monorepo root)
 
 **A:** We maintain two separate repositories:
 
-- **react_on_rails** (MIT) - Core functionality, completely free except pro directories as stated in LICENSE.md
+- **react_on_rails** (MIT) - Core functionality, completely free. Pro features are included but gated behind license validation as stated in LICENSE.md
 - **react_on_rails_pro** (Pro License) - Advanced features, subscription required for production
 
 ### Q: What requires a Pro subscription?
