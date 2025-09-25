@@ -5353,8 +5353,9 @@ react-on-rails-rsc@^19.0.2:
     neo-async "^2.6.1"
     webpack-sources "^3.2.0"
 
-"react-on-rails@file:..":
+"react-on-rails@link:.yalc/react-on-rails":
   version "0.0.0"
+  uid ""
 
 react-proptypes@^1.0.0:
   version "1.0.0"
