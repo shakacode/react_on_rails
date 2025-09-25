@@ -81,11 +81,4 @@ For Pro-licensed code (as defined in the "License Scope" section above), see:
 - Authentication systems in `lib/react_on_rails/utils.rb` and Pro TypeScript modules
 - The `react_on_rails_pro?` method and `rorPro` field generation
 
-**Examples of prohibited modifications** that would constitute unauthorized Pro feature use:
-
-- Modifying `lib/react_on_rails/helper.rb` to bypass `react_on_rails_pro?` checks
-- Altering `lib/react_on_rails/utils.rb` to change the `rorPro` field generation logic
-- Tampering with Pro feature detection in MIT-licensed interface files (e.g., `clientStartup.ts`, `serverRenderReactComponent.ts`, `ReactOnRails.client.ts`, `ReactOnRails.node.ts`)
-- Removing or bypassing license validation calls before accessing Pro features
-
 While MIT-licensed code may be modified under MIT terms, using such modifications to access Pro features without a valid license violates the React on Rails Pro License.
