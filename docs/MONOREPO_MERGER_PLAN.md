@@ -179,6 +179,9 @@ git subtree add --prefix=react_on_rails_pro pro-origin/main --squash
 - [x] Update root LICENSE.md to list `react_on_rails_pro/` as Pro-licensed
 - [x] Verify all pro files remain under `react_on_rails_pro/` directory
 - [x] Update .gitignore if needed
+- [x] Configure all linting tools (RuboCop, ESLint, Prettier, Knip) to exclude pro directory
+- [x] Update all dependencies to use local packages within monorepo (Ruby gems + JS packages)
+- [x] Set up yalc-based dependency management for local development
 
 **Expected Directory Structure After Merge:**
 
@@ -214,16 +217,16 @@ All other files are licensed under MIT License.
 
 After the initial merge, the following CI adjustments may be needed:
 
-- [ ] Fix any path-related issues in GitHub Actions workflows
-- [ ] Update any hardcoded references to file paths in CI scripts
-- [ ] Ensure core package tests still pass with pro directory present
-- [ ] Verify CircleCI configuration works in new directory structure
-- [ ] Fix any build script path issues
-- [ ] Update any test fixtures or references that assume single-repo structure
-- [ ] Resolve any dependency conflicts between core and pro packages
-- [ ] Fix any linting issues related to new directory structure
-- [ ] Update any documentation generation that depends on file paths
-- [ ] Ensure all CI caches work correctly with new structure
+- [x] Fix any path-related issues in GitHub Actions workflows
+- [x] Update any hardcoded references to file paths in CI scripts
+- [x] Ensure core package tests still pass with pro directory present
+- [x] Verify CircleCI configuration works in new directory structure
+- [x] Fix any build script path issues
+- [x] Update any test fixtures or references that assume single-repo structure
+- [x] Resolve any dependency conflicts between core and pro packages
+- [x] Fix any linting issues related to new directory structure
+- [x] Update any documentation generation that depends on file paths
+- [x] Ensure all CI caches work correctly with new structure
 
 **Success Criteria:** ✅ **ALL CI jobs pass for both core and pro packages independently**
 
