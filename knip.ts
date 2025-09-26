@@ -19,7 +19,11 @@ const config: KnipConfig = {
         'node_package/src/loadJsonFile.ts!',
         'eslint.config.ts',
       ],
-      project: ['node_package/src/**/*.[jt]s{x,}!', 'node_package/tests/**/*.[jt]s{x,}'],
+      project: [
+        'node_package/src/**/*.[jt]s{x,}!',
+        'node_package/tests/**/*.[jt]s{x,}',
+        '!react_on_rails_pro/**',
+      ],
       babel: {
         config: ['node_package/babel.config.js'],
       },
@@ -31,6 +35,8 @@ const config: KnipConfig = {
         'node_package/src/pro/ServerComponentFetchError.ts:isServerComponentFetchError',
         'node_package/src/pro/RSCRoute.tsx:RSCRouteProps',
         'node_package/src/pro/streamServerRenderedReactComponent.ts:StreamingTrackers',
+        // Exclude entire pro directory - it has its own package.json with dependencies
+        'react_on_rails_pro/**',
       ],
       ignoreBinaries: [
         // Knip fails to detect it's declared in devDependencies
@@ -41,6 +47,8 @@ const config: KnipConfig = {
       ignoreDependencies: [
         // Required for TypeScript compilation, but we don't depend on Turbolinks itself.
         '@types/turbolinks',
+        // Keep this even though knip doesn't detect usage
+        '@babel/preset-typescript',
         // The Knip ESLint plugin fails to detect these are transitively required by a config,
         // though we don't actually use its rules anywhere.
         '@babel/eslint-parser',
