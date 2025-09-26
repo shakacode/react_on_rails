@@ -1,6 +1,6 @@
 import { enableFetchMocks } from 'jest-fetch-mock';
 
-import { fetch } from '../src/utils.ts';
+import { fetch } from '../../packages/react-on-rails/src/utils.ts';
 import { createNodeReadableStream, getNodeVersion } from './testUtils.js';
 
 enableFetchMocks();

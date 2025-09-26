@@ -23,11 +23,11 @@ if (typeof window !== 'undefined') {
   // Node's fetch and polyfills like jest-fetch-mock return Node's Readable stream,
   // so we convert it to a web-standard ReadableStream for consistency
   // Note: Node's Readable stream exists in node 'stream' built-in module, can be imported as `import { Readable } from 'stream'`
-  jest.mock('../src/utils', () => ({
-    ...jest.requireActual('../src/utils'),
+  jest.mock('../../packages/react-on-rails/src/utils', () => ({
+    ...jest.requireActual('../../packages/react-on-rails/src/utils'),
     fetch: (...args) =>
       jest
-        .requireActual('../src/utils')
+        .requireActual('../../packages/react-on-rails/src/utils')
         .fetch(...args)
         .then((res) => {
           const originalBody = res.body;
