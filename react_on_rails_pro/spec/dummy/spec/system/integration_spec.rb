@@ -217,6 +217,28 @@ describe "renderedHtml from generator function", :js do
   end
 end
 
+describe "async render function returns string", :js do
+  subject { page }
+
+  before { visit "/async_render_function_returns_string" }
+
+  it "renders the string returned from the async render function" do
+    expect(page).to have_text 'Props: {"hello":"world"}'
+    expect(page.html).to include("[SERVER] RENDERED AsyncRenderFunctionReturnsString to dom node with id")
+  end
+end
+
+describe "async render function returns component", :js do
+  subject { page }
+
+  before { visit "/async_render_function_returns_component" }
+
+  it "renders the component returned from the async render function" do
+    expect(page).to have_text 'Props: {"hello":"world"}'
+    expect(page.html).to include("[SERVER] RENDERED AsyncRenderFunctionReturnsComponent to dom node with id")
+  end
+end
+
 describe "Manual client hydration", :js, type: :system do
   before { visit "/xhr_refresh" }
 
