@@ -40,7 +40,7 @@
   },
   "scripts": {
     "preinstall": "yarn run link-source && yalc add --link react-on-rails",
-    "link-source": "cd ../../.. && yarn && yalc publish"
+    "link-source": "cd ../../.. && yarn && cd packages/react-on-rails && yalc publish"
   },
   "devDependencies": {
     "@pmmmwh/react-refresh-webpack-plugin": "^0.5.15",

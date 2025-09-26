@@ -1,0 +1,66 @@
+{
+  "name": "react-on-rails",
+  "version": "16.1.1",
+  "description": "react-on-rails JavaScript for react_on_rails Ruby gem",
+  "main": "../../node_package/lib/ReactOnRails.full.js",
+  "type": "module",
+  "exports": {
+    ".": {
+      "react-server": "../../node_package/lib/pro/ReactOnRailsRSC.js",
+      "node": "../../node_package/lib/ReactOnRails.node.js",
+      "default": "../../node_package/lib/ReactOnRails.full.js"
+    },
+    "./client": "../../node_package/lib/ReactOnRails.client.js",
+    "./registerServerComponent/client": "../../node_package/lib/pro/registerServerComponent/client.js",
+    "./registerServerComponent/server": {
+      "react-server": "../../node_package/lib/pro/registerServerComponent/server.rsc.js",
+      "default": "../../node_package/lib/pro/registerServerComponent/server.js"
+    },
+    "./wrapServerComponentRenderer/client": "../../node_package/lib/pro/wrapServerComponentRenderer/client.js",
+    "./wrapServerComponentRenderer/server": {
+      "react-server": "../../node_package/lib/pro/wrapServerComponentRenderer/server.rsc.js",
+      "default": "../../node_package/lib/pro/wrapServerComponentRenderer/server.js"
+    },
+    "./RSCRoute": "../../node_package/lib/pro/RSCRoute.js",
+    "./RSCProvider": "../../node_package/lib/pro/RSCProvider.js",
+    "./ServerComponentFetchError": "../../node_package/lib/pro/ServerComponentFetchError.js"
+  },
+  "peerDependencies": {
+    "react": ">= 16",
+    "react-dom": ">= 16",
+    "react-on-rails-rsc": "19.0.2"
+  },
+  "peerDependenciesMeta": {
+    "react-on-rails-rsc": {
+      "optional": true
+    }
+  },
+  "files": [
+    "../../node_package/lib"
+  ],
+  "scripts": {
+    "build": "yarn run clean && yarn run tsc --declaration",
+    "build-watch": "yarn run clean && yarn run tsc --watch",
+    "clean": "rm -rf ../../node_package/lib",
+    "test": "jest ../../node_package/tests",
+    "type-check": "yarn run tsc --noEmit --noErrorTruncation"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shakacode/react_on_rails.git"
+  },
+  "keywords": [
+    "react",
+    "webpack",
+    "JavaScript",
+    "Ruby",
+    "on",
+    "Rails"
+  ],
+  "author": "justin.gordon@gmail.com",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/shakacode/react_on_rails/issues"
+  },
+  "homepage": "https://github.com/shakacode/react_on_rails#readme"
+}
