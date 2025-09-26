@@ -1,49 +1,14 @@
 {
   "name": "react-on-rails",
   "version": "16.1.1",
-  "description": "react-on-rails JavaScript for react_on_rails Ruby gem",
-  "main": "node_package/lib/ReactOnRails.full.js",
-  "type": "module",
-  "exports": {
-    ".": {
-      "react-server": "./node_package/lib/pro/ReactOnRailsRSC.js",
-      "node": "./node_package/lib/ReactOnRails.node.js",
-      "default": "./node_package/lib/ReactOnRails.full.js"
-    },
-    "./client": "./node_package/lib/ReactOnRails.client.js",
-    "./registerServerComponent/client": "./node_package/lib/pro/registerServerComponent/client.js",
-    "./registerServerComponent/server": {
-      "react-server": "./node_package/lib/pro/registerServerComponent/server.rsc.js",
-      "default": "./node_package/lib/pro/registerServerComponent/server.js"
-    },
-    "./wrapServerComponentRenderer/client": "./node_package/lib/pro/wrapServerComponentRenderer/client.js",
-    "./wrapServerComponentRenderer/server": {
-      "react-server": "./node_package/lib/pro/wrapServerComponentRenderer/server.rsc.js",
-      "default": "./node_package/lib/pro/wrapServerComponentRenderer/server.js"
-    },
-    "./RSCRoute": "./node_package/lib/pro/RSCRoute.js",
-    "./RSCProvider": "./node_package/lib/pro/RSCProvider.js",
-    "./ServerComponentFetchError": "./node_package/lib/pro/ServerComponentFetchError.js"
-  },
+  "description": "react-on-rails monorepo workspace manager",
+  "private": true,
   "workspaces": [
     "packages/react-on-rails"
   ],
   "directories": {
     "doc": "docs"
   },
-  "peerDependencies": {
-    "react": ">= 16",
-    "react-dom": ">= 16",
-    "react-on-rails-rsc": "19.0.2"
-  },
-  "peerDependenciesMeta": {
-    "react-on-rails-rsc": {
-      "optional": true
-    }
-  },
-  "files": [
-    "node_package/lib"
-  ],
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.17.4",
     "@babel/core": "^7.20.12",

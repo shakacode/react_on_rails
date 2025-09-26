@@ -1,12 +1,13 @@
 {
   "name": "react-on-rails",
   "version": "16.1.1",
-  "description": "react-on-rails workspace package - not for publishing",
-  "private": true,
+  "description": "react-on-rails JavaScript for react_on_rails Ruby gem",
+  "main": "lib/ReactOnRails.full.js",
+  "type": "module",
   "scripts": {
-    "build": "yarn run clean && yarn run tsc --declaration",
+    "build": "yarn run clean && yarn run tsc --declaration && cp -r ../../node_package/lib ./lib",
     "build-watch": "yarn run clean && yarn run tsc --watch",
-    "clean": "rm -rf ../../node_package/lib",
+    "clean": "rm -rf ../../node_package/lib ./lib",
     "test": "cd ../.. && jest node_package/tests",
     "type-check": "yarn run tsc --noEmit --noErrorTruncation"
   },
@@ -23,7 +24,41 @@
     "Rails"
   ],
   "author": "justin.gordon@gmail.com",
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "exports": {
+    ".": {
+      "react-server": "./lib/pro/ReactOnRailsRSC.js",
+      "node": "./lib/ReactOnRails.node.js",
+      "default": "./lib/ReactOnRails.full.js"
+    },
+    "./client": "./lib/ReactOnRails.client.js",
+    "./registerServerComponent/client": "./lib/pro/registerServerComponent/client.js",
+    "./registerServerComponent/server": {
+      "react-server": "./lib/pro/registerServerComponent/server.rsc.js",
+      "default": "./lib/pro/registerServerComponent/server.js"
+    },
+    "./wrapServerComponentRenderer/client": "./lib/pro/wrapServerComponentRenderer/client.js",
+    "./wrapServerComponentRenderer/server": {
+      "react-server": "./lib/pro/wrapServerComponentRenderer/server.rsc.js",
+      "default": "./lib/pro/wrapServerComponentRenderer/server.js"
+    },
+    "./RSCRoute": "./lib/pro/RSCRoute.js",
+    "./RSCProvider": "./lib/pro/RSCProvider.js",
+    "./ServerComponentFetchError": "./lib/pro/ServerComponentFetchError.js"
+  },
+  "peerDependencies": {
+    "react": ">= 16",
+    "react-dom": ">= 16",
+    "react-on-rails-rsc": "19.0.2"
+  },
+  "peerDependenciesMeta": {
+    "react-on-rails-rsc": {
+      "optional": true
+    }
+  },
+  "files": [
+    "lib"
+  ],
   "bugs": {
     "url": "https://github.com/shakacode/react_on_rails/issues"
   },
