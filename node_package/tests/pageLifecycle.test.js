@@ -3,7 +3,7 @@
  */
 
 // Mock the turbolinksUtils module before importing pageLifecycle
-jest.mock('../src/turbolinksUtils.ts', () => ({
+jest.mock('../../packages/react-on-rails/src/turbolinksUtils.ts', () => ({
   debugTurbolinks: jest.fn(),
   turbolinksInstalled: jest.fn(() => false),
   turbolinksSupported: jest.fn(() => false),
@@ -29,7 +29,7 @@ describe('pageLifecycle', () => {
   // We use require here instead of a global import at the top because we need to dynamically reload the module in each test.
   // This allows us to reset the module state between tests using jest.resetModules(), ensuring test isolation and preventing state leakage.
   // eslint-disable-next-line global-require
-  const importPageLifecycle = () => require('../src/pageLifecycle.ts');
+  const importPageLifecycle = () => require('../../packages/react-on-rails/src/pageLifecycle.ts');
 
   // Helper function to create navigation library mock
   const createNavigationMock = (overrides = {}) => ({
@@ -109,7 +109,7 @@ describe('pageLifecycle', () => {
 
   describe('with Turbo navigation library', () => {
     beforeEach(() => {
-      jest.doMock('../src/turbolinksUtils.ts', () =>
+      jest.doMock('../../packages/react-on-rails/src/turbolinksUtils.ts', () =>
         createNavigationMock({
           turboInstalled: jest.fn(() => true),
         }),
@@ -117,7 +117,7 @@ describe('pageLifecycle', () => {
     });
 
     afterEach(() => {
-      jest.dontMock('../src/turbolinksUtils.ts');
+      jest.dontMock('../../packages/react-on-rails/src/turbolinksUtils.ts');
     });
 
     it('should set up Turbo event listeners when Turbo is installed', () => {
@@ -137,7 +137,7 @@ describe('pageLifecycle', () => {
 
   describe('with Turbolinks 5 navigation library', () => {
     beforeEach(() => {
-      jest.doMock('../src/turbolinksUtils.ts', () =>
+      jest.doMock('../../packages/react-on-rails/src/turbolinksUtils.ts', () =>
         createNavigationMock({
           turbolinksInstalled: jest.fn(() => true),
           turbolinksSupported: jest.fn(() => true),
@@ -147,7 +147,7 @@ describe('pageLifecycle', () => {
     });
 
     afterEach(() => {
-      jest.dontMock('../src/turbolinksUtils.ts');
+      jest.dontMock('../../packages/react-on-rails/src/turbolinksUtils.ts');
     });
 
     it('should set up Turbolinks 5 event listeners when Turbolinks 5 is installed', () => {
@@ -167,7 +167,7 @@ describe('pageLifecycle', () => {
 
   describe('with Turbolinks 2 navigation library', () => {
     beforeEach(() => {
-      jest.doMock('../src/turbolinksUtils.ts', () =>
+      jest.doMock('../../packages/react-on-rails/src/turbolinksUtils.ts', () =>
         createNavigationMock({
           turbolinksInstalled: jest.fn(() => true),
           turbolinksSupported: jest.fn(() => true),
@@ -176,7 +176,7 @@ describe('pageLifecycle', () => {
     });
 
     afterEach(() => {
-      jest.dontMock('../src/turbolinksUtils.ts');
+      jest.dontMock('../../packages/react-on-rails/src/turbolinksUtils.ts');
     });
 
     it('should set up Turbolinks 2 event listeners when Turbolinks 2 is installed', () => {

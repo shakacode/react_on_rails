@@ -66,7 +66,7 @@
   },
   "scripts": {
     "preinstall": "yarn run link-source && yalc add --link react-on-rails",
-    "link-source": "cd ../.. && yarn run build && yalc publish",
+    "link-source": "cd ../.. && yarn run build && cd packages/react-on-rails && yalc publish",
     "lint": "cd ../.. && yarn run lint",
     "format": "cd ../.. && yarn run nps format",
     "test:js": "yarn run jest ./tests",

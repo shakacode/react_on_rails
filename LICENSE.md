@@ -12,7 +12,7 @@ This repository contains code under two different licenses:
 The following directories and all their contents are licensed under the **MIT License** (see full text below):
 
 - `lib/react_on_rails/` (excluding `lib/react_on_rails/pro/`)
-- `node_package/src/` (excluding `node_package/src/pro/`)
+- `packages/react-on-rails/` (excluding `packages/react-on-rails/src/pro/`)
 - `node_package/lib/` (excluding `node_package/lib/pro/`)
 - All other directories in this repository not explicitly listed as Pro-licensed
 
@@ -21,7 +21,7 @@ The following directories and all their contents are licensed under the **MIT Li
 The following directories and all their contents are licensed under the **React on Rails Pro License**:
 
 - `lib/react_on_rails/pro/`
-- `node_package/src/pro/`
+- `packages/react-on-rails/src/pro/`
 - `node_package/lib/pro/`
 - `react_on_rails_pro/` (entire directory)
 

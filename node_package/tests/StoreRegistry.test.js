@@ -1,6 +1,6 @@
 import { createStore } from 'redux';
 
-import * as StoreRegistry from '../src/pro/StoreRegistry.ts';
+import * as StoreRegistry from '../../packages/react-on-rails/src/pro/StoreRegistry.ts';
 
 function reducer() {
   return {};
