@@ -1,0 +1,50 @@
+{
+  "packageManager": "yarn@1.22.22",
+  "name": "app",
+  "private": true,
+  "version": "0.1.0",
+  "babel": {
+    "presets": [
+      "./node_modules/shakapacker/package/babel/preset.js"
+    ]
+  },
+  "browserslist": [
+    "defaults"
+  ],
+  "dependencies": {
+    "@babel/core": "7",
+    "@babel/plugin-transform-runtime": "7",
+    "@babel/preset-env": "7",
+    "@babel/preset-react": "^7.24.7",
+    "@babel/runtime": "7",
+    "@types/babel__core": "7",
+    "@types/webpack": "5",
+    "babel-loader": "8",
+    "babel-plugin-macros": "^3.1.0",
+    "babel-plugin-transform-react-remove-prop-types": "^0.4.24",
+    "compression-webpack-plugin": "9",
+    "css-loader": "^7.1.2",
+    "css-minimizer-webpack-plugin": "^7.0.0",
+    "mini-css-extract-plugin": "^2.9.0",
+    "prop-types": "^15.8.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-on-rails": "link:.yalc/react-on-rails",
+    "shakapacker": "8.0.0",
+    "style-loader": "^4.0.0",
+    "terser-webpack-plugin": "5",
+    "webpack": "5",
+    "webpack-assets-manifest": "5",
+    "webpack-cli": "4",
+    "webpack-merge": "5"
+  },
+  "scripts": {
+    "preinstall": "yarn run link-source && yalc add --link react-on-rails",
+    "link-source": "cd ../../.. && yarn && yalc publish"
+  },
+  "devDependencies": {
+    "@pmmmwh/react-refresh-webpack-plugin": "^0.5.15",
+    "react-refresh": "^0.14.2",
+    "webpack-dev-server": "4"
+  }
+}

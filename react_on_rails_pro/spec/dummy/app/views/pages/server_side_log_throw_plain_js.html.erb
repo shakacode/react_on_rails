@@ -1,0 +1,26 @@
+
+<h1>React Rails Server Rendering of Plain JS with an Error</h1>
+
+<p>Suppose you have some JavaScript that generates a string of HTML, but throws this error:</p>
+<pre>
+  <%%= server_render_js("(function() {
+    var x = ReactOnRails.getComponent('HelloString').world();
+    console.warn('ran console.warn on the server()');
+    throw new Error('Error thrown on server');
+    return x;
+  })()") %>
+
+</pre>
+
+This is what will get generated:
+
+<hr/>
+
+<pre>
+<%= server_render_js("(function() {
+    var x = ReactOnRails.getComponent('HelloString').world();
+    console.warn('ran console.warn on the server()');
+    throw new Error('Error thrown on server');
+    return x;
+  })()") %>
+</pre>

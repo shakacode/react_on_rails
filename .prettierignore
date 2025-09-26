@@ -1,5 +1,7 @@
 node_modules/
 package.json
+# Exclude pro package (has its own formatting)
+react_on_rails_pro/
 tmp/
 coverage/
 **/app/assets/webpack/

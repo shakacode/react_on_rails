@@ -144,9 +144,9 @@ react_on_rails/ (monorepo root)
 
 ---
 
-### Phase 2: Git Subtree Merger (Keep Original Structure)
+### Phase 2: Git Repository Merger (Keep Original Structure)
 
-#### PR #2: Merge react_on_rails_pro via Git Subtree + Fix CI
+#### PR #2: Merge react_on_rails_pro via Git Filter-Repo + Fix CI
 
 **Branch:** `merge-pro-subtree-with-ci`
 **Target:** react_on_rails repository
@@ -159,26 +159,47 @@ react_on_rails/ (monorepo root)
 
 **Git Strategy:**
 
-```bash
-# Add react_on_rails_pro as remote
-git remote add pro-origin https://github.com/shakacode/react_on_rails_pro.git
-git fetch pro-origin
+⚠️ **CRITICAL: Create feature branch FIRST before any work!**
 
-# Merge using subtree (preserves history)
-git subtree add --prefix=react_on_rails_pro pro-origin/main --squash
+```bash
+# 1. FIRST: Create and checkout feature branch
+git checkout -b merge-pro-subtree-with-ci
+
+# 2. Clone and prepare pro repository with filter-repo (better for file history browsing)
+git clone https://github.com/shakacode/react_on_rails_pro.git /tmp/react_on_rails_pro
+cd /tmp/react_on_rails_pro
+git filter-repo --to-subdirectory-filter react_on_rails_pro
+
+# 3. Add the prepared pro repo as remote and merge
+cd /path/to/react_on_rails
+git remote add pro-origin /tmp/react_on_rails_pro
+git fetch pro-origin
+git merge pro-origin/master --allow-unrelated-histories
+
+# 4. Push branch and create PR
+git push -u origin merge-pro-subtree-with-ci
 ```
+
+**Why filter-repo instead of subtree:**
+
+- Better file history browsing
+- Cleaner history integration compared to subtree prefixing
+- No issues with path-based git operations
 
 **Tasks:**
 
-- [ ] Execute git subtree merge into `react_on_rails_pro/` directory
-- [ ] **CRITICAL: Update CI to run tests for both packages**
-- [ ] Keep GitHub Actions for core package tests
-- [ ] Keep CircleCI for pro package tests (temporarily)
-- [ ] Update root scripts to test both packages
-- [ ] Ensure both packages build independently
-- [ ] Update root LICENSE.md to list `react_on_rails_pro/` as Pro-licensed
-- [ ] Verify all pro files remain under `react_on_rails_pro/` directory
-- [ ] Update .gitignore if needed
+- [x] Execute git filter-repo + merge into `react_on_rails_pro/` directory
+- [x] **CRITICAL: Update CI to run tests for both packages**
+- [x] Keep GitHub Actions for core package tests
+- [x] Keep CircleCI for pro package tests (temporarily)
+- [x] Update root scripts to test both packages
+- [x] Ensure both packages build independently
+- [x] Update root LICENSE.md to list `react_on_rails_pro/` as Pro-licensed
+- [x] Verify all pro files remain under `react_on_rails_pro/` directory
+- [x] Update .gitignore if needed
+- [x] Configure all linting tools (RuboCop, ESLint, Prettier, Knip) to exclude pro directory
+- [x] Update all dependencies to use local packages within monorepo (Ruby gems + JS packages)
+- [x] Set up yalc-based dependency management for local development
 
 **Expected Directory Structure After Merge:**
 
@@ -210,9 +231,24 @@ react_on_rails/ (root)
 All other files are licensed under MIT License.
 ```
 
+### Post-Merge CI Fixes Required
+
+After the initial merge, the following CI adjustments may be needed:
+
+- [x] Fix any path-related issues in GitHub Actions workflows
+- [x] Update any hardcoded references to file paths in CI scripts
+- [x] Ensure core package tests still pass with pro directory present
+- [x] Verify CircleCI configuration works in new directory structure
+- [x] Fix any build script path issues
+- [x] Update any test fixtures or references that assume single-repo structure
+- [x] Resolve any dependency conflicts between core and pro packages
+- [x] Fix any linting issues related to new directory structure
+- [x] Update any documentation generation that depends on file paths
+- [x] Ensure all CI caches work correctly with new structure
+
 **Success Criteria:** ✅ **ALL CI jobs pass for both core and pro packages independently**
 
-**Estimated Duration:** 3-5 days
+**Estimated Duration:** 2-3 days (with lessons learned above: 1-2 days)
 
 **Risk Level:** High (first major structural change)
 
@@ -222,6 +258,31 @@ All other files are licensed under MIT License.
 - After subtree merge, ensure the entire `react_on_rails_pro/` directory is listed in LICENSE.md as Pro-licensed
 - Verify no pro files accidentally ended up in MIT-licensed directories during the merge
 - Both CI systems (GitHub Actions + CircleCI) must pass independently
+
+**Critical Lessons Learned (Phase 2 Implementation):**
+
+1. **Branch Management**: ALWAYS create the feature branch BEFORE starting any work, not after commits
+2. **Git Merge Strategy**: Use `git filter-repo --to-subdirectory-filter` + `git merge --allow-unrelated-histories` instead of subtree for better file history browsing
+3. **Linting Tool Configuration**: ALL linting tools must exclude pro directory:
+   - Update `.rubocop.yml` with `'react_on_rails_pro/**/*'` exclusion
+   - Update `eslint.config.ts` with `'react_on_rails_pro/'` exclusion
+   - Update `.prettierignore` with `react_on_rails_pro/` exclusion
+   - Update `knip.ts` with `'react_on_rails_pro/**'` in ignore patterns
+4. **Local Dependencies**: Use yalc for JS packages, path references for Ruby gems:
+   - Add `preinstall` scripts to all package.json files that need local react-on-rails
+   - Use `link-source` scripts to build and publish packages with yalc
+   - Avoid `file:` paths in package.json - use `link:.yalc/package-name` instead
+5. **Multiple Dummy Apps**: Don't forget to update ALL dummy apps:
+   - `spec/dummy/` (main dummy app)
+   - `react_on_rails_pro/spec/dummy/` (pro dummy app)
+   - `react_on_rails_pro/spec/execjs-compatible-dummy/` (ExecJS dummy app)
+6. **CircleCI Optimization**: When using yalc with preinstall hooks:
+   - Remove build-core-package job (handled by preinstall scripts)
+   - Remove workspace sharing (yalc handles package distribution)
+   - Keep existing cache strategy for performance
+7. **Dependency Management**: Update both Ruby and JS dependencies to use local versions:
+   - Ruby: `path: "../.."` in gemspec and development dependencies
+   - JS: `yalc add --link package-name` in preinstall hooks
 
 ---
 

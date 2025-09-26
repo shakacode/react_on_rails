@@ -1,0 +1,23 @@
+<h1 class="page-header">
+  Server Render With Timeout
+</h1>
+<br/>
+This page demonstrates the use of setTimeout during server rendering.
+
+<h1 class="section-header">
+  Here's the render-function
+</h1>
+<pre><code class="language-jsx">
+<%= ApplicationHelper::include_code "ror-auto-load-components/SetTimeoutLoggingApp.server.jsx" %>
+</code></pre>
+<h2 class="section-header">
+  Here's the helper method call in the view
+</h2>
+<pre><code class="language-ruby">
+<%%= react_component("SetTimeoutLoggingApp", prerender: true, trace: true) %>
+</code></pre>
+<h2 class="section-header">
+  Result
+</h2>
+
+<%= react_component("SetTimeoutLoggingApp", prerender: true, trace: true) %>

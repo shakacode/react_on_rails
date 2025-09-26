@@ -1,0 +1,30 @@
+
+<h1>React Rails Server Rendering with throw from "Render-Function"</h1>
+<p>
+  This example demonstrates server side logging and error handling.<br/>
+  Open up your browser console and see the messages.<br/>
+  <br/>
+  What you see in your console is the result of running the JS code found in spec/dummy/client/app/components/HelloWorldWithLogAndThrow.jsx (reproduced below):<br/>
+  <pre>
+    console.log("console.log in HelloWorld")
+    console.warn("console.warn in HelloWorld")
+    console.error("console.error in HelloWorld");
+    throw new Error("throw in HelloWorldContainer");
+  </pre>
+</p>
+
+
+<hr/>
+
+About to call in the Rails template:
+<pre>
+  <%%= react_component("HelloWorldWithLogAndThrow", props: @app_props_server_render, prerender: true,
+                      trace: true, id: "HelloWorldWithLogAndThrow-react-component-0") %>
+</pre>
+
+Below is the result of the call:
+
+<hr/>
+
+<%= react_component("HelloWorldWithLogAndThrow", props: @app_props_server_render, prerender: true,
+                    trace: true, id: "HelloWorldWithLogAndThrow-react-component-0") %>

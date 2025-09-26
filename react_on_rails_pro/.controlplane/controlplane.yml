@@ -1,0 +1,22 @@
+# Configuration for "Heroku to CPLN playbook" custom scripts
+aliases:
+  common: &common
+    # Change this to your org name for staging. Production apps will use a different org
+    # for security.
+    cpln_org: shakacode-staging
+    # Example apps use only location. CPLN offers the ability to use multiple locations.
+    location: aws-us-east-2
+    # Configure the workload name used as a template for one-off scripts, like a Heroku one-off dyno.
+    one_off_workload: rails
+    # Like the entries in the Heroku Procfile that get deployed when the application code changes
+    # and the application image updates.
+    app_workloads:
+      - rails
+    # Like Heroku add-ons
+    additional_workloads:
+      - redis
+      - postgres
+
+apps:
+  ror-dummy:
+    <<: *common
