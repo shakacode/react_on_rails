@@ -6,7 +6,7 @@ namespace :docker do
     sh "docker-compose run lint rake lint:rubocop"
   end
 
-  desc "Run scss-lint linter from docker"
+  desc "Run stylelint linter from docker"
   task :scss do
     sh "docker-compose run lint rake lint:scss"
   end
