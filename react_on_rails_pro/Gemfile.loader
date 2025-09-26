@@ -1,0 +1,32 @@
+# frozen_string_literal: true
+
+# Load base dependencies
+base_deps = File.read(File.expand_path("./Gemfile.development_dependencies", __dir__))
+
+# Determine which override file to use
+override_deps = if ENV["CI"] == "true" && File.exist?(File.expand_path("./Gemfile.ci", __dir__))
+  # In CI environment, use CI dependencies
+  File.read(File.expand_path("./Gemfile.ci", __dir__))
+elsif File.exist?(File.expand_path("./Gemfile.local", __dir__))
+  # In non-CI environment, use local dependencies if they exist
+  File.read(File.expand_path("./Gemfile.local", __dir__))
+else
+  ""
+end
+
+# Parse override gems
+override_gem_names = override_deps.scan(/^\s*gem\s+["']([^"']+)["']/).flatten
+
+# Remove overridden gems from base dependencies
+override_gem_names.each do |gem_name|
+  base_deps.gsub!(/^\s*gem\s+["']#{gem_name}["'].*$/, '')
+end
+
+# Clean up any blank lines created by removals
+base_deps.gsub!(/^\s*$\n/, '')
+
+# Evaluate the modified base dependencies
+eval(base_deps)
+
+# Evaluate override dependencies if they exist
+eval(override_deps) unless override_deps.empty?

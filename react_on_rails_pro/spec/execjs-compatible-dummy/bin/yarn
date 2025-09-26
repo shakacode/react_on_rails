@@ -1,0 +1,19 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+APP_ROOT = File.expand_path("..", __dir__)
+Dir.chdir(APP_ROOT) do
+  yarn = ENV["PATH"].split(File::PATH_SEPARATOR)
+                    .reject { |dir| File.expand_path(dir) == __dir__ }
+                    .product(["yarn", "yarnpkg", "yarn.cmd", "yarn.ps1"])
+                    .map { |dir, file| File.expand_path(file, dir) }
+                    .find { |file| File.executable?(file) }
+
+  if yarn
+    exec yarn, *ARGV
+  else
+    warn "Yarn executable was not detected in the system."
+    warn "Download Yarn at https://yarnpkg.com/en/docs/install"
+    exit 1
+  end
+end

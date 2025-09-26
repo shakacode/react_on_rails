@@ -1,0 +1,79 @@
+<%= send(@render_on_server ? :stream_react_component : :react_component, "AsyncOnServerSyncOnClient", 
+  props: @app_props_server_render.merge(artificialDelay: params[:artificial_delay] || 0, postsCount: params[:posts_count] || 2), 
+  trace: true,
+  prerender: @render_on_server,
+  id: "AsyncOnServerSyncOnClient-react-component-0") %>
+<hr/>
+
+<br/>
+<br/>
+<h1 class="page-header">Understanding Server/Client Component Hydration Patterns</h1>
+
+<p>This page demonstrates an important React on Rails pattern: components that behave asynchronously on the server but synchronously on the client during hydration.</p>
+
+<h2 class="section-header">Component Implementation</h2>
+
+<pre><code class="language-jsx">
+<%= File.read(Rails.root.join "client/app/components/AsyncOnServerSyncOnClient.tsx") %>
+</code></pre>
+
+<h3>Key Implementation Detail</h3>
+
+<pre><code class="language-jsx">
+const ComponentToUse = typeof window === 'undefined' ? AsyncComponentOnServer : SyncComponentOnClient;
+</code></pre>
+
+<p>This implementation uses environment detection to conditionally render:</p>
+<ul>
+  <li><code>AsyncComponentOnServer</code>: An asynchronous component that waits for promises to resolve before rendering children (server-side)</li>
+  <li><code>SyncComponentOnClient</code>: A synchronous component that renders children immediately (client-side)</li>
+</ul>
+
+<h2 class="section-header">Client-Only Rendering Behavior</h2>
+
+<p>View the <a href="/async_on_server_sync_on_client_client_render">client-only rendering example</a> to observe:</p>
+
+<ul>
+  <li>No server-side rendering (page source lacks component HTML)</li>
+  <li>Immediate rendering of all client components (no loading states)</li>
+  <li>The Server Component inside the fourth Suspense boundary makes a separate HTTP request to <code>/rsc_payload/SimpleComponent</code> to fetch its RSC payload</li>
+</ul>
+
+<h2 class="section-header">Server Rendering + Client Hydration Behavior</h2>
+
+<p>This current page demonstrates the server-rendering with client hydration pattern:</p>
+
+<ul>
+  <li>Complete server-side rendering (page source contains all component HTML)</li>
+  <li>Progressive component rendering with appropriate loading states:
+    <ul>
+      <li>First Suspense boundary: Content appears after 2000ms (contains components with 1000ms and 2000ms delays)</li>
+      <li>Second Suspense boundary: Content appears after 3000ms</li>
+      <li>Third Suspense boundary: Content appears after 1000ms</li>
+      <li>Server Component: Appears after 2000ms delay</li>
+    </ul>
+  </li>
+  <li>No additional HTTP requests for RSC payloads as they're embedded directly in the HTML</li>
+  <li>Component lifecycle events occur in alignment with their respective render delays (check browser console)</li>
+</ul>
+
+<h2 class="section-header">RSC Payload Optimization</h2>
+
+<p>When a server component is rendered via server-side rendering, the React on Rails framework optimizes performance by embedding its RSC payload directly in the HTML rather than fetching it through a separate HTTP request.</p>
+
+<h2 class="section-header">How RSC Payloads Work</h2>
+
+<p>Server components are integrated into client components using the <code>RSCRoute</code> component:</p>
+
+<pre><code class="language-jsx">
+<RSCRoute componentName="MyServerComponent" props={...} />
+</code></pre>
+
+<p>The <code>RSCRoute</code> component leverages React on Rails to:</p>
+<ol>
+  <li>Insert an HTML marker indicating an embedded RSC payload will follow</li>
+  <li>During hydration, detect this marker and use the embedded payload</li>
+  <li>Skip additional HTTP requests that would otherwise be required</li>
+</ol>
+
+<p>This optimization significantly improves initial page load performance while maintaining component integrity across server and client environments.</p>

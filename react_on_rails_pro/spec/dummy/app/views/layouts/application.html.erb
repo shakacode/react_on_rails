@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <!-- TODO: should we import this as a part of ROR app -->
+  <% unless request.path.include?('posts_page') %>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/9000.0.1/themes/prism.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/9000.0.1/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/9000.0.1/components/prism-markup.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/9000.0.1/components/prism-jsx.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/9000.0.1/components/prism-ruby.min.js"></script>
+  <% end %>
+  <% if content_for?(:title) %>
+    <%= yield(:title) %>
+  <% else %>
+    <title>Dummy</title>
+  <% end %>
+  <%= yield :head %>
+  <style>
+      html {
+          font-size: 16px !important;
+      }
+  </style>
+  <%= stylesheet_pack_tag('client-bundle',
+                          media: 'all',
+                          'data-turbolinks-track': true) %>
+
+  <%# Used for testing purposes to simulate hydration failure %>
+  <% unless params[:skip_js_packs] == 'true' %>
+    <%= javascript_pack_tag('client-bundle', 'data-turbolinks-track': true, defer: false) %>
+  <% end %>
+  <%= csrf_meta_tags %>
+</head>
+<body class="bg-white">
+<div class="flex flex-row h-screen w-screen">
+  <div class="flex flex-col overflow-y-auto p-5 bg-slate-100 border-solid border-r-2 border-slate-700 min-w-[400px] max-w-[400px]">
+    <div class="flex flex-row">
+      <img style="width: 70px; height: 62px;" src="/rorp_logo.png"/>
+      <div class="px-2">
+        <h1 class="page-header">
+          React on Rails Pro
+        </h1>
+        <h3>
+          By <a class="text-red-700 underline" target="_blank" href="https://www.shakacode.com/">ShakaCode</a>
+        </h3>
+      </div>
+    </div>
+    <%= render "shared/menu" %>
+  </div>
+  <div class="flex-1 overflow-x-hidden overflow-y-auto">
+    <div class="p-5">
+      <% flash.each do |key, value| %>
+        <%= content_tag :div, value, class: "flash #{key}" %>
+      <% end %>
+      <div id="page-container">
+        <%= yield %>
+      </div>
+      <!-- This is a placeholder for ReactOnRails to know where to render the store props for
+       client side hydration -->
+      <%= redux_store_hydration_data %>
+    </div>
+  </div>
+</div>
+</body>
+</html>

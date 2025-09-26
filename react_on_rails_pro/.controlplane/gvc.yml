@@ -1,0 +1,25 @@
+# Template setup of the GVC, roughly corresponding to a Heroku app
+kind: gvc
+name: APP_GVC
+spec:
+  # For using templates for test apps, put ENV values here, stored in git repo.
+  # Production apps will have values configured manually after app creation.
+  env:
+    - name: DATABASE_URL
+      # Password does not matter because host postgres.APP_GVC.cpln.local can only be accessed
+      # locally within CPLN GVC, and postgres running on a CPLN workload is something only for a
+      # test app that lacks persistence.
+      value: 'postgres://postgres:password123@postgres.APP_GVC.cpln.local:5432/APP_GVC'
+    - name: RAILS_ENV
+      value: production
+    - name: NODE_ENV
+      value: production
+    - name: RAILS_SERVE_STATIC_FILES
+      value: 'true'
+    - name: REDIS_URL
+      # No password for GVC local Redis. See comment above for postgres.
+      value: 'redis://redis.APP_GVC.cpln.local:6379'
+  # Part of standard configuration
+  staticPlacement:
+    locationLinks:
+      - /org/APP_ORG/location/APP_LOCATION

@@ -1,0 +1,49 @@
+# Template setup of Rails server workload, roughly corresponding to Heroku dyno
+# type within Procfile.
+kind: workload
+name: rails
+spec:
+  type: standard
+  containers:
+    - name: rails
+      cpu: 512m
+      env:
+        - name: LOG_LEVEL
+          value: debug
+      # Inherit other ENV values from GVC
+      inheritEnv: true
+      image: '/org/APP_ORG/image/APP_IMAGE'
+      # TODO add liveness probe
+      memory: 1Gi
+      ports:
+        - number: 3000
+          protocol: http
+    - name: node-renderer
+      args:
+        - client/node-renderer.js
+      command: node
+      cpu: 512m
+      env:
+        - name: LOG_LEVEL
+          value: debug
+      inheritEnv: true
+      image: '/org/APP_ORG/image/APP_IMAGE'
+      # TODO add liveness probe
+      memory: 1Gi
+      ports:
+        - number: 3800
+          protocol: http
+  defaultOptions:
+    # Start out like this for "test apps"
+    autoscaling:
+      # Max of 1 effectively disables autoscaling, so a like a Heroku dyno count of 1
+      maxScale: 1
+    capacityAI: false
+  firewallConfig:
+    external:
+      # Default to allow public access to Rails server
+      inboundAllowCIDR:
+        - 0.0.0.0/0
+      # Could configure outbound for more security
+      outboundAllowCIDR:
+        - 0.0.0.0/0

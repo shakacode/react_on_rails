@@ -1,0 +1,8 @@
+<%= react_component("ServerComponentRouter", 
+    props: @app_props_server_render.merge(basePath: 'server_router_client_render', artificialDelay: params[:artificial_delay] || 0, postsCount: params[:posts_count] || 2),
+    prerender: false, 
+    trace: true, 
+    id: "ServerComponentRouter-react-component-0") %>
+<hr/>
+
+<h1>React Rails Server Client Side Rendering of React Router containing Server Components</h1>

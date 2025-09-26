@@ -1,0 +1,19 @@
+inherit_from:
+  - ../../.rubocop.yml
+
+AllCops:
+  Exclude:
+    - 'Procfile.*'
+    - 'bin/*'
+    - 'bin/**/*'
+    - 'client/**/*'
+    - 'db/schema.rb'
+    - 'node_modules/react-on-rails'
+    - 'node_modules/**/*'
+    - 'public/webpack/**/*'
+    - 'ssr-generated/**/*'
+
+Metrics/BlockLength:
+  Exclude:
+    - 'config/routes.rb'
+    - 'config/environments/*.rb'
