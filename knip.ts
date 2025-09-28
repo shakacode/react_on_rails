@@ -26,10 +26,10 @@ const config: KnipConfig = {
         '!packages/react-on-rails/lib/**',
       ],
       babel: {
-        config: ['node_package/babel.config.js'],
+        config: ['packages/react-on-rails/babel.config.cjs'],
       },
       ignore: [
-        'node_package/tests/emptyForTesting.js',
+        'packages/react-on-rails/tests/emptyForTesting.js',
         // Build output directories that should be ignored
         'packages/react-on-rails/lib/**',
         // Pro features exported for external consumption

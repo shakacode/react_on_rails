@@ -1,4 +1,4 @@
-import buildConsoleReplay, { consoleReplay } from '../../packages/react-on-rails/src/buildConsoleReplay.ts';
+import buildConsoleReplay, { consoleReplay } from '../src/buildConsoleReplay.ts';
 
 describe('consoleReplay', () => {
   it('does not throw an exception if no console.history object', () => {

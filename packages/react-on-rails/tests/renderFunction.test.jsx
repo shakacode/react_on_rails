@@ -5,7 +5,7 @@
 import * as React from 'react';
 import * as createReactClass from 'create-react-class';
 
-import isRenderFunction from '../../packages/react-on-rails/src/isRenderFunction.ts';
+import isRenderFunction from '../src/isRenderFunction.ts';
 
 describe('isRenderFunction', () => {
   it('returns false for a ES5 React Component', () => {

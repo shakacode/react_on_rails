@@ -1,4 +1,4 @@
-import scriptSanitizedVal from '../../packages/react-on-rails/src/scriptSanitizedVal.ts';
+import scriptSanitizedVal from '../src/scriptSanitizedVal.ts';
 
 describe('scriptSanitizedVal', () => {
   it('returns no </script if spaces, uppercase 1', () => {

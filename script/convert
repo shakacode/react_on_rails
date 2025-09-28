@@ -40,8 +40,8 @@ gsub_file_content("../spec/dummy/package.json", /"react": "[^"]*",/, '"react": "
 gsub_file_content("../spec/dummy/package.json", /"react-dom": "[^"]*",/, '"react-dom": "18.0.0",')
 gsub_file_content(
   "../packages/react-on-rails/package.json",
-  "cd ../.. && jest node_package/tests",
-  'cd ../.. && jest node_package/tests --testPathIgnorePatterns=\".*(RSC|stream|' \
+  "cd ../.. && jest packages/react-on-rails/tests",
+  'cd ../.. && jest packages/react-on-rails/tests --testPathIgnorePatterns=\".*(RSC|stream|' \
   'registerServerComponent|serverRenderReactComponent|SuspenseHydration).*\"'
 )
 # Keep modern JSX transform for React 18+

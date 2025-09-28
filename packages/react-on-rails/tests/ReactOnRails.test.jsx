@@ -4,7 +4,7 @@
 import { createStore } from 'redux';
 import * as React from 'react';
 import * as createReactClass from 'create-react-class';
-import ReactOnRails from '../../packages/react-on-rails/src/ReactOnRails.client.ts';
+import ReactOnRails from '../src/ReactOnRails.client.ts';
 
 describe('ReactOnRails', () => {
   it('render returns a virtual DOM element for component', () => {

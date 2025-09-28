@@ -13,14 +13,14 @@ export default {
     },
   }),
   testEnvironment: 'jsdom',
-  setupFiles: ['<rootDir>/node_package/tests/jest.setup.js'],
+  setupFiles: ['<rootDir>/packages/react-on-rails/tests/jest.setup.js'],
   // React Server Components tests require React 19 and only run with Node version 18 (`newest` in our CI matrix)
   moduleNameMapper:
     nodeVersion < 18
       ? {
-          'react-on-rails-rsc/client': '<rootDir>/node_package/tests/emptyForTesting.js',
-          '^@testing-library/dom$': '<rootDir>/node_package/tests/emptyForTesting.js',
-          '^@testing-library/react$': '<rootDir>/node_package/tests/emptyForTesting.js',
+          'react-on-rails-rsc/client': '<rootDir>/packages/react-on-rails/tests/emptyForTesting.js',
+          '^@testing-library/dom$': '<rootDir>/packages/react-on-rails/tests/emptyForTesting.js',
+          '^@testing-library/react$': '<rootDir>/packages/react-on-rails/tests/emptyForTesting.js',
         }
       : {},
 };
