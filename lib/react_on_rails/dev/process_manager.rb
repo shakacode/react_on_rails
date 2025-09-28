@@ -30,14 +30,12 @@ module ReactOnRails
           # Clean up stale files before starting
           FileManager.cleanup_stale_files
 
-          if process_available?("overmind")
-            run_process("overmind", ["start", "-f", procfile])
-          elsif process_available?("foreman")
-            run_process("foreman", ["start", "-f", procfile])
-          else
-            show_process_manager_installation_help
-            exit 1
-          end
+          # Try process managers in order of preference
+          return if run_process_if_available("overmind", ["start", "-f", procfile])
+          return if run_process_if_available("foreman", ["start", "-f", procfile])
+
+          show_process_manager_installation_help
+          exit 1
         end
 
         private
@@ -45,33 +43,38 @@ module ReactOnRails
         # Check if a process is actually usable in the current execution context
         # This is important for commands that might be intercepted by bundler
         def installed_in_current_context?(process)
-          # Try to execute the process with a simple flag to see if it works
+          # Try to execute the process with version flags to see if it works
           # Use system() because that's how we'll actually call it later
-          system(process, "--version", out: File::NULL, err: File::NULL)
+          version_flags_for(process).any? do |flag|
+            system(process, flag, out: File::NULL, err: File::NULL)
+          end
         rescue Errno::ENOENT
           false
         end
 
-        # Check if a process is available in either current context or system-wide
-        def process_available?(process)
-          installed?(process) || process_available_in_system?(process)
+        # Get appropriate version flags for different processes
+        def version_flags_for(process)
+          case process
+          when "overmind"
+            ["--version"]
+          when "foreman"
+            ["--version", "-v"]
+          else
+            ["--version", "-v", "-V"]
+          end
         end
 
-        # Try to run a process with intelligent fallback strategy
-        # First attempt: within current context (for processes that are in the current bundle)
-        # Fallback: outside bundler context (for system-installed processes)
-        def run_process(process, args)
-          success = if installed?(process)
-                      # Process works in current context - use it directly
-                      system(process, *args)
-                    else
-                      false
-                    end
+        # Try to run a process if it's available, with intelligent fallback strategy
+        # Returns true if process was found and executed, false if not available
+        def run_process_if_available(process, args)
+          # First attempt: try in current context (works for bundled processes)
+          return system(process, *args) if installed?(process)
 
-          # If current context failed or process not available, try system process
-          return if success
+          # Second attempt: try in system context (works for system-installed processes)
+          return run_process_outside_bundle(process, args) if process_available_in_system?(process)
 
-          run_process_outside_bundle(process, args)
+          # Process not available in either context
+          false
         end
 
         # Run a process outside of bundler context using Bundler.with_unbundled_env
@@ -89,13 +92,13 @@ module ReactOnRails
 
         # Check if a process is available system-wide (outside bundle context)
         def process_available_in_system?(process)
-          if defined?(Bundler)
-            Bundler.with_unbundled_env do
-              # Use system() directly to check if process exists outside bundler context
-              system(process, "--version", out: File::NULL, err: File::NULL)
+          return false unless defined?(Bundler)
+
+          Bundler.with_unbundled_env do
+            # Try version flags to check if process exists outside bundler context
+            version_flags_for(process).any? do |flag|
+              system(process, flag, out: File::NULL, err: File::NULL)
             end
-          else
-            false
           end
         rescue Errno::ENOENT
           false

@@ -30,10 +30,22 @@ RSpec.describe ReactOnRails::Dev::ProcessManager do
       expect(described_class.installed?("nonexistent")).to be false
     end
 
-    it "returns false when process returns false" do
+    it "returns false when all version flags fail" do
       expect_any_instance_of(Kernel).to receive(:system)
         .with("failing_process", "--version", out: File::NULL, err: File::NULL).and_return(false)
+      expect_any_instance_of(Kernel).to receive(:system)
+        .with("failing_process", "-v", out: File::NULL, err: File::NULL).and_return(false)
+      expect_any_instance_of(Kernel).to receive(:system)
+        .with("failing_process", "-V", out: File::NULL, err: File::NULL).and_return(false)
       expect(described_class.installed?("failing_process")).to be false
+    end
+
+    it "returns true when second version flag succeeds" do
+      expect_any_instance_of(Kernel).to receive(:system)
+        .with("foreman", "--version", out: File::NULL, err: File::NULL).and_return(false)
+      expect_any_instance_of(Kernel).to receive(:system)
+        .with("foreman", "-v", out: File::NULL, err: File::NULL).and_return(true)
+      expect(described_class.installed?("foreman")).to be true
     end
   end
 
@@ -58,23 +70,26 @@ RSpec.describe ReactOnRails::Dev::ProcessManager do
     end
 
     it "uses overmind when available" do
-      allow(described_class).to receive(:process_available?).with("overmind").and_return(true)
-      expect(described_class).to receive(:run_process).with("overmind", ["start", "-f", "Procfile.dev"])
+      expect(described_class).to receive(:run_process_if_available)
+        .with("overmind", ["start", "-f", "Procfile.dev"]).and_return(true)
 
       described_class.run_with_process_manager("Procfile.dev")
     end
 
     it "uses foreman when overmind not available and foreman is available" do
-      allow(described_class).to receive(:process_available?).with("overmind").and_return(false)
-      allow(described_class).to receive(:process_available?).with("foreman").and_return(true)
-      expect(described_class).to receive(:run_process).with("foreman", ["start", "-f", "Procfile.dev"])
+      expect(described_class).to receive(:run_process_if_available)
+        .with("overmind", ["start", "-f", "Procfile.dev"]).and_return(false)
+      expect(described_class).to receive(:run_process_if_available)
+        .with("foreman", ["start", "-f", "Procfile.dev"]).and_return(true)
 
       described_class.run_with_process_manager("Procfile.dev")
     end
 
     it "exits with error when no process manager available" do
-      allow(described_class).to receive(:process_available?).with("overmind").and_return(false)
-      allow(described_class).to receive(:process_available?).with("foreman").and_return(false)
+      expect(described_class).to receive(:run_process_if_available)
+        .with("overmind", ["start", "-f", "Procfile.dev"]).and_return(false)
+      expect(described_class).to receive(:run_process_if_available)
+        .with("foreman", ["start", "-f", "Procfile.dev"]).and_return(false)
       expect(described_class).to receive(:show_process_manager_installation_help)
       expect_any_instance_of(Kernel).to receive(:exit).with(1)
 
@@ -82,64 +97,38 @@ RSpec.describe ReactOnRails::Dev::ProcessManager do
     end
 
     it "cleans up stale files before starting" do
-      allow(described_class).to receive(:process_available?).with("overmind").and_return(true)
-      allow(described_class).to receive(:run_process)
+      allow(described_class).to receive(:run_process_if_available).and_return(true)
       expect(ReactOnRails::Dev::FileManager).to receive(:cleanup_stale_files)
 
       described_class.run_with_process_manager("Procfile.dev")
     end
   end
 
-  describe ".process_available?" do
-    it "returns true when process is available in current context" do
-      allow(described_class).to receive(:installed?).with("foreman").and_return(true)
-      allow(described_class).to receive(:process_available_in_system?).with("foreman").and_return(false)
-
-      expect(described_class.send(:process_available?, "foreman")).to be true
-    end
-
-    it "returns true when process is available system-wide" do
-      allow(described_class).to receive(:installed?).with("foreman").and_return(false)
-      allow(described_class).to receive(:process_available_in_system?).with("foreman").and_return(true)
-
-      expect(described_class.send(:process_available?, "foreman")).to be true
-    end
-
-    it "returns false when process is not available anywhere" do
-      allow(described_class).to receive(:installed?).with("foreman").and_return(false)
-      allow(described_class).to receive(:process_available_in_system?).with("foreman").and_return(false)
-
-      expect(described_class.send(:process_available?, "foreman")).to be false
-    end
-  end
-
-  describe ".run_process" do
-    before do
-      allow_any_instance_of(Kernel).to receive(:system).and_return(true)
-    end
-
-    it "tries current context first when process works there" do
+  describe ".run_process_if_available" do
+    it "returns true and runs process when available in current context" do
       allow(described_class).to receive(:installed?).with("foreman").and_return(true)
       expect_any_instance_of(Kernel).to receive(:system).with("foreman", "start", "-f", "Procfile.dev").and_return(true)
-      expect(described_class).not_to receive(:run_process_outside_bundle)
 
-      described_class.send(:run_process, "foreman", ["start", "-f", "Procfile.dev"])
+      result = described_class.send(:run_process_if_available, "foreman", ["start", "-f", "Procfile.dev"])
+      expect(result).to be true
     end
 
-    it "falls back to system process when current context fails" do
-      allow(described_class).to receive(:installed?).with("foreman").and_return(true)
-      expect_any_instance_of(Kernel).to receive(:system)
-        .with("foreman", "start", "-f", "Procfile.dev").and_return(false)
-      expect(described_class).to receive(:run_process_outside_bundle).with("foreman", ["start", "-f", "Procfile.dev"])
+    it "tries system context when not available in current context" do
+      allow(described_class).to receive(:installed?).with("foreman").and_return(false)
+      allow(described_class).to receive(:process_available_in_system?).with("foreman").and_return(true)
+      expect(described_class).to receive(:run_process_outside_bundle)
+        .with("foreman", ["start", "-f", "Procfile.dev"]).and_return(true)
 
-      described_class.send(:run_process, "foreman", ["start", "-f", "Procfile.dev"])
+      result = described_class.send(:run_process_if_available, "foreman", ["start", "-f", "Procfile.dev"])
+      expect(result).to be true
     end
 
-    it "uses system process directly when not available in current context" do
-      allow(described_class).to receive(:installed?).with("overmind").and_return(false)
-      expect(described_class).to receive(:run_process_outside_bundle).with("overmind", ["start", "-f", "Procfile.dev"])
+    it "returns false when process not available anywhere" do
+      allow(described_class).to receive(:installed?).with("nonexistent").and_return(false)
+      allow(described_class).to receive(:process_available_in_system?).with("nonexistent").and_return(false)
 
-      described_class.send(:run_process, "overmind", ["start", "-f", "Procfile.dev"])
+      result = described_class.send(:run_process_if_available, "nonexistent", ["start"])
+      expect(result).to be false
     end
   end
 
@@ -162,7 +151,7 @@ RSpec.describe ReactOnRails::Dev::ProcessManager do
   end
 
   describe ".process_available_in_system?" do
-    it "checks process availability outside bundle context" do
+    it "checks process availability outside bundle context with version flags" do
       bundler_double = class_double(Bundler)
       stub_const("Bundler", bundler_double)
       expect(bundler_double).to receive(:with_unbundled_env).and_yield
@@ -178,14 +167,30 @@ RSpec.describe ReactOnRails::Dev::ProcessManager do
       expect(described_class.send(:process_available_in_system?, "foreman")).to be false
     end
 
-    it "returns false when process fails outside bundle context" do
+    it "tries multiple version flags before failing" do
       bundler_double = class_double(Bundler)
       stub_const("Bundler", bundler_double)
       expect(bundler_double).to receive(:with_unbundled_env).and_yield
       expect_any_instance_of(Kernel).to receive(:system)
-        .with("overmind", "--version", out: File::NULL, err: File::NULL).and_return(false)
+        .with("foreman", "--version", out: File::NULL, err: File::NULL).and_return(false)
+      expect_any_instance_of(Kernel).to receive(:system)
+        .with("foreman", "-v", out: File::NULL, err: File::NULL).and_return(true)
 
-      expect(described_class.send(:process_available_in_system?, "overmind")).to be false
+      expect(described_class.send(:process_available_in_system?, "foreman")).to be true
+    end
+  end
+
+  describe ".version_flags_for" do
+    it "returns specific flags for overmind" do
+      expect(described_class.send(:version_flags_for, "overmind")).to eq(["--version"])
+    end
+
+    it "returns multiple flags for foreman" do
+      expect(described_class.send(:version_flags_for, "foreman")).to eq(["--version", "-v"])
+    end
+
+    it "returns generic flags for unknown processes" do
+      expect(described_class.send(:version_flags_for, "unknown")).to eq(["--version", "-v", "-V"])
     end
   end
 
