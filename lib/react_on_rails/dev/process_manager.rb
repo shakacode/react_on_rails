@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "timeout"
+
 module ReactOnRails
   module Dev
     class ProcessManager
@@ -46,9 +48,12 @@ module ReactOnRails
           # Try to execute the process with version flags to see if it works
           # Use system() because that's how we'll actually call it later
           version_flags_for(process).any? do |flag|
-            system(process, flag, out: File::NULL, err: File::NULL)
+            # Add timeout to prevent hanging on version checks
+            Timeout.timeout(5) do
+              system(process, flag, out: File::NULL, err: File::NULL)
+            end
           end
-        rescue Errno::ENOENT
+        rescue Errno::ENOENT, Timeout::Error
           false
         end
 
@@ -97,10 +102,13 @@ module ReactOnRails
           Bundler.with_unbundled_env do
             # Try version flags to check if process exists outside bundler context
             version_flags_for(process).any? do |flag|
-              system(process, flag, out: File::NULL, err: File::NULL)
+              # Add timeout to prevent hanging on version checks
+              Timeout.timeout(5) do
+                system(process, flag, out: File::NULL, err: File::NULL)
+              end
             end
           end
-        rescue Errno::ENOENT
+        rescue Errno::ENOENT, Timeout::Error
           false
         end
 
