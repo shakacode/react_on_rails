@@ -84,13 +84,13 @@ aliases:
   - &restore-package-node-modules-cache
     name: Restore cached node_modules directory (Pro)
     keys:
-      - v4-pro-package-node-modules-cache-{{ checksum "react_on_rails_pro/yarn.lock" }}
+      - v4-pro-package-node-modules-cache-{{ checksum "react_on_rails_pro/yarn.lock" }}-{{ checksum "yarn.lock" }}
 
   # Restore spec/dummy/node_modules dir from cache using yarn.lock checksum as a key.
   - &restore-dummy-app-node-modules-cache
     name: Restore cached spec/dummy/node_modules directory (Pro)
     keys:
-      - v4-pro-dummy-app-node-modules-cache-{{ checksum "react_on_rails_pro/spec/dummy/yarn.lock" }}
+      - v4-pro-dummy-app-node-modules-cache-{{ checksum "react_on_rails_pro/spec/dummy/yarn.lock" }}-{{ checksum "yarn.lock" }}
 
   # Restore vendor/bundle dir from cache using Gemfile.lock checksum as a key.
   - &restore-dummy-app-gem-cache
