@@ -21,7 +21,7 @@ const config: KnipConfig = {
       ],
       project: [
         'packages/react-on-rails/src/**/*.[jt]s{x,}!',
-        'node_package/tests/**/*.[jt]s{x,}',
+        'packages/react-on-rails/tests/**/*.[jt]s{x,}',
         '!react_on_rails_pro/**',
         '!packages/react-on-rails/lib/**',
       ],
@@ -45,7 +45,9 @@ const config: KnipConfig = {
         // Knip fails to detect it's declared in devDependencies
         'nps',
         // local scripts
-        'node_package/scripts/.*',
+        'packages/react-on-rails/scripts/.*',
+        // Has to be installed globally
+        'yalc',
       ],
       ignoreDependencies: [
         // Required for TypeScript compilation, but we don't depend on Turbolinks itself.

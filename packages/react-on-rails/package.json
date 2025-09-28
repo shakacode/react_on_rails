@@ -15,9 +15,9 @@
     "prepublishOnly": "yarn run build",
     "yalc:publish": "yalc publish",
     "yalc": "yalc",
-    "release:patch": "scripts/release patch",
-    "release:minor": "scripts/release minor",
-    "release:major": "scripts/release major"
+    "release:patch": "./scripts/release patch",
+    "release:minor": "./scripts/release minor",
+    "release:major": "./scripts/release major"
   },
   "repository": {
     "type": "git",
