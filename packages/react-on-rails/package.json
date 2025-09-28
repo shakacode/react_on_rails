@@ -10,15 +10,14 @@
     "clean": "rm -rf ./lib",
     "test": "cd ../.. && jest packages/react-on-rails/tests",
     "type-check": "yarn run tsc --noEmit --noErrorTruncation",
-    "start": "nps",
     "prepack": "nps build.prepack",
     "prepare": "nps build.prepack",
     "prepublishOnly": "yarn run build",
-    "check": "yarn run test && yarn run type-check",
+    "yalc:publish": "yalc publish",
+    "yalc": "yalc",
     "release:patch": "scripts/release patch",
     "release:minor": "scripts/release minor",
-    "release:major": "scripts/release major",
-    "postinstall": "test -f ../../.lefthook.yml && test -d ../../.git && command -v bundle >/dev/null 2>&1 && cd ../.. && bundle exec lefthook install || true"
+    "release:major": "scripts/release major"
   },
   "repository": {
     "type": "git",
