@@ -38,10 +38,6 @@ gsub_file_content("../package.json", /"react": "[^"]*",/, '"react": "18.0.0",')
 gsub_file_content("../package.json", /"react-dom": "[^"]*",/, '"react-dom": "18.0.0",')
 gsub_file_content("../spec/dummy/package.json", /"react": "[^"]*",/, '"react": "18.0.0",')
 gsub_file_content("../spec/dummy/package.json", /"react-dom": "[^"]*",/, '"react-dom": "18.0.0",')
-# Update workspace package peerDependencies for minimum React version
-gsub_file_content("../packages/react-on-rails/package.json", /"react": ">= 16",/, '"react": ">= 18",')
-gsub_file_content("../packages/react-on-rails/package.json", /"react-dom": ">= 16",/, '"react-dom": ">= 18",')
-# Update workspace package jest command for minimum Node version support
 gsub_file_content(
   "../packages/react-on-rails/package.json",
   "cd ../.. && jest node_package/tests",
