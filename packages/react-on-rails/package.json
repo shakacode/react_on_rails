@@ -5,9 +5,9 @@
   "main": "lib/ReactOnRails.full.js",
   "type": "module",
   "scripts": {
-    "build": "yarn run clean && yarn run tsc --declaration && cp -r ../../node_package/lib ./lib",
+    "build": "yarn run clean && yarn run tsc --declaration",
     "build-watch": "yarn run clean && yarn run tsc --watch",
-    "clean": "rm -rf ../../node_package/lib ./lib",
+    "clean": "rm -rf ./lib",
     "test": "cd ../.. && jest node_package/tests",
     "type-check": "yarn run tsc --noEmit --noErrorTruncation"
   },

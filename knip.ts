@@ -32,7 +32,6 @@ const config: KnipConfig = {
         'node_package/tests/emptyForTesting.js',
         // Build output directories that should be ignored
         'packages/react-on-rails/lib/**',
-        'node_package/lib/**',
         // Pro features exported for external consumption
         'packages/react-on-rails/src/pro/streamServerRenderedReactComponent.ts:transformRenderStreamChunksToResultObject',
         'packages/react-on-rails/src/pro/streamServerRenderedReactComponent.ts:streamServerRenderedComponent',

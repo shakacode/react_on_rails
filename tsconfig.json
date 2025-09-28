@@ -7,7 +7,7 @@
     "jsx": "react-jsx",
     "lib": ["dom", "es2020"],
     "noImplicitAny": true,
-    "outDir": "node_package/lib",
+    "outDir": "packages/react-on-rails/lib",
     "allowImportingTsExtensions": true,
     "rewriteRelativeImportExtensions": true,
     "strict": true,
