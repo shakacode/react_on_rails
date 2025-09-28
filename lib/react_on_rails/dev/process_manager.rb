@@ -4,11 +4,10 @@ module ReactOnRails
   module Dev
     class ProcessManager
       class << self
+        # Check if a process is available and usable in the current execution context
+        # This accounts for bundler context where system commands might be intercepted
         def installed?(process)
-          IO.popen([process, "-v"], &:close)
-          true
-        rescue Errno::ENOENT
-          false
+          installed_in_current_context?(process)
         end
 
         def ensure_procfile(procfile)
@@ -31,10 +30,10 @@ module ReactOnRails
           # Clean up stale files before starting
           FileManager.cleanup_stale_files
 
-          if installed?("overmind")
-            system("overmind", "start", "-f", procfile)
-          elsif foreman_available?
-            run_foreman(procfile)
+          if process_available?("overmind")
+            run_process("overmind", ["start", "-f", procfile])
+          elsif process_available?("foreman")
+            run_process("foreman", ["start", "-f", procfile])
           else
             show_process_manager_installation_help
             exit 1
@@ -43,50 +42,63 @@ module ReactOnRails
 
         private
 
-        # Check if foreman is available in either bundler context or system-wide
-        def foreman_available?
-          installed?("foreman") || foreman_available_in_system?
+        # Check if a process is actually usable in the current execution context
+        # This is important for commands that might be intercepted by bundler
+        def installed_in_current_context?(process)
+          # Try to execute the process with a simple flag to see if it works
+          # Use system() because that's how we'll actually call it later
+          system(process, "--version", out: File::NULL, err: File::NULL)
+        rescue Errno::ENOENT
+          false
         end
 
-        # Try to run foreman with intelligent fallback strategy
-        # First attempt: within bundler context (for projects that include foreman in Gemfile)
-        # Fallback: outside bundler context (for projects following React on Rails best practices)
-        def run_foreman(procfile)
-          success = if installed?("foreman")
-                      # Try within bundle context first
-                      system("foreman", "start", "-f", procfile)
+        # Check if a process is available in either current context or system-wide
+        def process_available?(process)
+          installed?(process) || process_available_in_system?(process)
+        end
+
+        # Try to run a process with intelligent fallback strategy
+        # First attempt: within current context (for processes that are in the current bundle)
+        # Fallback: outside bundler context (for system-installed processes)
+        def run_process(process, args)
+          success = if installed?(process)
+                      # Process works in current context - use it directly
+                      system(process, *args)
                     else
                       false
                     end
 
-          # If bundler context failed or foreman not in bundle, try system foreman
+          # If current context failed or process not available, try system process
           return if success
 
-          run_foreman_outside_bundle(procfile)
+          run_process_outside_bundle(process, args)
         end
 
-        # Run foreman outside of bundler context using Bundler.with_unbundled_env
-        # This allows using system-installed foreman even when it's not in the Gemfile
-        def run_foreman_outside_bundle(procfile)
+        # Run a process outside of bundler context using Bundler.with_unbundled_env
+        # This allows using system-installed processes even when they're not in the Gemfile
+        def run_process_outside_bundle(process, args)
           if defined?(Bundler)
             Bundler.with_unbundled_env do
-              system("foreman", "start", "-f", procfile)
+              system(process, *args)
             end
           else
             # Fallback if Bundler is not available
-            system("foreman", "start", "-f", procfile)
+            system(process, *args)
           end
         end
 
-        # Check if foreman is available system-wide (outside bundle context)
-        def foreman_available_in_system?
+        # Check if a process is available system-wide (outside bundle context)
+        def process_available_in_system?(process)
           if defined?(Bundler)
             Bundler.with_unbundled_env do
-              installed?("foreman")
+              # Use system() directly to check if process exists outside bundler context
+              system(process, "--version", out: File::NULL, err: File::NULL)
             end
           else
             false
           end
+        rescue Errno::ENOENT
+          false
         end
 
         # Improved error message with helpful guidance
