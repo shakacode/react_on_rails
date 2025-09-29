@@ -19,7 +19,7 @@ const config = tsEslint.config([
   includeIgnoreFile(path.resolve(__dirname, '.gitignore')),
   globalIgnores([
     // compiled code
-    'node_package/lib/',
+    'packages/*/lib/',
     // pro package (has its own linting)
     'react_on_rails_pro/',
     // used for tests only
@@ -145,7 +145,7 @@ const config = tsEslint.config([
     },
   },
   {
-    files: ['node_package/**/*'],
+    files: ['packages/**/*'],
     rules: {
       'import/extensions': ['error', 'ignorePackages'],
     },
@@ -182,7 +182,7 @@ const config = tsEslint.config([
     languageOptions: {
       parserOptions: {
         projectService: {
-          allowDefaultProject: ['eslint.config.ts', 'knip.ts', 'node_package/tests/*.test.{ts,tsx}'],
+          allowDefaultProject: ['eslint.config.ts', 'knip.ts', 'packages/*/tests/*.test.{ts,tsx}'],
           // Needed because `import * as ... from` instead of `import ... from` doesn't work in this file
           // for some imports.
           defaultProject: 'tsconfig.eslint.json',
@@ -217,7 +217,7 @@ const config = tsEslint.config([
     },
   },
   {
-    files: ['node_package/tests/**', '**/*.test.{js,jsx,ts,tsx}'],
+    files: ['packages/*/tests/**', '**/*.test.{js,jsx,ts,tsx}'],
 
     extends: [
       jest.configs['flat/recommended'],
