@@ -17,7 +17,7 @@ Gem::Specification.new do |s|
   s.license       = "MIT"
 
   s.files = `git ls-files -z`.split("\x0").reject do |f|
-    f.match(%r{^(docs|test|spec|features|gen-examples|tmp|node_modules|node_package|coverage|rakelib|script)/}) ||
+    f.match(%r{^(docs|test|spec|features|gen-examples|tmp|node_modules|packages|coverage|rakelib|script)/}) ||
       f.match(%r{^(jest\.config\.js|book\.json|package\.json|package-scripts\.yml|yarn\.lock|\..*)})
   end
   s.bindir        = "exe"

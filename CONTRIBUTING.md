@@ -40,7 +40,7 @@ It's critical to configure your IDE/editor to ignore certain directories. Otherw
 - /coverage
 - /tmp
 - /gen-examples
-- /node_package/lib
+- /packages/react-on-rails/lib
 - /node_modules
 - /spec/dummy/app/assets/webpack
 - /spec/dummy/log
@@ -121,7 +121,7 @@ Don't forget you may need to run yarn after adding packages with yalc to install
 
 #### Example: Testing NPM changes with the dummy app
 
-1. Add `console.log('Hello!')` to [clientStartup.ts, function render](https://github.com/shakacode/react_on_rails/blob/master/node_package/src/clientStartup.ts in `/node_package/src/clientStartup.js` to confirm we're getting an update to the node package client side. Do the same for function `serverRenderReactComponent` in `/node_package/src/serverRenderReactComponent.ts`.
+1. Add `console.log('Hello!')` to [clientStartup.ts, function render](https://github.com/shakacode/react_on_rails/blob/master/packages/react-on-rails/src/clientStartup.ts in `/packages/react-on-rails/src/clientStartup.js` to confirm we're getting an update to the node package client side. Do the same for function `serverRenderReactComponent` in `/packages/react-on-rails/src/serverRenderReactComponent.ts`.
 2. Refresh the browser if the server is already running or start the server using `foreman start` from `react_on_rails/spec/dummy` and navigate to `http://localhost:5000/`. You will now see the `Hello!` message printed in the browser's console. If you did not see that message, then review the steps above for the workflow of making changes and pushing them via yalc.
 
 # Development Setup for Gem and Node Package Contributors
@@ -134,7 +134,7 @@ After checking out the repo, making sure you have Ruby and Node version managers
 
 ### Local Node Package
 
-Note, the example and dummy apps will use your local `node_packages` folder as the `react-on-rails` node package. This will also be done automatically for you via the `rake examples:gen_all` rake task.
+Note, the example and dummy apps will use your local `packages/react-on-rails` folder as the `react-on-rails` node package. This will also be done automatically for you via the `rake examples:gen_all` rake task.
 
 _Side note: It's critical to use the alias section of the Webpack config to avoid a double inclusion error. This has already been done for you in the example and dummy apps, but for reference:_
 

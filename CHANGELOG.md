@@ -71,7 +71,7 @@ Changes since the last non-beta release.
 
 #### Pro License Features
 
-- **Core/Pro separation**: Moved Pro features into dedicated `lib/react_on_rails/pro/` and `node_package/src/pro/` directories with clear licensing boundaries [PR 1791](https://github.com/shakacode/react_on_rails/pull/1791) by [AbanoubGhadban](https://github.com/AbanoubGhadban)
+- **Core/Pro separation**: Moved Pro features into dedicated `lib/react_on_rails/pro/` and `node_package/src/pro/` directories with clear licensing boundaries (now located at `packages/react-on-rails/src/pro/`) [PR 1791](https://github.com/shakacode/react_on_rails/pull/1791) by [AbanoubGhadban](https://github.com/AbanoubGhadban)
 - **Runtime license validation**: Implemented Pro license gating with graceful fallback to core functionality when Pro license unavailable [PR 1791](https://github.com/shakacode/react_on_rails/pull/1791) by [AbanoubGhadban](https://github.com/AbanoubGhadban)
 - **Enhanced immediate hydration**: Improved immediate hydration functionality with Pro license validation and warning badges [PR 1791](https://github.com/shakacode/react_on_rails/pull/1791) by [AbanoubGhadban](https://github.com/AbanoubGhadban)
 - **License documentation**: Added NOTICE files in Pro directories referencing canonical `REACT-ON-RAILS-PRO-LICENSE.md` [PR 1791](https://github.com/shakacode/react_on_rails/pull/1791) by [AbanoubGhadban](https://github.com/AbanoubGhadban)
@@ -399,6 +399,8 @@ _Major bump because dropping support for Ruby 2.7 and deprecated `webpackConfigL
    @ ./node_modules/react-on-rails/node_package/lib/ReactOnRails.js 34:45-78
    @ ./client/app/packs/client-bundle.js 5:0-42 32:0-23 35:0-21 59:0-26
   ```
+
+  _Note: The `node_package/lib/` path in these error examples is now `packages/react-on-rails/lib/` in the current structure._
 
   It can be safely [suppressed](https://webpack.js.org/configuration/other-options/#ignorewarnings) in your Webpack configuration.
 

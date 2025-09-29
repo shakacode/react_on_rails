@@ -58,7 +58,7 @@ index aa7b000..af8761e 100644
 -  "version": "2.0.2",
 +  "version": "2.1.0",
    "description": "react-on-rails JavaScript for react_on_rails Ruby gem",
-   "main": "node_package/lib/ReactOnRails.js",
+   "main": "packages/react-on-rails/lib/ReactOnRails.js",
    "directories": {
 diff --git a/spec/dummy/Gemfile.lock b/spec/dummy/Gemfile.lock
 index 8ef51df..4489bfe 100644

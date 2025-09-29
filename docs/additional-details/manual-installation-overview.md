@@ -13,7 +13,7 @@ The only requirements within this directory for basic React on Rails integration
 1. Your Webpack configuration files:
    1. Create outputs in a directory like `/public/webpack`, which is customizable in your `config/initializers/react_on_rails.rb`.
    1. Provide server rendering if you wish to use that feature.
-1. Your JavaScript code "registers" any components and stores per the ReactOnRails APIs of ReactOnRails.register(components) and ReactOnRails.registerStore(stores). See [our JavaScript API docs](../api/javascript-api.md) and the [React on Rails source](https://github.com/shakacode/react_on_rails/tree/master/node_package/src/ReactOnRails.client.ts).
+1. Your JavaScript code "registers" any components and stores per the ReactOnRails APIs of ReactOnRails.register(components) and ReactOnRails.registerStore(stores). See [our JavaScript API docs](../api/javascript-api.md) and the [React on Rails source](https://github.com/shakacode/react_on_rails/tree/master/packages/react-on-rails/src/ReactOnRails.client.ts).
 1. Set your registration file as an "entry" point in your Webpack configs.
 1. Configure scripts in `client/package.json` as shown in the example apps. These are used for building your Webpack assets. Also do this for your top-level `package.json`.
 

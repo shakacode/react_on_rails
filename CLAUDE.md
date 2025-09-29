@@ -36,7 +36,7 @@ Git hooks will automatically run linting on **all changed files (staged + unstag
 - **Code Formatting**:
   - Format code with Prettier: `rake autofix`
   - Check formatting without fixing: `yarn start format.listDifferent`
-- **Build**: `yarn run build` (compiles TypeScript to JavaScript in node_package/lib)
+- **Build**: `yarn run build` (compiles TypeScript to JavaScript in packages/react-on-rails/lib)
 - **Type checking**: `yarn run type-check`
 - **⚠️ MANDATORY BEFORE GIT PUSH**: `bundle exec rubocop` and fix ALL violations + ensure trailing newlines
 - Never run `npm` commands, only equivalent Yarn Classic ones
@@ -86,7 +86,7 @@ Git hooks will automatically run linting on **all changed files (staged + unstag
 This project maintains both a Ruby gem and an NPM package:
 
 - **Ruby gem**: Located in `lib/`, provides Rails integration and server-side rendering
-- **NPM package**: Located in `node_package/src/`, provides client-side React integration
+- **NPM package**: Located in `packages/react-on-rails/src/`, provides client-side React integration
 
 ### Core Components
 
@@ -98,7 +98,7 @@ This project maintains both a Ruby gem and an NPM package:
 - **`engine.rb`**: Rails engine integration
 - **Generators**: Located in `lib/generators/react_on_rails/`
 
-#### JavaScript/TypeScript Side (`node_package/src/`)
+#### JavaScript/TypeScript Side (`packages/react-on-rails/src/`)
 
 - **`ReactOnRails.ts`**: Main entry point for client-side functionality
 - **`serverRenderReactComponent.ts`**: Server-side rendering logic
@@ -108,7 +108,7 @@ This project maintains both a Ruby gem and an NPM package:
 ### Build System
 
 - **Ruby**: Standard gemspec-based build
-- **JavaScript**: TypeScript compilation to `node_package/lib/`
+- **JavaScript**: TypeScript compilation to `packages/react-on-rails/lib/`
 - **Testing**: Jest for JS, RSpec for Ruby
 - **Linting**: ESLint for JS/TS, RuboCop for Ruby
 
@@ -130,6 +130,6 @@ This project maintains both a Ruby gem and an NPM package:
 
 Exclude these directories to prevent IDE slowdowns:
 
-- `/coverage`, `/tmp`, `/gen-examples`, `/node_package/lib`
+- `/coverage`, `/tmp`, `/gen-examples`, `/packages/react-on-rails/lib`
 - `/node_modules`, `/spec/dummy/node_modules`, `/spec/dummy/tmp`
 - `/spec/dummy/app/assets/webpack`, `/spec/dummy/log`
