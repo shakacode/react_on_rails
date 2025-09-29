@@ -93,39 +93,39 @@ Based on commit `4dee1ff3cff5998a38cfa758dec041ece9986623` analysis:
 
 **Checkpoint 2.1**: Create simple ComponentRegistry
 
-- [ ] Create `packages/react-on-rails/src/ComponentRegistry.ts` with:
+- [x] Create `packages/react-on-rails/src/ComponentRegistry.ts` with:
   - Simple Map-based storage (`registeredComponents = new Map()`)
   - Synchronous `register(components)` method
   - Synchronous `get(name)` method with error on missing component
   - `components()` method returning Map
   - Error throwing stub for `getOrWaitForComponent()` with message: `'getOrWaitForComponent requires react-on-rails-pro package'`
-- [ ] Write unit tests in `packages/react-on-rails/tests/ComponentRegistry.test.js`
-- [ ] Verify basic functionality with tests
+- [x] Write unit tests in `packages/react-on-rails/tests/ComponentRegistry.test.js`
+- [x] Verify basic functionality with tests
 
 **Checkpoint 2.2**: Create simple StoreRegistry
 
-- [ ] Create `packages/react-on-rails/src/StoreRegistry.ts` with:
+- [x] Create `packages/react-on-rails/src/StoreRegistry.ts` with:
   - Simple Map-based storage for generators and hydrated stores
   - All existing synchronous methods: `register()`, `getStore()`, `getStoreGenerator()`, `setStore()`, `clearHydratedStores()`, `storeGenerators()`, `stores()`
   - Error throwing stubs for async methods: `getOrWaitForStore()`, `getOrWaitForStoreGenerator()`
-- [ ] Write unit tests in `packages/react-on-rails/tests/StoreRegistry.test.js`
-- [ ] Verify basic functionality with tests
+- [x] Write unit tests in `packages/react-on-rails/tests/StoreRegistry.test.js`
+- [x] Verify basic functionality with tests
 
 **Checkpoint 2.3**: Create simple ClientRenderer
 
-- [ ] Create `packages/react-on-rails/src/ClientRenderer.ts` with:
+- [x] Create `packages/react-on-rails/src/ClientRenderer.ts` with:
   - Simple synchronous rendering based on pre-force-load `clientStartup.ts` implementation
   - Direct imports of core registries: `import { get as getComponent } from './ComponentRegistry'`
   - Basic `renderComponent(domId: string)` function
   - Export `reactOnRailsComponentLoaded` function
-- [ ] Write unit tests for basic rendering
-- [ ] Test simple component rendering works
+- [x] Write unit tests for basic rendering
+- [x] Test simple component rendering works
 
 **Success Validation**:
 
-- [ ] All unit tests pass
-- [ ] Core registries work independently
-- [ ] Simple rendering works without pro features
+- [x] All unit tests pass
+- [x] Core registries work independently
+- [x] Simple rendering works without pro features
 
 ### Step 3: Update Core Package to Use New Registries
 
