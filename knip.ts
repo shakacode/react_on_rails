@@ -26,7 +26,7 @@ const config: KnipConfig = {
         '!packages/react-on-rails/lib/**',
       ],
       babel: {
-        config: ['packages/react-on-rails/babel.config.cjs'],
+        config: ['packages/react-on-rails/babel.config.js'],
       },
       ignore: [
         'packages/react-on-rails/tests/emptyForTesting.js',
