@@ -1,8 +1,8 @@
 import type { ReactElement } from 'react';
 import * as ClientStartup from './clientStartup.ts';
-import { renderOrHydrateComponent, hydrateStore } from './pro/ClientSideRenderer.ts';
-import * as ComponentRegistry from './pro/ComponentRegistry.ts';
-import * as StoreRegistry from './pro/StoreRegistry.ts';
+import { reactOnRailsComponentLoaded } from './ClientRenderer.ts';
+import ComponentRegistry from './ComponentRegistry.ts';
+import StoreRegistry from './StoreRegistry.ts';
 import buildConsoleReplay from './buildConsoleReplay.ts';
 import createReactOutput from './createReactOutput.ts';
 import * as Authenticity from './Authenticity.ts';
@@ -93,11 +93,11 @@ globalThis.ReactOnRails = {
   },
 
   reactOnRailsComponentLoaded(domId: string): Promise<void> {
-    return renderOrHydrateComponent(domId);
+    return reactOnRailsComponentLoaded(domId);
   },
 
   reactOnRailsStoreLoaded(storeName: string): Promise<void> {
-    return hydrateStore(storeName);
+    throw new Error('reactOnRailsStoreLoaded requires react-on-rails-pro package');
   },
 
   authenticityToken(): string | null {
