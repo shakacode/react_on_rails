@@ -7,6 +7,7 @@ React on Rails now provides enhanced error messages with actionable solutions an
 ### 1. Smart Error Messages
 
 React on Rails now provides contextual error messages that:
+
 - Identify the specific problem
 - Suggest concrete solutions
 - Provide code examples
@@ -34,20 +35,23 @@ React on Rails supports automatic bundling, which eliminates the need for manual
 ### How to Use Auto-Bundling
 
 1. **In your Rails view**, enable auto-bundling:
+
 ```erb
-<%= react_component("YourComponent", 
-    props: { data: @data }, 
+<%= react_component("YourComponent",
+    props: { data: @data },
     auto_load_bundle: true) %>
 ```
 
 2. **Place your component** in the correct directory structure:
-```
+
+```text
 app/javascript/components/
 └── YourComponent/
     └── YourComponent.jsx  # Must have export default
 ```
 
 3. **Generate the bundles**:
+
 ```bash
 bundle exec rake react_on_rails:generate_packs
 ```
@@ -55,20 +59,21 @@ bundle exec rake react_on_rails:generate_packs
 ### Configuration for Auto-Bundling
 
 In `config/initializers/react_on_rails.rb`:
+
 ```ruby
 ReactOnRails.configure do |config|
   # Set the components directory (default: "components")
   config.components_subdirectory = "components"
-  
+
   # Enable auto-bundling globally (optional)
   config.auto_load_bundle = true
 end
 ```
 
 In `config/shakapacker.yml`:
+
 ```yaml
-default: &default
-  # Enable nested entries for auto-bundling
+default: &default # Enable nested entries for auto-bundling
   nested_entries_dir: components
 ```
 
@@ -82,18 +87,19 @@ Enable debug logging in your JavaScript entry file:
 // Enable debug mode for detailed logging
 ReactOnRails.setOptions({
   debugMode: true,
-  logComponentRegistration: true
+  logComponentRegistration: true,
 });
 
 // Register your components
 ReactOnRails.register({
   HelloWorld,
   ProductList,
-  UserProfile
+  UserProfile,
 });
 ```
 
 With debug mode enabled, you'll see:
+
 - Component registration timing
 - Component sizes
 - Registration confirmations
@@ -101,7 +107,7 @@ With debug mode enabled, you'll see:
 
 ### Console Output Example
 
-```
+```text
 [ReactOnRails] Debug mode enabled
 [ReactOnRails] Component registration logging enabled
 [ReactOnRails] Registering 3 component(s): HelloWorld, ProductList, UserProfile
@@ -116,12 +122,14 @@ With debug mode enabled, you'll see:
 ### Component Not Registered
 
 **Old Error:**
-```
+
+```text
 Component HelloWorld not found
 ```
 
 **New Error:**
-```
+
+```text
 ❌ React on Rails Error: Component 'HelloWorld' Not Registered
 
 Component 'HelloWorld' was not found in the component registry.
@@ -140,7 +148,7 @@ Did you mean one of these? HelloWorldApp, HelloWorldComponent
 
 2. Place your component in the components directory:
    app/javascript/components/HelloWorld/HelloWorld.jsx
-   
+
    Component structure:
    components/
    └── HelloWorld/
@@ -171,12 +179,14 @@ Rails Environment: development (detailed errors enabled)
 ### Missing Auto-loaded Bundle
 
 **Old Error:**
-```
+
+```text
 ERROR ReactOnRails: Component "Dashboard" is configured as "auto_load_bundle: true" but the generated component entrypoint is missing.
 ```
 
 **New Error:**
-```
+
+```text
 ❌ React on Rails Error: Auto-loaded Bundle Missing
 
 Component 'Dashboard' is configured for auto-loading but its bundle is missing.
@@ -197,7 +207,8 @@ Expected location: /app/javascript/generated/Dashboard.js
 ### Server Rendering Error (Browser API)
 
 **New Error with Contextual Help:**
-```
+
+```text
 ❌ React on Rails Server Rendering Error
 
 Component: UserProfile
@@ -218,7 +229,8 @@ ReferenceError: window is not defined
 ### Hydration Mismatch
 
 **New Error:**
-```
+
+```text
 ❌ React on Rails Error: Hydration Mismatch
 
 The server-rendered HTML doesn't match what React rendered on the client.
@@ -276,13 +288,13 @@ Recommendations:
 ReactOnRails.setOptions({
   // Enable full debug mode
   debugMode: true,
-  
+
   // Log component registration details only
   logComponentRegistration: true,
-  
+
   // Existing options
   traceTurbolinks: false,
-  turbo: false
+  turbo: false,
 });
 ```
 
@@ -293,10 +305,10 @@ ReactOnRails.setOptions({
 ReactOnRails.configure do |config|
   # Enable detailed error traces in development
   config.trace = Rails.env.development?
-  
+
   # Raise errors during prerendering for debugging
   config.raise_on_prerender_error = Rails.env.development?
-  
+
   # Show full error messages
   ENV["FULL_TEXT_ERRORS"] = "true" if Rails.env.development?
 end
@@ -314,16 +326,19 @@ end
 ### Quick Debugging Checklist
 
 1. **Component not rendering?**
+
    - Enable debug mode: `ReactOnRails.setOptions({ debugMode: true })`
    - Check browser console for registration logs
    - Verify component is registered on both server and client
 
 2. **Server rendering failing?**
+
    - Set `prerender: false` to test client-only rendering
    - Check for browser-only APIs (window, document, localStorage)
    - Review server logs: `tail -f log/development.log`
 
 3. **Hydration warnings?**
+
    - Look for non-deterministic values (Math.random, Date.now)
    - Check for browser-specific conditionals
    - Ensure props match between server and client
@@ -347,6 +362,6 @@ If upgrading from an earlier version of React on Rails:
 If you encounter issues not covered by the enhanced error messages:
 
 - 🚀 Professional Support: react_on_rails@shakacode.com
-- 💬 React + Rails Slack: https://invite.reactrails.com
-- 🆓 GitHub Issues: https://github.com/shakacode/react_on_rails/issues
-- 📖 Discussions: https://github.com/shakacode/react_on_rails/discussions
+- 💬 React + Rails Slack: [https://invite.reactrails.com](https://invite.reactrails.com)
+- 🆓 GitHub Issues: [https://github.com/shakacode/react_on_rails/issues](https://github.com/shakacode/react_on_rails/issues)
+- 📖 Discussions: [https://github.com/shakacode/react_on_rails/discussions](https://github.com/shakacode/react_on_rails/discussions)
