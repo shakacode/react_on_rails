@@ -396,6 +396,7 @@ After the initial merge, the following CI adjustments may be needed:
 - When creating new pro directories (`packages/react-on-rails-pro/` and `packages/react-on-rails-pro-node-renderer/`), immediately update LICENSE.md to include these new paths
 - Ensure all moved pro files retain their Pro license headers
 - Verify new package.json files have `"license": "UNLICENSED"`
+- **Build Output Locations**: Pro packages will now output to `packages/react-on-rails-pro/lib/` and `packages/react-on-rails-pro-node-renderer/lib/`
 - Test all workspace commands thoroughly
 
 ---
