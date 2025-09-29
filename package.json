@@ -60,7 +60,7 @@
   "scripts": {
     "test": "yarn workspaces run test",
     "clean": "yarn workspaces run clean",
-    "start": "yarn workspaces run start",
+    "start": "nps",
     "build": "yarn workspaces run build",
     "build-watch": "yarn workspaces run build-watch",
     "lint": "nps eslint",

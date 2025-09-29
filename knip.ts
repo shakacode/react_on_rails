@@ -10,6 +10,7 @@ const config: KnipConfig = {
       ignoreBinaries: [
         // Has to be installed globally
         'yalc',
+        'nps',
       ],
       ignore: ['react_on_rails_pro/**'],
       ignoreDependencies: [
