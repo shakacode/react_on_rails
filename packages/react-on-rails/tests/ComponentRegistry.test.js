@@ -6,34 +6,12 @@
 import * as React from 'react';
 import * as createReactClass from 'create-react-class';
 
-import * as ComponentRegistry from '../src/pro/ComponentRegistry.ts';
-
-const onPageLoadedCallbacks = [];
-const onPageUnloadedCallbacks = [];
-
-jest.mock('../src/pageLifecycle.ts', () => ({
-  onPageLoaded: jest.fn((cb) => {
-    onPageLoadedCallbacks.push(cb);
-    cb();
-  }),
-  onPageUnloaded: jest.fn((cb) => {
-    onPageUnloadedCallbacks.push(cb);
-    cb();
-  }),
-}));
-
-jest.mock('../src/context.ts', () => ({
-  getRailsContext: () => ({ componentRegistryTimeout: 100 }),
-}));
+import ComponentRegistry from '../src/ComponentRegistry.ts';
 
 describe('ComponentRegistry', () => {
   beforeEach(() => {
+    // Clear all registered components before each test
     ComponentRegistry.clear();
-    onPageLoadedCallbacks.forEach((cb) => cb());
-  });
-
-  afterEach(() => {
-    onPageUnloadedCallbacks.forEach((cb) => cb());
   });
 
   it('registers and retrieves React function components', () => {
@@ -85,19 +63,13 @@ describe('ComponentRegistry', () => {
     expect(actual).toEqual(expected);
   });
 
-  /*
-   * NOTE: Since is a singleton, it preserves value as the tests run.
-   * Thus, tests are cumulative.
-   */
   it('registers and retrieves multiple components', () => {
     // Plain react stateless functional components
     const C5 = () => <div>WHY</div>;
     const C6 = () => <div>NOW</div>;
-    const C7 = () => <div>NOW</div>;
+    const C7 = () => <div>LATER</div>;
     C7.renderFunction = true;
-    ComponentRegistry.register({ C5 });
-    ComponentRegistry.register({ C6 });
-    ComponentRegistry.register({ C7 });
+    ComponentRegistry.register({ C5, C6, C7 });
     const components = ComponentRegistry.components();
     expect(components.size).toBe(3);
     expect(components.get('C5')).toEqual({
@@ -123,8 +95,7 @@ describe('ComponentRegistry', () => {
   it('only detects a renderer function if it has three arguments', () => {
     const C7 = (a1, a2) => null;
     const C8 = (a1) => null;
-    ComponentRegistry.register({ C7 });
-    ComponentRegistry.register({ C8 });
+    ComponentRegistry.register({ C7, C8 });
     const components = ComponentRegistry.components();
     expect(components.get('C7')).toEqual({
       name: 'C7',
@@ -151,26 +122,27 @@ describe('ComponentRegistry', () => {
     expect(() => ComponentRegistry.register({ C9 })).toThrow(/Called register with null component named C9/);
   });
 
-  it('retrieves component asynchronously when registered later', async () => {
+  it('warns when registering component that is already registered', () => {
     const C1 = () => <div>HELLO</div>;
-    const componentPromise = ComponentRegistry.getOrWaitForComponent('C1');
+    const consoleSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     ComponentRegistry.register({ C1 });
-    const component = await componentPromise;
-    expect(component).toEqual({
-      name: 'C1',
-      component: C1,
-      renderFunction: false,
-      isRenderer: false,
-    });
+    ComponentRegistry.register({ C1 }); // Register again
+    expect(consoleSpy).toHaveBeenCalledWith('Called register for component that is already registered', 'C1');
+    consoleSpy.mockRestore();
   });
 
-  it('handles timeout for unregistered components', async () => {
-    let error;
-    try {
-      await ComponentRegistry.getOrWaitForComponent('NonExistent');
-    } catch (e) {
-      error = e;
-    }
-    expect(error.message).toMatch(/Could not find component/);
+  it('throws error when calling pro-only method getOrWaitForComponent', () => {
+    expect(() => ComponentRegistry.getOrWaitForComponent('TestComponent')).toThrow(
+      'getOrWaitForComponent requires react-on-rails-pro package',
+    );
+  });
+
+  it('returns components Map with correct interface', () => {
+    const TestComponent = () => <div>Test</div>;
+    ComponentRegistry.register({ TestComponent });
+    const componentsMap = ComponentRegistry.components();
+    expect(componentsMap).toBeInstanceOf(Map);
+    expect(componentsMap.size).toBe(1);
+    expect(componentsMap.has('TestComponent')).toBe(true);
   });
 });
