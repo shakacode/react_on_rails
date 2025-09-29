@@ -304,7 +304,7 @@ After the initial merge, the following CI adjustments may be needed:
 - [ ] Create `packages/react-on-rails/package.json` with correct configuration
 - [ ] Update root `package.json` to workspace manager (packages/react-on-rails only)
 - [ ] Update build scripts and import paths
-- [ ] Update TypeScript configurations
+- [ ] Update TypeScript configurations (build output moves from `node_package/lib/` to `packages/react-on-rails/lib/`)
 - [ ] Move core JS tests to `packages/react-on-rails/tests/`
 - [ ] Keep `react_on_rails_pro/` directory unchanged
 - [ ] Update CI to build via workspace
@@ -336,6 +336,7 @@ After the initial merge, the following CI adjustments may be needed:
 - When moving core files to `packages/react-on-rails/`, carefully verify that no pro files (especially from `node_package/src/pro/`) accidentally get moved to the MIT-licensed directory
 - Update LICENSE.md to reflect the new `packages/react-on-rails/` path
 - Ensure workspace configuration only includes core package initially
+- **Build Output Location Change**: Starting from this phase, TypeScript compilation output will be at `packages/react-on-rails/lib/` instead of `node_package/lib/`
 
 ---
 
@@ -359,6 +360,7 @@ After the initial merge, the following CI adjustments may be needed:
 - [ ] Update root workspace to include all 3 NPM packages
 - [ ] Update CI to test all packages
 - [ ] Setup proper dependencies between packages
+- [ ] Update build configurations (pro package outputs will be at `packages/react-on-rails-pro/lib/` and `packages/react-on-rails-pro-node-renderer/lib/`)
 - [ ] Move pro JS tests to package directories (`packages/react-on-rails-pro/tests/`, `packages/react-on-rails-pro-node-renderer/tests/`)
 
 **License Compliance:**
