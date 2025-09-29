@@ -129,7 +129,9 @@ export function renderComponent(domId: string): void {
 /**
  * Public API function that can be called to render a component after it has been loaded.
  * This is the function that should be exported and used by the Rails integration.
+ * Returns a Promise for API compatibility with pro version.
  */
-export function reactOnRailsComponentLoaded(domId: string): void {
+export function reactOnRailsComponentLoaded(domId: string): Promise<void> {
   renderComponent(domId);
+  return Promise.resolve();
 }

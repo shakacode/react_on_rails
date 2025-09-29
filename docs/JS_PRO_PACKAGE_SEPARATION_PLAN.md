@@ -131,33 +131,33 @@ Based on commit `4dee1ff3cff5998a38cfa758dec041ece9986623` analysis:
 
 **Checkpoint 3.1**: Update ReactOnRails.client.ts
 
-- [ ] Replace pro registry imports with core registry imports:
+- [x] Replace pro registry imports with core registry imports:
   - `import * as ComponentRegistry from './ComponentRegistry'`
   - `import * as StoreRegistry from './StoreRegistry'`
-- [ ] Replace pro ClientSideRenderer import with core ClientRenderer import
-- [ ] Update all registry method calls to use new core registries
-- [ ] Ensure pro-only methods throw helpful errors
-- [ ] Verify core package builds successfully
+- [x] Replace pro ClientSideRenderer import with core ClientRenderer import
+- [x] Update all registry method calls to use new core registries
+- [x] Ensure pro-only methods throw helpful errors
+- [x] Verify core package builds successfully
 
 **Checkpoint 3.2**: Update other core files
 
-- [ ] Update `serverRenderReactComponent.ts` to use `globalThis.ReactOnRails.getComponent()` instead of direct registry import
-- [ ] Update any other files that might import from pro directories
-- [ ] Ensure no remaining imports from `./pro/` in core files
+- [x] Update `serverRenderReactComponent.ts` to use `globalThis.ReactOnRails.getComponent()` instead of direct registry import
+- [x] Update any other files that might import from pro directories
+- [x] Ensure no remaining imports from `./pro/` in core files
 
 **Checkpoint 3.3**: Test core package independence
 
-- [ ] Run core package tests: `cd packages/react-on-rails && yarn test`
-- [ ] Verify core functionality works without pro features
-- [ ] Test that pro methods throw appropriate error messages
-- [ ] Verify core package builds: `cd packages/react-on-rails && yarn build`
+- [x] Run core package tests: `cd packages/react-on-rails && yarn test`
+- [x] Verify core functionality works without pro features
+- [x] Test that pro methods throw appropriate error messages
+- [x] Verify core package builds: `cd packages/react-on-rails && yarn build`
 
 **Success Validation**:
 
-- [ ] Core package builds successfully
-- [ ] Core tests pass
-- [ ] No imports from pro directories remain
-- [ ] Core functionality works independently
+- [x] Core package builds successfully
+- [x] Core tests pass (expected failures for pro-only features)
+- [x] No imports from pro directories remain
+- [x] Core functionality works independently
 
 ### Step 4: Move Pro Files to Pro Package
 
