@@ -17,6 +17,8 @@ import createReactOutput from '../createReactOutput.ts';
 const DEFAULT_OPTIONS = {
   traceTurbolinks: false,
   turbo: false,
+  debugMode: false,
+  logComponentRegistration: false,
 };
 
 interface Registries {
@@ -142,6 +144,24 @@ Fix: Use only react-on-rails OR react-on-rails-pro, not both.`);
         delete newOptions.turbo;
       }
 
+      if (typeof newOptions.debugMode !== 'undefined') {
+        this.options.debugMode = newOptions.debugMode;
+        if (newOptions.debugMode) {
+          console.log('[ReactOnRails] Debug mode enabled');
+        }
+        // eslint-disable-next-line no-param-reassign
+        delete newOptions.debugMode;
+      }
+
+      if (typeof newOptions.logComponentRegistration !== 'undefined') {
+        this.options.logComponentRegistration = newOptions.logComponentRegistration;
+        if (newOptions.logComponentRegistration) {
+          console.log('[ReactOnRails] Component registration logging enabled');
+        }
+        // eslint-disable-next-line no-param-reassign
+        delete newOptions.logComponentRegistration;
+      }
+
       if (Object.keys(newOptions).length > 0) {
         throw new Error(`Invalid options passed to ReactOnRails.options: ${JSON.stringify(newOptions)}`);
       }
@@ -164,7 +184,31 @@ Fix: Use only react-on-rails OR react-on-rails-pro, not both.`);
     // ===================================================================
 
     register(components: Record<string, ReactComponentOrRenderFunction>): void {
-      ComponentRegistry.register(components);
+      if (this.options.debugMode || this.options.logComponentRegistration) {
+        // Use performance.now() if available, otherwise fallback to Date.now()
+        const perf = typeof performance !== 'undefined' ? performance : { now: Date.now };
+        const startTime = perf.now();
+        const componentNames = Object.keys(components);
+        console.log(
+          `[ReactOnRails] Registering ${componentNames.length} component(s): ${componentNames.join(', ')}`,
+        );
+
+        ComponentRegistry.register(components);
+
+        const endTime = perf.now();
+        console.log(`[ReactOnRails] Component registration completed in ${(endTime - startTime).toFixed(2)}ms`);
+
+        // Log individual component details if in full debug mode
+        if (this.options.debugMode) {
+          componentNames.forEach((name) => {
+            const component = components[name];
+            const size = component.toString().length;
+            console.log(`[ReactOnRails] ✅ Registered: ${name} (~${(size / 1024).toFixed(1)}kb)`);
+          });
+        }
+      } else {
+        ComponentRegistry.register(components);
+      }
     },
 
     registerStore(stores: Record<string, StoreGenerator>): void {
