@@ -11,7 +11,7 @@ All directories in the `react_on_rails` repository are MIT licensed:
 ```
 react_on_rails/
 ├── lib/react_on_rails/           # Core Ruby code (MIT)
-├── packages/react-on-rails/src/  # Core JS/TS code (MIT)
+├── node_package/src/             # Core JS/TS code (MIT)
 │   └── pro/                      # Pro features with license validation (Pro licensed)
 ├── spec/                         # Core tests (MIT)
 ├── docs/                         # Documentation (MIT)
@@ -19,7 +19,7 @@ react_on_rails/
 └── [all other directories]       # MIT
 ```
 
-**Exception:** The `packages/react-on-rails/src/pro/` directory contains Pro implementation code licensed under the React on Rails Pro License. This code is included in the package but requires a valid Pro license to use.
+**Exception:** The `node_package/src/pro/` directory contains Pro implementation code licensed under the React on Rails Pro License. This code is included in the package but requires a valid Pro license to use.
 
 **Important Distinction:**
 
