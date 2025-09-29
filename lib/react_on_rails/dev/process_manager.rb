@@ -82,11 +82,11 @@ module ReactOnRails
           false
         end
 
-        # Run a process outside of bundler context using Bundler.with_unbundled_env
+        # Run a process outside of bundler context
         # This allows using system-installed processes even when they're not in the Gemfile
         def run_process_outside_bundle(process, args)
           if defined?(Bundler)
-            Bundler.with_unbundled_env do
+            with_unbundled_context do
               system(process, *args)
             end
           else
@@ -99,7 +99,7 @@ module ReactOnRails
         def process_available_in_system?(process)
           return false unless defined?(Bundler)
 
-          Bundler.with_unbundled_env do
+          with_unbundled_context do
             # Try version flags to check if process exists outside bundler context
             version_flags_for(process).any? do |flag|
               # Add timeout to prevent hanging on version checks
@@ -110,6 +110,19 @@ module ReactOnRails
           end
         rescue Errno::ENOENT, Timeout::Error
           false
+        end
+
+        # DRY helper method for Bundler context switching with API compatibility
+        # Supports both new (with_unbundled_env) and legacy (with_clean_env) Bundler APIs
+        def with_unbundled_context(&block)
+          if Bundler.respond_to?(:with_unbundled_env)
+            Bundler.with_unbundled_env(&block)
+          elsif Bundler.respond_to?(:with_clean_env)
+            Bundler.with_clean_env(&block)
+          else
+            # Fallback if neither method is available (very old Bundler versions)
+            yield
+          end
         end
 
         # Improved error message with helpful guidance

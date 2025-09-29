@@ -140,10 +140,8 @@ RSpec.describe ReactOnRails::Dev::ProcessManager do
   end
 
   describe ".run_process_outside_bundle" do
-    it "uses Bundler.with_unbundled_env when Bundler is available" do
-      bundler_double = class_double(Bundler)
-      stub_const("Bundler", bundler_double)
-      expect(bundler_double).to receive(:with_unbundled_env).and_yield
+    it "uses with_unbundled_context when Bundler is available" do
+      expect(described_class).to receive(:with_unbundled_context).and_yield
       expect_any_instance_of(Kernel).to receive(:system).with("foreman", "start", "-f", "Procfile.dev")
 
       described_class.send(:run_process_outside_bundle, "foreman", ["start", "-f", "Procfile.dev"])
@@ -159,9 +157,7 @@ RSpec.describe ReactOnRails::Dev::ProcessManager do
 
   describe ".process_available_in_system?" do
     it "checks process availability outside bundle context with version flags" do
-      bundler_double = class_double(Bundler)
-      stub_const("Bundler", bundler_double)
-      expect(bundler_double).to receive(:with_unbundled_env).and_yield
+      expect(described_class).to receive(:with_unbundled_context).and_yield
       expect(Timeout).to receive(:timeout).with(5).and_yield
       expect_any_instance_of(Kernel).to receive(:system)
         .with("foreman", "--version", out: File::NULL, err: File::NULL).and_return(true)
@@ -176,9 +172,7 @@ RSpec.describe ReactOnRails::Dev::ProcessManager do
     end
 
     it "tries multiple version flags before failing" do
-      bundler_double = class_double(Bundler)
-      stub_const("Bundler", bundler_double)
-      expect(bundler_double).to receive(:with_unbundled_env).and_yield
+      expect(described_class).to receive(:with_unbundled_context).and_yield
       expect(Timeout).to receive(:timeout).with(5).twice.and_yield
       expect_any_instance_of(Kernel).to receive(:system)
         .with("foreman", "--version", out: File::NULL, err: File::NULL).and_return(false)
@@ -189,9 +183,7 @@ RSpec.describe ReactOnRails::Dev::ProcessManager do
     end
 
     it "returns false when version check times out in system context" do
-      bundler_double = class_double(Bundler)
-      stub_const("Bundler", bundler_double)
-      expect(bundler_double).to receive(:with_unbundled_env).and_yield
+      expect(described_class).to receive(:with_unbundled_context).and_yield
       expect(Timeout).to receive(:timeout).with(5).and_raise(Timeout::Error)
 
       expect(described_class.send(:process_available_in_system?, "hanging_process")).to be false
@@ -209,6 +201,42 @@ RSpec.describe ReactOnRails::Dev::ProcessManager do
 
     it "returns generic flags for unknown processes" do
       expect(described_class.send(:version_flags_for, "unknown")).to eq(["--version", "-v", "-V"])
+    end
+  end
+
+  describe ".with_unbundled_context" do
+    it "uses with_unbundled_env when available" do
+      bundler_double = class_double(Bundler)
+      stub_const("Bundler", bundler_double)
+      allow(bundler_double).to receive(:respond_to?).with(:with_unbundled_env).and_return(true)
+      expect(bundler_double).to receive(:with_unbundled_env).and_yield
+
+      yielded = false
+      described_class.send(:with_unbundled_context) { yielded = true }
+      expect(yielded).to be true
+    end
+
+    it "falls back to with_clean_env when with_unbundled_env not available" do
+      bundler_double = class_double(Bundler)
+      stub_const("Bundler", bundler_double)
+      allow(bundler_double).to receive(:respond_to?).with(:with_unbundled_env).and_return(false)
+      allow(bundler_double).to receive(:respond_to?).with(:with_clean_env).and_return(true)
+      expect(bundler_double).to receive(:with_clean_env).and_yield
+
+      yielded = false
+      described_class.send(:with_unbundled_context) { yielded = true }
+      expect(yielded).to be true
+    end
+
+    it "yields directly when neither method is available" do
+      bundler_double = class_double(Bundler)
+      stub_const("Bundler", bundler_double)
+      allow(bundler_double).to receive(:respond_to?).with(:with_unbundled_env).and_return(false)
+      allow(bundler_double).to receive(:respond_to?).with(:with_clean_env).and_return(false)
+
+      yielded = false
+      described_class.send(:with_unbundled_context) { yielded = true }
+      expect(yielded).to be true
     end
   end
 
