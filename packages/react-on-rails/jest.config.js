@@ -1,4 +1,4 @@
-// eslint-disable-next-line import/no-relative-packages, import/extensions
+// eslint-disable-next-line import/no-relative-packages
 import rootConfig from '../../jest.config.base.js';
 
 const nodeVersion = parseInt(process.version.slice(1), 10);

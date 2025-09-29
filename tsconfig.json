@@ -13,7 +13,7 @@
     "strict": true,
     "incremental": true,
     "target": "es2020",
-    "typeRoots": ["./node_modules/@types", "./node_package/types"]
+    "typeRoots": ["./node_modules/@types"]
   },
-  "include": ["packages/react-on-rails/src/**/*", "node_package/types/**/*"]
+  "include": ["packages/react-on-rails/src/**/*"]
 }

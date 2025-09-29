@@ -20,7 +20,6 @@ tmp/
 
 node_modules
 
-/node_package/lib
 /packages/*/lib
 
 yarn-debug.*
