@@ -3,6 +3,7 @@
   "version": "16.1.1",
   "description": "react-on-rails monorepo workspace manager",
   "private": true,
+  "type": "module",
   "workspaces": [
     "packages/react-on-rails"
   ],
