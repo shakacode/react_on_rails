@@ -1,0 +1,518 @@
+# PR #4: Split JS Pro Code to Separate Package - Implementation Plan
+
+This comprehensive plan documents all architectural decisions and implementation steps for separating JavaScript Pro functionality from the core React-on-Rails package into a separate `react-on-rails-pro` package.
+
+## Core Architectural Decisions
+
+### 1. Package Dependency Strategy
+
+- **Decision**: Pro package uses core as a **dependency** (not peer dependency)
+- **Rationale**: Follows React's model, eliminates user version management complexity, prevents "forgetting to import" issues
+- **Implementation**: Pro package exports all core functionality + pro features
+- **User Experience**:
+  - Core users: `import ReactOnRails from 'react-on-rails'`
+  - Pro users: `import ReactOnRails from 'react-on-rails-pro'` (gets everything)
+- **Benefits**: Single import decision per project, no multi-entry-point issues
+
+### 2. Versioning Strategy
+
+- **Decision**: Caret range strategy (`^16.1.0`)
+- **Rationale**: Follows React-DOM pattern (`react-dom` uses `^19.1.1` for react)
+- **Implementation**: Major version alignment required, minor/patch independence allowed
+- **Pro package.json**: `"dependencies": { "react-on-rails": "^16.1.0" }`
+
+### 3. Registry Architecture
+
+- **Decision**: Dual registry system with direct imports based on package context
+- **Core Package**: Simple Map-based registries (synchronous only, pre-force-load behavior)
+- **Pro Package**: Advanced CallbackRegistry-based (async + synchronous, post-force-load behavior)
+- **Import Strategy**:
+  - **MIT files** → Import **core registries** directly
+  - **Pro files** → Import **pro registries** directly
+  - **Shared files** → Use `globalThis.ReactOnRails.get()` methods
+
+### 4. Code Reuse Strategy (DRY Principle)
+
+- **Decision**: Layer Pro features over Core functionality, reuse core rendering logic
+- **Implementation**: Pro package imports and enhances core components where possible
+- **Example**: Pro ClientSideRenderer uses core `createReactOutput()` and `reactHydrateOrRender()`
+- **Benefits**: Maximizes DRY, reduces duplication, clear feature separation
+
+### 5. Feature Split Strategy
+
+Based on commit `4dee1ff3cff5998a38cfa758dec041ece9986623` analysis:
+
+**Core Package (MIT) - Pre-Force-Load Behavior:**
+
+- Simple synchronous registries
+- Basic rendering without async waiting
+- Methods: `register()`, `getComponent()`, `getStore()`, etc.
+
+**Pro Package - Post-Force-Load Behavior:**
+
+- Advanced async registries with CallbackRegistry
+- Immediate hydration, store dependency waiting
+- Methods: `getOrWaitForComponent()`, `getOrWaitForStore()`, `reactOnRailsComponentLoaded()`, etc.
+
+## Implementation Steps
+
+### Step 1: Create React-on-Rails-Pro Package Structure
+
+**Checkpoint 1.1**: Create directory structure
+
+- [ ] Create `packages/react-on-rails-pro/` directory
+- [ ] Create `packages/react-on-rails-pro/src/` directory
+- [ ] Create `packages/react-on-rails-pro/tests/` directory
+- [ ] Verify directory structure matches target
+
+**Checkpoint 1.2**: Create package.json
+
+- [ ] Create `packages/react-on-rails-pro/package.json` with:
+  - `"name": "react-on-rails-pro"`
+  - `"license": "UNLICENSED"`
+  - `"dependencies": { "react-on-rails": "^16.1.0" }`
+  - Pro-specific exports configuration matching current pro exports
+  - Independent build scripts (`build`, `test`, `type-check`)
+- [ ] Test that `yarn install` works in pro package directory
+- [ ] Verify dependency resolution works correctly
+
+**Checkpoint 1.3**: Create TypeScript configuration
+
+- [ ] Create `packages/react-on-rails-pro/tsconfig.json`
+- [ ] Configure proper import resolution for core package types
+- [ ] Set output directory to `lib/`
+- [ ] Verify TypeScript compilation setup works
+
+**Success Validation**:
+
+- [ ] `cd packages/react-on-rails-pro && yarn install` succeeds
+- [ ] TypeScript can resolve core package imports
+- [ ] Directory structure is ready for code
+
+### Step 2: Create Simple MIT Registries for Core Package
+
+**Checkpoint 2.1**: Create simple ComponentRegistry
+
+- [ ] Create `packages/react-on-rails/src/ComponentRegistry.ts` with:
+  - Simple Map-based storage (`registeredComponents = new Map()`)
+  - Synchronous `register(components)` method
+  - Synchronous `get(name)` method with error on missing component
+  - `components()` method returning Map
+  - Error throwing stub for `getOrWaitForComponent()` with message: `'getOrWaitForComponent requires react-on-rails-pro package'`
+- [ ] Write unit tests in `packages/react-on-rails/tests/ComponentRegistry.test.js`
+- [ ] Verify basic functionality with tests
+
+**Checkpoint 2.2**: Create simple StoreRegistry
+
+- [ ] Create `packages/react-on-rails/src/StoreRegistry.ts` with:
+  - Simple Map-based storage for generators and hydrated stores
+  - All existing synchronous methods: `register()`, `getStore()`, `getStoreGenerator()`, `setStore()`, `clearHydratedStores()`, `storeGenerators()`, `stores()`
+  - Error throwing stubs for async methods: `getOrWaitForStore()`, `getOrWaitForStoreGenerator()`
+- [ ] Write unit tests in `packages/react-on-rails/tests/StoreRegistry.test.js`
+- [ ] Verify basic functionality with tests
+
+**Checkpoint 2.3**: Create simple ClientRenderer
+
+- [ ] Create `packages/react-on-rails/src/ClientRenderer.ts` with:
+  - Simple synchronous rendering based on pre-force-load `clientStartup.ts` implementation
+  - Direct imports of core registries: `import { get as getComponent } from './ComponentRegistry'`
+  - Basic `renderComponent(domId: string)` function
+  - Export `reactOnRailsComponentLoaded` function
+- [ ] Write unit tests for basic rendering
+- [ ] Test simple component rendering works
+
+**Success Validation**:
+
+- [ ] All unit tests pass
+- [ ] Core registries work independently
+- [ ] Simple rendering works without pro features
+
+### Step 3: Update Core Package to Use New Registries
+
+**Checkpoint 3.1**: Update ReactOnRails.client.ts
+
+- [ ] Replace pro registry imports with core registry imports:
+  - `import * as ComponentRegistry from './ComponentRegistry'`
+  - `import * as StoreRegistry from './StoreRegistry'`
+- [ ] Replace pro ClientSideRenderer import with core ClientRenderer import
+- [ ] Update all registry method calls to use new core registries
+- [ ] Ensure pro-only methods throw helpful errors
+- [ ] Verify core package builds successfully
+
+**Checkpoint 3.2**: Update other core files
+
+- [ ] Update `serverRenderReactComponent.ts` to use `globalThis.ReactOnRails.getComponent()` instead of direct registry import
+- [ ] Update any other files that might import from pro directories
+- [ ] Ensure no remaining imports from `./pro/` in core files
+
+**Checkpoint 3.3**: Test core package independence
+
+- [ ] Run core package tests: `cd packages/react-on-rails && yarn test`
+- [ ] Verify core functionality works without pro features
+- [ ] Test that pro methods throw appropriate error messages
+- [ ] Verify core package builds: `cd packages/react-on-rails && yarn build`
+
+**Success Validation**:
+
+- [ ] Core package builds successfully
+- [ ] Core tests pass
+- [ ] No imports from pro directories remain
+- [ ] Core functionality works independently
+
+### Step 4: Move Pro Files to Pro Package
+
+**Checkpoint 4.1**: Move Pro JavaScript/TypeScript files
+
+- [ ] Move all files from `packages/react-on-rails/src/pro/` to `packages/react-on-rails-pro/src/`
+- [ ] Preserve directory structure:
+  - `CallbackRegistry.ts`
+  - `ClientSideRenderer.ts`
+  - `ComponentRegistry.ts`
+  - `StoreRegistry.ts`
+  - `ReactOnRailsRSC.ts`
+  - `registerServerComponent/` directory
+  - `wrapServerComponentRenderer/` directory
+  - All other pro files (~23 files total)
+- [ ] Update license headers in moved files to reflect new package location
+- [ ] Verify all pro files moved correctly (count and validate)
+
+**Checkpoint 4.2**: Update import paths in moved files
+
+- [ ] Update imports in pro files to reference correct paths
+- [ ] Update imports from core package to use `react-on-rails` package imports where needed
+- [ ] Fix relative imports within pro package
+- [ ] Ensure no circular dependency issues
+
+**Checkpoint 4.3**: Remove pro directory from core
+
+- [ ] Delete empty `packages/react-on-rails/src/pro/` directory
+- [ ] Verify no references to old pro paths remain in any files
+- [ ] Update any remaining import statements that referenced pro paths
+
+**Success Validation**:
+
+- [ ] Pro files exist in correct new locations
+- [ ] No pro directory remains in core package
+- [ ] Import paths are correctly updated
+- [ ] No broken imports or missing files
+
+### Step 5: Move and Update Pro Tests
+
+**Checkpoint 5.1**: Identify pro-related tests
+
+- [ ] Search for test files importing from pro directories:
+  - `streamServerRenderedReactComponent.test.jsx`
+  - `registerServerComponent.client.test.jsx`
+  - `injectRSCPayload.test.ts`
+  - Tests for ComponentRegistry and StoreRegistry that test pro features
+- [ ] Identify tests that specifically test pro functionality
+- [ ] Create list of all test files that need to be moved
+
+**Checkpoint 5.2**: Move pro tests
+
+- [ ] Move identified pro tests to `packages/react-on-rails-pro/tests/`
+- [ ] Update test import paths to reflect new package structure
+- [ ] Update Jest configuration if needed for pro package
+- [ ] Ensure test utilities are available or create pro-specific ones
+
+**Checkpoint 5.3**: Update remaining core tests
+
+- [ ] Update core tests that may have been testing pro functionality to only test core features
+- [ ] Ensure core ComponentRegistry and StoreRegistry tests only test core functionality
+- [ ] Add tests for error throwing pro methods in core
+- [ ] Verify all core tests pass
+
+**Success Validation**:
+
+- [ ] Core tests pass and only test core functionality
+- [ ] Pro tests are properly moved and can run
+- [ ] No test dependencies on moved pro files remain in core
+
+### Step 6: Create Pro Package Implementation
+
+**Checkpoint 6.1**: Create pro package main entry point
+
+- [ ] Create `packages/react-on-rails-pro/src/index.ts` that:
+  - Imports all core functionality: `import ReactOnRailsCore from 'react-on-rails'`
+  - Imports pro registries: `import * as ProComponentRegistry from './ComponentRegistry'`
+  - Imports pro features: `import { renderOrHydrateComponent, hydrateStore } from './ClientSideRenderer'`
+  - Creates enhanced ReactOnRails object with all core methods plus pro methods
+  - Sets `globalThis.ReactOnRails` to pro version
+  - Exports enhanced version as default
+- [ ] Ensure pro startup script runs and replaces core startup behavior
+
+**Checkpoint 6.2**: Configure pro package exports
+
+- [ ] Update `packages/react-on-rails-pro/package.json` exports section
+- [ ] Include all current pro exports:
+  - `"."` (main entry)
+  - `"./RSCRoute"`
+  - `"./RSCProvider"`
+  - `"./registerServerComponent/client"`
+  - `"./registerServerComponent/server"`
+  - `"./wrapServerComponentRenderer/client"`
+  - `"./wrapServerComponentRenderer/server"`
+  - `"./ServerComponentFetchError"`
+- [ ] Ensure proper TypeScript declaration exports
+
+**Checkpoint 6.3**: Test pro package build and functionality
+
+- [ ] Verify pro package builds successfully: `cd packages/react-on-rails-pro && yarn build`
+- [ ] Test that pro package includes all core functionality
+- [ ] Test that pro-specific async methods work (`getOrWaitForComponent`, `getOrWaitForStore`)
+- [ ] Verify pro package can be imported and used
+
+**Success Validation**:
+
+- [ ] Pro package builds without errors
+- [ ] Pro package exports work correctly
+- [ ] Pro functionality is available when imported
+- [ ] All core functionality is preserved in pro package
+
+### Step 7: Update Workspace Configuration
+
+**Checkpoint 7.1**: Update root workspace
+
+- [ ] Update root `package.json` workspaces to include `"packages/react-on-rails-pro"`
+- [ ] Update workspace scripts:
+  - `"build"` should build both packages
+  - `"test"` should run tests for both packages
+  - `"type-check"` should check both packages
+- [ ] Configure build dependencies if pro package needs core built first
+
+**Checkpoint 7.2**: Test workspace functionality
+
+- [ ] Test `yarn build` builds both packages successfully
+- [ ] Test `yarn test` runs tests for both packages
+- [ ] Test `yarn type-check` checks both packages
+- [ ] Verify workspace dependency resolution works correctly
+
+**Success Validation**:
+
+- [ ] Workspace commands work for both packages
+- [ ] Both packages build in correct order
+- [ ] Workspace dependency resolution is working
+
+### Step 8: Update License Compliance
+
+**Checkpoint 8.1**: Update LICENSE.md
+
+- [ ] Remove `packages/react-on-rails/src/pro/` from Pro license section (no longer exists)
+- [ ] Add `packages/react-on-rails-pro/` to Pro license section
+- [ ] Update license scope to accurately reflect new structure:
+
+  ```md
+  ## MIT License applies to:
+
+  - `lib/react_on_rails/` (including specs)
+  - `packages/react-on-rails/` (including tests)
+
+  ## React on Rails Pro License applies to:
+
+  - `packages/react-on-rails-pro/` (including tests) (NEW)
+  - `react_on_rails_pro/` (remaining files)
+  ```
+
+- [ ] Verify all pro directories are listed correctly
+- [ ] Ensure no pro code remains in MIT-licensed directories
+
+**Checkpoint 8.2**: Verify license compliance
+
+- [ ] Run automated license check if available
+- [ ] Verify all pro files have correct license headers
+- [ ] Manually verify no MIT-licensed directories contain pro code
+- [ ] Check that `packages/react-on-rails-pro/package.json` has `"license": "UNLICENSED"`
+
+**Success Validation**:
+
+- [ ] LICENSE.md accurately reflects new structure
+- [ ] All pro files are properly licensed
+- [ ] No license violations exist
+
+### Step 9: Comprehensive Testing and Validation
+
+**Checkpoint 9.1**: Core package testing
+
+- [ ] Run full core package test suite: `cd packages/react-on-rails && yarn test`
+- [ ] Test core functionality in dummy Rails app with only core package
+- [ ] Verify pro methods throw appropriate error messages
+- [ ] Test that core package works in complete isolation
+- [ ] Verify core package build: `cd packages/react-on-rails && yarn build`
+
+**Checkpoint 9.2**: Pro package testing
+
+- [ ] Run full pro package test suite: `cd packages/react-on-rails-pro && yarn test`
+- [ ] Test in dummy Rails app with pro package (should include all core + pro features)
+- [ ] Test pro-specific features:
+  - Async component waiting (`getOrWaitForComponent`)
+  - Async store waiting (`getOrWaitForStore`)
+  - Immediate hydration feature
+  - RSC functionality
+- [ ] Verify pro package works as complete replacement for core
+
+**Checkpoint 9.3**: Integration testing
+
+- [ ] Test workspace builds: `yarn build` from root
+- [ ] Test workspace tests: `yarn test` from root
+- [ ] Verify no regressions in existing dummy app functionality
+- [ ] Test that switching from core to pro package works seamlessly
+- [ ] Verify all CI checks pass
+
+**Success Validation**:
+
+- [ ] All tests pass for both packages
+- [ ] No functional regressions
+- [ ] Pro package provides all core functionality plus enhancements
+- [ ] Clean upgrade path from core to pro
+
+### Step 10: Documentation and Final Cleanup
+
+**Checkpoint 10.1**: Update package documentation
+
+- [ ] Update core package README if needed (mention pro package existence)
+- [ ] Create `packages/react-on-rails-pro/README.md` with installation and usage instructions
+- [ ] Update any relevant documentation about package structure
+- [ ] Document upgrade path from core to pro
+
+**Checkpoint 10.2**: Final cleanup and verification
+
+- [ ] Remove any temporary files or configurations created during migration
+- [ ] Clean up any commented-out code
+- [ ] Verify all files are properly organized
+- [ ] Run final linting: `yarn lint` from root
+- [ ] Run final type checking: `yarn type-check` from root
+
+**Success Validation**:
+
+- [ ] Documentation is complete and accurate
+- [ ] All temporary artifacts removed
+- [ ] Final linting and type checking passes
+- [ ] Packages are ready for production use
+
+## Success Criteria
+
+### Functional Requirements
+
+- [ ] All existing functionality preserved in both packages
+- [ ] No breaking changes for existing core users
+- [ ] Pro users get all functionality (core + pro) from single package
+- [ ] Clean separation between synchronous (core) and asynchronous (pro) features
+
+### Technical Requirements
+
+- [ ] Both packages build independently without errors
+- [ ] All CI checks pass for both packages
+- [ ] TypeScript types work correctly for both packages
+- [ ] Proper dependency resolution in workspace
+- [ ] No circular dependencies
+
+### License Compliance
+
+- [ ] Strict separation between MIT and Pro licensed code
+- [ ] LICENSE.md accurately reflects all package locations
+- [ ] All pro files have correct license headers
+- [ ] No pro code in MIT-licensed directories
+
+### User Experience
+
+- [ ] Core users: Simple import, basic functionality
+- [ ] Pro users: Single import, all functionality
+- [ ] Clear upgrade path from core to pro
+- [ ] No migration required for existing code
+
+## Testing Strategy
+
+### After Each Major Step:
+
+1. **Build Test**: Verify affected packages build successfully
+2. **Unit Tests**: Run relevant unit test suites
+3. **Integration Test**: Test functionality in dummy Rails application
+4. **Regression Check**: Ensure no existing functionality broken
+5. **License Validation**: Check license compliance maintained
+
+### Validation Commands:
+
+```bash
+# Test workspace
+yarn build
+yarn test
+yarn type-check
+yarn lint
+
+# Test individual packages
+cd packages/react-on-rails && yarn build && yarn test
+cd packages/react-on-rails-pro && yarn build && yarn test
+
+# Test in dummy app
+cd spec/dummy && yarn install && yarn build
+```
+
+## Rollback Strategy
+
+### Git Strategy:
+
+- Each major step should be a separate commit with clear commit message
+- Use descriptive commit messages: `"Step 4.1: Move pro files to pro package"`
+- Tag successful major milestones
+
+### Rollback Process:
+
+1. **Identify Issue**: Determine which step introduced the problem
+2. **Revert Commits**: Use `git revert` to undo problematic changes
+3. **Analyze Root Cause**: Understand what went wrong
+4. **Fix and Retry**: Address the issue and re-attempt the step
+5. **Validate**: Ensure fix resolves the problem without introducing new issues
+
+## Key Implementation Principles
+
+### 1. Direct Import Strategy
+
+- **MIT files** import MIT registries directly (no indirection)
+- **Pro files** import Pro registries directly (access to async methods)
+- **Shared files** use `globalThis.ReactOnRails` for flexibility
+
+### 2. No Complex Dependency Injection
+
+- Avoid complex registry injection patterns
+- Keep architecture simple and understandable
+- Use direct imports for clear dependencies
+
+### 3. Maintain Backward Compatibility
+
+- Core users should see no changes in behavior
+- Pro users get enhanced functionality seamlessly
+- No breaking changes to existing APIs
+
+### 4. License Boundary Integrity
+
+- Maintain strict separation between MIT and Pro code
+- Update LICENSE.md immediately when moving files
+- Never allow pro code in MIT-licensed directories
+
+### 5. Independent Package Builds
+
+- Each package builds independently
+- Pro package manages its dependency on core package
+- Clean separation of concerns
+
+## Post-Implementation Validation
+
+### Manual Testing Checklist:
+
+- [ ] Fresh install of core package works
+- [ ] Fresh install of pro package works
+- [ ] Switching from core to pro package works
+- [ ] All async pro features work correctly
+- [ ] No console errors or warnings
+- [ ] Performance is acceptable
+- [ ] Memory leaks not introduced
+
+### Automated Testing:
+
+- [ ] All unit tests pass
+- [ ] All integration tests pass
+- [ ] CI pipeline passes completely
+- [ ] No new linting violations
+- [ ] TypeScript compilation clean
+
+This implementation plan ensures a methodical approach to separating the pro functionality while maintaining all existing capabilities and providing clear upgrade paths for users.
