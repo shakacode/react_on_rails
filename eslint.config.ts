@@ -48,6 +48,10 @@ const config = tsEslint.config([
     '**/.yalc/**/*',
     // generator templates - exclude TypeScript templates that need tsconfig.json
     '**/templates/**/*.tsx',
+    // Playwright test files
+    'spec/dummy/playwright.config.ts',
+    'spec/dummy/playwright/**/*.ts',
+    'spec/dummy/playwright/**/*.js',
     '**/templates/**/*.ts',
   ]),
   {

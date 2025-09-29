@@ -1,0 +1,5 @@
+
+# Playwright test artifacts
+playwright-report/
+test-results/
+playwright/.cache/

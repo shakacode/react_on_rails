@@ -27,6 +27,7 @@ Git hooks will automatically run linting on **all changed files (staged + unstag
 - **Run tests**:
   - Ruby tests: `rake run_rspec`
   - JavaScript tests: `yarn run test` or `rake js_tests`
+  - Playwright E2E tests: `yarn test:e2e` (see Playwright section below)
   - All tests: `rake` (default task runs lint and all tests except examples)
 - **Linting** (MANDATORY BEFORE EVERY COMMIT):
   - **REQUIRED**: `bundle exec rubocop` - Must pass with zero offenses
@@ -126,6 +127,110 @@ This project maintains both a Ruby gem and an NPM package:
 - Generated examples are in `gen-examples/` (ignored by git)
 - Only use `yarn` as the JS package manager, never `npm`
 
+## Playwright E2E Testing
+
+### Overview
+Playwright provides cross-browser end-to-end testing for React on Rails components. Tests run against a real Rails server with compiled assets, ensuring components work correctly in production-like conditions.
+
+### Setup and Installation
+```bash
+# Install Playwright and its dependencies
+yarn add -D @playwright/test
+yarn playwright install --with-deps  # Install browsers
+
+# Or just install specific browsers
+yarn playwright install chromium
+```
+
+### Running Playwright Tests
+```bash
+# Navigate to dummy app
+cd spec/dummy
+
+# Run all tests
+yarn test:e2e
+
+# Run tests in UI mode (interactive)
+yarn test:e2e:ui
+
+# Run tests with visible browser (headed mode)
+yarn test:e2e:headed
+
+# Debug tests
+yarn test:e2e:debug
+
+# View test report
+yarn test:e2e:report
+
+# Run specific test file
+yarn playwright test playwright/tests/basic-react-components.spec.ts
+
+# Run tests in specific browser
+yarn playwright test --project=chromium
+yarn playwright test --project=firefox
+yarn playwright test --project=webkit
+```
+
+### Writing Playwright Tests
+Tests are located in `spec/dummy/playwright/tests/` directory. Example:
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('React component interaction', async ({ page }) => {
+  await page.goto('/');
+  
+  // Find React on Rails component
+  const component = page.locator('#HelloWorld-react-component-1');
+  await expect(component).toBeVisible();
+  
+  // Interact with component
+  const input = component.locator('input');
+  await input.fill('Playwright Test');
+  
+  // Verify state change
+  const heading = component.locator('h3');
+  await expect(heading).toContainText('Playwright Test');
+});
+```
+
+### Test Helpers
+Custom test helpers are available in `spec/dummy/playwright/fixtures/test-helpers.ts`:
+- `waitForHydration()` - Wait for React on Rails components to hydrate
+- `getServerRenderedData()` - Extract server-rendered component data
+- `expectNoConsoleErrors()` - Verify no console errors occur
+
+### Configuration
+Configuration is in `spec/dummy/playwright.config.ts`:
+- Base URL: `http://localhost:3000`
+- Browsers: Chrome, Firefox, Safari, Mobile Chrome, Mobile Safari
+- Server: Automatically starts Rails server before tests
+- Reports: HTML reports for local, GitHub reports for CI
+
+### Continuous Integration
+Playwright tests run automatically in GitHub Actions on PRs and pushes to main branch. The workflow:
+1. Sets up Ruby and Node environments
+2. Installs dependencies
+3. Compiles assets
+4. Sets up database
+5. Runs Playwright tests
+6. Uploads test reports as artifacts
+
+### Best Practices
+- Always wait for React on Rails components to mount/hydrate before interactions
+- Use component-specific selectors (e.g., `#ComponentName-react-component-N`)
+- Test both server-rendered and client-rendered components
+- Include tests for Turbolinks/Turbo integration if enabled
+- Monitor console errors and network failures
+- Test across different browsers and viewports
+
+### Debugging Tips
+- Use `page.pause()` to pause execution in headed mode
+- Enable `trace: 'on'` in config for detailed traces
+- Use `--debug` flag to step through tests
+- Check `playwright-report/` for detailed test results
+- Use UI mode (`yarn test:e2e:ui`) for interactive debugging
+
 ## IDE Configuration
 
 Exclude these directories to prevent IDE slowdowns:
@@ -133,3 +238,4 @@ Exclude these directories to prevent IDE slowdowns:
 - `/coverage`, `/tmp`, `/gen-examples`, `/node_package/lib`
 - `/node_modules`, `/spec/dummy/node_modules`, `/spec/dummy/tmp`
 - `/spec/dummy/app/assets/webpack`, `/spec/dummy/log`
+- `/playwright-report`, `/test-results`
