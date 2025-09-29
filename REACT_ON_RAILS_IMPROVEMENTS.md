@@ -1,4 +1,5 @@
 # React on Rails Incremental Improvements Roadmap
+
 ## Practical Baby Steps to Match and Exceed Inertia Rails and Vite Ruby
 
 ## Executive Summary
@@ -8,11 +9,13 @@ With Rspack integration coming for better build performance and enhanced React S
 ## Current State Analysis
 
 ### What We're Building On
+
 - **Rspack Integration** (Coming Soon): Will provide faster builds comparable to Vite
 - **React Server Components** (Coming Soon): Separate node rendering process for better RSC support
 - **Existing Strengths**: Mature SSR, production-tested, comprehensive features
 
 ### Key Gaps to Address Incrementally
+
 - Error messages need improvement
 - Setup process could be smoother
 - Missing TypeScript-first approach
@@ -22,9 +25,11 @@ With Rspack integration coming for better build performance and enhanced React S
 ## Incremental Improvement Plan
 
 ## Phase 1: Immediate Fixes (Week 1-2)
-*Quick wins that improve developer experience immediately*
+
+_Quick wins that improve developer experience immediately_
 
 ### 1.1 Better Error Messages
+
 **Effort**: 2-3 days
 **Impact**: High
 
@@ -39,11 +44,13 @@ Location: app/javascript/bundles/HelloWorld/components/HelloWorld.jsx"
 ```
 
 **Implementation**:
+
 - Enhance error messages in `helper.rb`
 - Add suggestions for common mistakes
 - Include file paths and registration examples
 
 ### 1.2 Enhanced Doctor Command
+
 **Effort**: 1-2 days
 **Impact**: High
 
@@ -66,11 +73,13 @@ Recommendations:
 ```
 
 **Implementation**:
+
 - Extend existing doctor command
 - Add version compatibility checks
 - Provide actionable recommendations
 
 ### 1.3 Component Registration Debugging
+
 **Effort**: 1 day  
 **Impact**: Medium
 
@@ -78,8 +87,8 @@ Recommendations:
 // Add debug mode
 ReactOnRails.configure({
   debugMode: true,
-  logComponentRegistration: true
-})
+  logComponentRegistration: true,
+});
 
 // Console output:
 // [ReactOnRails] Registered: HelloWorld (2.3kb)
@@ -88,14 +97,17 @@ ReactOnRails.configure({
 ```
 
 **Implementation**:
+
 - Add debug logging to ComponentRegistry
 - Show bundle sizes and registration timing
 - Warn about server/client mismatches
 
 ## Phase 2: Developer Experience Polish (Week 3-4)
-*Improvements that make daily development smoother*
+
+_Improvements that make daily development smoother_
 
 ### 2.1 Modern Generator Templates
+
 **Effort**: 2-3 days
 **Impact**: High
 
@@ -127,12 +139,14 @@ export default function ProductCard({ name, price }: ProductCardProps) {
 ```
 
 **Implementation**:
+
 - Update generator templates
 - Auto-detect TypeScript, test framework
 - Use functional components by default
 - Add props interface for TypeScript
 
 ### 2.2 Setup Auto-Detection
+
 **Effort**: 2 days
 **Impact**: Medium
 
@@ -154,11 +168,13 @@ Configuring React on Rails for your stack...
 ```
 
 **Implementation**:
+
 - Check for common config files
 - Adapt templates based on detection
 - Preserve existing configurations
 
 ### 2.3 Configuration Simplification
+
 **Effort**: 1 day
 **Impact**: Medium
 
@@ -169,30 +185,33 @@ Configuring React on Rails for your stack...
 ReactOnRails.configure do |config|
   # Rspack optimized defaults (coming soon)
   config.build_system = :rspack # auto-detected
-  
+
   # Server-side rendering
   config.server_bundle_js_file = "server-bundle.js"
   config.prerender = true # Enable SSR
-  
+
   # Development experience
   config.development_mode = Rails.env.development?
   config.trace = true # Show render traces in development
-  
+
   # React Server Components (when using Pro)
   # config.rsc_bundle_js_file = "rsc-bundle.js"
 end
 ```
 
 **Implementation**:
+
 - Simplify configuration file
 - Add helpful comments
 - Group related settings
 - Provide sensible defaults
 
 ## Phase 3: Rspack Integration Excellence (Week 5-6)
-*Maximize the benefits of upcoming Rspack support*
+
+_Maximize the benefits of upcoming Rspack support_
 
 ### 3.1 Rspack Migration Assistant
+
 **Effort**: 3 days
 **Impact**: High
 
@@ -216,12 +235,14 @@ Next steps:
 ```
 
 **Implementation**:
+
 - Parse existing webpack config
 - Generate equivalent Rspack config
 - Identify manual migration needs
 - Provide migration guide
 
 ### 3.2 Build Performance Dashboard
+
 **Effort**: 2 days
 **Impact**: Medium
 
@@ -243,12 +264,14 @@ Top bottlenecks:
 ```
 
 **Implementation**:
+
 - Add build timing collection
 - Compare before/after metrics
 - Identify optimization opportunities
 - Store historical data
 
 ### 3.3 Rspack-Specific Optimizations
+
 **Effort**: 2 days
 **Impact**: Medium
 
@@ -259,7 +282,7 @@ module.exports = {
   experiments: {
     rspackFuture: {
       newTreeshaking: true, // Better tree shaking for React
-    }
+    },
   },
   optimization: {
     moduleIds: 'deterministic', // Consistent builds
@@ -269,28 +292,31 @@ module.exports = {
         vendor: {
           test: /[\\/]node_modules[\\/]/,
           name: 'vendors',
-          priority: 10
+          priority: 10,
         },
         react: {
           test: /[\\/]node_modules[\\/](react|react-dom)[\\/]/,
           name: 'react',
-          priority: 20
-        }
-      }
-    }
-  }
-}
+          priority: 20,
+        },
+      },
+    },
+  },
+};
 ```
 
 **Implementation**:
+
 - Create optimized Rspack presets
 - Add React-specific optimizations
 - Configure optimal chunking strategy
 
 ## Phase 4: React Server Components Polish (Week 7-8)
-*Enhance the upcoming RSC support*
+
+_Enhance the upcoming RSC support_
 
 ### 4.1 RSC Debugging Tools
+
 **Effort**: 3 days
 **Impact**: High
 
@@ -303,7 +329,7 @@ RSC Rendering Pipeline:
 2. RSC Bundle loaded: rsc-bundle.js (45ms)
 3. Component tree:
    <ProductLayout> (RSC)
-     <ProductDetails> (RSC) 
+     <ProductDetails> (RSC)
        <AddToCartButton> (Client) ✅ Hydrated
 4. Serialization time: 23ms
 5. Total RSC time: 89ms
@@ -314,12 +340,14 @@ Warnings:
 ```
 
 **Implementation**:
+
 - Add RSC render pipeline logging
 - Track component boundaries
 - Measure serialization time
 - Identify optimization opportunities
 
 ### 4.2 RSC Component Generator
+
 **Effort**: 2 days
 **Impact**: Medium
 
@@ -331,7 +359,7 @@ $ rails g react_on_rails:rsc ProductView
 export default async function ProductView({ id }: { id: string }) {
   // This runs on the server only
   const product = await db.products.find(id)
-  
+
   return (
     <div>
       <h1>{product.name}</h1>
@@ -348,11 +376,13 @@ export default function ProductClient({ product }) {
 ```
 
 **Implementation**:
+
 - Add RSC-specific generators
 - Use .server and .client conventions
 - Include async data fetching examples
 
 ### 4.3 RSC Performance Monitor
+
 **Effort**: 2 days
 **Impact**: Medium
 
@@ -364,7 +394,7 @@ class RSCPerformanceMiddleware
       start = Time.now
       result = @app.call(env)
       duration = Time.now - start
-      
+
       Rails.logger.info "[RSC] Rendered in #{duration}ms"
       result
     else
@@ -375,14 +405,17 @@ end
 ```
 
 **Implementation**:
+
 - Add timing middleware
 - Track RSC vs traditional renders
 - Log performance metrics
 
 ## Phase 5: Competitive Feature Parity (Week 9-10)
-*Add key features that competitors offer*
+
+_Add key features that competitors offer_
 
 ### 5.1 Inertia-Style Controller Helpers
+
 **Effort**: 3 days
 **Impact**: High
 
@@ -390,19 +423,19 @@ end
 # Simple props passing like Inertia
 class ProductsController < ApplicationController
   include ReactOnRails::ControllerHelpers
-  
+
   def show
     @product = Product.find(params[:id])
     @reviews = @product.reviews.recent
-    
+
     # Automatically serializes instance variables as props
     render_component "ProductShow"
     # Props: { product: @product, reviews: @reviews }
   end
-  
+
   def index
     @products = Product.page(params[:page])
-    
+
     # With explicit props
     render_component "ProductList", props: {
       products: @products,
@@ -413,12 +446,14 @@ end
 ```
 
 **Implementation**:
+
 - Create ControllerHelpers module
 - Auto-serialize instance variables
 - Support explicit props override
 - Handle pagination metadata
 
 ### 5.2 TypeScript Model Generation
+
 **Effort**: 3 days
 **Impact**: High
 
@@ -449,50 +484,55 @@ export interface Product {
 ```
 
 **Implementation**:
+
 - Parse Active Record models
 - Generate TypeScript interfaces
 - Handle associations
 - Support nullable fields
 
 ### 5.3 Form Component Helpers
+
 **Effort**: 2 days
 **Impact**: Medium
 
 ```tsx
 // Simple Rails-integrated forms
-import { useRailsForm } from 'react-on-rails/forms'
+import { useRailsForm } from 'react-on-rails/forms';
 
 export default function ProductForm({ product }) {
   const { form, submit, errors } = useRailsForm({
     action: '/products',
     method: 'POST',
-    model: product
-  })
-  
+    model: product,
+  });
+
   return (
     <form onSubmit={submit}>
       <input {...form.register('name')} />
       {errors.name && <span>{errors.name}</span>}
-      
+
       <input {...form.register('price')} type="number" />
       {errors.price && <span>{errors.price}</span>}
-      
+
       <button type="submit">Save Product</button>
     </form>
-  )
+  );
 }
 ```
 
 **Implementation**:
+
 - Create form hooks
 - Handle CSRF tokens automatically
 - Integrate with Rails validations
 - Support error display
 
 ## Phase 6: Documentation & Onboarding (Week 11-12)
-*Make it easier to learn and adopt*
+
+_Make it easier to learn and adopt_
 
 ### 6.1 Interactive Setup Wizard
+
 **Effort**: 3 days
 **Impact**: High
 
@@ -528,12 +568,14 @@ Run 'bin/dev' to start developing!
 ```
 
 **Implementation**:
+
 - Create interactive CLI wizard
 - Guide through common options
 - Generate appropriate config
 - Provide next steps
 
 ### 6.2 Migration Tool from Inertia
+
 **Effort**: 4 days
 **Impact**: High
 
@@ -560,12 +602,14 @@ Generated migration guide at: MIGRATION_GUIDE.md
 ```
 
 **Implementation**:
+
 - Parse Inertia components
 - Convert to React on Rails format
 - Update controller rendering
 - Generate migration guide
 
 ### 6.3 Component Catalog Generator
+
 **Effort**: 2 days
 **Impact**: Medium
 
@@ -599,15 +643,18 @@ Each component shows:
 ```
 
 **Implementation**:
+
 - Scan for React components
 - Generate catalog app
 - Extract prop types
 - Create live playground
 
 ## Phase 7: Performance Optimizations (Week 13-14)
-*Small improvements with big impact*
+
+_Small improvements with big impact_
 
 ### 7.1 Automatic Component Preloading
+
 **Effort**: 2 days
 **Impact**: Medium
 
@@ -615,7 +662,7 @@ Each component shows:
 # Automatically preload components based on routes
 class ApplicationController < ActionController::Base
   before_action :preload_components
-  
+
   def preload_components
     case controller_name
     when 'products'
@@ -631,11 +678,13 @@ end
 ```
 
 **Implementation**:
+
 - Add preloading helpers
 - Generate Link headers
 - Support route-based preloading
 
 ### 7.2 Bundle Analysis Command
+
 **Effort**: 1 day
 **Impact**: Medium
 
@@ -648,7 +697,7 @@ Total size: 524 KB (156 KB gzipped)
 
 Largest modules:
 1. react-dom: 128 KB (24.4%)
-2. @mui/material: 89 KB (17.0%) 
+2. @mui/material: 89 KB (17.0%)
 3. lodash: 71 KB (13.5%)
 4. Your code: 68 KB (13.0%)
 
@@ -667,11 +716,13 @@ Recommendations:
 ```
 
 **Implementation**:
+
 - Integrate with webpack-bundle-analyzer
 - Parse bundle stats
 - Identify optimization opportunities
 
 ### 7.3 Lazy Loading Helpers
+
 **Effort**: 2 days
 **Impact**: Medium
 
@@ -688,21 +739,24 @@ const ProductDetails = lazyComponent(() => import('./ProductDetails'), {
 })
 
 // In Rails view:
-<%= react_component_lazy("ProductDetails", 
+<%= react_component_lazy("ProductDetails",
       props: @product,
       loading: "ProductSkeleton") %>
 ```
 
 **Implementation**:
+
 - Create lazy loading utilities
 - Add loading state handling
 - Support preloading strategies
 - Integrate with Rails helpers
 
 ## Phase 8: Testing Improvements (Week 15-16)
-*Make testing easier and more reliable*
+
+_Make testing easier and more reliable_
 
 ### 8.1 Test Helper Enhancements
+
 **Effort**: 2 days
 **Impact**: Medium
 
@@ -710,17 +764,17 @@ const ProductDetails = lazyComponent(() => import('./ProductDetails'), {
 # Enhanced RSpec helpers
 RSpec.describe "Product page", type: :react do
   include ReactOnRails::TestHelpers
-  
+
   let(:product) { create(:product, name: "iPhone", price: 999) }
-  
+
   it "renders product information" do
     render_component("ProductCard", props: { product: product })
-    
+
     # New helpers
     expect(component).to have_react_text("iPhone")
     expect(component).to have_react_prop(:price, 999)
     expect(component).to have_react_class("product-card")
-    
+
     # Interaction helpers
     click_react_button("Add to Cart")
     expect(component).to have_react_state(:cartCount, 1)
@@ -729,12 +783,14 @@ end
 ```
 
 **Implementation**:
+
 - Extend test helpers
 - Add React-specific matchers
 - Support interaction testing
 - Improve error messages
 
 ### 8.2 Component Test Generator
+
 **Effort**: 1 day
 **Impact**: Low
 
@@ -752,12 +808,12 @@ describe('ProductCard', () => {
     name: 'Test Product',
     price: 99.99
   }
-  
+
   it('renders product name', () => {
     render(<ProductCard {...defaultProps} />)
     expect(screen.getByText('Test Product')).toBeInTheDocument()
   })
-  
+
   it('renders price', () => {
     render(<ProductCard {...defaultProps} />)
     expect(screen.getByText('$99.99')).toBeInTheDocument()
@@ -766,6 +822,7 @@ describe('ProductCard', () => {
 ```
 
 **Implementation**:
+
 - Parse component props
 - Generate appropriate tests
 - Use detected test framework
@@ -773,26 +830,29 @@ describe('ProductCard', () => {
 
 ## Implementation Priority Matrix
 
-| Priority | Effort | Impact | Items |
-|----------|--------|--------|-------|
-| **Do First** | Low | High | Better error messages, Enhanced doctor, Modern generators |
-| **Do Next** | Medium | High | Rspack migration, Controller helpers, TypeScript generation |
-| **Quick Wins** | Low | Medium | Config simplification, Debug logging, Test generators |
-| **Long Game** | High | High | Interactive wizard, Migration tools, Component catalog |
+| Priority       | Effort | Impact | Items                                                       |
+| -------------- | ------ | ------ | ----------------------------------------------------------- |
+| **Do First**   | Low    | High   | Better error messages, Enhanced doctor, Modern generators   |
+| **Do Next**    | Medium | High   | Rspack migration, Controller helpers, TypeScript generation |
+| **Quick Wins** | Low    | Medium | Config simplification, Debug logging, Test generators       |
+| **Long Game**  | High   | High   | Interactive wizard, Migration tools, Component catalog      |
 
 ## Success Metrics
 
 ### Short Term (4 weeks)
+
 - **Setup time**: Reduce from 30 min to 10 min
 - **Error clarity**: 90% of errors have actionable solutions
 - **Build speed**: 3x faster with Rspack
 
 ### Medium Term (8 weeks)
+
 - **TypeScript adoption**: 50% of new projects use TypeScript
 - **Migration success**: 10+ projects migrated from Inertia
 - **RSC usage**: 25% of Pro users adopt RSC
 
 ### Long Term (16 weeks)
+
 - **Developer satisfaction**: 4.5+ rating
 - **Community growth**: 20% increase in contributors
 - **Production adoption**: 50+ new production deployments
@@ -807,6 +867,7 @@ These incremental improvements focus on:
 4. **Progressive enhancement** without breaking changes
 
 Each improvement is:
+
 - **Independently valuable**
 - **Backwards compatible**
 - **Achievable in days/weeks**

@@ -37,18 +37,22 @@ globalThis.ReactOnRails = {
 
   register(components: Record<string, ReactComponentOrRenderFunction>): void {
     if (this.options.debugMode || this.options.logComponentRegistration) {
-      const startTime = performance.now();
+      // Use performance.now() if available, otherwise fallback to Date.now()
+      const perf = typeof performance !== 'undefined' ? performance : { now: Date.now };
+      const startTime = perf.now();
       const componentNames = Object.keys(components);
-      console.log(`[ReactOnRails] Registering ${componentNames.length} component(s): ${componentNames.join(', ')}`);
-      
+      console.log(
+        `[ReactOnRails] Registering ${componentNames.length} component(s): ${componentNames.join(', ')}`,
+      );
+
       ComponentRegistry.register(components);
-      
-      const endTime = performance.now();
+
+      const endTime = perf.now();
       console.log(`[ReactOnRails] Component registration completed in ${(endTime - startTime).toFixed(2)}ms`);
-      
+
       // Log individual component details if in full debug mode
       if (this.options.debugMode) {
-        componentNames.forEach(name => {
+        componentNames.forEach((name) => {
           const component = components[name];
           const size = component.toString().length;
           console.log(`[ReactOnRails] ✅ Registered: ${name} (~${(size / 1024).toFixed(1)}kb)`);
