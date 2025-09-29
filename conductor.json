@@ -1,0 +1,10 @@
+{
+  "scripts": {
+    "setup": "./conductor-setup.sh",
+    "run": "cd spec/dummy && bin/dev",
+    "test": "rake run_rspec:dummy",
+    "lint": "bundle exec rubocop && yarn run lint",
+    "archive": ""
+  },
+  "runScriptMode": "nonconcurrent"
+}
