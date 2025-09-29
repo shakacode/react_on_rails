@@ -18,7 +18,7 @@ If you are using [jquery-ujs](https://github.com/rails/jquery-ujs) for AJAX call
 
 ## API
 
-The best source of docs is the `interface ReactOnRails` in [types/index.ts](https://github.com/shakacode/react_on_rails/blob/master/node_package/src/types/index.ts). Here's a quick summary. No guarantees that this won't be outdated!
+The best source of docs is the `interface ReactOnRails` in [types/index.ts](https://github.com/shakacode/react_on_rails/blob/master/packages/react-on-rails/src/types/index.ts). Here's a quick summary. No guarantees that this won't be outdated!
 
 ```js
 /**

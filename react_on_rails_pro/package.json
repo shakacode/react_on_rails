@@ -116,7 +116,7 @@
   "scripts": {
     "preinstall": "yarn run link-source && yalc add --link react-on-rails",
     "postinstall": "test -f post-yarn-install.local && ./post-yarn-install.local || true",
-    "link-source": "cd ../ && yarn && yalc publish",
+    "link-source": "cd ../packages/react-on-rails && yarn && yalc publish",
     "test": "nps test",
     "prepack": "nps build.prepack",
     "prepare": "nps build.prepack",

@@ -1,0 +1,74 @@
+{
+  "name": "react-on-rails",
+  "version": "16.1.1",
+  "description": "react-on-rails JavaScript for react_on_rails Ruby gem",
+  "main": "lib/ReactOnRails.full.js",
+  "type": "module",
+  "scripts": {
+    "build": "yarn run clean && yarn run tsc --declaration",
+    "build-watch": "yarn run clean && yarn run tsc --watch",
+    "clean": "rm -rf ./lib",
+    "test": "jest tests",
+    "type-check": "yarn run tsc --noEmit --noErrorTruncation",
+    "prepack": "nps build.prepack",
+    "prepare": "nps build.prepack",
+    "prepublishOnly": "yarn run build",
+    "yalc:publish": "yalc publish",
+    "yalc": "yalc",
+    "release:patch": "./scripts/release patch",
+    "release:minor": "./scripts/release minor",
+    "release:major": "./scripts/release major"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shakacode/react_on_rails.git"
+  },
+  "keywords": [
+    "react",
+    "webpack",
+    "JavaScript",
+    "Ruby",
+    "on",
+    "Rails"
+  ],
+  "author": "justin.gordon@gmail.com",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "exports": {
+    ".": {
+      "react-server": "./lib/pro/ReactOnRailsRSC.js",
+      "node": "./lib/ReactOnRails.node.js",
+      "default": "./lib/ReactOnRails.full.js"
+    },
+    "./client": "./lib/ReactOnRails.client.js",
+    "./registerServerComponent/client": "./lib/pro/registerServerComponent/client.js",
+    "./registerServerComponent/server": {
+      "react-server": "./lib/pro/registerServerComponent/server.rsc.js",
+      "default": "./lib/pro/registerServerComponent/server.js"
+    },
+    "./wrapServerComponentRenderer/client": "./lib/pro/wrapServerComponentRenderer/client.js",
+    "./wrapServerComponentRenderer/server": {
+      "react-server": "./lib/pro/wrapServerComponentRenderer/server.rsc.js",
+      "default": "./lib/pro/wrapServerComponentRenderer/server.js"
+    },
+    "./RSCRoute": "./lib/pro/RSCRoute.js",
+    "./RSCProvider": "./lib/pro/RSCProvider.js",
+    "./ServerComponentFetchError": "./lib/pro/ServerComponentFetchError.js"
+  },
+  "peerDependencies": {
+    "react": ">= 16",
+    "react-dom": ">= 16",
+    "react-on-rails-rsc": "19.0.2"
+  },
+  "peerDependenciesMeta": {
+    "react-on-rails-rsc": {
+      "optional": true
+    }
+  },
+  "files": [
+    "lib"
+  ],
+  "bugs": {
+    "url": "https://github.com/shakacode/react_on_rails/issues"
+  },
+  "homepage": "https://github.com/shakacode/react_on_rails#readme"
+}

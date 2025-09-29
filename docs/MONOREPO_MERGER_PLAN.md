@@ -28,7 +28,7 @@ This document provides the complete implementation plan for merging the `react_o
 
 ### Timeline
 
-**Estimated Duration:** 4-5 weeks across 7 phases
+**Estimated Duration:** 5-6 weeks across 8 phases
 
 ## Current State Analysis
 
@@ -70,19 +70,18 @@ react_on_rails_pro/
 react_on_rails/ (monorepo root)
 ├── lib/
 │   ├── react_on_rails/           # Core Ruby (MIT)
+│   │   └── spec/                 # Core Ruby specs
 │   └── react_on_rails_pro/       # Pro Ruby (Pro license)
+│       └── spec/                 # Pro Ruby specs
 ├── packages/                     # NPM packages (yarn workspace)
 │   ├── react-on-rails/           # Core JS/TS (MIT)
+│   │   └── tests/                # Core JS/TS tests
 │   ├── react-on-rails-pro/       # Pro JS/TS (Pro license)
+│   │   └── tests/                # Pro JS/TS tests
 │   └── react-on-rails-pro-node-renderer/  # Pro node renderer
-├── spec/
-│   ├── ruby/                     # Ruby specs organized by package
-│   │   ├── react_on_rails/
-│   │   └── react_on_rails_pro/
-│   └── packages/                 # JS specs organized by package
-│       ├── react-on-rails/
-│       ├── react-on-rails-pro/
-│       └── react-on-rails-pro-node-renderer/
+│       └── tests/                # Pro node renderer tests
+├── spec/                         # Monorepo-level integration tests
+│   └── dummy/                    # Rails dummy app for testing
 ├── tools/                        # Shared development tools
 ├── docs/                         # Unified documentation
 ├── react_on_rails.gemspec        # Core gem
@@ -300,21 +299,22 @@ After the initial merge, the following CI adjustments may be needed:
 
 **Tasks:**
 
-- [ ] Create `packages/react-on-rails/` directory
-- [ ] Move `node_package/src/` to `packages/react-on-rails/src/` (excluding pro/ subdirectory)
-- [ ] Create `packages/react-on-rails/package.json` with correct configuration
-- [ ] Update root `package.json` to workspace manager (packages/react-on-rails only)
-- [ ] Update build scripts and import paths
-- [ ] Update TypeScript configurations
-- [ ] Keep `react_on_rails_pro/` directory unchanged
-- [ ] Update CI to build via workspace
-- [ ] Update LICENSE.md to include new package path
+- [x] Create `packages/react-on-rails/` directory
+- [x] Move `node_package/src/` to `packages/react-on-rails/src/` (excluding pro/ subdirectory)
+- [x] Create `packages/react-on-rails/package.json` with correct configuration
+- [x] Update root `package.json` to workspace manager (packages/react-on-rails only)
+- [x] Update build scripts and import paths
+- [x] Update TypeScript configurations (build output moves from `node_package/lib/` to `packages/react-on-rails/lib/`)
+- [x] Move core JS tests to `packages/react-on-rails/tests/`
+- [x] Keep `react_on_rails_pro/` directory unchanged
+- [x] Update CI to build via workspace
+- [x] Update LICENSE.md to include new package path
 
 **License Compliance:**
 
-- [ ] **CRITICAL: Verify NO pro files moved to MIT-licensed core package**
-- [ ] Ensure `packages/react-on-rails/src/` contains ONLY MIT-licensed code
-- [ ] Update LICENSE.md to reflect new paths:
+- [x] **CRITICAL: Verify NO pro files moved to MIT-licensed core package**
+- [x] Ensure `packages/react-on-rails/src/` contains ONLY MIT-licensed code
+- [x] Update LICENSE.md to reflect new paths:
 
   ```md
   ## MIT License applies to:
@@ -336,53 +336,53 @@ After the initial merge, the following CI adjustments may be needed:
 - When moving core files to `packages/react-on-rails/`, carefully verify that no pro files (especially from `node_package/src/pro/`) accidentally get moved to the MIT-licensed directory
 - Update LICENSE.md to reflect the new `packages/react-on-rails/` path
 - Ensure workspace configuration only includes core package initially
+- **Build Output Location Change**: Starting from this phase, TypeScript compilation output will be at `packages/react-on-rails/lib/` instead of `node_package/lib/`
 
 ---
 
-#### PR #4: Prepare Pro Package for Workspace Structure
+#### PR #4: Split JS Pro Code to Separate Package
 
-**Branch:** `prepare-pro-workspace`
+**Branch:** `split-js-pro-package`
 
 **Objectives:**
 
-- Extract pro NPM packages to workspace structure
-- Create separate pro packages
-- Establish full workspace configuration
+- Extract pro JS features from react-on-rails package to separate react-on-rails-pro package
+- Establish proper licensing boundaries for JS packages
+- Maintain functionality while separating concerns
 
 **Tasks:**
 
-- [ ] Move `react_on_rails_pro/packages/node-renderer/` to `packages/react-on-rails-pro-node-renderer/`
-- [ ] Extract pro JS features from `node_package/src/pro/` to `packages/react-on-rails-pro/src/`
-- [ ] Create individual `package.json` files for both pro packages:
-  - `packages/react-on-rails-pro/package.json` with `"license": "UNLICENSED"`
-  - `packages/react-on-rails-pro-node-renderer/package.json` with `"license": "UNLICENSED"`
-- [ ] Update root workspace to include all 3 NPM packages
-- [ ] Update CI to test all packages
-- [ ] Setup proper dependencies between packages
-- [ ] Move JS specs to organized structure
+- [ ] Extract pro JS features from `packages/react-on-rails/src/pro/` to `packages/react-on-rails-pro/src/`
+- [ ] Create `packages/react-on-rails-pro/package.json` with `"license": "UNLICENSED"`
+- [ ] Move pro JS tests from `packages/react-on-rails/tests/` to `packages/react-on-rails-pro/tests/`
+- [ ] Update root workspace to include `packages/react-on-rails-pro`
+- [ ] Setup proper dependencies between core and pro packages
+- [ ] Update build configurations (pro package output will be at `packages/react-on-rails-pro/lib/`)
+- [ ] Update TypeScript configurations for both packages
+- [ ] Remove pro/ directory from `packages/react-on-rails/src/`
 
 **License Compliance:**
 
-- [ ] **CRITICAL: Update LICENSE.md for new pro directory paths:**
+- [ ] **CRITICAL: Update LICENSE.md to remove pro code from MIT package:**
 
   ```md
   ## MIT License applies to:
 
-  - `lib/react_on_rails/`
-  - `packages/react-on-rails/`
+  - `lib/react_on_rails/` (including specs)
+  - `packages/react-on-rails/` (including tests) - NOW EXCLUDES pro/ subdirectory
 
   ## React on Rails Pro License applies to:
 
-  - `lib/react_on_rails_pro/`
-  - `packages/react-on-rails-pro/` (NEW)
-  - `packages/react-on-rails-pro-node-renderer/` (NEW)
+  - `lib/react_on_rails_pro/` (including specs)
+  - `packages/react-on-rails-pro/` (including tests) (NEW)
   - `react_on_rails_pro/` (remaining files)
   ```
 
 - [ ] Add Pro license headers to moved files
-- [ ] Verify all pro packages have `"license": "UNLICENSED"` in package.json
+- [ ] Verify react-on-rails-pro package has `"license": "UNLICENSED"` in package.json
+- [ ] Verify react-on-rails package no longer contains pro code
 
-**Success Criteria:** ✅ All CI checks pass + All pro files properly licensed + License paths updated + All 3 NPM packages build
+**Success Criteria:** ✅ All CI checks pass + Pro JS code cleanly separated + License boundaries established + Both NPM packages build independently
 
 **Estimated Duration:** 3-4 days
 
@@ -390,17 +390,68 @@ After the initial merge, the following CI adjustments may be needed:
 
 **Developer Notes:**
 
-- This is a critical step for license compliance!
-- When creating new pro directories (`packages/react-on-rails-pro/` and `packages/react-on-rails-pro-node-renderer/`), immediately update LICENSE.md to include these new paths
+- This is a critical step for license compliance and package separation!
+- When creating `packages/react-on-rails-pro/` directory, immediately update LICENSE.md to include this new path
 - Ensure all moved pro files retain their Pro license headers
-- Verify new package.json files have `"license": "UNLICENSED"`
-- Test all workspace commands thoroughly
+- Verify new package.json has `"license": "UNLICENSED"`
+- **Build Output Location**: Pro package will now output to `packages/react-on-rails-pro/lib/`
+- After moving pro code, verify react-on-rails package is purely MIT-licensed
+- Test both packages build independently via workspace commands
 
 ---
 
-### Phase 4: Final Monorepo Restructuring
+#### PR #5: Add Pro Node Renderer Package
 
-#### PR #5: Restructure Ruby Gems to Final Layout
+**Branch:** `add-pro-node-renderer`
+
+**Objectives:**
+
+- Extract pro node-renderer to separate workspace package
+- Complete NPM package workspace structure
+- Establish all 3 NPM packages
+
+**Tasks:**
+
+- [ ] Move `react_on_rails_pro/packages/node-renderer/` to `packages/react-on-rails-pro-node-renderer/`
+- [ ] Create `packages/react-on-rails-pro-node-renderer/package.json` with `"license": "UNLICENSED"`
+- [ ] Move node-renderer tests to `packages/react-on-rails-pro-node-renderer/tests/`
+- [ ] Update root workspace to include all 3 NPM packages
+- [ ] Update CI to test all packages
+- [ ] Update build configurations (node-renderer output will be at `packages/react-on-rails-pro-node-renderer/lib/`)
+
+**License Compliance:**
+
+- [ ] **CRITICAL: Update LICENSE.md for node-renderer package:**
+
+  ```md
+  ## React on Rails Pro License applies to:
+
+  - `lib/react_on_rails_pro/` (including specs)
+  - `packages/react-on-rails-pro/` (including tests)
+  - `packages/react-on-rails-pro-node-renderer/` (including tests) (NEW)
+  - `react_on_rails_pro/` (remaining files)
+  ```
+
+- [ ] Verify node-renderer package has `"license": "UNLICENSED"` in package.json
+
+**Success Criteria:** ✅ All CI checks pass + All 3 NPM packages build + Complete workspace structure established
+
+**Estimated Duration:** 2-3 days
+
+**Risk Level:** Medium (straightforward package extraction)
+
+**Developer Notes:**
+
+- This completes the NPM package workspace structure
+- **Build Output Location**: Node-renderer package will output to `packages/react-on-rails-pro-node-renderer/lib/`
+- Test all three packages build independently via workspace commands
+- Verify workspace commands work for all packages
+
+---
+
+### Phase 6: Final Monorepo Restructuring
+
+#### PR #6: Restructure Ruby Gems to Final Layout
 
 **Branch:** `restructure-ruby-gems`
 
@@ -414,13 +465,10 @@ After the initial merge, the following CI adjustments may be needed:
 
 - [ ] Move `react_on_rails_pro/lib/react_on_rails_pro/` to `lib/react_on_rails_pro/`
 - [ ] Move `react_on_rails_pro/react_on_rails_pro.gemspec` to root as `react_on_rails_pro.gemspec`
-- [ ] Move all Ruby specs to organized structure:
-  - `spec/ruby/react_on_rails/` (core specs)
-  - `spec/ruby/react_on_rails_pro/` (pro specs)
-- [ ] Move JS specs to organized structure:
-  - `spec/packages/react-on-rails/`
-  - `spec/packages/react-on-rails-pro/`
-  - `spec/packages/react-on-rails-pro-node-renderer/`
+- [ ] Move Ruby specs to gem directories:
+  - Core specs: `lib/react_on_rails/spec/` (or keep existing `spec/` location)
+  - Pro specs: `lib/react_on_rails_pro/spec/`
+- [ ] JS tests remain in package directories (already handled in previous phases)
 - [ ] Update root `Gemfile` to include both gemspecs
 - [ ] Remove empty `react_on_rails_pro/` directory
 - [ ] Update all require paths in Ruby code
@@ -433,19 +481,14 @@ After the initial merge, the following CI adjustments may be needed:
   ```md
   ## MIT License applies to:
 
-  - `lib/react_on_rails/`
-  - `packages/react-on-rails/`
-  - `spec/ruby/react_on_rails/`
-  - `spec/packages/react-on-rails/`
+  - `lib/react_on_rails/` (including specs)
+  - `packages/react-on-rails/` (including tests)
 
   ## React on Rails Pro License applies to:
 
-  - `lib/react_on_rails_pro/`
-  - `packages/react-on-rails-pro/`
-  - `packages/react-on-rails-pro-node-renderer/`
-  - `spec/ruby/react_on_rails_pro/`
-  - `spec/packages/react-on-rails-pro/`
-  - `spec/packages/react-on-rails-pro-node-renderer/`
+  - `lib/react_on_rails_pro/` (including specs)
+  - `packages/react-on-rails-pro/` (including tests)
+  - `packages/react-on-rails-pro-node-renderer/` (including tests)
   ```
 
 - [ ] Update both gemspec files with correct license:
@@ -473,9 +516,9 @@ After the initial merge, the following CI adjustments may be needed:
 
 ---
 
-### Phase 5: CI/CD & Tooling Unification
+### Phase 7: CI/CD & Tooling Unification
 
-#### PR #6: Unify CI/CD Configuration
+#### PR #7: Unify CI/CD Configuration
 
 **Branch:** `unify-cicd`
 
@@ -539,9 +582,9 @@ After the initial merge, the following CI adjustments may be needed:
 
 ---
 
-### Phase 6: Documentation & Polish
+### Phase 8: Documentation & Polish
 
-#### PR #7: Update Documentation & Examples
+#### PR #8: Update Documentation & Examples
 
 **Branch:** `update-docs-examples`
 
@@ -579,14 +622,14 @@ After the initial merge, the following CI adjustments may be needed:
 
   - `react_on_rails` Ruby gem
   - `react-on-rails` NPM package
-  - Core functionality in `lib/react_on_rails/` and `packages/react-on-rails/`
+  - Core functionality in `lib/react_on_rails/` and `packages/react-on-rails/` (including tests/specs)
 
   ### Pro Licensed (Subscription Required for Production):
 
   - `react_on_rails_pro` Ruby gem
   - `react-on-rails-pro` NPM package
   - `react-on-rails-pro-node-renderer` NPM package
-  - Pro functionality in `lib/react_on_rails_pro/` and `packages/react-on-rails-pro*/`
+  - Pro functionality in `lib/react_on_rails_pro/` and `packages/react-on-rails-pro*/` (including tests/specs)
 
   See [LICENSE.md](LICENSE.md) and [REACT-ON-RAILS-PRO-LICENSE.md](REACT-ON-RAILS-PRO-LICENSE.md)
   ```
@@ -615,7 +658,7 @@ After the initial merge, the following CI adjustments may be needed:
 
 1. **Directory Classification:**
 
-   - **MIT Licensed:** `lib/react_on_rails/`, `packages/react-on-rails/`, core specs
+   - **MIT Licensed:** `lib/react_on_rails/` (including specs), `packages/react-on-rails/` (including tests)
    - **Pro Licensed:** All directories explicitly listed in LICENSE.md under "React on Rails Pro License"
 
 2. **LICENSE.md Updates:**
@@ -643,16 +686,11 @@ PRO_DIRECTORIES = %w[
   lib/react_on_rails_pro
   packages/react-on-rails-pro
   packages/react-on-rails-pro-node-renderer
-  spec/ruby/react_on_rails_pro
-  spec/packages/react-on-rails-pro
-  spec/packages/react-on-rails-pro-node-renderer
 ].freeze
 
 MIT_DIRECTORIES = %w[
   lib/react_on_rails
   packages/react-on-rails
-  spec/ruby/react_on_rails
-  spec/packages/react-on-rails
 ].freeze
 
 def check_pro_license_headers

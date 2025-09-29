@@ -287,7 +287,7 @@ Use `gh pr create` with:
 When analyzing codebases, ignore these directories to avoid confusion:
 
 - `/coverage`, `/tmp`, `/gen-examples`
-- `/node_package/lib`, `/node_modules`
+- `/packages/react-on-rails/lib`, `/node_modules`
 - `/spec/dummy/app/assets/webpack`
 - `/spec/dummy/log`, `/spec/dummy/node_modules`, `/spec/dummy/tmp`
 - `/spec/react_on_rails/dummy-for-generators`

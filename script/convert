@@ -22,6 +22,7 @@ gsub_file_content("../Gemfile.development_dependencies", /gem "shakapacker", "[^
 gsub_file_content("../spec/dummy/package.json", /"shakapacker": "[^"]*",/, '"shakapacker": "8.2.0",')
 
 # The below packages don't work on the oldest supported Node version and aren't needed there anyway
+# Note: All dev dependencies remain in root package.json even after workspace migration
 gsub_file_content("../package.json", /"[^"]*eslint[^"]*": "[^"]*",?/, "")
 gsub_file_content("../package.json", /"globals": "[^"]*",/, "")
 gsub_file_content("../package.json", /"knip": "[^"]*",/, "")
@@ -38,9 +39,9 @@ gsub_file_content("../package.json", /"react-dom": "[^"]*",/, '"react-dom": "18.
 gsub_file_content("../spec/dummy/package.json", /"react": "[^"]*",/, '"react": "18.0.0",')
 gsub_file_content("../spec/dummy/package.json", /"react-dom": "[^"]*",/, '"react-dom": "18.0.0",')
 gsub_file_content(
-  "../package.json",
-  "jest node_package/tests",
-  'jest node_package/tests --testPathIgnorePatterns=\".*(RSC|stream|' \
+  "../packages/react-on-rails/package.json",
+  "jest tests",
+  'jest tests --testPathIgnorePatterns=\".*(RSC|stream|' \
   'registerServerComponent|serverRenderReactComponent|SuspenseHydration).*\"'
 )
 # Keep modern JSX transform for React 18+

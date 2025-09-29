@@ -7,13 +7,13 @@
     "jsx": "react-jsx",
     "lib": ["dom", "es2020"],
     "noImplicitAny": true,
-    "outDir": "node_package/lib",
+    "outDir": "packages/react-on-rails/lib",
     "allowImportingTsExtensions": true,
     "rewriteRelativeImportExtensions": true,
     "strict": true,
     "incremental": true,
     "target": "es2020",
-    "typeRoots": ["./node_modules/@types", "./node_package/types"]
+    "typeRoots": ["./node_modules/@types"]
   },
-  "include": ["node_package/src/**/*", "node_package/types/**/*"]
+  "include": ["packages/react-on-rails/src/**/*"]
 }

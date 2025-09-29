@@ -3,52 +3,19 @@ import type { KnipConfig } from 'knip';
 const config: KnipConfig = {
   // ! at the end means files are used in production
   workspaces: {
+    // Root workspace - manages the monorepo and global tooling
     '.': {
-      entry: [
-        'node_package/src/ReactOnRails.node.ts!',
-        'node_package/src/pro/ReactOnRailsRSC.ts!',
-        'node_package/src/pro/registerServerComponent/client.tsx!',
-        'node_package/src/pro/registerServerComponent/server.tsx!',
-        'node_package/src/pro/registerServerComponent/server.rsc.ts!',
-        'node_package/src/pro/wrapServerComponentRenderer/server.tsx!',
-        'node_package/src/pro/wrapServerComponentRenderer/server.rsc.tsx!',
-        'node_package/src/pro/RSCRoute.tsx!',
-        'node_package/src/pro/ServerComponentFetchError.ts!',
-        'node_package/src/pro/getReactServerComponent.server.ts!',
-        'node_package/src/pro/transformRSCNodeStream.ts!',
-        'node_package/src/loadJsonFile.ts!',
-        'eslint.config.ts',
-      ],
-      project: [
-        'node_package/src/**/*.[jt]s{x,}!',
-        'node_package/tests/**/*.[jt]s{x,}',
-        '!react_on_rails_pro/**',
-      ],
-      babel: {
-        config: ['node_package/babel.config.js'],
-      },
-      ignore: [
-        'node_package/tests/emptyForTesting.js',
-        // Pro features exported for external consumption
-        'node_package/src/pro/streamServerRenderedReactComponent.ts:transformRenderStreamChunksToResultObject',
-        'node_package/src/pro/streamServerRenderedReactComponent.ts:streamServerRenderedComponent',
-        'node_package/src/pro/ServerComponentFetchError.ts:isServerComponentFetchError',
-        'node_package/src/pro/RSCRoute.tsx:RSCRouteProps',
-        'node_package/src/pro/streamServerRenderedReactComponent.ts:StreamingTrackers',
-        // Exclude entire pro directory - it has its own package.json with dependencies
-        'react_on_rails_pro/**',
-      ],
+      entry: ['eslint.config.ts'],
+      project: ['*.{js,mjs,ts}'],
       ignoreBinaries: [
-        // Knip fails to detect it's declared in devDependencies
+        // Has to be installed globally
+        'yalc',
         'nps',
-        // local scripts
-        'node_package/scripts/.*',
       ],
+      ignore: ['react_on_rails_pro/**'],
       ignoreDependencies: [
         // Required for TypeScript compilation, but we don't depend on Turbolinks itself.
         '@types/turbolinks',
-        // Keep this even though knip doesn't detect usage
-        '@babel/preset-typescript',
         // The Knip ESLint plugin fails to detect these are transitively required by a config,
         // though we don't actually use its rules anywhere.
         '@babel/eslint-parser',
@@ -67,6 +34,39 @@ const config: KnipConfig = {
         // This is an optional peer dependency because users without RSC don't need it
         // but Knip doesn't like such dependencies to be referenced directly in code
         'react-on-rails-rsc',
+      ],
+    },
+
+    // React on Rails core package workspace
+    'packages/react-on-rails': {
+      entry: [
+        'src/ReactOnRails.node.ts!',
+        'src/pro/ReactOnRailsRSC.ts!',
+        'src/pro/registerServerComponent/client.tsx!',
+        'src/pro/registerServerComponent/server.tsx!',
+        'src/pro/registerServerComponent/server.rsc.ts!',
+        'src/pro/wrapServerComponentRenderer/server.tsx!',
+        'src/pro/wrapServerComponentRenderer/server.rsc.tsx!',
+        'src/pro/RSCRoute.tsx!',
+        'src/pro/ServerComponentFetchError.ts!',
+        'src/pro/getReactServerComponent.server.ts!',
+        'src/pro/transformRSCNodeStream.ts!',
+        'src/loadJsonFile.ts!',
+      ],
+      project: ['src/**/*.[jt]s{x,}!', 'tests/**/*.[jt]s{x,}', '!lib/**'],
+      ignore: [
+        'tests/emptyForTesting.js',
+        // Jest setup and test utilities - not detected by Jest plugin in workspace setup
+        'tests/jest.setup.js',
+        'tests/testUtils.js',
+        // Build output directories that should be ignored
+        'lib/**',
+        // Pro features exported for external consumption
+        'src/pro/streamServerRenderedReactComponent.ts:transformRenderStreamChunksToResultObject',
+        'src/pro/streamServerRenderedReactComponent.ts:streamServerRenderedComponent',
+        'src/pro/ServerComponentFetchError.ts:isServerComponentFetchError',
+        'src/pro/RSCRoute.tsx:RSCRouteProps',
+        'src/pro/streamServerRenderedReactComponent.ts:StreamingTrackers',
       ],
     },
     'spec/dummy': {
