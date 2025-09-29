@@ -8,7 +8,7 @@
     "build": "yarn run clean && yarn run tsc --declaration",
     "build-watch": "yarn run clean && yarn run tsc --watch",
     "clean": "rm -rf ./lib",
-    "test": "jest",
+    "test": "jest tests",
     "type-check": "yarn run tsc --noEmit --noErrorTruncation",
     "prepack": "nps build.prepack",
     "prepare": "nps build.prepack",
