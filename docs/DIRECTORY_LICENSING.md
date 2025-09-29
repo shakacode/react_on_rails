@@ -48,10 +48,10 @@ After the monorepo merger, the unified repository will have clear directory-base
 
 ```
 react_on_rails/ (monorepo root)
-├── lib/react_on_rails/           # Core Ruby code
-├── packages/react-on-rails/      # Core NPM package
-├── spec/ruby/react_on_rails/     # Core Ruby tests
-├── spec/packages/react-on-rails/ # Core JS tests
+├── lib/react_on_rails/           # Core Ruby code (including specs)
+├── packages/react-on-rails/      # Core NPM package (including tests)
+├── spec/                         # Monorepo-level integration tests
+│   └── dummy/                    # Rails dummy app for testing
 ├── docs/                         # Shared documentation
 ├── tools/                        # Shared development tools
 ├── .github/                      # Unified GitHub workflows
@@ -62,12 +62,9 @@ react_on_rails/ (monorepo root)
 
 ```
 react_on_rails/ (monorepo root)
-├── lib/react_on_rails_pro/       # Pro Ruby code
-├── packages/react-on-rails-pro/  # Pro NPM package
-├── packages/react-on-rails-pro-node-renderer/  # Pro Node renderer
-├── spec/ruby/react_on_rails_pro/ # Pro Ruby tests
-├── spec/packages/react-on-rails-pro/  # Pro JS tests
-└── spec/packages/react-on-rails-pro-node-renderer/  # Pro Node renderer tests
+├── lib/react_on_rails_pro/       # Pro Ruby code (including specs)
+├── packages/react-on-rails-pro/  # Pro NPM package (including tests)
+└── packages/react-on-rails-pro-node-renderer/  # Pro Node renderer (including tests)
 ```
 
 ## License Compliance Rules
