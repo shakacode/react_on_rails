@@ -272,6 +272,10 @@ export interface ReactOnRailsOptions {
   traceTurbolinks?: boolean;
   /** Turbo (the successor of Turbolinks) events will be registered, if set to true. */
   turbo?: boolean;
+  /** Enable debug mode for detailed logging of React on Rails operations. */
+  debugMode?: boolean;
+  /** Log component registration details including timing and size information. */
+  logComponentRegistration?: boolean;
 }
 
 export interface ReactOnRails {
