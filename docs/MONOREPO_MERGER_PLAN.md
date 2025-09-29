@@ -299,22 +299,22 @@ After the initial merge, the following CI adjustments may be needed:
 
 **Tasks:**
 
-- [ ] Create `packages/react-on-rails/` directory
-- [ ] Move `node_package/src/` to `packages/react-on-rails/src/` (excluding pro/ subdirectory)
-- [ ] Create `packages/react-on-rails/package.json` with correct configuration
-- [ ] Update root `package.json` to workspace manager (packages/react-on-rails only)
-- [ ] Update build scripts and import paths
-- [ ] Update TypeScript configurations (build output moves from `node_package/lib/` to `packages/react-on-rails/lib/`)
-- [ ] Move core JS tests to `packages/react-on-rails/tests/`
-- [ ] Keep `react_on_rails_pro/` directory unchanged
-- [ ] Update CI to build via workspace
-- [ ] Update LICENSE.md to include new package path
+- [x] Create `packages/react-on-rails/` directory
+- [x] Move `node_package/src/` to `packages/react-on-rails/src/` (excluding pro/ subdirectory)
+- [x] Create `packages/react-on-rails/package.json` with correct configuration
+- [x] Update root `package.json` to workspace manager (packages/react-on-rails only)
+- [x] Update build scripts and import paths
+- [x] Update TypeScript configurations (build output moves from `node_package/lib/` to `packages/react-on-rails/lib/`)
+- [x] Move core JS tests to `packages/react-on-rails/tests/`
+- [x] Keep `react_on_rails_pro/` directory unchanged
+- [x] Update CI to build via workspace
+- [x] Update LICENSE.md to include new package path
 
 **License Compliance:**
 
-- [ ] **CRITICAL: Verify NO pro files moved to MIT-licensed core package**
-- [ ] Ensure `packages/react-on-rails/src/` contains ONLY MIT-licensed code
-- [ ] Update LICENSE.md to reflect new paths:
+- [x] **CRITICAL: Verify NO pro files moved to MIT-licensed core package**
+- [x] Ensure `packages/react-on-rails/src/` contains ONLY MIT-licensed code
+- [x] Update LICENSE.md to reflect new paths:
 
   ```md
   ## MIT License applies to:
