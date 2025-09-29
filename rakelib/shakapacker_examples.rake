@@ -29,8 +29,7 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
     task example_type.gen_task_name_short => example_type.clobber_task_name do
       puts "Running shakapacker_examples:#{example_type.gen_task_name_short}"
       mkdir_p(example_type.dir)
-      example_type.rails_options += " --skip-javascript"
-      sh_in_dir(examples_dir, "rails new #{example_type.name} #{example_type.rails_options}")
+      sh_in_dir(examples_dir, "rails new #{example_type.name} #{example_type.rails_options} --skip-javascript")
       sh_in_dir(example_type.dir, "touch .gitignore")
       sh_in_dir(example_type.dir,
                 "echo \"gem 'react_on_rails', path: '#{relative_gem_root}'\" >> #{example_type.gemfile}")
