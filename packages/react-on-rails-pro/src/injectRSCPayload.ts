@@ -14,7 +14,7 @@
 
 import { PassThrough } from 'stream';
 import { finished } from 'stream/promises';
-import { createRSCPayloadKey } from 'react-on-rails/utils';
+import { createRSCPayloadKey } from './utils.ts';
 import { PipeableOrReadableStream } from 'react-on-rails/types';
 import RSCRequestTracker from './RSCRequestTracker.ts';
 
