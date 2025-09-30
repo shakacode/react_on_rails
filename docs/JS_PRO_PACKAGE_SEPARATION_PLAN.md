@@ -200,26 +200,27 @@ Based on commit `4dee1ff3cff5998a38cfa758dec041ece9986623` analysis:
 
 **Checkpoint 5.1**: Identify pro-related tests
 
-- [ ] Search for test files importing from pro directories:
+- [x] Search for test files importing from pro directories:
   - `streamServerRenderedReactComponent.test.jsx`
   - `registerServerComponent.client.test.jsx`
   - `injectRSCPayload.test.ts`
-  - Tests for ComponentRegistry and StoreRegistry that test pro features
-- [ ] Identify tests that specifically test pro functionality
-- [ ] Create list of all test files that need to be moved
+  - `SuspenseHydration.test.tsx`
+- [x] Identify tests that specifically test pro functionality
+- [x] Create list of all test files that need to be moved (4 test files identified)
 
 **Checkpoint 5.2**: Move pro tests
 
-- [ ] Move identified pro tests to `packages/react-on-rails-pro/tests/`
+- [x] Move identified pro tests to `packages/react-on-rails-pro/tests/` using git mv
+- [x] Git history preserved for all moved test files
 - [ ] Update test import paths to reflect new package structure
 - [ ] Update Jest configuration if needed for pro package
 - [ ] Ensure test utilities are available or create pro-specific ones
 
 **Checkpoint 5.3**: Update remaining core tests
 
-- [ ] Update core tests that may have been testing pro functionality to only test core features
-- [ ] Ensure core ComponentRegistry and StoreRegistry tests only test core functionality
-- [ ] Add tests for error throwing pro methods in core
+- [x] Update core tests that may have been testing pro functionality to only test core features
+- [x] Updated serverRenderReactComponent.test.ts to use core ComponentRegistry
+- [x] Core ComponentRegistry and StoreRegistry tests already test core functionality with pro method stubs
 - [ ] Verify all core tests pass
 
 **Success Validation**:
