@@ -15,7 +15,7 @@
 import { BundleManifest } from 'react-on-rails-rsc';
 import { buildClientRenderer } from 'react-on-rails-rsc/client.node';
 import transformRSCStream from './transformRSCNodeStream.ts';
-import loadJsonFile from 'react-on-rails/loadJsonFile';
+import loadJsonFile from './loadJsonFile.ts';
 import type { RailsContextWithServerStreamingCapabilities } from 'react-on-rails/types';
 
 type GetReactServerComponentOnServerProps = {
