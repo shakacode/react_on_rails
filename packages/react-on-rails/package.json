@@ -35,24 +35,27 @@
   "license": "SEE LICENSE IN LICENSE.md",
   "exports": {
     ".": {
-      "react-server": "./lib/pro/ReactOnRailsRSC.js",
       "node": "./lib/ReactOnRails.node.js",
       "default": "./lib/ReactOnRails.full.js"
     },
     "./client": "./lib/ReactOnRails.client.js",
-    "./registerServerComponent/client": "./lib/pro/registerServerComponent/client.js",
-    "./registerServerComponent/server": {
-      "react-server": "./lib/pro/registerServerComponent/server.rsc.js",
-      "default": "./lib/pro/registerServerComponent/server.js"
-    },
-    "./wrapServerComponentRenderer/client": "./lib/pro/wrapServerComponentRenderer/client.js",
-    "./wrapServerComponentRenderer/server": {
-      "react-server": "./lib/pro/wrapServerComponentRenderer/server.rsc.js",
-      "default": "./lib/pro/wrapServerComponentRenderer/server.js"
-    },
-    "./RSCRoute": "./lib/pro/RSCRoute.js",
-    "./RSCProvider": "./lib/pro/RSCProvider.js",
-    "./ServerComponentFetchError": "./lib/pro/ServerComponentFetchError.js"
+    "./types": "./lib/types/index.js",
+    "./context": "./lib/context.js",
+    "./pageLifecycle": "./lib/pageLifecycle.js",
+    "./utils": "./lib/utils.js",
+    "./createReactOutput": "./lib/createReactOutput.js",
+    "./isServerRenderResult": "./lib/isServerRenderResult.js",
+    "./reactApis": "./lib/reactApis.cjs",
+    "./reactHydrateOrRender": "./lib/reactHydrateOrRender.js",
+    "./turbolinksUtils": "./lib/turbolinksUtils.js",
+    "./isRenderFunction": "./lib/isRenderFunction.js",
+    "./ReactOnRails.client": "./lib/ReactOnRails.client.js",
+    "./ReactOnRails.full": "./lib/ReactOnRails.full.js",
+    "./handleError": "./lib/handleError.js",
+    "./serverRenderUtils": "./lib/serverRenderUtils.js",
+    "./loadJsonFile": "./lib/loadJsonFile.js",
+    "./buildConsoleReplay": "./lib/buildConsoleReplay.js",
+    "./ReactDOMServer": "./lib/ReactDOMServer.cjs"
   },
   "peerDependencies": {
     "react": ">= 16",
