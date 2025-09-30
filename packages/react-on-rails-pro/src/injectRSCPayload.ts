@@ -14,8 +14,8 @@
 
 import { PassThrough } from 'stream';
 import { finished } from 'stream/promises';
-import { createRSCPayloadKey } from '../utils.ts';
-import { PipeableOrReadableStream } from '../types/index.ts';
+import { createRSCPayloadKey } from 'react-on-rails/utils';
+import { PipeableOrReadableStream } from 'react-on-rails/types';
 import RSCRequestTracker from './RSCRequestTracker.ts';
 
 // In JavaScript, when an escape sequence with a backslash (\) is followed by a character

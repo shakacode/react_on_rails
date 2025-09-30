@@ -12,7 +12,7 @@
  * https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-import { RSCPayloadChunk } from '../types/index.ts';
+import { RSCPayloadChunk } from 'react-on-rails/types';
 
 /**
  * Transforms an RSC stream and replays console logs on the client.
