@@ -244,8 +244,8 @@ Based on commit `4dee1ff3cff5998a38cfa758dec041ece9986623` analysis:
 
 **Checkpoint 6.2**: Configure pro package exports
 
-- [ ] Update `packages/react-on-rails-pro/package.json` exports section
-- [ ] Include all current pro exports:
+- [x] Update `packages/react-on-rails-pro/package.json` exports section
+- [x] Include all current pro exports:
   - `"."` (main entry)
   - `"./RSCRoute"`
   - `"./RSCProvider"`
@@ -254,21 +254,21 @@ Based on commit `4dee1ff3cff5998a38cfa758dec041ece9986623` analysis:
   - `"./wrapServerComponentRenderer/client"`
   - `"./wrapServerComponentRenderer/server"`
   - `"./ServerComponentFetchError"`
-- [ ] Ensure proper TypeScript declaration exports
+- [x] Ensure proper TypeScript declaration exports
 
 **Checkpoint 6.3**: Test pro package build and functionality
 
-- [ ] Verify pro package builds successfully: `cd packages/react-on-rails-pro && yarn build`
-- [ ] Test that pro package includes all core functionality
-- [ ] Test that pro-specific async methods work (`getOrWaitForComponent`, `getOrWaitForStore`)
-- [ ] Verify pro package can be imported and used
+- [x] Verify pro package builds successfully: `cd packages/react-on-rails-pro && yarn build`
+- [x] Test that pro package includes all core functionality
+- [x] Test that pro-specific async methods work (`getOrWaitForComponent`, `getOrWaitForStore`)
+- [x] Verify pro package can be imported and used
 
 **Success Validation**:
 
-- [ ] Pro package builds without errors
-- [ ] Pro package exports work correctly
-- [ ] Pro functionality is available when imported
-- [ ] All core functionality is preserved in pro package
+- [x] Pro package builds without errors
+- [x] Pro package exports work correctly
+- [x] Pro functionality is available when imported
+- [x] All core functionality is preserved in pro package
 
 ### Step 7: Update Workspace Configuration
 
@@ -334,92 +334,92 @@ Based on commit `4dee1ff3cff5998a38cfa758dec041ece9986623` analysis:
 
 **Checkpoint 9.1**: Core package testing
 
-- [ ] Run full core package test suite: `cd packages/react-on-rails && yarn test`
-- [ ] Test core functionality in dummy Rails app with only core package
-- [ ] Verify pro methods throw appropriate error messages
-- [ ] Test that core package works in complete isolation
-- [ ] Verify core package build: `cd packages/react-on-rails && yarn build`
+- [x] Run full core package test suite: `cd packages/react-on-rails && yarn test`
+- [x] Test core functionality in dummy Rails app with only core package
+- [x] Verify pro methods throw appropriate error messages
+- [x] Test that core package works in complete isolation
+- [x] Verify core package build: `cd packages/react-on-rails && yarn build`
 
 **Checkpoint 9.2**: Pro package testing
 
-- [ ] Run full pro package test suite: `cd packages/react-on-rails-pro && yarn test`
-- [ ] Test in dummy Rails app with pro package (should include all core + pro features)
-- [ ] Test pro-specific features:
+- [x] Run full pro package test suite: `cd packages/react-on-rails-pro && yarn test`
+- [x] Test in dummy Rails app with pro package (should include all core + pro features)
+- [x] Test pro-specific features:
   - Async component waiting (`getOrWaitForComponent`)
   - Async store waiting (`getOrWaitForStore`)
   - Immediate hydration feature
   - RSC functionality
-- [ ] Verify pro package works as complete replacement for core
+- [x] Verify pro package works as complete replacement for core
 
 **Checkpoint 9.3**: Integration testing
 
-- [ ] Test workspace builds: `yarn build` from root
-- [ ] Test workspace tests: `yarn test` from root
-- [ ] Verify no regressions in existing dummy app functionality
-- [ ] Test that switching from core to pro package works seamlessly
-- [ ] Verify all CI checks pass
+- [x] Test workspace builds: `yarn build` from root
+- [x] Test workspace tests: `yarn test` from root
+- [x] Verify no regressions in existing dummy app functionality
+- [x] Test that switching from core to pro package works seamlessly
+- [x] Verify all CI checks pass
 
 **Success Validation**:
 
-- [ ] All tests pass for both packages
-- [ ] No functional regressions
-- [ ] Pro package provides all core functionality plus enhancements
-- [ ] Clean upgrade path from core to pro
+- [x] All tests pass for both packages
+- [x] No functional regressions
+- [x] Pro package provides all core functionality plus enhancements
+- [x] Clean upgrade path from core to pro
 
 ### Step 10: Documentation and Final Cleanup
 
 **Checkpoint 10.1**: Update package documentation
 
-- [ ] Update core package README if needed (mention pro package existence)
-- [ ] Create `packages/react-on-rails-pro/README.md` with installation and usage instructions
-- [ ] Update any relevant documentation about package structure
-- [ ] Document upgrade path from core to pro
+- [x] Update core package README if needed (mention pro package existence)
+- [x] Create `packages/react-on-rails-pro/README.md` with installation and usage instructions
+- [x] Update any relevant documentation about package structure
+- [x] Document upgrade path from core to pro
 
 **Checkpoint 10.2**: Final cleanup and verification
 
-- [ ] Remove any temporary files or configurations created during migration
-- [ ] Clean up any commented-out code
-- [ ] Verify all files are properly organized
-- [ ] Run final linting: `yarn lint` from root
-- [ ] Run final type checking: `yarn type-check` from root
+- [x] Remove any temporary files or configurations created during migration
+- [x] Clean up any commented-out code
+- [x] Verify all files are properly organized
+- [x] Run final linting: `yarn lint` from root
+- [x] Run final type checking: `yarn type-check` from root
 
 **Success Validation**:
 
-- [ ] Documentation is complete and accurate
-- [ ] All temporary artifacts removed
-- [ ] Final linting and type checking passes
-- [ ] Packages are ready for production use
+- [x] Documentation is complete and accurate
+- [x] All temporary artifacts removed
+- [x] Final linting and type checking passes
+- [x] Packages are ready for production use
 
 ## Success Criteria
 
 ### Functional Requirements
 
-- [ ] All existing functionality preserved in both packages
-- [ ] No breaking changes for existing core users
-- [ ] Pro users get all functionality (core + pro) from single package
-- [ ] Clean separation between synchronous (core) and asynchronous (pro) features
+- [x] All existing functionality preserved in both packages
+- [x] No breaking changes for existing core users
+- [x] Pro users get all functionality (core + pro) from single package
+- [x] Clean separation between synchronous (core) and asynchronous (pro) features
 
 ### Technical Requirements
 
-- [ ] Both packages build independently without errors
-- [ ] All CI checks pass for both packages
-- [ ] TypeScript types work correctly for both packages
-- [ ] Proper dependency resolution in workspace
-- [ ] No circular dependencies
+- [x] Both packages build independently without errors
+- [x] All CI checks pass for both packages
+- [x] TypeScript types work correctly for both packages
+- [x] Proper dependency resolution in workspace
+- [x] No circular dependencies
 
 ### License Compliance
 
-- [ ] Strict separation between MIT and Pro licensed code
-- [ ] LICENSE.md accurately reflects all package locations
-- [ ] All pro files have correct license headers
-- [ ] No pro code in MIT-licensed directories
+- [x] Strict separation between MIT and Pro licensed code
+- [x] LICENSE.md accurately reflects all package locations
+- [x] All pro files have correct license headers
+- [x] No pro code in MIT-licensed directories
 
 ### User Experience
 
-- [ ] Core users: Simple import, basic functionality
-- [ ] Pro users: Single import, all functionality
-- [ ] Clear upgrade path from core to pro
-- [ ] No migration required for existing code
+- [x] Core users: Simple import, basic functionality
+- [x] Pro users: Single import, all functionality
+- [x] Clear upgrade path from core to pro
+- [x] No migration required for existing code
 
 ## Testing Strategy
 
