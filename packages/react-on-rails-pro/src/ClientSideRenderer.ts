@@ -15,17 +15,17 @@
 /* eslint-disable max-classes-per-file */
 
 import type { ReactElement } from 'react';
-import type { RailsContext, RegisteredComponent, RenderFunction, Root } from '../types/index.ts';
+import type { RailsContext, RegisteredComponent, RenderFunction, Root } from 'react-on-rails/types';
 
-import { getRailsContext, resetRailsContext } from '../context.ts';
-import createReactOutput from '../createReactOutput.ts';
-import { isServerRenderHash } from '../isServerRenderResult.ts';
-import { supportsHydrate, supportsRootApi, unmountComponentAtNode } from '../reactApis.cts';
-import reactHydrateOrRender from '../reactHydrateOrRender.ts';
-import { debugTurbolinks } from '../turbolinksUtils.ts';
+import { getRailsContext, resetRailsContext } from 'react-on-rails/context';
+import createReactOutput from 'react-on-rails/createReactOutput';
+import { isServerRenderHash } from 'react-on-rails/isServerRenderResult';
+import { supportsHydrate, supportsRootApi, unmountComponentAtNode } from 'react-on-rails/reactApis';
+import reactHydrateOrRender from 'react-on-rails/reactHydrateOrRender';
+import { debugTurbolinks } from 'react-on-rails/turbolinksUtils';
 import * as StoreRegistry from './StoreRegistry.ts';
 import * as ComponentRegistry from './ComponentRegistry.ts';
-import { onPageLoaded } from '../pageLifecycle.ts';
+import { onPageLoaded } from 'react-on-rails/pageLifecycle';
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
 const IMMEDIATE_HYDRATION_PRO_WARNING =
