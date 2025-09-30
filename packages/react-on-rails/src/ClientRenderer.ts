@@ -127,6 +127,33 @@ export function renderComponent(domId: string): void {
 }
 
 /**
+ * Render all stores on the page.
+ */
+export function renderAllStores(): void {
+  const railsContext = getRailsContext();
+  if (!railsContext) return;
+  forEachStore(railsContext);
+}
+
+/**
+ * Render all components on the page.
+ * Core package renders all components after page load.
+ */
+export function renderAllComponents(): void {
+  const railsContext = getRailsContext();
+  if (!railsContext) return;
+
+  // Initialize all stores first
+  forEachStore(railsContext);
+
+  // Render all components
+  const componentElements = document.querySelectorAll('.js-react-on-rails-component');
+  for (let i = 0; i < componentElements.length; i += 1) {
+    renderElement(componentElements[i], railsContext);
+  }
+}
+
+/**
  * Public API function that can be called to render a component after it has been loaded.
  * This is the function that should be exported and used by the Rails integration.
  * Returns a Promise for API compatibility with pro version.
