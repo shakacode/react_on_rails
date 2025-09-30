@@ -4,11 +4,11 @@
   "description": "React on Rails Pro package with React Server Components support",
   "type": "module",
   "scripts": {
-    "build": "yarn run clean && yarn run tsc --declaration",
-    "build-watch": "yarn run clean && yarn run tsc --watch",
+    "build": "yarn run clean && ../../node_modules/.bin/tsc --project tsconfig.json --declaration",
+    "build-watch": "yarn run clean && ../../node_modules/.bin/tsc --project tsconfig.json --watch",
     "clean": "rm -rf ./lib",
     "test": "jest tests",
-    "type-check": "yarn run tsc --noEmit --noErrorTruncation",
+    "type-check": "../../node_modules/.bin/tsc --project tsconfig.json --noEmit --noErrorTruncation",
     "prepack": "nps build.prepack",
     "prepare": "nps build.prepack",
     "prepublishOnly": "yarn run build"

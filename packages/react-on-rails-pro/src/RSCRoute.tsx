@@ -72,7 +72,9 @@ export type RSCRouteProps = {
 };
 
 const PromiseWrapper = ({ promise }: { promise: Promise<React.ReactNode> }) => {
-  return React.use(promise);
+  // React.use is available in React 18.3+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (React as any).use(promise);
 };
 
 const RSCRoute = ({ componentName, componentProps }: RSCRouteProps): React.ReactNode => {
