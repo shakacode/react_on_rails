@@ -5,7 +5,7 @@
   "main": "lib/ReactOnRails.full.js",
   "type": "module",
   "scripts": {
-    "build": "yarn run clean && yarn run tsc --declaration",
+    "build": "yarn run clean && yarn run tsc",
     "build-watch": "yarn run clean && yarn run tsc --watch",
     "clean": "rm -rf ./lib",
     "test": "jest tests",
@@ -68,7 +68,8 @@
     }
   },
   "files": [
-    "lib"
+    "lib/**/*.js",
+    "lib/**/*.d.ts"
   ],
   "bugs": {
     "url": "https://github.com/shakacode/react_on_rails/issues"

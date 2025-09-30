@@ -3,17 +3,18 @@
   "compilerOptions": {
     "allowJs": true,
     "esModuleInterop": false,
+    "declaration": true,
+    "declarationMap": true,
     // needed for Jest tests even though we don't use .tsx
     "jsx": "react-jsx",
     "lib": ["dom", "es2020"],
     "noImplicitAny": true,
-    "outDir": "packages/react-on-rails/lib",
     "allowImportingTsExtensions": true,
     "rewriteRelativeImportExtensions": true,
     "strict": true,
+    "sourceMap": true,
     "incremental": true,
     "target": "es2020",
     "typeRoots": ["./node_modules/@types"]
-  },
-  "include": ["packages/react-on-rails/src/**/*"]
+  }
 }
