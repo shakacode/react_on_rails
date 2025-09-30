@@ -31,7 +31,7 @@ import {
   StreamingTrackers,
   transformRenderStreamChunksToResultObject,
 } from './streamServerRenderedReactComponent.ts';
-import loadJsonFile from 'react-on-rails/loadJsonFile';
+import loadJsonFile from './loadJsonFile.ts';
 
 let serverRendererPromise: Promise<ReturnType<typeof buildServerRenderer>> | undefined;
 
