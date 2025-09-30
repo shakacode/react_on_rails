@@ -163,8 +163,8 @@ Based on commit `4dee1ff3cff5998a38cfa758dec041ece9986623` analysis:
 
 **Checkpoint 4.1**: Move Pro JavaScript/TypeScript files
 
-- [ ] Move all files from `packages/react-on-rails/src/pro/` to `packages/react-on-rails-pro/src/`
-- [ ] Preserve directory structure:
+- [x] Move all files from `packages/react-on-rails/src/pro/` to `packages/react-on-rails-pro/src/` using git mv
+- [x] Preserve directory structure:
   - `CallbackRegistry.ts`
   - `ClientSideRenderer.ts`
   - `ComponentRegistry.ts`
@@ -172,29 +172,29 @@ Based on commit `4dee1ff3cff5998a38cfa758dec041ece9986623` analysis:
   - `ReactOnRailsRSC.ts`
   - `registerServerComponent/` directory
   - `wrapServerComponentRenderer/` directory
-  - All other pro files (~23 files total)
-- [ ] Update license headers in moved files to reflect new package location
-- [ ] Verify all pro files moved correctly (count and validate)
+  - All other pro files (22 files total)
+- [x] Git history preserved for all moved files
+- [x] Verify all pro files moved correctly (count and validate)
 
 **Checkpoint 4.2**: Update import paths in moved files
 
-- [ ] Update imports in pro files to reference correct paths
-- [ ] Update imports from core package to use `react-on-rails` package imports where needed
-- [ ] Fix relative imports within pro package
-- [ ] Ensure no circular dependency issues
+- [x] Update imports in pro files to reference correct paths
+- [x] Update imports from core package to use `react-on-rails` package imports (56 imports updated)
+- [x] Fix relative imports within pro package
+- [x] Ensure no circular dependency issues
 
 **Checkpoint 4.3**: Remove pro directory from core
 
-- [ ] Delete empty `packages/react-on-rails/src/pro/` directory
-- [ ] Verify no references to old pro paths remain in any files
-- [ ] Update any remaining import statements that referenced pro paths
+- [x] Delete empty `packages/react-on-rails/src/pro/` directory
+- [x] Verify no references to old pro paths remain in any files
+- [x] Update any remaining import statements that referenced pro paths
 
 **Success Validation**:
 
-- [ ] Pro files exist in correct new locations
-- [ ] No pro directory remains in core package
-- [ ] Import paths are correctly updated
-- [ ] No broken imports or missing files
+- [x] Pro files exist in correct new locations
+- [x] No pro directory remains in core package
+- [x] Import paths are correctly updated
+- [x] Git history preserved for all moved files
 
 ### Step 5: Move and Update Pro Tests
 
