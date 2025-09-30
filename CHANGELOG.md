@@ -71,7 +71,7 @@ Changes since the last non-beta release.
 
 #### Pro License Features
 
-- **Core/Pro separation**: Moved Pro features into dedicated `lib/react_on_rails/pro/` and `node_package/src/pro/` directories with clear licensing boundaries (now located at `packages/react-on-rails/src/pro/`) [PR 1791](https://github.com/shakacode/react_on_rails/pull/1791) by [AbanoubGhadban](https://github.com/AbanoubGhadban)
+- **Core/Pro separation**: Moved Pro features into dedicated `lib/react_on_rails/pro/` and `node_package/src/pro/` directories with clear licensing boundaries (now separated into `packages/react-on-rails-pro/` package) [PR 1791](https://github.com/shakacode/react_on_rails/pull/1791) by [AbanoubGhadban](https://github.com/AbanoubGhadban)
 - **Runtime license validation**: Implemented Pro license gating with graceful fallback to core functionality when Pro license unavailable [PR 1791](https://github.com/shakacode/react_on_rails/pull/1791) by [AbanoubGhadban](https://github.com/AbanoubGhadban)
 - **Enhanced immediate hydration**: Improved immediate hydration functionality with Pro license validation and warning badges [PR 1791](https://github.com/shakacode/react_on_rails/pull/1791) by [AbanoubGhadban](https://github.com/AbanoubGhadban)
 - **License documentation**: Added NOTICE files in Pro directories referencing canonical `REACT-ON-RAILS-PRO-LICENSE.md` [PR 1791](https://github.com/shakacode/react_on_rails/pull/1791) by [AbanoubGhadban](https://github.com/AbanoubGhadban)
