@@ -16,12 +16,12 @@ import * as React from 'react';
 import { PassThrough, Readable } from 'stream';
 
 import * as ComponentRegistry from './ComponentRegistry.ts';
-import createReactOutput from '../createReactOutput.ts';
-import { isPromise, isServerRenderHash } from '../isServerRenderResult.ts';
-import buildConsoleReplay from '../buildConsoleReplay.ts';
-import handleError from '../handleError.ts';
-import { renderToPipeableStream } from '../ReactDOMServer.cts';
-import { createResultObject, convertToError, validateComponent } from '../serverRenderUtils.ts';
+import createReactOutput from 'react-on-rails/createReactOutput';
+import { isPromise, isServerRenderHash } from 'react-on-rails/isServerRenderResult';
+import buildConsoleReplay from 'react-on-rails/buildConsoleReplay';
+import handleError from 'react-on-rails/handleError';
+import { renderToPipeableStream } from 'react-on-rails/ReactDOMServer';
+import { createResultObject, convertToError, validateComponent } from 'react-on-rails/serverRenderUtils';
 import {
   assertRailsContextWithServerStreamingCapabilities,
   RenderParams,
@@ -30,7 +30,7 @@ import {
   PipeableOrReadableStream,
   RailsContextWithServerStreamingCapabilities,
   assertRailsContextWithServerComponentMetadata,
-} from '../types/index.ts';
+} from 'react-on-rails/types';
 import injectRSCPayload from './injectRSCPayload.ts';
 import PostSSRHookTracker from './PostSSRHookTracker.ts';
 import RSCRequestTracker from './RSCRequestTracker.ts';

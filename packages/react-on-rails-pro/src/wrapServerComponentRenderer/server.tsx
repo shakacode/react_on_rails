@@ -13,11 +13,11 @@
  */
 
 import * as React from 'react';
-import type { RenderFunction, ReactComponentOrRenderFunction } from '../../types/index.ts';
+import type { RenderFunction, ReactComponentOrRenderFunction } from 'react-on-rails/types';
 import getReactServerComponent from '../getReactServerComponent.server.ts';
 import { createRSCProvider } from '../RSCProvider.tsx';
-import isRenderFunction from '../../isRenderFunction.ts';
-import { assertRailsContextWithServerStreamingCapabilities } from '../../types/index.ts';
+import isRenderFunction from 'react-on-rails/isRenderFunction';
+import { assertRailsContextWithServerStreamingCapabilities } from 'react-on-rails/types';
 
 /**
  * Wraps a client component with the necessary RSC context and handling for server-side operations.

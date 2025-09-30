@@ -12,9 +12,9 @@
  * https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-import { ItemRegistrationCallback } from '../types/index.ts';
-import { onPageLoaded, onPageUnloaded } from '../pageLifecycle.ts';
-import { getRailsContext } from '../context.ts';
+import { ItemRegistrationCallback } from 'react-on-rails/types';
+import { onPageLoaded, onPageUnloaded } from 'react-on-rails/pageLifecycle';
+import { getRailsContext } from 'react-on-rails/context';
 
 /**
  * Represents information about a registered item including its value,

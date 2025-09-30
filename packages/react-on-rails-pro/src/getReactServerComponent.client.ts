@@ -14,9 +14,9 @@
 
 import * as React from 'react';
 import { createFromReadableStream } from 'react-on-rails-rsc/client.browser';
-import { createRSCPayloadKey, fetch, wrapInNewPromise, extractErrorMessage } from '../utils.ts';
+import { createRSCPayloadKey, fetch, wrapInNewPromise, extractErrorMessage } from 'react-on-rails/utils';
 import transformRSCStreamAndReplayConsoleLogs from './transformRSCStreamAndReplayConsoleLogs.ts';
-import { RailsContext } from '../types/index.ts';
+import { RailsContext } from 'react-on-rails/types';
 
 declare global {
   interface Window {

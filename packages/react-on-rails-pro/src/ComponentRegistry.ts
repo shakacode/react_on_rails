@@ -12,8 +12,8 @@
  * https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-import { type RegisteredComponent, type ReactComponentOrRenderFunction } from '../types/index.ts';
-import isRenderFunction from '../isRenderFunction.ts';
+import { type RegisteredComponent, type ReactComponentOrRenderFunction } from 'react-on-rails/types';
+import isRenderFunction from 'react-on-rails/isRenderFunction';
 import CallbackRegistry from './CallbackRegistry.ts';
 
 const componentRegistry = new CallbackRegistry<RegisteredComponent>('component');

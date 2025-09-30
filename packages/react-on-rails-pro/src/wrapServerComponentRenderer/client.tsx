@@ -14,9 +14,9 @@
 
 import * as React from 'react';
 import * as ReactDOMClient from 'react-dom/client';
-import { ReactComponentOrRenderFunction, RenderFunction } from '../../types/index.ts';
-import isRenderFunction from '../../isRenderFunction.ts';
-import { ensureReactUseAvailable } from '../../reactApis.cts';
+import { ReactComponentOrRenderFunction, RenderFunction } from 'react-on-rails/types';
+import isRenderFunction from 'react-on-rails/isRenderFunction';
+import { ensureReactUseAvailable } from 'react-on-rails/reactApis';
 import { createRSCProvider } from '../RSCProvider.tsx';
 import getReactServerComponent from '../getReactServerComponent.client.ts';
 
