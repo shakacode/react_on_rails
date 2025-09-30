@@ -6,7 +6,8 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "incremental": false
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "lib", "tests"]
