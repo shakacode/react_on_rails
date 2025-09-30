@@ -3,11 +3,6 @@
   "compilerOptions": {
     "outDir": "./lib",
     "rootDir": "./src",
-    "baseUrl": ".",
-    "paths": {
-      "react-on-rails": ["../react-on-rails/src"],
-      "react-on-rails/*": ["../react-on-rails/src/*"]
-    },
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
