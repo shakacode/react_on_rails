@@ -53,7 +53,6 @@
     "./ReactOnRails.full": "./lib/ReactOnRails.full.js",
     "./handleError": "./lib/handleError.js",
     "./serverRenderUtils": "./lib/serverRenderUtils.js",
-    "./loadJsonFile": "./lib/loadJsonFile.js",
     "./buildConsoleReplay": "./lib/buildConsoleReplay.js",
     "./ReactDOMServer": "./lib/ReactDOMServer.cjs"
   },
