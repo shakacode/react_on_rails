@@ -14,7 +14,7 @@
 
 import * as React from 'react';
 import type { ClientGetReactServerComponentProps } from './getReactServerComponent.client.ts';
-import { createRSCPayloadKey } from 'react-on-rails/utils';
+import { createRSCPayloadKey } from './utils.ts';
 
 type RSCContextType = {
   getComponent: (componentName: string, componentProps: unknown) => Promise<React.ReactNode>;

@@ -13,7 +13,7 @@
  */
 
 import { PassThrough, Readable } from 'stream';
-import { extractErrorMessage } from 'react-on-rails/utils';
+import { extractErrorMessage } from './utils.ts';
 import {
   RSCPayloadStreamInfo,
   RSCPayloadCallback,
