@@ -26,6 +26,8 @@ const assertIsPromise: <T>(value: null | string | Promise<T>) => asserts value i
 describe('serverRenderReactComponent', () => {
   beforeEach(() => {
     ComponentRegistry.components().clear();
+    // Setup globalThis.ReactOnRails for serverRenderReactComponent
+    globalThis.ReactOnRails = { getComponent: ComponentRegistry.get } as any;
   });
 
   it('serverRenderReactComponent renders a registered component', () => {
