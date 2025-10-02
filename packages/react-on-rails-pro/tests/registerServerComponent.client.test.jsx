@@ -9,7 +9,7 @@ import { screen, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import * as path from 'path';
 import * as fs from 'fs';
-import { createNodeReadableStream, getNodeVersion } from '../../react-on-rails/tests/testUtils.js';
+import { createNodeReadableStream, getNodeVersion } from './testUtils.js';
 import ReactOnRails from '../src/index.ts';
 import registerServerComponent from '../src/registerServerComponent/client.tsx';
 import { clear as clearComponentRegistry } from '../src/ComponentRegistry.ts';
@@ -44,7 +44,7 @@ enableFetchMocks();
 
     expect(() => {
       // Re-import to trigger the check
-      jest.requireActual('../src/pro/wrapServerComponentRenderer/client.tsx');
+      jest.requireActual('../src/wrapServerComponentRenderer/client.tsx');
     }).toThrow('React.use is not defined');
   });
 
