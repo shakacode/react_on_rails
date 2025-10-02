@@ -13,7 +13,7 @@
  */
 
 import * as React from 'react';
-import ReactOnRails from 'react-on-rails/ReactOnRails.client';
+import ReactOnRails from '../index.ts';
 import RSCRoute from '../RSCRoute.tsx';
 import { ReactComponentOrRenderFunction } from 'react-on-rails/types';
 import wrapServerComponentRenderer from '../wrapServerComponentRenderer/client.tsx';
