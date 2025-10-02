@@ -1,13 +1,18 @@
 import type { ReactElement } from 'react';
-import type { RegisteredComponent, RailsContext } from './types/index.ts';
+import type { RegisteredComponent, RailsContext, RenderReturnType } from './types/index.ts';
 import ComponentRegistry from './ComponentRegistry.ts';
 import StoreRegistry from './StoreRegistry.ts';
 import createReactOutput from './createReactOutput.ts';
 import reactHydrateOrRender from './reactHydrateOrRender.ts';
 import { getRailsContext } from './context.ts';
 import { isServerRenderHash } from './isServerRenderResult.ts';
+import { onPageUnloaded } from './pageLifecycle.ts';
+import { supportsRootApi, unmountComponentAtNode } from './reactApis.cts';
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
+
+// Track all rendered roots for cleanup
+const renderedRoots = new Map<string, { root: RenderReturnType; domNode: Element }>();
 
 function initializeStore(el: Element, railsContext: RailsContext): void {
   const name = el.getAttribute(REACT_ON_RAILS_STORE_ATTRIBUTE) || '';
@@ -95,7 +100,9 @@ function renderElement(el: Element, railsContext: RailsContext): void {
 You returned a server side type of react-router error: ${JSON.stringify(reactElementOrRouterResult)}
 You should return a React.Component always for the client side entry point.`);
       } else {
-        reactHydrateOrRender(domNode, reactElementOrRouterResult as ReactElement, shouldHydrate);
+        const root = reactHydrateOrRender(domNode, reactElementOrRouterResult as ReactElement, shouldHydrate);
+        // Track the root for cleanup
+        renderedRoots.set(domNodeId, { root, domNode });
       }
     }
   } catch (e: unknown) {
@@ -162,3 +169,27 @@ export function reactOnRailsComponentLoaded(domId: string): Promise<void> {
   renderComponent(domId);
   return Promise.resolve();
 }
+
+/**
+ * Unmount all rendered React components and clear roots.
+ * This should be called on page unload to prevent memory leaks.
+ */
+function unmountAllComponents(): void {
+  renderedRoots.forEach(({ root, domNode }) => {
+    try {
+      if (supportsRootApi && root && typeof root === 'object' && 'unmount' in root) {
+        // React 18+ Root API
+        root.unmount();
+      } else {
+        // React 16-17 legacy API
+        unmountComponentAtNode(domNode);
+      }
+    } catch (error) {
+      console.error('Error unmounting component:', error);
+    }
+  });
+  renderedRoots.clear();
+}
+
+// Register cleanup on page unload
+onPageUnloaded(unmountAllComponents);
