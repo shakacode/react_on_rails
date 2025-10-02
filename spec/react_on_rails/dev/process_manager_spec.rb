@@ -19,19 +19,19 @@ RSpec.describe ReactOnRails::Dev::ProcessManager do
 
   describe ".installed?" do
     it "returns true when process is available in current context" do
-      expect(Timeout).to receive(:timeout).with(5).and_yield
+      expect(Timeout).to receive(:timeout).with(described_class::VERSION_CHECK_TIMEOUT).and_yield
       expect_any_instance_of(Kernel).to receive(:system)
         .with("overmind", "--version", out: File::NULL, err: File::NULL).and_return(true)
       expect(described_class).to be_installed("overmind")
     end
 
     it "returns false when process is not available in current context" do
-      expect(Timeout).to receive(:timeout).with(5).and_raise(Errno::ENOENT)
+      expect(Timeout).to receive(:timeout).with(described_class::VERSION_CHECK_TIMEOUT).and_raise(Errno::ENOENT)
       expect(described_class.installed?("nonexistent")).to be false
     end
 
     it "returns false when all version flags fail" do
-      expect(Timeout).to receive(:timeout).with(5).exactly(3).times.and_yield
+      expect(Timeout).to receive(:timeout).with(described_class::VERSION_CHECK_TIMEOUT).exactly(3).times.and_yield
       expect_any_instance_of(Kernel).to receive(:system)
         .with("failing_process", "--version", out: File::NULL, err: File::NULL).and_return(false)
       expect_any_instance_of(Kernel).to receive(:system)
@@ -42,7 +42,7 @@ RSpec.describe ReactOnRails::Dev::ProcessManager do
     end
 
     it "returns true when second version flag succeeds" do
-      expect(Timeout).to receive(:timeout).with(5).twice.and_yield
+      expect(Timeout).to receive(:timeout).with(described_class::VERSION_CHECK_TIMEOUT).twice.and_yield
       expect_any_instance_of(Kernel).to receive(:system)
         .with("foreman", "--version", out: File::NULL, err: File::NULL).and_return(false)
       expect_any_instance_of(Kernel).to receive(:system)
@@ -51,7 +51,7 @@ RSpec.describe ReactOnRails::Dev::ProcessManager do
     end
 
     it "returns false when version check times out" do
-      expect(Timeout).to receive(:timeout).with(5).and_raise(Timeout::Error)
+      expect(Timeout).to receive(:timeout).with(described_class::VERSION_CHECK_TIMEOUT).and_raise(Timeout::Error)
       expect(described_class.installed?("hanging_process")).to be false
     end
   end
@@ -158,7 +158,7 @@ RSpec.describe ReactOnRails::Dev::ProcessManager do
   describe ".process_available_in_system?" do
     it "checks process availability outside bundle context with version flags" do
       expect(described_class).to receive(:with_unbundled_context).and_yield
-      expect(Timeout).to receive(:timeout).with(5).and_yield
+      expect(Timeout).to receive(:timeout).with(described_class::VERSION_CHECK_TIMEOUT).and_yield
       expect_any_instance_of(Kernel).to receive(:system)
         .with("foreman", "--version", out: File::NULL, err: File::NULL).and_return(true)
 
@@ -173,7 +173,7 @@ RSpec.describe ReactOnRails::Dev::ProcessManager do
 
     it "tries multiple version flags before failing" do
       expect(described_class).to receive(:with_unbundled_context).and_yield
-      expect(Timeout).to receive(:timeout).with(5).twice.and_yield
+      expect(Timeout).to receive(:timeout).with(described_class::VERSION_CHECK_TIMEOUT).twice.and_yield
       expect_any_instance_of(Kernel).to receive(:system)
         .with("foreman", "--version", out: File::NULL, err: File::NULL).and_return(false)
       expect_any_instance_of(Kernel).to receive(:system)
@@ -184,7 +184,7 @@ RSpec.describe ReactOnRails::Dev::ProcessManager do
 
     it "returns false when version check times out in system context" do
       expect(described_class).to receive(:with_unbundled_context).and_yield
-      expect(Timeout).to receive(:timeout).with(5).and_raise(Timeout::Error)
+      expect(Timeout).to receive(:timeout).with(described_class::VERSION_CHECK_TIMEOUT).and_raise(Timeout::Error)
 
       expect(described_class.send(:process_available_in_system?, "hanging_process")).to be false
     end

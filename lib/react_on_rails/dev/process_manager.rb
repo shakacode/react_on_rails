@@ -5,6 +5,9 @@ require "timeout"
 module ReactOnRails
   module Dev
     class ProcessManager
+      # Timeout for version check operations to prevent hanging
+      VERSION_CHECK_TIMEOUT = 5
+
       class << self
         # Check if a process is available and usable in the current execution context
         # This accounts for bundler context where system commands might be intercepted
@@ -49,7 +52,7 @@ module ReactOnRails
           # Use system() because that's how we'll actually call it later
           version_flags_for(process).any? do |flag|
             # Add timeout to prevent hanging on version checks
-            Timeout.timeout(5) do
+            Timeout.timeout(VERSION_CHECK_TIMEOUT) do
               system(process, flag, out: File::NULL, err: File::NULL)
             end
           end
@@ -103,7 +106,7 @@ module ReactOnRails
             # Try version flags to check if process exists outside bundler context
             version_flags_for(process).any? do |flag|
               # Add timeout to prevent hanging on version checks
-              Timeout.timeout(5) do
+              Timeout.timeout(VERSION_CHECK_TIMEOUT) do
                 system(process, flag, out: File::NULL, err: File::NULL)
               end
             end
