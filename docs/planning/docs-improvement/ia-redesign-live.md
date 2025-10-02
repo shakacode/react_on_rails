@@ -165,9 +165,52 @@ This section tracks any deviations from the original plan and why we made them.
 
 ---
 
+#### Decision 2: Keep Descriptive Long Filenames (Oct 2, 2025)
+
+**Question:** Should we rename `installation-into-an-existing-rails-app.md` to just `installation.md`?
+
+**Decision:** Keep the original long descriptive filename.
+
+**Rationale:**
+
+- The distinction between "existing Rails app" vs "new Rails app" is meaningful
+- `tutorial.md` covers installation for NEW apps (with `rails new`)
+- `installation-into-an-existing-rails-app.md` covers EXISTING apps (already have code)
+- Shortening to `installation.md` creates ambiguity - users won't know which scenario it covers
+- Descriptive filenames help users find the right doc for their situation
+
+**Pattern:** Prefer descriptive filenames over short ones when there's meaningful distinction.
+
+---
+
 ## Issues & Blockers
 
-_None yet_
+### Issue 1: Content Overlap in Getting Started (Oct 2, 2025)
+
+**Problem:** Three files overlap significantly in covering installation:
+
+1. **quick-start.md** (212 lines)
+   - 15-minute setup
+   - Assumes existing Rails app (or just run `rails new`)
+   - Steps: install gem → run generator → hello world
+2. **installation-into-an-existing-rails-app.md** (67 lines)
+   - Detailed installation for existing apps
+   - Very similar steps to quick-start
+3. **tutorial.md** (389 lines)
+   - Comprehensive walkthrough with `rails new`
+   - Includes installation + features + deployment
+
+**Issue:** Users may be confused about which guide to follow. Content is redundant.
+
+**Status:** Flagged for Section 2 (Content Improvements) - NOT fixing during IA reorg
+
+**Next steps:** After completing IA restructuring, evaluate whether to:
+
+- Merge quick-start and installation docs
+- Delete one and improve the other
+- Clarify when to use each with better headers/descriptions
+
+_This is a content problem, not a structure problem. Keep moving files for now._
 
 ---
 
@@ -199,8 +242,9 @@ docs/
 ├── introduction.md              # NEW HOMEPAGE (to be created)
 ├── getting-started/
 │   ├── quick-start.md
-│   ├── installation.md
-│   └── tutorial.md
+│   ├── installation-into-an-existing-rails-app.md  # Decision 2: keep long name
+│   ├── tutorial.md
+│   └── project-structure.md
 ├── core-concepts/
 │   ├── server-side-rendering.md
 │   ├── client-vs-server-rendering.md
