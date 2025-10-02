@@ -128,7 +128,40 @@ This section tracks any deviations from the original plan and why we made them.
 
 ### Decision Log
 
-_None yet - will update as we go_
+#### Decision 1: Split Migration & Upgrading into Two Categories (Oct 2, 2025)
+
+**Original plan:** Category 6 called "Migration & Upgrading" in one folder `migration/`
+
+**Decision:** Split into TWO separate categories:
+
+- Category 6: 📈 **Upgrading** (`upgrading/`) - Version upgrades, release notes
+- Category 7: 🔄 **Migrating** (`migrating/`) - From other tools (react-rails, angular, etc.)
+
+**Rationale:**
+
+- Research showed popular frameworks use separate "Upgrading" and "Migrating" sections
+- Clear distinction: upgrading = staying with RoR between versions; migrating = coming FROM other tools
+- Both are important enough to warrant separate categories
+- Users have different intents: "I need to upgrade" vs "I'm switching from react-rails"
+- Only adds 1 category (8 total vs original 7) - still way better than current 11
+
+**New category structure:**
+
+```
+1. 🚀 Getting Started
+2. 📚 Core Concepts
+3. 🔧 Building Features
+4. 📖 API Reference
+5. 🚢 Deployment
+6. 📈 Upgrading          ← NEW (split from Migration & Upgrading)
+7. 🔄 Migrating          ← NEW (split from Migration & Upgrading)
+8. 💎 Pro
+```
+
+**Files affected:**
+
+- `upgrading/`: upgrading-react-on-rails.md, release notes, version-specific guides
+- `migrating/`: from-react-rails.md, from-angular.md
 
 ---
 
@@ -184,13 +217,17 @@ docs/
 │   ├── production-deployment.md
 │   ├── troubleshooting.md
 │   └── ...
-├── migration/
+├── upgrading/                   # SPLIT from migration (Decision 1)
 │   ├── upgrading-react-on-rails.md
-│   ├── migrating-from-react-rails.md
+│   ├── release-notes/
+│   └── ...
+├── migrating/                   # SPLIT from migration (Decision 1)
+│   ├── from-react-rails.md
+│   ├── from-angular.md
 │   └── ...
 └── pro/
     ├── react-on-rails-pro.md
     └── ...
 ```
 
-See `04-ia-redesign-plan.md` for detailed file mapping.
+See `04-ia-redesign-plan.md` for detailed file mapping (NOTE: plan has old structure, use this as reference).
