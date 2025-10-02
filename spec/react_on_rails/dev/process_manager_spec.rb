@@ -4,24 +4,6 @@ require_relative "../spec_helper"
 require "react_on_rails/dev/process_manager"
 
 RSpec.describe ReactOnRails::Dev::ProcessManager do
-  # Suppress stdout/stderr during tests
-  around do |example|
-    original_stderr = $stderr
-    original_stdout = $stdout
-    null_stderr = File.open(File::NULL, "w")
-    null_stdout = File.open(File::NULL, "w")
-
-    begin
-      $stderr = null_stderr
-      $stdout = null_stdout
-      example.run
-    ensure
-      $stderr = original_stderr
-      $stdout = original_stdout
-      null_stderr.close
-      null_stdout.close
-    end
-  end
 
   describe ".installed?" do
     it "returns true when process is available in current context" do
