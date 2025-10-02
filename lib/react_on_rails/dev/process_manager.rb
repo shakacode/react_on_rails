@@ -8,6 +8,9 @@ module ReactOnRails
       # Timeout for version check operations to prevent hanging
       VERSION_CHECK_TIMEOUT = 5
 
+      # Process managers in order of preference
+      PROCESS_MANAGERS = %w[overmind foreman].freeze
+
       class << self
         # Check if a process is available and usable in the current execution context
         # This accounts for bundler context where system commands might be intercepted
@@ -36,8 +39,9 @@ module ReactOnRails
           FileManager.cleanup_stale_files
 
           # Try process managers in order of preference
-          return if run_process_if_available("overmind", ["start", "-f", procfile])
-          return if run_process_if_available("foreman", ["start", "-f", procfile])
+          PROCESS_MANAGERS.each do |pm|
+            return if run_process_if_available(pm, ["start", "-f", procfile])
+          end
 
           show_process_manager_installation_help
           exit 1
@@ -155,11 +159,9 @@ module ReactOnRails
         end
 
         def valid_procfile_path?(procfile)
-          # Reject paths with shell metacharacters
-          return false if procfile.match?(/[;&|`$(){}\[\]<>]/)
-
-          # Ensure it's a readable file
-          File.readable?(procfile)
+          # system is invoked with args (no shell), so shell metacharacters are safe.
+          # Ensure it's a readable regular file.
+          File.file?(procfile) && File.readable?(procfile)
         rescue StandardError
           false
         end

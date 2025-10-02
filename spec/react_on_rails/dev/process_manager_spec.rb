@@ -5,16 +5,22 @@ require "react_on_rails/dev/process_manager"
 
 RSpec.describe ReactOnRails::Dev::ProcessManager do
   # Suppress stdout/stderr during tests
-  before(:all) do
-    @original_stderr = $stderr
-    @original_stdout = $stdout
-    $stderr = File.open(File::NULL, "w")
-    $stdout = File.open(File::NULL, "w")
-  end
+  around do |example|
+    original_stderr = $stderr
+    original_stdout = $stdout
+    null_stderr = File.open(File::NULL, "w")
+    null_stdout = File.open(File::NULL, "w")
 
-  after(:all) do
-    $stderr = @original_stderr
-    $stdout = @original_stdout
+    begin
+      $stderr = null_stderr
+      $stdout = null_stdout
+      example.run
+    ensure
+      $stderr = original_stderr
+      $stdout = original_stdout
+      null_stderr.close
+      null_stdout.close
+    end
   end
 
   describe ".installed?" do
