@@ -12,8 +12,8 @@
  * https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-import CallbackRegistry from './CallbackRegistry.ts';
 import type { Store, StoreGenerator } from 'react-on-rails/types';
+import CallbackRegistry from './CallbackRegistry.ts';
 
 const storeGeneratorRegistry = new CallbackRegistry<StoreGenerator>('store generator');
 const hydratedStoreRegistry = new CallbackRegistry<Store>('hydrated store');

@@ -23,9 +23,9 @@ import { isServerRenderHash } from 'react-on-rails/isServerRenderResult';
 import { supportsHydrate, supportsRootApi, unmountComponentAtNode } from 'react-on-rails/reactApis';
 import reactHydrateOrRender from 'react-on-rails/reactHydrateOrRender';
 import { debugTurbolinks } from 'react-on-rails/turbolinksUtils';
+import { onPageLoaded } from 'react-on-rails/pageLifecycle';
 import * as StoreRegistry from './StoreRegistry.ts';
 import * as ComponentRegistry from './ComponentRegistry.ts';
-import { onPageLoaded } from 'react-on-rails/pageLifecycle';
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
 const IMMEDIATE_HYDRATION_PRO_WARNING =

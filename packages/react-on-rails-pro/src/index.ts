@@ -19,6 +19,12 @@ export * from 'react-on-rails';
 import ReactOnRailsCore from 'react-on-rails/ReactOnRails.client';
 
 // Import pro registries and features
+import type {
+  Store,
+  StoreGenerator,
+  RegisteredComponent,
+  ReactComponentOrRenderFunction,
+} from 'react-on-rails/types';
 import * as ProComponentRegistry from './ComponentRegistry.ts';
 import * as ProStoreRegistry from './StoreRegistry.ts';
 import {
@@ -30,13 +36,6 @@ import {
   hydrateImmediateHydratedStores,
   unmountAll,
 } from './ClientSideRenderer.ts';
-
-import type {
-  Store,
-  StoreGenerator,
-  RegisteredComponent,
-  ReactComponentOrRenderFunction,
-} from 'react-on-rails/types';
 
 // Enhance ReactOnRails with Pro features
 const ReactOnRailsPro = {
