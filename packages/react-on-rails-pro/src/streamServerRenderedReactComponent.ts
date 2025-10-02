@@ -15,7 +15,6 @@
 import * as React from 'react';
 import { PassThrough, Readable } from 'stream';
 
-import * as ComponentRegistry from './ComponentRegistry.ts';
 import createReactOutput from 'react-on-rails/createReactOutput';
 import { isPromise, isServerRenderHash } from 'react-on-rails/isServerRenderResult';
 import buildConsoleReplay from 'react-on-rails/buildConsoleReplay';
@@ -31,6 +30,7 @@ import {
   RailsContextWithServerStreamingCapabilities,
   assertRailsContextWithServerComponentMetadata,
 } from 'react-on-rails/types';
+import * as ComponentRegistry from './ComponentRegistry.ts';
 import injectRSCPayload from './injectRSCPayload.ts';
 import PostSSRHookTracker from './PostSSRHookTracker.ts';
 import RSCRequestTracker from './RSCRequestTracker.ts';

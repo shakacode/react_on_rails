@@ -11,7 +11,9 @@
     "type-check": "yarn run tsc --noEmit --noErrorTruncation",
     "prepack": "nps build.prepack",
     "prepare": "nps build.prepack",
-    "prepublishOnly": "yarn run build"
+    "prepublishOnly": "yarn run build",
+    "yalc:publish": "yalc publish",
+    "yalc": "yalc"
   },
   "repository": {
     "type": "git",

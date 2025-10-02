@@ -14,8 +14,8 @@
 
 import * as React from 'react';
 import ReactOnRails from 'react-on-rails/ReactOnRails.client';
-import RSCRoute from '../RSCRoute.tsx';
 import { ReactComponent, RenderFunction } from 'react-on-rails/types';
+import RSCRoute from '../RSCRoute.tsx';
 import wrapServerComponentRenderer from '../wrapServerComponentRenderer/server.tsx';
 
 /**

@@ -5,7 +5,7 @@ import { renderToString } from 'react-dom/server';
 import { getMarkupFromTree } from '@apollo/client/react/ssr';
 import { ApolloClient, createHttpLink, InMemoryCache } from '@apollo/client';
 import { getSSRCache } from '@shakacode/use-ssr-computation.runtime/lib/ssrCache';
-import { RailsContext } from 'react-on-rails';
+import { RailsContext } from 'react-on-rails-pro';
 import ApolloGraphQL from '../components/LazyApolloGraphQL';
 import { preloadQuery } from '../ssr-computations/userQuery.ssr-computation';
 import { setApolloClient } from '../utils/lazyApollo';

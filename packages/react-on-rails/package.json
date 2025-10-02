@@ -68,6 +68,8 @@
   },
   "files": [
     "lib/**/*.js",
+    "lib/**/*.cjs",
+    "lib/**/*.mjs",
     "lib/**/*.d.ts"
   ],
   "bugs": {

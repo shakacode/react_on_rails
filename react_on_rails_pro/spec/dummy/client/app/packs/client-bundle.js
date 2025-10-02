@@ -1,6 +1,6 @@
 import '../assets/styles/application.css';
 
-import ReactOnRails from 'react-on-rails';
+import ReactOnRails from 'react-on-rails-pro';
 import Turbolinks from 'turbolinks';
 import SharedReduxStore from '../stores/SharedReduxStore';
 
