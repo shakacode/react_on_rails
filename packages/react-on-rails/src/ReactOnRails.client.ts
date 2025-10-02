@@ -194,7 +194,9 @@ globalThis.ReactOnRails = {
 
 globalThis.ReactOnRails.resetOptions();
 
-ClientStartup.clientStartup();
+setTimeout(() => {
+  ClientStartup.clientStartup();
+}, 0);
 
 export * from './types/index.ts';
 export default globalThis.ReactOnRails;
