@@ -4,8 +4,6 @@ require_relative "../spec_helper"
 require "react_on_rails/dev/process_manager"
 
 RSpec.describe ReactOnRails::Dev::ProcessManager do
-RSpec.describe ReactOnRails::Dev::ProcessManager do
-  describe ".installed?" do
   describe ".installed?" do
     it "returns true when process is available in current context" do
       expect(Timeout).to receive(:timeout).with(described_class::VERSION_CHECK_TIMEOUT).and_yield
