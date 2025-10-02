@@ -91,7 +91,7 @@ This plan tackles ALL four Information Architecture problems identified in Secti
 
 ## Proposed Solution
 
-### New Category Structure (7 Categories)
+### New Category Structure (8 Categories)
 
 **Based on user journey stages:**
 
@@ -101,8 +101,9 @@ This plan tackles ALL four Information Architecture problems identified in Secti
 3. 🔧 Building Features      [Common patterns, real-world examples]
 4. 📖 API Reference          [View helpers, config, JS API]
 5. 🚢 Deployment             [Production, performance, troubleshooting]
-6. 🔄 Migration & Upgrading  [Version upgrades, migrating from others]
-7. 💎 React on Rails Pro     [Pro features]
+6. 📈 Upgrading              [Version upgrades, release notes]
+7. 🔄 Migrating              [From other tools: react-rails, angular]
+8. 💎 React on Rails Pro     [Pro features]
 ```
 
 **Removed from user navigation:**
@@ -149,11 +150,11 @@ This plan tackles ALL four Information Architecture problems identified in Secti
 **Current location → New location:**
 
 ```
-docs/quick-start/README.md                              → Getting Started/Quick Start
-docs/guides/installation-into-an-existing-rails-app.md  → Getting Started/Installation
-docs/guides/tutorial.md                                 → Getting Started/Tutorial
-docs/additional-details/recommended-project-structure.md → Getting Started/Project Structure
-NEW: docs/introduction.md                               → Getting Started/Introduction (HOMEPAGE)
+docs/quick-start/README.md                               → getting-started/quick-start.md
+docs/guides/installation-into-an-existing-rails-app.md   → getting-started/installation-into-an-existing-rails-app.md
+docs/guides/tutorial.md                                  → getting-started/tutorial.md
+docs/additional-details/recommended-project-structure.md → getting-started/project-structure.md
+NEW: docs/introduction.md                                → docs/introduction.md (HOMEPAGE)
 ```
 
 ---
@@ -331,19 +332,38 @@ docs/rails/rails-engine-integration.md                     → Deployment/Rails 
 
 ---
 
-#### 6. 🔄 Migration & Upgrading (5-7 docs)
+#### 6. 📈 Upgrading (5-7 docs)
 
-**Purpose:** Help users upgrade versions or migrate from other tools.
+**Purpose:** Help users upgrade between React on Rails versions.
 
 **Contents:**
 
 - **Upgrading React on Rails** (`guides/upgrading-react-on-rails.md`)
-- **Migrating from react-rails** (`additional-details/migrating-from-react-rails.md`)
 - **Release Notes** (link to `release-notes/` folder)
 - **Breaking Changes** (extract from CHANGELOG)
 - **Upgrade Guides by Version:**
   - v16.0.0 (`release-notes/16.0.0.md`)
   - v15.0.0 (`release-notes/15.0.0.md`)
+- **Pro Performance Upgrade Guide** (`react-on-rails-pro/major-performance-breakthroughs-upgrade-guide.md`)
+
+**Current location → New location:**
+
+```
+docs/guides/upgrading-react-on-rails.md                                       → upgrading/upgrading-react-on-rails.md
+docs/react-on-rails-pro/major-performance-breakthroughs-upgrade-guide.md      → upgrading/pro-performance-upgrade.md
+docs/release-notes/                                                           → upgrading/release-notes/
+```
+
+---
+
+#### 7. 🔄 Migrating (2-3 docs)
+
+**Purpose:** Help users migrate TO React on Rails from other tools.
+
+**Contents:**
+
+- **Migrating from react-rails** (`additional-details/migrating-from-react-rails.md`)
+- **Migrating from AngularJS** (`javascript/angular-js-integration-migration.md`)
 
 **Could add (if valuable):**
 
@@ -354,14 +374,13 @@ docs/rails/rails-engine-integration.md                     → Deployment/Rails 
 **Current location → New location:**
 
 ```
-docs/guides/upgrading-react-on-rails.md                  → Migration/Upgrading
-docs/additional-details/migrating-from-react-rails.md    → Migration/From react-rails
-docs/release-notes/                                      → Migration/Release Notes
+docs/additional-details/migrating-from-react-rails.md  → migrating/from-react-rails.md
+docs/javascript/angular-js-integration-migration.md    → migrating/from-angular.md
 ```
 
 ---
 
-#### 7. 💎 React on Rails Pro (2-3 docs)
+#### 8. 💎 React on Rails Pro (2-3 docs)
 
 **Purpose:** Showcase Pro features, link to Pro docs.
 
@@ -374,8 +393,8 @@ docs/release-notes/                                      → Migration/Release N
 **Current location → New location:**
 
 ```
-docs/react-on-rails-pro/react-on-rails-pro.md                                 → Pro/Overview
-docs/react-on-rails-pro/major-performance-breakthroughs-upgrade-guide.md      → Pro/Performance
+docs/react-on-rails-pro/react-on-rails-pro.md                                → pro/react-on-rails-pro.md
+docs/react-on-rails-pro/major-performance-breakthroughs-upgrade-guide.md     → pro/major-performance-breakthroughs-upgrade-guide.md
 ```
 
 ---
