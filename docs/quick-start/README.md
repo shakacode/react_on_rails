@@ -124,7 +124,7 @@ With React on Rails auto-bundling, you don't need manual registration! Just add 
 <%= react_component("SimpleCounter", { initialCount: 5 }, { auto_load_bundle: true }) %>
 ```
 
-Note, your layout needs to include this in the <head>:
+Note, your layout needs to include this in the `<head>`:
 
 ```erb
     <%= stylesheet_pack_tag %>
