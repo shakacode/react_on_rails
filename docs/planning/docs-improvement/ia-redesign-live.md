@@ -295,65 +295,113 @@ _Test results will be logged here as we go_
 
 ---
 
-## Next Actions
+## Completion Summary
 
-**Current:** Complete Step 0 - create folder structure and commit baseline
+**✅ ALL STEPS COMPLETE (Steps 1-8):**
+- Step 1: Getting Started (4 files)
+- Step 2: Core Concepts (7 files) + API Reference (1 file)
+- Step 3: Building Features (14 files)
+- Step 4: API Reference (4 files)
+- Step 5: Deployment (9 files, then corrected to 7)
+- Step 6: Upgrading (4 files, then moved 1 to pro)
+- Step 7: Migrating (2 files)
+- Step 8: Pro (1 file)
 
-**After Step 0 approval:** Move to Step 1 (Getting Started files)
+**✅ ORPHANED FILES REORGANIZED (12 files):**
+After Steps 1-8, found 12 files not in original plan. Investigated and reorganized:
+- 7 moved to existing categories
+- 4 moved to outdated/
+- 1 merged and deleted
+
+**Total files moved:** ~50+ files across all steps
+
+**Next Actions:** Update website config, update internal links, create introduction.md
 
 ---
 
-## Reference: New Folder Structure
+## Reference: Final Folder Structure
 
 ```
 docs/
-├── introduction.md              # NEW HOMEPAGE (to be created in Step 8)
-├── getting-started/
+├── introduction.md              # TODO: Create in next phase
+├── getting-started/ (4 files)
 │   ├── quick-start.md
-│   ├── installation-into-an-existing-rails-app.md  # Decision 2: keep long name
+│   ├── installation-into-an-existing-rails-app.md
 │   ├── tutorial.md
 │   └── project-structure.md
-├── core-concepts/
+├── core-concepts/ (8 files)
 │   ├── how-react-on-rails-works.md
 │   ├── react-on-rails-overview.md
-│   └── ...
-├── building-features/
+│   ├── client-vs-server-rendering.md
+│   ├── react-server-rendering.md
+│   ├── render-functions-and-railscontext.md
+│   ├── render-functions.md                    # Orphaned: detailed render-functions guide
+│   ├── auto-bundling-file-system-based-automated-bundle-generation.md
+│   └── webpack-configuration.md
+├── building-features/ (15 files)
+│   ├── hmr-and-hot-reloading-with-the-webpack-dev-server.md
+│   ├── i18n.md
+│   ├── rspec-configuration.md
+│   ├── minitest-configuration.md
+│   ├── streaming-server-rendering.md
+│   ├── how-to-conditionally-server-render-based-on-device-type.md
+│   ├── how-to-use-different-files-for-client-and-server-rendering.md
 │   ├── react-router.md
 │   ├── react-and-redux.md
-│   ├── turbolinks.md                  # Decision 4: moved from deployment
-│   └── ...
-├── api-reference/
+│   ├── react-helmet.md
+│   ├── rails-webpacker-react-integration-options.md
+│   ├── code-splitting.md
+│   ├── images.md
+│   ├── foreman-issues.md
+│   └── turbolinks.md                          # Step 5 correction: from deployment
+├── api-reference/ (7 files)
+│   ├── README.md                              # Orphaned: index page
 │   ├── view-helpers-api.md
 │   ├── javascript-api.md
-│   ├── configuration.md                                      # Decision 3: reference list
-│   ├── rails_view_rendering_from_inline_javascript.md        # Decision 4: moved from rails/
-│   └── ...
-├── deployment/
-│   ├── deployment.md                              # Decision 4: focused on production only
+│   ├── redux-store-api.md
+│   ├── configuration.md
+│   ├── generator-details.md
+│   └── rails_view_rendering_from_inline_javascript.md  # Step 5 correction: from rails/
+├── deployment/ (10 files)
+│   ├── deployment.md
 │   ├── capistrano-deployment.md
 │   ├── heroku-deployment.md
 │   ├── elastic-beanstalk.md
 │   ├── troubleshooting-build-errors.md
 │   ├── troubleshooting-when-using-shakapacker.md
-│   └── troubleshooting-when-using-webpacker.md
-├── upgrading/                         # Decision 1: SPLIT from migration
+│   ├── troubleshooting-when-using-webpacker.md
+│   ├── server-rendering-tips.md               # Orphaned: SSR debugging
+│   ├── troubleshooting.md                     # Orphaned: comprehensive troubleshooting
+│   └── (removed 4 files in Step 5 corrections)
+├── upgrading/ (3 files)
 │   ├── upgrading-react-on-rails.md
-│   ├── release-notes/
-│   └── ...
-├── migrating/                         # Decision 1: SPLIT from migration
-│   ├── from-react-rails.md
-│   ├── from-angular.md
-│   ├── convert-rails-5-api-only-app.md        # Decision 4: moved from deployment
-│   └── ...
-├── pro/
+│   └── release-notes/
+│       ├── 15.0.0.md
+│       └── 16.0.0.md
+├── migrating/ (3 files)
+│   ├── migrating-from-react-rails.md
+│   ├── angular-js-integration-migration.md
+│   └── convert-rails-5-api-only-app.md        # Step 5 correction: from deployment
+├── pro/ (2 files)
 │   ├── react-on-rails-pro.md
-│   └── ...
-├── misc/                              # Decision 4: TEMPORARY - review later
-│   └── updating-dependencies.md
-└── advanced-topics/                   # Decision 4: TEMPORARY - review later
-    └── rails-engine-integration.md
+│   └── major-performance-breakthroughs-upgrade-guide.md
+├── misc/ (7 files - KEEPING as category)
+│   ├── updating-dependencies.md               # Step 5 correction + merged node-deps
+│   ├── credits.md                             # Orphaned: acknowledgments
+│   ├── asset-pipeline.md                      # Orphaned: warning guide
+│   ├── articles.md
+│   ├── code_of_conduct.md
+│   ├── doctrine.md
+│   ├── style.md
+│   └── tips.md
+└── advanced-topics/ (2 files - KEEPING as category)
+    ├── rails-engine-integration.md            # Step 5 correction: from deployment
+    └── manual-installation-overview.md        # Orphaned: manual setup guide
 ```
 
-**Note:** `misc/` and `advanced-topics/` are temporary holding folders created in Decision 4. We'll review at the end whether to keep these categories or redistribute files. All filenames kept original per Decision 2.
+**Final Decisions:**
+- `misc/` and `advanced-topics/` are now PERMANENT categories (not temporary)
+- All orphaned files found homes
+- Old folders (guides/, javascript/, additional-details/, etc.) are now EMPTY
 
-See `04-ia-redesign-plan.md` for detailed file mapping (NOTE: plan has old structure, use this live doc as source of truth).
+See `04-ia-redesign-plan.md` for original plan (NOTE: this live doc is source of truth after Steps 1-8 + orphaned files).
