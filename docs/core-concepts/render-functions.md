@@ -7,7 +7,7 @@ This guide explains how render-functions work in React on Rails and how to use t
 Render-functions take two parameters:
 
 1. `props`: The props passed from the Ruby helper methods (via the `props:` parameter), which become available in your JavaScript.
-2. `railsContext`: Rails contextual information like current pathname, locale, etc. See the [Render-Functions and the Rails Context](../guides/render-functions-and-railscontext.md) documentation for more details.
+2. `railsContext`: Rails contextual information like current pathname, locale, etc. See the [Render-Functions and the Rails Context](../core-concepts/render-functions-and-railscontext.md) documentation for more details.
 
 ### Identifying Render-Functions
 

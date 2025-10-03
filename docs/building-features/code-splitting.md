@@ -71,7 +71,7 @@ ReactOnRails.register({
 });
 ```
 
-Note that you should not register a renderer on the server, since there won't be a domNodeId when we're server rendering. Note that the `RouterApp` imported by `serverRegistration.js` is from a different file. For an example of how to set up an app for server rendering, see the [react router docs](./react-router.md).
+Note that you should not register a renderer on the server, since there won't be a domNodeId when we're server rendering. Note that the `RouterApp` imported by `serverRegistration.js` is from a different file. For an example of how to set up an app for server rendering, see the [react router docs](../building-features/react-router.md).
 
 #### RouterAppRenderer.jsx
 

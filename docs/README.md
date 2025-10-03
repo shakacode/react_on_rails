@@ -6,9 +6,9 @@
 
 New to React on Rails? Start here for the fastest path to success:
 
-**→ [15-Minute Quick Start Guide](./quick-start/README.md)**
+**→ [15-Minute Quick Start Guide](./getting-started/quick-start.md)**
 
-Already have Rails + Shakapacker? **→ [Add to existing app guide](./guides/installation-into-an-existing-rails-app.md)**
+Already have Rails + Shakapacker? **→ [Add to existing app guide](./getting-started/installation-into-an-existing-rails-app.md)**
 
 ## 📚 Learning Paths
 
@@ -18,72 +18,72 @@ Choose your journey based on your experience level:
 
 Perfect if you're new to React on Rails
 
-1. **[Quick Start](./quick-start/README.md)** - Get your first component running
+1. **[Quick Start](./getting-started/quick-start.md)** - Get your first component running
 2. **[Core Concepts](./getting-started.md)** - Understand the basics
-3. **[Tutorial](./guides/tutorial.md)** - Build something useful
+3. **[Tutorial](./getting-started/tutorial.md)** - Build something useful
 
 ### ⚡ **Experienced Developer Path**
 
 Jump to what you need
 
-- **[Installation Guide](./guides/installation-into-an-existing-rails-app.md)** - Detailed setup
-- **[API Reference](./api/README.md)** - Quick lookup
-- **[Advanced Features](./guides/advanced/README.md)** - SSR, Redux, Router
+- **[Installation Guide](./getting-started/installation-into-an-existing-rails-app.md)** - Detailed setup
+- **[API Reference](./api-reference/README.md)** - Quick lookup
+- **[Advanced Features](./advanced-topics/README.md)** - SSR, Redux, Router
 
 ### 🏗️ **Migrating from Other Solutions**
 
-- **[From react-rails](./additional-details/migrating-from-react-rails.md)** - Switch from the react-rails gem
-- **[Upgrading React on Rails](./guides/upgrading-react-on-rails.md)** - Version upgrade guide
+- **[From react-rails](./migrating/migrating-from-react-rails.md)** - Switch from the react-rails gem
+- **[Upgrading React on Rails](./upgrading/upgrading-react-on-rails.md)** - Version upgrade guide
 
 ## 🎯 Popular Use Cases
 
 Find guidance for your specific scenario:
 
-| I want to...                        | Go here                                                                    |
-| ----------------------------------- | -------------------------------------------------------------------------- |
-| **Add React to existing Rails app** | [Installation Guide](./guides/installation-into-an-existing-rails-app.md)  |
-| **Enable server-side rendering**    | [SSR Guide](./guides/react-server-rendering.md)                            |
-| **Set up hot reloading**            | [HMR Setup](./guides/hmr-and-hot-reloading-with-the-webpack-dev-server.md) |
-| **Use Redux with Rails**            | [Redux Integration](./javascript/react-and-redux.md)                       |
-| **Deploy to production**            | [Deployment Guide](./guides/deployment.md)                                 |
-| **Troubleshoot issues**             | [Troubleshooting](./troubleshooting/README.md)                             |
+| I want to...                        | Go here                                                                               |
+| ----------------------------------- | ------------------------------------------------------------------------------------- |
+| **Add React to existing Rails app** | [Installation Guide](./getting-started/installation-into-an-existing-rails-app.md)    |
+| **Enable server-side rendering**    | [SSR Guide](./core-concepts/react-server-rendering.md)                                |
+| **Set up hot reloading**            | [HMR Setup](./building-features/hmr-and-hot-reloading-with-the-webpack-dev-server.md) |
+| **Use Redux with Rails**            | [Redux Integration](./building-features/react-and-redux.md)                           |
+| **Deploy to production**            | [Deployment Guide](./deployment/deployment.md)                                        |
+| **Troubleshoot issues**             | [Troubleshooting](./deployment/troubleshooting.md)                                    |
 
 ## 📖 Complete Documentation
 
 ### Core Guides
 
 - **[Getting Started](./getting-started.md)** - Installation and basic setup
-- **[Tutorial](./guides/tutorial.md)** - Complete walkthrough with examples
-- **[Configuration](./guides/configuration.md)** - All configuration options
-- **[View Helpers](./api/view-helpers-api.md)** - Using `react_component` method
+- **[Tutorial](./getting-started/tutorial.md)** - Complete walkthrough with examples
+- **[Configuration](./api-reference/configuration.md)** - All configuration options
+- **[View Helpers](./api-reference/view-helpers-api.md)** - Using `react_component` method
 
 ### Features
 
-- **[Server-Side Rendering](./guides/react-server-rendering.md)** - SSR setup and optimization
-- **[Auto-Bundling](./guides/auto-bundling-file-system-based-automated-bundle-generation.md)** - Automatic bundle generation
-- **[Redux Integration](./javascript/react-and-redux.md)** - State management with Redux
-- **[React Router](./javascript/react-router.md)** - Client-side routing
-- **[Internationalization](./guides/i18n.md)** - I18n support
+- **[Server-Side Rendering](./core-concepts/react-server-rendering.md)** - SSR setup and optimization
+- **[Auto-Bundling](./core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md)** - Automatic bundle generation
+- **[Redux Integration](./building-features/react-and-redux.md)** - State management with Redux
+- **[React Router](./building-features/react-router.md)** - Client-side routing
+- **[Internationalization](./building-features/i18n.md)** - I18n support
 
 ### Development
 
-- **[Hot Module Replacement](./guides/hmr-and-hot-reloading-with-the-webpack-dev-server.md)** - Fast development workflow
-- **[Testing](./guides/rspec-configuration.md)** - Testing React components
-- **[Debugging](./javascript/troubleshooting-build-errors.md)** - Common debugging techniques
+- **[Hot Module Replacement](./building-features/hmr-and-hot-reloading-with-the-webpack-dev-server.md)** - Fast development workflow
+- **[Testing](./building-features/rspec-configuration.md)** - Testing React components
+- **[Debugging](./deployment/troubleshooting-build-errors.md)** - Common debugging techniques
 
 ### Deployment & Performance
 
-- **[Deployment](./guides/deployment.md)** - Production deployment guide
-- **[Performance](./guides/webpack-configuration.md)** - Optimization techniques
-- **[Bundle Optimization](./guides/webpack-configuration.md)** - Reduce bundle size
+- **[Deployment](./deployment/deployment.md)** - Production deployment guide
+- **[Performance](./core-concepts/webpack-configuration.md)** - Optimization techniques
+- **[Bundle Optimization](./core-concepts/webpack-configuration.md)** - Reduce bundle size
 
 ## 🆘 Need Help?
 
 ### Quick Solutions
 
-- **[Troubleshooting Guide](./troubleshooting/README.md)** - Common issues and solutions
-- **[FAQ](./troubleshooting/README.md)** - Frequently asked questions
-- **[Error Messages](./javascript/troubleshooting-build-errors.md)** - Decode error messages
+- **[Troubleshooting Guide](./deployment/troubleshooting.md)** - Common issues and solutions
+- **[FAQ](./deployment/troubleshooting.md)** - Frequently asked questions
+- **[Error Messages](./deployment/troubleshooting-build-errors.md)** - Decode error messages
 
 ### Community Support
 
@@ -108,62 +108,62 @@ Find guidance for your specific scenario:
 
 ### API Reference
 
-- [View Helpers API](./api/view-helpers-api.md)
-- [Redux Store API](./api/redux-store-api.md)
-- [JavaScript API](./api/javascript-api.md)
+- [View Helpers API](./api-reference/view-helpers-api.md)
+- [Redux Store API](./api-reference/redux-store-api.md)
+- [JavaScript API](./api-reference/javascript-api.md)
 
 ### Guides
 
 #### Getting Started
 
 - [Installation](./getting-started.md)
-- [Tutorial](./guides/tutorial.md)
-- [Basic Configuration](./guides/configuration.md)
+- [Tutorial](./getting-started/tutorial.md)
+- [Basic Configuration](./api-reference/configuration.md)
 
 #### Core Features
 
-- [Server-Side Rendering](./guides/react-server-rendering.md)
-- [Component Registration](./guides/render-functions-and-railscontext.md)
-- [Props and RailsContext](./guides/render-functions-and-railscontext.md)
+- [Server-Side Rendering](./core-concepts/react-server-rendering.md)
+- [Component Registration](./core-concepts/render-functions-and-railscontext.md)
+- [Props and RailsContext](./core-concepts/render-functions-and-railscontext.md)
 
 #### State Management
 
-- [Redux Integration](./javascript/react-and-redux.md)
-- [Context API](./guides/render-functions-and-railscontext.md)
+- [Redux Integration](./building-features/react-and-redux.md)
+- [Context API](./core-concepts/render-functions-and-railscontext.md)
 
 #### Routing
 
-- [React Router Setup](./javascript/react-router.md)
-- [Server-Side Routing](./guides/react-server-rendering.md)
+- [React Router Setup](./building-features/react-router.md)
+- [Server-Side Routing](./core-concepts/react-server-rendering.md)
 
 #### Advanced Topics
 
-- [Webpack Configuration](./guides/webpack-configuration.md)
-- [Code Splitting](./javascript/code-splitting.md)
-- [Performance Optimization](./guides/webpack-configuration.md)
+- [Webpack Configuration](./core-concepts/webpack-configuration.md)
+- [Code Splitting](./building-features/code-splitting.md)
+- [Performance Optimization](./core-concepts/webpack-configuration.md)
 
 #### Development
 
-- [Hot Module Replacement](./guides/hmr-and-hot-reloading-with-the-webpack-dev-server.md)
-- [Testing Components](./guides/rspec-configuration.md)
-- [Debugging](./javascript/troubleshooting-build-errors.md)
+- [Hot Module Replacement](./building-features/hmr-and-hot-reloading-with-the-webpack-dev-server.md)
+- [Testing Components](./building-features/rspec-configuration.md)
+- [Debugging](./deployment/troubleshooting-build-errors.md)
 
 #### Deployment
 
-- [Production Setup](./guides/deployment.md)
-- [Heroku Deployment](./guides/deployment.md)
-- [Docker Setup](./guides/deployment.md)
+- [Production Setup](./deployment/deployment.md)
+- [Heroku Deployment](./deployment/deployment.md)
+- [Docker Setup](./deployment/deployment.md)
 
 ### Migration Guides
 
-- [Upgrading React on Rails](./guides/upgrading-react-on-rails.md)
-- [From react-rails gem](./additional-details/migrating-from-react-rails.md)
+- [Upgrading React on Rails](./upgrading/upgrading-react-on-rails.md)
+- [From react-rails gem](./migrating/migrating-from-react-rails.md)
 
 ### Troubleshooting
 
-- [Common Issues](./troubleshooting/README.md)
-- [Error Messages](./javascript/troubleshooting-build-errors.md)
-- [Performance Issues](./javascript/troubleshooting-build-errors.md)
+- [Common Issues](./deployment/troubleshooting.md)
+- [Error Messages](./deployment/troubleshooting-build-errors.md)
+- [Performance Issues](./deployment/troubleshooting-build-errors.md)
 
 ### Contributing
 

@@ -37,4 +37,4 @@ end
 
 Note, full details of the React on Rails configuration are [here in docs/basics/configuration.md](https://shakacode.com/react-on-rails/docs/guides/configuration/).
 
-See the doc file [render-functions-and-railscontext.md](./render-functions-and-railscontext.md#rails-context) for how your client-side code uses the device information
+See the doc file [render-functions-and-railscontext.md](../core-concepts/render-functions-and-railscontext.md#rails-context) for how your client-side code uses the device information

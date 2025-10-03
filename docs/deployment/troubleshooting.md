@@ -301,4 +301,4 @@ console.log(ReactOnRails.getComponents());
 
 ---
 
-**💡 Tip:** Most issues are solved by ensuring your setup matches the [Quick Start Guide](../quick-start/README.md) exactly.
+**💡 Tip:** Most issues are solved by ensuring your setup matches the [Quick Start Guide](../getting-started/quick-start.md) exactly.

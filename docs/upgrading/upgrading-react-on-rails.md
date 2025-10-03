@@ -93,7 +93,7 @@ rails generate react_on_rails:install
 2. Verify all ProvidePlugin modules exist
 3. Check webpack alias configuration
 
-For troubleshooting build errors, see the [build errors guide](../javascript/troubleshooting-build-errors.md).
+For troubleshooting build errors, see the [build errors guide](../deployment/troubleshooting-build-errors.md).
 
 ### Enhanced Features in v16
 
@@ -141,7 +141,7 @@ If you still need that feature, please file an issue.
 In order to solve the issues regarding React Hooks compatibility, the number of parameters
 for functions is used to determine if you have a Render-Function that will get invoked to
 return a React component, or you are registering a React component defined by a function.
-Please see [Render-Functions and the Rails Context](./render-functions-and-railscontext.md) for
+Please see [Render-Functions and the Rails Context](../core-concepts/render-functions-and-railscontext.md) for
 more information on what a Render-Function is.
 
 ##### Update required for registered functions taking exactly 2 params.

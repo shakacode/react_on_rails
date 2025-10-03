@@ -1,8 +1,8 @@
 # Getting Started with an existing Rails app
 
-**Also consult the instructions for installing on a fresh Rails app**, see the [React on Rails Basic Tutorial](./tutorial.md).
+**Also consult the instructions for installing on a fresh Rails app**, see the [React on Rails Basic Tutorial](../getting-started/tutorial.md).
 
-**If you have Rails 5 API only project**, first [convert the Rails 5 API only app to a normal Rails app](../rails/convert-rails-5-api-only-app.md).
+**If you have Rails 5 API only project**, first [convert the Rails 5 API only app to a normal Rails app](../migrating/convert-rails-5-api-only-app.md).
 
 1. Add the following to your Gemfile and `bundle install`. We recommend fixing the version of React on Rails, as you will need to keep the exact version in sync with the version in your `package.json` file.
 
@@ -54,7 +54,7 @@
 
 ## Installation
 
-See the [Installation Overview](../additional-details/manual-installation-overview.md) for a concise set summary of what's in a React on Rails installation.
+See the [Installation Overview](../advanced-topics/manual-installation-overview.md) for a concise set summary of what's in a React on Rails installation.
 
 ## NPM
 

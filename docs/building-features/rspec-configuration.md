@@ -1,6 +1,6 @@
 # RSpec Configuration
 
-_Click [here for minitest](./minitest-configuration.md)_
+_Click [here for minitest](../building-features/minitest-configuration.md)_
 
 # If your Webpack configurations correspond to Shakapacker's default setup
 
@@ -11,7 +11,7 @@ compiled by Webpack before running tests and during production deployment:
 1. **Use Shakapacker's compile option**: Configure your `config/shakapacker.yml` so that `compile: true` is for `test` and `production`
    environments. Ensure that your `source_path` is correct, or else `Shakapacker` won't correctly
    detect changes.
-2. **Use the React on Rails settings and helpers**. Use the settings in `config/initializers/react_on_rails.rb`. Refer to [docs/configuration](./configuration.md).
+2. **Use the React on Rails settings and helpers**. Use the settings in `config/initializers/react_on_rails.rb`. Refer to [docs/configuration](../api-reference/configuration.md).
 
 ```yml
 config.build_test_command = "NODE_ENV=test RAILS_ENV=test bin/shakapacker"

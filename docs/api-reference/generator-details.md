@@ -37,7 +37,7 @@ Then you may run
     `rails s`
 ```
 
-Another good option is to create a simple test app per the [Tutorial](../guides/tutorial.md).
+Another good option is to create a simple test app per the [Tutorial](../getting-started/tutorial.md).
 
 # Understanding the Organization of the Generated Client Code
 

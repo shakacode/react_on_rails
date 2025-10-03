@@ -22,7 +22,7 @@ A key decision in your use React on Rails is whether you go with the Shakapacker
 
 ## Option 1: Default Generator Setup: Shakapacker app/javascript
 
-Typical Shakapacker apps have a standard directory structure as documented [here](https://github.com/shakacode/shakapacker/blob/master/README.md#configuration-and-code). If you follow [the basic tutorial](./tutorial.md), you will see this pattern in action. In order to customize the Webpack configuration, consult [Webpack Tips](../javascript/webpack.md).
+Typical Shakapacker apps have a standard directory structure as documented [here](https://github.com/shakacode/shakapacker/blob/master/README.md#configuration-and-code). If you follow [the basic tutorial](../getting-started/tutorial.md), you will see this pattern in action. In order to customize the Webpack configuration, consult [Webpack Tips](../outdated/webpack.md).
 
 The _advantage_ of using Shakapacker to configure Webpack is that there is very little code needed to get started, and you don't need to understand really anything about Webpack customization.
 

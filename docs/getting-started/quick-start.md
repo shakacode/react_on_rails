@@ -160,24 +160,24 @@ Now that you have React on Rails working, here's what to explore next:
 ### Immediate Next Steps
 
 1. **[Basic Configuration](../getting-started.md)** - Understand the setup
-2. **[View Helpers API](../api/view-helpers-api.md)** - Learn all the options for `react_component`
-3. **[Hot Module Replacement](../guides/hmr-and-hot-reloading-with-the-webpack-dev-server.md)** - Optimize your dev workflow
+2. **[View Helpers API](../api-reference/view-helpers-api.md)** - Learn all the options for `react_component`
+3. **[Hot Module Replacement](../building-features/hmr-and-hot-reloading-with-the-webpack-dev-server.md)** - Optimize your dev workflow
 
 ### Dive Deeper
 
-1. **[Complete Tutorial](../guides/tutorial.md)** - Build a full app with Redux
-2. **[Server-Side Rendering](../guides/react-server-rendering.md)** - Optimize for SEO and performance
-3. **[Production Deployment](../guides/deployment.md)** - Deploy to production
+1. **[Complete Tutorial](../getting-started/tutorial.md)** - Build a full app with Redux
+2. **[Server-Side Rendering](../core-concepts/react-server-rendering.md)** - Optimize for SEO and performance
+3. **[Production Deployment](../deployment/deployment.md)** - Deploy to production
 
 ### Advanced Features
 
-1. **[Redux Integration](../javascript/react-and-redux.md)** - Manage application state
-2. **[React Router](../javascript/react-router.md)** - Client-side routing
-3. **[Code Splitting](../javascript/code-splitting.md)** - Optimize bundle size
+1. **[Redux Integration](../building-features/react-and-redux.md)** - Manage application state
+2. **[React Router](../building-features/react-router.md)** - Client-side routing
+3. **[Code Splitting](../building-features/code-splitting.md)** - Optimize bundle size
 
 ## 🆘 Need Help?
 
-- **[Troubleshooting Guide](../troubleshooting/README.md)** - Common issues and solutions
+- **[Troubleshooting Guide](../deployment/troubleshooting.md)** - Common issues and solutions
 - **[React + Rails Slack](https://reactrails.slack.com)** - Join our community
 - **[GitHub Issues](https://github.com/shakacode/react_on_rails/issues)** - Report bugs
 

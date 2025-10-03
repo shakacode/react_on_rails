@@ -16,7 +16,7 @@ To provide a high performance framework for integrating Ruby on Rails with React
 1. Support for HMR for a great developer experience.
 1. Supports latest versions of React with hooks.
 1. [Redux](https://redux.js.org/) and [React Router](https://reactrouter.com/) integration including server-side-rendering.
-1. [Internationalization (I18n) and (localization)](./i18n.md)
+1. [Internationalization (I18n) and (localization)](../building-features/i18n.md)
 1. A supportive community. This [web search shows how live public sites are using React on Rails](https://publicwww.com/websites/%22react-on-rails%22++-undeveloped.com+depth%3Aall/).
 1. [ReScript (Reason ML) Support](https://github.com/shakacode/reason-react-on-rails-example).
 

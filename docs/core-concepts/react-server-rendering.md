@@ -1,6 +1,6 @@
 # React Server Rendering
 
-See also [Client vs. Server Rendering](./client-vs-server-rendering.md).
+See also [Client vs. Server Rendering](../core-concepts/client-vs-server-rendering.md).
 
 ## What is the easiest way to set up a Webpack configuration for server-side-rendering?
 
@@ -14,7 +14,7 @@ During the Rails rendering of HTML per a browser request, the Rails server will 
 
 The default JavaScript interpreter is [ExecJS](https://github.com/rails/execjs). If you want to maximize the performance of your server rendering, then you want to use React on Rails Pro which uses NodeJS to do the server rendering. See the [docs for React on Rails Pro](https://github.com/shakacode/react_on_rails/wiki).
 
-See [this note](./client-vs-server-rendering.md).
+See [this note](../core-concepts/client-vs-server-rendering.md).
 
 ## How do you do Server Rendering with React on Rails?
 
