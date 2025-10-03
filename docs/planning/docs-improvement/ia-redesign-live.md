@@ -201,6 +201,56 @@ This section tracks any deviations from the original plan and why we made them.
 
 ---
 
+#### Decision 4: Rethink Deployment Category - Remove Non-Deployment Files (Oct 3, 2025)
+
+**Context:** After completing Step 5 (moving Deployment files), we reviewed what actually ended up in `deployment/` and found several files that don't belong.
+
+**Problem:** The plan placed these files in Deployment, but upon review they're not deployment-specific.
+
+**Decision:** Move these 5 files OUT of Deployment to proper categories (keeping original filenames per Decision 2):
+
+1. `updating-dependencies.md` → **misc/updating-dependencies.md** (temporary holding)
+2. `turbolinks.md` → **building-features/turbolinks.md** (feature integration)
+3. `rails-engine-integration.md` → **advanced-topics/rails-engine-integration.md** (temporary holding)
+4. `convert-rails-5-api-only-app.md` → **migrating/convert-rails-5-api-only-app.md** (prerequisite migration)
+5. `rails_view_rendering_from_inline_javascript.md` → **api-reference/rails_view_rendering_from_inline_javascript.md** (API reference)
+
+**New temporary categories created:**
+- `misc/` - For files that don't fit elsewhere (review at end)
+- `advanced-topics/` - For advanced setup scenarios (review at end)
+
+**Deployment category now contains (7 files):**
+- Production deployment guides (4 files: deployment.md, capistrano, heroku, elastic-beanstalk)
+- Troubleshooting production/CI issues (3 files)
+
+**Rationale:**
+- Don't force-fit files to match the plan if they don't belong
+- Follow industry standards: categorize by user intent, not by technology
+- Protect important categories from bloat
+- Gather orphaned files in temporary categories for later review
+- Deployment should be about getting to production and operating in production
+
+**Pattern:** Categorize by WHEN and WHY users need the info, not by what technology it involves.
+
+---
+
+#### Decision 5: No "Rails" Category Needed (Oct 3, 2025)
+
+**Question:** Should we create a "Rails" category for Rails-specific files?
+
+**Decision:** NO - do not create a "Rails" category.
+
+**Rationale:**
+- React on Rails IS a Rails integration - everything is Rails-related
+- A "Rails" category would become a dumping ground like the old "Additional details"
+- Better to categorize by user intent (what are they trying to do?) not by technology
+- Industry pattern: Stimulus, Turbo, Inertia.js don't have "Rails" categories
+- Files from old `rails/` folder distributed to appropriate categories by intent
+
+**Pattern:** Intent-based categorization (user journey) beats technology-based categorization.
+
+---
+
 ## Issues & Blockers
 
 ### Issue 1: Content Overlap in Getting Started (Oct 2, 2025)
@@ -257,39 +307,53 @@ _Test results will be logged here as we go_
 
 ```
 docs/
-├── introduction.md              # NEW HOMEPAGE (to be created)
+├── introduction.md              # NEW HOMEPAGE (to be created in Step 8)
 ├── getting-started/
 │   ├── quick-start.md
 │   ├── installation-into-an-existing-rails-app.md  # Decision 2: keep long name
 │   ├── tutorial.md
 │   └── project-structure.md
 ├── core-concepts/
-│   ├── server-side-rendering.md
-│   ├── client-vs-server-rendering.md
+│   ├── how-react-on-rails-works.md
+│   ├── react-on-rails-overview.md
 │   └── ...
 ├── building-features/
-│   ├── using-redux.md
 │   ├── react-router.md
+│   ├── react-and-redux.md
+│   ├── turbolinks.md                  # Decision 4: moved from deployment
 │   └── ...
 ├── api-reference/
 │   ├── view-helpers-api.md
-│   ├── configuration.md
+│   ├── javascript-api.md
+│   ├── configuration.md                                      # Decision 3: reference list
+│   ├── rails_view_rendering_from_inline_javascript.md        # Decision 4: moved from rails/
 │   └── ...
 ├── deployment/
-│   ├── production-deployment.md
-│   ├── troubleshooting.md
-│   └── ...
-├── upgrading/                   # SPLIT from migration (Decision 1)
+│   ├── deployment.md                              # Decision 4: focused on production only
+│   ├── capistrano-deployment.md
+│   ├── heroku-deployment.md
+│   ├── elastic-beanstalk.md
+│   ├── troubleshooting-build-errors.md
+│   ├── troubleshooting-when-using-shakapacker.md
+│   └── troubleshooting-when-using-webpacker.md
+├── upgrading/                         # Decision 1: SPLIT from migration
 │   ├── upgrading-react-on-rails.md
 │   ├── release-notes/
 │   └── ...
-├── migrating/                   # SPLIT from migration (Decision 1)
+├── migrating/                         # Decision 1: SPLIT from migration
 │   ├── from-react-rails.md
 │   ├── from-angular.md
+│   ├── convert-rails-5-api-only-app.md        # Decision 4: moved from deployment
 │   └── ...
-└── pro/
-    ├── react-on-rails-pro.md
-    └── ...
+├── pro/
+│   ├── react-on-rails-pro.md
+│   └── ...
+├── misc/                              # Decision 4: TEMPORARY - review later
+│   └── updating-dependencies.md
+└── advanced-topics/                   # Decision 4: TEMPORARY - review later
+    └── rails-engine-integration.md
 ```
 
-See `04-ia-redesign-plan.md` for detailed file mapping (NOTE: plan has old structure, use this as reference).
+**Note:** `misc/` and `advanced-topics/` are temporary holding folders created in Decision 4. We'll review at the end whether to keep these categories or redistribute files. All filenames kept original per Decision 2.
+
+See `04-ia-redesign-plan.md` for detailed file mapping (NOTE: plan has old structure, use this live doc as source of truth).
