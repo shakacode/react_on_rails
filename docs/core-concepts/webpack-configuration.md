@@ -38,5 +38,5 @@ const { config, devServer } = require('shakapacker');
 
 You will want to consider using some of the same values set in these files:
 
-- https://github.com/shakacode/shakapacker/blob/master/package/environments/base.js
-- https://github.com/shakacode/shakapacker/blob/master/package/environments/development.js
+- https://github.com/shakacode/shakapacker/blob/master/package/environments/base.ts
+- https://github.com/shakacode/shakapacker/blob/master/package/environments/development.ts

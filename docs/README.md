@@ -28,7 +28,7 @@ Jump to what you need
 
 - **[Installation Guide](./getting-started/installation-into-an-existing-rails-app.md)** - Detailed setup
 - **[API Reference](./api-reference/README.md)** - Quick lookup
-- **[Advanced Features](./advanced-topics/README.md)** - SSR, Redux, Router
+- **[Advanced Features](./guides/advanced/README.md)** - SSR, Redux, Router
 
 ### 🏗️ **Migrating from Other Solutions**
 
