@@ -12,6 +12,8 @@
  * https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
+/// <reference types="react/experimental" />
+
 import * as React from 'react';
 import { useRSC } from './RSCProvider.tsx';
 import { ServerComponentFetchError } from './ServerComponentFetchError.ts';
@@ -73,8 +75,7 @@ export type RSCRouteProps = {
 
 const PromiseWrapper = ({ promise }: { promise: Promise<React.ReactNode> }) => {
   // React.use is available in React 18.3+
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (React as any).use(promise);
+  return React.use(promise);
 };
 
 const RSCRoute = ({ componentName, componentProps }: RSCRouteProps): React.ReactNode => {
