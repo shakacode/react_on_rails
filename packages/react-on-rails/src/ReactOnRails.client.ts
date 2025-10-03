@@ -89,14 +89,16 @@ globalThis.ReactOnRails = {
   },
 
   reactOnRailsPageLoaded() {
-    return ClientStartup.reactOnRailsPageLoaded();
+    ClientStartup.reactOnRailsPageLoaded();
+    return Promise.resolve();
   },
 
   reactOnRailsComponentLoaded(domId: string): Promise<void> {
     return reactOnRailsComponentLoaded(domId);
   },
 
-  reactOnRailsStoreLoaded(storeName: string): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  reactOnRailsStoreLoaded(_storeName: string): Promise<void> {
     throw new Error('reactOnRailsStoreLoaded requires react-on-rails-pro package');
   },
 
