@@ -17,6 +17,8 @@ export * from 'react-on-rails';
 
 // Import core ReactOnRails to enhance it
 import ReactOnRailsCore from 'react-on-rails/ReactOnRails.client';
+import { onPageLoaded, onPageUnloaded } from 'react-on-rails/pageLifecycle';
+import { debugTurbolinks } from 'react-on-rails/turbolinksUtils';
 
 // Import pro registries and features
 import type {
@@ -120,9 +122,6 @@ const ReactOnRailsPro = {
 globalThis.ReactOnRails = ReactOnRailsPro;
 
 // Pro client startup with immediate hydration support
-import { onPageLoaded, onPageUnloaded } from 'react-on-rails/pageLifecycle';
-import { debugTurbolinks } from 'react-on-rails/turbolinksUtils';
-
 export async function reactOnRailsPageLoaded() {
   debugTurbolinks('reactOnRailsPageLoaded [PRO]');
   // Pro: Render all components that don't have immediate_hydration

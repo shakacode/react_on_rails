@@ -4,7 +4,7 @@ import { renderAllComponents } from './ClientRenderer.ts';
 import { onPageLoaded } from './pageLifecycle.ts';
 import { debugTurbolinks } from './turbolinksUtils.ts';
 
-export async function reactOnRailsPageLoaded() {
+export function reactOnRailsPageLoaded() {
   debugTurbolinks('reactOnRailsPageLoaded');
   // Core package: Render all components after page is fully loaded
   renderAllComponents();

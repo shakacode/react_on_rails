@@ -151,7 +151,7 @@ const config = tsEslint.config([
     },
   },
   {
-    files: ['packages/react-on-rails/src/**/*'],
+    files: ['packages/**/src/**/*'],
     rules: {
       'import/extensions': ['error', 'ignorePackages'],
     },
