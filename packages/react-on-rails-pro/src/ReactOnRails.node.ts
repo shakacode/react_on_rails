@@ -12,7 +12,12 @@
  * https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-// Re-export the client-side Pro functionality from ReactOnRails.client.ts
-export * from './ReactOnRails.client.ts';
-// eslint-disable-next-line no-restricted-exports
-export { default } from './ReactOnRails.client.ts';
+import ReactOnRails from './ReactOnRails.full.ts';
+import streamServerRenderedReactComponent from './streamServerRenderedReactComponent.ts';
+
+// Add Pro server-side streaming functionality
+ReactOnRails.streamServerRenderedReactComponent = streamServerRenderedReactComponent;
+
+export * from './ReactOnRails.full.ts';
+// eslint-disable-next-line no-restricted-exports -- see https://github.com/eslint/eslint/issues/15617
+export { default } from './ReactOnRails.full.ts';

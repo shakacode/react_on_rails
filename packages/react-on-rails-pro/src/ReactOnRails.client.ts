@@ -12,7 +12,10 @@
  * https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-// Re-export the client-side Pro functionality from ReactOnRails.client.ts
-export * from './ReactOnRails.client.ts';
-// eslint-disable-next-line no-restricted-exports
-export { default } from './ReactOnRails.client.ts';
+import { createBaseClientObject } from 'react-on-rails/@internal/base/client';
+import { createReactOnRailsPro } from './createReactOnRailsPro.ts';
+
+const ReactOnRails = createReactOnRailsPro(createBaseClientObject);
+
+export * from 'react-on-rails/types';
+export default ReactOnRails;

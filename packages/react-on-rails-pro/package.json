@@ -30,7 +30,14 @@
   "author": "justin.gordon@gmail.com",
   "license": "UNLICENSED",
   "exports": {
-    ".": "./lib/index.js",
+    ".": {
+      "node": "./lib/ReactOnRails.node.js",
+      "default": "./lib/ReactOnRails.full.js"
+    },
+    "./client": "./lib/ReactOnRails.client.js",
+    "./ReactOnRails.client": "./lib/ReactOnRails.client.js",
+    "./ReactOnRails.full": "./lib/ReactOnRails.full.js",
+    "./ReactOnRails.node": "./lib/ReactOnRails.node.js",
     "./registerServerComponent/client": "./lib/registerServerComponent/client.js",
     "./registerServerComponent/server": {
       "react-server": "./lib/registerServerComponent/server.rsc.js",
