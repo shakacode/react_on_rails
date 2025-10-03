@@ -41,32 +41,44 @@ const config: KnipConfig = {
     'packages/react-on-rails': {
       entry: [
         'src/ReactOnRails.node.ts!',
-        'src/pro/ReactOnRailsRSC.ts!',
-        'src/pro/registerServerComponent/client.tsx!',
-        'src/pro/registerServerComponent/server.tsx!',
-        'src/pro/registerServerComponent/server.rsc.ts!',
-        'src/pro/wrapServerComponentRenderer/server.tsx!',
-        'src/pro/wrapServerComponentRenderer/server.rsc.tsx!',
-        'src/pro/RSCRoute.tsx!',
-        'src/pro/ServerComponentFetchError.ts!',
-        'src/pro/getReactServerComponent.server.ts!',
-        'src/pro/transformRSCNodeStream.ts!',
-        'src/loadJsonFile.ts!',
+      ],
+      project: ['src/**/*.[jt]s{x,}!', 'tests/**/*.[jt]s{x,}', '!lib/**'],
+      ignore: [
+        // Jest setup and test utilities - not detected by Jest plugin in workspace setup
+        'tests/jest.setup.js',
+        // Build output directories that should be ignored
+        'lib/**',
+      ],
+    },
+
+    // React on Rails Pro package workspace
+    'packages/react-on-rails-pro': {
+      entry: [
+        'src/index.ts!',
+        'src/ReactOnRailsRSC.ts!',
+        'src/registerServerComponent/client.tsx!',
+        'src/registerServerComponent/server.tsx!',
+        'src/registerServerComponent/server.rsc.ts!',
+        'src/wrapServerComponentRenderer/server.tsx!',
+        'src/wrapServerComponentRenderer/server.rsc.tsx!',
+        'src/RSCRoute.tsx!',
+        'src/ServerComponentFetchError.ts!',
+        'src/getReactServerComponent.server.ts!',
+        'src/transformRSCNodeStream.ts!',
       ],
       project: ['src/**/*.[jt]s{x,}!', 'tests/**/*.[jt]s{x,}', '!lib/**'],
       ignore: [
         'tests/emptyForTesting.js',
         // Jest setup and test utilities - not detected by Jest plugin in workspace setup
         'tests/jest.setup.js',
-        'tests/testUtils.js',
         // Build output directories that should be ignored
         'lib/**',
         // Pro features exported for external consumption
-        'src/pro/streamServerRenderedReactComponent.ts:transformRenderStreamChunksToResultObject',
-        'src/pro/streamServerRenderedReactComponent.ts:streamServerRenderedComponent',
-        'src/pro/ServerComponentFetchError.ts:isServerComponentFetchError',
-        'src/pro/RSCRoute.tsx:RSCRouteProps',
-        'src/pro/streamServerRenderedReactComponent.ts:StreamingTrackers',
+        'src/streamServerRenderedReactComponent.ts:transformRenderStreamChunksToResultObject',
+        'src/streamServerRenderedReactComponent.ts:streamServerRenderedComponent',
+        'src/ServerComponentFetchError.ts:isServerComponentFetchError',
+        'src/RSCRoute.tsx:RSCRouteProps',
+        'src/streamServerRenderedReactComponent.ts:StreamingTrackers',
       ],
     },
     'spec/dummy': {
