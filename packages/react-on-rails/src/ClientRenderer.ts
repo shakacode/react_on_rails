@@ -134,15 +134,6 @@ export function renderComponent(domId: string): void {
 }
 
 /**
- * Render all stores on the page.
- */
-export function renderAllStores(): void {
-  const railsContext = getRailsContext();
-  if (!railsContext) return;
-  forEachStore(railsContext);
-}
-
-/**
  * Render all components on the page.
  * Core package renders all components after page load.
  */
