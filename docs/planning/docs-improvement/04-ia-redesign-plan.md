@@ -172,7 +172,6 @@ NEW: docs/introduction.md                                → docs/introduction.m
 - **Component Registration** (`guides/render-functions-and-railscontext.md`)
 - **Auto-Bundling** (`guides/auto-bundling-file-system-based-automated-bundle-generation.md`)
 - **Webpack Integration** (`guides/webpack-configuration.md`)
-- **Configuration** (`guides/configuration.md`)
 
 **NEW docs needed (from Problem 2.1):**
 
@@ -183,14 +182,13 @@ NEW: docs/introduction.md                                → docs/introduction.m
 **Current location → New location:**
 
 ```
-docs/guides/how-react-on-rails-works.md                           → Core Concepts/How It Works
-docs/guides/react-on-rails-overview.md                            → Core Concepts/Overview
-docs/guides/client-vs-server-rendering.md                         → Core Concepts/Rendering
-docs/guides/react-server-rendering.md                             → Core Concepts/Server Rendering
-docs/guides/render-functions-and-railscontext.md                  → Core Concepts/Component Registration
-docs/guides/auto-bundling-file-system-based-automated-bundle-generation.md → Core Concepts/Auto-Bundling
-docs/guides/webpack-configuration.md                              → Core Concepts/Webpack
-docs/guides/configuration.md                                      → Core Concepts/Configuration
+docs/guides/how-react-on-rails-works.md                                        → core-concepts/how-it-works.md
+docs/guides/react-on-rails-overview.md                                         → core-concepts/overview.md
+docs/guides/client-vs-server-rendering.md                                      → core-concepts/client-vs-server-rendering.md
+docs/guides/react-server-rendering.md                                          → core-concepts/server-rendering.md
+docs/guides/render-functions-and-railscontext.md                               → core-concepts/render-functions-and-railscontext.md
+docs/guides/auto-bundling-file-system-based-automated-bundle-generation.md    → core-concepts/auto-bundling.md
+docs/guides/webpack-configuration.md                                           → core-concepts/webpack-configuration.md
 ```
 
 ---
@@ -266,9 +264,10 @@ docs/javascript/images.md                                                   → 
 
 - **Redux Store API** (`api/redux-store-api.md`)
 
-- **Configuration API** (extract from `guides/configuration.md`)
+- **Configuration API** (`guides/configuration.md`)
 
   - All config options reference
+  - ReactOnRails.configure do |config| options
 
 - **Generator Options** (`additional-details/generator-details.md`)
   - react_on_rails:install flags
@@ -277,11 +276,11 @@ docs/javascript/images.md                                                   → 
 **Current location → New location:**
 
 ```
-docs/api/view-helpers-api.md              → API Reference/View Helpers
-docs/api/javascript-api.md                → API Reference/JavaScript API
-docs/api/redux-store-api.md               → API Reference/Redux Store
-docs/guides/configuration.md              → Split: Core Concepts (guide) + API Reference (options list)
-docs/additional-details/generator-details.md → API Reference/Generator
+docs/api/view-helpers-api.md                     → api-reference/view-helpers-api.md
+docs/api/javascript-api.md                       → api-reference/javascript-api.md
+docs/api/redux-store-api.md                      → api-reference/redux-store-api.md
+docs/guides/configuration.md                     → api-reference/configuration.md
+docs/additional-details/generator-details.md     → api-reference/generator-details.md
 ```
 
 ---

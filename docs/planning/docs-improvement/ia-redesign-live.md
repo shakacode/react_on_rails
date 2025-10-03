@@ -183,6 +183,24 @@ This section tracks any deviations from the original plan and why we made them.
 
 ---
 
+#### Decision 3: Move configuration.md to API Reference (Oct 2, 2025)
+
+**Question:** Should `configuration.md` go in Core Concepts or API Reference?
+
+**Decision:** Move to API Reference.
+
+**Rationale:**
+
+- `configuration.md` is a 391-line reference list of ALL config options
+- Same format as `view-helpers-api.md` and `javascript-api.md` (method/parameter lists)
+- Users look it up when they need a specific setting (reference usage pattern)
+- Not teaching a concept - documenting an interface
+- Core Concepts = understanding how things work; API Reference = lookup tables for methods/configs
+
+**Pattern:** Reference lists of options/methods/parameters belong in API Reference, not Core Concepts.
+
+---
+
 ## Issues & Blockers
 
 ### Issue 1: Content Overlap in Getting Started (Oct 2, 2025)
