@@ -16,6 +16,7 @@ const compat = new FlatCompat({
 });
 
 const config = tsEslint.config([
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
   includeIgnoreFile(path.resolve(__dirname, '.gitignore')),
   globalIgnores([
     // compiled code
@@ -157,6 +158,14 @@ const config = tsEslint.config([
     },
   },
   {
+    files: ['packages/react-on-rails-pro/**/*'],
+    rules: {
+      // Disable import/named for pro package - can't resolve monorepo workspace imports
+      // TypeScript compiler validates these imports
+      'import/named': 'off',
+    },
+  },
+  {
     files: ['lib/generators/react_on_rails/templates/**/*'],
     rules: {
       // It doesn't use package.json from the template
@@ -181,12 +190,7 @@ const config = tsEslint.config([
 
     languageOptions: {
       parserOptions: {
-        projectService: {
-          allowDefaultProject: ['eslint.config.ts', 'knip.ts', 'packages/*/tests/*.test.{ts,tsx}'],
-          // Needed because `import * as ... from` instead of `import ... from` doesn't work in this file
-          // for some imports.
-          defaultProject: 'tsconfig.eslint.json',
-        },
+        projectService: true,
       },
     },
 

@@ -27,6 +27,7 @@ describe('serverRenderReactComponent', () => {
   beforeEach(() => {
     ComponentRegistry.components().clear();
     // Setup globalThis.ReactOnRails for serverRenderReactComponent
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/unbound-method, @typescript-eslint/no-explicit-any
     globalThis.ReactOnRails = { getComponent: ComponentRegistry.get } as any;
   });
 
