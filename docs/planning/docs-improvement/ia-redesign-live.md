@@ -216,14 +216,17 @@ This section tracks any deviations from the original plan and why we made them.
 5. `rails_view_rendering_from_inline_javascript.md` → **api-reference/rails_view_rendering_from_inline_javascript.md** (API reference)
 
 **New temporary categories created:**
+
 - `misc/` - For files that don't fit elsewhere (review at end)
 - `advanced-topics/` - For advanced setup scenarios (review at end)
 
 **Deployment category now contains (7 files):**
+
 - Production deployment guides (4 files: deployment.md, capistrano, heroku, elastic-beanstalk)
 - Troubleshooting production/CI issues (3 files)
 
 **Rationale:**
+
 - Don't force-fit files to match the plan if they don't belong
 - Follow industry standards: categorize by user intent, not by technology
 - Protect important categories from bloat
@@ -241,6 +244,7 @@ This section tracks any deviations from the original plan and why we made them.
 **Decision:** NO - do not create a "Rails" category.
 
 **Rationale:**
+
 - React on Rails IS a Rails integration - everything is Rails-related
 - A "Rails" category would become a dumping ground like the old "Additional details"
 - Better to categorize by user intent (what are they trying to do?) not by technology
@@ -298,6 +302,7 @@ _Test results will be logged here as we go_
 ## Completion Summary
 
 **✅ ALL STEPS COMPLETE (Steps 1-8):**
+
 - Step 1: Getting Started (4 files)
 - Step 2: Core Concepts (7 files) + API Reference (1 file)
 - Step 3: Building Features (14 files)
@@ -309,6 +314,7 @@ _Test results will be logged here as we go_
 
 **✅ ORPHANED FILES REORGANIZED (12 files):**
 After Steps 1-8, found 12 files not in original plan. Investigated and reorganized:
+
 - 7 moved to existing categories
 - 4 moved to outdated/
 - 1 merged and deleted
@@ -400,6 +406,7 @@ docs/
 ```
 
 **Final Decisions:**
+
 - `misc/` and `advanced-topics/` are now PERMANENT categories (not temporary)
 - All orphaned files found homes
 - Old folders (guides/, javascript/, additional-details/, etc.) are now EMPTY
