@@ -50,7 +50,6 @@ const AsyncComponentContainer = ({
   });
   return (
     <Suspense fallback={<div>Loading...</div>}>
-      {/* @ts-expect-error - AsyncComponent is a valid React 19 async component, but TypeScript doesn't recognize it yet */}
       <AsyncComponent promise={promise} onRendered={onAsyncComponentRendered} />
     </Suspense>
   );

@@ -35,7 +35,6 @@
   "license": "SEE LICENSE IN LICENSE.md",
   "exports": {
     ".": {
-      "node": "./lib/ReactOnRails.node.js",
       "default": "./lib/ReactOnRails.full.js"
     },
     "./client": "./lib/ReactOnRails.client.js",
@@ -54,7 +53,10 @@
     "./handleError": "./lib/handleError.js",
     "./serverRenderUtils": "./lib/serverRenderUtils.js",
     "./buildConsoleReplay": "./lib/buildConsoleReplay.js",
-    "./ReactDOMServer": "./lib/ReactDOMServer.cjs"
+    "./ReactDOMServer": "./lib/ReactDOMServer.cjs",
+    "./serverRenderReactComponent": "./lib/serverRenderReactComponent.js",
+    "./@internal/base/client": "./lib/base/client.js",
+    "./@internal/base/full": "./lib/base/full.js"
   },
   "peerDependencies": {
     "react": ">= 16",

@@ -22,9 +22,9 @@ import {
   StreamRenderState,
   StreamableComponentResult,
 } from 'react-on-rails/types';
-import ReactOnRails from 'react-on-rails/ReactOnRails.full';
 import handleError from 'react-on-rails/handleError';
 import { convertToError } from 'react-on-rails/serverRenderUtils';
+import ReactOnRails from './ReactOnRails.full.ts';
 
 import {
   streamServerRenderedComponent,
