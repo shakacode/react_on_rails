@@ -1,7 +1,9 @@
 import ReactOnRails from './ReactOnRails.full.ts';
-import streamServerRenderedReactComponent from './pro/streamServerRenderedReactComponent.ts';
 
-ReactOnRails.streamServerRenderedReactComponent = streamServerRenderedReactComponent;
+// Pro-only functionality - provide stub that directs users to upgrade
+ReactOnRails.streamServerRenderedReactComponent = () => {
+  throw new Error('streamServerRenderedReactComponent requires react-on-rails-pro package');
+};
 
 export * from './ReactOnRails.full.ts';
 // eslint-disable-next-line no-restricted-exports -- see https://github.com/eslint/eslint/issues/15617

@@ -64,12 +64,7 @@ describe ReactOnRailsHelper do
       allow(helper).to receive(:append_stylesheet_pack_tag)
       expect { helper.load_pack_for_generated_component("component_name", render_options) }.not_to raise_error
 
-      if ENV["CI_PACKER_VERSION"] == "oldest"
-        expect(helper).to have_received(:append_javascript_pack_tag).with("generated/component_name", { defer: false })
-      else
-        expect(helper).to have_received(:append_javascript_pack_tag)
-          .with("generated/component_name", { defer: false, async: true })
-      end
+      expect(helper).to have_received(:append_javascript_pack_tag).with("generated/component_name", { defer: true })
       expect(helper).to have_received(:append_stylesheet_pack_tag).with("generated/component_name")
     end
 
