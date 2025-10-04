@@ -66,3 +66,7 @@ ssr-generated
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# Playwright test artifacts (from cypress-on-rails gem)
+/spec/dummy/e2e/playwright-report/
+/spec/dummy/test-results/
