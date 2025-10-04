@@ -2,19 +2,19 @@
 
 ## Details
 
-1. [Overview](./guides/react-on-rails-overview.md)
+1. [Overview](./core-concepts/react-on-rails-overview.md)
 1. [Getting Started](./getting-started.md)
-1. [How React on Rails Works](./guides/how-react-on-rails-works.md)
-1. [Webpack Configuration](./guides/webpack-configuration.md)
-1. [View Helpers API](./api/view-helpers-api.md)
+1. [How React on Rails Works](./core-concepts/how-react-on-rails-works.md)
+1. [Webpack Configuration](./core-concepts/webpack-configuration.md)
+1. [View Helpers API](./api-reference/view-helpers-api.md)
 1. [Caching and Performance: React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/).
-1. [Deployment](./guides/deployment.md).
+1. [Deployment](./deployment/deployment.md).
 
 ## Changes and Upgrades
 
 1. [CHANGELOG.md](https://github.com/shakacode/react_on_rails/tree/master/CHANGELOG.md)
-2. [Upgrading React on Rails](./guides/upgrading-react-on-rails.md)
-3. [Troubleshooting Build Errors](./javascript/troubleshooting-build-errors.md)
+2. [Upgrading React on Rails](./upgrading/upgrading-react-on-rails.md)
+3. [Troubleshooting Build Errors](./deployment/troubleshooting-build-errors.md)
 
 ## Example Apps
 

@@ -1,6 +1,6 @@
 # Getting Started
 
-> **💡 Looking for the fastest way to get started?** Try our **[15-Minute Quick Start Guide](./quick-start/README.md)** instead.
+> **💡 Looking for the fastest way to get started?** Try our **[15-Minute Quick Start Guide](./getting-started/quick-start.md)** instead.
 
 ## Choose Your Starting Point
 
@@ -8,15 +8,15 @@ The best way to understand React on Rails depends on your situation:
 
 ### 🚀 **New to React on Rails?**
 
-**→ [15-Minute Quick Start](./quick-start/README.md)** - Get your first component working fast
+**→ [15-Minute Quick Start](./getting-started/quick-start.md)** - Get your first component working fast
 
 ### 📱 **Have an existing Rails app?**
 
-**→ [Add to Existing App](./guides/installation-into-an-existing-rails-app.md)** - Integrate React on Rails
+**→ [Add to Existing App](./getting-started/installation-into-an-existing-rails-app.md)** - Integrate React on Rails
 
 ### 📚 **Want comprehensive tutorial?**
 
-**→ [Complete Tutorial](./guides/tutorial.md)** - Step-by-step with Redux and routing
+**→ [Complete Tutorial](./getting-started/tutorial.md)** - Step-by-step with Redux and routing
 
 ### 👀 **Learn by example?**
 
@@ -78,7 +78,7 @@ bin/dev static #
 
 ### Configuration
 
-- Configure `config/initializers/react_on_rails.rb`. You can adjust some necessary settings and defaults. See file [docs/basics/configuration.md](./guides/configuration.md) for documentation of all configuration options.
+- Configure `config/initializers/react_on_rails.rb`. You can adjust some necessary settings and defaults. See file [docs/basics/configuration.md](./api-reference/configuration.md) for documentation of all configuration options.
 - Configure `config/shakapacker.yml`. If you used the generator and the default Shakapacker setup, you don't need to touch this file. If you are customizing your setup, then consult the [spec/dummy/config/shakapacker.yml](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/config/shakapacker.yml) example or the official default [shakapacker.yml](https://github.com/shakacode/shakapacker/blob/master/lib/install/config/shakapacker.yml).
 - Most apps should rely on the Shakapacker setup for Webpack. Shakapacker v6+ includes support for Webpack version 5.
 
@@ -135,13 +135,13 @@ With `auto_load_bundle: true`, and by placing your "exposed" components in the a
 - Automatically registers it for use.
 - Eliminates the need for manual pack configuration.
 
-See [Auto-Bundling: File-System-Based Automated Bundle Generation](./guides/auto-bundling-file-system-based-automated-bundle-generation.md)
+See [Auto-Bundling: File-System-Based Automated Bundle Generation](./core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md)
 
 Exposing your component in this way allows you to reference the component from a Rails view. You can expose as many components as you like, but their names must be unique. See below for the details of how you expose your components via the React on Rails Webpack configuration. You may call `ReactOnRails.register` many times.
 
 - `@some_props` can be either a hash or JSON string. This is an optional argument assuming you do not need to pass any options (if you want to pass options, such as `prerender: true`, but you do not want to pass any properties, simply pass an empty hash `{}`). **Props are automatically sanitized by React on Rails for security.** This will make the data available in your component:
 
-- This is what your HelloWorld.js file might contain. The railsContext is always available for any parameters that you _always_ want available for your React components. It has _nothing_ to do with the concept of the [React Context](https://react.dev/reference/react/useContext). See [Render-Functions and the RailsContext](./guides/render-functions-and-railscontext.md) for more details on this topic.
+- This is what your HelloWorld.js file might contain. The railsContext is always available for any parameters that you _always_ want available for your React components. It has _nothing_ to do with the concept of the [React Context](https://react.dev/reference/react/useContext). See [Render-Functions and the RailsContext](./core-concepts/render-functions-and-railscontext.md) for more details on this topic.
 
   ```js
   import React from 'react';
@@ -179,7 +179,7 @@ For details on techniques to use different code for client and server rendering,
 
 You have two ways to specify your React components. You can either register the React component (either function or class component) directly, or you can create a function that returns a React component, which we using the name of a "render-function". Creating a render-function allows you to:
 
-1. Access to the `railsContext`. See the [documentation for the railsContext](./guides/render-functions-and-railscontext.md) in terms of why you might need it. You **need** a Render-Function to access the `railsContext`.
+1. Access to the `railsContext`. See the [documentation for the railsContext](./core-concepts/render-functions-and-railscontext.md) in terms of why you might need it. You **need** a Render-Function to access the `railsContext`.
 2. Use the passed-in props to initialize a redux store or set up `react-router`.
 3. Return different components depending on what's in the props.
 
@@ -219,7 +219,7 @@ For server rendering, if you wish to return multiple HTML strings from a Render-
 }
 ```
 
-For details on using react_component_hash with react-helmet, see [our react-helmet documentation](./javascript/react-helmet.md).
+For details on using react_component_hash with react-helmet, see [our react-helmet documentation](./building-features/react-helmet.md).
 
 ## Error Handling
 
@@ -229,16 +229,16 @@ For details on using react_component_hash with react-helmet, see [our react-helm
 ## I18n
 
 React on Rails provides an option for automatic conversions of Rails `*.yml` locale files into `*.json` or `*.js`.
-See the [How to add I18n](./guides/i18n.md) for a summary of adding I18n.
+See the [How to add I18n](./building-features/i18n.md) for a summary of adding I18n.
 
 ## More Reading
 
 Depending on your goals, here's a progression of what to do next:
 
-1. **[View Helpers API](./api/view-helpers-api.md)** - for more options of the `react_component` method.
-2. **[Tutorial](./guides/tutorial.md)** - Comprehensive walkthrough of features with a real app.
-3. **[Configuration](./guides/configuration.md)** - Details on every possible option you can configure.
-4. **[Migration Guide](./guides/upgrading-react-on-rails.md)** - Upgrade advice for each version.
+1. **[View Helpers API](./api-reference/view-helpers-api.md)** - for more options of the `react_component` method.
+2. **[Tutorial](./getting-started/tutorial.md)** - Comprehensive walkthrough of features with a real app.
+3. **[Configuration](./api-reference/configuration.md)** - Details on every possible option you can configure.
+4. **[Migration Guide](./upgrading/upgrading-react-on-rails.md)** - Upgrade advice for each version.
 
 ---
 
@@ -246,7 +246,7 @@ Depending on your goals, here's a progression of what to do next:
 
 ### Rails/React Integration Options
 
-- **[Rails + Webpack Comparison](./guides/rails-webpacker-react-integration-options.md)**
+- **[Rails + Webpack Comparison](./building-features/rails-webpacker-react-integration-options.md)**
 
 ### JavaScript/TypeScript Module System
 
