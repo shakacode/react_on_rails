@@ -7,6 +7,7 @@ import type {
   Store,
   StoreGenerator,
   ReactOnRailsOptions,
+  ReactOnRailsInternal,
 } from '../types/index.ts';
 import * as Authenticity from '../Authenticity.ts';
 import buildConsoleReplay from '../buildConsoleReplay.ts';
@@ -35,11 +36,82 @@ interface Registries {
   };
 }
 
-export function createBaseClientObject(registries: Registries) {
+/**
+ * Base client object type that includes all core ReactOnRails methods except Pro-specific ones.
+ * Derived from ReactOnRailsInternal by omitting Pro-only methods.
+ */
+export type BaseClientObjectType = Omit<
+  ReactOnRailsInternal,
+  // Pro-only methods (not in base)
+  | 'getOrWaitForComponent'
+  | 'getOrWaitForStore'
+  | 'getOrWaitForStoreGenerator'
+  | 'reactOnRailsStoreLoaded'
+  | 'streamServerRenderedReactComponent'
+  | 'serverRenderRSCReactComponent'
+>;
+
+// Cache to track created objects and their registries
+let cachedObject: BaseClientObjectType | null = null;
+let cachedRegistries: Registries | null = null;
+
+export function createBaseClientObject(
+  registries: Registries,
+  currentObject: BaseClientObjectType | null = null,
+): BaseClientObjectType {
   const { ComponentRegistry, StoreRegistry } = registries;
 
-  return {
+  // Error detection: currentObject is null but we have a cached object
+  // This indicates webpack misconfiguration (multiple runtime chunks)
+  if (currentObject === null && cachedObject !== null) {
+    throw new Error(`\
+ReactOnRails was already initialized, but a new initialization was attempted without passing the existing global.
+This usually means Webpack's optimization.runtimeChunk is set to "true" or "multiple" instead of "single".
+
+Fix: Set optimization.runtimeChunk to "single" in your webpack configuration.
+See: https://github.com/shakacode/react_on_rails/issues/1558`);
+  }
+
+  // Error detection: currentObject exists but doesn't match cached object
+  // This could indicate:
+  // 1. Global was contaminated by external code
+  // 2. Mixing core and pro packages
+  if (currentObject !== null && cachedObject !== null && currentObject !== cachedObject) {
+    throw new Error(`\
+ReactOnRails global object mismatch detected.
+The current global ReactOnRails object is different from the one created by this package.
+
+This usually means:
+1. You're mixing react-on-rails (core) with react-on-rails-pro
+2. Another library is interfering with the global ReactOnRails object
+
+Fix: Use only one package (core OR pro) consistently throughout your application.`);
+  }
+
+  // Error detection: Different registries with existing cache
+  // This indicates mixing core and pro packages
+  if (cachedRegistries !== null) {
+    if (
+      registries.ComponentRegistry !== cachedRegistries.ComponentRegistry ||
+      registries.StoreRegistry !== cachedRegistries.StoreRegistry
+    ) {
+      throw new Error(`\
+Cannot mix react-on-rails (core) with react-on-rails-pro.
+Different registries detected - the packages use incompatible registries.
+
+Fix: Use only react-on-rails OR react-on-rails-pro, not both.`);
+    }
+  }
+
+  // If we have a cached object, return it (all checks passed above)
+  if (cachedObject !== null) {
+    return cachedObject;
+  }
+
+  // Create and return new object
+  const obj = {
     options: {} as Partial<ReactOnRailsOptions>,
+    isRSCBundle: false,
 
     // ===================================================================
     // STABLE METHOD IMPLEMENTATIONS - Core package implementations
@@ -167,8 +239,8 @@ export function createBaseClientObject(registries: Registries) {
       );
     },
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    reactOnRailsComponentLoaded(_domId: string): Promise<void> {
+    reactOnRailsComponentLoaded(domId: string): Promise<void> {
+      void domId; // Mark as used
       throw new Error(
         'ReactOnRails.reactOnRailsComponentLoaded is not initialized. This is a bug in react-on-rails.',
       );
@@ -178,24 +250,26 @@ export function createBaseClientObject(registries: Registries) {
     // SSR STUBS - Will throw errors in client bundle, overridden in full
     // ===================================================================
 
-    serverRenderReactComponent(): never {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    serverRenderReactComponent(...args: any[]): any {
+      void args; // Mark as used
       throw new Error(
         'serverRenderReactComponent is not available in "react-on-rails/client". Import "react-on-rails" server-side.',
       );
     },
 
-    handleError(): never {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    handleError(...args: any[]): any {
+      void args; // Mark as used
       throw new Error(
         'handleError is not available in "react-on-rails/client". Import "react-on-rails" server-side.',
       );
     },
-
-    // ===================================================================
-    // FLAGS
-    // ===================================================================
-
-    isRSCBundle: false,
   };
-}
 
-export type BaseClientObjectType = ReturnType<typeof createBaseClientObject>;
+  // Cache the object and registries
+  cachedObject = obj;
+  cachedRegistries = registries;
+
+  return obj;
+}

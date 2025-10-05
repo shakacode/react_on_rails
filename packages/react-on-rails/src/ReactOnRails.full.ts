@@ -1,7 +1,8 @@
 import { createBaseFullObject } from './base/full.ts';
-import { createReactOnRails } from './createReactOnRails.ts';
+import createReactOnRails from './createReactOnRails.ts';
 
-const ReactOnRails = createReactOnRails(createBaseFullObject);
+const currentGlobal = globalThis.ReactOnRails || null;
+const ReactOnRails = createReactOnRails(createBaseFullObject, currentGlobal);
 
 export * from './types/index.ts';
 export default ReactOnRails;

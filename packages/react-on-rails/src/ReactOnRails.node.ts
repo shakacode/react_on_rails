@@ -1,6 +1,7 @@
 import ReactOnRails from './ReactOnRails.full.ts';
 
 // Pro-only functionality - provide stub that directs users to upgrade
+
 ReactOnRails.streamServerRenderedReactComponent = () => {
   throw new Error('streamServerRenderedReactComponent requires react-on-rails-pro package');
 };

@@ -481,3 +481,6 @@ export type RenderOptions = {
   trace?: boolean;
   renderingReturnsPromises: boolean;
 };
+
+// Note: Global type declaration for ReactOnRails is in context.ts
+// to avoid circular dependencies with ReactOnRailsInternal

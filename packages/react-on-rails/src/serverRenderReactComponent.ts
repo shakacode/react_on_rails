@@ -147,7 +147,11 @@ function serverRenderReactComponentInternal(options: RenderParams): null | strin
   let renderState: RenderState;
 
   try {
-    const componentObj = globalThis.ReactOnRails.getComponent(componentName);
+    const reactOnRails = globalThis.ReactOnRails;
+    if (!reactOnRails) {
+      throw new Error('ReactOnRails is not defined');
+    }
+    const componentObj = reactOnRails.getComponent(componentName);
     validateComponent(componentObj, componentName);
 
     // Renders the component or executes the render function

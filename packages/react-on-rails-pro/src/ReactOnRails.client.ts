@@ -13,9 +13,10 @@
  */
 
 import { createBaseClientObject } from 'react-on-rails/@internal/base/client';
-import { createReactOnRailsPro } from './createReactOnRailsPro.ts';
+import createReactOnRailsPro from './createReactOnRailsPro.ts';
 
-const ReactOnRails = createReactOnRailsPro(createBaseClientObject);
+const currentGlobal = globalThis.ReactOnRails || null;
+const ReactOnRails = createReactOnRailsPro(createBaseClientObject, currentGlobal);
 
 export * from 'react-on-rails/types';
 export default ReactOnRails;

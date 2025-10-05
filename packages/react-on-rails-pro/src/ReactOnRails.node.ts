@@ -16,6 +16,7 @@ import ReactOnRails from './ReactOnRails.full.ts';
 import streamServerRenderedReactComponent from './streamServerRenderedReactComponent.ts';
 
 // Add Pro server-side streaming functionality
+
 ReactOnRails.streamServerRenderedReactComponent = streamServerRenderedReactComponent;
 
 export * from './ReactOnRails.full.ts';

@@ -1,34 +1,46 @@
-import { createBaseClientObject } from './base/client.ts';
+import { createBaseClientObject, type BaseClientObjectType } from './base/client.ts';
 import { createBaseFullObject } from './base/full.ts';
 import { clientStartup, reactOnRailsPageLoaded } from './clientStartup.ts';
 import { reactOnRailsComponentLoaded } from './ClientRenderer.ts';
 import ComponentRegistry from './ComponentRegistry.ts';
 import StoreRegistry from './StoreRegistry.ts';
-import type { RegisteredComponent, Store, StoreGenerator } from './types/index.ts';
+import type { ReactOnRailsInternal, RegisteredComponent, Store, StoreGenerator } from './types/index.ts';
 
 type BaseObjectCreator = typeof createBaseClientObject | typeof createBaseFullObject;
 
-// eslint-disable-next-line import/prefer-default-export
-export function createReactOnRails(baseObjectCreator: BaseObjectCreator) {
-  // Check if ReactOnRails already exists
-  if (globalThis.ReactOnRails !== undefined) {
-    throw new Error(`\
-The ReactOnRails value exists in the ${globalThis} scope, it may not be safe to overwrite it.
-This could be caused by setting Webpack's optimization.runtimeChunk to "true" or "multiple," rather than "single."
-Check your Webpack configuration. Read more at https://github.com/shakacode/react_on_rails/issues/1558.`);
-  }
+/**
+ * Core-specific functions that override base stubs and add Pro stubs.
+ * Typed explicitly to ensure type safety when mutating the base object.
+ */
+type ReactOnRailsCoreSpecificFunctions = Pick<
+  ReactOnRailsInternal,
+  | 'reactOnRailsPageLoaded'
+  | 'reactOnRailsComponentLoaded'
+  | 'getOrWaitForComponent'
+  | 'getOrWaitForStore'
+  | 'getOrWaitForStoreGenerator'
+  | 'reactOnRailsStoreLoaded'
+  | 'streamServerRenderedReactComponent'
+  | 'serverRenderRSCReactComponent'
+>;
 
-  // Create base object with core registries
-  const baseObject = baseObjectCreator({
-    ComponentRegistry,
-    StoreRegistry,
-  });
+export default function createReactOnRails(
+  baseObjectCreator: BaseObjectCreator,
+  currentGlobal: BaseClientObjectType | null = null,
+): ReactOnRailsInternal {
+  // Create base object with core registries, passing currentGlobal for caching/validation
+  const baseObject = baseObjectCreator(
+    {
+      ComponentRegistry,
+      StoreRegistry,
+    },
+    currentGlobal,
+  );
 
-  // Add core-specific implementations and pro-only stubs
-  const ReactOnRails = {
-    ...baseObject,
-
-    // Override client-side rendering stubs with core implementations
+  // Define core-specific functions with proper types
+  // This object acts as a type-safe specification of what we're adding/overriding on the base object
+  const reactOnRailsCoreSpecificFunctions: ReactOnRailsCoreSpecificFunctions = {
+    // Override base stubs with core implementations
     reactOnRailsPageLoaded(): Promise<void> {
       reactOnRailsPageLoaded();
       return Promise.resolve();
@@ -38,51 +50,60 @@ Check your Webpack configuration. Read more at https://github.com/shakacode/reac
       return reactOnRailsComponentLoaded(domId);
     },
 
-    // ===================================================================
-    // PRO-ONLY STUBS - These methods don't exist in base, add them here
-    // ===================================================================
-
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    getOrWaitForComponent(_name: string): Promise<RegisteredComponent> {
+    // Pro-only stubs (throw errors in core package)
+    getOrWaitForComponent(): Promise<RegisteredComponent> {
       throw new Error('getOrWaitForComponent requires react-on-rails-pro package');
     },
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    getOrWaitForStore(_name: string): Promise<Store> {
+    getOrWaitForStore(): Promise<Store> {
       throw new Error('getOrWaitForStore requires react-on-rails-pro package');
     },
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    getOrWaitForStoreGenerator(_name: string): Promise<StoreGenerator> {
+    getOrWaitForStoreGenerator(): Promise<StoreGenerator> {
       throw new Error('getOrWaitForStoreGenerator requires react-on-rails-pro package');
     },
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    reactOnRailsStoreLoaded(_storeName: string): Promise<void> {
+    reactOnRailsStoreLoaded(): Promise<void> {
       throw new Error('reactOnRailsStoreLoaded requires react-on-rails-pro package');
     },
 
-    streamServerRenderedReactComponent(): never {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    streamServerRenderedReactComponent(): any {
       throw new Error('streamServerRenderedReactComponent requires react-on-rails-pro package');
     },
 
-    serverRenderRSCReactComponent(): never {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    serverRenderRSCReactComponent(): any {
       throw new Error('serverRenderRSCReactComponent requires react-on-rails-pro package');
     },
   };
 
-  // Assign to global
-  globalThis.ReactOnRails = ReactOnRails;
+  // Type assertion is safe here because:
+  // 1. We start with BaseClientObjectType or BaseFullObjectType (from baseObjectCreator)
+  // 2. We add exactly the methods defined in ReactOnRailsCoreSpecificFunctions
+  // 3. ReactOnRailsInternal = Base + ReactOnRailsCoreSpecificFunctions
+  // TypeScript can't track the mutation, but we ensure type safety by explicitly typing
+  // the functions object above
+  const reactOnRails = baseObject as unknown as ReactOnRailsInternal;
 
-  // Reset options to defaults
-  ReactOnRails.resetOptions();
+  // Assign core-specific functions to the ReactOnRails object using Object.assign
+  // This pattern ensures we add exactly what's defined in the type, nothing more, nothing less
+  Object.assign(reactOnRails, reactOnRailsCoreSpecificFunctions);
 
-  // Run client startup
-  if (typeof window !== 'undefined') {
-    setTimeout(() => {
-      clientStartup();
-    }, 0);
+  // Assign to global if not already assigned
+  if (!globalThis.ReactOnRails) {
+    globalThis.ReactOnRails = reactOnRails;
+
+    // Reset options to defaults (only on first initialization)
+    reactOnRails.resetOptions();
+
+    // Run client startup (only on first initialization)
+    if (typeof window !== 'undefined') {
+      setTimeout(() => {
+        clientStartup();
+      }, 0);
+    }
   }
 
-  return ReactOnRails;
+  return reactOnRails;
 }

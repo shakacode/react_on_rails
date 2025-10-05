@@ -13,7 +13,7 @@
  */
 
 import { createBaseFullObject } from 'react-on-rails/@internal/base/full';
-import { createReactOnRailsPro } from './createReactOnRailsPro.ts';
+import createReactOnRailsPro from './createReactOnRailsPro.ts';
 
 // Warn about bundle size when included in browser bundles
 if (typeof window !== 'undefined') {
@@ -24,7 +24,8 @@ if (typeof window !== 'undefined') {
   );
 }
 
-const ReactOnRails = createReactOnRailsPro(createBaseFullObject);
+const currentGlobal = globalThis.ReactOnRails || null;
+const ReactOnRails = createReactOnRailsPro(createBaseFullObject, currentGlobal);
 
 export * from 'react-on-rails/types';
 export default ReactOnRails;

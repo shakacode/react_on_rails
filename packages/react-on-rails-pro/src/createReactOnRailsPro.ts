@@ -12,11 +12,11 @@
  * https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-import { createBaseClientObject } from 'react-on-rails/@internal/base/client';
+import { createBaseClientObject, type BaseClientObjectType } from 'react-on-rails/@internal/base/client';
 import { createBaseFullObject } from 'react-on-rails/@internal/base/full';
 import { onPageLoaded, onPageUnloaded } from 'react-on-rails/pageLifecycle';
 import { debugTurbolinks } from 'react-on-rails/turbolinksUtils';
-import type { Store, StoreGenerator, RegisteredComponent } from 'react-on-rails/types';
+import type { ReactOnRailsInternal, RegisteredComponent, Store, StoreGenerator } from 'react-on-rails/types';
 import * as ProComponentRegistry from './ComponentRegistry.ts';
 import * as ProStoreRegistry from './StoreRegistry.ts';
 import {
@@ -30,6 +30,22 @@ import {
 } from './ClientSideRenderer.ts';
 
 type BaseObjectCreator = typeof createBaseClientObject | typeof createBaseFullObject;
+
+/**
+ * Pro-specific functions that override base/core stubs with real implementations.
+ * Typed explicitly to ensure type safety when mutating the base object.
+ */
+type ReactOnRailsProSpecificFunctions = Pick<
+  ReactOnRailsInternal,
+  | 'reactOnRailsPageLoaded'
+  | 'reactOnRailsComponentLoaded'
+  | 'getOrWaitForComponent'
+  | 'getOrWaitForStore'
+  | 'getOrWaitForStoreGenerator'
+  | 'reactOnRailsStoreLoaded'
+  | 'streamServerRenderedReactComponent'
+  | 'serverRenderRSCReactComponent'
+>;
 
 // Pro client startup with immediate hydration support
 async function reactOnRailsPageLoaded() {
@@ -62,19 +78,23 @@ function clientStartup() {
   onPageUnloaded(reactOnRailsPageUnloaded);
 }
 
-// eslint-disable-next-line import/prefer-default-export
-export function createReactOnRailsPro(baseObjectCreator: BaseObjectCreator) {
-  // Create base object with Pro registries
-  const baseObject = baseObjectCreator({
-    ComponentRegistry: ProComponentRegistry,
-    StoreRegistry: ProStoreRegistry,
-  });
+export default function createReactOnRailsPro(
+  baseObjectCreator: BaseObjectCreator,
+  currentGlobal: BaseClientObjectType | null = null,
+): ReactOnRailsInternal {
+  // Create base object with Pro registries, passing currentGlobal for caching/validation
+  const baseObject = baseObjectCreator(
+    {
+      ComponentRegistry: ProComponentRegistry,
+      StoreRegistry: ProStoreRegistry,
+    },
+    currentGlobal,
+  );
 
-  // Add Pro-specific implementations
-  const ReactOnRails = {
-    ...baseObject,
-
-    // Override client-side rendering stubs with Pro implementations
+  // Define Pro-specific functions with proper types
+  // This object acts as a type-safe specification of what we're adding/overriding on the base object
+  const reactOnRailsProSpecificFunctions: ReactOnRailsProSpecificFunctions = {
+    // Override core implementations with Pro implementations
     reactOnRailsPageLoaded(): Promise<void> {
       return reactOnRailsPageLoaded();
     },
@@ -83,11 +103,7 @@ export function createReactOnRailsPro(baseObjectCreator: BaseObjectCreator) {
       return renderOrHydrateComponent(domId);
     },
 
-    // ===================================================================
-    // PRO-ONLY METHOD IMPLEMENTATIONS
-    // These methods don't exist in base, add them here
-    // ===================================================================
-
+    // Pro-only method implementations (override core stubs)
     getOrWaitForComponent(name: string): Promise<RegisteredComponent> {
       return ProComponentRegistry.getOrWaitForComponent(name);
     },
@@ -105,28 +121,42 @@ export function createReactOnRailsPro(baseObjectCreator: BaseObjectCreator) {
     },
 
     // streamServerRenderedReactComponent is added in ReactOnRails.node.ts
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
-    streamServerRenderedReactComponent(..._args: any[]): any {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    streamServerRenderedReactComponent(): any {
       throw new Error(
         'streamServerRenderedReactComponent requires importing from react-on-rails-pro in Node.js environment',
       );
     },
 
     // serverRenderRSCReactComponent is added in ReactOnRailsRSC.ts
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
-    serverRenderRSCReactComponent(..._args: any[]): any {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    serverRenderRSCReactComponent(): any {
       throw new Error('serverRenderRSCReactComponent is supported in RSC bundle only');
     },
   };
 
-  // Assign to global
-  globalThis.ReactOnRails = ReactOnRails;
+  // Type assertion is safe here because:
+  // 1. We start with BaseClientObjectType or BaseFullObjectType (from baseObjectCreator)
+  // 2. We add exactly the methods defined in ReactOnRailsProSpecificFunctions
+  // 3. ReactOnRailsInternal = Base + ReactOnRailsProSpecificFunctions
+  // TypeScript can't track the mutation, but we ensure type safety by explicitly typing
+  // the functions object above
+  const reactOnRailsPro = baseObject as unknown as ReactOnRailsInternal;
 
-  // Reset options to defaults
-  ReactOnRails.resetOptions();
+  // Assign Pro-specific functions to the ReactOnRailsPro object using Object.assign
+  // This pattern ensures we add exactly what's defined in the type, nothing more, nothing less
+  Object.assign(reactOnRailsPro, reactOnRailsProSpecificFunctions);
 
-  // Run Pro client startup with immediate hydration support
-  clientStartup();
+  // Assign to global if not already assigned
+  if (!globalThis.ReactOnRails) {
+    globalThis.ReactOnRails = reactOnRailsPro;
 
-  return ReactOnRails;
+    // Reset options to defaults (only on first initialization)
+    reactOnRailsPro.resetOptions();
+
+    // Run Pro client startup with immediate hydration support (only on first initialization)
+    clientStartup();
+  }
+
+  return reactOnRailsPro;
 }

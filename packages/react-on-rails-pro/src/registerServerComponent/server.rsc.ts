@@ -33,7 +33,8 @@ import { ReactComponent, RenderFunction } from 'react-on-rails/types';
  * });
  * ```
  */
-const registerServerComponent = (components: { [id: string]: ReactComponent | RenderFunction }) =>
+const registerServerComponent = (components: { [id: string]: ReactComponent | RenderFunction }) => {
   ReactOnRails.register(components);
+};
 
 export default registerServerComponent;

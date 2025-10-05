@@ -43,6 +43,7 @@ const registerServerComponent = (components: Record<string, ReactComponent>) => 
       <RSCRoute componentName={componentName} componentProps={props} />
     ));
   }
+
   ReactOnRails.register(componentsWrappedInRSCRoute);
 };
 
