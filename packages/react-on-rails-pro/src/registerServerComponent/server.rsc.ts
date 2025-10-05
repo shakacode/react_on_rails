@@ -12,8 +12,8 @@
  * https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-import ReactOnRails from 'react-on-rails/ReactOnRails.client';
 import { ReactComponent, RenderFunction } from 'react-on-rails/types';
+import ReactOnRails from '../ReactOnRails.client.ts';
 
 /**
  * Registers React Server Components in the RSC bundle.

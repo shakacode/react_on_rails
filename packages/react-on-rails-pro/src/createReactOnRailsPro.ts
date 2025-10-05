@@ -143,6 +143,16 @@ export default function createReactOnRailsPro(
   // the functions object above
   const reactOnRailsPro = baseObject as unknown as ReactOnRailsInternal;
 
+  if (reactOnRailsPro.streamServerRenderedReactComponent) {
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    reactOnRailsProSpecificFunctions.streamServerRenderedReactComponent = reactOnRailsPro.streamServerRenderedReactComponent;
+  }
+
+  if (reactOnRailsPro.serverRenderRSCReactComponent) {
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    reactOnRailsProSpecificFunctions.serverRenderRSCReactComponent = reactOnRailsPro.serverRenderRSCReactComponent;
+  }
+
   // Assign Pro-specific functions to the ReactOnRailsPro object using Object.assign
   // This pattern ensures we add exactly what's defined in the type, nothing more, nothing less
   Object.assign(reactOnRailsPro, reactOnRailsProSpecificFunctions);
