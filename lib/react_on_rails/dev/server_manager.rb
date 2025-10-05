@@ -27,7 +27,7 @@ module ReactOnRails
           puts "🔪 Killing all development processes..."
           puts ""
 
-          killed_any = kill_running_processes || cleanup_socket_files
+          killed_any = kill_running_processes || kill_port_processes([3000, 3001]) || cleanup_socket_files
 
           print_kill_summary(killed_any)
         end
@@ -73,6 +73,29 @@ module ReactOnRails
           rescue StandardError
             nil
           end
+        end
+
+        def kill_port_processes(ports)
+          killed_any = false
+
+          ports.each do |port|
+            pids = find_port_pids(port)
+            next unless pids.any?
+
+            puts "   ☠️  Killing process on port #{port} (PIDs: #{pids.join(', ')})"
+            terminate_processes(pids)
+            killed_any = true
+          end
+
+          killed_any
+        end
+
+        def find_port_pids(port)
+          stdout, _status = Open3.capture2("lsof", "-ti", ":#{port}", err: File::NULL)
+          stdout.split("\n").map(&:to_i).reject { |pid| pid == Process.pid }
+        rescue StandardError
+          # lsof command not found or other error (permission denied, etc.)
+          []
         end
 
         def cleanup_socket_files
