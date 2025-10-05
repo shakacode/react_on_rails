@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { Suspense, useEffect } from 'react';
-import RSCRoute from 'react-on-rails/RSCRoute';
+import RSCRoute from 'react-on-rails-pro/RSCRoute';
 
 const AsyncComponentOnServer = async ({
   promise,

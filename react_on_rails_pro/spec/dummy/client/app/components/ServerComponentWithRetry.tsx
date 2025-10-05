@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
-import RSCRoute from 'react-on-rails/RSCRoute';
-import { useRSC } from 'react-on-rails/RSCProvider';
-import { isServerComponentFetchError } from 'react-on-rails/ServerComponentFetchError';
+import RSCRoute from 'react-on-rails-pro/RSCRoute';
+import { useRSC } from 'react-on-rails-pro/RSCProvider';
+import { isServerComponentFetchError } from 'react-on-rails-pro/ServerComponentFetchError';
 
 const ErrorFallback = ({ error, resetErrorBoundary }: { error: Error; resetErrorBoundary: () => void }) => {
   const { refetchComponent } = useRSC();

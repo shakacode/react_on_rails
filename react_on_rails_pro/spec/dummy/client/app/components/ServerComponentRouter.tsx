@@ -1,6 +1,6 @@
 import React, { Suspense } from 'react';
 import { Routes, Route, Link } from 'react-router-dom';
-import RSCRoute from 'react-on-rails/RSCRoute';
+import RSCRoute from 'react-on-rails-pro/RSCRoute';
 // @ts-expect-error - EchoProps is a JavaScript file without TypeScript types
 import EchoProps from './EchoProps';
 import { ErrorBoundary } from './ErrorBoundary';
