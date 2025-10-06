@@ -53,13 +53,11 @@
     "./RSCProvider": "./lib/RSCProvider.js",
     "./ServerComponentFetchError": "./lib/ServerComponentFetchError.js"
   },
-  "dependencies": {
-    "react-on-rails": "*"
-  },
   "peerDependencies": {
     "react": ">= 16",
     "react-dom": ">= 16",
-    "react-on-rails-rsc": "19.0.2"
+    "react-on-rails-rsc": "19.0.2",
+    "react-on-rails": "*"
   },
   "peerDependenciesMeta": {
     "react-on-rails-rsc": {
