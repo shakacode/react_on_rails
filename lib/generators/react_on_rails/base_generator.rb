@@ -19,6 +19,12 @@ module ReactOnRails
                    desc: "Install Redux package and Redux version of Hello World Example",
                    aliases: "-R"
 
+      # --rspack
+      class_option :rspack,
+                   type: :boolean,
+                   default: false,
+                   desc: "Use Rspack instead of Webpack as the bundler"
+
       def add_hello_world_route
         route "get 'hello_world', to: 'hello_world#index'"
       end
@@ -82,6 +88,7 @@ module ReactOnRails
         if File.exist?(".shakapacker_just_installed")
           puts "Skipping Shakapacker config copy (already installed by Shakapacker installer)"
           File.delete(".shakapacker_just_installed") # Clean up marker
+          configure_rspack_in_shakapacker if options.rspack?
           return
         end
 
@@ -89,6 +96,7 @@ module ReactOnRails
         base_path = "base/base/"
         config = "config/shakapacker.yml"
         copy_file("#{base_path}#{config}", config)
+        configure_rspack_in_shakapacker if options.rspack?
       end
 
       def add_base_gems_to_gemfile
@@ -391,6 +399,30 @@ module ReactOnRails
       def add_configure_rspec_to_compile_assets(helper_file)
         search_str = "RSpec.configure do |config|"
         gsub_file(helper_file, search_str, CONFIGURE_RSPEC_TO_COMPILE_ASSETS)
+      end
+
+      def configure_rspack_in_shakapacker
+        shakapacker_config_path = "config/shakapacker.yml"
+        return unless File.exist?(shakapacker_config_path)
+
+        puts Rainbow("🔧 Configuring Shakapacker for Rspack...").yellow
+
+        # Read the current config
+        config_content = File.read(shakapacker_config_path)
+
+        # Update assets_bundler to rspack in default section
+        unless config_content.include?("assets_bundler:")
+          # Add assets_bundler after source_path in default section
+          config_content.gsub!(/^default: &default\n(\s+source_path:.*\n)/) do
+            "default: &default\n#{Regexp.last_match(1)}  assets_bundler: 'rspack'\n"
+          end
+        end
+
+        # Update webpack_loader to swc (rspack works best with SWC)
+        config_content.gsub!(/^\s*webpack_loader:.*$/, "  webpack_loader: 'swc'")
+
+        File.write(shakapacker_config_path, config_content)
+        puts Rainbow("✅ Updated shakapacker.yml for Rspack").green
       end
     end
   end

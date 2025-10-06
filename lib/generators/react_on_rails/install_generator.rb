@@ -28,6 +28,12 @@ module ReactOnRails
                    desc: "Generate TypeScript files and install TypeScript dependencies. Default: false",
                    aliases: "-T"
 
+      # --rspack
+      class_option :rspack,
+                   type: :boolean,
+                   default: false,
+                   desc: "Use Rspack instead of Webpack as the bundler. Default: false"
+
       # --ignore-warnings
       class_option :ignore_warnings,
                    type: :boolean,
@@ -73,7 +79,8 @@ module ReactOnRails
           create_css_module_types
           create_typescript_config
         end
-        invoke "react_on_rails:base", [], { typescript: options.typescript?, redux: options.redux? }
+        invoke "react_on_rails:base", [],
+               { typescript: options.typescript?, redux: options.redux?, rspack: options.rspack? }
         if options.redux?
           invoke "react_on_rails:react_with_redux", [], { typescript: options.typescript? }
         else
@@ -424,6 +431,7 @@ module ReactOnRails
         add_react_on_rails_package
         add_react_dependencies
         add_css_dependencies
+        add_rspack_dependencies if options.rspack?
         add_dev_dependencies
       end
 
@@ -489,12 +497,36 @@ module ReactOnRails
         handle_npm_failure("CSS dependencies", css_deps) unless success
       end
 
+      def add_rspack_dependencies
+        puts "Installing Rspack core dependencies..."
+        rspack_deps = %w[
+          @rspack/core
+          rspack-manifest-plugin
+        ]
+        if add_npm_dependencies(rspack_deps)
+          @added_dependencies_to_package_json = true
+          return
+        end
+
+        success = system("npm", "install", *rspack_deps)
+        @ran_direct_installs = true if success
+        handle_npm_failure("Rspack dependencies", rspack_deps) unless success
+      end
+
       def add_dev_dependencies
         puts "Installing development dependencies..."
-        dev_deps = %w[
-          @pmmmwh/react-refresh-webpack-plugin
-          react-refresh
-        ]
+        dev_deps = if options.rspack?
+                     %w[
+                       @rspack/cli
+                       @rspack/plugin-react-refresh
+                       react-refresh
+                     ]
+                   else
+                     %w[
+                       @pmmmwh/react-refresh-webpack-plugin
+                       react-refresh
+                     ]
+                   end
         if add_npm_dependencies(dev_deps, dev: true)
           @added_dependencies_to_package_json = true
           return
