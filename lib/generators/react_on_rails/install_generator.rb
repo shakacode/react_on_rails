@@ -38,6 +38,7 @@ module ReactOnRails
 
       def run_generators
         if installation_prerequisites_met? || options.ignore_warnings?
+          remove_default_gem_files
           invoke_generators
           add_bin_scripts
           # Only add the post install message if not using Redux
@@ -64,6 +65,53 @@ module ReactOnRails
 
       def print_generator_messages
         GeneratorMessages.messages.each { |message| puts message }
+      end
+
+      def remove_default_gem_files
+        remove_default_bin_dev
+        remove_default_shakapacker_yml
+      end
+
+      def remove_default_bin_dev
+        bin_dev_path = File.join(destination_root, "bin/dev")
+        return unless File.exist?(bin_dev_path)
+
+        default_bin_dev = <<~RUBY.strip
+          #!/usr/bin/env ruby
+          exec "./bin/rails", "server", *ARGV
+        RUBY
+
+        current_content = File.read(bin_dev_path).strip
+        return unless current_content == default_bin_dev
+
+        puts Rainbow("🗑️  Removing default bin/dev file to avoid conflicts...").yellow
+        File.delete(bin_dev_path)
+      end
+
+      def remove_default_shakapacker_yml
+        config_path = File.join(destination_root, "config/shakapacker.yml")
+        return unless File.exist?(config_path)
+        return unless shakapacker_yml_matches_default?(config_path)
+
+        puts Rainbow("🗑️  Removing default config/shakapacker.yml file to avoid conflicts...").yellow
+        File.delete(config_path)
+      end
+
+      def shakapacker_yml_matches_default?(config_path)
+        shakapacker_gem_path = Gem.loaded_specs["shakapacker"]&.full_gem_path
+        return false unless shakapacker_gem_path
+
+        default_config_path = File.join(shakapacker_gem_path, "lib/install/config/shakapacker.yml")
+        return false unless File.exist?(default_config_path)
+
+        default_content = File.read(default_config_path)
+        current_content = File.read(config_path)
+
+        current_content == default_content
+      rescue StandardError => e
+        # If we can't compare, don't delete - better safe than sorry
+        puts Rainbow("⚠️  Could not verify shakapacker.yml: #{e.message}").yellow if options.verbose?
+        false
       end
 
       def invoke_generators
