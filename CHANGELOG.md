@@ -23,6 +23,52 @@ After a release, please make sure to run `bundle exec rake update_changelog`. Th
 
 Changes since the last non-beta release.
 
+#### Breaking Changes
+
+- **React on Rails Core Package**: Several Pro-only methods have been removed from the core package and are now exclusively available in the `react-on-rails-pro` package. If you're using any of the following methods, you'll need to migrate to React on Rails Pro:
+  - `getOrWaitForComponent()`
+  - `getOrWaitForStore()`
+  - `getOrWaitForStoreGenerator()`
+  - `reactOnRailsStoreLoaded()`
+  - `streamServerRenderedReactComponent()`
+  - `serverRenderRSCReactComponent()`
+
+**Migration Guide:**
+
+To migrate to React on Rails Pro:
+
+1. Install the Pro package:
+
+   ```bash
+   yarn add react-on-rails-pro
+   # or
+   npm install react-on-rails-pro
+   ```
+
+2. Update your imports from `react-on-rails` to `react-on-rails-pro`:
+
+   ```javascript
+   // Before
+   import ReactOnRails from 'react-on-rails';
+
+   // After
+   import ReactOnRails from 'react-on-rails-pro';
+   ```
+
+3. For server-side rendering, update your import paths:
+
+   ```javascript
+   // Before
+   import ReactOnRails from 'react-on-rails';
+
+   // After
+   import ReactOnRails from 'react-on-rails-pro';
+   ```
+
+4. If you're using a free license for personal (non-production) use, you can obtain one at [React on Rails Pro License](https://www.shakacode.com/react-on-rails-pro). The Pro package is free for personal, educational, and non-production usage.
+
+**Note:** If you're not using any of the Pro-only methods listed above, no changes are required.
+
 ### [16.1.1] - 2025-09-24
 
 #### Bug Fixes
