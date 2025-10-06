@@ -39,7 +39,7 @@ const config: KnipConfig = {
 
     // React on Rails core package workspace
     'packages/react-on-rails': {
-      entry: ['src/ReactOnRails.node.ts!'],
+      entry: ['src/ReactOnRails.full.ts!', 'src/ReactOnRails.client.ts!'],
       project: ['src/**/*.[jt]s{x,}!', 'tests/**/*.[jt]s{x,}', '!lib/**'],
       ignore: [
         // Jest setup and test utilities - not detected by Jest plugin in workspace setup

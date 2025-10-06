@@ -24,6 +24,7 @@ type ReactOnRailsFullSpecificFunctions = Pick<
 /**
  * Full object type that includes all base methods plus real SSR implementations.
  * Derived from ReactOnRailsInternal by picking base methods and SSR methods.
+ * @public
  */
 export type BaseFullObjectType = Pick<
   ReactOnRailsInternal,

@@ -20,6 +20,7 @@ const componentRegistry = new CallbackRegistry<RegisteredComponent>('component')
 
 /**
  * @param components { component1: component1, component2: component2, etc. }
+ * @public
  */
 export function register(components: Record<string, ReactComponentOrRenderFunction>): void {
   Object.keys(components).forEach((name) => {
@@ -57,6 +58,7 @@ export const getOrWaitForComponent = (name: string): Promise<RegisteredComponent
  * Get a Map containing all registered components. Useful for debugging.
  * @returns Map where key is the component name and values are the
  * { name, component, renderFunction, isRenderer}
+ * @public
  */
 export const components = (): Map<string, RegisteredComponent> => componentRegistry.getAll();
 

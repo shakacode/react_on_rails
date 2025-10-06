@@ -116,6 +116,7 @@ You should return a React.Component always for the client side entry point.`);
 /**
  * Render a single component by its DOM ID.
  * This is the main entry point for rendering individual components.
+ * @public
  */
 export function renderComponent(domId: string): void {
   const railsContext = getRailsContext();
