@@ -323,6 +323,7 @@ describe "loadable components", :js do
   before { visit "loadable/A" }
 
   it "displays the proper text" do
+    sleep 2
     expect(page).to have_text "This is Page A."
     expect(page.html).to include("[SERVER] RENDERED Loadable")
   end
