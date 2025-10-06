@@ -7,6 +7,8 @@ module.exports = {
     transform: {
       react: {
         runtime: 'automatic',
+        development: process.env.NODE_ENV === 'development',
+        refresh: process.env.NODE_ENV === 'development', // Enable Fast Refresh in development
       },
     },
   },

@@ -28,7 +28,6 @@
     "regenerator-runtime": "^0.13.4"
   },
   "devDependencies": {
-    "@babel/core": "7.17.9",
     "@pmmmwh/react-refresh-webpack-plugin": "^0.5.1",
     "@rescript/react": "^0.13.0",
     "@types/react": "^19.0.0",
