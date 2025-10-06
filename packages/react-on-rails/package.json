@@ -41,7 +41,6 @@
     "./types": "./lib/types/index.js",
     "./context": "./lib/context.js",
     "./pageLifecycle": "./lib/pageLifecycle.js",
-    "./utils": "./lib/utils.js",
     "./createReactOutput": "./lib/createReactOutput.js",
     "./isServerRenderResult": "./lib/isServerRenderResult.js",
     "./reactApis": "./lib/reactApis.cjs",
