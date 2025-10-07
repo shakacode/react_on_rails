@@ -88,13 +88,50 @@ end
 
 shared_context "with pro features and immediate hydration" do
   before do
-    allow(ReactOnRails::Utils).to receive(:react_on_rails_pro_licence_valid?).and_return(true)
-  end
+    allow(ReactOnRails::Utils).to receive_messages(
+      react_on_rails_pro_licence_valid?: true,
+      react_on_rails_pro?: true
+    )
 
-  around do |example|
-    ReactOnRails.configure { |config| config.immediate_hydration = true }
-    example.run
-    ReactOnRails.configure { |config| config.immediate_hydration = false }
+    # Mock Pro gem for immediate_hydration
+    pro_config = Struct.new(:immediate_hydration).new(true)
+    stub_const("ReactOnRailsPro", Module.new do
+      define_singleton_method(:configuration) { pro_config }
+    end)
+
+    stub_const("ReactOnRailsPro::Helper", Module.new do
+      def self.enhance_component_script_data(args)
+        if args[:render_options].immediate_hydration
+          dom_id = args[:render_options].dom_id
+          script_tag = "<script>\n  typeof ReactOnRails === 'object' && " \
+                       "ReactOnRails.reactOnRailsComponentLoaded('#{dom_id}');\n        </script>"
+          {
+            script_attrs: args[:script_attrs].merge("data-immediate-hydration" => true),
+            additional_scripts: [script_tag]
+          }
+        else
+          { script_attrs: args[:script_attrs], additional_scripts: [] }
+        end
+      end
+
+      def self.enhance_store_script_data(args)
+        if args[:redux_store_data][:immediate_hydration]
+          store_name = args[:redux_store_data][:store_name]
+          script_tag = "<script>\n  typeof ReactOnRails === 'object' && " \
+                       "ReactOnRails.reactOnRailsStoreLoaded('#{store_name}');\n        </script>"
+          {
+            script_attrs: args[:script_attrs].merge("data-immediate-hydration" => true),
+            additional_scripts: [script_tag]
+          }
+        else
+          { script_attrs: args[:script_attrs], additional_scripts: [] }
+        end
+      end
+    end)
+
+    # Mock Gem.loaded_specs for version
+    gem_spec = Struct.new(:version).new(Gem::Version.new("1.0.0"))
+    allow(Gem).to receive(:loaded_specs).and_return({ "react_on_rails_pro" => gem_spec })
   end
 end
 
