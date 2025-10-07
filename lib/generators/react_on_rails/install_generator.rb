@@ -75,7 +75,10 @@ module ReactOnRails
       def remove_default_bin_dev
         bin_dev_path = File.join(destination_root, "bin/dev")
         return unless File.exist?(bin_dev_path)
+        return unless File.writable?(bin_dev_path)
 
+        # Rails 7+ default bin/dev content
+        # If Rails changes this default, this comparison will safely fail and preserve the file
         default_bin_dev = <<~RUBY.strip
           #!/usr/bin/env ruby
           exec "./bin/rails", "server", *ARGV
@@ -85,16 +88,17 @@ module ReactOnRails
         return unless current_content == default_bin_dev
 
         puts Rainbow("🗑️  Removing default bin/dev file to avoid conflicts...").yellow
-        File.delete(bin_dev_path)
+        FileUtils.rm_f(bin_dev_path)
       end
 
       def remove_default_shakapacker_yml
         config_path = File.join(destination_root, "config/shakapacker.yml")
         return unless File.exist?(config_path)
+        return unless File.writable?(config_path)
         return unless shakapacker_yml_matches_default?(config_path)
 
         puts Rainbow("🗑️  Removing default config/shakapacker.yml file to avoid conflicts...").yellow
-        File.delete(config_path)
+        FileUtils.rm_f(config_path)
       end
 
       def shakapacker_yml_matches_default?(config_path)
@@ -108,9 +112,8 @@ module ReactOnRails
         current_content = File.read(config_path)
 
         current_content == default_content
-      rescue StandardError => e
+      rescue StandardError
         # If we can't compare, don't delete - better safe than sorry
-        puts Rainbow("⚠️  Could not verify shakapacker.yml: #{e.message}").yellow if options.verbose?
         false
       end
 
