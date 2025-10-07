@@ -39,6 +39,9 @@ ReactOnRailsPro.configure do |config|
   # include any files used to generate the JSON props.
   config.dependency_globs = [File.join(Rails.root, "app", "views", "**", "*.jbuilder")]
 
+  # Enable immediate hydration (Pro default is true, explicitly set for clarity)
+  config.immediate_hydration = true
+
   # When using the Node Renderer, you may require some extra assets in addition to the bundle.
   # The assets_to_copy option allows the Node Renderer to have assets copied at the end of
   # the assets:precompile task or directly by the

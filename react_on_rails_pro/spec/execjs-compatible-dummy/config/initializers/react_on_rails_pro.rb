@@ -27,4 +27,7 @@ ReactOnRailsPro.configure do |config|
   # You can run rake react_on_rails_pro:process_v8_logs to process these files and generate a profile.v8log.json file
   # which can be analyzed using tools like Speed Scope (https://www.speedscope.app) or Chrome Developer Tools
   config.profile_server_rendering_js_code = true
+
+  # Enable immediate hydration (Pro default is true, explicitly set for clarity)
+  config.immediate_hydration = true
 end
