@@ -27,8 +27,13 @@ describe ReactOnRailsHelper do
     )
 
     # Mock Pro gem configuration and helper for immediate_hydration
-    pro_config = Struct.new(:immediate_hydration).new(true)
-    allow(ReactOnRailsPro).to receive(:configuration).and_return(pro_config)
+    stub_const("ReactOnRailsPro", Module.new do
+      def self.configuration
+        @configuration ||= Struct.new(:immediate_hydration).new(true)
+      end
+    end)
+
+    stub_const("ReactOnRailsPro::Helper", Module.new)
     allow(ReactOnRailsPro::Helper).to receive(:enhance_component_script_data) do |args|
       if args[:render_options].immediate_hydration
         dom_id = args[:render_options].dom_id
