@@ -253,7 +253,10 @@ module ReactOnRails
     #    immediate_hydration: false -- React on Rails Pro (licensed) feature. Pass as true if you wish to
     #                        hydrate this store immediately instead of waiting for the page to load.
     def redux_store(store_name, props: {}, defer: false, immediate_hydration: nil)
-      immediate_hydration = ReactOnRails.configuration.immediate_hydration if immediate_hydration.nil?
+      if immediate_hydration.nil? && ReactOnRails::Utils.react_on_rails_pro?
+        immediate_hydration = ReactOnRailsPro.configuration.immediate_hydration
+      end
+      immediate_hydration = false if immediate_hydration.nil?
 
       redux_store_data = { store_name: store_name,
                            props: props,
