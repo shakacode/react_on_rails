@@ -5344,6 +5344,10 @@ react-is@^16.12.0, react-is@^16.13.1, react-is@^16.7.0:
   resolved "https://registry.yarnpkg.com/react-is/-/react-is-16.13.1.tgz#789729a4dc36de2999dc156dd6c1d9c18cea56a4"
   integrity sha512-24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ==
 
+"react-on-rails-pro@link:.yalc/react-on-rails-pro":
+  version "0.0.0"
+  uid ""
+
 react-on-rails-rsc@^19.0.2:
   version "19.0.2"
   resolved "https://registry.yarnpkg.com/react-on-rails-rsc/-/react-on-rails-rsc-19.0.2.tgz#9b0077674b0b55a45ec0fb7d9d22f59fb45bf55f"
@@ -5353,7 +5357,7 @@ react-on-rails-rsc@^19.0.2:
     neo-async "^2.6.1"
     webpack-sources "^3.2.0"
 
-"react-on-rails@link:.yalc/react-on-rails":
+"react-on-rails@link:.yalc/react-on-rails-pro/.yalc/react-on-rails":
   version "0.0.0"
   uid ""
 

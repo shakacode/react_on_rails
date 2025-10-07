@@ -22,6 +22,15 @@ node_modules
 
 /packages/*/lib
 
+# TypeScript build artifacts in src (shouldn't be there, but just in case)
+/packages/*/src/**/*.js
+/packages/*/src/**/*.d.ts
+/packages/*/src/**/*.d.cts
+/packages/*/src/**/*.cjs
+/packages/*/src/**/*.map
+!/packages/*/src/**/*.test.js
+!/packages/*/src/**/*.spec.js
+
 yarn-debug.*
 yarn-error.*
 npm-debug.*

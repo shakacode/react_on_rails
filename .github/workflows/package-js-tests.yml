@@ -36,5 +36,7 @@ jobs:
         run: |
           yarn install --no-progress --no-emoji ${{ matrix.node-version == '22' && '--frozen-lockfile' || '' }}
           sudo yarn global add yalc
+      - name: Build Renderer package
+        run: yarn build
       - name: Run JS unit tests for Renderer package
         run: yarn test

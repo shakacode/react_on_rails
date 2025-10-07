@@ -84,7 +84,8 @@ jobs:
         run: cd packages/react-on-rails && yarn pack -f react-on-rails.tgz
       - name: Lint package types
         # our package is ESM-only
-        run: yarn run attw packages/react-on-rails/react-on-rails.tgz --profile esm-only
+        # Exclude internal exports used for react-on-rails-pro communication
+        run: yarn run attw packages/react-on-rails/react-on-rails.tgz --profile esm-only --exclude-entrypoints reactApis ReactDOMServer
       - name: Lint package publishing
         run: yarn run publint --strict packages/react-on-rails/react-on-rails.tgz
       # We only download and run Actionlint if there is any difference in GitHub Action workflows

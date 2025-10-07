@@ -1,21 +1,13 @@
-import {
-  hydrateAllStores,
-  hydrateImmediateHydratedStores,
-  renderOrHydrateAllComponents,
-  renderOrHydrateImmediateHydratedComponents,
-  unmountAll,
-} from './pro/ClientSideRenderer.ts';
-import { onPageLoaded, onPageUnloaded } from './pageLifecycle.ts';
+// Core package: Renders all components after full page load
+// Pro package: Can hydrate before page load (immediate_hydration) and supports on-demand rendering
+import { renderAllComponents } from './ClientRenderer.ts';
+import { onPageLoaded } from './pageLifecycle.ts';
 import { debugTurbolinks } from './turbolinksUtils.ts';
 
-export async function reactOnRailsPageLoaded() {
+export function reactOnRailsPageLoaded() {
   debugTurbolinks('reactOnRailsPageLoaded');
-  await Promise.all([hydrateAllStores(), renderOrHydrateAllComponents()]);
-}
-
-function reactOnRailsPageUnloaded(): void {
-  debugTurbolinks('reactOnRailsPageUnloaded');
-  unmountAll();
+  // Core package: Render all components after page is fully loaded
+  renderAllComponents();
 }
 
 export function clientStartup() {
@@ -33,13 +25,7 @@ export function clientStartup() {
   // eslint-disable-next-line no-underscore-dangle
   globalThis.__REACT_ON_RAILS_EVENT_HANDLERS_RAN_ONCE__ = true;
 
-  // Force loaded components and stores are rendered and hydrated immediately.
-  // The hydration process can handle the concurrent hydration of components and stores,
-  // so awaiting this isn't necessary.
-  void renderOrHydrateImmediateHydratedComponents();
-  void hydrateImmediateHydratedStores();
-
-  // Other components and stores are rendered and hydrated when the page is fully loaded
+  // Core package: Wait for full page load, then render all components
+  // Pro package: Can start hydration immediately (immediate_hydration: true) or wait for page load
   onPageLoaded(reactOnRailsPageLoaded);
-  onPageUnloaded(reactOnRailsPageUnloaded);
 }

@@ -2,7 +2,7 @@ import type { ReactOnRailsInternal, RailsContext } from './types/index.ts';
 
 declare global {
   /* eslint-disable no-var,vars-on-top,no-underscore-dangle */
-  var ReactOnRails: ReactOnRailsInternal;
+  var ReactOnRails: ReactOnRailsInternal | undefined;
   var __REACT_ON_RAILS_EVENT_HANDLERS_RAN_ONCE__: boolean;
   /* eslint-enable no-var,vars-on-top,no-underscore-dangle */
 }

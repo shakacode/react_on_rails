@@ -16,6 +16,12 @@ module ReactOnRails
       @instance ||= PacksGenerator.new
     end
 
+    def react_on_rails_npm_package
+      return "react-on-rails-pro" if ReactOnRails::Utils.react_on_rails_pro?
+
+      "react-on-rails"
+    end
+
     def generate_packs_if_stale
       return unless ReactOnRails.configuration.auto_load_bundle
 
@@ -104,7 +110,7 @@ module ReactOnRails
 
       if load_server_components && !client_entrypoint?(file_path)
         return <<~FILE_CONTENT.strip
-          import registerServerComponent from 'react-on-rails/registerServerComponent/client';
+          import registerServerComponent from '#{react_on_rails_npm_package}/registerServerComponent/client';
 
           registerServerComponent("#{registered_component_name}");
         FILE_CONTENT
@@ -113,7 +119,7 @@ module ReactOnRails
       relative_component_path = relative_component_path_from_generated_pack(file_path)
 
       <<~FILE_CONTENT.strip
-        import ReactOnRails from 'react-on-rails/client';
+        import ReactOnRails from '#{react_on_rails_npm_package}/client';
         import #{registered_component_name} from '#{relative_component_path}';
 
         ReactOnRails.register({#{registered_component_name}});
@@ -129,14 +135,14 @@ module ReactOnRails
 
     def build_server_pack_content(component_on_server_imports, server_components, client_components)
       content = <<~FILE_CONTENT
-        import ReactOnRails from 'react-on-rails';
+        import ReactOnRails from '#{react_on_rails_npm_package}';
 
         #{component_on_server_imports.join("\n")}\n
       FILE_CONTENT
 
       if server_components.any?
         content += <<~FILE_CONTENT
-          import registerServerComponent from 'react-on-rails/registerServerComponent/server';
+          import registerServerComponent from '#{react_on_rails_npm_package}/registerServerComponent/server';
           registerServerComponent({#{server_components.join(",\n")}});\n
         FILE_CONTENT
       end

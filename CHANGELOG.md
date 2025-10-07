@@ -23,6 +23,52 @@ After a release, please make sure to run `bundle exec rake update_changelog`. Th
 
 Changes since the last non-beta release.
 
+#### Breaking Changes
+
+- **React on Rails Core Package**: Several Pro-only methods have been removed from the core package and are now exclusively available in the `react-on-rails-pro` package. If you're using any of the following methods, you'll need to migrate to React on Rails Pro:
+  - `getOrWaitForComponent()`
+  - `getOrWaitForStore()`
+  - `getOrWaitForStoreGenerator()`
+  - `reactOnRailsStoreLoaded()`
+  - `streamServerRenderedReactComponent()`
+  - `serverRenderRSCReactComponent()`
+
+**Migration Guide:**
+
+To migrate to React on Rails Pro:
+
+1. Install the Pro package:
+
+   ```bash
+   yarn add react-on-rails-pro
+   # or
+   npm install react-on-rails-pro
+   ```
+
+2. Update your imports from `react-on-rails` to `react-on-rails-pro`:
+
+   ```javascript
+   // Before
+   import ReactOnRails from 'react-on-rails';
+
+   // After
+   import ReactOnRails from 'react-on-rails-pro';
+   ```
+
+3. For server-side rendering, update your import paths:
+
+   ```javascript
+   // Before
+   import ReactOnRails from 'react-on-rails';
+
+   // After
+   import ReactOnRails from 'react-on-rails-pro';
+   ```
+
+4. If you're using a free license for personal (non-production) use, you can obtain one at [React on Rails Pro License](https://www.shakacode.com/react-on-rails-pro). The Pro package is free for personal, educational, and non-production usage.
+
+**Note:** If you're not using any of the Pro-only methods listed above, no changes are required.
+
 ### [16.1.1] - 2025-09-24
 
 #### Bug Fixes
@@ -71,7 +117,7 @@ Changes since the last non-beta release.
 
 #### Pro License Features
 
-- **Core/Pro separation**: Moved Pro features into dedicated `lib/react_on_rails/pro/` and `node_package/src/pro/` directories with clear licensing boundaries (now located at `packages/react-on-rails/src/pro/`) [PR 1791](https://github.com/shakacode/react_on_rails/pull/1791) by [AbanoubGhadban](https://github.com/AbanoubGhadban)
+- **Core/Pro separation**: Moved Pro features into dedicated `lib/react_on_rails/pro/` and `node_package/src/pro/` directories with clear licensing boundaries (now separated into `packages/react-on-rails-pro/` package) [PR 1791](https://github.com/shakacode/react_on_rails/pull/1791) by [AbanoubGhadban](https://github.com/AbanoubGhadban)
 - **Runtime license validation**: Implemented Pro license gating with graceful fallback to core functionality when Pro license unavailable [PR 1791](https://github.com/shakacode/react_on_rails/pull/1791) by [AbanoubGhadban](https://github.com/AbanoubGhadban)
 - **Enhanced immediate hydration**: Improved immediate hydration functionality with Pro license validation and warning badges [PR 1791](https://github.com/shakacode/react_on_rails/pull/1791) by [AbanoubGhadban](https://github.com/AbanoubGhadban)
 - **License documentation**: Added NOTICE files in Pro directories referencing canonical `REACT-ON-RAILS-PRO-LICENSE.md` [PR 1791](https://github.com/shakacode/react_on_rails/pull/1791) by [AbanoubGhadban](https://github.com/AbanoubGhadban)

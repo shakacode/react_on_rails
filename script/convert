@@ -39,7 +39,7 @@ gsub_file_content("../package.json", /"react-dom": "[^"]*",/, '"react-dom": "18.
 gsub_file_content("../spec/dummy/package.json", /"react": "[^"]*",/, '"react": "18.0.0",')
 gsub_file_content("../spec/dummy/package.json", /"react-dom": "[^"]*",/, '"react-dom": "18.0.0",')
 gsub_file_content(
-  "../packages/react-on-rails/package.json",
+  "../packages/react-on-rails-pro/package.json",
   "jest tests",
   'jest tests --testPathIgnorePatterns=\".*(RSC|stream|' \
   'registerServerComponent|serverRenderReactComponent|SuspenseHydration).*\"'

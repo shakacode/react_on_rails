@@ -1,6 +1,6 @@
 import * as React from 'react';
 import serverRenderReactComponent from '../src/serverRenderReactComponent.ts';
-import * as ComponentRegistry from '../src/pro/ComponentRegistry.ts';
+import ComponentRegistry from '../src/ComponentRegistry.ts';
 import type {
   RenderParams,
   RenderResult,
@@ -26,6 +26,9 @@ const assertIsPromise: <T>(value: null | string | Promise<T>) => asserts value i
 describe('serverRenderReactComponent', () => {
   beforeEach(() => {
     ComponentRegistry.components().clear();
+    // Setup globalThis.ReactOnRails for serverRenderReactComponent
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/unbound-method, @typescript-eslint/no-explicit-any
+    globalThis.ReactOnRails = { getComponent: ComponentRegistry.get } as any;
   });
 
   it('serverRenderReactComponent renders a registered component', () => {
