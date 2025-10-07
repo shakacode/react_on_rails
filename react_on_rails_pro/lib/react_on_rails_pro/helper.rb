@@ -23,10 +23,11 @@ module ReactOnRailsPro
 
     # Enhances component script data with immediate hydration support
     # @param script_attrs [Hash] Base script tag attributes
-    # @param _script_content [String] Script content (not used in current implementation)
+    # @param script_content [String] Script content (not used in current implementation)
     # @param render_options [ReactOnRails::ReactComponent::RenderOptions] Render options
     # @return [Hash] Enhanced script attributes and additional scripts
-    def self.enhance_component_script_data(script_attrs:, _script_content:, render_options:)
+    def self.enhance_component_script_data(script_attrs:, script_content:, render_options:)
+      _ = script_content # Mark as intentionally unused
       if render_options.immediate_hydration
         # Add data attribute for immediate hydration
         script_attrs["data-immediate-hydration"] = true
@@ -48,10 +49,11 @@ module ReactOnRailsPro
 
     # Enhances store script data with immediate hydration support
     # @param script_attrs [Hash] Base script tag attributes
-    # @param _script_content [String] Script content (not used in current implementation)
+    # @param script_content [String] Script content (not used in current implementation)
     # @param redux_store_data [Hash] Redux store data including store_name and props
     # @return [Hash] Enhanced script attributes and additional scripts
-    def self.enhance_store_script_data(script_attrs:, _script_content:, redux_store_data:)
+    def self.enhance_store_script_data(script_attrs:, script_content:, redux_store_data:)
+      _ = script_content # Mark as intentionally unused
       if redux_store_data[:immediate_hydration]
         # Add data attribute for immediate hydration
         script_attrs["data-immediate-hydration"] = true
