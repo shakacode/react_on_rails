@@ -15,7 +15,10 @@ module ReactOnRails
     # Be sure to include view helper `redux_store_hydration_data` at the end of your layout or view
     # or else there will be no client side hydration of your stores.
     def redux_store(store_name, props: {}, immediate_hydration: nil)
-      immediate_hydration = ReactOnRails.configuration.immediate_hydration if immediate_hydration.nil?
+      if immediate_hydration.nil? && ReactOnRails::Utils.react_on_rails_pro?
+        immediate_hydration = ReactOnRailsPro.configuration.immediate_hydration
+      end
+      immediate_hydration = false if immediate_hydration.nil?
       redux_store_data = { store_name: store_name,
                            props: props,
                            immediate_hydration: immediate_hydration }
