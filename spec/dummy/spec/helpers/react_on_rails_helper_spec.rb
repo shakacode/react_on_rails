@@ -22,18 +22,38 @@ describe ReactOnRailsHelper do
     }
 
     allow(ReactOnRails::Utils).to receive_messages(
-      react_on_rails_pro_licence_valid?: true
+      react_on_rails_pro_licence_valid?: true,
+      react_on_rails_pro?: true
     )
 
-    # Configure immediate_hydration to true for tests since they expect that behavior
-    ReactOnRails.configure do |config|
-      config.immediate_hydration = true
+    # Mock Pro gem configuration and helper for immediate_hydration
+    allow(ReactOnRailsPro).to receive_message_chain(:configuration, :immediate_hydration).and_return(true)
+    allow(ReactOnRailsPro::Helper).to receive(:enhance_component_script_data) do |args|
+      if args[:render_options].immediate_hydration
+        dom_id = args[:render_options].dom_id
+        script_tag = "<script>\n  typeof ReactOnRails === 'object' && " \
+                     "ReactOnRails.reactOnRailsComponentLoaded('#{dom_id}');\n        </script>"
+        {
+          script_attrs: args[:script_attrs].merge("data-immediate-hydration" => true),
+          additional_scripts: [script_tag]
+        }
+      else
+        { script_attrs: args[:script_attrs], additional_scripts: [] }
+      end
     end
-  end
-
-  after do
-    # Reset to default - avoid validation issues by setting directly
-    ReactOnRails.configuration.immediate_hydration = false
+    allow(ReactOnRailsPro::Helper).to receive(:enhance_store_script_data) do |args|
+      if args[:redux_store_data][:immediate_hydration]
+        store_name = args[:redux_store_data][:store_name]
+        script_tag = "<script>\n  typeof ReactOnRails === 'object' && " \
+                     "ReactOnRails.reactOnRailsStoreLoaded('#{store_name}');\n        </script>"
+        {
+          script_attrs: args[:script_attrs].merge("data-immediate-hydration" => true),
+          additional_scripts: [script_tag]
+        }
+      else
+        { script_attrs: args[:script_attrs], additional_scripts: [] }
+      end
+    end
   end
 
   let(:hash) do
@@ -406,12 +426,8 @@ describe ReactOnRailsHelper do
 
         before do
           allow(ReactOnRails::Utils).to receive(:react_on_rails_pro_licence_valid?).and_return(false)
-        end
-
-        around do |example|
-          ReactOnRails.configure { |config| config.immediate_hydration = true }
-          example.run
-          ReactOnRails.configure { |config| config.immediate_hydration = false }
+          # Mock Pro gem configuration for immediate_hydration = true
+          allow(ReactOnRailsPro).to receive_message_chain(:configuration, :immediate_hydration).and_return(true)
         end
 
         it { is_expected.to include(badge_html_string) }

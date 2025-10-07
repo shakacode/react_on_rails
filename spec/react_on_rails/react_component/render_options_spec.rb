@@ -9,7 +9,6 @@ describe ReactOnRails::ReactComponent::RenderOptions do
     replay_console
     raise_on_prerender_error
     random_dom_id
-    immediate_hydration
   ].freeze
 
   def the_attrs(react_component_name: "App", options: {})
@@ -160,6 +159,64 @@ describe ReactOnRails::ReactComponent::RenderOptions do
           opts = described_class.new(**attrs)
 
           expect(opts.public_send(option)).to be true
+        end
+      end
+    end
+  end
+
+  # Pro feature tests - immediate_hydration is retrieved from Pro gem configuration
+  describe "#immediate_hydration" do
+    context "with immediate_hydration option set to true" do
+      it "returns true" do
+        options = { immediate_hydration: true }
+        attrs = the_attrs(options: options)
+
+        opts = described_class.new(**attrs)
+
+        expect(opts.immediate_hydration).to be true
+      end
+    end
+
+    context "with immediate_hydration option set to false" do
+      it "returns false" do
+        options = { immediate_hydration: false }
+        attrs = the_attrs(options: options)
+
+        opts = described_class.new(**attrs)
+
+        expect(opts.immediate_hydration).to be false
+      end
+    end
+
+    context "without immediate_hydration option" do
+      context "when Pro gem is installed" do
+        it "returns value from ReactOnRailsPro.configuration" do
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+
+          # Stub ReactOnRailsPro module and configuration
+          config_struct = Struct.new(:immediate_hydration)
+          pro_config = config_struct.new(true)
+
+          pro_module = Module.new do
+            define_singleton_method(:configuration) { pro_config }
+          end
+          stub_const("ReactOnRailsPro", pro_module)
+
+          attrs = the_attrs
+          opts = described_class.new(**attrs)
+
+          expect(opts.immediate_hydration).to be true
+        end
+      end
+
+      context "when Pro gem is NOT installed" do
+        it "returns nil" do
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+
+          attrs = the_attrs
+          opts = described_class.new(**attrs)
+
+          expect(opts.immediate_hydration).to be_nil
         end
       end
     end

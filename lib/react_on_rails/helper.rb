@@ -11,12 +11,10 @@ require "addressable/uri"
 require "react_on_rails/utils"
 require "react_on_rails/json_output"
 require "active_support/concern"
-require "react_on_rails/pro/helper"
 
 module ReactOnRails
   module Helper
     include ReactOnRails::Utils::Required
-    include ReactOnRails::Pro::Helper
 
     COMPONENT_HTML_KEY = "componentHtml"
 
@@ -791,6 +789,66 @@ module ReactOnRails
 
       instrument_method :react_component, type: "ReactOnRails", name: "react_component"
       instrument_method :react_component_hash, type: "ReactOnRails", name: "react_component_hash"
+    end
+
+    # Generates the complete component specification script tag.
+    # Handles both immediate hydration (Pro feature) and standard cases.
+    def generate_component_script(render_options)
+      # Collect script data
+      script_attrs = {
+        type: "application/json",
+        class: "js-react-on-rails-component",
+        id: "js-react-on-rails-component-#{render_options.dom_id}",
+        "data-component-name" => render_options.react_component_name,
+        "data-trace" => (render_options.trace ? true : nil),
+        "data-dom-id" => render_options.dom_id,
+        "data-store-dependencies" => render_options.store_dependencies&.to_json
+      }
+
+      script_content = json_safe_and_pretty(render_options.client_props).html_safe
+      additional_scripts = []
+
+      # Let Pro gem enhance if available
+      if ReactOnRails::Utils.react_on_rails_pro?
+        result = ReactOnRailsPro::Helper.enhance_component_script_data(
+          script_attrs: script_attrs,
+          script_content: script_content,
+          render_options: render_options
+        )
+        script_attrs = result[:script_attrs]
+        additional_scripts = result[:additional_scripts]
+      end
+
+      # Generate final HTML
+      main_script = content_tag(:script, script_content, script_attrs)
+      ([main_script] + additional_scripts).join("\n").html_safe
+    end
+
+    # Generates the complete store hydration script tag.
+    # Handles both immediate hydration (Pro feature) and standard cases.
+    def generate_store_script(redux_store_data)
+      script_attrs = {
+        type: "application/json",
+        "data-js-react-on-rails-store" => redux_store_data[:store_name].html_safe
+      }
+
+      script_content = json_safe_and_pretty(redux_store_data[:props]).html_safe
+      additional_scripts = []
+
+      # Let Pro gem enhance if available
+      if ReactOnRails::Utils.react_on_rails_pro?
+        result = ReactOnRailsPro::Helper.enhance_store_script_data(
+          script_attrs: script_attrs,
+          script_content: script_content,
+          redux_store_data: redux_store_data
+        )
+        script_attrs = result[:script_attrs]
+        additional_scripts = result[:additional_scripts]
+      end
+
+      # Generate final HTML
+      main_script = content_tag(:script, script_content, script_attrs)
+      ([main_script] + additional_scripts).join("\n").html_safe
     end
 
     def raise_missing_autoloaded_bundle(react_component_name)

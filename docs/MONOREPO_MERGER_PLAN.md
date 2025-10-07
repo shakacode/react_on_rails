@@ -404,7 +404,74 @@ After the initial merge, the following CI adjustments may be needed:
 
 ---
 
-#### PR #5: Add Pro Node Renderer Package
+#### PR #5: Move Pro Features from Core Gem to Pro Gem
+
+**Branch:** `move-pro-features-to-pro-gem`
+
+**Objectives:**
+
+- Move all Pro features from `lib/react_on_rails/pro/` to Pro gem
+- Delete `lib/react_on_rails/pro/` directory entirely
+- Ensure core gem is 100% MIT licensed with zero Pro code
+
+**Tasks:**
+
+- [x] Move `immediate_hydration` config from core gem to Pro gem (default: true in Pro)
+- [x] Refactor `RenderOptions` to remove Pro utilities
+- [x] Refactor helper methods (`generate_component_script`, `generate_store_script`) to use data enhancement pattern
+- [x] Create Pro helper module in Pro gem with enhancement methods
+- [x] Delete `lib/react_on_rails/pro/` directory entirely
+- [x] Update LICENSE.md to remove `lib/react_on_rails/pro/` reference
+- [x] Update tests in both gems
+
+**Implementation Details:**
+
+The `immediate_hydration` feature was the only Pro feature in the core gem. The refactoring uses a data enhancement pattern:
+
+1. Core gem collects script attributes/content as data structures (not HTML)
+2. If Pro gem loaded, it modifies the data (adds attributes, adds extra scripts)
+3. Core gem generates final HTML from the (possibly enhanced) data
+
+**Benefits:**
+
+- ✅ Clean separation: Core gem = 100% MIT, Pro gem = 100% Pro license
+- ✅ No HTML parsing needed
+- ✅ No Pro warning badge needed (can't enable Pro features without Pro gem)
+- ✅ Better architecture: Core gem doesn't know about Pro internals
+
+**License Compliance:**
+
+- [x] **CRITICAL: Update LICENSE.md:**
+
+  ```md
+  ## MIT License applies to:
+
+  - `lib/react_on_rails/` (entire directory)
+  - `packages/react-on-rails/` (entire package)
+
+  ## React on Rails Pro License applies to:
+
+  - `packages/react-on-rails-pro/` (entire package)
+  - `react_on_rails_pro/` (entire directory)
+  ```
+
+- [x] Verify no Pro code remains in core gem directories
+
+**Success Criteria:** ✅ All CI checks pass + `lib/react_on_rails/pro/` deleted + Core gem is 100% MIT licensed
+
+**Estimated Duration:** 2-3 days
+
+**Risk Level:** Medium (requires careful refactoring of helper methods)
+
+**Developer Notes:**
+
+- The core gem now calls `ReactOnRailsPro::Helper.enhance_component_script_data` and `ReactOnRailsPro::Helper.enhance_store_script_data` if Pro gem is loaded
+- The `immediate_hydration` method in `RenderOptions` now uses `retrieve_react_on_rails_pro_config_value_for(:immediate_hydration)`
+- Tests have been updated to mock Pro gem functionality
+
+---
+
+#### PR #6: Add Pro Node Renderer Package
 
 **Branch:** `add-pro-node-renderer`
 
@@ -455,7 +522,7 @@ After the initial merge, the following CI adjustments may be needed:
 
 ### Phase 6: Final Monorepo Restructuring
 
-#### PR #6: Restructure Ruby Gems to Final Layout
+#### PR #7: Restructure Ruby Gems to Final Layout
 
 **Branch:** `restructure-ruby-gems`
 
@@ -522,7 +589,7 @@ After the initial merge, the following CI adjustments may be needed:
 
 ### Phase 7: CI/CD & Tooling Unification
 
-#### PR #7: Unify CI/CD Configuration
+#### PR #8: Unify CI/CD Configuration
 
 **Branch:** `unify-cicd`
 
@@ -588,7 +655,7 @@ After the initial merge, the following CI adjustments may be needed:
 
 ### Phase 8: Documentation & Polish
 
-#### PR #8: Update Documentation & Examples
+#### PR #9: Update Documentation & Examples
 
 **Branch:** `update-docs-examples`
 
