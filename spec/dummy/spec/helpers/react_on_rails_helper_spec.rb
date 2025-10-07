@@ -27,6 +27,10 @@ describe ReactOnRailsHelper do
     )
 
     # Mock Pro gem configuration and helper for immediate_hydration
+    # Also need to mock Gem.loaded_specs for version
+    gem_spec = Struct.new(:version).new(Gem::Version.new("1.0.0"))
+    allow(Gem).to receive(:loaded_specs).and_return({ "react_on_rails_pro" => gem_spec })
+
     stub_const("ReactOnRailsPro", Module.new do
       def self.configuration
         @configuration ||= Struct.new(:immediate_hydration).new(true)
