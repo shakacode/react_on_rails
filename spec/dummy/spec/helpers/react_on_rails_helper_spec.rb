@@ -33,33 +33,35 @@ describe ReactOnRailsHelper do
       end
     end)
 
-    stub_const("ReactOnRailsPro::Helper", Module.new)
-    allow(ReactOnRailsPro::Helper).to receive(:enhance_component_script_data) do |args|
-      if args[:render_options].immediate_hydration
-        dom_id = args[:render_options].dom_id
-        script_tag = "<script>\n  typeof ReactOnRails === 'object' && " \
-                     "ReactOnRails.reactOnRailsComponentLoaded('#{dom_id}');\n        </script>"
-        {
-          script_attrs: args[:script_attrs].merge("data-immediate-hydration" => true),
-          additional_scripts: [script_tag]
-        }
-      else
-        { script_attrs: args[:script_attrs], additional_scripts: [] }
+    stub_const("ReactOnRailsPro::Helper", Module.new do
+      def self.enhance_component_script_data(args)
+        if args[:render_options].immediate_hydration
+          dom_id = args[:render_options].dom_id
+          script_tag = "<script>\n  typeof ReactOnRails === 'object' && " \
+                       "ReactOnRails.reactOnRailsComponentLoaded('#{dom_id}');\n        </script>"
+          {
+            script_attrs: args[:script_attrs].merge("data-immediate-hydration" => true),
+            additional_scripts: [script_tag]
+          }
+        else
+          { script_attrs: args[:script_attrs], additional_scripts: [] }
+        end
       end
-    end
-    allow(ReactOnRailsPro::Helper).to receive(:enhance_store_script_data) do |args|
-      if args[:redux_store_data][:immediate_hydration]
-        store_name = args[:redux_store_data][:store_name]
-        script_tag = "<script>\n  typeof ReactOnRails === 'object' && " \
-                     "ReactOnRails.reactOnRailsStoreLoaded('#{store_name}');\n        </script>"
-        {
-          script_attrs: args[:script_attrs].merge("data-immediate-hydration" => true),
-          additional_scripts: [script_tag]
-        }
-      else
-        { script_attrs: args[:script_attrs], additional_scripts: [] }
+
+      def self.enhance_store_script_data(args)
+        if args[:redux_store_data][:immediate_hydration]
+          store_name = args[:redux_store_data][:store_name]
+          script_tag = "<script>\n  typeof ReactOnRails === 'object' && " \
+                       "ReactOnRails.reactOnRailsStoreLoaded('#{store_name}');\n        </script>"
+          {
+            script_attrs: args[:script_attrs].merge("data-immediate-hydration" => true),
+            additional_scripts: [script_tag]
+          }
+        else
+          { script_attrs: args[:script_attrs], additional_scripts: [] }
+        end
       end
-    end
+    end)
   end
 
   let(:hash) do
