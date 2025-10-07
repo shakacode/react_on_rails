@@ -77,18 +77,24 @@ module ReactOnRails
         return unless File.exist?(bin_dev_path)
         return unless File.writable?(bin_dev_path)
 
-        # Rails 7+ default bin/dev content
-        # If Rails changes this default, this comparison will safely fail and preserve the file
-        default_bin_dev = <<~RUBY.strip
+        current_content = File.read(bin_dev_path).strip
+        return unless bin_dev_matches_rails_default?(current_content)
+
+        puts Rainbow("🗑️  Removing default bin/dev file to avoid conflicts...").yellow
+        FileUtils.rm_f(bin_dev_path)
+      end
+
+      def bin_dev_matches_rails_default?(content)
+        # Rails 7+ simple bin/dev content
+        # Note: Rails doesn't have a bin/dev template in its generators, but this is the
+        # common simple default that many Rails apps use. We check against this known
+        # default to avoid conflicts during installation.
+        rails_simple_default = <<~RUBY.strip
           #!/usr/bin/env ruby
           exec "./bin/rails", "server", *ARGV
         RUBY
 
-        current_content = File.read(bin_dev_path).strip
-        return unless current_content == default_bin_dev
-
-        puts Rainbow("🗑️  Removing default bin/dev file to avoid conflicts...").yellow
-        FileUtils.rm_f(bin_dev_path)
+        content == rails_simple_default
       end
 
       def remove_default_shakapacker_yml
