@@ -28,7 +28,26 @@ The `--rspack` flag allows users to generate a React on Rails application using 
   - Adds `assets_bundler: 'rspack'` to shakapacker.yml default section
   - Changes `webpack_loader` to `'swc'` (Rspack works best with SWC transpiler)
 
-### 3. Bundler Switching Script (`lib/generators/react_on_rails/templates/base/base/bin/switch-bundler`)
+### 3. Webpack Configuration Templates
+
+Updated webpack configuration templates to support both webpack and rspack bundlers with unified config approach:
+
+**development.js.tt**:
+
+- Added `config` to shakapacker require to access `assets_bundler` setting
+- Conditional React Refresh plugin loading based on `config.assets_bundler`:
+  - Rspack: Uses `@rspack/plugin-react-refresh`
+  - Webpack: Uses `@pmmmwh/react-refresh-webpack-plugin`
+- Prevents "window not found" errors when using rspack
+
+**serverWebpackConfig.js.tt**:
+
+- Added `bundler` variable that conditionally requires `@rspack/core` or `webpack`
+- Changed `webpack.optimize.LimitChunkCountPlugin` to `bundler.optimize.LimitChunkCountPlugin`
+- Enables same config to work with both bundlers without warnings
+- Avoids hardcoding webpack-specific imports
+
+### 4. Bundler Switching Script (`lib/generators/react_on_rails/templates/base/base/bin/switch-bundler`)
 
 Created a new executable script that allows switching between webpack and rspack after installation:
 
