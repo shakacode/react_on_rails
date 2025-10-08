@@ -2,7 +2,7 @@
 
 ## Details
 
-1. [Overview](./core-concepts/react-on-rails-overview.md)
+1. [Introduction](./introduction.md)
 1. [Getting Started](./getting-started.md)
 1. [How React on Rails Works](./core-concepts/how-react-on-rails-works.md)
 1. [Webpack Configuration](./core-concepts/webpack-configuration.md)
