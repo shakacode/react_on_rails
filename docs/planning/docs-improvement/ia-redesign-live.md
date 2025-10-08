@@ -368,11 +368,20 @@ After Steps 1-8, found 12 files not in original plan. Investigated and reorganiz
    - All valuable content already in introduction.md or README.md
    - No unique content lost
 
+6. **✅ Transformed `docs/getting-started.md` → `docs/getting-started/understanding-react-on-rails.md`**
+   - Reduced from 253 to 238 lines (still comprehensive but focused)
+   - Removed: Choose Starting Point (redundant), System Requirements (duplicate), More Reading (navigation)
+   - Transformed installation section to conceptual overview with links
+   - Kept: Basic Usage, Auto-Bundling concept, Render-Functions concept, Error Handling
+   - Added: Clear "Next Steps" section with organized paths
+   - Purpose: Conceptual journey guide explaining how things work (not step-by-step tutorial)
+   - Updated link in quick-start.md
+   - Deleted original `docs/getting-started.md`
+
 **Remaining Entry Point Tasks:**
-- Split `docs/getting-started.md` (extract installation/concepts/API, then delete)
 - Update website config (sc-website gatsby-node.js) to use introduction.md as homepage
 
-**Next Actions:** Handle getting-started.md extraction, then update website config
+**Next Actions:** Update website config when ready (keeping for last as user requested)
 
 ---
 
@@ -382,8 +391,8 @@ After Steps 1-8, found 12 files not in original plan. Investigated and reorganiz
 docs/
 ├── introduction.md              # ✅ Created - new unified homepage
 ├── README.md                    # ✅ Simplified for GitHub users
-├── getting-started.md           # TODO: Extract content then delete
-├── getting-started/ (4 files)
+├── getting-started/ (5 files)
+│   ├── understanding-react-on-rails.md  # ✅ NEW - Transformed from getting-started.md
 │   ├── quick-start.md
 │   ├── installation-into-an-existing-rails-app.md
 │   ├── tutorial.md
