@@ -108,6 +108,7 @@ task :release, %i[gem_version dry_run registry skip_push] do |_t, args|
     puts "  Updated #{file}"
   end
 
+  bundle_install_in(gem_root)
   # Update dummy app's Gemfile.lock
   bundle_install_in(dummy_app_dir)
 
