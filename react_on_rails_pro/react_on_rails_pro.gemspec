@@ -32,6 +32,7 @@ Gem::Specification.new do |s|
   s.add_runtime_dependency "connection_pool"
   s.add_runtime_dependency "execjs", "~> 2.9"
   s.add_runtime_dependency "httpx", "~> 1.5"
+  s.add_runtime_dependency "jwt", "~> 2.7"
   s.add_runtime_dependency "rainbow"
   s.add_runtime_dependency "react_on_rails", ">= 16.0.0"
   s.add_development_dependency "bundler"

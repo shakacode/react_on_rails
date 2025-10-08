@@ -16,6 +16,10 @@ module ReactOnRailsPro
       puts "[ReactOnRailsPro] #{message}"
     end
 
+    def self.licence_valid?
+      LicenseValidator.valid?
+    end
+
     def self.copy_assets
       return if ReactOnRailsPro.configuration.assets_to_copy.blank?
 
