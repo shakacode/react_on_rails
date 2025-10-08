@@ -70,9 +70,6 @@
     "yalc:publish": "yarn workspaces run yalc:publish",
     "yalc": "yarn workspaces run yalc",
     "publish": "yarn workspaces run publish",
-    "release:patch": "yarn workspaces run release:patch",
-    "release:minor": "yarn workspaces run release:minor",
-    "release:major": "yarn workspaces run release:major",
     "postinstall": "test -f .lefthook.yml && test -d .git && command -v bundle >/dev/null 2>&1 && bundle exec lefthook install || true"
   },
   "repository": {
