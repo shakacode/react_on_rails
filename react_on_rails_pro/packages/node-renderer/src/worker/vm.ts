@@ -317,6 +317,7 @@ export async function buildExecutionContext(
 
   const runInVM = async (renderingRequest: string, bundleFilePath: string, vmCluster?: typeof cluster) => {
     try {
+      const { bundlePath } = getConfig();
       const vmContext = mapBundleFilePathToVMContext.get(bundleFilePath);
       if (!vmContext) {
         throw new VMContextNotFoundError(bundleFilePath);
@@ -332,7 +333,7 @@ export async function buildExecutionContext(
         const workerId = vmCluster?.worker?.id;
         log.debug(`worker ${workerId ? `${workerId} ` : ''}received render request for bundle ${bundleFilePath} with code
   ${smartTrim(renderingRequest)}`);
-        const debugOutputPathCode = path.join(bundleFilePath, 'code.js');
+        const debugOutputPathCode = path.join(bundlePath, 'code.js');
         log.debug(`Full code executed written to: ${debugOutputPathCode}`);
         await writeFileAsync(debugOutputPathCode, renderingRequest);
       }
@@ -368,7 +369,7 @@ export async function buildExecutionContext(
       if (log.level === 'debug') {
         log.debug(`result from JS:
   ${smartTrim(result)}`);
-        const debugOutputPathResult = path.join(bundleFilePath, 'result.json');
+        const debugOutputPathResult = path.join(bundlePath, 'result.json');
         log.debug(`Wrote result to file: ${debugOutputPathResult}`);
         await writeFileAsync(debugOutputPathResult, result);
       }
