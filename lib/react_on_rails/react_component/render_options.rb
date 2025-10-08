@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require "react_on_rails/utils"
-require "react_on_rails/pro/utils"
+require "react_on_rails/pro_utils"
 
 module ReactOnRails
   module ReactComponent
@@ -16,7 +16,7 @@ module ReactOnRails
       def initialize(react_component_name: required("react_component_name"), options: required("options"))
         @react_component_name = react_component_name.camelize
 
-        result = ReactOnRails::Pro::Utils.disable_pro_render_options_if_not_licensed(options)
+        result = ReactOnRails::ProUtils.disable_pro_render_options_if_not_licensed(options)
         @options = result[:raw_options]
         @explicitly_disabled_pro_options = result[:explicitly_disabled_pro_options]
       end
