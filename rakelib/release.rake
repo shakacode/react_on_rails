@@ -45,8 +45,23 @@ task :release, %i[gem_version dry_run registry skip_push] do |_t, args|
   args_hash = args.to_hash
 
   is_dry_run = ReactOnRails::Utils.object_to_boolean(args_hash[:dry_run])
-  use_verdaccio = args_hash.fetch(:registry, "") == "verdaccio"
-  skip_push = args_hash.fetch(:skip_push, "") == "skip_push"
+
+  # Validate registry parameter
+  registry_value = args_hash.fetch(:registry, "")
+  unless registry_value.empty? || registry_value == "verdaccio" || registry_value == "npm"
+    raise ArgumentError,
+          "Invalid registry value '#{registry_value}'. Valid values are: 'verdaccio', 'npm', or empty string"
+  end
+
+  use_verdaccio = registry_value == "verdaccio"
+
+  # Validate skip_push parameter
+  skip_push_value = args_hash.fetch(:skip_push, "")
+  unless skip_push_value.empty? || skip_push_value == "skip_push"
+    raise ArgumentError, "Invalid skip_push value '#{skip_push_value}'. Valid values are: 'skip_push' or empty string"
+  end
+
+  skip_push = skip_push_value == "skip_push"
 
   gem_version = args_hash.fetch(:gem_version, "")
 
