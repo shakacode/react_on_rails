@@ -27,11 +27,14 @@ This task depends on the gem-release ruby gem which is installed via `bundle ins
 1st argument: The new version in rubygem format (no dashes). Pass no argument to
               automatically perform a patch version bump.
 2nd argument: Perform a dry run by passing 'true' as a second argument.
+3rd argument: Use Verdaccio local registry by passing 'verdaccio' as a third argument.
+              Requires Verdaccio server running on http://localhost:4873/
 
-Note: Accept defaults for npmjs options. Script will pause to get 2FA tokens.
-
-Example: `rake release[16.2.0,false]`")
-task :release, %i[gem_version dry_run] do |_t, args|
+Examples:
+  rake release[16.2.0]                  # Release to production
+  rake release[16.2.0,true]             # Dry run
+  rake release[16.2.0,false,verdaccio]  # Test release to Verdaccio")
+task :release, %i[gem_version dry_run registry] do |_t, args|
   include ReactOnRails::TaskHelpers
 
   # Check if there are uncommitted changes
@@ -39,6 +42,7 @@ task :release, %i[gem_version dry_run] do |_t, args|
   args_hash = args.to_hash
 
   is_dry_run = ReactOnRails::Utils.object_to_boolean(args_hash[:dry_run])
+  use_verdaccio = args_hash.fetch(:registry, "") == "verdaccio"
 
   gem_version = args_hash.fetch(:gem_version, "")
 
@@ -88,6 +92,22 @@ task :release, %i[gem_version dry_run] do |_t, args|
   # Update dummy app's Gemfile.lock
   bundle_install_in(dummy_app_dir)
 
+  # Prepare NPM registry configuration
+  npm_registry_url = use_verdaccio ? "http://localhost:4873/" : "https://registry.npmjs.org/"
+  npm_publish_args = use_verdaccio ? "--registry #{npm_registry_url}" : ""
+
+  if use_verdaccio
+    puts "\n#{'=' * 80}"
+    puts "VERDACCIO LOCAL REGISTRY MODE"
+    puts "=" * 80
+    puts "\nBefore proceeding, ensure:"
+    puts "  1. Verdaccio server is running on http://localhost:4873/"
+    puts "  2. You are authenticated with Verdaccio:"
+    puts "     npm adduser --registry http://localhost:4873/"
+    puts "\nPress ENTER to continue or Ctrl+C to cancel..."
+    $stdin.gets unless is_dry_run
+  end
+
   unless is_dry_run
     # Commit all version changes
     sh_in_dir(gem_root, "git add -A")
@@ -101,40 +121,54 @@ task :release, %i[gem_version dry_run] do |_t, args|
     sh_in_dir(gem_root, "git push --tags")
 
     puts "\n#{'=' * 80}"
-    puts "Publishing NPM packages..."
+    puts "Publishing NPM packages to #{use_verdaccio ? 'Verdaccio (local)' : 'npmjs.org'}..."
     puts "=" * 80
 
     # Publish react-on-rails NPM package
     puts "\nPublishing react-on-rails@#{actual_npm_version}..."
-    puts "Carefully add your OTP for NPM when prompted."
-    sh_in_dir(gem_root, "yarn workspace react-on-rails publish --new-version #{actual_npm_version}")
+    puts "Carefully add your OTP for NPM when prompted." unless use_verdaccio
+    sh_in_dir(gem_root, "yarn workspace react-on-rails publish --new-version #{actual_npm_version} #{npm_publish_args}")
 
     # Publish react-on-rails-pro NPM package
     puts "\nPublishing react-on-rails-pro@#{actual_npm_version}..."
-    puts "Carefully add your OTP for NPM when prompted."
-    sh_in_dir(gem_root, "yarn workspace react-on-rails-pro publish --new-version #{actual_npm_version}")
+    puts "Carefully add your OTP for NPM when prompted." unless use_verdaccio
+    sh_in_dir(gem_root,
+              "yarn workspace react-on-rails-pro publish --new-version #{actual_npm_version} #{npm_publish_args}")
 
-    puts "\n#{'=' * 80}"
-    puts "Publishing Ruby gem..."
-    puts "=" * 80
+    if use_verdaccio
+      puts "Skipping Ruby gem publication (Verdaccio mode)"
+      puts "=" * 80
+    else
+      puts "\n#{'=' * 80}"
+      puts "Publishing Ruby gem..."
+      puts "=" * 80
 
-    # Publish Ruby gem
-    puts "\nCarefully add your OTP for Rubygems when prompted."
-    sh_in_dir(gem_root, "gem release")
+      # Publish Ruby gem
+      puts "\nCarefully add your OTP for Rubygems when prompted."
+      sh_in_dir(gem_root, "gem release")
+    end
   end
+
+  npm_registry_note = if use_verdaccio
+                        "Verdaccio (http://localhost:4873/)"
+                      else
+                        "npmjs.org"
+                      end
 
   if is_dry_run
     puts "\n#{'=' * 80}"
     puts "DRY RUN COMPLETE"
     puts "=" * 80
     puts "Version would be bumped to: #{actual_gem_version} (gem) / #{actual_npm_version} (npm)"
+    puts "NPM Registry: #{npm_registry_note}"
     puts "Files that would be updated:"
     puts "  - lib/react_on_rails/version.rb"
     puts "  - package.json (root)"
     puts "  - packages/react-on-rails/package.json"
     puts "  - packages/react-on-rails-pro/package.json (version + dependency)"
     puts "  - spec/dummy/Gemfile.lock"
-    puts "\nTo actually release, run without dry_run: rake release[#{actual_gem_version}]"
+    registry_arg = use_verdaccio ? ",false,verdaccio" : ""
+    puts "\nTo actually release, run: rake release[#{actual_gem_version}#{registry_arg}]"
   else
     msg = <<~MSG
 
@@ -142,18 +176,34 @@ task :release, %i[gem_version dry_run] do |_t, args|
       RELEASE COMPLETE! 🎉
       #{'=' * 80}
 
-      Published:
-        - react-on-rails@#{actual_npm_version} (NPM)
-        - react-on-rails-pro@#{actual_npm_version} (NPM)
-        - react_on_rails #{actual_gem_version} (RubyGems)
-
-      Next steps:
-        1. Update CHANGELOG.md: bundle exec rake update_changelog
-        2. Update dummy app: cd #{dummy_app_dir} && bundle update react_on_rails
-        3. Commit CHANGELOG: cd #{gem_root} && git commit -a -m 'Update CHANGELOG.md and spec/dummy Gemfile.lock'
-        4. Push changes: git push
-
+      Published to #{npm_registry_note}:
+        - react-on-rails@#{actual_npm_version}
+        - react-on-rails-pro@#{actual_npm_version}
     MSG
+
+    msg += "    - react_on_rails #{actual_gem_version} (RubyGems)\n" unless use_verdaccio
+
+    if use_verdaccio
+      msg += <<~VERDACCIO
+
+        Verdaccio test packages published successfully!
+
+        To test installation:
+          npm install --registry http://localhost:4873/ react-on-rails@#{actual_npm_version}
+          npm install --registry http://localhost:4873/ react-on-rails-pro@#{actual_npm_version}
+
+      VERDACCIO
+    else
+      msg += <<~PRODUCTION
+
+        Next steps:
+          1. Update CHANGELOG.md: bundle exec rake update_changelog
+          3. Commit CHANGELOG: cd #{gem_root} && git commit -a -m 'Update CHANGELOG.md and spec/dummy Gemfile.lock'
+          4. Push changes: git push
+
+      PRODUCTION
+    end
+
     puts msg
   end
 end
