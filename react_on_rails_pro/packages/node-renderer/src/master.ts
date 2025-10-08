@@ -7,10 +7,27 @@ import log from './shared/log';
 import { buildConfig, Config, logSanitizedConfig } from './shared/configBuilder';
 import restartWorkers from './master/restartWorkers';
 import * as errorReporter from './shared/errorReporter';
+import { isLicenseValid, getLicenseValidationError } from './shared/licenseValidator';
 
 const MILLISECONDS_IN_MINUTE = 60000;
 
 export = function masterRun(runningConfig?: Partial<Config>) {
+  // Validate license before starting
+  if (!isLicenseValid()) {
+    const error = getLicenseValidationError() || 'Invalid license';
+    const isDevelopment = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
+
+    if (isDevelopment) {
+      log.warn(`[React on Rails Pro] ${error}`);
+      // Continue in development with warning
+    } else {
+      log.error(`[React on Rails Pro] ${error}`);
+      process.exit(1);
+    }
+  } else {
+    log.info('[React on Rails Pro] License validation successful');
+  }
+
   // Store config in app state. From now it can be loaded by any module using getConfig():
   const config = buildConfig(runningConfig);
   const { workersCount, allWorkersRestartInterval, delayBetweenIndividualWorkerRestarts } = config;

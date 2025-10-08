@@ -75,3 +75,6 @@ ssr-generated
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# React on Rails Pro license file
+config/react_on_rails_pro_license.key
