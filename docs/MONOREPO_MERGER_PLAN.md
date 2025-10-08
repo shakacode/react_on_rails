@@ -372,12 +372,11 @@ After the initial merge, the following CI adjustments may be needed:
   ```md
   ## MIT License applies to:
 
-  - `lib/react_on_rails/` (excluding `lib/react_on_rails/pro/`)
+  - `lib/react_on_rails/` (entire directory)
   - `packages/react-on-rails/` (entire package)
 
   ## React on Rails Pro License applies to:
 
-  - `lib/react_on_rails/pro/`
   - `packages/react-on-rails-pro/` (entire package)
   - `react_on_rails_pro/` (entire directory)
   ```
