@@ -159,7 +159,7 @@ Now that you have React on Rails working, here's what to explore next:
 
 ### Immediate Next Steps
 
-1. **[Basic Configuration](../getting-started.md)** - Understand the setup
+1. **[Understanding React on Rails](./understanding-react-on-rails.md)** - Core concepts explained
 2. **[View Helpers API](../api-reference/view-helpers-api.md)** - Learn all the options for `react_component`
 3. **[Hot Module Replacement](../building-features/hmr-and-hot-reloading-with-the-webpack-dev-server.md)** - Optimize your dev workflow
 
