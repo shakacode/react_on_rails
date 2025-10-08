@@ -54,7 +54,7 @@
     "./ServerComponentFetchError": "./lib/ServerComponentFetchError.js"
   },
   "dependencies": {
-    "react-on-rails": "16.1.2"
+    "react-on-rails": "*"
   },
   "peerDependencies": {
     "react": ">= 16",
