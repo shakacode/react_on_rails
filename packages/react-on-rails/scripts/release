@@ -1,6 +1,0 @@
-#!/bin/sh
-
-yarn version $1 -m "Bump version to %s"
-git push -u origin master
-git push --tags
-yarn publish

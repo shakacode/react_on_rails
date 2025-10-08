@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "bundler"
+require "json"
 require_relative "task_helpers"
 require_relative File.join(gem_root, "lib", "react_on_rails", "version_syntax_converter")
 require_relative File.join(gem_root, "lib", "react_on_rails", "git_utils")
@@ -14,24 +15,23 @@ end
 
 # rubocop:disable Metrics/BlockLength
 
-desc("Releases both the gem and node package using the given version.
+desc("Releases the gem and both NPM packages (react-on-rails and react-on-rails-pro).
 
 IMPORTANT: the gem version must be in valid rubygem format (no dashes).
-It will be automatically converted to a valid yarn semver by the rake task
-for the node package version. This only makes a difference for pre-release
-versions such as `3.0.0.beta.1` (yarn version would be `3.0.0-beta.1`).
+It will be automatically converted to valid npm semver by the rake task
+for the node package versions. This only makes a difference for pre-release
+versions such as `3.0.0.beta.1` (npm version would be `3.0.0-beta.1`).
 
-This task depends on the gem-release (ruby gem) and release-it (node package)
-which are installed via `bundle install` and `yarn global add release-it`
+This task depends on the gem-release ruby gem which is installed via `bundle install`.
 
 1st argument: The new version in rubygem format (no dashes). Pass no argument to
               automatically perform a patch version bump.
 2nd argument: Perform a dry run by passing 'true' as a second argument.
 
-Note, accept defaults for npmjs options. Script will pause to get 2FA tokens.
+Note: Accept defaults for npmjs options. Script will pause to get 2FA tokens.
 
-Example: `rake release[2.1.0,false]`")
-task :release, %i[gem_version dry_run tools_install] do |_t, args|
+Example: `rake release[16.2.0,false]`")
+task :release, %i[gem_version dry_run] do |_t, args|
   include ReactOnRails::TaskHelpers
 
   # Check if there are uncommitted changes
@@ -42,64 +42,119 @@ task :release, %i[gem_version dry_run tools_install] do |_t, args|
 
   gem_version = args_hash.fetch(:gem_version, "")
 
-  npm_version = if gem_version.strip.empty?
-                  ""
-                else
-                  ReactOnRails::VersionSyntaxConverter.new.rubygem_to_npm(gem_version)
-                end
-
   # Having the examples prevents publishing
   Rake::Task["shakapacker_examples:clobber"].invoke
   # Delete any react_on_rails.gemspec except the root one
   sh_in_dir(gem_root, "find . -mindepth 2 -name 'react_on_rails.gemspec' -delete")
 
-  # See https://github.com/svenfuchs/gem-release
+  # Pull latest changes
   sh_in_dir(gem_root, "git pull --rebase")
+
+  # Bump gem version using gem-release
   sh_in_dir(gem_root, "gem bump --no-commit #{%(--version #{gem_version}) unless gem_version.strip.empty?}")
+
+  # Read the actual version that was set
+  actual_gem_version = begin
+    version_file = File.join(gem_root, "lib", "react_on_rails", "version.rb")
+    version_content = File.read(version_file)
+    version_content.match(/VERSION = "(.+)"/)[1]
+  end
+
+  actual_npm_version = ReactOnRails::VersionSyntaxConverter.new.rubygem_to_npm(actual_gem_version)
+
+  puts "Updating package.json files to version #{actual_npm_version}..."
+
+  # Update all package.json files
+  package_json_files = [
+    File.join(gem_root, "package.json"),
+    File.join(gem_root, "packages", "react-on-rails", "package.json"),
+    File.join(gem_root, "packages", "react-on-rails-pro", "package.json")
+  ]
+
+  package_json_files.each do |file|
+    content = JSON.parse(File.read(file))
+    content["version"] = actual_npm_version
+
+    # For react-on-rails-pro, also update the react-on-rails dependency
+    if file.include?("react-on-rails-pro")
+      content["dependencies"] ||= {}
+      content["dependencies"]["react-on-rails"] = actual_npm_version
+    end
+
+    File.write(file, "#{JSON.pretty_generate(content)}\n")
+    puts "  Updated #{file}"
+  end
 
   # Update dummy app's Gemfile.lock
   bundle_install_in(dummy_app_dir)
 
-  puts "Carefully add your OTP for NPM. If you get an error, 'git reset --hard' and start over."
-  # Will bump the yarn version, commit, tag the commit, push to repo, and release on yarn
-  release_it_command = +"release-it"
-  release_it_command << " #{npm_version}" unless npm_version.strip.empty?
-  release_it_command << " --npm.publish --no-git.requireCleanWorkingDir"
-  release_it_command << " --dry-run --verbose" if is_dry_run
-  # Disable lefthook pre-commit hooks during release to prevent file modifications
-  sh_in_dir(gem_root, "LEFTHOOK=0 #{release_it_command}")
-
-  # Commit the Gemfile.lock changes made by release-it before gem release
   unless is_dry_run
-    sh_in_dir(gem_root, "git add Gemfile.lock")
-    # Only commit if there are staged changes
-    if `cd #{gem_root} && git diff --cached --quiet; echo $?`.strip == "0"
-      puts "No Gemfile.lock changes to commit"
-    else
-      sh_in_dir(gem_root, "git commit -m 'Update Gemfile.lock for version #{gem_version}'")
-    end
+    # Commit all version changes
+    sh_in_dir(gem_root, "git add -A")
+    sh_in_dir(gem_root, "git commit -m 'Bump version to #{actual_gem_version}'")
+
+    # Create git tag
+    sh_in_dir(gem_root, "git tag v#{actual_gem_version}")
+
+    # Push commits and tags
+    sh_in_dir(gem_root, "git push")
+    sh_in_dir(gem_root, "git push --tags")
+
+    puts "\n#{'=' * 80}"
+    puts "Publishing NPM packages..."
+    puts "=" * 80
+
+    # Publish react-on-rails NPM package
+    puts "\nPublishing react-on-rails@#{actual_npm_version}..."
+    puts "Carefully add your OTP for NPM when prompted."
+    sh_in_dir(gem_root, "yarn workspace react-on-rails publish --new-version #{actual_npm_version}")
+
+    # Publish react-on-rails-pro NPM package
+    puts "\nPublishing react-on-rails-pro@#{actual_npm_version}..."
+    puts "Carefully add your OTP for NPM when prompted."
+    sh_in_dir(gem_root, "yarn workspace react-on-rails-pro publish --new-version #{actual_npm_version}")
+
+    puts "\n#{'=' * 80}"
+    puts "Publishing Ruby gem..."
+    puts "=" * 80
+
+    # Publish Ruby gem
+    puts "\nCarefully add your OTP for Rubygems when prompted."
+    sh_in_dir(gem_root, "gem release")
   end
 
-  # Release the new gem version
+  if is_dry_run
+    puts "\n#{'=' * 80}"
+    puts "DRY RUN COMPLETE"
+    puts "=" * 80
+    puts "Version would be bumped to: #{actual_gem_version} (gem) / #{actual_npm_version} (npm)"
+    puts "Files that would be updated:"
+    puts "  - lib/react_on_rails/version.rb"
+    puts "  - package.json (root)"
+    puts "  - packages/react-on-rails/package.json"
+    puts "  - packages/react-on-rails-pro/package.json (version + dependency)"
+    puts "  - spec/dummy/Gemfile.lock"
+    puts "\nTo actually release, run without dry_run: rake release[#{actual_gem_version}]"
+  else
+    msg = <<~MSG
 
-  puts "Carefully add your OTP for Rubygems. If you get an error, run 'gem release' again."
-  sh_in_dir(gem_root, "gem release") unless is_dry_run
+      #{'=' * 80}
+      RELEASE COMPLETE! 🎉
+      #{'=' * 80}
 
-  msg = <<~MSG
-    Once you have successfully published, run these commands to update CHANGELOG.md:
+      Published:
+        - react-on-rails@#{actual_npm_version} (NPM)
+        - react-on-rails-pro@#{actual_npm_version} (NPM)
+        - react_on_rails #{actual_gem_version} (RubyGems)
 
-    bundle exec rake update_changelog
-    cd #{dummy_app_dir}; bundle update react_on_rails
-    cd #{gem_root}
-    git commit -a -m 'Update CHANGELOG.md and spec/dummy Gemfile.lock'
-    git push
-  MSG
-  puts msg
+      Next steps:
+        1. Update CHANGELOG.md: bundle exec rake update_changelog
+        2. Update dummy app: cd #{dummy_app_dir} && bundle update react_on_rails
+        3. Commit CHANGELOG: cd #{gem_root} && git commit -a -m 'Update CHANGELOG.md and spec/dummy Gemfile.lock'
+        4. Push changes: git push
+
+    MSG
+    puts msg
+  end
 end
 # rubocop:enable Metrics/BlockLength
-
-task :test do
-  unbundled_sh_in_dir(gem_root, "cd #{dummy_app_dir}; bundle update react_on_rails")
-  sh_in_dir(gem_root, "git commit -a -m 'Update Gemfile.lock for spec app'")
-  sh_in_dir(gem_root, "git push")
-end
