@@ -38,9 +38,14 @@ module ReactOnRails
 
       def run_generators
         if installation_prerequisites_met? || options.ignore_warnings?
-          # Only remove default files if Shakapacker is already configured
-          # If it's not configured, we'll install it ourselves and shouldn't delete what we create
-          remove_default_gem_files if shakapacker_configured?
+          # Check if Shakapacker is configured BEFORE we run any generators
+          # This way we know if it existed before React on Rails installation
+          shakapacker_was_preconfigured = shakapacker_configured?
+
+          # Only remove default files if Shakapacker was already configured before we started
+          # If it wasn't configured, we'll install it ourselves and shouldn't delete those files
+          remove_default_gem_files if shakapacker_was_preconfigured
+
           invoke_generators
           add_bin_scripts
           # Only add the post install message if not using Redux
