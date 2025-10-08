@@ -11,12 +11,12 @@ require "addressable/uri"
 require "react_on_rails/utils"
 require "react_on_rails/json_output"
 require "active_support/concern"
-require "react_on_rails/pro/helper"
+require "react_on_rails/pro_helper"
 
 module ReactOnRails
   module Helper
     include ReactOnRails::Utils::Required
-    include ReactOnRails::Pro::Helper
+    include ReactOnRails::ProHelper
 
     COMPONENT_HTML_KEY = "componentHtml"
 
