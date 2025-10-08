@@ -29,12 +29,15 @@ This task depends on the gem-release ruby gem which is installed via `bundle ins
 2nd argument: Perform a dry run by passing 'true' as a second argument.
 3rd argument: Use Verdaccio local registry by passing 'verdaccio' as a third argument.
               Requires Verdaccio server running on http://localhost:4873/
+4th argument: Skip pushing to remote by passing 'skip_push' as a fourth argument.
+              Useful for testing the release process locally.
 
 Examples:
-  rake release[16.2.0]                  # Release to production
-  rake release[16.2.0,true]             # Dry run
-  rake release[16.2.0,false,verdaccio]  # Test release to Verdaccio")
-task :release, %i[gem_version dry_run registry] do |_t, args|
+  rake release[16.2.0]                          # Release to production
+  rake release[16.2.0,true]                     # Dry run
+  rake release[16.2.0,false,verdaccio]          # Test release to Verdaccio
+  rake release[16.2.0,false,npm,skip_push]      # Release without pushing to remote")
+task :release, %i[gem_version dry_run registry skip_push] do |_t, args|
   include ReactOnRails::TaskHelpers
 
   # Check if there are uncommitted changes
@@ -43,6 +46,7 @@ task :release, %i[gem_version dry_run registry] do |_t, args|
 
   is_dry_run = ReactOnRails::Utils.object_to_boolean(args_hash[:dry_run])
   use_verdaccio = args_hash.fetch(:registry, "") == "verdaccio"
+  skip_push = args_hash.fetch(:skip_push, "") == "skip_push"
 
   gem_version = args_hash.fetch(:gem_version, "")
 
@@ -117,8 +121,10 @@ task :release, %i[gem_version dry_run registry] do |_t, args|
     sh_in_dir(gem_root, "git tag v#{actual_gem_version}")
 
     # Push commits and tags
-    sh_in_dir(gem_root, "git push")
-    sh_in_dir(gem_root, "git push --tags")
+    unless skip_push
+      sh_in_dir(gem_root, "git push")
+      sh_in_dir(gem_root, "git push --tags")
+    end
 
     puts "\n#{'=' * 80}"
     puts "Publishing NPM packages to #{use_verdaccio ? 'Verdaccio (local)' : 'npmjs.org'}..."
@@ -182,6 +188,16 @@ task :release, %i[gem_version dry_run registry] do |_t, args|
     MSG
 
     msg += "    - react_on_rails #{actual_gem_version} (RubyGems)\n" unless use_verdaccio
+
+    if skip_push
+      msg += <<~SKIP_PUSH
+
+        ⚠️  Git push was skipped. Don't forget to push manually:
+          git push
+          git push --tags
+
+      SKIP_PUSH
+    end
 
     if use_verdaccio
       msg += <<~VERDACCIO
