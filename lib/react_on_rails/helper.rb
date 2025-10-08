@@ -819,6 +819,7 @@ module ReactOnRails
           render_options: render_options
         )
         script_attrs = result[:script_attrs]
+        script_content = result[:script_content]
         additional_scripts = result[:additional_scripts]
       end
 
@@ -846,6 +847,7 @@ module ReactOnRails
           redux_store_data: redux_store_data
         )
         script_attrs = result[:script_attrs]
+        script_content = result[:script_content]
         additional_scripts = result[:additional_scripts]
       end
 

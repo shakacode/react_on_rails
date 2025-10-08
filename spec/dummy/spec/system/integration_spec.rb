@@ -107,10 +107,11 @@ shared_context "with pro features and immediate hydration" do
                        "ReactOnRails.reactOnRailsComponentLoaded('#{dom_id}');\n        </script>"
           {
             script_attrs: args[:script_attrs].merge("data-immediate-hydration" => true),
+            script_content: args[:script_content],
             additional_scripts: [script_tag]
           }
         else
-          { script_attrs: args[:script_attrs], additional_scripts: [] }
+          { script_attrs: args[:script_attrs], script_content: args[:script_content], additional_scripts: [] }
         end
       end
 
@@ -121,10 +122,11 @@ shared_context "with pro features and immediate hydration" do
                        "ReactOnRails.reactOnRailsStoreLoaded('#{store_name}');\n        </script>"
           {
             script_attrs: args[:script_attrs].merge("data-immediate-hydration" => true),
+            script_content: args[:script_content],
             additional_scripts: [script_tag]
           }
         else
-          { script_attrs: args[:script_attrs], additional_scripts: [] }
+          { script_attrs: args[:script_attrs], script_content: args[:script_content], additional_scripts: [] }
         end
       end
     end)
