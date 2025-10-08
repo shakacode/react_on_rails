@@ -321,7 +321,53 @@ After Steps 1-8, found 12 files not in original plan. Investigated and reorganiz
 
 **Total files moved:** ~50+ files across all steps
 
-**Next Actions:** Update website config, update internal links, create introduction.md
+---
+
+## Phase 3: Entry Point Consolidation (Oct 7, 2025)
+
+**Branch:** `feature/docs-ia-redesign-1845-continue` (continuing from merged PR #1845)
+
+### Actions Completed:
+
+1. **✅ Deleted orphaned `docs/guides/advanced/README.md`**
+   - Navigation index left behind after reorganization
+   - Linked to files now in core-concepts/
+   - Redundant, deleted
+
+2. **✅ Created `docs/introduction.md`** - New unified homepage
+   - Explains what React on Rails is and why use it
+   - When to use / when not to use decision guide
+   - Three clear paths: Quick Start, Installation, Tutorial
+   - Popular use cases quick reference table
+   - Core concepts links
+   - Philosophy section linking to doctrine
+   - Help and support section
+   - Added community stat (thousands of production sites)
+   - Added all 3 example repos (spec/dummy, demo SSR/HMR, reactrails.com)
+   - System requirements from actual docs
+   - Built from: overview.md, doctrine.md, README.md structure
+
+3. **✅ Deleted `docs/core-concepts/react-on-rails-overview.md`**
+   - Content consolidated into introduction.md
+   - Outdated prerequisites (Rails >=5 vs current Rails 7+)
+   - Created confusion with two similar entry points
+   - Updated 2 links: home.md and doctrine.md
+
+4. **✅ Simplified `docs/README.md`** for GitHub users
+   - Reduced from 173 lines to 65 lines
+   - Directs to website first
+   - Kept valuable learning paths from PR #1813
+   - Kept popular use cases table
+   - Added documentation categories overview
+   - Removed duplicate content (now in introduction.md)
+   - Purpose: Serves GitHub users browsing repo, not website visitors
+
+**Remaining Entry Point Tasks:**
+- Delete `docs/home.md` (will be replaced by introduction.md on website)
+- Split `docs/getting-started.md` (extract installation/concepts/API, then delete)
+- Update website config (sc-website gatsby-node.js) to use introduction.md as homepage
+
+**Next Actions:** Delete home.md, handle getting-started.md, then update website config
 
 ---
 
@@ -329,15 +375,16 @@ After Steps 1-8, found 12 files not in original plan. Investigated and reorganiz
 
 ```
 docs/
-├── introduction.md              # TODO: Create in next phase
+├── introduction.md              # ✅ Created - new unified homepage
+├── README.md                    # ✅ Simplified for GitHub users
+├── home.md                      # TODO: Delete (replaced by introduction.md)
 ├── getting-started/ (4 files)
 │   ├── quick-start.md
 │   ├── installation-into-an-existing-rails-app.md
 │   ├── tutorial.md
 │   └── project-structure.md
-├── core-concepts/ (8 files)
+├── core-concepts/ (7 files)
 │   ├── how-react-on-rails-works.md
-│   ├── react-on-rails-overview.md
 │   ├── client-vs-server-rendering.md
 │   ├── react-server-rendering.md
 │   ├── render-functions-and-railscontext.md
