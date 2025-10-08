@@ -267,7 +267,7 @@ module ReactOnRails
       end
 
       def shakapacker_in_gemfile_text?(gem_name)
-        gemfile = ENV["BUNDLE_GEMFILE"] || "Gemfile"
+        gemfile = ENV["BUNDLE_GEMFILE"] || File.join(destination_root, "Gemfile")
 
         File.file?(gemfile) &&
           File.foreach(gemfile).any? { |l| l.match?(/^\s*gem\s+['"]#{Regexp.escape(gem_name)}['"]/) }
