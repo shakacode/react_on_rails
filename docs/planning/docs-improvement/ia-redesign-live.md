@@ -362,12 +362,17 @@ After Steps 1-8, found 12 files not in original plan. Investigated and reorganiz
    - Removed duplicate content (now in introduction.md)
    - Purpose: Serves GitHub users browsing repo, not website visitors
 
+5. **✅ Deleted `docs/home.md`**
+   - Was the current website homepage (29 lines of links)
+   - Replaced by introduction.md
+   - All valuable content already in introduction.md or README.md
+   - No unique content lost
+
 **Remaining Entry Point Tasks:**
-- Delete `docs/home.md` (will be replaced by introduction.md on website)
 - Split `docs/getting-started.md` (extract installation/concepts/API, then delete)
 - Update website config (sc-website gatsby-node.js) to use introduction.md as homepage
 
-**Next Actions:** Delete home.md, handle getting-started.md, then update website config
+**Next Actions:** Handle getting-started.md extraction, then update website config
 
 ---
 
@@ -377,7 +382,7 @@ After Steps 1-8, found 12 files not in original plan. Investigated and reorganiz
 docs/
 ├── introduction.md              # ✅ Created - new unified homepage
 ├── README.md                    # ✅ Simplified for GitHub users
-├── home.md                      # TODO: Delete (replaced by introduction.md)
+├── getting-started.md           # TODO: Extract content then delete
 ├── getting-started/ (4 files)
 │   ├── quick-start.md
 │   ├── installation-into-an-existing-rails-app.md
