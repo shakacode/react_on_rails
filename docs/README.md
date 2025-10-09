@@ -33,14 +33,14 @@ Jump straight to what you need
 
 Find guidance for your specific scenario:
 
-| I want to...                        | Go here                                                                                |
-| ----------------------------------- | -------------------------------------------------------------------------------------- |
-| **Add React to existing Rails app** | [Installation Guide](./getting-started/installation-into-an-existing-rails-app.md)     |
-| **Enable server-side rendering**    | [SSR Guide](./core-concepts/react-server-rendering.md)                                 |
+| I want to...                        | Go here                                                                               |
+| ----------------------------------- | ------------------------------------------------------------------------------------- |
+| **Add React to existing Rails app** | [Installation Guide](./getting-started/installation-into-an-existing-rails-app.md)    |
+| **Enable server-side rendering**    | [SSR Guide](./core-concepts/react-server-rendering.md)                                |
 | **Set up hot reloading**            | [HMR Setup](./building-features/hmr-and-hot-reloading-with-the-webpack-dev-server.md) |
-| **Use Redux with Rails**            | [Redux Integration](./building-features/react-and-redux.md)                            |
-| **Deploy to production**            | [Deployment Guide](./deployment/deployment.md)                                         |
-| **Troubleshoot issues**             | [Troubleshooting](./deployment/troubleshooting.md)                                     |
+| **Use Redux with Rails**            | [Redux Integration](./building-features/react-and-redux.md)                           |
+| **Deploy to production**            | [Deployment Guide](./deployment/deployment.md)                                        |
+| **Troubleshoot issues**             | [Troubleshooting](./deployment/troubleshooting.md)                                    |
 
 ## 📖 Documentation Categories
 
