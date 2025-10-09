@@ -25,6 +25,7 @@ PATH
       connection_pool
       execjs (~> 2.9)
       httpx (~> 1.5)
+      jwt (~> 2.7)
       rainbow
       react_on_rails (>= 16.0.0)
 
@@ -184,6 +185,8 @@ GEM
       railties (>= 4.2.0)
       thor (>= 0.14, < 2.0)
     json (2.7.2)
+    jwt (2.9.3)
+      base64
     launchy (3.0.1)
       addressable (~> 2.8)
       childprocess (~> 5.0)
