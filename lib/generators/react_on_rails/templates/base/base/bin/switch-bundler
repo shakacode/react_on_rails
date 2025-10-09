@@ -3,6 +3,7 @@
 
 require "fileutils"
 require "yaml"
+require "json"
 
 # Script to switch between webpack and rspack bundlers
 class BundlerSwitcher
@@ -96,28 +97,29 @@ class BundlerSwitcher
     # Detect package manager
     package_manager = detect_package_manager
 
-    # Install dependencies
-    install_cmd = case package_manager
-                  when "yarn"
-                    "yarn add #{deps[:dependencies].join(' ')}"
-                  when "pnpm"
-                    "pnpm add #{deps[:dependencies].join(' ')}"
-                  else
-                    "npm install #{deps[:dependencies].join(' ')}"
-                  end
+    # Install dependencies using array form to prevent command injection
+    success = case package_manager
+              when "yarn"
+                system("yarn", "add", *deps[:dependencies])
+              when "pnpm"
+                system("pnpm", "add", *deps[:dependencies])
+              else
+                system("npm", "install", *deps[:dependencies])
+              end
 
-    # Install dev dependencies
-    install_dev_cmd = case package_manager
-                      when "yarn"
-                        "yarn add -D #{deps[:dev_dependencies].join(' ')}"
-                      when "pnpm"
-                        "pnpm add -D #{deps[:dev_dependencies].join(' ')}"
-                      else
-                        "npm install --save-dev #{deps[:dev_dependencies].join(' ')}"
-                      end
+    abort("❌ Failed to install dependencies") unless success
 
-    system(install_cmd) || abort("❌ Failed to install dependencies")
-    system(install_dev_cmd) || abort("❌ Failed to install dev dependencies")
+    # Install dev dependencies using array form to prevent command injection
+    success = case package_manager
+              when "yarn"
+                system("yarn", "add", "-D", *deps[:dev_dependencies])
+              when "pnpm"
+                system("pnpm", "add", "-D", *deps[:dev_dependencies])
+              else
+                system("npm", "install", "--save-dev", *deps[:dev_dependencies])
+              end
+
+    abort("❌ Failed to install dev dependencies") unless success
 
     puts "✅ Installed #{@target_bundler} dependencies"
   end
