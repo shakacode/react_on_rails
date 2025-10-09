@@ -54,8 +54,6 @@
 
 ## Installation
 
-See the [Installation Overview](../advanced-topics/manual-installation-overview.md) for a concise set summary of what's in a React on Rails installation.
-
 ## NPM
 
 All JavaScript in React On Rails is loaded from npm: [react-on-rails](https://www.npmjs.com/package/react-on-rails). To manually install this (you did not use the generator), assuming you have a standard configuration, run this command (assuming you are in the directory where you have your `node_modules`):
