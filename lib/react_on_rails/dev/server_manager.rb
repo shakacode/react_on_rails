@@ -70,8 +70,12 @@ module ReactOnRails
         def terminate_processes(pids)
           pids.each do |pid|
             Process.kill("TERM", pid)
-          rescue StandardError
+          rescue Errno::ESRCH
+            # Process already stopped - this is fine
             nil
+          rescue Errno::EPERM
+            # Permission denied - warn the user
+            puts "   ⚠️  Process #{pid} - permission denied (process owned by another user)"
           end
         end
 
