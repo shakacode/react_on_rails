@@ -1,11 +1,14 @@
-// This is a placeholder public key for development/testing
-// In production, this should be replaced with ShakaCode's actual public key
-// The private key corresponding to this public key should NEVER be committed to the repository
+// ShakaCode's public key for React on Rails Pro license verification
+// The private key corresponding to this public key is held by ShakaCode
+// and is never committed to the repository
+// Last updated: 2025-10-09 15:57:09 UTC
+// Source: http://localhost:8788/api/public-key
 export const PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0Z3VS5JJcds3xfn/ygWyF/NP
-lRQkqfph3x6TEOirFCpDfRjowDXAk66dPmLzw5qVOmGVPKgpJBjZR7oMIMgxBPUoj00F
-DwlhUGmOVoqnVWGFHVUHDL5qYQaZzRdp4Bh9fxnN52Yk8+FuHsT+5lxLcaRV6mRtX7OT
-5pQbxV0o0/OxPFC1Hz9RdLPUevnWNbLe8f5ePHivmqsoAH9HE4g03WkFZEqBLmjqpJj8
-VqGR0q8CPPRCFGAr9S4WCQqBhLDH0j/JR+FpPX9Df8vfFJhHdBGdTGjN4g9g6qwPYmVH
-ukAErHNIJMNmzYjFIT4+Xwp6xKHyUqL3w3JZDQnFywIDAQAB
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAlJFK3aWuycVp9X05qhGo
+FLztH8yjpuAKUoC4DKHX0fYjNIzwG3xwhLWKKDCmnNfuzW5R09/albl59/ZCHFyS
+I7H7Aita1l9rnHCHEyyyJUs/E7zMG27lsECkNoCJr5cD/qtabY45uggFJrl3YRgy
+ieonNQvxLtvPuatAPd6jfs/PlHOYA3z+t0C5uDW5YlXJkLKzKKiikvxsyOnk94Uq
+J7FWzSdlvY08aLkERZDlGuWcjvQexVz7NCAMR050aEgobwxg2AuaCWDd8cDH6Asq
+mhGxQr7ulvrXfDMI6dBqa3ihfjgk+dpA8ilfUsCFc8ovbIA0oE8BTIxogyYr2KaH
+vQIDAQAB
 -----END PUBLIC KEY-----`;
