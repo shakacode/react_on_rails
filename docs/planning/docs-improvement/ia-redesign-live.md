@@ -374,13 +374,19 @@ After Steps 1-8, found 12 files not in original plan. Investigated and reorganiz
    - No unique content lost
 
 6. **✅ Transformed `docs/getting-started.md` → `docs/getting-started/using-react-on-rails.md`**
+
    - Reduced from 253 to 238 lines (still comprehensive but focused)
    - Removed: Choose Starting Point (redundant), System Requirements (duplicate), More Reading (navigation)
    - Transformed installation section to conceptual overview with links
-   - Kept: Basic Usage, Auto-Bundling concept, Render-Functions concept, Error Handling
-   - Added: Clear "Next Steps" section with organized paths
-   - Purpose: Conceptual journey guide explaining how things work (not step-by-step tutorial)
-   - Updated link in quick-start.md
+
+7. **✅ Deleted `docs/advanced-topics/manual-installation-overview.md`**
+   - Outdated since 2018 (had "TODO: Review this file" for 7 years)
+   - Confused purpose: title said "Manual Installation" but subtitle said "summarizes what generator does"
+   - Outdated content: referenced `/client`, `webpacker`, missing auto-bundling
+   - No clear use case: generator IS the manual installation (not external CLI)
+   - Content better covered in: how-react-on-rails-works.md, using-react-on-rails.md
+   - Removed link from installation-into-an-existing-rails-app.md
+   - Decision discussed with team in Slack
    - Deleted original `docs/getting-started.md`
 
 **Remaining Entry Point Tasks:**
@@ -467,9 +473,8 @@ docs/
 │   ├── doctrine.md
 │   ├── style.md
 │   └── tips.md
-└── advanced-topics/ (2 files - KEEPING as category)
-    ├── rails-engine-integration.md            # Step 5 correction: from deployment
-    └── manual-installation-overview.md        # Orphaned: manual setup guide
+└── advanced-topics/ (1 file - KEEPING as category)
+    └── rails-engine-integration.md            # Step 5 correction: from deployment
 ```
 
 **Final Decisions:**
