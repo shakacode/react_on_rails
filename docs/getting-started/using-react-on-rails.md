@@ -16,12 +16,14 @@ When you install React on Rails, several things happen:
 4. **Shakapacker configured** - Webpack integration for Rails (required dependency)
 
 The generator sets up:
+
 - Component directories (typically `app/javascript/bundles/` or with auto-bundling in `app/javascript/src/*/ror_components/`)
 - Rails integration (controllers, views, initializer)
 - Webpack configuration for building JavaScript bundles
 - Development workflow with hot module replacement
 
 **For detailed installation instructions, see:**
+
 - **[Quick Start Guide](./quick-start.md)** - Fastest path (15 minutes)
 - **[Installation Guide](./installation-into-an-existing-rails-app.md)** - For existing Rails apps
 - **[Complete Tutorial](./tutorial.md)** - Step-by-step with Redux and routing
@@ -39,11 +41,13 @@ Once installed, you render React components in Rails views using the `react_comp
 ### Basic Options
 
 **Client-side rendering only (default):**
+
 ```erb
 <%= react_component("HelloWorld", props: { name: "World" }) %>
 ```
 
 **Server-side rendering for SEO/performance:**
+
 ```erb
 <%= react_component("HelloWorld", props: { name: "World" }, prerender: true) %>
 ```
@@ -53,6 +57,7 @@ The component name (`"HelloWorld"`) must match the name you registered in your J
 ### Configuration
 
 React on Rails is configured in `config/initializers/react_on_rails.rb`:
+
 - Server rendering settings
 - Development vs production behavior
 - Logging options
@@ -87,6 +92,7 @@ You must configure webpack entry points and manually register each component.
 ```
 
 With auto-bundling enabled:
+
 1. Place components in designated directories (e.g., `app/javascript/src/*/ror_components/`)
 2. React on Rails automatically finds and bundles them
 3. No manual webpack configuration needed
@@ -94,12 +100,14 @@ With auto-bundling enabled:
 5. Components are loaded on-demand per page
 
 **Configuration (in `config/initializers/react_on_rails.rb`):**
+
 ```ruby
 config.components_subdirectory = "ror_components"  # Directory name for auto-discovery
 config.auto_load_bundle = true                      # Enable automatic bundle loading
 ```
 
 **Benefits:**
+
 - Eliminates boilerplate configuration
 - Automatic code splitting per component
 - Smaller initial bundle sizes
@@ -137,6 +145,7 @@ app/javascript/
 ### Development Workflow
 
 The generator creates `bin/dev` for starting both:
+
 - Rails server (port 3000)
 - Webpack dev server (for hot reloading)
 
@@ -156,15 +165,11 @@ Sometimes you need more than just a simple React component. **Render-Functions**
 ```js
 const MyApp = (props, railsContext) => {
   // Access Rails context
-  console.log(railsContext.pathname);  // Current URL
+  console.log(railsContext.pathname); // Current URL
   console.log(railsContext.i18nLocale); // Current locale
 
   // Return a React component
-  return () => (
-    <div>
-      Hello from {railsContext.pathname}
-    </div>
-  );
+  return () => <div>Hello from {railsContext.pathname}</div>;
 };
 
 export default MyApp;
@@ -183,7 +188,9 @@ For advanced server rendering (like React Router), you can return an object:
 
 ```js
 {
-  renderedHtml: { componentHtml, redirectLocation, error }
+  renderedHtml: {
+    componentHtml, redirectLocation, error;
+  }
 }
 ```
 
