@@ -796,9 +796,11 @@ echo "✅ Files reorganized. Review changes before committing."
 
 ### Phase 3: Content Updates (react_on_rails repo)
 
+**STATUS:** ✅ COMPLETED (with adaptations) - See ia-redesign-live.md for details
+
 **Create new files:**
 
-**1. `docs/introduction.md`**
+**1. `docs/introduction.md`** ✅ DONE
 
 - Homepage for docs
 - Explains what React on Rails is
@@ -806,49 +808,56 @@ echo "✅ Files reorganized. Review changes before committing."
 - Links to three paths (Quick Start, Installation, Tutorial)
 - Philosophy section
 
-**2. Split `docs/getting-started.md`:**
+**2. Split `docs/getting-started.md`:** ✅ DONE (but transformed, not split)
 
-- Move installation → `docs/getting-started/installation.md`
-- Move concepts → Core Concepts category
-- Move API examples → API Reference
-- DELETE original after content extracted
+- **PLANNED:** Move installation → `docs/getting-started/installation.md`
+- **ACTUAL:** Transformed to `docs/getting-started/using-react-on-rails.md` (conceptual guide)
+- **REASON:** installation.md already existed, needed conceptual guide instead
+- DELETE original after content extracted ✅ DONE
 
-**3. Update `docs/README.md`:**
-Option A: Delete entirely (introduction.md is new homepage)
-Option B: Keep as simple TOC without learning paths
+**3. Update `docs/README.md`:** ✅ DONE (kept simplified)
 
-**4. Delete `docs/home.md`:**
+- **DECIDED:** Option B (kept as simple TOC)
+- Reduced from 173 → 65 lines
+- Serves GitHub users browsing repo
+
+**4. Delete `docs/home.md`:** ✅ DONE
 
 - Redundant with introduction.md
 
-**5. Update cross-references:**
+**ADDITIONS (discovered during implementation):**
 
-- Search all docs for links to moved files
-- Update relative paths
-- Automated script:
+**5. Tutorial improvements** ✅ DONE
 
-```bash
-#!/bin/bash
-# Update internal links after reorganization
+- Extracted Heroku deployment (139 lines) to dedicated guide
+- Fixed outdated versions (Ruby 3.0+, Rails 7+, RoR v16)
+- Clarified Redux vs Hooks usage
+- Merged duplicate HMR sections
+- Reorganized "Other features" → "Going Further"
 
-# Find all .md files
-find docs -name "*.md" -type f | while read file; do
-  # Replace old paths with new paths
-  sed -i 's|guides/installation-into-an-existing-rails-app.md|getting-started/installation.md|g' "$file"
-  sed -i 's|guides/tutorial.md|getting-started/tutorial.md|g' "$file"
-  sed -i 's|guides/how-react-on-rails-works.md|core-concepts/how-it-works.md|g' "$file"
-  # ... etc for all moved files
-done
-```
+**6. Delete `manual-installation-overview.md`** ✅ DONE
+
+- Outdated since 2018
+- Confused purpose
+- No clear use case (generator IS manual installation)
+
+**7. Update cross-references:** ✅ DONE (manually)
+
+- Updated links to renamed/moved files as they were discovered
+- Key changes:
+  - overview.md → introduction.md (2 links)
+  - understanding-react-on-rails.md → using-react-on-rails.md (1 link)
+  - manual-installation-overview.md link removed (1 link)
+- **NOTE:** Did not use automated script - manual updates were more appropriate given incremental changes
 
 **Testing checklist:**
 
-- [ ] All new files created
-- [ ] Old files deleted or split
-- [ ] All internal links updated
-- [ ] Run markdown link checker
-- [ ] Manual spot-checks of navigation
-- [ ] Test on local gatsby build
+- [x] All new files created
+- [x] Old files deleted or transformed
+- [x] All internal links updated (manually as encountered)
+- [ ] Run markdown link checker (TODO: before final merge)
+- [x] Manual spot-checks of navigation
+- [ ] Test on local gatsby build (deferred to Phase 1 - website config)
 
 ---
 
