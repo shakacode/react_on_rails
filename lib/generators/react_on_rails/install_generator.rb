@@ -38,14 +38,6 @@ module ReactOnRails
 
       def run_generators
         if installation_prerequisites_met? || options.ignore_warnings?
-          # Check if Shakapacker is configured BEFORE we run any generators
-          # This way we know if it existed before React on Rails installation
-          shakapacker_was_preconfigured = shakapacker_configured?
-
-          # Only remove default files if Shakapacker was already configured before we started
-          # If it wasn't configured, we'll install it ourselves and shouldn't delete those files
-          remove_default_gem_files if shakapacker_was_preconfigured
-
           invoke_generators
           add_bin_scripts
           # Only add the post install message if not using Redux
@@ -72,62 +64,6 @@ module ReactOnRails
 
       def print_generator_messages
         GeneratorMessages.messages.each { |message| puts message }
-      end
-
-      def remove_default_gem_files
-        remove_default_bin_dev
-        remove_default_shakapacker_yml
-      end
-
-      def remove_default_bin_dev
-        bin_dev_path = File.join(destination_root, "bin/dev")
-        return unless File.exist?(bin_dev_path)
-        return unless File.writable?(bin_dev_path)
-
-        current_content = File.read(bin_dev_path).strip
-        return unless bin_dev_matches_rails_default?(current_content)
-
-        puts Rainbow("🗑️  Removing default bin/dev file to avoid conflicts...").yellow
-        FileUtils.rm_f(bin_dev_path)
-      end
-
-      def bin_dev_matches_rails_default?(content)
-        # Rails 7+ simple bin/dev content
-        # Note: Rails doesn't have a bin/dev template in its generators, but this is the
-        # common simple default that many Rails apps use. We check against this known
-        # default to avoid conflicts during installation.
-        rails_simple_default = <<~RUBY.strip
-          #!/usr/bin/env ruby
-          exec "./bin/rails", "server", *ARGV
-        RUBY
-
-        content == rails_simple_default
-      end
-
-      def remove_default_shakapacker_yml
-        config_path = File.join(destination_root, "config/shakapacker.yml")
-        return unless File.exist?(config_path)
-        return unless File.writable?(config_path)
-        return unless shakapacker_yml_matches_default?(config_path)
-
-        puts Rainbow("🗑️  Removing default config/shakapacker.yml file to avoid conflicts...").yellow
-        FileUtils.rm_f(config_path)
-      end
-
-      def shakapacker_yml_matches_default?(config_path)
-        shakapacker_gem_path = Gem.loaded_specs["shakapacker"]&.full_gem_path
-        return false unless shakapacker_gem_path
-
-        default_config_path = File.join(shakapacker_gem_path, "lib/install/config/shakapacker.yml")
-        return false unless File.exist?(default_config_path)
-
-        default_content = File.read(default_config_path)
-        current_content = File.read(config_path)
-
-        current_content == default_content
-      rescue StandardError
-        # If we can't compare, don't delete - better safe than sorry
-        false
       end
 
       def invoke_generators
