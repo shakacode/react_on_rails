@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-require "rails_helper"
 require "jwt"
+require_relative "spec_helper"
 
 RSpec.describe ReactOnRailsPro::LicenseValidator do
   let(:test_private_key) do
