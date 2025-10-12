@@ -65,16 +65,12 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
         ENV["REACT_ON_RAILS_PRO_LICENSE"] = expired_token
       end
 
-      it "raises error in production" do
-        allow(Rails.env).to receive(:development?).and_return(false)
-        allow(Rails.env).to receive(:test?).and_return(false)
+      it "raises error" do
         expect { described_class.valid? }.to raise_error(ReactOnRailsPro::Error, /License has expired/)
       end
 
-      it "returns true in development with warning" do
-        allow(Rails.env).to receive(:development?).and_return(true)
-        expect(Rails.logger).to receive(:warn).with(/License has expired/)
-        expect(described_class.valid?).to be true
+      it "includes FREE license information in error message" do
+        expect { described_class.valid? }.to raise_error(ReactOnRailsPro::Error, /FREE evaluation license/)
       end
     end
 
@@ -92,23 +88,12 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
         ENV["REACT_ON_RAILS_PRO_LICENSE"] = token_without_exp
       end
 
-      it "raises error in production" do
-        allow(Rails.env).to receive(:development?).and_return(false)
-        allow(Rails.env).to receive(:test?).and_return(false)
+      it "raises error" do
         expect { described_class.valid? }.to raise_error(ReactOnRailsPro::Error, /License is missing required expiration field/)
       end
 
-      it "returns true in development with warning" do
-        allow(Rails.env).to receive(:development?).and_return(true)
-        expect(Rails.logger).to receive(:warn).with(/License is missing required expiration field/)
-        expect(described_class.valid?).to be true
-      end
-
-      it "sets appropriate validation error in development" do
-        allow(Rails.env).to receive(:development?).and_return(true)
-        allow(Rails.logger).to receive(:warn)
-        described_class.valid?
-        expect(described_class.validation_error).to eq("License is missing required expiration field")
+      it "includes FREE license information in error message" do
+        expect { described_class.valid? }.to raise_error(ReactOnRailsPro::Error, /FREE evaluation license/)
       end
     end
 
@@ -119,16 +104,12 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
         ENV["REACT_ON_RAILS_PRO_LICENSE"] = invalid_token
       end
 
-      it "raises error in production" do
-        allow(Rails.env).to receive(:development?).and_return(false)
-        allow(Rails.env).to receive(:test?).and_return(false)
+      it "raises error" do
         expect { described_class.valid? }.to raise_error(ReactOnRailsPro::Error, /Invalid license signature/)
       end
 
-      it "returns true in development with warning" do
-        allow(Rails.env).to receive(:development?).and_return(true)
-        expect(Rails.logger).to receive(:warn).with(/Invalid license signature/)
-        expect(described_class.valid?).to be true
+      it "includes FREE license information in error message" do
+        expect { described_class.valid? }.to raise_error(ReactOnRailsPro::Error, /FREE evaluation license/)
       end
     end
 
@@ -140,16 +121,12 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
         allow(Rails.root).to receive(:join).with("config", "react_on_rails_pro_license.key").and_return(config_path)
       end
 
-      it "returns false in production with error" do
-        allow(Rails.env).to receive(:development?).and_return(false)
-        allow(Rails.env).to receive(:test?).and_return(false)
+      it "raises error" do
         expect { described_class.valid? }.to raise_error(ReactOnRailsPro::Error, /No license found/)
       end
 
-      it "returns true in development with warning" do
-        allow(Rails.env).to receive(:development?).and_return(true)
-        expect(Rails.logger).to receive(:warn).with(/No license found/)
-        expect(described_class.valid?).to be true
+      it "includes FREE license information in error message" do
+        expect { described_class.valid? }.to raise_error(ReactOnRailsPro::Error, /FREE evaluation license/)
       end
     end
 
@@ -188,13 +165,15 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
       before do
         expired_token = JWT.encode(expired_payload, test_private_key, "RS256")
         ENV["REACT_ON_RAILS_PRO_LICENSE"] = expired_token
-        allow(Rails.env).to receive(:development?).and_return(true)
-        allow(Rails.logger).to receive(:warn)
       end
 
       it "returns the error message" do
-        described_class.valid?
-        expect(described_class.validation_error).to eq("License has expired")
+        begin
+          described_class.valid?
+        rescue ReactOnRailsPro::Error
+          # Expected error
+        end
+        expect(described_class.validation_error).to include("License has expired")
       end
     end
   end
