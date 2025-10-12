@@ -12,21 +12,18 @@ import { isLicenseValid, getLicenseValidationError } from './shared/licenseValid
 const MILLISECONDS_IN_MINUTE = 60000;
 
 export = function masterRun(runningConfig?: Partial<Config>) {
-  // Validate license before starting
+  // Validate license before starting - required in all environments
+  log.info('[React on Rails Pro] Validating license...');
+
   if (!isLicenseValid()) {
     const error = getLicenseValidationError() || 'Invalid license';
-    const isDevelopment = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
-
-    if (isDevelopment) {
-      log.warn(`[React on Rails Pro] ${error}`);
-      // Continue in development with warning
-    } else {
-      log.error(`[React on Rails Pro] ${error}`);
-      process.exit(1);
-    }
-  } else {
-    log.info('[React on Rails Pro] License validation successful');
+    log.error(`[React on Rails Pro] ${error}`);
+    // License validation already calls process.exit(1) in handleInvalidLicense
+    // But we add this for safety in case the validator changes
+    process.exit(1);
   }
+
+  log.info('[React on Rails Pro] License validation successful');
 
   // Store config in app state. From now it can be loaded by any module using getConfig():
   const config = buildConfig(runningConfig);
