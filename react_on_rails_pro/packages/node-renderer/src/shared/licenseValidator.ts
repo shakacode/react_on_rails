@@ -102,7 +102,9 @@ class LicenseValidator {
 
     try {
       const decoded = jwt.verify(licenseString, PUBLIC_KEY, {
-        algorithms: ['RS256']
+        algorithms: ['RS256'],
+        // Disable automatic expiration verification so we can handle it manually with custom logic
+        ignoreExpiration: true
       }) as LicenseData;
 
       this.licenseData = decoded;
