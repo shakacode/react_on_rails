@@ -184,11 +184,12 @@ The license is a JWT (JSON Web Token) signed with RSA-256, containing:
 
 ```json
 {
-  "sub": "user@example.com",        // Your email
-  "iat": 1234567890,                 // Issued at timestamp
+  "sub": "user@example.com",        // Your email (REQUIRED)
+  "iat": 1234567890,                 // Issued at timestamp (REQUIRED)
   "exp": 1234567890,                 // Expiration timestamp (REQUIRED)
-  "license_type": "free",            // "free" or "paid"
-  "organization": "Your Company"     // Optional
+  "plan": "free",                    // License plan: "free" or "paid" (Optional)
+  "organization": "Your Company",    // Organization name (Optional)
+  "issued_by": "api"                 // License issuer identifier (Optional)
 }
 ```
 

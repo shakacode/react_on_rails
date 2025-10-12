@@ -12,13 +12,6 @@ module ReactOnRailsPro
     # This ensures the application fails fast if the license is invalid or missing
     initializer "react_on_rails_pro.validate_license", before: :load_config_initializers do
       config.after_initialize do
-        # Skip license validation during asset precompilation
-        next if defined?(Rake) && Rake::Task.task_defined?("assets:precompile")
-
-        # Skip license validation when running RSpec tests
-        # Tests mock the license validation with stub keys
-        next if defined?(RSpec)
-
         Rails.logger.info "[React on Rails Pro] Validating license..."
 
         if ReactOnRailsPro::LicenseValidator.valid?

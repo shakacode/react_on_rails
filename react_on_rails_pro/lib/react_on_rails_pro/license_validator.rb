@@ -119,10 +119,11 @@ module ReactOnRailsPro
       def log_license_info(license)
         return unless license
 
-        license_type = license["license_type"]
-        return unless license_type
+        plan = license["plan"]
+        issued_by = license["issued_by"]
 
-        Rails.logger.info("[React on Rails Pro] License type: #{license_type}")
+        Rails.logger.info("[React on Rails Pro] License plan: #{plan}") if plan
+        Rails.logger.info("[React on Rails Pro] Issued by: #{issued_by}") if issued_by
       end
     end
   end

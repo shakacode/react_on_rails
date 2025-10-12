@@ -147,9 +147,14 @@ class LicenseValidator {
   }
 
   private logLicenseInfo(license: LicenseData): void {
-    const licenseType = (license as any).license_type;
-    if (licenseType) {
-      console.log(`[React on Rails Pro] License type: ${licenseType}`);
+    const plan = (license as any).plan;
+    const issuedBy = (license as any).issued_by;
+
+    if (plan) {
+      console.log(`[React on Rails Pro] License plan: ${plan}`);
+    }
+    if (issuedBy) {
+      console.log(`[React on Rails Pro] Issued by: ${issuedBy}`);
     }
   }
 }
