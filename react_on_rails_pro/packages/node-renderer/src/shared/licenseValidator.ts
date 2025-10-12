@@ -6,7 +6,7 @@ import { PUBLIC_KEY } from './licensePublicKey';
 interface LicenseData {
   sub?: string;
   iat?: number;
-  exp?: number;
+  exp: number; // Required: expiration timestamp
   [key: string]: any;
 }
 
@@ -60,8 +60,15 @@ class LicenseValidator {
         return false;
       }
 
-      // Check expiry if present
-      if (license.exp && Date.now() / 1000 > license.exp) {
+      // Check that exp field exists
+      if (!license.exp) {
+        this.validationError = 'License is missing required expiration field';
+        this.handleInvalidLicense(isDevelopment, this.validationError);
+        return isDevelopment;
+      }
+
+      // Check expiry
+      if (Date.now() / 1000 > license.exp) {
         this.validationError = 'License has expired';
         this.handleInvalidLicense(isDevelopment, this.validationError);
         return isDevelopment;

@@ -36,8 +36,15 @@ module ReactOnRailsPro
           license = load_and_decode_license
           return false unless license
 
-          # Check expiry if present
-          if license["exp"] && Time.now.to_i > license["exp"]
+          # Check that exp field exists
+          unless license["exp"]
+            @validation_error = "License is missing required expiration field"
+            handle_invalid_license(development_mode, @validation_error)
+            return development_mode
+          end
+
+          # Check expiry
+          if Time.now.to_i > license["exp"]
             @validation_error = "License has expired"
             handle_invalid_license(development_mode, @validation_error)
             return development_mode
@@ -63,6 +70,9 @@ module ReactOnRailsPro
           license_string,
           public_key,
           true,
+          # NOTE: Never remove the 'algorithm' parameter from JWT.decode to prevent algorithm bypassing vulnerabilities.
+          # Ensure to hardcode the expected algorithm.
+          # See: https://auth0.com/blog/critical-vulnerabilities-in-json-web-token-libraries/
           algorithm: "RS256"
         ).first
       end
