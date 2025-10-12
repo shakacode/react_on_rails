@@ -34,7 +34,8 @@ module ReactOnRailsPro
 
         begin
           license = load_and_decode_license
-          return false unless license
+          # If no license found, load_license_string already handled the error
+          return development_mode unless license
 
           # Check that exp field exists
           unless license["exp"]
@@ -51,6 +52,9 @@ module ReactOnRailsPro
           end
 
           true
+        rescue ReactOnRailsPro::Error
+          # Re-raise errors from handle_invalid_license in production mode
+          raise
         rescue JWT::DecodeError => e
           @validation_error = "Invalid license signature: #{e.message}"
           handle_invalid_license(development_mode, @validation_error)
@@ -73,7 +77,9 @@ module ReactOnRailsPro
           # NOTE: Never remove the 'algorithm' parameter from JWT.decode to prevent algorithm bypassing vulnerabilities.
           # Ensure to hardcode the expected algorithm.
           # See: https://auth0.com/blog/critical-vulnerabilities-in-json-web-token-libraries/
-          algorithm: "RS256"
+          algorithm: "RS256",
+          # Disable automatic expiration verification so we can handle it manually with custom logic
+          verify_expiration: false
         ).first
       end
 

@@ -30,8 +30,8 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
 
   before do
     described_class.reset!
-    # Stub the public key to use our test key
-    allow(ReactOnRailsPro::LicensePublicKey).to receive(:KEY).and_return(test_public_key)
+    # Stub the public key constant to use our test key
+    stub_const("ReactOnRailsPro::LicensePublicKey::KEY", test_public_key)
     # Clear ENV variable
     ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
   end
@@ -65,16 +65,50 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
         ENV["REACT_ON_RAILS_PRO_LICENSE"] = expired_token
       end
 
-      it "returns false in production" do
+      it "raises error in production" do
         allow(Rails.env).to receive(:development?).and_return(false)
         allow(Rails.env).to receive(:test?).and_return(false)
-        expect(described_class.valid?).to be false
+        expect { described_class.valid? }.to raise_error(ReactOnRailsPro::Error, /License has expired/)
       end
 
       it "returns true in development with warning" do
         allow(Rails.env).to receive(:development?).and_return(true)
         expect(Rails.logger).to receive(:warn).with(/License has expired/)
         expect(described_class.valid?).to be true
+      end
+    end
+
+    context "with license missing exp field" do
+      let(:payload_without_exp) do
+        {
+          sub: "test@example.com",
+          iat: Time.now.to_i
+          # exp field is missing
+        }
+      end
+
+      before do
+        token_without_exp = JWT.encode(payload_without_exp, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token_without_exp
+      end
+
+      it "raises error in production" do
+        allow(Rails.env).to receive(:development?).and_return(false)
+        allow(Rails.env).to receive(:test?).and_return(false)
+        expect { described_class.valid? }.to raise_error(ReactOnRailsPro::Error, /License is missing required expiration field/)
+      end
+
+      it "returns true in development with warning" do
+        allow(Rails.env).to receive(:development?).and_return(true)
+        expect(Rails.logger).to receive(:warn).with(/License is missing required expiration field/)
+        expect(described_class.valid?).to be true
+      end
+
+      it "sets appropriate validation error in development" do
+        allow(Rails.env).to receive(:development?).and_return(true)
+        allow(Rails.logger).to receive(:warn)
+        described_class.valid?
+        expect(described_class.validation_error).to eq("License is missing required expiration field")
       end
     end
 
@@ -85,10 +119,10 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
         ENV["REACT_ON_RAILS_PRO_LICENSE"] = invalid_token
       end
 
-      it "returns false in production" do
+      it "raises error in production" do
         allow(Rails.env).to receive(:development?).and_return(false)
         allow(Rails.env).to receive(:test?).and_return(false)
-        expect(described_class.valid?).to be false
+        expect { described_class.valid? }.to raise_error(ReactOnRailsPro::Error, /Invalid license signature/)
       end
 
       it "returns true in development with warning" do
@@ -99,9 +133,11 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
     end
 
     context "with missing license" do
+      let(:config_path) { double("Pathname", exist?: false) }
+
       before do
         ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
-        allow(File).to receive(:read).and_raise(Errno::ENOENT)
+        allow(Rails.root).to receive(:join).with("config", "react_on_rails_pro_license.key").and_return(config_path)
       end
 
       it "returns false in production with error" do
@@ -152,8 +188,8 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
       before do
         expired_token = JWT.encode(expired_payload, test_private_key, "RS256")
         ENV["REACT_ON_RAILS_PRO_LICENSE"] = expired_token
-        allow(Rails.env).to receive(:development?).and_return(false)
-        allow(Rails.env).to receive(:test?).and_return(false)
+        allow(Rails.env).to receive(:development?).and_return(true)
+        allow(Rails.logger).to receive(:warn)
       end
 
       it "returns the error message" do
