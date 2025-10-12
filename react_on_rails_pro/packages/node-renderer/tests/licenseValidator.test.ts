@@ -112,6 +112,49 @@ describe('LicenseValidator', () => {
       consoleSpy.mockRestore();
     });
 
+    it('returns false for license missing exp field in production', () => {
+      const payloadWithoutExp = {
+        sub: 'test@example.com',
+        iat: Math.floor(Date.now() / 1000)
+        // exp field is missing
+      };
+
+      const tokenWithoutExp = jwt.sign(payloadWithoutExp, testPrivateKey, { algorithm: 'RS256' });
+      process.env.REACT_ON_RAILS_PRO_LICENSE = tokenWithoutExp;
+      process.env.NODE_ENV = 'production';
+
+      const module = require('../src/shared/licenseValidator');
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      expect(module.isLicenseValid()).toBe(false);
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('License is missing required expiration field'));
+
+      consoleSpy.mockRestore();
+    });
+
+    it('returns true for license missing exp field in development with warning', () => {
+      const payloadWithoutExp = {
+        sub: 'test@example.com',
+        iat: Math.floor(Date.now() / 1000)
+        // exp field is missing
+      };
+
+      const tokenWithoutExp = jwt.sign(payloadWithoutExp, testPrivateKey, { algorithm: 'RS256' });
+      process.env.REACT_ON_RAILS_PRO_LICENSE = tokenWithoutExp;
+      process.env.NODE_ENV = 'development';
+
+      const module = require('../src/shared/licenseValidator');
+      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+
+      expect(module.isLicenseValid()).toBe(true);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.stringContaining('License is missing required expiration field')
+      );
+
+      consoleSpy.mockRestore();
+    });
+
     it('returns false for invalid signature', () => {
       // Generate a different key pair for invalid signature
       const { privateKey: wrongKey } = crypto.generateKeyPairSync('rsa', {
