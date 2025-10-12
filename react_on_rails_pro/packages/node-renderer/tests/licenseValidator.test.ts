@@ -69,7 +69,7 @@ describe('LicenseValidator', () => {
       expect(module.isLicenseValid()).toBe(true);
     });
 
-    it('returns false for expired license in production', () => {
+    it('returns false for expired license', () => {
       const expiredPayload = {
         sub: 'test@example.com',
         iat: Math.floor(Date.now() / 1000) - 7200,
@@ -78,41 +78,22 @@ describe('LicenseValidator', () => {
 
       const expiredToken = jwt.sign(expiredPayload, testPrivateKey, { algorithm: 'RS256' });
       process.env.REACT_ON_RAILS_PRO_LICENSE = expiredToken;
-      process.env.NODE_ENV = 'production';
 
       const module = require('../src/shared/licenseValidator');
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+      const exitSpy = jest.spyOn(process, 'exit').mockImplementation(() => {
+        throw new Error('process.exit called');
+      });
 
-      expect(module.isLicenseValid()).toBe(false);
+      expect(() => module.isLicenseValid()).toThrow('process.exit called');
       expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('License has expired'));
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('FREE evaluation license'));
 
       consoleSpy.mockRestore();
+      exitSpy.mockRestore();
     });
 
-    it('returns true for expired license in development with warning', () => {
-      const expiredPayload = {
-        sub: 'test@example.com',
-        iat: Math.floor(Date.now() / 1000) - 7200,
-        exp: Math.floor(Date.now() / 1000) - 3600 // Expired 1 hour ago
-      };
-
-      const expiredToken = jwt.sign(expiredPayload, testPrivateKey, { algorithm: 'RS256' });
-      process.env.REACT_ON_RAILS_PRO_LICENSE = expiredToken;
-      process.env.NODE_ENV = 'development';
-
-      const module = require('../src/shared/licenseValidator');
-      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
-
-      expect(module.isLicenseValid()).toBe(true);
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.stringContaining('License has expired')
-      );
-
-      consoleSpy.mockRestore();
-    });
-
-    it('returns false for license missing exp field in production', () => {
+    it('returns false for license missing exp field', () => {
       const payloadWithoutExp = {
         sub: 'test@example.com',
         iat: Math.floor(Date.now() / 1000)
@@ -121,38 +102,19 @@ describe('LicenseValidator', () => {
 
       const tokenWithoutExp = jwt.sign(payloadWithoutExp, testPrivateKey, { algorithm: 'RS256' });
       process.env.REACT_ON_RAILS_PRO_LICENSE = tokenWithoutExp;
-      process.env.NODE_ENV = 'production';
 
       const module = require('../src/shared/licenseValidator');
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+      const exitSpy = jest.spyOn(process, 'exit').mockImplementation(() => {
+        throw new Error('process.exit called');
+      });
 
-      expect(module.isLicenseValid()).toBe(false);
+      expect(() => module.isLicenseValid()).toThrow('process.exit called');
       expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('License is missing required expiration field'));
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('FREE evaluation license'));
 
       consoleSpy.mockRestore();
-    });
-
-    it('returns true for license missing exp field in development with warning', () => {
-      const payloadWithoutExp = {
-        sub: 'test@example.com',
-        iat: Math.floor(Date.now() / 1000)
-        // exp field is missing
-      };
-
-      const tokenWithoutExp = jwt.sign(payloadWithoutExp, testPrivateKey, { algorithm: 'RS256' });
-      process.env.REACT_ON_RAILS_PRO_LICENSE = tokenWithoutExp;
-      process.env.NODE_ENV = 'development';
-
-      const module = require('../src/shared/licenseValidator');
-      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
-
-      expect(module.isLicenseValid()).toBe(true);
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.stringContaining('License is missing required expiration field')
-      );
-
-      consoleSpy.mockRestore();
+      exitSpy.mockRestore();
     });
 
     it('returns false for invalid signature', () => {
@@ -173,31 +135,39 @@ describe('LicenseValidator', () => {
 
       const invalidToken = jwt.sign(validPayload, wrongKey, { algorithm: 'RS256' });
       process.env.REACT_ON_RAILS_PRO_LICENSE = invalidToken;
-      process.env.NODE_ENV = 'production';
 
       const module = require('../src/shared/licenseValidator');
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+      const exitSpy = jest.spyOn(process, 'exit').mockImplementation(() => {
+        throw new Error('process.exit called');
+      });
 
-      expect(module.isLicenseValid()).toBe(false);
+      expect(() => module.isLicenseValid()).toThrow('process.exit called');
       expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Invalid license signature'));
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('FREE evaluation license'));
 
       consoleSpy.mockRestore();
+      exitSpy.mockRestore();
     });
 
     it('returns false for missing license', () => {
       delete process.env.REACT_ON_RAILS_PRO_LICENSE;
-      process.env.NODE_ENV = 'production';
 
       // Mock fs.existsSync to return false (no config file)
       (fs.existsSync as jest.Mock).mockReturnValue(false);
 
       const module = require('../src/shared/licenseValidator');
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+      const exitSpy = jest.spyOn(process, 'exit').mockImplementation(() => {
+        throw new Error('process.exit called');
+      });
 
-      expect(module.isLicenseValid()).toBe(false);
+      expect(() => module.isLicenseValid()).toThrow('process.exit called');
       expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('No license found'));
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('FREE evaluation license'));
 
       consoleSpy.mockRestore();
+      exitSpy.mockRestore();
     });
 
     it('loads license from config file when ENV not set', () => {

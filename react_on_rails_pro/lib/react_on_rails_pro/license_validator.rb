@@ -29,40 +29,47 @@ module ReactOnRailsPro
       private
 
       def validate_license
-        # In development, show warnings but allow usage
-        development_mode = Rails.env.development? || Rails.env.test?
-
         begin
           license = load_and_decode_license
           # If no license found, load_license_string already handled the error
-          return development_mode unless license
+          return false unless license
 
           # Check that exp field exists
           unless license["exp"]
-            @validation_error = "License is missing required expiration field"
-            handle_invalid_license(development_mode, @validation_error)
-            return development_mode
+            @validation_error = "License is missing required expiration field. " \
+                               "Your license may be from an older version. " \
+                               "Get a FREE evaluation license at https://shakacode.com/react-on-rails-pro"
+            handle_invalid_license(@validation_error)
+            return false
           end
 
           # Check expiry
           if Time.now.to_i > license["exp"]
-            @validation_error = "License has expired"
-            handle_invalid_license(development_mode, @validation_error)
-            return development_mode
+            @validation_error = "License has expired. " \
+                               "Get a FREE evaluation license (3 months) at https://shakacode.com/react-on-rails-pro " \
+                               "or upgrade to a paid license for production use."
+            handle_invalid_license(@validation_error)
+            return false
           end
+
+          # Log license type if present (for analytics)
+          log_license_info(license)
 
           true
         rescue ReactOnRailsPro::Error
-          # Re-raise errors from handle_invalid_license in production mode
+          # Re-raise errors from handle_invalid_license
           raise
         rescue JWT::DecodeError => e
-          @validation_error = "Invalid license signature: #{e.message}"
-          handle_invalid_license(development_mode, @validation_error)
-          development_mode
+          @validation_error = "Invalid license signature: #{e.message}. " \
+                             "Your license file may be corrupted. " \
+                             "Get a FREE evaluation license at https://shakacode.com/react-on-rails-pro"
+          handle_invalid_license(@validation_error)
+          false
         rescue StandardError => e
-          @validation_error = "License validation error: #{e.message}"
-          handle_invalid_license(development_mode, @validation_error)
-          development_mode
+          @validation_error = "License validation error: #{e.message}. " \
+                             "Get a FREE evaluation license at https://shakacode.com/react-on-rails-pro"
+          handle_invalid_license(@validation_error)
+          false
         end
       end
 
@@ -94,8 +101,8 @@ module ReactOnRailsPro
 
         @validation_error = "No license found. Please set REACT_ON_RAILS_PRO_LICENSE environment variable " \
                            "or create config/react_on_rails_pro_license.key file. " \
-                           "Visit https://shakacode.com/react-on-rails-pro to obtain a license."
-        handle_invalid_license(Rails.env.development? || Rails.env.test?, @validation_error)
+                           "Get a FREE evaluation license at https://shakacode.com/react-on-rails-pro"
+        handle_invalid_license(@validation_error)
         nil
       end
 
@@ -103,16 +110,19 @@ module ReactOnRailsPro
         ReactOnRailsPro::LicensePublicKey::KEY
       end
 
-      def handle_invalid_license(development_mode, message)
+      def handle_invalid_license(message)
         full_message = "[React on Rails Pro] #{message}"
+        Rails.logger.error(full_message)
+        raise ReactOnRailsPro::Error, full_message
+      end
 
-        if development_mode
-          Rails.logger.warn(full_message)
-          puts "\e[33m#{full_message}\e[0m" # Yellow warning in console
-        else
-          Rails.logger.error(full_message)
-          raise ReactOnRailsPro::Error, full_message
-        end
+      def log_license_info(license)
+        return unless license
+
+        license_type = license["license_type"]
+        return unless license_type
+
+        Rails.logger.info("[React on Rails Pro] License type: #{license_type}")
       end
     end
   end

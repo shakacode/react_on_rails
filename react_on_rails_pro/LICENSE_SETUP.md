@@ -1,136 +1,244 @@
 # React on Rails Pro License Setup
 
-This document explains how to configure your React on Rails Pro license for the Pro features to work properly.
+This document explains how to configure your React on Rails Pro license.
 
-## Prerequisites
+## Getting a FREE License
 
-- React on Rails Pro gem installed
-- React on Rails Pro Node packages installed
-- Valid license key from [ShakaCode](https://shakacode.com/react-on-rails-pro)
+**All users need a license** - even for development and evaluation!
 
-## License Configuration
+### Get Your FREE Evaluation License (3 Months)
+
+1. Visit [https://shakacode.com/react-on-rails-pro](https://shakacode.com/react-on-rails-pro)
+2. Register with your email
+3. Receive your FREE 3-month evaluation license immediately
+4. Use it for development, testing, and evaluation
+
+**No credit card required!**
+
+## License Types
+
+### Free License
+- **Duration**: 3 months
+- **Usage**: Development, testing, evaluation, CI/CD
+- **Cost**: FREE - just register with your email
+- **Renewal**: Get a new free license or upgrade to paid
+
+### Paid License
+- **Duration**: 1 year (or longer)
+- **Usage**: Production deployment
+- **Cost**: Subscription-based
+- **Support**: Includes professional support
+
+## Installation
 
 ### Method 1: Environment Variable (Recommended)
 
-Set the `REACT_ON_RAILS_PRO_LICENSE` environment variable with your license key:
+Set the `REACT_ON_RAILS_PRO_LICENSE` environment variable:
 
 ```bash
-export REACT_ON_RAILS_PRO_LICENSE="your_jwt_license_token_here"
+export REACT_ON_RAILS_PRO_LICENSE="eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
-For production deployments, add this to your deployment configuration:
+**For different environments:**
 
-- **Heroku**: `heroku config:set REACT_ON_RAILS_PRO_LICENSE="your_token"`
-- **Docker**: Add to your Dockerfile or docker-compose.yml
-- **Kubernetes**: Add to your secrets or ConfigMap
+```bash
+# Development (.env file)
+REACT_ON_RAILS_PRO_LICENSE=your_license_token_here
+
+# Production (Heroku)
+heroku config:set REACT_ON_RAILS_PRO_LICENSE="your_token"
+
+# Production (Docker)
+# Add to docker-compose.yml or Dockerfile ENV
+
+# CI/CD
+# Add to your CI environment variables (see CI_SETUP.md)
+```
 
 ### Method 2: Configuration File
 
-Create a file at `config/react_on_rails_pro_license.key` in your Rails root directory:
+Create `config/react_on_rails_pro_license.key` in your Rails root:
 
 ```bash
-echo "your_jwt_license_token_here" > config/react_on_rails_pro_license.key
+echo "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..." > config/react_on_rails_pro_license.key
 ```
 
-**Important**: This file is automatically excluded from Git via .gitignore. Never commit your license key to version control.
+**Important**: Add this file to your `.gitignore` to avoid committing your license:
+
+```bash
+# Add to .gitignore
+echo "config/react_on_rails_pro_license.key" >> .gitignore
+```
+
+**Never commit your license to version control.**
 
 ## License Validation
 
 The license is validated at multiple points:
 
-1. **Ruby Gem**: Validated when Rails initializes
-2. **Node Renderer**: Validated when the Node renderer starts
-3. **Browser Package**: Relies on server-side validation (via `railsContext.rorPro`)
+1. **Ruby Gem**: When Rails application starts
+2. **Node Renderer**: When the Node renderer process starts
+3. **Browser Package**: Trusts server-side validation (via `railsContext.rorPro`)
 
-### Development vs Production
+### All Environments Require Valid License
 
-- **Development Environment**:
-  - Invalid or missing licenses show warnings but allow continued usage
-  - 30-day grace period for evaluation
+React on Rails Pro requires a valid license in **all environments**:
 
-- **Production Environment**:
-  - Invalid or missing licenses will prevent Pro features from working
-  - The application will raise errors if license validation fails
+- ✅ **Development**: Requires license (use FREE license)
+- ✅ **Test**: Requires license (use FREE license)
+- ✅ **CI/CD**: Requires license (use FREE license)
+- ✅ **Production**: Requires license (use paid license)
+
+Get your FREE evaluation license in 30 seconds - no credit card required!
+
+## Team Setup
+
+### For Development Teams
+
+Each developer should:
+
+1. Get their own FREE license from [shakacode.com](https://shakacode.com/react-on-rails-pro)
+2. Store it locally using one of the methods above
+3. Ensure `config/react_on_rails_pro_license.key` is in your `.gitignore`
+
+### For CI/CD
+
+Set up CI with a license (see [CI_SETUP.md](./CI_SETUP.md) for detailed instructions):
+
+1. Get a FREE license (can use any team member's or create `ci@yourcompany.com`)
+2. Add to CI environment variables as `REACT_ON_RAILS_PRO_LICENSE`
+3. Renew every 3 months (or use a paid license)
+
+**Recommended**: Use GitHub Secrets, GitLab CI Variables, or your CI provider's secrets management.
 
 ## Verification
 
-To verify your license is properly configured:
+### Verify License is Working
 
-### Ruby Console
-
+**Ruby Console:**
 ```ruby
 rails console
 > ReactOnRails::Utils.react_on_rails_pro_licence_valid?
-# Should return true if license is valid
+# Should return: true
 ```
 
-### Node Renderer
-
-When starting the Node renderer, you should see:
-
-```
-[React on Rails Pro] License validation successful
+**Check License Details:**
+```ruby
+> ReactOnRailsPro::LicenseValidator.license_data
+# Shows: {"sub"=>"your@email.com", "exp"=>1234567890, ...}
 ```
 
-### Rails Context
-
-In your browser's JavaScript console:
-
+**Browser JavaScript Console:**
 ```javascript
 window.railsContext.rorPro
-// Should return true if license is valid
+// Should return: true
 ```
 
 ## Troubleshooting
 
-### Common Issues
+### Error: "No license found"
 
-1. **"No license found" error**
-   - Verify the environment variable is set: `echo $REACT_ON_RAILS_PRO_LICENSE`
-   - Check the config file exists: `ls config/react_on_rails_pro_license.key`
+**Solutions:**
+1. Verify environment variable: `echo $REACT_ON_RAILS_PRO_LICENSE`
+2. Check config file exists: `ls config/react_on_rails_pro_license.key`
+3. **Get a FREE license**: [https://shakacode.com/react-on-rails-pro](https://shakacode.com/react-on-rails-pro)
 
-2. **"Invalid license signature" error**
-   - Ensure you're using the complete JWT token (it should be a long string starting with "eyJ")
-   - Verify the license hasn't been modified or truncated
+### Error: "Invalid license signature"
 
-3. **"License has expired" error**
-   - Contact ShakaCode support to renew your license
-   - In development, this will show as a warning but continue working
+**Causes:**
+- License token was truncated or modified
+- Wrong license format (must be complete JWT token)
 
-4. **Node renderer fails to start**
-   - Check that the same license is available to the Node process
-   - Verify NODE_ENV is set correctly (development/production)
+**Solutions:**
+1. Ensure you copied the complete license (starts with `eyJ`)
+2. Check for extra spaces or newlines
+3. Get a new FREE license if corrupted
 
-### Debug Mode
+### Error: "License has expired"
 
-For more detailed logging, set:
+**Solutions:**
+1. **Free License**: Get a new 3-month FREE license
+2. **Paid License**: Contact support to renew
+3. Visit: [https://shakacode.com/react-on-rails-pro](https://shakacode.com/react-on-rails-pro)
 
-```bash
-export REACT_ON_RAILS_PRO_DEBUG=true
+### Error: "License is missing required expiration field"
+
+**Cause:** You may have an old license format
+
+**Solution:** Get a new FREE license from [shakacode.com](https://shakacode.com/react-on-rails-pro)
+
+### Application Won't Start
+
+If your application fails to start due to license issues:
+
+1. **Quick fix**: Set a valid license environment variable
+2. **Get FREE license**: Takes 30 seconds at [shakacode.com](https://shakacode.com/react-on-rails-pro)
+3. Check logs for specific error message
+4. Ensure license is accessible to all processes (Rails + Node renderer)
+
+## License Technical Details
+
+### Format
+
+The license is a JWT (JSON Web Token) signed with RSA-256, containing:
+
+```json
+{
+  "sub": "user@example.com",        // Your email
+  "iat": 1234567890,                 // Issued at timestamp
+  "exp": 1234567890,                 // Expiration timestamp (REQUIRED)
+  "license_type": "free",            // "free" or "paid"
+  "organization": "Your Company"     // Optional
+}
 ```
 
-## License Format
+### Security
 
-The license is a JWT (JSON Web Token) signed with RSA-256. It contains:
+- **Offline validation**: No internet connection required
+- **Public key verification**: Uses embedded RSA public key
+- **Tamper-proof**: Any modification invalidates the signature
+- **No tracking**: License validation happens locally
 
-- Subscriber email
-- Issue date
-- Expiration date (if applicable)
+### Privacy
 
-The token is verified using a public key embedded in the code, ensuring authenticity without requiring internet connectivity.
+- We only collect email during registration
+- No usage tracking or phone-home in the license system
+- License is validated offline using cryptographic signatures
 
 ## Support
 
-If you encounter any issues with license validation:
+Need help?
 
-1. Check this documentation
-2. Review the troubleshooting section above
-3. Contact ShakaCode support at support@shakacode.com
-4. Visit https://shakacode.com/react-on-rails-pro for license management
+1. **Quick Start**: Get a FREE license at [shakacode.com/react-on-rails-pro](https://shakacode.com/react-on-rails-pro)
+2. **Documentation**: Check [CI_SETUP.md](./CI_SETUP.md) for CI configuration
+3. **Email**: support@shakacode.com
+4. **License Management**: [shakacode.com/react-on-rails-pro](https://shakacode.com/react-on-rails-pro)
 
-## Security Notes
+## Security Best Practices
 
-- Never share your license key publicly
-- Never commit the license key to version control
-- Use environment variables for production deployments
-- The license key is tied to your organization's subscription
+1. ✅ **Never commit licenses to Git** - Add `config/react_on_rails_pro_license.key` to `.gitignore`
+2. ✅ **Use environment variables in production**
+3. ✅ **Use CI secrets for CI/CD environments**
+4. ✅ **Don't share licenses publicly**
+5. ✅ **Each developer gets their own FREE license**
+6. ✅ **Renew before expiration** (we'll send reminders)
+
+## FAQ
+
+**Q: Why do I need a license for development?**
+A: We provide FREE 3-month licenses so we can track usage and provide better support. Registration takes 30 seconds!
+
+**Q: Can I use a free license in production?**
+A: Free licenses are for evaluation only. Production deployments require a paid license.
+
+**Q: Can multiple developers share one license?**
+A: Each developer should get their own FREE license. For CI, you can share one license via environment variable.
+
+**Q: What happens when my free license expires?**
+A: Get a new 3-month FREE license, or upgrade to a paid license for production use.
+
+**Q: Do I need internet to validate the license?**
+A: No! License validation is completely offline using cryptographic signatures.
+
+**Q: Is my email shared or sold?**
+A: Never. We only use it to send you license renewals and important updates.

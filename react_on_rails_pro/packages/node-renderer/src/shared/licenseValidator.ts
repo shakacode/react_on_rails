@@ -52,8 +52,6 @@ class LicenseValidator {
   }
 
   private validateLicense(): boolean {
-    const isDevelopment = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
-
     try {
       const license = this.loadAndDecodeLicense();
       if (!license) {
@@ -62,27 +60,37 @@ class LicenseValidator {
 
       // Check that exp field exists
       if (!license.exp) {
-        this.validationError = 'License is missing required expiration field';
-        this.handleInvalidLicense(isDevelopment, this.validationError);
-        return isDevelopment;
+        this.validationError = 'License is missing required expiration field. ' +
+                               'Your license may be from an older version. ' +
+                               'Get a FREE evaluation license at https://shakacode.com/react-on-rails-pro';
+        this.handleInvalidLicense(this.validationError);
+        return false;
       }
 
       // Check expiry
       if (Date.now() / 1000 > license.exp) {
-        this.validationError = 'License has expired';
-        this.handleInvalidLicense(isDevelopment, this.validationError);
-        return isDevelopment;
+        this.validationError = 'License has expired. ' +
+                               'Get a FREE evaluation license (3 months) at https://shakacode.com/react-on-rails-pro ' +
+                               'or upgrade to a paid license for production use.';
+        this.handleInvalidLicense(this.validationError);
+        return false;
       }
+
+      // Log license type if present (for analytics)
+      this.logLicenseInfo(license);
 
       return true;
     } catch (error: any) {
       if (error.name === 'JsonWebTokenError') {
-        this.validationError = `Invalid license signature: ${error.message}`;
+        this.validationError = `Invalid license signature: ${error.message}. ` +
+                               'Your license file may be corrupted. ' +
+                               'Get a FREE evaluation license at https://shakacode.com/react-on-rails-pro';
       } else {
-        this.validationError = `License validation error: ${error.message}`;
+        this.validationError = `License validation error: ${error.message}. ` +
+                               'Get a FREE evaluation license at https://shakacode.com/react-on-rails-pro';
       }
-      this.handleInvalidLicense(isDevelopment, this.validationError);
-      return isDevelopment;
+      this.handleInvalidLicense(this.validationError);
+      return false;
     }
   }
 
@@ -124,22 +132,24 @@ class LicenseValidator {
     this.validationError =
       'No license found. Please set REACT_ON_RAILS_PRO_LICENSE environment variable ' +
       'or create config/react_on_rails_pro_license.key file. ' +
-      'Visit https://shakacode.com/react-on-rails-pro to obtain a license.';
+      'Get a FREE evaluation license at https://shakacode.com/react-on-rails-pro';
 
-    const isDevelopment = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
-    this.handleInvalidLicense(isDevelopment, this.validationError);
+    this.handleInvalidLicense(this.validationError);
 
     return undefined;
   }
 
-  private handleInvalidLicense(isDevelopment: boolean, message: string): void {
+  private handleInvalidLicense(message: string): void {
     const fullMessage = `[React on Rails Pro] ${message}`;
+    console.error(fullMessage);
+    // Validation errors should prevent the application from starting
+    process.exit(1);
+  }
 
-    if (isDevelopment) {
-      console.warn('\x1b[33m%s\x1b[0m', fullMessage); // Yellow warning
-    } else {
-      console.error(fullMessage);
-      // In production, we'll exit the process later in the startup code
+  private logLicenseInfo(license: LicenseData): void {
+    const licenseType = (license as any).license_type;
+    if (licenseType) {
+      console.log(`[React on Rails Pro] License type: ${licenseType}`);
     }
   }
 }
