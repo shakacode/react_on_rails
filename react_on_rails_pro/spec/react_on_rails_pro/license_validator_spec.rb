@@ -28,12 +28,21 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
     }
   end
 
+  let(:mock_logger) { instance_double(Logger, error: nil, info: nil) }
+  let(:mock_root) { instance_double(Pathname, join: config_file_path) }
+  let(:config_file_path) { instance_double(Pathname, exist?: false) }
+
   before do
     described_class.reset!
     # Stub the public key constant to use our test key
     stub_const("ReactOnRailsPro::LicensePublicKey::KEY", test_public_key)
     # Clear ENV variable
     ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
+
+    # Stub Rails.logger to avoid nil errors in unit tests
+    allow(Rails).to receive(:logger).and_return(mock_logger)
+    # Stub Rails.root for config file path tests
+    allow(Rails).to receive(:root).and_return(mock_root)
   end
 
   after do
@@ -89,7 +98,8 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
       end
 
       it "raises error" do
-        expect { described_class.valid? }.to raise_error(ReactOnRailsPro::Error, /License is missing required expiration field/)
+        expect { described_class.valid? }
+          .to raise_error(ReactOnRailsPro::Error, /License is missing required expiration field/)
       end
 
       it "includes FREE license information in error message" do
@@ -114,11 +124,9 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
     end
 
     context "with missing license" do
-      let(:config_path) { double("Pathname", exist?: false) }
-
       before do
         ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
-        allow(Rails.root).to receive(:join).with("config", "react_on_rails_pro_license.key").and_return(config_path)
+        # config_file_path is already set to exist?: false in the let block
       end
 
       it "raises error" do
@@ -126,18 +134,21 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
       end
 
       it "includes FREE license information in error message" do
-        expect { described_class.valid? }.to raise_error(ReactOnRailsPro::Error, /FREE evaluation license/)
+        expect { described_class.valid? }
+          .to raise_error(ReactOnRailsPro::Error, /FREE evaluation license/)
       end
     end
 
     context "with license in config file" do
-      let(:config_path) { Rails.root.join("config", "react_on_rails_pro_license.key") }
       let(:valid_token) { JWT.encode(valid_payload, test_private_key, "RS256") }
+      let(:file_config_path) { instance_double(Pathname, exist?: true) }
 
       before do
         ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
-        allow(config_path).to receive(:exist?).and_return(true)
-        allow(File).to receive(:read).with(config_path).and_return(valid_token)
+        allow(mock_root).to receive(:join)
+          .with("config", "react_on_rails_pro_license.key")
+          .and_return(file_config_path)
+        allow(File).to receive(:read).with(file_config_path).and_return(valid_token)
       end
 
       it "returns true" do
