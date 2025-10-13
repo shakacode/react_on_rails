@@ -10,7 +10,8 @@ module ReactOnRailsPro
 
     # Validate license on Rails startup
     # This ensures the application fails fast if the license is invalid or missing
-    initializer "react_on_rails_pro.validate_license", before: :load_config_initializers do
+    initializer "react_on_rails_pro.validate_license" do
+      # Use after_initialize to ensure Rails.logger is available
       config.after_initialize do
         Rails.logger.info "[React on Rails Pro] Validating license..."
 
