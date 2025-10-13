@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "jwt"
-require "pathname"
 
 module ReactOnRailsPro
   class LicenseValidator
@@ -33,8 +32,6 @@ module ReactOnRailsPro
 
       def validate_license
         license = load_and_decode_license
-        # If no license found, load_license_string already handled the error
-        return false unless license
 
         # Check that exp field exists
         unless license["exp"]
@@ -42,7 +39,6 @@ module ReactOnRailsPro
                               "Your license may be from an older version. " \
                               "Get a FREE evaluation license at https://shakacode.com/react-on-rails-pro"
           handle_invalid_license(@validation_error)
-          return false
         end
 
         # Check expiry
@@ -51,32 +47,25 @@ module ReactOnRailsPro
                               "Get a FREE evaluation license (3 months) at https://shakacode.com/react-on-rails-pro " \
                               "or upgrade to a paid license for production use."
           handle_invalid_license(@validation_error)
-          return false
         end
 
         # Log license type if present (for analytics)
         log_license_info(license)
 
         true
-      rescue ReactOnRailsPro::Error
-        # Re-raise errors from handle_invalid_license
-        raise
       rescue JWT::DecodeError => e
         @validation_error = "Invalid license signature: #{e.message}. " \
                             "Your license file may be corrupted. " \
                             "Get a FREE evaluation license at https://shakacode.com/react-on-rails-pro"
         handle_invalid_license(@validation_error)
-        false
       rescue StandardError => e
         @validation_error = "License validation error: #{e.message}. " \
                             "Get a FREE evaluation license at https://shakacode.com/react-on-rails-pro"
         handle_invalid_license(@validation_error)
-        false
       end
 
       def load_and_decode_license
         license_string = load_license_string
-        return nil unless license_string
 
         JWT.decode(
           license_string,
@@ -88,6 +77,7 @@ module ReactOnRailsPro
           algorithm: "RS256",
           # Disable automatic expiration verification so we can handle it manually with custom logic
           verify_expiration: false
+        # JWT.decode returns an array [data, header]; we use `.first` to get the data (payload).
         ).first
       end
 
@@ -104,7 +94,6 @@ module ReactOnRailsPro
                             "or create config/react_on_rails_pro_license.key file. " \
                             "Get a FREE evaluation license at https://shakacode.com/react-on-rails-pro"
         handle_invalid_license(@validation_error)
-        nil
       end
 
       def public_key
@@ -118,8 +107,6 @@ module ReactOnRailsPro
       end
 
       def log_license_info(license)
-        return unless license
-
         plan = license["plan"]
         issued_by = license["issued_by"]
 
