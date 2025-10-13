@@ -118,14 +118,16 @@ Set up CI with a license (see [CI_SETUP.md](./CI_SETUP.md) for detailed instruct
 **Ruby Console:**
 ```ruby
 rails console
-> ReactOnRails::Utils.react_on_rails_pro_licence_valid?
+> ReactOnRails::Utils.react_on_rails_pro?
 # Should return: true
 ```
+
+**Note:** With startup validation enabled, your Rails app won't start with an invalid license. If you can run the Rails console, your license is valid.
 
 **Check License Details:**
 ```ruby
 > ReactOnRailsPro::LicenseValidator.license_data
-# Shows: {"sub"=>"your@email.com", "exp"=>1234567890, ...}
+# Shows: {"sub"=>"your@email.com", "exp"=>1234567890, "plan"=>"free", ...}
 ```
 
 **Browser JavaScript Console:**

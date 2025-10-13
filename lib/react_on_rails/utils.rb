@@ -228,7 +228,12 @@ module ReactOnRails
       end
     end
 
-    # Todo -- remove this for v13, as we don't need both boolean and number
+    # Checks if React on Rails Pro is installed and licensed.
+    # With startup validation enabled, if this returns true, it means:
+    # 1. The react_on_rails_pro gem is installed
+    # 2. The license is valid (or the app would have failed to start)
+    #
+    # @return [Boolean] true if Pro is available with valid license
     def self.react_on_rails_pro?
       return @react_on_rails_pro if defined?(@react_on_rails_pro)
 
@@ -244,21 +249,6 @@ module ReactOnRails
                                     else
                                       ""
                                     end
-    end
-
-    def self.react_on_rails_pro_licence_valid?
-      return @react_on_rails_pro_licence_valid if defined?(@react_on_rails_pro_licence_valid)
-
-      @react_on_rails_pro_licence_valid = begin
-        return false unless react_on_rails_pro?
-
-        # Maintain compatibility with legacy versions of React on Rails Pro:
-        # Earlier releases did not require license validation, as they were distributed as private gems.
-        # This check ensures that the method works correctly regardless of the installed version.
-        return true unless ReactOnRailsPro::Utils.respond_to?(:licence_valid?)
-
-        ReactOnRailsPro::Utils.licence_valid?
-      end
     end
 
     def self.rsc_support_enabled?

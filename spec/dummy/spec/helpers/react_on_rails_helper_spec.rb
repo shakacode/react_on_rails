@@ -22,7 +22,7 @@ describe ReactOnRailsHelper do
     }
 
     allow(ReactOnRails::Utils).to receive_messages(
-      react_on_rails_pro_licence_valid?: true
+      react_on_rails_pro?: true
     )
 
     # Configure immediate_hydration to true for tests since they expect that behavior
@@ -389,7 +389,7 @@ describe ReactOnRailsHelper do
         subject(:react_app) { react_component("App", props: props, immediate_hydration: true) }
 
         before do
-          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro_licence_valid?).and_return(false)
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
         end
 
         it { is_expected.to include(badge_html_string) }
@@ -405,7 +405,7 @@ describe ReactOnRailsHelper do
         subject(:react_app) { react_component("App", props: props) }
 
         before do
-          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro_licence_valid?).and_return(false)
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
         end
 
         around do |example|
@@ -421,7 +421,7 @@ describe ReactOnRailsHelper do
         subject(:react_app) { react_component("App", props: props, immediate_hydration: false) }
 
         before do
-          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro_licence_valid?).and_return(false)
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
         end
 
         it { is_expected.not_to include(badge_html_string) }
@@ -437,7 +437,7 @@ describe ReactOnRailsHelper do
 
         before do
           allow(ReactOnRails::Utils).to receive_messages(
-            react_on_rails_pro_licence_valid?: true
+            react_on_rails_pro?: true
           )
         end
 
@@ -483,7 +483,7 @@ describe ReactOnRailsHelper do
         subject(:react_app) { react_component_hash("App", props: props, immediate_hydration: true) }
 
         before do
-          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro_licence_valid?).and_return(false)
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
         end
 
         it "adds badge to componentHtml" do
@@ -496,7 +496,7 @@ describe ReactOnRailsHelper do
 
         before do
           allow(ReactOnRails::Utils).to receive_messages(
-            react_on_rails_pro_licence_valid?: true
+            react_on_rails_pro?: true
           )
         end
 
@@ -541,7 +541,7 @@ describe ReactOnRailsHelper do
         subject(:store) { redux_store("reduxStore", props: props, immediate_hydration: true) }
 
         before do
-          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro_licence_valid?).and_return(false)
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
         end
 
         it { is_expected.to include(badge_html_string) }
@@ -557,7 +557,7 @@ describe ReactOnRailsHelper do
         subject(:store) { redux_store("reduxStore", props: props, immediate_hydration: false) }
 
         before do
-          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro_licence_valid?).and_return(false)
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
         end
 
         it { is_expected.not_to include(badge_html_string) }
@@ -568,7 +568,7 @@ describe ReactOnRailsHelper do
 
         before do
           allow(ReactOnRails::Utils).to receive_messages(
-            react_on_rails_pro_licence_valid?: true
+            react_on_rails_pro?: true
           )
         end
 

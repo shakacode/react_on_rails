@@ -340,26 +340,35 @@ docker run -e REACT_ON_RAILS_PRO_LICENSE="$REACT_ON_RAILS_PRO_LICENSE" your-imag
 
 ## Verification
 
-### Check License in CI
+License validation happens automatically when Rails starts.
 
-Add a verification step to your CI pipeline:
+✅ **If your CI tests run, your license is valid**
+❌ **If license is invalid, Rails fails to start immediately**
 
-```bash
-# Verify license is loaded
-bundle exec rails runner "puts ReactOnRails::Utils.react_on_rails_pro_licence_valid? ? '✅ License valid' : '❌ License invalid'"
-```
+**No verification step needed** - the application won't start without a valid license.
 
 ### Debug License Issues
 
-If tests fail with license errors:
+If Rails fails to start in CI with license errors:
 
 ```bash
-# Check if license is set
-echo "License set: ${REACT_ON_RAILS_PRO_LICENSE:0:20}..." # Shows first 20 chars
+# Check if license environment variable is set (show first 20 chars only)
+echo "License set: ${REACT_ON_RAILS_PRO_LICENSE:0:20}..."
 
-# Check license format
-bundle exec rails runner "require 'jwt'; puts JWT.decode(ENV['REACT_ON_RAILS_PRO_LICENSE'], nil, false)"
+# Decode the license to check expiration
+bundle exec rails runner "
+  require 'jwt'
+  payload = JWT.decode(ENV['REACT_ON_RAILS_PRO_LICENSE'], nil, false).first
+  puts 'Email: ' + payload['sub']
+  puts 'Expires: ' + Time.at(payload['exp']).to_s
+  puts 'Expired: ' + (Time.now.to_i > payload['exp']).to_s
+"
 ```
+
+**Common issues:**
+- License not set in CI environment variables
+- License truncated when copying (should be 500+ characters)
+- License expired (get a new FREE license at https://shakacode.com/react-on-rails-pro)
 
 ## Security Best Practices
 

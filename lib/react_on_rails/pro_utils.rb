@@ -5,9 +5,9 @@ module ReactOnRails
     PRO_ONLY_OPTIONS = %i[immediate_hydration].freeze
 
     # Checks if React on Rails Pro features are available
-    # @return [Boolean] true if Pro license is valid, false otherwise
+    # @return [Boolean] true if Pro is installed and licensed, false otherwise
     def self.support_pro_features?
-      ReactOnRails::Utils.react_on_rails_pro_licence_valid?
+      ReactOnRails::Utils.react_on_rails_pro?
     end
 
     def self.disable_pro_render_options_if_not_licensed(raw_options)

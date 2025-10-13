@@ -377,10 +377,10 @@ module ReactOnRails
           i18nDefaultLocale: I18n.default_locale,
           rorVersion: ReactOnRails::VERSION,
           # TODO: v13 just use the version if existing
-          rorPro: ReactOnRails::Utils.react_on_rails_pro_licence_valid?
+          rorPro: ReactOnRails::Utils.react_on_rails_pro?
         }
 
-        if ReactOnRails::Utils.react_on_rails_pro_licence_valid?
+        if ReactOnRails::Utils.react_on_rails_pro?
           result[:rorProVersion] = ReactOnRails::Utils.react_on_rails_pro_version
 
           if ReactOnRails::Utils.rsc_support_enabled?
