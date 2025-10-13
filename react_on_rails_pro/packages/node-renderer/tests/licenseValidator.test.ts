@@ -75,7 +75,7 @@ describe('LicenseValidator', () => {
   });
 
   describe('validateLicense', () => {
-    it('returns true for valid license in ENV', () => {
+    it('validates successfully for valid license in ENV', () => {
       const validPayload = {
         sub: 'test@example.com',
         iat: Math.floor(Date.now() / 1000),
@@ -86,7 +86,8 @@ describe('LicenseValidator', () => {
       process.env.REACT_ON_RAILS_PRO_LICENSE = validToken;
 
       const module = require('../src/shared/licenseValidator');
-      expect(module.validateLicense()).toBe(true);
+      expect(() => module.validateLicense()).not.toThrow();
+      expect(process.exit).not.toHaveBeenCalled();
     });
 
     it('calls process.exit for expired license', () => {
@@ -192,7 +193,8 @@ describe('LicenseValidator', () => {
       // Reset to pick up the new ENV variable
       reset();
 
-      expect(module.validateLicense()).toBe(true);
+      expect(() => module.validateLicense()).not.toThrow();
+      expect(process.exit).not.toHaveBeenCalled();
     });
 
     it('caches validation result', () => {
@@ -208,13 +210,15 @@ describe('LicenseValidator', () => {
       const module = require('../src/shared/licenseValidator');
 
       // First call
-      expect(module.validateLicense()).toBe(true);
+      module.validateLicense();
+      expect(process.exit).not.toHaveBeenCalled();
 
       // Change ENV (shouldn't affect cached result)
       delete process.env.REACT_ON_RAILS_PRO_LICENSE;
 
-      // Second call should use cache
-      expect(module.validateLicense()).toBe(true);
+      // Second call should use cache and not fail
+      module.validateLicense();
+      expect(process.exit).not.toHaveBeenCalled();
     });
   });
 

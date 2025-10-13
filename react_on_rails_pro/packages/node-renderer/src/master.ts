@@ -7,23 +7,15 @@ import log from './shared/log';
 import { buildConfig, Config, logSanitizedConfig } from './shared/configBuilder';
 import restartWorkers from './master/restartWorkers';
 import * as errorReporter from './shared/errorReporter';
-import { validateLicense, getValidationError } from './shared/licenseValidator';
+import { validateLicense } from './shared/licenseValidator';
 
 const MILLISECONDS_IN_MINUTE = 60000;
 
 export = function masterRun(runningConfig?: Partial<Config>) {
   // Validate license before starting - required in all environments
   log.info('[React on Rails Pro] Validating license...');
-
-  if (validateLicense()) {
-    log.info('[React on Rails Pro] License validation successful');
-  } else {
-    // License validation already calls process.exit(1) in handleInvalidLicense
-    // But we add this for safety in case the validator changes
-    const error = getValidationError() || 'Invalid license';
-    log.error(`[React on Rails Pro] ${error}`);
-    process.exit(1);
-  }
+  validateLicense();
+  log.info('[React on Rails Pro] License validation successful');
 
   // Store config in app state. From now it can be loaded by any module using getConfig():
   const config = buildConfig(runningConfig);

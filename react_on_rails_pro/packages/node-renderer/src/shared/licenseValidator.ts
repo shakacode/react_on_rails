@@ -19,19 +19,17 @@ let cachedLicenseData: LicenseData | undefined;
 let cachedValidationError: string | undefined;
 
 /**
- * Validates the license and raises an error if invalid.
+ * Validates the license and exits the process if invalid.
  * Caches the result after first validation.
  *
- * @returns true if license is valid
  * @throws Exits process if license is invalid
  */
-export function validateLicense(): boolean {
+export function validateLicense(): void {
   if (cachedValid !== undefined) {
-    return cachedValid;
+    return;
   }
 
   cachedValid = performValidation();
-  return cachedValid;
 }
 
 /**
