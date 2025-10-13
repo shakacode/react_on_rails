@@ -5,43 +5,46 @@ import * as crypto from 'crypto';
 // Mock modules
 jest.mock('fs');
 jest.mock('../src/shared/licensePublicKey', () => ({
-  PUBLIC_KEY: ''
+  PUBLIC_KEY: '',
 }));
 
 describe('LicenseValidator', () => {
-  let licenseValidator: any;
-  let testPrivateKey: string;
-  let testPublicKey: string;
+  let validateLicense;
+  let getLicenseData;
+  let getValidationError;
+  let reset;
+  let testPrivateKey;
+  let testPublicKey;
 
   beforeEach(() => {
     // Clear the module cache to get a fresh instance
     jest.resetModules();
 
     // Mock process.exit globally to prevent tests from actually exiting
-    // Individual tests will override this mock if they need to test exit behavior
-    jest.spyOn(process, 'exit').mockImplementation((() => {
+    jest.spyOn(process, 'exit').mockImplementation(() => {
       // Do nothing - let tests continue
-    }) as any);
+      return undefined;
+    });
 
-    // Mock console.error to suppress error logs during tests
+    // Mock console methods to suppress logs during tests
     jest.spyOn(console, 'error').mockImplementation(() => {});
     jest.spyOn(console, 'log').mockImplementation(() => {});
 
     // Reset fs mocks to default (no file exists)
-    (fs.existsSync as jest.Mock).mockReturnValue(false);
-    (fs.readFileSync as jest.Mock).mockReturnValue('');
+    jest.mocked(fs.existsSync).mockReturnValue(false);
+    jest.mocked(fs.readFileSync).mockReturnValue('');
 
     // Generate test RSA key pair
     const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
       modulusLength: 2048,
       publicKeyEncoding: {
         type: 'spki',
-        format: 'pem'
+        format: 'pem',
       },
       privateKeyEncoding: {
         type: 'pkcs8',
-        format: 'pem'
-      }
+        format: 'pem',
+      },
     });
 
     testPrivateKey = privateKey;
@@ -49,7 +52,7 @@ describe('LicenseValidator', () => {
 
     // Mock the public key module
     jest.doMock('../src/shared/licensePublicKey', () => ({
-      PUBLIC_KEY: testPublicKey
+      PUBLIC_KEY: testPublicKey,
     }));
 
     // Clear environment variable
@@ -57,10 +60,13 @@ describe('LicenseValidator', () => {
 
     // Import after mocking
     const module = require('../src/shared/licenseValidator');
-    licenseValidator = module.licenseValidator;
+    validateLicense = module.validateLicense;
+    getLicenseData = module.getLicenseData;
+    getValidationError = module.getValidationError;
+    reset = module.reset;
 
     // Reset the validator state
-    licenseValidator.reset();
+    reset();
   });
 
   afterEach(() => {
@@ -68,26 +74,26 @@ describe('LicenseValidator', () => {
     jest.restoreAllMocks();
   });
 
-  describe('isLicenseValid', () => {
+  describe('validateLicense', () => {
     it('returns true for valid license in ENV', () => {
       const validPayload = {
         sub: 'test@example.com',
         iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(Date.now() / 1000) + 3600 // Valid for 1 hour
+        exp: Math.floor(Date.now() / 1000) + 3600, // Valid for 1 hour
       };
 
       const validToken = jwt.sign(validPayload, testPrivateKey, { algorithm: 'RS256' });
       process.env.REACT_ON_RAILS_PRO_LICENSE = validToken;
 
       const module = require('../src/shared/licenseValidator');
-      expect(module.isLicenseValid()).toBe(true);
+      expect(module.validateLicense()).toBe(true);
     });
 
     it('calls process.exit for expired license', () => {
       const expiredPayload = {
         sub: 'test@example.com',
         iat: Math.floor(Date.now() / 1000) - 7200,
-        exp: Math.floor(Date.now() / 1000) - 3600 // Expired 1 hour ago
+        exp: Math.floor(Date.now() / 1000) - 3600, // Expired 1 hour ago
       };
 
       const expiredToken = jwt.sign(expiredPayload, testPrivateKey, { algorithm: 'RS256' });
@@ -95,8 +101,8 @@ describe('LicenseValidator', () => {
 
       const module = require('../src/shared/licenseValidator');
 
-      // Call isLicenseValid which should trigger process.exit
-      module.isLicenseValid();
+      // Call validateLicense which should trigger process.exit
+      module.validateLicense();
 
       // Verify process.exit was called with code 1
       expect(process.exit).toHaveBeenCalledWith(1);
@@ -107,7 +113,7 @@ describe('LicenseValidator', () => {
     it('calls process.exit for license missing exp field', () => {
       const payloadWithoutExp = {
         sub: 'test@example.com',
-        iat: Math.floor(Date.now() / 1000)
+        iat: Math.floor(Date.now() / 1000),
         // exp field is missing
       };
 
@@ -116,10 +122,12 @@ describe('LicenseValidator', () => {
 
       const module = require('../src/shared/licenseValidator');
 
-      module.isLicenseValid();
+      module.validateLicense();
 
       expect(process.exit).toHaveBeenCalledWith(1);
-      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('License is missing required expiration field'));
+      expect(console.error).toHaveBeenCalledWith(
+        expect.stringContaining('License is missing required expiration field'),
+      );
       expect(console.error).toHaveBeenCalledWith(expect.stringContaining('FREE evaluation license'));
     });
 
@@ -129,14 +137,14 @@ describe('LicenseValidator', () => {
         modulusLength: 2048,
         privateKeyEncoding: {
           type: 'pkcs8',
-          format: 'pem'
-        }
+          format: 'pem',
+        },
       });
 
       const validPayload = {
         sub: 'test@example.com',
         iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(Date.now() / 1000) + 3600
+        exp: Math.floor(Date.now() / 1000) + 3600,
       };
 
       const invalidToken = jwt.sign(validPayload, wrongKey, { algorithm: 'RS256' });
@@ -144,7 +152,7 @@ describe('LicenseValidator', () => {
 
       const module = require('../src/shared/licenseValidator');
 
-      module.isLicenseValid();
+      module.validateLicense();
 
       expect(process.exit).toHaveBeenCalledWith(1);
       expect(console.error).toHaveBeenCalledWith(expect.stringContaining('Invalid license signature'));
@@ -155,11 +163,11 @@ describe('LicenseValidator', () => {
       delete process.env.REACT_ON_RAILS_PRO_LICENSE;
 
       // Mock fs.existsSync to return false (no config file)
-      (fs.existsSync as jest.Mock).mockReturnValue(false);
+      jest.mocked(fs.existsSync).mockReturnValue(false);
 
       const module = require('../src/shared/licenseValidator');
 
-      module.isLicenseValid();
+      module.validateLicense();
 
       expect(process.exit).toHaveBeenCalledWith(1);
       expect(console.error).toHaveBeenCalledWith(expect.stringContaining('No license found'));
@@ -170,7 +178,7 @@ describe('LicenseValidator', () => {
       const validPayload = {
         sub: 'test@example.com',
         iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(Date.now() / 1000) + 3600
+        exp: Math.floor(Date.now() / 1000) + 3600,
       };
 
       const validToken = jwt.sign(validPayload, testPrivateKey, { algorithm: 'RS256' });
@@ -182,16 +190,16 @@ describe('LicenseValidator', () => {
       const module = require('../src/shared/licenseValidator');
 
       // Reset to pick up the new ENV variable
-      licenseValidator.reset();
+      reset();
 
-      expect(module.isLicenseValid()).toBe(true);
+      expect(module.validateLicense()).toBe(true);
     });
 
     it('caches validation result', () => {
       const validPayload = {
         sub: 'test@example.com',
         iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(Date.now() / 1000) + 3600
+        exp: Math.floor(Date.now() / 1000) + 3600,
       };
 
       const validToken = jwt.sign(validPayload, testPrivateKey, { algorithm: 'RS256' });
@@ -200,13 +208,13 @@ describe('LicenseValidator', () => {
       const module = require('../src/shared/licenseValidator');
 
       // First call
-      expect(module.isLicenseValid()).toBe(true);
+      expect(module.validateLicense()).toBe(true);
 
       // Change ENV (shouldn't affect cached result)
       delete process.env.REACT_ON_RAILS_PRO_LICENSE;
 
       // Second call should use cache
-      expect(module.isLicenseValid()).toBe(true);
+      expect(module.validateLicense()).toBe(true);
     });
   });
 
@@ -216,7 +224,7 @@ describe('LicenseValidator', () => {
         sub: 'test@example.com',
         iat: Math.floor(Date.now() / 1000),
         exp: Math.floor(Date.now() / 1000) + 3600,
-        customField: 'customValue'
+        customField: 'customValue',
       };
 
       const validToken = jwt.sign(payload, testPrivateKey, { algorithm: 'RS256' });
@@ -231,12 +239,12 @@ describe('LicenseValidator', () => {
     });
   });
 
-  describe('getLicenseValidationError', () => {
+  describe('getValidationError', () => {
     it('returns error message for expired license', () => {
       const expiredPayload = {
         sub: 'test@example.com',
         iat: Math.floor(Date.now() / 1000) - 7200,
-        exp: Math.floor(Date.now() / 1000) - 3600
+        exp: Math.floor(Date.now() / 1000) - 3600,
       };
 
       const expiredToken = jwt.sign(expiredPayload, testPrivateKey, { algorithm: 'RS256' });
@@ -244,10 +252,10 @@ describe('LicenseValidator', () => {
 
       const module = require('../src/shared/licenseValidator');
 
-      module.isLicenseValid();
+      module.validateLicense();
 
       expect(process.exit).toHaveBeenCalledWith(1);
-      expect(module.getLicenseValidationError()).toContain('License has expired');
+      expect(module.getValidationError()).toContain('License has expired');
     });
   });
 });
