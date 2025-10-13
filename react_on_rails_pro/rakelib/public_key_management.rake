@@ -21,6 +21,7 @@ namespace :react_on_rails_pro do
     # Determine the API URL based on the source
     api_url = case source
               when "local", "localhost"
+                # Use the default local URL created by the Cloudflare Wrangler tool when the worker is run locally
                 "http://localhost:8788/api/public-key"
               when "production", "prod"
                 "https://www.shakacode.com/api/public-key"
@@ -55,6 +56,8 @@ namespace :react_on_rails_pro do
         exit 1
       end
 
+      # TODO: Add a prepublish check to ensure this key matches the latest public key from the API.
+      # This should be implemented after publishing the API endpoint on the ShakaCode website.
       # Update Ruby public key file
       ruby_file_path = File.join(File.dirname(__FILE__), "..", "lib", "react_on_rails_pro", "license_public_key.rb")
       ruby_content = <<~RUBY.strip_heredoc
@@ -67,6 +70,11 @@ namespace :react_on_rails_pro do
             # and is never committed to the repository
             # Last updated: #{Time.now.utc.strftime("%Y-%m-%d %H:%M:%S UTC")}
             # Source: #{api_url}
+            #
+            # You can update this public key by running the rake task:
+            #   react_on_rails_pro:update_public_key
+            # This task fetches the latest key from the API endpoint:
+            #   http://shakacode.com/api/public-key
             KEY = OpenSSL::PKey::RSA.new(<<~PEM.strip.strip_heredoc)
               #{public_key.strip}
             PEM
@@ -85,6 +93,11 @@ namespace :react_on_rails_pro do
         // and is never committed to the repository
         // Last updated: #{Time.now.utc.strftime("%Y-%m-%d %H:%M:%S UTC")}
         // Source: #{api_url}
+        //
+        // You can update this public key by running the rake task:
+        //   react_on_rails_pro:update_public_key
+        // This task fetches the latest key from the API endpoint:
+        //   http://shakacode.com/api/public-key
         export const PUBLIC_KEY = `#{public_key.strip}`;
       TYPESCRIPT
 
@@ -106,68 +119,6 @@ namespace :react_on_rails_pro do
     rescue StandardError => e
       puts "❌ Error: #{e.message}"
       puts e.backtrace.first(5)
-      exit 1
-    end
-  end
-
-  desc "Verify the current public key configuration"
-  task :verify_public_key do
-    puts "Verifying public key configuration..."
-
-    begin
-      # Load and check Ruby public key
-      require "openssl"
-
-      # Need to define OpenSSL before loading the public key
-      require_relative "../lib/react_on_rails_pro/license_public_key"
-      ruby_key = ReactOnRailsPro::LicensePublicKey::KEY
-      puts "✅ Ruby public key loaded successfully"
-      puts "   Key size: #{ruby_key.n.num_bits} bits"
-
-      # Check Node public key file exists
-      node_file_path = File.join(File.dirname(__FILE__), "..", "packages", "node-renderer", "src", "shared", "licensePublicKey.ts")
-      if File.exist?(node_file_path)
-        node_content = File.read(node_file_path)
-        if node_content.include?("BEGIN PUBLIC KEY")
-          puts "✅ Node public key file exists and contains a public key"
-        else
-          puts "⚠️  Node public key file exists but may not contain a valid key"
-        end
-      else
-        puts "❌ Node public key file not found: #{node_file_path}"
-      end
-
-      # Try to validate with current license if one exists (simplified check without Rails)
-      license_file = File.join(File.dirname(__FILE__), "..", "spec", "dummy", "config", "react_on_rails_pro_license.key")
-      if ENV["REACT_ON_RAILS_PRO_LICENSE"] || File.exist?(license_file)
-        puts "\n✅ License configuration detected"
-        puts "   ENV variable set" if ENV["REACT_ON_RAILS_PRO_LICENSE"]
-        puts "   Config file exists: #{license_file}" if File.exist?(license_file)
-
-        # Basic JWT validation test
-        require "jwt"
-        license = ENV["REACT_ON_RAILS_PRO_LICENSE"] || File.read(license_file).strip
-
-        begin
-          payload, _header = JWT.decode(license, ruby_key, true, { algorithm: "RS256" })
-          puts "   ✅ License signature valid"
-          puts "   License email: #{payload['sub']}" if payload['sub']
-          puts "   Organization: #{payload['organization']}" if payload['organization']
-        rescue JWT::ExpiredSignature
-          puts "   ⚠️  License expired"
-        rescue JWT::DecodeError => e
-          puts "   ⚠️  License validation failed: #{e.message}"
-        end
-      else
-        puts "\n⚠️  No license configured"
-        puts "   Set REACT_ON_RAILS_PRO_LICENSE env variable or create config/react_on_rails_pro_license.key"
-      end
-    rescue LoadError => e
-      puts "❌ Failed to load required module: #{e.message}"
-      puts "   You may need to run 'bundle install' first"
-      exit 1
-    rescue StandardError => e
-      puts "❌ Error during verification: #{e.message}"
       exit 1
     end
   end
