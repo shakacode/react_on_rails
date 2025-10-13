@@ -132,13 +132,18 @@ describe('LicenseValidator', () => {
 
     it('calls process.exit for invalid signature', () => {
       // Generate a different key pair for invalid signature
-      const { privateKey: wrongKey } = crypto.generateKeyPairSync('rsa', {
+      const wrongKeyPair = crypto.generateKeyPairSync('rsa', {
         modulusLength: 2048,
+        publicKeyEncoding: {
+          type: 'spki',
+          format: 'pem',
+        },
         privateKeyEncoding: {
           type: 'pkcs8',
           format: 'pem',
         },
       });
+      const wrongKey = wrongKeyPair.privateKey;
 
       const validPayload = {
         sub: 'test@example.com',
