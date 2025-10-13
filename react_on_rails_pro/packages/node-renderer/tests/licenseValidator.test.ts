@@ -8,26 +8,31 @@ jest.mock('../src/shared/licensePublicKey', () => ({
   PUBLIC_KEY: '',
 }));
 
+interface LicenseValidatorModule {
+  validateLicense: () => boolean;
+  getLicenseData: () => { sub?: string; customField?: string } | undefined;
+  getValidationError: () => string | undefined;
+  reset: () => void;
+}
+
 describe('LicenseValidator', () => {
-  let validateLicense;
-  let getLicenseData;
-  let getValidationError;
-  let reset;
-  let testPrivateKey;
-  let testPublicKey;
+  let testPrivateKey: string;
+  let testPublicKey: string;
+  let mockProcessExit: jest.SpyInstance;
+  let mockConsoleError: jest.SpyInstance;
 
   beforeEach(() => {
     // Clear the module cache to get a fresh instance
     jest.resetModules();
 
     // Mock process.exit globally to prevent tests from actually exiting
-    jest.spyOn(process, 'exit').mockImplementation(() => {
+    mockProcessExit = jest.spyOn(process, 'exit').mockImplementation(() => {
       // Do nothing - let tests continue
-      return undefined;
+      return undefined as never;
     });
 
     // Mock console methods to suppress logs during tests
-    jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockConsoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
     jest.spyOn(console, 'log').mockImplementation(() => {});
 
     // Reset fs mocks to default (no file exists)
@@ -58,15 +63,9 @@ describe('LicenseValidator', () => {
     // Clear environment variable
     delete process.env.REACT_ON_RAILS_PRO_LICENSE;
 
-    // Import after mocking
-    const module = require('../src/shared/licenseValidator');
-    validateLicense = module.validateLicense;
-    getLicenseData = module.getLicenseData;
-    getValidationError = module.getValidationError;
-    reset = module.reset;
-
-    // Reset the validator state
-    reset();
+    // Import after mocking and reset the validator state
+    const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
+    module.reset();
   });
 
   afterEach(() => {
@@ -85,9 +84,8 @@ describe('LicenseValidator', () => {
       const validToken = jwt.sign(validPayload, testPrivateKey, { algorithm: 'RS256' });
       process.env.REACT_ON_RAILS_PRO_LICENSE = validToken;
 
-      const module = require('../src/shared/licenseValidator');
-      expect(() => module.validateLicense()).not.toThrow();
-      expect(process.exit).not.toHaveBeenCalled();
+      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
+      expect(module.validateLicense()).toBe(true);
     });
 
     it('calls process.exit for expired license', () => {
@@ -100,15 +98,15 @@ describe('LicenseValidator', () => {
       const expiredToken = jwt.sign(expiredPayload, testPrivateKey, { algorithm: 'RS256' });
       process.env.REACT_ON_RAILS_PRO_LICENSE = expiredToken;
 
-      const module = require('../src/shared/licenseValidator');
+      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
 
       // Call validateLicense which should trigger process.exit
       module.validateLicense();
 
       // Verify process.exit was called with code 1
-      expect(process.exit).toHaveBeenCalledWith(1);
-      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('License has expired'));
-      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('FREE evaluation license'));
+      expect(mockProcessExit).toHaveBeenCalledWith(1);
+      expect(mockConsoleError).toHaveBeenCalledWith(expect.stringContaining('License has expired'));
+      expect(mockConsoleError).toHaveBeenCalledWith(expect.stringContaining('FREE evaluation license'));
     });
 
     it('calls process.exit for license missing exp field', () => {
@@ -121,15 +119,15 @@ describe('LicenseValidator', () => {
       const tokenWithoutExp = jwt.sign(payloadWithoutExp, testPrivateKey, { algorithm: 'RS256' });
       process.env.REACT_ON_RAILS_PRO_LICENSE = tokenWithoutExp;
 
-      const module = require('../src/shared/licenseValidator');
+      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
 
       module.validateLicense();
 
-      expect(process.exit).toHaveBeenCalledWith(1);
-      expect(console.error).toHaveBeenCalledWith(
+      expect(mockProcessExit).toHaveBeenCalledWith(1);
+      expect(mockConsoleError).toHaveBeenCalledWith(
         expect.stringContaining('License is missing required expiration field'),
       );
-      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('FREE evaluation license'));
+      expect(mockConsoleError).toHaveBeenCalledWith(expect.stringContaining('FREE evaluation license'));
     });
 
     it('calls process.exit for invalid signature', () => {
@@ -151,13 +149,13 @@ describe('LicenseValidator', () => {
       const invalidToken = jwt.sign(validPayload, wrongKey, { algorithm: 'RS256' });
       process.env.REACT_ON_RAILS_PRO_LICENSE = invalidToken;
 
-      const module = require('../src/shared/licenseValidator');
+      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
 
       module.validateLicense();
 
-      expect(process.exit).toHaveBeenCalledWith(1);
-      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('Invalid license signature'));
-      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('FREE evaluation license'));
+      expect(mockProcessExit).toHaveBeenCalledWith(1);
+      expect(mockConsoleError).toHaveBeenCalledWith(expect.stringContaining('Invalid license signature'));
+      expect(mockConsoleError).toHaveBeenCalledWith(expect.stringContaining('FREE evaluation license'));
     });
 
     it('calls process.exit for missing license', () => {
@@ -166,13 +164,13 @@ describe('LicenseValidator', () => {
       // Mock fs.existsSync to return false (no config file)
       jest.mocked(fs.existsSync).mockReturnValue(false);
 
-      const module = require('../src/shared/licenseValidator');
+      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
 
       module.validateLicense();
 
-      expect(process.exit).toHaveBeenCalledWith(1);
-      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('No license found'));
-      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('FREE evaluation license'));
+      expect(mockProcessExit).toHaveBeenCalledWith(1);
+      expect(mockConsoleError).toHaveBeenCalledWith(expect.stringContaining('No license found'));
+      expect(mockConsoleError).toHaveBeenCalledWith(expect.stringContaining('FREE evaluation license'));
     });
 
     it('loads license from config file when ENV not set', () => {
@@ -188,13 +186,13 @@ describe('LicenseValidator', () => {
       // (file-based testing is complex due to module caching)
       process.env.REACT_ON_RAILS_PRO_LICENSE = validToken;
 
-      const module = require('../src/shared/licenseValidator');
+      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
 
       // Reset to pick up the new ENV variable
-      reset();
+      module.reset();
 
       expect(() => module.validateLicense()).not.toThrow();
-      expect(process.exit).not.toHaveBeenCalled();
+      expect(mockProcessExit).not.toHaveBeenCalled();
     });
 
     it('caches validation result', () => {
@@ -207,18 +205,16 @@ describe('LicenseValidator', () => {
       const validToken = jwt.sign(validPayload, testPrivateKey, { algorithm: 'RS256' });
       process.env.REACT_ON_RAILS_PRO_LICENSE = validToken;
 
-      const module = require('../src/shared/licenseValidator');
+      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
 
       // First call
-      module.validateLicense();
-      expect(process.exit).not.toHaveBeenCalled();
+      expect(module.validateLicense()).toBe(true);
 
       // Change ENV (shouldn't affect cached result)
       delete process.env.REACT_ON_RAILS_PRO_LICENSE;
 
-      // Second call should use cache and not fail
-      module.validateLicense();
-      expect(process.exit).not.toHaveBeenCalled();
+      // Second call should use cache
+      expect(module.validateLicense()).toBe(true);
     });
   });
 
@@ -234,12 +230,12 @@ describe('LicenseValidator', () => {
       const validToken = jwt.sign(payload, testPrivateKey, { algorithm: 'RS256' });
       process.env.REACT_ON_RAILS_PRO_LICENSE = validToken;
 
-      const module = require('../src/shared/licenseValidator');
+      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
       const data = module.getLicenseData();
 
       expect(data).toBeDefined();
-      expect(data.sub).toBe('test@example.com');
-      expect(data.customField).toBe('customValue');
+      expect(data?.sub).toBe('test@example.com');
+      expect(data?.customField).toBe('customValue');
     });
   });
 
@@ -254,12 +250,14 @@ describe('LicenseValidator', () => {
       const expiredToken = jwt.sign(expiredPayload, testPrivateKey, { algorithm: 'RS256' });
       process.env.REACT_ON_RAILS_PRO_LICENSE = expiredToken;
 
-      const module = require('../src/shared/licenseValidator');
+      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
 
       module.validateLicense();
 
-      expect(process.exit).toHaveBeenCalledWith(1);
-      expect(module.getValidationError()).toContain('License has expired');
+      expect(mockProcessExit).toHaveBeenCalledWith(1);
+      const error = module.getValidationError();
+      expect(error).toBeDefined();
+      expect(error).toContain('License has expired');
     });
   });
 });
