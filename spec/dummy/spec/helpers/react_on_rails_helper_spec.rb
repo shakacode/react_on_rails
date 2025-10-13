@@ -22,7 +22,9 @@ describe ReactOnRailsHelper do
     }
 
     allow(ReactOnRails::Utils).to receive_messages(
-      react_on_rails_pro?: true
+      react_on_rails_pro?: true,
+      react_on_rails_pro_version: "",
+      rsc_support_enabled?: false
     )
 
     # Configure immediate_hydration to true for tests since they expect that behavior
