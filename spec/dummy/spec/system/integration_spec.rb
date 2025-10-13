@@ -90,7 +90,8 @@ shared_context "with pro features and immediate hydration" do
   before do
     allow(ReactOnRails::Utils).to receive_messages(
       react_on_rails_pro?: true,
-      react_on_rails_pro_version: ""
+      react_on_rails_pro_version: "",
+      rsc_support_enabled?: false
     )
   end
 
