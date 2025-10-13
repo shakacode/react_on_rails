@@ -3,6 +3,7 @@
 // and is never committed to the repository
 // Last updated: 2025-10-09 15:57:09 UTC
 // Source: http://shakacode.com/api/public-key
+//
 // You can update this public key by running the rake task:
 //   react_on_rails_pro:update_public_key
 // This task fetches the latest key from the API endpoint:

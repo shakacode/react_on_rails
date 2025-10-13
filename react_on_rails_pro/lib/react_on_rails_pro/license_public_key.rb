@@ -1,24 +1,20 @@
 # frozen_string_literal: true
 
 module ReactOnRailsPro
-  # Module: LicensePublicKey
-  #
-  # Contains ShakaCode's public RSA key used for React on Rails Pro license verification.
-  # The corresponding private key is securely held by ShakaCode and is never committed to the repository.
-  #
-  # You can update this public key by running the rake task:
-  #   react_on_rails_pro:update_public_key
-  # This task fetches the latest key from the API endpoint:
-  #   http://shakacode.com/api/public-key
-  #
-  # TODO: Add a prepublish check to ensure this key matches the latest public key from the API.
-  #       This should be implemented after publishing the API endpoint on the ShakaCode website.
   module LicensePublicKey
     # ShakaCode's public key for React on Rails Pro license verification
     # The private key corresponding to this public key is held by ShakaCode
     # and is never committed to the repository
     # Last updated: 2025-10-09 15:57:09 UTC
     # Source: http://shakacode.com/api/public-key
+    #
+    # You can update this public key by running the rake task:
+    #   react_on_rails_pro:update_public_key
+    # This task fetches the latest key from the API endpoint:
+    #   http://shakacode.com/api/public-key
+    #
+    # TODO: Add a prepublish check to ensure this key matches the latest public key from the API.
+    #       This should be implemented after publishing the API endpoint on the ShakaCode website.
     KEY = OpenSSL::PKey::RSA.new(<<~PEM.strip.strip_heredoc)
       -----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAlJFK3aWuycVp9X05qhGo
