@@ -40,9 +40,8 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
     ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
 
     # Stub Rails.logger to avoid nil errors in unit tests
-    allow(Rails).to receive(:logger).and_return(mock_logger)
     # Stub Rails.root for config file path tests
-    allow(Rails).to receive(:root).and_return(mock_root)
+    allow(Rails).to receive_messages(logger: mock_logger, root: mock_root)
   end
 
   after do
@@ -50,7 +49,7 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
     ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
   end
 
-  describe ".valid?" do
+  describe ".validate!" do
     context "with valid license in ENV" do
       before do
         valid_token = JWT.encode(valid_payload, test_private_key, "RS256")
@@ -58,13 +57,13 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
       end
 
       it "returns true" do
-        expect(described_class.valid?).to be true
+        expect(described_class.validate!).to be true
       end
 
       it "caches the result" do
         expect(described_class).to receive(:validate_license).once.and_call_original
-        described_class.valid?
-        described_class.valid? # Second call should use cache
+        described_class.validate!
+        described_class.validate! # Second call should use cache
       end
     end
 
@@ -75,11 +74,11 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
       end
 
       it "raises error" do
-        expect { described_class.valid? }.to raise_error(ReactOnRailsPro::Error, /License has expired/)
+        expect { described_class.validate! }.to raise_error(ReactOnRailsPro::Error, /License has expired/)
       end
 
       it "includes FREE license information in error message" do
-        expect { described_class.valid? }.to raise_error(ReactOnRailsPro::Error, /FREE evaluation license/)
+        expect { described_class.validate! }.to raise_error(ReactOnRailsPro::Error, /FREE evaluation license/)
       end
     end
 
@@ -98,12 +97,12 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
       end
 
       it "raises error" do
-        expect { described_class.valid? }
+        expect { described_class.validate! }
           .to raise_error(ReactOnRailsPro::Error, /License is missing required expiration field/)
       end
 
       it "includes FREE license information in error message" do
-        expect { described_class.valid? }.to raise_error(ReactOnRailsPro::Error, /FREE evaluation license/)
+        expect { described_class.validate! }.to raise_error(ReactOnRailsPro::Error, /FREE evaluation license/)
       end
     end
 
@@ -115,11 +114,11 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
       end
 
       it "raises error" do
-        expect { described_class.valid? }.to raise_error(ReactOnRailsPro::Error, /Invalid license signature/)
+        expect { described_class.validate! }.to raise_error(ReactOnRailsPro::Error, /Invalid license signature/)
       end
 
       it "includes FREE license information in error message" do
-        expect { described_class.valid? }.to raise_error(ReactOnRailsPro::Error, /FREE evaluation license/)
+        expect { described_class.validate! }.to raise_error(ReactOnRailsPro::Error, /FREE evaluation license/)
       end
     end
 
@@ -130,11 +129,11 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
       end
 
       it "raises error" do
-        expect { described_class.valid? }.to raise_error(ReactOnRailsPro::Error, /No license found/)
+        expect { described_class.validate! }.to raise_error(ReactOnRailsPro::Error, /No license found/)
       end
 
       it "includes FREE license information in error message" do
-        expect { described_class.valid? }
+        expect { described_class.validate! }
           .to raise_error(ReactOnRailsPro::Error, /FREE evaluation license/)
       end
     end
@@ -152,7 +151,7 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
       end
 
       it "returns true" do
-        expect(described_class.valid?).to be true
+        expect(described_class.validate!).to be true
       end
     end
   end
@@ -180,7 +179,7 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
 
       it "returns the error message" do
         begin
-          described_class.valid?
+          described_class.validate!
         rescue ReactOnRailsPro::Error
           # Expected error
         end
@@ -193,13 +192,13 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
     before do
       valid_token = JWT.encode(valid_payload, test_private_key, "RS256")
       ENV["REACT_ON_RAILS_PRO_LICENSE"] = valid_token
-      described_class.valid? # Cache the result
+      described_class.validate! # Cache the result
     end
 
     it "clears the cached validation result" do
-      expect(described_class.instance_variable_get(:@valid)).to be true
+      expect(described_class.instance_variable_get(:@validate)).to be true
       described_class.reset!
-      expect(described_class.instance_variable_defined?(:@valid)).to be false
+      expect(described_class.instance_variable_defined?(:@validate)).to be false
     end
   end
 end

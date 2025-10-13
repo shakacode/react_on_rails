@@ -6,7 +6,7 @@ module ReactOnRailsPro
     # The private key corresponding to this public key is held by ShakaCode
     # and is never committed to the repository
     # Last updated: 2025-10-09 15:57:09 UTC
-    # Source: http://localhost:8788/api/public-key
+    # Source: http://shakacode.com/api/public-key
     KEY = OpenSSL::PKey::RSA.new(<<~PEM.strip.strip_heredoc)
       -----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAlJFK3aWuycVp9X05qhGo

@@ -16,8 +16,12 @@ module ReactOnRailsPro
       puts "[ReactOnRailsPro] #{message}"
     end
 
-    def self.licence_valid?
-      LicenseValidator.valid?
+    # Validates the license and raises an exception if invalid.
+    #
+    # @return [Boolean] true if license is valid
+    # @raise [ReactOnRailsPro::Error] if license is invalid
+    def self.validate_licence!
+      LicenseValidator.validate!
     end
 
     def self.copy_assets

@@ -15,7 +15,7 @@ module ReactOnRailsPro
       config.after_initialize do
         Rails.logger.info "[React on Rails Pro] Validating license..."
 
-        if ReactOnRailsPro::LicenseValidator.valid?
+        if ReactOnRailsPro::LicenseValidator.validate!
           Rails.logger.info "[React on Rails Pro] License validation successful"
         else
           # License validation will raise an error, so this line won't be reached
