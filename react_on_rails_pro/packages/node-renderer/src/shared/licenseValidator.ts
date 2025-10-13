@@ -4,9 +4,12 @@ import * as path from 'path';
 import { PUBLIC_KEY } from './licensePublicKey';
 
 interface LicenseData {
-  sub?: string;
-  iat?: number;
+  sub?: string; // Subject (email for whom the license is issued)
+  iat?: number; // Issued at timestamp
   exp: number; // Required: expiration timestamp
+  plan?: string; // Optional: license plan (e.g., "free", "paid")
+  issued_by?: string; // Optional: who issued the license
+  // Allow additional fields
   [key: string]: any;
 }
 
@@ -114,6 +117,10 @@ function loadAndDecodeLicense(): LicenseData {
   const licenseString = loadLicenseString();
 
   const decoded = jwt.verify(licenseString, PUBLIC_KEY, {
+    // Enforce RS256 algorithm only to prevent "alg=none" and downgrade attacks.
+    // Adding other algorithms to the whitelist (e.g., ['RS256', 'HS256']) can introduce vulnerabilities:
+    // If the public key is mistakenly used as a secret for HMAC algorithms (like HS256), attackers could forge tokens.
+    // Always carefully review algorithm changes to avoid signature bypass risks.
     algorithms: ['RS256'],
     // Disable automatic expiration verification so we can handle it manually with custom logic
     ignoreExpiration: true,
@@ -168,8 +175,7 @@ function handleInvalidLicense(message: string): never {
  * @private
  */
 function logLicenseInfo(license: LicenseData): void {
-  const plan = (license as any).plan;
-  const issuedBy = (license as any).issued_by;
+  const { plan, issued_by: issuedBy } = license;
 
   if (plan) {
     console.log(`[React on Rails Pro] License plan: ${plan}`);
