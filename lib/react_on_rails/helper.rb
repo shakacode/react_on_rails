@@ -620,10 +620,23 @@ module ReactOnRails
 
       @rendered_rails_context = true
 
-      content_tag(:script,
-                  json_safe_and_pretty(data).html_safe,
-                  type: "application/json",
-                  id: "js-react-on-rails-context")
+      attribution_comment = react_on_rails_attribution_comment
+      script_tag = content_tag(:script,
+                               json_safe_and_pretty(data).html_safe,
+                               type: "application/json",
+                               id: "js-react-on-rails-context")
+
+      "#{attribution_comment}\n#{script_tag}".html_safe
+    end
+
+    # Generates the HTML attribution comment
+    # Pro version calls ReactOnRailsPro::Utils for license-specific details
+    def react_on_rails_attribution_comment
+      if ReactOnRails::Utils.react_on_rails_pro?
+        ReactOnRailsPro::Utils.pro_attribution_comment
+      else
+        "<!-- Powered by React on Rails (c) ShakaCode | Open Source -->"
+      end
     end
 
     # prepend the rails_context if not yet applied

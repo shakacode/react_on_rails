@@ -164,5 +164,23 @@ module ReactOnRailsPro
         end
       end.join("_").underscore
     end
+
+    # Generates the Pro-specific HTML attribution comment based on license status
+    # Called by React on Rails helper to generate license-specific attribution
+    def self.pro_attribution_comment
+      base = "Powered by React on Rails Pro (c) ShakaCode"
+
+      # Check if in grace period
+      grace_days = ReactOnRailsPro::LicenseValidator.grace_days_remaining
+      comment = if grace_days
+                  "#{base} | Licensed (Expired - Grace Period: #{grace_days} days remaining)"
+                elsif ReactOnRailsPro::LicenseValidator.evaluation?
+                  "#{base} | Evaluation License"
+                else
+                  "#{base} | Licensed"
+                end
+
+      "<!-- #{comment} -->"
+    end
   end
 end

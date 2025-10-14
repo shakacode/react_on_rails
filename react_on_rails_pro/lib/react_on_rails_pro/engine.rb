@@ -15,7 +15,7 @@ module ReactOnRailsPro
       config.after_initialize do
         Rails.logger.info "[React on Rails Pro] Validating license..."
 
-        ReactOnRailsPro::LicenseValidator.validate!
+        ReactOnRailsPro::LicenseValidator.validated_license_data!
 
         Rails.logger.info "[React on Rails Pro] License validation successful"
       end
