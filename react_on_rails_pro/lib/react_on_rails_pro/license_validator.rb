@@ -68,8 +68,12 @@ module ReactOnRailsPro
         license_string = load_license_string
 
         JWT.decode(
+          # The JWT token containing the license data
           license_string,
+          # RSA public key used to verify the JWT signature
           public_key,
+          # verify_signature: NEVER set to false! When false, signature verification is skipped,
+          # allowing anyone to forge licenses. Must always be true for security.
           true,
           # NOTE: Never remove the 'algorithm' parameter from JWT.decode to prevent algorithm bypassing vulnerabilities.
           # Ensure to hardcode the expected algorithm.
@@ -91,7 +95,7 @@ module ReactOnRailsPro
         return File.read(config_path).strip if config_path.exist?
 
         @validation_error = "No license found. Please set REACT_ON_RAILS_PRO_LICENSE environment variable " \
-                            "or create config/react_on_rails_pro_license.key file. " \
+                            "or create #{config_path} file. " \
                             "Get a FREE evaluation license at https://shakacode.com/react-on-rails-pro"
         handle_invalid_license(@validation_error)
       end
@@ -108,10 +112,10 @@ module ReactOnRailsPro
 
       def log_license_info(license)
         plan = license["plan"]
-        issued_by = license["issued_by"]
+        iss = license["iss"]
 
         Rails.logger.info("[React on Rails Pro] License plan: #{plan}") if plan
-        Rails.logger.info("[React on Rails Pro] Issued by: #{issued_by}") if issued_by
+        Rails.logger.info("[React on Rails Pro] Issued by: #{iss}") if iss
       end
     end
   end

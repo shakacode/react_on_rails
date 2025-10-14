@@ -4,11 +4,16 @@ import * as path from 'path';
 import { PUBLIC_KEY } from './licensePublicKey';
 
 interface LicenseData {
-  sub?: string; // Subject (email for whom the license is issued)
-  iat?: number; // Issued at timestamp
-  exp: number; // Required: expiration timestamp
-  plan?: string; // Optional: license plan (e.g., "free", "paid")
-  issued_by?: string; // Optional: who issued the license
+  // Subject (email for whom the license is issued)
+  sub?: string;
+  // Issued at timestamp
+  iat?: number;
+  // Required: expiration timestamp
+  exp: number;
+  // Optional: license plan (e.g., "free", "paid")
+  plan?: string;
+  // Issuer (who issued the license)
+  iss?: string;
   // Allow additional fields
   [key: string]: unknown;
 }
@@ -34,13 +39,13 @@ function handleInvalidLicense(message: string): never {
  * @private
  */
 function logLicenseInfo(license: LicenseData): void {
-  const { plan, issued_by: issuedBy } = license;
+  const { plan, iss } = license;
 
   if (plan) {
     console.log(`[React on Rails Pro] License plan: ${plan}`);
   }
-  if (issuedBy) {
-    console.log(`[React on Rails Pro] Issued by: ${issuedBy}`);
+  if (iss) {
+    console.log(`[React on Rails Pro] Issued by: ${iss}`);
   }
 }
 
@@ -57,18 +62,19 @@ function loadLicenseString(): string | never {
   }
 
   // Then try config file (relative to project root)
+  let configPath;
   try {
-    const configPath = path.join(process.cwd(), 'config', 'react_on_rails_pro_license.key');
+    configPath = path.join(process.cwd(), 'config', 'react_on_rails_pro_license.key');
     if (fs.existsSync(configPath)) {
       return fs.readFileSync(configPath, 'utf8').trim();
     }
-  } catch {
-    // File doesn't exist or can't be read
+  } catch (error) {
+    console.error(`[React on Rails Pro] Error reading license file: ${(error as Error).message}`);
   }
 
   cachedValidationError =
     'No license found. Please set REACT_ON_RAILS_PRO_LICENSE environment variable ' +
-    'or create config/react_on_rails_pro_license.key file. ' +
+    `or create ${configPath ?? 'config/react_on_rails_pro_license.key'} file. ` +
     'Get a FREE evaluation license at https://shakacode.com/react-on-rails-pro';
 
   handleInvalidLicense(cachedValidationError);
@@ -114,6 +120,7 @@ function performValidation(): boolean | never {
     }
 
     // Check expiry
+    // Date.now() returns milliseconds, but JWT exp is in Unix seconds, so divide by 1000
     if (Date.now() / 1000 > license.exp) {
       cachedValidationError =
         'License has expired. ' +

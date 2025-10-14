@@ -20,8 +20,12 @@ describe('LicenseValidator', () => {
   let testPublicKey: string;
   let mockProcessExit: jest.SpyInstance;
   let mockConsoleError: jest.SpyInstance;
+  let originalEnv: NodeJS.ProcessEnv;
 
   beforeEach(() => {
+    // Store original environment
+    originalEnv = { ...process.env };
+
     // Clear the module cache to get a fresh instance
     jest.resetModules();
 
@@ -69,9 +73,21 @@ describe('LicenseValidator', () => {
   });
 
   afterEach(() => {
-    delete process.env.REACT_ON_RAILS_PRO_LICENSE;
+    // Restore original environment
+    process.env = originalEnv;
     jest.restoreAllMocks();
   });
+
+  /**
+   * Helper function to mock the REACT_ON_RAILS_PRO_LICENSE environment variable
+   */
+  const mockLicenseEnv = (token: string | undefined) => {
+    if (token === undefined) {
+      delete process.env.REACT_ON_RAILS_PRO_LICENSE;
+    } else {
+      process.env.REACT_ON_RAILS_PRO_LICENSE = token;
+    }
+  };
 
   describe('validateLicense', () => {
     it('validates successfully for valid license in ENV', () => {
@@ -82,7 +98,7 @@ describe('LicenseValidator', () => {
       };
 
       const validToken = jwt.sign(validPayload, testPrivateKey, { algorithm: 'RS256' });
-      process.env.REACT_ON_RAILS_PRO_LICENSE = validToken;
+      mockLicenseEnv(validToken);
 
       const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
       expect(module.validateLicense()).toBe(true);
@@ -96,7 +112,7 @@ describe('LicenseValidator', () => {
       };
 
       const expiredToken = jwt.sign(expiredPayload, testPrivateKey, { algorithm: 'RS256' });
-      process.env.REACT_ON_RAILS_PRO_LICENSE = expiredToken;
+      mockLicenseEnv(expiredToken);
 
       const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
 
@@ -117,7 +133,7 @@ describe('LicenseValidator', () => {
       };
 
       const tokenWithoutExp = jwt.sign(payloadWithoutExp, testPrivateKey, { algorithm: 'RS256' });
-      process.env.REACT_ON_RAILS_PRO_LICENSE = tokenWithoutExp;
+      mockLicenseEnv(tokenWithoutExp);
 
       const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
 
@@ -152,7 +168,7 @@ describe('LicenseValidator', () => {
       };
 
       const invalidToken = jwt.sign(validPayload, wrongKey, { algorithm: 'RS256' });
-      process.env.REACT_ON_RAILS_PRO_LICENSE = invalidToken;
+      mockLicenseEnv(invalidToken);
 
       const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
 
@@ -164,7 +180,7 @@ describe('LicenseValidator', () => {
     });
 
     it('calls process.exit for missing license', () => {
-      delete process.env.REACT_ON_RAILS_PRO_LICENSE;
+      mockLicenseEnv(undefined);
 
       // Mock fs.existsSync to return false (no config file)
       jest.mocked(fs.existsSync).mockReturnValue(false);
@@ -178,7 +194,7 @@ describe('LicenseValidator', () => {
       expect(mockConsoleError).toHaveBeenCalledWith(expect.stringContaining('FREE evaluation license'));
     });
 
-    it('loads license from config file when ENV not set', () => {
+    it('validates license from ENV variable after reset', () => {
       const validPayload = {
         sub: 'test@example.com',
         iat: Math.floor(Date.now() / 1000),
@@ -189,7 +205,7 @@ describe('LicenseValidator', () => {
 
       // Set the license in ENV variable instead of file
       // (file-based testing is complex due to module caching)
-      process.env.REACT_ON_RAILS_PRO_LICENSE = validToken;
+      mockLicenseEnv(validToken);
 
       const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
 
@@ -208,7 +224,7 @@ describe('LicenseValidator', () => {
       };
 
       const validToken = jwt.sign(validPayload, testPrivateKey, { algorithm: 'RS256' });
-      process.env.REACT_ON_RAILS_PRO_LICENSE = validToken;
+      mockLicenseEnv(validToken);
 
       const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
 
@@ -216,7 +232,7 @@ describe('LicenseValidator', () => {
       expect(module.validateLicense()).toBe(true);
 
       // Change ENV (shouldn't affect cached result)
-      delete process.env.REACT_ON_RAILS_PRO_LICENSE;
+      mockLicenseEnv(undefined);
 
       // Second call should use cache
       expect(module.validateLicense()).toBe(true);
@@ -233,7 +249,7 @@ describe('LicenseValidator', () => {
       };
 
       const validToken = jwt.sign(payload, testPrivateKey, { algorithm: 'RS256' });
-      process.env.REACT_ON_RAILS_PRO_LICENSE = validToken;
+      mockLicenseEnv(validToken);
 
       const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
       const data = module.getLicenseData();
@@ -253,7 +269,7 @@ describe('LicenseValidator', () => {
       };
 
       const expiredToken = jwt.sign(expiredPayload, testPrivateKey, { algorithm: 'RS256' });
-      process.env.REACT_ON_RAILS_PRO_LICENSE = expiredToken;
+      mockLicenseEnv(expiredToken);
 
       const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
 

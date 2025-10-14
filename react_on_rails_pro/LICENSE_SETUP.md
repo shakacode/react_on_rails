@@ -191,7 +191,7 @@ The license is a JWT (JSON Web Token) signed with RSA-256, containing:
   "exp": 1234567890,                 // Expiration timestamp (REQUIRED)
   "plan": "free",                    // License plan: "free" or "paid" (Optional)
   "organization": "Your Company",    // Organization name (Optional)
-  "issued_by": "api"                 // License issuer identifier (Optional)
+  "iss": "api"                       // Issuer identifier (Optional, standard JWT claim)
 }
 ```
 
