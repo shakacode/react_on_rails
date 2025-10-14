@@ -23,6 +23,9 @@ let cachedValid: boolean | undefined;
 let cachedLicenseData: LicenseData | undefined;
 let cachedValidationError: string | undefined;
 
+// Grace period: 1 month (in seconds)
+const GRACE_PERIOD_SECONDS = 30 * 24 * 60 * 60;
+
 /**
  * Handles invalid license by logging error and exiting.
  * @private
@@ -32,6 +35,32 @@ function handleInvalidLicense(message: string): never {
   console.error(fullMessage);
   // Validation errors should prevent the application from starting
   process.exit(1);
+}
+
+/**
+ * Checks if the current environment is production.
+ * @private
+ */
+function isProduction(): boolean {
+  return process.env.NODE_ENV === 'production';
+}
+
+/**
+ * Checks if the license is within the grace period.
+ * @private
+ */
+function isWithinGracePeriod(expTime: number): boolean {
+  return Date.now() / 1000 <= expTime + GRACE_PERIOD_SECONDS;
+}
+
+/**
+ * Calculates remaining grace period days.
+ * @private
+ */
+function graceDaysRemaining(expTime: number): number {
+  const graceEnd = expTime + GRACE_PERIOD_SECONDS;
+  const secondsRemaining = graceEnd - Date.now() / 1000;
+  return Math.floor(secondsRemaining / (24 * 60 * 60));
 }
 
 /**
@@ -119,14 +148,30 @@ function performValidation(): boolean | never {
       handleInvalidLicense(cachedValidationError);
     }
 
-    // Check expiry
+    // Check expiry with grace period for production
     // Date.now() returns milliseconds, but JWT exp is in Unix seconds, so divide by 1000
-    if (Date.now() / 1000 > license.exp) {
+    const currentTime = Date.now() / 1000;
+    const expTime = license.exp;
+
+    if (currentTime > expTime) {
+      const daysExpired = Math.floor((currentTime - expTime) / (24 * 60 * 60));
+
       cachedValidationError =
-        'License has expired. ' +
+        `License has expired ${daysExpired} day(s) ago. ` +
         'Get a FREE evaluation license (3 months) at https://shakacode.com/react-on-rails-pro ' +
         'or upgrade to a paid license for production use.';
-      handleInvalidLicense(cachedValidationError);
+
+      // In production, allow a grace period of 1 month with error logging
+      if (isProduction() && isWithinGracePeriod(expTime)) {
+        const graceDays = graceDaysRemaining(expTime);
+        console.error(
+          `[React on Rails Pro] WARNING: ${cachedValidationError} ` +
+            `Grace period: ${graceDays} day(s) remaining. ` +
+            'Application will fail to start after grace period expires.',
+        );
+      } else {
+        handleInvalidLicense(cachedValidationError);
+      }
     }
 
     // Log license type if present (for analytics)

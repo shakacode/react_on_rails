@@ -30,6 +30,9 @@ module ReactOnRailsPro
 
       private
 
+      # Grace period: 1 month (in seconds)
+      GRACE_PERIOD_SECONDS = 30 * 24 * 60 * 60
+
       def validate_license
         license = load_and_decode_license
 
@@ -41,12 +44,28 @@ module ReactOnRailsPro
           handle_invalid_license(@validation_error)
         end
 
-        # Check expiry
-        if Time.now.to_i > license["exp"]
-          @validation_error = "License has expired. " \
+        # Check expiry with grace period for production
+        current_time = Time.now.to_i
+        exp_time = license["exp"]
+
+        if current_time > exp_time
+          days_expired = ((current_time - exp_time) / (24 * 60 * 60)).to_i
+
+          @validation_error = "License has expired #{days_expired} day(s) ago. " \
                               "Get a FREE evaluation license (3 months) at https://shakacode.com/react-on-rails-pro " \
                               "or upgrade to a paid license for production use."
-          handle_invalid_license(@validation_error)
+
+          # In production, allow a grace period of 1 month with error logging
+          if production? && within_grace_period?(exp_time)
+            grace_days_remaining = grace_days_remaining(exp_time)
+            Rails.logger.error(
+              "[React on Rails Pro] WARNING: #{@validation_error} " \
+              "Grace period: #{grace_days_remaining} day(s) remaining. " \
+              "Application will fail to start after grace period expires."
+            )
+          else
+            handle_invalid_license(@validation_error)
+          end
         end
 
         # Log license type if present (for analytics)
@@ -62,6 +81,20 @@ module ReactOnRailsPro
         @validation_error = "License validation error: #{e.message}. " \
                             "Get a FREE evaluation license at https://shakacode.com/react-on-rails-pro"
         handle_invalid_license(@validation_error)
+      end
+
+      def production?
+        Rails.env.production?
+      end
+
+      def within_grace_period?(exp_time)
+        Time.now.to_i <= exp_time + GRACE_PERIOD_SECONDS
+      end
+
+      def grace_days_remaining(exp_time)
+        grace_end = exp_time + GRACE_PERIOD_SECONDS
+        seconds_remaining = grace_end - Time.now.to_i
+        (seconds_remaining / (24 * 60 * 60)).to_i
       end
 
       def load_and_decode_license

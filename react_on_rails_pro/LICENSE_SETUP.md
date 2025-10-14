@@ -84,12 +84,26 @@ The license is validated at multiple points:
 
 React on Rails Pro requires a valid license in **all environments**:
 
-- ✅ **Development**: Requires license (use FREE license)
-- ✅ **Test**: Requires license (use FREE license)
-- ✅ **CI/CD**: Requires license (use FREE license)
-- ✅ **Production**: Requires license (use paid license)
+- ✅ **Development**: Requires license (use FREE license) - **Fails immediately on expiration**
+- ✅ **Test**: Requires license (use FREE license) - **Fails immediately on expiration**
+- ✅ **CI/CD**: Requires license (use FREE license) - **Fails immediately on expiration**
+- ✅ **Production**: Requires license (use paid license) - **1-month grace period after expiration**
 
 Get your FREE evaluation license in 30 seconds - no credit card required!
+
+### Production Grace Period
+
+**Production environments only** receive a **1-month grace period** when a license expires:
+
+- ⚠️ **During grace period**: Application continues to run but logs ERROR messages on every startup
+- ❌ **After grace period**: Application fails to start (same as dev/test)
+- 🔔 **Warning messages**: Include days remaining in grace period
+- ✅ **Development/Test**: No grace period - fails immediately (helps catch expiration early)
+
+**Important**: The grace period is designed to give production deployments time to renew, but you should:
+1. Monitor your logs for license expiration warnings
+2. Renew licenses before they expire
+3. Test license renewal in development/staging first
 
 ## Team Setup
 
@@ -158,10 +172,19 @@ window.railsContext.rorPro
 
 ### Error: "License has expired"
 
+**What happens:**
+- **Development/Test/CI**: Application fails to start immediately
+- **Production**: 1-month grace period with ERROR logs, then fails to start
+
 **Solutions:**
 1. **Free License**: Get a new 3-month FREE license
 2. **Paid License**: Contact support to renew
 3. Visit: [https://shakacode.com/react-on-rails-pro](https://shakacode.com/react-on-rails-pro)
+
+**If you see grace period warnings in production:**
+- You have time to renew, but don't wait!
+- The warning shows how many days remain
+- Plan your license renewal before the grace period ends
 
 ### Error: "License is missing required expiration field"
 

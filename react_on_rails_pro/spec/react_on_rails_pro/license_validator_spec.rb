@@ -73,12 +73,75 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
         ENV["REACT_ON_RAILS_PRO_LICENSE"] = expired_token
       end
 
-      it "raises error" do
-        expect { described_class.validate! }.to raise_error(ReactOnRailsPro::Error, /License has expired/)
+      context "in development/test environment" do
+        before do
+          allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new("development"))
+        end
+
+        it "raises error immediately" do
+          expect { described_class.validate! }.to raise_error(ReactOnRailsPro::Error, /License has expired/)
+        end
+
+        it "includes FREE license information in error message" do
+          expect { described_class.validate! }.to raise_error(ReactOnRailsPro::Error, /FREE evaluation license/)
+        end
       end
 
-      it "includes FREE license information in error message" do
-        expect { described_class.validate! }.to raise_error(ReactOnRailsPro::Error, /FREE evaluation license/)
+      context "in production environment" do
+        before do
+          allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new("production"))
+        end
+
+        context "within grace period (expired < 1 month ago)" do
+          let(:expired_within_grace) do
+            {
+              sub: "test@example.com",
+              iat: Time.now.to_i - (15 * 24 * 60 * 60), # Issued 15 days ago
+              exp: Time.now.to_i - (10 * 24 * 60 * 60)  # Expired 10 days ago (within 1 month grace)
+            }
+          end
+
+          before do
+            token = JWT.encode(expired_within_grace, test_private_key, "RS256")
+            ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+          end
+
+          it "does not raise error" do
+            expect { described_class.validate! }.not_to raise_error
+          end
+
+          it "logs warning with grace period remaining" do
+            expect(mock_logger).to receive(:error).with(/WARNING:.*License has expired.*Grace period:.*day\(s\) remaining/)
+            described_class.validate!
+          end
+
+          it "returns true" do
+            expect(described_class.validate!).to be true
+          end
+        end
+
+        context "outside grace period (expired > 1 month ago)" do
+          let(:expired_outside_grace) do
+            {
+              sub: "test@example.com",
+              iat: Time.now.to_i - (60 * 24 * 60 * 60), # Issued 60 days ago
+              exp: Time.now.to_i - (35 * 24 * 60 * 60)  # Expired 35 days ago (outside 1 month grace)
+            }
+          end
+
+          before do
+            token = JWT.encode(expired_outside_grace, test_private_key, "RS256")
+            ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+          end
+
+          it "raises error" do
+            expect { described_class.validate! }.to raise_error(ReactOnRailsPro::Error, /License has expired/)
+          end
+
+          it "includes FREE license information in error message" do
+            expect { described_class.validate! }.to raise_error(ReactOnRailsPro::Error, /FREE evaluation license/)
+          end
+        end
       end
     end
 

@@ -104,25 +104,74 @@ describe('LicenseValidator', () => {
       expect(module.validateLicense()).toBe(true);
     });
 
-    it('calls process.exit for expired license', () => {
-      const expiredPayload = {
-        sub: 'test@example.com',
-        iat: Math.floor(Date.now() / 1000) - 7200,
-        exp: Math.floor(Date.now() / 1000) - 3600, // Expired 1 hour ago
-      };
+    describe('expired license behavior', () => {
+      it('calls process.exit for expired license in development/test', () => {
+        const expiredPayload = {
+          sub: 'test@example.com',
+          iat: Math.floor(Date.now() / 1000) - 7200,
+          exp: Math.floor(Date.now() / 1000) - 3600, // Expired 1 hour ago
+        };
 
-      const expiredToken = jwt.sign(expiredPayload, testPrivateKey, { algorithm: 'RS256' });
-      mockLicenseEnv(expiredToken);
+        const expiredToken = jwt.sign(expiredPayload, testPrivateKey, { algorithm: 'RS256' });
+        mockLicenseEnv(expiredToken);
+        // Ensure NODE_ENV is not production
+        delete process.env.NODE_ENV;
 
-      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
+        const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
 
-      // Call validateLicense which should trigger process.exit
-      module.validateLicense();
+        // Call validateLicense which should trigger process.exit
+        module.validateLicense();
 
-      // Verify process.exit was called with code 1
-      expect(mockProcessExit).toHaveBeenCalledWith(1);
-      expect(mockConsoleError).toHaveBeenCalledWith(expect.stringContaining('License has expired'));
-      expect(mockConsoleError).toHaveBeenCalledWith(expect.stringContaining('FREE evaluation license'));
+        // Verify process.exit was called with code 1
+        expect(mockProcessExit).toHaveBeenCalledWith(1);
+        expect(mockConsoleError).toHaveBeenCalledWith(expect.stringContaining('License has expired'));
+        expect(mockConsoleError).toHaveBeenCalledWith(expect.stringContaining('FREE evaluation license'));
+      });
+
+      it('logs warning but does not exit in production within grace period', () => {
+        // Expired 10 days ago (within 30-day grace period)
+        const expiredWithinGrace = {
+          sub: 'test@example.com',
+          iat: Math.floor(Date.now() / 1000) - 15 * 24 * 60 * 60,
+          exp: Math.floor(Date.now() / 1000) - 10 * 24 * 60 * 60,
+        };
+
+        const expiredToken = jwt.sign(expiredWithinGrace, testPrivateKey, { algorithm: 'RS256' });
+        mockLicenseEnv(expiredToken);
+        process.env.NODE_ENV = 'production';
+
+        const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
+
+        // Should not exit
+        expect(() => module.validateLicense()).not.toThrow();
+        expect(mockProcessExit).not.toHaveBeenCalled();
+
+        // Should log warning
+        expect(mockConsoleError).toHaveBeenCalledWith(
+          expect.stringMatching(/WARNING:.*License has expired.*Grace period:.*day\(s\) remaining/),
+        );
+      });
+
+      it('calls process.exit in production outside grace period', () => {
+        // Expired 35 days ago (outside 30-day grace period)
+        const expiredOutsideGrace = {
+          sub: 'test@example.com',
+          iat: Math.floor(Date.now() / 1000) - 60 * 24 * 60 * 60,
+          exp: Math.floor(Date.now() / 1000) - 35 * 24 * 60 * 60,
+        };
+
+        const expiredToken = jwt.sign(expiredOutsideGrace, testPrivateKey, { algorithm: 'RS256' });
+        mockLicenseEnv(expiredToken);
+        process.env.NODE_ENV = 'production';
+
+        const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
+
+        module.validateLicense();
+
+        // Verify process.exit was called with code 1
+        expect(mockProcessExit).toHaveBeenCalledWith(1);
+        expect(mockConsoleError).toHaveBeenCalledWith(expect.stringContaining('License has expired'));
+      });
     });
 
     it('calls process.exit for license missing exp field', () => {
