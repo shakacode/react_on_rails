@@ -27,6 +27,17 @@ describe ReactOnRailsHelper do
       rsc_support_enabled?: false
     )
 
+    # Stub ReactOnRailsPro::Utils.pro_attribution_comment for all tests
+    # since react_on_rails_pro? is set to true by default
+    pro_module = Module.new
+    utils_module = Module.new do
+      def self.pro_attribution_comment
+        "<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed -->"
+      end
+    end
+    stub_const("ReactOnRailsPro", pro_module)
+    stub_const("ReactOnRailsPro::Utils", utils_module)
+
     # Configure immediate_hydration to true for tests since they expect that behavior
     ReactOnRails.configure do |config|
       config.immediate_hydration = true
@@ -641,15 +652,10 @@ describe ReactOnRailsHelper do
       let(:pro_comment) { "<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed -->" }
 
       before do
-        pro_module = Module.new
-        utils_module = Module.new do
-          def self.pro_attribution_comment; end
-        end
-        stub_const("ReactOnRailsPro", pro_module)
-        stub_const("ReactOnRailsPro::Utils", utils_module)
-
+        # ReactOnRailsPro::Utils is already stubbed in global before block
+        # Just override the return value for this context
         allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
-        allow(utils_module).to receive(:pro_attribution_comment).and_return(pro_comment)
+        allow(ReactOnRailsPro::Utils).to receive(:pro_attribution_comment).and_return(pro_comment)
       end
 
       it "returns the Pro attribution comment" do
