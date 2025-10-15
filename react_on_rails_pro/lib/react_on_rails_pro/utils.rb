@@ -20,8 +20,8 @@ module ReactOnRailsPro
     #
     # @return [Boolean] true if license is valid
     # @raise [ReactOnRailsPro::Error] if license is invalid
-    def self.validate_licence!
-      LicenseValidator.validate!
+    def self.validated_license_data!
+      LicenseValidator.validated_license_data!
     end
 
     def self.copy_assets

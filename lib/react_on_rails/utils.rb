@@ -239,7 +239,7 @@ module ReactOnRails
       @react_on_rails_pro = begin
         return false unless gem_available?("react_on_rails_pro")
 
-        ReactOnRailsPro::Utils.validate_licence!
+        ReactOnRailsPro::Utils.validated_license_data!.present?
       end
     end
 
