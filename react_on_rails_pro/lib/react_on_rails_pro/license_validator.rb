@@ -4,6 +4,9 @@ require "jwt"
 
 module ReactOnRailsPro
   class LicenseValidator
+    # Grace period: 1 month (in seconds)
+    GRACE_PERIOD_SECONDS = 30 * 24 * 60 * 60
+
     class << self
       # Validates the license and returns the license data
       # Caches the result after first validation
@@ -45,8 +48,8 @@ module ReactOnRailsPro
       # @return [Boolean] true if plan is not "paid"
       def evaluation?
         data = validated_license_data!
-        plan = data["plan"]
-        plan != "paid"
+        plan = data["plan"].to_s
+        plan != "paid" && !plan.start_with?("paid_")
       end
 
       # Returns remaining grace period days if license is expired but in grace period
@@ -60,9 +63,6 @@ module ReactOnRailsPro
       end
 
       private
-
-      # Grace period: 1 month (in seconds)
-      GRACE_PERIOD_SECONDS = 30 * 24 * 60 * 60
 
       # Validates the license data and raises if invalid
       # Logs info/errors and handles grace period logic
@@ -160,10 +160,10 @@ module ReactOnRailsPro
         config_path = Rails.root.join("config", "react_on_rails_pro_license.key")
         return File.read(config_path).strip if config_path.exist?
 
-        @validation_error = "No license found. Please set REACT_ON_RAILS_PRO_LICENSE environment variable " \
-                            "or create #{config_path} file. " \
-                            "Get a FREE evaluation license at https://shakacode.com/react-on-rails-pro"
-        handle_invalid_license(@validation_error)
+        error_msg = "No license found. Please set REACT_ON_RAILS_PRO_LICENSE environment variable " \
+                    "or create #{config_path} file. " \
+                    "Get a FREE evaluation license at https://shakacode.com/react-on-rails-pro"
+        handle_invalid_license(error_msg)
       end
 
       def public_key
