@@ -1,3 +1,5 @@
+# React on Rails Credits and Authors
+
 ## Authors
 
 [The Shaka Code team!](http://www.shakacode.com/about/)

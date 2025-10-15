@@ -1,3 +1,5 @@
+# Integrating React on Rails with Rails Engines
+
 ## In your engine
 
 - At the top of `config/initializers/react_on_rails.rb`
