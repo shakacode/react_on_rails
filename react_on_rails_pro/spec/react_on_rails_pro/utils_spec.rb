@@ -220,10 +220,6 @@ module ReactOnRailsPro
     end
 
     describe ".pro_attribution_comment" do
-      before do
-        allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new("production"))
-      end
-
       context "when license is valid and not in grace period" do
         before do
           allow(ReactOnRailsPro::LicenseValidator).to receive_messages(grace_days_remaining: nil, evaluation?: false)
