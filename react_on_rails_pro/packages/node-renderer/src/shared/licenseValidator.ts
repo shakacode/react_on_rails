@@ -18,13 +18,12 @@ interface LicenseData {
   [key: string]: unknown;
 }
 
-// Module-level state for caching
-let cachedValid: boolean | undefined;
-let cachedLicenseData: LicenseData | undefined;
-let cachedValidationError: string | undefined;
-
 // Grace period: 1 month (in seconds)
 const GRACE_PERIOD_SECONDS = 30 * 24 * 60 * 60;
+
+// Module-level state for caching
+let cachedLicenseData: LicenseData | undefined;
+let cachedGraceDaysRemaining: number | undefined;
 
 /**
  * Handles invalid license by logging error and exiting.
@@ -38,7 +37,7 @@ function handleInvalidLicense(message: string): never {
 }
 
 /**
- * Checks if the current environment is production.
+ * Checks if running in production environment.
  * @private
  */
 function isProduction(): boolean {
@@ -46,21 +45,21 @@ function isProduction(): boolean {
 }
 
 /**
- * Checks if the license is within the grace period.
+ * Checks if current time is within grace period after expiration.
  * @private
  */
 function isWithinGracePeriod(expTime: number): boolean {
-  return Date.now() / 1000 <= expTime + GRACE_PERIOD_SECONDS;
+  return Math.floor(Date.now() / 1000) <= expTime + GRACE_PERIOD_SECONDS;
 }
 
 /**
  * Calculates remaining grace period days.
  * @private
  */
-function graceDaysRemaining(expTime: number): number {
+function calculateGraceDaysRemaining(expTime: number): number {
   const graceEnd = expTime + GRACE_PERIOD_SECONDS;
-  const secondsRemaining = graceEnd - Date.now() / 1000;
-  return Math.floor(secondsRemaining / (24 * 60 * 60));
+  const secondsRemaining = graceEnd - Math.floor(Date.now() / 1000);
+  return secondsRemaining <= 0 ? 0 : Math.floor(secondsRemaining / (24 * 60 * 60));
 }
 
 /**
@@ -83,7 +82,7 @@ function logLicenseInfo(license: LicenseData): void {
  * @private
  */
 // eslint-disable-next-line consistent-return
-function loadLicenseString(): string | never {
+function loadLicenseString(): string {
   // First try environment variable
   const envLicense = process.env.REACT_ON_RAILS_PRO_LICENSE;
   if (envLicense) {
@@ -91,9 +90,8 @@ function loadLicenseString(): string | never {
   }
 
   // Then try config file (relative to project root)
-  let configPath;
   try {
-    configPath = path.join(process.cwd(), 'config', 'react_on_rails_pro_license.key');
+    const configPath = path.join(process.cwd(), 'config', 'react_on_rails_pro_license.key');
     if (fs.existsSync(configPath)) {
       return fs.readFileSync(configPath, 'utf8').trim();
     }
@@ -101,12 +99,12 @@ function loadLicenseString(): string | never {
     console.error(`[React on Rails Pro] Error reading license file: ${(error as Error).message}`);
   }
 
-  cachedValidationError =
+  const errorMsg =
     'No license found. Please set REACT_ON_RAILS_PRO_LICENSE environment variable ' +
-    `or create ${configPath ?? 'config/react_on_rails_pro_license.key'} file. ` +
+    'or create config/react_on_rails_pro_license.key file. ' +
     'Get a FREE evaluation license at https://shakacode.com/react-on-rails-pro';
 
-  handleInvalidLicense(cachedValidationError);
+  handleInvalidLicense(errorMsg);
 }
 
 /**
@@ -126,119 +124,136 @@ function loadAndDecodeLicense(): LicenseData {
     ignoreExpiration: true,
   }) as LicenseData;
 
-  cachedLicenseData = decoded;
   return decoded;
 }
 
 /**
- * Performs the actual license validation logic.
+ * Validates the license data and throws if invalid.
+ * Logs info/errors and handles grace period logic.
+ *
+ * @param license - The decoded license data
+ * @returns Grace days remaining if in grace period, undefined otherwise
+ * @throws Never returns - exits process if license is invalid
  * @private
  */
+function validateLicenseData(license: LicenseData): number | undefined {
+  // Check that exp field exists
+  if (!license.exp) {
+    const error =
+      'License is missing required expiration field. ' +
+      'Your license may be from an older version. ' +
+      'Get a FREE evaluation license at https://shakacode.com/react-on-rails-pro';
+    handleInvalidLicense(error);
+  }
+
+  // Check expiry with grace period for production
+  const currentTime = Math.floor(Date.now() / 1000);
+  const expTime = license.exp;
+  let graceDays: number | undefined;
+
+  if (currentTime > expTime) {
+    const daysExpired = Math.floor((currentTime - expTime) / (24 * 60 * 60));
+
+    const error =
+      `License has expired ${daysExpired} day(s) ago. ` +
+      'Get a FREE evaluation license (3 months) at https://shakacode.com/react-on-rails-pro ' +
+      'or upgrade to a paid license for production use.';
+
+    // In production, allow a grace period of 1 month with error logging
+    if (isProduction() && isWithinGracePeriod(expTime)) {
+      // Calculate grace days once here
+      graceDays = calculateGraceDaysRemaining(expTime);
+      console.error(
+        `[React on Rails Pro] WARNING: ${error} ` +
+          `Grace period: ${graceDays} day(s) remaining. ` +
+          'Application will fail to start after grace period expires.',
+      );
+    } else {
+      handleInvalidLicense(error);
+    }
+  }
+
+  // Log license type if present (for analytics)
+  logLicenseInfo(license);
+
+  // Return grace days (undefined if not in grace period)
+  return graceDays;
+}
+
+/**
+ * Validates the license and returns the license data.
+ * Caches the result after first validation.
+ *
+ * @returns The validated license data
+ * @throws Exits process if license is invalid
+ */
 // eslint-disable-next-line consistent-return
-function performValidation(): boolean | never {
+export function getValidatedLicenseData(): LicenseData {
+  if (cachedLicenseData !== undefined) {
+    return cachedLicenseData;
+  }
+
   try {
-    const license = loadAndDecodeLicense();
+    // Load and decode license (but don't cache yet)
+    const licenseData = loadAndDecodeLicense();
 
-    // Check that exp field exists
-    if (!license.exp) {
-      cachedValidationError =
-        'License is missing required expiration field. ' +
-        'Your license may be from an older version. ' +
-        'Get a FREE evaluation license at https://shakacode.com/react-on-rails-pro';
-      handleInvalidLicense(cachedValidationError);
-    }
+    // Validate the license (raises if invalid, returns grace_days)
+    const graceDays = validateLicenseData(licenseData);
 
-    // Check expiry with grace period for production
-    // Date.now() returns milliseconds, but JWT exp is in Unix seconds, so divide by 1000
-    const currentTime = Date.now() / 1000;
-    const expTime = license.exp;
+    // Validation passed - now cache both data and grace days
+    cachedLicenseData = licenseData;
+    cachedGraceDaysRemaining = graceDays;
 
-    if (currentTime > expTime) {
-      const daysExpired = Math.floor((currentTime - expTime) / (24 * 60 * 60));
-
-      cachedValidationError =
-        `License has expired ${daysExpired} day(s) ago. ` +
-        'Get a FREE evaluation license (3 months) at https://shakacode.com/react-on-rails-pro ' +
-        'or upgrade to a paid license for production use.';
-
-      // In production, allow a grace period of 1 month with error logging
-      if (isProduction() && isWithinGracePeriod(expTime)) {
-        const graceDays = graceDaysRemaining(expTime);
-        console.error(
-          `[React on Rails Pro] WARNING: ${cachedValidationError} ` +
-            `Grace period: ${graceDays} day(s) remaining. ` +
-            'Application will fail to start after grace period expires.',
-        );
-      } else {
-        handleInvalidLicense(cachedValidationError);
-      }
-    }
-
-    // Log license type if present (for analytics)
-    logLicenseInfo(license);
-
-    return true;
+    return cachedLicenseData;
   } catch (error: unknown) {
     if (error instanceof Error && error.name === 'JsonWebTokenError') {
-      cachedValidationError =
+      const errorMsg =
         `Invalid license signature: ${error.message}. ` +
         'Your license file may be corrupted. ' +
         'Get a FREE evaluation license at https://shakacode.com/react-on-rails-pro';
+      handleInvalidLicense(errorMsg);
     } else if (error instanceof Error) {
-      cachedValidationError =
+      const errorMsg =
         `License validation error: ${error.message}. ` +
         'Get a FREE evaluation license at https://shakacode.com/react-on-rails-pro';
+      handleInvalidLicense(errorMsg);
     } else {
-      cachedValidationError =
+      const errorMsg =
         'License validation error: Unknown error. ' +
         'Get a FREE evaluation license at https://shakacode.com/react-on-rails-pro';
+      handleInvalidLicense(errorMsg);
     }
-    handleInvalidLicense(cachedValidationError);
   }
 }
 
 /**
- * Validates the license and exits the process if invalid.
- * Caches the result after first validation.
+ * Checks if the current license is an evaluation/free license.
  *
- * @returns true if license is valid
- * @throws Exits process if license is invalid
+ * @returns true if plan is not "paid"
  */
-export function validateLicense(): boolean {
-  if (cachedValid !== undefined) {
-    return cachedValid;
-  }
-
-  cachedValid = performValidation();
-  return cachedValid;
+export function isEvaluation(): boolean {
+  const data = getValidatedLicenseData();
+  const plan = String(data.plan || '');
+  return plan !== 'paid' && !plan.startsWith('paid_');
 }
 
 /**
- * Gets the decoded license data.
+ * Returns remaining grace period days if license is expired but in grace period.
  *
- * @returns Decoded license data or undefined if no license
+ * @returns Number of days remaining, or undefined if not in grace period
  */
-export function getLicenseData(): LicenseData | undefined {
-  if (!cachedLicenseData) {
-    loadAndDecodeLicense();
-  }
-  return cachedLicenseData;
-}
+export function getGraceDaysRemaining(): number | undefined {
+  // Ensure license is validated and cached
+  getValidatedLicenseData();
 
-/**
- * Gets the validation error message if validation failed.
- *
- * @returns Error message or undefined
- */
-export function getValidationError(): string | undefined {
-  return cachedValidationError;
+  // Return cached grace days (undefined if not in grace period)
+  return cachedGraceDaysRemaining;
 }
 
 /**
  * Resets all cached validation state (primarily for testing).
  */
 export function reset(): void {
-  cachedValid = undefined;
   cachedLicenseData = undefined;
-  cachedValidationError = undefined;
+  cachedGraceDaysRemaining = undefined;
 }
