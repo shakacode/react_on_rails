@@ -10,6 +10,8 @@ This guide explains how to configure React on Rails Pro licenses for CI/CD envir
 2. Add `REACT_ON_RAILS_PRO_LICENSE` to your CI environment variables
 3. Done! Your tests will run with a valid license
 
+**⚠️ Important: The free 3-month evaluation license is intended for personal, educational, and evaluation purposes only (including CI/CD testing). It should NOT be used for production deployments. Production use requires a paid license.**
+
 ## Getting a License for CI
 
 You have two options:
@@ -21,8 +23,8 @@ You have two options:
 
 ### Option 2: Create a Dedicated CI License
 - Register with `ci@yourcompany.com` or similar
-- Get a FREE 3-month license
-- Renew every 3 months (or use a paid license)
+- Get a FREE 3-month evaluation license (for personal, educational, and evaluation purposes only)
+- Renew every 3 months (or use a paid license for production)
 
 ## Configuration by CI Provider
 
@@ -447,15 +449,15 @@ jobs:
 
 ### When to Use Different Licenses
 
-- **CI/Test**: FREE license (renew every 3 months)
-- **Staging**: Can use FREE or paid license
-- **Production**: Paid license (required)
+- **CI/Test**: FREE evaluation license (for personal, educational, and evaluation purposes - renew every 3 months)
+- **Staging**: Can use FREE evaluation license for non-production testing or paid license
+- **Production**: Paid license (required - free licenses are NOT for production use)
 
 ## License Renewal
 
 ### Setting Up Renewal Reminders
 
-FREE licenses expire every 3 months. Set a reminder:
+FREE evaluation licenses (for personal, educational, and evaluation purposes only) expire every 3 months. Set a reminder:
 
 1. **Calendar reminder**: 2 weeks before expiration
 2. **CI notification**: Tests will fail when expired

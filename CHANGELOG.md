@@ -23,6 +23,10 @@ After a release, please make sure to run `bundle exec rake update_changelog`. Th
 
 Changes since the last non-beta release.
 
+#### Added
+
+- **Attribution Comment**: Added HTML comment attribution to Rails views containing React on Rails functionality. The comment automatically displays which version is in use (open source React on Rails or React on Rails Pro) and, for Pro users, shows the license status. This helps identify React on Rails usage across your application. [PR #1857](https://github.com/shakacode/react_on_rails/pull/1857) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 #### Breaking Changes
 
 - **React on Rails Core Package**: Several Pro-only methods have been removed from the core package and are now exclusively available in the `react-on-rails-pro` package. If you're using any of the following methods, you'll need to migrate to React on Rails Pro:
@@ -65,7 +69,7 @@ To migrate to React on Rails Pro:
    import ReactOnRails from 'react-on-rails-pro';
    ```
 
-4. If you're using a free license for personal (non-production) use, you can obtain one at [React on Rails Pro License](https://www.shakacode.com/react-on-rails-pro). The Pro package is free for personal, educational, and non-production usage.
+4. If you're using a free license, you can obtain one at [React on Rails Pro License](https://www.shakacode.com/react-on-rails-pro). **Important: The free 3-month evaluation license is intended for personal, educational, and evaluation purposes only. It should NOT be used for production deployments.** Production use requires a paid license.
 
 **Note:** If you're not using any of the Pro-only methods listed above, no changes are required.
 

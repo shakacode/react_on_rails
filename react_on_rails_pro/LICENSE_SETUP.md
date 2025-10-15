@@ -15,11 +15,13 @@ This document explains how to configure your React on Rails Pro license.
 
 **No credit card required!**
 
+**⚠️ Important: The free 3-month evaluation license is intended for personal, educational, and evaluation purposes only. It should NOT be used for production deployments. Production use requires a paid license.**
+
 ## License Types
 
 ### Free License
 - **Duration**: 3 months
-- **Usage**: Development, testing, evaluation, CI/CD
+- **Usage**: Personal, educational, and evaluation purposes only (development, testing, evaluation, CI/CD) - **NOT for production**
 - **Cost**: FREE - just register with your email
 - **Renewal**: Get a new free license or upgrade to paid
 
