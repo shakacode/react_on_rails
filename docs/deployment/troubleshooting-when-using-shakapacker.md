@@ -1,13 +1,15 @@
-# Client rendering crashes when configuring `optimization.runtimeChunk` to `multiple`
+# Troubleshooting Shakapacker Configuration Issues
 
-## Context
+## Client rendering crashes when configuring `optimization.runtimeChunk` to `multiple`
+
+### Context
 
 1. Ruby version: 3.1
 2. Rails version: 7.0.6
 3. Shakapacker version: 6.6.0
 4. React on Rails version: 13.3.5
 
-## The failure
+### The failure
 
 Configuring Webpack to embed the runtime in each chunk and calling `react_component` twice in a Rails view/partial causes the client render to crash with the following error:
 
@@ -27,9 +29,9 @@ VM4859 clientStartup.js:132 Uncaught Error: ReactOnRails encountered an error wh
     at HTMLDocument.onReadyStateChange (VM4859 clientStartup.js:238:13)
 ```
 
-## Configs
+### Configs
 
-### Webpack configuration
+#### Webpack configuration
 
 ```js
 optimization: {
@@ -37,7 +39,7 @@ optimization: {
 },
 ```
 
-### Rails view
+#### Rails view
 
 ```haml
 = react_component("XXX", props: @props)
@@ -45,13 +47,13 @@ optimization: {
 = react_component("YYY", props: @props)
 ```
 
-## The problem
+### The problem
 
 Configuring Webpack to embed the runtime in each chunk and calling `react_component` twice in a Rails view/partial causes the client render to crash.
 
 Read more at https://github.com/shakacode/react_on_rails/issues/1558.
 
-## Solution
+### Solution
 
 To overcome this issue, we could use [shakapacker](https://github.com/shakacode/shakapacker)'s default optimization configuration (pseudo-code):
 

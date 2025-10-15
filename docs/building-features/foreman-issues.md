@@ -1,4 +1,4 @@
-# Foreman Issues
+# Troubleshooting Foreman with React on Rails
 
 ## It is not recommended to include foreman into Gemfile
 

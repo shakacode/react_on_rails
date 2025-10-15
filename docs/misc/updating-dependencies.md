@@ -1,4 +1,4 @@
-# Updating Dependencies
+# Updating Ruby and JavaScript Dependencies
 
 If you frequently update dependencies in small batches, you will avoid large and painful updates later. Then again, if you don't have good test coverage, it's hazardous to update dependencies at any time.
 

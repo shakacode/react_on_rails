@@ -1,4 +1,4 @@
-# API Reference
+# React on Rails API Reference Guide
 
 Complete API documentation for React on Rails.
 
