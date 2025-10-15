@@ -258,7 +258,7 @@ describe ReactOnRailsHelper do
     it { expect(self).to respond_to :react_component }
 
     it { is_expected.to be_an_instance_of ActiveSupport::SafeBuffer }
-    it { is_expected.to start_with "<script" }
+    it { is_expected.to start_with "<!--" }
     it { is_expected.to match %r{</script>\s*$} }
     it { is_expected.to include react_component_div }
 
@@ -536,7 +536,7 @@ describe ReactOnRailsHelper do
     it { expect(self).to respond_to :redux_store }
 
     it { is_expected.to be_an_instance_of ActiveSupport::SafeBuffer }
-    it { is_expected.to start_with "<script" }
+    it { is_expected.to start_with "<!--" }
     it { is_expected.to end_with "</script>" }
 
     it {
