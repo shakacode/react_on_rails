@@ -633,5 +633,46 @@ describe ReactOnRailsHelper do
       expect(helper).to have_received(:rails_context).with(server_side: false)
     end
   end
+
+  describe "#react_on_rails_attribution_comment" do
+    let(:helper) { PlainReactOnRailsHelper.new }
+
+    context "when React on Rails Pro is installed" do
+      let(:pro_comment) { "<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed -->" }
+
+      before do
+        pro_module = Module.new
+        utils_module = Module.new do
+          def self.pro_attribution_comment; end
+        end
+        stub_const("ReactOnRailsPro", pro_module)
+        stub_const("ReactOnRailsPro::Utils", utils_module)
+
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+        allow(utils_module).to receive(:pro_attribution_comment).and_return(pro_comment)
+      end
+
+      it "returns the Pro attribution comment" do
+        result = helper.send(:react_on_rails_attribution_comment)
+        expect(result).to eq(pro_comment)
+      end
+
+      it "calls ReactOnRailsPro::Utils.pro_attribution_comment" do
+        helper.send(:react_on_rails_attribution_comment)
+        expect(ReactOnRailsPro::Utils).to have_received(:pro_attribution_comment)
+      end
+    end
+
+    context "when React on Rails Pro is NOT installed" do
+      before do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+      end
+
+      it "returns the open source attribution comment" do
+        result = helper.send(:react_on_rails_attribution_comment)
+        expect(result).to eq("<!-- Powered by React on Rails (c) ShakaCode | Open Source -->")
+      end
+    end
+  end
 end
 # rubocop:enable Metrics/BlockLength
