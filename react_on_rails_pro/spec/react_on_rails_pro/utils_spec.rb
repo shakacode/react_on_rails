@@ -239,7 +239,7 @@ module ReactOnRailsPro
         it "returns attribution comment with grace period information" do
           result = described_class.pro_attribution_comment
           expected = "<!-- Powered by React on Rails Pro (c) ShakaCode | " \
-                     "Licensed (Expired - Grace Period: 15 days remaining) -->"
+                     "Licensed (Expired - Grace Period: 15 day(s) remaining) -->"
           expect(result).to eq(expected)
         end
       end
@@ -252,7 +252,7 @@ module ReactOnRailsPro
         it "returns attribution comment with singular day" do
           result = described_class.pro_attribution_comment
           expected = "<!-- Powered by React on Rails Pro (c) ShakaCode | " \
-                     "Licensed (Expired - Grace Period: 1 days remaining) -->"
+                     "Licensed (Expired - Grace Period: 1 day(s) remaining) -->"
           expect(result).to eq(expected)
         end
       end
@@ -276,7 +276,7 @@ module ReactOnRailsPro
         it "returns attribution comment with grace period information" do
           result = described_class.pro_attribution_comment
           expected = "<!-- Powered by React on Rails Pro (c) ShakaCode | " \
-                     "Licensed (Expired - Grace Period: 0 days remaining) -->"
+                     "Licensed (Expired - Grace Period: 0 day(s) remaining) -->"
           expect(result).to eq(expected)
         end
       end

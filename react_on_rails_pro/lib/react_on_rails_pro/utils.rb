@@ -173,7 +173,7 @@ module ReactOnRailsPro
       # Check if in grace period
       grace_days = ReactOnRailsPro::LicenseValidator.grace_days_remaining
       comment = if grace_days
-                  "#{base} | Licensed (Expired - Grace Period: #{grace_days} days remaining)"
+                  "#{base} | Licensed (Expired - Grace Period: #{grace_days} day(s) remaining)"
                 elsif ReactOnRailsPro::LicenseValidator.evaluation?
                   "#{base} | Evaluation License"
                 else
