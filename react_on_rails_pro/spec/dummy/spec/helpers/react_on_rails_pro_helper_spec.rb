@@ -13,7 +13,7 @@ module StreamingTestHelpers
   def response; end
 end
 
-describe ReactOnRailsProHelper, type: :helper do
+describe ReactOnRailsProHelper do
   # In order to test the pro helper, we need to load the methods from the regular helper.
   # I couldn't see any easier way to do this.
   include ReactOnRails::Helper
@@ -693,6 +693,47 @@ describe ReactOnRailsProHelper, type: :helper do
 
         expect(second_random_value).not_to eq(first_random_value)
       end
+    end
+  end
+
+  describe "attribution comment in stream_react_component" do
+    include StreamingTestHelpers
+
+    let(:component_name) { "TestComponent" }
+    let(:props) { { test: "data" } }
+    let(:component_options) { { prerender: true, id: "#{component_name}-react-component-0" } }
+    let(:chunks) do
+      [
+        { html: "<div>Test Content</div>", consoleReplayScript: "" }
+      ]
+    end
+
+    before do
+      @rorp_rendering_fibers = []
+      ReactOnRailsPro::Request.instance_variable_set(:@connection, nil)
+      original_httpx_plugin = HTTPX.method(:plugin)
+      allow(HTTPX).to receive(:plugin) do |*args|
+        original_httpx_plugin.call(:mock_stream).plugin(*args)
+      end
+      clear_stream_mocks
+
+      mock_streaming_response(%r{http://localhost:3800/bundles/[a-f0-9]{32}-test/render/[a-f0-9]{32}}, 200,
+                              count: 1) do |yielder|
+        chunks.each do |chunk|
+          yielder.call("#{chunk.to_json}\n")
+        end
+      end
+    end
+
+    it "includes the Pro attribution comment in the rendered output" do
+      result = stream_react_component(component_name, props: props, **component_options)
+      expect(result).to include("<!-- Powered by React on Rails Pro (c) ShakaCode")
+    end
+
+    it "includes the attribution comment only once" do
+      result = stream_react_component(component_name, props: props, **component_options)
+      comment_count = result.scan("<!-- Powered by React on Rails Pro").length
+      expect(comment_count).to eq(1)
     end
   end
 end

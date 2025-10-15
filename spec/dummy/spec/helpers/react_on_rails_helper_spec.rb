@@ -674,5 +674,136 @@ describe ReactOnRailsHelper do
       end
     end
   end
+
+  describe "attribution comment inclusion in rendered output" do
+    let(:props) { { name: "Test" } }
+
+    before do
+      allow(SecureRandom).to receive(:uuid).and_return(0)
+    end
+
+    describe "#react_component" do
+      context "when React on Rails Pro is installed" do
+        before do
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+          allow(ReactOnRailsPro::Utils).to receive(:pro_attribution_comment)
+            .and_return("<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed -->")
+        end
+
+        it "includes the Pro attribution comment in the rendered output" do
+          result = react_component("App", props: props)
+          expect(result).to include("<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed -->")
+        end
+
+        it "includes the attribution comment only once" do
+          result = react_component("App", props: props)
+          comment_count = result.scan("<!-- Powered by React on Rails Pro").length
+          expect(comment_count).to eq(1)
+        end
+      end
+
+      context "when React on Rails Pro is NOT installed" do
+        before do
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+        end
+
+        it "includes the open source attribution comment in the rendered output" do
+          result = react_component("App", props: props)
+          expect(result).to include("<!-- Powered by React on Rails (c) ShakaCode | Open Source -->")
+        end
+
+        it "includes the attribution comment only once" do
+          result = react_component("App", props: props)
+          comment_count = result.scan("<!-- Powered by React on Rails").length
+          expect(comment_count).to eq(1)
+        end
+      end
+    end
+
+    describe "#redux_store" do
+      context "when React on Rails Pro is installed" do
+        before do
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+          allow(ReactOnRailsPro::Utils).to receive(:pro_attribution_comment)
+            .and_return("<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed -->")
+        end
+
+        it "includes the Pro attribution comment in the rendered output" do
+          result = redux_store("TestStore", props: props)
+          expect(result).to include("<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed -->")
+        end
+
+        it "includes the attribution comment only once" do
+          result = redux_store("TestStore", props: props)
+          comment_count = result.scan("<!-- Powered by React on Rails Pro").length
+          expect(comment_count).to eq(1)
+        end
+      end
+
+      context "when React on Rails Pro is NOT installed" do
+        before do
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+        end
+
+        it "includes the open source attribution comment in the rendered output" do
+          result = redux_store("TestStore", props: props)
+          expect(result).to include("<!-- Powered by React on Rails (c) ShakaCode | Open Source -->")
+        end
+
+        it "includes the attribution comment only once" do
+          result = redux_store("TestStore", props: props)
+          comment_count = result.scan("<!-- Powered by React on Rails").length
+          expect(comment_count).to eq(1)
+        end
+      end
+    end
+
+    describe "#react_component_hash" do
+      before do
+        allow(ReactOnRails::ServerRenderingPool).to receive(:server_render_js_with_console_logging).and_return(
+          "html" => { "componentHtml" => "<div>Test</div>", "title" => "Test Title" },
+          "consoleReplayScript" => ""
+        )
+        allow(ReactOnRails::ServerRenderingJsCode).to receive(:js_code_renderer)
+          .and_return(ReactOnRails::ServerRenderingJsCode)
+      end
+
+      context "when React on Rails Pro is installed" do
+        before do
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+          allow(ReactOnRailsPro::Utils).to receive(:pro_attribution_comment)
+            .and_return("<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed -->")
+        end
+
+        it "includes the Pro attribution comment in the componentHtml" do
+          result = react_component_hash("App", props: props, prerender: true)
+          expect(result["componentHtml"]).to include("<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed -->")
+        end
+
+        it "includes the attribution comment only once" do
+          result = react_component_hash("App", props: props, prerender: true)
+          comment_count = result["componentHtml"].scan("<!-- Powered by React on Rails Pro").length
+          expect(comment_count).to eq(1)
+        end
+      end
+
+      context "when React on Rails Pro is NOT installed" do
+        before do
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+        end
+
+        it "includes the open source attribution comment in the componentHtml" do
+          result = react_component_hash("App", props: props, prerender: true)
+          expect(result["componentHtml"]).to include("<!-- Powered by React on Rails (c) ShakaCode | Open Source -->")
+        end
+
+        it "includes the attribution comment only once" do
+          result = react_component_hash("App", props: props, prerender: true)
+          comment_count = result["componentHtml"].scan("<!-- Powered by React on Rails").length
+          expect(comment_count).to eq(1)
+        end
+      end
+    end
+  end
 end
 # rubocop:enable Metrics/BlockLength
