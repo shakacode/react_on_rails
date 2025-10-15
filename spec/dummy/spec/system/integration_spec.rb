@@ -93,6 +93,17 @@ shared_context "with pro features and immediate hydration" do
       react_on_rails_pro_version: "",
       rsc_support_enabled?: false
     )
+
+    # Stub ReactOnRailsPro::Utils.pro_attribution_comment for all tests
+    # since react_on_rails_pro? is set to true by default
+    pro_module = Module.new
+    utils_module = Module.new do
+      def self.pro_attribution_comment
+        "<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed -->"
+      end
+    end
+    stub_const("ReactOnRailsPro", pro_module)
+    stub_const("ReactOnRailsPro::Utils", utils_module)
   end
 
   around do |example|
