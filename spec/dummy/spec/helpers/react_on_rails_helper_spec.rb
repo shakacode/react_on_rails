@@ -804,6 +804,66 @@ describe ReactOnRailsHelper do
         end
       end
     end
+
+    describe "single attribution comment per page" do
+      context "when React on Rails Pro is installed" do
+        before do
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+          allow(ReactOnRailsPro::Utils).to receive(:pro_attribution_comment)
+            .and_return("<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed -->")
+        end
+
+        it "includes the attribution comment only once when calling multiple react_component helpers" do
+          result1 = react_component("App1", props: props)
+          result2 = react_component("App2", props: props)
+          combined_result = result1 + result2
+
+          comment_count = combined_result.scan("<!-- Powered by React on Rails Pro").length
+          expect(comment_count).to eq(1)
+        end
+
+        it "includes the attribution comment only once when calling mixed SSR helpers" do
+          component_result = react_component("App", props: props)
+          store_result = redux_store("TestStore", props: props)
+          combined_result = component_result + store_result
+
+          comment_count = combined_result.scan("<!-- Powered by React on Rails Pro").length
+          expect(comment_count).to eq(1)
+        end
+
+        it "includes the attribution comment only once when calling react_component multiple times" do
+          results = Array.new(5) { |i| react_component("App#{i}", props: props) }
+          combined_result = results.join
+
+          comment_count = combined_result.scan("<!-- Powered by React on Rails Pro").length
+          expect(comment_count).to eq(1)
+        end
+      end
+
+      context "when React on Rails Pro is NOT installed" do
+        before do
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+        end
+
+        it "includes the attribution comment only once when calling multiple react_component helpers" do
+          result1 = react_component("App1", props: props)
+          result2 = react_component("App2", props: props)
+          combined_result = result1 + result2
+
+          comment_count = combined_result.scan("<!-- Powered by React on Rails").length
+          expect(comment_count).to eq(1)
+        end
+
+        it "includes the attribution comment only once when calling mixed SSR helpers" do
+          component_result = react_component("App", props: props)
+          store_result = redux_store("TestStore", props: props)
+          combined_result = component_result + store_result
+
+          comment_count = combined_result.scan("<!-- Powered by React on Rails").length
+          expect(comment_count).to eq(1)
+        end
+      end
+    end
   end
 end
 # rubocop:enable Metrics/BlockLength
