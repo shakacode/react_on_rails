@@ -21,7 +21,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
 
   # TODO: test pro features without license
   before do
-    allow(ReactOnRails::Utils).to receive(:react_on_rails_pro_licence_valid?).and_return(true)
+    allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
   end
 
   it "works without raising error" do

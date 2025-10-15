@@ -2,6 +2,7 @@
 
 require_relative "spec_helper"
 
+# rubocop:disable Metrics/ModuleLength
 module ReactOnRailsPro
   RSpec.describe Utils do
     describe "cache helpers .bundle_hash and .bundle_file_name" do
@@ -21,9 +22,7 @@ module ReactOnRailsPro
 
           before do
             allow(ReactOnRails.configuration)
-              .to receive(:server_bundle_js_file).and_return(nil)
-            allow(ReactOnRails.configuration)
-              .to receive(:rsc_bundle_js_file).and_return(nil)
+              .to receive_messages(server_bundle_js_file: nil, rsc_bundle_js_file: nil)
             allow(Shakapacker).to receive_message_chain("manifest.lookup!")
               .with("client-bundle.js")
               .and_return("/webpack/production/client-bundle-0123456789abcdef.js")
@@ -42,9 +41,8 @@ module ReactOnRailsPro
               allow(ReactOnRails::Utils).to receive(:server_bundle_js_file_path)
                 .and_return(server_bundle_js_file_path)
               allow(ReactOnRails.configuration)
-                .to receive(:server_bundle_js_file).and_return("webpack-bundle.js")
-              allow(ReactOnRails.configuration)
-                .to receive(:rsc_bundle_js_file).and_return("rsc-webpack-bundle.js")
+                .to receive_messages(server_bundle_js_file: "webpack-bundle.js",
+                                     rsc_bundle_js_file: "rsc-webpack-bundle.js")
               allow(File).to receive(:mtime).with(server_bundle_js_file_path).and_return(123)
 
               result = described_class.bundle_hash
@@ -80,14 +78,13 @@ module ReactOnRailsPro
               rsc_bundle_js_file_path = File.expand_path("./public/#{rsc_bundle_js_file}")
               allow(Shakapacker).to receive_message_chain("manifest.lookup!")
                 .and_return(rsc_bundle_js_file)
-              allow(ReactOnRails::Utils).to receive(:server_bundle_js_file_path)
-                .and_return(rsc_bundle_js_file_path.gsub("rsc-", ""))
-              allow(ReactOnRails::Utils).to receive(:rsc_bundle_js_file_path)
-                .and_return(rsc_bundle_js_file_path)
+              allow(ReactOnRails::Utils).to receive_messages(
+                server_bundle_js_file_path: rsc_bundle_js_file_path.gsub("rsc-", ""),
+                rsc_bundle_js_file_path: rsc_bundle_js_file_path
+              )
               allow(ReactOnRails.configuration)
-                .to receive(:server_bundle_js_file).and_return("webpack-bundle.js")
-              allow(ReactOnRails.configuration)
-                .to receive(:rsc_bundle_js_file).and_return("rsc-webpack-bundle.js")
+                .to receive_messages(server_bundle_js_file: "webpack-bundle.js",
+                                     rsc_bundle_js_file: "rsc-webpack-bundle.js")
               allow(Digest::MD5).to receive(:file)
                 .with(rsc_bundle_js_file_path)
                 .and_return("barfoobarfoo")
@@ -221,5 +218,69 @@ module ReactOnRailsPro
 
       it { expect(printable_cache_key).to eq("1_2_3_4_5") }
     end
+
+    describe ".pro_attribution_comment" do
+      context "when license is valid and not in grace period" do
+        before do
+          allow(ReactOnRailsPro::LicenseValidator).to receive_messages(grace_days_remaining: nil, evaluation?: false)
+        end
+
+        it "returns the standard licensed attribution comment" do
+          result = described_class.pro_attribution_comment
+          expect(result).to eq("<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed -->")
+        end
+      end
+
+      context "when license is in grace period" do
+        before do
+          allow(ReactOnRailsPro::LicenseValidator).to receive(:grace_days_remaining).and_return(15)
+        end
+
+        it "returns attribution comment with grace period information" do
+          result = described_class.pro_attribution_comment
+          expected = "<!-- Powered by React on Rails Pro (c) ShakaCode | " \
+                     "Licensed (Expired - Grace Period: 15 day(s) remaining) -->"
+          expect(result).to eq(expected)
+        end
+      end
+
+      context "when license is in grace period with 1 day remaining" do
+        before do
+          allow(ReactOnRailsPro::LicenseValidator).to receive(:grace_days_remaining).and_return(1)
+        end
+
+        it "returns attribution comment with singular day" do
+          result = described_class.pro_attribution_comment
+          expected = "<!-- Powered by React on Rails Pro (c) ShakaCode | " \
+                     "Licensed (Expired - Grace Period: 1 day(s) remaining) -->"
+          expect(result).to eq(expected)
+        end
+      end
+
+      context "when using evaluation license" do
+        before do
+          allow(ReactOnRailsPro::LicenseValidator).to receive_messages(grace_days_remaining: nil, evaluation?: true)
+        end
+
+        it "returns evaluation license attribution comment" do
+          result = described_class.pro_attribution_comment
+          expect(result).to eq("<!-- Powered by React on Rails Pro (c) ShakaCode | Evaluation License -->")
+        end
+      end
+
+      context "when grace_days_remaining returns 0" do
+        before do
+          allow(ReactOnRailsPro::LicenseValidator).to receive(:grace_days_remaining).and_return(0)
+        end
+
+        it "returns attribution comment with grace period information" do
+          result = described_class.pro_attribution_comment
+          expected = "<!-- Powered by React on Rails Pro (c) ShakaCode | " \
+                     "Licensed (Expired - Grace Period: 0 day(s) remaining) -->"
+          expect(result).to eq(expected)
+        end
+      end
+    end
   end
 end
+# rubocop:enable Metrics/ModuleLength

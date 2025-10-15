@@ -22,8 +22,21 @@ describe ReactOnRailsHelper do
     }
 
     allow(ReactOnRails::Utils).to receive_messages(
-      react_on_rails_pro_licence_valid?: true
+      react_on_rails_pro?: true,
+      react_on_rails_pro_version: "",
+      rsc_support_enabled?: false
     )
+
+    # Stub ReactOnRailsPro::Utils.pro_attribution_comment for all tests
+    # since react_on_rails_pro? is set to true by default
+    pro_module = Module.new
+    utils_module = Module.new do
+      def self.pro_attribution_comment
+        "<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed -->"
+      end
+    end
+    stub_const("ReactOnRailsPro", pro_module)
+    stub_const("ReactOnRailsPro::Utils", utils_module)
 
     # Configure immediate_hydration to true for tests since they expect that behavior
     ReactOnRails.configure do |config|
@@ -245,7 +258,7 @@ describe ReactOnRailsHelper do
     it { expect(self).to respond_to :react_component }
 
     it { is_expected.to be_an_instance_of ActiveSupport::SafeBuffer }
-    it { is_expected.to start_with "<script" }
+    it { is_expected.to start_with "<!--" }
     it { is_expected.to match %r{</script>\s*$} }
     it { is_expected.to include react_component_div }
 
@@ -389,7 +402,7 @@ describe ReactOnRailsHelper do
         subject(:react_app) { react_component("App", props: props, immediate_hydration: true) }
 
         before do
-          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro_licence_valid?).and_return(false)
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
         end
 
         it { is_expected.to include(badge_html_string) }
@@ -405,7 +418,7 @@ describe ReactOnRailsHelper do
         subject(:react_app) { react_component("App", props: props) }
 
         before do
-          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro_licence_valid?).and_return(false)
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
         end
 
         around do |example|
@@ -421,7 +434,7 @@ describe ReactOnRailsHelper do
         subject(:react_app) { react_component("App", props: props, immediate_hydration: false) }
 
         before do
-          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro_licence_valid?).and_return(false)
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
         end
 
         it { is_expected.not_to include(badge_html_string) }
@@ -437,7 +450,7 @@ describe ReactOnRailsHelper do
 
         before do
           allow(ReactOnRails::Utils).to receive_messages(
-            react_on_rails_pro_licence_valid?: true
+            react_on_rails_pro?: true
           )
         end
 
@@ -483,7 +496,7 @@ describe ReactOnRailsHelper do
         subject(:react_app) { react_component_hash("App", props: props, immediate_hydration: true) }
 
         before do
-          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro_licence_valid?).and_return(false)
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
         end
 
         it "adds badge to componentHtml" do
@@ -496,7 +509,7 @@ describe ReactOnRailsHelper do
 
         before do
           allow(ReactOnRails::Utils).to receive_messages(
-            react_on_rails_pro_licence_valid?: true
+            react_on_rails_pro?: true
           )
         end
 
@@ -523,7 +536,7 @@ describe ReactOnRailsHelper do
     it { expect(self).to respond_to :redux_store }
 
     it { is_expected.to be_an_instance_of ActiveSupport::SafeBuffer }
-    it { is_expected.to start_with "<script" }
+    it { is_expected.to start_with "<!--" }
     it { is_expected.to end_with "</script>" }
 
     it {
@@ -541,7 +554,7 @@ describe ReactOnRailsHelper do
         subject(:store) { redux_store("reduxStore", props: props, immediate_hydration: true) }
 
         before do
-          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro_licence_valid?).and_return(false)
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
         end
 
         it { is_expected.to include(badge_html_string) }
@@ -557,7 +570,7 @@ describe ReactOnRailsHelper do
         subject(:store) { redux_store("reduxStore", props: props, immediate_hydration: false) }
 
         before do
-          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro_licence_valid?).and_return(false)
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
         end
 
         it { is_expected.not_to include(badge_html_string) }
@@ -568,7 +581,7 @@ describe ReactOnRailsHelper do
 
         before do
           allow(ReactOnRails::Utils).to receive_messages(
-            react_on_rails_pro_licence_valid?: true
+            react_on_rails_pro?: true
           )
         end
 
@@ -629,6 +642,233 @@ describe ReactOnRailsHelper do
     it "calls rails_context with server_side: false" do
       helper.send(:rails_context_if_not_already_rendered)
       expect(helper).to have_received(:rails_context).with(server_side: false)
+    end
+  end
+
+  describe "#react_on_rails_attribution_comment" do
+    let(:helper) { PlainReactOnRailsHelper.new }
+
+    context "when React on Rails Pro is installed" do
+      let(:pro_comment) { "<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed -->" }
+
+      before do
+        # ReactOnRailsPro::Utils is already stubbed in global before block
+        # Just override the return value for this context
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+        allow(ReactOnRailsPro::Utils).to receive(:pro_attribution_comment).and_return(pro_comment)
+      end
+
+      it "returns the Pro attribution comment" do
+        result = helper.send(:react_on_rails_attribution_comment)
+        expect(result).to eq(pro_comment)
+      end
+
+      it "calls ReactOnRailsPro::Utils.pro_attribution_comment" do
+        helper.send(:react_on_rails_attribution_comment)
+        expect(ReactOnRailsPro::Utils).to have_received(:pro_attribution_comment)
+      end
+    end
+
+    context "when React on Rails Pro is NOT installed" do
+      before do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+      end
+
+      it "returns the open source attribution comment" do
+        result = helper.send(:react_on_rails_attribution_comment)
+        expect(result).to eq("<!-- Powered by React on Rails (c) ShakaCode | Open Source -->")
+      end
+    end
+  end
+
+  describe "attribution comment inclusion in rendered output" do
+    let(:props) { { name: "Test" } }
+
+    before do
+      allow(SecureRandom).to receive(:uuid).and_return(0)
+    end
+
+    describe "#react_component" do
+      context "when React on Rails Pro is installed" do
+        before do
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+          allow(ReactOnRailsPro::Utils).to receive(:pro_attribution_comment)
+            .and_return("<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed -->")
+        end
+
+        it "includes the Pro attribution comment in the rendered output" do
+          result = react_component("App", props: props)
+          expect(result).to include("<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed -->")
+        end
+
+        it "includes the attribution comment only once" do
+          result = react_component("App", props: props)
+          comment_count = result.scan("<!-- Powered by React on Rails Pro").length
+          expect(comment_count).to eq(1)
+        end
+      end
+
+      context "when React on Rails Pro is NOT installed" do
+        before do
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+        end
+
+        it "includes the open source attribution comment in the rendered output" do
+          result = react_component("App", props: props)
+          expect(result).to include("<!-- Powered by React on Rails (c) ShakaCode | Open Source -->")
+        end
+
+        it "includes the attribution comment only once" do
+          result = react_component("App", props: props)
+          comment_count = result.scan("<!-- Powered by React on Rails").length
+          expect(comment_count).to eq(1)
+        end
+      end
+    end
+
+    describe "#redux_store" do
+      context "when React on Rails Pro is installed" do
+        before do
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+          allow(ReactOnRailsPro::Utils).to receive(:pro_attribution_comment)
+            .and_return("<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed -->")
+        end
+
+        it "includes the Pro attribution comment in the rendered output" do
+          result = redux_store("TestStore", props: props)
+          expect(result).to include("<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed -->")
+        end
+
+        it "includes the attribution comment only once" do
+          result = redux_store("TestStore", props: props)
+          comment_count = result.scan("<!-- Powered by React on Rails Pro").length
+          expect(comment_count).to eq(1)
+        end
+      end
+
+      context "when React on Rails Pro is NOT installed" do
+        before do
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+        end
+
+        it "includes the open source attribution comment in the rendered output" do
+          result = redux_store("TestStore", props: props)
+          expect(result).to include("<!-- Powered by React on Rails (c) ShakaCode | Open Source -->")
+        end
+
+        it "includes the attribution comment only once" do
+          result = redux_store("TestStore", props: props)
+          comment_count = result.scan("<!-- Powered by React on Rails").length
+          expect(comment_count).to eq(1)
+        end
+      end
+    end
+
+    describe "#react_component_hash" do
+      before do
+        allow(ReactOnRails::ServerRenderingPool).to receive(:server_render_js_with_console_logging).and_return(
+          "html" => { "componentHtml" => "<div>Test</div>", "title" => "Test Title" },
+          "consoleReplayScript" => ""
+        )
+        allow(ReactOnRails::ServerRenderingJsCode).to receive(:js_code_renderer)
+          .and_return(ReactOnRails::ServerRenderingJsCode)
+      end
+
+      context "when React on Rails Pro is installed" do
+        before do
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+          allow(ReactOnRailsPro::Utils).to receive(:pro_attribution_comment)
+            .and_return("<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed -->")
+        end
+
+        it "includes the Pro attribution comment in the componentHtml" do
+          result = react_component_hash("App", props: props, prerender: true)
+          expect(result["componentHtml"]).to include("<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed -->")
+        end
+
+        it "includes the attribution comment only once" do
+          result = react_component_hash("App", props: props, prerender: true)
+          comment_count = result["componentHtml"].scan("<!-- Powered by React on Rails Pro").length
+          expect(comment_count).to eq(1)
+        end
+      end
+
+      context "when React on Rails Pro is NOT installed" do
+        before do
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+        end
+
+        it "includes the open source attribution comment in the componentHtml" do
+          result = react_component_hash("App", props: props, prerender: true)
+          expect(result["componentHtml"]).to include("<!-- Powered by React on Rails (c) ShakaCode | Open Source -->")
+        end
+
+        it "includes the attribution comment only once" do
+          result = react_component_hash("App", props: props, prerender: true)
+          comment_count = result["componentHtml"].scan("<!-- Powered by React on Rails").length
+          expect(comment_count).to eq(1)
+        end
+      end
+    end
+
+    describe "single attribution comment per page" do
+      context "when React on Rails Pro is installed" do
+        before do
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+          allow(ReactOnRailsPro::Utils).to receive(:pro_attribution_comment)
+            .and_return("<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed -->")
+        end
+
+        it "includes the attribution comment only once when calling multiple react_component helpers" do
+          result1 = react_component("App1", props: props)
+          result2 = react_component("App2", props: props)
+          combined_result = result1 + result2
+
+          comment_count = combined_result.scan("<!-- Powered by React on Rails Pro").length
+          expect(comment_count).to eq(1)
+        end
+
+        it "includes the attribution comment only once when calling mixed SSR helpers" do
+          component_result = react_component("App", props: props)
+          store_result = redux_store("TestStore", props: props)
+          combined_result = component_result + store_result
+
+          comment_count = combined_result.scan("<!-- Powered by React on Rails Pro").length
+          expect(comment_count).to eq(1)
+        end
+
+        it "includes the attribution comment only once when calling react_component multiple times" do
+          results = Array.new(5) { |i| react_component("App#{i}", props: props) }
+          combined_result = results.join
+
+          comment_count = combined_result.scan("<!-- Powered by React on Rails Pro").length
+          expect(comment_count).to eq(1)
+        end
+      end
+
+      context "when React on Rails Pro is NOT installed" do
+        before do
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+        end
+
+        it "includes the attribution comment only once when calling multiple react_component helpers" do
+          result1 = react_component("App1", props: props)
+          result2 = react_component("App2", props: props)
+          combined_result = result1 + result2
+
+          comment_count = combined_result.scan("<!-- Powered by React on Rails").length
+          expect(comment_count).to eq(1)
+        end
+
+        it "includes the attribution comment only once when calling mixed SSR helpers" do
+          component_result = react_component("App", props: props)
+          store_result = redux_store("TestStore", props: props)
+          combined_result = component_result + store_result
+
+          comment_count = combined_result.scan("<!-- Powered by React on Rails").length
+          expect(comment_count).to eq(1)
+        end
+      end
     end
   end
 end

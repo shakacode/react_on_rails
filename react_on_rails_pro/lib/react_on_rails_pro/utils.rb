@@ -16,6 +16,14 @@ module ReactOnRailsPro
       puts "[ReactOnRailsPro] #{message}"
     end
 
+    # Validates the license and raises an exception if invalid.
+    #
+    # @return [Boolean] true if license is valid
+    # @raise [ReactOnRailsPro::Error] if license is invalid
+    def self.validated_license_data!
+      LicenseValidator.validated_license_data!
+    end
+
     def self.copy_assets
       return if ReactOnRailsPro.configuration.assets_to_copy.blank?
 
@@ -155,6 +163,24 @@ module ReactOnRailsPro
           key.to_s
         end
       end.join("_").underscore
+    end
+
+    # Generates the Pro-specific HTML attribution comment based on license status
+    # Called by React on Rails helper to generate license-specific attribution
+    def self.pro_attribution_comment
+      base = "Powered by React on Rails Pro (c) ShakaCode"
+
+      # Check if in grace period
+      grace_days = ReactOnRailsPro::LicenseValidator.grace_days_remaining
+      comment = if grace_days
+                  "#{base} | Licensed (Expired - Grace Period: #{grace_days} day(s) remaining)"
+                elsif ReactOnRailsPro::LicenseValidator.evaluation?
+                  "#{base} | Evaluation License"
+                else
+                  "#{base} | Licensed"
+                end
+
+      "<!-- #{comment} -->"
     end
   end
 end

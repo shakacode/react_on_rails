@@ -44,6 +44,7 @@
     "@fastify/multipart": "^8.3.1 || ^9.0.3",
     "fastify": "^4.29.0 || ^5.2.1",
     "fs-extra": "^11.2.0",
+    "jsonwebtoken": "^9.0.2",
     "lockfile": "^1.0.4"
   },
   "devDependencies": {
@@ -59,6 +60,7 @@
     "@tsconfig/node14": "^14.1.2",
     "@types/fs-extra": "^11.0.4",
     "@types/jest": "^29.5.12",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/lockfile": "^1.0.4",
     "@types/touch": "^3.1.5",
     "babel-jest": "^29.7.0",

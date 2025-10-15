@@ -7,10 +7,16 @@ import log from './shared/log';
 import { buildConfig, Config, logSanitizedConfig } from './shared/configBuilder';
 import restartWorkers from './master/restartWorkers';
 import * as errorReporter from './shared/errorReporter';
+import { getValidatedLicenseData } from './shared/licenseValidator';
 
 const MILLISECONDS_IN_MINUTE = 60000;
 
 export = function masterRun(runningConfig?: Partial<Config>) {
+  // Validate license before starting - required in all environments
+  log.info('[React on Rails Pro] Validating license...');
+  getValidatedLicenseData();
+  log.info('[React on Rails Pro] License validation successful');
+
   // Store config in app state. From now it can be loaded by any module using getConfig():
   const config = buildConfig(runningConfig);
   const { workersCount, allWorkersRestartInterval, delayBetweenIndividualWorkerRestarts } = config;
