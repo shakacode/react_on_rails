@@ -28,7 +28,7 @@ For a fleshed out integration of React on Rails with React Router, check out [Re
 
 - [react-webpack-rails-tutorial/client/app/bundles/comments/routes/routes.jsx](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/client/app/bundles/comments/routes/routes.jsx)
 
-# Server Rendering Using React Router V4
+## Server Rendering Using React Router V4
 
 Your Render-Function may not return an object with the property `renderedHtml`. Thus, you call
 `renderToString()` and return an object with this property.
