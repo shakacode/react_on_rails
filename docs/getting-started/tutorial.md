@@ -22,7 +22,7 @@ By the time you read this, the latest may have changed. Be sure to check the ver
 - [https://rubygems.org/gems/react_on_rails](https://rubygems.org/gems/react_on_rails)
 - [https://www.npmjs.com/package/react-on-rails](https://www.npmjs.com/package/react-on-rails)
 
-# Table of Contents
+## Table of Contents
 
 - [Installation](#installation)
   - [Setting up your environment](#setting-up-your-environment)
@@ -42,9 +42,9 @@ By the time you read this, the latest may have changed. Be sure to check the ver
     - [RubyMine performance tip](#rubymine-performance-tip)
 - [Conclusion](#conclusion)
 
-# Installation
+## Installation
 
-## Setting up your environment
+### Setting up your environment
 
 Trying out **React on Rails** is super easy, so long as you have the basic prerequisites.
 
@@ -54,7 +54,7 @@ Trying out **React on Rails** is super easy, so long as you have the basic prere
 - **yarn:** We use [yarn classic](https://classic.yarnpkg.com/) as our node package manager.
 - You need to have either [Overmind](https://github.com/DarthSim/overmind) or [Foreman](https://rubygems.org/gems/foreman) as a process manager.
 
-## Create a new Ruby on Rails App
+### Create a new Ruby on Rails App
 
 Then we need to create a fresh Rails application as follows.
 
@@ -72,7 +72,7 @@ cd test-react-on-rails
 
 Note: You can use `--database=postgresql` option to use Postgresql for the database.
 
-## Add the Shakapacker and react_on_rails gems
+### Add the Shakapacker and react_on_rails gems
 
 We recommend using the latest version of these gems. Otherwise, specify the
 exact versions of both the gem and npm packages. In other words, don't use
@@ -86,7 +86,7 @@ bundle add shakapacker --strict
 Note: The latest released React On Rails version is considered stable. Please use the latest
 version to ensure you get all the security patches and the best support.
 
-## Run the Shakapacker generator
+### Run the Shakapacker generator
 
 ```bash
 bundle exec rails shakapacker:install
@@ -100,7 +100,7 @@ git commit -am "Initial commit"
 
 Alternatively, you can use `--ignore-warnings` in the next step.
 
-## Run the React on Rails Generator
+### Run the React on Rails Generator
 
 ```bash
 rails generate react_on_rails:install
@@ -118,7 +118,7 @@ rails generate react_on_rails:install --redux
 
 If you prefer to use React Hooks instead of Redux, run the basic installer without the `--redux` flag.
 
-## Setting up your environment variables
+### Setting up your environment variables
 
 Add the following variable to your environment:
 
@@ -128,7 +128,7 @@ EXECJS_RUNTIME=Node
 
 Then run the server with one of the following options:
 
-## Running the app
+### Running the app
 
 ```bash
 ./bin/dev # For HMR
@@ -138,7 +138,7 @@ Then run the server with one of the following options:
 
 Visit [http://localhost:3000/hello_world](http://localhost:3000/hello_world) and see your **React On Rails** app running!
 
-# HMR vs. React Hot Reloading
+## HMR vs. React Hot Reloading
 
 First, check that the `hmr` and the `inline` options are `true` in your `config/shakapacker.yml` file.
 
@@ -154,7 +154,7 @@ If you want to go further with HMR, take a look at these links:
 
 React on Rails will automatically handle disabling server rendering if there is only one bundle file created by the Webpack development server by `shakapacker`.
 
-# Deployment
+## Deployment
 
 Now that you have React on Rails working locally, you're ready to deploy to production!
 
@@ -171,9 +171,9 @@ These guides cover:
 - Environment variables
 - Troubleshooting common deployment issues
 
-# Going Further
+## Going Further
 
-## Turning on Server Rendering
+### Turning on Server Rendering
 
 You can turn on server rendering by simply changing the `prerender` option to `true`:
 
@@ -217,9 +217,9 @@ For more details on server rendering, see:
 - [Client vs. Server Rendering](../core-concepts/client-vs-server-rendering.md)
 - [React Server Rendering](../core-concepts/react-server-rendering.md)
 
-## Optional Configuration
+### Optional Configuration
 
-### Moving from the Rails default `/app/javascript` to the recommended `/client` structure
+#### Moving from the Rails default `/app/javascript` to the recommended `/client` structure
 
 ShakaCode recommends that you use `/client` for your client side app. This way a non-Rails, front-end developer can be at home just by opening up the `/client` directory.
 
@@ -235,7 +235,7 @@ mv app/javascript client
 source_path: client
 ```
 
-### Custom IP & PORT setup (Cloud9 example)
+#### Custom IP & PORT setup (Cloud9 example)
 
 In case you are running some custom setup with different IP or PORT you should also edit Procfile.dev. For example, to be able to run on free Cloud9 IDE we are putting IP 0.0.0.0 and PORT 8080. The default generated file `Procfile.dev` uses `-p 3000`.
 
@@ -245,14 +245,14 @@ web: rails s -p 8080 -b 0.0.0.0
 
 Then visit https://your-shared-addr.c9users.io:8080/hello_world
 
-### RubyMine performance tip
+#### RubyMine performance tip
 
 It's super important to exclude certain directories from RubyMine or else it will slow to a crawl as it tries to parse all the npm files.
 
 - Generated files, per the settings in your `config/shakapacker.yml`, which default to `public/packs` and `public/packs-test`
 - `node_modules`
 
-# Conclusion
+## Conclusion
 
 - Browse the docs on [our documentation website](https://www.shakacode.com/react-on-rails/docs/)
 

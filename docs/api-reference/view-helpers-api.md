@@ -158,6 +158,6 @@ See the [React on Rails Pro Configuration](https://github.com/shakacode/react_on
 
 ---
 
-# More details
+## More details
 
 See the [lib/react_on_rails/helper.rb](https://github.com/shakacode/react_on_rails/tree/master/lib/react_on_rails/helper.rb) source.

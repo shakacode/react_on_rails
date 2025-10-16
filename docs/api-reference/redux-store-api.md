@@ -98,7 +98,7 @@ This method has the same API as the controller extension. **HOWEVER**, we recomm
 
 Place this view helper (no parameters) at the end of your shared layout so ReactOnRails will render the redux store hydration data. Since we're going to be setting up the stores in the controllers, we need to know where on the view to put the client-side rendering of this hydration data, which is a hidden div with a matching class that contains a data props. For an example, see [spec/dummy/app/views/layouts/application.html.erb](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/app/views/layouts/application.html.erb).
 
-# More Details
+## More Details
 
 - [lib/react_on_rails/controller.rb](https://github.com/shakacode/react_on_rails/tree/master/lib/react_on_rails/controller.rb) source
 - [lib/react_on_rails/helper.rb](https://github.com/shakacode/react_on_rails/tree/master/lib/react_on_rails/helper.rb) source
