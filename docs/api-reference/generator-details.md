@@ -39,7 +39,7 @@ Then you may run
 
 Another good option is to create a simple test app per the [Tutorial](../getting-started/tutorial.md).
 
-# Understanding the Organization of the Generated Client Code
+## Understanding the Organization of the Generated Client Code
 
 The generated client code follows our organization scheme. Each unique set of functionality is given its own folder inside of `app/javascript/app/bundles`. This encourages modularity of _domains_.
 
@@ -51,7 +51,7 @@ Inside the generated "HelloWorld" domain you will find the following folders:
 
 You may also notice the `app/lib` folder. This is for any code that is common between bundles and therefore needs to be shared (for example, middleware).
 
-## Redux
+### Redux
 
 If you have used the `--redux` generator option, you will notice the familiar additional redux folders in addition to the aforementioned folders. The Hello World example has also been modified to use Redux.
 
