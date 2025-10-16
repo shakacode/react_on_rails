@@ -41,18 +41,78 @@ Another good option is to create a simple test app per the [Tutorial](../getting
 
 ## Understanding the Organization of the Generated Client Code
 
-The generated client code follows our organization scheme. Each unique set of functionality is given its own folder inside of `app/javascript/app/bundles`. This encourages modularity of _domains_.
+The React on Rails generator creates different directory structures depending on whether you use the `--redux` option.
 
-Inside the generated "HelloWorld" domain you will find the following folders:
+### Default Structure (Without Redux)
 
-- `startup`: contains the entry point files for webpack. It defaults to a single file that is used for both server and client compilation. But if these need to be different, then you can create two Webpack configurations with separate endpoints. Since RoR v14.2 this is strongly recommended because the client can import `react-on-rails/client` instead of `react-on-rails` for decreased bundle size.
-- `containers`: contains "smart components" (components that have functionality and logic that is passed to child "dumb components").
-- `components`: contains "dumb components", or components that simply render their properties and call functions given to them as properties by a parent component. Ultimately, at least one of these dumb components will have a parent container component.
+The basic generator creates a simple, flat structure optimized for auto-bundling:
 
-You may also notice the `app/lib` folder. This is for any code that is common between bundles and therefore needs to be shared (for example, middleware).
+```
+app/javascript/
+└── src/
+    └── HelloWorld/
+        └── ror_components/          # Components auto-registered by React on Rails
+            ├── HelloWorld.jsx       # Your React component
+            ├── HelloWorld.module.css
+            └── HelloWorld.server.js # Optional: separate server rendering logic
+```
 
-### Redux
+- **`src/`**: Source directory for all React components
+- **`ror_components/`**: Directory name is configurable via `config.components_subdirectory` in `config/initializers/react_on_rails.rb`
+- **Auto-registration**: Components in `ror_components/` directories are automatically discovered and registered when using `auto_load_bundle: true`
 
-If you have used the `--redux` generator option, you will notice the familiar additional redux folders in addition to the aforementioned folders. The Hello World example has also been modified to use Redux.
+For components that need different client vs. server implementations, use `.client.jsx` and `.server.jsx` suffixes (e.g., `HelloWorld.client.jsx` and `HelloWorld.server.jsx`).
 
-Note the organizational paradigm of "bundles". These are like application domains and are used for grouping your code into webpack bundles, in case you decide to create different bundles for deployment. This is also useful for separating out logical parts of your application. The concept is that each bundle will have it's own Redux store. If you have code that you want to reuse across bundles, including components and reducers, place them under `/client/app/lib`.
+### Redux Structure (With `--redux` Option)
+
+The Redux generator creates a more structured organization with familiar Redux patterns:
+
+```
+app/javascript/
+└── src/
+    └── HelloWorldApp/
+        ├── actions/                 # Redux action creators
+        │   └── helloWorldActionCreators.js
+        ├── components/              # Presentational components
+        │   ├── HelloWorld.jsx
+        │   └── HelloWorld.module.css
+        ├── constants/               # Action type constants
+        │   └── helloWorldConstants.js
+        ├── containers/              # Connected components (smart components)
+        │   └── HelloWorldContainer.js
+        ├── reducers/                # Redux reducers
+        │   └── helloWorldReducer.js
+        ├── ror_components/          # Auto-registered entry points
+        │   ├── HelloWorldApp.client.jsx
+        │   └── HelloWorldApp.server.jsx
+        └── store/                   # Redux store configuration
+            └── helloWorldStore.js
+```
+
+This structure follows Redux best practices:
+
+- **`components/`**: Presentational "dumb" components that receive data via props
+- **`containers/`**: Container "smart" components connected to Redux store
+- **`actions/`** and **`reducers/`**: Standard Redux patterns
+- **`ror_components/`**: Entry point files that initialize Redux and render the app
+
+### TypeScript Support
+
+The generator also supports a `--typescript` option for generating TypeScript files:
+
+```bash
+rails generate react_on_rails:install --typescript
+```
+
+This creates `.tsx` files instead of `.jsx` and adds TypeScript configuration.
+
+### Auto-Bundling and Component Registration
+
+Modern React on Rails uses auto-bundling to eliminate manual webpack configuration. Components placed in the configured `components_subdirectory` (default: `ror_components`) are automatically:
+
+1. Discovered by the generator
+2. Bundled into separate webpack entry points
+3. Registered for use with `react_component` helper
+4. Loaded on-demand when used in views
+
+For detailed information on auto-bundling, see the [Auto-Bundling Guide](../core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md).
