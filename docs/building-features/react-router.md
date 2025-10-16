@@ -4,7 +4,7 @@ _This article needs updating for the latest version of React Router_
 
 React on Rails supports the use of React Router. Client-side code doesn't need any special configuration for the React on Rails gem. Implement React Router how you normally would. Note, you might want to avoid using Turbolinks as both Turbolinks and React Router will be trying to handle the back and forward buttons. If you get this figured out, please do share with the community! Otherwise, you might have to tweak the basic settings for Turbolinks, and this may or may not be worth the effort.
 
-If you are working with the HelloWorldApp created by the react_on_rails generator, then the code below corresponds to the module in `client/app/bundles/HelloWorld/startup/HelloWorldApp.jsx`.
+If you are working with the HelloWorldApp created by the react_on_rails generator (with `--redux` option), the code below corresponds to your Redux entry point component (typically in `src/HelloWorldApp/ror_components/`).
 
 ```js
 import { BrowserRouter, Switch } from 'react-router-dom';
