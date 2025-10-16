@@ -522,23 +522,58 @@ As of version 13.3.4, bundles inside directories that match `config.components_s
 
 #### 2. CSS not loading (FOUC - Flash of Unstyled Content)
 
-**Problem**: Components load but CSS styles are missing or delayed.
+**Problem**: Components load but CSS styles are missing or delayed, particularly with server-side rendering and `auto_load_bundle = true`.
 
-**Important**: FOUC (Flash of Unstyled Content) **only occurs with HMR (Hot Module Replacement)**. Static and production modes work perfectly without FOUC.
+**Root Cause**: When using `auto_load_bundle = true`, `react_component` calls automatically invoke `append_stylesheet_pack_tag` during rendering. However, Shakapacker requires these appends to execute BEFORE the main `stylesheet_pack_tag` in your layout's `<head>`. Since Rails renders the layout's `<head>` before the `<body>` (where `react_component` calls typically occur), the appends happen too late, causing FOUC.
 
-**Solutions**:
+**Solution**: Use the `content_for :body_content` pattern documented in Shakapacker's [Preventing FOUC guide](https://github.com/shakacode/shakapacker/blob/master/docs/preventing_fouc.md#the-content_for-body_content-pattern).
 
-- **Development with HMR** (`./bin/dev`): FOUC is expected behavior due to dynamic CSS injection - **not a bug**
-- **Development static** (`./bin/dev static`): No FOUC - CSS is extracted to separate files like production
-- **Production** (`./bin/dev prod`): No FOUC - CSS is extracted and optimized
-- **Layout**: Verify your layout includes empty `<%= stylesheet_pack_tag %>` placeholder for CSS injection
-- **Component imports**: Check that CSS files are properly imported: `import styles from './Component.module.css';`
+This pattern renders your body content first, ensuring all `react_component` auto-appends execute before the `<head>` renders:
 
-**Key insight**: Choose your development mode based on your current needs:
+```erb
+<%# Step 1: This block executes first, capturing content AND triggering auto-appends %>
+<% content_for :body_content do %>
+  <%= react_component "NavigationBarApp", prerender: true %>
 
-- Use HMR for fastest development (accept FOUC)
-- Use static mode when testing styling without FOUC
-- Use production mode for final testing
+  <div class="container">
+    <%= yield %>
+  </div>
+
+  <%= react_component "Footer", prerender: true %>
+<% end %>
+<!DOCTYPE html>
+<html>
+<head>
+  <%= csrf_meta_tags %>
+  <%= csp_meta_tag %>
+
+  <%# Step 2: Head renders with all accumulated stylesheet/JS appends %>
+  <%= stylesheet_pack_tag(media: 'all') %>
+  <%= javascript_pack_tag(defer: true) %>
+</head>
+<body>
+  <%# Step 3: Finally, the captured body_content is rendered here %>
+  <%= yield :body_content %>
+</body>
+</html>
+```
+
+**Note**: While defining body content before `<!DOCTYPE html>` may seem counter-intuitive, Rails processes the `content_for` block first (capturing content and triggering appends), then renders the HTML in proper document order.
+
+**Alternative**: If the `content_for` pattern doesn't fit your needs, disable auto-loading and manually specify packs:
+
+```ruby
+# config/initializers/react_on_rails.rb
+config.auto_load_bundle = false
+```
+
+**Additional Resources**:
+
+- **Complete FOUC prevention guide**: [Shakapacker Preventing FOUC documentation](https://github.com/shakacode/shakapacker/blob/master/docs/preventing_fouc.md)
+- **Working example**: [react-webpack-rails-tutorial PR #686](https://github.com/shakacode/react-webpack-rails-tutorial/pull/686)
+- **Related issue**: [Shakapacker #720](https://github.com/shakacode/shakapacker/issues/720)
+
+**Note**: HMR-related FOUC in development mode (dynamic CSS injection) is separate from this SSR auto-loading issue. See Shakapacker docs for details.
 
 #### 3. "document is not defined" errors during SSR
 
