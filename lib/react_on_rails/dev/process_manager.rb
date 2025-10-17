@@ -147,7 +147,7 @@ module ReactOnRails
             DO NOT add foreman to your Gemfile. Install it globally on your system.
 
             For more information about why foreman should not be in your Gemfile, see:
-            https://github.com/shakacode/react_on_rails/blob/master/docs/javascript/foreman-issues.md
+            https://github.com/ddollar/foreman/wiki/Don't-Bundle-Foreman
 
             After installation, try running this script again.
             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
