@@ -6,13 +6,14 @@ Having issues with React on Rails? This guide covers the most common problems an
 
 ### Is your issue with...?
 
-| Problem Area         | Quick Check                                 | Go to Section                                |
-| -------------------- | ------------------------------------------- | -------------------------------------------- |
-| **Installation**     | Generator fails or components don't appear  | [Installation Issues](#-installation-issues) |
-| **Compilation**      | Webpack errors, build failures              | [Build Issues](#-build-issues)               |
-| **Runtime**          | Components not rendering, JavaScript errors | [Runtime Issues](#-runtime-issues)           |
-| **Server Rendering** | SSR not working, hydration mismatches       | [SSR Issues](#-server-side-rendering-issues) |
-| **Performance**      | Slow builds, large bundles, memory issues   | [Performance Issues](#-performance-issues)   |
+| Problem Area         | Quick Check                                 | Go to Section                                                |
+| -------------------- | ------------------------------------------- | ------------------------------------------------------------ |
+| **Installation**     | Generator fails or components don't appear  | [Installation Issues](#-installation-issues)                 |
+| **Compilation**      | Webpack errors, build failures              | [Build Issues](#-build-issues)                               |
+| **Runtime**          | Components not rendering, JavaScript errors | [Runtime Issues](#-runtime-issues)                           |
+| **Styling (FOUC)**   | Unstyled content flash with SSR             | [Flash of Unstyled Content](#flash-of-unstyled-content-fouc) |
+| **Server Rendering** | SSR not working, hydration mismatches       | [SSR Issues](#-server-side-rendering-issues)                 |
+| **Performance**      | Slow builds, large bundles, memory issues   | [Performance Issues](#-performance-issues)                   |
 
 ## 🚨 Installation Issues
 
@@ -162,6 +163,33 @@ useEffect(() => {
 <% else %>
   <%= react_component('MyComponent', props: @props) %>
 <% end %>
+```
+
+### "Flash of Unstyled Content (FOUC)"
+
+**Symptoms:** Page briefly shows unstyled content before CSS loads, particularly with SSR and `auto_load_bundle`
+
+**Root Cause:** When using `auto_load_bundle = true` with server-side rendering, `react_component` calls trigger `append_stylesheet_pack_tag` during body rendering, but these appends must execute BEFORE the `stylesheet_pack_tag` in the `<head>`.
+
+**Solution:** Use the `content_for :body_content` pattern to ensure appends happen before the head renders.
+
+**See:** [FOUC Prevention Guide](../core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md#2-css-not-loading-fouc---flash-of-unstyled-content) for detailed solutions and examples.
+
+**Quick fix:**
+
+```erb
+<% content_for :body_content do %>
+  <%= react_component "MyComponent", prerender: true %>
+<% end %>
+<!DOCTYPE html>
+<html>
+<head>
+  <%= stylesheet_pack_tag(media: 'all') %>
+</head>
+<body>
+  <%= yield :body_content %>
+</body>
+</html>
 ```
 
 ## 🖥️ Server-Side Rendering Issues
