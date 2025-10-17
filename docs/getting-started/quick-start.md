@@ -173,7 +173,6 @@ Now that you have React on Rails working, here's what to explore next:
 
 1. **[Redux Integration](../building-features/react-and-redux.md)** - Manage application state
 2. **[React Router](../building-features/react-router.md)** - Client-side routing
-3. **[Code Splitting](../building-features/code-splitting.md)** - Optimize bundle size
 
 ## 🆘 Need Help?
 
