@@ -429,7 +429,7 @@ docs/
 │   ├── react-and-redux.md
 │   ├── react-helmet.md
 │   ├── rails-webpacker-react-integration-options.md
-│   ├── code-splitting.md
+│   ├── code-splitting.md                      # Moved to outdated/ (marked outdated)
 │   ├── images.md
 │   ├── foreman-issues.md
 │   └── turbolinks.md                          # Step 5 correction: from deployment

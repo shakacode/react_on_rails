@@ -230,7 +230,6 @@ Now that you understand the core concepts, here are recommended paths forward:
 
 ### Advanced Topics
 
-- **[Code Splitting](../building-features/code-splitting.md)** - Optimize bundle sizes
 - **[Webpack Configuration](../core-concepts/webpack-configuration.md)** - Customize webpack
 - **[Different Client/Server Code](../building-features/how-to-use-different-files-for-client-and-server-rendering.md)** - Separate bundles
 
