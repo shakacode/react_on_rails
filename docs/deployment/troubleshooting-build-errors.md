@@ -276,5 +276,5 @@ fi
 ## Need More Help?
 
 - Check the [general troubleshooting guide](../deployment/troubleshooting-when-using-shakapacker.md)
-- Review [webpack configuration docs](../outdated/webpack.md)
+- Review [webpack configuration guide](../core-concepts/webpack-configuration.md)
 - Contact [justin@shakacode.com](mailto:justin@shakacode.com) for professional support
