@@ -5,7 +5,7 @@ import HydrationStatus from '../components/HydrationStatus';
 const AsyncComponentsBranch = ({ branchName, level }) => {
   const buildResult = () => {
     console.log(`${branchName} (level ${level})`);
-    console.error('Error message', { branchName, level });
+    // console.error('Error message', { branchName, level });
     if (level === 0) {
       return <div>{`${branchName} (level 0)`}</div>;
     }

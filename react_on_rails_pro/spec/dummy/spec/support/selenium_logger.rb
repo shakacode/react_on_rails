@@ -29,4 +29,18 @@ RSpec.configure do |config|
 
     raise("JavaScript Error(s) on the page:\n\n#{errors.join("\n")}") if cleaned_errors.present?
   end
+
+  config.after(:each, type: :system, js: true) do
+    errors = page.driver.browser.logs.get(:browser)
+    if errors.present?
+      aggregate_failures 'javascript errrors' do
+        errors.each do |error|
+          expect(error.level).not_to eq('SEVERE'), error.message
+          next unless error.level == 'WARNING'
+          STDERR.puts 'WARN: javascript warning'
+          STDERR.puts error.message
+        end
+      end
+    end
+  end
 end

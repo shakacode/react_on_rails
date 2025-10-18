@@ -571,6 +571,11 @@ end
 describe "Pages/server_router", :js do
   subject { page }
 
+  it "renders /server_router/simple-server-component properly" do
+    navigate_with_streaming("/server_router/simple-server-component")
+    expect_client_component_inside_server_component_hydrated(page)
+  end
+
   it "navigates between pages" do
     navigate_with_streaming("/server_router/simple-server-component")
     expect_client_component_inside_server_component_hydrated(page)
@@ -607,6 +612,15 @@ describe "Pages/server_router", :js do
     expect(page).to have_text("branch1 (level 1)")
     expect(page).not_to have_text("Loading branch1 at level 1...")
     expect(page).not_to have_text("Loading branch1 at level 3...")
+  end
+
+  it "renders /server_router/streaming-server-component with no errors" do
+    visit("/server_router/simple-server-component")
+    click_link "Server Component with visible streaming behavior"
+
+    sleep 4
+    expect(page).to have_text("branch2 (level 0)")
+    expect(page).to have_text(/HydrationStatus\: (Page loaded|Hydrated)/)
   end
 end
 
