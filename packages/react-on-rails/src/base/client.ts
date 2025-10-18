@@ -196,7 +196,9 @@ Fix: Use only react-on-rails OR react-on-rails-pro, not both.`);
         ComponentRegistry.register(components);
 
         const endTime = perf.now();
-        console.log(`[ReactOnRails] Component registration completed in ${(endTime - startTime).toFixed(2)}ms`);
+        console.log(
+          `[ReactOnRails] Component registration completed in ${(endTime - startTime).toFixed(2)}ms`,
+        );
 
         // Log individual component details if in full debug mode
         if (this.options.debugMode) {

@@ -47,12 +47,13 @@ module ReactOnRails
 
     private
 
+    # rubocop:disable Metrics/AbcSize
     def calc_message(component_name, console_messages, err, js_code, props)
       header = Rainbow("❌ React on Rails Server Rendering Error").red.bright
       message = +"#{header}\n\n"
-      
+
       message << Rainbow("Component: #{component_name}").yellow << "\n\n"
-      
+
       if err
         message << Rainbow("Error Details:").red.bright << "\n"
         message << <<~MSG
@@ -69,11 +70,11 @@ module ReactOnRails
       else
         backtrace = nil
       end
-      
+
       # Add props information
       message << Rainbow("Props:").blue.bright << "\n"
       message << "#{Utils.smart_trim(props, MAX_ERROR_SNIPPET_TO_LOG)}\n\n"
-      
+
       # Add code snippet
       message << Rainbow("JavaScript Code:").blue.bright << "\n"
       message << "#{Utils.smart_trim(js_code, MAX_ERROR_SNIPPET_TO_LOG)}\n\n"
@@ -86,16 +87,18 @@ module ReactOnRails
       # Add actionable suggestions
       message << Rainbow("💡 Troubleshooting Steps:").yellow.bright << "\n"
       message << build_troubleshooting_suggestions(component_name, err, console_messages)
-      
+
       # Add help and support information
       message << "\n#{Utils.default_troubleshooting_section}\n"
 
       [backtrace, message]
     end
-    
+    # rubocop:enable Metrics/AbcSize
+
+    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
     def build_troubleshooting_suggestions(component_name, err, console_messages)
       suggestions = []
-      
+
       # Check for common error patterns
       if err&.message&.include?("window is not defined") || console_messages&.include?("window is not defined")
         suggestions << <<~SUGGESTION
@@ -103,14 +106,14 @@ module ReactOnRails
              #{Rainbow("if (typeof window !== 'undefined') { ... }").cyan}
         SUGGESTION
       end
-      
+
       if err&.message&.include?("document is not defined") || console_messages&.include?("document is not defined")
         suggestions << <<~SUGGESTION
           1. DOM API used on server - use React refs or useEffect:
-             #{Rainbow("useEffect(() => { /* DOM operations here */ }, [])").cyan}
+             #{Rainbow('useEffect(() => { /* DOM operations here */ }, [])').cyan}
         SUGGESTION
       end
-      
+
       if err&.message&.include?("Cannot read") || err&.message&.include?("undefined")
         suggestions << <<~SUGGESTION
           1. Check for null/undefined values in props
@@ -118,7 +121,7 @@ module ReactOnRails
              #{Rainbow("props.data?.value || 'default'").cyan}
         SUGGESTION
       end
-      
+
       if err&.message&.include?("Hydration") || console_messages&.include?("Hydration")
         suggestions << <<~SUGGESTION
           1. Server and client render mismatch - ensure consistent:
@@ -127,20 +130,21 @@ module ReactOnRails
              - User agent checks (avoid or use props)
         SUGGESTION
       end
-      
+
       # Generic suggestions
       suggestions << <<~SUGGESTION
         • Temporarily disable SSR to isolate the issue:
-          #{Rainbow("prerender: false").cyan} in your view helper
+          #{Rainbow('prerender: false').cyan} in your view helper
         • Check server logs for detailed errors:
-          #{Rainbow("tail -f log/development.log").cyan}
+          #{Rainbow('tail -f log/development.log').cyan}
         • Verify component registration:
           #{Rainbow("ReactOnRails.register({ #{component_name}: #{component_name} })").cyan}
         • Ensure server bundle is up to date:
-          #{Rainbow("bin/shakapacker").cyan} or #{Rainbow("yarn run build:server").cyan}
+          #{Rainbow('bin/shakapacker').cyan} or #{Rainbow('yarn run build:server').cyan}
       SUGGESTION
-      
+
       suggestions.join("\n")
     end
+    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
   end
 end
