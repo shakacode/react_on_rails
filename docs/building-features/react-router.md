@@ -14,7 +14,7 @@ If you're using Turbo (Rails 7+) or Turbolinks (Rails 6 and earlier), be aware t
 
 If you successfully integrate both, please share your solution with the community!
 
-For more details, see [Turbo/Turbolinks Guide](../rails/turbolinks.md).
+For more details, see [Turbo/Turbolinks Guide](./turbolinks.md).
 
 ## Installation
 
@@ -180,4 +180,4 @@ For a practical example of route organization, see the [routes configuration fil
 
 - [React Router Official Documentation](https://reactrouter.com/)
 - [React Router v6 Migration Guide](https://reactrouter.com/en/main/upgrading/v5) - If upgrading from v5
-- [React on Rails Turbo/Turbolinks Guide](../rails/turbolinks.md)
+- [React on Rails Turbo/Turbolinks Guide](./turbolinks.md)
