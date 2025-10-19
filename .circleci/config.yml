@@ -343,6 +343,51 @@ jobs:
       - store_artifacts:
           path: react_on_rails_pro/spec/dummy/yarn-error.log
 
+  # TODO: DRY with previous job
+  dummy-app-node-renderer-e2-tests:
+    docker:
+      - image: *docker_image
+    steps:
+      - checkout
+      - run: *print-system-info
+      - restore_cache: *restore-package-gem-cache
+      - restore_cache: *restore-package-node-modules-cache
+      - restore_cache: *restore-dummy-app-node-modules-cache
+      - restore_cache: *restore-dummy-app-gem-cache
+      - run: rm -rf react_on_rails_pro/spec/dummy/public/webpack
+      - run: rm -rf react_on_rails_pro/spec/dummy/ssr-generated
+      - restore_cache: *restore-dummy-app-webpack-bundle-cache
+      - run: *install-dummy-app-ruby-gems
+      - run: *install-package-node-modules
+      - run: *install-latest-chrome
+      - run: *install-dummy-app-node-modules
+      - run:
+          name: Generate file-system based entrypoints (Pro)
+          working_directory: react_on_rails_pro
+          command: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
+      - run:
+          name: Run Pro Node renderer in a background
+          working_directory: react_on_rails_pro
+          command: cd spec/dummy && yarn run node-renderer
+          background: true
+      - run:
+          name: run rails server in background (Pro dummy app)
+          working_directory: react_on_rails_pro
+          command: cd spec/dummy && RAILS_ENV=test rails server
+          background: true
+      - run:
+          name: wait for rails server to start
+          command: |
+            while ! curl -s http://localhost:3000 > /dev/null; do sleep 1; done
+      - run:
+          name: Run playwright tests (Pro dummy app)
+          working_directory: react_on_rails_pro/spec/dummy
+          command: yarn e2e-test
+      - store_test_results:
+          path: react_on_rails_pro/spec/dummy/results.xml
+      - store_artifacts:
+          path: react_on_rails_pro/spec/dummy/playwright-report
+
 workflows:
   version: 2
   build-and-test:
