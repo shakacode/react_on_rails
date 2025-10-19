@@ -49,7 +49,7 @@ By the time you read this, the latest may have changed. Be sure to check the ver
 Trying out **React on Rails** is super easy, so long as you have the basic prerequisites.
 
 - **Ruby:** We support all active Ruby versions but recommend using the latest stable Ruby version. Solutions like [rvm](https://rvm.io) or [rbenv](https://github.com/rbenv/rbenv) make it easy to have multiple Ruby versions on your machine.
-- **Rails:** We support Rails 6 and later.
+- **Rails:** This tutorial targets Rails 7.0+. React on Rails supports Rails 6 and later, but some tutorial steps may differ for Rails 6.
 - **Nodejs:** We support all [active Node versions](https://github.com/nodejs/release#release-schedule) but recommend using the latest LTS release of Nodejs for the longest support. Older inactive node versions might still work but is not guaranteed. We also recommend using [nvm](https://github.com/nvm-sh/nvm/) to ease using different node versions in different projects.
 - **yarn:** We use [yarn classic](https://classic.yarnpkg.com/) as our node package manager.
 - You need to have either [Overmind](https://github.com/DarthSim/overmind) or [Foreman](https://rubygems.org/gems/foreman) as a process manager.
@@ -58,7 +58,7 @@ Trying out **React on Rails** is super easy, so long as you have the basic prere
 
 Then we need to create a fresh Rails application as follows.
 
-First, be sure to run `rails -v` and check you are using Rails 7.0 or above.
+First, be sure to run `rails -v` and check you are using Rails 7.0 or above for this tutorial.
 
 ```bash
 # For Rails 6.x

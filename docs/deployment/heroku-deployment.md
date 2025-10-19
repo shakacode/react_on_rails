@@ -97,7 +97,7 @@ Next, configure your app for Puma, per the [instructions on Heroku](https://devc
 
 Create `./Procfile` with the following content. This is what Heroku uses to start your app.
 
-```
+```procfile
 web: bundle exec puma -C config/puma.rb
 ```
 
