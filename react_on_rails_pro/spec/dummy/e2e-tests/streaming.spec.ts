@@ -25,7 +25,7 @@ const assertPageState = async(page: Page, sentValues: Number[]) => {
   }));
 }
 
-test('has title', async ({ page }) => {
+test('incrementally render RedisReciever page', async ({ page }) => {
   const requestId = randomUUID();
   await page.goto(`http://localhost:3000/redis_receiver_for_testing?request_id=${requestId}`, { waitUntil: "commit" });
 
