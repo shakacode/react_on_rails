@@ -123,7 +123,7 @@ After running `rails generate react_on_rails:install`, you'll see:
 
 ### Component Structure
 
-```
+```text
 app/javascript/
 └── bundles/HelloWorld/          # or src/HelloWorld/ror_components/ with auto-bundling
     └── HelloWorld.jsx
@@ -187,11 +187,13 @@ export default MyApp;
 For advanced server rendering (like React Router), you can return an object:
 
 ```js
-{
+({
   renderedHtml: {
-    componentHtml, redirectLocation, error;
-  }
-}
+    componentHtml,
+    redirectLocation,
+    error,
+  },
+});
 ```
 
 Use with `react_component_hash` helper for multiple HTML strings (useful with React Helmet for meta tags).
