@@ -77,11 +77,13 @@
   },
   "devDependencies": {
     "@babel/preset-typescript": "^7.23.2",
+    "@playwright/test": "^1.56.1",
     "@pmmmwh/react-refresh-webpack-plugin": "0.5.3",
     "@tailwindcss/aspect-ratio": "^0.4.2",
     "@tailwindcss/forms": "^0.5.3",
     "@tailwindcss/typography": "^0.5.9",
     "@tsconfig/create-react-app": "^2.0.1",
+    "@types/node": "^24.8.1",
     "@types/react-dom": "^18.2.14",
     "jsdom": "^16.4.0",
     "pino-pretty": "^13.0.0",
@@ -95,6 +97,7 @@
   "scripts": {
     "test": "yarn run build:test && yarn run lint && rspec",
     "lint": "cd ../.. && nps lint",
+    "e2e-test": "playwright test",
     "preinstall": "yarn run link-source && yalc add --link react-on-rails-pro && cd .yalc/react-on-rails-pro && yalc add --link react-on-rails && cd ../.. && yalc add --link @shakacode-tools/react-on-rails-pro-node-renderer",
     "link-source": "cd ../../.. && yarn && yarn run yalc:publish && cd react_on_rails_pro && yarn && yalc publish",
     "postinstall": "test -f post-yarn-install.local && ./post-yarn-install.local || true",
