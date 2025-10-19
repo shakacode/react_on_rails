@@ -21,7 +21,7 @@ Perfect if you're new to React on Rails
 Jump straight to what you need
 
 - **[Installation Guide](./getting-started/installation-into-an-existing-rails-app.md)** - Add to existing Rails app
-- **[API Reference](./api-reference/README.md)** - View helpers, configuration, JavaScript API
+- **[API Reference](./api-reference/view-helpers-api.md)** - View helpers, configuration, JavaScript API
 - **[Core Concepts](./core-concepts/how-react-on-rails-works.md)** - Architecture and SSR
 
 ### 🏗️ **Migrating from Other Solutions**
