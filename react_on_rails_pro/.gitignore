@@ -75,3 +75,10 @@ yalc.lock
 
 # React on Rails Pro License Key
 config/react_on_rails_pro_license.key
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
