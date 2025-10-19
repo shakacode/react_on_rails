@@ -41,6 +41,19 @@ Git hooks will automatically run linting on **all changed files (staged + unstag
 - **⚠️ MANDATORY BEFORE GIT PUSH**: `bundle exec rubocop` and fix ALL violations + ensure trailing newlines
 - Never run `npm` commands, only equivalent Yarn Classic ones
 
+## Changelog
+
+- **Update CHANGELOG.md for user-visible changes only**
+- User-visible changes include: new features, bug fixes, breaking changes, deprecations, performance improvements
+- **Do NOT add changelog entries for**: linting fixes, code formatting, internal refactoring, test updates, documentation fixes
+- Non-user-visible changes don't need changelog entries even if they modify code
+- **Format requirements**:
+  - Always link to the PR: `[PR #123](https://github.com/shakacode/react_on_rails/pull/123)`
+  - Always link to the author: `by [username](https://github.com/username)`
+  - Keep formatting consistent with existing entries
+  - When releasing a version, update the version diff links at the bottom of CHANGELOG.md
+  - **For breaking changes**: Use bold formatting and link to migration documentation (e.g., `**Breaking**: Description. See [Migration Guide](docs/vX_upgrade.md)`)
+
 ## ⚠️ FORMATTING RULES
 
 **Prettier is the SOLE authority for formatting non-Ruby files, and RuboCop for formatting Ruby files. NEVER manually format code.**
