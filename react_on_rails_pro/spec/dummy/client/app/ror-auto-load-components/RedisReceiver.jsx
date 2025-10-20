@@ -20,7 +20,7 @@ const RedisItemWithWrapper = ({ getValue, itemIndex }) => (
 // To test the page behavior when a client component is rendered asynchronously at the page
 const AsyncToggleContainer = async ({ children, childrenTitle, getValue }) => {
   await getValue('ToggleContainer');
-  return <ToggleContainer children={children} childrenTitle={childrenTitle} />
+  return <ToggleContainer childrenTitle={childrenTitle}>{children}</ToggleContainer>
 }
 
 const RedisReceiver = ({ requestId, asyncToggleContainer }, railsContext) => {
@@ -31,14 +31,16 @@ const RedisReceiver = ({ requestId, asyncToggleContainer }, railsContext) => {
   }
 
   const UsedToggleContainer = asyncToggleContainer ? AsyncToggleContainer : ToggleContainer;
-  const toggleContainerGetValueParam = asyncToggleContainer ? getValue : undefined;
 
   return () => (
     <ErrorBoundary>
       <main className='redis-receiver-container'>
         <h1 className="redis-receiver-header">A list of items received from Redis:</h1>
         <Suspense fallback={<div>Loading ToggleContainer</div>}>
-          <UsedToggleContainer childrenTitle="Redis Items" getValue={toggleContainerGetValueParam}>
+          <UsedToggleContainer
+            childrenTitle="Redis Items"
+            {...(toggleContainerGetValueParam ? { getValue } : {})}
+          >
             <ol className='redis-items-container'>
               {
                 [0,1,2,3,4].map(index => <RedisItemWithWrapper key={index} getValue={getValue} itemIndex={index} />)

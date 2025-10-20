@@ -389,7 +389,7 @@ jobs:
           working_directory: react_on_rails_pro/spec/dummy
           command: yarn e2e-test
       - store_test_results:
-          path: react_on_rails_pro/spec/dummy/results.xml
+          path: react_on_rails_pro/spec/dummy/test-results/results.xml
       - store_artifacts:
           path: react_on_rails_pro/spec/dummy/playwright-report
 
