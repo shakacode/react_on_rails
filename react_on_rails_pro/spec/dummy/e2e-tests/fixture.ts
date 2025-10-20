@@ -19,6 +19,7 @@ export type RedisReceiverControllerFixture = {
   sendRedisValue: (key: string, value: unknown) => Promise<void>;
   sendRedisItemValue: (itemIndex: Number, value: unknown) => Promise<void>;
   matchPageSnapshot: (snapshotPath: string) => Promise<void>;
+  waitForConsoleMessage: (msg: string) => Promise<void>;
 }
 
 const redisControlledTest = base.extend<RedisRequestIdFixture, RedisClientFixture>({
@@ -36,7 +37,11 @@ const redisControlledTest = base.extend<RedisRequestIdFixture, RedisClientFixtur
   },
 
   nonBlockingNavigateWithRequestId: async ({ redisRequestId, page }, use) => {
-    await use((path) => page.goto(`${path}?request_id=${redisRequestId}`, { waitUntil: "commit" }))
+    await use((path) => {
+      const requestIdParam = `request_id=${redisRequestId}`;
+      const fullPath = path.includes('?') ? `${path}&${requestIdParam}` : `${path}?${requestIdParam}`;
+      return page.goto(fullPath, { waitUntil: "commit" })
+    })
   },
 });
 
@@ -57,12 +62,37 @@ const redisReceiverPageController = redisControlledTest.extend<RedisReceiverCont
       await expect(page.locator('.redis-receiver-container:visible').first()).toMatchAriaSnapshot({ name: `${snapshotPath}.aria.yml` });
     })
   },
+  waitForConsoleMessage: async({ page }, use) =>{
+    await use(async(msg) => {
+      if ((await page.consoleMessages()).find(consoleMsg => consoleMsg.text().includes(msg))) {
+        return;
+      }
+
+      await page.waitForEvent('console', {
+        predicate: (consoleMsg) => consoleMsg.text().includes(msg),
+      })
+    })
+  }
 })
 
 const redisReceiverPageTest = redisReceiverPageController.extend<RedisReceiverPageFixture>({
   pagePath: [async({ nonBlockingNavigateWithRequestId }, use) => {
     const pagePath = '/redis_receiver_for_testing';
     await nonBlockingNavigateWithRequestId(pagePath);
+    await use(pagePath);
+  }, { auto: true }]
+})
+
+const redisReceiverPageWithAsyncClientComponentTest = redisReceiverPageController.extend<RedisReceiverPageFixture>({
+  pagePath: [async({ page, nonBlockingNavigateWithRequestId, sendRedisValue }, use) => {
+    const pagePath = '/redis_receiver_for_testing?async_toggle_container=true';
+    await nonBlockingNavigateWithRequestId(pagePath);
+
+    await expect(page.getByText("Loading ToggleContainer")).toBeVisible();
+    await expect(page.locator('.toggle-button')).not.toBeVisible();
+
+    await sendRedisValue('ToggleContainer', 'anything');
+    await expect(page.locator('.toggle-button')).toBeVisible();
     await use(pagePath);
   }, { auto: true }]
 })
@@ -85,8 +115,8 @@ const redisReceiverPageAfterNavigationTest = redisReceiverPageController.extend<
 })
 
 export { 
-  redisControlledTest,
   redisReceiverPageTest,
   redisReceiverInsideRouterPageTest,
   redisReceiverPageAfterNavigationTest,
+  redisReceiverPageWithAsyncClientComponentTest,
  };

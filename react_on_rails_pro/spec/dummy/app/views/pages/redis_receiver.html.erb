@@ -1,5 +1,5 @@
 <%= stream_react_component("RedisReceiver", 
-    props: { requestId: @request_id }, 
+    props: { requestId: @request_id, asyncToggleContainer: params[:async_toggle_container] }, 
     prerender: true, 
     trace: true, 
     id: "RedisReceiver-react-component-0") %>

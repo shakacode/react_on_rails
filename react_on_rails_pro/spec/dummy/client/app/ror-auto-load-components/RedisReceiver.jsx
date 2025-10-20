@@ -31,18 +31,21 @@ const RedisReceiver = ({ requestId, asyncToggleContainer }, railsContext) => {
   }
 
   const UsedToggleContainer = asyncToggleContainer ? AsyncToggleContainer : ToggleContainer;
+  const toggleContainerGetValueParam = asyncToggleContainer ? getValue : undefined;
 
-  return (
+  return () => (
     <ErrorBoundary>
       <main className='redis-receiver-container'>
         <h1 className="redis-receiver-header">A list of items received from Redis:</h1>
-        <UsedToggleContainer childrenTitle="Redis Items">
-          <ol className='redis-items-container'>
-            {
-              [0,1,2,3,4].map(index => <RedisItemWithWrapper key={index} getValue={getValue} itemIndex={index} />)
-            }
-          </ol>
-        </UsedToggleContainer>
+        <Suspense fallback={<div>Loading ToggleContainer</div>}>
+          <UsedToggleContainer childrenTitle="Redis Items" getValue={toggleContainerGetValueParam}>
+            <ol className='redis-items-container'>
+              {
+                [0,1,2,3,4].map(index => <RedisItemWithWrapper key={index} getValue={getValue} itemIndex={index} />)
+              }
+            </ol>
+          </UsedToggleContainer>
+        </Suspense>
       </main>
     </ErrorBoundary>
   )
