@@ -1,5 +1,6 @@
-import { expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import {
+  redisReceiverPageController,
   redisReceiverPageTest,
   redisReceiverInsideRouterPageTest,
   redisReceiverPageAfterNavigationTest,
@@ -66,4 +67,20 @@ import {
     sendRedisItemValue(4, 'Incremental Value5');
     await matchPageSnapshot('stage5');
   })
+})
+
+redisReceiverInsideRouterPageTest('no RSC payload request is made when the page is server side rendered', async ({ getNetworkRequests }) => {
+  await expect(await getNetworkRequests(/rsc_payload/)).toHaveLength(0);
+})
+
+redisReceiverPageAfterNavigationTest('RSC payload request is made on navigation', async ({ getNetworkRequests }) => {
+  await expect(await getNetworkRequests(/rsc_payload/)).toHaveLength(1);
+})
+
+redisReceiverPageController('client side rendered router fetches RSC payload', async ({ page, getNetworkRequests }) => {
+  await page.goto('/server_router_client_render/simple-server-component');
+
+  await expect(page.getByText('Post 1')).toBeVisible();
+  await expect(page.getByText('Toggle')).toBeVisible();
+  await expect(await getNetworkRequests(/rsc_payload/)).toHaveLength(1);
 })

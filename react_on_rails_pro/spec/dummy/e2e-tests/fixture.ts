@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { test as base, Response, expect } from '@playwright/test';
+import { test as base, Response, expect, Request } from '@playwright/test';
 import { createClient, RedisClientType } from 'redis';
 
 type RedisClientFixture = {
@@ -20,6 +20,7 @@ export type RedisReceiverControllerFixture = {
   sendRedisItemValue: (itemIndex: Number, value: unknown) => Promise<void>;
   matchPageSnapshot: (snapshotPath: string) => Promise<void>;
   waitForConsoleMessage: (msg: string) => Promise<void>;
+  getNetworkRequests: (requestUrlPattern: RegExp) => Promise<Request[]>;
 }
 
 const redisControlledTest = base.extend<RedisRequestIdFixture, RedisClientFixture>({
@@ -72,6 +73,11 @@ const redisReceiverPageController = redisControlledTest.extend<RedisReceiverCont
         predicate: (consoleMsg) => consoleMsg.text().includes(msg),
       })
     })
+  },
+  getNetworkRequests: async({ page }, use) => {
+    await use(async(requestUrlPattern) => {
+      return (await page.requests()).filter(request => request.url().match(requestUrlPattern))
+    })
   }
 })
 
@@ -114,7 +120,8 @@ const redisReceiverPageAfterNavigationTest = redisReceiverPageController.extend<
   }, { auto: true }]
 })
 
-export { 
+export {
+  redisReceiverPageController,
   redisReceiverPageTest,
   redisReceiverInsideRouterPageTest,
   redisReceiverPageAfterNavigationTest,
