@@ -76,7 +76,7 @@ class PagesController < ApplicationController
       redis = ::Redis.new
       5.times do |index|
         sleep 1
-        redis.xadd("stream:#{@request_id}", { ":Item#{index + 1}" => "Value of Item#{index + 1}".to_json })
+        redis.xadd("stream:#{@request_id}", { ":Item#{index}" => "Value of Item#{index + 1}".to_json })
       end
     rescue StandardError => e
       Rails.logger.error "Error writing Items to Redis: #{e.message}"

@@ -1,3 +1,5 @@
+"use client";
+
 /*
  * Copyright (c) 2025 Shakacode LLC
  *

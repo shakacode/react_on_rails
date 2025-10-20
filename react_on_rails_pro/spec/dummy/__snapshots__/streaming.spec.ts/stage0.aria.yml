@@ -1,0 +1,8 @@
+- main:
+  - heading "A list of items received from Redis:" [level=1]
+  - list:
+    - paragraph: Waiting for the key "Item1"
+    - paragraph: Waiting for the key "Item2"
+    - paragraph: Waiting for the key "Item3"
+    - paragraph: Waiting for the key "Item4"
+    - paragraph: Waiting for the key "Item5"

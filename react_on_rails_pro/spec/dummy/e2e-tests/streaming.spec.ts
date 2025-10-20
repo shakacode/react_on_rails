@@ -1,51 +1,39 @@
-import { randomUUID } from 'crypto';
-import { test, expect, Page } from '@playwright/test';
-import { createClient } from 'redis';
+import {
+  redisReceiverPageTest,
+  redisReceiverInsideRouterPageTest,
+  redisReceiverPageAfterNavigationTest,
+} from './fixture';
 
-const createRedisClient = async () => {
-  const url = process.env.REDIS_URL || 'redis://localhost:6379';
-  const client = createClient({ url });
-  await client.connect();
-  return client;
-}
+// Can be used to delay the execution
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+// Snapshot testing the best testing strategy for our use case
+// Because we need to ensure that any transformation done on the HTML or RSC payload stream won't affect
+//   - Order of fallback or components at the page
+//   - Any update chunk won't affect previously rendered parts of the page
+//   - Rendered component won't get back to its fallback component at any stage of the page
+//   - Snapshot testing saves huge number of complex assertions
+([
+  ['RedisReceiver', redisReceiverPageTest],
+  ['RedisReceiver inside router page', redisReceiverInsideRouterPageTest],
+  ['RedisReceiver inside router after navigation', redisReceiverPageAfterNavigationTest],
+] as const).forEach(([pageName, test]) => {
+  test(`snapshot for page ${pageName}`, async ({ matchPageSnapshot, sendRedisItemValue }) => {
+    await matchPageSnapshot('stage0');
 
-const assertPageState = async(page: Page, sentValues: Number[]) => {
-  const nonSentValues = [1,2,3,4,5].filter(v => !sentValues.includes(v));
+    sendRedisItemValue(0, 'Incremental Value1');
+    await matchPageSnapshot('stage1');
 
-  await Promise.all(sentValues.map(async (v) => {
-    await expect(page.getByText(`Value of "Item${v}": Value${v}`)).toBeVisible();
-    await expect(page.getByText(`Waiting for the key "Item${v}"`)).not.toBeVisible();
-  }));
+    sendRedisItemValue(3, 'Incremental Value4');
+    await matchPageSnapshot('stage2');
 
-  await Promise.all(nonSentValues.map(async (v) => {
-    await expect(page.getByText(`Value of "Item${v}": Value${v}`)).not.toBeVisible()
-    await expect(page.getByText(`Waiting for the key "Item${v}"`)).toBeVisible()
-  }));
-}
+    sendRedisItemValue(1, 'Incremental Value2');
+    await matchPageSnapshot('stage3');
 
-test('incrementally render RedisReciever page', async ({ page }) => {
-  const requestId = randomUUID();
-  await page.goto(`http://localhost:3000/redis_receiver_for_testing?request_id=${requestId}`, { waitUntil: "commit" });
+    sendRedisItemValue(2, 'Incremental Value3');
+    await matchPageSnapshot('stage4');
 
-  const sentValues: Number[] = [];
-  await assertPageState(page, sentValues);
-
-  const redisClient = await createRedisClient();
-  redisClient.xAdd(`stream:${requestId}`, '*', { ':Item1': JSON.stringify('Value1') });
-  sentValues.push(1);
-  await assertPageState(page, sentValues);
-
-  redisClient.xAdd(`stream:${requestId}`, '*', { ':Item4': JSON.stringify('Value4') });
-  sentValues.push(4);
-  await assertPageState(page, sentValues);
-
-  redisClient.xAdd(`stream:${requestId}`, '*', { ':Item2': JSON.stringify('Value2') });
-  sentValues.push(2);
-  await assertPageState(page, sentValues);
-
-  redisClient.xAdd(`stream:${requestId}`, '*', { ':Item3': JSON.stringify('Value3') });
-  sentValues.push(3);
-  await assertPageState(page, sentValues);
-});
+    sendRedisItemValue(4, 'Incremental Value5');
+    await matchPageSnapshot('stage5');
+  })
+})

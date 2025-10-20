@@ -42,6 +42,11 @@ export default function App({ basePath = '/server_router', ...props }: { basePat
             </Link>
           </li>
           <li>
+            <Link to={`${basePath}/redis-receiver-for-testing`}>
+              Redis Receiver For Testing
+            </Link>
+          </li>
+          <li>
             <Link to={`${basePath}/server-component-with-retry`}>Server Component with Retry</Link>
           </li>
         </ul>
@@ -71,6 +76,10 @@ export default function App({ basePath = '/server_router', ...props }: { basePat
             />
             <Route path="client-component" element={<EchoProps {...props} />} />
           </Route>
+          <Route
+            path={`${basePath}/redis-receiver-for-testing`}
+            element={<RSCRoute componentName="RedisReceiver" componentProps={props} />}
+          />
           <Route
             path={`${basePath}/streaming-server-component`}
             element={<RSCRoute componentName="AsyncComponentsTreeForTesting" componentProps={props} />}
