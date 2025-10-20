@@ -17,7 +17,7 @@ type RedisReceiverPageFixture = {
 
 export type RedisReceiverControllerFixture = {
   sendRedisValue: (key: string, value: unknown) => Promise<void>;
-  sendRedisItemValue: (itemIndex: Number, value: unknown) => Promise<void>;
+  sendRedisItemValue: (itemIndex: number, value: unknown) => Promise<void>;
   matchPageSnapshot: (snapshotPath: string) => Promise<void>;
   waitForConsoleMessage: (msg: string) => Promise<void>;
   getNetworkRequests: (requestUrlPattern: RegExp) => Promise<Request[]>;
@@ -33,8 +33,9 @@ const redisControlledTest = base.extend<RedisRequestIdFixture, RedisClientFixtur
     await client.close();
   }, { scope: 'worker' }],
 
-  redisRequestId: async ({}, use) => {
+  redisRequestId: async ({ redisClient }, use) => {
     await use(randomUUID());
+    redisClient.del
   },
 
   nonBlockingNavigateWithRequestId: async ({ redisRequestId, page }, use) => {

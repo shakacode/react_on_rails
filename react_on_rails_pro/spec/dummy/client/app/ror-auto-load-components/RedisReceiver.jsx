@@ -9,7 +9,7 @@ const RedisItem = async ({ getValue, itemIndex }) => {
 }
 
 const RedisItemWithWrapper = ({ getValue, itemIndex }) => (
-  <section class={`redis-item${itemIndex}-container`}>
+  <section className={`redis-item${itemIndex}-container`}>
     <Suspense fallback={<p className={`redis-item${itemIndex}-fallback`}>Waiting for the key "Item{itemIndex + 1}"</p>}>
       <RedisItem getValue={getValue} itemIndex={itemIndex} />
     </Suspense>

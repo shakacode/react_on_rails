@@ -94,7 +94,7 @@ class PagesController < ApplicationController
 
   def redis_receiver_for_testing
     @request_id = params[:request_id]
-    raise "request_id is required at the url" if @request_id.empty?
+    raise "request_id is required at the url" if @request_id.blank?
 
     stream_view_containing_react_components(template: "/pages/redis_receiver")
   end

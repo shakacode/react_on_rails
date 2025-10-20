@@ -381,6 +381,10 @@ jobs:
           command: |
             while ! curl -s http://localhost:3000 > /dev/null; do sleep 1; done
       - run:
+          name: install playwright dependencies
+          working_directory: react_on_rails_pro/spec/dummy
+          command: yarn playwright install --with-deps
+      - run:
           name: Run playwright tests (Pro dummy app)
           working_directory: react_on_rails_pro/spec/dummy
           command: yarn e2e-test

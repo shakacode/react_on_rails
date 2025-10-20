@@ -22,24 +22,24 @@ import {
   test(`incremental rendering of page: ${pageName}`, async ({ matchPageSnapshot, sendRedisItemValue }) => {
     await matchPageSnapshot('stage0');
 
-    sendRedisItemValue(0, 'Incremental Value1');
+    await sendRedisItemValue(0, 'Incremental Value1');
     await matchPageSnapshot('stage1');
 
-    sendRedisItemValue(3, 'Incremental Value4');
+    await sendRedisItemValue(3, 'Incremental Value4');
     await matchPageSnapshot('stage2');
 
-    sendRedisItemValue(1, 'Incremental Value2');
+    await sendRedisItemValue(1, 'Incremental Value2');
     await matchPageSnapshot('stage3');
 
-    sendRedisItemValue(2, 'Incremental Value3');
+    await sendRedisItemValue(2, 'Incremental Value3');
     await matchPageSnapshot('stage4');
 
-    sendRedisItemValue(4, 'Incremental Value5');
+    await sendRedisItemValue(4, 'Incremental Value5');
     await matchPageSnapshot('stage5');
   });
 
   test(`early hydration of page: ${pageName}`, async ({ page, waitForConsoleMessage, matchPageSnapshot, sendRedisItemValue }) => {
-    waitForConsoleMessage('ToggleContainer with title');
+    await waitForConsoleMessage('ToggleContainer with title');
 
     await page.click('.toggle-button');
     await expect(page.getByText(/Waiting for the key "Item\d"/)).not.toBeVisible();
@@ -52,19 +52,19 @@ import {
     }
     await matchPageSnapshot('stage0');
 
-    sendRedisItemValue(0, 'Incremental Value1');
+    await sendRedisItemValue(0, 'Incremental Value1');
     await matchPageSnapshot('stage1');
 
-    sendRedisItemValue(3, 'Incremental Value4');
+    await sendRedisItemValue(3, 'Incremental Value4');
     await matchPageSnapshot('stage2');
 
-    sendRedisItemValue(1, 'Incremental Value2');
+    await sendRedisItemValue(1, 'Incremental Value2');
     await matchPageSnapshot('stage3');
 
-    sendRedisItemValue(2, 'Incremental Value3');
+    await sendRedisItemValue(2, 'Incremental Value3');
     await matchPageSnapshot('stage4');
 
-    sendRedisItemValue(4, 'Incremental Value5');
+    await sendRedisItemValue(4, 'Incremental Value5');
     await matchPageSnapshot('stage5');
   })
 })
