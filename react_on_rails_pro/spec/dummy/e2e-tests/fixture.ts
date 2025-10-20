@@ -34,7 +34,13 @@ const redisControlledTest = base.extend<RedisRequestIdFixture, RedisClientFixtur
   }, { scope: 'worker' }],
 
   redisRequestId: async ({ redisClient }, use) => {
-    await use(randomUUID());
+    const id = randomUUID();
+    try {
+      await use(id);
+    } finally {
+      // cleanup of the stream for this request
+      await redisClient.del(`stream:${id}`);
+    }
   },
 
   nonBlockingNavigateWithRequestId: async ({ redisRequestId, page }, use) => {

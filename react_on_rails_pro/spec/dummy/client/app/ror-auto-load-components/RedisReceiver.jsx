@@ -39,7 +39,7 @@ const RedisReceiver = ({ requestId, asyncToggleContainer }, railsContext) => {
         <Suspense fallback={<div>Loading ToggleContainer</div>}>
           <UsedToggleContainer
             childrenTitle="Redis Items"
-            {...(toggleContainerGetValueParam ? { getValue } : {})}
+            {...(asyncToggleContainer ? { getValue } : {})}
           >
             <ol className='redis-items-container'>
               {
