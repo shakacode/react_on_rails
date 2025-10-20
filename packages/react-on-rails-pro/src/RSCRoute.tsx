@@ -1,5 +1,3 @@
-"use client";
-
 /*
  * Copyright (c) 2025 Shakacode LLC
  *
@@ -15,6 +13,7 @@
  */
 
 /// <reference types="react/experimental" />
+"use client";
 
 import * as React from 'react';
 import { useRSC } from './RSCProvider.tsx';
