@@ -82,6 +82,12 @@ class PagesController < ApplicationController
       Rails.logger.error "Error writing Items to Redis: #{e.message}"
       Rails.logger.error e.backtrace.join("\n")
       raise e
+    ensure
+      begin
+        redis&.close
+      rescue StandardError => close_err
+        Rails.logger.warn "Failed to close Redis: #{close_err.message}"
+      end
     end
 
     stream_view_containing_react_components(template: "/pages/redis_receiver")

@@ -30,12 +30,11 @@ const redisControlledTest = base.extend<RedisRequestIdFixture, RedisClientFixtur
     const client = createClient({ url });
     await client.connect();
     await use(client as RedisClientType);
-    await client.close();
+    await client.quit();
   }, { scope: 'worker' }],
 
   redisRequestId: async ({ redisClient }, use) => {
     await use(randomUUID());
-    redisClient.del
   },
 
   nonBlockingNavigateWithRequestId: async ({ redisRequestId, page }, use) => {
