@@ -347,6 +347,7 @@ jobs:
   dummy-app-node-renderer-e2-tests:
     docker:
       - image: *docker_image
+      - image: cimg/redis:6.2.6
     steps:
       - checkout
       - run: *print-system-info
@@ -416,6 +417,10 @@ workflows:
           requires:
             - install-package-ruby-gems
       - rspec-dummy-app-node-renderer:
+          requires:
+            - install-package-ruby-gems
+            - build-dummy-app-webpack-test-bundles
+      - dummy-app-node-renderer-e2-tests:
           requires:
             - install-package-ruby-gems
             - build-dummy-app-webpack-test-bundles
