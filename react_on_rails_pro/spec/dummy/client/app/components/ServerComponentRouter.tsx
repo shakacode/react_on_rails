@@ -42,9 +42,7 @@ export default function App({ basePath = '/server_router', ...props }: { basePat
             </Link>
           </li>
           <li>
-            <Link to={`${basePath}/redis-receiver-for-testing`}>
-              Redis Receiver For Testing
-            </Link>
+            <Link to={`${basePath}/redis-receiver-for-testing`}>Redis Receiver For Testing</Link>
           </li>
           <li>
             <Link to={`${basePath}/server-component-with-retry`}>Server Component with Retry</Link>

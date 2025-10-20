@@ -13,12 +13,17 @@ import {
 //   - Any update chunk won't affect previously rendered parts of the page
 //   - Rendered component won't get back to its fallback component at any stage of the page
 //   - Snapshot testing saves huge number of complex assertions
-([
-  ['RedisReceiver', redisReceiverPageTest],
-  ['RedisReceiver inside router page', redisReceiverInsideRouterPageTest],
-  ['RedisReceiver inside router after navigation', redisReceiverPageAfterNavigationTest],
-  ['RedisReceiver with Async Toggle Container Client Component', redisReceiverPageWithAsyncClientComponentTest],
-] as const).forEach(([pageName, test]) => {
+(
+  [
+    ['RedisReceiver', redisReceiverPageTest],
+    ['RedisReceiver inside router page', redisReceiverInsideRouterPageTest],
+    ['RedisReceiver inside router after navigation', redisReceiverPageAfterNavigationTest],
+    [
+      'RedisReceiver with Async Toggle Container Client Component',
+      redisReceiverPageWithAsyncClientComponentTest,
+    ],
+  ] as const
+).forEach(([pageName, test]) => {
   test(`incremental rendering of page: ${pageName}`, async ({ matchPageSnapshot, sendRedisItemValue }) => {
     await matchPageSnapshot('stage0');
 
@@ -38,7 +43,12 @@ import {
     await matchPageSnapshot('stage5');
   });
 
-  test(`early hydration of page: ${pageName}`, async ({ page, waitForConsoleMessage, matchPageSnapshot, sendRedisItemValue }) => {
+  test(`early hydration of page: ${pageName}`, async ({
+    page,
+    waitForConsoleMessage,
+    matchPageSnapshot,
+    sendRedisItemValue,
+  }) => {
     await waitForConsoleMessage('ToggleContainer with title');
 
     await page.click('.toggle-button');
@@ -66,21 +76,30 @@ import {
 
     await sendRedisItemValue(4, 'Incremental Value5');
     await matchPageSnapshot('stage5');
-  })
-})
+  });
+});
 
-redisReceiverInsideRouterPageTest('no RSC payload request is made when the page is server side rendered', async ({ getNetworkRequests }) => {
-  await expect(await getNetworkRequests(/rsc_payload/)).toHaveLength(0);
-})
+redisReceiverInsideRouterPageTest(
+  'no RSC payload request is made when the page is server side rendered',
+  async ({ getNetworkRequests }) => {
+    await expect(await getNetworkRequests(/rsc_payload/)).toHaveLength(0);
+  },
+);
 
-redisReceiverPageAfterNavigationTest('RSC payload request is made on navigation', async ({ getNetworkRequests }) => {
-  await expect(await getNetworkRequests(/rsc_payload/)).toHaveLength(1);
-})
+redisReceiverPageAfterNavigationTest(
+  'RSC payload request is made on navigation',
+  async ({ getNetworkRequests }) => {
+    await expect(await getNetworkRequests(/rsc_payload/)).toHaveLength(1);
+  },
+);
 
-redisReceiverPageController('client side rendered router fetches RSC payload', async ({ page, getNetworkRequests }) => {
-  await page.goto('/server_router_client_render/simple-server-component');
+redisReceiverPageController(
+  'client side rendered router fetches RSC payload',
+  async ({ page, getNetworkRequests }) => {
+    await page.goto('/server_router_client_render/simple-server-component');
 
-  await expect(page.getByText('Post 1')).toBeVisible();
-  await expect(page.getByText('Toggle')).toBeVisible();
-  await expect(await getNetworkRequests(/rsc_payload/)).toHaveLength(1);
-})
+    await expect(page.getByText('Post 1')).toBeVisible();
+    await expect(page.getByText('Toggle')).toBeVisible();
+    await expect(await getNetworkRequests(/rsc_payload/)).toHaveLength(1);
+  },
+);
