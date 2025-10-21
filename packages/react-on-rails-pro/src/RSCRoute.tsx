@@ -14,6 +14,8 @@
 
 /// <reference types="react/experimental" />
 
+'use client';
+
 import * as React from 'react';
 import { useRSC } from './RSCProvider.tsx';
 import { ServerComponentFetchError } from './ServerComponentFetchError.ts';

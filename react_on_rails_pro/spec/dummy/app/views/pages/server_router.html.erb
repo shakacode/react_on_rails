@@ -1,5 +1,9 @@
 <%= stream_react_component("ServerComponentRouter", 
-    props: @app_props_server_render.merge(artificialDelay: params[:artificial_delay] || 0, postsCount: params[:posts_count] || 2),
+    props: @app_props_server_render.merge(
+      artificialDelay: params[:artificial_delay] || 0,
+      postsCount: params[:posts_count] || 2,
+      requestId: params[:request_id],
+    ),
     trace: true, 
     id: "ServerComponentRouter-react-component-0") %>
 <hr/>

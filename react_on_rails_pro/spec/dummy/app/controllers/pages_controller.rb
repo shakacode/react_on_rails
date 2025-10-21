@@ -69,6 +69,42 @@ class PagesController < ApplicationController
     raise "Redis thread timed out"
   end
 
+  def redis_receiver
+    @request_id = SecureRandom.uuid
+
+    redis_thread = Thread.new do
+      redis = ::Redis.new
+      5.times do |index|
+        sleep 1
+        redis.xadd("stream:#{@request_id}", { ":Item#{index}" => "Value of Item#{index + 1}".to_json })
+      end
+    rescue StandardError => e
+      Rails.logger.error "Error writing Items to Redis: #{e.message}"
+      Rails.logger.error e.backtrace.join("\n")
+      raise e
+    ensure
+      begin
+        redis&.close
+      rescue StandardError => close_err
+        Rails.logger.warn "Failed to close Redis: #{close_err.message}"
+      end
+    end
+
+    stream_view_containing_react_components(template: "/pages/redis_receiver")
+
+    return if redis_thread.join(10)
+
+    Rails.logger.error "Redis thread timed out"
+    raise "Redis thread timed out"
+  end
+
+  def redis_receiver_for_testing
+    @request_id = params[:request_id]
+    raise "request_id is required at the url" if @request_id.blank?
+
+    stream_view_containing_react_components(template: "/pages/redis_receiver")
+  end
+
   def async_on_server_sync_on_client
     @render_on_server = true
     stream_view_containing_react_components(template: "/pages/async_on_server_sync_on_client")
