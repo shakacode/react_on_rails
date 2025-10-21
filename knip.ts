@@ -11,6 +11,9 @@ const config: KnipConfig = {
         // Has to be installed globally
         'yalc',
         'nps',
+        // Pro package binaries used in Pro workflows
+        'playwright',
+        'e2e-test',
       ],
       ignore: ['react_on_rails_pro/**'],
       ignoreDependencies: [
