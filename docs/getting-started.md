@@ -71,8 +71,10 @@ Start the app:
 ```bash
 bin/dev help
 bin/dev # start with hmr
-bin/dev static #
+bin/dev static # start with statically created bundles (no HMR)
 ```
+
+> **Note:** Ensure that you have `overmind` or `foreman` installed to run `bin/dev`.
 
 ## Basic Usage
 
