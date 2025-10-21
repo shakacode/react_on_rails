@@ -17,6 +17,8 @@ jobs:
       matrix:
         node-version: ['20', '22']
     runs-on: ubuntu-22.04
+    env:
+      REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -67,6 +69,8 @@ jobs:
       matrix:
         ruby-version: ['3.3.7']
     runs-on: ubuntu-22.04
+    env:
+      REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE }}
     steps:
       - uses: actions/checkout@v4
         with:

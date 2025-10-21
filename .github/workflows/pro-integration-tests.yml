@@ -14,6 +14,8 @@ jobs:
   # Build webpack test bundles for dummy app
   build-dummy-app-webpack-test-bundles:
     runs-on: ubuntu-22.04
+    env:
+      REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -101,6 +103,8 @@ jobs:
         # Test parallelization - split tests across 3 shards
         shard: [1, 2, 3]
     runs-on: ubuntu-22.04
+    env:
+      REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -260,6 +264,8 @@ jobs:
   dummy-app-node-renderer-e2e-tests:
     needs: build-dummy-app-webpack-test-bundles
     runs-on: ubuntu-22.04
+    env:
+      REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE }}
     # Redis service container
     services:
       redis:
