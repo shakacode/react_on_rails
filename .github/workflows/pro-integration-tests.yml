@@ -210,7 +210,18 @@ jobs:
           RAILS_ENV=test rails server &
 
       - name: Wait for Rails server to start
-        run: while ! curl -s http://localhost:3000 > /dev/null; do sleep 1; done
+        run: |
+          timeout=60
+          elapsed=0
+          while ! curl -s http://localhost:3000 > /dev/null; do
+            sleep 1
+            elapsed=$((elapsed + 1))
+            if [ $elapsed -ge $timeout ]; then
+              echo "Timeout waiting for Rails server to start after ${timeout}s"
+              exit 1
+            fi
+          done
+          echo "Rails server started after ${elapsed}s"
 
       - name: Run RSpec tests for Pro dummy app
         run: |
@@ -384,7 +395,18 @@ jobs:
           RAILS_ENV=test rails server &
 
       - name: Wait for Rails server to start
-        run: while ! curl -s http://localhost:3000 > /dev/null; do sleep 1; done
+        run: |
+          timeout=300
+          elapsed=0
+          while ! curl -s http://localhost:3000 > /dev/null; do
+            sleep 1
+            elapsed=$((elapsed + 1))
+            if [ $elapsed -ge $timeout ]; then
+              echo "Timeout waiting for Rails server to start after ${timeout}s"
+              exit 1
+            fi
+          done
+          echo "Rails server started after ${elapsed}s"
 
       - name: Install Playwright dependencies
         run: cd spec/dummy && yarn playwright install --with-deps
