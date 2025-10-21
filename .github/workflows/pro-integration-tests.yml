@@ -97,11 +97,6 @@ jobs:
   # RSpec integration tests with Node renderer
   rspec-dummy-app-node-renderer:
     needs: build-dummy-app-webpack-test-bundles
-    strategy:
-      fail-fast: false
-      matrix:
-        # Test parallelization - split tests across 3 shards
-        shard: [1, 2, 3]
     runs-on: ubuntu-22.04
     env:
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE }}
@@ -213,51 +208,49 @@ jobs:
       - name: Wait for Rails server to start
         run: while ! curl -s http://localhost:3000 > /dev/null; do sleep 1; done
 
-      - name: Run RSpec tests for Pro dummy app (shard ${{ matrix.shard }}/3)
+      - name: Run RSpec tests for Pro dummy app
         run: |
           cd spec/dummy
-          SPEC_FILES=$(find spec -name '*_spec.rb' | sort | awk "NR % 3 == ${{ matrix.shard }} - 1")
           bundle exec rspec \
+            --profile 10 \
             --format progress \
             --format RspecJunitFormatter \
             --out ~/rspec/rspec.xml \
-            --format documentation \
-            --only-failures \
-            $SPEC_FILES
+            --format documentation
 
       - name: Store test results
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: pro-rspec-integration-results-shard${{ matrix.shard }}
+          name: pro-rspec-integration-results
           path: ~/rspec
 
       - name: Store screenshots
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: pro-rspec-screenshots-shard${{ matrix.shard }}
+          name: pro-rspec-screenshots
           path: react_on_rails_pro/spec/dummy/tmp/screenshots
 
       - name: Store Capybara artifacts
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: pro-rspec-capybara-shard${{ matrix.shard }}
+          name: pro-rspec-capybara
           path: react_on_rails_pro/spec/dummy/tmp/capybara
 
       - name: Store test log
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: pro-rspec-test-log-shard${{ matrix.shard }}
+          name: pro-rspec-test-log
           path: react_on_rails_pro/spec/dummy/log/test.log
 
       - name: Store yarn error log
         uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: pro-rspec-yarn-error-log-shard${{ matrix.shard }}
+          name: pro-rspec-yarn-error-log
           path: react_on_rails_pro/spec/dummy/yarn-error.log
 
   # Playwright E2E tests with Redis service
