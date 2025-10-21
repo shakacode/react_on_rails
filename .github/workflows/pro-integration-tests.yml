@@ -32,7 +32,7 @@ jobs:
         with:
           node-version: 22
           cache: yarn
-          cache-dependency-path: 'react_on_rails_pro/yarn.lock'
+          cache-dependency-path: 'react_on_rails_pro/**/yarn.lock'
 
       - name: Print system information
         run: |
@@ -121,7 +121,7 @@ jobs:
         with:
           node-version: 22
           cache: yarn
-          cache-dependency-path: 'react_on_rails_pro/yarn.lock'
+          cache-dependency-path: 'react_on_rails_pro/**/yarn.lock'
 
       - name: Print system information
         run: |
@@ -208,11 +208,13 @@ jobs:
         run: |
           cd spec/dummy
           yarn run node-renderer &
+          true
 
       - name: Run Rails server in background
         run: |
           cd spec/dummy
           RAILS_ENV=test rails server &
+          true
 
       - name: Wait for Rails server to start
         run: |
@@ -298,7 +300,7 @@ jobs:
         with:
           node-version: 22
           cache: yarn
-          cache-dependency-path: 'react_on_rails_pro/yarn.lock'
+          cache-dependency-path: 'react_on_rails_pro/**/yarn.lock'
 
       - name: Print system information
         run: |
@@ -385,11 +387,13 @@ jobs:
         run: |
           cd spec/dummy
           yarn run node-renderer &
+          true
 
       - name: Run Rails server in background
         run: |
           cd spec/dummy
           RAILS_ENV=test rails server &
+          true
 
       - name: Wait for Rails server to start
         run: |
