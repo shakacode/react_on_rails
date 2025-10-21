@@ -21,7 +21,7 @@ jobs:
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: 3
+          ruby-version: 3.3
           bundler: 2.5.4
 
       - name: Setup Node
