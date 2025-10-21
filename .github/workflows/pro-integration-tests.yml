@@ -22,7 +22,7 @@ jobs:
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: 3.3.7
+          ruby-version: 3.4
           bundler: 2.5.4
 
       - name: Setup Node
@@ -109,7 +109,7 @@ jobs:
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: 3.3.7
+          ruby-version: 3.4
           bundler: 2.5.4
 
       - name: Setup Node
@@ -279,7 +279,7 @@ jobs:
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: 3.3.7
+          ruby-version: 3.4
           bundler: 2.5.4
 
       - name: Setup Node

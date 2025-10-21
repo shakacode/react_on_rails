@@ -65,7 +65,7 @@ jobs:
   rspec-package-specs:
     strategy:
       matrix:
-        ruby-version: ['3.2', '3.3']
+        ruby-version: ['3.2', '3.4']
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
