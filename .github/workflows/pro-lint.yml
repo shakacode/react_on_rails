@@ -1,0 +1,106 @@
+name: React on Rails Pro - Lint
+
+on:
+  push:
+    branches:
+      - 'master'
+  pull_request:
+
+defaults:
+  run:
+    working-directory: react_on_rails_pro
+
+jobs:
+  lint-js-and-ruby:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.3.7
+          bundler: 2.5.4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+          cache-dependency-path: 'react_on_rails_pro/yarn.lock'
+
+      - name: Print system information
+        run: |
+          echo "Linux release: "; cat /etc/issue
+          echo "Current user: "; whoami
+          echo "Current directory: "; pwd
+          echo "Ruby version: "; ruby -v
+          echo "Node version: "; node -v
+          echo "Yarn version: "; yarn --version
+          echo "Bundler version: "; bundle --version
+
+      - name: Cache Pro package node modules
+        uses: actions/cache@v4
+        with:
+          path: react_on_rails_pro/node_modules
+          key: v4-pro-package-node-modules-cache-${{ hashFiles('react_on_rails_pro/yarn.lock') }}
+
+      - name: Cache Pro package Ruby gems
+        uses: actions/cache@v4
+        with:
+          path: react_on_rails_pro/vendor/bundle
+          key: v4-pro-package-gem-cache-${{ hashFiles('react_on_rails_pro/react_on_rails_pro.gemspec') }}
+
+      - name: Cache Pro dummy app node modules
+        uses: actions/cache@v4
+        with:
+          path: react_on_rails_pro/spec/dummy/node_modules
+          key: v4-pro-dummy-app-node-modules-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/yarn.lock') }}
+
+      - name: Cache Pro dummy app Ruby gems
+        uses: actions/cache@v4
+        with:
+          path: react_on_rails_pro/spec/dummy/vendor/bundle
+          key: v4-pro-dummy-app-gem-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/Gemfile.lock') }}
+
+      - name: Install Ruby Gems for Pro package
+        run: |
+          gem install bundler -v "2.5.4"
+          echo "Bundler version: "; bundle --version
+          bundle config set --local path 'vendor/bundle'
+          bundle config set --local disable_checksum_validation true
+          bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
+
+      - name: Install Node modules with Yarn for Pro package
+        run: |
+          sudo yarn global add yalc
+          yarn install --frozen-lockfile --no-progress --no-emoji
+
+      - name: Install Ruby Gems for Pro dummy app
+        run: |
+          cd spec/dummy
+          bundle lock --add-platform 'x86_64-linux'
+          bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
+
+      - name: Install Node modules with Yarn for Pro dummy app
+        run: cd spec/dummy && yarn install --frozen-lockfile --no-progress --no-emoji
+
+      - name: Install Node modules with Yarn for ExecJS dummy app
+        run: cd spec/execjs-compatible-dummy && yarn install --frozen-lockfile --no-progress --no-emoji
+
+      - name: Generate file-system based entrypoints
+        run: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
+
+      - name: Lint Ruby
+        run: bundle exec rubocop
+
+      - name: Lint JS
+        run: yarn run nps eslint
+
+      - name: Check formatting
+        run: yarn run nps format.listDifferent
+
+      - name: Check TypeScript
+        run: yarn run nps check-typescript
