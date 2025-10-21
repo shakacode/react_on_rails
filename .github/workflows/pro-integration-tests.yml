@@ -211,8 +211,7 @@ jobs:
         run: cd spec/dummy && RAILS_ENV=test rails server &
 
       - name: Wait for Rails server to start
-        run: |
-          while ! curl -s http://localhost:3000 > /dev/null; do sleep 1; done
+        run: while ! curl -s http://localhost:3000 > /dev/null; do sleep 1; done
 
       - name: Run RSpec tests for Pro dummy app (shard ${{ matrix.shard }}/3)
         run: |
@@ -384,8 +383,7 @@ jobs:
         run: cd spec/dummy && RAILS_ENV=test rails server &
 
       - name: Wait for Rails server to start
-        run: |
-          while ! curl -s http://localhost:3000 > /dev/null; do sleep 1; done
+        run: while ! curl -s http://localhost:3000 > /dev/null; do sleep 1; done
 
       - name: Install Playwright dependencies
         run: cd spec/dummy && yarn playwright install --with-deps
