@@ -72,8 +72,8 @@ const createForm = ({ project = 'spec-dummy', commit = '', props = {}, throwJsEr
 const makeRequest = async (options = {}) => {
   const startTime = Date.now();
   const form = createForm(options);
-  const { address, port } = app.server.address();
-  const client = http2.connect(`http://${address}:${port}`);
+  const { port } = app.server.address();
+  const client = http2.connect(`http://localhost:${port}`);
   const request = client.request({
     ':method': 'POST',
     ':path': `/bundles/${SERVER_BUNDLE_TIMESTAMP}/render/454a82526211afdb215352755d36032c`,
