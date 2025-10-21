@@ -205,16 +205,10 @@ jobs:
         run: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
 
       - name: Run Pro Node renderer in background
-        run: |
-          cd spec/dummy
-          yarn run node-renderer &
-          true
+        run: cd spec/dummy && yarn run node-renderer &
 
       - name: Run Rails server in background
-        run: |
-          cd spec/dummy
-          RAILS_ENV=test rails server &
-          true
+        run: cd spec/dummy && RAILS_ENV=test rails server &
 
       - name: Wait for Rails server to start
         run: |
@@ -384,16 +378,10 @@ jobs:
         run: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
 
       - name: Run Pro Node renderer in background
-        run: |
-          cd spec/dummy
-          yarn run node-renderer &
-          true
+        run: cd spec/dummy && yarn run node-renderer &
 
       - name: Run Rails server in background
-        run: |
-          cd spec/dummy
-          RAILS_ENV=test rails server &
-          true
+        run: cd spec/dummy && RAILS_ENV=test rails server &
 
       - name: Wait for Rails server to start
         run: |
