@@ -200,10 +200,14 @@ jobs:
         run: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
 
       - name: Run Pro Node renderer in background
-        run: cd spec/dummy && yarn run node-renderer &
+        run: |
+          cd spec/dummy
+          yarn run node-renderer &
 
       - name: Run Rails server in background
-        run: cd spec/dummy && RAILS_ENV=test rails server &
+        run: |
+          cd spec/dummy
+          RAILS_ENV=test rails server &
 
       - name: Wait for Rails server to start
         run: while ! curl -s http://localhost:3000 > /dev/null; do sleep 1; done
@@ -370,10 +374,14 @@ jobs:
         run: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
 
       - name: Run Pro Node renderer in background
-        run: cd spec/dummy && yarn run node-renderer &
+        run: |
+          cd spec/dummy
+          yarn run node-renderer &
 
       - name: Run Rails server in background
-        run: cd spec/dummy && RAILS_ENV=test rails server &
+        run: |
+          cd spec/dummy
+          RAILS_ENV=test rails server &
 
       - name: Wait for Rails server to start
         run: while ! curl -s http://localhost:3000 > /dev/null; do sleep 1; done
