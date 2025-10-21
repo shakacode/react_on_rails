@@ -4,5 +4,4 @@
     "outDir": "./lib"
   },
   "include": ["src/**/*"],
-  "allowDefaultProject": "../spec/dummy/e2e-tests/*"
 }

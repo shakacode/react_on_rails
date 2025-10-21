@@ -7,5 +7,5 @@
     "strict": true,
     "skipLibCheck": true
   },
-  "include": ["**/*.ts", "**/*.tsx", "**/*.d.ts"]
+  "include": ["client/**/*.ts", "client/**/*.tsx", "client/**/*.d.ts", "e2e-tests/*"]
 }
