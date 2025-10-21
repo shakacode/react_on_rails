@@ -339,6 +339,8 @@ jobs:
       - store_artifacts:
           path: react_on_rails_pro/spec/dummy/tmp/screenshots
       - store_artifacts:
+          path: react_on_rails_pro/spec/dummy/tmp/capybara
+      - store_artifacts:
           path: react_on_rails_pro/spec/dummy/log/test.log
       - store_artifacts:
           path: react_on_rails_pro/spec/dummy/yarn-error.log
