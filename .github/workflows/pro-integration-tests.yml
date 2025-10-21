@@ -205,10 +205,14 @@ jobs:
         run: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
 
       - name: Run Pro Node renderer in background
-        run: cd spec/dummy && yarn run node-renderer &
+        run: |
+          cd spec/dummy
+          yarn run node-renderer &
 
       - name: Run Rails server in background
-        run: cd spec/dummy && RAILS_ENV=test rails server &
+        run: |
+          cd spec/dummy
+          RAILS_ENV=test rails server &
 
       - name: Wait for Rails server to start
         run: |
@@ -217,13 +221,14 @@ jobs:
       - name: Run RSpec tests for Pro dummy app (shard ${{ matrix.shard }}/3)
         run: |
           cd spec/dummy
+          SPEC_FILES=$(find spec -name '*_spec.rb' | sort | awk "NR % 3 == ${{ matrix.shard }} - 1")
           bundle exec rspec \
             --format progress \
             --format RspecJunitFormatter \
             --out ~/rspec/rspec.xml \
             --format documentation \
             --only-failures \
-            $(find spec -name '*_spec.rb' | sort | awk "NR % 3 == ${{ matrix.shard }} - 1")
+            $SPEC_FILES
 
       - name: Store test results
         uses: actions/upload-artifact@v4
@@ -377,10 +382,14 @@ jobs:
         run: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
 
       - name: Run Pro Node renderer in background
-        run: cd spec/dummy && yarn run node-renderer &
+        run: |
+          cd spec/dummy
+          yarn run node-renderer &
 
       - name: Run Rails server in background
-        run: cd spec/dummy && RAILS_ENV=test rails server &
+        run: |
+          cd spec/dummy
+          RAILS_ENV=test rails server &
 
       - name: Wait for Rails server to start
         run: |
