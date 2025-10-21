@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect } from '@playwright/test';
 import {
   redisReceiverPageController,
   redisReceiverPageTest,
@@ -57,9 +57,7 @@ import {
     await page.click('.toggle-button');
     const fallbackElements = page.getByText(/Waiting for the key "Item\d"/);
     await expect(fallbackElements).toHaveCount(5);
-    for (const el of await fallbackElements.all()) {
-      await expect(el).toBeVisible();
-    }
+    await Promise.all((await fallbackElements.all()).map((el) => expect(el).toBeVisible()));
     await matchPageSnapshot('stage0');
 
     await sendRedisItemValue(0, 'Incremental Value1');
@@ -82,14 +80,14 @@ import {
 redisReceiverInsideRouterPageTest(
   'no RSC payload request is made when the page is server side rendered',
   async ({ getNetworkRequests }) => {
-    await expect(await getNetworkRequests(/rsc_payload/)).toHaveLength(0);
+    expect(await getNetworkRequests(/rsc_payload/)).toHaveLength(0);
   },
 );
 
 redisReceiverPageAfterNavigationTest(
   'RSC payload request is made on navigation',
   async ({ getNetworkRequests }) => {
-    await expect(await getNetworkRequests(/rsc_payload/)).toHaveLength(1);
+    expect(await getNetworkRequests(/rsc_payload/)).toHaveLength(1);
   },
 );
 
@@ -100,6 +98,6 @@ redisReceiverPageController(
 
     await expect(page.getByText('Post 1')).toBeVisible();
     await expect(page.getByText('Toggle')).toBeVisible();
-    await expect(await getNetworkRequests(/rsc_payload/)).toHaveLength(1);
+    expect(await getNetworkRequests(/rsc_payload/)).toHaveLength(1);
   },
 );
