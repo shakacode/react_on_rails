@@ -1,5 +1,7 @@
 import { createClient, RedisClientType } from 'redis';
 
+const REDIS_READ_TIMEOUT = 10000;
+
 /**
  * Redis xRead result message structure
  */
@@ -292,7 +294,7 @@ export function listenToRequestData(requestId: string): RequestListener {
           );
           // Keep the pending promise in the dictionary with the error state
         }
-      }, 8000);
+      }, REDIS_READ_TIMEOUT);
 
       // Store the promise and its controllers
       if (resolvePromise && rejectPromise) {
