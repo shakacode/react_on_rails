@@ -97,9 +97,6 @@ jobs:
   # Jest unit tests for Pro package
   package-js-tests:
     needs: build-dummy-app-webpack-test-bundles
-    strategy:
-      matrix:
-        node-version: ['20', '22']
     runs-on: ubuntu-22.04
     env:
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE }}
@@ -111,7 +108,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 22
           cache: yarn
           cache-dependency-path: 'react_on_rails_pro/**/yarn.lock'
 
@@ -160,7 +157,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: pro-jest-results-node${{ matrix.node-version }}
+          name: pro-jest-results
           path: react_on_rails_pro/jest
 
   # RSpec tests for Pro package
