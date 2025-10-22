@@ -31,6 +31,15 @@ const railsEnv = 'test';
 
 disableHttp2();
 
+// Helper to create worker with standard options
+const createWorker = (options: Parameters<typeof worker>[0] = {}) =>
+  worker({
+    serverBundleCachePath: serverBundleCachePathForTest(),
+    supportModules: true,
+    stubTimers: false,
+    ...options,
+  });
+
 describe('worker', () => {
   beforeEach(async () => {
     await resetForTest(testName);
@@ -41,9 +50,7 @@ describe('worker', () => {
   });
 
   test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest when bundle is provided and did not yet exist', async () => {
-    const app = worker({
-      serverBundleCachePath: serverBundleCachePathForTest(),
-    });
+    const app = createWorker();
 
     const form = formAutoContent({
       gemVersion,
@@ -69,9 +76,7 @@ describe('worker', () => {
   });
 
   test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest', async () => {
-    const app = worker({
-      serverBundleCachePath: serverBundleCachePathForTest(),
-    });
+    const app = createWorker();
 
     const form = formAutoContent({
       gemVersion,
@@ -105,8 +110,7 @@ describe('worker', () => {
     async () => {
       await createVmBundleForTest();
 
-      const app = worker({
-        serverBundleCachePath: serverBundleCachePathForTest(),
+      const app = createWorker({
         password: 'password',
       });
 
@@ -132,8 +136,7 @@ describe('worker', () => {
     async () => {
       await createVmBundleForTest();
 
-      const app = worker({
-        serverBundleCachePath: serverBundleCachePathForTest(),
+      const app = createWorker({
         password: 'password',
       });
 
@@ -159,8 +162,7 @@ describe('worker', () => {
     async () => {
       await createVmBundleForTest();
 
-      const app = worker({
-        serverBundleCachePath: serverBundleCachePathForTest(),
+      const app = createWorker({
         password: 'my_password',
       });
 
@@ -187,9 +189,7 @@ describe('worker', () => {
     async () => {
       await createVmBundleForTest();
 
-      const app = worker({
-        serverBundleCachePath: serverBundleCachePathForTest(),
-      });
+      const app = createWorker();
 
       const res = await app
         .inject()
@@ -211,8 +211,7 @@ describe('worker', () => {
     const bundleHash = 'some-bundle-hash';
     await createAsset(testName, bundleHash);
 
-    const app = worker({
-      serverBundleCachePath: serverBundleCachePathForTest(),
+    const app = createWorker({
       password: 'my_password',
     });
 
@@ -237,8 +236,7 @@ describe('worker', () => {
     const bundleHash = 'some-bundle-hash';
     await createAsset(testName, bundleHash);
 
-    const app = worker({
-      serverBundleCachePath: serverBundleCachePathForTest(),
+    const app = createWorker({
       password: 'my_password',
     });
 
@@ -261,8 +259,7 @@ describe('worker', () => {
 
   test('post /asset-exists requires targetBundles (protocol version 2.0.0)', async () => {
     await createAsset(testName, String(BUNDLE_TIMESTAMP));
-    const app = worker({
-      serverBundleCachePath: serverBundleCachePathForTest(),
+    const app = createWorker({
       password: 'my_password',
     });
 
@@ -283,8 +280,7 @@ describe('worker', () => {
   test('post /upload-assets', async () => {
     const bundleHash = 'some-bundle-hash';
 
-    const app = worker({
-      serverBundleCachePath: serverBundleCachePathForTest(),
+    const app = createWorker({
       password: 'my_password',
     });
 
@@ -307,8 +303,7 @@ describe('worker', () => {
     const bundleHash = 'some-bundle-hash';
     const bundleHashOther = 'some-other-bundle-hash';
 
-    const app = worker({
-      serverBundleCachePath: serverBundleCachePathForTest(),
+    const app = createWorker({
       password: 'my_password',
     });
 
@@ -334,9 +329,7 @@ describe('worker', () => {
     test('allows request when gem version matches package version', async () => {
       await createVmBundleForTest();
 
-      const app = worker({
-        serverBundleCachePath: serverBundleCachePathForTest(),
-      });
+      const app = createWorker();
 
       const res = await app
         .inject()
@@ -355,9 +348,7 @@ describe('worker', () => {
     test('rejects request in development when gem version does not match', async () => {
       await createVmBundleForTest();
 
-      const app = worker({
-        serverBundleCachePath: serverBundleCachePathForTest(),
-      });
+      const app = createWorker();
 
       const res = await app
         .inject()
@@ -379,9 +370,7 @@ describe('worker', () => {
     test('allows request in production when gem version does not match (with warning)', async () => {
       await createVmBundleForTest();
 
-      const app = worker({
-        serverBundleCachePath: serverBundleCachePathForTest(),
-      });
+      const app = createWorker();
 
       const res = await app
         .inject()
@@ -400,9 +389,7 @@ describe('worker', () => {
     test('normalizes gem version with dot before prerelease (4.0.0.rc.1 == 4.0.0-rc.1)', async () => {
       await createVmBundleForTest();
 
-      const app = worker({
-        serverBundleCachePath: serverBundleCachePathForTest(),
-      });
+      const app = createWorker();
 
       // If package version is 4.0.0, this tests that 4.0.0.rc.1 gets normalized to 4.0.0-rc.1
       // For this test to work properly, we need to use a version that when normalized matches
@@ -426,9 +413,7 @@ describe('worker', () => {
     test('normalizes gem version case-insensitively (4.0.0-RC.1 == 4.0.0-rc.1)', async () => {
       await createVmBundleForTest();
 
-      const app = worker({
-        serverBundleCachePath: serverBundleCachePathForTest(),
-      });
+      const app = createWorker();
 
       const gemVersionUpperCase = packageJson.version.toUpperCase();
 
@@ -449,9 +434,7 @@ describe('worker', () => {
     test('handles whitespace in gem version', async () => {
       await createVmBundleForTest();
 
-      const app = worker({
-        serverBundleCachePath: serverBundleCachePathForTest(),
-      });
+      const app = createWorker();
 
       const gemVersionWithWhitespace = `  ${packageJson.version}  `;
 
@@ -474,8 +457,7 @@ describe('worker', () => {
     const bundleHash = 'some-bundle-hash';
     const secondaryBundleHash = 'secondary-bundle-hash';
 
-    const app = worker({
-      serverBundleCachePath: serverBundleCachePathForTest(),
+    const app = createWorker({
       password: 'my_password',
     });
 
@@ -529,8 +511,7 @@ describe('worker', () => {
   test('post /upload-assets with only bundles (no assets)', async () => {
     const bundleHash = 'bundle-only-hash';
 
-    const app = worker({
-      serverBundleCachePath: serverBundleCachePathForTest(),
+    const app = createWorker({
       password: 'my_password',
     });
 
@@ -565,8 +546,7 @@ describe('worker', () => {
   test('post /upload-assets with no assets and no bundles (empty request)', async () => {
     const bundleHash = 'empty-request-hash';
 
-    const app = worker({
-      serverBundleCachePath: serverBundleCachePathForTest(),
+    const app = createWorker({
       password: 'my_password',
     });
 
@@ -593,8 +573,7 @@ describe('worker', () => {
   test('post /upload-assets with duplicate bundle hash silently skips overwrite and returns 200', async () => {
     const bundleHash = 'duplicate-bundle-hash';
 
-    const app = worker({
-      serverBundleCachePath: serverBundleCachePathForTest(),
+    const app = createWorker({
       password: 'my_password',
     });
 
@@ -669,16 +648,15 @@ describe('worker', () => {
     expect(files).toHaveLength(1);
     expect(files[0]).toBe(`${bundleHash}.js`);
 
-    // Verify the original content is preserved (62 bytes from bundle.js, not 84 from secondary-bundle.js)
-    expect(secondBundleSize).toBe(62); // Size of getFixtureBundle(), not getFixtureSecondaryBundle()
+    // Verify the original content is preserved (1646 bytes from bundle.js, not 1689 from secondary-bundle.js)
+    expect(secondBundleSize).toBe(1646); // Size of getFixtureBundle(), not getFixtureSecondaryBundle()
   });
 
   test('post /upload-assets with bundles placed in their own hash directories, not targetBundles directories', async () => {
     const bundleHash = 'actual-bundle-hash';
     const targetBundleHash = 'target-bundle-hash'; // Different from actual bundle hash
 
-    const app = worker({
-      serverBundleCachePath: serverBundleCachePathForTest(),
+    const app = createWorker({
       password: 'my_password',
     });
 
@@ -723,8 +701,7 @@ describe('worker', () => {
   describe('incremental render endpoint', () => {
     // Helper functions to reduce code duplication
     const createWorkerApp = (password = 'my_password') =>
-      worker({
-        serverBundleCachePath: serverBundleCachePathForTest(),
+      createWorker({
         password,
       });
 
