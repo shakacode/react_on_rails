@@ -27,6 +27,10 @@ Changes since the last non-beta release.
 
 - **Attribution Comment**: Added HTML comment attribution to Rails views containing React on Rails functionality. The comment automatically displays which version is in use (open source React on Rails or React on Rails Pro) and, for Pro users, shows the license status. This helps identify React on Rails usage across your application. [PR #1857](https://github.com/shakacode/react_on_rails/pull/1857) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
+#### Bug Fixes
+
+- **Use as Git dependency**: All packages can now be installed as Git dependencies. This is useful for development and testing purposes. See [CONTRIBUTING.md](./CONTRIBUTING.md#git-dependencies) for documentation. [PR #1873](https://github.com/shakacode/react_on_rails/pull/1873) by [alexeyr-ci2](https://github.com/alexeyr-ci2).
+
 #### Breaking Changes
 
 - **React on Rails Core Package**: Several Pro-only methods have been removed from the core package and are now exclusively available in the `react-on-rails-pro` package. If you're using any of the following methods, you'll need to migrate to React on Rails Pro:
@@ -1767,7 +1771,7 @@ such as:
 
 - Fix several generator-related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/16.1.1...master
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/16.1.1...master
 [16.1.1]: https://github.com/shakacode/react_on_rails/compare/16.1.0...16.1.1
 [16.1.0]: https://github.com/shakacode/react_on_rails/compare/16.0.0...16.1.0
 [16.0.0]: https://github.com/shakacode/react_on_rails/compare/14.2.0...16.0.0
