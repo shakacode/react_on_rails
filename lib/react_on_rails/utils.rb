@@ -111,9 +111,16 @@ module ReactOnRails
 
     private_class_method def self.server_bundle?(bundle_name)
       config = ReactOnRails.configuration
-      bundle_name == config.server_bundle_js_file ||
-      bundle_name == config.rsc_bundle_js_file ||
-      bundle_name == config.react_server_client_manifest_file
+      return true if bundle_name == config.server_bundle_js_file
+
+      # Check Pro configurations if Pro is available
+      if react_on_rails_pro?
+        pro_config = ReactOnRailsPro.configuration
+        return true if bundle_name == pro_config.rsc_bundle_js_file ||
+                       bundle_name == pro_config.react_server_client_manifest_file
+      end
+
+      false
     end
 
     private_class_method def self.handle_missing_manifest_entry(bundle_name, is_server_bundle)

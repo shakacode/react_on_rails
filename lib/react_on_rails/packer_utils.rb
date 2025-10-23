@@ -55,8 +55,12 @@ module ReactOnRails
       # the webpack-dev-server is provided by the config value
       # "same_bundle_for_client_and_server" where a value of true
       # would mean that the bundle is created by the webpack-dev-server
-      is_bundle_running_on_server = (bundle_name == ReactOnRails.configuration.server_bundle_js_file) ||
-                                    (bundle_name == ReactOnRails.configuration.rsc_bundle_js_file)
+      is_bundle_running_on_server = bundle_name == ReactOnRails.configuration.server_bundle_js_file
+
+      # Check Pro RSC bundle if Pro is available
+      if ReactOnRails::Utils.react_on_rails_pro? && defined?(ReactOnRailsPro)
+        is_bundle_running_on_server ||= (bundle_name == ReactOnRailsPro.configuration.rsc_bundle_js_file)
+      end
 
       if ::Shakapacker.dev_server.running? && (!is_bundle_running_on_server ||
         ReactOnRails.configuration.same_bundle_for_client_and_server)

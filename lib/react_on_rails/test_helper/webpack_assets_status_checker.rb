@@ -50,10 +50,16 @@ module ReactOnRails
       def all_compiled_assets
         @all_compiled_assets ||= begin
           webpack_generated_files = @webpack_generated_files.map do |bundle_name|
-            if bundle_name == ReactOnRails.configuration.react_client_manifest_file
-              ReactOnRails::Utils.react_client_manifest_file_path
-            elsif bundle_name == ReactOnRails.configuration.react_server_client_manifest_file
-              ReactOnRails::Utils.react_server_client_manifest_file_path
+            # Check if this is a Pro RSC manifest file
+            if ReactOnRails::Utils.react_on_rails_pro?
+              pro_config = ReactOnRailsPro.configuration
+              if bundle_name == pro_config.react_client_manifest_file
+                ReactOnRails::Utils.react_client_manifest_file_path
+              elsif bundle_name == pro_config.react_server_client_manifest_file
+                ReactOnRails::Utils.react_server_client_manifest_file_path
+              else
+                ReactOnRails::Utils.bundle_js_file_path(bundle_name)
+              end
             else
               ReactOnRails::Utils.bundle_js_file_path(bundle_name)
             end

@@ -198,5 +198,65 @@ module ReactOnRailsPro
                            /ExecJS profiler only supports Node.js \(V8\) or V8 runtimes./)
       end
     end
+
+    describe "RSC configuration options" do
+      it "has default values for RSC bundle and manifest files" do
+        ReactOnRailsPro.configure {} # rubocop:disable Lint/EmptyBlock
+
+        expect(ReactOnRailsPro.configuration.rsc_bundle_js_file).to eq("rsc-bundle.js")
+        expect(ReactOnRailsPro.configuration.react_client_manifest_file).to eq("react-client-manifest.json")
+        expect(ReactOnRailsPro.configuration.react_server_client_manifest_file).to eq("react-server-client-manifest.json")
+      end
+
+      it "allows setting rsc_bundle_js_file" do
+        ReactOnRailsPro.configure do |config|
+          config.rsc_bundle_js_file = "custom-rsc-bundle.js"
+        end
+
+        expect(ReactOnRailsPro.configuration.rsc_bundle_js_file).to eq("custom-rsc-bundle.js")
+      end
+
+      it "allows setting react_client_manifest_file" do
+        ReactOnRailsPro.configure do |config|
+          config.react_client_manifest_file = "custom-client-manifest.json"
+        end
+
+        expect(ReactOnRailsPro.configuration.react_client_manifest_file).to eq("custom-client-manifest.json")
+      end
+
+      it "allows setting react_server_client_manifest_file" do
+        ReactOnRailsPro.configure do |config|
+          config.react_server_client_manifest_file = "custom-server-client-manifest.json"
+        end
+
+        expect(ReactOnRailsPro.configuration.react_server_client_manifest_file).to eq("custom-server-client-manifest.json")
+      end
+
+      it "allows nil values for RSC configuration options" do
+        ReactOnRailsPro.configure do |config|
+          config.rsc_bundle_js_file = nil
+          config.react_client_manifest_file = nil
+          config.react_server_client_manifest_file = nil
+        end
+
+        expect(ReactOnRailsPro.configuration.rsc_bundle_js_file).to be_nil
+        expect(ReactOnRailsPro.configuration.react_client_manifest_file).to be_nil
+        expect(ReactOnRailsPro.configuration.react_server_client_manifest_file).to be_nil
+      end
+
+      it "configures all RSC options together for a typical RSC setup" do
+        ReactOnRailsPro.configure do |config|
+          config.enable_rsc_support = true
+          config.rsc_bundle_js_file = "rsc-bundle.js"
+          config.react_client_manifest_file = "client-manifest.json"
+          config.react_server_client_manifest_file = "server-client-manifest.json"
+        end
+
+        expect(ReactOnRailsPro.configuration.enable_rsc_support).to be(true)
+        expect(ReactOnRailsPro.configuration.rsc_bundle_js_file).to eq("rsc-bundle.js")
+        expect(ReactOnRailsPro.configuration.react_client_manifest_file).to eq("client-manifest.json")
+        expect(ReactOnRailsPro.configuration.react_server_client_manifest_file).to eq("server-client-manifest.json")
+      end
+    end
   end
 end
