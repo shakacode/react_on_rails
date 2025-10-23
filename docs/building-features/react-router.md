@@ -179,5 +179,5 @@ For a practical example of route organization, see the [routes configuration fil
 ## Additional Resources
 
 - [React Router Official Documentation](https://reactrouter.com/)
-- [React Router v6 Migration Guide](https://reactrouter.com/en/main/upgrading/v5) - If upgrading from v5
+- [React Router v6 Migration Guide](https://reactrouter.com/docs/en/v6/upgrading/v5) - If upgrading from v5
 - [React on Rails Turbo/Turbolinks Guide](./turbolinks.md)
