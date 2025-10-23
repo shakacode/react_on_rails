@@ -64,8 +64,9 @@ module ReactOnRailsPro
             "'serverRenderReactComponent'"
           end
         rsc_params = if ReactOnRailsPro.configuration.enable_rsc_support && render_options.streaming?
-                       react_client_manifest_file = ReactOnRails.configuration.react_client_manifest_file
-                       react_server_client_manifest_file = ReactOnRails.configuration.react_server_client_manifest_file
+                       config = ReactOnRailsPro.configuration
+                       react_client_manifest_file = config.react_client_manifest_file
+                       react_server_client_manifest_file = config.react_server_client_manifest_file
                        <<-JS
                           railsContext.reactClientManifestFileName = '#{react_client_manifest_file}';
                           railsContext.reactServerClientManifestFileName = '#{react_server_client_manifest_file}';
