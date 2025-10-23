@@ -190,7 +190,6 @@ module ReactOnRails
       end
     end
 
-
     it "changes the configuration of the gem, such as setting the prerender option to false" do
       test_path = File.expand_path("public/webpack/test")
       allow(::Shakapacker).to receive_message_chain("config.public_output_path")
