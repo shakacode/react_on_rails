@@ -58,7 +58,7 @@ module ReactOnRails
       is_bundle_running_on_server = bundle_name == ReactOnRails.configuration.server_bundle_js_file
 
       # Check Pro RSC bundle if Pro is available
-      if ReactOnRails::Utils.react_on_rails_pro? && defined?(ReactOnRailsPro)
+      if ReactOnRails::Utils.react_on_rails_pro?
         is_bundle_running_on_server ||= (bundle_name == ReactOnRailsPro.configuration.rsc_bundle_js_file)
       end
 

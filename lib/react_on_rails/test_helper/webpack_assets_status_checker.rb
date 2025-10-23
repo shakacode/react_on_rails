@@ -47,22 +47,21 @@ module ReactOnRails
 
       private
 
+      def resolve_asset_path(bundle_name)
+        # Check if this is a Pro RSC manifest file
+        if ReactOnRails::Utils.react_on_rails_pro?
+          pro_config = ReactOnRailsPro.configuration
+          return ReactOnRailsPro::Utils.react_client_manifest_file_path if bundle_name == pro_config.react_client_manifest_file
+          return ReactOnRailsPro::Utils.react_server_client_manifest_file_path if bundle_name == pro_config.react_server_client_manifest_file
+        end
+        
+        ReactOnRails::Utils.bundle_js_file_path(bundle_name)
+      end
+
       def all_compiled_assets
         @all_compiled_assets ||= begin
           webpack_generated_files = @webpack_generated_files.map do |bundle_name|
-            # Check if this is a Pro RSC manifest file
-            if ReactOnRails::Utils.react_on_rails_pro?
-              pro_config = ReactOnRailsPro.configuration
-              if bundle_name == pro_config.react_client_manifest_file
-                ReactOnRailsPro::Utils.react_client_manifest_file_path
-              elsif bundle_name == pro_config.react_server_client_manifest_file
-                ReactOnRailsPro::Utils.react_server_client_manifest_file_path
-              else
-                ReactOnRails::Utils.bundle_js_file_path(bundle_name)
-              end
-            else
-              ReactOnRails::Utils.bundle_js_file_path(bundle_name)
-            end
+            resolve_asset_path(bundle_name)
           end
 
           if webpack_generated_files.present?
