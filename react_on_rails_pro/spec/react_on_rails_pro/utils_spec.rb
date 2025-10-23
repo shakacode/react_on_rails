@@ -226,7 +226,6 @@ module ReactOnRailsPro
       context "when RSC support is enabled" do
         before do
           allow(ReactOnRailsPro.configuration).to receive(:enable_rsc_support).and_return(true)
-          described_class.instance_variable_set(:@rsc_support_enabled, nil)
         end
 
         it "returns true" do
@@ -237,7 +236,6 @@ module ReactOnRailsPro
       context "when RSC support is disabled" do
         before do
           allow(ReactOnRailsPro.configuration).to receive(:enable_rsc_support).and_return(false)
-          described_class.instance_variable_set(:@rsc_support_enabled, nil)
         end
 
         it "returns false" do
