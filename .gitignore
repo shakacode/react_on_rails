@@ -75,3 +75,4 @@ ssr-generated
 
 # Claude Code local settings
 .claude/settings.local.json
+.claude/.fuse_hidden*
