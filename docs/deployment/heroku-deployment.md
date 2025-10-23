@@ -129,7 +129,7 @@ Next, update your `package.json` to specify the version of yarn and node. Add th
 
 ```json
   "engines": {
-    "node": "16.19.0",
+    "node": "20.0.0",
     "yarn": "1.22.4"
   },
 ```
