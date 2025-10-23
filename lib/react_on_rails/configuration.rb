@@ -9,8 +9,6 @@ module ReactOnRails
   end
 
   DEFAULT_GENERATED_ASSETS_DIR = File.join(%w[public webpack], Rails.env).freeze
-  DEFAULT_REACT_CLIENT_MANIFEST_FILE = "react-client-manifest.json"
-  DEFAULT_REACT_SERVER_CLIENT_MANIFEST_FILE = "react-server-client-manifest.json"
   DEFAULT_COMPONENT_REGISTRY_TIMEOUT = 5000
 
   def self.configuration
@@ -20,9 +18,6 @@ module ReactOnRails
       # generated_assets_dirs is deprecated
       generated_assets_dir: "",
       server_bundle_js_file: "",
-      rsc_bundle_js_file: "",
-      react_client_manifest_file: DEFAULT_REACT_CLIENT_MANIFEST_FILE,
-      react_server_client_manifest_file: DEFAULT_REACT_SERVER_CLIENT_MANIFEST_FILE,
       prerender: false,
       auto_load_bundle: false,
       replay_console: true,
@@ -72,8 +67,8 @@ module ReactOnRails
                   :server_render_method, :random_dom_id, :auto_load_bundle,
                   :same_bundle_for_client_and_server, :rendering_props_extension,
                   :make_generated_server_bundle_the_entrypoint,
-                  :generated_component_packs_loading_strategy, :immediate_hydration, :rsc_bundle_js_file,
-                  :react_client_manifest_file, :react_server_client_manifest_file, :component_registry_timeout,
+                  :generated_component_packs_loading_strategy, :immediate_hydration,
+                  :component_registry_timeout,
                   :server_bundle_output_path, :enforce_private_server_bundles
 
     # rubocop:disable Metrics/AbcSize
@@ -90,7 +85,6 @@ module ReactOnRails
                    i18n_dir: nil, i18n_yml_dir: nil, i18n_output_format: nil, i18n_yml_safe_load_options: nil,
                    random_dom_id: nil, server_render_method: nil, rendering_props_extension: nil,
                    components_subdirectory: nil, auto_load_bundle: nil, immediate_hydration: nil,
-                   rsc_bundle_js_file: nil, react_client_manifest_file: nil, react_server_client_manifest_file: nil,
                    component_registry_timeout: nil, server_bundle_output_path: nil, enforce_private_server_bundles: nil)
       self.node_modules_location = node_modules_location.present? ? node_modules_location : Rails.root
       self.generated_assets_dirs = generated_assets_dirs
@@ -119,9 +113,6 @@ module ReactOnRails
 
       # Server rendering:
       self.server_bundle_js_file = server_bundle_js_file
-      self.rsc_bundle_js_file = rsc_bundle_js_file
-      self.react_client_manifest_file = react_client_manifest_file
-      self.react_server_client_manifest_file = react_server_client_manifest_file
       self.same_bundle_for_client_and_server = same_bundle_for_client_and_server
       self.server_renderer_pool_size = self.development_mode ? 1 : server_renderer_pool_size
       self.server_renderer_timeout = server_renderer_timeout # seconds

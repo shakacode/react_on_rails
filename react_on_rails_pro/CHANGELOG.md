@@ -19,9 +19,21 @@ You can find the **package** version numbers from this repo's tags and below in 
 ### Added
 - Added `cached_stream_react_component` helper method, similar to `cached_react_component` but for streamed components.
 - **License Validation System**: Implemented comprehensive JWT-based license validation with offline verification using RSA-256 signatures. License validation occurs at startup in both Ruby and Node.js environments. Supports required fields (`sub`, `iat`, `exp`) and optional fields (`plan`, `organization`, `iss`). FREE evaluation licenses are available for 3 months at [shakacode.com/react-on-rails-pro](https://shakacode.com/react-on-rails-pro). [PR #1857](https://github.com/shakacode/react_on_rails/pull/1857) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **Pro-Specific Configurations Moved from Open-Source**: The following React Server Components (RSC) configurations are now exclusively in the Pro gem and should be configured in `ReactOnRailsPro.configure`:
+  - `rsc_bundle_js_file` - Path to the RSC bundle file
+  - `react_server_client_manifest_file` - Path to the React server client manifest
+  - `react_client_manifest_file` - Path to the React client manifest
+
+  These configurations were previously available in the open-source `ReactOnRails.configure` block but have been moved to Pro where they belong since RSC is a Pro-only feature.
+- **Streaming View Helpers Now Pro-Exclusive**: The following view helpers are now defined exclusively in the Pro gem:
+  - `stream_react_component` - Progressive SSR using React 18+ streaming
+  - `rsc_payload_react_component` - RSC payload rendering
+
+  These helpers were previously in the open-source gem but have been moved to Pro as they are Pro-only features.
 
 ### Changed (Breaking)
 - `config.prerender_caching`, which controls caching for non-streaming components, now also controls caching for streamed components. To disable caching for an individual render, pass `internal_option(:skip_prerender_cache)`.
+- **Configuration Migration Required**: If you are using RSC features, you must move the RSC-related configurations from `ReactOnRails.configure` to `ReactOnRailsPro.configure` in your initializers. See the migration example in the [React on Rails CHANGELOG](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#unreleased).
 
 ## [4.0.0-rc.15] - 2025-08-11
 
