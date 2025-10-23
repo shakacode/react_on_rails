@@ -139,6 +139,99 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  context "with --rspack" do
+    before(:all) { run_generator_test_with_args(%w[--rspack], package_json: true) }
+
+    include_examples "base_generator", application_js: true
+    include_examples "no_redux_generator"
+
+    it "creates bin/switch-bundler script" do
+      assert_file "bin/switch-bundler" do |content|
+        expect(content).to include("class BundlerSwitcher")
+        expect(content).to include("RSPACK_DEPS")
+        expect(content).to include("WEBPACK_DEPS")
+      end
+    end
+
+    it "installs rspack dependencies in package.json" do
+      assert_file "package.json" do |content|
+        package_json = JSON.parse(content)
+        expect(package_json["dependencies"]).to include("@rspack/core")
+        expect(package_json["dependencies"]).to include("rspack-manifest-plugin")
+        expect(package_json["devDependencies"]).to include("@rspack/cli")
+        expect(package_json["devDependencies"]).to include("@rspack/plugin-react-refresh")
+      end
+    end
+
+    it "does not install webpack-specific dependencies" do
+      assert_file "package.json" do |content|
+        package_json = JSON.parse(content)
+        expect(package_json["dependencies"]).not_to include("webpack")
+        expect(package_json["devDependencies"]).not_to include("webpack-cli")
+        expect(package_json["devDependencies"]).not_to include("@pmmmwh/react-refresh-webpack-plugin")
+      end
+    end
+
+    it "generates unified webpack config with bundler detection" do
+      assert_file "config/webpack/development.js" do |content|
+        expect(content).to include("const { devServer, inliningCss, config } = require('shakapacker')")
+        expect(content).to include("if (config.assets_bundler === 'rspack')")
+        expect(content).to include("@rspack/plugin-react-refresh")
+        expect(content).to include("@pmmmwh/react-refresh-webpack-plugin")
+      end
+    end
+
+    it "generates server webpack config with bundler variable" do
+      assert_file "config/webpack/serverWebpackConfig.js" do |content|
+        expect(content).to include("const bundler = config.assets_bundler === 'rspack'")
+        expect(content).to include("? require('@rspack/core')")
+        expect(content).to include(": require('webpack')")
+        expect(content).to include("new bundler.optimize.LimitChunkCountPlugin")
+      end
+    end
+  end
+
+  context "with --rspack --typescript" do
+    before(:all) { run_generator_test_with_args(%w[--rspack --typescript], package_json: true) }
+
+    include_examples "base_generator_common", application_js: true
+    include_examples "no_redux_generator"
+
+    it "creates TypeScript component files with .tsx extension" do
+      assert_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.tsx"
+      assert_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.server.tsx"
+    end
+
+    it "creates tsconfig.json file" do
+      assert_file "tsconfig.json" do |content|
+        config = JSON.parse(content)
+        expect(config["compilerOptions"]["jsx"]).to eq("react-jsx")
+        expect(config["compilerOptions"]["strict"]).to be true
+        expect(config["include"]).to include("app/javascript/**/*")
+      end
+    end
+
+    it "installs both rspack and typescript dependencies" do
+      assert_file "package.json" do |content|
+        package_json = JSON.parse(content)
+        # Rspack dependencies
+        expect(package_json["dependencies"]).to include("@rspack/core")
+        expect(package_json["devDependencies"]).to include("@rspack/cli")
+        # TypeScript dependencies
+        expect(package_json["devDependencies"]).to include("typescript")
+        expect(package_json["devDependencies"]).to include("@types/react")
+        expect(package_json["devDependencies"]).to include("@types/react-dom")
+      end
+    end
+
+    it "TypeScript component includes proper typing" do
+      assert_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.tsx" do |content|
+        expect(content).to match(/interface HelloWorldProps/)
+        expect(content).to match(/React\.FC<HelloWorldProps>/)
+      end
+    end
+  end
+
   context "with helpful message" do
     let(:expected) do
       GeneratorMessages.format_info(GeneratorMessages.helpful_message_after_installation)
