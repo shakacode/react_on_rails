@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+
+# Run only after ./prod-assets
+NODE_ENV=production RAILS_ENV=production bundle exec rails s -p 3001
