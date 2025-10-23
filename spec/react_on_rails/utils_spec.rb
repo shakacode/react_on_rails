@@ -247,11 +247,23 @@ module ReactOnRails
               before do
                 # Mock Pro gem being available
                 allow(described_class).to receive(:react_on_rails_pro?).and_return(true)
-                stub_const("ReactOnRailsPro", Module.new)
+
+                # Create a mock Pro module with configuration method
+                pro_module = Module.new do
+                  def self.configuration
+                    @configuration
+                  end
+
+                  def self.configuration=(config)
+                    @configuration = config
+                  end
+                end
+                stub_const("ReactOnRailsPro", pro_module)
+
                 pro_config = double("ProConfiguration") # rubocop:disable RSpec/VerifiedDoubles
-                allow(ReactOnRailsPro).to receive(:configuration).and_return(pro_config)
                 allow(pro_config).to receive_messages(rsc_bundle_js_file: rsc_bundle_name,
                                                       react_server_client_manifest_file: nil)
+                ReactOnRailsPro.configuration = pro_config
               end
 
               context "with enforce_private_server_bundles=false" do
