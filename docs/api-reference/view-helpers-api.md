@@ -80,21 +80,6 @@ export default (props, _railsContext) => {
 
 ---
 
-### cached_react_component and cached_react_component_hash
-
-Fragment caching is a [React on Rails Pro](https://github.com/shakacode/react_on_rails/wiki) feature. The API is the same as the above, but for 2 differences:
-
-1. The `cache_key` takes the same parameters as any Rails `cache` view helper.
-1. The **props** are passed via a block so that evaluation of the props is not done unless the cache is broken. Suppose you put your props calculation into some method called `some_slow_method_that_returns_props`:
-
-```erb
-<%= cached_react_component("App", cache_key: [@user, @post], prerender: true) do
-  some_slow_method_that_returns_props
-end %>
-```
-
----
-
 ### rails_context
 
 You can call `rails_context` or `rails_context(server_side: true|false)` from your controller or view to see what values are in the Rails Context. Pass true or false depending on whether you want to see the server-side or the client-side `rails_context`. Typically, for computing cache keys, you should leave `server_side` as the default true. When calling this from a controller method, use `helpers.rails_context`.
@@ -129,6 +114,45 @@ Renderer functions are not meant to be used on the server since there's no DOM o
 - Currently, the only option you may pass is `replay_console` (boolean)
 
 This is a helper method that takes any JavaScript expression and returns the output from evaluating it. If you have more than one line that needs to be executed, wrap it in an IIFE. JS exceptions will be caught and console messages handled properly.
+
+---
+
+## Pro-Only View Helpers
+
+The following view helpers are available exclusively with [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro). These require a valid React on Rails Pro license and will not be available if the Pro gem is not installed or properly licensed.
+
+### cached_react_component and cached_react_component_hash
+
+Fragment caching helpers that cache React component rendering to improve performance. The API is the same as `react_component` and `react_component_hash`, but with these differences:
+
+1. The `cache_key` takes the same parameters as any Rails `cache` view helper.
+2. The **props** are passed via a block so that evaluation of the props is not done unless the cache is broken.
+
+Example usage:
+
+```erb
+<%= cached_react_component("App", cache_key: [@user, @post], prerender: true) do
+  some_slow_method_that_returns_props
+end %>
+```
+
+### stream_react_component
+
+Progressive server-side rendering using React 18+ streaming with `renderToPipeableStream`. This enables:
+- Faster Time to First Byte (TTFB)
+- Progressive page loading with Suspense boundaries
+- Better perceived performance
+
+See the [Streaming Server Rendering guide](../building-features/streaming-server-rendering.md) for usage details.
+
+### rsc_payload_react_component
+
+Renders React Server Component (RSC) payloads in NDJSON format for client-side consumption. Used in conjunction with RSC support to enable:
+- Reduced JavaScript bundle sizes
+- Server-side data fetching
+- Selective client-side hydration
+
+See the [React on Rails Pro Configuration](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/docs/configuration.md) for RSC setup.
 
 ---
 
