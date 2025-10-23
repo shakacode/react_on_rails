@@ -74,6 +74,7 @@ To migrate to React on Rails Pro:
 **Note:** If you're not using any of the Pro-only methods listed above, no changes are required.
 
 - **Pro-Specific Configurations Moved to Pro Gem**: The following React Server Components (RSC) configurations have been moved from `ReactOnRails.configure` to `ReactOnRailsPro.configure`:
+
   - `rsc_bundle_js_file` - Path to the RSC bundle file
   - `react_server_client_manifest_file` - Path to the React server client manifest
   - `react_client_manifest_file` - Path to the React client manifest
@@ -99,6 +100,7 @@ To migrate to React on Rails Pro:
   See the [React on Rails Pro Configuration docs](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/docs/configuration.md) for more details.
 
 - **Streaming View Helpers Moved to Pro Gem**: The following view helpers have been removed from the open-source gem and are now only available in React on Rails Pro:
+
   - `stream_react_component` - Progressive SSR using React 18+ streaming
   - `rsc_payload_react_component` - RSC payload rendering
 

@@ -139,6 +139,7 @@ end %>
 ### stream_react_component
 
 Progressive server-side rendering using React 18+ streaming with `renderToPipeableStream`. This enables:
+
 - Faster Time to First Byte (TTFB)
 - Progressive page loading with Suspense boundaries
 - Better perceived performance
@@ -148,6 +149,7 @@ See the [Streaming Server Rendering guide](../building-features/streaming-server
 ### rsc_payload_react_component
 
 Renders React Server Component (RSC) payloads in NDJSON format for client-side consumption. Used in conjunction with RSC support to enable:
+
 - Reduced JavaScript bundle sizes
 - Server-side data fetching
 - Selective client-side hydration
