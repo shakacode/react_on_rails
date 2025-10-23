@@ -5,6 +5,10 @@ require_relative "spec_helper"
 # rubocop:disable Metrics/ModuleLength
 module ReactOnRailsPro
   RSpec.describe Utils do
+    before do
+      allow(LicenseValidator).to receive(:validated_license_data!).and_return({})
+    end
+
     describe "cache helpers .bundle_hash and .bundle_file_name" do
       context "with file in manifest", :webpacker do
         before do
