@@ -234,8 +234,13 @@ module ReactOnRails
         stub_packer_source_path(component_name: components_directory,
                                 packer_source_path: packer_source_path)
         allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
-        allow(ReactOnRailsPro.configuration).to receive_messages(
-          enable_rsc_support: true
+        stub_const("ReactOnRailsPro::Utils", Class.new do
+          def self.rsc_support_enabled?
+            true
+          end
+        end)
+        allow(ReactOnRailsPro::Utils).to receive_messages(
+          rsc_support_enabled?: true
         )
       end
 
@@ -309,7 +314,7 @@ module ReactOnRails
 
       context "when RSC support is disabled" do
         before do
-          allow(ReactOnRailsPro.configuration).to receive(:enable_rsc_support).and_return(false)
+          allow(ReactOnRailsPro::Utils).to receive(:rsc_support_enabled?).and_return(false)
           described_class.instance.generate_packs_if_stale
         end
 
