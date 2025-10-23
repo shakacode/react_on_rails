@@ -4,7 +4,7 @@ import path from 'path';
 import fsPromises from 'fs/promises';
 import fs from 'fs';
 import fsExtra from 'fs-extra';
-import { buildVM, resetVM } from '../src/worker/vm';
+import { buildExecutionContext, resetVM } from '../src/worker/vm';
 import { buildConfig } from '../src/shared/configBuilder';
 
 export const mkdirAsync = fsPromises.mkdir;
@@ -58,13 +58,25 @@ export function vmSecondaryBundlePath(testName: string) {
 }
 
 export async function createVmBundle(testName: string) {
+  // Build config with module support before creating VM bundle
+  buildConfig({
+    bundlePath: bundlePath(testName),
+    supportModules: true,
+    stubTimers: false,
+  });
   await safeCopyFileAsync(getFixtureBundle(), vmBundlePath(testName));
-  return buildVM(vmBundlePath(testName));
+  await buildExecutionContext([vmBundlePath(testName)], /* buildVmsIfNeeded */ true);
 }
 
 export async function createSecondaryVmBundle(testName: string) {
+  // Build config with module support before creating VM bundle
+  buildConfig({
+    bundlePath: bundlePath(testName),
+    supportModules: true,
+    stubTimers: false,
+  });
   await safeCopyFileAsync(getFixtureSecondaryBundle(), vmSecondaryBundlePath(testName));
-  return buildVM(vmSecondaryBundlePath(testName));
+  await buildExecutionContext([vmSecondaryBundlePath(testName)], /* buildVmsIfNeeded */ true);
 }
 
 export function lockfilePath(testName: string) {
@@ -143,5 +155,51 @@ export function readRenderingRequest(projectName: string, commit: string, reques
   );
   return fs.readFileSync(path.resolve(__dirname, renderingRequestRelativePath), 'utf8');
 }
+
+/**
+ * Custom waitFor function that retries an expect statement until it passes or timeout is reached
+ * @param expectFn - Function containing Jest expect statements
+ * @param options - Configuration options
+ * @param options.timeout - Maximum time to wait in milliseconds (default: 1000)
+ * @param options.interval - Time between retries in milliseconds (default: 10)
+ * @param options.message - Custom error message when timeout is reached
+ */
+export const waitFor = async (
+  expectFn: () => void,
+  options: {
+    timeout?: number;
+    interval?: number;
+    message?: string;
+  } = {},
+): Promise<void> => {
+  const { timeout = 1000, interval = 10, message } = options;
+  const startTime = Date.now();
+  let lastError: Error | null = null;
+
+  while (Date.now() - startTime < timeout) {
+    try {
+      expectFn();
+      // If we get here, the expect passed, so we can return
+      return;
+    } catch (error) {
+      lastError = error as Error;
+      // Expect failed, continue retrying
+      if (Date.now() - startTime >= timeout) {
+        // Timeout reached, re-throw the last error
+        throw error;
+      }
+    }
+
+    // Wait before next retry
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, interval);
+    });
+  }
+
+  // Timeout reached, throw error with descriptive message
+  const defaultMessage = `Expect condition not met within ${timeout}ms`;
+  throw new Error(message || defaultMessage + (lastError ? `\nLast error: ${lastError.message}` : ''));
+};
 
 setConfig('helper');
