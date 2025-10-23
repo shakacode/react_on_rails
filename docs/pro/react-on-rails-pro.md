@@ -1,4 +1,4 @@
-## React on Rails Pro
+# React on Rails Pro
 
 Support React on Rails development [by becoming a Github sponsor](https://github.com/sponsors/shakacode) and get these benefits:
 

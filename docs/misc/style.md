@@ -33,7 +33,7 @@ Follow these style guidelines per the linter configuration. Basically, lint your
 - [Sass Guidelines](http://sass-guidelin.es/) by [Hugo Giraudel](http://hugogiraudel.com/)
 - [Github Front End Guidelines](http://primercss.io/guidelines/)
 
-# Git Usage
+## Git Usage
 
 - Follow a [GitHub flow](https://docs.github.com/en/get-started/using-github/github-flow) model where you branch off master for features.
 - Before merging a branch to master, rebase it on top of master, by using command like `git fetch; git checkout my-branch; git rebase -i origin/master`. Clean up your commit message at this point. Be super careful to communicate with anybody else working on this branch and do not do this when others have uncommitted changes. Ideally, your merge of your feature back to master should be one nice commit.

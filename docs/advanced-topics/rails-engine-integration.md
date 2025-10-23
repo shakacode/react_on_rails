@@ -1,3 +1,5 @@
+# Integrating React on Rails with Rails Engines
+
 ## In your engine
 
 - At the top of `config/initializers/react_on_rails.rb`
@@ -30,7 +32,7 @@ As far as solving the assets issue, `lib/tasks/assets.rake` in `react_on_rails` 
 
 Another solution would be to detach this rake task from the `rails assets:precompile` task. This can be done by adding `REACT_ON_RAILS_PRECOMPILE=false` to your environment. If you do so, then React assets will have to be bundled separately from `rails assets:precompile`.
 
-# Github Issues
+## Github Issues
 
 - [Integration with an engine #342](https://github.com/shakacode/react_on_rails/issues/342)
 - [Feature: target destination option for the install generator #459](https://github.com/shakacode/react_on_rails/issues/459)

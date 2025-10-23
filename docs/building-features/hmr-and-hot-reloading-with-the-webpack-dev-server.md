@@ -14,13 +14,13 @@ If you are **_not_** using server-side rendering (**_not_** using `prerender: tr
 then you can follow all the regular docs for using the `bin/shakapacker-dev-server`
 during development.
 
-# Server Side Rendering with the Default shakacode/shakapacker bin/shakapacker-dev-server
+## Server Side Rendering with the Default shakacode/shakapacker bin/shakapacker-dev-server
 
 If you are using server-side rendering, then you have a couple of options. The
 recommended technique is to have a different Webpack configuration for server
 rendering.
 
-## If you use the same Webpack setup for your server and client bundles
+### If you use the same Webpack setup for your server and client bundles
 
 If you do use the `webpack-dev-server` for prerendering, be sure to set the
 `config/initializers/react_on_rails.rb` setting of
@@ -40,9 +40,9 @@ If you don't configure these two to false, you'll see errors like:
 - `ReferenceError: window is not defined` (if `hmr` is true)
 - `TypeError: Cannot read property 'prototype' of undefined` (if `inline` is true)
 
-# Client-Side rendering with HMR using react-refresh-webpack-plugin
+## Client-Side rendering with HMR using react-refresh-webpack-plugin
 
-## Basic installation
+### Basic installation
 
 To enable the HMR functionality, you have to use `./bin/shakapacker-dev-server`
 

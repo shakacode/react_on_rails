@@ -1,4 +1,4 @@
-# Images
+# Configuring Images and Assets with Webpack
 
 1. leading slash necessary on the
    a. Option name for the file-loader and url-loader (todo reference)

@@ -4,7 +4,7 @@ _Also see the example repo of [React on Rails Tutorial With SSR, HMR fast refres
 
 ---
 
-_Updated for Ruby 2.7, Rails 7, React on Rails v13, and Shakapacker v7_
+_Updated for Ruby 3.0+, Rails 7, React on Rails v16, and Shakapacker v7_
 
 This tutorial guides you through setting up a new or existing Rails app with **React on Rails**, demonstrating Rails + React + Redux + Server Rendering.
 
@@ -22,7 +22,7 @@ By the time you read this, the latest may have changed. Be sure to check the ver
 - [https://rubygems.org/gems/react_on_rails](https://rubygems.org/gems/react_on_rails)
 - [https://www.npmjs.com/package/react-on-rails](https://www.npmjs.com/package/react-on-rails)
 
-# Table of Contents
+## Table of Contents
 
 - [Installation](#installation)
   - [Setting up your environment](#setting-up-your-environment)
@@ -33,34 +33,32 @@ By the time you read this, the latest may have changed. Be sure to check the ver
   - [Setting up your environment variables](#setting-up-your-environment-variables)
   - [Running the app](#running-the-app)
 - [HMR vs. React Hot Reloading](#hmr-vs-react-hot-reloading)
-- [Deploying to Heroku](#deploying-to-heroku)
-  - [Create Your Heroku App](#create-your-heroku-app)
-  - [Swap out sqlite for postgres](#swap-out-sqlite-for-postgres)
-- [Other features](#other-features)
+- [Deployment](#deployment)
+- [Going Further](#going-further)
   - [Turning on Server Rendering](#turning-on-server-rendering)
-  - [Moving from the Rails default `/app/javascript` to the recommended `/client` structure](#moving-from-the-rails-default-appjavascript-to-the-recommended-client-structure)
-  - [Using HMR with the shakapacker setup](#using-hmr-with-the-shakapacker-setup)
-  - [Custom IP & PORT setup (Cloud9 example)](#custom-ip--port-setup-cloud9-example)
-  - [RubyMine performance tip](#rubymine-performance-tip)
+  - [Optional Configuration](#optional-configuration)
+    - [Moving from the Rails default `/app/javascript` to the recommended `/client` structure](#moving-from-the-rails-default-appjavascript-to-the-recommended-client-structure)
+    - [Custom IP & PORT setup (Cloud9 example)](#custom-ip--port-setup-cloud9-example)
+    - [RubyMine performance tip](#rubymine-performance-tip)
 - [Conclusion](#conclusion)
 
-# Installation
+## Installation
 
-## Setting up your environment
+### Setting up your environment
 
 Trying out **React on Rails** is super easy, so long as you have the basic prerequisites.
 
 - **Ruby:** We support all active Ruby versions but recommend using the latest stable Ruby version. Solutions like [rvm](https://rvm.io) or [rbenv](https://github.com/rbenv/rbenv) make it easy to have multiple Ruby versions on your machine.
-- **Rails:** We support Rails 6 and later.
+- **Rails:** This tutorial targets Rails 7.0+. React on Rails supports Rails 6 and later, but some tutorial steps may differ for Rails 6.
 - **Nodejs:** We support all [active Node versions](https://github.com/nodejs/release#release-schedule) but recommend using the latest LTS release of Nodejs for the longest support. Older inactive node versions might still work but is not guaranteed. We also recommend using [nvm](https://github.com/nvm-sh/nvm/) to ease using different node versions in different projects.
 - **yarn:** We use [yarn classic](https://classic.yarnpkg.com/) as our node package manager.
 - You need to have either [Overmind](https://github.com/DarthSim/overmind) or [Foreman](https://rubygems.org/gems/foreman) as a process manager.
 
-## Create a new Ruby on Rails App
+### Create a new Ruby on Rails App
 
 Then we need to create a fresh Rails application as follows.
 
-First, be sure to run `rails -v` and check you are using Rails 5.1.3 or above. If you are using an older version of Rails, you'll need to install Webpacker with React per the instructions [here](https://github.com/rails/webpacker).
+First, be sure to run `rails -v` and check you are using Rails 7.0 or above for this tutorial.
 
 ```bash
 # For Rails 6.x
@@ -74,7 +72,7 @@ cd test-react-on-rails
 
 Note: You can use `--database=postgresql` option to use Postgresql for the database.
 
-## Add the Shakapacker and react_on_rails gems
+### Add the Shakapacker and react_on_rails gems
 
 We recommend using the latest version of these gems. Otherwise, specify the
 exact versions of both the gem and npm packages. In other words, don't use
@@ -88,7 +86,7 @@ bundle add shakapacker --strict
 Note: The latest released React On Rails version is considered stable. Please use the latest
 version to ensure you get all the security patches and the best support.
 
-## Run the Shakapacker generator
+### Run the Shakapacker generator
 
 ```bash
 bundle exec rails shakapacker:install
@@ -102,7 +100,7 @@ git commit -am "Initial commit"
 
 Alternatively, you can use `--ignore-warnings` in the next step.
 
-## Run the React on Rails Generator
+### Run the React on Rails Generator
 
 ```bash
 rails generate react_on_rails:install
@@ -112,14 +110,15 @@ You will be prompted to approve changes in certain files. Press `enter` to proce
 one by one or enter `a` to replace all configuration files required by the project.
 You can check the diffs before you commit to see what changed.
 
-Note, using `redux` is no longer recommended as the basic installer uses React Hooks.
-If you want the Redux install, run:
+**Note on Redux:** The basic installer uses React Hooks for state management. However, this tutorial demonstrates Redux integration (as used in the [live example](https://reactrails.com/)). To follow this tutorial with Redux, run:
 
 ```bash
 rails generate react_on_rails:install --redux
 ```
 
-## Setting up your environment variables
+If you prefer to use React Hooks instead of Redux, run the basic installer without the `--redux` flag.
+
+### Setting up your environment variables
 
 Add the following variable to your environment:
 
@@ -129,7 +128,7 @@ EXECJS_RUNTIME=Node
 
 Then run the server with one of the following options:
 
-## Running the app
+### Running the app
 
 ```bash
 ./bin/dev # For HMR
@@ -139,157 +138,42 @@ Then run the server with one of the following options:
 
 Visit [http://localhost:3000/hello_world](http://localhost:3000/hello_world) and see your **React On Rails** app running!
 
-# HMR vs. React Hot Reloading
+## HMR vs. React Hot Reloading
 
 First, check that the `hmr` and the `inline` options are `true` in your `config/shakapacker.yml` file.
 
-The basic setup will have HMR working with the default Shakapacker setup. The basic
-[HMR](https://webpack.js.org/concepts/hot-module-replacement/), without a special
-React setup, will cause a full page refresh each time you save a file.
+The basic setup will have HMR working with the default Shakapacker setup. When you run `./bin/dev` and change a JSX file, the browser will automatically refresh!
 
-# Deploying to Heroku
+The basic [HMR](https://webpack.js.org/concepts/hot-module-replacement/), without a special React setup, will cause a full page refresh each time you save a file.
 
-## Create Your Heroku App
+If you want to go further with HMR, take a look at these links:
 
-_Assuming you can log in to heroku.com and have logged into your shell for Heroku._
+- [webpack-dev-server](https://github.com/rails/webpacker/blob/5-x-stable/docs/webpack-dev-server.md)
+- [DevServer](https://webpack.js.org/configuration/dev-server/)
+- [Hot Module Replacement](https://webpack.js.org/concepts/hot-module-replacement/)
 
-1. Visit [https://dashboard.heroku.com/new](https://dashboard.heroku.com/new) and create an app, say named `my-name-react-on-rails`:
+React on Rails will automatically handle disabling server rendering if there is only one bundle file created by the Webpack development server by `shakapacker`.
 
-![06](https://cloud.githubusercontent.com/assets/20628911/17465014/1f29bf3c-5cf4-11e6-869f-4215987ae854.png)
+## Deployment
 
-Run this command that looks like this from your new Heroku app
+Now that you have React on Rails working locally, you're ready to deploy to production!
 
-```bash
-heroku git:remote -a my-name-react-on-rails
-```
+For detailed deployment instructions, see:
 
-Set heroku to use multiple buildpacks:
+- **[Heroku Deployment Guide](../deployment/heroku-deployment.md)** - Step-by-step Heroku deployment
+- **[General Deployment Guide](../deployment/deployment.md)** - Production deployment strategies for any platform
 
-```bash
-heroku buildpacks:set heroku/ruby
-heroku buildpacks:add --index 1 heroku/nodejs
-```
+These guides cover:
 
-## Swap out sqlite for postgres
+- Configuring buildpacks
+- Database setup (PostgreSQL)
+- Asset compilation
+- Environment variables
+- Troubleshooting common deployment issues
 
-Heroku requires your app to use Postgresql. If you have not set up your app
-with Postgresql, you need to change your app settings to use this database.
+## Going Further
 
-Run the following command (in Rails 6+):
-
-```bash
-rails db:system:change --to=postgresql
-```
-
-If for any reason you want to do this process manually, run these two commands:
-
-```bash
-bundle remove sqlite3
-bundle add pg
-```
-
-![07](https://cloud.githubusercontent.com/assets/20628911/17465015/1f2f4042-5cf4-11e6-8287-2fb077550809.png)
-
-Now replace your `database.yml` file with this (assuming your app name is "ror").
-
-```yml
-default: &default
-  adapter: postgresql
-  username:
-  password:
-  host: localhost
-
-development:
-  <<: *default
-  database: ror_development
-
-# Warning: The database defined as "test" will be erased and
-# re-generated from your development database when you run "rake".
-# Do not set this db to the same as development or production.
-test:
-  <<: *default
-  database: ror_test
-
-production:
-  <<: *default
-  database: ror_production
-```
-
-Then you need to set up Postgres so you can run locally:
-
-```bash
-rake db:setup
-rake db:migrate
-```
-
-![08](https://cloud.githubusercontent.com/assets/20628911/17465016/1f3559f0-5cf4-11e6-8ab4-c5572e4644a5.png)
-
-Optionally you can add this line to your `routes.rb`. That way, your root page will go to the Hello World page for React On Rails.
-
-```ruby
-root "hello_world#index"
-```
-
-![09](https://cloud.githubusercontent.com/assets/20628911/17465018/1f3b685e-5cf4-11e6-93f8-105fc48517d0.png)
-
-Next, configure your app for Puma, per the [instructions on Heroku](https://devcenter.heroku.com/articles/deploying-rails-applications-with-the-puma-web-server).
-
-Create `./Procfile` with the following content. This is what Heroku uses to start your app.
-
-```
-web: bundle exec puma -C config/puma.rb
-```
-
-Note, newer versions of Rails create this file automatically. However, the [docs on Heroku](https://devcenter.heroku.com/articles/deploying-rails-applications-with-the-puma-web-server#config) have something a bit different, so please make it conform to those docs. As of 2020-06-04, the docs looked like this:
-
-`config/puma.rb`
-
-```rb
-workers Integer(ENV['WEB_CONCURRENCY'] || 2)
-threads_count = Integer(ENV['RAILS_MAX_THREADS'] || 5)
-threads threads_count, threads_count
-
-preload_app!
-
-rackup      DefaultRackup
-port        ENV['PORT']     || 3000
-environment ENV['RACK_ENV'] || 'development'
-
-on_worker_boot do
-  # Worker specific setup for Rails 4.1+
-  # See: https://devcenter.heroku.com/articles/deploying-rails-applications-with-the-puma-web-server#on-worker-boot
-  ActiveRecord::Base.establish_connection
-end
-```
-
-Next, update your `package.json` to specify the version of yarn and node. Add this section:
-
-```json
-  "engines": {
-    "node": "16.19.0",
-    "yarn": "1.22.4"
-  },
-```
-
-Then after all changes are done don't forget to commit them with git and finally, you can push your app to Heroku!
-
-```bash
-git add -A
-git commit -m "Changes for Heroku"
-git push heroku master
-```
-
-Then run:
-
-```bash
-heroku open
-```
-
-and you will see your live app and you can share this URL with your friends. Congrats!
-
-# Other features
-
-## Turning on Server Rendering
+### Turning on Server Rendering
 
 You can turn on server rendering by simply changing the `prerender` option to `true`:
 
@@ -333,7 +217,9 @@ For more details on server rendering, see:
 - [Client vs. Server Rendering](../core-concepts/client-vs-server-rendering.md)
 - [React Server Rendering](../core-concepts/react-server-rendering.md)
 
-## Moving from the Rails default `/app/javascript` to the recommended `/client` structure
+### Optional Configuration
+
+#### Moving from the Rails default `/app/javascript` to the recommended `/client` structure
 
 ShakaCode recommends that you use `/client` for your client side app. This way a non-Rails, front-end developer can be at home just by opening up the `/client` directory.
 
@@ -349,21 +235,7 @@ mv app/javascript client
 source_path: client
 ```
 
-## Using HMR with the shakapacker setup
-
-Start the app using `overmind start -f Procfile.dev` or `foreman start -f Procfile.dev`.
-
-When you change and save a JSX file, the browser will automatically refresh!
-
-So you get some basics from HMR with no code changes. If you want to go further, take a look at these links:
-
-- [webpack-dev-server](https://github.com/rails/webpacker/blob/5-x-stable/docs/webpack-dev-server.md)
-- [DevServer](https://webpack.js.org/configuration/dev-server/)
-- [Hot Module Replacement](https://webpack.js.org/concepts/hot-module-replacement/)
-
-React on Rails will automatically handle disabling server rendering if there is only one bundle file created by the Webpack development server by `shakapcker`.
-
-## Custom IP & PORT setup (Cloud9 example)
+#### Custom IP & PORT setup (Cloud9 example)
 
 In case you are running some custom setup with different IP or PORT you should also edit Procfile.dev. For example, to be able to run on free Cloud9 IDE we are putting IP 0.0.0.0 and PORT 8080. The default generated file `Procfile.dev` uses `-p 3000`.
 
@@ -373,14 +245,14 @@ web: rails s -p 8080 -b 0.0.0.0
 
 Then visit https://your-shared-addr.c9users.io:8080/hello_world
 
-## RubyMine performance tip
+#### RubyMine performance tip
 
 It's super important to exclude certain directories from RubyMine or else it will slow to a crawl as it tries to parse all the npm files.
 
 - Generated files, per the settings in your `config/shakapacker.yml`, which default to `public/packs` and `public/packs-test`
 - `node_modules`
 
-# Conclusion
+## Conclusion
 
 - Browse the docs on [our documentation website](https://www.shakacode.com/react-on-rails/docs/)
 

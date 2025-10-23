@@ -234,7 +234,7 @@ RSpec.describe ReactOnRails::Dev::ProcessManager do
       expect { described_class.send(:show_process_manager_installation_help) }
         .to output(/DO NOT add foreman to your Gemfile/).to_stderr
       expect { described_class.send(:show_process_manager_installation_help) }
-        .to output(/foreman-issues\.md/).to_stderr
+        .to output(/Don't-Bundle-Foreman/).to_stderr
     end
   end
 end

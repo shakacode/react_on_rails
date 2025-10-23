@@ -1,3 +1,5 @@
+# React on Rails Configuration Options
+
 Here is the full set of config options. This file is `/config/initializers/react_on_rails.rb`
 
 First, you should have a `/config/shakapacker.yml` setup.
