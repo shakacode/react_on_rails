@@ -51,7 +51,7 @@ module ReactOnRailsPro
       return @rsc_support_enabled if defined?(@rsc_support_enabled)
 
       rorp_config = ReactOnRailsPro.configuration
-      @rsc_support_enabled = rorp_config.respond_to?(:enable_rsc_support) && rorp_config.enable_rsc_support
+      @rsc_support_enabled = rorp_config.respond_to?(:enable_rsc_support) && !!rorp_config.enable_rsc_support
     end
 
     # Validates the license and raises an exception if invalid.
