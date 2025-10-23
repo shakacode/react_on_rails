@@ -248,7 +248,7 @@ module ReactOnRails
                 # Mock Pro gem being available
                 allow(described_class).to receive(:react_on_rails_pro?).and_return(true)
                 stub_const("ReactOnRailsPro", Module.new)
-                pro_config = double("ProConfiguration")
+                pro_config = double("ProConfiguration") # rubocop:disable RSpec/VerifiedDoubles
                 allow(ReactOnRailsPro).to receive(:configuration).and_return(pro_config)
                 allow(pro_config).to receive_messages(rsc_bundle_js_file: rsc_bundle_name,
                                                       react_server_client_manifest_file: nil)
