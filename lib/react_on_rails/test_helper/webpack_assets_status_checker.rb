@@ -51,10 +51,14 @@ module ReactOnRails
         # Check if this is a Pro RSC manifest file
         if ReactOnRails::Utils.react_on_rails_pro?
           pro_config = ReactOnRailsPro.configuration
-          return ReactOnRailsPro::Utils.react_client_manifest_file_path if bundle_name == pro_config.react_client_manifest_file
-          return ReactOnRailsPro::Utils.react_server_client_manifest_file_path if bundle_name == pro_config.react_server_client_manifest_file
+          if bundle_name == pro_config.react_client_manifest_file
+            return ReactOnRailsPro::Utils.react_client_manifest_file_path
+          end
+          if bundle_name == pro_config.react_server_client_manifest_file
+            return ReactOnRailsPro::Utils.react_server_client_manifest_file_path
+          end
         end
-        
+
         ReactOnRails::Utils.bundle_js_file_path(bundle_name)
       end
 
