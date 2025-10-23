@@ -7,6 +7,7 @@
 # 1. The white spacing in this file matters!
 # 2. Keep all #{some_var} fully to the left so that all indentation is done evenly in that var
 require "react_on_rails/prerender_error"
+require "react_on_rails/smart_error"
 require "addressable/uri"
 require "react_on_rails/utils"
 require "react_on_rails/json_output"
@@ -638,14 +639,11 @@ module ReactOnRails
     end
 
     def raise_missing_autoloaded_bundle(react_component_name)
-      msg = <<~MSG
-        **ERROR** ReactOnRails: Component "#{react_component_name}" is configured as "auto_load_bundle: true"
-        but the generated component entrypoint, which should have been at #{generated_components_pack_path(react_component_name)},
-        is missing. You might want to check that this component is in a directory named "#{ReactOnRails.configuration.components_subdirectory}"
-        & that "bundle exec rake react_on_rails:generate_packs" has been run.
-      MSG
-
-      raise ReactOnRails::Error, msg
+      raise ReactOnRails::SmartError.new(
+        error_type: :missing_auto_loaded_bundle,
+        component_name: react_component_name,
+        expected_path: generated_components_pack_path(react_component_name)
+      )
     end
   end
 end
