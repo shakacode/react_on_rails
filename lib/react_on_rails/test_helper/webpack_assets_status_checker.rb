@@ -54,9 +54,9 @@ module ReactOnRails
             if ReactOnRails::Utils.react_on_rails_pro?
               pro_config = ReactOnRailsPro.configuration
               if bundle_name == pro_config.react_client_manifest_file
-                ReactOnRails::Utils.react_client_manifest_file_path
+                ReactOnRailsPro::Utils.react_client_manifest_file_path
               elsif bundle_name == pro_config.react_server_client_manifest_file
-                ReactOnRails::Utils.react_server_client_manifest_file_path
+                ReactOnRailsPro::Utils.react_server_client_manifest_file_path
               else
                 ReactOnRails::Utils.bundle_js_file_path(bundle_name)
               end

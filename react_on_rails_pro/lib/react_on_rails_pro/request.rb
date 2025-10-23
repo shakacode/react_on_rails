@@ -49,7 +49,7 @@ module ReactOnRailsPro
 
         # Add RSC bundle if enabled
         if ReactOnRailsPro.configuration.enable_rsc_support
-          rsc_bundle_path = ReactOnRails::Utils.rsc_bundle_js_file_path
+          rsc_bundle_path = ReactOnRailsPro::Utils.rsc_bundle_js_file_path
           unless File.exist?(rsc_bundle_path)
             raise ReactOnRailsPro::Error, "RSC bundle not found at #{rsc_bundle_path}. " \
                                           "Please build your bundles before uploading assets."
@@ -154,7 +154,7 @@ module ReactOnRailsPro
         if ReactOnRailsPro.configuration.enable_rsc_support
           add_bundle_to_form(
             form,
-            bundle_path: ReactOnRails::Utils.rsc_bundle_js_file_path,
+            bundle_path: ReactOnRailsPro::Utils.rsc_bundle_js_file_path,
             bundle_file_name: pool.rsc_renderer_bundle_file_name,
             bundle_hash: pool.rsc_bundle_hash,
             check_bundle: check_bundle
@@ -178,8 +178,8 @@ module ReactOnRailsPro
         assets_to_copy = (ReactOnRailsPro.configuration.assets_to_copy || []).dup
         # react_client_manifest and react_server_manifest files are needed to generate react server components payload
         if ReactOnRailsPro.configuration.enable_rsc_support
-          assets_to_copy << ReactOnRails::Utils.react_client_manifest_file_path
-          assets_to_copy << ReactOnRails::Utils.react_server_client_manifest_file_path
+          assets_to_copy << ReactOnRailsPro::Utils.react_client_manifest_file_path
+          assets_to_copy << ReactOnRailsPro::Utils.react_server_client_manifest_file_path
         end
 
         return form unless assets_to_copy.present?

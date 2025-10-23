@@ -78,13 +78,16 @@ module ReactOnRailsPro
               rsc_bundle_js_file_path = File.expand_path("./public/#{rsc_bundle_js_file}")
               allow(Shakapacker).to receive_message_chain("manifest.lookup!")
                 .and_return(rsc_bundle_js_file)
-              allow(ReactOnRails::Utils).to receive_messages(
-                server_bundle_js_file_path: rsc_bundle_js_file_path.gsub("rsc-", ""),
-                rsc_bundle_js_file_path: rsc_bundle_js_file_path
-              )
+              allow(ReactOnRails::Utils).to receive(:server_bundle_js_file_path)
+                .and_return(rsc_bundle_js_file_path.gsub("rsc-", ""))
+              allow(described_class).to receive(:rsc_bundle_js_file_path)
+                .and_return(rsc_bundle_js_file_path)
               allow(ReactOnRails.configuration)
-                .to receive_messages(server_bundle_js_file: "webpack-bundle.js",
-                                     rsc_bundle_js_file: "rsc-webpack-bundle.js")
+                .to receive(:server_bundle_js_file)
+                .and_return("webpack-bundle.js")
+              allow(ReactOnRailsPro.configuration)
+                .to receive(:rsc_bundle_js_file)
+                .and_return("rsc-webpack-bundle.js")
               allow(Digest::MD5).to receive(:file)
                 .with(rsc_bundle_js_file_path)
                 .and_return("barfoobarfoo")
