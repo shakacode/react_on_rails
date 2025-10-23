@@ -244,11 +244,19 @@ module ReactOnRails
               let(:public_path) { File.expand_path(File.join(packer_public_output_path, rsc_bundle_name)) }
               let(:ssr_generated_path) { File.expand_path(File.join("ssr-generated", rsc_bundle_name)) }
 
+              before do
+                # Mock Pro gem being available
+                allow(described_class).to receive(:react_on_rails_pro?).and_return(true)
+                stub_const("ReactOnRailsPro", Module.new)
+                pro_config = double("ProConfiguration")
+                allow(ReactOnRailsPro).to receive(:configuration).and_return(pro_config)
+                allow(pro_config).to receive_messages(rsc_bundle_js_file: rsc_bundle_name,
+                                                      react_server_client_manifest_file: nil)
+              end
+
               context "with enforce_private_server_bundles=false" do
                 before do
                   mock_missing_manifest_entry(rsc_bundle_name)
-                  allow(ReactOnRails).to receive_message_chain("configuration.rsc_bundle_js_file")
-                    .and_return(rsc_bundle_name)
                   allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
                     .and_return("ssr-generated")
                   allow(ReactOnRails).to receive_message_chain("configuration.enforce_private_server_bundles")
@@ -283,8 +291,6 @@ module ReactOnRails
               context "with enforce_private_server_bundles=true" do
                 before do
                   mock_missing_manifest_entry(rsc_bundle_name)
-                  allow(ReactOnRails).to receive_message_chain("configuration.rsc_bundle_js_file")
-                    .and_return(rsc_bundle_name)
                   allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
                     .and_return("ssr-generated")
                   allow(ReactOnRails).to receive_message_chain("configuration.enforce_private_server_bundles")
