@@ -238,7 +238,11 @@ module ReactOnRails
       raise(ReactOnRails::Error, compile_command_conflict_message) if ReactOnRails::PackerUtils.precompile?
 
       precompile_tasks = lambda {
-        Rake::Task["react_on_rails:generate_packs"].invoke
+        # Skip generate_packs if shakapacker has a precompile hook configured
+        unless ReactOnRails::PackerUtils.shakapacker_precompile_hook_configured?
+          Rake::Task["react_on_rails:generate_packs"].invoke
+        end
+
         Rake::Task["react_on_rails:assets:webpack"].invoke
 
         # VERSIONS is per the shakacode/shakapacker clean method definition.
