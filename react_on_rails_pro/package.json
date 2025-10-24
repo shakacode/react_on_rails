@@ -116,7 +116,7 @@
     "packages/node-renderer/dist"
   ],
   "scripts": {
-    "preinstall": "yarn run link-source && yalc add --link react-on-rails",
+    "preinstall": "node ./script/preinstall.js",
     "postinstall": "test -f post-yarn-install.local && ./post-yarn-install.local || true",
     "link-source": "cd ../packages/react-on-rails && yarn && yalc publish",
     "test": "nps test",
