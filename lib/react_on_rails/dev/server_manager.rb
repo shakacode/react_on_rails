@@ -243,7 +243,7 @@ module ReactOnRails
           <<~MODES
             #{Rainbow('🔥 HMR Development mode (default)').cyan.bold} - #{Rainbow('Procfile.dev').green}:
             #{Rainbow('•').yellow} #{Rainbow('Hot Module Replacement (HMR) enabled').white}
-            #{Rainbow('•').yellow} #{Rainbow('React on Rails pack generation before Procfile start').white}
+            #{Rainbow('•').yellow} #{Rainbow('React on Rails pack generation (via precompile hook or bin/dev)').white}
             #{Rainbow('•').yellow} #{Rainbow('Webpack dev server for fast recompilation').white}
             #{Rainbow('•').yellow} #{Rainbow('Source maps for debugging').white}
             #{Rainbow('•').yellow} #{Rainbow('May have Flash of Unstyled Content (FOUC)').white}
@@ -252,7 +252,7 @@ module ReactOnRails
 
             #{Rainbow('📦 Static development mode').cyan.bold} - #{Rainbow('Procfile.dev-static-assets').green}:
             #{Rainbow('•').yellow} #{Rainbow('No HMR (static assets with auto-recompilation)').white}
-            #{Rainbow('•').yellow} #{Rainbow('React on Rails pack generation before Procfile start').white}
+            #{Rainbow('•').yellow} #{Rainbow('React on Rails pack generation (via precompile hook or bin/dev)').white}
             #{Rainbow('•').yellow} #{Rainbow('Webpack watch mode for auto-recompilation').white}
             #{Rainbow('•').yellow} #{Rainbow('CSS extracted to separate files (no FOUC)').white}
             #{Rainbow('•').yellow} #{Rainbow('Development environment (faster builds than production)').white}
@@ -260,7 +260,7 @@ module ReactOnRails
             #{Rainbow('•').yellow} #{Rainbow('Access at:').white} #{Rainbow('http://localhost:3000/<route>').cyan.underline}
 
             #{Rainbow('🏭 Production-assets mode').cyan.bold} - #{Rainbow('Procfile.dev-prod-assets').green}:
-            #{Rainbow('•').yellow} #{Rainbow('React on Rails pack generation before Procfile start').white}
+            #{Rainbow('•').yellow} #{Rainbow('React on Rails pack generation (via precompile hook or assets:precompile)').white}
             #{Rainbow('•').yellow} #{Rainbow('Asset precompilation with NODE_ENV=production (webpack optimizations)').white}
             #{Rainbow('•').yellow} #{Rainbow('RAILS_ENV=development by default for assets:precompile (avoids credentials)').white}
             #{Rainbow('•').yellow} #{Rainbow('Use --rails-env=production for assets:precompile only (not server processes)').white}
@@ -276,16 +276,20 @@ module ReactOnRails
         def run_production_like(_verbose: false, route: nil, rails_env: nil)
           procfile = "Procfile.dev-prod-assets"
 
+          features = [
+            "Precompiling assets with production optimizations",
+            "Running Rails server on port 3001",
+            "No HMR (Hot Module Replacement)",
+            "CSS extracted to separate files (no FOUC)"
+          ]
+
+          # NOTE: Pack generation happens automatically during assets:precompile
+          # either via precompile hook or via the configuration.rb adjust_precompile_task
+
           print_procfile_info(procfile, route: route)
           print_server_info(
             "🏭 Starting production-like development server...",
-            [
-              "Generating React on Rails packs",
-              "Precompiling assets with production optimizations",
-              "Running Rails server on port 3001",
-              "No HMR (Hot Module Replacement)",
-              "CSS extracted to separate files (no FOUC)"
-            ],
+            features,
             3001,
             route: route
           )
@@ -404,15 +408,22 @@ module ReactOnRails
 
         def run_static_development(procfile, verbose: false, route: nil)
           print_procfile_info(procfile, route: route)
+
+          features = [
+            "Using shakapacker --watch (no HMR)",
+            "CSS extracted to separate files (no FOUC)",
+            "Development environment (source maps, faster builds)",
+            "Auto-recompiles on file changes"
+          ]
+
+          # Add pack generation info if not using precompile hook
+          unless ReactOnRails::PackerUtils.shakapacker_precompile_hook_configured?
+            features.unshift("Generating React on Rails packs")
+          end
+
           print_server_info(
             "⚡ Starting development server with static assets...",
-            [
-              "Generating React on Rails packs",
-              "Using shakapacker --watch (no HMR)",
-              "CSS extracted to separate files (no FOUC)",
-              "Development environment (source maps, faster builds)",
-              "Auto-recompiles on file changes"
-            ],
+            features,
             route: route
           )
 
