@@ -166,5 +166,18 @@ module ReactOnRails
 
       raise ReactOnRails::Error, msg
     end
+
+    # Check if shakapacker.yml has a precompile_hook configured
+    # This prevents react_on_rails from running generate_packs redundantly
+    def self.shakapacker_precompile_hook_configured?
+      return false unless defined?(::Shakapacker)
+
+      config_data = ::Shakapacker.config.send(:data)
+      hook = config_data[:precompile_hook]
+
+      hook.present?
+    rescue StandardError
+      false
+    end
   end
 end
