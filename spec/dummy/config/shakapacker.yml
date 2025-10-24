@@ -25,6 +25,11 @@ default: &default
   cache_manifest: false
   nested_entries: true
 
+  # Hook to run before webpack compilation (e.g., for generating dynamic entry points)
+  # SECURITY: Only reference trusted scripts within your project. The hook command will be
+  # validated to ensure it points to a file within the project root.
+  precompile_hook: 'bin/shakapacker-precompile-hook'
+
 development:
   <<: *default
   # Turn this to true if you want to use the rails/shakapacker check that the test
