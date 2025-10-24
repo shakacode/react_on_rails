@@ -1,0 +1,20 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Shakapacker precompile hook for React on Rails
+#
+# This script runs before webpack compilation to generate pack files
+# for auto-bundled components. It's called automatically by Shakapacker
+# when configured in config/shakapacker.yml:
+#   precompile_hook: 'bin/shakapacker-precompile-hook'
+
+require_relative "../config/environment"
+
+begin
+  puts Rainbow("🔄 Running React on Rails precompile hook...").cyan
+  ReactOnRails::PacksGenerator.instance.generate_packs_if_stale
+rescue StandardError => e
+  warn Rainbow("❌ Error in precompile hook: #{e.message}").red
+  warn e.backtrace.first(5).join("\n")
+  exit 1
+end
