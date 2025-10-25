@@ -4,63 +4,153 @@ module ReactOnRails
   # Responsible for checking versions of rubygem versus yarn node package
   # against each other at runtime.
   class VersionChecker
-    attr_reader :node_package_version
+    attr_reader :package_json_data
 
     # Semver uses - to separate pre-release, but RubyGems use .
     VERSION_PARTS_REGEX = /(\d+)\.(\d+)\.(\d+)(?:[-.]([0-9A-Za-z.-]+))?/
 
     def self.build
-      new(NodePackageVersion.build)
+      new(PackageJsonData.build)
     end
 
-    def initialize(node_package_version)
-      @node_package_version = node_package_version
+    def initialize(package_json_data)
+      @package_json_data = package_json_data
     end
 
     # For compatibility, the gem and the node package versions should always match,
     # unless the user really knows what they're doing. So we will give a
     # warning if they do not.
     def log_if_gem_and_node_package_versions_differ
-      return if node_package_version.raw.nil? || node_package_version.local_path_or_url?
-      return log_node_semver_version_warning if node_package_version.semver_wildcard?
+      errors = []
 
-      log_differing_versions_warning unless node_package_version.parts == gem_version_parts
+      # Check if both react-on-rails and react-on-rails-pro are present
+      check_for_both_packages(errors)
+
+      # Check react-on-rails or react-on-rails-pro package
+      check_main_package_version(errors)
+
+      # Check node-renderer package if Pro is present
+      check_node_renderer_version(errors) if package_json_data.pro_package?
+
+      # Handle errors based on environment
+      handle_errors(errors) if errors.any?
     end
 
     private
 
-    def common_error_msg
-      <<-MSG.strip_heredoc
-         Detected: #{node_package_version.raw}
-              gem: #{gem_version}
-         Ensure the installed version of the gem is the same as the version of
-         your installed Node package. Do not use >= or ~> in your Gemfile for react_on_rails.
-         Do not use ^, ~, or other non-exact versions in your package.json for react-on-rails.
-         Run `yarn add react-on-rails --exact` in the directory containing folder node_modules.
+    def check_for_both_packages(errors)
+      return unless package_json_data.both_packages?
+
+      msg = <<~MSG.strip_heredoc
+        React on Rails: Both 'react-on-rails' and 'react-on-rails-pro' packages are detected in package.json.
+        You only need to install 'react-on-rails-pro' package as it already includes 'react-on-rails' as a dependency.
+        Please remove 'react-on-rails' from your package.json dependencies.
+      MSG
+      errors << { type: :warning, message: msg }
+    end
+
+    def check_main_package_version(errors)
+      package_name = package_json_data.pro_package? ? "react-on-rails-pro" : "react-on-rails"
+      package_version_data = package_json_data.get_package_version(package_name)
+
+      return if package_version_data.nil?
+      return if package_version_data.local_path_or_url?
+
+      # Check for exact version (no semver wildcards)
+      if package_version_data.semver_wildcard?
+        msg = build_semver_wildcard_error(package_name, package_version_data.raw)
+        errors << { type: :error, message: msg }
+        return
+      end
+
+      # Check version match
+      expected_version = package_json_data.pro_package? ? pro_gem_version : gem_version
+      return if package_version_data.parts == version_parts(expected_version)
+
+      msg = build_version_mismatch_error(package_name, package_version_data.raw, expected_version)
+      errors << { type: :error, message: msg }
+    end
+
+    def check_node_renderer_version(errors)
+      node_renderer_data = package_json_data.get_package_version("@shakacode-tools/react-on-rails-pro-node-renderer")
+      return if node_renderer_data.nil?
+      return if node_renderer_data.local_path_or_url?
+
+      # Check for exact version
+      if node_renderer_data.semver_wildcard?
+        msg = build_semver_wildcard_error("@shakacode-tools/react-on-rails-pro-node-renderer",
+                                          node_renderer_data.raw)
+        errors << { type: :error, message: msg }
+        return
+      end
+
+      # Check version match with Pro gem
+      return if node_renderer_data.parts == version_parts(pro_gem_version)
+
+      msg = build_version_mismatch_error("@shakacode-tools/react-on-rails-pro-node-renderer",
+                                         node_renderer_data.raw, pro_gem_version)
+      errors << { type: :error, message: msg }
+    end
+
+    def build_semver_wildcard_error(package_name, raw_version)
+      <<~MSG.strip_heredoc
+        React on Rails: Package '#{package_name}' is using a non-exact version: #{raw_version}
+        For guaranteed compatibility, you must use exact versions (no ^, ~, >=, etc.).
+        Run: yarn add #{package_name}@#{expected_version_for_package(package_name)} --exact
       MSG
     end
 
-    def log_differing_versions_warning
-      msg = "**WARNING** ReactOnRails: ReactOnRails gem and Node package versions do not match\n#{common_error_msg}"
-      Rails.logger.warn(msg)
+    def build_version_mismatch_error(package_name, package_version, gem_version)
+      <<~MSG.strip_heredoc
+        React on Rails: Package '#{package_name}' version does not match the gem version.
+        Package version: #{package_version}
+        Gem version:     #{gem_version}
+        Run: yarn add #{package_name}@#{gem_version} --exact
+      MSG
     end
 
-    def log_node_semver_version_warning
-      msg = "**WARNING** ReactOnRails: Your Node package version for react-on-rails is not an exact version\n" \
-            "#{common_error_msg}"
-      Rails.logger.warn(msg)
+    def expected_version_for_package(package_name)
+      case package_name
+      when "react-on-rails"
+        gem_version
+      when "react-on-rails-pro", "@shakacode-tools/react-on-rails-pro-node-renderer"
+        pro_gem_version
+      end
+    end
+
+    def handle_errors(errors)
+      errors.each do |error|
+        if error[:type] == :warning
+          Rails.logger.warn("**WARNING** #{error[:message]}")
+        elsif development_or_test?
+          raise ReactOnRails::Error, error[:message]
+        else
+          Rails.logger.error("**ERROR** #{error[:message]}")
+        end
+      end
+    end
+
+    def development_or_test?
+      Rails.env.development? || Rails.env.test?
     end
 
     def gem_version
       ReactOnRails::VERSION
     end
 
-    def gem_version_parts
-      gem_version.match(VERSION_PARTS_REGEX)&.captures&.compact
+    def pro_gem_version
+      return nil unless defined?(ReactOnRailsPro)
+
+      ReactOnRailsPro::VERSION
     end
 
-    class NodePackageVersion
-      attr_reader :package_json
+    def version_parts(version)
+      version&.match(VERSION_PARTS_REGEX)&.captures&.compact
+    end
+
+    # Represents package.json data and provides methods to check for packages
+    class PackageJsonData
+      attr_reader :package_json_path
 
       def self.build
         new(package_json_path)
@@ -70,24 +160,61 @@ module ReactOnRails
         Rails.root.join(ReactOnRails.configuration.node_modules_location, "package.json")
       end
 
-      def initialize(package_json)
-        @package_json = package_json
+      def initialize(package_json_path)
+        @package_json_path = package_json_path
       end
 
-      def raw
-        return @raw if defined?(@raw)
+      def pro_package?
+        package_exists?("react-on-rails-pro")
+      end
 
-        if File.exist?(package_json)
-          parsed_package_contents = JSON.parse(package_json_contents)
-          if parsed_package_contents.key?("dependencies") &&
-             parsed_package_contents["dependencies"].key?("react-on-rails")
-            return @raw = parsed_package_contents["dependencies"]["react-on-rails"]
-          end
+      def main_package?
+        package_exists?("react-on-rails")
+      end
+
+      def both_packages?
+        main_package? && pro_package?
+      end
+
+      def get_package_version(package_name)
+        version = find_package_version(package_name)
+        return nil if version.nil?
+
+        PackageVersion.new(version)
+      end
+
+      private
+
+      def package_exists?(package_name)
+        !find_package_version(package_name).nil?
+      end
+
+      def find_package_version(package_name)
+        return nil unless File.exist?(package_json_path)
+
+        parsed = parsed_package_json
+        return nil unless parsed
+
+        parsed.dig("dependencies", package_name) || parsed.dig("devDependencies", package_name)
+      end
+
+      def parsed_package_json
+        return @parsed_package_json if defined?(@parsed_package_json)
+
+        @parsed_package_json = begin
+          JSON.parse(File.read(package_json_path))
+        rescue JSON::ParserError, Errno::ENOENT
+          nil
         end
-        msg = "No 'react-on-rails' entry in the dependencies of #{NodePackageVersion.package_json_path}, " \
-              "which is the expected location according to ReactOnRails.configuration.node_modules_location"
-        Rails.logger.warn(msg)
-        @raw = nil
+      end
+    end
+
+    # Represents a package version string from package.json
+    class PackageVersion
+      attr_reader :raw
+
+      def initialize(raw)
+        @raw = raw
       end
 
       def semver_wildcard?
@@ -113,12 +240,6 @@ module ReactOnRails
         end
 
         match.captures.compact
-      end
-
-      private
-
-      def package_json_contents
-        @package_json_contents ||= File.read(package_json)
       end
     end
   end

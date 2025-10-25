@@ -17,11 +17,11 @@ Gem::Specification.new do |s|
   s.metadata["rubygems_mfa_required"] = "true"
 
   s.files         = `git ls-files -z`.split("\x0")
-                                     .reject { |f|
+                                     .reject do |f|
                                        f.match(
                                          %r{^(test|spec|features|tmp|node_modules|packages|coverage|Gemfile.lock|lib/tasks)/}
                                        )
-                                     }
+                                     end
   s.bindir        = "exe"
   s.executables   = s.files.grep(%r{^exe/}) { |f| File.basename(f) }
   s.require_paths = ["lib"]
@@ -34,7 +34,8 @@ Gem::Specification.new do |s|
   s.add_runtime_dependency "httpx", "~> 1.5"
   s.add_runtime_dependency "jwt", "~> 2.7"
   s.add_runtime_dependency "rainbow"
-  s.add_runtime_dependency "react_on_rails", ">= 16.0.0"
+  # Pro gem requires exact version match with main gem for guaranteed compatibility
+  s.add_runtime_dependency "react_on_rails", ReactOnRailsPro::VERSION
   s.add_development_dependency "bundler"
   s.add_development_dependency "commonmarker"
   s.add_development_dependency "gem-release"
