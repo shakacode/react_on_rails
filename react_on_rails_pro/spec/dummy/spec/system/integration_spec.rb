@@ -411,6 +411,7 @@ shared_examples "streamed component tests" do |path, selector|
     expect(page).not_to have_text "Loading branch2"
     expect(page).not_to have_text(/Loading branch1 at level \d+/)
     expect(page).to have_text(/branch1 \(level \d+\)/, count: 5)
+    screenshot_and_save_page
   end
 
   it "doesn't hydrate status component if packs are not loaded" do

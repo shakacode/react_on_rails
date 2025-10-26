@@ -24,24 +24,26 @@ import {
     ],
   ] as const
 ).forEach(([pageName, test]) => {
-  test(`incremental rendering of page: ${pageName}`, async ({ matchPageSnapshot, sendRedisItemValue }) => {
-    await matchPageSnapshot('stage0');
+  [...Array(parseInt(process.env.REPEATS ?? '1')).keys()].forEach(index => {
+    test(`incremental rendering of page: ${pageName},no:${index}`, async ({ matchPageSnapshot, sendRedisItemValue }) => {
+      await matchPageSnapshot('stage0');
 
-    await sendRedisItemValue(0, 'Incremental Value1');
-    await matchPageSnapshot('stage1');
+      await sendRedisItemValue(0, 'Incremental Value1');
+      await matchPageSnapshot('stage1');
 
-    await sendRedisItemValue(3, 'Incremental Value4');
-    await matchPageSnapshot('stage2');
+      await sendRedisItemValue(3, 'Incremental Value4');
+      await matchPageSnapshot('stage2');
 
-    await sendRedisItemValue(1, 'Incremental Value2');
-    await matchPageSnapshot('stage3');
+      await sendRedisItemValue(1, 'Incremental Value2');
+      await matchPageSnapshot('stage3');
 
-    await sendRedisItemValue(2, 'Incremental Value3');
-    await matchPageSnapshot('stage4');
+      await sendRedisItemValue(2, 'Incremental Value3');
+      await matchPageSnapshot('stage4');
 
-    await sendRedisItemValue(4, 'Incremental Value5');
-    await matchPageSnapshot('stage5');
-  });
+      await sendRedisItemValue(4, 'Incremental Value5');
+      await matchPageSnapshot('stage5');
+    });
+  })
 
   test(`early hydration of page: ${pageName}`, async ({
     page,

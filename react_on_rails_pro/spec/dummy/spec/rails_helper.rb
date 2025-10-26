@@ -171,4 +171,5 @@ RSpec.configure do |config|
   Capybara.asset_host = "http://localhost:3000"
   Capybara.app_host = "http://localhost:3000"
   Capybara.run_server = false
+  Capybara.save_path = "tmp/capybara#{ENV['TEST_NO']}"
 end
