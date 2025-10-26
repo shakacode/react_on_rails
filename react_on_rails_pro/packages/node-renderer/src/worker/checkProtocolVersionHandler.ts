@@ -8,6 +8,11 @@ import log from '../shared/log';
 
 const NODE_ENV = process.env.NODE_ENV || 'production';
 
+// Cache to store version comparison results to avoid repeated normalization and logging
+// Key: gemVersion string, Value: boolean (true if matches, false if mismatch)
+// If key exists, it means we've already processed and logged this version (if needed)
+const versionCache = new Map<string, boolean>();
+
 /**
  * Normalizes a version string to handle differences between Ruby gem and NPM version formats.
  * Converts prerelease versions like "4.0.0.rc.1" to "4.0.0-rc.1" for consistent comparison.
@@ -53,17 +58,31 @@ Update either the renderer or the Rails server`,
 
   // Check gem version
   if (gemVersion) {
-    const normalizedGemVersion = normalizeVersion(gemVersion);
-    const normalizedPackageVersion = normalizeVersion(packageJson.version);
+    // Check cache first
+    let versionsMatch = versionCache.get(gemVersion);
+    let justCached = false;
 
-    if (normalizedGemVersion !== normalizedPackageVersion) {
+    // If not in cache, perform comparison and cache the result
+    if (versionsMatch === undefined) {
+      const normalizedGemVersion = normalizeVersion(gemVersion);
+      const normalizedPackageVersion = normalizeVersion(packageJson.version);
+      versionsMatch = normalizedGemVersion === normalizedPackageVersion;
+      versionCache.set(gemVersion, versionsMatch);
+      justCached = true;
+    }
+
+    // Handle version mismatch
+    if (!versionsMatch) {
       const isProduction = railsEnv === 'production' || NODE_ENV === 'production';
 
       const mismatchMessage = `React on Rails Pro gem version (${gemVersion}) does not match node renderer version (${packageJson.version}). Using exact matching versions is recommended for best compatibility.`;
 
       if (isProduction) {
         // In production, log a warning but allow the request to proceed
-        log.warn(mismatchMessage);
+        // Only log once per unique gemVersion (when it was first cached)
+        if (justCached) {
+          log.warn(mismatchMessage);
+        }
       } else {
         // In development, throw an error to prevent potential issues
         return {
