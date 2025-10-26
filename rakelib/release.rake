@@ -143,7 +143,7 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
     content["version"] = actual_npm_version
 
     # For react-on-rails-pro package, also update the react-on-rails dependency to exact version
-    if content["name"] == "packages/react-on-rails-pro"
+    if content["name"] == "react-on-rails-pro"
       content["dependencies"] ||= {}
       content["dependencies"]["react-on-rails"] = actual_npm_version
     end
