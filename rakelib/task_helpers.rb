@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+require "English"
+require "open3"
+
 module ReactOnRails
   module TaskHelpers
     # Returns the root folder of the react_on_rails gem
@@ -35,8 +38,76 @@ module ReactOnRails
     end
 
     def bundle_install_in(dir)
+      # Auto-detect and switch to required Ruby version if needed
+      switch_to_required_ruby_version(dir)
+
       unbundled_sh_in_dir(dir, "bundle install")
     end
+
+    private
+
+    # Detects the required Ruby version from Bundler and switches to it if needed
+    def switch_to_required_ruby_version(dir)
+      required_version = detect_bundler_ruby_version(dir)
+      return unless required_version
+
+      current_version = RUBY_VERSION
+      return if versions_match?(current_version, required_version)
+
+      puts "  Switching Ruby version: #{current_version} → #{required_version}"
+      switch_ruby_version(required_version)
+    end
+
+    # Detects the required Ruby version using Bundler
+    def detect_bundler_ruby_version(dir)
+      stdout, stderr, status = Open3.capture3("bundle platform --ruby", chdir: dir)
+
+      unless status.success?
+        puts "  ⚠️  Failed to detect Ruby version in #{dir}"
+        puts "  Error: #{stderr.strip}" unless stderr.strip.empty?
+        return nil
+      end
+
+      # Parse "ruby 3.3.7" or "ruby 3.3.7-rc1" or "ruby 3.4.0-preview1"
+      # Regex matches: digits.dots followed by optional -prerelease
+      match = stdout.strip.match(/ruby\s+([\d.]+(?:-[a-zA-Z0-9.]+)?)/)
+      match ? match[1] : nil
+    rescue StandardError => e
+      puts "  ⚠️  Error detecting Ruby version: #{e.message}"
+      nil
+    end
+
+    # Checks if two Ruby versions match
+    def versions_match?(current, required)
+      # Require exact match since Bundler enforces exact version requirements
+      current == required
+    end
+
+    # Switches to the specified Ruby version using the configured version manager
+    def switch_ruby_version(version)
+      version_manager = ENV.fetch("RUBY_VERSION_MANAGER", "rvm")
+
+      case version_manager
+      when "rvm"
+        sh "rvm use #{version}"
+      when "rbenv"
+        sh "rbenv shell #{version}"
+      when "asdf"
+        sh "asdf shell ruby #{version}"
+      else
+        # TODO: Support chruby if possible
+        puts "  ⚠️  Unknown RUBY_VERSION_MANAGER: #{version_manager}"
+        puts "  Supported values: rvm, rbenv, asdf"
+        puts "  Note: chruby is not supported due to shell function limitations"
+        raise "Ruby version #{version} required. Current: #{RUBY_VERSION}"
+      end
+    rescue StandardError => e
+      puts "  ⚠️  Failed to switch Ruby version: #{e.message}"
+      puts "  Please manually switch to Ruby #{version} and try again"
+      raise
+    end
+
+    public
 
     def bundle_install_in_no_turbolinks(dir)
       sh_in_dir(dir, "DISABLE_TURBOLINKS=TRUE bundle install")
