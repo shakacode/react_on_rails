@@ -86,8 +86,8 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
   # Delete any react_on_rails_pro.gemspec except the one in react_on_rails_pro directory
   sh_in_dir(gem_root, "find . -mindepth 3 -name 'react_on_rails_pro.gemspec' -delete")
 
-  # Pull latest changes (skip in dry-run mode)
-  sh_in_dir(gem_root, "git pull --rebase") unless is_dry_run
+  # Pull latest changes (skip in dry-run mode or when skip_push is set)
+  sh_in_dir(gem_root, "git pull --rebase") unless is_dry_run || skip_push
 
   # Determine if version_input is semver keyword or explicit version
   semver_keywords = %w[patch minor major]
