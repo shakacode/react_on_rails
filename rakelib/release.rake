@@ -122,8 +122,8 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
   pro_version_content = File.read(pro_version_file)
   # We use gsub instead of `gem bump` here because the git tree is already dirty
   # from bumping the core gem version above, and `gem bump` fails with uncommitted changes
-  # Replace only the VERSION line, keeping PROTOCOL_VERSION and all formatting intact
-  pro_version_content.gsub!(/VERSION = ".+"/, "VERSION = \"#{actual_gem_version}\"")
+  # Use word boundary \b to match only VERSION, not PROTOCOL_VERSION
+  pro_version_content.gsub!(/\bVERSION = ".+"/, "VERSION = \"#{actual_gem_version}\"")
   File.write(pro_version_file, pro_version_content)
   puts "  Updated #{pro_version_file}"
   puts "  Note: react_on_rails_pro.gemspec will automatically use ReactOnRails::VERSION"
