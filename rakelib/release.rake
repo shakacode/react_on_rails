@@ -15,29 +15,38 @@ end
 
 # rubocop:disable Metrics/BlockLength
 
-desc("Releases the gem and both NPM packages (react-on-rails and react-on-rails-pro).
+desc("Unified release script for all React on Rails packages and gems.
 
-IMPORTANT: the gem version must be in valid rubygem format (no dashes).
-It will be automatically converted to valid npm semver by the rake task
-for the node package versions. This only makes a difference for pre-release
-versions such as `3.0.0.beta.1` (npm version would be `3.0.0-beta.1`).
+IMPORTANT: This script uses UNIFIED VERSIONING - all packages (core + pro) will be
+updated to the same version number and released together.
 
-This task depends on the gem-release ruby gem which is installed via `bundle install`.
+Version argument can be:
+  - Semver bump type: 'patch', 'minor', or 'major' (e.g., 16.1.1 → 16.1.2, 16.2.0, or 17.0.0)
+  - Explicit version: '16.2.0' (in rubygem format, no dashes)
 
-1st argument: The new version in rubygem format (no dashes). Pass no argument to
-              automatically perform a patch version bump.
-2nd argument: Perform a dry run by passing 'true' as a second argument.
-3rd argument: Use Verdaccio local registry by passing 'verdaccio' as a third argument.
-              Requires Verdaccio server running on http://localhost:4873/
-4th argument: Skip pushing to remote by passing 'skip_push' as a fourth argument.
-              Useful for testing the release process locally.
+This will update and release:
+  PUBLIC (npmjs.org + rubygems.org):
+    - react-on-rails NPM package
+    - react-on-rails-pro NPM package
+    - react_on_rails RubyGem
+  PRIVATE (GitHub Packages):
+    - @shakacode-tools/react-on-rails-pro-node-renderer NPM package
+    - react_on_rails_pro RubyGem
+
+1st argument: Version (patch/minor/major OR explicit version like 16.2.0)
+2nd argument: Dry run (true/false, default: false)
+3rd argument: Registry (verdaccio/npm, default: npm)
+4th argument: Skip push (skip_push to skip, default: push)
 
 Examples:
-  rake release[16.2.0]                          # Release to production
-  rake release[16.2.0,true]                     # Dry run
-  rake release[16.2.0,false,verdaccio]          # Test release to Verdaccio
+  rake release[patch]                           # Bump patch version (16.1.1 → 16.1.2)
+  rake release[minor]                           # Bump minor version (16.1.1 → 16.2.0)
+  rake release[major]                           # Bump major version (16.1.1 → 17.0.0)
+  rake release[16.2.0]                          # Set explicit version
+  rake release[patch,true]                      # Dry run
+  rake release[16.2.0,false,verdaccio]          # Test with Verdaccio
   rake release[16.2.0,false,npm,skip_push]      # Release without pushing to remote")
-task :release, %i[gem_version dry_run registry skip_push] do |_t, args|
+task :release, %i[version dry_run registry skip_push] do |_t, args|
   include ReactOnRails::TaskHelpers
 
   # Check if there are uncommitted changes
@@ -63,20 +72,37 @@ task :release, %i[gem_version dry_run registry skip_push] do |_t, args|
 
   skip_push = skip_push_value == "skip_push"
 
-  gem_version = args_hash.fetch(:gem_version, "")
+  version_input = args_hash.fetch(:version, "")
+
+  if version_input.strip.empty?
+    raise ArgumentError,
+          "Version argument is required. Use 'patch', 'minor', 'major', or explicit version (e.g., '16.2.0')"
+  end
 
   # Having the examples prevents publishing
   Rake::Task["shakapacker_examples:clobber"].invoke
   # Delete any react_on_rails.gemspec except the root one
   sh_in_dir(gem_root, "find . -mindepth 2 -name 'react_on_rails.gemspec' -delete")
+  # Delete any react_on_rails_pro.gemspec except the one in react_on_rails_pro directory
+  sh_in_dir(gem_root, "find . -mindepth 3 -name 'react_on_rails_pro.gemspec' -delete")
 
-  # Pull latest changes
-  sh_in_dir(gem_root, "git pull --rebase")
+  # Pull latest changes (skip in dry-run mode)
+  sh_in_dir(gem_root, "git pull --rebase") unless is_dry_run
 
-  # Bump gem version using gem-release
-  sh_in_dir(gem_root, "gem bump --no-commit #{%(--version #{gem_version}) unless gem_version.strip.empty?}")
+  # Determine if version_input is semver keyword or explicit version
+  semver_keywords = %w[patch minor major]
+  is_semver_bump = semver_keywords.include?(version_input.strip.downcase)
 
-  # Read the actual version that was set
+  if is_semver_bump
+    # Use gem bump with semver keyword
+    puts "Bumping #{version_input} version for react_on_rails gem..."
+  else
+    # Use explicit version
+    puts "Setting react_on_rails gem version to #{version_input}..."
+  end
+  sh_in_dir(gem_root, "gem bump --no-commit --version #{version_input}")
+
+  # Read the actual version that was set for react_on_rails
   actual_gem_version = begin
     version_file = File.join(gem_root, "lib", "react_on_rails", "version.rb")
     version_content = File.read(version_file)
@@ -85,21 +111,39 @@ task :release, %i[gem_version dry_run registry skip_push] do |_t, args|
 
   actual_npm_version = ReactOnRails::VersionSyntaxConverter.new.rubygem_to_npm(actual_gem_version)
 
-  puts "Updating package.json files to version #{actual_npm_version}..."
+  puts "\n#{'=' * 80}"
+  puts "UNIFIED VERSION: #{actual_gem_version} (gem) / #{actual_npm_version} (npm)"
+  puts "=" * 80
+
+  # Update react_on_rails_pro gem version to match
+  puts "\nUpdating react_on_rails_pro gem version to #{actual_gem_version}..."
+  pro_gem_root = File.join(gem_root, "react_on_rails_pro")
+  pro_version_file = File.join(pro_gem_root, "lib", "react_on_rails_pro", "version.rb")
+  pro_version_content = File.read(pro_version_file)
+  # We use gsub instead of `gem bump` here because the git tree is already dirty
+  # from bumping the core gem version above, and `gem bump` fails with uncommitted changes
+  # Replace only the VERSION line, keeping PROTOCOL_VERSION and all formatting intact
+  pro_version_content.gsub!(/VERSION = ".+"/, "VERSION = \"#{actual_gem_version}\"")
+  File.write(pro_version_file, pro_version_content)
+  puts "  Updated #{pro_version_file}"
+  puts "  Note: react_on_rails_pro.gemspec will automatically use ReactOnRails::VERSION"
+
+  puts "\nUpdating package.json files to version #{actual_npm_version}..."
 
   # Update all package.json files
   package_json_files = [
     File.join(gem_root, "package.json"),
     File.join(gem_root, "packages", "react-on-rails", "package.json"),
-    File.join(gem_root, "packages", "react-on-rails-pro", "package.json")
+    File.join(gem_root, "packages", "react-on-rails-pro", "package.json"),
+    File.join(gem_root, "react_on_rails_pro", "package.json")
   ]
 
   package_json_files.each do |file|
     content = JSON.parse(File.read(file))
     content["version"] = actual_npm_version
 
-    # For react-on-rails-pro, also update the react-on-rails dependency
-    if file.include?("react-on-rails-pro")
+    # For react-on-rails-pro package, also update the react-on-rails dependency to exact version
+    if content["name"] == "packages/react-on-rails-pro"
       content["dependencies"] ||= {}
       content["dependencies"]["react-on-rails"] = actual_npm_version
     end
@@ -111,6 +155,11 @@ task :release, %i[gem_version dry_run registry skip_push] do |_t, args|
   bundle_install_in(gem_root)
   # Update dummy app's Gemfile.lock
   bundle_install_in(dummy_app_dir)
+  # Update pro dummy app's Gemfile.lock
+  pro_dummy_app_dir = File.join(gem_root, "react_on_rails_pro", "spec", "dummy")
+  bundle_install_in(pro_dummy_app_dir) if Dir.exist?(pro_dummy_app_dir)
+  # Update pro root Gemfile.lock
+  bundle_install_in(pro_gem_root)
 
   # Prepare NPM registry configuration
   npm_registry_url = use_verdaccio ? "http://localhost:4873/" : "https://registry.npmjs.org/"
@@ -143,7 +192,7 @@ task :release, %i[gem_version dry_run registry skip_push] do |_t, args|
     end
 
     puts "\n#{'=' * 80}"
-    puts "Publishing NPM packages to #{use_verdaccio ? 'Verdaccio (local)' : 'npmjs.org'}..."
+    puts "Publishing PUBLIC packages to #{use_verdaccio ? 'Verdaccio (local)' : 'npmjs.org'}..."
     puts "=" * 80
 
     # Publish react-on-rails NPM package
@@ -157,17 +206,47 @@ task :release, %i[gem_version dry_run registry skip_push] do |_t, args|
     sh_in_dir(gem_root,
               "yarn workspace react-on-rails-pro publish --new-version #{actual_npm_version} #{npm_publish_args}")
 
+    # Publish node-renderer NPM package (to Verdaccio or GitHub Packages depending on mode)
+    puts "\n#{'=' * 80}"
     if use_verdaccio
-      puts "Skipping Ruby gem publication (Verdaccio mode)"
-      puts "=" * 80
+      puts "Publishing node-renderer to Verdaccio (local)..."
+    else
+      puts "Publishing PRIVATE node-renderer to GitHub Packages..."
+    end
+    puts "=" * 80
+
+    # Publish react-on-rails-pro-node-renderer NPM package
+    node_renderer_registry = if use_verdaccio
+                               "Verdaccio (http://localhost:4873/)"
+                             else
+                               "GitHub Packages"
+                             end
+    node_renderer_name = "@shakacode-tools/react-on-rails-pro-node-renderer"
+    puts "\nPublishing #{node_renderer_name}@#{actual_npm_version} to #{node_renderer_registry}..."
+    puts "Ensure you're authenticated with GitHub Packages (see ~/.npmrc)" unless use_verdaccio
+    sh_in_dir(pro_gem_root,
+              "yarn publish --new-version #{actual_npm_version} --no-git-tag-version #{npm_publish_args}")
+
+    if use_verdaccio
+      puts "\nSkipping Ruby gem publication (Verdaccio is NPM-only)"
     else
       puts "\n#{'=' * 80}"
-      puts "Publishing Ruby gem..."
+      puts "Publishing PUBLIC Ruby gem..."
       puts "=" * 80
 
-      # Publish Ruby gem
+      # Publish react_on_rails Ruby gem
       puts "\nCarefully add your OTP for Rubygems when prompted."
       sh_in_dir(gem_root, "gem release")
+
+      puts "\n#{'=' * 80}"
+      puts "Publishing PRIVATE Ruby gem to GitHub Packages..."
+      puts "=" * 80
+
+      # Publish react_on_rails_pro Ruby gem to GitHub Packages
+      puts "\nPublishing react_on_rails_pro gem to GitHub Packages..."
+      puts "Ensure you have GitHub token in ~/.gem/credentials"
+      sh_in_dir(pro_gem_root,
+                "gem release --key github --host https://rubygems.pkg.github.com/shakacode-tools")
     end
   end
 
@@ -183,12 +262,16 @@ task :release, %i[gem_version dry_run registry skip_push] do |_t, args|
     puts "=" * 80
     puts "Version would be bumped to: #{actual_gem_version} (gem) / #{actual_npm_version} (npm)"
     puts "NPM Registry: #{npm_registry_note}"
-    puts "Files that would be updated:"
+    puts "\nFiles that would be updated:"
     puts "  - lib/react_on_rails/version.rb"
+    puts "  - react_on_rails_pro/lib/react_on_rails_pro/version.rb"
     puts "  - package.json (root)"
     puts "  - packages/react-on-rails/package.json"
     puts "  - packages/react-on-rails-pro/package.json (version + dependency)"
-    puts "  - spec/dummy/Gemfile.lock"
+    puts "  - react_on_rails_pro/package.json (node-renderer)"
+    puts "  - Gemfile.lock files (root, dummy apps, pro)"
+    puts "\nAuto-synced (no write needed):"
+    puts "  - react_on_rails_pro/react_on_rails_pro.gemspec (uses ReactOnRails::VERSION)"
     registry_arg = use_verdaccio ? ",false,verdaccio" : ""
     puts "\nTo actually release, run: rake release[#{actual_gem_version}#{registry_arg}]"
   else
@@ -201,9 +284,14 @@ task :release, %i[gem_version dry_run registry skip_push] do |_t, args|
       Published to #{npm_registry_note}:
         - react-on-rails@#{actual_npm_version}
         - react-on-rails-pro@#{actual_npm_version}
+        - @shakacode-tools/react-on-rails-pro-node-renderer@#{actual_npm_version}
     MSG
 
-    msg += "    - react_on_rails #{actual_gem_version} (RubyGems)\n" unless use_verdaccio
+    unless use_verdaccio
+      msg += "\n  Ruby Gems:\n"
+      msg += "    - react_on_rails #{actual_gem_version} (RubyGems.org)\n"
+      msg += "    - react_on_rails_pro #{actual_gem_version} (GitHub Packages)\n"
+    end
 
     if skip_push
       msg += <<~SKIP_PUSH
@@ -215,26 +303,30 @@ task :release, %i[gem_version dry_run registry skip_push] do |_t, args|
       SKIP_PUSH
     end
 
-    if use_verdaccio
-      msg += <<~VERDACCIO
+    msg += if use_verdaccio
+             <<~VERDACCIO
 
-        Verdaccio test packages published successfully!
+               Verdaccio test packages published successfully!
 
-        To test installation:
-          npm install --registry http://localhost:4873/ react-on-rails@#{actual_npm_version}
-          npm install --registry http://localhost:4873/ react-on-rails-pro@#{actual_npm_version}
+               To test installation:
+                 npm install --registry http://localhost:4873/ react-on-rails@#{actual_npm_version}
+                 npm install --registry http://localhost:4873/ react-on-rails-pro@#{actual_npm_version}
+                 npm install --registry http://localhost:4873/ @shakacode-tools/react-on-rails-pro-node-renderer@#{actual_npm_version}
 
-      VERDACCIO
-    else
-      msg += <<~PRODUCTION
+               Note: Ruby gems were not published (Verdaccio is NPM-only)
 
-        Next steps:
-          1. Update CHANGELOG.md: bundle exec rake update_changelog
-          3. Commit CHANGELOG: cd #{gem_root} && git commit -a -m 'Update CHANGELOG.md and spec/dummy Gemfile.lock'
-          4. Push changes: git push
+             VERDACCIO
+           else
+             <<~PRODUCTION
 
-      PRODUCTION
-    end
+               Next steps:
+                 1. Update CHANGELOG.md: bundle exec rake update_changelog
+                 2. Update pro CHANGELOG.md: cd react_on_rails_pro && bundle exec rake update_changelog
+                 3. Commit CHANGELOGs: git commit -a -m 'Update CHANGELOG.md files'
+                 4. Push changes: git push
+
+             PRODUCTION
+           end
 
     puts msg
   end

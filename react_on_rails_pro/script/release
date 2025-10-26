@@ -1,3 +1,15 @@
 #!/bin/bash
 
-echo "See `rake -D release`"
+echo "⚠️  DEPRECATED: This script has been moved to the repository root."
+echo ""
+echo "Please use the unified release script from the root directory:"
+echo "  cd .. && rake -D release"
+echo ""
+echo "Or run: cd .. && rake release[VERSION]"
+echo ""
+echo "Examples:"
+echo "  cd .. && rake release[patch]         # Bump patch version"
+echo "  cd .. && rake release[minor]         # Bump minor version"
+echo "  cd .. && rake release[16.2.0]        # Set explicit version"
+echo "  cd .. && rake release[patch,true]    # Dry run"
+echo ""
