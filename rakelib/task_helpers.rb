@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "English"
-require "open3"
 
 module ReactOnRails
   module TaskHelpers
@@ -39,10 +38,8 @@ module ReactOnRails
 
     def bundle_install_in(dir)
       required_version = detect_bundler_ruby_version(dir)
-      puts "  Detected Ruby version from Bundler: #{required_version}"
-      puts "  Current Ruby version: #{RUBY_VERSION}"
 
-      if required_version && RUBY_VERSION != required_version
+      if required_version && required_version != RUBY_VERSION
         puts "  Switching Ruby version: #{RUBY_VERSION} → #{required_version}"
         # Run version switch and bundle install in the same shell context
         bundle_install_with_ruby_version(dir, required_version)
@@ -56,7 +53,6 @@ module ReactOnRails
     # Runs bundle install with the specified Ruby version in the same shell context
     def bundle_install_with_ruby_version(dir, version)
       version_manager = ENV.fetch("RUBY_VERSION_MANAGER", "rvm")
-      puts "  Using RUBY_VERSION_MANAGER: #{version_manager}"
 
       command = case version_manager
                 when "rvm"
@@ -72,7 +68,6 @@ module ReactOnRails
                   raise "Ruby version #{version} required. Current: #{RUBY_VERSION}"
                 end
 
-      puts "  Running: #{command}"
       unbundled_sh_in_dir(dir, command)
     rescue StandardError => e
       puts "  ⚠️  Failed to switch Ruby version and run bundle install: #{e.message}"
@@ -82,18 +77,26 @@ module ReactOnRails
 
     # Detects the required Ruby version using Bundler
     def detect_bundler_ruby_version(dir)
-      stdout, stderr, status = Open3.capture3("bundle platform --ruby", chdir: dir)
-      puts "  result: #{stdout.strip}, #{stderr.strip}, status: #{status.exitstatus}"
+      output = nil
+      exit_status = nil
 
-      unless status.success?
+      # Run in unbundled environment to avoid conflicts with parent Bundler context
+      Bundler.with_unbundled_env do
+        Dir.chdir(dir) do
+          output = `bundle platform --ruby 2>&1`
+          exit_status = $CHILD_STATUS.exitstatus
+        end
+      end
+
+      unless exit_status == 0
         puts "  ⚠️  Failed to detect Ruby version in #{dir}"
-        puts "  Error: #{stderr.strip}" unless stderr.strip.empty?
+        puts "  Error: #{output.strip}" unless output.strip.empty?
         return nil
       end
 
       # Parse "ruby 3.3.7" or "ruby 3.3.7-rc1" or "ruby 3.4.0-preview1"
       # Regex matches: digits.dots followed by optional -prerelease
-      match = stdout.strip.match(/ruby\s+([\d.]+(?:-[a-zA-Z0-9.]+)?)/)
+      match = output.strip.match(/ruby\s+([\d.]+(?:-[a-zA-Z0-9.]+)?)/)
       match ? match[1] : nil
     rescue StandardError => e
       puts "  ⚠️  Error detecting Ruby version: #{e.message}"
