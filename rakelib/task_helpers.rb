@@ -88,7 +88,7 @@ module ReactOnRails
         end
       end
 
-      unless exit_status == 0
+      unless exit_status.zero?
         puts "  ⚠️  Failed to detect Ruby version in #{dir}"
         puts "  Error: #{output.strip}" unless output.strip.empty?
         return nil

@@ -19,13 +19,16 @@ rake release[version,dry_run,registry,skip_push]
 **Arguments:**
 
 1. **`version`** (required): Version bump type or explicit version
+
    - Bump types: `patch`, `minor`, `major`
    - Explicit: `16.2.0` (rubygem format, no dashes)
 
 2. **`dry_run`** (optional): `true` to preview changes without releasing
+
    - Default: `false`
 
 3. **`registry`** (optional): Publishing registry for testing
+
    - `verdaccio`: Publish all NPM packages to local Verdaccio (skips RubyGems)
    - `npm`: Normal release to npmjs.org + rubygems.org (default)
 
@@ -50,19 +53,19 @@ rake release[patch,false,npm,skip_push]      # Release but don't push to GitHub
 The release task publishes 5 packages with unified versioning:
 
 **PUBLIC (npmjs.org + rubygems.org):**
+
 1. **react-on-rails** - NPM package
 2. **react-on-rails-pro** - NPM package
 3. **react_on_rails** - RubyGem
 
-**PRIVATE (GitHub Packages):**
-4. **@shakacode-tools/react-on-rails-pro-node-renderer** - NPM package
-5. **react_on_rails_pro** - RubyGem
+**PRIVATE (GitHub Packages):** 4. **@shakacode-tools/react-on-rails-pro-node-renderer** - NPM package 5. **react_on_rails_pro** - RubyGem
 
 ### Version Synchronization
 
 The task updates versions in all the following files:
 
 **Core package:**
+
 - `lib/react_on_rails/version.rb` (source of truth for all packages)
 - `package.json` (root workspace)
 - `packages/react-on-rails/package.json`
@@ -70,6 +73,7 @@ The task updates versions in all the following files:
 - `spec/dummy/Gemfile.lock`
 
 **Pro package:**
+
 - `react_on_rails_pro/lib/react_on_rails_pro/version.rb` (VERSION only, not PROTOCOL_VERSION)
 - `react_on_rails_pro/package.json` (node-renderer)
 - `packages/react-on-rails-pro/package.json` (+ dependency version)
@@ -77,6 +81,7 @@ The task updates versions in all the following files:
 - `react_on_rails_pro/spec/dummy/Gemfile.lock`
 
 **Note:**
+
 - `react_on_rails_pro.gemspec` dynamically references `ReactOnRails::VERSION`
 - `react-on-rails-pro` NPM dependency is pinned to exact version (e.g., `"react-on-rails": "16.2.0"`)
 
@@ -143,11 +148,13 @@ After a successful release, you'll see instructions to:
 You must be logged in and have publish permissions:
 
 **For public packages (npmjs.org):**
+
 ```bash
 npm login
 ```
 
 **For private packages (GitHub Packages):**
+
 - Get a GitHub personal access token with `write:packages` scope
 - Add to `~/.npmrc`:
   ```
@@ -162,9 +169,11 @@ npm login
 ### RubyGems Publishing
 
 **For public gem (rubygems.org):**
+
 - Standard RubyGems credentials via `gem push`
 
 **For private gem (GitHub Packages):**
+
 - Add to `~/.gem/credentials`:
   ```
   :github: Bearer <GITHUB_TOKEN>
@@ -173,6 +182,7 @@ npm login
 ### Ruby Version Management
 
 The script automatically detects and switches Ruby versions when needed:
+
 - Supports: RVM, rbenv, asdf
 - Set via `RUBY_VERSION_MANAGER` environment variable (default: `rvm`)
 - Example: Pro dummy app requires Ruby 3.3.7, script auto-switches from 3.3.0
@@ -186,17 +196,20 @@ This task depends on the `gem-release` Ruby gem, which is installed via `bundle 
 Before releasing to production, test the release process locally:
 
 1. Install and start Verdaccio:
+
    ```bash
    npm install -g verdaccio
    verdaccio
    ```
 
 2. Run release with verdaccio registry:
+
    ```bash
    rake release[patch,false,verdaccio]
    ```
 
 3. This will:
+
    - Publish all 3 NPM packages to local Verdaccio
    - Skip RubyGem publishing
    - Update version files (revert manually after testing)

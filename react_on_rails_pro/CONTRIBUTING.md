@@ -301,12 +301,12 @@ You need authentication for both public and private package registries:
 **Private packages (GitHub Packages):**
 - Get a GitHub personal access token with `write:packages` scope
 - Configure `~/.npmrc`:
-  ```
+  ```ini
   //npm.pkg.github.com/:_authToken=<TOKEN>
   always-auth=true
   ```
 - Configure `~/.gem/credentials`:
-  ```
+  ```yaml
   :github: Bearer <GITHUB_TOKEN>
   ```
 - Set environment variable: `export GITHUB_TOKEN=<TOKEN>`
