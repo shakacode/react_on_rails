@@ -23,13 +23,13 @@ cd .. && rake -D release
 cd /path/to/react_on_rails
 
 # Release with version bump
-rake release[4.0.0]
+rake release[17.0.0]
 
 # Dry run first (recommended)
-rake release[4.0.0,true]
+rake release[17.0.0,true]
 
 # Test with local Verdaccio
-rake release[4.0.0,false,verdaccio]
+rake release[17.0.0,false,verdaccio]
 ```
 
 This unified script releases all 5 packages together:

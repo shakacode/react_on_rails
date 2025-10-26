@@ -318,13 +318,13 @@ From the **repository root**, run:
 ```bash
 # Full release
 cd /path/to/react_on_rails
-rake release[4.0.0]
+rake release[17.0.0]
 
 # Dry run first
-rake release[4.0.0,true]
+rake release[17.0.0,true]
 
 # Test with Verdaccio
-rake release[4.0.0,false,verdaccio]
+rake release[17.0.0,false,verdaccio]
 ```
 
 For complete documentation, see:
