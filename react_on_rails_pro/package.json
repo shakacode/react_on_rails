@@ -17,6 +17,9 @@
   "bin": {
     "react-on-rails-pro-node-renderer": "packages/node-renderer/dist/default-node-renderer.js"
   },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "directories": {
     "doc": "docs"
   },
