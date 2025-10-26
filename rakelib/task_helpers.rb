@@ -82,10 +82,12 @@ module ReactOnRails
 
     # Detects the required Ruby version using Bundler
     def detect_bundler_ruby_version(dir)
-      stdout = `cd #{dir} && bundle platform --ruby`
+      stdout, stderr, status = Open3.capture3("bundle platform --ruby", chdir: dir)
+      puts "  result: #{stdout.strip}, #{stderr.strip}, status: #{status.exitstatus}"
 
-      unless $CHILD_STATUS.success?
-        puts "  ⚠️  bundle platform command failed"
+      unless status.success?
+        puts "  ⚠️  Failed to detect Ruby version in #{dir}"
+        puts "  Error: #{stderr.strip}" unless stderr.strip.empty?
         return nil
       end
 
