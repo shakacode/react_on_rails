@@ -66,12 +66,17 @@ cd PROJECT_NAME
    bundle exec rails generate react_on_rails:install
    ```
 
+> **Note:** Ensure that you have `overmind` or `foreman` installed to run `bin/dev`.
+>
+> - **overmind**: `brew install overmind` (macOS) or see [installation guide](https://github.com/DarthSim/overmind#installation)
+> - **foreman**: `gem install foreman` (install globally, not in your project bundle - [details](https://github.com/ddollar/foreman/wiki/Don't-Bundle-Foreman))
+
 Start the app:
 
 ```bash
 bin/dev help
 bin/dev # start with hmr
-bin/dev static #
+bin/dev static # start with statically created bundles (no HMR)
 ```
 
 ## Basic Usage
