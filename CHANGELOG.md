@@ -27,6 +27,8 @@ Changes since the last non-beta release.
 
 - **Attribution Comment**: Added HTML comment attribution to Rails views containing React on Rails functionality. The comment automatically displays which version is in use (open source React on Rails or React on Rails Pro) and, for Pro users, shows the license status. This helps identify React on Rails usage across your application. [PR #1857](https://github.com/shakacode/react_on_rails/pull/1857) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
+- **Improved Error Messages**: Error messages for version mismatches and package configuration issues now include package-manager-specific installation commands (npm, yarn, pnpm, bun). [PR #1881](https://github.com/shakacode/react_on_rails/pull/1881) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 #### Breaking Changes
 
 - **React on Rails Core Package**: Several Pro-only methods have been removed from the core package and are now exclusively available in the `react-on-rails-pro` package. If you're using any of the following methods, you'll need to migrate to React on Rails Pro:
@@ -105,6 +107,14 @@ To migrate to React on Rails Pro:
   - `rsc_payload_react_component` - RSC payload rendering
 
   These helpers are now defined exclusively in the `react-on-rails-pro` gem.
+
+- **Strict Version Validation at Boot Time**: Applications now fail to boot (instead of logging warnings) when package.json is misconfigured with wrong versions, missing packages, or semver wildcards. Users must use exact versions in package.json (no ^, ~, >, <, \* operators). **Migration**: Update package.json to use exact versions matching installed gem (e.g., `"16.1.1"` not `"^16.1.1"`). [PR #1881](https://github.com/shakacode/react_on_rails/pull/1881) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+- **Node Renderer Version Validation** (Pro users only): Remote node renderer now validates gem version at request time. Version mismatches in development return 412 Precondition Failed (production allows with warning). **Migration**: Ensure react_on_rails_pro gem and @shakacode-tools/react-on-rails-pro-node-renderer package versions match. [PR #1881](https://github.com/shakacode/react_on_rails/pull/1881) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+#### Security
+
+- **Command Injection Protection**: Added security hardening to prevent potential command injection in package manager commands. [PR #1881](https://github.com/shakacode/react_on_rails/pull/1881) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 ### [16.1.1] - 2025-09-24
 
