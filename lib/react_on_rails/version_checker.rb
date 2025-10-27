@@ -57,71 +57,79 @@ module ReactOnRails
       MSG
     end
 
-    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
     def validate_package_gem_compatibility!
       has_base_package = node_package_version.react_on_rails_package?
       has_pro_package = node_package_version.react_on_rails_pro_package?
       is_pro_gem = ReactOnRails::Utils.react_on_rails_pro?
 
-      # Error: No packages installed
-      if !has_base_package && !has_pro_package
-        base_install_cmd = ReactOnRails::Utils.package_manager_install_exact_command("react-on-rails", gem_version)
-        pro_install_cmd = ReactOnRails::Utils.package_manager_install_exact_command("react-on-rails-pro", gem_version)
+      validate_packages_installed!(has_base_package, has_pro_package)
+      validate_no_duplicate_packages!(has_base_package, has_pro_package)
+      validate_pro_gem_uses_pro_package!(is_pro_gem, has_pro_package)
+      validate_pro_package_has_pro_gem!(is_pro_gem, has_pro_package)
+    end
 
-        raise ReactOnRails::Error, <<~MSG.strip
-          **ERROR** ReactOnRails: No React on Rails npm package is installed.
+    def validate_packages_installed!(has_base_package, has_pro_package)
+      return if has_base_package || has_pro_package
 
-          You must install either 'react-on-rails' or 'react-on-rails-pro' package.
+      base_install_cmd = ReactOnRails::Utils.package_manager_install_exact_command("react-on-rails", gem_version)
+      pro_install_cmd = ReactOnRails::Utils.package_manager_install_exact_command("react-on-rails-pro", gem_version)
 
-          Fix:
-            If using the standard (free) version:
-            Run: #{base_install_cmd}
+      raise ReactOnRails::Error, <<~MSG.strip
+        **ERROR** ReactOnRails: No React on Rails npm package is installed.
 
-            Or if using React on Rails Pro:
-            Run: #{pro_install_cmd}
+        You must install either 'react-on-rails' or 'react-on-rails-pro' package.
 
-          #{package_json_location}
-        MSG
-      end
+        Fix:
+          If using the standard (free) version:
+          Run: #{base_install_cmd}
 
-      # Error: Both packages installed
-      if has_base_package && has_pro_package
-        remove_cmd = ReactOnRails::Utils.package_manager_remove_command("react-on-rails")
+          Or if using React on Rails Pro:
+          Run: #{pro_install_cmd}
 
-        raise ReactOnRails::Error, <<~MSG.strip
-          **ERROR** ReactOnRails: Both 'react-on-rails' and 'react-on-rails-pro' packages are installed.
+        #{package_json_location}
+      MSG
+    end
 
-          If you're using React on Rails Pro, only install the 'react-on-rails-pro' package.
-          The Pro package already includes all functionality from the base package.
+    def validate_no_duplicate_packages!(has_base_package, has_pro_package)
+      return unless has_base_package && has_pro_package
 
-          Fix:
-            1. Remove 'react-on-rails' from your package.json dependencies
-            2. Run: #{remove_cmd}
-            3. Keep only: react-on-rails-pro
+      remove_cmd = ReactOnRails::Utils.package_manager_remove_command("react-on-rails")
 
-          #{package_json_location}
-        MSG
-      end
+      raise ReactOnRails::Error, <<~MSG.strip
+        **ERROR** ReactOnRails: Both 'react-on-rails' and 'react-on-rails-pro' packages are installed.
 
-      # Error: Pro gem but using base package
-      if is_pro_gem && !has_pro_package
-        remove_cmd = ReactOnRails::Utils.package_manager_remove_command("react-on-rails")
-        install_cmd = ReactOnRails::Utils.package_manager_install_exact_command("react-on-rails-pro", gem_version)
+        If you're using React on Rails Pro, only install the 'react-on-rails-pro' package.
+        The Pro package already includes all functionality from the base package.
 
-        raise ReactOnRails::Error, <<~MSG.strip
-          **ERROR** ReactOnRails: You have the Pro gem installed but are using the base 'react-on-rails' package.
+        Fix:
+          1. Remove 'react-on-rails' from your package.json dependencies
+          2. Run: #{remove_cmd}
+          3. Keep only: react-on-rails-pro
 
-          When using React on Rails Pro, you must use the 'react-on-rails-pro' npm package.
+        #{package_json_location}
+      MSG
+    end
 
-          Fix:
-            1. Remove the base package: #{remove_cmd}
-            2. Install the Pro package: #{install_cmd}
+    def validate_pro_gem_uses_pro_package!(is_pro_gem, has_pro_package)
+      return unless is_pro_gem && !has_pro_package
 
-          #{package_json_location}
-        MSG
-      end
+      remove_cmd = ReactOnRails::Utils.package_manager_remove_command("react-on-rails")
+      install_cmd = ReactOnRails::Utils.package_manager_install_exact_command("react-on-rails-pro", gem_version)
 
-      # Error: Pro package but not Pro gem
+      raise ReactOnRails::Error, <<~MSG.strip
+        **ERROR** ReactOnRails: You have the Pro gem installed but are using the base 'react-on-rails' package.
+
+        When using React on Rails Pro, you must use the 'react-on-rails-pro' npm package.
+
+        Fix:
+          1. Remove the base package: #{remove_cmd}
+          2. Install the Pro package: #{install_cmd}
+
+        #{package_json_location}
+      MSG
+    end
+
+    def validate_pro_package_has_pro_gem!(is_pro_gem, has_pro_package)
       return unless !is_pro_gem && has_pro_package
 
       remove_pro_cmd = ReactOnRails::Utils.package_manager_remove_command("react-on-rails-pro")
@@ -144,7 +152,6 @@ module ReactOnRails
         #{package_json_location}
       MSG
     end
-    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
 
     def validate_exact_version!
       return if node_package_version.raw.nil? || node_package_version.local_path_or_url?
