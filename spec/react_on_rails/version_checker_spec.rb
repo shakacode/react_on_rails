@@ -38,6 +38,27 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
         end
       end
 
+      context "when neither react-on-rails nor react-on-rails-pro packages are installed" do
+        let(:node_package_version) do
+          instance_double(VersionChecker::NodePackageVersion,
+                          react_on_rails_package?: false,
+                          react_on_rails_pro_package?: false,
+                          raw: nil,
+                          local_path_or_url?: false,
+                          package_json: "/fake/path/package.json")
+        end
+
+        before do
+          stub_gem_version("16.1.1")
+        end
+
+        it "raises an error" do
+          expect { check_version_and_raise(node_package_version) }
+            .to raise_error(ReactOnRails::Error,
+                            /No React on Rails npm package is installed/)
+        end
+      end
+
       context "when Pro gem is installed but using base package" do
         let(:node_package_version) do
           instance_double(VersionChecker::NodePackageVersion,
@@ -194,10 +215,16 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
         end
 
         it "raises an error" do
-          # Override File.exist? to return false for this test
-          allow(File).to receive(:exist?).with(node_package_version.package_json).and_return(false)
-          # Still need to stub Rails for package_json_location
-          allow(Rails).to receive_message_chain(:root, :join).and_return(node_package_version.package_json)
+          # Mock Rails.root properly
+          fake_root = File.dirname(node_package_version.package_json)
+          fake_root_pathname = Pathname.new(fake_root)
+          allow(Rails).to receive(:root).and_return(fake_root_pathname)
+
+          # Override File.exist? to return false for all paths (including package.json)
+          allow(File).to receive(:exist?).and_return(false)
+          # Mock yarn.lock to exist so package manager detection works
+          allow(File).to receive(:exist?).with(File.join(fake_root, "yarn.lock")).and_return(true)
+
           allow(ReactOnRails).to receive_message_chain(:configuration, :node_modules_location).and_return("")
 
           version_checker = described_class.new(node_package_version)
@@ -217,16 +244,26 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
                       package_json: "/fake/path/package.json")
     end
 
+    # rubocop:disable Metrics/AbcSize
     def check_version_and_raise(node_package_version)
-      # Stub File.exist? for the package.json check
+      # Mock Rails.root to return a proper path string
+      fake_root = File.dirname(node_package_version.package_json)
+      fake_root_pathname = Pathname.new(fake_root)
+      allow(Rails).to receive(:root).and_return(fake_root_pathname)
+
+      # Stub File.exist? for the package.json and lock files
+      # We mock specific paths and return false for everything else
+      allow(File).to receive(:exist?).and_return(false)
       allow(File).to receive(:exist?).with(node_package_version.package_json).and_return(true)
-      # Stub Rails.root.join for package_json_location helper
-      allow(Rails).to receive_message_chain(:root, :join).and_return(node_package_version.package_json)
+      # Mock lock files - use yarn.lock so package manager detection returns :yarn
+      allow(File).to receive(:exist?).with(File.join(fake_root, "yarn.lock")).and_return(true)
+
       # Stub ReactOnRails.configuration.node_modules_location
       allow(ReactOnRails).to receive_message_chain(:configuration, :node_modules_location).and_return("")
       version_checker = VersionChecker.new(node_package_version)
       version_checker.validate_version_and_package_compatibility!
     end
+    # rubocop:enable Metrics/AbcSize
 
     describe VersionChecker::NodePackageVersion do
       subject(:node_package_version) { described_class.new(package_json) }

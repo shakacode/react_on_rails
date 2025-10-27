@@ -668,7 +668,7 @@ module ReactOnRails
           it "returns :yarn for yarn@3.6.0" do
             allow(File).to receive(:exist?).with(package_json_path).and_return(true)
             allow(File).to receive(:read).with(package_json_path)
-              .and_return('{"packageManager": "yarn@3.6.0"}')
+                                         .and_return('{"packageManager": "yarn@3.6.0"}')
 
             expect(described_class.detect_package_manager).to eq(:yarn)
           end
@@ -676,7 +676,7 @@ module ReactOnRails
           it "returns :pnpm for pnpm@8.0.0" do
             allow(File).to receive(:exist?).with(package_json_path).and_return(true)
             allow(File).to receive(:read).with(package_json_path)
-              .and_return('{"packageManager": "pnpm@8.0.0"}')
+                                         .and_return('{"packageManager": "pnpm@8.0.0"}')
 
             expect(described_class.detect_package_manager).to eq(:pnpm)
           end
@@ -684,7 +684,7 @@ module ReactOnRails
           it "returns :bun for bun@1.0.0" do
             allow(File).to receive(:exist?).with(package_json_path).and_return(true)
             allow(File).to receive(:read).with(package_json_path)
-              .and_return('{"packageManager": "bun@1.0.0"}')
+                                         .and_return('{"packageManager": "bun@1.0.0"}')
 
             expect(described_class.detect_package_manager).to eq(:bun)
           end
@@ -692,7 +692,7 @@ module ReactOnRails
           it "returns :npm for npm@9.0.0" do
             allow(File).to receive(:exist?).with(package_json_path).and_return(true)
             allow(File).to receive(:read).with(package_json_path)
-              .and_return('{"packageManager": "npm@9.0.0"}')
+                                         .and_return('{"packageManager": "npm@9.0.0"}')
 
             expect(described_class.detect_package_manager).to eq(:npm)
           end
@@ -701,7 +701,7 @@ module ReactOnRails
             allow(File).to receive(:exist?).and_call_original
             allow(File).to receive(:exist?).with(package_json_path).and_return(true)
             allow(File).to receive(:read).with(package_json_path)
-              .and_return('{"packageManager": "unknown@1.0.0"}')
+                                         .and_return('{"packageManager": "unknown@1.0.0"}')
             allow(File).to receive(:exist?).with(File.join(Rails.root, "yarn.lock")).and_return(true)
 
             expect(described_class.detect_package_manager).to eq(:yarn)
@@ -712,7 +712,7 @@ module ReactOnRails
           before do
             allow(File).to receive(:exist?).with(package_json_path).and_return(true)
             allow(File).to receive(:read).with(package_json_path)
-              .and_return('{"name": "my-app"}')
+                                         .and_return('{"name": "my-app"}')
           end
 
           it "returns :yarn when yarn.lock exists" do

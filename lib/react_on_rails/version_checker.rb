@@ -57,10 +57,32 @@ module ReactOnRails
       MSG
     end
 
+    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
     def validate_package_gem_compatibility!
       has_base_package = node_package_version.react_on_rails_package?
       has_pro_package = node_package_version.react_on_rails_pro_package?
       is_pro_gem = ReactOnRails::Utils.react_on_rails_pro?
+
+      # Error: No packages installed
+      if !has_base_package && !has_pro_package
+        base_install_cmd = ReactOnRails::Utils.package_manager_install_exact_command("react-on-rails", gem_version)
+        pro_install_cmd = ReactOnRails::Utils.package_manager_install_exact_command("react-on-rails-pro", gem_version)
+
+        raise ReactOnRails::Error, <<~MSG.strip
+          **ERROR** ReactOnRails: No React on Rails npm package is installed.
+
+          You must install either 'react-on-rails' or 'react-on-rails-pro' package.
+
+          Fix:
+            If using the standard (free) version:
+            Run: #{base_install_cmd}
+
+            Or if using React on Rails Pro:
+            Run: #{pro_install_cmd}
+
+          #{package_json_location}
+        MSG
+      end
 
       # Error: Both packages installed
       if has_base_package && has_pro_package
@@ -122,6 +144,7 @@ module ReactOnRails
         #{package_json_location}
       MSG
     end
+    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
 
     def validate_exact_version!
       return if node_package_version.raw.nil? || node_package_version.local_path_or_url?
