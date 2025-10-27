@@ -159,7 +159,7 @@ npm login
 
 - Get a GitHub personal access token with `write:packages` scope
 - Add to `~/.npmrc`:
-  ```
+  ```ini
   //npm.pkg.github.com/:_authToken=<TOKEN>
   always-auth=true
   ```
