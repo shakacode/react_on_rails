@@ -279,7 +279,11 @@ module ReactOnRails
       end
 
       def wildcard_or_x_range?
-        raw == "*" || raw =~ /^x$/i || raw =~ /\dx\b/i || raw =~ /^\*\./ || raw =~ /\.x/i
+        raw == "*" ||
+          raw =~ /^[xX*]$/ ||
+          raw =~ /^[xX*]\./ ||
+          raw =~ /\.[xX*]\b/ ||
+          raw =~ /\.[xX*]$/
       end
 
       def range_operator?
