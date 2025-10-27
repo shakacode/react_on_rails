@@ -269,7 +269,25 @@ module ReactOnRails
         # See https://docs.npmjs.com/cli/v10/configuring-npm/package-json#dependencies
         # We want to disallow all expressions other than exact versions
         # and the ones allowed by local_path_or_url?
-        raw.blank? || raw.start_with?(/[~^><*]/) || raw.include?(" - ") || raw.include?(" || ")
+        return true if raw.blank?
+
+        special_version_string? || wildcard_or_x_range? || range_operator? || range_syntax?
+      end
+
+      def special_version_string?
+        %w[latest next canary beta alpha rc].include?(raw.downcase)
+      end
+
+      def wildcard_or_x_range?
+        raw == "*" || raw =~ /^x$/i || raw =~ /\dx\b/i || raw =~ /^\*\./ || raw =~ /\.x/i
+      end
+
+      def range_operator?
+        raw.start_with?(/[~^><*]/)
+      end
+
+      def range_syntax?
+        raw.include?(" - ") || raw.include?(" || ")
       end
 
       def local_path_or_url?
@@ -304,7 +322,26 @@ module ReactOnRails
       end
 
       def parsed_package_contents
-        @parsed_package_contents ||= JSON.parse(package_json_contents)
+        return @parsed_package_contents if defined?(@parsed_package_contents)
+
+        begin
+          @parsed_package_contents = JSON.parse(package_json_contents)
+        rescue JSON::ParserError => e
+          raise ReactOnRails::Error, <<~MSG.strip
+            **ERROR** ReactOnRails: Failed to parse package.json file.
+
+            Location: #{package_json}
+            Error: #{e.message}
+
+            The package.json file contains invalid JSON. Please check the file for syntax errors.
+
+            Common issues:
+              - Missing or extra commas
+              - Unquoted keys or values
+              - Trailing commas (not allowed in JSON)
+              - Comments (not allowed in standard JSON)
+          MSG
+        end
       end
     end
   end
