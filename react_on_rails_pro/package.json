@@ -103,7 +103,7 @@
     "packages/node-renderer/dist"
   ],
   "scripts": {
-    "preinstall": "(test -f yarn.lock && yarn run link-source && yalc add --link react-on-rails) || true",
+    "preinstall": "test -f yarn.lock || exit 0; yarn run link-source && yalc add --link react-on-rails",
     "postinstall": "test -f post-yarn-install.local && ./post-yarn-install.local || true",
     "link-source": "cd ../packages/react-on-rails && yarn && yalc publish",
     "test": "nps test",
