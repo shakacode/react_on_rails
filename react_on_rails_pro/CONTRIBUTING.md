@@ -282,14 +282,51 @@ TRACE_REACT_ON_RAILS=true && foreman start -f Procfile.dev
 ```
 
 # Releasing
-Contact Justin Gordon, [justin@shakacode.com](mailto:justin@shakacode.com).
 
-> [!NOTE]
-> These files need to include auth tokens to [publish to Github Packages](https://docs.github.com/en/enterprise-server%403.10/packages/working-with-a-github-packages-registry/working-with-the-rubygems-registry):
-> 1. `~/.npmrc`
-> 2. `~/.gem/credentials`
+⚠️ **The release process has moved to the repository root.**
 
-Then run a command like:
+React on Rails Pro is now released together with React on Rails using unified versioning.
+All packages (core + pro) are released together with the same version number.
+
+Contact Justin Gordon, [justin@shakacode.com](mailto:justin@shakacode.com) for release permissions.
+
+## Prerequisites
+
+You need authentication for both public and private package registries:
+
+**Public packages (npmjs.org + rubygems.org):**
+- NPM: Run `npm login`
+- RubyGems: Standard credentials via `gem push`
+
+**Private packages (GitHub Packages):**
+- Get a GitHub personal access token with `write:packages` scope
+- Configure `~/.npmrc`:
+  ```ini
+  //npm.pkg.github.com/:_authToken=<TOKEN>
+  always-auth=true
+  ```
+- Configure `~/.gem/credentials`:
+  ```yaml
+  :github: Bearer <GITHUB_TOKEN>
+  ```
+- Set environment variable: `export GITHUB_TOKEN=<TOKEN>`
+
+## Release Command
+
+From the **repository root**, run:
+
 ```bash
-bundle exec rake release\[4.0.0.rc.1\]
+# Full release
+cd /path/to/react_on_rails
+rake release[17.0.0]
+
+# Dry run first
+rake release[17.0.0,true]
+
+# Test with Verdaccio
+rake release[17.0.0,false,verdaccio]
 ```
+
+For complete documentation, see:
+- [Root Release Documentation](../docs/contributor-info/releasing.md)
+- Run `rake -D release` for inline help

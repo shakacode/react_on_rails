@@ -1,3 +1,0 @@
-#!/bin/bash
-
-echo "See `rake -D release`"

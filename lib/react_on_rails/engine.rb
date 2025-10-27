@@ -4,8 +4,17 @@ require "rails/railtie"
 
 module ReactOnRails
   class Engine < ::Rails::Engine
+    # Validate package versions and compatibility on Rails startup
+    # This ensures the application fails fast if versions don't match or packages are misconfigured
+    initializer "react_on_rails.validate_version_and_package_compatibility" do
+      config.after_initialize do
+        Rails.logger.info "[React on Rails] Validating package version and compatibility..."
+        VersionChecker.build.validate_version_and_package_compatibility!
+        Rails.logger.info "[React on Rails] Package validation successful"
+      end
+    end
+
     config.to_prepare do
-      VersionChecker.build.log_if_gem_and_node_package_versions_differ
       ReactOnRails::ServerRenderingPool.reset_pool
     end
 

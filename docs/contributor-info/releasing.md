@@ -1,6 +1,6 @@
 # Install and Release
 
-We're releasing this as a combined Ruby gem plus two NPM packages. We keep the version numbers in sync across all packages.
+We're releasing this as a unified release with 5 packages total. We keep the version numbers in sync across all packages using unified versioning.
 
 ## Testing the Gem before Release from a Rails App
 
@@ -13,41 +13,79 @@ Run `rake -D release` to see instructions on how to release via the rake task.
 ### Release Command
 
 ```bash
-rake release[gem_version,dry_run]
+rake release[version,dry_run,registry,skip_push]
 ```
 
 **Arguments:**
 
-- `gem_version`: The new version in rubygem format (no dashes). Pass no argument to automatically perform a patch version bump.
-- `dry_run`: Optional. Pass `true` to see what would happen without actually releasing.
+1. **`version`** (required): Version bump type or explicit version
 
-**Example:**
+   - Bump types: `patch`, `minor`, `major`
+   - Explicit: `16.2.0`
+   - Pre-release: `16.2.0.beta.1` (rubygem format with dots, converted to `16.2.0-beta.1` for NPM)
+
+2. **`dry_run`** (optional): `true` to preview changes without releasing
+
+   - Default: `false`
+
+3. **`registry`** (optional): Publishing registry for testing
+
+   - `verdaccio`: Publish all NPM packages to local Verdaccio (skips RubyGems)
+   - `npm`: Normal release to npmjs.org + rubygems.org (default)
+
+4. **`skip_push`** (optional): Skip git push to remote
+   - `skip_push`: Don't push commits/tags to remote
+   - Default: pushes to remote
+
+**Examples:**
 
 ```bash
-rake release[16.2.0]        # Release version 16.2.0
-rake release[16.2.0,true]   # Dry run to preview changes
-rake release                # Auto-bump patch version
+rake release[patch]                          # Bump patch version (16.1.1 → 16.1.2)
+rake release[minor]                          # Bump minor version (16.1.1 → 16.2.0)
+rake release[major]                          # Bump major version (16.1.1 → 17.0.0)
+rake release[16.2.0]                         # Set explicit version
+rake release[16.2.0.beta.1]                  # Set pre-release version (→ 16.2.0-beta.1 for NPM)
+rake release[16.2.0,true]                    # Dry run to preview changes
+rake release[16.2.0,false,verdaccio]         # Test with local Verdaccio
+rake release[patch,false,npm,skip_push]      # Release but don't push to GitHub
 ```
 
 ### What Gets Released
 
-The release task publishes three packages with the same version number:
+The release task publishes 5 packages with unified versioning:
 
-1. **react-on-rails** NPM package
-2. **react-on-rails-pro** NPM package
-3. **react_on_rails** Ruby gem
+**PUBLIC (npmjs.org + rubygems.org):**
+
+1. **react-on-rails** - NPM package
+2. **react-on-rails-pro** - NPM package
+3. **react_on_rails** - RubyGem
+
+**PRIVATE (GitHub Packages):** 4. **@shakacode-tools/react-on-rails-pro-node-renderer** - NPM package 5. **react_on_rails_pro** - RubyGem
 
 ### Version Synchronization
 
 The task updates versions in all the following files:
 
-- `lib/react_on_rails/version.rb` (source of truth)
+**Core package:**
+
+- `lib/react_on_rails/version.rb` (source of truth for all packages)
 - `package.json` (root workspace)
 - `packages/react-on-rails/package.json`
-- `packages/react-on-rails-pro/package.json` (both version field and react-on-rails dependency)
+- `Gemfile.lock` (root)
 - `spec/dummy/Gemfile.lock`
 
-**Note:** The `react-on-rails-pro` package declares an exact version dependency on `react-on-rails` (e.g., `"react-on-rails": "16.2.0"`). This ensures users install compatible versions of both packages.
+**Pro package:**
+
+- `react_on_rails_pro/lib/react_on_rails_pro/version.rb` (VERSION only, not PROTOCOL_VERSION)
+- `react_on_rails_pro/package.json` (node-renderer)
+- `packages/react-on-rails-pro/package.json` (+ dependency version)
+- `react_on_rails_pro/Gemfile.lock`
+- `react_on_rails_pro/spec/dummy/Gemfile.lock`
+
+**Note:**
+
+- `react_on_rails_pro.gemspec` dynamically references `ReactOnRails::VERSION`
+- `react-on-rails-pro` NPM dependency is pinned to exact version (e.g., `"react-on-rails": "16.2.0"`)
 
 ### Pre-release Versions
 
@@ -107,13 +145,84 @@ After a successful release, you'll see instructions to:
 
 ## Requirements
 
-This task depends on the `gem-release` Ruby gem, which is installed via `bundle install`.
+### NPM Publishing
 
-For NPM publishing, you must be logged in to npm and have publish permissions for both packages:
+You must be logged in and have publish permissions:
+
+**For public packages (npmjs.org):**
 
 ```bash
 npm login
 ```
+
+**For private packages (GitHub Packages):**
+
+- Get a GitHub personal access token with `write:packages` scope
+- Add to `~/.npmrc`:
+  ```ini
+  //npm.pkg.github.com/:_authToken=<TOKEN>
+  always-auth=true
+  ```
+- Set environment variable:
+  ```bash
+  export GITHUB_TOKEN=<TOKEN>
+  ```
+
+### RubyGems Publishing
+
+**For public gem (rubygems.org):**
+
+- Standard RubyGems credentials via `gem push`
+
+**For private gem (GitHub Packages):**
+
+- Add to `~/.gem/credentials`:
+  ```
+  :github: Bearer <GITHUB_TOKEN>
+  ```
+
+### Ruby Version Management
+
+The script automatically detects and switches Ruby versions when needed:
+
+- Supports: RVM, rbenv, asdf
+- Set via `RUBY_VERSION_MANAGER` environment variable (default: `rvm`)
+- Example: Pro dummy app requires Ruby 3.3.7, script auto-switches from 3.3.0
+
+### Dependencies
+
+This task depends on the `gem-release` Ruby gem, which is installed via `bundle install`.
+
+## Testing with Verdaccio
+
+Before releasing to production, test the release process locally:
+
+1. Install and start Verdaccio:
+
+   ```bash
+   npm install -g verdaccio
+   verdaccio
+   ```
+
+2. Run release with verdaccio registry:
+
+   ```bash
+   rake release[patch,false,verdaccio]
+   ```
+
+3. This will:
+
+   - Publish all 3 NPM packages to local Verdaccio
+   - Skip RubyGem publishing
+   - Update version files (revert manually after testing)
+
+4. Test installing from Verdaccio:
+   ```bash
+   npm set registry http://localhost:4873/
+   npm install react-on-rails@16.2.0
+   # Reset when done:
+   npm config delete registry
+   ```
 
 ## Troubleshooting
 

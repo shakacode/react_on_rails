@@ -1,6 +1,6 @@
 {
   "name": "@shakacode-tools/react-on-rails-pro-node-renderer",
-  "version": "4.0.0",
+  "version": "16.1.1",
   "protocolVersion": "2.0.0",
   "description": "react-on-rails-pro JavaScript for react_on_rails_pro Ruby gem",
   "exports": {
@@ -19,18 +19,6 @@
   },
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
-  },
-  "release-it": {
-    "git": {
-      "requireCleanWorkingDir": false
-    },
-    "github": {
-      "release": false
-    },
-    "npm": {
-      "publish": true,
-      "skipChecks": true
-    }
   },
   "directories": {
     "doc": "docs"
@@ -89,7 +77,6 @@
     "prettier": "^3.2.5",
     "react-on-rails": "link:.yalc/react-on-rails",
     "redis": "^5.0.1",
-    "release-it": "^17.6.0",
     "sentry-testkit": "^5.0.6",
     "touch": "^3.1.0",
     "typescript": "^5.4.3",

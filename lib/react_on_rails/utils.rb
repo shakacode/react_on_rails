@@ -5,6 +5,7 @@ require "open3"
 require "rainbow"
 require "active_support"
 require "active_support/core_ext/string"
+require "shellwords"
 
 # rubocop:disable Metrics/ModuleLength
 module ReactOnRails
@@ -281,6 +282,125 @@ module ReactOnRails
       end
 
       puts "Prepended\n#{text_to_prepend}to #{file}."
+    end
+
+    # Detects which package manager is being used.
+    # First checks the packageManager field in package.json (Node.js Corepack standard),
+    # then falls back to checking for lock files.
+    #
+    # @return [Symbol] The package manager symbol (:npm, :yarn, :pnpm, :bun)
+    def self.detect_package_manager
+      manager = detect_package_manager_from_package_json || detect_package_manager_from_lock_files
+      manager || :yarn # Default to yarn if no detection succeeds
+    end
+
+    # Validates package_name input to prevent command injection
+    #
+    # @param package_name [String] The package name to validate
+    # @raise [ReactOnRails::Error] if package_name contains potentially unsafe characters
+    private_class_method def self.validate_package_name!(package_name)
+      raise ReactOnRails::Error, "package_name cannot be nil" if package_name.nil?
+      raise ReactOnRails::Error, "package_name cannot be empty" if package_name.to_s.strip.empty?
+
+      # Allow valid npm package names: alphanumeric, hyphens, underscores, dots, slashes (for scoped packages)
+      # See: https://github.com/npm/validate-npm-package-name
+      return if package_name.match?(%r{\A[@a-z0-9][a-z0-9._/-]*\z}i)
+
+      raise ReactOnRails::Error, "Invalid package name: #{package_name.inspect}. " \
+                                 "Package names must contain only alphanumeric characters, " \
+                                 "hyphens, underscores, dots, and slashes (for scoped packages)."
+    end
+
+    # Validates package_name and version inputs to prevent command injection
+    #
+    # @param package_name [String] The package name to validate
+    # @param version [String] The version to validate
+    # @raise [ReactOnRails::Error] if inputs contain potentially unsafe characters
+    private_class_method def self.validate_package_command_inputs!(package_name, version)
+      validate_package_name!(package_name)
+
+      raise ReactOnRails::Error, "version cannot be nil" if version.nil?
+      raise ReactOnRails::Error, "version cannot be empty" if version.to_s.strip.empty?
+
+      # Allow valid semver versions and common npm version patterns
+      # This allows: 1.2.3, 1.2.3-beta.1, 1.2.3-alpha, etc.
+      return if version.match?(/\A[a-z0-9][a-z0-9._-]*\z/i)
+
+      raise ReactOnRails::Error, "Invalid version: #{version.inspect}. " \
+                                 "Versions must contain only alphanumeric characters, dots, hyphens, and underscores."
+    end
+
+    private_class_method def self.detect_package_manager_from_package_json
+      package_json_path = File.join(Rails.root, ReactOnRails.configuration.node_modules_location, "package.json")
+      return nil unless File.exist?(package_json_path)
+
+      package_json_data = JSON.parse(File.read(package_json_path))
+      return nil unless package_json_data["packageManager"]
+
+      manager_string = package_json_data["packageManager"]
+      # Extract manager name from strings like "yarn@3.6.0" or "pnpm@8.0.0"
+      manager_name = manager_string.split("@").first
+      manager_name.to_sym if %w[npm yarn pnpm bun].include?(manager_name)
+    rescue StandardError
+      nil
+    end
+
+    private_class_method def self.detect_package_manager_from_lock_files
+      root = Rails.root
+      return :yarn if File.exist?(File.join(root, "yarn.lock"))
+      return :pnpm if File.exist?(File.join(root, "pnpm-lock.yaml"))
+      return :bun if File.exist?(File.join(root, "bun.lockb"))
+      return :npm if File.exist?(File.join(root, "package-lock.json"))
+
+      nil
+    end
+
+    # Returns the appropriate install command for the detected package manager.
+    # Generates the correct command with exact version syntax.
+    #
+    # @param package_name [String] The name of the package to install
+    # @param version [String] The exact version to install
+    # @return [String] The command to run (e.g., "yarn add react-on-rails@16.0.0 --exact")
+    def self.package_manager_install_exact_command(package_name, version)
+      validate_package_command_inputs!(package_name, version)
+
+      manager = detect_package_manager
+      # Escape shell arguments to prevent command injection
+      safe_package = Shellwords.escape("#{package_name}@#{version}")
+
+      case manager
+      when :pnpm
+        "pnpm add #{safe_package} --save-exact"
+      when :bun
+        "bun add #{safe_package} --exact"
+      when :npm
+        "npm install #{safe_package} --save-exact"
+      else # :yarn or unknown, default to yarn
+        "yarn add #{safe_package} --exact"
+      end
+    end
+
+    # Returns the appropriate remove command for the detected package manager.
+    #
+    # @param package_name [String] The name of the package to remove
+    # @return [String] The command to run (e.g., "yarn remove react-on-rails")
+    def self.package_manager_remove_command(package_name)
+      validate_package_name!(package_name)
+
+      manager = detect_package_manager
+      # Escape shell arguments to prevent command injection
+      safe_package = Shellwords.escape(package_name)
+
+      case manager
+      when :pnpm
+        "pnpm remove #{safe_package}"
+      when :bun
+        "bun remove #{safe_package}"
+      when :npm
+        "npm uninstall #{safe_package}"
+      else # :yarn or unknown, default to yarn
+        "yarn remove #{safe_package}"
+      end
     end
 
     def self.default_troubleshooting_section

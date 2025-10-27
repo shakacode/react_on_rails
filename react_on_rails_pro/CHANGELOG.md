@@ -30,6 +30,7 @@ You can find the **package** version numbers from this repo's tags and below in 
   - `rsc_payload_react_component` - RSC payload rendering
 
   These helpers were previously in the open-source gem but have been moved to Pro as they are Pro-only features.
+- **Node Renderer Gem Version Validation**: The node renderer now validates that the Ruby gem version (`react_on_rails_pro`) matches the node renderer package version (`@shakacode-tools/react-on-rails-pro-node-renderer`) on every render request. Environment-aware: strict enforcement in development (returns 412 Precondition Failed on mismatch), permissive in production (allows with warning). Includes version normalization to handle Ruby gem vs NPM format differences (e.g., `4.0.0.rc.1` vs `4.0.0-rc.1`). [PR #1881](https://github.com/shakacode/react_on_rails/pull/1881) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 ### Changed (Breaking)
 - `config.prerender_caching`, which controls caching for non-streaming components, now also controls caching for streamed components. To disable caching for an individual render, pass `internal_option(:skip_prerender_cache)`.

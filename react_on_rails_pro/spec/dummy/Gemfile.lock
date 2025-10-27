@@ -20,14 +20,14 @@ PATH
 PATH
   remote: ../..
   specs:
-    react_on_rails_pro (4.0.0)
+    react_on_rails_pro (16.1.1)
       addressable
       connection_pool
       execjs (~> 2.9)
       httpx (~> 1.5)
       jwt (~> 2.7)
       rainbow
-      react_on_rails (>= 16.0.0)
+      react_on_rails (= 16.1.1)
 
 GEM
   remote: https://rubygems.org/

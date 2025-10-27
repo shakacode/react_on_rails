@@ -176,7 +176,8 @@ module ReactOnRailsPro
         "gemVersion" => ReactOnRailsPro::VERSION,
         "protocolVersion" => ReactOnRailsPro::PROTOCOL_VERSION,
         "password" => ReactOnRailsPro.configuration.renderer_password,
-        "dependencyBundleTimestamps" => dependencies
+        "dependencyBundleTimestamps" => dependencies,
+        "railsEnv" => Rails.env.to_s
       }
     end
 
