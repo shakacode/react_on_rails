@@ -11,6 +11,8 @@ const NODE_ENV = process.env.NODE_ENV || 'production';
 // Cache to store version comparison results to avoid repeated normalization and logging
 // Key: gemVersion string, Value: boolean (true if matches, false if mismatch)
 // If key exists, it means we've already processed and logged this version (if needed)
+// Cache is cleared when it exceeds 10 entries to prevent unbounded growth
+const VERSION_CACHE_MAX_SIZE = 10;
 const versionCache = new Map<string, boolean>();
 
 /**
@@ -67,6 +69,12 @@ Update either the renderer or the Rails server`,
       const normalizedGemVersion = normalizeVersion(gemVersion);
       const normalizedPackageVersion = normalizeVersion(packageJson.version);
       versionsMatch = normalizedGemVersion === normalizedPackageVersion;
+
+      // Clear cache if it exceeds max size to prevent unbounded growth
+      if (versionCache.size >= VERSION_CACHE_MAX_SIZE) {
+        versionCache.clear();
+      }
+
       versionCache.set(gemVersion, versionsMatch);
       justCached = true;
     }
