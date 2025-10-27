@@ -654,6 +654,247 @@ module ReactOnRails
           described_class.gem_available?("nonexistent_gem")
         end
       end
+
+      describe ".detect_package_manager" do
+        let(:package_json_path) { File.join(Rails.root, "client", "package.json") }
+
+        before do
+          allow(ReactOnRails).to receive_message_chain("configuration.node_modules_location")
+            .and_return("client")
+          allow(Rails).to receive(:root).and_return(Rails.root)
+        end
+
+        context "when packageManager field exists in package.json" do
+          it "returns :yarn for yarn@3.6.0" do
+            allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+            allow(File).to receive(:read).with(package_json_path)
+              .and_return('{"packageManager": "yarn@3.6.0"}')
+
+            expect(described_class.detect_package_manager).to eq(:yarn)
+          end
+
+          it "returns :pnpm for pnpm@8.0.0" do
+            allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+            allow(File).to receive(:read).with(package_json_path)
+              .and_return('{"packageManager": "pnpm@8.0.0"}')
+
+            expect(described_class.detect_package_manager).to eq(:pnpm)
+          end
+
+          it "returns :bun for bun@1.0.0" do
+            allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+            allow(File).to receive(:read).with(package_json_path)
+              .and_return('{"packageManager": "bun@1.0.0"}')
+
+            expect(described_class.detect_package_manager).to eq(:bun)
+          end
+
+          it "returns :npm for npm@9.0.0" do
+            allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+            allow(File).to receive(:read).with(package_json_path)
+              .and_return('{"packageManager": "npm@9.0.0"}')
+
+            expect(described_class.detect_package_manager).to eq(:npm)
+          end
+
+          it "falls back to lock file detection for unknown manager" do
+            allow(File).to receive(:exist?).and_call_original
+            allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+            allow(File).to receive(:read).with(package_json_path)
+              .and_return('{"packageManager": "unknown@1.0.0"}')
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "yarn.lock")).and_return(true)
+
+            expect(described_class.detect_package_manager).to eq(:yarn)
+          end
+        end
+
+        context "when packageManager field does not exist" do
+          before do
+            allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+            allow(File).to receive(:read).with(package_json_path)
+              .and_return('{"name": "my-app"}')
+          end
+
+          it "returns :yarn when yarn.lock exists" do
+            allow(File).to receive(:exist?).and_call_original
+            allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "yarn.lock")).and_return(true)
+
+            expect(described_class.detect_package_manager).to eq(:yarn)
+          end
+
+          it "returns :pnpm when pnpm-lock.yaml exists" do
+            allow(File).to receive(:exist?).and_call_original
+            allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "yarn.lock")).and_return(false)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "pnpm-lock.yaml")).and_return(true)
+
+            expect(described_class.detect_package_manager).to eq(:pnpm)
+          end
+
+          it "returns :bun when bun.lockb exists" do
+            allow(File).to receive(:exist?).and_call_original
+            allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "yarn.lock")).and_return(false)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "pnpm-lock.yaml")).and_return(false)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "bun.lockb")).and_return(true)
+
+            expect(described_class.detect_package_manager).to eq(:bun)
+          end
+
+          it "returns :npm when package-lock.json exists" do
+            allow(File).to receive(:exist?).and_call_original
+            allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "yarn.lock")).and_return(false)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "pnpm-lock.yaml")).and_return(false)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "bun.lockb")).and_return(false)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "package-lock.json")).and_return(true)
+
+            expect(described_class.detect_package_manager).to eq(:npm)
+          end
+
+          it "defaults to :yarn when no lock files exist" do
+            allow(File).to receive(:exist?).and_call_original
+            allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "yarn.lock")).and_return(false)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "pnpm-lock.yaml")).and_return(false)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "bun.lockb")).and_return(false)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "package-lock.json")).and_return(false)
+
+            expect(described_class.detect_package_manager).to eq(:yarn)
+          end
+        end
+
+        context "when package.json cannot be parsed" do
+          before do
+            allow(File).to receive(:exist?).and_call_original
+            allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+            allow(File).to receive(:read).with(package_json_path).and_return("invalid json")
+          end
+
+          it "falls back to lock file detection" do
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "yarn.lock")).and_return(true)
+
+            expect(described_class.detect_package_manager).to eq(:yarn)
+          end
+        end
+
+        context "when package.json does not exist" do
+          before do
+            allow(File).to receive(:exist?).and_call_original
+            allow(File).to receive(:exist?).with(package_json_path).and_return(false)
+          end
+
+          it "falls back to lock file detection" do
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "yarn.lock")).and_return(false)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "pnpm-lock.yaml")).and_return(true)
+
+            expect(described_class.detect_package_manager).to eq(:pnpm)
+          end
+        end
+      end
+
+      describe ".package_manager_install_exact_command" do
+        before do
+          allow(described_class).to receive(:detect_package_manager).and_return(package_manager)
+        end
+
+        context "when using yarn" do
+          let(:package_manager) { :yarn }
+
+          it "returns yarn add command with --exact flag" do
+            expect(described_class.package_manager_install_exact_command("react-on-rails", "16.0.0"))
+              .to eq("yarn add react-on-rails@16.0.0 --exact")
+          end
+        end
+
+        context "when using pnpm" do
+          let(:package_manager) { :pnpm }
+
+          it "returns pnpm add command with --save-exact flag" do
+            expect(described_class.package_manager_install_exact_command("react-on-rails", "16.0.0"))
+              .to eq("pnpm add react-on-rails@16.0.0 --save-exact")
+          end
+        end
+
+        context "when using bun" do
+          let(:package_manager) { :bun }
+
+          it "returns bun add command with --exact flag" do
+            expect(described_class.package_manager_install_exact_command("react-on-rails", "16.0.0"))
+              .to eq("bun add react-on-rails@16.0.0 --exact")
+          end
+        end
+
+        context "when using npm" do
+          let(:package_manager) { :npm }
+
+          it "returns npm install command with --save-exact flag" do
+            expect(described_class.package_manager_install_exact_command("react-on-rails", "16.0.0"))
+              .to eq("npm install react-on-rails@16.0.0 --save-exact")
+          end
+        end
+
+        context "when package manager is unknown" do
+          let(:package_manager) { :unknown }
+
+          it "defaults to yarn add command" do
+            expect(described_class.package_manager_install_exact_command("react-on-rails", "16.0.0"))
+              .to eq("yarn add react-on-rails@16.0.0 --exact")
+          end
+        end
+      end
+
+      describe ".package_manager_remove_command" do
+        before do
+          allow(described_class).to receive(:detect_package_manager).and_return(package_manager)
+        end
+
+        context "when using yarn" do
+          let(:package_manager) { :yarn }
+
+          it "returns yarn remove command" do
+            expect(described_class.package_manager_remove_command("react-on-rails"))
+              .to eq("yarn remove react-on-rails")
+          end
+        end
+
+        context "when using pnpm" do
+          let(:package_manager) { :pnpm }
+
+          it "returns pnpm remove command" do
+            expect(described_class.package_manager_remove_command("react-on-rails"))
+              .to eq("pnpm remove react-on-rails")
+          end
+        end
+
+        context "when using bun" do
+          let(:package_manager) { :bun }
+
+          it "returns bun remove command" do
+            expect(described_class.package_manager_remove_command("react-on-rails"))
+              .to eq("bun remove react-on-rails")
+          end
+        end
+
+        context "when using npm" do
+          let(:package_manager) { :npm }
+
+          it "returns npm uninstall command" do
+            expect(described_class.package_manager_remove_command("react-on-rails"))
+              .to eq("npm uninstall react-on-rails")
+          end
+        end
+
+        context "when package manager is unknown" do
+          let(:package_manager) { :unknown }
+
+          it "defaults to yarn remove command" do
+            expect(described_class.package_manager_remove_command("react-on-rails"))
+              .to eq("yarn remove react-on-rails")
+          end
+        end
+      end
     end
 
     # RSC utility method tests moved to react_on_rails_pro/spec/react_on_rails_pro/utils_spec.rb

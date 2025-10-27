@@ -37,6 +37,9 @@ module ReactOnRails
     def validate_package_json_exists!
       return if File.exist?(node_package_version.package_json)
 
+      base_install_cmd = ReactOnRails::Utils.package_manager_install_exact_command("react-on-rails", gem_version)
+      pro_install_cmd = ReactOnRails::Utils.package_manager_install_exact_command("react-on-rails-pro", gem_version)
+
       raise ReactOnRails::Error, <<~MSG.strip
         **ERROR** ReactOnRails: package.json file not found.
 
@@ -47,10 +50,10 @@ module ReactOnRails
 
         Fix:
           1. Ensure you have a package.json in your project root
-          2. Run: yarn add react-on-rails@#{gem_version} --exact
+          2. Run: #{base_install_cmd}
 
           Or if using React on Rails Pro:
-          Run: yarn add react-on-rails-pro@#{gem_version} --exact
+          Run: #{pro_install_cmd}
       MSG
     end
 
@@ -61,6 +64,8 @@ module ReactOnRails
 
       # Error: Both packages installed
       if has_base_package && has_pro_package
+        remove_cmd = ReactOnRails::Utils.package_manager_remove_command("react-on-rails")
+
         raise ReactOnRails::Error, <<~MSG.strip
           **ERROR** ReactOnRails: Both 'react-on-rails' and 'react-on-rails-pro' packages are installed.
 
@@ -69,7 +74,7 @@ module ReactOnRails
 
           Fix:
             1. Remove 'react-on-rails' from your package.json dependencies
-            2. Run: yarn remove react-on-rails
+            2. Run: #{remove_cmd}
             3. Keep only: react-on-rails-pro
 
           #{package_json_location}
@@ -78,14 +83,17 @@ module ReactOnRails
 
       # Error: Pro gem but using base package
       if is_pro_gem && !has_pro_package
+        remove_cmd = ReactOnRails::Utils.package_manager_remove_command("react-on-rails")
+        install_cmd = ReactOnRails::Utils.package_manager_install_exact_command("react-on-rails-pro", gem_version)
+
         raise ReactOnRails::Error, <<~MSG.strip
           **ERROR** ReactOnRails: You have the Pro gem installed but are using the base 'react-on-rails' package.
 
           When using React on Rails Pro, you must use the 'react-on-rails-pro' npm package.
 
           Fix:
-            1. Remove the base package: yarn remove react-on-rails
-            2. Install the Pro package: yarn add react-on-rails-pro@#{gem_version} --exact
+            1. Remove the base package: #{remove_cmd}
+            2. Install the Pro package: #{install_cmd}
 
           #{package_json_location}
         MSG
@@ -93,6 +101,9 @@ module ReactOnRails
 
       # Error: Pro package but not Pro gem
       return unless !is_pro_gem && has_pro_package
+
+      remove_pro_cmd = ReactOnRails::Utils.package_manager_remove_command("react-on-rails-pro")
+      install_base_cmd = ReactOnRails::Utils.package_manager_install_exact_command("react-on-rails", gem_version)
 
       raise ReactOnRails::Error, <<~MSG.strip
         **ERROR** ReactOnRails: You have the 'react-on-rails-pro' package installed but the Pro gem is not installed.
@@ -105,8 +116,8 @@ module ReactOnRails
           2. Run: bundle install
 
         Or if you meant to use the base version:
-          1. Remove the Pro package: yarn remove react-on-rails-pro
-          2. Install the base package: yarn add react-on-rails@#{gem_version} --exact
+          1. Remove the Pro package: #{remove_pro_cmd}
+          2. Install the base package: #{install_base_cmd}
 
         #{package_json_location}
       MSG
@@ -118,6 +129,8 @@ module ReactOnRails
       return unless node_package_version.semver_wildcard?
 
       package_name = node_package_version.package_name
+      install_cmd = ReactOnRails::Utils.package_manager_install_exact_command(package_name, gem_version)
+
       raise ReactOnRails::Error, <<~MSG.strip
         **ERROR** ReactOnRails: The '#{package_name}' package version is not an exact version.
 
@@ -128,7 +141,7 @@ module ReactOnRails
         Do not use ^, ~, >, <, *, or other semver ranges.
 
         Fix:
-          Run: yarn add #{package_name}@#{gem_version} --exact
+          Run: #{install_cmd}
 
         #{package_json_location}
       MSG
@@ -140,6 +153,8 @@ module ReactOnRails
       return if node_package_version.parts == gem_version_parts
 
       package_name = node_package_version.package_name
+      install_cmd = ReactOnRails::Utils.package_manager_install_exact_command(package_name, gem_version)
+
       raise ReactOnRails::Error, <<~MSG.strip
         **ERROR** ReactOnRails: The '#{package_name}' package version does not match the gem version.
 
@@ -149,7 +164,7 @@ module ReactOnRails
         The npm package and gem versions must match exactly for compatibility.
 
         Fix:
-          Run: yarn add #{package_name}@#{gem_version} --exact
+          Run: #{install_cmd}
 
         #{package_json_location}
       MSG

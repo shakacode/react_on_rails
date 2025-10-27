@@ -283,6 +283,81 @@ module ReactOnRails
       puts "Prepended\n#{text_to_prepend}to #{file}."
     end
 
+    # Detects which package manager is being used.
+    # First checks the packageManager field in package.json (Node.js Corepack standard),
+    # then falls back to checking for lock files.
+    #
+    # @return [Symbol] The package manager symbol (:npm, :yarn, :pnpm, :bun)
+    def self.detect_package_manager
+      manager = detect_package_manager_from_package_json || detect_package_manager_from_lock_files
+      manager || :yarn # Default to yarn if no detection succeeds
+    end
+
+    private_class_method def self.detect_package_manager_from_package_json
+      package_json_path = File.join(Rails.root, ReactOnRails.configuration.node_modules_location, "package.json")
+      return nil unless File.exist?(package_json_path)
+
+      package_json_data = JSON.parse(File.read(package_json_path))
+      return nil unless package_json_data["packageManager"]
+
+      manager_string = package_json_data["packageManager"]
+      # Extract manager name from strings like "yarn@3.6.0" or "pnpm@8.0.0"
+      manager_name = manager_string.split("@").first
+      manager_name.to_sym if %w[npm yarn pnpm bun].include?(manager_name)
+    rescue StandardError
+      nil
+    end
+
+    private_class_method def self.detect_package_manager_from_lock_files
+      root = Rails.root
+      return :yarn if File.exist?(File.join(root, "yarn.lock"))
+      return :pnpm if File.exist?(File.join(root, "pnpm-lock.yaml"))
+      return :bun if File.exist?(File.join(root, "bun.lockb"))
+      return :npm if File.exist?(File.join(root, "package-lock.json"))
+
+      nil
+    end
+
+    # Returns the appropriate install command for the detected package manager.
+    # Generates the correct command with exact version syntax.
+    #
+    # @param package_name [String] The name of the package to install
+    # @param version [String] The exact version to install
+    # @return [String] The command to run (e.g., "yarn add react-on-rails@16.0.0 --exact")
+    def self.package_manager_install_exact_command(package_name, version)
+      manager = detect_package_manager
+
+      case manager
+      when :pnpm
+        "pnpm add #{package_name}@#{version} --save-exact"
+      when :bun
+        "bun add #{package_name}@#{version} --exact"
+      when :npm
+        "npm install #{package_name}@#{version} --save-exact"
+      else # :yarn or unknown, default to yarn
+        "yarn add #{package_name}@#{version} --exact"
+      end
+    end
+
+    # Returns the appropriate remove command for the detected package manager.
+    #
+    # @param package_name [String] The name of the package to remove
+    # @return [String] The command to run (e.g., "yarn remove react-on-rails")
+    def self.package_manager_remove_command(package_name)
+      manager = detect_package_manager
+
+      case manager
+      when :pnpm
+        "pnpm remove #{package_name}"
+      when :bun
+        "bun remove #{package_name}"
+      when :npm
+        "npm uninstall #{package_name}"
+      else # :yarn or unknown, default to yarn
+        "yarn remove #{package_name}"
+      end
+    end
+
     def self.default_troubleshooting_section
       <<~DEFAULT
         📞 Get Help & Support:
