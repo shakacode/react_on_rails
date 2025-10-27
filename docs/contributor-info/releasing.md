@@ -21,7 +21,8 @@ rake release[version,dry_run,registry,skip_push]
 1. **`version`** (required): Version bump type or explicit version
 
    - Bump types: `patch`, `minor`, `major`
-   - Explicit: `16.2.0` (rubygem format, no dashes)
+   - Explicit: `16.2.0`
+   - Pre-release: `16.2.0.beta.1` (rubygem format with dots, converted to `16.2.0-beta.1` for NPM)
 
 2. **`dry_run`** (optional): `true` to preview changes without releasing
 
@@ -43,6 +44,7 @@ rake release[patch]                          # Bump patch version (16.1.1 → 16
 rake release[minor]                          # Bump minor version (16.1.1 → 16.2.0)
 rake release[major]                          # Bump major version (16.1.1 → 17.0.0)
 rake release[16.2.0]                         # Set explicit version
+rake release[16.2.0.beta.1]                  # Set pre-release version (→ 16.2.0-beta.1 for NPM)
 rake release[16.2.0,true]                    # Dry run to preview changes
 rake release[16.2.0,false,verdaccio]         # Test with local Verdaccio
 rake release[patch,false,npm,skip_push]      # Release but don't push to GitHub

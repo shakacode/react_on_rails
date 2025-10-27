@@ -22,7 +22,8 @@ updated to the same version number and released together.
 
 Version argument can be:
   - Semver bump type: 'patch', 'minor', or 'major' (e.g., 16.1.1 → 16.1.2, 16.2.0, or 17.0.0)
-  - Explicit version: '16.2.0' (in rubygem format, no dashes)
+  - Explicit version: '16.2.0'
+  - Pre-release version: '16.2.0.beta.1' (rubygem format with dots, converted to 16.2.0-beta.1 for NPM)
 
 This will update and release:
   PUBLIC (npmjs.org + rubygems.org):
@@ -43,6 +44,7 @@ Examples:
   rake release[minor]                           # Bump minor version (16.1.1 → 16.2.0)
   rake release[major]                           # Bump major version (16.1.1 → 17.0.0)
   rake release[16.2.0]                          # Set explicit version
+  rake release[16.2.0.beta.1]                   # Set pre-release version (→ 16.2.0-beta.1 for NPM)
   rake release[patch,true]                      # Dry run
   rake release[16.2.0,false,verdaccio]          # Test with Verdaccio
   rake release[16.2.0,false,npm,skip_push]      # Release without pushing to remote")
