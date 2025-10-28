@@ -18,7 +18,7 @@ If you open the HTML source of any web page using React on Rails, you'll see the
 
 **Note**: If server rendering is not used (prerender: false), then the major difference is that the HTML rendered for the React component only contains the outer div: `<div id="HelloWorld-react-component-0"/>`. The first specification of the React component is just the same.
 
-# Different Server-Side Rendering Code (and a Server-Specific Bundle)
+## Different Server-Side Rendering Code (and a Server-Specific Bundle)
 
 You may want different code for your server-rendered components running server-side versus client-side. For example, if you have an animation that runs when a component is displayed, you might need to turn that off when server rendering. One way to handle this is conditional code like `if (window) { doClientOnlyCode() }`.
 
