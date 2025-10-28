@@ -10,7 +10,7 @@
 
 Turbo is the modern replacement for Turbolinks, providing fast navigation through your Rails app without full page reloads.
 
-### Basic Setup (Free)
+### Basic Setup
 
 **1. Install Turbo**
 
