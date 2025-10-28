@@ -8,12 +8,91 @@
 
 ## Using Turbo
 
-To configure Turbo the following option can be set:
-`ReactOnRails.setOptions({ turbo: true })`
+Turbo is the modern replacement for Turbolinks, providing fast navigation through your Rails app without full page reloads.
 
-Turbo is not auto-detected like older Turbolinks.
+### Basic Setup (Free)
 
-_TODO: Walk through code changes in PR 1620._
+**1. Install Turbo**
+
+Add the Turbo Rails gem and JavaScript package:
+
+```bash
+# Gemfile
+gem "turbo-rails"
+
+# JavaScript
+yarn add @hotwired/turbo-rails
+```
+
+**2. Enable Turbo in React on Rails**
+
+Import Turbo and configure React on Rails to work with it:
+
+```js
+// app/javascript/packs/application.js
+import '@hotwired/turbo-rails';
+
+ReactOnRails.setOptions({
+  turbo: true, // Enable Turbo support (not auto-detected)
+});
+```
+
+**3. Use Turbo Frames** (works out of the box)
+
+Turbo Frames work with React components without any special configuration:
+
+```erb
+<%# app/views/items/index.html.erb %>
+<%= turbo_frame_tag 'item-list' do %>
+  <%= react_component("ItemList", props: @items) %>
+<% end %>
+
+<%# Clicking a link that responds with another turbo_frame_tag will update just that frame %>
+```
+
+### Turbo Streams (Requires React on Rails Pro)
+
+> **⚡️ React on Rails Pro Feature**
+>
+> Turbo Streams require the `immediate_hydration: true` option, which is a [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/) licensed feature.
+
+**Why Turbo Streams Need Special Handling:**
+
+Unlike Turbo Frames, Turbo Streams don't dispatch the normal `turbo:render` events that React on Rails uses to hydrate components. Instead, they directly manipulate the DOM. The `immediate_hydration` option tells React on Rails to hydrate the component immediately when it's inserted into the DOM, without waiting for page load events.
+
+**Example: Create a Turbo Stream Response**
+
+```erb
+<%# app/views/items/index.html.erb - Initial page with frame %>
+<%= turbo_frame_tag 'item-list' do %>
+  <%= button_to "Load Items", items_path, method: :post %>
+<% end %>
+```
+
+```erb
+<%# app/views/items/create.turbo_stream.erb - Turbo Stream response %>
+<%= turbo_stream.update 'item-list' do %>
+  <%= react_component("ItemList",
+                      props: @items,
+                      immediate_hydration: true) %>
+<% end %>
+```
+
+**What Happens:**
+
+1. User clicks "Load Items" button
+2. Rails responds with `create.turbo_stream.erb`
+3. Turbo Stream updates the `item-list` frame with the new React component
+4. `immediate_hydration: true` ensures the component hydrates immediately
+
+**Learn More:**
+
+- See [v16.0 Release Notes](../upgrading/release-notes/16.0.0.md#enhanced-script-loading-strategies) for full `immediate_hydration` documentation
+- See [Streaming Server Rendering](./streaming-server-rendering.md) for another Pro use case
+- Working example in codebase: `spec/dummy/app/views/pages/turbo_stream_send_hello_world.turbo_stream.erb`
+- Contact [justin@shakacode.com](mailto:justin@shakacode.com) for React on Rails Pro licensing
+
+**Migration Note:** If you're referencing [PR #1620](https://github.com/shakacode/react_on_rails/pull/1620) discussions, note that `force_load` was renamed to `immediate_hydration` in v16.0.
 
 ## Legacy Turbolinks Support
 
@@ -96,8 +175,17 @@ document.addEventListener('turbolinks:load', function () {
 
 React on Rails 15 fixes both issues, so if you still have the listener it can be removed (and should be as `reactOnRailsPageLoaded()` is now async).
 
-> [!WARNING]
-> Do not use `immediate_hydration: false` (React on Rails Pro licensed feature) with Turbolinks if you have async scripts.
+> [!WARNING] > **Async Scripts with Turbolinks Require Pro Feature**
+>
+> If you use async script loading with Turbolinks, you must enable `immediate_hydration: true` to prevent race conditions. This is a React on Rails Pro feature.
+>
+> Without `immediate_hydration: true`, async scripts may not be ready when Turbolinks fires navigation events, causing components to fail hydration.
+>
+> **Alternatives:**
+>
+> - Use `defer` instead of `async` (waits for full page load before hydration)
+> - Upgrade to modern Turbo (recommended)
+> - Use React on Rails Pro for `immediate_hydration: true`
 
 ### Turbolinks 5 Specific Information
 
