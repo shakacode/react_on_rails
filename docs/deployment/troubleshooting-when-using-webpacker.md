@@ -1,3 +1,5 @@
+# Troubleshooting Webpacker Manifest Errors
+
 ## Context
 
 Rails: 5.0.2

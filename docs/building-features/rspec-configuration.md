@@ -2,7 +2,7 @@
 
 _Click [here for minitest](../building-features/minitest-configuration.md)_
 
-# If your Webpack configurations correspond to Shakapacker's default setup
+## If your Webpack configurations correspond to Shakapacker's default setup
 
 If you're able to configure your Webpack configuration to be run by having your Webpack configuration
 returned by the files in `/config/webpack`, then you have 2 options to ensure that your files are
@@ -20,7 +20,7 @@ config.build_test_command = "NODE_ENV=test RAILS_ENV=test bin/shakapacker"
 Which should you use? If you're already using the `Shakapacker` way to configure Webpack, then
 you can keep things simple and use the `Shakapacker` options.
 
-# Checking for stale assets using React on Rails
+## Checking for stale assets using React on Rails
 
 Because you will probably want to run RSpec tests that rely on compiled Webpack assets (typically, your integration/feature specs where `js: true`), you will want to ensure you don't accidentally run tests on missing or stale Webpack assets. If you did use stale Webpack assets, you will get invalid test results as your tests do not use the very latest JavaScript code.
 

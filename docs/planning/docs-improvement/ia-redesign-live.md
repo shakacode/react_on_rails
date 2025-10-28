@@ -321,7 +321,79 @@ After Steps 1-8, found 12 files not in original plan. Investigated and reorganiz
 
 **Total files moved:** ~50+ files across all steps
 
-**Next Actions:** Update website config, update internal links, create introduction.md
+---
+
+## Phase 3: Entry Point Consolidation (Oct 7, 2025)
+
+**Branch:** `feature/docs-ia-redesign-1845-continue` (continuing from merged PR #1845)
+
+### Actions Completed:
+
+1. **✅ Deleted orphaned `docs/guides/advanced/README.md`**
+
+   - Navigation index left behind after reorganization
+   - Linked to files now in core-concepts/
+   - Redundant, deleted
+
+2. **✅ Created `docs/introduction.md`** - New unified homepage
+
+   - Explains what React on Rails is and why use it
+   - When to use / when not to use decision guide
+   - Three clear paths: Quick Start, Installation, Tutorial
+   - Popular use cases quick reference table
+   - Core concepts links
+   - Philosophy section linking to doctrine
+   - Help and support section
+   - Added community stat (thousands of production sites)
+   - Added all 3 example repos (spec/dummy, demo SSR/HMR, reactrails.com)
+   - System requirements from actual docs
+   - Built from: overview.md, doctrine.md, README.md structure
+
+3. **✅ Deleted `docs/core-concepts/react-on-rails-overview.md`**
+
+   - Content consolidated into introduction.md
+   - Outdated prerequisites (Rails >=5 vs current Rails 7+)
+   - Created confusion with two similar entry points
+   - Updated 2 links: home.md and doctrine.md
+
+4. **✅ Simplified `docs/README.md`** for GitHub users
+
+   - Reduced from 173 lines to 65 lines
+   - Directs to website first
+   - Kept valuable learning paths from PR #1813
+   - Kept popular use cases table
+   - Added documentation categories overview
+   - Removed duplicate content (now in introduction.md)
+   - Purpose: Serves GitHub users browsing repo, not website visitors
+
+5. **✅ Deleted `docs/home.md`**
+
+   - Was the current website homepage (29 lines of links)
+   - Replaced by introduction.md
+   - All valuable content already in introduction.md or README.md
+   - No unique content lost
+
+6. **✅ Transformed `docs/getting-started.md` → `docs/getting-started/using-react-on-rails.md`**
+
+   - Reduced from 253 to 238 lines (still comprehensive but focused)
+   - Removed: Choose Starting Point (redundant), System Requirements (duplicate), More Reading (navigation)
+   - Transformed installation section to conceptual overview with links
+
+7. **✅ Deleted `docs/advanced-topics/manual-installation-overview.md`**
+   - Outdated since 2018 (had "TODO: Review this file" for 7 years)
+   - Confused purpose: title said "Manual Installation" but subtitle said "summarizes what generator does"
+   - Outdated content: referenced `/client`, `webpacker`, missing auto-bundling
+   - No clear use case: generator IS the manual installation (not external CLI)
+   - Content better covered in: how-react-on-rails-works.md, using-react-on-rails.md
+   - Removed link from installation-into-an-existing-rails-app.md
+   - Decision discussed with team in Slack
+   - Deleted original `docs/getting-started.md`
+
+**Remaining Entry Point Tasks:**
+
+- Update website config (sc-website gatsby-node.js) to use introduction.md as homepage
+
+**Next Actions:** Update website config when ready (keeping for last as user requested)
 
 ---
 
@@ -329,15 +401,16 @@ After Steps 1-8, found 12 files not in original plan. Investigated and reorganiz
 
 ```
 docs/
-├── introduction.md              # TODO: Create in next phase
-├── getting-started/ (4 files)
+├── introduction.md              # ✅ Created - new unified homepage
+├── README.md                    # ✅ Simplified for GitHub users
+├── getting-started/ (5 files)
+│   ├── using-react-on-rails.md  # ✅ NEW - Transformed from getting-started.md
 │   ├── quick-start.md
 │   ├── installation-into-an-existing-rails-app.md
 │   ├── tutorial.md
 │   └── project-structure.md
-├── core-concepts/ (8 files)
+├── core-concepts/ (7 files)
 │   ├── how-react-on-rails-works.md
-│   ├── react-on-rails-overview.md
 │   ├── client-vs-server-rendering.md
 │   ├── react-server-rendering.md
 │   ├── render-functions-and-railscontext.md
@@ -356,7 +429,7 @@ docs/
 │   ├── react-and-redux.md
 │   ├── react-helmet.md
 │   ├── rails-webpacker-react-integration-options.md
-│   ├── code-splitting.md
+│   ├── code-splitting.md                      # Moved to outdated/ (marked outdated)
 │   ├── images.md
 │   ├── foreman-issues.md
 │   └── turbolinks.md                          # Step 5 correction: from deployment
@@ -400,9 +473,8 @@ docs/
 │   ├── doctrine.md
 │   ├── style.md
 │   └── tips.md
-└── advanced-topics/ (2 files - KEEPING as category)
-    ├── rails-engine-integration.md            # Step 5 correction: from deployment
-    └── manual-installation-overview.md        # Orphaned: manual setup guide
+└── advanced-topics/ (1 file - KEEPING as category)
+    └── rails-engine-integration.md            # Step 5 correction: from deployment
 ```
 
 **Final Decisions:**

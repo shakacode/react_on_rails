@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, Route, Switch } from 'react-router-dom';
+import { Link, Route, Routes } from 'react-router-dom';
 import RouterFirstPage from './RouterFirstPage';
 import RouterSecondPage from './RouterSecondPage';
 
@@ -21,10 +21,10 @@ const RouterLayout = () => (
       </li>
     </ul>
     <hr />
-    <Switch>
-      <Route path="/react_router/first_page" component={RouterFirstPage} />
-      <Route path="/react_router/second_page" component={RouterSecondPage} />
-    </Switch>
+    <Routes>
+      <Route path="first_page" element={<RouterFirstPage />} />
+      <Route path="second_page" element={<RouterSecondPage />} />
+    </Routes>
   </div>
 );
 

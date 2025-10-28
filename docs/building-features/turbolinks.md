@@ -6,45 +6,124 @@
 - See [PR 1374](https://github.com/shakacode/react_on_rails/pull/1374).
 - Ability to use with [Turbo (`@hotwired/turbo`)](https://turbo.hotwired.dev/), as Turbolinks becomes obsolete.
 
-# Using Turbo
+## Using Turbo
 
-To configure Turbo the following option can be set:
-`ReactOnRails.setOptions({ turbo: true })`
+Turbo is the modern replacement for Turbolinks, providing fast navigation through your Rails app without full page reloads.
 
-Turbo is not auto-detected like older Turbolinks.
+### Basic Setup
 
-_TODO: Walk through code changes in PR 1620._
+**1. Install Turbo**
 
-# Legacy Turbolinks
+Add the Turbo Rails gem and JavaScript package:
 
-_The following docs may be outdated. We recommend updating to the latest Turbo or removing old Turbolinks._
+```bash
+# Gemfile
+gem "turbo-rails"
 
+# JavaScript
+yarn add @hotwired/turbo-rails
+```
+
+**2. Enable Turbo in React on Rails**
+
+Import Turbo and configure React on Rails to work with it:
+
+```js
+// app/javascript/packs/application.js
+import '@hotwired/turbo-rails';
+
+ReactOnRails.setOptions({
+  turbo: true, // Enable Turbo support (not auto-detected)
+});
+```
+
+**3. Use Turbo Frames** (works out of the box)
+
+Turbo Frames work with React components without any special configuration:
+
+```erb
+<%# app/views/items/index.html.erb %>
+<%= turbo_frame_tag 'item-list' do %>
+  <%= react_component("ItemList", props: @items) %>
+<% end %>
+
+<%# Clicking a link that responds with another turbo_frame_tag will update just that frame %>
+```
+
+### Turbo Streams (Requires React on Rails Pro)
+
+> **⚡️ React on Rails Pro Feature**
+>
+> Turbo Streams require the `immediate_hydration: true` option, which is a [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/) licensed feature.
+
+**Why Turbo Streams Need Special Handling:**
+
+Unlike Turbo Frames, Turbo Streams don't dispatch the normal `turbo:render` events that React on Rails uses to hydrate components. Instead, they directly manipulate the DOM. The `immediate_hydration` option tells React on Rails to hydrate the component immediately when it's inserted into the DOM, without waiting for page load events.
+
+**Example: Create a Turbo Stream Response**
+
+```erb
+<%# app/views/items/index.html.erb - Initial page with frame %>
+<%= turbo_frame_tag 'item-list' do %>
+  <%= button_to "Load Items", items_path, method: :post %>
+<% end %>
+```
+
+```erb
+<%# app/views/items/create.turbo_stream.erb - Turbo Stream response %>
+<%= turbo_stream.update 'item-list' do %>
+  <%= react_component("ItemList",
+                      props: @items,
+                      immediate_hydration: true) %>
+<% end %>
+```
+
+**What Happens:**
+
+1. User clicks "Load Items" button
+2. Rails responds with `create.turbo_stream.erb`
+3. Turbo Stream updates the `item-list` frame with the new React component
+4. `immediate_hydration: true` ensures the component hydrates immediately
+
+**Learn More:**
+
+- See [v16.0 Release Notes](../upgrading/release-notes/16.0.0.md#enhanced-script-loading-strategies) for full `immediate_hydration` documentation
+- See [Streaming Server Rendering](./streaming-server-rendering.md) for another Pro use case
+- Working example in codebase: `spec/dummy/app/views/pages/turbo_stream_send_hello_world.turbo_stream.erb`
+- Contact [justin@shakacode.com](mailto:justin@shakacode.com) for React on Rails Pro licensing
+
+**Migration Note:** If you're referencing [PR #1620](https://github.com/shakacode/react_on_rails/pull/1620) discussions, note that `force_load` was renamed to `immediate_hydration` in v16.0.
+
+## Legacy Turbolinks Support
+
+_The following documentation covers older Turbolinks versions (2.x and 5.x). While still supported by React on Rails, we recommend migrating to Turbo when possible._
+
+React on Rails currently supports:
+
+- **Turbolinks 5.x** (e.g., 5.0.0+) - Auto-detected
+- **Turbolinks 2.x** (Classic) - Auto-detected
 - See [Turbolinks on Github](https://github.com/rails/turbolinks)
-- React on Rails currently supports 2.5.x of Turbolinks and 5.0.0 of Turbolinks 5.
-- You may include Turbolinks either via yarn (recommended) or via the gem.
 
-## Why Turbolinks?
+You may include Turbolinks either via yarn (recommended) or via the gem.
+
+### Why Turbolinks?
 
 As you switch between Rails HTML controller requests, you will only load the HTML and you will not reload JavaScript and stylesheets.
 This definitely can make an app perform better, even if the JavaScript and stylesheets are cached by the browser, as they will still require parsing.
 
-## Requirements for Using Turbolinks
+### Requirements for Using Turbolinks
 
 1. Either **avoid using [React Router](https://reactrouter.com/)** or be prepared to deal with any conflicts between it and Turbolinks.
 2. **Use one JS and one CSS file** throughout your app. Otherwise, you will have to figure out how best to handle multiple JS and CSS files throughout the app given Turbolinks.
 
-## Why Not Turbolinks
+### Why Not Turbolinks
 
 1. [React Router](https://reactrouter.com/) handles the back and forward buttons, as does Turbolinks. You _might_ be able to make this work. _Please share your findings._
 1. You want to do code splitting to minimize the JavaScript loaded.
 
-## More Information
+### Installation
 
-- CSRF tokens need thorough checking with Turbolinks5. Turbolinks5 changes the head element by JavaScript (not only body) on page changes with the correct csrf meta tag. But if the JS code parsed this from head when several windows were opened, then our specs didn't all pass. I didn't examine the details, it may be caused by app code, not library code. Anyway, it may need additional checking because there is a CSRF helper in ReactOnRails and it needs to work with Turbolinks5.
-- Turbolinks5 sends requests without the `Accept: */*` in the header, only exactly like `Accept: text/html` which makes Rails behave a bit specifically compared to normal and mime-parsing, which is skipped when Rails sees `*/*`. For more details on the special handling of `*/*` you can read [Mime Type Resolution in Rails](http://blog.bigbinary.com/2010/11/23/mime-type-resolution-in-rails.html).
-- If you're using multiple Webpack bundles, make sure that there are no name conflicts between JS objects or Redux store paths.
-
-### Install Checklist
+#### Install Checklist
 
 1. Include turbolinks via yarn as shown in the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/blob/8a6c8aa2e3b7ae5b08b0a9744fb3a63a2fe0f002/client/webpack.client.base.config.js#L22) or include the gem "turbolinks".
 1. Included the proper "track" tags when you include the javascript and stylesheet:
@@ -61,13 +140,7 @@ NOTE: for Turbolinks 2.x, use `'data-turbolinks-track' => true`
    //= require turbolinks
    ```
 
-## Turbolinks 5
-
-Turbolinks 5 is now supported. React on Rails will automatically detect which version of Turbolinks you are using and use the correct event handlers.
-
-For more information on Turbolinks 5: [https://github.com/turbolinks/turbolinks](https://github.com/turbolinks/turbolinks)
-
-## Turbolinks from NPM
+#### Turbolinks from NPM
 
 See the [instructions on installing from NPM](https://github.com/turbolinks/turbolinks#installation-using-npm).
 
@@ -76,7 +149,7 @@ import Turbolinks from 'turbolinks';
 Turbolinks.start();
 ```
 
-### Async script loading
+##### Async script loading
 
 Async script loading can be done like this (starting with Shakapacker 8.2):
 
@@ -102,10 +175,33 @@ document.addEventListener('turbolinks:load', function () {
 
 React on Rails 15 fixes both issues, so if you still have the listener it can be removed (and should be as `reactOnRailsPageLoaded()` is now async).
 
-> [!WARNING]
-> Do not use `immediate_hydration: false` (React on Rails Pro licensed feature) with Turbolinks if you have async scripts.
+> [!WARNING] > **Async Scripts with Turbolinks Require Pro Feature**
+>
+> If you use async script loading with Turbolinks, you must enable `immediate_hydration: true` to prevent race conditions. This is a React on Rails Pro feature.
+>
+> Without `immediate_hydration: true`, async scripts may not be ready when Turbolinks fires navigation events, causing components to fail hydration.
+>
+> **Alternatives:**
+>
+> - Use `defer` instead of `async` (waits for full page load before hydration)
+> - Upgrade to modern Turbo (recommended)
+> - Use React on Rails Pro for `immediate_hydration: true`
 
-## Troubleshooting
+### Turbolinks 5 Specific Information
+
+React on Rails will automatically detect which version of Turbolinks you are using (2.x or 5.x) and use the correct event handlers.
+
+For more information on Turbolinks 5: [https://github.com/turbolinks/turbolinks](https://github.com/turbolinks/turbolinks)
+
+### Technical Details and Troubleshooting
+
+#### CSRF and MIME Type Handling
+
+- **CSRF tokens**: Turbolinks 5 changes the head element by JavaScript (not only body) on page changes with the correct csrf meta tag. Be thorough checking CSRF tokens, especially when multiple windows are opened, as the CSRF helper in ReactOnRails needs to work with Turbolinks5.
+- **MIME type handling**: Turbolinks 5 sends requests with `Accept: text/html` only (not `Accept: */*`), which makes Rails behave differently compared to normal requests. For more details on the special handling of `*/*` you can read [Mime Type Resolution in Rails](http://blog.bigbinary.com/2010/11/23/mime-type-resolution-in-rails.html).
+- **Multiple Webpack bundles**: If you're using multiple Webpack bundles, make sure that there are no name conflicts between JS objects or Redux store paths.
+
+#### Debugging Turbolinks Events
 
 To turn on tracing of Turbolinks events, put this in your registration file, where you register your components.
 
