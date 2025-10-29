@@ -28,9 +28,9 @@ export default {
 
   // Allow Jest to transform react-on-rails package from node_modules
   transformIgnorePatterns: ['node_modules/(?!react-on-rails)'],
-  testEnvironmentOptions: {
-    customExportConditions: process.env.NODE_CONDITIONS?.split(',') ?? [],
-  },
+  testEnvironmentOptions: !!process.env.NODE_CONDITIONS ? {
+    customExportConditions: process.env.NODE_CONDITIONS.split(','),
+  } : {},
   // Set root directory to current package
   rootDir: '.',
 };
