@@ -22,7 +22,6 @@ import {
   StreamRenderState,
   StreamableComponentResult,
 } from 'react-on-rails/types';
-import handleError from 'react-on-rails/handleError';
 import { convertToError } from 'react-on-rails/serverRenderUtils';
 import ReactOnRails from './ReactOnRails.full.ts';
 
@@ -86,7 +85,7 @@ const streamRenderRSCComponent = (
   initializeAndRender().catch((e: unknown) => {
     const error = convertToError(e);
     reportError(error);
-    const errorHtml = handleError({ e: error, name: options.name, serverSide: true });
+    const errorHtml = JSON.stringify({ e: error, name: options.name, serverSide: true });
     writeChunk(errorHtml);
     endStream();
   });

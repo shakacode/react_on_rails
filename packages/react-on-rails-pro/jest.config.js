@@ -31,4 +31,8 @@ export default {
 
   // Set root directory to current package
   rootDir: '.',
+
+  testEnvironmentOptions: {
+    customExportConditions: process.env.NODE_CONDITIONS?.split(','),
+  },
 };

@@ -73,5 +73,9 @@
   "bugs": {
     "url": "https://github.com/shakacode/react_on_rails/issues"
   },
-  "homepage": "https://github.com/shakacode/react_on_rails#readme"
+  "homepage": "https://github.com/shakacode/react_on_rails#readme",
+  "devDependencies": {
+    "@types/mock-fs": "^4.13.4",
+    "mock-fs": "^5.5.0"
+  }
 }
