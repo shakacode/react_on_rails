@@ -48,7 +48,7 @@ gsub_file_content(
 gsub_file_content(
   "../packages/react-on-rails-pro/package.json",
   /"test-rsc": "(?:\\"|[^"])*",/,
-  '"test-rsc": "exit 0",',
+  '"test-rsc": "exit 0",'
 )
 # Keep modern JSX transform for React 18+
 # gsub_file_content("../tsconfig.json", "react-jsx", "react")
