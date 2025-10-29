@@ -47,12 +47,16 @@
     "./ReactOnRails.client": "./lib/ReactOnRails.client.js",
     "./ReactOnRails.full": "./lib/ReactOnRails.full.js",
     "./handleError": "./lib/handleError.js",
+    "./generateRenderingErrorMessage": "./lib/generateRenderingErrorMessage.js",
     "./serverRenderUtils": "./lib/serverRenderUtils.js",
     "./buildConsoleReplay": "./lib/buildConsoleReplay.js",
     "./ReactDOMServer": "./lib/ReactDOMServer.cjs",
     "./serverRenderReactComponent": "./lib/serverRenderReactComponent.js",
     "./@internal/base/client": "./lib/base/client.js",
-    "./@internal/base/full": "./lib/base/full.js"
+    "./@internal/base/full": {
+      "react-server": "./lib/base/full.rsc.js",
+      "default": "./lib/base/full.js"
+    }
   },
   "peerDependencies": {
     "react": ">= 16",

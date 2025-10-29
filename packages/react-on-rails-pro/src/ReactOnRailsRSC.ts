@@ -22,15 +22,15 @@ import {
   StreamRenderState,
   StreamableComponentResult,
 } from 'react-on-rails/types';
-import handleError from 'react-on-rails/handleError';
 import { convertToError } from 'react-on-rails/serverRenderUtils';
+import handleError from './handleErrorRSC.ts';
 import ReactOnRails from './ReactOnRails.full.ts';
 
 import {
   streamServerRenderedComponent,
   StreamingTrackers,
   transformRenderStreamChunksToResultObject,
-} from './streamServerRenderedReactComponent.ts';
+} from './streamingUtils.ts';
 import loadJsonFile from './loadJsonFile.ts';
 
 let serverRendererPromise: Promise<ReturnType<typeof buildServerRenderer>> | undefined;
@@ -51,7 +51,7 @@ const streamRenderRSCComponent = (
     isShellReady: true,
   };
 
-  const { pipeToTransform, readableStream, emitError, writeChunk, endStream } =
+  const { pipeToTransform, readableStream, emitError } =
     transformRenderStreamChunksToResultObject(renderState);
 
   const reportError = (error: Error) => {
@@ -87,8 +87,7 @@ const streamRenderRSCComponent = (
     const error = convertToError(e);
     reportError(error);
     const errorHtml = handleError({ e: error, name: options.name, serverSide: true });
-    writeChunk(errorHtml);
-    endStream();
+    pipeToTransform(errorHtml);
   });
 
   readableStream.on('end', () => {
@@ -99,7 +98,7 @@ const streamRenderRSCComponent = (
 
 ReactOnRails.serverRenderRSCReactComponent = (options: RSCRenderParams) => {
   try {
-    return streamServerRenderedComponent(options, streamRenderRSCComponent);
+    return streamServerRenderedComponent(options, streamRenderRSCComponent, handleError);
   } finally {
     console.history = [];
   }

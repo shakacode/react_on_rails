@@ -16,7 +16,7 @@ if (typeof window !== 'undefined') {
  * SSR-specific functions that extend the base client object to create a full object.
  * Typed explicitly to ensure type safety when mutating the base object.
  */
-type ReactOnRailsFullSpecificFunctions = Pick<
+export type ReactOnRailsFullSpecificFunctions = Pick<
   ReactOnRailsInternal,
   'handleError' | 'serverRenderReactComponent'
 >;
