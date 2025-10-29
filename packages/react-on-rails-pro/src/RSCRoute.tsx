@@ -80,7 +80,7 @@ const PromiseWrapper = ({ promise }: { promise: Promise<React.ReactNode> }) => {
   const promiseResult = React.use(promise);
 
   // In case that an error happened during the rendering of the RSC payload before the rendering of the component itself starts
-  // RSC bundle will return an error object serilaized inside the RSC payload
+  // RSC bundle will return an error object serialized inside the RSC payload
   if (promiseResult instanceof Error) {
     throw promiseResult;
   }
