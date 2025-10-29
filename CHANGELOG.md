@@ -29,6 +29,8 @@ Changes since the last non-beta release.
 
 - **Improved Error Messages**: Error messages for version mismatches and package configuration issues now include package-manager-specific installation commands (npm, yarn, pnpm, bun). [PR #1881](https://github.com/shakacode/react_on_rails/pull/1881) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
+- **Improved RSC Payload Error Handling**: Errors that happen during generation of RSC payload are transferred properly to rails side and logs the error message and stack. [PR #1888](https://github.com/shakacode/react_on_rails/pull/1888) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 #### Bug Fixes
 
 - **Use as Git dependency**: All packages can now be installed as Git dependencies. This is useful for development and testing purposes. See [CONTRIBUTING.md](./CONTRIBUTING.md#git-dependencies) for documentation. [PR #1873](https://github.com/shakacode/react_on_rails/pull/1873) by [alexeyr-ci2](https://github.com/alexeyr-ci2).
