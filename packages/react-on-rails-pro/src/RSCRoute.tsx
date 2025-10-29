@@ -77,7 +77,15 @@ export type RSCRouteProps = {
 
 const PromiseWrapper = ({ promise }: { promise: Promise<React.ReactNode> }) => {
   // React.use is available in React 18.3+
-  return React.use(promise);
+  const promiseResult = React.use(promise);
+
+  // In case that an error happened during the rendering of the RSC payload before the rendering of the component itself starts
+  // RSC bundle will return an error object serilaized inside the RSC payload
+  if (promiseResult instanceof Error) {
+    throw promiseResult;
+  }
+
+  return promiseResult;
 };
 
 const RSCRoute = ({ componentName, componentProps }: RSCRouteProps): React.ReactNode => {
