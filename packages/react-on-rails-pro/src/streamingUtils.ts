@@ -18,7 +18,6 @@ import { PassThrough, Readable } from 'stream';
 import createReactOutput from 'react-on-rails/createReactOutput';
 import { isPromise, isServerRenderHash } from 'react-on-rails/isServerRenderResult';
 import buildConsoleReplay from 'react-on-rails/buildConsoleReplay';
-import handleError from 'react-on-rails/handleError';
 import { createResultObject, convertToError, validateComponent } from 'react-on-rails/serverRenderUtils';
 import {
   RenderParams,
@@ -27,6 +26,7 @@ import {
   PipeableOrReadableStream,
   RailsContextWithServerStreamingCapabilities,
   assertRailsContextWithServerComponentMetadata,
+  ErrorOptions,
 } from 'react-on-rails/types';
 import * as ComponentRegistry from './ComponentRegistry.ts';
 import PostSSRHookTracker from './PostSSRHookTracker.ts';
@@ -179,6 +179,7 @@ type StreamRenderer<T, P extends RenderParams> = (
 export const streamServerRenderedComponent = <T, P extends RenderParams>(
   options: P,
   renderStrategy: StreamRenderer<T, P>,
+  handleError: (options: ErrorOptions) => PipeableOrReadableStream,
 ): T => {
   const { name: componentName, domNodeId, trace, props, railsContext, throwJsErrors } = options;
 
@@ -233,7 +234,7 @@ export const streamServerRenderedComponent = <T, P extends RenderParams>(
 
     return renderStrategy(reactRenderingResult, optionsWithStreamingCapabilities, streamingTrackers);
   } catch (e) {
-    const { readableStream, writeChunk, emitError, endStream } = transformRenderStreamChunksToResultObject({
+    const { readableStream, pipeToTransform, emitError } = transformRenderStreamChunksToResultObject({
       hasErrors: true,
       isShellReady: false,
       result: null,
@@ -243,9 +244,8 @@ export const streamServerRenderedComponent = <T, P extends RenderParams>(
     }
 
     const error = convertToError(e);
-    const htmlResult = handleError({ e: error, name: componentName, serverSide: true });
-    writeChunk(htmlResult);
-    endStream();
+    const htmlResultStream = handleError({ e: error, name: componentName, serverSide: true });
+    pipeToTransform(htmlResultStream);
     return readableStream as T;
   }
 };
