@@ -14,6 +14,7 @@ import * as mock from 'mock-fs';
 import ReactOnRails, { RailsContextWithServerStreamingCapabilities } from '../src/ReactOnRailsRSC';
 import AsyncQueue from './AsyncQueue';
 import StreamReader from './StreamReader';
+import removeRSCChunkStack from './utils/removeRSCChunkStack';
 
 const manifestFileDirectory = path.resolve(__dirname, '../src')
 const clientManifestPath = path.join(manifestFileDirectory, 'react-client-manifest.json');
@@ -82,35 +83,10 @@ const createParallelRenders = (size: number) => {
 
   const enqueue = (value: string) => asyncQueues.forEach(asyncQueues => asyncQueues.enqueue(value));
 
-  const removeComponentJsonData = (chunk: string) => {
-    const parsedJson = JSON.parse(chunk);
-    const html = parsedJson.html as string;
-    const santizedHtml = html.split('\n').map(chunkLine => {
-      if (!chunkLine.includes('"stack":')) {
-        return chunkLine;
-      }
-
-      const regexMatch = /(^\d+):\{/.exec(chunkLine)
-      if (!regexMatch) {
-        return;
-      }
-
-      const chunkJsonString = chunkLine.slice(chunkLine.indexOf('{'));
-      const chunkJson = JSON.parse(chunkJsonString);
-      delete chunkJson.stack;
-      return `${regexMatch[1]}:${JSON.stringify(chunkJson)}`
-    });
-
-    return JSON.stringify({
-      ...parsedJson,
-      html: santizedHtml,
-    });
-  }
-
   const expectNextChunk = (nextChunk: string) => Promise.all(
     readers.map(async (reader) => {
       const chunk = await reader.nextChunk();
-      expect(removeComponentJsonData(chunk)).toEqual(removeComponentJsonData(nextChunk));
+      expect(removeRSCChunkStack(chunk)).toEqual(removeRSCChunkStack(nextChunk));
     })
   );
   

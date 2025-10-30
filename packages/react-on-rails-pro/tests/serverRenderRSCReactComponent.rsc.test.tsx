@@ -12,6 +12,7 @@ import { text } from 'stream/consumers';
 import { buildServerRenderer } from 'react-on-rails-rsc/server.node';
 import createReactOutput from 'react-on-rails/createReactOutput';
 import ReactOnRails, { RailsContextWithServerStreamingCapabilities } from '../src/ReactOnRailsRSC.ts';
+import removeRSCStackFromAllChunks from './utils/removeRSCStackFromAllChunks.ts'
 
 const PromiseWrapper = async ({ promise, name }: { promise: Promise<string>, name: string }) => {
   console.log(`[${name}] Before awaitng`);
@@ -59,7 +60,7 @@ mock({
 
 afterAll(() => {
   mock.restore();
-})
+});
 
 test('no logs leakage between concurrent rendering components', async () => {
   const readable1 = ReactOnRails.serverRenderRSCReactComponent({
@@ -89,10 +90,74 @@ test('no logs leakage between concurrent rendering components', async () => {
 
   expect(content1).toContain("First Unique Name");
   expect(content2).toContain("Second Unique Name");
-  // expect(content1.match(/First Unique Name/g)).toHaveLength(55)
-  // expect(content2.match(/Second Unique Name/g)).toHaveLength(55)
   expect(content1).not.toContain("Second Unique Name");
   expect(content2).not.toContain("First Unique Name");
+});
 
-  // expect(content1.replace(new RegExp("First Unique Name", 'g'), "Second Unique Name")).toEqual(content2);
-})
+test('no logs lekage from outside the component', async () => {
+  const readable1 = ReactOnRails.serverRenderRSCReactComponent({
+    railsContext: {
+      reactClientManifestFileName: 'react-client-manifest.json',
+      reactServerClientManifestFileName: 'react-server-client-manifest.json',
+    } as unknown as RailsContextWithServerStreamingCapabilities,
+    name: 'PromiseContainer',
+    renderingReturnsPromises: true,
+    throwJsErrors: true,
+    domNodeId: 'dom-id',
+    props: { name: "First Unique Name" }
+  });
+
+  const promise = new Promise<void>((resolve) => {
+    let i = 0;
+    const intervalId = setInterval(() => {
+      console.log(`Interval ${i} at [Outside The Component]`);
+      i += 1;
+      if (i === 50) {
+        clearInterval(intervalId);
+        resolve();
+      }
+    }, 1);
+  });
+
+  const [content1] = await Promise.all([text(readable1), promise]);
+
+  expect(content1).toContain("First Unique Name");
+  expect(content1).not.toContain("Outside The Component");
+});
+
+test('[bug] catches logs outside the component during reading the stream', async () => {
+  const readable1 = ReactOnRails.serverRenderRSCReactComponent({
+    railsContext: {
+      reactClientManifestFileName: 'react-client-manifest.json',
+      reactServerClientManifestFileName: 'react-server-client-manifest.json',
+    } as unknown as RailsContextWithServerStreamingCapabilities,
+    name: 'PromiseContainer',
+    renderingReturnsPromises: true,
+    throwJsErrors: true,
+    domNodeId: 'dom-id',
+    props: { name: "First Unique Name" }
+  });
+  
+  let content1 = "";
+  let i = 0;
+  readable1.on('data', (chunk) => {
+    i += 1;
+    // To avoid infinite loop
+    if (i < 5) {
+      console.log("Outside The Component");
+    }
+    content1 += chunk.toString();
+  });
+
+  // However, any logs from outside the stream 'data' event callback is not catched
+  const intervalId = setInterval(() => {
+    console.log("From Interval")
+  }, 2);
+  await finished(readable1);
+  clearInterval(intervalId);
+
+  expect(content1).toContain("First Unique Name");
+  expect(content1).not.toContain("From Interval");
+  // Here's the bug
+  expect(content1).toContain("Outside The Component");
+});
