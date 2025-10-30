@@ -111,6 +111,7 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
 
   const transformStream = new PassThrough({
     transform(chunk: Buffer, _, callback) {
+      console.log("Stream working");
       const htmlChunk = chunk.toString();
       const consoleReplayScript = buildConsoleReplay(consoleHistory, previouslyReplayedConsoleMessages);
       previouslyReplayedConsoleMessages = consoleHistory?.length || 0;
@@ -124,6 +125,9 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
       renderState.hasErrors = false;
 
       callback();
+    },
+    flush() {
+      console.log("Stream flushed");
     },
   });
 
@@ -141,6 +145,7 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
 
   const writeChunk = (chunk: string) => transformStream.write(chunk);
   const endStream = () => {
+    console.log("Stream ended");
     transformStream.end();
     if (pipedStream && 'abort' in pipedStream) {
       pipedStream.abort();
