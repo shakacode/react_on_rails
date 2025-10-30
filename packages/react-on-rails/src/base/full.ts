@@ -1,6 +1,6 @@
 import { createBaseClientObject, type BaseClientObjectType } from './client.ts';
 import type { ReactOnRailsInternal, RenderParams, RenderResult, ErrorOptions } from '../types/index.ts';
-import handleError from '../handleError.ts';
+import handleError from '../generateRenderingErrorMessage.ts';
 import serverRenderReactComponent from '../serverRenderReactComponent.ts';
 
 // Warn about bundle size when included in browser bundles

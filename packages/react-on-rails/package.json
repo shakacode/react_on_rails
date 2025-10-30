@@ -46,7 +46,7 @@
     "./isRenderFunction": "./lib/isRenderFunction.js",
     "./ReactOnRails.client": "./lib/ReactOnRails.client.js",
     "./ReactOnRails.full": "./lib/ReactOnRails.full.js",
-    "./handleError": "./lib/handleError.js",
+    "./handleError": "./lib/generateRenderingErrorMessage.js",
     "./serverRenderUtils": "./lib/serverRenderUtils.js",
     "./buildConsoleReplay": "./lib/buildConsoleReplay.js",
     "./ReactDOMServer": "./lib/ReactDOMServer.cjs",

@@ -30,7 +30,7 @@ import {
   streamServerRenderedComponent,
   StreamingTrackers,
   transformRenderStreamChunksToResultObject,
-} from './streamServerRenderedReactComponent.ts';
+} from './streamingUtils.ts';
 import loadJsonFile from './loadJsonFile.ts';
 
 let serverRendererPromise: Promise<ReturnType<typeof buildServerRenderer>> | undefined;
