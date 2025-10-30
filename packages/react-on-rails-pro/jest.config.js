@@ -28,7 +28,13 @@ export default {
 
   // Allow Jest to transform react-on-rails package from node_modules
   transformIgnorePatterns: ['node_modules/(?!react-on-rails)'],
-
+  // RSC tests needs the node condition "react-server" to run
+  // So, before running these tests, we set "NODE_CONDITIONS=react-server"
+  testEnvironmentOptions: process.env.NODE_CONDITIONS
+    ? {
+        customExportConditions: process.env.NODE_CONDITIONS.split(','),
+      }
+    : {},
   // Set root directory to current package
   rootDir: '.',
 };

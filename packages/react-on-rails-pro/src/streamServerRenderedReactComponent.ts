@@ -14,7 +14,6 @@
 
 import { Readable } from 'stream';
 
-import handleError from 'react-on-rails/handleError';
 import { renderToPipeableStream } from 'react-on-rails/ReactDOMServer';
 import { convertToError } from 'react-on-rails/serverRenderUtils';
 import {
@@ -24,11 +23,12 @@ import {
   StreamableComponentResult,
 } from 'react-on-rails/types';
 import injectRSCPayload from './injectRSCPayload.ts';
-import { 
+import {
+  streamServerRenderedComponent,
   StreamingTrackers,
   transformRenderStreamChunksToResultObject,
-  streamServerRenderedComponent,
- } from './streamingUtils.ts';
+} from './streamingUtils.ts';
+import handleError from './handleError.ts';
 
 const streamRenderReactComponent = (
   reactRenderingResult: StreamableComponentResult,
@@ -55,9 +55,8 @@ const streamRenderReactComponent = (
   };
 
   const sendErrorHtml = (error: Error) => {
-    const errorHtml = handleError({ e: error, name: componentName, serverSide: true });
-    writeChunk(errorHtml);
-    endStream();
+    const errorHtmlStream = handleError({ e: error, name: componentName, serverSide: true });
+    pipeToTransform(errorHtmlStream);
   };
 
   assertRailsContextWithServerStreamingCapabilities(railsContext);
@@ -102,6 +101,6 @@ const streamRenderReactComponent = (
 };
 
 const streamServerRenderedReactComponent = (options: RenderParams): Readable =>
-  streamServerRenderedComponent(options, streamRenderReactComponent);
+  streamServerRenderedComponent(options, streamRenderReactComponent, handleError);
 
 export default streamServerRenderedReactComponent;

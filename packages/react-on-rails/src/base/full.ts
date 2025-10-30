@@ -1,6 +1,6 @@
 import { createBaseClientObject, type BaseClientObjectType } from './client.ts';
 import type { ReactOnRailsInternal, RenderParams, RenderResult, ErrorOptions } from '../types/index.ts';
-import handleError from '../generateRenderingErrorMessage.ts';
+import handleError from '../handleError.ts';
 import serverRenderReactComponent from '../serverRenderReactComponent.ts';
 
 // Warn about bundle size when included in browser bundles
@@ -16,7 +16,7 @@ if (typeof window !== 'undefined') {
  * SSR-specific functions that extend the base client object to create a full object.
  * Typed explicitly to ensure type safety when mutating the base object.
  */
-type ReactOnRailsFullSpecificFunctions = Pick<
+export type ReactOnRailsFullSpecificFunctions = Pick<
   ReactOnRailsInternal,
   'handleError' | 'serverRenderReactComponent'
 >;
