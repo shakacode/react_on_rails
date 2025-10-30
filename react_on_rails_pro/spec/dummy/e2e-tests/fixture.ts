@@ -68,7 +68,7 @@ const redisReceiverPageController = redisControlledTest.extend<RedisReceiverCont
   },
   matchPageSnapshot: async ({ page }, use) => {
     await use(async (snapshotPath) => {
-      await expect(page.locator('.redis-receiver-container:visible')).toBeVisible({ timeout: 10000 });
+      await expect(page.locator('.redis-receiver-container:visible')).toBeVisible();
       await expect(page.locator('.redis-receiver-container:visible').first()).toMatchAriaSnapshot({
         name: `${snapshotPath}.aria.yml`,
       });
