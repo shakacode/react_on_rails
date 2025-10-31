@@ -8,7 +8,7 @@
     "build-watch": "yarn run clean && yarn run tsc --watch",
     "clean": "rm -rf ./lib",
     "test": "yarn test:non-rsc && yarn test:rsc",
-    "test:non-rsc": "jest tests --testPathIgnorePatterns=\".*(.rsc.test.).*\"",
+    "test:non-rsc": "jest tests --testPathIgnorePatterns=\".*\\.rsc\\.test\\..*\"",
     "test:rsc": "NODE_CONDITIONS=react-server jest tests/*.rsc.test.*",
     "type-check": "yarn run tsc --noEmit --noErrorTruncation",
     "prepack": "nps build.prepack",
