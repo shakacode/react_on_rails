@@ -298,7 +298,7 @@ export function listenToRequestData(requestId: string): RequestListener {
       isActive = false;
 
       // Reject and cleanup all pending promises
-      Object.entries(pendingPromises).forEach(([key, pendingPromise]) => {
+      Object.entries(pendingPromises).forEach(([_, pendingPromise]) => {
         if (pendingPromise && !pendingPromise.resolved) {
           clearTimeout(pendingPromise.timer);
           pendingPromise.reject(new Error('Redis connection closed'));
@@ -306,6 +306,7 @@ export function listenToRequestData(requestId: string): RequestListener {
       });
 
       // Clear the pendingPromises map completely
+      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
       Object.keys(pendingPromises).forEach((key) => delete pendingPromises[key]);
 
       // Always close THIS listener's Redis client
