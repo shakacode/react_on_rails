@@ -66,10 +66,15 @@ export function listenToRequestData(requestId: string): RequestListener {
 
     // Start connection if not already in progress
     if (!connectionPromise) {
-      connectionPromise = redisClient.connect().then(() => {
-        isClientConnected = true;
-        connectionPromise = null; // Clear after successful connection
-      });
+      connectionPromise = redisClient.connect()
+        .then(() => {
+          isClientConnected = true;
+          connectionPromise = null; // Clear after successful connection
+        })
+        .catch((error) => {
+          connectionPromise = null; // Clear on error to allow retry
+          throw error; // Re-throw to propagate error
+        });
     }
 
     // Wait for connection to complete (handles concurrent calls)
