@@ -36,6 +36,7 @@ interface PendingPromise {
 
 // Shared Redis client
 let sharedRedisClient: RedisClientType | null = null;
+let connectionPromise: Promise<unknown> | undefined;
 let isClientConnected = false;
 
 // Store active listeners by requestId
@@ -54,7 +55,10 @@ async function getRedisClient() {
   }
 
   if (!isClientConnected) {
-    await sharedRedisClient.connect();
+    if (!connectionPromise) {
+      connectionPromise = sharedRedisClient.connect();
+    }
+    await connectionPromise;
     isClientConnected = true;
   }
 
@@ -66,7 +70,11 @@ async function getRedisClient() {
  */
 async function closeRedisClient() {
   if (sharedRedisClient && isClientConnected) {
-    await sharedRedisClient.quit();
+    const currendRedisClient = sharedRedisClient;
+    sharedRedisClient = null;
+    connectionPromise = undefined;
+
+    await currendRedisClient.quit();
     isClientConnected = false;
   }
 }
