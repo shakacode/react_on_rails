@@ -47,6 +47,7 @@ export function listenToRequestData(requestId: string): RequestListener {
   const messagesToDelete: string[] = [];
   let isActive = true;
   let isEnded = false;
+  let initializationError: Error | null = null;
 
   // Create dedicated Redis client for THIS listener
   const url = process.env.REDIS_URL || 'redis://localhost:6379';
@@ -232,18 +233,6 @@ export function listenToRequestData(requestId: string): RequestListener {
     }
   }
 
-  // Start listening to existing and new messages immediately
-  (async () => {
-    try {
-      await checkExistingMessages();
-      await setupStreamListener();
-    } catch (error) {
-      console.error('Error initializing Redis listener:', error);
-    }
-  })().catch((error: unknown) => {
-    console.error('Error initializing Redis listener:', error);
-  });
-
   // Create the listener object
   const listener: RequestListener = {
     /**
@@ -252,6 +241,13 @@ export function listenToRequestData(requestId: string): RequestListener {
      * @returns A promise that resolves when the key is found
      */
     getValue: async (key: string) => {
+      // If initialization failed, reject immediately with the initialization error
+      if (initializationError) {
+        return Promise.reject(
+          new Error(`Redis listener initialization failed: ${initializationError.message}`),
+        );
+      }
+
       // If we already have a promise for this key, return it
       const existingPromise = pendingPromises[key];
       if (existingPromise) {
@@ -341,6 +337,20 @@ export function listenToRequestData(requestId: string): RequestListener {
       }
     },
   };
+
+  // Start listening to existing and new messages immediately
+  (async () => {
+    try {
+      await checkExistingMessages();
+      await setupStreamListener();
+    } catch (error) {
+      console.error('Error initializing Redis listener:', error);
+      initializationError = error instanceof Error ? error : new Error(String(error));
+      await listener.close();
+    }
+  })().catch((error: unknown) => {
+    console.error('Fatal error in Redis listener initialization:', error);
+  });
 
   return listener;
 }
