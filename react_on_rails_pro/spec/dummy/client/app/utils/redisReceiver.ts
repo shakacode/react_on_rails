@@ -66,12 +66,13 @@ export function listenToRequestData(requestId: string): RequestListener {
 
     // Start connection if not already in progress
     if (!connectionPromise) {
-      connectionPromise = redisClient.connect()
+      connectionPromise = redisClient
+        .connect()
         .then(() => {
           isClientConnected = true;
           connectionPromise = null; // Clear after successful connection
         })
-        .catch((error) => {
+        .catch((error: unknown) => {
           connectionPromise = null; // Clear on error to allow retry
           throw error; // Re-throw to propagate error
         });
@@ -314,14 +315,26 @@ export function listenToRequestData(requestId: string): RequestListener {
       // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
       Object.keys(pendingPromises).forEach((key) => delete pendingPromises[key]);
 
+      // Wait for any pending connection attempt to complete
+      if (connectionPromise) {
+        try {
+          await connectionPromise;
+        } catch {
+          // Connection failed, but we still need to clean up state
+          connectionPromise = null;
+        }
+      }
+
       // Always close THIS listener's Redis client
       try {
         if (isClientConnected) {
           await redisClient.quit();
-          isClientConnected = false;
         }
       } catch (error) {
         console.error('Error closing Redis client:', error);
+      } finally {
+        isClientConnected = false;
+        connectionPromise = null;
       }
     },
   };
