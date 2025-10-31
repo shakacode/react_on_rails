@@ -48,6 +48,7 @@ export function listenToRequestData(requestId: string): RequestListener {
   let isActive = true;
   let isEnded = false;
   let initializationError: Error | null = null;
+  let lastProcessedId = '0'; // Track last processed message ID
 
   // Create dedicated Redis client for THIS listener
   const url = process.env.REDIS_URL || 'redis://localhost:6379';
@@ -100,7 +101,8 @@ export function listenToRequestData(requestId: string): RequestListener {
         if (pendingPromise && !pendingPromise.resolved) {
           clearTimeout(pendingPromise.timer);
           pendingPromise.reject(new Error(`Key ${key} not found before stream ended`));
-          pendingPromises[key] = undefined;
+          // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+          delete pendingPromises[key];
         }
       });
 
@@ -121,7 +123,10 @@ export function listenToRequestData(requestId: string): RequestListener {
         clearTimeout(pendingPromise.timer);
         pendingPromise.resolve(parsedValue);
         pendingPromise.resolved = true; // Mark as resolved
+        // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+        delete pendingPromises[normalizedKey];
       } else {
+        // Value arrived before getValue was called - store for immediate resolution
         pendingPromises[normalizedKey] = {
           promise: Promise.resolve(parsedValue),
           resolve: () => {},
@@ -171,6 +176,7 @@ export function listenToRequestData(requestId: string): RequestListener {
 
         // Process each message
         for (const { id, message } of messages) {
+          lastProcessedId = id; // Track last processed ID
           processMessage(message, id);
         }
 
@@ -193,8 +199,8 @@ export function listenToRequestData(requestId: string): RequestListener {
     try {
       const client = await ensureConnected();
 
-      // Use $ as the ID to read only new messages
-      let lastId = '$';
+      // Start from last processed message, or $ for new messages if no messages were processed yet
+      let lastId = lastProcessedId === '0' ? '$' : lastProcessedId;
 
       // Start reading from the stream
       const readStream = async () => {
@@ -241,6 +247,11 @@ export function listenToRequestData(requestId: string): RequestListener {
      * @returns A promise that resolves when the key is found
      */
     getValue: async (key: string) => {
+      // If listener is closed, reject immediately
+      if (!isActive) {
+        return Promise.reject(new Error('Redis listener has been closed'));
+      }
+
       // If initialization failed, reject immediately with the initialization error
       if (initializationError) {
         return Promise.reject(
@@ -275,7 +286,8 @@ export function listenToRequestData(requestId: string): RequestListener {
           pendingPromise.reject(
             new Error(`Timeout waiting for key: ${key}, available keys: ${receivedKeys.join(', ')}`),
           );
-          // Keep the pending promise in the dictionary with the error state
+          // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+          delete pendingPromises[key];
         }
       }, REDIS_READ_TIMEOUT);
 
