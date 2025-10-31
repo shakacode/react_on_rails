@@ -301,6 +301,9 @@ export function listenToRequestData(requestId: string): RequestListener {
      * Closes the Redis client connection
      */
     close: async () => {
+      if (!isActive) {
+        return;
+      }
       isActive = false;
 
       // Reject and cleanup all pending promises
