@@ -34,10 +34,10 @@ const AsyncToggleContainer = async ({ children, childrenTitle, getValue }) => {
 };
 
 const RedisReceiver = ({ requestId, asyncToggleContainer }, railsContext) => {
-  const { getValue, close } = listenToRequestData(requestId);
+  const { getValue, destroy } = listenToRequestData(requestId);
 
   if ('addPostSSRHook' in railsContext) {
-    railsContext.addPostSSRHook(close);
+    railsContext.addPostSSRHook(destroy);
   }
 
   const UsedToggleContainer = asyncToggleContainer ? AsyncToggleContainer : ToggleContainer;
