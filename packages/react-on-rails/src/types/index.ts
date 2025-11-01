@@ -225,7 +225,6 @@ export interface RenderParams extends Params {
 
 export interface RSCRenderParams extends Omit<RenderParams, 'railsContext'> {
   railsContext: RailsContextWithServerStreamingCapabilities;
-  reactClientManifestFileName: string;
 }
 
 export interface CreateParams extends Params {

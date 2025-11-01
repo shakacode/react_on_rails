@@ -72,6 +72,7 @@
     "jest-junit": "^16.0.0",
     "jsdom": "^16.5.0",
     "ndb": "^1.1.5",
+    "node-html-parser": "^7.0.1",
     "nps": "^5.9.12",
     "pino-pretty": "^13.0.0",
     "prettier": "^3.2.5",
