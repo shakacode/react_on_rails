@@ -36,7 +36,7 @@ ReactOnRailsPro.configure do |config|
 
   # Retry request in case of time out on the node-renderer side
   # 0 - no retry
-  config.renderer_request_retry_limit = 1
+  config.renderer_request_retry_limit = 0
 
   # Array of globs to find any files for which changes should bust the fragment cache for
   # cached_react_component and cached_react_component_hash. This should
