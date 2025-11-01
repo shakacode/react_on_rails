@@ -75,7 +75,7 @@ export function listenToRequestData(requestId: string): RequestListener {
     }
 
     // Create new listening promise
-    listenToStreamPromise = (async (): Promise<void> => {
+    const promise = (async (): Promise<void> => {
       if (isClosed) {
         throw new Error('Redis Connection is closed');
       }
@@ -123,10 +123,12 @@ export function listenToRequestData(requestId: string): RequestListener {
       }
     })();
 
-    return listenToStreamPromise.finally(() => {
+    listenToStreamPromise = promise.finally(() => {
       // Reset so next call creates new promise
       listenToStreamPromise = null;
     });
+
+    return listenToStreamPromise;
   }
 
   /**

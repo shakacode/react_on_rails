@@ -98,6 +98,17 @@ jobs:
   package-js-tests:
     needs: build-dummy-app-webpack-test-bundles
     runs-on: ubuntu-22.04
+    # Redis service container
+    services:
+      redis:
+        image: cimg/redis:6.2.6
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE }}
     steps:
