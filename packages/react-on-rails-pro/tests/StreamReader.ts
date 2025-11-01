@@ -1,5 +1,5 @@
 import { PassThrough, Readable } from 'node:stream';
-import AsyncQueue from './AsyncQueue';
+import AsyncQueue from './AsyncQueue.ts';
 
 class StreamReader {
   private asyncQueue: AsyncQueue<string>;
@@ -11,7 +11,7 @@ class StreamReader {
     const readableStream = new PassThrough();
     pipeableStream.pipe(readableStream);
 
-    readableStream.on('data', (chunk) => {
+    readableStream.on('data', (chunk: Buffer) => {
       const decodedChunk = decoder.decode(chunk);
       this.asyncQueue.enqueue(decodedChunk);
     });

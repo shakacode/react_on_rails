@@ -1,27 +1,22 @@
 /**
  * @jest-environment node
  */
+/// <reference types="react/experimental" />
 
 import * as React from 'react';
 import { Suspense } from 'react';
 import * as mock from 'mock-fs';
-import * as fs from 'fs';
 import * as path from 'path';
-import { pipeline, finished } from 'stream/promises';
+import { finished } from 'stream/promises';
 import { text } from 'stream/consumers';
-import { buildServerRenderer } from 'react-on-rails-rsc/server.node';
-import createReactOutput from 'react-on-rails/createReactOutput';
 import ReactOnRails, { RailsContextWithServerStreamingCapabilities } from '../src/ReactOnRailsRSC.ts';
-import removeRSCStackFromAllChunks from './utils/removeRSCStackFromAllChunks.ts'
 
-const PromiseWrapper = async ({ promise, name }: { promise: Promise<string>, name: string }) => {
+const PromiseWrapper = async ({ promise, name }: { promise: Promise<string>; name: string }) => {
   console.log(`[${name}] Before awaitng`);
   const value = await promise;
   console.log(`[${name}] After awaitng`);
-  return (
-    <p>Value: {value}</p>
-  );
-}
+  return <p>Value: {value}</p>;
+};
 
 const PromiseContainer = ({ name }: { name: string }) => {
   const promise = new Promise<string>((resolve) => {
@@ -44,21 +39,23 @@ const PromiseContainer = ({ name }: { name: string }) => {
       </Suspense>
     </div>
   );
-}
+};
 
 ReactOnRails.register({ PromiseContainer });
 
-const manifestFileDirectory = path.resolve(__dirname, '../src')
+const manifestFileDirectory = path.resolve(__dirname, '../src');
 const clientManifestPath = path.join(manifestFileDirectory, 'react-client-manifest.json');
 
-mock({
-  [clientManifestPath]: JSON.stringify({
-    filePathToModuleMetadata: {},
-    moduleLoading: { prefix: '', crossOrigin: null },
-  }),
+beforeEach(() => {
+  mock({
+    [clientManifestPath]: JSON.stringify({
+      filePathToModuleMetadata: {},
+      moduleLoading: { prefix: '', crossOrigin: null },
+    }),
+  });
 });
 
-afterAll(() => {
+afterEach(() => {
   mock.restore();
 });
 
@@ -72,7 +69,7 @@ test('no logs leakage between concurrent rendering components', async () => {
     renderingReturnsPromises: true,
     throwJsErrors: true,
     domNodeId: 'dom-id',
-    props: { name: "First Unique Name" }
+    props: { name: 'First Unique Name' },
   });
   const readable2 = ReactOnRails.serverRenderRSCReactComponent({
     railsContext: {
@@ -83,15 +80,15 @@ test('no logs leakage between concurrent rendering components', async () => {
     renderingReturnsPromises: true,
     throwJsErrors: true,
     domNodeId: 'dom-id',
-    props: { name: "Second Unique Name" }
+    props: { name: 'Second Unique Name' },
   });
 
   const [content1, content2] = await Promise.all([text(readable1), text(readable2)]);
 
-  expect(content1).toContain("First Unique Name");
-  expect(content2).toContain("Second Unique Name");
-  expect(content1).not.toContain("Second Unique Name");
-  expect(content2).not.toContain("First Unique Name");
+  expect(content1).toContain('First Unique Name');
+  expect(content2).toContain('Second Unique Name');
+  expect(content1).not.toContain('Second Unique Name');
+  expect(content2).not.toContain('First Unique Name');
 });
 
 test('no logs lekage from outside the component', async () => {
@@ -104,7 +101,7 @@ test('no logs lekage from outside the component', async () => {
     renderingReturnsPromises: true,
     throwJsErrors: true,
     domNodeId: 'dom-id',
-    props: { name: "First Unique Name" }
+    props: { name: 'First Unique Name' },
   });
 
   const promise = new Promise<void>((resolve) => {
@@ -121,8 +118,8 @@ test('no logs lekage from outside the component', async () => {
 
   const [content1] = await Promise.all([text(readable1), promise]);
 
-  expect(content1).toContain("First Unique Name");
-  expect(content1).not.toContain("Outside The Component");
+  expect(content1).toContain('First Unique Name');
+  expect(content1).not.toContain('Outside The Component');
 });
 
 test('[bug] catches logs outside the component during reading the stream', async () => {
@@ -135,29 +132,29 @@ test('[bug] catches logs outside the component during reading the stream', async
     renderingReturnsPromises: true,
     throwJsErrors: true,
     domNodeId: 'dom-id',
-    props: { name: "First Unique Name" }
+    props: { name: 'First Unique Name' },
   });
-  
-  let content1 = "";
+
+  let content1 = '';
   let i = 0;
-  readable1.on('data', (chunk) => {
+  readable1.on('data', (chunk: Buffer) => {
     i += 1;
     // To avoid infinite loop
     if (i < 5) {
-      console.log("Outside The Component");
+      console.log('Outside The Component');
     }
     content1 += chunk.toString();
   });
 
   // However, any logs from outside the stream 'data' event callback is not catched
   const intervalId = setInterval(() => {
-    console.log("From Interval")
+    console.log('From Interval');
   }, 2);
   await finished(readable1);
   clearInterval(intervalId);
 
-  expect(content1).toContain("First Unique Name");
-  expect(content1).not.toContain("From Interval");
+  expect(content1).toContain('First Unique Name');
+  expect(content1).not.toContain('From Interval');
   // Here's the bug
-  expect(content1).toContain("Outside The Component");
+  expect(content1).toContain('Outside The Component');
 });

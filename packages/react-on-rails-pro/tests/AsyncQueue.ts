@@ -1,13 +1,15 @@
 import * as EventEmitter from 'node:events';
 
 class AsyncQueue<T> {
-  private eventEmitter = new EventEmitter<{ data: any, end: any }>();
+  private eventEmitter = new EventEmitter();
+
   private buffer: T[] = [];
+
   private isEnded = false;
 
   enqueue(value: T) {
     if (this.isEnded) {
-      throw new Error("Queue Ended");
+      throw new Error('Queue Ended');
     }
 
     if (this.eventEmitter.listenerCount('data') > 0) {
@@ -28,31 +30,27 @@ class AsyncQueue<T> {
       if (bufferValueIfExist) {
         resolve(bufferValueIfExist);
       } else if (this.isEnded) {
-        reject(new Error("Queue Ended"));
+        reject(new Error('Queue Ended'));
       } else {
-        let teardown = () => {}
+        let teardown = () => {};
         const onData = (value: T) => {
           resolve(value);
           teardown();
-        }
-        
+        };
+
         const onEnd = () => {
-          reject(new Error("Queue Ended"));
+          reject(new Error('Queue Ended'));
           teardown();
-        }
+        };
 
         this.eventEmitter.on('data', onData);
         this.eventEmitter.on('end', onEnd);
         teardown = () => {
           this.eventEmitter.off('data', onData);
           this.eventEmitter.off('end', onEnd);
-        }
+        };
       }
-    })
-  }
-
-  toString() {
-    return ""
+    });
   }
 }
 
