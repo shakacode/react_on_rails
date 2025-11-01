@@ -23,7 +23,7 @@ interface RedisStreamResult {
  */
 interface RequestListener {
   getValue: (key: string) => Promise<unknown>;
-  destroy: () => Promise<void>;
+  destroy: () => void;
 }
 
 /**
@@ -51,13 +51,13 @@ export function listenToRequestData(requestId: string): RequestListener {
   /**
    * Closes the Redis connection and rejects all pending promises
    */
-  async function close(): Promise<void> {
+  function close() {
     if (isClosed) return;
     isClosed = true;
 
     // Close client - this will cause xRead to throw, which rejects pending promises
     try {
-      await redisClient.quit();
+      redisClient.destroy();
     } finally {
       isConnected = false;
     }
@@ -84,6 +84,7 @@ export function listenToRequestData(requestId: string): RequestListener {
       // And `listenToStream` runs only one promise at a time, so no fear of race condition
       if (!isConnected) {
         await redisClient.connect();
+        await redisClient.expire(streamKey, REDIS_LISTENER_TIMEOUT / 1000); // Set TTL to avoid stale streams
         isConnected = true;
       }
 
@@ -118,7 +119,7 @@ export function listenToRequestData(requestId: string): RequestListener {
 
       // If end message received, close the connection
       if (receivedEndMessage) {
-        await close();
+        close();
       }
     })();
 
@@ -174,19 +175,19 @@ export function listenToRequestData(requestId: string): RequestListener {
   /**
    * Destroys the listener, closing the connection and preventing further getValue calls
    */
-  async function destroy(): Promise<void> {
+  function destroy() {
     if (isDestroyed) return;
     isDestroyed = true;
 
     // Clear global timeout
     clearTimeout(globalTimeout);
 
-    await close();
+    close();
   }
 
   // Global timeout - destroys listener after 15 seconds
   globalTimeout = setTimeout(() => {
-    void destroy();
+    destroy();
   }, REDIS_LISTENER_TIMEOUT);
 
   return { getValue, destroy };
