@@ -24,7 +24,8 @@ ReactOnRailsPro.configure do |config|
   # that the remote renderer works for CI.
   config.renderer_use_fallback_exec_js = false
 
-  config.ssr_timeout = 10
+  config.renderer_http_pool_timeout = 20
+  config.ssr_timeout = 30
 
   config.raise_non_shell_server_rendering_errors = false
 
