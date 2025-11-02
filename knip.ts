@@ -75,6 +75,7 @@ const config: KnipConfig = {
         'tests/emptyForTesting.js',
         // Jest setup and test utilities - not detected by Jest plugin in workspace setup
         'tests/jest.setup.js',
+        'tests/utils/removeRSCStackFromAllChunks.ts',
         // Build output directories that should be ignored
         'lib/**',
         // Pro features exported for external consumption
