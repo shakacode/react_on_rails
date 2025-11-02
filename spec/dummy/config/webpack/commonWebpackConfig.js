@@ -60,7 +60,9 @@ baseClientWebpackConfig.module.rules.forEach((rule) => {
   if (Array.isArray(rule.use)) {
     rule.use.forEach((loader) => {
       if (loader.loader && loader.loader.includes('css-loader') && loader.options?.modules) {
+        // eslint-disable-next-line no-param-reassign
         loader.options.modules.namedExport = false;
+        // eslint-disable-next-line no-param-reassign
         loader.options.modules.exportLocalsConvention = 'camelCase';
       }
     });
