@@ -53,6 +53,20 @@ baseClientWebpackConfig.module.rules.forEach((rule) => {
   }
 });
 
+// Configure CSS Modules to use default exports (Shakapacker 9.0 compatibility)
+// Shakapacker 9.0 defaults to namedExport: true, but we use default imports
+// To restore backward compatibility with existing code using `import styles from`
+baseClientWebpackConfig.module.rules.forEach((rule) => {
+  if (Array.isArray(rule.use)) {
+    rule.use.forEach((loader) => {
+      if (loader.loader && loader.loader.includes('css-loader') && loader.options?.modules) {
+        loader.options.modules.namedExport = false;
+        loader.options.modules.exportLocalsConvention = 'camelCase';
+      }
+    });
+  }
+});
+
 // add jquery
 const exposeJQuery = {
   test: require.resolve('jquery'),
