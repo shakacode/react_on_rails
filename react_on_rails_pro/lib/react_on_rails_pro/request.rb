@@ -229,6 +229,7 @@ module ReactOnRailsPro
           # https://honeyryderchuck.gitlab.io/httpx/wiki/Persistent
           .plugin(
             :retries,
+            max_retries: 1,
             retry_change_requests: true,
             retry_after: ->(req, res) do
               Rails.logger.error("An error occured and retry is going to be made")
