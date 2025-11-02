@@ -33,7 +33,7 @@ module ReactOnRails
     end
 
     def self.supports_async_loading?
-      shakapacker_version_requirement_met?("9.3.0")
+      shakapacker_version_requirement_met?("8.2.0")
     end
 
     def self.supports_basic_pack_generation?
