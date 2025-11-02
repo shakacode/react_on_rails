@@ -149,6 +149,8 @@ The generator creates `bin/dev` for starting both:
 - Rails server (port 3000)
 - Webpack dev server (for hot reloading)
 
+> **Note:** You need `overmind` or `foreman` installed to run `bin/dev`. Install with `brew install overmind` (macOS) or `gem install foreman` (globally). See the [Quick Start Guide](./quick-start.md#-step-2-start-the-development-server-1-minute) for detailed installation instructions.
+
 ---
 
 ## Render-Functions and RailsContext
