@@ -112,6 +112,9 @@ module ReactOnRailsPro
               "[ReactOnRailsPro] Timed out trying to make a request to the Node Renderer. " \
                 "Retrying #{available_retries} more times..."
             end
+            Rails.logger.error("An error occured and react on rails retry is going to be made")
+            Rails.logger.error("Error: #{e}")
+            Rails.logger.error("Post Options: #{post_options}")
             available_retries -= 1
             next
           rescue HTTPX::Error => e # Connection errors or other unexpected errors
@@ -234,7 +237,7 @@ module ReactOnRailsPro
             retry_after: ->(req, res) do
               Rails.logger.error("An error occured and retry is going to be made")
               Rails.logger.error("Error: #{res.error}")
-              Rails.logger.error("Request Body: #{req.body&.first(1000)}")
+              Rails.logger.error("Request Body: #{req.body&.to_s.first(1000)}")
               nil
             end,
           )
