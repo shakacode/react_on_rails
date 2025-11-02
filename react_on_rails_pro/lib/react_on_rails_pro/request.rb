@@ -257,8 +257,12 @@ module ReactOnRailsPro
             # :operation_timeout
             # :keep_alive_timeout
             timeout: {
-              connect_timeout: ReactOnRailsPro.configuration.renderer_http_pool_timeout,
-              read_timeout: ReactOnRailsPro.configuration.ssr_timeout
+              connect_timeout: 100,
+              read_timeout: 100,
+              write_timeout: 100,
+              request_timeout: 100,
+              operation_timeout: 100,
+              keep_alive_timeout: 100,
             }
           )
       rescue StandardError => e

@@ -125,6 +125,11 @@ export default function run(config: Partial<Config>) {
     logger:
       logHttpLevel !== 'silent' ? { name: 'RORP HTTP', level: logHttpLevel, ...sharedLoggerOptions } : false,
     ...fastifyServerOptions,
+    pluginTimeout: 1_000_1000,
+    requestTimeout: 1_000_1000,
+    keepAliveTimeout: 1_000_1000,
+    connectionTimeout: 1_000_1000,
+    http2SessionTimeout: 1_000_1000,
   });
 
   // We shouldn't have unhandled errors here, but just in case
