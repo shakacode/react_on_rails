@@ -201,6 +201,8 @@ module ReactOnRails
         dev_deps = %w[
           @pmmmwh/react-refresh-webpack-plugin
           react-refresh
+          @swc/core
+          swc-loader
         ]
         return if add_npm_dependencies(dev_deps, dev: true)
 
