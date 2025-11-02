@@ -24,7 +24,9 @@ const sassLoaderConfig = {
 const scssConfigIndex = baseClientWebpackConfig.module.rules.findIndex((config) =>
   '.scss'.match(config.test),
 );
-baseClientWebpackConfig.module.rules[scssConfigIndex]?.use.push(sassLoaderConfig);
+if (scssConfigIndex !== -1 && baseClientWebpackConfig.module.rules[scssConfigIndex]?.use) {
+  baseClientWebpackConfig.module.rules[scssConfigIndex].use.push(sassLoaderConfig);
+}
 
 // Configure CSS Modules to use default exports (Shakapacker 9.0 compatibility)
 // Shakapacker 9.0 defaults to namedExport: true, but we use default imports
