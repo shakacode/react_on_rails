@@ -13,6 +13,7 @@ Before starting, make sure you have:
 - **Rails 7+** application (Rails 5.2+ supported)
 - **Ruby 3.0+** (required)
 - **Node.js 20+** and **Yarn**
+- **Foreman or Overmind** (for running `bin/dev`)
 - **Basic familiarity** with React and Rails
 
 > 💡 **Don't have a Rails app?** Run `rails new my_react_app` first.
@@ -41,6 +42,11 @@ Take a look at the files created by the generator.
 - Webpack configuration
 
 ## 🎯 Step 2: Start the Development Server (1 minute)
+
+> **Note:** Ensure you have `overmind` or `foreman` installed to run `bin/dev`.
+>
+> - **overmind**: `brew install overmind` (macOS) or see [installation guide](https://github.com/DarthSim/overmind#installation)
+> - **foreman**: `gem install foreman` (install globally, not in your project bundle - [details](https://github.com/ddollar/foreman/wiki/Don't-Bundle-Foreman))
 
 Start both Rails and the Webpack dev server:
 
