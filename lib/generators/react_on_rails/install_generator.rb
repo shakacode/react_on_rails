@@ -430,25 +430,20 @@ module ReactOnRails
       def add_react_on_rails_package
         major_minor_patch_only = /\A\d+\.\d+\.\d+\z/
 
-        # Try to use package_json gem first, fall back to direct npm commands
+        # Always use direct npm install with --save-exact to ensure exact version matching
+        # The package_json gem doesn't support --save-exact flag
         react_on_rails_pkg = if ReactOnRails::VERSION.match?(major_minor_patch_only)
-                               ["react-on-rails@#{ReactOnRails::VERSION}"]
+                               "react-on-rails@#{ReactOnRails::VERSION}"
                              else
                                puts "Adding the latest react-on-rails NPM module. " \
                                     "Double check this is correct in package.json"
-                               ["react-on-rails"]
+                               "react-on-rails"
                              end
 
         puts "Installing React on Rails package..."
-        if add_npm_dependencies(react_on_rails_pkg)
-          @added_dependencies_to_package_json = true
-          return
-        end
-
-        puts "Using direct npm commands as fallback"
-        success = system("npm", "install", *react_on_rails_pkg)
+        success = system("npm", "install", "--save-exact", react_on_rails_pkg)
         @ran_direct_installs = true if success
-        handle_npm_failure("react-on-rails package", react_on_rails_pkg) unless success
+        handle_npm_failure("react-on-rails package", [react_on_rails_pkg]) unless success
       end
 
       def add_react_dependencies
