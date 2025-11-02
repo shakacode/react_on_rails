@@ -6,8 +6,13 @@ module ReactOnRails
   class Engine < ::Rails::Engine
     # Validate package versions and compatibility on Rails startup
     # This ensures the application fails fast if versions don't match or packages are misconfigured
+    # Skip validation during installation tasks (e.g., shakapacker:install)
     initializer "react_on_rails.validate_version_and_package_compatibility" do
       config.after_initialize do
+        # Skip validation if package.json doesn't exist yet (during initial setup)
+        package_json = VersionChecker::NodePackageVersion.package_json_path
+        next unless File.exist?(package_json)
+
         Rails.logger.info "[React on Rails] Validating package version and compatibility..."
         VersionChecker.build.validate_version_and_package_compatibility!
         Rails.logger.info "[React on Rails] Package validation successful"
