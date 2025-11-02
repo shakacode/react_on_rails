@@ -213,18 +213,28 @@ module ReactOnRails
     end
 
     class NodePackageVersion
-      attr_reader :package_json
+      attr_reader :package_json, :yarn_lock, :package_lock
 
       def self.build
-        new(package_json_path)
+        new(package_json_path, yarn_lock_path, package_lock_path)
       end
 
       def self.package_json_path
         Rails.root.join(ReactOnRails.configuration.node_modules_location, "package.json")
       end
 
-      def initialize(package_json)
+      def self.yarn_lock_path
+        Rails.root.join(ReactOnRails.configuration.node_modules_location, "..", "yarn.lock")
+      end
+
+      def self.package_lock_path
+        Rails.root.join(ReactOnRails.configuration.node_modules_location, "..", "package-lock.json")
+      end
+
+      def initialize(package_json, yarn_lock = nil, package_lock = nil)
         @package_json = package_json
+        @yarn_lock = yarn_lock
+        @package_lock = package_lock
       end
 
       def raw
@@ -238,10 +248,16 @@ module ReactOnRails
         deps = parsed["dependencies"]
 
         # Check for react-on-rails-pro first (Pro takes precedence)
-        return @raw = deps["react-on-rails-pro"] if deps.key?("react-on-rails-pro")
+        if deps.key?("react-on-rails-pro")
+          @raw = resolve_version(deps["react-on-rails-pro"], "react-on-rails-pro")
+          return @raw
+        end
 
         # Fall back to react-on-rails
-        return @raw = deps["react-on-rails"] if deps.key?("react-on-rails")
+        if deps.key?("react-on-rails")
+          @raw = resolve_version(deps["react-on-rails"], "react-on-rails")
+          return @raw
+        end
 
         # Neither package found
         msg = "No 'react-on-rails' or 'react-on-rails-pro' entry in the dependencies of " \
@@ -313,6 +329,85 @@ module ReactOnRails
       end
 
       private
+
+      # Resolve version from lockfiles if available, otherwise use package.json version
+      def resolve_version(package_json_version, package_name)
+        # Try yarn.lock first
+        if yarn_lock && File.exist?(yarn_lock)
+          lockfile_version = version_from_yarn_lock(package_name)
+          return lockfile_version if lockfile_version
+        end
+
+        # Try package-lock.json
+        if package_lock && File.exist?(package_lock)
+          lockfile_version = version_from_package_lock(package_name)
+          return lockfile_version if lockfile_version
+        end
+
+        # Fall back to package.json version
+        package_json_version
+      end
+
+      # Parse version from yarn.lock
+      # Looks for entries like:
+      #   react-on-rails@^16.1.1:
+      #     version "16.1.1"
+      # rubocop:disable Metrics/CyclomaticComplexity
+      def version_from_yarn_lock(package_name)
+        return nil unless yarn_lock && File.exist?(yarn_lock)
+
+        in_package_block = false
+        File.foreach(yarn_lock) do |line|
+          # Check if we're starting the block for our package
+          if line.match?(/^"?#{Regexp.escape(package_name)}@/)
+            in_package_block = true
+            next
+          end
+
+          # If we're in the package block, look for the version line
+          if in_package_block
+            # Version line looks like:  version "16.1.1"
+            if (match = line.match(/^\s+version\s+"([^"]+)"/))
+              return match[1]
+            end
+
+            # If we hit a blank line or new package, we've left the block
+            break if line.strip.empty? || (line[0] != " " && line[0] != "\t")
+          end
+        end
+
+        nil
+      end
+      # rubocop:enable Metrics/CyclomaticComplexity
+
+      # Parse version from package-lock.json
+      # Supports both v1 (dependencies) and v2/v3 (packages) formats
+      # rubocop:disable Metrics/CyclomaticComplexity
+      def version_from_package_lock(package_name)
+        return nil unless package_lock && File.exist?(package_lock)
+
+        begin
+          parsed = JSON.parse(File.read(package_lock))
+
+          # Try v2/v3 format first (packages)
+          if parsed["packages"]
+            # Look for node_modules/package-name entry
+            node_modules_key = "node_modules/#{package_name}"
+            return parsed["packages"][node_modules_key]["version"] if parsed["packages"][node_modules_key]
+          end
+
+          # Fall back to v1 format (dependencies)
+          if parsed["dependencies"] && parsed["dependencies"][package_name]
+            return parsed["dependencies"][package_name]["version"]
+          end
+        rescue JSON::ParserError
+          # If we can't parse the lockfile, fall back to package.json version
+          nil
+        end
+
+        nil
+      end
+      # rubocop:enable Metrics/CyclomaticComplexity
 
       def package_installed?(package_name)
         return false unless File.exist?(package_json)
