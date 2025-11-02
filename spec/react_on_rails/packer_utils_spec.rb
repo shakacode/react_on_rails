@@ -78,14 +78,14 @@ module ReactOnRails
     end
 
     describe ".supports_async_loading?" do
-      it "returns true when ::Shakapacker >= 8.2.0" do
-        allow(described_class).to receive(:shakapacker_version_requirement_met?).with("8.2.0").and_return(true)
+      it "returns true when ::Shakapacker >= 9.3.0" do
+        allow(described_class).to receive(:shakapacker_version_requirement_met?).with("9.3.0").and_return(true)
 
         expect(described_class.supports_async_loading?).to be(true)
       end
 
-      it "returns false when ::Shakapacker < 8.2.0" do
-        allow(described_class).to receive(:shakapacker_version_requirement_met?).with("8.2.0").and_return(false)
+      it "returns false when ::Shakapacker < 9.3.0" do
+        allow(described_class).to receive(:shakapacker_version_requirement_met?).with("9.3.0").and_return(false)
 
         expect(described_class.supports_async_loading?).to be(false)
       end
