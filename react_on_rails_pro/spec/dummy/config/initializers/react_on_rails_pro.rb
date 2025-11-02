@@ -24,8 +24,7 @@ ReactOnRailsPro.configure do |config|
   # that the remote renderer works for CI.
   config.renderer_use_fallback_exec_js = false
 
-  config.renderer_http_pool_timeout = 20
-  config.ssr_timeout = 30
+  config.ssr_timeout = 10
 
   config.raise_non_shell_server_rendering_errors = false
 
@@ -36,7 +35,7 @@ ReactOnRailsPro.configure do |config|
 
   # Retry request in case of time out on the node-renderer side
   # 0 - no retry
-  config.renderer_request_retry_limit = 0
+  config.renderer_request_retry_limit = 1
 
   # Array of globs to find any files for which changes should bust the fragment cache for
   # cached_react_component and cached_react_component_hash. This should

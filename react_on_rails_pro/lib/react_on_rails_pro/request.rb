@@ -234,8 +234,8 @@ module ReactOnRailsPro
             retry_after: ->(req, res) do
               Rails.logger.error("An error occured and retry is going to be made")
               Rails.logger.error("Error: #{res.error}")
-              Rails.logger.error("Request Body: #{req.body}")
-              0
+              Rails.logger.error("Request Body: #{req.body&.first(1000)}")
+              nil
             end,
           )
           .plugin(:stream)
@@ -254,12 +254,8 @@ module ReactOnRailsPro
             # :operation_timeout
             # :keep_alive_timeout
             timeout: {
-              connect_timeout: 100,
-              read_timeout: 100,
-              write_timeout: 100,
-              request_timeout: 100,
-              operation_timeout: 100,
-              keep_alive_timeout: 100,
+              connect_timeout: ReactOnRailsPro.configuration.renderer_http_pool_timeout,
+              read_timeout: ReactOnRailsPro.configuration.ssr_timeout
             }
           )
       rescue StandardError => e

@@ -55,6 +55,7 @@ const streamRenderRSCComponent = (
     transformRenderStreamChunksToResultObject(renderState);
 
   const reportError = (error: Error) => {
+    console.error('Error in RSC stream', error);
     if (throwJsErrors) {
       emitError(error);
     }
