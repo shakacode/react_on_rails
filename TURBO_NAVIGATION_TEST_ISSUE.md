@@ -143,7 +143,7 @@ npm run test:e2e -- --grep "Turbo navigation"
 
 ## Files to Create/Modify
 
-```
+```tree
 spec/dummy/spec/playwright/
   ├── turbo_navigation.spec.js          (new)
   └── support/
