@@ -1,4 +1,4 @@
-const defaultConfigFunc = require('shakapacker/package/babel/preset');
+const defaultConfigFunc = require('shakapacker/package/babel/preset.js');
 
 module.exports = function createBabelConfig(api) {
   const resultConfig = defaultConfigFunc(api);
