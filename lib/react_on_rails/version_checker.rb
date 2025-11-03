@@ -212,6 +212,7 @@ module ReactOnRails
       "Package.json location: #{VersionChecker::NodePackageVersion.package_json_path}"
     end
 
+    # rubocop:disable Metrics/ClassLength
     class NodePackageVersion
       attr_reader :package_json, :yarn_lock, :package_lock
 
@@ -224,11 +225,13 @@ module ReactOnRails
       end
 
       def self.yarn_lock_path
-        Rails.root.join(ReactOnRails.configuration.node_modules_location, "..", "yarn.lock")
+        lockfile_dir = File.dirname(Rails.root.join(ReactOnRails.configuration.node_modules_location).to_s)
+        File.join(lockfile_dir, "yarn.lock")
       end
 
       def self.package_lock_path
-        Rails.root.join(ReactOnRails.configuration.node_modules_location, "..", "package-lock.json")
+        lockfile_dir = File.dirname(Rails.root.join(ReactOnRails.configuration.node_modules_location).to_s)
+        File.join(lockfile_dir, "package-lock.json")
       end
 
       def initialize(package_json, yarn_lock = nil, package_lock = nil)
@@ -393,12 +396,14 @@ module ReactOnRails
           if parsed["packages"]
             # Look for node_modules/package-name entry
             node_modules_key = "node_modules/#{package_name}"
-            return parsed["packages"][node_modules_key]["version"] if parsed["packages"][node_modules_key]
+            package_data = parsed["packages"][node_modules_key]
+            return package_data["version"] if package_data&.key?("version")
           end
 
           # Fall back to v1 format (dependencies)
-          if parsed["dependencies"] && parsed["dependencies"][package_name]
-            return parsed["dependencies"][package_name]["version"]
+          if parsed["dependencies"]
+            dependency_data = parsed["dependencies"][package_name]
+            return dependency_data["version"] if dependency_data&.key?("version")
           end
         rescue JSON::ParserError
           # If we can't parse the lockfile, fall back to package.json version
@@ -443,5 +448,6 @@ module ReactOnRails
         end
       end
     end
+    # rubocop:enable Metrics/ClassLength
   end
 end
