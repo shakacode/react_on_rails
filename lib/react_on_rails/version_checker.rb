@@ -225,13 +225,17 @@ module ReactOnRails
       end
 
       def self.yarn_lock_path
-        lockfile_dir = File.dirname(Rails.root.join(ReactOnRails.configuration.node_modules_location).to_s)
-        File.join(lockfile_dir, "yarn.lock")
+        # Lockfiles are in the same directory as package.json
+        # If node_modules_location is empty, use Rails.root
+        base_dir = ReactOnRails.configuration.node_modules_location.presence || ""
+        Rails.root.join(base_dir, "yarn.lock").to_s
       end
 
       def self.package_lock_path
-        lockfile_dir = File.dirname(Rails.root.join(ReactOnRails.configuration.node_modules_location).to_s)
-        File.join(lockfile_dir, "package-lock.json")
+        # Lockfiles are in the same directory as package.json
+        # If node_modules_location is empty, use Rails.root
+        base_dir = ReactOnRails.configuration.node_modules_location.presence || ""
+        Rails.root.join(base_dir, "package-lock.json").to_s
       end
 
       def initialize(package_json, yarn_lock = nil, package_lock = nil)
@@ -355,6 +359,8 @@ module ReactOnRails
       # Looks for entries like:
       #   react-on-rails@^16.1.1:
       #     version "16.1.1"
+      # The pattern ensures exact package name match to avoid matching similar names
+      # (e.g., "react-on-rails" won't match "react-on-rails-pro")
       # rubocop:disable Metrics/CyclomaticComplexity
       def version_from_yarn_lock(package_name)
         return nil unless yarn_lock && File.exist?(yarn_lock)
@@ -362,6 +368,8 @@ module ReactOnRails
         in_package_block = false
         File.foreach(yarn_lock) do |line|
           # Check if we're starting the block for our package
+          # Pattern: optionally quoted package name, followed by @, ensuring it's not followed by more word chars
+          # This prevents "react-on-rails" from matching "react-on-rails-pro"
           if line.match?(/^"?#{Regexp.escape(package_name)}@/)
             in_package_block = true
             next
@@ -403,7 +411,8 @@ module ReactOnRails
           # Fall back to v1 format (dependencies)
           if parsed["dependencies"]
             dependency_data = parsed["dependencies"][package_name]
-            return dependency_data["version"] if dependency_data&.key?("version")
+            # In v1, the dependency can be a hash with a "version" key
+            return dependency_data["version"] if dependency_data.is_a?(Hash) && dependency_data.key?("version")
           end
         rescue JSON::ParserError
           # If we can't parse the lockfile, fall back to package.json version
