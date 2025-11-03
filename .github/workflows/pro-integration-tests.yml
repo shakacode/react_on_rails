@@ -75,7 +75,7 @@ jobs:
           yarn && yalc publish
 
       - name: Install Node modules with Yarn for Pro dummy app
-        run: cd spec/dummy && yarn install --frozen-lockfile --ignore-scripts --no-progress --no-emoji
+        run: cd spec/dummy && yarn install --ignore-scripts --no-progress --no-emoji
 
       - name: Install Ruby Gems for Pro dummy app
         run: |
@@ -195,7 +195,7 @@ jobs:
           yarn && yalc publish
 
       - name: Install Node modules with Yarn for Pro dummy app
-        run: cd spec/dummy && yarn install --frozen-lockfile --ignore-scripts --no-progress --no-emoji
+        run: cd spec/dummy && yarn install --ignore-scripts --no-progress --no-emoji
 
       - name: Ensure minimum required Chrome version
         run: |
@@ -387,7 +387,7 @@ jobs:
           yarn && yalc publish
 
       - name: Install Node modules with Yarn for Pro dummy app
-        run: cd spec/dummy && yarn install --frozen-lockfile --ignore-scripts --no-progress --no-emoji
+        run: cd spec/dummy && yarn install --ignore-scripts --no-progress --no-emoji
 
       - name: Ensure minimum required Chrome version
         run: |

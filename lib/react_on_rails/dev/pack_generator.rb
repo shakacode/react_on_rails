@@ -25,13 +25,21 @@ module ReactOnRails
         private
 
         def run_pack_generation(silent: false)
-          # If we're already inside a Bundler context (e.g., called from bin/dev),
+          # If we're already inside a Bundler context AND Rails is available (e.g., called from bin/dev),
           # we can directly require and run the task. Otherwise, use bundle exec.
-          if defined?(Bundler)
+          if defined?(Bundler) && rails_available?
             run_rake_task_directly(silent: silent)
           else
             run_via_bundle_exec(silent: silent)
           end
+        end
+
+        def rails_available?
+          return false unless defined?(Rails)
+          return false unless Rails.respond_to?(:application)
+          return false if Rails.application.nil?
+
+          true
         end
 
         def run_rake_task_directly(silent: false)
