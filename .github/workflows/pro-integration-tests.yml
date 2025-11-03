@@ -92,8 +92,15 @@ jobs:
           sudo yarn global add yalc
           yarn install --frozen-lockfile --no-progress --no-emoji
 
+      - name: Build and publish packages with yalc
+        run: |
+          cd ..
+          yarn run yalc:publish
+          cd react_on_rails_pro
+          yarn run yalc:publish
+
       - name: Install Node modules with Yarn for Pro dummy app
-        run: cd spec/dummy && yarn install --frozen-lockfile --no-progress --no-emoji
+        run: cd spec/dummy && yarn install --frozen-lockfile --ignore-scripts --no-progress --no-emoji
 
       - name: Install Ruby Gems for Pro dummy app
         run: |
@@ -211,8 +218,15 @@ jobs:
           sudo yarn global add yalc
           yarn install --frozen-lockfile --no-progress --no-emoji
 
+      - name: Build and publish packages with yalc
+        run: |
+          cd ..
+          yarn run yalc:publish
+          cd react_on_rails_pro
+          yarn run yalc:publish
+
       - name: Install Node modules with Yarn for Pro dummy app
-        run: cd spec/dummy && yarn install --frozen-lockfile --no-progress --no-emoji
+        run: cd spec/dummy && yarn install --frozen-lockfile --ignore-scripts --no-progress --no-emoji
 
       - name: Ensure minimum required Chrome version
         run: |
@@ -402,8 +416,15 @@ jobs:
           sudo yarn global add yalc
           yarn install --frozen-lockfile --no-progress --no-emoji
 
+      - name: Build and publish packages with yalc
+        run: |
+          cd ..
+          yarn run yalc:publish
+          cd react_on_rails_pro
+          yarn run yalc:publish
+
       - name: Install Node modules with Yarn for Pro dummy app
-        run: cd spec/dummy && yarn install --frozen-lockfile --no-progress --no-emoji
+        run: cd spec/dummy && yarn install --frozen-lockfile --ignore-scripts --no-progress --no-emoji
 
       - name: Ensure minimum required Chrome version
         run: |
