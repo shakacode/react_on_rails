@@ -13,8 +13,8 @@ module ReactOnRails
         package_json = VersionChecker::NodePackageVersion.package_json_path
         next unless File.exist?(package_json)
 
-        # Skip validation when running generators (packages may not be installed yet)
-        next if defined?(Rails::Generators) && ARGV.any? { |arg| arg.include?("generate") || arg.include?("g") }
+        # Skip validation when generators explicitly set this flag (packages may not be installed yet)
+        next if ENV["REACT_ON_RAILS_SKIP_VALIDATION"] == "true"
 
         Rails.logger.info "[React on Rails] Validating package version and compatibility..."
         VersionChecker.build.validate_version_and_package_compatibility!

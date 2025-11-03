@@ -95,4 +95,35 @@ module GeneratorHelper
   def component_extension(options)
     options.typescript? ? "tsx" : "jsx"
   end
+
+  # Detects the package manager based on lock files and returns the appropriate command and exact flag
+  # Returns: [package_manager, exact_flag, add_command]
+  # Examples: ["yarn", "--exact", "add"], ["npm", "--save-exact", "install"]
+  def detect_package_manager_and_exact_flag
+    lock_files = {
+      "yarn.lock" => ["yarn", "--exact", "add"],
+      "pnpm-lock.yaml" => ["pnpm", "--save-exact", "add"],
+      "bun.lockb" => ["bun", "--exact", "add"],
+      "package-lock.json" => ["npm", "--save-exact", "install"]
+    }
+
+    detected = []
+    lock_files.each do |lock_file, config|
+      detected << [lock_file, config] if File.exist?(File.join(destination_root, lock_file))
+    end
+
+    # Warn if multiple lock files detected
+    if detected.size > 1
+      GeneratorMessages.add_warning(<<~MSG.strip)
+        ⚠️  Multiple package manager lock files detected:
+        #{detected.map { |lf, _| "  • #{lf}" }.join("\n")}
+
+        This can cause dependency conflicts. Consider using only one package manager.
+        Using #{detected.first[0]} based on file precedence.
+      MSG
+    end
+
+    # Return first detected, or default to npm
+    detected.empty? ? ["npm", "--save-exact", "install"] : detected.first[1]
+  end
 end
