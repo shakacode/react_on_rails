@@ -203,6 +203,66 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     end
   end
 
+  describe ".terminate_processes" do
+    it "successfully kills processes" do
+      pids = [1234, 5678]
+      expect(Process).to receive(:kill).with("TERM", 1234)
+      expect(Process).to receive(:kill).with("TERM", 5678)
+
+      described_class.terminate_processes(pids)
+    end
+
+    it "handles ESRCH (process not found) silently" do
+      pids = [1234]
+      allow(Process).to receive(:kill).with("TERM", 1234).and_raise(Errno::ESRCH)
+
+      # Should not raise an error and should not output anything
+      expect { described_class.terminate_processes(pids) }.not_to raise_error
+    end
+
+    it "handles EPERM (permission denied) with warning" do
+      pids = [1234]
+      allow(Process).to receive(:kill).with("TERM", 1234).and_raise(Errno::EPERM)
+
+      # Should not raise an error but should output a warning
+      expect { described_class.terminate_processes(pids) }.to output(/permission denied/).to_stdout_from_any_process
+    end
+
+    it "handles mixed success and ESRCH" do
+      pids = [1234, 5678]
+      expect(Process).to receive(:kill).with("TERM", 1234)
+      allow(Process).to receive(:kill).with("TERM", 5678).and_raise(Errno::ESRCH)
+
+      expect { described_class.terminate_processes(pids) }.not_to raise_error
+    end
+
+    it "handles mixed success and EPERM" do
+      pids = [1234, 5678]
+      expect(Process).to receive(:kill).with("TERM", 1234)
+      allow(Process).to receive(:kill).with("TERM", 5678).and_raise(Errno::EPERM)
+
+      expect do
+        described_class.terminate_processes(pids)
+      end.to output(/5678.*permission denied/).to_stdout_from_any_process
+    end
+
+    it "handles ArgumentError (invalid signal)" do
+      pids = [1234]
+      allow(Process).to receive(:kill).with("TERM", 1234).and_raise(ArgumentError)
+
+      # Should not raise an error
+      expect { described_class.terminate_processes(pids) }.not_to raise_error
+    end
+
+    it "handles RangeError (invalid PID)" do
+      pids = [999_999_999_999]
+      allow(Process).to receive(:kill).with("TERM", 999_999_999_999).and_raise(RangeError)
+
+      # Should not raise an error
+      expect { described_class.terminate_processes(pids) }.not_to raise_error
+    end
+  end
+
   describe ".show_help" do
     it "displays help information" do
       expect { described_class.show_help }.to output(%r{Usage: bin/dev \[command\]}).to_stdout_from_any_process
