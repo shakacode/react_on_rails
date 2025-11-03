@@ -43,16 +43,55 @@ Git hooks will automatically run linting on **all changed files (staged + unstag
 
 ## Changelog
 
+**See CHANGELOG.md lines 15-18 for contributor guidelines and [keepachangelog.com](http://keepachangelog.com/) format.**
+
 - **Update CHANGELOG.md for user-visible changes only**
 - User-visible changes include: new features, bug fixes, breaking changes, deprecations, performance improvements
 - **Do NOT add changelog entries for**: linting fixes, code formatting, internal refactoring, test updates, documentation fixes
 - Non-user-visible changes don't need changelog entries even if they modify code
-- **Format requirements**:
-  - Always link to the PR: `[PR 1818](https://github.com/shakacode/react_on_rails/pull/1818)` (no hash symbol)
-  - Always link to the author: `by [username](https://github.com/username)`
-  - Keep formatting consistent with existing entries
-  - When releasing a version, run `bundle exec rake update_changelog` to update version headers and diff links
-  - **For breaking changes**: Use bold formatting and link to migration documentation (e.g., `**Breaking**: Description. See [Migration Guide](docs/vX_upgrade.md)`)
+
+### Section Headers
+
+Use appropriate section headers under the `[Unreleased]` version:
+
+- **Standard headers** (from keepachangelog.com): `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`
+- **Custom headers** (project-specific): `New Features`, `Breaking Changes`, `Bug Fixes`, `Security Enhancements`, `API Improvements`, `Developer Experience`, `Generator Improvements`, `Code Improvements`, `Performance`, `Pro License Features`
+
+Choose the header that best describes your change. Use custom headers for complex changes that benefit from more specific categorization.
+
+### Format Requirements
+
+- **PR link format**: `[PR 1818](https://github.com/shakacode/react_on_rails/pull/1818)` (no hash symbol)
+- **Author link format**: `by [username](https://github.com/username)`
+- Keep formatting consistent with existing entries
+- When releasing a version, run `bundle exec rake update_changelog` to update version headers and diff links
+
+### Entry Format Examples
+
+**Simple entry:**
+
+```markdown
+- **Feature Name**: Brief description of the change. [PR 1818](https://github.com/shakacode/react_on_rails/pull/1818) by [username](https://github.com/username)
+```
+
+**Breaking change with migration guide:**
+
+```markdown
+- **Feature Name**: Description of breaking change. See migration guide below. [PR 1818](https://github.com/shakacode/react_on_rails/pull/1818) by [username](https://github.com/username)
+
+**Migration Guide:**
+
+1. Step one
+2. Step two
+```
+
+**Entry with sub-bullets:**
+
+```markdown
+- **Feature Name**: Description with details:
+  - Detail one with more context
+  - Detail two. [PR 1818](https://github.com/shakacode/react_on_rails/pull/1818) by [username](https://github.com/username)
+```
 
 ## ⚠️ FORMATTING RULES
 
