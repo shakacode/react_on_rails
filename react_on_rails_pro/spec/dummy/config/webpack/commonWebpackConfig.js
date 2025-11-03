@@ -29,7 +29,9 @@ const baseClientWebpackConfig = generateWebpackConfig();
 const scssConfigIndex = baseClientWebpackConfig.module.rules.findIndex((config) =>
   '.scss'.match(config.test),
 );
-baseClientWebpackConfig.module.rules[scssConfigIndex].use.push(sassLoaderConfig);
+if (scssConfigIndex !== -1 && baseClientWebpackConfig.module.rules[scssConfigIndex]?.use) {
+  baseClientWebpackConfig.module.rules[scssConfigIndex].use.push(sassLoaderConfig);
+}
 
 if (isHMR) {
   baseClientWebpackConfig.plugins.push(
