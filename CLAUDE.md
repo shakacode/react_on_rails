@@ -46,7 +46,8 @@ Git hooks will automatically run linting on **all changed files (staged + unstag
 - **Update CHANGELOG.md for user-visible changes only** (features, bug fixes, breaking changes, deprecations, performance improvements)
 - **Do NOT add entries for**: linting, formatting, refactoring, tests, or documentation fixes
 - **Format**: `[PR 1818](https://github.com/shakacode/react_on_rails/pull/1818) by [username](https://github.com/username)` (no hash in PR number)
-- **See CHANGELOG.md lines 15-18** for full guidelines and `bundle exec rake update_changelog` for version management
+- **Use `/update-changelog` command** for guided changelog updates with automatic formatting
+- **Version management**: Run `bundle exec rake update_changelog` after releases to update version headers
 - **Examples**: Run `grep -A 3 "^#### " CHANGELOG.md | head -30` to see real formatting examples
 
 ## ⚠️ FORMATTING RULES
