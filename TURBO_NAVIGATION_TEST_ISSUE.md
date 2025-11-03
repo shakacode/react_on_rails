@@ -15,7 +15,7 @@ A regression was discovered where JavaScript fails to work after navigating betw
 - Set `turbo: true` in ReactOnRails options
 - **Forgot to update layout file** from `data-turbolinks-track` to `data-turbo-track`
 
-**Bug fixed in:** PR #XXXX (commit f03b935d)
+**Bug fixed in:** PR #1896 (commit f03b935d)
 
 - Updated `spec/dummy/app/views/layouts/application.html.erb`
 - Changed `data-turbolinks-track: true` to `data-turbo-track: 'reload'`
