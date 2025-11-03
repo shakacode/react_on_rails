@@ -4,6 +4,10 @@
 default: &default
   source_path: app/javascript
 
+  # Hook to run before compilation (e.g., for ReScript builds, pack generation)
+  # See: https://github.com/shakacode/shakapacker/blob/main/docs/precompile_hook.md
+  precompile_hook: bin/shakapacker-precompile-hook
+
   # You can have a subdirectory of the source_path, like 'packs' (recommended).
   # Alternatively, you can use '/' to use the whole source_path directory.
   # Notice that this is a relative path to source_path
