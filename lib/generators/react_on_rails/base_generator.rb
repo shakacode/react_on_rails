@@ -171,11 +171,21 @@ module ReactOnRails
         react_deps = %w[
           react
           react-dom
-          @babel/preset-react
           prop-types
-          babel-plugin-transform-react-remove-prop-types
-          babel-plugin-macros
         ]
+
+        # Add compiler-specific dependencies
+        # If using swc, add swc packages; otherwise add babel packages
+        react_deps += if using_swc?
+                        %w[@swc/core swc-loader]
+                      else
+                        %w[
+                          @babel/preset-react
+                          babel-plugin-transform-react-remove-prop-types
+                          babel-plugin-macros
+                        ]
+                      end
+
         return if add_npm_dependencies(react_deps)
 
         success = system("npm", "install", *react_deps)
@@ -201,13 +211,21 @@ module ReactOnRails
         dev_deps = %w[
           @pmmmwh/react-refresh-webpack-plugin
           react-refresh
-          @swc/core
-          swc-loader
         ]
         return if add_npm_dependencies(dev_deps, dev: true)
 
         success = system("npm", "install", "--save-dev", *dev_deps)
         handle_npm_failure("development dependencies", dev_deps, dev: true) unless success
+      end
+
+      def using_swc?
+        # Check shakapacker.yml for javascript_compiler setting
+        # Default to babel if not specified
+        shakapacker_config_path = File.join(destination_root, "config", "shakapacker.yml")
+        return false unless File.exist?(shakapacker_config_path)
+
+        config_content = File.read(shakapacker_config_path)
+        config_content.include?("javascript_compiler: swc")
       end
 
       def install_js_dependencies
