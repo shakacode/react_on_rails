@@ -31,8 +31,6 @@
     "react-dom": "^18.3.1",
     "react-on-rails": "link:.yalc/react-on-rails",
     "shakapacker": "9.3.0",
-    "swc-loader": "^0.2.6",
-    "@swc/core": "^1.7.0",
     "style-loader": "^4.0.0",
     "terser-webpack-plugin": "5",
     "webpack": "5",
@@ -46,7 +44,9 @@
   },
   "devDependencies": {
     "@pmmmwh/react-refresh-webpack-plugin": "^0.5.15",
+    "@swc/core": "^1.7.0",
     "react-refresh": "^0.14.2",
+    "swc-loader": "^0.2.6",
     "webpack-dev-server": "4"
   }
 }
