@@ -421,7 +421,6 @@ module ReactOnRails
             route: route
           )
 
-          build_rescript_if_needed
           PackGenerator.generate(verbose: verbose)
           ProcessManager.ensure_procfile(procfile)
           ProcessManager.run_with_process_manager(procfile)
@@ -429,24 +428,9 @@ module ReactOnRails
 
         def run_development(procfile, verbose: false, route: nil)
           print_procfile_info(procfile, route: route)
-          build_rescript_if_needed
           PackGenerator.generate(verbose: verbose)
           ProcessManager.ensure_procfile(procfile)
           ProcessManager.run_with_process_manager(procfile)
-        end
-
-        def build_rescript_if_needed
-          # Check for both old (bsconfig.json) and new (rescript.json) config files
-          return unless File.exist?("bsconfig.json") || File.exist?("rescript.json")
-
-          print "🔧 Building ReScript... "
-          success = system("yarn build:rescript > /dev/null 2>&1")
-          puts success ? "✅" : "❌"
-
-          return if success
-
-          puts "❌ ReScript build failed"
-          exit 1
         end
 
         def print_server_info(title, features, port = 3000, route: nil)
