@@ -34,7 +34,17 @@ if (scssConfigIndex !== -1 && baseClientWebpackConfig.module.rules[scssConfigInd
 baseClientWebpackConfig.module.rules.forEach((rule) => {
   if (Array.isArray(rule.use)) {
     rule.use.forEach((loader) => {
-      if (loader.loader && loader.loader.includes('css-loader') && loader.options?.modules) {
+      if (
+        loader &&
+        typeof loader === 'object' &&
+        loader.loader &&
+        typeof loader.loader === 'string' &&
+        loader.loader.includes('css-loader') &&
+        loader.options &&
+        typeof loader.options === 'object' &&
+        loader.options.modules &&
+        typeof loader.options.modules === 'object'
+      ) {
         // eslint-disable-next-line no-param-reassign
         loader.options.modules.namedExport = false;
         // eslint-disable-next-line no-param-reassign
