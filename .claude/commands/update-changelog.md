@@ -59,7 +59,7 @@ For breaking changes, use this format:
 
 Entries should be organized under these section headings. The project uses both standard and custom headings:
 
-**Standard headings** (from keepachangelog.com):
+**Standard headings** (from keepachangelog.com) - use these for most changes:
 
 - `#### Added` - New features
 - `#### Changed` - Changes to existing functionality
@@ -67,21 +67,18 @@ Entries should be organized under these section headings. The project uses both 
 - `#### Removed` - Removed features
 - `#### Fixed` - Bug fixes
 - `#### Security` - Security-related changes
+- `#### Improved` - Improvements to existing features
 
-**Custom headings** (project-specific):
+**Custom headings** (project-specific) - use sparingly when standard headings don't fit:
 
-- `#### Breaking Changes` - Breaking changes only
-- `#### New Features` - New features
-- `#### Bug Fixes` - Bug fixes
-- `#### Security Enhancements` - Security improvements
+- `#### Breaking Changes` - Breaking changes with migration guides
 - `#### API Improvements` - API changes and improvements
-- `#### Developer Experience` - DX improvements
-- `#### Generator Improvements` - Generator changes
-- `#### Code Improvements` - Code quality improvements
+- `#### Developer Experience` - Developer workflow improvements
+- `#### Generator Improvements` - Generator-specific changes
 - `#### Performance` - Performance improvements
-- `#### Pro License Features` - Pro-only features
+- `#### Pro License Features` - React on Rails Pro features
 
-**Choose the header that best describes your change.** Use custom headers for complex changes that benefit from more specific categorization.
+**Prefer standard headings.** Only use custom headings when the change needs more specific categorization.
 
 **Only include section headings that have entries.**
 
@@ -211,7 +208,7 @@ grep -A 3 "^#### " CHANGELOG.md | head -30
 
 ### Breaking Change Example
 
-````markdown
+```markdown
 - **React on Rails Core Package**: Several Pro-only methods have been removed from the core package and are now exclusively available in the `react-on-rails-pro` package. If you're using any of the following methods, you'll need to migrate to React on Rails Pro:
   - `getOrWaitForComponent()`
   - `getOrWaitForStore()`
@@ -225,24 +222,14 @@ grep -A 3 "^#### " CHANGELOG.md | head -30
 To migrate to React on Rails Pro:
 
 1. Install the Pro package:
-
-   ```bash
    yarn add react-on-rails-pro
-   # or
-   npm install react-on-rails-pro
-   ```
-````
 
 2. Update your imports from `react-on-rails` to `react-on-rails-pro`:
-
-   ```javascript
    // Before
    import ReactOnRails from 'react-on-rails';
 
    // After
    import ReactOnRails from 'react-on-rails-pro';
-   ```
-
 ```
 
 ## Additional Notes
@@ -253,4 +240,3 @@ To migrate to React on Rails Pro:
 - Be consistent with existing formatting in the changelog
 - Always ensure the file ends with a trailing newline
 - See CHANGELOG.md lines 15-18 for additional contributor guidelines
-```
