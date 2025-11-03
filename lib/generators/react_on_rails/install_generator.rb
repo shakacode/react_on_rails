@@ -461,8 +461,7 @@ module ReactOnRails
       def add_react_on_rails_package
         major_minor_patch_only = /\A\d+\.\d+\.\d+\z/
 
-        # Always use direct npm install with --save-exact to ensure exact version matching
-        # The package_json gem doesn't support --save-exact flag
+        # Use detected package manager with --save-exact flag to ensure exact version matching
         react_on_rails_pkg = if ReactOnRails::VERSION.match?(major_minor_patch_only)
                                "react-on-rails@#{ReactOnRails::VERSION}"
                              else
@@ -472,7 +471,8 @@ module ReactOnRails
                              end
 
         puts "Installing React on Rails package..."
-        success = system("npm", "install", "--save-exact", react_on_rails_pkg)
+        package_manager, exact_flag, add_command = detect_package_manager_and_exact_flag
+        success = system(package_manager, add_command, exact_flag, react_on_rails_pkg)
         @ran_direct_installs = true if success
         handle_npm_failure("react-on-rails package", [react_on_rails_pkg]) unless success
       end
@@ -492,7 +492,8 @@ module ReactOnRails
           return
         end
 
-        success = system("npm", "install", *react_deps)
+        package_manager, _exact_flag, add_command = detect_package_manager_and_exact_flag
+        success = system(package_manager, add_command, *react_deps)
         @ran_direct_installs = true if success
         handle_npm_failure("React dependencies", react_deps) unless success
       end
@@ -510,7 +511,8 @@ module ReactOnRails
           return
         end
 
-        success = system("npm", "install", *css_deps)
+        package_manager, _exact_flag, add_command = detect_package_manager_and_exact_flag
+        success = system(package_manager, add_command, *css_deps)
         @ran_direct_installs = true if success
         handle_npm_failure("CSS dependencies", css_deps) unless success
       end
@@ -550,7 +552,10 @@ module ReactOnRails
           return
         end
 
-        success = system("npm", "install", "--save-dev", *dev_deps)
+        package_manager, _exact_flag, add_command = detect_package_manager_and_exact_flag
+        # For dev dependencies, we need to add the --dev or -D flag depending on the package manager
+        dev_flag = package_manager == "npm" ? "--save-dev" : "-D"
+        success = system(package_manager, add_command, dev_flag, *dev_deps)
         @ran_direct_installs = true if success
         handle_npm_failure("development dependencies", dev_deps, dev: true) unless success
       end
