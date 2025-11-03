@@ -43,10 +43,5 @@
   "retryOn429": true,
   "retryCount": 5,
   "fallbackRetryDelay": "30s",
-  "aliveStatusCodes": [200, 206],
-  "retry": {
-    "maxRetries": 5,
-    "retryAfterMs": 10000,
-    "retryOn": [429, 500, 502, 503, 504]
-  }
+  "aliveStatusCodes": [200, 206]
 }

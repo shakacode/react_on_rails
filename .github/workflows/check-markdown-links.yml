@@ -23,14 +23,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check markdown links
-        uses: tcort/github-action-markdown-link-check@a800ad5f1c35bf61987946fd31c15726a1c9f2ba # v1.1.0
+      - name: Check markdown links (with retry on transient errors)
+        uses: Wandalen/wretry.action@v3.5.0
         with:
-          use-quiet-mode: 'yes'
-          use-verbose-mode: 'no'
-          config-file: '.github/markdown-link-check-config.json'
-          folder-path: 'docs/'
-          file-extension: '.md'
-          max-depth: -1
-          check-modified-files-only: 'no'
-          base-branch: 'master'
+          action: tcort/github-action-markdown-link-check@a800ad5f1c35bf61987946fd31c15726a1c9f2ba
+          with: |
+            use-quiet-mode: yes
+            use-verbose-mode: no
+            config-file: .github/markdown-link-check-config.json
+            folder-path: docs/
+            file-extension: .md
+            max-depth: -1
+            check-modified-files-only: no
+            base-branch: master
+          attempt_limit: 3
+          attempt_delay: 10000
