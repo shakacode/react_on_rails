@@ -10,6 +10,8 @@ const config: KnipConfig = {
       ignoreBinaries: [
         // Has to be installed globally
         'yalc',
+        // Used in package.json scripts (devDependency, so unlisted in production mode)
+        'nps',
         // Pro package binaries used in Pro workflows
         'playwright',
         'e2e-test',
@@ -108,6 +110,9 @@ const config: KnipConfig = {
         'bin/.*',
       ],
       ignoreDependencies: [
+        // Build-time dependencies not detected by Knip in any mode
+        '@babel/runtime',
+        'mini-css-extract-plugin',
         // There's no ReScript plugin for Knip
         '@rescript/react',
         // The Babel plugin fails to detect it

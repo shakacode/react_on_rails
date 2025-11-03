@@ -72,7 +72,7 @@ jobs:
         run: cd spec/dummy && RAILS_ENV="test" bundle exec rake react_on_rails:generate_packs
       - name: Detect dead code
         run: |
-          yarn run knip
+          yarn run knip --no-config-hints
           yarn run knip --production
       - name: Lint JS
         run: yarn run eslint --report-unused-disable-directives
