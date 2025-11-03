@@ -1,0 +1,70 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Shakapacker precompile hook
+# This script runs before Shakapacker compilation in both development and production.
+# See: https://github.com/shakacode/shakapacker/blob/main/docs/precompile_hook.md
+
+require "fileutils"
+
+# Build ReScript if needed
+def build_rescript_if_needed
+  # Check for both old (bsconfig.json) and new (rescript.json) config files
+  return unless File.exist?("bsconfig.json") || File.exist?("rescript.json")
+
+  puts "🔧 Building ReScript..."
+
+  # Try to find the ReScript build command
+  if system("command -v yarn > /dev/null 2>&1")
+    success = system("yarn build:rescript")
+  elsif system("command -v npm > /dev/null 2>&1")
+    success = system("npm run build:rescript")
+  else
+    warn "⚠️  Warning: Neither yarn nor npm found. Skipping ReScript build."
+    return
+  end
+
+  if success
+    puts "✅ ReScript build completed successfully"
+  else
+    warn "❌ ReScript build failed"
+    exit 1
+  end
+end
+
+# Generate React on Rails packs if needed
+def generate_packs_if_needed
+  return unless File.exist?("config/initializers/react_on_rails.rb")
+
+  # Check if auto-pack generation is configured
+  config_file = File.read("config/initializers/react_on_rails.rb")
+  return unless config_file.include?("auto_load_bundle") || config_file.include?("components_subdirectory")
+
+  puts "📦 Generating React on Rails packs..."
+
+  # Check if bundle and rake task are available
+  bundle_available = system("command -v bundle > /dev/null 2>&1")
+  rake_task_exists = system("bundle exec rails -T | grep -q react_on_rails:generate_packs")
+  return unless bundle_available && rake_task_exists
+
+  success = system("bundle exec rails react_on_rails:generate_packs")
+
+  if success
+    puts "✅ Pack generation completed successfully"
+  else
+    warn "❌ Pack generation failed"
+    exit 1
+  end
+end
+
+# Main execution
+begin
+  build_rescript_if_needed
+  generate_packs_if_needed
+
+  exit 0
+rescue StandardError => e
+  warn "❌ Precompile hook failed: #{e.message}"
+  warn e.backtrace.join("\n")
+  exit 1
+end
