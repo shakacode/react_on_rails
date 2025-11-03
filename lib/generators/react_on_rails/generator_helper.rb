@@ -2,6 +2,7 @@
 
 require "rainbow"
 require "json"
+require_relative "generator_messages"
 
 module GeneratorHelper
   def package_json
