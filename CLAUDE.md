@@ -48,10 +48,10 @@ Git hooks will automatically run linting on **all changed files (staged + unstag
 - **Do NOT add changelog entries for**: linting fixes, code formatting, internal refactoring, test updates, documentation fixes
 - Non-user-visible changes don't need changelog entries even if they modify code
 - **Format requirements**:
-  - Always link to the PR: `[PR #123](https://github.com/shakacode/react_on_rails/pull/123)`
+  - Always link to the PR: `[PR 1818](https://github.com/shakacode/react_on_rails/pull/1818)` (no hash symbol)
   - Always link to the author: `by [username](https://github.com/username)`
   - Keep formatting consistent with existing entries
-  - When releasing a version, update the version diff links at the bottom of CHANGELOG.md
+  - When releasing a version, run `bundle exec rake update_changelog` to update version headers and diff links
   - **For breaking changes**: Use bold formatting and link to migration documentation (e.g., `**Breaking**: Description. See [Migration Guide](docs/vX_upgrade.md)`)
 
 ## ⚠️ FORMATTING RULES
