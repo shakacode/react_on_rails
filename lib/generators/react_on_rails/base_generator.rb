@@ -2,6 +2,7 @@
 
 require "rails/generators"
 require "fileutils"
+require "yaml"
 require_relative "generator_messages"
 require_relative "generator_helper"
 module ReactOnRails
@@ -232,13 +233,21 @@ module ReactOnRails
 
       def using_swc?
         # Check shakapacker.yml for javascript_compiler setting
-        # Shakapacker 9.3.0 defaults to SWC if not specified
+        # Parse YAML to properly handle comments and get actual configured value
         shakapacker_config_path = File.join(destination_root, "config", "shakapacker.yml")
-        return true unless File.exist?(shakapacker_config_path)
+        return false unless File.exist?(shakapacker_config_path)
 
-        config_content = File.read(shakapacker_config_path)
-        # Return true (SWC) unless explicitly set to babel
-        !config_content.include?("javascript_compiler: babel")
+        begin
+          config = YAML.safe_load_file(shakapacker_config_path)
+          # Check default section for javascript_compiler setting
+          javascript_compiler = config.dig("default", "javascript_compiler")
+          # Return true only if explicitly set to "swc"
+          javascript_compiler == "swc"
+        rescue StandardError => e
+          # If YAML parsing fails, default to babel (false)
+          puts "Warning: Could not parse shakapacker.yml: #{e.message}"
+          false
+        end
       end
 
       def install_js_dependencies
