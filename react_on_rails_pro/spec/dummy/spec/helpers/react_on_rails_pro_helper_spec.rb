@@ -330,6 +330,7 @@ describe ReactOnRailsProHelper do
     def mock_request_and_response(mock_chunks = chunks, count: 1)
       # Reset connection instance variables to ensure clean state for tests
       ReactOnRailsPro::Request.instance_variable_set(:@connection, nil)
+      ReactOnRailsPro::Request.instance_variable_set(:@connection_without_retries, nil)
       original_httpx_plugin = HTTPX.method(:plugin)
       allow(HTTPX).to receive(:plugin) do |*args|
         original_httpx_plugin.call(:mock_stream).plugin(*args)
