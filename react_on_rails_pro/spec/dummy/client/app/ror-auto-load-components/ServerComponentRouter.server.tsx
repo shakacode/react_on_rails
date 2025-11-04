@@ -1,5 +1,3 @@
-'use client';
-
 import * as React from 'react';
 import { StaticRouter } from 'react-router-dom/server.js';
 import { RailsContext, ReactComponentOrRenderFunction } from 'react-on-rails-pro';
