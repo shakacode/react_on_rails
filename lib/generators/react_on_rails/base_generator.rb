@@ -220,12 +220,13 @@ module ReactOnRails
 
       def using_swc?
         # Check shakapacker.yml for javascript_compiler setting
-        # Default to babel if not specified
+        # Shakapacker 9.3.0 defaults to SWC if not specified
         shakapacker_config_path = File.join(destination_root, "config", "shakapacker.yml")
-        return false unless File.exist?(shakapacker_config_path)
+        return true unless File.exist?(shakapacker_config_path)
 
         config_content = File.read(shakapacker_config_path)
-        config_content.include?("javascript_compiler: swc")
+        # Return true (SWC) unless explicitly set to babel
+        !config_content.include?("javascript_compiler: babel")
       end
 
       def install_js_dependencies
