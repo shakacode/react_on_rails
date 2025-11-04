@@ -14,15 +14,18 @@ def build_rescript_if_needed
 
   puts "🔧 Building ReScript..."
 
-  # Try to find the ReScript build command
-  if system("command -v yarn > /dev/null 2>&1")
-    success = system("yarn build:rescript")
-  elsif system("command -v npm > /dev/null 2>&1")
-    success = system("npm run build:rescript")
-  else
-    warn "⚠️  Warning: Neither yarn nor npm found. Skipping ReScript build."
-    return
-  end
+  # Cross-platform package manager detection
+  yarn_available = system("yarn", "--version", out: File::NULL, err: File::NULL)
+  npm_available = system("npm", "--version", out: File::NULL, err: File::NULL)
+
+  success = if yarn_available
+              system("yarn", "build:rescript")
+            elsif npm_available
+              system("npm", "run", "build:rescript")
+            else
+              warn "⚠️  Warning: Neither yarn nor npm found. Skipping ReScript build."
+              return
+            end
 
   if success
     puts "✅ ReScript build completed successfully"
@@ -36,18 +39,24 @@ end
 def generate_packs_if_needed
   return unless File.exist?("config/initializers/react_on_rails.rb")
 
-  # Check if auto-pack generation is configured
+  # Check if auto-pack generation is configured (match actual config assignments, not comments)
   config_file = File.read("config/initializers/react_on_rails.rb")
-  return unless config_file.include?("auto_load_bundle") || config_file.include?("components_subdirectory")
+  has_auto_load = config_file =~ /^\s*config\.auto_load_bundle\s*=/
+  has_components_subdir = config_file =~ /^\s*config\.components_subdirectory\s*=/
+  return unless has_auto_load || has_components_subdir
 
   puts "📦 Generating React on Rails packs..."
 
-  # Check if bundle and rake task are available
-  bundle_available = system("command -v bundle > /dev/null 2>&1")
-  rake_task_exists = system("bundle exec rails -T | grep -q react_on_rails:generate_packs")
-  return unless bundle_available && rake_task_exists
+  # Cross-platform bundle availability check
+  bundle_available = system("bundle", "--version", out: File::NULL, err: File::NULL)
+  return unless bundle_available
 
-  success = system("bundle exec rails react_on_rails:generate_packs")
+  # Check if rake task exists (cross-platform)
+  task_list = `bundle exec rails -T 2>&1`
+  return unless task_list.include?("react_on_rails:generate_packs")
+
+  # Use array form for better cross-platform support
+  success = system("bundle", "exec", "rails", "react_on_rails:generate_packs")
 
   if success
     puts "✅ Pack generation completed successfully"

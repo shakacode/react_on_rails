@@ -48,7 +48,7 @@ module ReactOnRails
           # Load Rails environment if not already loaded
           require File.expand_path("config/environment", Dir.pwd) unless defined?(Rails)
 
-          Rake::Task.clear
+          # Load tasks only if not already loaded (don't clear all tasks)
           Rails.application.load_tasks unless Rake::Task.task_defined?("react_on_rails:generate_packs")
 
           if silent
@@ -59,7 +59,9 @@ module ReactOnRails
           end
 
           begin
-            Rake::Task["react_on_rails:generate_packs"].invoke
+            task = Rake::Task["react_on_rails:generate_packs"]
+            task.reenable # Allow re-execution if called multiple times
+            task.invoke
             true
           rescue StandardError => e
             warn "Error generating packs: #{e.message}" unless silent
