@@ -45,9 +45,6 @@ module ReactOnRails
         def run_rake_task_directly(silent: false)
           require "rake"
 
-          # Load Rails environment if not already loaded
-          require File.expand_path("config/environment", Dir.pwd) unless defined?(Rails)
-
           # Load tasks only if not already loaded (don't clear all tasks)
           Rails.application.load_tasks unless Rake::Task.task_defined?("react_on_rails:generate_packs")
 
