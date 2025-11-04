@@ -12,6 +12,8 @@
  * https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
+'use client';
+
 import * as React from 'react';
 import type { ClientGetReactServerComponentProps } from './getReactServerComponent.client.ts';
 import { createRSCPayloadKey } from './utils.ts';
