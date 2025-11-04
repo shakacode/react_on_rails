@@ -146,7 +146,7 @@ module ReactOnRails
               out: File::NULL, err: File::NULL
             )
           else
-            system("bundle", "exec", "rake", "react_on_rails:generate_packs")
+            system "bundle exec rake react_on_rails:generate_packs"
           end
         end
       end
