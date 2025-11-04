@@ -73,9 +73,9 @@ module ReactOnRails
 
         def run_via_bundle_exec(silent: false)
           if silent
-            system("bundle", "exec", "rake", "react_on_rails:generate_packs", out: File::NULL, err: File::NULL)
+            system "bundle exec rake react_on_rails:generate_packs > /dev/null 2>&1"
           else
-            system("bundle", "exec", "rake", "react_on_rails:generate_packs")
+            system "bundle exec rake react_on_rails:generate_packs"
           end
         end
       end
