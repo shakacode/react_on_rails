@@ -4,10 +4,6 @@
 default: &default
   source_path: app/javascript
 
-  # Hook to run before compilation (e.g., for ReScript builds, pack generation)
-  # See: https://github.com/shakacode/shakapacker/blob/main/docs/precompile_hook.md
-  precompile_hook: bin/shakapacker-precompile-hook
-
   # You can have a subdirectory of the source_path, like 'packs' (recommended).
   # Alternatively, you can use '/' to use the whole source_path directory.
   # Notice that this is a relative path to source_path
@@ -40,6 +36,9 @@ default: &default
   # Reload manifest.json on all requests so we reload latest compiled packs
   cache_manifest: false
 
+  # Select loader to use, available options are 'babel' (default), 'swc' or 'esbuild'
+  webpack_loader: 'babel'
+
   # Raises an error if there is a mismatch in the shakapacker gem and npm package being used
   ensure_consistent_versioning: true
 
@@ -50,12 +49,6 @@ default: &default
   # Don't use contentHash except for production for performance
   # https://webpack.js.org/guides/build-performance/#avoid-production-specific-tooling
   useContentHash: false
-
-  # Compiler to use for JavaScript: 'babel' or 'swc'
-  # SWC is faster but Babel has more plugins and wider ecosystem support
-  # React on Rails defaults to Babel if not specified for wider compatibility
-  # Uncomment and set to 'swc' for faster compilation:
-  # javascript_compiler: swc
 
   # Setting the asset host here will override Rails.application.config.asset_host.
   # Here, you can set different asset_host per environment. Note that
