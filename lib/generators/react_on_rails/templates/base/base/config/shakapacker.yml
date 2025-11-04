@@ -53,9 +53,9 @@ default: &default
 
   # Compiler to use for JavaScript: 'babel' or 'swc'
   # SWC is faster but Babel has more plugins and wider ecosystem support
-  # Shakapacker 9.3.0+ defaults to 'swc' if not specified
-  # Uncomment to use Babel instead:
-  # javascript_compiler: babel
+  # React on Rails defaults to Babel if not specified for wider compatibility
+  # Uncomment and set to 'swc' for faster compilation:
+  # javascript_compiler: swc
 
   # Setting the asset host here will override Rails.application.config.asset_host.
   # Here, you can set different asset_host per environment. Note that
