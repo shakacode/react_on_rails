@@ -129,7 +129,7 @@ Package react-on-rails@12.0.0-12070fd1 added ==> /Users/justin/shakacode/react-o
 Don't forget you may need to run yarn after adding packages with yalc to install/update dependencies/bin scripts.
 ```
 
-Of course, you can do the same with `react-on-rails-pro` and `@shakacode-tools/react-on-rails-pro-node-renderer` packages.
+Of course, you can do the same with `react-on-rails-pro` and `react-on-rails-pro-node-renderer` packages.
 
 This is the approach `spec/dummy` apps use, so you can also look at their implementation.
 

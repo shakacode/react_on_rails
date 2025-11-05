@@ -37,16 +37,16 @@ For the most control over the setup, create a JavaScript file to start the NodeR
    cd renderer-app
    ```
 2. Make sure you have **Node.js** version **14** or higher and **Yarn** installed.
-3. Init node application and yarn add to install `@shakacode-tools/react-on-rails-pro-node-renderer` package.
+3. Init node application and install the `react-on-rails-pro-node-renderer` package.
    ```sh
    yarn init
-   yarn add https://[your-github-token]:x-oauth-basic@github.com/shakacode/react_on_rails_pro.git\#master
+   yarn add react-on-rails-pro-node-renderer
    ```
 4. Configure a JavaScript file that will launch the rendering server per the docs in [Node Renderer JavaScript Configuration](./js-configuration.md). For example, create a file `node-renderer.js`. Here is a simple example that uses all the defaults except for serverBundleCachePath:
 
    ```javascript
    import path from 'path';
-   import reactOnRailsProNodeRenderer from '@shakacode-tools/react-on-rails-pro-node-renderer';
+   import reactOnRailsProNodeRenderer from 'react-on-rails-pro-node-renderer';
 
    const config = {
      serverBundleCachePath: path.resolve(__dirname, '../.node-renderer-bundles'),
