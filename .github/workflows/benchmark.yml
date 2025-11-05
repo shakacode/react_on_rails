@@ -33,16 +33,16 @@ on:
         description: 'Maximum connections/virtual users'
         required: false
         type: number
-      tools:
-        description: 'Comma-separated list of tools to run'
-        required: false
-        default: 'fortio,vegeta,k6'
-        type: string
       web_concurrency:
         description: 'Number of Puma worker processes'
         required: false
         default: 2
         type: number
+      tools:
+        description: 'Comma-separated list of tools to run'
+        required: false
+        default: 'fortio,vegeta,k6'
+        type: string
   push:
     branches:
       - master
@@ -58,8 +58,8 @@ env:
   REQUEST_TIMEOUT: ${{ github.event.inputs.request_timeout || '60s' }}
   CONNECTIONS: ${{ github.event.inputs.connections || '10' }}
   MAX_CONNECTIONS: ${{ github.event.inputs.max_connections || github.event.inputs.connections || '10' }}
-  TOOLS: ${{ github.event.inputs.tools || 'fortio,vegeta,k6' }}
   WEB_CONCURRENCY: ${{ github.event.inputs.web_concurrency || '2' }}
+  TOOLS: ${{ github.event.inputs.tools || 'fortio,vegeta,k6' }}
 
 jobs:
   benchmark:
@@ -268,8 +268,8 @@ jobs:
           echo "  - REQUEST_TIMEOUT: ${REQUEST_TIMEOUT}"
           echo "  - CONNECTIONS: ${CONNECTIONS}"
           echo "  - MAX_CONNECTIONS: ${MAX_CONNECTIONS}"
-          echo "  - TOOLS: ${TOOLS}"
           echo "  - WEB_CONCURRENCY: ${WEB_CONCURRENCY}"
+          echo "  - TOOLS: ${TOOLS}"
           echo ""
 
           if ! spec/performance/bench.sh; then
