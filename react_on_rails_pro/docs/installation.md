@@ -53,6 +53,8 @@ ReactOnRailsPro.configure do |config|
 end
 ```
 
+⚠️ **Security Warning**: Never commit your license token to version control. Always use environment variables or secure secret management systems (like Rails credentials, Heroku config vars, AWS Secrets Manager, etc.).
+
 ## Rails Configuration
 
 You don't need to create an initializer if you are satisfied with the defaults as described in [Configuration](./configuration.md).
