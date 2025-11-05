@@ -30,6 +30,12 @@ module ReactOnRails
     #   generators concurrently (e.g., in parallel tests), ensure tests run in separate
     #   processes to avoid ENV variable conflicts.
     #
+    # @example Testing with parallel processes
+    #   # In RSpec configuration:
+    #   config.before(:each) do |example|
+    #     ENV.delete("REACT_ON_RAILS_SKIP_VALIDATION")
+    #   end
+    #
     # @note Manual ENV Setting: While this ENV variable is designed to be set by generators,
     #   users can manually set it (e.g., `REACT_ON_RAILS_SKIP_VALIDATION=true rails server`)
     #   to bypass validation. This should only be done temporarily during debugging or
