@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { globalIgnores } from 'eslint/config';
 import jest from 'eslint-plugin-jest';
 import prettierRecommended from 'eslint-plugin-prettier/recommended';
@@ -8,16 +9,21 @@ import tsEslint from 'typescript-eslint';
 import { includeIgnoreFile } from '@eslint/compat';
 import js from '@eslint/js';
 import { FlatCompat } from '@eslint/eslintrc';
+import noUseClientInServerFiles from './eslint-rules/no-use-client-in-server-files.cjs';
+
+const filename = fileURLToPath(import.meta.url);
+// eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+const dirname = path.dirname(filename) as string;
 
 const compat = new FlatCompat({
-  baseDirectory: __dirname,
+  baseDirectory: dirname,
   recommendedConfig: js.configs.recommended,
   allConfig: js.configs.all,
 });
 
 const config = tsEslint.config([
   // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-  includeIgnoreFile(path.resolve(__dirname, '.gitignore')),
+  includeIgnoreFile(path.resolve(dirname, '.gitignore')),
   globalIgnores([
     // compiled code
     'packages/*/lib/',
@@ -84,7 +90,18 @@ const config = tsEslint.config([
       },
     },
 
+    plugins: {
+      'react-on-rails': {
+        rules: {
+          'no-use-client-in-server-files': noUseClientInServerFiles,
+        },
+      },
+    },
+
     rules: {
+      // Custom React on Rails rules
+      'react-on-rails/no-use-client-in-server-files': 'error',
+
       'no-shadow': 'off',
       'no-console': 'off',
       'function-paren-newline': 'off',
