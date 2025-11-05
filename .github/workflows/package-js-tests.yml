@@ -15,6 +15,7 @@ on:
       - 'docs/**'
       - 'lib/**'
       - 'spec/react_on_rails/**'
+  workflow_dispatch:
 
 jobs:
   detect-changes:
