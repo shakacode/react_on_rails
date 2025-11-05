@@ -247,7 +247,14 @@ describe ReactOnRailsPro::Request do
               yielder.call("#{original_chunks[0]}\n")
               # Simulate connection error mid-stream by creating a mock error response
               # Create a minimal mock request object that satisfies the ErrorResponse constructor
-              mock_options = instance_double(HTTPX::Options, timeout: {}, debug_level: 0)
+              mock_options = instance_double(
+                HTTPX::Options,
+                timeout: {},
+                debug_level: 0,
+                debug: false,
+                debug?: false,
+                logger: nil
+              )
               mock_request = instance_double(
                 HTTPX::Request,
                 uri: URI(render_full_url),
