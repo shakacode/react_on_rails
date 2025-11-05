@@ -29,6 +29,12 @@ module ReactOnRails
     #   run in a single process, so concurrent execution is not a concern. If running
     #   generators concurrently (e.g., in parallel tests), ensure tests run in separate
     #   processes to avoid ENV variable conflicts.
+    #
+    # @note Manual ENV Setting: While this ENV variable is designed to be set by generators,
+    #   users can manually set it (e.g., `REACT_ON_RAILS_SKIP_VALIDATION=true rails server`)
+    #   to bypass validation. This should only be done temporarily during debugging or
+    #   setup scenarios. The validation helps catch version mismatches early, so bypassing
+    #   it in production is not recommended.
     def self.skip_version_validation?
       # Skip if explicitly disabled via environment variable (set by generators)
       # Using ENV variable instead of ARGV because Rails can modify/clear ARGV during

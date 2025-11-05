@@ -73,8 +73,7 @@ module ReactOnRails
           GeneratorMessages.add_error(error)
         end
       ensure
-        # Always clean up ENV variable to avoid affecting subsequent processes
-        # This is safe even if concurrent generators run in separate processes
+        # Always clean up ENV variable, even if generator fails
         ENV.delete("REACT_ON_RAILS_SKIP_VALIDATION")
         print_generator_messages
       end
