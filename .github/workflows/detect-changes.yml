@@ -1,0 +1,57 @@
+name: Detect Changes
+
+on:
+  workflow_call:
+    outputs:
+      docs_only:
+        description: 'Only documentation files changed'
+        value: ${{ jobs.detect.outputs.docs_only }}
+      run_lint:
+        description: 'Should run linting'
+        value: ${{ jobs.detect.outputs.run_lint }}
+      run_ruby_tests:
+        description: 'Should run Ruby tests'
+        value: ${{ jobs.detect.outputs.run_ruby_tests }}
+      run_js_tests:
+        description: 'Should run JS tests'
+        value: ${{ jobs.detect.outputs.run_js_tests }}
+      run_dummy_tests:
+        description: 'Should run dummy app tests'
+        value: ${{ jobs.detect.outputs.run_dummy_tests }}
+      run_generators:
+        description: 'Should run generator tests'
+        value: ${{ jobs.detect.outputs.run_generators }}
+
+jobs:
+  detect:
+    runs-on: ubuntu-22.04
+    outputs:
+      docs_only: ${{ steps.changes.outputs.docs_only }}
+      run_lint: ${{ steps.changes.outputs.run_lint }}
+      run_ruby_tests: ${{ steps.changes.outputs.run_ruby_tests }}
+      run_js_tests: ${{ steps.changes.outputs.run_js_tests }}
+      run_dummy_tests: ${{ steps.changes.outputs.run_dummy_tests }}
+      run_generators: ${{ steps.changes.outputs.run_generators }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Detect changes
+        id: changes
+        run: |
+          # For master branch, always run everything
+          if [ "${{ github.ref }}" = "refs/heads/master" ]; then
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            echo "run_lint=true" >> "$GITHUB_OUTPUT"
+            echo "run_ruby_tests=true" >> "$GITHUB_OUTPUT"
+            echo "run_js_tests=true" >> "$GITHUB_OUTPUT"
+            echo "run_dummy_tests=true" >> "$GITHUB_OUTPUT"
+            echo "run_generators=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # For PRs, analyze changes
+          BASE_SHA="${{ github.event.pull_request.base.sha || github.event.before }}"
+          script/ci-changes-detector "$BASE_SHA"

@@ -61,6 +61,61 @@ See [Run NPM JS tests](#run-npm-js-tests) for the JS tests and [RSpec Testing](#
 
 See [Dev Initial Setup](#dev-initial-setup) below for, well... initial setup.
 
+## CI Testing and Optimization
+
+React on Rails Pro shares the optimized CI pipeline with the main gem. The CI system intelligently runs only relevant tests based on file changes.
+
+### CI Behavior
+
+- **On PRs/Branches**: Runs reduced test matrix (latest Ruby/Node versions only) for faster feedback
+- **On Master**: Runs full test matrix (all Ruby/Node/dependency combinations) for complete coverage
+- **Docs-only changes**: CI skips entirely when only `.md` files or `docs/` directory change
+
+### Local CI Tools
+
+The repository root provides local CI tools that work with both the main gem and Pro:
+
+#### `bin/ci-local` - Smart Local CI Runner
+
+Run from the **repository root** to test Pro changes:
+
+```bash
+# Navigate to repository root first
+cd ..
+
+# Auto-detect what to test (includes Pro tests if Pro files changed)
+bin/ci-local
+
+# Run all CI checks (same as master branch)
+bin/ci-local --all
+
+# Quick check - only fast tests
+bin/ci-local --fast
+```
+
+The detector automatically identifies Pro-related changes and runs appropriate Pro tests.
+
+#### `script/ci-changes-detector` - Change Analysis
+
+Analyzes changes to both main gem and Pro:
+
+```bash
+# From repository root
+script/ci-changes-detector origin/master
+```
+
+### CI Best Practices for Pro
+
+✅ **DO:**
+- Run `bin/ci-local` from repository root before pushing
+- Test Pro changes alongside main gem changes if modifying both
+- Use `bin/ci-local --fast` during rapid iteration
+
+❌ **DON'T:**
+- Push Pro changes without testing locally first
+- Modify both Pro and main gem without running full tests
+
+For comprehensive CI documentation, see [`../docs/CI_OPTIMIZATION.md`](../docs/CI_OPTIMIZATION.md) in the repository root.
 
 # IDE/Editor Setup
 It's critical to configure your IDE/editor to ignore certain directories. Otherwise your IDE might slow to a crawl!

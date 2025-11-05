@@ -11,7 +11,28 @@ defaults:
     working-directory: react_on_rails_pro
 
 jobs:
+  detect-changes:
+    runs-on: ubuntu-22.04
+    outputs:
+      docs_only: ${{ steps.detect.outputs.docs_only }}
+      run_pro_lint: ${{ steps.detect.outputs.run_pro_lint }}
+      run_pro_tests: ${{ steps.detect.outputs.run_pro_tests }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Detect relevant changes
+        id: detect
+        working-directory: .
+        run: |
+          BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/master' }}"
+          script/ci-changes-detector "$BASE_REF"
+        shell: bash
+
   lint-js-and-ruby:
+    needs: detect-changes
+    if: github.ref == 'refs/heads/master' || needs.detect-changes.outputs.run_pro_lint == 'true'
     runs-on: ubuntu-22.04
     env:
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE }}

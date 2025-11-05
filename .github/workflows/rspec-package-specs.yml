@@ -4,15 +4,56 @@ on:
   push:
     branches:
       - 'master'
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'packages/react-on-rails/src/**'
+      - 'node_package/src/**'
   pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'packages/react-on-rails/src/**'
+      - 'node_package/src/**'
 
 jobs:
+  detect-changes:
+    runs-on: ubuntu-22.04
+    outputs:
+      docs_only: ${{ steps.detect.outputs.docs_only }}
+      run_lint: ${{ steps.detect.outputs.run_lint }}
+      run_js_tests: ${{ steps.detect.outputs.run_js_tests }}
+      run_ruby_tests: ${{ steps.detect.outputs.run_ruby_tests }}
+      run_dummy_tests: ${{ steps.detect.outputs.run_dummy_tests }}
+      run_generators: ${{ steps.detect.outputs.run_generators }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Fetch enough history for change detection (50 commits is usually sufficient for PRs)
+          fetch-depth: 50
+          persist-credentials: false
+      - name: Detect relevant changes
+        id: detect
+        run: |
+          BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/master' }}"
+          script/ci-changes-detector "$BASE_REF"
+        shell: bash
+
   rspec-package-tests:
+    needs: detect-changes
+    # Run on master OR when Ruby tests needed on PR (but skip minimum deps on PR)
+    if: |
+      (github.ref == 'refs/heads/master' || needs.detect-changes.outputs.run_ruby_tests == 'true')
     strategy:
       fail-fast: false
       matrix:
-        ruby-version: ['3.2', '3.4']
-        dependency-level: ['minimum', 'latest']
+        include:
+          # Always run: Latest versions (fast feedback on PRs)
+          - ruby-version: '3.4'
+            dependency-level: 'latest'
+          # Master only: Minimum supported versions (full coverage)
+          - ruby-version: '3.2'
+            dependency-level: 'minimum'
     env:
       BUNDLE_FROZEN: ${{ matrix.dependency-level == 'minimum' && 'false' || 'true' }}
     runs-on: ubuntu-22.04

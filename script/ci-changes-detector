@@ -1,0 +1,244 @@
+#!/usr/bin/env bash
+# CI Changes Detector
+# Analyzes git changes to determine which CI jobs need to run
+# Usage: script/ci-changes-detector [base-ref]
+
+set -euo pipefail
+
+BASE_REF="${1:-origin/master}"
+CURRENT_REF="${2:-HEAD}"
+
+# Handle initial commits where before SHA is all zeros
+if [[ "$BASE_REF" =~ ^0+$ ]]; then
+  BASE_REF="origin/master"
+fi
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Fetch the base ref if it's a remote ref
+if [[ "$BASE_REF" == origin/* ]]; then
+  if ! git fetch origin master --depth=50 2>/dev/null; then
+    echo "${RED}Error: Failed to fetch $BASE_REF${NC}"
+    echo "Please check your network connection and try again."
+    exit 1
+  fi
+fi
+
+# Validate that the base ref exists
+if ! git rev-parse --verify "$BASE_REF" >/dev/null 2>&1; then
+  echo "${RED}Error: Base ref '$BASE_REF' does not exist${NC}"
+  echo "Available branches:"
+  git branch -a | head -10
+  exit 1
+fi
+
+# Get list of changed files (committed + uncommitted)
+CHANGED_FILES=$(git diff --name-only "$BASE_REF"..."$CURRENT_REF" 2>/dev/null || echo "")
+
+# For local development, also include uncommitted changes
+if [ -z "${CI:-}" ] && [ "$CURRENT_REF" = "HEAD" ]; then
+  UNCOMMITTED=$(git diff --name-only HEAD 2>/dev/null || echo "")
+  UNTRACKED=$(git ls-files --others --exclude-standard 2>/dev/null || echo "")
+  CHANGED_FILES=$(printf "%s\n%s\n%s" "$CHANGED_FILES" "$UNCOMMITTED" "$UNTRACKED" | grep -v '^$' || echo "")
+fi
+
+if [ -z "$CHANGED_FILES" ]; then
+  echo "No changes detected between $BASE_REF and $CURRENT_REF"
+  exit 0
+fi
+
+# Initialize flags
+DOCS_ONLY=true
+RUBY_CHANGED=false
+JS_CHANGED=false
+GENERATORS_CHANGED=false
+WORKFLOWS_CHANGED=false
+LINT_CONFIG_CHANGED=false
+SPEC_DUMMY_CHANGED=false
+RSPEC_CHANGED=false
+PRO_CHANGED=false
+PRO_DUMMY_CHANGED=false
+
+# Analyze each changed file
+while IFS= read -r file; do
+  case "$file" in
+    # Documentation files
+    *.md|*.mdx|*.markdown|*.rst|*.txt|docs/*|docs/**/*|react_on_rails_pro/docs/*|react_on_rails_pro/docs/**/*|SUMMARY.md|book.json)
+      # Don't change DOCS_ONLY flag, just continue
+      ;;
+
+    # Ruby source code
+    lib/*.rb|lib/**/*.rb)
+      DOCS_ONLY=false
+      RUBY_CHANGED=true
+      ;;
+
+    # Ruby specs (except dummy app)
+    spec/react_on_rails/*|spec/react_on_rails/**/*)
+      DOCS_ONLY=false
+      RUBY_CHANGED=true
+      RSPEC_CHANGED=true
+      ;;
+
+    # Generators
+    lib/generators/*|lib/generators/**/*|rakelib/example_type.rb|rakelib/example_config.yml|rakelib/examples.rake)
+      DOCS_ONLY=false
+      GENERATORS_CHANGED=true
+      ;;
+
+    # JavaScript/TypeScript source
+    packages/react-on-rails/src/*|packages/react-on-rails/src/**/*|node_package/src/*|node_package/src/**/*)
+      DOCS_ONLY=false
+      JS_CHANGED=true
+      ;;
+
+    # Dummy app
+    spec/dummy/*)
+      DOCS_ONLY=false
+      SPEC_DUMMY_CHANGED=true
+      ;;
+
+    # React on Rails Pro package / dummy app
+    react_on_rails_pro/spec/dummy/*)
+      DOCS_ONLY=false
+      PRO_CHANGED=true
+      PRO_DUMMY_CHANGED=true
+      ;;
+    react_on_rails_pro/*|react_on_rails_pro/**/*)
+      DOCS_ONLY=false
+      PRO_CHANGED=true
+      ;;
+
+    # GitHub workflows
+    .github/workflows/*)
+      DOCS_ONLY=false
+      WORKFLOWS_CHANGED=true
+      ;;
+
+    # Lint/format configuration
+    .rubocop.yml|.eslintrc*|.prettierrc*|tsconfig.json|.editorconfig)
+      DOCS_ONLY=false
+      LINT_CONFIG_CHANGED=true
+      ;;
+
+    # Gemfile, package.json, lockfiles
+    Gemfile|Gemfile.lock|package.json|yarn.lock|spec/dummy/Gemfile|spec/dummy/Gemfile.lock|spec/dummy/package.json|spec/dummy/yarn.lock)
+      DOCS_ONLY=false
+      RUBY_CHANGED=true
+      JS_CHANGED=true
+      ;;
+
+    # Anything else is considered a code change
+    *)
+      DOCS_ONLY=false
+      ;;
+  esac
+done <<< "$CHANGED_FILES"
+
+# Output results
+echo "=== CI Changes Analysis ==="
+echo "Base: $BASE_REF | Current: $CURRENT_REF"
+echo ""
+
+if [ "$DOCS_ONLY" = true ]; then
+  echo -e "${GREEN}✓ Documentation-only changes${NC}"
+  echo ""
+  echo "Recommended CI jobs: NONE (skip CI)"
+  echo ""
+  echo "You can skip CI on this commit with:"
+  echo "  git commit --amend -m \"\$(git log -1 --pretty=%B)\" -m \"[skip ci]\""
+  exit 0
+fi
+
+echo "Changed file categories:"
+[ "$RUBY_CHANGED" = true ] && echo -e "${YELLOW}  • Ruby source code${NC}"
+[ "$JS_CHANGED" = true ] && echo -e "${YELLOW}  • JavaScript/TypeScript code${NC}"
+[ "$GENERATORS_CHANGED" = true ] && echo -e "${YELLOW}  • Generators${NC}"
+[ "$RSPEC_CHANGED" = true ] && echo -e "${YELLOW}  • RSpec tests${NC}"
+[ "$SPEC_DUMMY_CHANGED" = true ] && echo -e "${YELLOW}  • Dummy app${NC}"
+[ "$PRO_CHANGED" = true ] && echo -e "${YELLOW}  • React on Rails Pro${NC}"
+[ "$WORKFLOWS_CHANGED" = true ] && echo -e "${YELLOW}  • GitHub workflows${NC}"
+[ "$LINT_CONFIG_CHANGED" = true ] && echo -e "${YELLOW}  • Lint/format configuration${NC}"
+
+echo ""
+echo "Recommended CI jobs:"
+
+# Determine which jobs to run
+RUN_LINT=false
+RUN_RUBY_TESTS=false
+RUN_JS_TESTS=false
+RUN_DUMMY_TESTS=false
+RUN_GENERATORS=false
+RUN_PRO_LINT=false
+RUN_PRO_TESTS=false
+
+if [ "$LINT_CONFIG_CHANGED" = true ] || [ "$RUBY_CHANGED" = true ] || [ "$JS_CHANGED" = true ] || [ "$WORKFLOWS_CHANGED" = true ]; then
+  RUN_LINT=true
+fi
+
+if [ "$RUBY_CHANGED" = true ] || [ "$RSPEC_CHANGED" = true ]; then
+  RUN_RUBY_TESTS=true
+fi
+
+if [ "$JS_CHANGED" = true ]; then
+  RUN_JS_TESTS=true
+fi
+
+if [ "$SPEC_DUMMY_CHANGED" = true ] || [ "$RUBY_CHANGED" = true ] || [ "$JS_CHANGED" = true ]; then
+  RUN_DUMMY_TESTS=true
+fi
+
+if [ "$GENERATORS_CHANGED" = true ]; then
+  RUN_GENERATORS=true
+fi
+
+if [ "$PRO_CHANGED" = true ]; then
+  RUN_PRO_LINT=true
+  RUN_PRO_TESTS=true
+fi
+
+if [ "$PRO_DUMMY_CHANGED" = true ]; then
+  RUN_PRO_TESTS=true
+fi
+
+[ "$RUN_LINT" = true ] && echo "  ✓ Lint (Ruby + JS)"
+[ "$RUN_RUBY_TESTS" = true ] && echo "  ✓ RSpec gem tests"
+[ "$RUN_JS_TESTS" = true ] && echo "  ✓ JS unit tests"
+[ "$RUN_DUMMY_TESTS" = true ] && echo "  ✓ Dummy app integration tests"
+[ "$RUN_GENERATORS" = true ] && echo "  ✓ Generator tests"
+[ "$RUN_PRO_LINT" = true ] && echo "  ✓ React on Rails Pro lint"
+[ "$RUN_PRO_TESTS" = true ] && echo "  ✓ React on Rails Pro tests"
+
+# Export as GitHub Actions outputs if running in CI
+if [ -n "${GITHUB_OUTPUT:-}" ]; then
+  {
+    echo "docs_only=$DOCS_ONLY"
+    echo "run_lint=$RUN_LINT"
+    echo "run_ruby_tests=$RUN_RUBY_TESTS"
+    echo "run_js_tests=$RUN_JS_TESTS"
+    echo "run_dummy_tests=$RUN_DUMMY_TESTS"
+    echo "run_generators=$RUN_GENERATORS"
+    echo "run_pro_lint=$RUN_PRO_LINT"
+    echo "run_pro_tests=$RUN_PRO_TESTS"
+  } >> "$GITHUB_OUTPUT"
+fi
+
+# Export as JSON for programmatic parsing (when CI_JSON_OUTPUT=1)
+if [ "${CI_JSON_OUTPUT:-}" = "1" ]; then
+  cat << EOF
+{
+  "docs_only": $DOCS_ONLY,
+  "run_lint": $RUN_LINT,
+  "run_ruby_tests": $RUN_RUBY_TESTS,
+  "run_js_tests": $RUN_JS_TESTS,
+  "run_dummy_tests": $RUN_DUMMY_TESTS,
+  "run_generators": $RUN_GENERATORS,
+  "run_pro_lint": $RUN_PRO_LINT,
+  "run_pro_tests": $RUN_PRO_TESTS
+}
+EOF
+fi

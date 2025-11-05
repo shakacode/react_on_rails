@@ -4,26 +4,53 @@ on:
   push:
     branches:
       - 'master'
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
   pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
 
 jobs:
+  detect-changes:
+    runs-on: ubuntu-22.04
+    outputs:
+      docs_only: ${{ steps.detect.outputs.docs_only }}
+      run_lint: ${{ steps.detect.outputs.run_lint }}
+      run_js_tests: ${{ steps.detect.outputs.run_js_tests }}
+      run_ruby_tests: ${{ steps.detect.outputs.run_ruby_tests }}
+      run_dummy_tests: ${{ steps.detect.outputs.run_dummy_tests }}
+      run_generators: ${{ steps.detect.outputs.run_generators }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Fetch enough history for change detection (50 commits is usually sufficient for PRs)
+          fetch-depth: 50
+          persist-credentials: false
+      - name: Detect relevant changes
+        id: detect
+        run: |
+          BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/master' }}"
+          script/ci-changes-detector "$BASE_REF"
+        shell: bash
+
   build-dummy-app-webpack-test-bundles:
+    needs: detect-changes
+    # Run on master OR when tests needed on PR (but skip minimum deps on PR)
+    if: |
+      (github.ref == 'refs/heads/master' || needs.detect-changes.outputs.run_dummy_tests == 'true')
     strategy:
       matrix:
-        ruby-version: ['3.2', '3.4']
-        node-version: ['20', '22']
         include:
-          - ruby-version: '3.2'
-            node-version: '20'
-            dependency-level: 'minimum'
+          # Always run: Latest versions (fast feedback on PRs)
           - ruby-version: '3.4'
             node-version: '22'
             dependency-level: 'latest'
-        exclude:
+          # Master only: Minimum supported versions (full coverage)
           - ruby-version: '3.2'
-            node-version: '22'
-          - ruby-version: '3.4'
             node-version: '20'
+            dependency-level: 'minimum'
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -91,24 +118,22 @@ jobs:
           key: dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
 
   dummy-app-integration-tests:
-    needs: build-dummy-app-webpack-test-bundles
+    needs: [detect-changes, build-dummy-app-webpack-test-bundles]
+    # Run on master OR when tests needed on PR (but skip minimum deps on PR)
+    if: |
+      (github.ref == 'refs/heads/master' || needs.detect-changes.outputs.run_dummy_tests == 'true')
     strategy:
       fail-fast: false
       matrix:
-        ruby-version: ['3.2', '3.4']
-        node-version: ['20', '22']
         include:
-          - ruby-version: '3.2'
-            node-version: '20'
-            dependency-level: 'minimum'
+          # Always run: Latest versions (fast feedback on PRs)
           - ruby-version: '3.4'
             node-version: '22'
             dependency-level: 'latest'
-        exclude:
+          # Master only: Minimum supported versions (full coverage)
           - ruby-version: '3.2'
-            node-version: '22'
-          - ruby-version: '3.4'
             node-version: '20'
+            dependency-level: 'minimum'
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
