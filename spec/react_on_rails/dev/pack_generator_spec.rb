@@ -3,6 +3,19 @@
 require_relative "../spec_helper"
 require "react_on_rails/dev/pack_generator"
 
+# Tests for PackGenerator.generate which triggers pack generation for react_on_rails
+#
+# This class is responsible for:
+# 1. Detecting if shakapacker has a precompile hook configured and skipping if so
+# 2. Choosing the optimal execution strategy (direct Rake task vs bundle exec)
+# 3. Handling errors appropriately and providing user-friendly output
+#
+# Test coverage includes:
+# - Shakapacker hook detection (skip generation when hook is configured)
+# - Direct Rake execution in Bundler context (faster, no subprocess overhead)
+# - Fallback to bundle exec when Rails/Bundler not available
+# - Error handling with proper stderr output
+# - Silent mode output suppression
 RSpec.describe ReactOnRails::Dev::PackGenerator do
   describe ".generate" do
     before do

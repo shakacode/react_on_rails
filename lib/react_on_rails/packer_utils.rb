@@ -169,23 +169,38 @@ module ReactOnRails
 
     # Check if shakapacker.yml has a precompile hook configured
     # This prevents react_on_rails from running generate_packs twice
+    #
+    # Returns false if detection fails for any reason (missing shakapacker, malformed config, etc.)
+    # to ensure generate_packs runs rather than being incorrectly skipped
     def self.shakapacker_precompile_hook_configured?
       return false unless defined?(::Shakapacker)
 
+      hooks = extract_precompile_hooks
+      return false if hooks.nil?
+
+      hook_contains_generate_packs?(hooks)
+    rescue StandardError => e
+      # Swallow errors during hook detection to fail safe - if we can't detect the hook,
+      # we should run generate_packs rather than skip it incorrectly.
+      # Possible errors: NoMethodError (config method missing), TypeError (unexpected data structure),
+      # or errors from shakapacker's internal implementation changes
+      warn "Warning: Unable to detect shakapacker precompile hook: #{e.message}" if ENV["DEBUG"]
+      false
+    end
+
+    def self.extract_precompile_hooks
       # Access config data using private :data method since there's no public API
       # to access the raw configuration hash needed for hook detection
       config_data = ::Shakapacker.config.send(:data)
 
       # Try symbol keys first (Shakapacker's internal format), then fall back to string keys
-      hooks = config_data&.dig(:hooks, :precompile) || config_data&.dig("hooks", "precompile")
+      config_data&.dig(:hooks, :precompile) || config_data&.dig("hooks", "precompile")
+    end
 
-      return false if hooks.nil?
-
+    def self.hook_contains_generate_packs?(hooks)
       # Check if any hook contains the generate_packs rake task using word boundary
       # to avoid false positives from comments or similar strings
       Array(hooks).any? { |hook| hook.to_s.match?(/\breact_on_rails:generate_packs\b/) }
-    rescue StandardError
-      false
     end
   end
 end

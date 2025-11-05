@@ -5,6 +5,24 @@ require "stringio"
 
 module ReactOnRails
   module Dev
+    # PackGenerator triggers the generation of React on Rails packs
+    #
+    # Design decisions:
+    # 1. Why trigger via Rake task instead of direct Ruby code?
+    #    - The actual pack generation logic lives in lib/react_on_rails/packs_generator.rb
+    #    - The rake task (lib/tasks/generate_packs.rake) provides a stable, documented interface
+    #    - This allows the implementation to evolve without breaking bin/dev
+    #    - Users can also run the task directly: `rake react_on_rails:generate_packs`
+    #
+    # 2. Why two execution strategies (direct vs bundle exec)?
+    #    - Direct Rake execution: Faster when already in Bundler/Rails context (bin/dev)
+    #    - Bundle exec fallback: Required when called outside Rails context
+    #    - This optimization avoids subprocess overhead in the common case
+    #
+    # 3. Why is the class named "PackGenerator" when it delegates?
+    #    - It's a semantic wrapper around pack generation for the dev workflow
+    #    - Provides a clean API for bin/dev without exposing Rake internals
+    #    - Handles hook detection, error handling, and output formatting
     class PackGenerator
       class << self
         def generate(verbose: false)
