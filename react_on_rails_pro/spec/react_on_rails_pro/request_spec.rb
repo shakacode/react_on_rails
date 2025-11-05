@@ -252,7 +252,6 @@ describe ReactOnRailsPro::Request do
                 timeout: {},
                 debug_level: 0,
                 debug: false,
-                debug?: false,
                 logger: nil
               )
               mock_request = instance_double(
