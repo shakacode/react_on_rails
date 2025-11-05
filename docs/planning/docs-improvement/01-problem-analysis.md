@@ -743,7 +743,7 @@ From `gatsby-node.js:41-42`:
 
 **TanStack:**
 
-- Docs: `tanstack.com/router/latest/docs`
+- Docs: `[tanstack.com/router/latest/docs](https://tanstack.com/router/latest/docs/framework/react/overview)`
 - No testimonials in technical docs
 - Marketing content on separate pages
 
@@ -1183,7 +1183,7 @@ keywords: [installation, setup, rails]
    - TypeScript types shown
    - Inline JSDoc comments
 
-**Source:** https://tanstack.com/router/latest/docs
+**Source:** https://tanstack.com/router/latest/docs/framework/react/overview
 
 ---
 
