@@ -17,7 +17,7 @@
 'use client';
 
 import * as React from 'react';
-import { Component, use, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { useRSC } from './RSCProvider.tsx';
 import { ServerComponentFetchError } from './ServerComponentFetchError.ts';
 
@@ -25,7 +25,7 @@ import { ServerComponentFetchError } from './ServerComponentFetchError.ts';
  * Error boundary component for RSCRoute that adds server component name and props to the error
  * So, the parent ErrorBoundary can refetch the server component
  */
-class RSCRouteErrorBoundary extends Component<
+class RSCRouteErrorBoundary extends React.Component<
   { children: ReactNode; componentName: string; componentProps: unknown },
   { error: Error | null }
 > {
@@ -77,8 +77,8 @@ export type RSCRouteProps = {
 };
 
 const PromiseWrapper = ({ promise }: { promise: Promise<ReactNode> }) => {
-  // use is available in React 18.3+
-  const promiseResult = use(promise);
+  // React.use is available in React 18.3+
+  const promiseResult = React.use(promise);
 
   // In case that an error happened during the rendering of the RSC payload before the rendering of the component itself starts
   // RSC bundle will return an error object serialized inside the RSC payload
