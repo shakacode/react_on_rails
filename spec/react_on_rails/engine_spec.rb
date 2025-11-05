@@ -50,6 +50,11 @@ module ReactOnRails
               expect(Rails.logger).not_to have_received(:debug)
                 .with("[React on Rails] Skipping validation during generator runtime")
             end
+
+            it "short-circuits before checking File.exist?" do
+              described_class.skip_version_validation?
+              expect(File).not_to have_received(:exist?)
+            end
           end
 
           context "when package.json is missing" do
