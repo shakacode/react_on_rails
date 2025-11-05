@@ -56,6 +56,18 @@ for cmd in ${TOOLS//,/ } jq column awk tee bc; do
   fi
 done
 
+echo "Benchmark parameters:
+  - RATE: ${RATE:-unset}
+  - DURATION_SEC: ${DURATION_SEC:-unset}
+  - REQUEST_TIMEOUT: ${REQUEST_TIMEOUT:-unset}
+  - CONNECTIONS: ${CONNECTIONS:-unset}
+  - MAX_CONNECTIONS: ${MAX_CONNECTIONS:-unset}
+  - WEB_CONCURRENCY: ${WEB_CONCURRENCY:-unset}
+  - RAILS_MAX_THREADS: ${RAILS_MAX_THREADS:-unset}
+  - RAILS_MIN_THREADS: ${RAILS_MIN_THREADS:-unset}
+  - TOOLS: ${TOOLS:-unset}
+"
+
 TIMEOUT_SEC=60
 START=$(date +%s)
 until curl -fsS "$TARGET" >/dev/null; do
