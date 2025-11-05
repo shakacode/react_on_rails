@@ -28,7 +28,10 @@ module ReactOnRails
         def generate(verbose: false)
           # Skip if shakapacker has a precompile hook configured
           if ReactOnRails::PackerUtils.shakapacker_precompile_hook_configured?
-            puts "⏭️  Skipping pack generation (handled by shakapacker precompile hook)" if verbose
+            if verbose
+              hook_value = ReactOnRails::PackerUtils.shakapacker_precompile_hook_value
+              puts "⏭️  Skipping pack generation (handled by shakapacker precompile hook: #{hook_value})"
+            end
             return
           end
 

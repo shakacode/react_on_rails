@@ -240,7 +240,8 @@ module ReactOnRails
       precompile_tasks = lambda {
         # Skip generate_packs if shakapacker has a precompile hook configured
         if ReactOnRails::PackerUtils.shakapacker_precompile_hook_configured?
-          puts "Skipping react_on_rails:generate_packs (configured in shakapacker precompile hook)"
+          hook_value = ReactOnRails::PackerUtils.shakapacker_precompile_hook_value
+          puts "Skipping react_on_rails:generate_packs (configured in shakapacker precompile hook: #{hook_value})"
         else
           Rake::Task["react_on_rails:generate_packs"].invoke
         end

@@ -25,12 +25,13 @@ RSpec.describe ReactOnRails::Dev::PackGenerator do
 
     context "when shakapacker precompile hook is configured" do
       before do
-        allow(ReactOnRails::PackerUtils).to receive(:shakapacker_precompile_hook_configured?).and_return(true)
+        allow(ReactOnRails::PackerUtils).to receive_messages(shakapacker_precompile_hook_configured?: true,
+                                                             shakapacker_precompile_hook_value: "bin/precompile_hook")
       end
 
-      it "skips pack generation in verbose mode" do
+      it "skips pack generation in verbose mode and shows hook value" do
         expect { described_class.generate(verbose: true) }
-          .to output(/⏭️  Skipping pack generation \(handled by shakapacker precompile hook\)/)
+          .to output(%r{⏭️  Skipping pack generation \(handled by shakapacker precompile hook: bin/precompile_hook\)})
           .to_stdout_from_any_process
       end
 
