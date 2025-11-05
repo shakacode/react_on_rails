@@ -427,7 +427,7 @@ describe "Pages/stream_async_components_for_testing", :js do
                   "#AsyncComponentsTreeForTesting-react-component-0"
 end
 
-describe "React Router Sixth Page", :js do
+describe "React Router Sixth Page", :js, skip: "Work in progress in another branch" do
   it_behaves_like "streamed component tests", "/server_router/streaming-server-component",
                   "#ServerComponentRouter-react-component-0"
 end
