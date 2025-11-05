@@ -21,10 +21,38 @@ const sassLoaderConfig = {
   },
 };
 
-const scssConfigIndex = baseClientWebpackConfig.module.rules.findIndex((config) =>
-  '.scss'.match(config.test),
-);
-baseClientWebpackConfig.module.rules[scssConfigIndex]?.use.push(sassLoaderConfig);
+// Add sass-resources-loader to all SCSS rules (both .scss and .module.scss)
+baseClientWebpackConfig.module.rules.forEach((rule) => {
+  if (rule.test && '.scss'.match(rule.test) && Array.isArray(rule.use)) {
+    rule.use.push(sassLoaderConfig);
+  }
+});
+
+// Configure CSS Modules to use default exports (Shakapacker 9.0 compatibility)
+// Shakapacker 9.0 defaults to namedExport: true, but we use default imports
+// To restore backward compatibility with existing code using `import styles from`
+baseClientWebpackConfig.module.rules.forEach((rule) => {
+  if (Array.isArray(rule.use)) {
+    rule.use.forEach((loader) => {
+      if (
+        loader &&
+        typeof loader === 'object' &&
+        loader.loader &&
+        typeof loader.loader === 'string' &&
+        loader.loader.includes('css-loader') &&
+        loader.options &&
+        typeof loader.options === 'object' &&
+        loader.options.modules &&
+        typeof loader.options.modules === 'object'
+      ) {
+        // eslint-disable-next-line no-param-reassign
+        loader.options.modules.namedExport = false;
+        // eslint-disable-next-line no-param-reassign
+        loader.options.modules.exportLocalsConvention = 'camelCase';
+      }
+    });
+  }
+});
 
 // add jquery
 const exposeJQuery = {
