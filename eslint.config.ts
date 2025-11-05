@@ -85,7 +85,18 @@ const config = tsEslint.config([
       },
     },
 
+    plugins: {
+      'react-on-rails': {
+        rules: {
+          'no-use-client-in-server-files': noUseClientInServerFiles,
+        },
+      },
+    },
+
     rules: {
+      // Custom React on Rails rules
+      'react-on-rails/no-use-client-in-server-files': 'error',
+
       'no-shadow': 'off',
       'no-console': 'off',
       'function-paren-newline': 'off',
@@ -168,13 +179,6 @@ const config = tsEslint.config([
   },
   {
     files: ['**/*.server.ts', '**/*.server.tsx'],
-    plugins: {
-      'react-on-rails': {
-        rules: {
-          'no-use-client-in-server-files': noUseClientInServerFiles,
-        },
-      },
-    },
     rules: {
       'react-on-rails/no-use-client-in-server-files': 'error',
     },
