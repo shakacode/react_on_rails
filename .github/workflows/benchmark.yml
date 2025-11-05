@@ -19,6 +19,11 @@ on:
         required: false
         default: 10
         type: number
+      request_timeout:
+        description: 'Request timeout (e.g., "60s", "1m", "90s")'
+        required: false
+        default: '60s'
+        type: string
       vus:
         description: 'Virtual users for k6'
         required: false
@@ -41,6 +46,7 @@ env:
   # Benchmark parameters
   RATE: ${{ github.event.inputs.rate || '50' }}
   DURATION_SEC: ${{ github.event.inputs.duration_sec || '10' }}
+  REQUEST_TIMEOUT: ${{ github.event.inputs.request_timeout || '60s' }}
   VUS: ${{ github.event.inputs.vus || '100' }}
   TOOLS: ${{ github.event.inputs.tools || 'fortio,vegeta,k6' }}
 
