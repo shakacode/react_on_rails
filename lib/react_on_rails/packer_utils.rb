@@ -172,13 +172,18 @@ module ReactOnRails
     def self.shakapacker_precompile_hook_configured?
       return false unless defined?(::Shakapacker)
 
+      # Access config data using private :data method since there's no public API
+      # to access the raw configuration hash needed for hook detection
       config_data = ::Shakapacker.config.send(:data)
-      hooks = config_data.dig("hooks", "precompile")
 
-      return false unless hooks
+      # Try symbol keys first (Shakapacker's internal format), then fall back to string keys
+      hooks = config_data&.dig(:hooks, :precompile) || config_data&.dig("hooks", "precompile")
 
-      # Check if any hook contains the generate_packs rake task
-      Array(hooks).any? { |hook| hook.to_s.include?("react_on_rails:generate_packs") }
+      return false if hooks.nil?
+
+      # Check if any hook contains the generate_packs rake task using word boundary
+      # to avoid false positives from comments or similar strings
+      Array(hooks).any? { |hook| hook.to_s.match?(/\breact_on_rails:generate_packs\b/) }
     rescue StandardError
       false
     end

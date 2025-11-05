@@ -2,6 +2,7 @@
 
 require_relative "spec_helper"
 
+# rubocop:disable Metrics/ModuleLength
 module ReactOnRails
   describe PackerUtils do
     describe ".shakapacker_version_requirement_met?" do
@@ -158,7 +159,15 @@ module ReactOnRails
       end
 
       context "when precompile hook contains react_on_rails:generate_packs" do
-        it "returns true for single hook" do
+        it "returns true for single hook with symbol keys" do
+          allow(mock_config).to receive(:send).with(:data).and_return(
+            { hooks: { precompile: "bundle exec rake react_on_rails:generate_packs" } }
+          )
+
+          expect(described_class.shakapacker_precompile_hook_configured?).to be(true)
+        end
+
+        it "returns true for single hook with string keys" do
           allow(mock_config).to receive(:send).with(:data).and_return(
             { "hooks" => { "precompile" => "bundle exec rake react_on_rails:generate_packs" } }
           )
@@ -168,7 +177,7 @@ module ReactOnRails
 
         it "returns true for hook in array" do
           allow(mock_config).to receive(:send).with(:data).and_return(
-            { "hooks" => { "precompile" => ["bundle exec rake react_on_rails:generate_packs", "echo done"] } }
+            { hooks: { precompile: ["bundle exec rake react_on_rails:generate_packs", "echo done"] } }
           )
 
           expect(described_class.shakapacker_precompile_hook_configured?).to be(true)
@@ -178,7 +187,15 @@ module ReactOnRails
       context "when precompile hook does not contain react_on_rails:generate_packs" do
         it "returns false for different hook" do
           allow(mock_config).to receive(:send).with(:data).and_return(
-            { "hooks" => { "precompile" => "bundle exec rake some_other_task" } }
+            { hooks: { precompile: "bundle exec rake some_other_task" } }
+          )
+
+          expect(described_class.shakapacker_precompile_hook_configured?).to be(false)
+        end
+
+        it "returns false for similar but different task name" do
+          allow(mock_config).to receive(:send).with(:data).and_return(
+            { hooks: { precompile: "bundle exec rake react_on_rails:generate_packs_extra" } }
           )
 
           expect(described_class.shakapacker_precompile_hook_configured?).to be(false)
@@ -191,7 +208,7 @@ module ReactOnRails
         end
 
         it "returns false when precompile hook is nil" do
-          allow(mock_config).to receive(:send).with(:data).and_return({ "hooks" => {} })
+          allow(mock_config).to receive(:send).with(:data).and_return({ hooks: {} })
 
           expect(described_class.shakapacker_precompile_hook_configured?).to be(false)
         end
@@ -238,3 +255,4 @@ module ReactOnRails
     end
   end
 end
+# rubocop:enable Metrics/ModuleLength
