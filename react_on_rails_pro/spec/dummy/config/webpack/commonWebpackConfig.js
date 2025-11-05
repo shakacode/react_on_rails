@@ -29,7 +29,7 @@ const baseClientWebpackConfig = generateWebpackConfig();
 
 // Add sass-resources-loader to all SCSS rules
 baseClientWebpackConfig.module.rules.forEach((rule) => {
-  if (Array.isArray(rule.use) && rule.test && rule.test.test('.scss')) {
+  if (Array.isArray(rule.use) && rule.test && rule.test.test('example.scss')) {
     rule.use.push(sassLoaderConfig);
   }
 });
