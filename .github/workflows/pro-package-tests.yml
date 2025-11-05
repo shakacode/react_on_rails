@@ -52,7 +52,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: yarn
+          # Disable cache for Node 22 due to V8 bug in 22.21.0
+          # https://github.com/nodejs/node/issues/56010
+          cache: ''
           cache-dependency-path: 'react_on_rails_pro/**/yarn.lock'
 
       - name: Print system information
@@ -144,7 +146,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: yarn
+          # Disable cache for Node 22 due to V8 bug in 22.21.0
+          # https://github.com/nodejs/node/issues/56010
+          cache: ''
           cache-dependency-path: 'react_on_rails_pro/**/yarn.lock'
 
       - name: Print system information
