@@ -204,9 +204,6 @@ describe ReactOnRailsPro::Request do
       # Reset connections to ensure we're using a fresh connection
       described_class.reset_connection
 
-      # Create a spy to check if retries plugin is used
-      allow(HTTPX).to receive(:plugin).and_call_original
-
       # Trigger a streaming request
       mock_streaming_response(render_full_url, 200) do |yielder|
         yielder.call("Test chunk\n")
@@ -223,6 +220,57 @@ describe ReactOnRailsPro::Request do
       # by checking that a connection was created with retries disabled
       connection_without_retries = described_class.send(:connection_without_retries)
       expect(connection_without_retries).to be_a(HTTPX::Session)
+    end
+
+    it "prevents body duplication when streaming request is retried after mid-transmission error" do
+      # This integration test verifies the complete fix for https://github.com/shakacode/react_on_rails/issues/1895
+      # It ensures that when a streaming request fails mid-transmission and is retried,
+      # the client doesn't receive duplicate chunks.
+
+      described_class.reset_connection
+
+      # Track how many times the request is made to verify retry behavior
+      request_attempt = 0
+      original_chunks = ["Chunk 1", "Chunk 2", "Chunk 3"]
+
+      # Mock a streaming response that fails on first attempt, succeeds on second
+      connection = described_class.send(:connection_without_retries)
+      allow(connection).to receive(:post).and_wrap_original do |original_method, *args, **kwargs|
+        if kwargs[:stream]
+          request_attempt += 1
+
+          # Set up mock based on attempt number
+          if request_attempt == 1
+            # First attempt: simulate mid-transmission failure (HTTPError during streaming)
+            # This simulates a connection error after partial data is sent
+            mock_streaming_response(render_full_url, 200) do |yielder|
+              yielder.call("#{original_chunks[0]}\n")
+              # Simulate connection error mid-stream
+              raise HTTPX::HTTPError.new("Connection error", nil)
+            end
+          else
+            # Second attempt: complete all chunks successfully
+            mock_streaming_response(render_full_url, 200) do |yielder|
+              original_chunks.each { |chunk| yielder.call("#{chunk}\n") }
+            end
+          end
+        end
+
+        original_method.call(*args, **kwargs)
+      end
+
+      stream = described_class.render_code_as_stream("/render", "console.log('test');", is_rsc_payload: false)
+      received_chunks = []
+
+      # StreamRequest should handle the retry and yield all chunks exactly once
+      stream.each_chunk { |chunk| received_chunks << chunk }
+
+      # Verify no duplication: should have exactly 3 chunks, not 4 (1 from failed + 3 from retry)
+      expect(received_chunks).to eq(original_chunks)
+      expect(received_chunks.size).to eq(3)
+
+      # Verify retry actually happened
+      expect(request_attempt).to eq(2)
     end
   end
 end
