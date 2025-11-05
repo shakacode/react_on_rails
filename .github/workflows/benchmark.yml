@@ -34,6 +34,11 @@ on:
         required: false
         default: 'fortio,vegeta,k6'
         type: string
+      web_concurrency:
+        description: 'Number of Puma worker processes'
+        required: false
+        default: 2
+        type: number
   push:
     branches:
       - master
@@ -56,6 +61,7 @@ env:
   REQUEST_TIMEOUT: ${{ github.event.inputs.request_timeout || '60s' }}
   VUS: ${{ github.event.inputs.vus || '100' }}
   TOOLS: ${{ github.event.inputs.tools || 'fortio,vegeta,k6' }}
+  WEB_CONCURRENCY: ${{ github.event.inputs.web_concurrency || '2' }}
 
 jobs:
   benchmark:
@@ -275,8 +281,10 @@ jobs:
           echo "Benchmark parameters:"
           echo "  - RATE: ${RATE}"
           echo "  - DURATION_SEC: ${DURATION_SEC}"
+          echo "  - REQUEST_TIMEOUT: ${REQUEST_TIMEOUT}"
           echo "  - VUS: ${VUS}"
           echo "  - TOOLS: ${TOOLS}"
+          echo "  - WEB_CONCURRENCY: ${WEB_CONCURRENCY}"
           echo ""
 
           if ! spec/performance/bench.sh; then
