@@ -242,7 +242,7 @@ With `defer: true`, your streamed components will:
 <!-- ✅ GOOD: No defer - allows Selective Hydration to work -->
 <%= javascript_pack_tag('client-bundle', 'data-turbo-track': 'reload', defer: false) %>
 
-<!-- ✅ BEST: Use async for even faster hydration (requires Shakapacker 8.2+) -->
+<!-- ✅ BEST: Use async for even faster hydration (requires Shakapacker ≥ 8.2.0) -->
 <%= javascript_pack_tag('client-bundle', 'data-turbo-track': 'reload', async: true) %>
 ```
 
@@ -255,7 +255,7 @@ With `defer: true`, your streamed components will:
 
 #### Why Async is Better Than No Defer
 
-With Shakapacker 8.2+, using `async: true` provides the best performance:
+With Shakapacker ≥ 8.2.0, using `async: true` provides the best performance:
 
 - **No defer/async**: Scripts block HTML parsing and streaming
 - **defer: true**: Scripts wait for complete page load (defeats Selective Hydration)
@@ -266,6 +266,6 @@ With Shakapacker 8.2+, using `async: true` provides the best performance:
 
 #### Migration Timeline
 
-1. **Before Shakapacker 8.2**: Use `defer: false` for streaming pages
-2. **After Shakapacker 8.2**: Migrate to `async: true` for streaming pages
-3. **Non-streaming pages**: Can continue using `defer: true` safely
+1. **Before Shakapacker 8.2.0**: Use `defer: false` for streaming pages
+2. **Shakapacker ≥ 8.2.0**: Migrate to `async: true` for streaming pages
+3. **Non-streaming pages**: Can continue using `defer: true` safely (regardless of Shakapacker version)
