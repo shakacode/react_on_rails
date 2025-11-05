@@ -20,7 +20,7 @@ module.exports = {
       description: "Prevent 'use client' directive in .server.tsx files",
       category: 'Best Practices',
       recommended: true,
-      url: 'https://github.com/shakacode/react_on_rails/pull/1896',
+      url: 'https://github.com/shakacode/react_on_rails/pull/1919',
     },
     messages: {
       useClientInServerFile: `Files with '.server.tsx' extension should not have 'use client' directive. Server files are for React Server Components and should not use client-only APIs. If this component needs client-side features, rename it to .client.tsx or .tsx instead.`,
@@ -42,10 +42,10 @@ module.exports = {
         const sourceCode = context.sourceCode || context.getSourceCode();
         const text = sourceCode.getText();
 
-        // Check for 'use client' directive at the start of the file (not multiline)
-        // Handle both single and double quotes, with or without semicolon
-        // Only matches at the very beginning of the file (not anywhere on its own line)
-        const useClientPattern = /^\s*['"]use client['"];?\s*\n?/;
+        // Check for 'use client' directive at the start of the file
+        // Uses backreference (\1) to ensure matching quotes (both single or both double)
+        // Only matches at the very beginning of the file
+        const useClientPattern = /^\s*(['"])use client\1;?\s*\n?/;
         const match = text.match(useClientPattern);
 
         if (match) {
@@ -56,16 +56,8 @@ module.exports = {
             node,
             messageId: 'useClientInServerFile',
             fix(fixer) {
-              // Remove the 'use client' directive and any trailing newlines
-              const start = directiveIndex;
-              let end = directiveIndex + match[0].length;
-
-              // Also remove the newline after the directive if present
-              if (text[end] === '\n') {
-                end += 1;
-              }
-
-              return fixer.removeRange([start, end]);
+              // Remove the 'use client' directive (regex already captures trailing newline)
+              return fixer.removeRange([directiveIndex, directiveIndex + match[0].length]);
             },
           });
         }
