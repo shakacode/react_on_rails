@@ -15,11 +15,9 @@
 /// <reference types="react/experimental" />
 
 import type { ReactNode } from 'react';
-import ReactClient from 'react/index.js';
+import * as React from 'react';
 import { useRSC } from './RSCProvider.tsx';
 import { ServerComponentFetchError } from './ServerComponentFetchError.ts';
-
-const React = ReactClient as typeof import('react');
 
 /**
  * Error boundary component for RSCRoute that adds server component name and props to the error
