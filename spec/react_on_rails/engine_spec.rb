@@ -13,6 +13,26 @@ module ReactOnRails
         allow(Rails.logger).to receive(:debug)
       end
 
+      context "when REACT_ON_RAILS_SKIP_VALIDATION is set" do
+        before do
+          ENV["REACT_ON_RAILS_SKIP_VALIDATION"] = "true"
+        end
+
+        after do
+          ENV.delete("REACT_ON_RAILS_SKIP_VALIDATION")
+        end
+
+        it "returns true" do
+          expect(described_class.skip_version_validation?).to be true
+        end
+
+        it "logs debug message about environment variable" do
+          described_class.skip_version_validation?
+          expect(Rails.logger).to have_received(:debug)
+            .with("[React on Rails] Skipping validation - disabled via environment variable")
+        end
+      end
+
       context "when package.json doesn't exist" do
         before do
           allow(File).to receive(:exist?).with(package_json_path).and_return(false)

@@ -20,6 +20,12 @@ module ReactOnRails
     # Determine if version validation should be skipped
     # @return [Boolean] true if validation should be skipped
     def self.skip_version_validation?
+      # Skip if explicitly disabled via environment variable (set by generators)
+      if ENV["REACT_ON_RAILS_SKIP_VALIDATION"] == "true"
+        Rails.logger.debug "[React on Rails] Skipping validation - disabled via environment variable"
+        return true
+      end
+
       # Check package.json first as it's cheaper and handles more cases
       if package_json_missing?
         Rails.logger.debug "[React on Rails] Skipping validation - package.json not found"
