@@ -14,7 +14,8 @@
 
 'use client';
 
-import React, { createContext, useContext, type ReactNode } from 'react';
+import * as React from 'react';
+import { createContext, useContext, type ReactNode } from 'react';
 import type { ClientGetReactServerComponentProps } from './getReactServerComponent.client.ts';
 import { createRSCPayloadKey } from './utils.ts';
 

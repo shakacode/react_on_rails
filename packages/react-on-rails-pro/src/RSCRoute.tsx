@@ -16,7 +16,8 @@
 
 'use client';
 
-import React, { Component, use, type ReactNode } from 'react';
+import * as React from 'react';
+import { Component, use, type ReactNode } from 'react';
 import { useRSC } from './RSCProvider.tsx';
 import { ServerComponentFetchError } from './ServerComponentFetchError.ts';
 
