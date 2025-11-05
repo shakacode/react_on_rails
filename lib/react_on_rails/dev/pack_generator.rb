@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "English"
+require "stringio"
 
 module ReactOnRails
   module Dev
@@ -105,7 +106,10 @@ module ReactOnRails
           error_msg += "\n#{error.backtrace.join("\n")}" if ENV["DEBUG"]
 
           # Always write to stderr, even in silent mode
-          warn error_msg
+          # Use STDERR constant instead of warn/$stderr to bypass capture_output redirection
+          # rubocop:disable Style/StderrPuts, Style/GlobalStdStream
+          STDERR.puts error_msg
+          # rubocop:enable Style/StderrPuts, Style/GlobalStdStream
         end
 
         def run_via_bundle_exec(silent: false)
