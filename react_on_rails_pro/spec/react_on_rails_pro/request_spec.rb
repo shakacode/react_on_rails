@@ -246,7 +246,12 @@ describe ReactOnRailsPro::Request do
             mock_streaming_response(render_full_url, 200) do |yielder|
               yielder.call("#{original_chunks[0]}\n")
               # Simulate connection error mid-stream
-              raise HTTPX::HTTPError.new("Connection error", nil)
+              # HTTPError expects a response object, so create a mock error response
+              error_response = HTTPX::ErrorResponse.new(
+                HTTPX::Request.new("POST", render_full_url),
+                StandardError.new("Connection closed")
+              )
+              raise HTTPX::HTTPError, error_response
             end
           else
             # Second attempt: complete all chunks successfully
