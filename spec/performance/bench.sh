@@ -54,6 +54,13 @@ until curl -fsS "$TARGET" >/dev/null; do
   sleep 1
 done
 
+echo "Warming up server with 10 requests..."
+for i in {1..10}; do
+  curl -fsS "$TARGET" >/dev/null || true
+  sleep 0.5
+done
+echo "Warm-up complete"
+
 mkdir -p "$OUTDIR"
 
 if [ "$RATE" = "max" ]; then
