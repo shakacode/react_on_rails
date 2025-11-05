@@ -84,6 +84,10 @@ module ReactOnRailsPro
 
       private
 
+      # NOTE: We maintain two separate HTTP connection pools to handle streaming vs non-streaming requests.
+      # This doubles the memory footprint (e.g., if renderer_http_pool_size is 10, we use 20 total connections).
+      # This tradeoff is acceptable to prevent body duplication in streaming responses.
+
       def connection
         @connection ||= create_connection
       end
