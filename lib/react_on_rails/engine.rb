@@ -9,7 +9,7 @@ module ReactOnRails
     # Skip validation during installation tasks (e.g., shakapacker:install) or generator runtime
     initializer "react_on_rails.validate_version_and_package_compatibility" do
       config.after_initialize do
-        next if skip_version_validation?
+        next if Engine.skip_version_validation?
 
         Rails.logger.info "[React on Rails] Validating package version and compatibility..."
         VersionChecker.build.validate_version_and_package_compatibility!
