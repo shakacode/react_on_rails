@@ -74,6 +74,9 @@ module ReactOnRails
         end
       ensure
         # Always clean up ENV variable, even if generator fails
+        # CRITICAL: ENV cleanup must come first to ensure it executes even if
+        # print_generator_messages raises an exception. This prevents ENV pollution
+        # that could affect subsequent processes.
         ENV.delete("REACT_ON_RAILS_SKIP_VALIDATION")
         print_generator_messages
       end
