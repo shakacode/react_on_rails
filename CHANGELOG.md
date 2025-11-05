@@ -34,11 +34,14 @@ Changes since the last non-beta release.
 #### Changed
 
 - **Shakapacker 9.0.0 Upgrade**: Upgraded Shakapacker from 8.2.0 to 9.0.0 with Babel transpiler configuration for compatibility. Key changes include:
+
   - Configured `javascript_transpiler: babel` in shakapacker.yml (Shakapacker 9.0 defaults to SWC which has PropTypes handling issues)
   - Added precompile hook support via `bin/shakapacker-precompile-hook` for ReScript builds and pack generation
   - Configured CSS Modules to use default exports (`namedExport: false`) for backward compatibility with existing `import styles from` syntax
   - Fixed webpack configuration to process SCSS rules and CSS loaders in a single pass for better performance
     [PR 1904](https://github.com/shakacode/react_on_rails/pull/1904) by [justin808](https://github.com/justin808).
+
+- **Shakapacker 9.1.0 Upgrade**: Upgraded Shakapacker from 9.0.0 to 9.1.0. This minor version update includes bug fixes and improvements. Updated webpack configuration in Pro dummy apps to use forEach pattern for better compatibility with multiple SCSS rules. [PR 1921](https://github.com/shakacode/react_on_rails/pull/1921) by [justin808](https://github.com/justin808).
 
 #### Bug Fixes
 
