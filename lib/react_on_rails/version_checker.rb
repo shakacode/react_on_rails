@@ -338,7 +338,12 @@ module ReactOnRails
       private
 
       # Resolve version from lockfiles if available, otherwise use package.json version
+      # rubocop:disable Metrics/CyclomaticComplexity
       def resolve_version(package_json_version, package_name)
+        # If package.json specifies a local path or URL, don't try to resolve from lockfiles
+        # Lockfiles may contain placeholder versions like "0.0.0" for local links
+        return package_json_version if local_path_or_url_version?(package_json_version)
+
         # Try yarn.lock first
         if yarn_lock && File.exist?(yarn_lock)
           lockfile_version = version_from_yarn_lock(package_name)
@@ -353,6 +358,14 @@ module ReactOnRails
 
         # Fall back to package.json version
         package_json_version
+      end
+      # rubocop:enable Metrics/CyclomaticComplexity
+
+      # Check if a version string represents a local path or URL
+      def local_path_or_url_version?(version)
+        return false if version.nil?
+
+        version.include?("/") && !version.start_with?("npm:")
       end
 
       # Parse version from yarn.lock
