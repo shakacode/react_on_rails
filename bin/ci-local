@@ -1,0 +1,212 @@
+#!/usr/bin/env bash
+# Local CI Runner
+# Runs appropriate CI checks based on changes in current branch
+# Usage: bin/ci-local [--all] [--fast] [base-ref]
+
+set -euo pipefail
+
+# Parse arguments
+RUN_ALL=false
+FAST_MODE=false
+BASE_REF="origin/master"
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --all)
+      RUN_ALL=true
+      shift
+      ;;
+    --fast)
+      FAST_MODE=true
+      shift
+      ;;
+    *)
+      BASE_REF="$1"
+      shift
+      ;;
+  esac
+done
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+echo -e "${BLUE}=== React on Rails Local CI ===${NC}"
+echo ""
+
+# Detect changes unless --all is specified
+if [ "$RUN_ALL" = false ]; then
+  echo "Analyzing changes since $BASE_REF..."
+  DETECTOR_OUTPUT=$(script/ci-changes-detector "$BASE_REF" 2>&1)
+
+  echo "$DETECTOR_OUTPUT"
+  echo ""
+
+  # Check if docs only
+  if echo "$DETECTOR_OUTPUT" | grep -q "Documentation-only changes"; then
+    echo -e "${GREEN}No CI needed for documentation-only changes!${NC}"
+    exit 0
+  fi
+
+  # Parse detector output to determine what to run
+  RUN_LINT=$(echo "$DETECTOR_OUTPUT" | grep -q "Lint (Ruby + JS)" && echo true || echo false)
+  RUN_RUBY=$(echo "$DETECTOR_OUTPUT" | grep -q "RSpec gem tests" && echo true || echo false)
+  RUN_JS=$(echo "$DETECTOR_OUTPUT" | grep -q "JS unit tests" && echo true || echo false)
+  RUN_DUMMY=$(echo "$DETECTOR_OUTPUT" | grep -q "Dummy app integration tests" && echo true || echo false)
+  RUN_GENERATORS=$(echo "$DETECTOR_OUTPUT" | grep -q "Generator tests" && echo true || echo false)
+  RUN_PRO_LINT=$(echo "$DETECTOR_OUTPUT" | grep -q "React on Rails Pro lint" && echo true || echo false)
+  RUN_PRO_TESTS=$(echo "$DETECTOR_OUTPUT" | grep -q "React on Rails Pro tests" && echo true || echo false)
+else
+  echo -e "${YELLOW}Running ALL CI checks (--all mode)${NC}"
+  echo ""
+  RUN_LINT=true
+  RUN_RUBY=true
+  RUN_JS=true
+  RUN_DUMMY=true
+  RUN_GENERATORS=true
+  RUN_PRO_LINT=true
+  RUN_PRO_TESTS=true
+fi
+
+# Track failures
+FAILED_JOBS=()
+PRO_DEPS_READY=false
+
+# Helper function to run a job
+run_job() {
+  local job_name="$1"
+  local command="$2"
+
+  echo -e "${BLUE}▶ Running: $job_name${NC}"
+  if eval "$command"; then
+    echo -e "${GREEN}✓ $job_name passed${NC}"
+    echo ""
+    return 0
+  else
+    echo -e "${RED}✗ $job_name failed${NC}"
+    echo ""
+    FAILED_JOBS+=("$job_name")
+    return 1
+  fi
+}
+
+ensure_pro_dependencies() {
+  if [ "$PRO_DEPS_READY" = true ]; then
+    return 0
+  fi
+
+  if [ ! -d "react_on_rails_pro" ]; then
+    PRO_DEPS_READY=true
+    return 0
+  fi
+
+  if [ ! -d "react_on_rails_pro/node_modules" ] || [ ! -d "react_on_rails_pro/vendor/bundle" ]; then
+    echo -e "${YELLOW}Installing React on Rails Pro dependencies...${NC}"
+    run_job "React on Rails Pro Dependencies" "cd react_on_rails_pro && bundle install && yarn install" || true
+  fi
+
+  PRO_DEPS_READY=true
+}
+
+# Ensure dependencies are installed
+if [ ! -d "node_modules" ] || [ ! -d "vendor/bundle" ]; then
+  echo -e "${YELLOW}Installing dependencies...${NC}"
+  run_job "Dependency Installation" "bundle install && yarn install"
+fi
+
+# Run linting
+if [ "$RUN_LINT" = true ]; then
+  run_job "RuboCop" "bundle exec rubocop" || true
+  run_job "ESLint" "yarn run eslint --report-unused-disable-directives" || true
+  run_job "Prettier Check" "yarn start format.listDifferent" || true
+  run_job "TypeScript Type Check" "yarn run type-check" || true
+fi
+
+# Run JS unit tests
+if [ "$RUN_JS" = true ]; then
+  run_job "JS Unit Tests" "yarn test" || true
+fi
+
+# Run Ruby gem tests
+if [ "$RUN_RUBY" = true ]; then
+  if [ "$FAST_MODE" = true ]; then
+    run_job "RSpec (Gem Only - Fast)" "bundle exec rspec spec/react_on_rails" || true
+  else
+    run_job "RSpec (Gem Only)" "bundle exec rake run_rspec:gem" || true
+  fi
+fi
+
+# Run dummy app tests
+if [ "$RUN_DUMMY" = true ]; then
+  if [ "$FAST_MODE" = true ]; then
+    echo -e "${YELLOW}Skipping dummy app tests in --fast mode${NC}"
+    echo ""
+  else
+    # Build dummy app if needed
+    if [ ! -d "spec/dummy/node_modules" ]; then
+      echo -e "${YELLOW}Setting up dummy app...${NC}"
+      run_job "Dummy App Setup" "cd spec/dummy && yarn install" || true
+    fi
+
+    run_job "Dummy App Integration Tests" "bundle exec rake run_rspec:dummy" || true
+  fi
+fi
+
+# Run generator tests
+if [ "$RUN_GENERATORS" = true ]; then
+  if [ "$FAST_MODE" = true ]; then
+    echo -e "${YELLOW}Skipping generator tests in --fast mode (they are slow)${NC}"
+    echo ""
+  else
+    run_job "Generator Tests" "bundle exec rake run_rspec:shakapacker_examples" || true
+  fi
+fi
+
+# Run React on Rails Pro linting
+if [ "$RUN_PRO_LINT" = true ] || [ "$RUN_PRO_TESTS" = true ]; then
+  if [ ! -d "react_on_rails_pro" ]; then
+    echo -e "${YELLOW}React on Rails Pro directory not found. Skipping Pro checks.${NC}"
+    RUN_PRO_LINT=false
+    RUN_PRO_TESTS=false
+  fi
+fi
+
+if [ "$RUN_PRO_LINT" = true ]; then
+  ensure_pro_dependencies
+  run_job "React on Rails Pro RuboCop" "cd react_on_rails_pro && bundle exec rubocop" || true
+  run_job "React on Rails Pro ESLint" "cd react_on_rails_pro && yarn run nps eslint" || true
+  run_job "React on Rails Pro Format Check" "cd react_on_rails_pro && yarn run nps format.listDifferent" || true
+  run_job "React on Rails Pro TypeScript Check" "cd react_on_rails_pro && yarn run nps check-typescript" || true
+fi
+
+# Run React on Rails Pro tests
+if [ "$RUN_PRO_TESTS" = true ]; then
+  ensure_pro_dependencies
+  if [ "$FAST_MODE" = true ]; then
+    echo -e "${YELLOW}Skipping React on Rails Pro tests in --fast mode${NC}"
+    echo ""
+  else
+    run_job "React on Rails Pro JS Tests" "cd react_on_rails_pro && yarn run nps test" || true
+    run_job "React on Rails Pro RSpec" "cd react_on_rails_pro && bundle exec rspec" || true
+  fi
+fi
+
+# Summary
+echo ""
+echo -e "${BLUE}=== CI Summary ===${NC}"
+
+if [ ${#FAILED_JOBS[@]} -eq 0 ]; then
+  echo -e "${GREEN}All checks passed! ✓${NC}"
+  exit 0
+else
+  echo -e "${RED}Failed jobs:${NC}"
+  for job in "${FAILED_JOBS[@]}"; do
+    echo -e "${RED}  ✗ $job${NC}"
+  done
+  echo ""
+  echo -e "${YELLOW}Fix the failures above before pushing.${NC}"
+  exit 1
+fi
