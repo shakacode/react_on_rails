@@ -29,7 +29,7 @@ This will update and release:
   PUBLIC (npmjs.org + rubygems.org):
     - react-on-rails NPM package
     - react-on-rails-pro NPM package
-    - @shakacode-tools/react-on-rails-pro-node-renderer NPM package
+    - react-on-rails-pro-node-renderer NPM package
     - react_on_rails RubyGem
     - react_on_rails_pro RubyGem
 
@@ -213,7 +213,7 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
     puts "=" * 80
 
     # Publish react-on-rails-pro-node-renderer NPM package
-    node_renderer_name = "@shakacode-tools/react-on-rails-pro-node-renderer"
+    node_renderer_name = "react-on-rails-pro-node-renderer"
     puts "\nPublishing #{node_renderer_name}@#{actual_npm_version}..."
     puts "Carefully add your OTP for NPM when prompted." unless use_verdaccio
     sh_in_dir(pro_gem_root,
@@ -275,7 +275,7 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
       Published to #{npm_registry_note}:
         - react-on-rails@#{actual_npm_version}
         - react-on-rails-pro@#{actual_npm_version}
-        - @shakacode-tools/react-on-rails-pro-node-renderer@#{actual_npm_version}
+        - react-on-rails-pro-node-renderer@#{actual_npm_version}
     MSG
 
     unless use_verdaccio
@@ -302,7 +302,7 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
                To test installation:
                  npm install --registry http://localhost:4873/ react-on-rails@#{actual_npm_version}
                  npm install --registry http://localhost:4873/ react-on-rails-pro@#{actual_npm_version}
-                 npm install --registry http://localhost:4873/ @shakacode-tools/react-on-rails-pro-node-renderer@#{actual_npm_version}
+                 npm install --registry http://localhost:4873/ react-on-rails-pro-node-renderer@#{actual_npm_version}
 
                Note: Ruby gems were not published (Verdaccio is NPM-only)
 
