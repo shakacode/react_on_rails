@@ -90,7 +90,7 @@ if [ "$RATE" = "max" ]; then
     }
   }"
 else
-  FORTIO_ARGS=(-qps "$RATE" -uniform -c "$CONNECTIONS")
+  FORTIO_ARGS=(-qps "$RATE" -uniform -nocatchup -c "$CONNECTIONS")
   VEGETA_ARGS=(-rate="$RATE" --workers="$CONNECTIONS" --max-workers="$MAX_CONNECTIONS")
   K6_SCENARIOS="{
     constant_rate: {
