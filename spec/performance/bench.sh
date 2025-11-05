@@ -84,10 +84,9 @@ if [ "$RATE" = "max" ]; then
   VEGETA_ARGS=(-rate=infinity --workers="$CONNECTIONS" --max-workers="$CONNECTIONS")
   K6_SCENARIOS="{
     max_rate: {
-      executor: 'shared-iterations',
+      executor: 'constant-vus',
       vus: $CONNECTIONS,
-      iterations: $((CONNECTIONS * DURATION_SEC * 10)),
-      maxDuration: '$DURATION'
+      duration: '$DURATION'
     }
   }"
 else
