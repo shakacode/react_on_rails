@@ -44,6 +44,10 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: yarn
           cache-dependency-path: '**/yarn.lock'
+        env:
+          # Workaround for Node 22.21.0 V8 code cache bug
+          # https://github.com/nodejs/node/issues/56010
+          NODE_OPTIONS: --no-compilation-cache
       - name: Print system information
         run: |
           echo "Linux release: "; cat /etc/issue
@@ -125,6 +129,10 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: yarn
           cache-dependency-path: '**/yarn.lock'
+        env:
+          # Workaround for Node 22.21.0 V8 code cache bug
+          # https://github.com/nodejs/node/issues/56010
+          NODE_OPTIONS: --no-compilation-cache
       - name: Print system information
         run: |
           echo "Linux release: "; cat /etc/issue
