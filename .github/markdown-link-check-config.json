@@ -41,7 +41,7 @@
   ],
   "timeout": "20s",
   "retryOn429": true,
-  "retryCount": 3,
+  "retryCount": 5,
   "fallbackRetryDelay": "30s",
   "aliveStatusCodes": [200, 206]
 }
