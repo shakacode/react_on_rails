@@ -239,7 +239,7 @@ module ReactOnRails
         return if shakapacker_in_gemfile?
 
         puts Rainbow("📝 Adding Shakapacker to Gemfile...").yellow
-        success = system("bundle add shakapacker --strict")
+        success = system("bundle add shakapacker --version=9.3.0")
         return if success
 
         handle_shakapacker_gemfile_error
@@ -283,7 +283,7 @@ module ReactOnRails
           • Gemfile permissions
 
           Please try manually:
-              bundle add shakapacker --strict
+              bundle add shakapacker --version=9.3.0
 
           Then re-run: rails generate react_on_rails:install
         MSG

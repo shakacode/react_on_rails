@@ -17,7 +17,7 @@ import ReactClient from 'react/index.js';
 import type { ClientGetReactServerComponentProps } from './getReactServerComponent.client.ts';
 import { createRSCPayloadKey } from './utils.ts';
 
-const React = ReactClient as typeof import('react');
+const React = ReactClient;
 
 type RSCContextType = {
   getComponent: (componentName: string, componentProps: unknown) => Promise<ReactNode>;
