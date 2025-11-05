@@ -8,6 +8,7 @@ import tsEslint from 'typescript-eslint';
 import { includeIgnoreFile } from '@eslint/compat';
 import js from '@eslint/js';
 import { FlatCompat } from '@eslint/eslintrc';
+import noUseClientInServerFiles from './eslint-rules/no-use-client-in-server-files.cjs';
 
 const compat = new FlatCompat({
   baseDirectory: __dirname,
@@ -163,6 +164,19 @@ const config = tsEslint.config([
       // Disable import/named for pro package - can't resolve monorepo workspace imports
       // TypeScript compiler validates these imports
       'import/named': 'off',
+    },
+  },
+  {
+    files: ['**/*.server.ts', '**/*.server.tsx'],
+    plugins: {
+      'react-on-rails': {
+        rules: {
+          'no-use-client-in-server-files': noUseClientInServerFiles,
+        },
+      },
+    },
+    rules: {
+      'react-on-rails/no-use-client-in-server-files': 'error',
     },
   },
   {
