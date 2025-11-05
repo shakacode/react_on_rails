@@ -36,7 +36,16 @@ on:
       web_concurrency:
         description: 'Number of Puma worker processes'
         required: false
-        default: 2
+        default: 4
+        type: number
+      rails_max_threads:
+        description: 'Maximum number of Puma threads'
+        required: false
+        default: 3
+        type: number
+      rails_min_threads:
+        description: 'Minimum number of Puma threads (same as maximum if not set)'
+        required: false
         type: number
       tools:
         description: 'Comma-separated list of tools to run'
@@ -63,9 +72,11 @@ env:
   RATE: ${{ github.event.inputs.rate || 'max' }}
   DURATION_SEC: ${{ github.event.inputs.duration_sec || 30 }}
   REQUEST_TIMEOUT: ${{ github.event.inputs.request_timeout || '60s' }}
-  CONNECTIONS: ${{ github.event.inputs.connections || '10' }}
-  MAX_CONNECTIONS: ${{ github.event.inputs.max_connections || github.event.inputs.connections || '10' }}
-  WEB_CONCURRENCY: ${{ github.event.inputs.web_concurrency || '2' }}
+  CONNECTIONS: ${{ github.event.inputs.connections || 10 }}
+  MAX_CONNECTIONS: ${{ github.event.inputs.max_connections || github.event.inputs.connections || 10 }}
+  WEB_CONCURRENCY: ${{ github.event.inputs.web_concurrency || 4 }}
+  RAILS_MAX_THREADS: ${{ github.event.inputs.rails_max_threads || 3 }}
+  RAILS_MIN_THREADS: ${{ github.event.inputs.rails_min_threads || github.event.inputs.rails_max_threads || 3 }}
   TOOLS: ${{ github.event.inputs.tools || 'fortio,vegeta,k6' }}
 
 jobs:
@@ -290,6 +301,8 @@ jobs:
           echo "  - CONNECTIONS: ${CONNECTIONS}"
           echo "  - MAX_CONNECTIONS: ${MAX_CONNECTIONS}"
           echo "  - WEB_CONCURRENCY: ${WEB_CONCURRENCY}"
+          echo "  - RAILS_MAX_THREADS: ${RAILS_MAX_THREADS}"
+          echo "  - RAILS_MIN_THREADS: ${RAILS_MIN_THREADS}"
           echo "  - TOOLS: ${TOOLS}"
           echo ""
 
