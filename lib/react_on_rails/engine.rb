@@ -18,9 +18,22 @@ module ReactOnRails
     end
 
     # Determine if version validation should be skipped
+    #
+    # This method checks multiple conditions to determine if package version validation
+    # should be skipped. Validation is skipped during setup scenarios where the npm
+    # package isn't installed yet (e.g., during generator execution).
+    #
     # @return [Boolean] true if validation should be skipped
+    #
+    # @note Thread Safety: ENV variables are process-global. In practice, Rails generators
+    #   run in a single process, so concurrent execution is not a concern. If running
+    #   generators concurrently (e.g., in parallel tests), ensure tests run in separate
+    #   processes to avoid ENV variable conflicts.
     def self.skip_version_validation?
       # Skip if explicitly disabled via environment variable (set by generators)
+      # Using ENV variable instead of ARGV because Rails can modify/clear ARGV during
+      # initialization, making ARGV unreliable for detecting generator context. The ENV
+      # variable persists through the entire Rails initialization process.
       if ENV["REACT_ON_RAILS_SKIP_VALIDATION"] == "true"
         Rails.logger.debug "[React on Rails] Skipping validation - disabled via environment variable"
         return true
@@ -33,6 +46,7 @@ module ReactOnRails
       end
 
       # Skip during generator runtime since packages are installed during execution
+      # This is a fallback check in case ENV wasn't set, though ENV is the primary mechanism
       if running_generator?
         Rails.logger.debug "[React on Rails] Skipping validation during generator runtime"
         return true

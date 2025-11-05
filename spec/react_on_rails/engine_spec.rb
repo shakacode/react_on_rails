@@ -31,6 +31,43 @@ module ReactOnRails
           expect(Rails.logger).to have_received(:debug)
             .with("[React on Rails] Skipping validation - disabled via environment variable")
         end
+
+        context "with package.json present and ARGV set to generator" do
+          before do
+            allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+            stub_const("ARGV", ["generate", "react_on_rails:install"])
+          end
+
+          it "returns true (ENV takes precedence over other conditions)" do
+            expect(described_class.skip_version_validation?).to be true
+          end
+
+          it "logs ENV variable message, not ARGV message" do
+            described_class.skip_version_validation?
+            expect(Rails.logger).to have_received(:debug)
+              .with("[React on Rails] Skipping validation - disabled via environment variable")
+            expect(Rails.logger).not_to have_received(:debug)
+              .with("[React on Rails] Skipping validation during generator runtime")
+          end
+        end
+
+        context "with package.json missing" do
+          before do
+            allow(File).to receive(:exist?).with(package_json_path).and_return(false)
+          end
+
+          it "returns true (ENV takes precedence over package.json check)" do
+            expect(described_class.skip_version_validation?).to be true
+          end
+
+          it "logs ENV variable message, not package.json message" do
+            described_class.skip_version_validation?
+            expect(Rails.logger).to have_received(:debug)
+              .with("[React on Rails] Skipping validation - disabled via environment variable")
+            expect(Rails.logger).not_to have_received(:debug)
+              .with("[React on Rails] Skipping validation - package.json not found")
+          end
+        end
       end
 
       context "when package.json doesn't exist" do
