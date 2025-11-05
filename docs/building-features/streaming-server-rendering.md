@@ -211,3 +211,61 @@ Streaming SSR is particularly valuable in specific scenarios. Here's when to con
    - Prioritize critical data that should be included in the initial HTML
    - Use streaming for supplementary data that can load progressively
    - Consider implementing a waterfall strategy for dependent data
+
+### Script Loading Strategy for Streaming
+
+**IMPORTANT**: When using streaming server rendering, you should NOT use `defer: true` for your JavaScript pack tags. Here's why:
+
+#### Understanding the Problem with Defer
+
+Deferred scripts (`defer: true`) only execute after the entire HTML document has finished parsing and streaming. This defeats the key benefit of React 18's Selective Hydration feature, which allows streamed components to hydrate as soon as they arrive—even while other parts of the page are still streaming.
+
+**Example Problem:**
+
+```erb
+<!-- ❌ BAD: This delays hydration for ALL streamed components -->
+<%= javascript_pack_tag('client-bundle', defer: true) %>
+```
+
+With `defer: true`, your streamed components will:
+
+1. Arrive progressively in the HTML stream
+2. Be visible to users immediately
+3. But remain non-interactive until the ENTIRE page finishes streaming
+4. Only then will they hydrate
+
+#### Recommended Approaches
+
+**For Pages WITH Streaming Components:**
+
+```erb
+<!-- ✅ GOOD: No defer - allows Selective Hydration to work -->
+<%= javascript_pack_tag('client-bundle', 'data-turbo-track': 'reload', defer: false) %>
+
+<!-- ✅ BEST: Use async for even faster hydration (requires Shakapacker 8.2+) -->
+<%= javascript_pack_tag('client-bundle', 'data-turbo-track': 'reload', async: true) %>
+```
+
+**For Pages WITHOUT Streaming Components:**
+
+```erb
+<!-- ✅ OK: defer is fine when not using streaming -->
+<%= javascript_pack_tag('client-bundle', 'data-turbo-track': 'reload', defer: true) %>
+```
+
+#### Why Async is Better Than No Defer
+
+With Shakapacker 8.2+, using `async: true` provides the best performance:
+
+- **No defer/async**: Scripts block HTML parsing and streaming
+- **defer: true**: Scripts wait for complete page load (defeats Selective Hydration)
+- **async: true**: Scripts load in parallel and execute ASAP, enabling:
+  - Selective Hydration to work immediately
+  - Components to become interactive as they stream in
+  - Optimal Time to Interactive (TTI)
+
+#### Migration Timeline
+
+1. **Before Shakapacker 8.2**: Use `defer: false` for streaming pages
+2. **After Shakapacker 8.2**: Migrate to `async: true` for streaming pages
+3. **Non-streaming pages**: Can continue using `defer: true` safely

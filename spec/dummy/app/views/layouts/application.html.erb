@@ -9,7 +9,9 @@
 
   <%= yield :head %>
 
-  <!--  NOTE: Must use defer and not async to keep async scripts loading in correct order  -->
+  <%# defer: true is safe here because this app does NOT use streaming server rendering.
+      For apps with streaming components, use defer: false or async: true to enable
+      React 18's Selective Hydration. See docs/building-features/streaming-server-rendering.md %>
   <%= javascript_pack_tag('client-bundle', 'data-turbo-track': 'reload', defer: true) %>
 
   <%= csrf_meta_tags %>
