@@ -7,6 +7,7 @@ default: &default
   public_output_path: packs
   cache_path: tmp/webpacker
   webpack_compile_output: true
+  javascript_transpiler: babel
 
   # Additional paths webpack should lookup modules
   # ['app/assets', 'engine/foo/app/assets']
