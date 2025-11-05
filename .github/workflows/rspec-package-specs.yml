@@ -15,6 +15,7 @@ on:
       - 'docs/**'
       - 'packages/react-on-rails/src/**'
       - 'node_package/src/**'
+  workflow_dispatch:
 
 jobs:
   detect-changes:

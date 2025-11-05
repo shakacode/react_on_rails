@@ -37,7 +37,11 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
       sh_in_dir(example_type.dir, "echo \"gem 'shakapacker', '>= 8.2.0'\" >> #{example_type.gemfile}")
       bundle_install_in(example_type.dir)
       sh_in_dir(example_type.dir, "rake shakapacker:install")
-      sh_in_dir(example_type.dir, example_type.generator_shell_commands)
+      # Set ENV variable to skip validation during generator run since npm package isn't installed yet
+      generator_commands = example_type.generator_shell_commands.map do |cmd|
+        "REACT_ON_RAILS_SKIP_VALIDATION=true #{cmd}"
+      end
+      sh_in_dir(example_type.dir, generator_commands)
       sh_in_dir(example_type.dir, "yarn")
     end
   end
