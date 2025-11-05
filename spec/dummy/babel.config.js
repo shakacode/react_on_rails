@@ -1,4 +1,5 @@
-const defaultConfigFunc = require('shakapacker/package/babel/preset');
+// eslint-disable-next-line import/extensions
+const defaultConfigFunc = require('shakapacker/package/babel/preset.js');
 
 module.exports = function createBabelConfig(api) {
   const resultConfig = defaultConfigFunc(api);

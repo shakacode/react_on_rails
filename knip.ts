@@ -10,6 +10,7 @@ const config: KnipConfig = {
       ignoreBinaries: [
         // Has to be installed globally
         'yalc',
+        // Used in package.json scripts (devDependency, so unlisted in production mode)
         'nps',
         // Pro package binaries used in Pro workflows
         'playwright',
@@ -109,8 +110,9 @@ const config: KnipConfig = {
         'bin/.*',
       ],
       ignoreDependencies: [
-        // Knip thinks it can be a devDependency, but it's supposed to be in dependencies.
+        // Build-time dependencies not detected by Knip in any mode
         '@babel/runtime',
+        'mini-css-extract-plugin',
         // There's no ReScript plugin for Knip
         '@rescript/react',
         // The Babel plugin fails to detect it
@@ -120,17 +122,15 @@ const config: KnipConfig = {
         'node-libs-browser',
         // The below dependencies are not detected by the Webpack plugin
         // due to the config issue.
-        'css-loader',
         'expose-loader',
         'file-loader',
         'imports-loader',
-        'mini-css-extract-plugin',
         'null-loader',
-        'sass',
-        'sass-loader',
         'sass-resources-loader',
         'style-loader',
         'url-loader',
+        // Transitive dependency of shakapacker but listed as direct dependency
+        'webpack-merge',
       ],
     },
   },
