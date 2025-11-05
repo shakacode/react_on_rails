@@ -24,7 +24,7 @@ jobs:
           persist-credentials: false
       - name: Detect relevant changes
         id: detect
-        working-directory: ..
+        working-directory: .
         run: |
           BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/master' }}"
           script/ci-changes-detector "$BASE_REF"
