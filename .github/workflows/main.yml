@@ -11,6 +11,7 @@ on:
     paths-ignore:
       - '**.md'
       - 'docs/**'
+  workflow_dispatch:
 
 jobs:
   detect-changes:
