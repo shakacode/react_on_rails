@@ -21,7 +21,19 @@ NC='\033[0m' # No Color
 
 # Fetch the base ref if it's a remote ref
 if [[ "$BASE_REF" == origin/* ]]; then
-  git fetch origin master --depth=1 2>/dev/null || true
+  if ! git fetch origin master --depth=50 2>/dev/null; then
+    echo "${RED}Error: Failed to fetch $BASE_REF${NC}"
+    echo "Please check your network connection and try again."
+    exit 1
+  fi
+fi
+
+# Validate that the base ref exists
+if ! git rev-parse --verify "$BASE_REF" >/dev/null 2>&1; then
+  echo "${RED}Error: Base ref '$BASE_REF' does not exist${NC}"
+  echo "Available branches:"
+  git branch -a | head -10
+  exit 1
 fi
 
 # Get list of changed files (committed + uncommitted)
@@ -213,4 +225,20 @@ if [ -n "${GITHUB_OUTPUT:-}" ]; then
     echo "run_pro_lint=$RUN_PRO_LINT"
     echo "run_pro_tests=$RUN_PRO_TESTS"
   } >> "$GITHUB_OUTPUT"
+fi
+
+# Export as JSON for programmatic parsing (when CI_JSON_OUTPUT=1)
+if [ "${CI_JSON_OUTPUT:-}" = "1" ]; then
+  cat << EOF
+{
+  "docs_only": $DOCS_ONLY,
+  "run_lint": $RUN_LINT,
+  "run_ruby_tests": $RUN_RUBY_TESTS,
+  "run_js_tests": $RUN_JS_TESTS,
+  "run_dummy_tests": $RUN_DUMMY_TESTS,
+  "run_generators": $RUN_GENERATORS,
+  "run_pro_lint": $RUN_PRO_LINT,
+  "run_pro_tests": $RUN_PRO_TESTS
+}
+EOF
 fi

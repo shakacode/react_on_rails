@@ -29,7 +29,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          # Fetch enough history for change detection (50 commits is usually sufficient for PRs)
+          fetch-depth: 50
           persist-credentials: false
       - name: Detect relevant changes
         id: detect
@@ -40,13 +41,20 @@ jobs:
 
   rspec-package-tests:
     needs: detect-changes
-    if: github.ref == 'refs/heads/master' || needs.detect-changes.outputs.run_ruby_tests == 'true'
+    # Run on master OR when Ruby tests needed on PR (but skip minimum deps on PR)
+    if: |
+      (github.ref == 'refs/heads/master' || needs.detect-changes.outputs.run_ruby_tests == 'true')
+      && (github.ref == 'refs/heads/master' || matrix.dependency-level == 'latest')
     strategy:
       fail-fast: false
       matrix:
-        # On master: test all combinations. On PRs: test only latest versions for speed
-        ruby-version: ${{ github.ref == 'refs/heads/master' && fromJSON('["3.2", "3.4"]') || fromJSON('["3.4"]') }}
-        dependency-level: ${{ github.ref == 'refs/heads/master' && fromJSON('["minimum", "latest"]') || fromJSON('["latest"]') }}
+        include:
+          # Always run: Latest versions (fast feedback on PRs)
+          - ruby-version: '3.4'
+            dependency-level: 'latest'
+          # Master only: Minimum supported versions (full coverage)
+          - ruby-version: '3.2'
+            dependency-level: 'minimum'
     env:
       BUNDLE_FROZEN: ${{ matrix.dependency-level == 'minimum' && 'false' || 'true' }}
     runs-on: ubuntu-22.04

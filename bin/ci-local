@@ -40,25 +40,73 @@ echo ""
 # Detect changes unless --all is specified
 if [ "$RUN_ALL" = false ]; then
   echo "Analyzing changes since $BASE_REF..."
-  DETECTOR_OUTPUT=$(script/ci-changes-detector "$BASE_REF" 2>&1)
 
-  echo "$DETECTOR_OUTPUT"
-  echo ""
+  # Try JSON output first (if jq is available)
+  if command -v jq >/dev/null 2>&1; then
+    # Get JSON output (hide from stdout)
+    DETECTOR_JSON=$(CI_JSON_OUTPUT=1 script/ci-changes-detector "$BASE_REF" 2>&1 | grep -E '^\{|^\s|^\}' | tr -d '\n')
 
-  # Check if docs only
-  if echo "$DETECTOR_OUTPUT" | grep -q "Documentation-only changes"; then
-    echo -e "${GREEN}No CI needed for documentation-only changes!${NC}"
-    exit 0
+    if [ -n "$DETECTOR_JSON" ] && echo "$DETECTOR_JSON" | jq -e . >/dev/null 2>&1; then
+      # Show human-readable output
+      script/ci-changes-detector "$BASE_REF" 2>&1
+      echo ""
+
+      # Parse JSON output (robust)
+      RUN_LINT=$(echo "$DETECTOR_JSON" | jq -r '.run_lint // false')
+      RUN_RUBY=$(echo "$DETECTOR_JSON" | jq -r '.run_ruby_tests // false')
+      RUN_JS=$(echo "$DETECTOR_JSON" | jq -r '.run_js_tests // false')
+      RUN_DUMMY=$(echo "$DETECTOR_JSON" | jq -r '.run_dummy_tests // false')
+      RUN_GENERATORS=$(echo "$DETECTOR_JSON" | jq -r '.run_generators // false')
+      RUN_PRO_LINT=$(echo "$DETECTOR_JSON" | jq -r '.run_pro_lint // false')
+      RUN_PRO_TESTS=$(echo "$DETECTOR_JSON" | jq -r '.run_pro_tests // false')
+      DOCS_ONLY=$(echo "$DETECTOR_JSON" | jq -r '.docs_only // false')
+
+      if [ "$DOCS_ONLY" = "true" ]; then
+        echo -e "${GREEN}No CI needed for documentation-only changes!${NC}"
+        exit 0
+      fi
+    else
+      # JSON parsing failed, fall back to text parsing
+      echo -e "${YELLOW}⚠ JSON parsing failed, using text parsing (install jq for better reliability)${NC}"
+      DETECTOR_OUTPUT=$(script/ci-changes-detector "$BASE_REF" 2>&1)
+      echo "$DETECTOR_OUTPUT"
+      echo ""
+
+      if echo "$DETECTOR_OUTPUT" | grep -q "Documentation-only changes"; then
+        echo -e "${GREEN}No CI needed for documentation-only changes!${NC}"
+        exit 0
+      fi
+
+      # Parse text output (fragile fallback)
+      RUN_LINT=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ Lint (Ruby + JS)" && echo true || echo false)
+      RUN_RUBY=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ RSpec gem tests" && echo true || echo false)
+      RUN_JS=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ JS unit tests" && echo true || echo false)
+      RUN_DUMMY=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ Dummy app integration tests" && echo true || echo false)
+      RUN_GENERATORS=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ Generator tests" && echo true || echo false)
+      RUN_PRO_LINT=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ React on Rails Pro lint" && echo true || echo false)
+      RUN_PRO_TESTS=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ React on Rails Pro tests" && echo true || echo false)
+    fi
+  else
+    # jq not available, use text parsing with warning
+    echo -e "${YELLOW}ℹ Note: Install 'jq' for more reliable change detection${NC}"
+    DETECTOR_OUTPUT=$(script/ci-changes-detector "$BASE_REF" 2>&1)
+    echo "$DETECTOR_OUTPUT"
+    echo ""
+
+    if echo "$DETECTOR_OUTPUT" | grep -q "Documentation-only changes"; then
+      echo -e "${GREEN}No CI needed for documentation-only changes!${NC}"
+      exit 0
+    fi
+
+    # Parse text output (fragile fallback)
+    RUN_LINT=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ Lint (Ruby + JS)" && echo true || echo false)
+    RUN_RUBY=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ RSpec gem tests" && echo true || echo false)
+    RUN_JS=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ JS unit tests" && echo true || echo false)
+    RUN_DUMMY=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ Dummy app integration tests" && echo true || echo false)
+    RUN_GENERATORS=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ Generator tests" && echo true || echo false)
+    RUN_PRO_LINT=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ React on Rails Pro lint" && echo true || echo false)
+    RUN_PRO_TESTS=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ React on Rails Pro tests" && echo true || echo false)
   fi
-
-  # Parse detector output to determine what to run
-  RUN_LINT=$(echo "$DETECTOR_OUTPUT" | grep -q "Lint (Ruby + JS)" && echo true || echo false)
-  RUN_RUBY=$(echo "$DETECTOR_OUTPUT" | grep -q "RSpec gem tests" && echo true || echo false)
-  RUN_JS=$(echo "$DETECTOR_OUTPUT" | grep -q "JS unit tests" && echo true || echo false)
-  RUN_DUMMY=$(echo "$DETECTOR_OUTPUT" | grep -q "Dummy app integration tests" && echo true || echo false)
-  RUN_GENERATORS=$(echo "$DETECTOR_OUTPUT" | grep -q "Generator tests" && echo true || echo false)
-  RUN_PRO_LINT=$(echo "$DETECTOR_OUTPUT" | grep -q "React on Rails Pro lint" && echo true || echo false)
-  RUN_PRO_TESTS=$(echo "$DETECTOR_OUTPUT" | grep -q "React on Rails Pro tests" && echo true || echo false)
 else
   echo -e "${YELLOW}Running ALL CI checks (--all mode)${NC}"
   echo ""
@@ -105,7 +153,12 @@ ensure_pro_dependencies() {
 
   if [ ! -d "react_on_rails_pro/node_modules" ] || [ ! -d "react_on_rails_pro/vendor/bundle" ]; then
     echo -e "${YELLOW}Installing React on Rails Pro dependencies...${NC}"
-    run_job "React on Rails Pro Dependencies" "cd react_on_rails_pro && bundle install && yarn install" || true
+    if ! (cd react_on_rails_pro && bundle install && yarn install); then
+      echo -e "${YELLOW}⚠ Pro dependencies installation failed, skipping Pro tests${NC}"
+      RUN_PRO_LINT=false
+      RUN_PRO_TESTS=false
+      return 1
+    fi
   fi
 
   PRO_DEPS_READY=true
@@ -114,28 +167,34 @@ ensure_pro_dependencies() {
 # Ensure dependencies are installed
 if [ ! -d "node_modules" ] || [ ! -d "vendor/bundle" ]; then
   echo -e "${YELLOW}Installing dependencies...${NC}"
-  run_job "Dependency Installation" "bundle install && yarn install"
+  if ! (bundle install && yarn install); then
+    echo -e "${RED}✗ Dependency installation failed${NC}"
+    echo -e "${RED}Cannot proceed without dependencies. Please fix the errors above.${NC}"
+    exit 1
+  fi
+  echo -e "${GREEN}✓ Dependencies installed${NC}"
+  echo ""
 fi
 
 # Run linting
 if [ "$RUN_LINT" = true ]; then
-  run_job "RuboCop" "bundle exec rubocop" || true
-  run_job "ESLint" "yarn run eslint --report-unused-disable-directives" || true
-  run_job "Prettier Check" "yarn start format.listDifferent" || true
-  run_job "TypeScript Type Check" "yarn run type-check" || true
+  run_job "RuboCop" "bundle exec rubocop"
+  run_job "ESLint" "yarn run eslint --report-unused-disable-directives"
+  run_job "Prettier Check" "yarn start format.listDifferent"
+  run_job "TypeScript Type Check" "yarn run type-check"
 fi
 
 # Run JS unit tests
 if [ "$RUN_JS" = true ]; then
-  run_job "JS Unit Tests" "yarn test" || true
+  run_job "JS Unit Tests" "yarn test"
 fi
 
 # Run Ruby gem tests
 if [ "$RUN_RUBY" = true ]; then
   if [ "$FAST_MODE" = true ]; then
-    run_job "RSpec (Gem Only - Fast)" "bundle exec rspec spec/react_on_rails" || true
+    run_job "RSpec (Gem Only - Fast)" "bundle exec rspec spec/react_on_rails"
   else
-    run_job "RSpec (Gem Only)" "bundle exec rake run_rspec:gem" || true
+    run_job "RSpec (Gem Only)" "bundle exec rake run_rspec:gem"
   fi
 fi
 
@@ -148,10 +207,15 @@ if [ "$RUN_DUMMY" = true ]; then
     # Build dummy app if needed
     if [ ! -d "spec/dummy/node_modules" ]; then
       echo -e "${YELLOW}Setting up dummy app...${NC}"
-      run_job "Dummy App Setup" "cd spec/dummy && yarn install" || true
+      if ! (cd spec/dummy && yarn install); then
+        echo -e "${YELLOW}⚠ Dummy app setup failed, skipping dummy app tests${NC}"
+        echo ""
+      else
+        run_job "Dummy App Integration Tests" "bundle exec rake run_rspec:dummy"
+      fi
+    else
+      run_job "Dummy App Integration Tests" "bundle exec rake run_rspec:dummy"
     fi
-
-    run_job "Dummy App Integration Tests" "bundle exec rake run_rspec:dummy" || true
   fi
 fi
 
@@ -161,7 +225,7 @@ if [ "$RUN_GENERATORS" = true ]; then
     echo -e "${YELLOW}Skipping generator tests in --fast mode (they are slow)${NC}"
     echo ""
   else
-    run_job "Generator Tests" "bundle exec rake run_rspec:shakapacker_examples" || true
+    run_job "Generator Tests" "bundle exec rake run_rspec:shakapacker_examples"
   fi
 fi
 
@@ -175,22 +239,22 @@ if [ "$RUN_PRO_LINT" = true ] || [ "$RUN_PRO_TESTS" = true ]; then
 fi
 
 if [ "$RUN_PRO_LINT" = true ]; then
-  ensure_pro_dependencies
-  run_job "React on Rails Pro RuboCop" "cd react_on_rails_pro && bundle exec rubocop" || true
-  run_job "React on Rails Pro ESLint" "cd react_on_rails_pro && yarn run nps eslint" || true
-  run_job "React on Rails Pro Format Check" "cd react_on_rails_pro && yarn run nps format.listDifferent" || true
-  run_job "React on Rails Pro TypeScript Check" "cd react_on_rails_pro && yarn run nps check-typescript" || true
+  if ensure_pro_dependencies; then
+    run_job "React on Rails Pro RuboCop" "cd react_on_rails_pro && bundle exec rubocop"
+    run_job "React on Rails Pro ESLint" "cd react_on_rails_pro && yarn run nps eslint"
+    run_job "React on Rails Pro Format Check" "cd react_on_rails_pro && yarn run nps format.listDifferent"
+    run_job "React on Rails Pro TypeScript Check" "cd react_on_rails_pro && yarn run nps check-typescript"
+  fi
 fi
 
 # Run React on Rails Pro tests
 if [ "$RUN_PRO_TESTS" = true ]; then
-  ensure_pro_dependencies
   if [ "$FAST_MODE" = true ]; then
     echo -e "${YELLOW}Skipping React on Rails Pro tests in --fast mode${NC}"
     echo ""
-  else
-    run_job "React on Rails Pro JS Tests" "cd react_on_rails_pro && yarn run nps test" || true
-    run_job "React on Rails Pro RSpec" "cd react_on_rails_pro && bundle exec rspec" || true
+  elif ensure_pro_dependencies; then
+    run_job "React on Rails Pro JS Tests" "cd react_on_rails_pro && yarn run nps test"
+    run_job "React on Rails Pro RSpec" "cd react_on_rails_pro && bundle exec rspec"
   fi
 fi
 

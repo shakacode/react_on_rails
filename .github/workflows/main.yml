@@ -25,7 +25,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          # Fetch enough history for change detection (50 commits is usually sufficient for PRs)
+          fetch-depth: 50
           persist-credentials: false
       - name: Detect relevant changes
         id: detect
@@ -36,27 +37,21 @@ jobs:
 
   build-dummy-app-webpack-test-bundles:
     needs: detect-changes
-    if: github.ref == 'refs/heads/master' || needs.detect-changes.outputs.run_dummy_tests == 'true'
+    # Run on master OR when tests needed on PR (but skip minimum deps on PR)
+    if: |
+      (github.ref == 'refs/heads/master' || needs.detect-changes.outputs.run_dummy_tests == 'true')
+      && (github.ref == 'refs/heads/master' || matrix.dependency-level == 'latest')
     strategy:
       matrix:
-        # On master: test all combinations. On PRs: test only latest versions for speed
-        ruby-version: ${{ github.ref == 'refs/heads/master' && fromJSON('["3.2", "3.4"]') || fromJSON('["3.4"]') }}
-        node-version: ${{ github.ref == 'refs/heads/master' && fromJSON('["20", "22"]') || fromJSON('["22"]') }}
         include:
-          - ruby-version: '3.2'
-            node-version: '20'
-            dependency-level: 'minimum'
+          # Always run: Latest versions (fast feedback on PRs)
           - ruby-version: '3.4'
             node-version: '22'
             dependency-level: 'latest'
-        exclude:
+          # Master only: Minimum supported versions (full coverage)
           - ruby-version: '3.2'
-            node-version: '22'
-          - ruby-version: '3.4'
             node-version: '20'
-          # On PRs, exclude the minimum dependency combination to run faster
-          - ruby-version: ${{ github.ref != 'refs/heads/master' && '3.2' || 'none' }}
-            node-version: '20'
+            dependency-level: 'minimum'
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -125,28 +120,22 @@ jobs:
 
   dummy-app-integration-tests:
     needs: [detect-changes, build-dummy-app-webpack-test-bundles]
-    if: github.ref == 'refs/heads/master' || needs.detect-changes.outputs.run_dummy_tests == 'true'
+    # Run on master OR when tests needed on PR (but skip minimum deps on PR)
+    if: |
+      (github.ref == 'refs/heads/master' || needs.detect-changes.outputs.run_dummy_tests == 'true')
+      && (github.ref == 'refs/heads/master' || matrix.dependency-level == 'latest')
     strategy:
       fail-fast: false
       matrix:
-        # On master: test all combinations. On PRs: test only latest versions for speed
-        ruby-version: ${{ github.ref == 'refs/heads/master' && fromJSON('["3.2", "3.4"]') || fromJSON('["3.4"]') }}
-        node-version: ${{ github.ref == 'refs/heads/master' && fromJSON('["20", "22"]') || fromJSON('["22"]') }}
         include:
-          - ruby-version: '3.2'
-            node-version: '20'
-            dependency-level: 'minimum'
+          # Always run: Latest versions (fast feedback on PRs)
           - ruby-version: '3.4'
             node-version: '22'
             dependency-level: 'latest'
-        exclude:
+          # Master only: Minimum supported versions (full coverage)
           - ruby-version: '3.2'
-            node-version: '22'
-          - ruby-version: '3.4'
             node-version: '20'
-          # On PRs, exclude the minimum dependency combination to run faster
-          - ruby-version: ${{ github.ref != 'refs/heads/master' && '3.2' || 'none' }}
-            node-version: '20'
+            dependency-level: 'minimum'
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4

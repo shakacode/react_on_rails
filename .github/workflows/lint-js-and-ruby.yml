@@ -43,6 +43,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          # No need for history in lint job
+          fetch-depth: 1
           persist-credentials: false
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
