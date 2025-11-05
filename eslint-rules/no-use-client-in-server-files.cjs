@@ -23,10 +23,7 @@ module.exports = {
       url: 'https://github.com/shakacode/react_on_rails/pull/1896',
     },
     messages: {
-      useClientInServerFile:
-        "Files with '.server.tsx' extension should not have 'use client' directive. " +
-        'Server files are for React Server Components and should not use client-only APIs. ' +
-        'If this component needs client-side features, rename it to .client.tsx or .tsx instead.',
+      useClientInServerFile: `Files with '.server.tsx' extension should not have 'use client' directive. Server files are for React Server Components and should not use client-only APIs. If this component needs client-side features, rename it to .client.tsx or .tsx instead.`,
     },
     schema: [],
     fixable: 'code',
@@ -45,9 +42,10 @@ module.exports = {
         const sourceCode = context.sourceCode || context.getSourceCode();
         const text = sourceCode.getText();
 
-        // Check for 'use client' directive at the start of the file
+        // Check for 'use client' directive at the start of the file (not multiline)
         // Handle both single and double quotes, with or without semicolon
-        const useClientPattern = /^\s*['"]use client['"];?\s*$/m;
+        // Only matches at the very beginning of the file (not anywhere on its own line)
+        const useClientPattern = /^\s*['"]use client['"];?\s*\n?/;
         const match = text.match(useClientPattern);
 
         if (match) {

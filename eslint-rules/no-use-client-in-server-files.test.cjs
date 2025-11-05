@@ -157,5 +157,3 @@ import React from 'react';
     },
   ],
 });
-
-console.log('All tests passed!');
