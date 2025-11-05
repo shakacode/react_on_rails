@@ -37,10 +37,7 @@ jobs:
 
   examples:
     needs: detect-changes
-    # Run on master OR when generators changed on PR (but skip minimum deps on PR)
-    if: |
-      (github.ref == 'refs/heads/master' || needs.detect-changes.outputs.run_generators == 'true')
-      && (github.ref == 'refs/heads/master' || matrix.dependency-level == 'latest')
+    if: github.ref == 'refs/heads/master' || needs.detect-changes.outputs.run_generators == 'true'
     strategy:
       fail-fast: false
       matrix:

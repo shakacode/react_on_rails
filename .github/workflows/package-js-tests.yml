@@ -44,7 +44,6 @@ jobs:
     # Run on master OR when JS tests needed on PR (but skip Node 20 on PR)
     if: |
       (github.ref == 'refs/heads/master' || needs.detect-changes.outputs.run_js_tests == 'true')
-      && (github.ref == 'refs/heads/master' || matrix.node-version == '22')
     strategy:
       matrix:
         include:
