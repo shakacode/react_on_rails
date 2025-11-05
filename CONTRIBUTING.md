@@ -322,6 +322,105 @@ Run `rake -T` or `rake -D` to see testing options.
 
 See below for verifying changes to the generators.
 
+## CI Testing and Optimization
+
+React on Rails uses an optimized CI pipeline that runs faster on branches while maintaining full coverage on `master`. Contributors have access to local CI tools to validate changes before pushing.
+
+### CI Behavior
+
+- **On PRs/Branches**: Runs reduced test matrix (latest Ruby/Node versions only) for faster feedback (~12 min vs ~45 min)
+- **On Master**: Runs full test matrix (all Ruby/Node/dependency combinations) for complete coverage
+- **Docs-only changes**: CI skips entirely when only `.md` files or `docs/` directory change
+
+### Local CI Tools
+
+#### `bin/ci-local` - Smart Local CI Runner
+
+Analyzes your changes and runs appropriate tests locally before pushing:
+
+```bash
+# Auto-detect what to test based on changed files
+bin/ci-local
+
+# Run all CI checks (same as master branch)
+bin/ci-local --all
+
+# Quick check - only fast tests, skip slow integration tests
+bin/ci-local --fast
+
+# Compare against a different branch
+bin/ci-local origin/develop
+```
+
+**Benefits:**
+
+- Catches CI failures before pushing
+- Skips irrelevant tests (e.g., Ruby tests when only JS changed)
+- Provides clear summary of what passed/failed
+
+#### `script/ci-changes-detector` - Change Analysis
+
+Analyzes git changes and recommends which CI jobs to run:
+
+```bash
+# Check what changed since master
+script/ci-changes-detector origin/master
+
+# JSON output for scripting (requires jq)
+CI_JSON_OUTPUT=1 script/ci-changes-detector origin/master
+```
+
+**Output example:**
+
+```
+=== CI Changes Analysis ===
+Changed file categories:
+  • Ruby source code
+  • JavaScript/TypeScript code
+
+Recommended CI jobs:
+  ✓ Lint (Ruby + JS)
+  ✓ RSpec gem tests
+  ✓ JS unit tests
+```
+
+#### `/run-ci` - Claude Code Command
+
+If using Claude Code, run `/run-ci` for interactive CI execution that:
+
+1. Analyzes your changes
+2. Shows recommended CI jobs
+3. Asks which tests to run
+4. Executes and reports results
+
+### CI Best Practices
+
+✅ **DO:**
+
+- Run `bin/ci-local` before pushing to catch issues early
+- Use `bin/ci-local --fast` during rapid iteration
+- Trust the reduced matrix on PRs - master validates everything
+- Separate docs-only changes into dedicated commits/PRs when possible
+
+❌ **DON'T:**
+
+- Push without running local tests first
+- Mix code and docs changes if you want docs to skip CI
+- Expect PR CI to catch minimum Ruby/Node version issues (use `bin/ci-local --all` for that)
+
+### Understanding CI Optimizations
+
+The CI system intelligently skips unnecessary work:
+
+| Change Type                | CI Behavior           | Time Saved |
+| -------------------------- | --------------------- | ---------- |
+| Docs only (`.md`, `docs/`) | Skips all CI          | 100%       |
+| Ruby code only             | Skips JS tests        | ~30%       |
+| JS code only               | Skips Ruby-only tests | ~30%       |
+| Workflow changes           | Runs lint only        | ~75%       |
+
+For more details, see [`docs/CI_OPTIMIZATION.md`](./docs/CI_OPTIMIZATION.md).
+
 ### Install Generator
 
 In your Rails app add this gem with a path to your fork.
