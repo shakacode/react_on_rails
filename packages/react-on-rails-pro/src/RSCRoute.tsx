@@ -14,7 +14,8 @@
 
 /// <reference types="react/experimental" />
 
-import type { ReactNode } from 'react';
+'use client';
+
 import * as React from 'react';
 import { useRSC } from './RSCProvider.tsx';
 import { ServerComponentFetchError } from './ServerComponentFetchError.ts';
@@ -24,10 +25,10 @@ import { ServerComponentFetchError } from './ServerComponentFetchError.ts';
  * So, the parent ErrorBoundary can refetch the server component
  */
 class RSCRouteErrorBoundary extends React.Component<
-  { children: ReactNode; componentName: string; componentProps: unknown },
+  { children: React.ReactNode; componentName: string; componentProps: unknown },
   { error: Error | null }
 > {
-  constructor(props: { children: ReactNode; componentName: string; componentProps: unknown }) {
+  constructor(props: { children: React.ReactNode; componentName: string; componentProps: unknown }) {
     super(props);
     this.state = { error: null };
   }
@@ -74,7 +75,7 @@ export type RSCRouteProps = {
   componentProps: unknown;
 };
 
-const PromiseWrapper = ({ promise }: { promise: Promise<ReactNode> }) => {
+const PromiseWrapper = ({ promise }: { promise: Promise<React.ReactNode> }) => {
   // React.use is available in React 18.3+
   const promiseResult = React.use(promise);
 
@@ -87,7 +88,7 @@ const PromiseWrapper = ({ promise }: { promise: Promise<ReactNode> }) => {
   return promiseResult;
 };
 
-const RSCRoute = ({ componentName, componentProps }: RSCRouteProps): ReactNode => {
+const RSCRoute = ({ componentName, componentProps }: RSCRouteProps): React.ReactNode => {
   const { getComponent } = useRSC();
   const componentPromise = getComponent(componentName, componentProps);
   return (
