@@ -42,12 +42,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: yarn
-          cache-dependency-path: '**/yarn.lock'
-        env:
-          # Workaround for Node 22.21.0 V8 code cache bug
+          # Disable cache for Node 22 due to V8 bug in 22.21.0
           # https://github.com/nodejs/node/issues/56010
-          NODE_OPTIONS: --no-compilation-cache
+          cache: ${{ matrix.node-version != '22' && 'yarn' || '' }}
+          cache-dependency-path: '**/yarn.lock'
       - name: Print system information
         run: |
           echo "Linux release: "; cat /etc/issue
@@ -127,12 +125,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: yarn
-          cache-dependency-path: '**/yarn.lock'
-        env:
-          # Workaround for Node 22.21.0 V8 code cache bug
+          # Disable cache for Node 22 due to V8 bug in 22.21.0
           # https://github.com/nodejs/node/issues/56010
-          NODE_OPTIONS: --no-compilation-cache
+          cache: ${{ matrix.node-version != '22' && 'yarn' || '' }}
+          cache-dependency-path: '**/yarn.lock'
       - name: Print system information
         run: |
           echo "Linux release: "; cat /etc/issue
