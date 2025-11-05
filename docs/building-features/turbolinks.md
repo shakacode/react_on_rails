@@ -128,12 +128,21 @@ This definitely can make an app perform better, even if the JavaScript and style
 1. Include turbolinks via yarn as shown in the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/blob/8a6c8aa2e3b7ae5b08b0a9744fb3a63a2fe0f002/client/webpack.client.base.config.js#L22) or include the gem "turbolinks".
 1. Included the proper "track" tags when you include the javascript and stylesheet:
 
+**For Turbolinks 5.x:**
+
 ```erb
   <%= stylesheet_link_tag 'application', media: 'all', 'data-turbolinks-track' => 'reload' %>
   <%= javascript_include_tag 'application', 'data-turbolinks-track' => 'reload' %>
 ```
 
-NOTE: for Turbolinks 2.x, use `'data-turbolinks-track' => true`
+**For Turbolinks 2.x (Classic):**
+
+```erb
+  <%= stylesheet_link_tag 'application', media: 'all', 'data-turbolinks-track' => true %>
+  <%= javascript_include_tag 'application', 'data-turbolinks-track' => true %>
+```
+
+**Note:** If you're using modern Turbo (recommended), use `'data-turbo-track' => 'reload'` instead of `'data-turbolinks-track'`. See the "Using Turbo" section at the top of this document.
 
 1. Add turbolinks to your `application.js` file:
    ```javascript

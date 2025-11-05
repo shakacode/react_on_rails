@@ -22,11 +22,11 @@
   </style>
   <%= stylesheet_pack_tag('client-bundle',
                           media: 'all',
-                          'data-turbolinks-track': true) %>
+                          'data-turbo-track': 'reload') %>
 
   <%# Used for testing purposes to simulate hydration failure %>
   <% unless params[:skip_js_packs] == 'true' %>
-    <%= javascript_pack_tag('client-bundle', 'data-turbolinks-track': true, defer: false) %>
+    <%= javascript_pack_tag('client-bundle', 'data-turbo-track': 'reload', defer: false) %>
   <% end %>
   <%= csrf_meta_tags %>
 </head>
