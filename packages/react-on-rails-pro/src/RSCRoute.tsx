@@ -19,7 +19,7 @@ import ReactClient from 'react/index.js';
 import { useRSC } from './RSCProvider.tsx';
 import { ServerComponentFetchError } from './ServerComponentFetchError.ts';
 
-const React = ReactClient as typeof import('react');
+const React = ReactClient;
 
 /**
  * Error boundary component for RSCRoute that adds server component name and props to the error
