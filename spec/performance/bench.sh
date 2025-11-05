@@ -6,8 +6,10 @@ set -euo pipefail
 TARGET="http://${BASE_URL:-localhost:3001}/${ROUTE:-server_side_hello_world_hooks}"
 # requests per second; if "max" will get maximum number of queries instead of a fixed rate
 RATE=${RATE:-50}
-# virtual users for k6
-VUS=${VUS:-100}
+# concurrent connections/virtual users
+CONNECTIONS=${CONNECTIONS:-10}
+# maximum connections/virtual users
+MAX_CONNECTIONS=${MAX_CONNECTIONS:-$CONNECTIONS}
 DURATION_SEC=${DURATION_SEC:-10}
 DURATION="${DURATION_SEC}s"
 # request timeout (duration string like "60s", "1m", "90s")
@@ -20,8 +22,12 @@ if ! { [ "$RATE" = "max" ] || { [[ "$RATE" =~ ^[0-9]+(\.[0-9]+)?$ ]] && (( $(bc 
   echo "Error: RATE must be 'max' or a positive number (got: '$RATE')" >&2
   exit 1
 fi
-if ! { [[ "$VUS" =~ ^[0-9]+$ ]] && [ "$VUS" -gt 0 ]; }; then
-  echo "Error: VUS must be a positive integer (got: '$VUS')" >&2
+if ! { [[ "$CONNECTIONS" =~ ^[0-9]+$ ]] && [ "$CONNECTIONS" -gt 0 ]; }; then
+  echo "Error: CONNECTIONS must be a positive integer (got: '$CONNECTIONS')" >&2
+  exit 1
+fi
+if ! { [[ "$MAX_CONNECTIONS" =~ ^[0-9]+$ ]] && [ "$MAX_CONNECTIONS" -gt 0 ]; }; then
+  echo "Error: MAX_CONNECTIONS must be a positive integer (got: '$MAX_CONNECTIONS')" >&2
   exit 1
 fi
 if ! { [[ "$DURATION_SEC" =~ ^[0-9]+(\.[0-9]+)?$ ]] && (( $(bc -l <<< "$DURATION_SEC > 0") )); }; then
@@ -70,27 +76,31 @@ echo "Warm-up complete"
 mkdir -p "$OUTDIR"
 
 if [ "$RATE" = "max" ]; then
-  FORTIO_ARGS=(-qps 0)
-  VEGETA_ARGS=(-rate=infinity)
+  if [ "$CONNECTIONS" != "$MAX_CONNECTIONS" ]; then
+    echo "For RATE=max, CONNECTIONS (got $CONNECTIONS) and MAX_CONNECTIONS (got $MAX_CONNECTIONS) should be the same"
+    exit 1
+  fi
+  FORTIO_ARGS=(-qps 0 -c "$CONNECTIONS")
+  VEGETA_ARGS=(-rate=infinity --workers="$CONNECTIONS" --max-workers="$CONNECTIONS")
   K6_SCENARIOS="{
     max_rate: {
       executor: 'shared-iterations',
-      vus: $VUS,
-      iterations: $((VUS * DURATION_SEC * 10)),
+      vus: $CONNECTIONS,
+      iterations: $((CONNECTIONS * DURATION_SEC * 10)),
       maxDuration: '$DURATION'
     }
   }"
 else
-  FORTIO_ARGS=(-qps "$RATE" -uniform)
-  VEGETA_ARGS=(-rate="$RATE")
+  FORTIO_ARGS=(-qps "$RATE" -uniform -c "$CONNECTIONS")
+  VEGETA_ARGS=(-rate="$RATE" --workers="$CONNECTIONS" --max-workers="$MAX_CONNECTIONS")
   K6_SCENARIOS="{
     constant_rate: {
       executor: 'constant-arrival-rate',
       rate: $RATE,
       timeUnit: '1s',
       duration: '$DURATION',
-      preAllocatedVUs: $VUS,
-      maxVUs: $((VUS * 10))
+      preAllocatedVUs: $CONNECTIONS,
+      maxVUs: $MAX_CONNECTIONS
     }
   }"
 fi
