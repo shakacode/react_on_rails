@@ -37,6 +37,10 @@ module ReactOnRails
       # Removed: --skip-shakapacker-install (Shakapacker is now a required dependency)
 
       def run_generators
+        # Set environment variable to skip validation during generator run
+        # This is inherited by all invoked generators and persists through Rails initialization
+        ENV["REACT_ON_RAILS_SKIP_VALIDATION"] = "true"
+
         if installation_prerequisites_met? || options.ignore_warnings?
           invoke_generators
           add_bin_scripts
@@ -55,6 +59,7 @@ module ReactOnRails
           GeneratorMessages.add_error(error)
         end
       ensure
+        ENV.delete("REACT_ON_RAILS_SKIP_VALIDATION")
         print_generator_messages
       end
 
