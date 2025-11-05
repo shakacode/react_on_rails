@@ -113,6 +113,9 @@ const config: KnipConfig = {
         // Build-time dependencies not detected by Knip in any mode
         '@babel/runtime',
         'mini-css-extract-plugin',
+        // SWC dependencies used by Shakapacker 9.0 (default transpiler)
+        '@swc/core',
+        'swc-loader',
         // There's no ReScript plugin for Knip
         '@rescript/react',
         // The Babel plugin fails to detect it
