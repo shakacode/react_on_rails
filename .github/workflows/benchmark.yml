@@ -24,10 +24,14 @@ on:
         required: false
         default: '60s'
         type: string
-      vus:
-        description: 'Virtual users for k6'
+      connections:
+        description: 'Concurrent connections/virtual users'
         required: false
-        default: 100
+        default: 10
+        type: number
+      max_connections:
+        description: 'Maximum connections/virtual users'
+        required: false
         type: number
       tools:
         description: 'Comma-separated list of tools to run'
@@ -52,7 +56,8 @@ env:
   RATE: ${{ github.event.inputs.rate || 'max' }}
   DURATION_SEC: ${{ github.event.inputs.duration_sec || 30 }}
   REQUEST_TIMEOUT: ${{ github.event.inputs.request_timeout || '60s' }}
-  VUS: ${{ github.event.inputs.vus || '100' }}
+  CONNECTIONS: ${{ github.event.inputs.connections || '10' }}
+  MAX_CONNECTIONS: ${{ github.event.inputs.max_connections || github.event.inputs.connections || '10' }}
   TOOLS: ${{ github.event.inputs.tools || 'fortio,vegeta,k6' }}
   WEB_CONCURRENCY: ${{ github.event.inputs.web_concurrency || '2' }}
 
@@ -261,7 +266,8 @@ jobs:
           echo "  - RATE: ${RATE}"
           echo "  - DURATION_SEC: ${DURATION_SEC}"
           echo "  - REQUEST_TIMEOUT: ${REQUEST_TIMEOUT}"
-          echo "  - VUS: ${VUS}"
+          echo "  - CONNECTIONS: ${CONNECTIONS}"
+          echo "  - MAX_CONNECTIONS: ${MAX_CONNECTIONS}"
           echo "  - TOOLS: ${TOOLS}"
           echo "  - WEB_CONCURRENCY: ${WEB_CONCURRENCY}"
           echo ""
