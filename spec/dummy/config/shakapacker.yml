@@ -5,6 +5,10 @@ default: &default
   source_entry_path: packs
   public_root_path: public
 
+  # Use Babel instead of SWC (Shakapacker 9.0 default) for better compatibility
+  # SWC has issues with PropTypes handling
+  javascript_transpiler: babel
+
   # Hook to run before compilation (e.g., for ReScript builds, pack generation)
   # See: https://github.com/shakacode/shakapacker/blob/main/docs/precompile_hook.md
   precompile_hook: bin/shakapacker-precompile-hook

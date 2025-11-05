@@ -29,7 +29,6 @@
     "regenerator-runtime": "^0.13.4"
   },
   "devDependencies": {
-    "@swc/core": "^1.7.0",
     "@babel/core": "7.17.9",
     "@babel/plugin-transform-runtime": "7.17.0",
     "@babel/preset-env": "7",
@@ -54,7 +53,6 @@
     "sass-resources-loader": "^2.1.0",
     "shakapacker": "9.0.0",
     "style-loader": "^3.3.1",
-    "swc-loader": "^0.2.6",
     "terser-webpack-plugin": "5.3.1",
     "url-loader": "^4.0.0",
     "webpack": "5.72.0",
