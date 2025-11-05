@@ -10,6 +10,8 @@ RATE=${RATE:-50}
 VUS=${VUS:-100}
 DURATION_SEC=${DURATION_SEC:-10}
 DURATION="${DURATION_SEC}s"
+# request timeout (duration string like "60s", "1m", "90s")
+REQUEST_TIMEOUT=${REQUEST_TIMEOUT:-60s}
 # Tools to run (comma-separated)
 TOOLS=${TOOLS:-fortio,vegeta,k6}
 
@@ -24,6 +26,10 @@ if ! { [[ "$VUS" =~ ^[0-9]+$ ]] && [ "$VUS" -gt 0 ]; }; then
 fi
 if ! { [[ "$DURATION_SEC" =~ ^[0-9]+(\.[0-9]+)?$ ]] && (( $(bc -l <<< "$DURATION_SEC > 0") )); }; then
   echo "Error: DURATION_SEC must be a positive number (got: '$DURATION_SEC')" >&2
+  exit 1
+fi
+if ! [[ "$REQUEST_TIMEOUT" =~ ^([0-9]+(\.[0-9]+)?[smh])+$ ]]; then
+  echo "Error: REQUEST_TIMEOUT must be a duration like '60s', '1m', '1.5m' (got: '$REQUEST_TIMEOUT')" >&2
   exit 1
 fi
 
@@ -92,14 +98,14 @@ fi
 if (( RUN_FORTIO )); then
   echo "===> Fortio"
   # TODO https://github.com/fortio/fortio/wiki/FAQ#i-want-to-get-the-best-results-what-flags-should-i-pass
-  fortio load "${FORTIO_ARGS[@]}" -t "$DURATION" -timeout 30s -json "$OUTDIR/fortio.json" "$TARGET" \
+  fortio load "${FORTIO_ARGS[@]}" -t "$DURATION" -timeout "$REQUEST_TIMEOUT" -json "$OUTDIR/fortio.json" "$TARGET" \
     | tee "$OUTDIR/fortio.txt"
 fi
 
 if (( RUN_VEGETA )); then
   echo
   echo "===> Vegeta"
-  echo "GET $TARGET" | vegeta attack "${VEGETA_ARGS[@]}" -duration="$DURATION" \
+  echo "GET $TARGET" | vegeta attack "${VEGETA_ARGS[@]}" -duration="$DURATION" -timeout="$REQUEST_TIMEOUT" \
     | tee "$OUTDIR/vegeta.bin" \
     | vegeta report | tee "$OUTDIR/vegeta.txt"
   vegeta report -type=json "$OUTDIR/vegeta.bin" > "$OUTDIR/vegeta.json"
@@ -114,6 +120,9 @@ import { check } from 'k6';
 
 export const options = {
   scenarios: $K6_SCENARIOS,
+  httpReq: {
+    timeout: '$REQUEST_TIMEOUT',
+  },
 };
 
 export default function () {
