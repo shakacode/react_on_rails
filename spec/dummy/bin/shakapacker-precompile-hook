@@ -61,8 +61,9 @@ def generate_packs_if_needed
 
   # Check if auto-pack generation is configured (match actual config assignments, not comments)
   config_file = File.read(initializer_path)
-  has_auto_load = config_file =~ /^\s*config\.auto_load_bundle\s*=/
-  has_components_subdir = config_file =~ /^\s*config\.components_subdirectory\s*=/
+  # Match uncommented configuration lines only (lines not starting with #)
+  has_auto_load = config_file =~ /^\s*(?!#).*config\.auto_load_bundle\s*=/
+  has_components_subdir = config_file =~ /^\s*(?!#).*config\.components_subdirectory\s*=/
   return unless has_auto_load || has_components_subdir
 
   puts "📦 Generating React on Rails packs..."
@@ -71,8 +72,8 @@ def generate_packs_if_needed
   bundle_available = system("bundle", "--version", out: File::NULL, err: File::NULL)
   return unless bundle_available
 
-  # Check if rake task exists (cross-platform)
-  task_list = `bundle exec rails -T 2>&1`
+  # Check if rake task exists (use array form for security)
+  task_list = IO.popen(["bundle", "exec", "rails", "-T"], err: [:child, :out], &:read)
   return unless task_list.include?("react_on_rails:generate_packs")
 
   # Use array form for better cross-platform support

@@ -21,18 +21,17 @@ const sassLoaderConfig = {
   },
 };
 
-// Add sass-resources-loader to all SCSS rules (both .scss and .module.scss)
-baseClientWebpackConfig.module.rules.forEach((rule) => {
-  if (rule.test && '.scss'.match(rule.test) && Array.isArray(rule.use)) {
-    rule.use.push(sassLoaderConfig);
-  }
-});
-
-// Configure CSS Modules to use default exports (Shakapacker 9.0 compatibility)
-// Shakapacker 9.0 defaults to namedExport: true, but we use default imports
-// To restore backward compatibility with existing code using `import styles from`
+// Process webpack rules in single pass for efficiency
 baseClientWebpackConfig.module.rules.forEach((rule) => {
   if (Array.isArray(rule.use)) {
+    // Add sass-resources-loader to all SCSS rules (both .scss and .module.scss)
+    if (rule.test && '.scss'.match(rule.test)) {
+      rule.use.push(sassLoaderConfig);
+    }
+
+    // Configure CSS Modules to use default exports (Shakapacker 9.0 compatibility)
+    // Shakapacker 9.0 defaults to namedExport: true, but we use default imports
+    // To restore backward compatibility with existing code using `import styles from`
     rule.use.forEach((loader) => {
       if (
         loader &&
