@@ -5970,13 +5970,14 @@ sha.js@^2.4.0, sha.js@^2.4.8:
     inherits "^2.0.1"
     safe-buffer "^5.0.1"
 
-shakapacker@8.0.0:
-  version "8.0.0"
-  resolved "https://registry.yarnpkg.com/shakapacker/-/shakapacker-8.0.0.tgz#f29537c19078af7318758c92e7a1bca4cee96bdd"
-  integrity sha512-HCdpITzIKXzGEyUWQhKzPbpwwOsgTamaPH+0kXdhM59VQxZ3NWnT5cL3DlJdAT3sGsWCJskEl3eMkQlnh9DjhA==
+shakapacker@9.1.0:
+  version "9.1.0"
+  resolved "https://registry.npmjs.org/shakapacker/-/shakapacker-9.1.0.tgz#6d63c4d27b9358073dd8fc3c6e79252b96d36a36"
+  integrity sha512-PL0DuzNLFJMwr5s908ImMuvejmC20WuDa7EfAPpPFU1pM5U8cPqqC4kwSdXFLfVU0Or/UqeegNyIB1sGBdSPiw==
   dependencies:
     js-yaml "^4.1.0"
     path-complete-extname "^1.0.0"
+    webpack-merge "^5.8.0"
 
 shallow-clone@^3.0.0:
   version "3.0.1"
@@ -6815,9 +6816,9 @@ webpack-manifest-plugin@^2.0.4:
     object.entries "^1.1.0"
     tapable "^1.0.0"
 
-webpack-merge@5, webpack-merge@^5.7.3:
+webpack-merge@5, webpack-merge@^5.7.3, webpack-merge@^5.8.0:
   version "5.10.0"
-  resolved "https://registry.yarnpkg.com/webpack-merge/-/webpack-merge-5.10.0.tgz#a3ad5d773241e9c682803abf628d4cd62b8a4177"
+  resolved "https://registry.npmjs.org/webpack-merge/-/webpack-merge-5.10.0.tgz#a3ad5d773241e9c682803abf628d4cd62b8a4177"
   integrity sha512-+4zXKdx7UnO+1jaN4l2lHVD+mFvnlZQP/6ljaJVb4SZiwIKeUnrT5l0gkT8z+n4hKpC+jpOv6O9R+gLtag7pSA==
   dependencies:
     clone-deep "^4.0.1"
