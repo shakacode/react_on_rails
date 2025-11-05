@@ -292,19 +292,6 @@ jobs:
         run: |
           set -e  # Exit on any error
           echo "🏃 Running benchmark suite..."
-          echo "Script: spec/performance/bench.sh"
-          echo ""
-          echo "Benchmark parameters:"
-          echo "  - RATE: ${RATE}"
-          echo "  - DURATION_SEC: ${DURATION_SEC}"
-          echo "  - REQUEST_TIMEOUT: ${REQUEST_TIMEOUT}"
-          echo "  - CONNECTIONS: ${CONNECTIONS}"
-          echo "  - MAX_CONNECTIONS: ${MAX_CONNECTIONS}"
-          echo "  - WEB_CONCURRENCY: ${WEB_CONCURRENCY}"
-          echo "  - RAILS_MAX_THREADS: ${RAILS_MAX_THREADS}"
-          echo "  - RAILS_MIN_THREADS: ${RAILS_MIN_THREADS}"
-          echo "  - TOOLS: ${TOOLS}"
-          echo ""
 
           if ! spec/performance/bench.sh; then
             echo "❌ ERROR: Benchmark execution failed"
