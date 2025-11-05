@@ -25,22 +25,27 @@ module ReactOnRails
         private
 
         def run_pack_generation(silent: false)
-          # If we're already inside a Bundler context (e.g., called from bin/dev),
+          # If we're already inside a Bundler context AND Rails is available (e.g., called from bin/dev),
           # we can directly require and run the task. Otherwise, use bundle exec.
-          if defined?(Bundler)
+          if defined?(Bundler) && rails_available?
             run_rake_task_directly(silent: silent)
           else
             run_via_bundle_exec(silent: silent)
           end
         end
 
+        def rails_available?
+          return false unless defined?(Rails)
+          return false unless Rails.respond_to?(:application)
+          return false if Rails.application.nil?
+
+          true
+        end
+
         def run_rake_task_directly(silent: false)
           require "rake"
 
-          # Load Rails environment if not already loaded
-          require File.expand_path("config/environment", Dir.pwd) unless defined?(Rails)
-
-          Rake::Task.clear
+          # Load tasks only if not already loaded (don't clear all tasks)
           Rails.application.load_tasks unless Rake::Task.task_defined?("react_on_rails:generate_packs")
 
           if silent
@@ -51,7 +56,9 @@ module ReactOnRails
           end
 
           begin
-            Rake::Task["react_on_rails:generate_packs"].invoke
+            task = Rake::Task["react_on_rails:generate_packs"]
+            task.reenable # Allow re-execution if called multiple times
+            task.invoke
             true
           rescue StandardError => e
             warn "Error generating packs: #{e.message}" unless silent
