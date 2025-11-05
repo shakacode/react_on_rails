@@ -12,12 +12,12 @@ on:
       rate:
         description: 'Requests per second (use "max" for maximum throughput)'
         required: false
-        default: '50'
+        default: 'max'
         type: string
       duration_sec:
         description: 'Duration in seconds'
         required: false
-        default: 10
+        default: 30
         type: number
       request_timeout:
         description: 'Request timeout (e.g., "60s", "1m", "90s")'
@@ -44,8 +44,8 @@ env:
   K6_VERSION: "1.3.0"
   VEGETA_VERSION: "12.13.0"
   # Benchmark parameters
-  RATE: ${{ github.event.inputs.rate || '50' }}
-  DURATION_SEC: ${{ github.event.inputs.duration_sec || '10' }}
+  RATE: ${{ github.event.inputs.rate || 'max' }}
+  DURATION_SEC: ${{ github.event.inputs.duration_sec || 30 }}
   REQUEST_TIMEOUT: ${{ github.event.inputs.request_timeout || '60s' }}
   VUS: ${{ github.event.inputs.vus || '100' }}
   TOOLS: ${{ github.event.inputs.tools || 'fortio,vegeta,k6' }}
