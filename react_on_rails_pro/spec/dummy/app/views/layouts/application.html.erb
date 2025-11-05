@@ -24,7 +24,10 @@
                           media: 'all',
                           'data-turbo-track': 'reload') %>
 
-  <%# Used for testing purposes to simulate hydration failure %>
+  <%# defer: false is required because this app uses streaming server rendering.
+      Deferred scripts delay hydration until the entire page finishes streaming,
+      defeating React 18's Selective Hydration. See docs/building-features/streaming-server-rendering.md
+      skip_js_packs param is used for testing purposes to simulate hydration failure %>
   <% unless params[:skip_js_packs] == 'true' %>
     <%= javascript_pack_tag('client-bundle', 'data-turbo-track': 'reload', defer: false) %>
   <% end %>
