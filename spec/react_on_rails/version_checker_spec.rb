@@ -428,6 +428,140 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
         end
       end
 
+      describe "Lockfile version resolution" do
+        context "with semver caret in package.json and yarn.lock" do
+          let(:package_json) { File.expand_path("fixtures/semver_caret_package.json", __dir__) }
+          let(:yarn_lock) { File.expand_path("fixtures/semver_caret_yarn.lock", __dir__) }
+          let(:node_package_version) { described_class.new(package_json, yarn_lock, nil) }
+
+          describe "#raw" do
+            it "returns exact version from yarn.lock instead of semver range" do
+              expect(node_package_version.raw).to eq("1.2.3")
+            end
+          end
+        end
+
+        context "with similar package names in yarn.lock" do
+          let(:package_json) { File.expand_path("fixtures/similar_packages_package.json", __dir__) }
+          let(:yarn_lock) { File.expand_path("fixtures/similar_packages_yarn.lock", __dir__) }
+          let(:node_package_version) { described_class.new(package_json, yarn_lock, nil) }
+
+          describe "#raw" do
+            it "returns exact version for react-on-rails-pro, not react-on-rails" do
+              expect(node_package_version.raw).to eq("16.1.1")
+            end
+          end
+        end
+
+        context "with semver caret in package.json and package-lock.json v2" do
+          let(:package_json) { File.expand_path("fixtures/semver_caret_package.json", __dir__) }
+          let(:package_lock) { File.expand_path("fixtures/semver_caret_package-lock.json", __dir__) }
+          let(:node_package_version) { described_class.new(package_json, nil, package_lock) }
+
+          describe "#raw" do
+            it "returns exact version from package-lock.json v2 instead of semver range" do
+              expect(node_package_version.raw).to eq("1.2.3")
+            end
+          end
+        end
+
+        context "with semver caret in package.json and package-lock.json v1" do
+          let(:package_json) { File.expand_path("fixtures/semver_caret_package.json", __dir__) }
+          let(:package_lock) { File.expand_path("fixtures/semver_caret_package-lock_v1.json", __dir__) }
+          let(:node_package_version) { described_class.new(package_json, nil, package_lock) }
+
+          describe "#raw" do
+            it "returns exact version from package-lock.json v1 instead of semver range" do
+              expect(node_package_version.raw).to eq("1.2.3")
+            end
+          end
+        end
+
+        context "with pro package semver caret and yarn.lock" do
+          let(:package_json) { File.expand_path("fixtures/pro_semver_caret_package.json", __dir__) }
+          let(:yarn_lock) { File.expand_path("fixtures/pro_semver_caret_yarn.lock", __dir__) }
+          let(:node_package_version) { described_class.new(package_json, yarn_lock, nil) }
+
+          describe "#raw" do
+            it "returns exact version from yarn.lock for pro package" do
+              expect(node_package_version.raw).to eq("16.1.1")
+            end
+          end
+        end
+
+        context "with pro package semver caret and package-lock.json" do
+          let(:package_json) { File.expand_path("fixtures/pro_semver_caret_package.json", __dir__) }
+          let(:package_lock) { File.expand_path("fixtures/pro_semver_caret_package-lock.json", __dir__) }
+          let(:node_package_version) { described_class.new(package_json, nil, package_lock) }
+
+          describe "#raw" do
+            it "returns exact version from package-lock.json for pro package" do
+              expect(node_package_version.raw).to eq("16.1.1")
+            end
+          end
+        end
+
+        context "with exact version and yarn.lock" do
+          let(:package_json) { File.expand_path("fixtures/semver_exact_package.json", __dir__) }
+          let(:yarn_lock) { File.expand_path("fixtures/semver_exact_yarn.lock", __dir__) }
+          let(:node_package_version) { described_class.new(package_json, yarn_lock, nil) }
+
+          describe "#raw" do
+            it "returns exact version from yarn.lock matching package.json" do
+              expect(node_package_version.raw).to eq("16.1.1")
+            end
+          end
+        end
+
+        context "with semver caret but no lockfile" do
+          let(:package_json) { File.expand_path("fixtures/semver_caret_package.json", __dir__) }
+          let(:node_package_version) { described_class.new(package_json, nil, nil) }
+
+          describe "#raw" do
+            it "falls back to package.json version when no lockfile exists" do
+              expect(node_package_version.raw).to eq("^1.2.3")
+            end
+          end
+        end
+
+        context "when both yarn.lock and package-lock.json exist" do
+          let(:package_json) { File.expand_path("fixtures/semver_caret_package.json", __dir__) }
+          let(:yarn_lock) { File.expand_path("fixtures/semver_caret_yarn.lock", __dir__) }
+          let(:package_lock) { File.expand_path("fixtures/semver_caret_package-lock.json", __dir__) }
+          let(:node_package_version) { described_class.new(package_json, yarn_lock, package_lock) }
+
+          describe "#raw" do
+            it "prefers yarn.lock over package-lock.json" do
+              expect(node_package_version.raw).to eq("1.2.3")
+            end
+          end
+        end
+
+        context "with malformed yarn.lock" do
+          let(:package_json) { File.expand_path("fixtures/semver_caret_package.json", __dir__) }
+          let(:yarn_lock) { File.expand_path("fixtures/malformed_yarn.lock", __dir__) }
+          let(:node_package_version) { described_class.new(package_json, yarn_lock, nil) }
+
+          describe "#raw" do
+            it "falls back to package.json version when yarn.lock is malformed" do
+              expect(node_package_version.raw).to eq("^1.2.3")
+            end
+          end
+        end
+
+        context "with malformed package-lock.json" do
+          let(:package_json) { File.expand_path("fixtures/semver_caret_package.json", __dir__) }
+          let(:package_lock) { File.expand_path("fixtures/malformed_package-lock.txt", __dir__) }
+          let(:node_package_version) { described_class.new(package_json, nil, package_lock) }
+
+          describe "#raw" do
+            it "falls back to package.json version when package-lock.json is malformed" do
+              expect(node_package_version.raw).to eq("^1.2.3")
+            end
+          end
+        end
+      end
+
       describe "Pro package detection" do
         context "with react-on-rails package" do
           let(:package_json) { File.expand_path("fixtures/normal_package.json", __dir__) }
