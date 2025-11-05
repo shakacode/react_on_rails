@@ -12,16 +12,17 @@
  * https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-'use client';
-
-import * as React from 'react';
+import type { ReactNode } from 'react';
+import ReactClient from 'react/index.js';
 import type { ClientGetReactServerComponentProps } from './getReactServerComponent.client.ts';
 import { createRSCPayloadKey } from './utils.ts';
 
-type RSCContextType = {
-  getComponent: (componentName: string, componentProps: unknown) => Promise<React.ReactNode>;
+const React = ReactClient as typeof import('react');
 
-  refetchComponent: (componentName: string, componentProps: unknown) => Promise<React.ReactNode>;
+type RSCContextType = {
+  getComponent: (componentName: string, componentProps: unknown) => Promise<ReactNode>;
+
+  refetchComponent: (componentName: string, componentProps: unknown) => Promise<ReactNode>;
 };
 
 const RSCContext = React.createContext<RSCContextType | undefined>(undefined);
@@ -48,9 +49,9 @@ const RSCContext = React.createContext<RSCContextType | undefined>(undefined);
 export const createRSCProvider = ({
   getServerComponent,
 }: {
-  getServerComponent: (props: ClientGetReactServerComponentProps) => Promise<React.ReactNode>;
+  getServerComponent: (props: ClientGetReactServerComponentProps) => Promise<ReactNode>;
 }) => {
-  const fetchRSCPromises: Record<string, Promise<React.ReactNode>> = {};
+  const fetchRSCPromises: Record<string, Promise<ReactNode>> = {};
 
   const getComponent = (componentName: string, componentProps: unknown) => {
     const key = createRSCPayloadKey(componentName, componentProps);
@@ -76,7 +77,7 @@ export const createRSCProvider = ({
 
   const contextValue = { getComponent, refetchComponent };
 
-  return ({ children }: { children: React.ReactNode }) => {
+  return ({ children }: { children: ReactNode }) => {
     return <RSCContext.Provider value={contextValue}>{children}</RSCContext.Provider>;
   };
 };
