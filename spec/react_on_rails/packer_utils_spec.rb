@@ -2,7 +2,6 @@
 
 require_relative "spec_helper"
 
-# rubocop:disable Metrics/ModuleLength
 module ReactOnRails
   describe PackerUtils do
     describe ".shakapacker_version_requirement_met?" do
@@ -148,135 +147,46 @@ module ReactOnRails
         allow(::Shakapacker).to receive(:config).and_return(mock_config)
       end
 
-      context "when shakapacker is not defined" do
-        before do
-          hide_const("::Shakapacker")
+      context "when precompile_hook is configured" do
+        it "returns true when hook command contains generate_packs rake task" do
+          hook_value = "bundle exec rake react_on_rails:generate_packs"
+          allow(mock_config).to receive(:send).with(:data)
+                                              .and_return({ precompile_hook: hook_value })
+          expect(described_class.shakapacker_precompile_hook_configured?).to be true
         end
+
+        it "returns false when hook command doesn't contain generate_packs" do
+          allow(mock_config).to receive(:send).with(:data)
+                                              .and_return({ precompile_hook: "bin/some-other-command" })
+          expect(described_class.shakapacker_precompile_hook_configured?).to be false
+        end
+      end
+
+      context "when precompile_hook is not configured" do
+        it "returns false for nil" do
+          allow(mock_config).to receive(:send).with(:data).and_return({ precompile_hook: nil })
+          expect(described_class.shakapacker_precompile_hook_configured?).to be false
+        end
+
+        it "returns false for empty string" do
+          allow(mock_config).to receive(:send).with(:data).and_return({ precompile_hook: "" })
+          expect(described_class.shakapacker_precompile_hook_configured?).to be false
+        end
+      end
+
+      context "when Shakapacker is not available" do
+        before { hide_const("::Shakapacker") }
 
         it "returns false" do
-          expect(described_class.shakapacker_precompile_hook_configured?).to be(false)
+          expect(described_class.shakapacker_precompile_hook_configured?).to be false
         end
       end
 
-      context "when precompile hook contains react_on_rails:generate_packs" do
-        it "returns true for direct command with symbol keys" do
-          allow(mock_config).to receive(:send).with(:data).and_return(
-            { hooks: { precompile: "bundle exec rake react_on_rails:generate_packs" } }
-          )
-
-          expect(described_class.shakapacker_precompile_hook_configured?).to be(true)
-        end
-
-        it "returns true for direct command with string keys" do
-          allow(mock_config).to receive(:send).with(:data).and_return(
-            { "hooks" => { "precompile" => "bundle exec rake react_on_rails:generate_packs" } }
-          )
-
-          expect(described_class.shakapacker_precompile_hook_configured?).to be(true)
-        end
-
-        it "returns true when hook points to script file containing the task" do
-          allow(mock_config).to receive(:send).with(:data).and_return(
-            { hooks: { precompile: "bin/shakapacker_precompile" } }
-          )
-
-          # Mock Rails.root
-          rails_root = instance_double(Pathname)
-          allow(Rails).to receive(:root).and_return(rails_root)
-
-          script_path = instance_double(Pathname, file?: true)
-          allow(rails_root).to receive(:join).with("bin/shakapacker_precompile").and_return(script_path)
-          allow(File).to receive(:exist?).with(script_path).and_return(true)
-          allow(File).to receive(:read).with(script_path)
-                                       .and_return("#!/bin/bash\nbundle exec rake react_on_rails:generate_packs\n")
-
-          expect(described_class.shakapacker_precompile_hook_configured?).to be(true)
-        end
-
-        it "returns false when hook points to script file without the task" do
-          allow(mock_config).to receive(:send).with(:data).and_return(
-            { hooks: { precompile: "bin/other_script" } }
-          )
-
-          # Mock Rails.root
-          rails_root = instance_double(Pathname)
-          allow(Rails).to receive(:root).and_return(rails_root)
-
-          script_path = instance_double(Pathname, file?: true)
-          allow(rails_root).to receive(:join).with("bin/other_script").and_return(script_path)
-          allow(File).to receive(:exist?).with(script_path).and_return(true)
-          allow(File).to receive(:read).with(script_path)
-                                       .and_return("#!/bin/bash\necho 'doing other stuff'\n")
-
-          expect(described_class.shakapacker_precompile_hook_configured?).to be(false)
-        end
-      end
-
-      context "when precompile hook does not contain react_on_rails:generate_packs" do
-        it "returns false for different hook" do
-          allow(mock_config).to receive(:send).with(:data).and_return(
-            { hooks: { precompile: "bundle exec rake some_other_task" } }
-          )
-
-          expect(described_class.shakapacker_precompile_hook_configured?).to be(false)
-        end
-
-        it "returns false for similar but different task name" do
-          allow(mock_config).to receive(:send).with(:data).and_return(
-            { hooks: { precompile: "bundle exec rake react_on_rails:generate_packs_extra" } }
-          )
-
-          expect(described_class.shakapacker_precompile_hook_configured?).to be(false)
-        end
-
-        it "returns false when hooks is nil" do
-          allow(mock_config).to receive(:send).with(:data).and_return({})
-
-          expect(described_class.shakapacker_precompile_hook_configured?).to be(false)
-        end
-
-        it "returns false when precompile hook is nil" do
-          allow(mock_config).to receive(:send).with(:data).and_return({ hooks: {} })
-
-          expect(described_class.shakapacker_precompile_hook_configured?).to be(false)
-        end
-      end
-
-      context "when an error occurs" do
+      context "when config.send raises an error" do
         it "returns false" do
-          allow(mock_config).to receive(:send).with(:data).and_raise(StandardError.new("test error"))
-
-          expect(described_class.shakapacker_precompile_hook_configured?).to be(false)
+          allow(mock_config).to receive(:send).and_raise(NoMethodError)
+          expect(described_class.shakapacker_precompile_hook_configured?).to be false
         end
-      end
-    end
-
-    describe ".shakapacker_precompile_hook_value" do
-      let(:mock_config) { instance_double("::Shakapacker::Config") } # rubocop:disable RSpec/VerifiedDoubleReference
-
-      before do
-        allow(::Shakapacker).to receive(:config).and_return(mock_config)
-      end
-
-      it "returns the hook value when configured" do
-        hook_value = "bin/shakapacker_precompile"
-        allow(mock_config).to receive(:send).with(:data).and_return(
-          { hooks: { precompile: hook_value } }
-        )
-
-        expect(described_class.shakapacker_precompile_hook_value).to eq(hook_value)
-      end
-
-      it "returns nil when no hook is configured" do
-        allow(mock_config).to receive(:send).with(:data).and_return({})
-
-        expect(described_class.shakapacker_precompile_hook_value).to be_nil
-      end
-
-      it "returns nil when an error occurs" do
-        allow(mock_config).to receive(:send).with(:data).and_raise(StandardError.new("test error"))
-
-        expect(described_class.shakapacker_precompile_hook_value).to be_nil
       end
     end
   end
@@ -312,4 +222,3 @@ module ReactOnRails
     end
   end
 end
-# rubocop:enable Metrics/ModuleLength

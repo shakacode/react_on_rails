@@ -37,12 +37,16 @@ module ReactOnRails
                         app/views/layouts/hello_world.html.erb
                         Procfile.dev
                         Procfile.dev-static-assets
-                        Procfile.dev-prod-assets]
+                        Procfile.dev-prod-assets
+                        bin/shakapacker-precompile-hook]
         base_templates = %w[config/initializers/react_on_rails.rb]
         base_files.each { |file| copy_file("#{base_path}#{file}", file) }
         base_templates.each do |file|
           template("#{base_path}/#{file}.tt", file)
         end
+
+        # Make the hook script executable (copy_file guarantees it exists)
+        File.chmod(0o755, File.join(destination_root, "bin/shakapacker-precompile-hook"))
       end
 
       def copy_js_bundle_files
