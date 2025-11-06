@@ -11,6 +11,9 @@ pre-commit:
     rubocop:
       run: bin/lefthook/ruby-lint all-changed
 
+    eslint:
+      run: bin/lefthook/eslint-lint all-changed
+
     prettier:
       run: bin/lefthook/prettier-format all-changed
 

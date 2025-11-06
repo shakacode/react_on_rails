@@ -17,6 +17,12 @@ These requirements are non-negotiable. CI will fail if not followed.
 
 Git hooks will automatically run linting on **all changed files (staged + unstaged + untracked)** before each commit - making it fast while preventing CI failures!
 
+Pre-commit hooks automatically run:
+- **RuboCop** (auto-fix Ruby code style)
+- **ESLint** (auto-fix JS/TS code style)
+- **Prettier** (auto-format all supported files)
+- **Trailing newline checks** (ensure all files end with newlines)
+
 **Note:** Git hooks are for React on Rails gem developers only, not for users who install the gem.
 
 ## Development Commands
@@ -90,12 +96,16 @@ Git hooks will automatically run linting on **all changed files (staged + unstag
 
 ## Project Architecture
 
-### Dual Package Structure
+### Monorepo Structure
 
-This project maintains both a Ruby gem and an NPM package:
+This is a monorepo containing both the open-source package and the Pro package:
 
+- **Open Source**: Root directory contains the main React on Rails gem and package
+- **Pro Package**: `react_on_rails_pro/` contains the Pro features (separate linting/formatting config)
 - **Ruby gem**: Located in `lib/`, provides Rails integration and server-side rendering
 - **NPM package**: Located in `packages/react-on-rails/src/`, provides client-side React integration
+
+**IMPORTANT**: The `react_on_rails_pro/` directory has its own Prettier/ESLint configuration. When CI runs, it lints both directories separately. The pre-commit hooks will catch issues in both directories.
 
 ### Core Components
 
