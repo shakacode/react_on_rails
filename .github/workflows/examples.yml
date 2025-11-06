@@ -66,8 +66,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: yarn
-          cache-dependency-path: '**/yarn.lock'
+          # TODO: Re-enable yarn caching once Node.js V8 cache crash is fixed
+          # Tracking: https://github.com/actions/setup-node/issues/1028
+          # cache: yarn
+          # cache-dependency-path: '**/yarn.lock'
       - name: Print system information
         run: |
           echo "Linux release: "; cat /etc/issue
