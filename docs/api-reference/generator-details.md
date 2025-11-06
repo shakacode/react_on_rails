@@ -11,7 +11,7 @@ Usage:
 Options:
   -R, [--redux], [--no-redux]                      # Install Redux package and Redux version of Hello World Example. Default: false
   -T, [--typescript], [--no-typescript]            # Generate TypeScript files and install TypeScript dependencies. Default: false
-      [--rspack], [--no-rspack]                    # Use Rspack instead of Webpack as the bundler. Default: false
+      [--rspack]                                   # Use Rspack instead of Webpack as the bundler. Default: false
       [--ignore-warnings], [--no-ignore-warnings]  # Skip warnings. Default: false
 
 Runtime options:
@@ -155,6 +155,17 @@ The switch-bundler script automatically:
 - Updates shakapacker.yml configuration
 - Installs/removes appropriate dependencies
 - Works with npm, yarn, and pnpm
+
+**Limitations of `bin/switch-bundler`:**
+
+The switch-bundler utility handles the standard configuration and dependencies, but has some limitations:
+
+- **Custom webpack plugins**: Does not modify custom webpack plugins or loaders in your config files
+- **Manual updates needed**: If you have custom webpack configuration, you may need to update it to use unified patterns (see examples in [Webpack Configuration](../core-concepts/webpack-configuration.md#unified-configuration))
+- **Third-party dependencies**: Does not detect or update third-party webpack-specific packages you may have added
+- **YAML formatting**: Uses YAML.dump which may change formatting/whitespace (but preserves functionality)
+
+For apps with custom webpack configurations, review the generated config templates to understand the unified configuration patterns that work with both bundlers.
 
 **Combining with other options:**
 
