@@ -197,8 +197,8 @@ module ReactOnRails
       config_data = ::Shakapacker.config.send(:data)
 
       # Try symbol keys first (Shakapacker's internal format), then fall back to string keys
-      # Note: Currently only one hook value is supported, but this will change to support lists
-      config_data&.dig(:hooks, :precompile) || config_data&.dig("hooks", "precompile")
+      # The key is 'precompile_hook' at the top level of the config
+      config_data&.[](:precompile_hook) || config_data&.[]("precompile_hook")
     end
 
     def self.hook_contains_generate_packs?(hook_value)
