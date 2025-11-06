@@ -11,7 +11,7 @@ Usage:
 Options:
   -R, [--redux], [--no-redux]                      # Install Redux package and Redux version of Hello World Example. Default: false
   -T, [--typescript], [--no-typescript]            # Generate TypeScript files and install TypeScript dependencies. Default: false
-      [--rspack]                                   # Use Rspack instead of Webpack as the bundler. Default: false
+      [--rspack], [--no-rspack]                    # Use Rspack instead of Webpack as the bundler. Default: false
       [--ignore-warnings], [--no-ignore-warnings]  # Skip warnings. Default: false
 
 Runtime options:
