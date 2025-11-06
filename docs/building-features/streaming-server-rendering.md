@@ -236,36 +236,63 @@ With `defer: true`, your streamed components will:
 
 #### Recommended Approaches
 
-**For Pages WITH Streaming Components:**
+**For All Pages (With or Without Streaming Components):**
 
 ```erb
-<!-- ✅ GOOD: No defer - allows Selective Hydration to work -->
-<%= javascript_pack_tag('client-bundle', 'data-turbo-track': 'reload', defer: false) %>
-
-<!-- ✅ BEST: Use async for even faster hydration (requires Shakapacker ≥ 8.2.0) -->
+<!-- ✅ BEST: Use async with immediate_hydration (requires Shakapacker ≥ 8.2.0 and React on Rails Pro) -->
 <%= javascript_pack_tag('client-bundle', 'data-turbo-track': 'reload', async: true) %>
 ```
 
-**For Pages WITHOUT Streaming Components:**
+With `async: true` and the `immediate_hydration` Pro feature enabled, your components hydrate as soon as they're available—before the full page finishes loading. This provides optimal Time to Interactive (TTI) for both streaming and non-streaming pages.
+
+**Alternative for Non-Pro or Pre-8.2.0 Shakapacker:**
 
 ```erb
-<!-- ✅ OK: defer is fine when not using streaming -->
+<!-- ✅ GOOD: No defer - allows components to hydrate early -->
+<%= javascript_pack_tag('client-bundle', 'data-turbo-track': 'reload', defer: false) %>
+```
+
+**⚠️ Not Recommended (Even for Non-Streaming Pages):**
+
+```erb
+<!-- ⚠️ defer delays hydration until full page load - suboptimal even without streaming -->
 <%= javascript_pack_tag('client-bundle', 'data-turbo-track': 'reload', defer: true) %>
 ```
 
-#### Why Async is Better Than No Defer
+While `defer: true` won't defeat Selective Hydration on non-streaming pages (since there's no streaming to defeat), it still delays all component hydration until after the complete page loads, resulting in slower Time to Interactive.
 
-With Shakapacker ≥ 8.2.0, using `async: true` provides the best performance:
+#### Using generated_component_packs_loading_strategy Config
 
-- **No defer/async**: Scripts block HTML parsing and streaming
-- **defer: true**: Scripts wait for complete page load (defeats Selective Hydration)
-- **async: true**: Scripts load in parallel and execute ASAP, enabling:
-  - Selective Hydration to work immediately
-  - Components to become interactive as they stream in
-  - Optimal Time to Interactive (TTI)
+Instead of manually specifying `async: true` on each `javascript_pack_tag`, you can configure the loading strategy globally for auto-generated component packs:
+
+```ruby
+# config/initializers/react_on_rails.rb
+ReactOnRails.configure do |config|
+  # Set loading strategy for auto-generated component packs
+  # Options: :sync, :async, :defer
+  config.generated_component_packs_loading_strategy = :async
+
+  # Enable immediate hydration (React on Rails Pro feature)
+  # Components hydrate as soon as their HTML arrives, without waiting for full page load
+  config.immediate_hydration = true
+end
+```
+
+This configuration applies to components rendered with auto-generated packs. For manual `javascript_pack_tag` calls, you'll still need to specify `async: true` explicitly.
+
+#### Why Async is Better
+
+With Shakapacker ≥ 8.2.0 and React on Rails Pro, using `async: true` + `immediate_hydration: true` provides the best performance:
+
+- **defer: true**: Scripts wait for complete page load, delaying all hydration
+- **No defer/async**: Scripts block HTML parsing
+- **async: true + immediate_hydration: true**: Scripts load in parallel and components hydrate immediately, enabling:
+  - Fastest Time to Interactive (TTI)
+  - Selective Hydration for streaming components
+  - Early hydration for all components (streaming or not)
 
 #### Migration Timeline
 
-1. **Before Shakapacker 8.2.0**: Use `defer: false` for streaming pages
-2. **Shakapacker ≥ 8.2.0**: Migrate to `async: true` for streaming pages
-3. **Non-streaming pages**: Can continue using `defer: true` safely (regardless of Shakapacker version)
+1. **Before Shakapacker 8.2.0 or without React on Rails Pro**: Use `defer: false`
+2. **Shakapacker ≥ 8.2.0 + React on Rails Pro**: Use `async: true` with `immediate_hydration: true` for optimal performance
+3. **Avoid `defer: true`**: Even for non-streaming pages, defer delays hydration unnecessarily
