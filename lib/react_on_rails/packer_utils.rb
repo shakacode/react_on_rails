@@ -166,5 +166,78 @@ module ReactOnRails
 
       raise ReactOnRails::Error, msg
     end
+
+    # Check if shakapacker.yml has a precompile hook configured
+    # This prevents react_on_rails from running generate_packs twice
+    #
+    # Returns false if detection fails for any reason (missing shakapacker, malformed config, etc.)
+    # to ensure generate_packs runs rather than being incorrectly skipped
+    #
+    # Note: Currently checks a single hook value. Future enhancement will support hook lists
+    # to allow prepending/appending multiple commands. See related Shakapacker issue for details.
+    def self.shakapacker_precompile_hook_configured?
+      return false unless defined?(::Shakapacker)
+
+      hook_value = extract_precompile_hook
+      return false if hook_value.nil?
+
+      hook_contains_generate_packs?(hook_value)
+    rescue StandardError => e
+      # Swallow errors during hook detection to fail safe - if we can't detect the hook,
+      # we should run generate_packs rather than skip it incorrectly.
+      # Possible errors: NoMethodError (config method missing), TypeError (unexpected data structure),
+      # or errors from shakapacker's internal implementation changes
+      warn "Warning: Unable to detect shakapacker precompile hook: #{e.message}" if ENV["DEBUG"]
+      false
+    end
+
+    def self.extract_precompile_hook
+      # Access config data using private :data method since there's no public API
+      # to access the raw configuration hash needed for hook detection
+      config_data = ::Shakapacker.config.send(:data)
+
+      # Try symbol keys first (Shakapacker's internal format), then fall back to string keys
+      # Note: Currently only one hook value is supported, but this will change to support lists
+      config_data&.dig(:hooks, :precompile) || config_data&.dig("hooks", "precompile")
+    end
+
+    def self.hook_contains_generate_packs?(hook_value)
+      # The hook value can be either:
+      # 1. A direct command containing the rake task
+      # 2. A path to a script file that needs to be read
+      return false if hook_value.blank?
+
+      # Check if it's a direct command first
+      return true if hook_value.to_s.match?(/\breact_on_rails:generate_packs\b/)
+
+      # Check if it's a script file path
+      script_path = resolve_hook_script_path(hook_value)
+      return false unless script_path && File.exist?(script_path)
+
+      # Read and check script contents
+      script_contents = File.read(script_path)
+      script_contents.match?(/\breact_on_rails:generate_packs\b/)
+    rescue StandardError
+      # If we can't read the script, assume it doesn't contain generate_packs
+      false
+    end
+
+    def self.resolve_hook_script_path(hook_value)
+      # Hook value might be a script path relative to Rails root
+      return nil unless defined?(Rails) && Rails.respond_to?(:root)
+
+      potential_path = Rails.root.join(hook_value.to_s.strip)
+      potential_path if potential_path.file?
+    end
+
+    # Returns the configured precompile hook value for logging/debugging
+    # Returns nil if no hook is configured
+    def self.shakapacker_precompile_hook_value
+      return nil unless defined?(::Shakapacker)
+
+      extract_precompile_hook
+    rescue StandardError
+      nil
+    end
   end
 end
