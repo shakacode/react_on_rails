@@ -55,10 +55,7 @@ const commonWebpackConfig = () => {
   // Shakapacker 9 defaults to namedExport: true, but our code uses default imports
   // Override to use the old behavior for backward compatibility
   config.module.rules.forEach((rule) => {
-    if (
-      rule.test &&
-      (rule.test.test('example.module.scss') || rule.test.test('example.module.css'))
-    ) {
+    if (rule.test && (rule.test.test('example.module.scss') || rule.test.test('example.module.css'))) {
       if (Array.isArray(rule.use)) {
         rule.use.forEach((loader) => {
           if (
