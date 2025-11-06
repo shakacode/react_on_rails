@@ -14,7 +14,7 @@ SWC (Speedy Web Compiler) is a Rust-based JavaScript/TypeScript compiler that is
 - **Node.js 18+** - Recommended for best compatibility
 - **Yarn or npm** - For package management
 
-This guide assumes you're already using Shakapacker 9.0+. If you need to upgrade from an earlier version, see the [Shakapacker upgrade guide](https://github.com/shakacode/shakapacker/blob/main/docs/v8_to_v9_upgrade.md).
+This guide assumes you're already using Shakapacker 9.0+. If you need to upgrade from an earlier version, see the [Shakapacker upgrade guide](https://github.com/shakacode/shakapacker/blob/main/docs/v9_upgrade.md).
 
 ## Migration Steps
 
