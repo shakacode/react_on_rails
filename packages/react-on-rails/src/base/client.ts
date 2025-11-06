@@ -13,6 +13,8 @@ import * as Authenticity from '../Authenticity.ts';
 import buildConsoleReplay from '../buildConsoleReplay.ts';
 import reactHydrateOrRender from '../reactHydrateOrRender.ts';
 import createReactOutput from '../createReactOutput.ts';
+import { getRailsContext } from '../context.ts';
+import { isPromise, isServerRenderHash } from '../isServerRenderResult.ts';
 
 const DEFAULT_OPTIONS = {
   traceTurbolinks: false,
@@ -266,7 +268,30 @@ Fix: Use only react-on-rails OR react-on-rails-pro, not both.`);
       hydrate: boolean,
     ): RenderReturnType {
       const componentObj = ComponentRegistry.get(name);
-      const reactElement = createReactOutput({ componentObj, props, domNodeId });
+      const railsContext = getRailsContext();
+      const reactElement = createReactOutput({
+        componentObj,
+        props,
+        domNodeId,
+        railsContext: railsContext ?? undefined,
+        shouldHydrate: hydrate,
+      });
+
+      // Guard against server render hash (shouldn't happen in client, but check anyway)
+      if (isServerRenderHash(reactElement)) {
+        throw new Error(
+          `You returned a server side type of react-router error: ${JSON.stringify(reactElement)}\n` +
+            'You should return a React.Component always for the client side entry point.',
+        );
+      }
+
+      // Guard against promises (not supported in this sync API)
+      if (isPromise(reactElement)) {
+        throw new Error(
+          'Async render functions are not supported in ReactOnRails.render(). ' +
+            'Use ReactOnRails.reactOnRailsComponentLoaded() for async component rendering.',
+        );
+      }
 
       return this.reactHydrateOrRender(
         document.getElementById(domNodeId) as Element,
