@@ -407,21 +407,16 @@ module ReactOnRails
 
         puts Rainbow("🔧 Configuring Shakapacker for Rspack...").yellow
 
-        # Read the current config
-        config_content = File.read(shakapacker_config_path)
+        # Parse YAML config properly to avoid fragile regex manipulation
+        config = YAML.load_file(shakapacker_config_path)
 
-        # Update assets_bundler to rspack in default section
-        unless config_content.include?("assets_bundler:")
-          # Add assets_bundler after source_path in default section
-          config_content.gsub!(/^default: &default\n(\s+source_path:.*\n)/) do
-            "default: &default\n#{Regexp.last_match(1)}  assets_bundler: 'rspack'\n"
-          end
-        end
+        # Update default section
+        config["default"] ||= {}
+        config["default"]["assets_bundler"] = "rspack"
+        config["default"]["webpack_loader"] = "swc"
 
-        # Update webpack_loader to swc (rspack works best with SWC)
-        config_content.gsub!(/^\s*webpack_loader:.*$/, "  webpack_loader: 'swc'")
-
-        File.write(shakapacker_config_path, config_content)
+        # Write back as YAML
+        File.write(shakapacker_config_path, YAML.dump(config))
         puts Rainbow("✅ Updated shakapacker.yml for Rspack").green
       end
     end
