@@ -1,4 +1,13 @@
-const { env } = require('shakapacker');
+/* eslint-disable global-require */
+let env;
+try {
+  ({ env } = require('shakapacker'));
+} catch (error) {
+  console.error('Failed to load shakapacker:', error.message);
+  console.error('Make sure shakapacker is installed: yarn add shakapacker');
+  process.exit(1);
+}
+/* eslint-enable global-require */
 
 const customConfig = {
   options: {

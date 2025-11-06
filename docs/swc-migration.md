@@ -8,6 +8,14 @@ This document describes the migration from Babel to SWC for JavaScript/TypeScrip
 
 SWC (Speedy Web Compiler) is a Rust-based JavaScript/TypeScript compiler that is approximately 20x faster than Babel. Shakapacker 9.0+ uses SWC as the default transpiler.
 
+## Prerequisites
+
+- **Shakapacker 9.0+** - SWC support requires Shakapacker version 9.0 or higher
+- **Node.js 18+** - Recommended for best compatibility
+- **Yarn or npm** - For package management
+
+This guide assumes you're already using Shakapacker 9.0+. If you need to upgrade from an earlier version, see the [Shakapacker upgrade guide](https://github.com/shakacode/shakapacker/blob/main/docs/v8_to_v9_upgrade.md).
+
 ## Migration Steps
 
 **Note**: This migration has been successfully implemented in the React on Rails standard dummy app (`spec/dummy`). The Pro dummy app (`react_on_rails_pro/spec/dummy`) continues using Babel for RSC stability.
@@ -32,7 +40,14 @@ default: &default # Using SWC for faster JavaScript transpilation (20x faster th
 Create `config/swc.config.js` in your Rails application root with the following content:
 
 ```javascript
-const { env } = require('shakapacker');
+let env;
+try {
+  ({ env } = require('shakapacker'));
+} catch (error) {
+  console.error('Failed to load shakapacker:', error.message);
+  console.error('Make sure shakapacker is installed: yarn add shakapacker');
+  process.exit(1);
+}
 
 const customConfig = {
   options: {
@@ -181,6 +196,46 @@ jsc: {
 ### Issue: Class Names Being Mangled (Stimulus)
 
 **Solution**: Already configured with `keepClassNames: true` in our SWC config.
+
+### Issue: Build Fails with "Cannot find module '@swc/core'"
+
+**Solution**: Clear node_modules and reinstall:
+
+```bash
+rm -rf node_modules yarn.lock
+yarn install
+```
+
+### Issue: Fast Refresh Not Working
+
+**Solution**: Ensure webpack-dev-server is running and check that:
+
+- `env.runningWebpackDevServer` is true in development
+- No syntax errors in components
+- Components follow Fast Refresh rules (no anonymous exports, must export React components)
+
+### Issue: Syntax Errors Not Being Caught
+
+**Solution**: SWC parser is more permissive than Babel. Add TypeScript or stricter ESLint configuration for better error catching:
+
+```bash
+yarn add -D @typescript-eslint/parser @typescript-eslint/eslint-plugin
+```
+
+### Issue: TypeScript Files Not Transpiling
+
+**Solution**: For TypeScript files, update your SWC config to use TypeScript parser:
+
+```javascript
+jsc: {
+  parser: {
+    syntax: 'typescript',
+    tsx: true,
+    dynamicImport: true,
+  },
+  // ... rest of config
+}
+```
 
 ## Testing Results
 
