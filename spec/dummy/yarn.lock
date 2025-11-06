@@ -5653,10 +5653,10 @@ sha.js@^2.4.0, sha.js@^2.4.8:
     inherits "^2.0.1"
     safe-buffer "^5.0.1"
 
-shakapacker@9.1.0:
-  version "9.1.0"
-  resolved "https://registry.npmjs.org/shakapacker/-/shakapacker-9.1.0.tgz#6d63c4d27b9358073dd8fc3c6e79252b96d36a36"
-  integrity sha512-PL0DuzNLFJMwr5s908ImMuvejmC20WuDa7EfAPpPFU1pM5U8cPqqC4kwSdXFLfVU0Or/UqeegNyIB1sGBdSPiw==
+shakapacker@9.2.0:
+  version "9.2.0"
+  resolved "https://registry.npmjs.org/shakapacker/-/shakapacker-9.2.0.tgz#130bbeef9e72f2bd7f8ce5b1316ca3c778201e97"
+  integrity sha512-eEjps0qlufHAFOYY1fixZaXkIXLOE+FgQdjwKHhARryHfv4KxYIZiSQTFU4I6BOEXaK32zkTfEXOdU46YQv2pg==
   dependencies:
     js-yaml "^4.1.0"
     path-complete-extname "^1.0.0"

@@ -43,6 +43,8 @@ Changes since the last non-beta release.
 
 - **Shakapacker 9.1.0 Upgrade**: Upgraded Shakapacker from 9.0.0 to 9.1.0. This minor version update includes bug fixes and improvements. Updated webpack configuration in Pro dummy apps to use forEach pattern for better compatibility with multiple SCSS rules. [PR 1921](https://github.com/shakacode/react_on_rails/pull/1921) by [justin808](https://github.com/justin808).
 
+- **Shakapacker 9.2.0 Upgrade**: Upgraded Shakapacker from 9.1.0 to 9.2.0. This minor version update adds a new `bin/shakapacker-config` utility for debugging webpack/rspack configurations with doctor mode, save mode, and stdout mode options. Supports YAML, JSON, and Node.js inspect output formats. by [justin808](https://github.com/justin808).
+
 #### Bug Fixes
 
 - **Use as Git dependency**: All packages can now be installed as Git dependencies. This is useful for development and testing purposes. See [CONTRIBUTING.md](./CONTRIBUTING.md#git-dependencies) for documentation. [PR #1873](https://github.com/shakacode/react_on_rails/pull/1873) by [alexeyr-ci2](https://github.com/alexeyr-ci2).
