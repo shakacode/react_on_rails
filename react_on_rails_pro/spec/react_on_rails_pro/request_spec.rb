@@ -251,8 +251,7 @@ describe ReactOnRailsPro::Request do
                 HTTPX::Options,
                 timeout: {},
                 debug_level: 0,
-                debug: false,
-                logger: nil
+                debug: false
               )
               mock_request = instance_double(
                 HTTPX::Request,
