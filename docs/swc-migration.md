@@ -10,6 +10,8 @@ SWC (Speedy Web Compiler) is a Rust-based JavaScript/TypeScript compiler that is
 
 ## Migration Steps
 
+**Note**: This migration has been successfully implemented in the React on Rails standard dummy app (`spec/dummy`). The Pro dummy app (`react_on_rails_pro/spec/dummy`) continues using Babel for RSC stability.
+
 ### 1. Install Required Dependencies
 
 ```bash
@@ -27,7 +29,7 @@ default: &default # Using SWC for faster JavaScript transpilation (20x faster th
 
 ### 3. Create SWC Configuration File
 
-Create `config/swc.config.js` with the following content:
+Create `config/swc.config.js` in your Rails application root with the following content:
 
 ```javascript
 const { env } = require('shakapacker');
@@ -203,7 +205,9 @@ Test coverage includes:
 
 **For React on Rails projects without React Server Components**: ✅ **Migration to SWC is recommended**
 
-**For projects using React Server Components**: ⚠️ **Proceed with caution** - consider staying with Babel until SWC RSC support stabilizes, or conduct extensive testing before production deployment.
+The standard React on Rails dummy app (`spec/dummy`) successfully uses SWC, demonstrating its compatibility with core React on Rails features.
+
+**For projects using React Server Components**: ⚠️ **Stay with Babel for now** - The React on Rails Pro dummy app continues using Babel due to RSC's experimental status with SWC. Consider staying with Babel until SWC RSC support stabilizes, or conduct extensive testing before production deployment.
 
 ## References
 
