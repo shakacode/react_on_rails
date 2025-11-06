@@ -17,6 +17,12 @@ These requirements are non-negotiable. CI will fail if not followed.
 
 Git hooks will automatically run linting on **all changed files (staged + unstaged + untracked)** before each commit - making it fast while preventing CI failures!
 
+Pre-commit hooks automatically run:
+- **RuboCop** (auto-fix Ruby code style)
+- **ESLint** (auto-fix JS/TS code style)
+- **Prettier** (auto-format all supported files)
+- **Trailing newline checks** (ensure all files end with newlines)
+
 **Note:** Git hooks are for React on Rails gem developers only, not for users who install the gem.
 
 ## Development Commands
@@ -90,12 +96,16 @@ Git hooks will automatically run linting on **all changed files (staged + unstag
 
 ## Project Architecture
 
-### Dual Package Structure
+### Monorepo Structure
 
-This project maintains both a Ruby gem and an NPM package:
+This is a monorepo containing both the open-source package and the Pro package:
 
+- **Open Source**: Root directory contains the main React on Rails gem and package
+- **Pro Package**: `react_on_rails_pro/` contains the Pro features (separate linting/formatting config)
 - **Ruby gem**: Located in `lib/`, provides Rails integration and server-side rendering
 - **NPM package**: Located in `packages/react-on-rails/src/`, provides client-side React integration
+
+**IMPORTANT**: The `react_on_rails_pro/` directory has its own Prettier/ESLint configuration. When CI runs, it lints both directories separately. The pre-commit hooks will catch issues in both directories.
 
 ### Core Components
 
@@ -126,6 +136,94 @@ This project maintains both a Ruby gem and an NPM package:
 - **Dummy app**: `spec/dummy/` - Rails app for testing integration
 - **Examples**: Generated via rake tasks for different webpack configurations
 - **Rake tasks**: Defined in `rakelib/` for various development operations
+
+## Debugging Webpack Configuration Issues
+
+When encountering issues with Webpack/Shakapacker configuration (e.g., components not rendering, CSS modules failing), use this debugging approach:
+
+### 1. Create Debug Scripts
+
+Create temporary debug scripts in the dummy app root to inspect the actual webpack configuration:
+
+```javascript
+// debug-webpack-rules.js - Inspect all webpack rules
+const { generateWebpackConfig } = require('shakapacker');
+
+const config = generateWebpackConfig();
+
+console.log('=== Webpack Rules ===');
+console.log(`Total rules: ${config.module.rules.length}\n`);
+
+config.module.rules.forEach((rule, index) => {
+  console.log(`\nRule ${index}:`);
+  console.log('  test:', rule.test);
+  console.log('  use:', Array.isArray(rule.use) ? rule.use.map(u => typeof u === 'string' ? u : u.loader) : rule.use);
+
+  if (rule.test) {
+    console.log('  Matches .scss:', rule.test.test && rule.test.test('example.scss'));
+    console.log('  Matches .module.scss:', rule.test.test && rule.test.test('example.module.scss'));
+  }
+});
+```
+
+```javascript
+// debug-webpack-with-config.js - Inspect config AFTER modifications
+const commonWebpackConfig = require('./config/webpack/commonWebpackConfig');
+
+const config = commonWebpackConfig();
+
+console.log('=== Webpack Rules AFTER commonWebpackConfig ===');
+config.module.rules.forEach((rule, index) => {
+  if (rule.test && rule.test.test('example.module.scss')) {
+    console.log(`\nRule ${index} (CSS Modules):`);
+    if (Array.isArray(rule.use)) {
+      rule.use.forEach((loader, i) => {
+        if (loader.loader && loader.loader.includes('css-loader')) {
+          console.log(`  css-loader options:`, loader.options);
+        }
+      });
+    }
+  }
+});
+```
+
+### 2. Run Debug Scripts
+
+```bash
+cd spec/dummy  # or react_on_rails_pro/spec/dummy
+NODE_ENV=test RAILS_ENV=test node debug-webpack-rules.js
+NODE_ENV=test RAILS_ENV=test node debug-webpack-with-config.js
+```
+
+### 3. Analyze Output
+
+- Verify the rules array structure matches expectations
+- Check that loader options are correctly set
+- Confirm rules only match intended file patterns
+- Ensure modifications don't break existing loaders
+
+### 4. Common Issues & Solutions
+
+**CSS Modules breaking after Shakapacker upgrade:**
+- Shakapacker 9.0+ defaults to `namedExport: true` for CSS Modules
+- Existing code using `import styles from './file.module.css'` will fail
+- Override in webpack config:
+  ```javascript
+  loader.options.modules.namedExport = false;
+  loader.options.modules.exportLocalsConvention = 'camelCase';
+  ```
+
+**Rules not matching expected files:**
+- Use `.test.test('example.file')` to check regex matching
+- Shakapacker may combine multiple file extensions in single rules
+- Test with actual filenames from your codebase
+
+### 5. Clean Up
+
+Always remove debug scripts before committing:
+```bash
+rm debug-*.js
+```
 
 ## Important Notes
 

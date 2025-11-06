@@ -26,10 +26,17 @@ const sassLoaderConfig = {
 };
 
 const baseClientWebpackConfig = generateWebpackConfig();
-const scssConfigIndex = baseClientWebpackConfig.module.rules.findIndex((config) =>
-  '.scss'.match(config.test),
-);
-baseClientWebpackConfig.module.rules[scssConfigIndex].use.push(sassLoaderConfig);
+
+// Add sass-resources-loader to all SCSS rules (both .scss and .module.scss)
+baseClientWebpackConfig.module.rules.forEach((rule) => {
+  if (
+    Array.isArray(rule.use) &&
+    rule.test &&
+    (rule.test.test('example.scss') || rule.test.test('example.module.scss'))
+  ) {
+    rule.use.push(sassLoaderConfig);
+  }
+});
 
 if (isHMR) {
   baseClientWebpackConfig.plugins.push(
@@ -41,6 +48,34 @@ if (isHMR) {
   );
 }
 
-const commonWebpackConfig = () => merge({}, baseClientWebpackConfig, commonOptions, aliasConfig);
+const commonWebpackConfig = () => {
+  const config = merge({}, baseClientWebpackConfig, commonOptions, aliasConfig);
+
+  // Fix CSS modules for Shakapacker 9.x compatibility
+  // Shakapacker 9 defaults to namedExport: true, but our code uses default imports
+  // Override to use the old behavior for backward compatibility
+  config.module.rules.forEach((rule) => {
+    if (rule.test && (rule.test.test('example.module.scss') || rule.test.test('example.module.css'))) {
+      if (Array.isArray(rule.use)) {
+        rule.use.forEach((loader) => {
+          if (
+            loader.loader &&
+            loader.loader.includes('css-loader') &&
+            loader.options &&
+            loader.options.modules
+          ) {
+            // Disable named exports to support default imports
+            // eslint-disable-next-line no-param-reassign
+            loader.options.modules.namedExport = false;
+            // eslint-disable-next-line no-param-reassign
+            loader.options.modules.exportLocalsConvention = 'camelCase';
+          }
+        });
+      }
+    }
+  });
+
+  return config;
+};
 
 module.exports = commonWebpackConfig;

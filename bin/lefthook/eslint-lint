@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Format JS/TS/JSON/MD files with Prettier
+# Lint and auto-fix JS/TS files with ESLint
 set -euo pipefail
 
 CONTEXT="${1:-staged}"
-files="$(bin/lefthook/get-changed-files "$CONTEXT" '\.(js|jsx|ts|tsx|json|md|yml|yaml)$')"
+files="$(bin/lefthook/get-changed-files "$CONTEXT" '\.(js|jsx|ts|tsx)$')"
 
 if [ -z "$files" ]; then
-  echo "✅ No files to format with Prettier"
+  echo "✅ No JS/TS files to lint with ESLint"
   exit 0
 fi
 
@@ -14,16 +14,20 @@ fi
 root_files=$(echo "$files" | grep -v '^react_on_rails_pro/' || true)
 pro_files=$(echo "$files" | grep '^react_on_rails_pro/' || true)
 
-# Format root files
+exit_code=0
+
+# Lint root files
 if [ -n "$root_files" ]; then
   if [ "$CONTEXT" = "all-changed" ]; then
-    echo "💅 Prettier on root changed files:"
+    echo "🔍 ESLint on root changed files:"
   else
-    echo "💅 Prettier on root $CONTEXT files:"
+    echo "🔍 ESLint on root $CONTEXT files:"
   fi
   printf "  %s\n" $root_files
 
-  yarn run prettier --write $root_files
+  if ! yarn run eslint $root_files --report-unused-disable-directives --fix; then
+    exit_code=1
+  fi
 
   # Re-stage files if running on staged or all-changed context
   if [ "$CONTEXT" = "staged" ] || [ "$CONTEXT" = "all-changed" ]; then
@@ -31,19 +35,21 @@ if [ -n "$root_files" ]; then
   fi
 fi
 
-# Format Pro files (using Pro's Prettier config)
+# Lint Pro files (using Pro's ESLint config)
 if [ -n "$pro_files" ]; then
   if [ "$CONTEXT" = "all-changed" ]; then
-    echo "💅 Prettier on Pro changed files:"
+    echo "🔍 ESLint on Pro changed files:"
   else
-    echo "💅 Prettier on Pro $CONTEXT files:"
+    echo "🔍 ESLint on Pro $CONTEXT files:"
   fi
   printf "  %s\n" $pro_files
 
   # Strip react_on_rails_pro/ prefix for running in Pro directory
   pro_files_relative=$(echo "$pro_files" | sed 's|^react_on_rails_pro/||')
 
-  (cd react_on_rails_pro && yarn run prettier --write $pro_files_relative)
+  if ! (cd react_on_rails_pro && yarn run eslint $pro_files_relative --report-unused-disable-directives --fix); then
+    exit_code=1
+  fi
 
   # Re-stage files if running on staged or all-changed context
   if [ "$CONTEXT" = "staged" ] || [ "$CONTEXT" = "all-changed" ]; then
@@ -51,4 +57,8 @@ if [ -n "$pro_files" ]; then
   fi
 fi
 
-echo "✅ Prettier formatting complete"
+if [ $exit_code -eq 0 ]; then
+  echo "✅ ESLint checks passed"
+fi
+
+exit $exit_code
