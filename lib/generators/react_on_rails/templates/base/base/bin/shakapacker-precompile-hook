@@ -7,6 +7,16 @@
 # for auto-bundled components. It's called automatically by Shakapacker
 # when configured in config/shakapacker.yml:
 #   precompile_hook: 'bin/shakapacker-precompile-hook'
+#
+# Emoji Scheme:
+#   🔄 = Running/in-progress
+#   ✅ = Success
+#   ❌ = Error
+
+# Skip validation during precompile hook execution
+# The hook runs early in the build process, potentially before full Rails initialization,
+# and doesn't need package version validation since it's part of the build itself
+ENV["REACT_ON_RAILS_SKIP_VALIDATION"] = "true"
 
 require_relative "../config/environment"
 

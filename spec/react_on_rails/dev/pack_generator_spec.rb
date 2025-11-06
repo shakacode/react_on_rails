@@ -5,6 +5,33 @@ require "react_on_rails/dev/pack_generator"
 
 RSpec.describe ReactOnRails::Dev::PackGenerator do
   describe ".generate" do
+    context "when shakapacker precompile hook is configured" do
+      before do
+        allow(ReactOnRails::PackerUtils).to receive(:shakapacker_precompile_hook_configured?).and_return(true)
+      end
+
+      it "skips pack generation in verbose mode" do
+        expect { described_class.generate(verbose: true) }
+          .to output(/⏭️  Skipping pack generation/).to_stdout_from_any_process
+      end
+
+      it "skips pack generation silently in quiet mode" do
+        expect { described_class.generate(verbose: false) }
+          .not_to output.to_stdout_from_any_process
+      end
+
+      it "does not invoke the rake task" do
+        # Mock the task to ensure it's not called
+        mock_task = instance_double(Rake::Task)
+        allow(Rake::Task).to receive(:[]).with("react_on_rails:generate_packs").and_return(mock_task)
+        allow(mock_task).to receive(:invoke)
+
+        described_class.generate(verbose: false)
+
+        expect(mock_task).not_to have_received(:invoke)
+      end
+    end
+
     context "when in Bundler context with Rails available" do
       let(:mock_task) { instance_double(Rake::Task) }
       let(:mock_rails_app) do
@@ -17,6 +44,9 @@ RSpec.describe ReactOnRails::Dev::PackGenerator do
       end
 
       before do
+        # Ensure precompile hook is not configured for these tests
+        allow(ReactOnRails::PackerUtils).to receive(:shakapacker_precompile_hook_configured?).and_return(false)
+
         # Setup Bundler context
         stub_const("Bundler", Module.new)
         allow(ENV).to receive(:[]).and_call_original

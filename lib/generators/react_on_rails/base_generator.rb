@@ -45,8 +45,8 @@ module ReactOnRails
           template("#{base_path}/#{file}.tt", file)
         end
 
-        # Make the hook script executable
-        File.chmod(0o755, "bin/shakapacker-precompile-hook") if File.exist?("bin/shakapacker-precompile-hook")
+        # Make the hook script executable (copy_file guarantees it exists)
+        File.chmod(0o755, File.join(destination_root, "bin/shakapacker-precompile-hook"))
       end
 
       def copy_js_bundle_files
