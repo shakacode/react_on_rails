@@ -31,6 +31,9 @@ git add . && git commit -m "Add react_on_rails gem"
 
 # Run the installer
 bin/rails generate react_on_rails:install
+
+# Optional: Use Rspack for ~20x faster builds
+# bin/rails generate react_on_rails:install --rspack
 ```
 
 Take a look at the files created by the generator.
@@ -40,6 +43,8 @@ Take a look at the files created by the generator.
 - React component files in `client/`
 - A sample controller and view
 - Webpack configuration
+
+> 💡 **Performance Tip:** Add the `--rspack` flag for significantly faster builds (~20x improvement). You can also switch bundlers later with `bin/switch-bundler rspack`.
 
 ## 🎯 Step 2: Start the Development Server (1 minute)
 

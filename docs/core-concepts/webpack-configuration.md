@@ -11,6 +11,73 @@
 
 To get a deeper understanding of Shakapacker, watch [RailsConf 2020 CE - Webpacker, It-Just-Works, But How? by Justin Gordon](https://youtu.be/sJLoOpc5LD8).
 
+## Rspack vs. Webpack
+
+[Rspack](https://rspack.dev/) is a high-performance JavaScript bundler written in Rust that provides significantly faster builds than Webpack (~20x improvement). React on Rails supports both bundlers through unified configuration.
+
+### Using Rspack
+
+Generate a new app with Rspack:
+
+```bash
+rails generate react_on_rails:install --rspack
+```
+
+Or switch an existing app to Rspack:
+
+```bash
+bin/switch-bundler rspack
+```
+
+### Performance Benefits
+
+- **Build times**: ~53-270ms with Rspack vs typical webpack builds
+- **~20x faster transpilation** with SWC (used by Rspack)
+- **Faster development** builds and CI runs
+
+### Unified Configuration
+
+React on Rails generates unified webpack configuration files that work with both bundlers:
+
+**config/webpack/development.js** - Conditional plugin loading:
+
+```javascript
+const { config } = require('shakapacker');
+
+if (config.assets_bundler === 'rspack') {
+  // Rspack uses @rspack/plugin-react-refresh
+  const ReactRefreshPlugin = require('@rspack/plugin-react-refresh');
+  clientWebpackConfig.plugins.push(new ReactRefreshPlugin());
+} else {
+  // Webpack uses @pmmmwh/react-refresh-webpack-plugin
+  const ReactRefreshWebpackPlugin = require('@pmmmwh/react-refresh-webpack-plugin');
+  clientWebpackConfig.plugins.push(new ReactRefreshWebpackPlugin());
+}
+```
+
+**config/webpack/serverWebpackConfig.js** - Dynamic bundler detection:
+
+```javascript
+const { config } = require('shakapacker');
+
+const bundler = config.assets_bundler === 'rspack' ? require('@rspack/core') : require('webpack');
+
+// Use bundler-specific APIs
+serverWebpackConfig.plugins.unshift(new bundler.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));
+```
+
+### Configuration in shakapacker.yml
+
+Rspack configuration is controlled via `config/shakapacker.yml`:
+
+```yaml
+default: &default
+  assets_bundler: 'rspack' # or 'webpack'
+  webpack_loader: 'swc' # Rspack works best with SWC
+```
+
+The `bin/switch-bundler` script automatically updates this configuration when switching bundlers.
+
 Per the example repo [shakacode/react_on_rails_demo_ssr_hmr](https://github.com/shakacode/react_on_rails_demo_ssr_hmr),
 you should consider keeping your codebase mostly consistent with the defaults for [Shakapacker](https://github.com/shakacode/shakapacker).
 
