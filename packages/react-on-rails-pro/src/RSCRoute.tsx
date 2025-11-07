@@ -16,7 +16,7 @@
 
 'use client';
 
-import * as React from 'react';
+import React, { Component, use, type ReactNode } from 'react';
 import { useRSC } from './RSCProvider.tsx';
 import { ServerComponentFetchError } from './ServerComponentFetchError.ts';
 
@@ -24,11 +24,11 @@ import { ServerComponentFetchError } from './ServerComponentFetchError.ts';
  * Error boundary component for RSCRoute that adds server component name and props to the error
  * So, the parent ErrorBoundary can refetch the server component
  */
-class RSCRouteErrorBoundary extends React.Component<
-  { children: React.ReactNode; componentName: string; componentProps: unknown },
+class RSCRouteErrorBoundary extends Component<
+  { children: ReactNode; componentName: string; componentProps: unknown },
   { error: Error | null }
 > {
-  constructor(props: { children: React.ReactNode; componentName: string; componentProps: unknown }) {
+  constructor(props: { children: ReactNode; componentName: string; componentProps: unknown }) {
     super(props);
     this.state = { error: null };
   }
@@ -75,9 +75,9 @@ export type RSCRouteProps = {
   componentProps: unknown;
 };
 
-const PromiseWrapper = ({ promise }: { promise: Promise<React.ReactNode> }) => {
-  // React.use is available in React 18.3+
-  const promiseResult = React.use(promise);
+const PromiseWrapper = ({ promise }: { promise: Promise<ReactNode> }) => {
+  // use is available in React 18.3+
+  const promiseResult = use(promise);
 
   // In case that an error happened during the rendering of the RSC payload before the rendering of the component itself starts
   // RSC bundle will return an error object serialized inside the RSC payload
@@ -88,7 +88,7 @@ const PromiseWrapper = ({ promise }: { promise: Promise<React.ReactNode> }) => {
   return promiseResult;
 };
 
-const RSCRoute = ({ componentName, componentProps }: RSCRouteProps): React.ReactNode => {
+const RSCRoute = ({ componentName, componentProps }: RSCRouteProps): ReactNode => {
   const { getComponent } = useRSC();
   const componentPromise = getComponent(componentName, componentProps);
   return (

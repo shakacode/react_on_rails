@@ -12,17 +12,19 @@
  * https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-import * as React from 'react';
+'use client';
+
+import React, { createContext, useContext, type ReactNode } from 'react';
 import type { ClientGetReactServerComponentProps } from './getReactServerComponent.client.ts';
 import { createRSCPayloadKey } from './utils.ts';
 
 type RSCContextType = {
-  getComponent: (componentName: string, componentProps: unknown) => Promise<React.ReactNode>;
+  getComponent: (componentName: string, componentProps: unknown) => Promise<ReactNode>;
 
-  refetchComponent: (componentName: string, componentProps: unknown) => Promise<React.ReactNode>;
+  refetchComponent: (componentName: string, componentProps: unknown) => Promise<ReactNode>;
 };
 
-const RSCContext = React.createContext<RSCContextType | undefined>(undefined);
+const RSCContext = createContext<RSCContextType | undefined>(undefined);
 
 /**
  * Creates a provider context for React Server Components.
@@ -46,9 +48,9 @@ const RSCContext = React.createContext<RSCContextType | undefined>(undefined);
 export const createRSCProvider = ({
   getServerComponent,
 }: {
-  getServerComponent: (props: ClientGetReactServerComponentProps) => Promise<React.ReactNode>;
+  getServerComponent: (props: ClientGetReactServerComponentProps) => Promise<ReactNode>;
 }) => {
-  const fetchRSCPromises: Record<string, Promise<React.ReactNode>> = {};
+  const fetchRSCPromises: Record<string, Promise<ReactNode>> = {};
 
   const getComponent = (componentName: string, componentProps: unknown) => {
     const key = createRSCPayloadKey(componentName, componentProps);
@@ -74,7 +76,7 @@ export const createRSCProvider = ({
 
   const contextValue = { getComponent, refetchComponent };
 
-  return ({ children }: { children: React.ReactNode }) => {
+  return ({ children }: { children: ReactNode }) => {
     return <RSCContext.Provider value={contextValue}>{children}</RSCContext.Provider>;
   };
 };
@@ -95,11 +97,11 @@ export const createRSCProvider = ({
  * @example
  * ```tsx
  * const { getComponent } = useRSC();
- * const serverComponent = React.use(getComponent('MyServerComponent', props));
+ * const serverComponent = use(getComponent('MyServerComponent', props));
  * ```
  */
 export const useRSC = () => {
-  const context = React.useContext(RSCContext);
+  const context = useContext(RSCContext);
   if (!context) {
     throw new Error('useRSC must be used within a RSCProvider');
   }
