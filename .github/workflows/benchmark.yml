@@ -14,11 +14,11 @@ on:
         required: false
         default: 'max'
         type: string
-      duration_sec:
-        description: 'Duration in seconds'
+      duration:
+        description: 'Duration (e.g., "30s", "1m", "90s")'
         required: false
-        default: 30
-        type: number
+        default: '30s'
+        type: string
       request_timeout:
         description: 'Request timeout (e.g., "60s", "1m", "90s")'
         required: false
@@ -63,7 +63,7 @@ env:
   VEGETA_VERSION: "12.13.0"
   # Benchmark parameters
   RATE: ${{ github.event.inputs.rate || 'max' }}
-  DURATION_SEC: ${{ github.event.inputs.duration_sec || 30 }}
+  DURATION: ${{ github.event.inputs.duration || '30s' }}
   REQUEST_TIMEOUT: ${{ github.event.inputs.request_timeout || '60s' }}
   CONNECTIONS: ${{ github.event.inputs.connections || 10 }}
   MAX_CONNECTIONS: ${{ github.event.inputs.max_connections || github.event.inputs.connections || 10 }}
