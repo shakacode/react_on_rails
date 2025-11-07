@@ -20,6 +20,7 @@
 
 **🚀 React on Rails v16.0 Released!** Major modernization with ESM support, enhanced React Server Components, and streamlined configuration.
 
+- **⚡ Rspack Support**: New `--rspack` generator flag for ~20x faster builds! Use Rspack instead of Webpack for dramatically improved build performance. See [Rspack documentation](https://www.shakacode.com/react-on-rails/docs/api/generator-details#rspack-support) for details.
 - **ESM-only package**: Modern module system with better tree-shaking and performance
 - **React Server Components**: Improved rendering flow and new `RSCRoute` component for seamless SSR
 - **Performance improvements**: New async loading strategies and optimized bundle generation
@@ -111,8 +112,9 @@ To provide a high-performance framework for integrating Ruby on Rails with React
 
 | Feature                       | Benefit                                                                                                                                                                                      |
 | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ⚡ **Rspack Support**         | [~20x faster builds](./docs/api-reference/generator-details.md#rspack-support) with Rspack bundler - dramatically reduce build times in development and CI                                   |
 | 🎯 **Smart Bundle Loading**   | [Automated bundle optimization](./docs/guides/auto-bundling-file-system-based-automated-bundle-generation.md) based on components used - no more manual `javascript_pack_tags` configuration |
-| ⚡ **Server-Side Rendering**  | Enhanced React Server Components support for better SEO and UX performance                                                                                                                   |
+| 🌟 **Server-Side Rendering**  | Enhanced React Server Components support for better SEO and UX performance                                                                                                                   |
 | 🚀 **Advanced Loading**       | `sync`, `async`, and `defer` options for optimal performance based on your needs                                                                                                             |
 | 🔥 **Hot Module Replacement** | Instant feedback during development with tight [Shakapacker](https://github.com/shakacode/shakapacker) integration                                                                           |
 | 📦 **Easy Props Passing**     | Direct Rails → React data flow without separate API calls                                                                                                                                    |

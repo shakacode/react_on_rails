@@ -1,20 +1,26 @@
 <%= add_documentation_reference(config[:message], "// https://github.com/shakacode/react_on_rails_demo_ssr_hmr/blob/master/config/webpack/development.js") %>
 
-const { devServer, inliningCss } = require('shakapacker');
+const { devServer, inliningCss, config } = require('shakapacker');
 
 const generateWebpackConfigs = require('./generateWebpackConfigs');
 
 const developmentEnvOnly = (clientWebpackConfig, _serverWebpackConfig) => {
-  // React Refresh (Fast Refresh) setup - only when webpack-dev-server is running (HMR mode)
-  // This matches the condition in generateWebpackConfigs.js and babel.config.js
+  // React Refresh (Fast Refresh) setup - only when dev server is running (HMR mode)
   if (process.env.WEBPACK_SERVE) {
     // eslint-disable-next-line global-require
-    const ReactRefreshWebpackPlugin = require('@pmmmwh/react-refresh-webpack-plugin');
-    clientWebpackConfig.plugins.push(
-      new ReactRefreshWebpackPlugin({
-        // Use default overlay configuration for better compatibility
-      }),
-    );
+    if (config.assets_bundler === 'rspack') {
+      // Rspack uses @rspack/plugin-react-refresh for React Fast Refresh
+      const ReactRefreshPlugin = require('@rspack/plugin-react-refresh');
+      clientWebpackConfig.plugins.push(new ReactRefreshPlugin());
+    } else {
+      // Webpack uses @pmmmwh/react-refresh-webpack-plugin
+      const ReactRefreshWebpackPlugin = require('@pmmmwh/react-refresh-webpack-plugin');
+      clientWebpackConfig.plugins.push(
+        new ReactRefreshWebpackPlugin({
+          // Use default overlay configuration for better compatibility
+        }),
+      );
+    }
   }
 };
 

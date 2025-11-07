@@ -31,6 +31,9 @@ git add . && git commit -m "Add react_on_rails gem"
 
 # Run the installer
 bin/rails generate react_on_rails:install
+
+# Optional: Use Rspack for ~20x faster builds
+# bin/rails generate react_on_rails:install --rspack
 ```
 
 Take a look at the files created by the generator.
@@ -40,6 +43,10 @@ Take a look at the files created by the generator.
 - React component files in `client/`
 - A sample controller and view
 - Webpack configuration
+
+> 💡 **Performance Tip:** Add the `--rspack` flag for significantly faster builds (~20x improvement). You can also switch bundlers later with `bin/switch-bundler rspack`.
+>
+> **Note on `bin/switch-bundler`:** This utility safely switches between webpack and rspack by updating `shakapacker.yml` and managing dependencies. However, it does not modify custom webpack configuration code. If you have custom webpack plugins or loaders, you may need to update those manually to work with rspack. See [Rspack documentation](../api-reference/generator-details.md#rspack-support) for details on unified configuration patterns.
 
 ## 🎯 Step 2: Start the Development Server (1 minute)
 

@@ -1,0 +1,145 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "fileutils"
+require "yaml"
+require "json"
+
+# Script to switch between webpack and rspack bundlers
+class BundlerSwitcher
+  WEBPACK_DEPS = {
+    dependencies: %w[webpack webpack-assets-manifest webpack-merge],
+    dev_dependencies: %w[webpack-cli webpack-dev-server @pmmmwh/react-refresh-webpack-plugin]
+  }.freeze
+
+  RSPACK_DEPS = {
+    dependencies: %w[@rspack/core rspack-manifest-plugin],
+    dev_dependencies: %w[@rspack/cli @rspack/plugin-react-refresh]
+  }.freeze
+
+  def initialize(target_bundler)
+    @target_bundler = target_bundler.to_s.downcase
+    @shakapacker_config = "config/shakapacker.yml"
+    validate_bundler!
+  end
+
+  def switch!
+    puts "🔄 Switching to #{@target_bundler}..."
+
+    update_shakapacker_config
+    update_dependencies
+    install_dependencies
+
+    puts "✅ Successfully switched to #{@target_bundler}!"
+    puts "\nNext steps:"
+    puts "  1. Review your webpack configuration files in config/webpack/"
+    puts "  2. Restart your development server"
+  end
+
+  private
+
+  def validate_bundler!
+    return if %w[webpack rspack].include?(@target_bundler)
+
+    abort "❌ Invalid bundler: #{@target_bundler}. Use 'webpack' or 'rspack'"
+  end
+
+  def update_shakapacker_config
+    abort "❌ #{@shakapacker_config} not found" unless File.exist?(@shakapacker_config)
+
+    puts "📝 Updating #{@shakapacker_config}..."
+    config = YAML.load_file(@shakapacker_config)
+
+    config["default"] ||= {}
+    config["default"]["assets_bundler"] = @target_bundler
+
+    # Update webpack_loader based on bundler
+    # Rspack works best with SWC, webpack typically uses babel
+    config["default"]["webpack_loader"] = @target_bundler == "rspack" ? "swc" : "babel"
+
+    File.write(@shakapacker_config, YAML.dump(config))
+    puts "✅ Updated assets_bundler to '#{@target_bundler}'"
+  end
+
+  # rubocop:disable Metrics/CyclomaticComplexity
+  def update_dependencies
+    puts "📦 Updating package.json dependencies..."
+
+    package_json_path = "package.json"
+    unless File.exist?(package_json_path)
+      puts "⚠️  package.json not found, skipping dependency updates"
+      return
+    end
+
+    package_json = JSON.parse(File.read(package_json_path))
+
+    remove_deps = @target_bundler == "rspack" ? WEBPACK_DEPS : RSPACK_DEPS
+
+    # Remove old bundler dependencies
+    remove_deps[:dependencies].each do |dep|
+      package_json["dependencies"]&.delete(dep)
+    end
+    remove_deps[:dev_dependencies].each do |dep|
+      package_json["devDependencies"]&.delete(dep)
+    end
+
+    puts "✅ Removed #{@target_bundler == 'rspack' ? 'webpack' : 'rspack'} dependencies"
+    File.write(package_json_path, JSON.pretty_generate(package_json))
+  end
+  # rubocop:enable Metrics/CyclomaticComplexity
+
+  # rubocop:disable Metrics/CyclomaticComplexity
+  def install_dependencies
+    puts "📥 Installing #{@target_bundler} dependencies..."
+
+    deps = @target_bundler == "rspack" ? RSPACK_DEPS : WEBPACK_DEPS
+
+    # Detect package manager
+    package_manager = detect_package_manager
+
+    # Install dependencies using array form to prevent command injection
+    success = case package_manager
+              when "yarn"
+                system("yarn", "add", *deps[:dependencies])
+              when "pnpm"
+                system("pnpm", "add", *deps[:dependencies])
+              else
+                system("npm", "install", *deps[:dependencies])
+              end
+
+    abort("❌ Failed to install dependencies") unless success
+
+    # Install dev dependencies using array form to prevent command injection
+    success = case package_manager
+              when "yarn"
+                system("yarn", "add", "-D", *deps[:dev_dependencies])
+              when "pnpm"
+                system("pnpm", "add", "-D", *deps[:dev_dependencies])
+              else
+                system("npm", "install", "--save-dev", *deps[:dev_dependencies])
+              end
+
+    abort("❌ Failed to install dev dependencies") unless success
+
+    puts "✅ Installed #{@target_bundler} dependencies"
+  end
+  # rubocop:enable Metrics/CyclomaticComplexity
+
+  def detect_package_manager
+    return "yarn" if File.exist?("yarn.lock")
+    return "pnpm" if File.exist?("pnpm-lock.yaml")
+
+    "npm"
+  end
+end
+
+# Main execution
+if ARGV.empty?
+  puts "Usage: bin/switch-bundler [webpack|rspack]"
+  puts "\nExamples:"
+  puts "  bin/switch-bundler rspack   # Switch to Rspack"
+  puts "  bin/switch-bundler webpack  # Switch to Webpack"
+  exit 1
+end
+
+BundlerSwitcher.new(ARGV[0]).switch!

@@ -10,6 +10,8 @@ Usage:
 
 Options:
   -R, [--redux], [--no-redux]                      # Install Redux package and Redux version of Hello World Example. Default: false
+  -T, [--typescript], [--no-typescript]            # Generate TypeScript files and install TypeScript dependencies. Default: false
+      [--rspack], [--no-rspack]                    # Use Rspack instead of Webpack as the bundler. Default: false
       [--ignore-warnings], [--no-ignore-warnings]  # Skip warnings. Default: false
 
 Runtime options:
@@ -28,6 +30,18 @@ can pass the redux option if you'd like to have redux setup for you automaticall
     Passing the --redux generator option causes the generated Hello World example
     to integrate the Redux state container framework. The necessary node modules
     will be automatically included for you.
+
+* TypeScript
+
+    Passing the --typescript generator option generates TypeScript files (.tsx)
+    instead of JavaScript files (.jsx) and sets up TypeScript configuration.
+
+* Rspack
+
+    Passing the --rspack generator option uses Rspack instead of Webpack as the
+    bundler, providing significantly faster builds (~20x improvement with SWC).
+    Includes unified configuration that works with both bundlers and a
+    bin/switch-bundler utility to switch between bundlers post-installation.
 
 *******************************************************************************
 
@@ -105,6 +119,68 @@ rails generate react_on_rails:install --typescript
 ```
 
 This creates `.tsx` files instead of `.jsx` and adds TypeScript configuration.
+
+### Rspack Support
+
+The generator supports a `--rspack` option for using Rspack instead of Webpack as the bundler:
+
+```bash
+rails generate react_on_rails:install --rspack
+```
+
+**Benefits:**
+
+- **~20x faster builds** with SWC transpilation (build times of ~53-270ms vs typical webpack builds)
+- **Unified configuration** - same webpack config files work for both bundlers
+- **Easy switching** - includes `bin/switch-bundler` utility to switch between bundlers post-installation
+
+**What gets installed:**
+
+- Rspack core packages (`@rspack/core`, `@rspack/cli`)
+- Rspack-specific plugins (`@rspack/plugin-react-refresh`, `rspack-manifest-plugin`)
+- Shakapacker configured with `assets_bundler: 'rspack'` and `webpack_loader: 'swc'`
+
+**Switching bundlers after installation:**
+
+```bash
+# Switch to Rspack
+bin/switch-bundler rspack
+
+# Switch back to Webpack
+bin/switch-bundler webpack
+```
+
+The switch-bundler script automatically:
+
+- Updates shakapacker.yml configuration
+- Installs/removes appropriate dependencies
+- Works with npm, yarn, and pnpm
+
+**Limitations of `bin/switch-bundler`:**
+
+The switch-bundler utility handles the standard configuration and dependencies, but has some limitations:
+
+- **Custom webpack plugins**: Does not modify custom webpack plugins or loaders in your config files
+- **Manual updates needed**: If you have custom webpack configuration, you may need to update it to use unified patterns (see examples in [Webpack Configuration](../core-concepts/webpack-configuration.md#unified-configuration))
+- **Third-party dependencies**: Does not detect or update third-party webpack-specific packages you may have added
+- **YAML formatting**: Uses YAML.dump which may change formatting/whitespace (but preserves functionality)
+
+For apps with custom webpack configurations, review the generated config templates to understand the unified configuration patterns that work with both bundlers.
+
+**Combining with other options:**
+
+```bash
+# Rspack with TypeScript
+rails generate react_on_rails:install --rspack --typescript
+
+# Rspack with Redux
+rails generate react_on_rails:install --rspack --redux
+
+# All options combined
+rails generate react_on_rails:install --rspack --typescript --redux
+```
+
+For more details on Rspack configuration, see the [Webpack Configuration](../core-concepts/webpack-configuration.md#rspack-vs-webpack) docs.
 
 ### Auto-Bundling and Component Registration
 
