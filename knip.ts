@@ -10,6 +10,7 @@ const config: KnipConfig = {
       ignoreBinaries: [
         // Has to be installed globally
         'yalc',
+        'ruby',
         // Used in package.json scripts (devDependency, so unlisted in production mode)
         'nps',
         // Pro package binaries used in Pro workflows
@@ -17,7 +18,6 @@ const config: KnipConfig = {
         'e2e-test',
         // Local binaries
         'bin/.*',
-        'spec/performance/bench.sh',
       ],
       ignore: ['react_on_rails_pro/**'],
       ignoreDependencies: [
