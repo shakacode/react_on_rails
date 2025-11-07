@@ -40,7 +40,9 @@ jobs:
 
       - name: Generate React on Rails packs
         working-directory: spec/dummy
-        run: RAILS_ENV=test bundle exec rake react_on_rails:generate_packs
+        env:
+          RAILS_ENV: test
+        run: bundle exec rake react_on_rails:generate_packs
 
       - name: Build test assets
         working-directory: spec/dummy
