@@ -9,10 +9,10 @@ This directory contains end-to-end tests using Playwright integrated with Rails 
 yarn playwright install --with-deps
 
 # Run all tests
-yarn playwright test
+yarn test:e2e
 
 # Run in UI mode for debugging
-yarn playwright test --ui
+yarn test:e2e:ui
 ```
 
 ## Features
@@ -153,37 +153,37 @@ await app('my_command', { some: 'options' });
 
 ```bash
 # All tests
-yarn playwright test
+yarn test:e2e
 
 # Specific file
-yarn playwright test e2e/playwright/e2e/react_on_rails/basic_components.spec.js
+yarn test:e2e e2e/playwright/e2e/react_on_rails/basic_components.spec.js
 
 # UI mode (interactive)
-yarn playwright test --ui
+yarn test:e2e:ui
 
 # Headed mode (visible browser)
-yarn playwright test --headed
+yarn test:e2e:headed
 
 # Debug mode
-yarn playwright test --debug
+yarn test:e2e:debug
 
 # Specific browser
-yarn playwright test --project=chromium
-yarn playwright test --project=firefox
-yarn playwright test --project=webkit
+yarn test:e2e --project=chromium
+yarn test:e2e --project=firefox
+yarn test:e2e --project=webkit
 
 # View last run report
-yarn playwright show-report
+yarn test:e2e:report
 ```
 
 ## Debugging
 
-1. **UI Mode**: `yarn playwright test --ui` - Best for interactive debugging
-2. **Headed Mode**: `yarn playwright test --headed` - See browser actions
+1. **UI Mode**: `yarn test:e2e:ui` - Best for interactive debugging
+2. **Headed Mode**: `yarn test:e2e:headed` - See browser actions
 3. **Pause Execution**: Add `await page.pause()` in your test
 4. **Console Logging**: Check browser console in headed mode
 5. **Screenshots**: Automatically taken on failure
-6. **Test Reports**: Check `playwright-report/` after test run
+6. **Test Reports**: Check `e2e/playwright-report/` after test run
 
 ## Best Practices
 
