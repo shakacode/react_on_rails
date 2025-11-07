@@ -5653,14 +5653,15 @@ sha.js@^2.4.0, sha.js@^2.4.8:
     inherits "^2.0.1"
     safe-buffer "^5.0.1"
 
-shakapacker@9.2.0:
-  version "9.2.0"
-  resolved "https://registry.npmjs.org/shakapacker/-/shakapacker-9.2.0.tgz#130bbeef9e72f2bd7f8ce5b1316ca3c778201e97"
-  integrity sha512-eEjps0qlufHAFOYY1fixZaXkIXLOE+FgQdjwKHhARryHfv4KxYIZiSQTFU4I6BOEXaK32zkTfEXOdU46YQv2pg==
+shakapacker@9.3.0:
+  version "9.3.0"
+  resolved "https://registry.npmjs.org/shakapacker/-/shakapacker-9.3.0.tgz#a73f1d17aebf85768da522ec2552d5f2867f8481"
+  integrity sha512-q3gug4dZhJRLe8LHQOwG5jx7Jik0T+ZcMxEhiTyEAuIN8cIt4eek6gCn4OQdIqhdZXAiUBCUpfIHdWt9yUO9/g==
   dependencies:
     js-yaml "^4.1.0"
     path-complete-extname "^1.0.0"
     webpack-merge "^5.8.0"
+    yargs "^17.7.2"
 
 shallow-clone@^3.0.0:
   version "3.0.1"
@@ -6468,7 +6469,7 @@ yargs-parser@^21.1.1:
   resolved "https://registry.yarnpkg.com/yargs-parser/-/yargs-parser-21.1.1.tgz#9096bceebf990d21bb31fa9516e0ede294a77d35"
   integrity sha512-tVpsJW7DdjecAiFpbIB1e3qxIQsE6NoPc5/eTdrbbIC4h0LVsWhnoa3g+m2HclBIujHzsxZ4VJVA+GUuc2/LBw==
 
-yargs@^17.3.1:
+yargs@^17.3.1, yargs@^17.7.2:
   version "17.7.2"
   resolved "https://registry.yarnpkg.com/yargs/-/yargs-17.7.2.tgz#991df39aca675a192b816e1e0363f9d75d2aa269"
   integrity sha512-7dSzzRQ++CKnNI/krKnYRV7JKKPUXMEh61soaHKg9mrWEhzFWhFnxPxGl+69cD1Ou63C13NUPCnmIcrvqCuM6w==
