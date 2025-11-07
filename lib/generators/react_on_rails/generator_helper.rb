@@ -26,9 +26,9 @@ module GeneratorHelper
 
     begin
       if dev
-        pj.manager.add(packages, type: :dev)
+        pj.manager.add(packages, type: :dev, exact: true)
       else
-        pj.manager.add(packages)
+        pj.manager.add(packages, exact: true)
       end
       true
     rescue StandardError => e
