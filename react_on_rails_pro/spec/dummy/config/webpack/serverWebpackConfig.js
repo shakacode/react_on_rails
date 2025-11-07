@@ -123,13 +123,15 @@ const configureServer = (rscBundle = false) => {
 
   serverWebpackConfig.node = false;
 
-  // React 19 Fix: Explicitly set conditionNames to prevent resolving to react-server build
-  // The server bundle should use the regular React build, not the react-server build
-  // Only the RSC bundle should use react-server condition
+  // React 19 Fix: Prevent webpack from resolving to react-server condition
+  // The server-bundle needs the full React with hooks for SSR, not the react-server build
+  // Explicitly set conditionNames without react-server
   if (!serverWebpackConfig.resolve) {
     serverWebpackConfig.resolve = {};
   }
-  serverWebpackConfig.resolve.conditionNames = ['node', 'require', 'import', '...'];
+  // For target: 'node', webpack defaults to ['node', 'import', 'require', 'default']
+  // We explicitly list them to ensure react-server is not included
+  serverWebpackConfig.resolve.conditionNames = ['node', 'import', 'require', 'default'];
 
   return serverWebpackConfig;
 };
