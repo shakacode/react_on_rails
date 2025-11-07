@@ -197,6 +197,6 @@ If you encounter issues:
 
 ## Related Documentation
 
-- [Auto-Bundling Guide](https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation/)
-- [Server Rendering](https://www.shakacode.com/react-on-rails/docs/guides/server-rendering/)
-- [Component Registration](https://www.shakacode.com/react-on-rails/docs/guides/component-registration/)
+- [Auto-Bundling Guide](../core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md)
+- [Server Rendering](../core-concepts/react-server-rendering.md)
+- [JavaScript API (Component Registration)](../api-reference/javascript-api.md)
