@@ -38,6 +38,14 @@ jobs:
         working-directory: spec/dummy
         run: yarn playwright install --with-deps
 
+      - name: Generate React on Rails packs
+        working-directory: spec/dummy
+        run: RAILS_ENV=test bundle exec rake react_on_rails:generate_packs
+
+      - name: Build test assets
+        working-directory: spec/dummy
+        run: yarn build:test
+
       - name: Run Playwright tests
         working-directory: spec/dummy
         run: yarn test:e2e
