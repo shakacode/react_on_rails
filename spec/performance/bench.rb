@@ -24,14 +24,6 @@ REQUEST_TIMEOUT = ENV.fetch("REQUEST_TIMEOUT", "60s")
 TOOLS = ENV.fetch("TOOLS", "fortio,vegeta,k6").split(",")
 
 OUTDIR = "bench_results"
-FORTIO_JSON = "#{OUTDIR}/fortio.json".freeze
-FORTIO_TXT = "#{OUTDIR}/fortio.txt".freeze
-VEGETA_BIN = "#{OUTDIR}/vegeta.bin".freeze
-VEGETA_JSON = "#{OUTDIR}/vegeta.json".freeze
-VEGETA_TXT = "#{OUTDIR}/vegeta.txt".freeze
-K6_TEST_JS = "#{OUTDIR}/k6_test.js".freeze
-K6_SUMMARY_JSON = "#{OUTDIR}/k6_summary.json".freeze
-K6_TXT = "#{OUTDIR}/k6.txt".freeze
 SUMMARY_TXT = "#{OUTDIR}/summary.txt".freeze
 
 # Validate input parameters
@@ -72,11 +64,6 @@ validate_duration(DURATION, "DURATION")
 validate_duration(REQUEST_TIMEOUT, "REQUEST_TIMEOUT")
 
 raise "MAX_CONNECTIONS (#{MAX_CONNECTIONS}) must be >= CONNECTIONS (#{CONNECTIONS})" if MAX_CONNECTIONS < CONNECTIONS
-
-# Precompute checks for each tool
-run_fortio = TOOLS.include?("fortio")
-run_vegeta = TOOLS.include?("vegeta")
-run_k6 = TOOLS.include?("k6")
 
 # Check required tools are installed
 required_tools = TOOLS + %w[column tee]
@@ -126,103 +113,43 @@ puts "Warm-up complete"
 
 FileUtils.mkdir_p(OUTDIR)
 
-# Configure tool-specific arguments
-if RATE == "max"
-  if CONNECTIONS != MAX_CONNECTIONS
-    raise "For RATE=max, CONNECTIONS must be equal to MAX_CONNECTIONS (got #{CONNECTIONS} and #{MAX_CONNECTIONS})"
-  end
-
-  fortio_args = ["-qps", 0, "-c", CONNECTIONS]
-  vegeta_args = ["-rate=infinity", "--workers=#{CONNECTIONS}", "--max-workers=#{CONNECTIONS}"]
-  k6_scenarios = <<~JS.strip
-    {
-      max_rate: {
-        executor: 'constant-vus',
-        vus: #{CONNECTIONS},
-        duration: '#{DURATION}'
-      }
-    }
-  JS
-else
-  fortio_args = ["-qps", RATE, "-uniform", "-nocatchup", "-c", CONNECTIONS]
-  vegeta_args = ["-rate=#{RATE}", "--workers=#{CONNECTIONS}", "--max-workers=#{MAX_CONNECTIONS}"]
-  k6_scenarios = <<~JS.strip
-    {
-      constant_rate: {
-        executor: 'constant-arrival-rate',
-        rate: #{RATE},
-        timeUnit: '1s',
-        duration: '#{DURATION}',
-        preAllocatedVUs: #{CONNECTIONS},
-        maxVUs: #{MAX_CONNECTIONS}
-      }
-    }
-  JS
+# Validate RATE=max constraint
+is_max_rate = RATE == "max"
+if is_max_rate && CONNECTIONS != MAX_CONNECTIONS
+  raise "For RATE=max, CONNECTIONS must be equal to MAX_CONNECTIONS (got #{CONNECTIONS} and #{MAX_CONNECTIONS})"
 end
-
-# Run Fortio
-if run_fortio
-  puts "===> Fortio"
-  # TODO: https://github.com/fortio/fortio/wiki/FAQ#i-want-to-get-the-best-results-what-flags-should-i-pass
-  fortio_cmd = [
-    "fortio", "load",
-    *fortio_args,
-    "-t", DURATION,
-    "-timeout", REQUEST_TIMEOUT,
-    "-json", FORTIO_JSON,
-    TARGET
-  ].join(" ")
-  raise "Fortio benchmark failed" unless system("#{fortio_cmd} | tee #{FORTIO_TXT}")
-end
-
-# Run Vegeta
-if run_vegeta
-  puts "\n===> Vegeta"
-  vegeta_cmd = [
-    "echo", "'GET #{TARGET}'", "|",
-    "vegeta", "attack",
-    *vegeta_args,
-    "-duration=#{DURATION}",
-    "-timeout=#{REQUEST_TIMEOUT}"
-  ].join(" ")
-  raise "Vegeta attack failed" unless system("#{vegeta_cmd} | tee #{VEGETA_BIN} | vegeta report | tee #{VEGETA_TXT}")
-  raise "Vegeta report generation failed" unless system("vegeta report -type=json #{VEGETA_BIN} > #{VEGETA_JSON}")
-end
-
-# Run k6
-if run_k6
-  puts "\n===> k6"
-  k6_script = <<~JS
-    import http from 'k6/http';
-    import { check } from 'k6';
-
-    export const options = {
-      scenarios: #{k6_scenarios},
-    };
-
-    export default function () {
-      const response = http.get('#{TARGET}', { timeout: '#{REQUEST_TIMEOUT}' });
-      check(response, {
-        'status=200': r => r.status === 200,
-        // you can add more if needed:
-        // 'status=500': r => r.status === 500,
-      });
-    }
-  JS
-  File.write(K6_TEST_JS, k6_script)
-  k6_command = "k6 run --summary-export=#{K6_SUMMARY_JSON} --summary-trend-stats 'min,avg,med,max,p(90),p(99)'"
-  raise "k6 benchmark failed" unless system("#{k6_command} #{K6_TEST_JS} | tee #{K6_TXT}")
-end
-
-puts "\n===> Parsing results and generating summary"
 
 # Initialize summary file
 File.write(SUMMARY_TXT, "Tool\tRPS\tp50(ms)\tp90(ms)\tp99(ms)\tStatus\n")
 
-# Parse Fortio results
-if run_fortio
+# Fortio
+if TOOLS.include?("fortio")
   begin
-    fortio_data = parse_json_file(FORTIO_JSON, "Fortio")
+    puts "===> Fortio"
+
+    fortio_json = "#{OUTDIR}/fortio.json"
+    fortio_txt = "#{OUTDIR}/fortio.txt"
+
+    # Configure Fortio arguments
+    # See https://github.com/fortio/fortio/wiki/FAQ#i-want-to-get-the-best-results-what-flags-should-i-pass
+    fortio_args =
+      if is_max_rate
+        ["-qps", 0, "-c", CONNECTIONS]
+      else
+        ["-qps", RATE, "-uniform", "-nocatchup", "-c", CONNECTIONS]
+      end
+
+    fortio_cmd = [
+      "fortio", "load",
+      *fortio_args,
+      "-t", DURATION,
+      "-timeout", REQUEST_TIMEOUT,
+      "-json", fortio_json,
+      TARGET
+    ].join(" ")
+    raise "Fortio benchmark failed" unless system("#{fortio_cmd} | tee #{fortio_txt}")
+
+    fortio_data = parse_json_file(fortio_json, "Fortio")
     fortio_rps = fortio_data["ActualQPS"]&.round(2) || "missing"
 
     percentiles = fortio_data.dig("DurationHistogram", "Percentiles") || []
@@ -247,10 +174,34 @@ if run_fortio
   end
 end
 
-# Parse Vegeta results
-if run_vegeta
+# Vegeta
+if TOOLS.include?("vegeta")
   begin
-    vegeta_data = parse_json_file(VEGETA_JSON, "Vegeta")
+    puts "\n===> Vegeta"
+
+    vegeta_bin = "#{OUTDIR}/vegeta.bin"
+    vegeta_json = "#{OUTDIR}/vegeta.json"
+    vegeta_txt = "#{OUTDIR}/vegeta.txt"
+
+    # Configure Vegeta arguments
+    vegeta_args =
+      if is_max_rate
+        ["-rate=infinity", "--workers=#{CONNECTIONS}", "--max-workers=#{CONNECTIONS}"]
+      else
+        ["-rate=#{RATE}", "--workers=#{CONNECTIONS}", "--max-workers=#{MAX_CONNECTIONS}"]
+      end
+
+    vegeta_cmd = [
+      "echo 'GET #{TARGET}' |",
+      "vegeta", "attack",
+      *vegeta_args,
+      "-duration=#{DURATION}",
+      "-timeout=#{REQUEST_TIMEOUT}"
+    ].join(" ")
+    raise "Vegeta attack failed" unless system("#{vegeta_cmd} | tee #{vegeta_bin} | vegeta report | tee #{vegeta_txt}")
+    raise "Vegeta report generation failed" unless system("vegeta report -type=json #{vegeta_bin} > #{vegeta_json}")
+
+    vegeta_data = parse_json_file(vegeta_json, "Vegeta")
     # .throughput is successful_reqs/total_period, .rate is all_requests/attack_period
     vegeta_rps = vegeta_data["throughput"]&.round(2) || "missing"
     vegeta_p50 = vegeta_data.dig("latencies", "50th")&./(1_000_000.0)&.round(2) || "missing"
@@ -271,10 +222,64 @@ if run_vegeta
   end
 end
 
-# Parse k6 results
-if run_k6
+# k6
+if TOOLS.include?("k6")
   begin
-    k6_data = parse_json_file(K6_SUMMARY_JSON, "k6")
+    puts "\n===> k6"
+
+    k6_script_file = "#{OUTDIR}/k6_test.js"
+    k6_summary_json = "#{OUTDIR}/k6_summary.json"
+    k6_txt = "#{OUTDIR}/k6.txt"
+
+    # Configure k6 scenarios
+    k6_scenarios =
+      if is_max_rate
+        <<~JS.strip
+          {
+            max_rate: {
+              executor: 'constant-vus',
+              vus: #{CONNECTIONS},
+              duration: '#{DURATION}'
+            }
+          }
+        JS
+      else
+        <<~JS.strip
+          {
+            constant_rate: {
+              executor: 'constant-arrival-rate',
+              rate: #{RATE},
+              timeUnit: '1s',
+              duration: '#{DURATION}',
+              preAllocatedVUs: #{CONNECTIONS},
+              maxVUs: #{MAX_CONNECTIONS}
+            }
+          }
+        JS
+      end
+
+    k6_script = <<~JS
+      import http from 'k6/http';
+      import { check } from 'k6';
+
+      export const options = {
+        scenarios: #{k6_scenarios},
+      };
+
+      export default function () {
+        const response = http.get('#{TARGET}', { timeout: '#{REQUEST_TIMEOUT}' });
+        check(response, {
+          'status=200': r => r.status === 200,
+          // you can add more if needed:
+          // 'status=500': r => r.status === 500,
+        });
+      }
+    JS
+    File.write(k6_script_file, k6_script)
+    k6_command = "k6 run --summary-export=#{k6_summary_json} --summary-trend-stats 'min,avg,med,max,p(90),p(99)'"
+    raise "k6 benchmark failed" unless system("#{k6_command} #{k6_script_file} | tee #{k6_txt}")
+
+    k6_data = parse_json_file(k6_summary_json, "k6")
     k6_rps = k6_data.dig("metrics", "iterations", "rate")&.round(2) || "missing"
     k6_p50 = k6_data.dig("metrics", "http_req_duration", "med")&.round(2) || "missing"
     k6_p90 = k6_data.dig("metrics", "http_req_duration", "p(90)")&.round(2) || "missing"
