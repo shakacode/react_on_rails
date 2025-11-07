@@ -1,0 +1,46 @@
+name: Playwright E2E Tests
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  playwright:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: spec/dummy
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+          working-directory: spec/dummy
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'yarn'
+          cache-dependency-path: spec/dummy/yarn.lock
+
+      - name: Install dependencies
+        run: |
+          bundle install
+          yarn install
+
+      - name: Install Playwright browsers
+        run: yarn playwright install --with-deps
+
+      - name: Run Playwright tests
+        run: yarn playwright test
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: spec/dummy/playwright-report/
+          retention-days: 30

@@ -249,23 +249,28 @@ yarn playwright install --with-deps
 
 ### Running Playwright Tests
 
+**Note:** Playwright will automatically start the Rails server on port 5017 before running tests. You don't need to manually start the server.
+
 ```bash
 cd spec/dummy
 
-# Run all tests
-yarn playwright test
+# Run all tests (Rails server auto-starts)
+yarn test:e2e
 
 # Run tests in UI mode (interactive debugging)
-yarn playwright test --ui
+yarn test:e2e:ui
 
 # Run tests with visible browser
-yarn playwright test --headed
+yarn test:e2e:headed
 
 # Debug a specific test
-yarn playwright test --debug
+yarn test:e2e:debug
+
+# View test report
+yarn test:e2e:report
 
 # Run specific test file
-yarn playwright test e2e/playwright/e2e/react_on_rails/basic_components.spec.js
+yarn test:e2e e2e/playwright/e2e/react_on_rails/basic_components.spec.js
 ```
 
 ### Writing Tests
@@ -358,10 +363,18 @@ spec/dummy/e2e/
 
 ### Debugging
 
-- Run in UI mode: `yarn playwright test --ui`
+- Run in UI mode: `yarn test:e2e:ui`
 - Use `page.pause()` to pause execution
 - Check `playwright-report/` for detailed results after test failures
 - Enable debug logging in `playwright.config.js`
+
+### CI Integration
+
+Playwright E2E tests run automatically in CI via GitHub Actions (`.github/workflows/playwright.yml`). The workflow:
+- Runs on all PRs and pushes to master
+- Uses GitHub Actions annotations for test failures
+- Uploads HTML reports as artifacts (available for 30 days)
+- Auto-starts Rails server before running tests
 
 ## IDE Configuration
 
