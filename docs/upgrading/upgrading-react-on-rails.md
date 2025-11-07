@@ -21,6 +21,16 @@ rails generate react_on_rails:install
 - `shakapacker.yml` settings
 - other configuration files
 
+## Upgrading to React 19
+
+If you're upgrading to React 19, please see the comprehensive [React 19 Upgrade Guide](./react-19-upgrade-guide.md).
+
+**Key Changes in React 19:**
+
+- Conditional package exports affect module resolution
+- TypeScript import patterns may need updates
+- React Server Components require named imports
+
 ## Upgrading to v16
 
 ### Breaking Changes
