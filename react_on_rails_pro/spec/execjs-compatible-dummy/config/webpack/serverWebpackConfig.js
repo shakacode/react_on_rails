@@ -48,9 +48,10 @@ const configureServer = () => {
   serverWebpackConfig.output = {
     filename: 'server-bundle.js',
     globalObject: 'this',
+    // Note: libraryTarget should only be 'commonjs2' when using Node renderer
+    // For ExecJS (default), leave it undefined to allow proper evaluation
     // If using the React on Rails Pro node server renderer, uncomment the next line
-    // React 19 requires commonjs2 for proper Node.js module resolution
-    libraryTarget: 'commonjs2',
+    // libraryTarget: 'commonjs2',
     path: config.outputPath,
     publicPath: config.publicPath,
     // https://webpack.js.org/configuration/output/#outputglobalobject
