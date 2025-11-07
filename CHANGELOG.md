@@ -51,6 +51,8 @@ Changes since the last non-beta release.
 
 #### Bug Fixes
 
+- **React 19 Compatibility**: Fixed compatibility with React 19 by ensuring Pro package (RSCProvider, RSCRoute) uses named imports from React instead of namespace imports. This prevents build errors when esModuleInterop is disabled in TypeScript configuration. [PR 1937](https://github.com/shakacode/react_on_rails/pull/1937) by [justin808](https://github.com/justin808).
+
 - **Use as Git dependency**: All packages can now be installed as Git dependencies. This is useful for development and testing purposes. See [CONTRIBUTING.md](./CONTRIBUTING.md#git-dependencies) for documentation. [PR #1873](https://github.com/shakacode/react_on_rails/pull/1873) by [alexeyr-ci2](https://github.com/alexeyr-ci2).
 
 #### Breaking Changes
