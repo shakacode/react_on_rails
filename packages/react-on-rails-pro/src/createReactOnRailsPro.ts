@@ -145,11 +145,13 @@ export default function createReactOnRailsPro(
 
   if (reactOnRailsPro.streamServerRenderedReactComponent) {
     reactOnRailsProSpecificFunctions.streamServerRenderedReactComponent =
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       reactOnRailsPro.streamServerRenderedReactComponent;
   }
 
   if (reactOnRailsPro.serverRenderRSCReactComponent) {
     reactOnRailsProSpecificFunctions.serverRenderRSCReactComponent =
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       reactOnRailsPro.serverRenderRSCReactComponent;
   }
 
