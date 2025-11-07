@@ -8,9 +8,6 @@ on:
 jobs:
   playwright:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: spec/dummy
 
     steps:
       - uses: actions/checkout@v4
@@ -19,23 +16,27 @@ jobs:
         with:
           ruby-version: '3.3'
           bundler-cache: true
-          working-directory: spec/dummy
 
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'yarn'
-          cache-dependency-path: spec/dummy/yarn.lock
 
-      - name: Install dependencies
+      - name: Install root dependencies
+        run: yarn install
+
+      - name: Install dummy app dependencies
+        working-directory: spec/dummy
         run: |
           bundle install
           yarn install
 
       - name: Install Playwright browsers
+        working-directory: spec/dummy
         run: yarn playwright install --with-deps
 
       - name: Run Playwright tests
+        working-directory: spec/dummy
         run: yarn playwright test
 
       - uses: actions/upload-artifact@v4
