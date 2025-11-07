@@ -14,8 +14,7 @@
 
 'use client';
 
-import * as React from 'react';
-import { type ReactNode } from 'react';
+import { createContext, useContext, type ReactNode } from 'react';
 import type { ClientGetReactServerComponentProps } from './getReactServerComponent.client.ts';
 import { createRSCPayloadKey } from './utils.ts';
 
@@ -25,7 +24,7 @@ type RSCContextType = {
   refetchComponent: (componentName: string, componentProps: unknown) => Promise<ReactNode>;
 };
 
-const RSCContext = React.createContext<RSCContextType | undefined>(undefined);
+const RSCContext = createContext<RSCContextType | undefined>(undefined);
 
 /**
  * Creates a provider context for React Server Components.
@@ -102,7 +101,7 @@ export const createRSCProvider = ({
  * ```
  */
 export const useRSC = () => {
-  const context = React.useContext(RSCContext);
+  const context = useContext(RSCContext);
   if (!context) {
     throw new Error('useRSC must be used within a RSCProvider');
   }
