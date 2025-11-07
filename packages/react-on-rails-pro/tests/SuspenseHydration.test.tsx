@@ -128,12 +128,11 @@ async function renderAndHydrate() {
   };
 
   const writeSecondChunk = async () => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     let { done, value } = await reader.read();
     let decoded = '';
     while (!done) {
       decoded += new TextDecoder().decode(value as Buffer);
-      // eslint-disable-next-line no-await-in-loop, @typescript-eslint/no-unsafe-assignment
+      // eslint-disable-next-line no-await-in-loop
       ({ done, value } = await reader.read());
     }
 
