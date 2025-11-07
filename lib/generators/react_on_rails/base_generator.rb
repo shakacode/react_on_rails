@@ -412,8 +412,13 @@ module ReactOnRails
         puts Rainbow("🔧 Configuring Shakapacker for Rspack...").yellow
 
         # Parse YAML config properly to avoid fragile regex manipulation
-        config = YAML.load_file(shakapacker_config_path, aliases: true)
-
+        # Support both old and new Psych versions
+        config = begin
+          YAML.load_file(shakapacker_config_path, aliases: true)
+        rescue ArgumentError
+          # Older Psych versions don't support the aliases parameter
+          YAML.load_file(shakapacker_config_path)
+        end
         # Update default section
         config["default"] ||= {}
         config["default"]["assets_bundler"] = "rspack"
