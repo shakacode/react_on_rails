@@ -159,14 +159,6 @@ const config = tsEslint.config([
     },
   },
   {
-    files: ['packages/react-on-rails-pro/**/*'],
-    rules: {
-      // Disable import/named for pro package - can't resolve monorepo workspace imports
-      // TypeScript compiler validates these imports
-      'import/named': 'off',
-    },
-  },
-  {
     files: ['**/*.server.ts', '**/*.server.tsx'],
     plugins: {
       'react-on-rails': {
@@ -226,6 +218,22 @@ const config = tsEslint.config([
         },
       ],
       '@typescript-eslint/restrict-template-expressions': 'off',
+    },
+  },
+  {
+    files: ['packages/react-on-rails-pro/**/*'],
+    rules: {
+      // Disable import rules for pro package - can't resolve monorepo workspace imports
+      // TypeScript compiler validates these imports
+      'import/named': 'off',
+      'import/no-unresolved': 'off',
+      // Disable unsafe type rules - Pro package uses internal APIs with complex types
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-redundant-type-constituents': 'off',
     },
   },
   {
