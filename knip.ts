@@ -15,7 +15,6 @@ const config: KnipConfig = {
         'e2e-test',
         // Local binaries
         'bin/.*',
-        'spec/performance/bench.sh',
       ],
       ignore: ['react_on_rails_pro/**', 'react_on_rails/vendor/**'],
       ignoreDependencies: [
