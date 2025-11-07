@@ -31,6 +31,8 @@ Changes since the last non-beta release.
 
 - **Improved Error Messages**: Error messages for version mismatches and package configuration issues now include package-manager-specific installation commands (npm, yarn, pnpm, bun). [PR #1881](https://github.com/shakacode/react_on_rails/pull/1881) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
+- **Smart Error Messages with Actionable Solutions**: Added intelligent Ruby-side error handling with context-aware, actionable solutions for common issues. Features include fuzzy matching for component name typos, environment-specific debugging suggestions, color-coded error formatting, and detailed troubleshooting guides for component registration, auto-bundling, hydration mismatches, server rendering errors, and Redux store issues. See the [Improved Error Messages guide](docs/guides/improved-error-messages.md) for details. [PR 1934](https://github.com/shakacode/react_on_rails/pull/1934) by [justin808](https://github.com/justin808).
+
 - **Improved RSC Payload Error Handling**: Errors that happen during generation of RSC payload are transferred properly to rails side and logs the error message and stack. [PR #1888](https://github.com/shakacode/react_on_rails/pull/1888) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 #### Changed

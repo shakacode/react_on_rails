@@ -151,9 +151,13 @@ module ReactOnRails
       end
 
       it "includes colored output markers" do
+        # Enable Rainbow coloring for this test
+        Rainbow.enabled = true
         message = error.message
         # Rainbow adds ANSI color codes
         expect(message).to match(/\e\[/) # ANSI escape sequence
+      ensure
+        Rainbow.enabled = false
       end
     end
 

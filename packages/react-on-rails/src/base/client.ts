@@ -186,7 +186,7 @@ Fix: Use only react-on-rails OR react-on-rails-pro, not both.`);
     register(components: Record<string, ReactComponentOrRenderFunction>): void {
       if (this.options.debugMode || this.options.logComponentRegistration) {
         // Use performance.now() if available, otherwise fallback to Date.now()
-        const perf = typeof performance !== 'undefined' ? performance : { now: Date.now };
+        const perf = typeof performance !== 'undefined' ? performance : { now: () => Date.now() };
         const startTime = perf.now();
         const componentNames = Object.keys(components);
         console.log(
@@ -205,7 +205,7 @@ Fix: Use only react-on-rails OR react-on-rails-pro, not both.`);
           componentNames.forEach((name) => {
             const component = components[name];
             const size = component.toString().length;
-            console.log(`[ReactOnRails] ✅ Registered: ${name} (~${(size / 1024).toFixed(1)}kb)`);
+            console.log(`[ReactOnRails] ✅ Registered: ${name} (~${(size / 1024).toFixed(1)} chars)`);
           });
         }
       } else {
