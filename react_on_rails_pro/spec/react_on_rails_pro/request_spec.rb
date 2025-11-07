@@ -245,25 +245,9 @@ describe ReactOnRailsPro::Request do
             # This simulates a connection error after partial data is sent
             mock_streaming_response(render_full_url, 200) do |yielder|
               yielder.call("#{original_chunks[0]}\n")
-              # Simulate connection error mid-stream by creating a mock error response
-              # Create a minimal mock request object that satisfies the ErrorResponse constructor
-              mock_options = instance_double(
-                HTTPX::Options,
-                timeout: {},
-                debug_level: 0,
-                debug: false
-              )
-              mock_request = instance_double(
-                HTTPX::Request,
-                uri: URI(render_full_url),
-                response: nil,
-                options: mock_options
-              )
-              error_response = HTTPX::ErrorResponse.new(
-                mock_request,
-                StandardError.new("Connection closed")
-              )
-              raise HTTPX::HTTPError, error_response
+              # Simulate connection error mid-stream
+              # StreamRequest catches any error and retries, so we can use a simple error
+              raise IOError, "Connection closed"
             end
           else
             # Second attempt: complete all chunks successfully
