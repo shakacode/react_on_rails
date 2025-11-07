@@ -57,6 +57,16 @@ rescue StandardError => e
   raise "Failed to read #{tool_name} results: #{e.message}"
 end
 
+def failure_metrics(error)
+  ["FAILED", "FAILED", "FAILED", "FAILED", error.message]
+end
+
+def add_summary_line(*parts)
+  File.open(SUMMARY_TXT, "a") do |f|
+    f.puts parts.join("\t")
+  end
+end
+
 validate_rate(RATE)
 validate_positive_integer(CONNECTIONS, "CONNECTIONS")
 validate_positive_integer(MAX_CONNECTIONS, "MAX_CONNECTIONS")
@@ -120,11 +130,12 @@ if is_max_rate && CONNECTIONS != MAX_CONNECTIONS
 end
 
 # Initialize summary file
-File.write(SUMMARY_TXT, "Tool\tRPS\tp50(ms)\tp90(ms)\tp99(ms)\tStatus\n")
+File.write(SUMMARY_TXT, "")
+add_summary_line("Tool", "RPS", "p50(ms)", "p90(ms)", "p99(ms)", "Status")
 
 # Fortio
 if TOOLS.include?("fortio")
-  begin
+  fortio_metrics = begin
     puts "===> Fortio"
 
     fortio_json = "#{OUTDIR}/fortio.json"
@@ -162,21 +173,20 @@ if TOOLS.include?("fortio")
     fortio_p50 = (p50_data["Value"] * 1000).round(2)
     fortio_p90 = (p90_data["Value"] * 1000).round(2)
     fortio_p99 = (p99_data["Value"] * 1000).round(2)
-    fortio_status = fortio_data["RetCodes"]&.map { |k, v| "#{k}=#{v}" }&.join(",") || "unknown"
-    File.open(SUMMARY_TXT, "a") do |f|
-      f.puts "Fortio\t#{fortio_rps}\t#{fortio_p50}\t#{fortio_p90}\t#{fortio_p99}\t#{fortio_status}"
-    end
+    fortio_status = fortio_data["RetCodes"]&.map { |k, v| "#{k}=#{v}" }&.join(",") || "missing"
+
+    [fortio_rps, fortio_p50, fortio_p90, fortio_p99, fortio_status]
   rescue StandardError => e
     puts "Error: #{e.message}"
-    File.open(SUMMARY_TXT, "a") do |f|
-      f.puts "Fortio\tFAILED\tFAILED\tFAILED\tFAILED\t#{e.message}"
-    end
+    failure_metrics(e)
   end
+
+  add_summary_line("Fortio", *fortio_metrics)
 end
 
 # Vegeta
 if TOOLS.include?("vegeta")
-  begin
+  vegeta_metrics = begin
     puts "\n===> Vegeta"
 
     vegeta_bin = "#{OUTDIR}/vegeta.bin"
@@ -207,24 +217,20 @@ if TOOLS.include?("vegeta")
     vegeta_p50 = vegeta_data.dig("latencies", "50th")&./(1_000_000.0)&.round(2) || "missing"
     vegeta_p90 = vegeta_data.dig("latencies", "90th")&./(1_000_000.0)&.round(2) || "missing"
     vegeta_p99 = vegeta_data.dig("latencies", "99th")&./(1_000_000.0)&.round(2) || "missing"
-    vegeta_status = vegeta_data["status_codes"]&.map { |k, v| "#{k}=#{v}" }&.join(",") || "unknown"
-    vegeta_line = [
-      "Vegeta", vegeta_rps, vegeta_p50, vegeta_p90, vegeta_p99, vegeta_status
-    ].join("\t")
-    File.open(SUMMARY_TXT, "a") do |f|
-      f.puts vegeta_line
-    end
+    vegeta_status = vegeta_data["status_codes"]&.map { |k, v| "#{k}=#{v}" }&.join(",") || "missing"
+
+    [vegeta_rps, vegeta_p50, vegeta_p90, vegeta_p99, vegeta_status]
   rescue StandardError => e
     puts "Error: #{e.message}"
-    File.open(SUMMARY_TXT, "a") do |f|
-      f.puts "Vegeta\tFAILED\tFAILED\tFAILED\tFAILED\t#{e.message}"
-    end
+    failure_metrics(e)
   end
+
+  add_summary_line("Vegeta", *vegeta_metrics)
 end
 
 # k6
 if TOOLS.include?("k6")
-  begin
+  k6_metrics = begin
     puts "\n===> k6"
 
     k6_script_file = "#{OUTDIR}/k6_test.js"
@@ -299,15 +305,13 @@ if TOOLS.include?("k6")
     k6_status_parts << "other=#{k6_reqs_other}" if k6_reqs_other.positive?
     k6_status = k6_status_parts.empty? ? "missing" : k6_status_parts.join(",")
 
-    File.open(SUMMARY_TXT, "a") do |f|
-      f.puts "k6\t#{k6_rps}\t#{k6_p50}\t#{k6_p90}\t#{k6_p99}\t#{k6_status}"
-    end
+    [k6_rps, k6_p50, k6_p90, k6_p99, k6_status]
   rescue StandardError => e
     puts "Error: #{e.message}"
-    File.open(SUMMARY_TXT, "a") do |f|
-      f.puts "k6\tFAILED\tFAILED\tFAILED\tFAILED\t#{e.message}"
-    end
+    failure_metrics(e)
   end
+
+  add_summary_line("k6", *k6_metrics)
 end
 
 puts "\nSummary saved to #{SUMMARY_TXT}"
