@@ -39,6 +39,7 @@ React on Rails supports automatic bundling, which eliminates the need for manual
    ```
 
 3. **Generate bundles:**
+   Bundles are automatically generated during asset precompilation via the Shakapacker precompile hook. For manual generation during development:
    ```bash
    bundle exec rake react_on_rails:generate_packs
    ```
@@ -57,7 +58,7 @@ Component 'HelloWorld' not found
 
 **After:**
 
-```
+````
 ❌ React on Rails Error
 
 🔍 Problem:
@@ -93,6 +94,13 @@ If you prefer manual registration:
 
 2. Import the component:
    import HelloWorld from './components/HelloWorld';
+
+3. Include the bundle in your layout (e.g., `app/views/layouts/application.html.erb`):
+   ```erb
+   <%= javascript_pack_tag 'application' %>
+   <%= stylesheet_pack_tag 'application' %>
+````
+
 ```
 
 ### Enhanced SSR Errors
@@ -108,6 +116,7 @@ Server-side rendering errors now include:
 **Example SSR Error:**
 
 ```
+
 ❌ React on Rails Server Rendering Error
 
 Component: HelloWorldApp
@@ -123,13 +132,14 @@ The component tried to access 'window' which doesn't exist on the server.
 
 Solutions:
 • Wrap browser API calls in useEffect:
-  useEffect(() => { /* DOM operations here */ }, [])
+useEffect(() => { /_ DOM operations here _/ }, [])
 
 • Check if running in browser:
-  if (typeof window !== 'undefined') { /* browser code */ }
+if (typeof window !== 'undefined') { /_ browser code _/ }
 
 • Use dynamic import for browser-only code
-```
+
+````
 
 ## Ruby Configuration
 
@@ -142,10 +152,10 @@ raise ReactOnRails::SmartError.new(
   error_type: :component_not_registered,
   component_name: "MyComponent",
   additional_context: {
-    available_components: ReactOnRails::WebpackerUtils.registered_components
+    available_components: ReactOnRails::PackerUtils.registered_components
   }
 )
-```
+````
 
 ### Error Types
 
@@ -160,7 +170,7 @@ Available error types:
 ## Best Practices
 
 1. **Prefer auto-bundling** for new components to avoid registration issues
-2. **Use server-side rendering** to catch errors early in development
+2. **Use server-side rendering** to catch React component errors, hydration mismatches, and SSR-specific issues (like accessing browser APIs) during development before they reach production
 3. **Check error messages carefully** - they include specific solutions
 4. **Keep components in standard locations** for better error detection
 

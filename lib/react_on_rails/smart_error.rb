@@ -8,21 +8,6 @@ module ReactOnRails
   class SmartError < Error
     attr_reader :component_name, :error_type, :props, :js_code, :additional_context
 
-    COMMON_COMPONENT_NAMES = %w[
-      App
-      HelloWorld
-      Header
-      Footer
-      Navigation
-      Sidebar
-      Dashboard
-      UserProfile
-      ProductList
-      ProductCard
-      LoginForm
-      RegisterForm
-    ].freeze
-
     def initialize(error_type:, component_name: nil, props: nil, js_code: nil, **additional_context)
       @error_type = error_type
       @component_name = component_name
@@ -310,8 +295,10 @@ module ReactOnRails
     def find_similar_components(name)
       return [] unless additional_context[:available_components]
 
-      available = additional_context[:available_components] + COMMON_COMPONENT_NAMES
-      available.uniq!
+      available = additional_context[:available_components]
+      return [] if available.empty?
+
+      available = available.uniq
 
       # Simple similarity check - could be enhanced with Levenshtein distance
       similar = available.select do |comp|
