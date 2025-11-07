@@ -15,10 +15,10 @@ RATE = ENV.fetch("RATE", "50")
 # concurrent connections/virtual users
 CONNECTIONS = ENV.fetch("CONNECTIONS", "10").to_i
 # maximum connections/virtual users
-MAX_CONNECTIONS = ENV.fetch("MAX_CONNECTIONS", CONNECTIONS.to_s).to_i
-DURATION_SEC = ENV.fetch("DURATION_SEC", "10").to_f
-DURATION = "#{DURATION_SEC}s".freeze
-# request timeout (duration string like "60s", "1m", "90s")
+MAX_CONNECTIONS = ENV.fetch("MAX_CONNECTIONS", CONNECTIONS).to_i
+# benchmark duration (duration string like "30s", "1m", "90s")
+DURATION = ENV.fetch("DURATION", "30s")
+# request timeout (duration string as above)
 REQUEST_TIMEOUT = ENV.fetch("REQUEST_TIMEOUT", "60s")
 # Tools to run (comma-separated)
 TOOLS = ENV.fetch("TOOLS", "fortio,vegeta,k6").split(",")
@@ -50,15 +50,9 @@ def validate_positive_integer(value, name)
 end
 
 def validate_duration(value, name)
-  return if value.is_a?(Numeric) && value.positive?
-
-  raise "#{name} must be a positive number (got: '#{value}')"
-end
-
-def validate_timeout(value)
   return if value.match?(/^(\d+(\.\d+)?[smh])+$/)
 
-  raise "REQUEST_TIMEOUT must be a duration like '60s', '1m', '1.5m' (got: '#{value}')"
+  raise "#{name} must be a duration like '10s', '1m', '1.5m' (got: '#{value}')"
 end
 
 def parse_json_file(file_path, tool_name)
@@ -74,8 +68,8 @@ end
 validate_rate(RATE)
 validate_positive_integer(CONNECTIONS, "CONNECTIONS")
 validate_positive_integer(MAX_CONNECTIONS, "MAX_CONNECTIONS")
-validate_duration(DURATION_SEC, "DURATION_SEC")
-validate_timeout(REQUEST_TIMEOUT)
+validate_duration(DURATION, "DURATION")
+validate_duration(REQUEST_TIMEOUT, "REQUEST_TIMEOUT")
 
 raise "MAX_CONNECTIONS (#{MAX_CONNECTIONS}) must be >= CONNECTIONS (#{CONNECTIONS})" if MAX_CONNECTIONS < CONNECTIONS
 
@@ -93,7 +87,7 @@ end
 puts <<~PARAMS
   Benchmark parameters:
     - RATE: #{RATE}
-    - DURATION_SEC: #{DURATION_SEC}
+    - DURATION: #{DURATION}
     - REQUEST_TIMEOUT: #{REQUEST_TIMEOUT}
     - CONNECTIONS: #{CONNECTIONS}
     - MAX_CONNECTIONS: #{MAX_CONNECTIONS}
