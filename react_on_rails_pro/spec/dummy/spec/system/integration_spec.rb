@@ -422,7 +422,8 @@ shared_examples "streamed component tests" do |path, selector|
   end
 end
 
-describe "Pages/stream_async_components_for_testing", :js do
+describe "Pages/stream_async_components_for_testing", :js,
+         skip: "Flaky test replaced by Playwright E2E tests in e2e-tests/streaming.spec.ts" do
   it_behaves_like "streamed component tests", "/stream_async_components_for_testing",
                   "#AsyncComponentsTreeForTesting-react-component-0"
 end
