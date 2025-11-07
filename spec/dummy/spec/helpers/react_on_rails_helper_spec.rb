@@ -128,7 +128,7 @@ describe ReactOnRailsHelper do
     it "throws an error in development if generated component isn't found" do
       allow(Rails.env).to receive(:development?).and_return(true)
       expect { helper.load_pack_for_generated_component("nonexisting_component", render_options) }
-        .to raise_error(ReactOnRails::Error, /the generated component entrypoint/)
+        .to raise_error(ReactOnRails::SmartError, /Auto-loaded Bundle Missing/)
     end
   end
 
