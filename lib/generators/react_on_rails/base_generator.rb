@@ -412,7 +412,7 @@ module ReactOnRails
         puts Rainbow("🔧 Configuring Shakapacker for Rspack...").yellow
 
         # Parse YAML config properly to avoid fragile regex manipulation
-        config = YAML.load_file(shakapacker_config_path)
+        config = YAML.load_file(shakapacker_config_path, aliases: true)
 
         # Update default section
         config["default"] ||= {}
