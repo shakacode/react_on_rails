@@ -204,13 +204,10 @@ if run_k6
 
     export const options = {
       scenarios: #{k6_scenarios},
-      httpReq: {
-        timeout: '#{REQUEST_TIMEOUT}',
-      },
     };
 
     export default function () {
-      const response = http.get('#{TARGET}');
+      const response = http.get('#{TARGET}', { timeout: '#{REQUEST_TIMEOUT}' });
       check(response, {
         'status=200': r => r.status === 200,
         // you can add more if needed:
