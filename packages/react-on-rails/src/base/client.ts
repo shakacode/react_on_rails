@@ -205,7 +205,7 @@ Fix: Use only react-on-rails OR react-on-rails-pro, not both.`);
           componentNames.forEach((name) => {
             const component = components[name];
             const size = component.toString().length;
-            console.log(`[ReactOnRails] ✅ Registered: ${name} (~${(size / 1024).toFixed(1)} chars)`);
+            console.log(`[ReactOnRails] ✅ Registered: ${name} (${size} chars)`);
           });
         }
       } else {
