@@ -412,7 +412,7 @@ If you encounter issues during the upgrade:
 1. **Check the Issues**: [React on Rails GitHub Issues](https://github.com/shakacode/react_on_rails/issues)
 2. **Community Forum**: [ShakaCode Forum](https://forum.shakacode.com)
 3. **Discord**: [React on Rails Discord](https://discord.gg/reactonrails)
-4. **Commercial Support**: Contact [ShakaCode](https://www.shakacode.com/contact) for professional support
+4. **Commercial Support**: Contact [ShakaCode](mailto:justin@shakacode.com) for professional support
 
 ## Changelog
 
