@@ -45,8 +45,8 @@ const configureServer = () => {
   serverWebpackConfig.output = {
     filename: 'server-bundle.js',
     globalObject: 'this',
-    // If using the React on Rails Pro node server renderer, uncomment the next line
-    // libraryTarget: 'commonjs2',
+    // React 19 requires commonjs2 for proper Node.js module resolution
+    libraryTarget: 'commonjs2',
     path: config.outputPath,
     publicPath: config.publicPath,
     // https://webpack.js.org/configuration/output/#outputglobalobject
@@ -107,8 +107,8 @@ const configureServer = () => {
 
   // If using the default 'web', then libraries like Emotion and loadable-components
   // break with SSR. The fix is to use a node renderer and change the target.
-  // If using the React on Rails Pro node server renderer, uncomment the next line
-  // serverWebpackConfig.target = 'node'
+  // React 19 requires target: 'node' to properly handle Node.js built-in modules
+  serverWebpackConfig.target = 'node';
 
   // React 19 Fix: Prevent webpack from resolving to react-server condition
   // The server-bundle needs the full React with hooks for SSR, not the react-server build
