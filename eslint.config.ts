@@ -97,6 +97,9 @@ const config = tsEslint.config([
       // Custom React on Rails rules
       'react-on-rails/no-use-client-in-server-files': 'error',
 
+      // React 17+ with new JSX transform doesn't require React in scope
+      'react/react-in-jsx-scope': 'off',
+
       'no-shadow': 'off',
       'no-console': 'off',
       'function-paren-newline': 'off',

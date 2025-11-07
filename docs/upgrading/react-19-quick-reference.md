@@ -169,4 +169,4 @@ bin/rails assets:precompile
 - [Full React 19 Upgrade Guide](./react-19-upgrade-guide.md)
 - [React on Rails Issues](https://github.com/shakacode/react_on_rails/issues)
 - [ShakaCode Forum](https://forum.shakacode.com)
-- [Commercial Support](https://www.shakacode.com/contact)
+- [Commercial Support](mailto:justin@shakacode.com)

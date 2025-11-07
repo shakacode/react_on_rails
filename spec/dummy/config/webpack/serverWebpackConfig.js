@@ -110,6 +110,14 @@ const configureServer = () => {
   // If using the React on Rails Pro node server renderer, uncomment the next line
   // serverWebpackConfig.target = 'node'
 
+  // React 19 Fix: Explicitly set conditionNames to prevent resolving to react-server build
+  // The server bundle should use the regular React build, not the react-server build
+  // Only the RSC bundle should use react-server condition
+  if (!serverWebpackConfig.resolve) {
+    serverWebpackConfig.resolve = {};
+  }
+  serverWebpackConfig.resolve.conditionNames = ['node', 'require', 'import', '...'];
+
   return serverWebpackConfig;
 };
 
