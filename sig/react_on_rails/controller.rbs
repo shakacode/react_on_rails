@@ -1,0 +1,15 @@
+module ReactOnRails
+  module Controller
+    # Type alias for ActiveSupport::SafeBuffer (html_safe strings)
+    type safe_buffer = String
+
+    def redux_store: (
+      String store_name,
+      ?props: untyped,
+      ?immediate_hydration: bool
+    ) -> void
+
+    # Returns html_safe string (ActiveSupport::SafeBuffer)
+    def redux_store_hydration_data: () -> safe_buffer
+  end
+end

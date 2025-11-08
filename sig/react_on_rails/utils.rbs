@@ -1,0 +1,34 @@
+module ReactOnRails
+  module Utils
+    TRUNCATION_FILLER: String
+
+    def self.truthy_presence: (untyped obj) -> untyped
+    def self.wrap_message: (String msg, ?Symbol color) -> String
+    def self.object_to_boolean: (untyped value) -> bool
+    def self.server_rendering_is_enabled?: () -> bool
+    def self.invoke_and_exit_if_failed: (String cmd, String failure_message) -> Array[String]
+    def self.server_bundle_path_is_http?: () -> bool
+    def self.bundle_js_file_path: (String bundle_name) -> String
+    def self.react_on_rails_pro?: () -> bool
+    def self.react_on_rails_pro_version: () -> String?
+    def self.rsc_support_enabled?: () -> bool
+    def self.full_text_errors_enabled?: () -> bool
+    def self.smart_trim: (String str, ?Integer max_length) -> String
+    def self.find_most_recent_mtime: (Array[String] files) -> Time?
+    def self.prepend_to_file_if_text_not_present: (file: String, text_to_prepend: String, regex: Regexp) -> void
+    def self.detect_package_manager: () -> String
+    def self.default_troubleshooting_section: () -> String
+    def self.server_bundle_js_file_path: () -> String
+    def self.running_on_windows?: () -> bool
+    def self.rails_version_less_than: (String version) -> bool
+    def self.rails_version_less_than_4_1_1?: () -> bool
+    def self.source_path: () -> String
+    def self.public_bundles_full_path: () -> String
+    def self.generated_assets_full_path: () -> String
+    def self.gem_available?: (String name) -> bool
+
+    module Required
+      def required: (String name) -> untyped
+    end
+  end
+end
