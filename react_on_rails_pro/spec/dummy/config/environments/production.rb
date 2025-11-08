@@ -3,6 +3,9 @@
 Rails.application.configure do
   # Settings specified here will take precedence over those in config/application.rb.
 
+  # Use a hardcoded secret for this test/dummy app (not for real production use)
+  config.secret_key_base = ENV.fetch("SECRET_KEY_BASE", "dummy-secret-key-base-for-testing-only")
+
   # Code is not reloaded between requests.
   config.cache_classes = true
 
