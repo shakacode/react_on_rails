@@ -1,15 +1,16 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+require "English"
 require "json"
 require "fileutils"
 require "net/http"
 require "uri"
 
 # Benchmark parameters
+PRO = ENV.fetch("PRO", "false") == "true"
+APP_DIR = PRO ? "react_on_rails_pro/spec/dummy" : "spec/dummy"
 BASE_URL = ENV.fetch("BASE_URL", "localhost:3001")
-ROUTE = ENV.fetch("ROUTE", "server_side_hello_world_hooks")
-TARGET = URI.parse("http://#{BASE_URL}/#{ROUTE}")
 # requests per second; if "max" will get maximum number of queries instead of a fixed rate
 RATE = ENV.fetch("RATE", "50")
 # concurrent connections/virtual users
@@ -67,6 +68,30 @@ def add_summary_line(*parts)
   end
 end
 
+# Get routes from the Rails app filtered by pages# and react_router# controllers
+def get_benchmark_routes(app_dir)
+  routes_output = `cd #{app_dir} && bundle exec rails routes 2>&1`
+  raise "Failed to get routes from #{app_dir}" unless $CHILD_STATUS.success?
+
+  routes = []
+  routes_output.each_line do |line|
+    # Parse lines like: "server_side_hello_world GET  /server_side_hello_world(.:format)  pages#server_side_hello_world"
+    # We want GET routes only (not POST, etc.) served by pages# or react_router# controllers
+    # Capture path up to (.:format) part using [^(\s]+ (everything except '(' and whitespace)
+    next unless (match = line.match(/GET\s+([^(\s]+).*(pages|react_router)#/))
+
+    path = match[1]
+    path = "/" if path.empty? # Handle root route
+    routes << path
+  end
+  raise "No pages# or react_router# routes found in #{app_dir}" if routes.empty?
+
+  routes
+end
+
+# Get all routes to benchmark
+routes = get_benchmark_routes(APP_DIR)
+
 validate_rate(RATE)
 validate_positive_integer(CONNECTIONS, "CONNECTIONS")
 validate_positive_integer(MAX_CONNECTIONS, "MAX_CONNECTIONS")
@@ -83,6 +108,8 @@ end
 
 puts <<~PARAMS
   Benchmark parameters:
+    - APP_DIR: #{APP_DIR}
+    - BASE_URL: #{BASE_URL}
     - RATE: #{RATE}
     - DURATION: #{DURATION}
     - REQUEST_TIMEOUT: #{REQUEST_TIMEOUT}
@@ -104,47 +131,42 @@ end
 
 # Wait for the server to be ready
 TIMEOUT_SEC = 60
+puts "Checking server availability at #{BASE_URL}..."
+test_uri = URI.parse("http://#{BASE_URL}#{routes.first}")
 start_time = Time.now
 loop do
-  break if server_responding?(TARGET)
+  break if server_responding?(test_uri)
 
-  raise "Target #{TARGET} not responding within #{TIMEOUT_SEC}s" if Time.now - start_time > TIMEOUT_SEC
+  raise "Server at #{BASE_URL} not responding within #{TIMEOUT_SEC}s" if Time.now - start_time > TIMEOUT_SEC
 
   sleep 1
 end
-
-# Warm up server
-puts "Warming up server with 10 requests..."
-10.times do
-  server_responding?(TARGET)
-  sleep 0.5
-end
-puts "Warm-up complete"
+puts "Server is ready!"
 
 FileUtils.mkdir_p(OUTDIR)
 
 # Validate RATE=max constraint
-is_max_rate = RATE == "max"
-if is_max_rate && CONNECTIONS != MAX_CONNECTIONS
+IS_MAX_RATE = RATE == "max"
+if IS_MAX_RATE && CONNECTIONS != MAX_CONNECTIONS
   raise "For RATE=max, CONNECTIONS must be equal to MAX_CONNECTIONS (got #{CONNECTIONS} and #{MAX_CONNECTIONS})"
 end
 
-# Initialize summary file
-File.write(SUMMARY_TXT, "")
-add_summary_line("Tool", "RPS", "p50(ms)", "p90(ms)", "p99(ms)", "Status")
+# rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity, Metrics/MethodLength
 
-# Fortio
-if TOOLS.include?("fortio")
-  fortio_metrics = begin
-    puts "===> Fortio"
+# Benchmark a single route with Fortio
+def run_fortio_benchmark(target, route_name)
+  return nil unless TOOLS.include?("fortio")
 
-    fortio_json = "#{OUTDIR}/fortio.json"
-    fortio_txt = "#{OUTDIR}/fortio.txt"
+  begin
+    puts "===> Fortio: #{route_name}"
+
+    fortio_json = "#{OUTDIR}/#{route_name}_fortio.json"
+    fortio_txt = "#{OUTDIR}/#{route_name}_fortio.txt"
 
     # Configure Fortio arguments
     # See https://github.com/fortio/fortio/wiki/FAQ#i-want-to-get-the-best-results-what-flags-should-i-pass
     fortio_args =
-      if is_max_rate
+      if IS_MAX_RATE
         ["-qps", 0, "-c", CONNECTIONS]
       else
         ["-qps", RATE, "-uniform", "-nocatchup", "-c", CONNECTIONS]
@@ -156,7 +178,7 @@ if TOOLS.include?("fortio")
       "-t", DURATION,
       "-timeout", REQUEST_TIMEOUT,
       "-json", fortio_json,
-      TARGET
+      target
     ].join(" ")
     raise "Fortio benchmark failed" unless system("#{fortio_cmd} | tee #{fortio_txt}")
 
@@ -180,29 +202,29 @@ if TOOLS.include?("fortio")
     puts "Error: #{error.message}"
     failure_metrics(error)
   end
-
-  add_summary_line("Fortio", *fortio_metrics)
 end
 
-# Vegeta
-if TOOLS.include?("vegeta")
-  vegeta_metrics = begin
-    puts "\n===> Vegeta"
+# Benchmark a single route with Vegeta
+def run_vegeta_benchmark(target, route_name)
+  return nil unless TOOLS.include?("vegeta")
 
-    vegeta_bin = "#{OUTDIR}/vegeta.bin"
-    vegeta_json = "#{OUTDIR}/vegeta.json"
-    vegeta_txt = "#{OUTDIR}/vegeta.txt"
+  begin
+    puts "\n===> Vegeta: #{route_name}"
+
+    vegeta_bin = "#{OUTDIR}/#{route_name}_vegeta.bin"
+    vegeta_json = "#{OUTDIR}/#{route_name}_vegeta.json"
+    vegeta_txt = "#{OUTDIR}/#{route_name}_vegeta.txt"
 
     # Configure Vegeta arguments
     vegeta_args =
-      if is_max_rate
+      if IS_MAX_RATE
         ["-rate=infinity", "--workers=#{CONNECTIONS}", "--max-workers=#{CONNECTIONS}"]
       else
         ["-rate=#{RATE}", "--workers=#{CONNECTIONS}", "--max-workers=#{MAX_CONNECTIONS}"]
       end
 
     vegeta_cmd = [
-      "echo 'GET #{TARGET}' |",
+      "echo 'GET #{target}' |",
       "vegeta", "attack",
       *vegeta_args,
       "-duration=#{DURATION}",
@@ -212,7 +234,6 @@ if TOOLS.include?("vegeta")
     raise "Vegeta report generation failed" unless system("vegeta report -type=json #{vegeta_bin} > #{vegeta_json}")
 
     vegeta_data = parse_json_file(vegeta_json, "Vegeta")
-    # .throughput is successful_reqs/total_period, .rate is all_requests/attack_period
     vegeta_rps = vegeta_data["throughput"]&.round(2) || "missing"
     vegeta_p50 = vegeta_data.dig("latencies", "50th")&./(1_000_000.0)&.round(2) || "missing"
     vegeta_p90 = vegeta_data.dig("latencies", "90th")&./(1_000_000.0)&.round(2) || "missing"
@@ -224,22 +245,22 @@ if TOOLS.include?("vegeta")
     puts "Error: #{error.message}"
     failure_metrics(error)
   end
-
-  add_summary_line("Vegeta", *vegeta_metrics)
 end
 
-# k6
-if TOOLS.include?("k6")
-  k6_metrics = begin
-    puts "\n===> k6"
+# Benchmark a single route with k6
+def run_k6_benchmark(target, route_name)
+  return nil unless TOOLS.include?("k6")
 
-    k6_script_file = "#{OUTDIR}/k6_test.js"
-    k6_summary_json = "#{OUTDIR}/k6_summary.json"
-    k6_txt = "#{OUTDIR}/k6.txt"
+  begin
+    puts "\n===> k6: #{route_name}"
+
+    k6_script_file = "#{OUTDIR}/#{route_name}_k6_test.js"
+    k6_summary_json = "#{OUTDIR}/#{route_name}_k6_summary.json"
+    k6_txt = "#{OUTDIR}/#{route_name}_k6.txt"
 
     # Configure k6 scenarios
     k6_scenarios =
-      if is_max_rate
+      if IS_MAX_RATE
         <<~JS.strip
           {
             max_rate: {
@@ -273,11 +294,9 @@ if TOOLS.include?("k6")
       };
 
       export default function () {
-        const response = http.get('#{TARGET}', { timeout: '#{REQUEST_TIMEOUT}' });
+        const response = http.get('#{target}', { timeout: '#{REQUEST_TIMEOUT}' });
         check(response, {
           'status=200': r => r.status === 200,
-          // you can add more if needed:
-          // 'status=500': r => r.status === 500,
         });
       }
     JS
@@ -294,8 +313,6 @@ if TOOLS.include?("k6")
     # Status: compute successful vs failed requests
     k6_reqs_total = k6_data.dig("metrics", "http_reqs", "count") || 0
     k6_checks = k6_data.dig("root_group", "checks") || {}
-    # Extract status code from check name (e.g., "status=200" -> "200")
-    # Handle both "status=XXX" format and other potential formats
     k6_status_parts = k6_checks.map do |name, check|
       status_label = name.start_with?("status=") ? name.delete_prefix("status=") : name
       "#{status_label}=#{check['passes']}"
@@ -310,8 +327,44 @@ if TOOLS.include?("k6")
     puts "Error: #{error.message}"
     failure_metrics(error)
   end
+end
 
-  add_summary_line("k6", *k6_metrics)
+# rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity, Metrics/MethodLength
+
+# Initialize summary file
+File.write(SUMMARY_TXT, "")
+add_summary_line("Route", "Tool", "RPS", "p50(ms)", "p90(ms)", "p99(ms)", "Status")
+
+# Run benchmarks for each route
+routes.each do |route|
+  separator = "=" * 80
+  puts "\n#{separator}"
+  puts "Benchmarking route: #{route}"
+  puts separator
+
+  target = URI.parse("http://#{BASE_URL}#{route}")
+
+  # Warm up server for this route
+  puts "Warming up server for #{route} with 10 requests..."
+  10.times do
+    server_responding?(target)
+    sleep 0.5
+  end
+  puts "Warm-up complete for #{route}"
+
+  # Sanitize route name for filenames
+  route_name = route.gsub(%r{^/}, "").tr("/", "_")
+  route_name = "root" if route_name.empty?
+
+  # Run each benchmark tool
+  fortio_metrics = run_fortio_benchmark(target, route_name)
+  add_summary_line(route, "Fortio", *fortio_metrics) if fortio_metrics
+
+  vegeta_metrics = run_vegeta_benchmark(target, route_name)
+  add_summary_line(route, "Vegeta", *vegeta_metrics) if vegeta_metrics
+
+  k6_metrics = run_k6_benchmark(target, route_name)
+  add_summary_line(route, "k6", *k6_metrics) if k6_metrics
 end
 
 puts "\nSummary saved to #{SUMMARY_TXT}"
