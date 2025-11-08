@@ -89,5 +89,8 @@ module ReactOnRails
     def configure_skip_display_none_deprecation: () -> void
     def raise_missing_components_subdirectory: () -> void
     def compile_command_conflict_message: () -> String
+    def rsc_bundle_js_file: () -> String?
+    def react_client_manifest_file: () -> String?
+    def react_server_client_manifest_file: () -> String?
   end
 end
