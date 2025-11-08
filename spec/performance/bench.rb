@@ -177,6 +177,8 @@ def run_fortio_benchmark(target, route_name)
       *fortio_args,
       "-t", DURATION,
       "-timeout", REQUEST_TIMEOUT,
+      # Allow redirects. Could use -L instead, but it uses the slower HTTP client.
+      "-allow-initial-errors",
       "-json", fortio_json,
       target
     ].join(" ")
