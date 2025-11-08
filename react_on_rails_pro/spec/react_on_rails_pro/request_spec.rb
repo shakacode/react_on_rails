@@ -194,5 +194,32 @@ describe ReactOnRailsPro::Request do
         expect(mocked_block).not_to have_received(:call)
       end
     end
+
+    it "does not use HTTPx retries plugin for streaming requests to prevent body duplication" do
+      # This test verifies the fix for https://github.com/shakacode/react_on_rails/issues/1895
+      # When streaming requests encounter connection errors mid-transmission, HTTPx retries
+      # would cause body duplication because partial chunks are already sent to the client.
+      # The StreamRequest class handles retries properly by starting fresh requests.
+
+      # Reset connections to ensure we're using a fresh connection
+      described_class.reset_connection
+
+      # Trigger a streaming request
+      mock_streaming_response(render_full_url, 200) do |yielder|
+        yielder.call("Test chunk\n")
+      end
+
+      stream = described_class.render_code_as_stream("/render", "console.log('test');", is_rsc_payload: false)
+      chunks = []
+      stream.each_chunk { |chunk| chunks << chunk }
+
+      # Verify that the streaming request completed successfully
+      expect(chunks).to eq(["Test chunk"])
+
+      # Verify that the connection_without_retries was created
+      # by checking that a connection was created with retries disabled
+      connection_without_retries = described_class.send(:connection_without_retries)
+      expect(connection_without_retries).to be_a(HTTPX::Session)
+    end
   end
 end

@@ -75,6 +75,9 @@ module ReactOnRailsPro
 
       send_bundle = false
       error_body = +""
+      # Retry logic for streaming requests is handled here by starting fresh requests.
+      # The HTTPx connection used for streaming has retries disabled (see Request#connection_without_retries)
+      # to prevent body duplication when partial chunks are already sent to the client.
       loop do
         stream_response = @request_executor.call(send_bundle)
 
