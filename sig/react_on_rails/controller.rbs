@@ -3,7 +3,7 @@ module ReactOnRails
     def redux_store: (
       String store_name,
       ?props: untyped,
-      ?immediate_hydration: bool?
+      ?immediate_hydration: bool
     ) -> void
 
     def redux_store_hydration_data: () -> String

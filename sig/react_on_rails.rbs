@@ -13,21 +13,23 @@ module ReactOnRails
   end
 
   class PrerenderError < Error
-    attr_accessor js_code: String?
-    attr_accessor err: Hash[Symbol, untyped]
-    attr_accessor js_message: String
+    attr_reader component_name: String?
+    attr_reader js_code: String?
+    attr_reader err: Hash[Symbol, untyped]?
+    attr_reader props: (Hash[Symbol, untyped] | String)?
+    attr_reader console_messages: Array[String]?
 
     def initialize: (
       ?component_name: String?,
       ?js_code: String?,
-      ?err: Hash[Symbol, untyped],
+      ?err: Hash[Symbol, untyped]?,
       ?props: (Hash[Symbol, untyped] | String)?,
-      ?js_message: String
+      ?console_messages: Array[String]?
     ) -> void
 
-    def console_messages: () -> Array[String]
-    def base_message: () -> String
-    def build_message: () -> String
+    def to_honeybadger_context: () -> Hash[Symbol, untyped]
+    def raven_context: () -> Hash[Symbol, untyped]
+    def to_error_context: () -> Hash[Symbol, untyped]
   end
 
   class JsonParseError < Error

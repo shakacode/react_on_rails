@@ -6,12 +6,12 @@ module ReactOnRails
     def react_component: (
       String component_name,
       ?Hash[Symbol, untyped] options
-    ) -> String
+    ) ?{ () -> untyped } -> String
 
     def react_component_hash: (
       String component_name,
       ?Hash[Symbol, untyped] options
-    ) -> Hash[String, String]
+    ) ?{ () -> untyped } -> Hash[String, String]
 
     def redux_store: (
       String store_name,
@@ -36,7 +36,7 @@ module ReactOnRails
     def internal_react_component: (
       String component_name,
       Hash[Symbol, untyped] options
-    ) -> Hash[Symbol, untyped]
+    ) ?{ () -> untyped } -> Hash[Symbol, untyped]
 
     def build_react_component_result_for_server_rendered_string: (
       server_rendered_html: String,
