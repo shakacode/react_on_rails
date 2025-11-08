@@ -9,6 +9,10 @@ on:
         required: false
         default: false
         type: boolean
+      routes:
+        description: 'Comma-separated routes to benchmark (e.g., "/,/hello"). Leave empty to auto-detect from Rails.'
+        required: false
+        type: string
       rate:
         description: 'Requests per second (use "max" for maximum throughput)'
         required: false
@@ -69,6 +73,7 @@ env:
   K6_VERSION: "1.4.2"
   VEGETA_VERSION: "12.13.0"
   # Benchmark parameters
+  ROUTES: ${{ github.event.inputs.routes }}
   RATE: ${{ github.event.inputs.rate || 'max' }}
   DURATION: ${{ github.event.inputs.duration || '30s' }}
   REQUEST_TIMEOUT: ${{ github.event.inputs.request_timeout || '60s' }}
