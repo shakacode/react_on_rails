@@ -248,10 +248,14 @@ With `defer: true`, your streamed components will:
 
 **For Pages WITHOUT Streaming Components:**
 
+With Shakapacker ≥ 8.2.0, `async: true` is recommended even for non-streaming pages to improve Time to Interactive (TTI):
+
 ```erb
-<!-- ✅ OK: defer is fine when not using streaming -->
-<%= javascript_pack_tag('client-bundle', 'data-turbo-track': 'reload', defer: true) %>
+<!-- ✅ RECOMMENDED: Use async with immediate_hydration for optimal performance -->
+<%= javascript_pack_tag('client-bundle', 'data-turbo-track': 'reload', async: true) %>
 ```
+
+Note: `async: true` with the `immediate_hydration` feature allows components to hydrate during page load, improving TTI even without streaming. See the Immediate Hydration section below for configuration details.
 
 #### Why Async is Better Than No Defer
 
@@ -267,5 +271,50 @@ With Shakapacker ≥ 8.2.0, using `async: true` provides the best performance:
 #### Migration Timeline
 
 1. **Before Shakapacker 8.2.0**: Use `defer: false` for streaming pages
-2. **Shakapacker ≥ 8.2.0**: Migrate to `async: true` for streaming pages
-3. **Non-streaming pages**: Can continue using `defer: true` safely (regardless of Shakapacker version)
+2. **Shakapacker ≥ 8.2.0**: Migrate to `async: true` for all pages (streaming and non-streaming)
+3. **Enable `immediate_hydration`**: Configure for optimal Time to Interactive (see section below)
+
+#### Configuring Immediate Hydration
+
+React on Rails Pro supports the `immediate_hydration` feature, which allows components to hydrate during the page loading state (before DOMContentLoaded). This works optimally with `async: true` scripts:
+
+```ruby
+# config/initializers/react_on_rails.rb
+ReactOnRails.configure do |config|
+  config.immediate_hydration = true # Enable early hydration
+
+  # Optional: Configure pack loading strategy globally
+  config.generated_component_packs_loading_strategy = :async
+end
+```
+
+**Benefits of `immediate_hydration` with `async: true`:**
+
+- Components become interactive as soon as their JavaScript loads
+- No need to wait for DOMContentLoaded or full page load
+- Optimal Time to Interactive (TTI) for both streaming and non-streaming pages
+- Works seamlessly with React 18's Selective Hydration
+
+**Note:** The `immediate_hydration` feature requires a React on Rails Pro license.
+
+**Component-Level Control:**
+
+You can also enable immediate hydration on a per-component basis:
+
+```erb
+<%= react_component('MyComponent', props: {}, immediate_hydration: true) %>
+```
+
+**generated_component_packs_loading_strategy Option:**
+
+This configuration option sets the default loading strategy for auto-generated component packs:
+
+- `:async` (recommended for Shakapacker ≥ 8.2.0) - Scripts load asynchronously
+- `:defer` - Scripts defer until page load completes
+- `:sync` - Scripts load synchronously (blocks page rendering)
+
+```ruby
+ReactOnRails.configure do |config|
+  config.generated_component_packs_loading_strategy = :async
+end
+```
