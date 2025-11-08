@@ -10,6 +10,7 @@ require "uri"
 # Benchmark parameters
 PRO = ENV.fetch("PRO", "false") == "true"
 APP_DIR = PRO ? "react_on_rails_pro/spec/dummy" : "spec/dummy"
+ROUTES = ENV.fetch("ROUTES", nil)
 BASE_URL = ENV.fetch("BASE_URL", "localhost:3001")
 # requests per second; if "max" will get maximum number of queries instead of a fixed rate
 RATE = ENV.fetch("RATE", "50")
@@ -90,7 +91,12 @@ def get_benchmark_routes(app_dir)
 end
 
 # Get all routes to benchmark
-routes = get_benchmark_routes(APP_DIR)
+routes =
+  if ROUTES
+    ROUTES.split(",").map(&:strip)
+  else
+    get_benchmark_routes(APP_DIR)
+  end
 
 validate_rate(RATE)
 validate_positive_integer(CONNECTIONS, "CONNECTIONS")
@@ -109,6 +115,7 @@ end
 puts <<~PARAMS
   Benchmark parameters:
     - APP_DIR: #{APP_DIR}
+    - ROUTES: #{ROUTES || 'auto-detect from Rails'}
     - BASE_URL: #{BASE_URL}
     - RATE: #{RATE}
     - DURATION: #{DURATION}
