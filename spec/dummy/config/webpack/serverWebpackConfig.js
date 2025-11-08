@@ -109,18 +109,18 @@ const configureServer = () => {
 
   // If using the default 'web', then libraries like Emotion and loadable-components
   // break with SSR. The fix is to use a node renderer and change the target.
-  // React 19 requires target: 'node' to properly handle Node.js built-in modules
-  serverWebpackConfig.target = 'node';
-
-  // React 19 Fix: Prevent webpack from resolving to react-server condition
-  // The server-bundle needs the full React with hooks for SSR, not the react-server build
-  // Explicitly set conditionNames without react-server
-  if (!serverWebpackConfig.resolve) {
-    serverWebpackConfig.resolve = {};
-  }
-  // For target: 'node', webpack defaults to ['node', 'import', 'require', 'default']
-  // We explicitly list them to ensure react-server is not included
-  serverWebpackConfig.resolve.conditionNames = ['node', 'import', 'require', 'default'];
+  // If using the React on Rails Pro node server renderer, uncomment the next lines
+  // serverWebpackConfig.target = 'node';
+  //
+  // // React 19 Fix: Prevent webpack from resolving to react-server condition
+  // // The server-bundle needs the full React with hooks for SSR, not the react-server build
+  // // Explicitly set conditionNames without react-server
+  // if (!serverWebpackConfig.resolve) {
+  //   serverWebpackConfig.resolve = {};
+  // }
+  // // For target: 'node', webpack defaults to ['node', 'import', 'require', 'default']
+  // // We explicitly list them to ensure react-server is not included
+  // serverWebpackConfig.resolve.conditionNames = ['node', 'import', 'require', 'default'];
 
   return serverWebpackConfig;
 };

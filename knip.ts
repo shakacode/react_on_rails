@@ -38,9 +38,6 @@ const config: KnipConfig = {
         // This is an optional peer dependency because users without RSC don't need it
         // but Knip doesn't like such dependencies to be referenced directly in code
         'react-on-rails-rsc',
-        // SWC transpiler dependencies used in dummy apps
-        '@swc/core',
-        'swc-loader',
       ],
     },
 
@@ -100,8 +97,6 @@ const config: KnipConfig = {
         'config/webpack/{production,development,test}.js',
         // Declaring this as webpack.config instead doesn't work correctly
         'config/webpack/webpack.config.js',
-        // SWC configuration for Shakapacker
-        'config/swc.config.js',
       ],
       ignore: ['**/app-react16/**/*'],
       project: ['**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}!', 'config/webpack/*.js'],

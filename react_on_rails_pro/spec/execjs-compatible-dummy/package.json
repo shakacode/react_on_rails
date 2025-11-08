@@ -44,9 +44,7 @@
   },
   "devDependencies": {
     "@pmmmwh/react-refresh-webpack-plugin": "^0.5.15",
-    "@swc/core": "^1.15.0",
     "react-refresh": "^0.14.2",
-    "swc-loader": "^0.2.6",
     "webpack-dev-server": "4"
   }
 }
