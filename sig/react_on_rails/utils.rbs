@@ -1,0 +1,22 @@
+module ReactOnRails
+  module Utils
+    TRUNCATION_FILLER: String
+
+    def self.truthy_presence: (untyped obj) -> untyped
+    def self.wrap_message: (String msg, ?Symbol color) -> String
+    def self.object_to_boolean: (untyped value) -> bool
+    def self.server_rendering_is_enabled?: () -> bool
+    def self.invoke_and_exit_if_failed: (String cmd, String failure_message) -> Array[String]
+    def self.server_bundle_path_is_http?: () -> bool
+    def self.bundle_js_file_path: (String bundle_name) -> String
+    def self.react_on_rails_pro?: () -> bool
+    def self.server_bundle?: (String bundle_name) -> bool
+    def self.running_on_windows?: () -> bool
+    def self.rails_version_less_than?: (String version) -> bool
+    def self.rails_version_less_than_4_1_1?: () -> bool
+
+    module Required
+      def required: (String name) -> untyped
+    end
+  end
+end

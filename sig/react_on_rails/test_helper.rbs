@@ -1,0 +1,11 @@
+module ReactOnRails
+  module TestHelper
+    def self.configure_rspec_to_compile_assets: (untyped config) -> void
+    def self.ensure_assets_compiled: (?force_compile: bool) -> void
+    def self.webpack_assets_compiled?: () -> bool
+
+    module EnsureAssetsCompiled
+      def self.has_been_run?: () -> bool
+    end
+  end
+end

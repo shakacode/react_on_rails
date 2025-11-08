@@ -1,0 +1,12 @@
+module ReactOnRails
+  module ServerRenderingPool
+    def self.pool: () -> untyped
+
+    def self.reset_pool_if_server_bundle_was_modified: () -> void
+    def self.reset_pool: () -> void
+    def self.server_render_js_with_console_logging: (
+      String js_code,
+      Hash[Symbol, untyped] render_options
+    ) -> Hash[String, untyped]
+  end
+end

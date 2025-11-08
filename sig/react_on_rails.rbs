@@ -1,0 +1,36 @@
+# Type signatures for ReactOnRails gem
+
+module ReactOnRails
+  VERSION: String
+
+  DEFAULT_GENERATED_ASSETS_DIR: String
+  DEFAULT_COMPONENT_REGISTRY_TIMEOUT: Integer
+
+  def self.configure: () { (Configuration) -> void } -> void
+  def self.configuration: () -> Configuration
+
+  class Error < StandardError
+  end
+
+  class PrerenderError < Error
+    attr_accessor js_code: String?
+    attr_accessor err: Hash[Symbol, untyped]
+    attr_accessor js_message: String
+
+    def initialize: (
+      ?component_name: String?,
+      ?js_code: String?,
+      ?err: Hash[Symbol, untyped],
+      ?props: (Hash[Symbol, untyped] | String)?,
+      ?js_message: String
+    ) -> void
+
+    def console_messages: () -> Array[String]
+    def base_message: () -> String
+    def build_message: () -> String
+  end
+
+  class JsonParseError < Error
+    def initialize: (Hash[Symbol, untyped] err) -> void
+  end
+end

@@ -1,0 +1,57 @@
+module ReactOnRails
+  module Helper
+    COMPONENT_HTML_KEY: String
+
+    # Main helper methods
+    def react_component: (
+      String component_name,
+      ?Hash[Symbol, untyped] options
+    ) -> String
+
+    def react_component_hash: (
+      String component_name,
+      ?Hash[Symbol, untyped] options
+    ) -> Hash[String, String]
+
+    def redux_store: (
+      String store_name,
+      ?Hash[Symbol, untyped] props
+    ) -> String
+
+    def redux_store_hydration_data: () -> String
+
+    def server_render_js: (
+      String js_expression,
+      ?Hash[Symbol, untyped] options
+    ) -> String
+
+    def sanitized_props_string: (untyped props) -> String
+
+    def rails_context: (
+      ?server_side: bool
+    ) -> Hash[Symbol, untyped]
+
+    private
+
+    def internal_react_component: (
+      String component_name,
+      Hash[Symbol, untyped] options
+    ) -> Hash[Symbol, untyped]
+
+    def build_react_component_result_for_server_rendered_string: (
+      server_rendered_html: String,
+      component_specification_tag: String,
+      console_script: String,
+      render_options: Hash[Symbol, untyped]
+    ) -> String
+
+    def build_react_component_result_for_server_rendered_hash: (
+      server_rendered_html: Hash[String, untyped],
+      component_specification_tag: String,
+      console_script: String,
+      render_options: Hash[Symbol, untyped]
+    ) -> Hash[String, String]
+
+    def prepend_render_rails_context: (String result) -> String
+  end
+end

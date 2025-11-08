@@ -1,0 +1,12 @@
+module ReactOnRails
+  module VersionChecker
+    def self.log_if_gem_and_node_package_versions_differ: () -> void
+
+    private
+
+    def self.node_package_version: () -> String?
+    def self.gem_version: () -> String
+    def self.node_package_version_different_from_gem?: () -> bool
+    def self.pr_1683_warning: () -> String
+  end
+end
