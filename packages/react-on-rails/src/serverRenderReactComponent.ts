@@ -1,5 +1,4 @@
-import * as React from 'react';
-import type { ReactElement } from 'react';
+import { isValidElement, type ReactElement } from 'react';
 
 // ComponentRegistry is accessed via globalThis.ReactOnRails.getComponent for cross-bundle compatibility
 import createReactOutput from './createReactOutput.ts';
@@ -69,7 +68,7 @@ function processPromise(
     return '{}';
   }
   return result.then((promiseResult) => {
-    if (React.isValidElement(promiseResult)) {
+    if (isValidElement(promiseResult)) {
       return processReactElement(promiseResult);
     }
     return promiseResult;
