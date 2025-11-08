@@ -1,29 +1,37 @@
 module ReactOnRails
   module Helper
+    # Type alias for ActiveSupport::SafeBuffer (html_safe strings)
+    type safe_buffer = String
+
     COMPONENT_HTML_KEY: String
 
     # Main helper methods
+    # Returns html_safe string (ActiveSupport::SafeBuffer)
     def react_component: (
       String component_name,
       ?Hash[Symbol, untyped] options
-    ) ?{ () -> untyped } -> String
+    ) ?{ () -> untyped } -> safe_buffer
 
+    # Returns hash with html_safe strings (ActiveSupport::SafeBuffer)
     def react_component_hash: (
       String component_name,
       ?Hash[Symbol, untyped] options
-    ) ?{ () -> untyped } -> Hash[String, String]
+    ) ?{ () -> untyped } -> Hash[String, safe_buffer]
 
+    # Returns html_safe string (ActiveSupport::SafeBuffer)
     def redux_store: (
       String store_name,
       ?Hash[Symbol, untyped] props
-    ) -> String
+    ) -> safe_buffer
 
-    def redux_store_hydration_data: () -> String
+    # Returns html_safe string (ActiveSupport::SafeBuffer)
+    def redux_store_hydration_data: () -> safe_buffer
 
+    # Returns html_safe string (ActiveSupport::SafeBuffer)
     def server_render_js: (
       String js_expression,
       ?Hash[Symbol, untyped] options
-    ) -> String
+    ) -> safe_buffer
 
     def sanitized_props_string: (untyped props) -> String
 
@@ -43,15 +51,15 @@ module ReactOnRails
       component_specification_tag: String,
       console_script: String,
       render_options: Hash[Symbol, untyped]
-    ) -> String
+    ) -> safe_buffer
 
     def build_react_component_result_for_server_rendered_hash: (
       server_rendered_html: Hash[String, untyped],
       component_specification_tag: String,
       console_script: String,
       render_options: Hash[Symbol, untyped]
-    ) -> Hash[String, String]
+    ) -> Hash[String, safe_buffer]
 
-    def prepend_render_rails_context: (String result) -> String
+    def prepend_render_rails_context: (String result) -> safe_buffer
   end
 end

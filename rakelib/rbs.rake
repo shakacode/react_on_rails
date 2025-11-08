@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+# rubocop:disable Metrics/BlockLength
 namespace :rbs do
   desc "Validate RBS type signatures"
   task :validate do
@@ -11,10 +12,14 @@ namespace :rbs do
     # Run RBS validate
     result = system("bundle exec rbs -I sig validate")
 
-    if result
+    case result
+    when true
       puts "✓ RBS validation passed"
-    else
+    when false
       puts "✗ RBS validation failed"
+      exit 1
+    when nil
+      puts "✗ RBS command not found or could not be executed"
       exit 1
     end
   end
@@ -30,3 +35,4 @@ namespace :rbs do
     puts "\nTotal: #{sig_files.count} files"
   end
 end
+# rubocop:enable Metrics/BlockLength

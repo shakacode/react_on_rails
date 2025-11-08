@@ -47,7 +47,7 @@ module ReactOnRails
       ?logging_on_server: bool?,
       ?server_renderer_pool_size: Integer?,
       ?server_renderer_timeout: Integer?,
-      ?raise_on_prerender_error: bool,
+      ?raise_on_prerender_error: bool?,
       ?skip_display_none: bool?,
       ?generated_assets_dirs: Array[String]?,
       ?generated_assets_dir: String?,
