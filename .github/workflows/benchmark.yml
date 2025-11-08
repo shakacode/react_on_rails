@@ -29,33 +29,34 @@ on:
         default: '60s'
         type: string
       connections:
-        description: 'Concurrent connections/virtual users'
+        description: 'Concurrent connections/virtual users (also used as max)'
         required: false
         default: 10
-        type: number
-      max_connections:
-        description: 'Maximum connections/virtual users'
-        required: false
         type: number
       web_concurrency:
         description: 'Number of Puma worker processes'
         required: false
         default: 4
         type: number
-      rails_max_threads:
-        description: 'Maximum number of Puma threads'
+      rails_threads:
+        description: 'Number of Puma threads (min and max will be same)'
         required: false
         default: 3
-        type: number
-      rails_min_threads:
-        description: 'Minimum number of Puma threads (same as maximum if not set)'
-        required: false
         type: number
       tools:
         description: 'Comma-separated list of tools to run'
         required: false
         default: 'fortio,vegeta,k6'
         type: string
+      app_version:
+        description: 'Which app version to benchmark'
+        required: false
+        default: 'both'
+        type: choice
+        options:
+          - 'both'
+          - 'core_only'
+          - 'pro_only'
   push:
     branches:
       - master
@@ -78,15 +79,17 @@ env:
   DURATION: ${{ github.event.inputs.duration || '30s' }}
   REQUEST_TIMEOUT: ${{ github.event.inputs.request_timeout || '60s' }}
   CONNECTIONS: ${{ github.event.inputs.connections || 10 }}
-  MAX_CONNECTIONS: ${{ github.event.inputs.max_connections || github.event.inputs.connections || 10 }}
+  MAX_CONNECTIONS: ${{ github.event.inputs.connections || 10 }}
   WEB_CONCURRENCY: ${{ github.event.inputs.web_concurrency || 4 }}
-  RAILS_MAX_THREADS: ${{ github.event.inputs.rails_max_threads || 3 }}
-  RAILS_MIN_THREADS: ${{ github.event.inputs.rails_min_threads || github.event.inputs.rails_max_threads || 3 }}
+  RAILS_MAX_THREADS: ${{ github.event.inputs.rails_threads || 3 }}
+  RAILS_MIN_THREADS: ${{ github.event.inputs.rails_threads || 3 }}
   TOOLS: ${{ github.event.inputs.tools || 'fortio,vegeta,k6' }}
 
 jobs:
   benchmark:
     runs-on: ubuntu-latest
+    env:
+      REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE }}
 
     steps:
       # ============================================
@@ -183,8 +186,8 @@ jobs:
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '3.4'
-          bundler: 2.5.9
+          ruby-version: ${{ env.RUBY_VERSION }}
+          bundler: ${{ env.BUNDLER_VERSION }}
 
       - name: Get gem home directory
         run: echo "GEM_HOME_PATH=$(gem env home)" >> $GITHUB_ENV
@@ -229,29 +232,34 @@ jobs:
         run: cd packages/react-on-rails && yarn install --no-progress --no-emoji --frozen-lockfile && yalc publish
 
       - name: yalc add react-on-rails
+        if: github.event.inputs.app_version != 'pro_only'
         run: cd spec/dummy && yalc add react-on-rails
 
       - name: Install Node modules with Yarn for dummy app
+        if: github.event.inputs.app_version != 'pro_only'
         run: cd spec/dummy && yarn install --no-progress --no-emoji
 
       - name: Save dummy app ruby gems to cache
+        if: github.event.inputs.app_version != 'pro_only'
         uses: actions/cache@v4
         with:
           path: spec/dummy/vendor/bundle
           key: dummy-app-gem-cache-${{ hashFiles('spec/dummy/Gemfile.lock') }}
 
       - name: Install Ruby Gems for dummy app
+        if: github.event.inputs.app_version != 'pro_only'
         run: |
           cd spec/dummy
           bundle lock --add-platform 'x86_64-linux'
           if ! bundle check --path=vendor/bundle; then
-            bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
+            bundle _2.5.4_ install --path=vendor/bundle --jobs=4 --retry=3
           fi
 
       - name: generate file system-based packs
         run: cd spec/dummy && RAILS_ENV="production" bundle exec rake react_on_rails:generate_packs
 
       - name: Prepare production assets
+        if: github.event.inputs.app_version != 'pro_only'
         run: |
           set -e  # Exit on any error
           echo "🔨 Building production assets..."
@@ -265,6 +273,7 @@ jobs:
           echo "✅ Production assets built successfully"
 
       - name: Start production server
+        if: github.event.inputs.app_version != 'pro_only'
         run: |
           set -e  # Exit on any error
           echo "🚀 Starting production server..."
@@ -289,14 +298,15 @@ jobs:
           exit 1
 
       # ============================================
-      # STEP 5: RUN BENCHMARKS
+      # STEP 5: RUN CORE BENCHMARKS
       # ============================================
 
-      - name: Execute benchmark suite
-        timeout-minutes: 20
+      - name: Execute Core benchmark suite
+        if: github.event.inputs.app_version != 'pro_only'
+        timeout-minutes: 120
         run: |
           set -e  # Exit on any error
-          echo "🏃 Running benchmark suite..."
+          echo "🏃 Running Core benchmark suite..."
 
           if ! ruby spec/performance/bench.rb; then
             echo "❌ ERROR: Benchmark execution failed"
@@ -305,7 +315,8 @@ jobs:
 
           echo "✅ Benchmark suite completed successfully"
 
-      - name: Validate benchmark results
+      - name: Validate Core benchmark results
+        if: github.event.inputs.app_version != 'pro_only'
         run: |
           set -e  # Exit on any error
           echo "🔍 Validating benchmark output files..."
@@ -343,39 +354,183 @@ jobs:
             echo "Continuing with available results..."
           fi
 
-      # ============================================
-      # STEP 6: COLLECT BENCHMARK RESULTS
-      # ============================================
-
-      - name: Upload benchmark results
+      - name: Upload Core benchmark results
         uses: actions/upload-artifact@v4
-        if: always()  # Upload even if benchmark fails
+        if: github.event.inputs.app_version != 'pro_only' && always()
         with:
-          name: benchmark-results-${{ github.run_number }}
+          name: benchmark-core-results-${{ github.run_number }}
           path: bench_results/
           retention-days: 30
           if-no-files-found: warn
 
-      - name: Verify artifact upload
-        if: success()
+      # ============================================
+      # STEP 6: SETUP PRO APPLICATION SERVER
+      # ============================================
+      - name: Cache Pro package node modules
+        if: github.event.inputs.app_version != 'core_only'
+        uses: actions/cache@v4
+        with:
+          path: react_on_rails_pro/node_modules
+          key: v4-pro-package-node-modules-cache-${{ hashFiles('react_on_rails_pro/yarn.lock') }}
+
+      - name: Cache Pro dummy app node modules
+        if: github.event.inputs.app_version != 'core_only'
+        uses: actions/cache@v4
+        with:
+          path: react_on_rails_pro/spec/dummy/node_modules
+          key: v4-pro-dummy-app-node-modules-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/yarn.lock') }}
+
+      - name: Cache Pro dummy app Ruby gems
+        if: github.event.inputs.app_version != 'core_only'
+        uses: actions/cache@v4
+        with:
+          path: react_on_rails_pro/spec/dummy/vendor/bundle
+          key: v4-pro-dummy-app-gem-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/Gemfile.lock') }}
+
+      - name: Install Node modules with Yarn for Pro package
+        if: github.event.inputs.app_version != 'core_only'
         run: |
-          echo "✅ Benchmark results uploaded as workflow artifacts"
-          echo "📦 Artifact name: benchmark-results-${{ github.run_number }}"
-          echo "🔗 Access artifacts from the Actions tab in GitHub"
+          cd react_on_rails_pro
+          sudo yarn global add yalc
+          yarn install --frozen-lockfile --no-progress --no-emoji
+
+      - name: Install Node modules with Yarn for Pro dummy app
+        if: github.event.inputs.app_version != 'core_only'
+        run: cd react_on_rails_pro/spec/dummy && yarn install --frozen-lockfile --no-progress --no-emoji
+
+      - name: Cache Pro dummy app Ruby gems
+        if: env.RUN_PRO
+        uses: actions/cache@v4
+        with:
+          path: react_on_rails_pro/spec/dummy/vendor/bundle
+          key: v4-pro-dummy-app-gem-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/Gemfile.lock') }}
+
+      - name: Install Ruby Gems for Pro dummy app
+        if: github.event.inputs.app_version != 'core_only'
+        run: |
+          cd react_on_rails_pro/spec/dummy
+          bundle lock --add-platform 'x86_64-linux'
+          bundle config set path vendor/bundle
+          bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
+
+      - name: Generate file-system based entrypoints for Pro
+        if: github.event.inputs.app_version != 'core_only'
+        run: cd react_on_rails_pro/spec/dummy && bundle exec rake react_on_rails:generate_packs
+
+      - name: Prepare Pro production assets
+        if: github.event.inputs.app_version != 'core_only'
+        run: |
+          set -e
+          echo "🔨 Building Pro production assets..."
+          cd react_on_rails_pro/spec/dummy
+
+          if ! bin/prod-assets; then
+            echo "❌ ERROR: Failed to build production assets"
+            exit 1
+          fi
+
+          echo "✅ Production assets built successfully"
+
+      - name: Start Pro production server
+        if: github.event.inputs.app_version != 'core_only'
+        run: |
+          set -e
+          echo "🚀 Starting Pro production server..."
+          cd react_on_rails_pro/spec/dummy
+
+          # Start server in background
+          bin/prod &
+          echo "Server started in background"
+
+          # Wait for server to be ready (max 30 seconds)
+          echo "⏳ Waiting for server to be ready..."
+          for i in {1..30}; do
+            if curl -fsS http://localhost:3001 > /dev/null; then
+              echo "✅ Server is ready and responding"
+              exit 0
+            fi
+            echo "  Attempt $i/30: Server not ready yet..."
+            sleep 1
+          done
+
+          echo "❌ ERROR: Server failed to start within 30 seconds"
+          exit 1
 
       # ============================================
-      # WORKFLOW COMPLETION
+      # STEP 7: RUN PRO BENCHMARKS
       # ============================================
 
+      - name: Execute Pro benchmark suite
+        if: github.event.inputs.app_version != 'core_only'
+        timeout-minutes: 120
+        run: |
+          set -e
+          echo "🏃 Running Pro benchmark suite..."
+
+          if ! PRO=true ruby spec/performance/bench.rb; then
+            echo "❌ ERROR: Benchmark execution failed"
+            exit 1
+          fi
+
+          echo "✅ Benchmark suite completed successfully"
+
+      - name: Validate Pro benchmark results
+        if: github.event.inputs.app_version != 'core_only'
+        run: |
+          set -e
+          echo "🔍 Validating Pro benchmark output files..."
+
+          RESULTS_DIR="bench_results"
+          REQUIRED_FILES=("summary.txt")
+          MISSING_FILES=()
+
+          if [ ! -d "${RESULTS_DIR}" ]; then
+            echo "❌ ERROR: Benchmark results directory '${RESULTS_DIR}' not found"
+            exit 1
+          fi
+
+          echo "Generated files:"
+          ls -lh ${RESULTS_DIR}/ || true
+          echo ""
+
+          for file in "${REQUIRED_FILES[@]}"; do
+            if [ ! -f "${RESULTS_DIR}/${file}" ]; then
+              MISSING_FILES+=("${file}")
+            fi
+          done
+
+          if [ ${#MISSING_FILES[@]} -eq 0 ]; then
+            echo "✅ All required benchmark output files present"
+            echo "📊 Summary preview:"
+            head -20 ${RESULTS_DIR}/summary.txt || true
+          else
+            echo "⚠️ WARNING: Some required files are missing:"
+            printf '  - %s\n' "${MISSING_FILES[@]}"
+            echo "Continuing with available results..."
+          fi
+
+      - name: Upload Pro benchmark results
+        uses: actions/upload-artifact@v4
+        if: github.event.inputs.app_version != 'core_only' && always()
+        with:
+          name: benchmark-pro-results-${{ github.run_number }}
+          path: bench_results/
+          retention-days: 30
+          if-no-files-found: warn
+
+      # ============================================
+      # STEP 8: WORKFLOW COMPLETION
+      # ============================================
       - name: Workflow summary
         if: always()
         run: |
           echo "📋 Benchmark Workflow Summary"
-          echo "=============================="
+          echo "===================================="
           echo "Status: ${{ job.status }}"
           echo "Run number: ${{ github.run_number }}"
           echo "Triggered by: ${{ github.actor }}"
           echo "Branch: ${{ github.ref_name }}"
+          echo "App version: ${{ github.event.inputs.app_version || 'both' }}"
           echo ""
           if [ "${{ job.status }}" == "success" ]; then
             echo "✅ All steps completed successfully"
