@@ -26,6 +26,9 @@
     },
     {
       "pattern": "^https://reactrails\\.slack\\.com"
+    },
+    {
+      "pattern": "^https://www\\.linkedin\\.com"
     }
   ],
   "replacementPatterns": [
