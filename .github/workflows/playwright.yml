@@ -23,7 +23,7 @@ jobs:
           cache: 'yarn'
 
       - name: Install yalc globally
-        run: npm install -g yalc
+        run: yarn global add yalc
 
       - name: Install root dependencies
         run: yarn install

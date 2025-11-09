@@ -5,7 +5,7 @@ if defined?(DatabaseCleaner)
   DatabaseCleaner.strategy = :truncation
   DatabaseCleaner.clean
 else
-  logger.warn "add database_cleaner or update cypress/app_commands/clean.rb"
+  Rails.logger.warn "add database_cleaner or update cypress/app_commands/clean.rb"
   Post.delete_all if defined?(Post)
 end
 

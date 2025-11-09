@@ -71,7 +71,7 @@ module.exports = defineConfig({
 
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: 'RAILS_ENV=test bundle exec rails server -p 5017',
+    command: 'RAILS_ENV=test bundle exec rails server -b 127.0.0.1 -p 5017',
     url: 'http://127.0.0.1:5017',
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,

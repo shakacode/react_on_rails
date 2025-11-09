@@ -1,4 +1,4 @@
-import { request, expect } from '@playwright/test';
+import { request } from '@playwright/test';
 import config from '../../playwright.config';
 
 const contextPromise = request.newContext({
@@ -9,8 +9,12 @@ const appCommands = async (data) => {
   const context = await contextPromise;
   const response = await context.post('/__e2e__/command', { data });
 
-  expect(response.ok()).toBeTruthy();
-  return response.body;
+  if (!response.ok()) {
+    const text = await response.text();
+    throw new Error(`Rails command '${data.name}' failed: ${response.status()} - ${text}`);
+  }
+
+  return response.json();
 };
 
 const app = (name, options = {}) => appCommands({ name, options }).then((body) => body[0]);
@@ -20,22 +24,32 @@ const appFactories = (options) => app('factory_bot', options);
 
 const appVcrInsertCassette = async (cassetteName, options) => {
   const context = await contextPromise;
-  // eslint-disable-next-line no-param-reassign
-  if (!options) options = {};
+  const normalizedOptions = options || {};
+  const cleanedOptions = Object.fromEntries(
+    Object.entries(normalizedOptions).filter(([, value]) => value !== undefined),
+  );
 
-  // eslint-disable-next-line no-param-reassign
-  Object.keys(options).forEach((key) => (options[key] === undefined ? delete options[key] : {}));
-  const response = await context.post('/__e2e__/vcr/insert', { data: [cassetteName, options] });
-  expect(response.ok()).toBeTruthy();
-  return response.body;
+  const response = await context.post('/__e2e__/vcr/insert', { data: [cassetteName, cleanedOptions] });
+
+  if (!response.ok()) {
+    const text = await response.text();
+    throw new Error(`VCR insert cassette '${cassetteName}' failed: ${response.status()} - ${text}`);
+  }
+
+  return response.json();
 };
 
 const appVcrEjectCassette = async () => {
   const context = await contextPromise;
 
   const response = await context.post('/__e2e__/vcr/eject');
-  expect(response.ok()).toBeTruthy();
-  return response.body;
+
+  if (!response.ok()) {
+    const text = await response.text();
+    throw new Error(`VCR eject cassette failed: ${response.status()} - ${text}`);
+  }
+
+  return response.json();
 };
 
 export { appCommands, app, appScenario, appEval, appFactories, appVcrInsertCassette, appVcrEjectCassette };
