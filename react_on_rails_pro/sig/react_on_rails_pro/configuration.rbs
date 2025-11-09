@@ -1,0 +1,100 @@
+module ReactOnRailsPro
+  class Configuration
+    DEFAULT_RENDERER_URL: String
+    DEFAULT_RENDERER_METHOD: String
+    DEFAULT_RENDERER_FALLBACK_EXEC_JS: bool
+    DEFAULT_RENDERER_HTTP_POOL_SIZE: Integer
+    DEFAULT_RENDERER_HTTP_POOL_TIMEOUT: Integer
+    DEFAULT_RENDERER_HTTP_POOL_WARN_TIMEOUT: Float
+    DEFAULT_SSR_TIMEOUT: Integer
+    DEFAULT_PRERENDER_CACHING: bool
+    DEFAULT_TRACING: bool
+    DEFAULT_DEPENDENCY_GLOBS: Array[untyped]
+    DEFAULT_EXCLUDED_DEPENDENCY_GLOBS: Array[untyped]
+    DEFAULT_REMOTE_BUNDLE_CACHE_ADAPTER: nil
+    DEFAULT_RENDERER_REQUEST_RETRY_LIMIT: Integer
+    DEFAULT_THROW_JS_ERRORS: bool
+    DEFAULT_RENDERING_RETURNS_PROMISES: bool
+    DEFAULT_PROFILE_SERVER_RENDERING_JS_CODE: bool
+    DEFAULT_RAISE_NON_SHELL_SERVER_RENDERING_ERRORS: bool
+    DEFAULT_ENABLE_RSC_SUPPORT: bool
+    DEFAULT_RSC_PAYLOAD_GENERATION_URL_PATH: String
+    DEFAULT_RSC_BUNDLE_JS_FILE: String
+    DEFAULT_REACT_CLIENT_MANIFEST_FILE: String
+    DEFAULT_REACT_SERVER_CLIENT_MANIFEST_FILE: String
+
+    attr_accessor renderer_url: String?
+    attr_accessor renderer_password: String?
+    attr_accessor tracing: bool?
+    attr_accessor server_renderer: String?
+    attr_accessor renderer_use_fallback_exec_js: bool?
+    attr_accessor prerender_caching: bool?
+    attr_accessor renderer_http_pool_size: Integer?
+    attr_accessor renderer_http_pool_timeout: Integer?
+    attr_accessor renderer_http_pool_warn_timeout: Float?
+    attr_accessor dependency_globs: Array[String]?
+    attr_accessor excluded_dependency_globs: Array[String]?
+    attr_accessor rendering_returns_promises: bool?
+    attr_accessor remote_bundle_cache_adapter: Module?
+    attr_accessor ssr_pre_hook_js: String?
+    attr_accessor assets_to_copy: Array[String]?
+    attr_accessor renderer_request_retry_limit: Integer?
+    attr_accessor throw_js_errors: bool?
+    attr_accessor ssr_timeout: Integer?
+    attr_accessor profile_server_rendering_js_code: bool?
+    attr_accessor raise_non_shell_server_rendering_errors: bool?
+    attr_accessor enable_rsc_support: bool?
+    attr_accessor rsc_payload_generation_url_path: String?
+    attr_accessor rsc_bundle_js_file: String?
+    attr_accessor react_client_manifest_file: String?
+    attr_accessor react_server_client_manifest_file: String?
+
+    def initialize: (
+      ?renderer_url: String?,
+      ?renderer_password: String?,
+      ?server_renderer: String?,
+      ?renderer_use_fallback_exec_js: bool?,
+      ?prerender_caching: bool?,
+      ?renderer_http_pool_size: Integer?,
+      ?renderer_http_pool_timeout: Integer?,
+      ?renderer_http_pool_warn_timeout: Float?,
+      ?tracing: bool?,
+      ?dependency_globs: Array[String]?,
+      ?excluded_dependency_globs: Array[String]?,
+      ?rendering_returns_promises: bool?,
+      ?remote_bundle_cache_adapter: Module?,
+      ?ssr_pre_hook_js: String?,
+      ?assets_to_copy: Array[String]?,
+      ?renderer_request_retry_limit: Integer?,
+      ?throw_js_errors: bool?,
+      ?ssr_timeout: Integer?,
+      ?profile_server_rendering_js_code: bool?,
+      ?raise_non_shell_server_rendering_errors: bool?,
+      ?enable_rsc_support: bool?,
+      ?rsc_payload_generation_url_path: String?,
+      ?rsc_bundle_js_file: String?,
+      ?react_client_manifest_file: String?,
+      ?react_server_client_manifest_file: String?
+    ) -> void
+
+    def setup_config_values: () -> void
+
+    def check_react_on_rails_support_for_rsc: () -> void
+
+    def setup_execjs_profiler_if_needed: () -> void
+
+    def node_renderer?: () -> bool
+
+    private
+
+    def setup_assets_to_copy: () -> void
+
+    def configure_default_url_if_not_provided: () -> void
+
+    def validate_url: () -> void
+
+    def validate_remote_bundle_cache_adapter: () -> void
+
+    def setup_renderer_password: () -> void
+  end
+end

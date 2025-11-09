@@ -34,5 +34,26 @@ namespace :rbs do
     sig_files.each { |f| puts "  #{f}" }
     puts "\nTotal: #{sig_files.count} files"
   end
+
+  desc "Run Steep type checker"
+  task :steep do
+    puts "Running Steep type checker..."
+
+    result = system("bundle exec steep check")
+
+    case result
+    when true
+      puts "✓ Steep type checking passed"
+    when false
+      puts "✗ Steep type checking failed"
+      exit 1
+    when nil
+      puts "✗ Steep command not found or could not be executed"
+      exit 1
+    end
+  end
+
+  desc "Run all RBS checks (validate + steep)"
+  task all: %i[validate steep]
 end
 # rubocop:enable Metrics/BlockLength

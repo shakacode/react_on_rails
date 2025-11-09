@@ -1,0 +1,7 @@
+module ReactOnRailsPro
+  module Cache
+    def self.fetch: (String key) { () -> String } -> String
+
+    def self.enabled?: () -> bool
+  end
+end

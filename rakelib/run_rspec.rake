@@ -22,7 +22,9 @@ namespace :run_rspec do
 
   desc "Run RSpec for top level only"
   task :gem do
-    run_tests_in("", rspec_args: File.join("spec", "react_on_rails"))
+    run_tests_in("",
+                 rspec_args: File.join("spec", "react_on_rails"),
+                 env_vars: "RBS_TEST_TARGET='ReactOnRails::*' RUBYOPT='-rrbs/test/setup'")
   end
 
   desc "Runs dummy rspec with turbolinks"

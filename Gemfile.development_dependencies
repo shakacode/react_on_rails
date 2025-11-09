@@ -34,6 +34,7 @@ group :development, :test do
   gem "pry-rails"
   gem "pry-rescue"
   gem "rbs", require: false
+  gem "steep", require: false
   gem "rubocop", "1.61.0", require: false
   gem "rubocop-performance", "~>1.20.0", require: false
   gem "rubocop-rspec", "~>2.26", require: false
