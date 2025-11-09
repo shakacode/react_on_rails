@@ -51,9 +51,6 @@ module ReactOnRails
       server_bundle_output_path: "ssr-generated",
       enforce_private_server_bundles: false
     )
-    # TODO: Add automatic detection of server_bundle_output_path from shakapacker.yml
-    # See feature/shakapacker-yml-integration branch for implementation
-    # Requires Shakapacker v8.5.0+ and semantic version checking
   end
 
   class Configuration
