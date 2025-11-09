@@ -9,8 +9,8 @@ namespace :rbs do
 
     puts "Validating RBS type signatures..."
 
-    # Run RBS validate
-    result = system("bundle exec rbs -I sig validate")
+    # Run RBS validate (use rbs directly, not bundle exec since we're already in bundle context)
+    result = system("rbs -I sig validate")
 
     case result
     when true
@@ -39,7 +39,8 @@ namespace :rbs do
   task :steep do
     puts "Running Steep type checker..."
 
-    result = system("bundle exec steep check")
+    # Use steep directly, not bundle exec since we're already in bundle context
+    result = system("steep check")
 
     case result
     when true
