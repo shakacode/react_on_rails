@@ -4,6 +4,10 @@
 >
 > This Redux API is no longer recommended as it prevents dynamic code splitting for performance. Instead, you should use the standard `react_component` view helper passing in a "Render-Function."
 
+> [!IMPORTANT]
+>
+> **Script Loading Requirement:** If you use Redux shared stores with inline component registration (registering components in view templates with `<script>ReactOnRails.register({ MyComponent })</script>`), you **must use `defer: true`** in your `javascript_pack_tag` instead of `async: true`. With async loading, the bundle may execute before inline scripts, causing component registration failures. See the [Streaming Server Rendering documentation](../building-features/streaming-server-rendering.md#important-redux-shared-store-caveat) for details and alternatives.
+
 You don't need to use the `redux_store` api to use Redux. This API was set up to support multiple calls to `react_component` on one page that all talk to the same Redux store.
 
 If you are only rendering one React component on a page, as is typical to do a "Single Page App" in React, then you should _probably_ pass the props to your React component in a "Render-Function."
