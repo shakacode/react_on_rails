@@ -3,19 +3,17 @@
 // loaded automatically before your test files.
 //
 // This is a great place to put global configuration and
-// behavior that modifies Cypress.
+// behavior that modifies Playwright.
 //
-// You can change the location of this file or turn off
-// automatically serving support files with the
-// 'supportFile' configuration option.
+// This file is automatically loaded before test execution
+// to set up global hooks, fixtures, and helper functions.
 //
 // You can read more here:
-// https://on.cypress.io/configuration
+// https://playwright.dev/docs/test-fixtures
 // ***********************************************************
 
-// Import commands.js using ES2015 syntax:
+// Import Playwright-Rails helper functions:
 import './on-rails';
-// import 'cypress-on-rails/support/index'
 
 // Alternatively you can use CommonJS syntax:
-// require('./commands')
+// require('./on-rails')
