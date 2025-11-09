@@ -89,6 +89,10 @@ jobs:
         run: bundle check --path=vendor/bundle || bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
       - name: Lint Ruby
         run: bundle exec rubocop
+      - name: Validate RBS type signatures
+        run: bundle exec rake rbs:validate
+      - name: Run Steep type checker
+        run: bundle exec rake rbs:steep
       - name: Install Node modules with Yarn for dummy app
         run: cd spec/dummy && yarn install --no-progress --no-emoji --frozen-lockfile
       - name: Save dummy app ruby gems to cache

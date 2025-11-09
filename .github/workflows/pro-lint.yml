@@ -141,6 +141,9 @@ jobs:
       - name: Lint Ruby
         run: bundle exec rubocop
 
+      - name: Validate RBS type signatures
+        run: bundle exec rbs -I sig validate
+
       - name: Lint JS
         run: yarn run nps eslint
 
