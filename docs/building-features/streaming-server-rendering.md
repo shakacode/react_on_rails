@@ -257,6 +257,25 @@ With Shakapacker ≥ 8.2.0, `async: true` is recommended even for non-streaming 
 
 Note: `async: true` with the `immediate_hydration` feature allows components to hydrate during page load, improving TTI even without streaming. See the Immediate Hydration section below for configuration details.
 
+**⚠️ Important: Redux Shared Store Caveat**
+
+If you are using Redux shared stores with the `redux_store` helper and **inline script registration** (registering components in view templates with `<script>ReactOnRails.register({ MyComponent })</script>`), you must use `defer: true` instead of `async: true`:
+
+```erb
+<!-- ⚠️ REQUIRED for Redux shared stores with inline registration -->
+<%= javascript_pack_tag('client-bundle', 'data-turbo-track': 'reload', defer: true) %>
+```
+
+**Why?** With `async: true`, the bundle executes immediately upon download, potentially **before** inline `<script>` tags in the HTML execute. This causes component registration failures when React on Rails tries to hydrate the component.
+
+**Solutions:**
+
+1. **Use `defer: true`** - Ensures proper execution order (inline scripts run before bundle)
+2. **Move registration to bundle** - Register components in your JavaScript bundle instead of inline scripts (recommended)
+3. **Use React on Rails Pro** - Pro's `getOrWaitForStore` and `getOrWaitForStoreGenerator` can handle async loading with inline registration
+
+See the [Redux Store API documentation](../api-reference/redux-store-api.md) for more details on Redux shared stores.
+
 #### Why Async is Better Than No Defer
 
 With Shakapacker ≥ 8.2.0, using `async: true` provides the best performance:
