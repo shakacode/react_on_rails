@@ -81,7 +81,33 @@ Failed CI jobs:
 
 Will run the following commands:
   • dummy-app-integration-tests: bundle exec rake run_rspec:all_dummy
+
+💡 Tip: For RSpec failures, you can run specific failing examples:
+   1. Go to the failed job on GitHub Actions
+   2. Copy the 'Failed examples:' section
+   3. Run: pbpaste | bin/ci-run-failed-specs
 ```
+
+#### Run Only Failed Examples (Even More Targeted!)
+
+When RSpec tests fail, run just those specific examples:
+
+```bash
+# Copy failure output from GitHub Actions, then:
+pbpaste | bin/ci-run-failed-specs
+
+# Or pass spec paths directly:
+bin/ci-run-failed-specs './spec/system/integration_spec.rb[1:1:1:1]'
+
+# Or from a file:
+bin/ci-run-failed-specs < failures.txt
+```
+
+This script:
+- 🎯 **Runs only failing examples** - not the entire test suite
+- 📋 **Parses RSpec output** - extracts spec paths automatically
+- 🔄 **Deduplicates** - removes duplicate specs
+- 📁 **Auto-detects directory** - runs from spec/dummy when needed
 
 #### Smart Test Detection
 
