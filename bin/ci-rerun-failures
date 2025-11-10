@@ -15,12 +15,48 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Show help
+show_help() {
+  cat << EOF
+${BLUE}CI Failure Re-runner${NC}
+
+Automatically detects failed CI jobs from GitHub and re-runs them locally.
+
+${YELLOW}Usage:${NC}
+  bin/ci-rerun-failures [OPTIONS] [PR_NUMBER]
+
+${YELLOW}Options:${NC}
+  --previous, --prev, -p    Search recent commits for failures (when current is clean)
+  --help, -h                Show this help message
+
+${YELLOW}Examples:${NC}
+  bin/ci-rerun-failures              # Check current commit
+  bin/ci-rerun-failures --previous   # Find failures in recent commits
+  bin/ci-rerun-failures 1964         # Check specific PR number
+
+${YELLOW}Features:${NC}
+  - Fetches actual CI failures from GitHub using gh CLI
+  - Waits for in-progress CI jobs (polls every 30s)
+  - Maps CI job names to local rake commands
+  - Deduplicates commands
+  - Shows what will run before executing
+
+${YELLOW}Related Tools:${NC}
+  bin/ci-run-failed-specs    Run specific failing RSpec examples
+  bin/ci-local               Smart test detection based on code changes
+EOF
+  exit 0
+}
+
 # Parse arguments
 USE_PREVIOUS=false
 PR_NUMBER=""
 
 while [[ $# -gt 0 ]]; do
   case $1 in
+    --help|-h)
+      show_help
+      ;;
     --previous|--prev|-p)
       USE_PREVIOUS=true
       shift
