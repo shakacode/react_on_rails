@@ -59,13 +59,11 @@
 ## Developer Experience
 
 - [ ] **bin/dev help command enhancements**
-
   - [x] Add emojis and colors for better readability
   - [ ] Add section about component development patterns
   - [ ] Include troubleshooting for client/server split issues
 
 - [ ] **Babel Configuration Conflict Detection**
-
   - [ ] Add validation in generator/initializer to detect conflicting Babel configs
   - [ ] Improve error messaging for duplicate preset issues
   - [ ] Common conflict: babel.config.js + package.json "babel" section

@@ -607,22 +607,18 @@ This approach:
 **Common Issues and Solutions:**
 
 1. **React components not rendering (empty divs)**
-
    - **Cause**: Missing yalc setup for JavaScript package
    - **Solution**: Follow yalc setup steps above after running generator
 
 2. **Generator fails with Shakapacker errors**
-
    - **Cause**: Conflicting Shakapacker versions or incomplete installation
    - **Solution**: Clean reset and ensure consistent Shakapacker version across tests
 
 3. **Babel configuration conflicts during yalc development**
-
    - **Cause**: Both `babel.config.js` and `package.json` "babel" section defining presets
    - **Solution**: Remove "babel" section from `package.json`, keep only `babel.config.js`
 
 4. **"Package.json not found" errors**
-
    - **Cause**: Generator trying to access non-existent package.json files
    - **Solution**: Test with commits that fix this specific issue (e.g., bc69dcd0)
 

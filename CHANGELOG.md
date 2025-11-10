@@ -38,7 +38,6 @@ Changes since the last non-beta release.
 #### Changed
 
 - **Shakapacker 9.0.0 Upgrade**: Upgraded Shakapacker from 8.2.0 to 9.0.0 with Babel transpiler configuration for compatibility. Key changes include:
-
   - Configured `javascript_transpiler: babel` in shakapacker.yml (Shakapacker 9.0 defaults to SWC which has PropTypes handling issues)
   - Added precompile hook support via `bin/shakapacker-precompile-hook` for ReScript builds and pack generation
   - Configured CSS Modules to use default exports (`namedExport: false`) for backward compatibility with existing `import styles from` syntax
@@ -100,7 +99,6 @@ To migrate to React on Rails Pro:
 **Note:** If you're not using any of the Pro-only methods listed above, no changes are required.
 
 - **Pro-Specific Configurations Moved to Pro Gem**: The following React Server Components (RSC) configurations have been moved from `ReactOnRails.configure` to `ReactOnRailsPro.configure`:
-
   - `rsc_bundle_js_file` - Path to the RSC bundle file
   - `react_server_client_manifest_file` - Path to the React server client manifest
   - `react_client_manifest_file` - Path to the React client manifest
@@ -126,7 +124,6 @@ To migrate to React on Rails Pro:
   See the [React on Rails Pro Configuration docs](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/docs/configuration.md) for more details.
 
 - **Streaming View Helpers Moved to Pro Gem**: The following view helpers have been removed from the open-source gem and are now only available in React on Rails Pro:
-
   - `stream_react_component` - Progressive SSR using React 18+ streaming
   - `rsc_payload_react_component` - RSC payload rendering
 
@@ -151,12 +148,10 @@ To migrate to React on Rails Pro:
 #### New Features
 
 - **Server Bundle Security**: Added new configuration options for enhanced server bundle security and organization:
-
   - `server_bundle_output_path`: Configurable directory (relative to the Rails root) for server bundle output (default: "ssr-generated"). If set to `nil`, the server bundle will be loaded from the same public directory as client bundles. [PR 1798](https://github.com/shakacode/react_on_rails/pull/1798) by [justin808](https://github.com/justin808)
   - `enforce_private_server_bundles`: When enabled, ensures server bundles are only loaded from private directories outside the public folder (default: false for backward compatibility) [PR 1798](https://github.com/shakacode/react_on_rails/pull/1798) by [justin808](https://github.com/justin808)
 
 - **Improved Bundle Path Resolution**: Bundle path resolution for server bundles now works as follows:
-
   - If `server_bundle_output_path` is set, the server bundle is loaded from that directory.
   - If `server_bundle_output_path` is not set, the server bundle falls back to the client bundle directory (typically the public output path).
   - If `enforce_private_server_bundles` is enabled:
@@ -268,7 +263,6 @@ See [Release Notes](docs/release-notes/16.0.0.md) for complete migration guide.
 
 - **`defer_generated_component_packs` deprecated** → use `generated_component_packs_loading_strategy`
 - Migration:
-
   - `defer_generated_component_packs: true` → `generated_component_packs_loading_strategy: :defer`
   - `defer_generated_component_packs: false` → `generated_component_packs_loading_strategy: :sync`
   - Recommended: `generated_component_packs_loading_strategy: :async` for best performance
@@ -677,7 +671,6 @@ for details.
 - Removal of config.symlink_non_digested_assets_regex as it's no longer needed with rails/webpacker.
   If any business needs this, we can move the code to a separate gem.
 - Added configuration option `same_bundle_for_client_and_server` with default `false` because
-
   1. Production applications would typically have a server bundle that differs from the client bundle
   2. This change only affects trying to use HMR with react_on_rails with rails/webpacker.
 
@@ -1395,13 +1388,11 @@ No changes.
 - Added automatic compilation of assets at precompile is now done by ReactOnRails. Thus, you don't need to provide your own `assets.rake` file that does the precompilation.
   [#398](https://github.com/shakacode/react_on_rails/pull/398) by [robwise](https://github.com/robwise), [jbhatab](https://github.com/jbhatab), and [justin808](https://github.com/justin808).
 - **Migration to v6**
-
   - Do not run the generator again if you've already run it.
 
   - See [shakacode/react-webpack-rails-tutorial/pull/287](https://github.com/shakacode/react-webpack-rails-tutorial/pull/287) for an example of upgrading from v5.
 
   - To configure the asset compilation you can either
-
     1. Specify a `config/react_on_rails` setting for `build_production_command` to be nil to turn this feature off.
     2. Specify the script command you want to run to build your production assets, and remove your `assets.rake` file.
 
