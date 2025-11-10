@@ -44,9 +44,15 @@ const configureServer = () => {
   };
   serverWebpackConfig.plugins.unshift(new bundler.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));
 
-  // Custom output for the server-bundle that matches the config in
-  // config/initializers/react_on_rails.rb
-  // Server bundles are output to a private directory (not public) for security
+  // Custom output for the server-bundle
+  // ⚠️ IMPORTANT: This output.path must match server_bundle_output_path in
+  //              config/initializers/react_on_rails.rb
+  //
+  // Both are currently set to 'ssr-generated' (relative to Rails.root)
+  // Keeping these in sync ensures React on Rails can find the server bundle at runtime.
+  //
+  // Server bundles are output to a private directory (not public) for security.
+  // This prevents server-side code from being exposed via the web server.
   serverWebpackConfig.output = {
     filename: 'server-bundle.js',
     globalObject: 'this',
