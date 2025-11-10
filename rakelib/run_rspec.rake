@@ -20,22 +20,50 @@ namespace :run_rspec do
 
   spec_dummy_dir = File.join("spec", "dummy")
 
+  # RBS Runtime Type Checking Configuration
+  # ========================================
+  # Runtime type checking is opt-in via ENV["ENABLE_RBS_RUNTIME_CHECKING"]
+  # This prevents silent failures and allows disabling when RBS isn't available
+  #
+  # Coverage Strategy:
+  # - :gem task - Enables checking for ReactOnRails::* (direct gem unit tests)
+  # - :dummy tasks - Enables checking (integration tests exercise gem code paths)
+  # - :example tasks - No checking (examples are user-facing demo apps)
+  #
+  # Rationale per Evil Martians best practices:
+  # Runtime checking catches type errors in actual execution paths that static
+  # analysis might miss. Dummy/integration tests exercise more code paths than
+  # unit tests alone, providing comprehensive type safety validation.
+  def rbs_runtime_env_vars
+    return "" unless ENV["ENABLE_RBS_RUNTIME_CHECKING"]
+
+    begin
+      require "rbs"
+      "RBS_TEST_TARGET='ReactOnRails::*' RUBYOPT='-rrbs/test/setup'"
+    rescue LoadError
+      warn "Warning: RBS gem not available, skipping runtime type checking"
+      ""
+    end
+  end
+
   desc "Run RSpec for top level only"
   task :gem do
     run_tests_in("",
                  rspec_args: File.join("spec", "react_on_rails"),
-                 env_vars: "RBS_TEST_TARGET='ReactOnRails::*' RUBYOPT='-rrbs/test/setup'")
+                 env_vars: rbs_runtime_env_vars)
   end
 
   desc "Runs dummy rspec with turbolinks"
   task dummy: ["dummy_apps:dummy_app"] do
-    run_tests_in(spec_dummy_dir)
+    run_tests_in(spec_dummy_dir,
+                 env_vars: rbs_runtime_env_vars)
   end
 
   desc "Runs dummy rspec without turbolinks"
   task dummy_no_turbolinks: ["dummy_apps:dummy_app"] do
+    env_vars = [rbs_runtime_env_vars, "DISABLE_TURBOLINKS=TRUE"].reject(&:empty?).join(" ")
     run_tests_in(spec_dummy_dir,
-                 env_vars: "DISABLE_TURBOLINKS=TRUE",
+                 env_vars: env_vars,
                  command_name: "dummy_no_turbolinks")
   end
 
