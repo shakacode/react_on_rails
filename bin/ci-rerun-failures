@@ -1,0 +1,147 @@
+#!/usr/bin/env bash
+# CI Failure Re-runner
+# Automatically detects failed CI jobs and re-runs them locally
+# Usage: bin/ci-rerun-failures [pr-number]
+
+set -euo pipefail
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+PR_NUMBER="${1:-}"
+
+echo -e "${BLUE}=== CI Failure Re-runner ===${NC}"
+echo ""
+
+# Fetch PR status using gh CLI
+if [ -z "$PR_NUMBER" ]; then
+  echo "Fetching current PR status..."
+  if ! gh pr view --json statusCheckRollup >/dev/null 2>&1; then
+    echo -e "${RED}Error: Not on a PR branch or gh CLI not authenticated${NC}"
+    echo "Usage: bin/ci-rerun-failures [pr-number]"
+    exit 1
+  fi
+  STATUS_JSON=$(gh pr view --json statusCheckRollup,number)
+  PR_NUMBER=$(echo "$STATUS_JSON" | jq -r '.number')
+else
+  echo "Fetching PR #$PR_NUMBER status..."
+  if ! gh pr view "$PR_NUMBER" --json statusCheckRollup >/dev/null 2>&1; then
+    echo -e "${RED}Error: PR #$PR_NUMBER not found${NC}"
+    exit 1
+  fi
+  STATUS_JSON=$(gh pr view "$PR_NUMBER" --json statusCheckRollup,number)
+fi
+
+echo -e "${GREEN}Analyzing PR #$PR_NUMBER...${NC}"
+echo ""
+
+# Parse failed checks
+FAILED_CHECKS=$(echo "$STATUS_JSON" | jq -r '.statusCheckRollup[] | select(.conclusion == "FAILURE") | .name')
+
+if [ -z "$FAILED_CHECKS" ]; then
+  echo -e "${GREEN}No failed checks found! All CI jobs passed.${NC}"
+  exit 0
+fi
+
+echo -e "${YELLOW}Failed CI jobs:${NC}"
+echo "$FAILED_CHECKS" | while read -r check; do
+  echo -e "${RED}  ✗ $check${NC}"
+done
+echo ""
+
+# Map CI job names to local commands
+declare -A JOB_MAP
+JOB_MAP["lint-js-and-ruby"]="bundle exec rubocop && yarn run eslint --report-unused-disable-directives && yarn start format.listDifferent"
+JOB_MAP["rspec-package-tests"]="bundle exec rake run_rspec:gem"
+JOB_MAP["package-js-tests"]="yarn test"
+JOB_MAP["dummy-app-integration-tests (3.4, 22, latest)"]="bundle exec rake run_rspec:all_dummy"
+JOB_MAP["dummy-app-integration-tests (3.2, 20, minimum)"]="bundle exec rake run_rspec:all_dummy"
+JOB_MAP["examples"]="bundle exec rake run_rspec:shakapacker_examples"
+
+# Track what we'll run (deduplicated)
+declare -A COMMANDS_TO_RUN
+
+while IFS= read -r check; do
+  for job_name in "${!JOB_MAP[@]}"; do
+    if [[ "$check" == "$job_name"* ]]; then
+      COMMANDS_TO_RUN["${JOB_MAP[$job_name]}"]="$job_name"
+      break
+    fi
+  done
+done <<< "$FAILED_CHECKS"
+
+if [ ${#COMMANDS_TO_RUN[@]} -eq 0 ]; then
+  echo -e "${YELLOW}No local equivalents found for failed jobs.${NC}"
+  echo "Failed jobs might be from Pro or other workflows."
+  echo ""
+  echo "You can still run common test suites:"
+  echo "  bundle exec rake run_rspec:all_dummy    # Dummy app tests"
+  echo "  bundle exec rake run_rspec:gem          # Gem tests"
+  echo "  yarn test                                 # JS tests"
+  exit 1
+fi
+
+echo -e "${BLUE}Will run the following commands:${NC}"
+for cmd in "${!COMMANDS_TO_RUN[@]}"; do
+  echo -e "${BLUE}  • ${COMMANDS_TO_RUN[$cmd]}:${NC} $cmd"
+done
+echo ""
+
+# Confirm before running
+read -p "Run these tests now? [Y/n] " -n 1 -r
+echo
+if [[ ! $REPLY =~ ^[Yy]$ ]] && [[ ! -z $REPLY ]]; then
+  echo "Cancelled."
+  exit 0
+fi
+
+echo ""
+
+# Ensure dependencies
+if [ ! -d "node_modules" ] || [ ! -d "vendor/bundle" ]; then
+  echo -e "${YELLOW}Installing dependencies...${NC}"
+  bundle install && yarn install
+  echo ""
+fi
+
+# Run commands
+FAILED_COMMANDS=()
+
+for cmd in "${!COMMANDS_TO_RUN[@]}"; do
+  job_name="${COMMANDS_TO_RUN[$cmd]}"
+  echo -e "${BLUE}▶ Running: $job_name${NC}"
+  echo -e "${BLUE}Command: $cmd${NC}"
+  echo ""
+
+  if eval "$cmd"; then
+    echo -e "${GREEN}✓ $job_name passed${NC}"
+    echo ""
+  else
+    echo -e "${RED}✗ $job_name failed${NC}"
+    echo ""
+    FAILED_COMMANDS+=("$job_name")
+  fi
+done
+
+# Summary
+echo ""
+echo -e "${BLUE}=== Summary ===${NC}"
+
+if [ ${#FAILED_COMMANDS[@]} -eq 0 ]; then
+  echo -e "${GREEN}All local tests passed! ✓${NC}"
+  echo ""
+  echo "Push your changes and CI should pass."
+  exit 0
+else
+  echo -e "${RED}Some tests still failing:${NC}"
+  for cmd in "${FAILED_COMMANDS[@]}"; do
+    echo -e "${RED}  ✗ $cmd${NC}"
+  done
+  echo ""
+  echo -e "${YELLOW}Fix these failures before pushing.${NC}"
+  exit 1
+fi

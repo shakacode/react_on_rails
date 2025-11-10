@@ -172,15 +172,16 @@ module ReactOnRails
 
       msg = <<~MSG
         ReactOnRails: Your current version of shakapacker \
-        does not support async script loading,  which may cause performance issues. Please either:
-        1. Use :sync or :defer loading strategy instead of :async
+        does not support async script loading. Please either:
+        1. Use :defer or :sync loading strategy instead of :async
         2. Upgrade to Shakapacker v8.2.0 or above to enable async script loading
       MSG
       if PackerUtils.supports_async_loading?
         self.generated_component_packs_loading_strategy ||= :async
       elsif generated_component_packs_loading_strategy.nil?
-        Rails.logger.warn("**WARNING** #{msg}")
-        self.generated_component_packs_loading_strategy = :sync
+        # Use defer as the default for older Shakapacker versions to ensure
+        # generated component packs load and register components before main bundle executes
+        self.generated_component_packs_loading_strategy = :defer
       elsif generated_component_packs_loading_strategy == :async
         raise ReactOnRails::Error, "**ERROR** #{msg}"
       end
