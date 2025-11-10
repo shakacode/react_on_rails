@@ -99,7 +99,7 @@ module ReactOnRailsPro
       def perform_request(path, **post_options) # rubocop:disable Metrics/AbcSize,Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
         # For streaming requests, use connection without retries to prevent body duplication
         # The StreamRequest class handles retries properly by starting fresh requests
-        conn = connection
+        conn = post_options[:stream] ? connection_without_retries : connection
 
         available_retries = ReactOnRailsPro.configuration.renderer_request_retry_limit
         retry_request = true
