@@ -42,5 +42,7 @@ ReactOnRails.configure do |config|
   config.components_subdirectory = "startup"
   config.auto_load_bundle = true
   config.immediate_hydration = false
-  config.generated_component_packs_loading_strategy = :async
+  # Don't explicitly set generated_component_packs_loading_strategy - let it default based on Shakapacker version
+  # - Shakapacker >= 8.2.0: defaults to :async (optimal performance)
+  # - Shakapacker < 8.2.0: defaults to :sync (compatibility)
 end
