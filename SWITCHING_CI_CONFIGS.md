@@ -53,15 +53,20 @@ The project runs tests against two configurations:
 
 ## Prerequisites
 
-You must have [asdf](https://asdf-vm.com/) installed to manage Ruby and Node versions.
+You must have a version manager like [mise](https://mise.jdx.dev/) (recommended) or [asdf](https://asdf-vm.com/) installed to manage Ruby and Node versions.
 
 ```bash
-# Install asdf if needed (macOS with Homebrew)
+# Install mise (recommended, modern alternative to asdf)
+brew install mise
+echo 'eval "$(mise activate zsh)"' >> ~/.zshrc
+source ~/.zshrc
+
+# OR install asdf (legacy option)
 brew install asdf
 echo -e "\n. $(brew --prefix asdf)/libexec/asdf.sh" >> ~/.zshrc
 source ~/.zshrc
 
-# Install plugins
+# Install plugins (only needed for asdf, mise reads from mise.toml)
 asdf plugin add ruby
 asdf plugin add nodejs
 ```
@@ -102,7 +107,7 @@ This will:
 ```bash
 # Reload your shell to pick up new Ruby/Node versions
 cd /Users/justin/conductor/react_on_rails/.conductor/kuwait-v1
-asdf current
+mise current  # or: asdf current
 
 # Build and test
 rake node_package
@@ -132,7 +137,7 @@ This will:
 ```bash
 # Reload your shell to pick up new Ruby/Node versions
 cd /Users/justin/conductor/react_on_rails/.conductor/kuwait-v1
-asdf current
+mise current  # or: asdf current
 
 # Build and test
 rake node_package
@@ -210,19 +215,27 @@ bin/ci-switch-config latest
 
 ## Troubleshooting
 
-### "asdf: No version is set for ruby"
+### "No version is set for ruby" or version didn't change
 
 After switching, you need to reload your shell:
 
 ```bash
 cd /Users/justin/conductor/react_on_rails/.conductor/kuwait-v1
-# The cd command will trigger asdf to load the new versions
+# The cd command will trigger mise/asdf to load the new versions
 ruby --version  # Verify it changed
 ```
 
 ### Ruby/Node version didn't change
 
-If asdf doesn't automatically switch:
+If your version manager doesn't automatically switch:
+
+**For mise:**
+
+```bash
+mise install  # Install missing versions from mise.toml or .tool-versions
+```
+
+**For asdf:**
 
 ```bash
 asdf install  # Install missing versions from .tool-versions
