@@ -33,6 +33,7 @@ test.describe('React on Rails Basic Components', () => {
 
   test('should handle client-side interactivity in React component', async ({ page }) => {
     await page.goto('/');
+    await page.waitForLoadState('networkidle');
 
     // Find the HelloWorld component
     const helloWorld = page.locator('#HelloWorld-react-component-1');
@@ -49,6 +50,7 @@ test.describe('React on Rails Basic Components', () => {
 
   test('should handle Redux state changes', async ({ page }) => {
     await page.goto('/');
+    await page.waitForLoadState('networkidle');
 
     // Find the Redux app component
     const reduxApp = page.locator('#ReduxApp-react-component-0');
