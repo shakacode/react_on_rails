@@ -5,7 +5,7 @@ module ReactOnRails
 
     def redux_store: (
       String store_name,
-      ?props: untyped,
+      ?props: Hash[Symbol, untyped] | String,
       ?immediate_hydration: bool
     ) -> void
 
