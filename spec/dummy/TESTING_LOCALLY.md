@@ -44,12 +44,30 @@ bundle exec rake run_rspec:gem
 
 ❌ **System tests** - May fail with SSL errors on Ruby 3.4.3 + OpenSSL 3.6
 
-### For Contributors
+### Solution: Use Ruby 3.2 (Recommended)
 
-If you need to run system tests locally:
+The easiest fix is to switch to Ruby 3.2, which CI also uses:
 
-1. Consider using Ruby 3.2 or Ruby 3.4 with OpenSSL 3.3 (not 3.6)
-2. Or rely on CI for system test verification
-3. Focus local testing on unit/integration tests that don't require browser automation
+```bash
+# If using mise/rtx
+mise use ruby@3.2
+
+# Then reinstall dependencies
+bundle install
+
+# Run system tests
+cd spec/dummy
+bundle exec rspec spec/system/integration_spec.rb
+```
+
+Ruby 3.2 doesn't have the OpenSSL 3.6 compatibility issues and matches the CI environment more closely.
+
+### Alternative Solutions
+
+If you need to run system tests locally but want to stay on Ruby 3.4:
+
+1. **Use Ruby 3.4 with OpenSSL 3.3** - Requires recompiling Ruby with an older OpenSSL
+2. **Or rely on CI** for system test verification
+3. **Focus local testing** on unit/integration tests that don't require browser automation
 
 This issue is tracked in: https://github.com/openssl/openssl/issues/20385
