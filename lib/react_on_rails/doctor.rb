@@ -1209,6 +1209,7 @@ module ReactOnRails
     # Extract output.path from webpack config, supporting multiple patterns
     def extract_webpack_output_path(webpack_content, _webpack_config_path)
       # Pattern 1: path: require('path').resolve(__dirname, '../../ssr-generated')
+      # Explicitly match ../../path pattern for clarity
       hardcoded_pattern = %r{path:\s*require\(['"]path['"]\)\.resolve\(__dirname,\s*['"]\.\./\.\./([^'"]+)['"]\)}
       if (match = webpack_content.match(hardcoded_pattern))
         return match[1]
