@@ -165,6 +165,13 @@ for cmd in "${!COMMANDS_TO_RUN[@]}"; do
 done
 echo ""
 
+# Offer to show GitHub Actions logs for more specific failures
+echo -e "${YELLOW}💡 Tip: For RSpec failures, you can run specific failing examples:${NC}"
+echo "   1. Go to the failed job on GitHub Actions"
+echo "   2. Copy the 'Failed examples:' section"
+echo "   3. Run: pbpaste | bin/ci-run-failed-specs"
+echo ""
+
 # Confirm before running
 read -p "Run these tests now? [Y/n] " -n 1 -r
 echo
