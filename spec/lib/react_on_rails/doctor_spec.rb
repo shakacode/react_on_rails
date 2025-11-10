@@ -522,4 +522,201 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
   end
+
+  describe "server bundle path validation" do
+    let(:doctor) { described_class.new }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+
+    before do
+      allow(checker).to receive(:add_info)
+      allow(checker).to receive(:add_success)
+      allow(checker).to receive(:add_warning)
+    end
+
+    describe "#validate_server_bundle_path_sync" do
+      context "when webpack config file doesn't exist" do
+        before do
+          allow(File).to receive(:exist?).with("config/webpack/serverWebpackConfig.js").and_return(false)
+        end
+
+        it "adds info message and skips validation" do
+          expected_msg = "\n  ℹ️  Webpack server config not found - skipping path validation"
+          expect(checker).to receive(:add_info).with(expected_msg)
+          doctor.send(:validate_server_bundle_path_sync, "ssr-generated")
+        end
+      end
+
+      context "when webpack config uses hardcoded path" do
+        let(:webpack_content) do
+          <<~JS
+            serverWebpackConfig.output = {
+              filename: 'server-bundle.js',
+              path: require('path').resolve(__dirname, '../../ssr-generated'),
+            };
+          JS
+        end
+
+        before do
+          allow(File).to receive(:exist?).with("config/webpack/serverWebpackConfig.js").and_return(true)
+          allow(File).to receive(:read).with("config/webpack/serverWebpackConfig.js").and_return(webpack_content)
+        end
+
+        it "reports success when paths match" do
+          expected_msg = "\n  ✅ Webpack and Rails configs are in sync (both use 'ssr-generated')"
+          expect(checker).to receive(:add_success).with(expected_msg)
+          doctor.send(:validate_server_bundle_path_sync, "ssr-generated")
+        end
+
+        it "reports warning when paths don't match" do
+          expect(checker).to receive(:add_warning).with(/Configuration mismatch detected/)
+          doctor.send(:validate_server_bundle_path_sync, "server-bundles")
+        end
+
+        it "includes both paths in warning when mismatched" do
+          expect(checker).to receive(:add_warning) do |msg|
+            expect(msg).to include('server_bundle_output_path = "server-bundles"')
+            expect(msg).to include('output.path = "ssr-generated"')
+          end
+          doctor.send(:validate_server_bundle_path_sync, "server-bundles")
+        end
+      end
+
+      context "when webpack config uses config.outputPath" do
+        let(:webpack_content) do
+          <<~JS
+            serverWebpackConfig.output = {
+              filename: 'server-bundle.js',
+              path: config.outputPath,
+            };
+          JS
+        end
+
+        before do
+          allow(File).to receive(:exist?).with("config/webpack/serverWebpackConfig.js").and_return(true)
+          allow(File).to receive(:read).with("config/webpack/serverWebpackConfig.js").and_return(webpack_content)
+        end
+
+        it "reports that it cannot validate" do
+          expect(checker).to receive(:add_info).with(/Webpack config uses config\.outputPath/)
+          doctor.send(:validate_server_bundle_path_sync, "ssr-generated")
+        end
+
+        it "does not report success or warning" do
+          expect(checker).not_to receive(:add_success)
+          expect(checker).not_to receive(:add_warning)
+          doctor.send(:validate_server_bundle_path_sync, "ssr-generated")
+        end
+      end
+
+      context "when webpack config uses a variable" do
+        let(:webpack_content) do
+          <<~JS
+            const outputPath = calculatePath();
+            serverWebpackConfig.output = {
+              path: outputPath,
+            };
+          JS
+        end
+
+        before do
+          allow(File).to receive(:exist?).with("config/webpack/serverWebpackConfig.js").and_return(true)
+          allow(File).to receive(:read).with("config/webpack/serverWebpackConfig.js").and_return(webpack_content)
+        end
+
+        it "reports that it cannot validate" do
+          expect(checker).to receive(:add_info).with(/Webpack config uses a variable/)
+          doctor.send(:validate_server_bundle_path_sync, "ssr-generated")
+        end
+      end
+
+      context "when webpack config reading fails" do
+        before do
+          allow(File).to receive(:exist?).with("config/webpack/serverWebpackConfig.js").and_return(true)
+          allow(File).to receive(:read).and_raise(StandardError, "Permission denied")
+        end
+
+        it "handles error gracefully" do
+          expect(checker).to receive(:add_info).with(/Could not validate webpack config: Permission denied/)
+          doctor.send(:validate_server_bundle_path_sync, "ssr-generated")
+        end
+      end
+    end
+
+    describe "#extract_webpack_output_path" do
+      context "with hardcoded path pattern" do
+        let(:webpack_content) do
+          "path: require('path').resolve(__dirname, '../../my-bundle-dir')"
+        end
+
+        it "extracts the path" do
+          result = doctor.send(:extract_webpack_output_path, webpack_content, "config/webpack/test.js")
+          expect(result).to eq("my-bundle-dir")
+        end
+      end
+
+      context "with config.outputPath" do
+        let(:webpack_content) { "path: config.outputPath" }
+
+        it "returns nil and adds info message" do
+          expect(checker).to receive(:add_info).with(/config\.outputPath/)
+          result = doctor.send(:extract_webpack_output_path, webpack_content, "config/webpack/test.js")
+          expect(result).to be_nil
+        end
+      end
+
+      context "with variable" do
+        let(:webpack_content) { "path: myPath" }
+
+        it "returns nil and adds info message" do
+          expect(checker).to receive(:add_info).with(/variable/)
+          result = doctor.send(:extract_webpack_output_path, webpack_content, "config/webpack/test.js")
+          expect(result).to be_nil
+        end
+      end
+
+      context "with unrecognized pattern" do
+        let(:webpack_content) { "output: {}" }
+
+        it "returns nil and adds info message" do
+          expect(checker).to receive(:add_info).with(/Could not parse/)
+          result = doctor.send(:extract_webpack_output_path, webpack_content, "config/webpack/test.js")
+          expect(result).to be_nil
+        end
+      end
+    end
+
+    describe "#normalize_path" do
+      it "removes leading ./" do
+        expect(doctor.send(:normalize_path, "./ssr-generated")).to eq("ssr-generated")
+      end
+
+      it "removes leading /" do
+        expect(doctor.send(:normalize_path, "/ssr-generated")).to eq("ssr-generated")
+      end
+
+      it "removes trailing /" do
+        expect(doctor.send(:normalize_path, "ssr-generated/")).to eq("ssr-generated")
+      end
+
+      it "handles paths with both leading and trailing slashes" do
+        expect(doctor.send(:normalize_path, "./ssr-generated/")).to eq("ssr-generated")
+      end
+
+      it "strips whitespace" do
+        expect(doctor.send(:normalize_path, "  ssr-generated  ")).to eq("ssr-generated")
+      end
+
+      it "returns unchanged path if already normalized" do
+        expect(doctor.send(:normalize_path, "ssr-generated")).to eq("ssr-generated")
+      end
+
+      it "handles nil gracefully" do
+        expect(doctor.send(:normalize_path, nil)).to be_nil
+      end
+
+      it "handles non-string values gracefully" do
+        expect(doctor.send(:normalize_path, 123)).to eq(123)
+      end
+    end
+  end
 end
