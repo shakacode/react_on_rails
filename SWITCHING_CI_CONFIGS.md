@@ -106,7 +106,7 @@ This will:
 
 ```bash
 # Reload your shell to pick up new Ruby/Node versions
-cd /Users/justin/conductor/react_on_rails/.conductor/kuwait-v1
+cd <project-root>
 mise current  # or: asdf current
 
 # Build and test
@@ -136,7 +136,7 @@ This will:
 
 ```bash
 # Reload your shell to pick up new Ruby/Node versions
-cd /Users/justin/conductor/react_on_rails/.conductor/kuwait-v1
+cd <project-root>
 mise current  # or: asdf current
 
 # Build and test
@@ -174,7 +174,7 @@ bin/ci-switch-config status
 bin/ci-switch-config minimum
 
 # 3. Reload shell
-cd /Users/justin/conductor/react_on_rails/.conductor/kuwait-v1
+cd <project-root>
 
 # 4. Verify versions changed
 ruby --version  # Should show 3.2.x
@@ -220,7 +220,7 @@ bin/ci-switch-config latest
 After switching, you need to reload your shell:
 
 ```bash
-cd /Users/justin/conductor/react_on_rails/.conductor/kuwait-v1
+cd <project-root>
 # The cd command will trigger mise/asdf to load the new versions
 ruby --version  # Verify it changed
 ```

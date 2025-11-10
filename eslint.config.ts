@@ -17,7 +17,7 @@ const compat = new FlatCompat({
 });
 
 // eslint-disable-next-line @typescript-eslint/no-deprecated
-const config = tsEslint.config([
+export default tsEslint.config([
   // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
   includeIgnoreFile(path.resolve(__dirname, '.gitignore')),
   globalIgnores([
@@ -267,5 +267,3 @@ const config = tsEslint.config([
   // https://github.com/prettier/eslint-plugin-prettier?tab=readme-ov-file#configuration-new-eslintconfigjs
   prettierRecommended,
 ]);
-
-export default config;
