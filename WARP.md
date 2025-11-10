@@ -9,6 +9,7 @@ React on Rails is a Ruby gem and NPM package that seamlessly integrates React co
 ## Essential Development Commands
 
 ### Setup
+
 ```bash
 # Initial setup for gem development
 bundle && yarn
@@ -21,6 +22,7 @@ bundle exec lefthook install
 ```
 
 ### Testing
+
 ```bash
 # All tests (excluding examples) - recommended for local development
 rake all_but_examples
@@ -41,6 +43,7 @@ VERBOSE=true rake react_on_rails:doctor  # Detailed output
 ```
 
 ### Linting & Formatting (CRITICAL BEFORE EVERY COMMIT)
+
 ```bash
 # Auto-fix all violations (RECOMMENDED workflow)
 rake autofix  # Runs eslint --fix, prettier --write, and rubocop -A
@@ -56,6 +59,7 @@ yarn start format.listDifferent
 ```
 
 ### Building
+
 ```bash
 # Build NPM package (TypeScript → JavaScript)
 yarn run build                       # One-time build
@@ -66,6 +70,7 @@ yarn run type-check
 ```
 
 ### Development Server (Dummy App)
+
 ```bash
 cd spec/dummy
 
@@ -79,6 +84,7 @@ bin/dev prod                         # Production-like environment
 ```
 
 ### Local Testing with Yalc
+
 ```bash
 # In react_on_rails directory
 yarn run build
@@ -113,6 +119,7 @@ yarn                                 # Update dependencies
 This project maintains two distinct but integrated packages:
 
 #### Ruby Gem (`lib/`)
+
 - **Purpose:** Rails integration and server-side rendering
 - **Key Components:**
   - `helper.rb` - Rails view helpers (`react_component`, etc.)
@@ -123,6 +130,7 @@ This project maintains two distinct but integrated packages:
   - Generators in `lib/generators/react_on_rails/`
 
 #### NPM Package (`node_package/src/`)
+
 - **Purpose:** Client-side React integration
 - **Key Components:**
   - `ReactOnRails.ts` - Main entry point for client-side functionality
@@ -148,35 +156,41 @@ This project maintains two distinct but integrated packages:
 ### Key Architectural Patterns
 
 #### Server-Side Rendering
+
 - Uses isolated Node.js processes via `connection_pool`
 - Separate server bundles can be configured for SSR-specific code
 - React Server Components (RSC) support in Pro version
 
 #### Auto-Bundling
+
 - File-system-based automatic bundle generation
 - Components in designated directories are auto-discovered
 - Eliminates manual `javascript_pack_tags` configuration
 - See `packs_generator.rb` for implementation
 
 #### Component Registration
+
 - Manual: `ReactOnRails.register({ ComponentName })` in pack files
 - Auto: Components auto-registered via `auto_load_bundle: true` option
 
 ## Testing & Examples
 
 ### Dummy App (`spec/dummy/`)
+
 - Full Rails app for integration testing
 - Examples of various React on Rails features
 - Uses Shakapacker for webpack configuration
 - Includes SSR, Redux, React Router examples
 
 ### Generated Examples (`gen-examples/`)
+
 - Created via `rake shakapacker_examples:gen_all`
 - Ignored by git
 - Used for comprehensive generator testing
 - Should be excluded from IDE to prevent slowdown
 
 ### Important Test Patterns
+
 - Use `yalc` for local package testing, not `npm link`
 - Always run `yalc push` after changes to see updates in test apps
 - Test both with/without Shakapacker pre-installed
@@ -185,6 +199,7 @@ This project maintains two distinct but integrated packages:
 ## Common Development Workflows
 
 ### Making Code Changes
+
 1. Make changes to Ruby or TypeScript code
 2. For NPM changes: `yarn run build` or `yarn run build-watch`
 3. For Yalc testing: `yalc push`
@@ -193,6 +208,7 @@ This project maintains two distinct but integrated packages:
 6. Commit changes
 
 ### Fixing Bugs
+
 1. Create failing test that reproduces issue
 2. Implement minimal fix
 3. Ensure all tests pass
@@ -200,6 +216,7 @@ This project maintains two distinct but integrated packages:
 5. Update documentation if needed
 
 ### Adding Features
+
 1. Plan implementation (use TODO list for complex tasks)
 2. Write tests first (TDD)
 3. Implement feature
@@ -208,6 +225,7 @@ This project maintains two distinct but integrated packages:
 6. Update relevant documentation
 
 ### Testing Generator Changes
+
 ```bash
 # Create test Rails app
 rails new test-app --skip-javascript
@@ -233,11 +251,13 @@ bin/dev
 **Prettier is the SOLE authority for non-Ruby files. RuboCop is the SOLE authority for Ruby files.**
 
 ### Standard Workflow
+
 1. Make code changes
 2. Run `rake autofix`
 3. Commit
 
 ### Merge Conflict Resolution
+
 1. Resolve logical conflicts only (don't manually format)
 2. `git add .`
 3. `rake autofix`
@@ -249,18 +269,22 @@ bin/dev
 ## RuboCop Common Issues
 
 ### Trailing Whitespace
+
 Remove all trailing whitespace from lines
 
 ### Line Length (120 chars max)
+
 Break long lines into multiple lines using proper indentation
 
 ### Named Subjects (RSpec)
+
 ```ruby
 # Good
 subject(:method_result) { instance.method_name(arg) }
 ```
 
 ### Security/Eval Violations
+
 ```ruby
 # rubocop:disable Security/Eval
 # ... code with eval
@@ -270,6 +294,7 @@ subject(:method_result) { instance.method_name(arg) }
 ## IDE Configuration
 
 **Exclude these directories to prevent IDE slowdowns:**
+
 - `/coverage`, `/tmp`, `/gen-examples`
 - `/node_package/lib`, `/node_modules`
 - `/spec/dummy/app/assets/webpack`
@@ -279,16 +304,19 @@ subject(:method_result) { instance.method_name(arg) }
 ## Important Constraints
 
 ### Package Manager
+
 - **ONLY use Yarn Classic (1.x)** - never use npm
 - Package manager enforced via `packageManager` field in package.json
 
 ### Dependencies
+
 - Shakapacker >= 6.0 required (v16+ drops Webpacker support)
 - Ruby >= 3.0
 - Node.js >= 18 (tested: 18-22)
 - Rails >= 5.2
 
 ### Pro Features
+
 - React Server Components (RSC)
 - Streaming SSR
 - Loadable Components
@@ -298,23 +326,27 @@ subject(:method_result) { instance.method_name(arg) }
 ## Troubleshooting
 
 ### React Components Not Rendering
+
 - Ensure yalc setup is complete
 - Run `yalc push` after changes
 - Check browser console for errors
 - Verify component is registered correctly
 
 ### Generator Issues
+
 - Run `rake react_on_rails:doctor`
 - Check Shakapacker is properly installed
 - Ensure package.json exists
 - Test with `bin/dev kill` to stop conflicting processes
 
 ### Test Failures
+
 - Run tests from correct directory (project root vs spec/dummy)
 - Check that `bundle install` and `yarn install` are current
 - Verify git hooks are installed: `bundle exec lefthook install`
 
 ### Linting Failures
+
 - **Always run `bundle exec rubocop` before pushing**
 - Use `rake autofix` to fix most issues automatically
 - Check `.rubocop.yml` for project-specific rules
@@ -322,6 +354,7 @@ subject(:method_result) { instance.method_name(arg) }
 ## Monorepo Merger (In Progress)
 
 The project is merging `react_on_rails` and `react_on_rails_pro` into a unified monorepo. During this transition:
+
 - Continue contributing to current structure
 - License compliance is critical (no Pro code in MIT areas)
 - See `docs/MONOREPO_MERGER_PLAN_REF.md` for details
