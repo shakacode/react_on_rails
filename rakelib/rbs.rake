@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "open3"
+
 # rubocop:disable Metrics/BlockLength
 namespace :rbs do
   desc "Validate RBS type signatures"
@@ -9,22 +11,16 @@ namespace :rbs do
 
     puts "Validating RBS type signatures..."
 
-    # IMPORTANT: Always use 'bundle exec' even though rake runs in bundle context
-    # Reason: Direct 'rake' calls (without 'bundle exec rake') won't have gems in path
-    # This ensures the task works regardless of how the user invokes rake
-    # Redirect stderr to suppress bundler warnings that don't affect validation
-    result = system("bundle exec rbs -I sig validate 2>/dev/null")
+    # Use Open3 for better error handling - captures stdout, stderr, and exit status separately
+    # This allows us to distinguish between actual validation errors and warnings
+    stdout, stderr, status = Open3.capture3("rbs -I sig validate")
 
-    case result
-    when true
+    if status.success?
       puts "✓ RBS validation passed"
-    when false
-      # Re-run with stderr to show actual validation errors
-      puts "Validation errors detected:"
-      system("bundle exec rbs -I sig validate")
-      exit 1
-    when nil
-      puts "✗ RBS command not found or could not be executed"
+    else
+      puts "✗ RBS validation failed"
+      puts stdout unless stdout.empty?
+      warn stderr unless stderr.empty?
       exit 1
     end
   end
@@ -44,22 +40,15 @@ namespace :rbs do
   task :steep do
     puts "Running Steep type checker..."
 
-    # IMPORTANT: Always use 'bundle exec' even though rake runs in bundle context
-    # Reason: Direct 'rake' calls (without 'bundle exec rake') won't have gems in path
-    # This ensures the task works regardless of how the user invokes rake
-    # Redirect stderr to suppress bundler warnings
-    result = system("bundle exec steep check 2>/dev/null")
+    # Use Open3 for better error handling
+    stdout, stderr, status = Open3.capture3("steep check")
 
-    case result
-    when true
+    if status.success?
       puts "✓ Steep type checking passed"
-    when false
-      # Re-run with stderr to show actual type errors
-      puts "Type checking errors detected:"
-      system("bundle exec steep check")
-      exit 1
-    when nil
-      puts "✗ Steep command not found or could not be executed"
+    else
+      puts "✗ Steep type checking failed"
+      puts stdout unless stdout.empty?
+      warn stderr unless stderr.empty?
       exit 1
     end
   end

@@ -22,8 +22,8 @@ namespace :run_rspec do
 
   # RBS Runtime Type Checking Configuration
   # ========================================
-  # Runtime type checking is opt-in via ENV["ENABLE_RBS_RUNTIME_CHECKING"]
-  # This prevents silent failures and allows disabling when RBS isn't available
+  # Runtime type checking is ENABLED BY DEFAULT when RBS gem is available
+  # Use ENV["DISABLE_RBS_RUNTIME_CHECKING"] = "true" to disable
   #
   # Coverage Strategy:
   # - :gem task - Enables checking for ReactOnRails::* (direct gem unit tests)
@@ -35,13 +35,14 @@ namespace :run_rspec do
   # analysis might miss. Dummy/integration tests exercise more code paths than
   # unit tests alone, providing comprehensive type safety validation.
   def rbs_runtime_env_vars
-    return "" unless ENV["ENABLE_RBS_RUNTIME_CHECKING"]
+    return "" if ENV["DISABLE_RBS_RUNTIME_CHECKING"] == "true"
 
     begin
       require "rbs"
       "RBS_TEST_TARGET='ReactOnRails::*' RUBYOPT='-rrbs/test/setup'"
     rescue LoadError
-      warn "Warning: RBS gem not available, skipping runtime type checking"
+      # RBS not available - silently skip runtime checking
+      # This is expected in environments without the rbs gem
       ""
     end
   end
