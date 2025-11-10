@@ -1,10 +1,10 @@
 import type { ReactOnRailsInternal, RailsContext } from './types/index.ts';
 
 declare global {
-  /* eslint-disable no-underscore-dangle */
-  let ReactOnRails: ReactOnRailsInternal | undefined;
-  let __REACT_ON_RAILS_EVENT_HANDLERS_RAN_ONCE__: boolean;
-  /* eslint-enable no-underscore-dangle */
+  /* eslint-disable no-underscore-dangle, vars-on-top */
+  var ReactOnRails: ReactOnRailsInternal | undefined;
+  var __REACT_ON_RAILS_EVENT_HANDLERS_RAN_ONCE__: boolean;
+  /* eslint-enable no-underscore-dangle, vars-on-top */
 }
 
 let currentRailsContext: RailsContext | null = null;
