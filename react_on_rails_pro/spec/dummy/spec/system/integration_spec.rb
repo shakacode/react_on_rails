@@ -396,7 +396,7 @@ shared_examples "streamed component tests" do |path, selector|
 
   it "hydrates the component" do
     visit path
-    expect(page.html).to include("client-bundle.js")
+    expect(page.html).to match(/client-bundle[^\"]*.js/)
     change_text_expect_dom_selector(selector)
   end
 
