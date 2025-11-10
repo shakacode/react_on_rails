@@ -58,6 +58,9 @@ Pre-commit hooks automatically run:
 # Automatically detects and re-runs only the failed CI jobs
 bin/ci-rerun-failures
 
+# Search recent commits for failures (when current commit is clean/in-progress)
+bin/ci-rerun-failures --previous
+
 # Or for a specific PR number
 bin/ci-rerun-failures 1964
 ```
@@ -65,6 +68,8 @@ bin/ci-rerun-failures 1964
 This script:
 - ✨ **Fetches actual CI failures** from GitHub using `gh` CLI
 - 🎯 **Runs only what failed** - no wasted time on passing tests
+- ⏳ **Waits for in-progress CI** - offers to poll until completion
+- 🔍 **Searches previous commits** - finds failures before your latest push
 - 📋 **Shows you exactly what will run** before executing
 - 🚀 **Maps CI jobs to local commands** automatically
 
