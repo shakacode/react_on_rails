@@ -77,7 +77,14 @@ describe ReactOnRailsHelper do
       allow(helper).to receive(:append_stylesheet_pack_tag)
       expect { helper.load_pack_for_generated_component("component_name", render_options) }.not_to raise_error
 
-      expect(helper).to have_received(:append_javascript_pack_tag).with("generated/component_name", { defer: true })
+      # Expect the default loading strategy based on Shakapacker version
+      if ReactOnRails::PackerUtils.supports_async_loading?
+        expect(helper).to have_received(:append_javascript_pack_tag).with("generated/component_name",
+                                                                          { defer: false, async: true })
+      else
+        # When async is not supported, defaults to :sync which means { defer: false }
+        expect(helper).to have_received(:append_javascript_pack_tag).with("generated/component_name", { defer: false })
+      end
       expect(helper).to have_received(:append_stylesheet_pack_tag).with("generated/component_name")
     end
 
