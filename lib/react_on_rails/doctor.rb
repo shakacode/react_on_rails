@@ -664,6 +664,7 @@ module ReactOnRails
       end
     end
 
+    # rubocop:disable Metrics/CyclomaticComplexity
     def analyze_server_rendering_config(content)
       checker.add_info("\n🖥️  Server Rendering:")
 
@@ -674,6 +675,18 @@ module ReactOnRails
       else
         checker.add_info("  server_bundle_js_file: server-bundle.js (default)")
       end
+
+      # Server bundle output path
+      server_bundle_path_match = content.match(/config\.server_bundle_output_path\s*=\s*["']([^"']+)["']/)
+      rails_bundle_path = server_bundle_path_match ? server_bundle_path_match[1] : "ssr-generated"
+      checker.add_info("  server_bundle_output_path: #{rails_bundle_path}")
+
+      # Enforce private server bundles
+      enforce_private_match = content.match(/config\.enforce_private_server_bundles\s*=\s*([^\s\n,]+)/)
+      checker.add_info("  enforce_private_server_bundles: #{enforce_private_match[1]}") if enforce_private_match
+
+      # Validate webpack config matches Rails config
+      validate_server_bundle_path_sync(rails_bundle_path)
 
       # RSC bundle file (Pro feature)
       rsc_bundle_match = content.match(/config\.rsc_bundle_js_file\s*=\s*["']([^"']+)["']/)
@@ -699,7 +712,7 @@ module ReactOnRails
 
       checker.add_info("  raise_on_prerender_error: #{raise_on_error_match[1]}")
     end
-    # rubocop:enable Metrics/AbcSize
+    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
 
     # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
     def analyze_performance_config(content)
@@ -1142,6 +1155,58 @@ module ReactOnRails
         checker.add_info("  #{label}: #{value}")
       rescue StandardError => e
         checker.add_info("  #{label}: <error reading value: #{e.message}>")
+      end
+    end
+
+    # Validates that webpack serverWebpackConfig.js output.path matches
+    # React on Rails config.server_bundle_output_path
+    def validate_server_bundle_path_sync(rails_bundle_path)
+      webpack_config_path = "config/webpack/serverWebpackConfig.js"
+
+      unless File.exist?(webpack_config_path)
+        checker.add_info("\n  ℹ️  Webpack server config not found - skipping path validation")
+        return
+      end
+
+      begin
+        webpack_content = File.read(webpack_config_path)
+
+        # Extract the path from webpack config
+        # Look for: path: require('path').resolve(__dirname, '../../ssr-generated')
+        path_regex = %r{path:\s*require\(['"]path['"]\)\.resolve\(__dirname,\s*['"]\.\./\.\./([^'"]+)['"]\)}
+        path_match = webpack_content.match(path_regex)
+
+        unless path_match
+          checker.add_info("\n  ℹ️  Could not parse webpack server bundle path - skipping validation")
+          return
+        end
+
+        webpack_bundle_path = path_match[1]
+
+        # Compare the paths
+        if webpack_bundle_path == rails_bundle_path
+          checker.add_success("\n  ✅ Webpack and Rails configs are in sync (both use '#{rails_bundle_path}')")
+        else
+          checker.add_warning(<<~MSG.strip)
+            \n  ⚠️  Configuration mismatch detected!
+
+            React on Rails config (config/initializers/react_on_rails.rb):
+              server_bundle_output_path = "#{rails_bundle_path}"
+
+            Webpack config (#{webpack_config_path}):
+              output.path = "#{webpack_bundle_path}" (relative to Rails.root)
+
+            These must match for server rendering to work correctly.
+
+            To fix:
+            1. Update server_bundle_output_path in config/initializers/react_on_rails.rb, OR
+            2. Update output.path in #{webpack_config_path}
+
+            Make sure both point to the same directory relative to Rails.root.
+          MSG
+        end
+      rescue StandardError => e
+        checker.add_info("\n  ℹ️  Could not validate webpack config: #{e.message}")
       end
     end
   end
