@@ -50,6 +50,7 @@ group :test do
   gem "capybara"
   gem "capybara-screenshot"
   gem "coveralls", require: false
+  gem "cypress-on-rails", "~> 1.19"
   gem "equivalent-xml"
   gem "generator_spec"
   gem "launchy"

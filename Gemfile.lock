@@ -120,6 +120,8 @@ GEM
       thor (>= 0.19.4, < 2.0)
       tins (~> 1.6)
     crass (1.0.6)
+    cypress-on-rails (1.19.0)
+      rack
     date (3.3.4)
     debug (1.9.2)
       irb (~> 1.10)
@@ -420,6 +422,7 @@ DEPENDENCIES
   capybara
   capybara-screenshot
   coveralls
+  cypress-on-rails (~> 1.19)
   debug
   equivalent-xml
   gem-release

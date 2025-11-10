@@ -234,6 +234,10 @@ const config = tsEslint.config([
       '@typescript-eslint/no-unsafe-return': 'off',
       '@typescript-eslint/no-unsafe-argument': 'off',
       '@typescript-eslint/no-redundant-type-constituents': 'off',
+      // Allow deprecated React APIs for backward compatibility with React < 18
+      '@typescript-eslint/no-deprecated': 'off',
+      // Allow unbound methods - needed for method reassignment patterns
+      '@typescript-eslint/unbound-method': 'off',
     },
   },
   {
