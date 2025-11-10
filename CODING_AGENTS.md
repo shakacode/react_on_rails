@@ -260,15 +260,18 @@ Use `gh pr create` with:
 ## Debugging Workflow
 
 1. **Understand the Problem**
+
    - Read the issue carefully
    - Reproduce the bug if possible
    - Identify root cause
 
 2. **Create Minimal Test Case**
+
    - Write failing test that demonstrates issue
    - Keep it focused and minimal
 
 3. **Implement Fix**
+
    - Make smallest change possible
    - Ensure fix doesn't break existing functionality
    - Follow existing code patterns

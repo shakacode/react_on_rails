@@ -59,16 +59,19 @@ This plan tackles ALL four Information Architecture problems identified in Secti
 ### Measurable Outcomes
 
 1. **Navigation clarity:**
+
    - ✅ User can find installation docs in < 10 seconds
    - ✅ Clear difference between beginner and advanced topics
    - ✅ One obvious starting point (not four)
 
 2. **Content organization:**
+
    - ✅ Every doc has clear category home
    - ✅ No "catch-all" categories
    - ✅ Internal docs hidden from main nav
 
 3. **Professional appearance:**
+
    - ✅ No "Outdated" category visible
    - ✅ No testimonials in technical docs
    - ✅ No planning documents in user nav
@@ -122,18 +125,22 @@ This plan tackles ALL four Information Architecture problems identified in Secti
 **Contents:**
 
 - **Introduction** (NEW - see Section 1.2 solution)
+
   - Why React on Rails?
   - Comparison with alternatives
   - When to use / when not to use
 
 - **Quick Start** (`quick-start/README.md`)
+
   - 15-minute setup
   - First component
 
 - **Installation** (`guides/installation-into-an-existing-rails-app.md`)
+
   - Detailed installation for existing apps
 
 - **Tutorial** (`guides/tutorial.md`)
+
   - Comprehensive walkthrough
 
 - **Project Structure** (`additional-details/recommended-project-structure.md`)
@@ -244,11 +251,13 @@ docs/javascript/images.md                                                   → 
 **Contents:**
 
 - **View Helpers** (`api/view-helpers-api.md`)
+
   - react_component
   - react_component_hash
   - Options and parameters
 
 - **JavaScript API** (`api/javascript-api.md`)
+
   - ReactOnRails.register
   - ReactOnRails.getStore
   - etc.
@@ -256,6 +265,7 @@ docs/javascript/images.md                                                   → 
 - **Redux Store API** (`api/redux-store-api.md`)
 
 - **Configuration API** (`guides/configuration.md`)
+
   - All config options reference
   - ReactOnRails.configure do |config| options
 
@@ -957,6 +967,7 @@ rm -rf docs/outdated
 ### In `sc-website` repo:
 
 1. **`gatsby-node.js`**
+
    - Update `reactOnRailsDocsFoldersOrder` (lines 31-44)
    - Add filter to exclude internal docs (around line 151)
    - Update index page handling (around line 196)
@@ -1245,27 +1256,32 @@ open https://www.shakacode.com/react-on-rails/docs/
 **To discuss with team:**
 
 1. **Should we keep `docs/README.md` or delete it?**
+
    - Option A: Delete (introduction.md is new homepage)
    - Option B: Keep as simple TOC
    - **Recommendation:** Delete (simplify entry points)
 
 2. **What to do with `docs/misc/doctrine.md`?**
+
    - Option A: Integrate into introduction.md (philosophy section)
    - Option B: Separate "Philosophy" page
    - **Recommendation:** Integrate (fewer top-level pages)
 
 3. **Should contributor docs be in CONTRIBUTING.md or separate site?**
+
    - Option A: All in CONTRIBUTING.md (simple)
    - Option B: Separate `/contributing/` docs site (more discoverable)
    - **Recommendation:** CONTRIBUTING.md for now (simpler)
 
 4. **How to handle testimonials on marketing site?**
+
    - Option A: New /testimonials page
    - Option B: Integrate into /case-studies
    - Option C: Scatter across site (homepage, about, etc.)
    - **Recommendation:** Get marketing team input
 
 5. **Should we add version switcher?**
+
    - For v15 vs v16 docs
    - Similar to Next.js version switcher
    - **Recommendation:** Defer to later phase (nice-to-have)
@@ -1282,15 +1298,18 @@ open https://www.shakacode.com/react-on-rails/docs/
 **Before starting implementation:**
 
 1. **Review this plan with Justin and Bob**
+
    - Get feedback on category structure
    - Confirm approach is sound
    - Resolve open questions
 
 2. **Prioritize phases**
+
    - Must-do: Phases 1-3 (core IA changes)
    - Nice-to-have: Phases 4-6 (cleanup)
 
 3. **Set up staging environment**
+
    - Fork sc-website repo
    - Test locally
    - Deploy to staging if available
@@ -1303,16 +1322,19 @@ open https://www.shakacode.com/react-on-rails/docs/
 **After plan approved:**
 
 1. **Start with Phase 1** (website config)
+
    - Small, testable change
    - See if approach works
    - Learn the system
 
 2. **Get feedback early**
+
    - Show category structure working
    - Adjust if needed
    - Build confidence
 
 3. **Move to Phase 2** (file moves)
+
    - Bigger change but mechanical
    - Run script, test, commit
 

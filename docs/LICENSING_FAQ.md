@@ -7,6 +7,7 @@
 **A:** Nothing changes for end users! We'll maintain the same dual licensing structure:
 
 - **MIT Licensed (Free & Open Source):**
+
   - `react_on_rails` Ruby gem
   - `react-on-rails` NPM package
   - Core functionality remains completely free

@@ -34,6 +34,7 @@ const reactOnRailsDocsFoldersOrder = [
 **Specific Issues:**
 
 1. **"Additional details"** - Vague catch-all containing:
+
    - `migrating-from-react-rails.md` (migration guide)
    - `generator-details.md` (technical reference)
    - `recommended-project-structure.md` (best practices)
@@ -41,6 +42,7 @@ const reactOnRailsDocsFoldersOrder = [
    - These belong in different categories based on user intent
 
 2. **"Misc"** - Another unclear bucket with:
+
    - `tips.md` - General guidance (should be in guides)
    - `doctrine.md` - Philosophy/principles (should be in introduction)
    - `style.md` - Code style guide (contributor docs)
@@ -73,6 +75,7 @@ const reactOnRailsDocsFoldersOrder = [
 **Entry Points Found:**
 
 1. **`docs/README.md`** (173 lines)
+
    - Comprehensive navigation hub
    - Learning paths section (lines 13-36)
    - Popular use cases table (lines 40-49)
@@ -80,11 +83,13 @@ const reactOnRailsDocsFoldersOrder = [
    - **Issue:** Too long for a README, actually a full navigation page
 
 2. **`docs/home.md`** (29 lines)
+
    - Minimal landing page
    - Just links to other docs
    - **Issue:** Unclear purpose - why exists separately from README?
 
 3. **`docs/getting-started.md`** (254 lines)
+
    - Installation instructions
    - System requirements
    - Basic usage examples
@@ -134,6 +139,7 @@ From `getting-started.md:3-11`:
 **Contributor Docs in Main Navigation:**
 
 1. **`contributor-info/` folder** - 5 files:
+
    - `linters.md` - Linting setup for contributors
    - `coding-agents-guide.md` - Guide for AI coding assistants
    - `errors-with-hooks.md` - Git hooks troubleshooting
@@ -142,6 +148,7 @@ From `getting-started.md:3-11`:
    - `pull-requests.md` - PR guidelines
 
 2. **Planning documents visible:**
+
    - `docs/planning/DOCUMENTATION_IMPROVEMENT_PLAN.md`
    - `docs/planning/DOCS_PR_SUMMARY.md`
    - These are internal planning docs, not user documentation
@@ -317,17 +324,20 @@ Instead of a "learning guide" pattern:
 **Installation Information Locations:**
 
 1. **`getting-started.md:38-76`** - "Basic Installation"
+
    - Rails app creation
    - Shakapacker prerequisites
    - Generator command
    - Starting the app
 
 2. **`guides/installation-into-an-existing-rails-app.md`** - Full guide
+
    - (Not yet examined but referenced multiple times)
    - Seems to be the canonical installation guide
    - But not clearly marked as THE starting point
 
 3. **`quick-start/README.md`** - Quick installation
+
    - Promised "15-minute" path
    - Unclear how it differs from other guides
 
@@ -986,11 +996,13 @@ keywords: [installation, setup, rails]
 **What's Missing:**
 
 1. **Problem statement:**
+
    - Why integrate React with Rails?
    - What problems does React on Rails solve?
    - What are the alternatives?
 
 2. **Comparison with alternatives:**
+
    - vs. plain Rails views
    - vs. separate React frontend
    - vs. react-rails gem
@@ -998,6 +1010,7 @@ keywords: [installation, setup, rails]
    - vs. Inertia.js
 
 3. **When to use / when not to use:**
+
    - Best fit use cases
    - When to choose something else
    - Migration scenarios
@@ -1032,16 +1045,19 @@ keywords: [installation, setup, rails]
 **What's Missing:**
 
 1. **Migrating from plain Rails views:**
+
    - How to gradually introduce React
    - Which views to convert first
    - Hybrid approach patterns
 
 2. **Migrating from separate React frontend:**
+
    - Moving from React SPA to React on Rails
    - Sharing components
    - Authentication/session handling
 
 3. **Migrating from Hotwire/Turbo:**
+
    - When to switch
    - How to coexist
    - Gradual migration strategy
@@ -1083,11 +1099,13 @@ keywords: [installation, setup, rails]
    ```
 
 2. **Common error messages:**
+
    - Database of actual error text
    - Direct solutions
    - Search optimization
 
 3. **Debugging tools:**
+
    - How to enable trace mode
    - How to inspect SSR output
    - Browser devtools setup
@@ -1113,16 +1131,19 @@ keywords: [installation, setup, rails]
 **Next.js Strengths We're Missing:**
 
 1. **Clear learning path:**
+
    - Installation → Creating routes → Data fetching → Deployment
    - Each step builds on previous
    - Time estimates provided
 
 2. **Interactive examples:**
+
    - Code playground integration
    - Copy-paste ready examples
    - Visual diagrams
 
 3. **Version switcher:**
+
    - App Router vs Pages Router clearly separated
    - Easy to switch between versions
    - Migration guides prominent
@@ -1141,15 +1162,18 @@ keywords: [installation, setup, rails]
 **TanStack Strengths We're Missing:**
 
 1. **Clear difficulty levels:**
+
    - 🔰 Quick Start (beginner)
    - 📘 Guide (intermediate)
    - 📕 API Reference (lookup)
 
 2. **Framework adapters clearly separated:**
+
    - React, Vue, Svelte, etc. in tabs
    - Don't mix framework-specific advice
 
 3. **Examples repository:**
+
    - Linked examples for every major feature
    - Can clone and run locally
    - Multiple implementation approaches shown
@@ -1168,16 +1192,19 @@ keywords: [installation, setup, rails]
 **Rails Guides Strengths We're Missing:**
 
 1. **Consistent structure:**
+
    - Every guide follows same template
    - Predictable sections
    - Known length and depth
 
 2. **Glossary:**
+
    - Terms defined
    - Linked throughout docs
    - No assumed knowledge
 
 3. **Contributing guide prominent:**
+
    - Clear how to improve docs
    - Documentation standard
    - Review process
