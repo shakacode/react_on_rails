@@ -12,6 +12,21 @@ ReactOnRails.configure do |config|
   # Set to "" if you're not using server rendering
   config.server_bundle_js_file = "server-bundle.js"
 
+  # ⚠️ IMPORTANT: This must match output.path in config/webpack/serverWebpackConfig.js
+  #
+  # Both are currently set to 'ssr-generated' (relative to Rails.root)
+  # Keeping these in sync ensures React on Rails can find the server bundle at runtime.
+  #
+  # Configure where server bundles are output. Defaults to "ssr-generated".
+  # This path is relative to Rails.root and should point to a private directory
+  # (outside of public/) for security.
+  config.server_bundle_output_path = "ssr-generated"
+
+  # Enforce that server bundles are only loaded from private (non-public) directories.
+  # When true, server bundles will only be loaded from the configured server_bundle_output_path.
+  # This is recommended for production to prevent server-side code from being exposed.
+  config.enforce_private_server_bundles = true
+
   ################################################################################
   # Test Configuration (Optional)
   ################################################################################
