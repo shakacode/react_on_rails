@@ -9,14 +9,19 @@ namespace :rbs do
 
     puts "Validating RBS type signatures..."
 
-    # Run RBS validate (use rbs directly, not bundle exec since we're already in bundle context)
-    result = system("rbs -I sig validate")
+    # IMPORTANT: Always use 'bundle exec' even though rake runs in bundle context
+    # Reason: Direct 'rake' calls (without 'bundle exec rake') won't have gems in path
+    # This ensures the task works regardless of how the user invokes rake
+    # Redirect stderr to suppress bundler warnings that don't affect validation
+    result = system("bundle exec rbs -I sig validate 2>/dev/null")
 
     case result
     when true
       puts "✓ RBS validation passed"
     when false
-      puts "✗ RBS validation failed"
+      # Re-run with stderr to show actual validation errors
+      puts "Validation errors detected:"
+      system("bundle exec rbs -I sig validate")
       exit 1
     when nil
       puts "✗ RBS command not found or could not be executed"
@@ -39,14 +44,19 @@ namespace :rbs do
   task :steep do
     puts "Running Steep type checker..."
 
-    # Use steep directly, not bundle exec since we're already in bundle context
-    result = system("steep check")
+    # IMPORTANT: Always use 'bundle exec' even though rake runs in bundle context
+    # Reason: Direct 'rake' calls (without 'bundle exec rake') won't have gems in path
+    # This ensures the task works regardless of how the user invokes rake
+    # Redirect stderr to suppress bundler warnings
+    result = system("bundle exec steep check 2>/dev/null")
 
     case result
     when true
       puts "✓ Steep type checking passed"
     when false
-      puts "✗ Steep type checking failed"
+      # Re-run with stderr to show actual type errors
+      puts "Type checking errors detected:"
+      system("bundle exec steep check")
       exit 1
     when nil
       puts "✗ Steep command not found or could not be executed"
