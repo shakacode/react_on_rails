@@ -422,13 +422,12 @@ shared_examples "streamed component tests" do |path, selector|
   end
 end
 
-describe "Pages/stream_async_components_for_testing", :js,
-         skip: "Flaky test replaced by Playwright E2E tests in e2e-tests/streaming.spec.ts" do
+describe "Pages/stream_async_components_for_testing", :js do
   it_behaves_like "streamed component tests", "/stream_async_components_for_testing",
                   "#AsyncComponentsTreeForTesting-react-component-0"
 end
 
-describe "React Router Sixth Page", :js, skip: "Work in progress in another branch: justin808/fix-body-dup-retry" do
+describe "React Router Sixth Page", :js do
   it_behaves_like "streamed component tests", "/server_router/streaming-server-component",
                   "#ServerComponentRouter-react-component-0"
 end
