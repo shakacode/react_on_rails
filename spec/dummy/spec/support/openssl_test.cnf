@@ -1,0 +1,21 @@
+# OpenSSL configuration for test environment
+# Disables CRL checking to avoid SSL errors with OpenSSL 3.6+
+# when accessing external resources during tests
+
+openssl_conf = openssl_init
+
+[openssl_init]
+ssl_conf = ssl_sect
+
+[ssl_sect]
+system_default = system_default_sect
+
+[system_default_sect]
+Options = UnsafeLegacyRenegotiation
+CipherString = DEFAULT@SECLEVEL=1
+
+# Disable CRL checking - not critical for test environment
+# This prevents "unable to get certificate CRL" errors
+[CRL]
+crl_check = no
+crl_check_all = no

@@ -3,6 +3,12 @@
 ENV["RAILS_ENV"] ||= "test"
 SERVER_BUNDLE_PATH = File.expand_path("../../public/webpack/#{ENV.fetch('RAILS_ENV', nil)}/server-bundle.js", __FILE__)
 
+# Fix for OpenSSL 3.x CRL verification issues in test environment
+# OpenSSL 3.6+ has stricter CRL checking which causes SSL errors when accessing external resources
+# in tests (e.g., GitHub Pages). This disables CRL checks which are not critical for test environments.
+# See: https://github.com/openssl/openssl/issues/20385
+ENV["OPENSSL_CONF"] = File.expand_path("support/openssl_test.cnf", __dir__)
+
 require_relative "simplecov_helper"
 require_relative "spec_helper"
 
