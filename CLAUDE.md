@@ -148,6 +148,8 @@ DISABLE_TURBOLINKS=TRUE bundle exec rspec './spec/system/integration_spec.rb[1:1
 
 **Note**: Always run `bin/shakapacker-precompile-hook` before `bin/shakapacker` to ensure component packs are generated and any compilation tasks (ReScript, etc.) are completed. The hook handles all precompile steps that newer Shakapacker versions run automatically.
 
+**⚠️ Known Issue**: System tests may fail locally on Ruby 3.4.3 + OpenSSL 3.6 with SSL certificate errors. This is an environment issue, not a code issue. See `spec/dummy/TESTING_LOCALLY.md` for details. **Use CI as the source of truth for system tests.**
+
 **Note**: System tests may fail locally with SSL/environment issues but pass in CI. When in doubt, rely on `rake run_rspec:all_dummy`.
 
 #### Common Test Tasks
