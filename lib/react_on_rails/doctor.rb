@@ -1171,20 +1171,16 @@ module ReactOnRails
       begin
         webpack_content = File.read(webpack_config_path)
 
-        # Extract the path from webpack config
-        # Look for: path: require('path').resolve(__dirname, '../../ssr-generated')
-        path_regex = %r{path:\s*require\(['"]path['"]\)\.resolve\(__dirname,\s*['"]\.\./\.\./([^'"]+)['"]\)}
-        path_match = webpack_content.match(path_regex)
+        # Try to extract the path from webpack config
+        webpack_bundle_path = extract_webpack_output_path(webpack_content, webpack_config_path)
 
-        unless path_match
-          checker.add_info("\n  ℹ️  Could not parse webpack server bundle path - skipping validation")
-          return
-        end
+        return unless webpack_bundle_path
 
-        webpack_bundle_path = path_match[1]
+        # Normalize and compare paths
+        normalized_webpack_path = normalize_path(webpack_bundle_path)
+        normalized_rails_path = normalize_path(rails_bundle_path)
 
-        # Compare the paths
-        if webpack_bundle_path == rails_bundle_path
+        if normalized_webpack_path == normalized_rails_path
           checker.add_success("\n  ✅ Webpack and Rails configs are in sync (both use '#{rails_bundle_path}')")
         else
           checker.add_warning(<<~MSG.strip)
@@ -1208,6 +1204,43 @@ module ReactOnRails
       rescue StandardError => e
         checker.add_info("\n  ℹ️  Could not validate webpack config: #{e.message}")
       end
+    end
+
+    # Extract output.path from webpack config, supporting multiple patterns
+    def extract_webpack_output_path(webpack_content, _webpack_config_path)
+      # Pattern 1: path: require('path').resolve(__dirname, '../../ssr-generated')
+      hardcoded_pattern = %r{path:\s*require\(['"]path['"]\)\.resolve\(__dirname,\s*['"]\.\./\.\./([^'"]+)['"]\)}
+      if (match = webpack_content.match(hardcoded_pattern))
+        return match[1]
+      end
+
+      # Pattern 2: path: config.outputPath (can't validate - runtime value)
+      if webpack_content.match?(/path:\s*config\.outputPath/)
+        checker.add_info(<<~MSG.strip)
+          \n  ℹ️  Webpack config uses config.outputPath (from shakapacker.yml)
+          Cannot validate sync with Rails config as this is resolved at build time.
+          Ensure your shakapacker.yml public_output_path matches server_bundle_output_path.
+        MSG
+        return nil
+      end
+
+      # Pattern 3: path: some_variable (can't validate)
+      if webpack_content.match?(/path:\s*[a-zA-Z_]\w*/)
+        checker.add_info("\n  ℹ️  Webpack config uses a variable for output.path - cannot validate")
+        return nil
+      end
+
+      checker.add_info("\n  ℹ️  Could not parse webpack server bundle path - skipping validation")
+      nil
+    end
+
+    # Normalize path for comparison (remove leading ./, trailing /)
+    def normalize_path(path)
+      return path unless path.is_a?(String)
+
+      normalized = path.strip
+      normalized = normalized.sub(%r{^\.?/}, "") # Remove leading ./ or /
+      normalized.sub(%r{/$}, "") # Remove trailing /
     end
   end
   # rubocop:enable Metrics/ClassLength
