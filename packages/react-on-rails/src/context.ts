@@ -2,10 +2,10 @@ import type { ReactOnRailsInternal, RailsContext } from './types/index.ts';
 
 declare global {
   // TypeScript requires 'var' (not 'let') in 'declare global' for proper global scope augmentation across modules
-  /* eslint-disable no-underscore-dangle, vars-on-top */
+  /* eslint-disable no-underscore-dangle, vars-on-top, no-var */
   var ReactOnRails: ReactOnRailsInternal | undefined;
   var __REACT_ON_RAILS_EVENT_HANDLERS_RAN_ONCE__: boolean;
-  /* eslint-enable no-underscore-dangle, vars-on-top */
+  /* eslint-enable no-underscore-dangle, vars-on-top, no-var */
 }
 
 let currentRailsContext: RailsContext | null = null;
