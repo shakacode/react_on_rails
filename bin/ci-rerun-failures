@@ -39,11 +39,32 @@ fi
 echo -e "${GREEN}Analyzing PR #$PR_NUMBER...${NC}"
 echo ""
 
+# Check for in-progress jobs
+IN_PROGRESS_COUNT=$(echo "$STATUS_JSON" | jq '[.statusCheckRollup[] | select(.status == "IN_PROGRESS")] | length')
+if [ "$IN_PROGRESS_COUNT" -gt 0 ]; then
+  echo -e "${YELLOW}⏳ $IN_PROGRESS_COUNT CI jobs are still running...${NC}"
+  echo ""
+  read -p "Wait for CI to complete? [Y/n] " -n 1 -r
+  echo
+  if [[ $REPLY =~ ^[Yy]$ ]] || [[ -z $REPLY ]]; then
+    echo "Waiting for CI to complete (checking every 30 seconds)..."
+    while [ "$IN_PROGRESS_COUNT" -gt 0 ]; do
+      sleep 30
+      STATUS_JSON=$(gh pr view "$PR_NUMBER" --json statusCheckRollup,number 2>/dev/null)
+      IN_PROGRESS_COUNT=$(echo "$STATUS_JSON" | jq '[.statusCheckRollup[] | select(.status == "IN_PROGRESS")] | length')
+      FAILED_COUNT=$(echo "$STATUS_JSON" | jq '[.statusCheckRollup[] | select(.conclusion == "FAILURE")] | length')
+      echo -e "  In progress: $IN_PROGRESS_COUNT | Failed: $FAILED_COUNT"
+    done
+    echo -e "${GREEN}✓ CI completed!${NC}"
+    echo ""
+  fi
+fi
+
 # Parse failed checks
 FAILED_CHECKS=$(echo "$STATUS_JSON" | jq -r '.statusCheckRollup[] | select(.conclusion == "FAILURE") | .name')
 
 if [ -z "$FAILED_CHECKS" ]; then
-  echo -e "${GREEN}No failed checks found! All CI jobs passed.${NC}"
+  echo -e "${GREEN}✓ No failed checks found! All CI jobs passed.${NC}"
   exit 0
 fi
 
