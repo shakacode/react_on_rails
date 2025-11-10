@@ -18,8 +18,61 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Show help
+show_help() {
+  cat << EOF
+${BLUE}Failed Spec Runner${NC}
+
+Run only the specific RSpec examples that failed in CI.
+
+${YELLOW}Usage:${NC}
+  bin/ci-run-failed-specs [OPTIONS] [SPEC_PATHS...]
+  pbpaste | bin/ci-run-failed-specs
+  bin/ci-run-failed-specs < failures.txt
+
+${YELLOW}Options:${NC}
+  --help, -h    Show this help message
+
+${YELLOW}Examples:${NC}
+  # Pass spec paths directly
+  bin/ci-run-failed-specs './spec/system/integration_spec.rb[1:1:1:1]'
+
+  # Copy from GitHub Actions, paste to run
+  pbpaste | bin/ci-run-failed-specs
+
+  # From file
+  bin/ci-run-failed-specs < failures.txt
+
+  # Multiple specs
+  bin/ci-run-failed-specs './spec/system/integration_spec.rb[1:1:1:1]' './spec/system/integration_spec.rb[10:1]'
+
+${YELLOW}Features:${NC}
+  - Parses RSpec failure output automatically
+  - Extracts spec paths from "rspec ./spec/..." lines
+  - Deduplicates specs
+  - Auto-detects working directory (runs from spec/dummy when needed)
+  - Confirms before running
+
+${YELLOW}Workflow:${NC}
+  1. Go to failed job on GitHub Actions
+  2. Copy the "Failed examples:" section
+  3. Run: pbpaste | bin/ci-run-failed-specs
+  4. Tests run only for those specific failures
+
+${YELLOW}Related Tools:${NC}
+  bin/ci-rerun-failures    Auto-detect and re-run failed CI jobs
+  bin/ci-local             Smart test detection based on code changes
+EOF
+  exit 0
+}
+
 echo -e "${BLUE}=== Failed Spec Runner ===${NC}"
 echo ""
+
+# Check for help flag
+if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
+  show_help
+fi
 
 # Collect spec paths
 SPECS=()
