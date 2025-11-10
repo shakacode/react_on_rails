@@ -17,6 +17,8 @@ ReactOnRails.configure do |config|
   # Both are currently set to 'ssr-generated' (relative to Rails.root)
   # Keeping these in sync ensures React on Rails can find the server bundle at runtime.
   #
+  # Run 'rails react_on_rails:doctor' to verify these configs are in sync.
+  #
   # Configure where server bundles are output. Defaults to "ssr-generated".
   # This path is relative to Rails.root and should point to a private directory
   # (outside of public/) for security.
