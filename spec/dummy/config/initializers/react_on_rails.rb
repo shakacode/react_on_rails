@@ -42,5 +42,5 @@ ReactOnRails.configure do |config|
   config.components_subdirectory = "startup"
   config.auto_load_bundle = true
   config.immediate_hydration = false
-  config.generated_component_packs_loading_strategy = :defer
+  config.generated_component_packs_loading_strategy = :async
 end

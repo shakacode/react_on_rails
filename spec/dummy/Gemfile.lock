@@ -269,6 +269,8 @@ GEM
     rb-fsevent (0.11.2)
     rb-inotify (0.10.1)
       ffi (~> 1.0)
+    rbs (3.9.5)
+      logger
     rdoc (6.14.2)
       erb
       psych (>= 4.0.0)
@@ -382,9 +384,6 @@ GEM
       actionpack (>= 6.0.0)
       activejob (>= 6.0.0)
       railties (>= 6.0.0)
-    turbolinks (5.2.1)
-      turbolinks-source (~> 5.2)
-    turbolinks-source (5.2.0)
     tzinfo (2.0.6)
       concurrent-ruby (~> 1.0)
     uglifier (4.2.0)
@@ -433,6 +432,7 @@ DEPENDENCIES
   pry-rescue
   puma (~> 6.0)
   rails (~> 7.1)
+  rbs
   react_on_rails!
   rspec-rails
   rspec-retry
@@ -449,7 +449,6 @@ DEPENDENCIES
   sprockets (~> 4.0)
   sqlite3 (~> 1.6)
   turbo-rails
-  turbolinks
   uglifier
   webdrivers (= 5.3.0)
 
