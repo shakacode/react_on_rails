@@ -48,6 +48,117 @@ Pre-commit hooks automatically run:
 - **⚠️ MANDATORY BEFORE GIT PUSH**: `bundle exec rubocop` and fix ALL violations + ensure trailing newlines
 - Never run `npm` commands, only equivalent Yarn Classic ones
 
+### Replicating CI Failures Locally
+
+**CRITICAL: NEVER wait for CI to verify fixes. Always replicate failures locally first.**
+
+#### Re-run Failed CI Jobs (🔥 NEW - Most Efficient!)
+
+```bash
+# Automatically detects and re-runs only the failed CI jobs
+bin/ci-rerun-failures
+
+# Or for a specific PR number
+bin/ci-rerun-failures 1964
+```
+
+This script:
+- ✨ **Fetches actual CI failures** from GitHub using `gh` CLI
+- 🎯 **Runs only what failed** - no wasted time on passing tests
+- 📋 **Shows you exactly what will run** before executing
+- 🚀 **Maps CI jobs to local commands** automatically
+
+**Example output:**
+```
+Failed CI jobs:
+  ✗ dummy-app-integration-tests (3.4, 22, latest)
+  ✗ dummy-app-integration-tests (3.2, 20, minimum)
+
+Will run the following commands:
+  • dummy-app-integration-tests: bundle exec rake run_rspec:all_dummy
+```
+
+#### Smart Test Detection
+
+```bash
+# Runs tests based on your code changes
+bin/ci-local
+
+# Run all CI checks
+bin/ci-local --all
+
+# Fast mode - skips slow tests
+bin/ci-local --fast
+```
+
+#### Manual Test Commands
+
+When you need to run specific test suites manually:
+
+```bash
+# All dummy app tests (matches CI most closely)
+bundle exec rake run_rspec:all_dummy
+```
+
+This automatically builds TypeScript, generates packs, builds webpack, and runs tests.
+
+#### Faster Iteration for Specific Tests
+
+```bash
+# Run from project root
+rake node_package                              # 1. Build TypeScript and link via yalc
+
+# Run from spec/dummy directory
+cd spec/dummy
+bin/shakapacker-precompile-hook                # 2. Run precompile tasks (generate packs, ReScript, etc.)
+RAILS_ENV=test bin/shakapacker                 # 3. Build webpack
+DISABLE_TURBOLINKS=TRUE bundle exec rspec './spec/system/integration_spec.rb[1:1:1:1]'
+```
+
+**Note**: Always run `bin/shakapacker-precompile-hook` before `bin/shakapacker` to ensure component packs are generated and any compilation tasks (ReScript, etc.) are completed. The hook handles all precompile steps that newer Shakapacker versions run automatically.
+
+**Note**: System tests may fail locally with SSL/environment issues but pass in CI. When in doubt, rely on `rake run_rspec:all_dummy`.
+
+#### Common Test Tasks
+
+```bash
+# All dummy app tests (with and without turbolinks)
+bundle exec rake run_rspec:all_dummy
+
+# Only tests without turbolinks (matches one CI job)
+bundle exec rake run_rspec:dummy_no_turbolinks
+
+# Gem-only tests (fast, no webpack needed)
+bundle exec rake run_rspec:gem
+
+# Everything except generated examples
+bundle exec rake all_but_examples
+```
+
+#### Debugging Component Registration Issues
+
+When you see "Could not find component registered with name X":
+
+1. **Check generated packs exist**:
+   ```bash
+   ls -la spec/dummy/client/app/packs/generated/
+   ls -la spec/dummy/client/app/generated/
+   ```
+
+2. **Verify webpack output**:
+   ```bash
+   ls -la spec/dummy/public/webpack/test/js/
+   ```
+
+3. **Check script loading in HTML**: Inspect the page source for `<script>` tags
+   - Look for `defer` or `async` attributes
+   - Verify generated component packs load before main bundle
+
+4. **Test in browser console** (when app runs):
+   ```javascript
+   ReactOnRails.registeredComponents()  // See what's registered
+   ```
+
 ## Changelog
 
 - **Update CHANGELOG.md for user-visible changes only** (features, bug fixes, breaking changes, deprecations, performance improvements)

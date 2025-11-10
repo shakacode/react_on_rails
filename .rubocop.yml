@@ -25,6 +25,7 @@ AllCops:
     - '**/node_modules/**/*'
     - '**/public/**/*'
     - '**/tmp/**/*'
+    - 'bin/*'  # Shell scripts
     - 'coverage/**/*'
     - 'gen-examples/examples/**/*'
     - 'node_modules/**/*'

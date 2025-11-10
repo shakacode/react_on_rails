@@ -82,8 +82,8 @@ describe ReactOnRailsHelper do
         expect(helper).to have_received(:append_javascript_pack_tag).with("generated/component_name",
                                                                           { defer: false, async: true })
       else
-        # When async is not supported, defaults to :sync which means { defer: false }
-        expect(helper).to have_received(:append_javascript_pack_tag).with("generated/component_name", { defer: false })
+        # When async is not supported, defaults to :defer which means { defer: true }
+        expect(helper).to have_received(:append_javascript_pack_tag).with("generated/component_name", { defer: true })
       end
       expect(helper).to have_received(:append_stylesheet_pack_tag).with("generated/component_name")
     end
