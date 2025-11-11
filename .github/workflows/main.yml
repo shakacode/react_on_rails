@@ -39,8 +39,11 @@ jobs:
   build-dummy-app-webpack-test-bundles:
     needs: detect-changes
     # Run on master, workflow_dispatch, OR when tests needed on PR
+    # For regular PRs: only run latest versions
+    # For master/workflow_dispatch: run all versions
     if: |
-      (github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.run_dummy_tests == 'true')
+      (github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.run_dummy_tests == 'true') &&
+      (matrix.dependency-level != 'minimum' || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch')
     strategy:
       matrix:
         include:
@@ -52,9 +55,6 @@ jobs:
           - ruby-version: '3.2'
             node-version: '20'
             dependency-level: 'minimum'
-        # On PRs (not workflow_dispatch), only run latest versions
-        exclude:
-          - ${{ github.event_name != 'workflow_dispatch' && github.ref != 'refs/heads/master' && matrix.dependency-level == 'minimum' || null }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -126,8 +126,11 @@ jobs:
   dummy-app-integration-tests:
     needs: [detect-changes, build-dummy-app-webpack-test-bundles]
     # Run on master, workflow_dispatch, OR when tests needed on PR
+    # For regular PRs: only run latest versions
+    # For master/workflow_dispatch: run all versions
     if: |
-      (github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.run_dummy_tests == 'true')
+      (github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.run_dummy_tests == 'true') &&
+      (matrix.dependency-level != 'minimum' || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch')
     strategy:
       fail-fast: false
       matrix:
@@ -140,9 +143,6 @@ jobs:
           - ruby-version: '3.2'
             node-version: '20'
             dependency-level: 'minimum'
-        # On PRs (not workflow_dispatch), only run latest versions
-        exclude:
-          - ${{ github.event_name != 'workflow_dispatch' && github.ref != 'refs/heads/master' && matrix.dependency-level == 'minimum' || null }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4

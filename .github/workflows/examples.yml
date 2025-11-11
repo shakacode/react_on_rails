@@ -38,7 +38,11 @@ jobs:
 
   examples:
     needs: detect-changes
-    if: github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.run_generators == 'true'
+    # For regular PRs: only run latest versions
+    # For master/workflow_dispatch: run all versions
+    if: |
+      (github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.run_generators == 'true') &&
+      (matrix.dependency-level != 'minimum' || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch')
     strategy:
       fail-fast: false
       matrix:
@@ -49,9 +53,6 @@ jobs:
           # Master and workflow_dispatch: Minimum supported versions (full coverage)
           - ruby-version: '3.2'
             dependency-level: 'minimum'
-        # On PRs (not workflow_dispatch), only run latest versions
-        exclude:
-          - ${{ github.event_name != 'workflow_dispatch' && github.ref != 'refs/heads/master' && matrix.dependency-level == 'minimum' || null }}
     env:
       SKIP_YARN_COREPACK_CHECK: 0
       BUNDLE_FROZEN: ${{ matrix.dependency-level == 'minimum' && 'false' || 'true' }}
