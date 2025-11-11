@@ -6,6 +6,8 @@ on:
 
 jobs:
   welcome:
+    # Skip for bots (dependabot, renovate, etc.)
+    if: github.event.pull_request.user.type != 'Bot'
     runs-on: ubuntu-22.04
     permissions:
       pull-requests: write

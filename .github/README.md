@@ -35,6 +35,20 @@ By default, PRs run a subset of CI jobs to provide fast feedback:
 
 This is intentional to keep PR feedback loops fast. However, before merging, you should verify compatibility across all supported versions. The `/run-full-ci` command makes this easy without waiting for the PR to be merged to master.
 
+### Security & Access Control
+
+**Only repository collaborators with write access can trigger full CI runs.** This prevents:
+
+- Resource abuse from external contributors
+- Unauthorized access to Pro package tests
+- Potential DoS attacks via repeated CI runs
+
+If an unauthorized user attempts to use `/run-full-ci`, they'll receive a message explaining the restriction.
+
+### Concurrency Protection
+
+Multiple `/run-full-ci` comments on the same PR will cancel in-progress runs to prevent resource waste and duplicate results.
+
 ## Testing Comment-Triggered Workflows
 
 **Important**: Comment-triggered workflows (`issue_comment` event) only execute from the **default branch** (master). This creates a chicken-and-egg problem when developing workflow changes.
