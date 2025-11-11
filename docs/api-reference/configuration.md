@@ -94,6 +94,234 @@ ReactOnRails.configure do |config|
   # This controls what command is run to build assets during tests
   ################################################################################
   config.build_test_command = "RAILS_ENV=test bin/shakapacker"
+
+  #
+  # React Server Components and Streaming SSR are React on Rails Pro features.
+  # For detailed configuration of RSC and streaming features, see:
+  # https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/docs/configuration.md
+  #
+  # Key Pro configurations (configured in ReactOnRailsPro.configure block):
+  # - rsc_bundle_js_file: Path to RSC bundle
+  # - react_client_manifest_file: Client component manifest for RSC
+  # - react_server_client_manifest_file: Server manifest for RSC
+  # - enable_rsc_support: Enable React Server Components
+  #
+  # See Pro documentation for complete setup instructions.
+
+  ################################################################################
+  # SERVER BUNDLE SECURITY AND ORGANIZATION
+  ################################################################################
+
+  # ⚠️ RECOMMENDED: Use Shakapacker 9.0+ for Automatic Configuration
+  #
+  # For Shakapacker 9.0+, add to config/shakapacker.yml:
+  #   private_output_path: ssr-generated
+  #
+  # React on Rails will automatically detect and use this value, eliminating the need
+  # to configure server_bundle_output_path here. This provides a single source of truth.
+  #
+  # For older Shakapacker versions or custom setups, manually configure:
+  # This configures the directory (relative to the Rails root) where the server bundle will be output.
+  # By default, this is "ssr-generated". If set to nil, the server bundle will be loaded from the same
+  # public directory as client bundles. For enhanced security, use this option in conjunction with
+  # `enforce_private_server_bundles` to ensure server bundles are only loaded from private directories
+  # config.server_bundle_output_path = "ssr-generated"
+
+  # When set to true, React on Rails will only load server bundles from private, explicitly configured directories (such as `ssr-generated`), and will raise an error if a server bundle is found in a public or untrusted location. This helps prevent accidental or malicious execution of untrusted JavaScript on the server, and is strongly recommended for production environments. And prevent leakage of server-side code to the client (Especially in the case of RSC).
+  # Default is false for backward compatibility, but enabling this option is a best practice for security.
+  config.enforce_private_server_bundles = false
+
+  ################################################################################
+  # BUNDLE ORGANIZATION EXAMPLES
+  ################################################################################
+  #
+  # This configuration creates a clear separation between client and server assets:
+  #
+  # CLIENT BUNDLES (Public, Web-Accessible):
+  #   Location: public/webpack/[environment]/ or public/packs/ (According to your shakapacker.yml configuration)
+  #   Files: application.js, manifest.json, CSS files
+  #   Served by: Web server directly
+  #   Access: ReactOnRails::Utils.public_bundles_full_path
+  #
+  # SERVER BUNDLES (Private, Server-Only):
+  #   Location: ssr-generated/ (when server_bundle_output_path configured)
+  #   Files: server-bundle.js, rsc-bundle.js
+  #   Served by: Never served to browsers
+  #   Access: ReactOnRails::Utils.server_bundle_js_file_path
+  #
+  # Example directory structure with recommended configuration:
+  #   app/
+  #   ├── ssr-generated/           # Private server bundles
+  #   │   ├── server-bundle.js
+  #   │   └── rsc-bundle.js
+  #   └── public/
+  #       └── webpack/development/ # Public client bundles
+  #           ├── application.js
+  #           ├── manifest.json
+  #           └── styles.css
+  #
+  ################################################################################
+
+  # `prerender` means server-side rendering
+  # default is false. This is an option for view helpers `render_component` and `render_component_hash`.
+  # Set to true to change the default value to true.
+  config.prerender = false
+
+  # THE BELOW OPTIONS FOR SERVER-SIDE RENDERING RARELY NEED CHANGING
+  #
+  # This value only affects server-side rendering when using the webpack-dev-server
+  # If you are hashing the server bundle and you want to use the same bundle for client and server,
+  # you'd set this to `true` so that React on Rails reads the server bundle from the webpack-dev-server.
+  # Normally, you have different bundles for client and server, thus, the default is false.
+  # Furthermore, if you are not hashing the server bundle (not in the manifest.json), then React on Rails
+  # will only look for the server bundle to be created in the typical file location, typically by
+  # a `shakapacker --watch` process.
+  # If true, ensure that in config/shakapacker.yml that you have both dev_server.hmr and
+  # dev_server.inline set to false.
+  config.same_bundle_for_client_and_server = false
+
+  # If set to true, this forces Rails to reload the server bundle if it is modified
+  # Default value is Rails.env.development?
+  # You probably will never change this.
+  config.development_mode = Rails.env.development?
+
+  # For server rendering so that the server-side console replays in the browser console.
+  # This can be set to false so that server side messages are not displayed in the browser.
+  # Default is true. Be cautious about turning this off, as it can make debugging difficult.
+  # Default value is true
+  config.replay_console = true
+
+  # Default is true. Logs server rendering messages to Rails.logger.info. If false, you'll only
+  # see the server rendering messages in the browser console.
+  config.logging_on_server = true
+
+  # Default is true only for development? to raise exception on server if the JS code throws for
+  # server rendering. The reason is that the server logs will show the error and force you to fix
+  # any server rendering issues immediately during development.
+  config.raise_on_prerender_error = Rails.env.development?
+
+  # This configuration allows logic to be applied to client rendered props, such as stripping props that are only used during server rendering.
+  # Add a module with an adjust_props_for_client_side_hydration method that expects the component's name & props hash
+  # See below for an example definition of RenderingPropsExtension
+  config.rendering_props_extension = RenderingPropsExtension
+
+  ################################################################################
+  # Server Renderer Configuration for ExecJS
+  ################################################################################
+  # The default server rendering is ExecJS, by default using Node.js runtime
+  # If you wish to use an alternative Node server rendering for higher performance,
+  # contact justin@shakacode.com for details.
+  #
+  # For ExecJS:
+  # You can configure your pool of JS virtual machines and specify where it should load code:
+  # On MRI, use `node.js` runtime for the best performance
+  # (see https://github.com/shakacode/react_on_rails/issues/1438)
+  # Also see https://github.com/shakacode/react_on_rails/issues/1457#issuecomment-1165026717 if using `mini_racer`
+  # On MRI, you'll get a deadlock with `pool_size` > 1
+  # If you're using JRuby, you can increase `pool_size` to have real multi-threaded rendering.
+  config.server_renderer_pool_size = 1 # increase if you're on JRuby
+  config.server_renderer_timeout = 20 # seconds
+
+  ################################################################################
+  ################################################################################
+  # FILE SYSTEM BASED COMPONENT REGISTRY
+  # `render_component` and `render_component_hash` view helper methods can
+  # auto-load the bundle for the generated component, to avoid having to specify the
+  # bundle manually for each view with the component.
+  #
+  # SHAKAPACKER VERSION REQUIREMENTS:
+  # - Basic pack generation: Shakapacker 6.5.1+
+  # - Advanced auto-registration with nested entries: Shakapacker 7.0.0+
+  # - Async loading support: Shakapacker 8.2.0+
+  #
+  # Feature Compatibility Matrix:
+  # | Shakapacker Version | Basic Pack Generation | Auto-Registration | Nested Entries | Async Loading |
+  # |-------------------|----------------------|-------------------|----------------|---------------|
+  # | 6.5.1 - 6.9.x     | ✅ Yes                | ❌ No              | ❌ No           | ❌ No          |
+  # | 7.0.0 - 8.1.x     | ✅ Yes                | ✅ Yes             | ✅ Yes          | ❌ No          |
+  # | 8.2.0+            | ✅ Yes                | ✅ Yes             | ✅ Yes          | ✅ Yes         |
+  #
+  ################################################################################
+  # components_subdirectory is the name of the subdirectory matched to detect and register components automatically
+  # The default is nil. You can enable the feature by updating it in the next line.
+  config.components_subdirectory = nil
+  # Change to a value like this example to enable this feature
+  # config.components_subdirectory = "ror_components"
+
+  # Default is false.
+  # The default can be overridden as an option in calls to view helpers
+  # `render_component` and `render_component_hash`. You may set to true to change the default to auto loading.
+  # NOTE: Requires Shakapacker 6.5.1+ for basic functionality, 7.0.0+ for full auto-registration features.
+  # See version requirements matrix above for complete feature compatibility.
+  config.auto_load_bundle = false
+
+  # Default is false
+  # Set this to true & instead of trying to import the generated server components into your existing
+  # server bundle entrypoint, the PacksGenerator will create a server bundle entrypoint using
+  # config.server_bundle_js_file for the filename.
+  config.make_generated_server_bundle_the_entrypoint = false
+
+  # Configuration for how generated component packs are loaded.
+  # Options: :sync, :async, :defer
+  # - :sync (default for Shakapacker < 8.2.0): Loads scripts synchronously
+  # - :async (default for Shakapacker ≥ 8.2.0): Loads scripts asynchronously for better performance
+  # - :defer: Defers script execution until after page load
+  config.generated_component_packs_loading_strategy = :async
+
+  # DEPRECATED: Use `generated_component_packs_loading_strategy` instead.
+  # Migration: `defer_generated_component_packs: true` → `generated_component_packs_loading_strategy: :defer`
+  # Migration: `defer_generated_component_packs: false` → `generated_component_packs_loading_strategy: :sync`
+  # See [16.0.0 Release Notes](docs/release-notes/16.0.0.md) for more details.
+  # config.defer_generated_component_packs = false
+
+  # Default is false
+  # React on Rails Pro (licensed) feature: When true, components hydrate immediately as soon as
+  # their server-rendered HTML reaches the client, without waiting for the full page load.
+  # This improves time-to-interactive performance.
+  config.immediate_hydration = false
+
+  ################################################################################
+  # I18N OPTIONS
+  ################################################################################
+  # Replace the following line to the location where you keep translation.js & default.js for use
+  # by the npm packages react-intl. Be sure this directory exists!
+  # config.i18n_dir = Rails.root.join("client", "app", "libs", "i18n")
+  #
+  # If not using the i18n feature, then leave this section commented out or set the value
+  # of config.i18n_dir to nil.
+  #
+  # Replace the following line to the location where you keep your client i18n yml files
+  # that will source for automatic generation on translations.js & default.js
+  # By default(without this option) all yaml files from Rails.root.join("config", "locales")
+  # and installed gems are loaded
+  config.i18n_yml_dir = Rails.root.join("config", "locales")
+
+  # Possible output formats are js and json
+  # The default format is json
+  config.i18n_output_format = 'json'
+
+  # Possible YAML.safe_load options pass-through for locales
+  # config.i18n_yml_safe_load_options = { permitted_classes: [Symbol] }
+
+  ################################################################################
+  ################################################################################
+  # TEST CONFIGURATION OPTIONS
+  # Below options are used with the use of this test helper:
+  # ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+  #
+  # NOTE:
+  # Instead of using this test helper, you may ensure fresh test files using Shakapacker via:
+  # 1. Have `config/webpack/test.js` exporting an array of objects to configure both client and server bundles.
+  # 2. Set the compile option to true in config/shakapacker.yml for env test
+  ################################################################################
+
+  # If you are using this in your spec_helper.rb (or rails_helper.rb):
+  #
+  # ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+  #
+  # with rspec then this controls what yarn command is run
+  # to automatically refresh your Webpack assets on every test run.
+  #
 end
 ```
 

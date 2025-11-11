@@ -78,6 +78,38 @@ default: &default
 
 The `bin/switch-bundler` script automatically updates this configuration when switching bundlers.
 
+### Server Bundle Configuration (Shakapacker 9.0+)
+
+**Recommended**: For Shakapacker 9.0+, use `private_output_path` in `shakapacker.yml` for server bundles:
+
+```yaml
+default: &default # ... other config ...
+  private_output_path: ssr-generated
+```
+
+This provides a single source of truth for server bundle location. React on Rails automatically detects this configuration, eliminating the need to set `server_bundle_output_path` in your React on Rails initializer.
+
+In your `config/webpack/serverWebpackConfig.js`:
+
+```javascript
+const { config } = require('shakapacker');
+
+serverWebpackConfig.output = {
+  filename: 'server-bundle.js',
+  globalObject: 'this',
+  path: config.privateOutputPath, // Automatically uses shakapacker.yml value
+};
+```
+
+**Benefits:**
+
+- Single source of truth in `shakapacker.yml`
+- Automatic synchronization between webpack and React on Rails
+- No configuration duplication
+- Better maintainability
+
+**For older Shakapacker versions:** Use hardcoded paths and manual configuration as shown in the generator templates.
+
 Per the example repo [shakacode/react_on_rails_demo_ssr_hmr](https://github.com/shakacode/react_on_rails_demo_ssr_hmr),
 you should consider keeping your codebase mostly consistent with the defaults for [Shakapacker](https://github.com/shakacode/shakapacker).
 
