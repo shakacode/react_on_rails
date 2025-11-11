@@ -83,7 +83,8 @@ jobs:
   benchmark:
     runs-on: ubuntu-latest
     env:
-      REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE }}
+      SECRET_KEY_BASE: 'dummy-secret-key-for-ci-testing-not-used-in-production'
+      REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
 
     steps:
       # ============================================
@@ -231,12 +232,8 @@ jobs:
         run: |
           cd spec/dummy
           bundle lock --add-platform 'x86_64-linux'
-          if ! bundle check --path=vendor/bundle; then
-            bundle _2.5.4_ install --path=vendor/bundle --jobs=4 --retry=3
-          fi
-
-      - name: generate file system-based packs
-        run: cd spec/dummy && RAILS_ENV="production" bundle exec rake react_on_rails:generate_packs
+          bundle config set path vendor/bundle
+          bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
 
       - name: Prepare production assets
         if: github.event.inputs.app_version != 'pro_only'
