@@ -126,6 +126,15 @@ ReactOnRails.configure do |config|
   # SERVER BUNDLE SECURITY AND ORGANIZATION
   ################################################################################
 
+  # ⚠️ RECOMMENDED: Use Shakapacker 9.0+ for Automatic Configuration
+  #
+  # For Shakapacker 9.0+, add to config/shakapacker.yml:
+  #   private_output_path: ssr-generated
+  #
+  # React on Rails will automatically detect and use this value, eliminating the need
+  # to configure server_bundle_output_path here. This provides a single source of truth.
+  #
+  # For older Shakapacker versions or custom setups, manually configure:
   # This configures the directory (relative to the Rails root) where the server bundle will be output.
   # By default, this is "ssr-generated". If set to nil, the server bundle will be loaded from the same
   # public directory as client bundles. For enhanced security, use this option in conjunction with
