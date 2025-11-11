@@ -48,6 +48,52 @@ Pre-commit hooks automatically run:
 - **⚠️ MANDATORY BEFORE GIT PUSH**: `bundle exec rubocop` and fix ALL violations + ensure trailing newlines
 - Never run `npm` commands, only equivalent Yarn Classic ones
 
+### Replicating CI Failures Locally
+
+**CRITICAL: NEVER wait for CI to verify fixes. Always replicate failures locally first.**
+
+#### Re-run Failed CI Jobs
+
+```bash
+# Automatically detects and re-runs only the failed CI jobs
+bin/ci-rerun-failures
+
+# Search recent commits for failures (when current commit is clean/in-progress)
+bin/ci-rerun-failures --previous
+
+# Or for a specific PR number
+bin/ci-rerun-failures 1964
+```
+
+This script:
+- ✨ **Fetches actual CI failures** from GitHub using `gh` CLI
+- 🎯 **Runs only what failed** - no wasted time on passing tests
+- ⏳ **Waits for in-progress CI** - offers to poll until completion
+- 🔍 **Searches previous commits** - finds failures before your latest push
+- 📋 **Shows you exactly what will run** before executing
+- 🚀 **Maps CI jobs to local commands** automatically
+
+#### Run Only Failed Examples
+
+When RSpec tests fail, run just those specific examples:
+
+```bash
+# Copy failure output from GitHub Actions, then:
+pbpaste | bin/ci-run-failed-specs
+
+# Or pass spec paths directly:
+bin/ci-run-failed-specs './spec/system/integration_spec.rb[1:1:1:1]'
+
+# Or from a file:
+bin/ci-run-failed-specs < failures.txt
+```
+
+This script:
+- 🎯 **Runs only failing examples** - not the entire test suite
+- 📋 **Parses RSpec output** - extracts spec paths automatically
+- 🔄 **Deduplicates** - removes duplicate specs
+- 📁 **Auto-detects directory** - runs from spec/dummy when needed
+
 ## Changelog
 
 - **Update CHANGELOG.md for user-visible changes only** (features, bug fixes, breaking changes, deprecations, performance improvements)
