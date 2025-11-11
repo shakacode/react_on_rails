@@ -184,7 +184,12 @@ while IFS= read -r check; do
   done
 done <<< "$FAILED_CHECKS"
 
-if [ ${#COMMANDS_TO_RUN[@]} -eq 0 ]; then
+# Check if any commands were found (handle empty array with set -u)
+set +u
+NUM_COMMANDS=${#COMMANDS_TO_RUN[@]}
+set -u
+
+if [ "$NUM_COMMANDS" -eq 0 ]; then
   echo -e "${YELLOW}No local equivalents found for failed jobs.${NC}"
   echo "Failed jobs might be from Pro or other workflows."
   echo ""
