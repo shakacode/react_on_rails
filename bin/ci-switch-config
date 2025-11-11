@@ -6,7 +6,7 @@
 #   bin/ci-switch-config latest    # Ruby 3.4, Node 22, latest deps
 #   bin/ci-switch-config status    # Show current configuration
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -67,30 +67,34 @@ show_status() {
   echo ""
   echo "Dependency versions:"
 
+  SHAKAPACKER_GEM=""
   if [ -f "$PROJECT_ROOT/Gemfile.development_dependencies" ]; then
-    SHAKAPACKER_GEM=$(grep 'gem "shakapacker"' "$PROJECT_ROOT/Gemfile.development_dependencies" | sed -E 's/.*"([0-9.]+)".*/\1/')
-    echo "  Shakapacker (gem): $SHAKAPACKER_GEM"
+    SHAKAPACKER_GEM=$(grep 'gem "shakapacker"' "$PROJECT_ROOT/Gemfile.development_dependencies" | sed -E 's/.*"([0-9.]+)".*/\1/' || echo "")
+    echo "  Shakapacker (gem): ${SHAKAPACKER_GEM:-not found}"
   fi
 
+  SHAKAPACKER_NPM=""
   if [ -f "$PROJECT_ROOT/spec/dummy/package.json" ]; then
-    SHAKAPACKER_NPM=$(grep '"shakapacker"' "$PROJECT_ROOT/spec/dummy/package.json" | sed -E 's/.*"([0-9.]+)".*/\1/')
-    echo "  Shakapacker (npm): $SHAKAPACKER_NPM"
+    SHAKAPACKER_NPM=$(grep '"shakapacker"' "$PROJECT_ROOT/spec/dummy/package.json" | sed -E 's/.*"([0-9.]+)".*/\1/' || echo "")
+    echo "  Shakapacker (npm): ${SHAKAPACKER_NPM:-not found}"
   fi
 
+  REACT_ROOT=""
   if [ -f "$PROJECT_ROOT/package.json" ]; then
-    REACT_ROOT=$(grep '"react":' "$PROJECT_ROOT/package.json" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
-    echo "  React (root): $REACT_ROOT"
+    REACT_ROOT=$(grep '"react":' "$PROJECT_ROOT/package.json" | head -1 | sed -E 's/.*"([^"]+)".*/\1/' || echo "")
+    echo "  React (root): ${REACT_ROOT:-not found}"
   fi
 
+  REACT_DUMMY=""
   if [ -f "$PROJECT_ROOT/spec/dummy/package.json" ]; then
-    REACT_DUMMY=$(grep '"react":' "$PROJECT_ROOT/spec/dummy/package.json" | sed -E 's/.*"([^"]+)".*/\1/')
-    echo "  React (dummy): $REACT_DUMMY"
+    REACT_DUMMY=$(grep '"react":' "$PROJECT_ROOT/spec/dummy/package.json" | sed -E 's/.*"([^"]+)".*/\1/' || echo "")
+    echo "  React (dummy): ${REACT_DUMMY:-not found}"
   fi
 
   echo ""
-  if [[ "$SHAKAPACKER_GEM" == "8.2.0" ]] && [[ "$REACT_ROOT" == "18.0.0" ]]; then
+  if [[ "${SHAKAPACKER_GEM}" == "8.2.0" ]] && [[ "${REACT_ROOT}" == "18.0.0" ]]; then
     echo -e "Current config: ${GREEN}minimum${NC} (matches CI: Ruby 3.2, Node 20, minimum deps)"
-  elif [[ "$SHAKAPACKER_GEM" == "9.3.0" ]] && [[ "$REACT_ROOT" =~ 19 ]]; then
+  elif [[ "${SHAKAPACKER_GEM}" == "9.3.0" ]] && [[ "${REACT_ROOT}" =~ 19 ]]; then
     echo -e "Current config: ${GREEN}latest${NC} (matches CI: Ruby 3.4, Node 22, latest deps)"
   else
     echo -e "Current config: ${YELLOW}unknown/mixed${NC}"
@@ -108,9 +112,9 @@ switch_to_minimum() {
   # Check if we have git changes
   if ! git diff --quiet || ! git diff --cached --quiet; then
     print_warning "You have uncommitted changes. This script will modify files."
-    read -p "Continue? (y/N) " -n 1 -r
+    read -p "Continue? (y/N) " -n 1 -r REPLY
     echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    if [[ ! "${REPLY}" =~ ^[Yy]$ ]]; then
       echo "Aborted."
       exit 1
     fi
@@ -188,9 +192,9 @@ restore_to_latest() {
   # Check if we have git changes
   if ! git diff --quiet || ! git diff --cached --quiet; then
     print_warning "You have uncommitted changes. This script will restore from git."
-    read -p "Continue? This will discard changes to package.json, Gemfile, etc. (y/N) " -n 1 -r
+    read -p "Continue? This will discard changes to package.json, Gemfile, etc. (y/N) " -n 1 -r REPLY
     echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    if [[ ! "${REPLY}" =~ ^[Yy]$ ]]; then
       echo "Aborted."
       exit 1
     fi
