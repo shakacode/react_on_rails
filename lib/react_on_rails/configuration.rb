@@ -142,6 +142,7 @@ module ReactOnRails
       check_component_registry_timeout
       validate_generated_component_packs_loading_strategy
       validate_enforce_private_server_bundles
+      auto_detect_server_bundle_path_from_shakapacker
     end
 
     private
@@ -212,6 +213,35 @@ module ReactOnRails
       raise ReactOnRails::Error, "enforce_private_server_bundles is set to true, but " \
                                  "server_bundle_output_path (#{server_bundle_output_path}) is inside " \
                                  "the public directory. Please set it to a directory outside of public."
+    end
+
+    # Auto-detect server_bundle_output_path from Shakapacker 9.0+ private_output_path
+    # Only sets if user hasn't explicitly configured server_bundle_output_path
+    def auto_detect_server_bundle_path_from_shakapacker
+      # Skip if user explicitly set server_bundle_output_path to something other than default
+      return if server_bundle_output_path != "ssr-generated"
+
+      # Skip if Shakapacker is not available
+      return unless defined?(::Shakapacker)
+
+      # Check if Shakapacker config has private_output_path method (9.0+)
+      return unless ::Shakapacker.config.respond_to?(:private_output_path)
+
+      begin
+        private_path = ::Shakapacker.config.private_output_path
+        return unless private_path
+
+        # Convert from Pathname to relative string path
+        relative_path = private_path.to_s.sub("#{Rails.root}/", "")
+        self.server_bundle_output_path = relative_path
+
+        Rails.logger.info("ReactOnRails: Auto-detected server_bundle_output_path from " \
+                          "shakapacker.yml private_output_path: '#{relative_path}'")
+      rescue StandardError => e
+        # Fail gracefully - if auto-detection fails, keep the default
+        Rails.logger.debug("ReactOnRails: Could not auto-detect server bundle path from " \
+                           "Shakapacker: #{e.message}")
+      end
     end
 
     def check_minimum_shakapacker_version
