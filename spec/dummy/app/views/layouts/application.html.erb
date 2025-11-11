@@ -9,10 +9,16 @@
 
   <%= yield :head %>
 
-  <%# Use defer: true to ensure proper script execution order.
-      When using generated component packs (auto_load_bundle), defer ensures
-      component registrations complete before React hydration begins. %>
-  <%= javascript_pack_tag('client-bundle', 'data-turbo-track': 'reload', defer: true) %>
+  <%# Conditionally use defer: true for pages with Redux shared stores (inline registration).
+      Modern apps should use async: true for optimal performance. See docs for details:
+      docs/building-features/streaming-server-rendering.md %>
+  <% if uses_redux_shared_store? %>
+    <%# defer: true required for Redux shared stores with inline component registration %>
+    <%= javascript_pack_tag('client-bundle', 'data-turbo-track': 'reload', defer: true) %>
+  <% else %>
+    <%# async: true is the recommended approach for modern apps (Shakapacker >= 8.2.0) %>
+    <%= javascript_pack_tag('client-bundle', 'data-turbo-track': 'reload', async: true) %>
+  <% end %>
 
   <%= csrf_meta_tags %>
 </head>

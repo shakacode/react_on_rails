@@ -284,9 +284,9 @@ module ReactOnRails
             .with("8.2.0").and_return(true)
         end
 
-        it "defaults to :defer" do
+        it "defaults to :async" do
           ReactOnRails.configure {} # rubocop:disable Lint/EmptyBlock
-          expect(ReactOnRails.configuration.generated_component_packs_loading_strategy).to eq(:defer)
+          expect(ReactOnRails.configuration.generated_component_packs_loading_strategy).to eq(:async)
         end
 
         it "accepts :async value" do
@@ -332,9 +332,10 @@ module ReactOnRails
           allow(Rails.logger).to receive(:warn)
         end
 
-        it "defaults to :defer" do
+        it "defaults to :sync and logs a warning" do
           ReactOnRails.configure {} # rubocop:disable Lint/EmptyBlock
-          expect(ReactOnRails.configuration.generated_component_packs_loading_strategy).to eq(:defer)
+          expect(ReactOnRails.configuration.generated_component_packs_loading_strategy).to eq(:sync)
+          expect(Rails.logger).to have_received(:warn).with(/does not support async script loading/)
         end
 
         it "accepts :defer value" do
