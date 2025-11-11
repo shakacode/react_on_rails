@@ -688,8 +688,8 @@ module ReactOnRails
       enforce_private_match = content.match(/config\.enforce_private_server_bundles\s*=\s*([^\s\n,]+)/)
       checker.add_info("  enforce_private_server_bundles: #{enforce_private_match[1]}") if enforce_private_match
 
-      # Validate webpack config matches Rails config
-      validate_server_bundle_path_sync(rails_bundle_path)
+      # Check Shakapacker integration and provide recommendations
+      check_shakapacker_private_output_path(rails_bundle_path)
 
       # RSC bundle file (Pro feature)
       rsc_bundle_match = content.match(/config\.rsc_bundle_js_file\s*=\s*["']([^"']+)["']/)
@@ -1405,91 +1405,69 @@ module ReactOnRails
       Rails.logger.debug(message)
     end
 
-    # Validates that webpack serverWebpackConfig.js output.path matches
-    # React on Rails config.server_bundle_output_path
-    def validate_server_bundle_path_sync(rails_bundle_path)
-      webpack_config_path = "config/webpack/serverWebpackConfig.js"
-
-      unless File.exist?(webpack_config_path)
-        checker.add_info("\n  ℹ️  Webpack server config not found - skipping path validation")
+    # Check Shakapacker private_output_path integration and provide recommendations
+    # rubocop:disable Metrics/MethodLength
+    def check_shakapacker_private_output_path(rails_bundle_path)
+      unless defined?(::Shakapacker)
+        checker.add_info("\n  ℹ️  Shakapacker not detected - using manual configuration")
         return
       end
 
+      # Check if Shakapacker 9.0+ with private_output_path support
+      unless ::Shakapacker.config.respond_to?(:private_output_path)
+        checker.add_info(<<~MSG.strip)
+          \n  💡 Recommendation: Upgrade to Shakapacker 9.0+
+
+          Shakapacker 9.0+ adds 'private_output_path' in shakapacker.yml for server bundles.
+          This eliminates the need to configure server_bundle_output_path separately.
+
+          Benefits:
+          - Single source of truth in shakapacker.yml
+          - Automatic detection by React on Rails
+          - No configuration duplication
+        MSG
+        return
+      end
+
+      # Shakapacker 9.0+ is available
       begin
-        webpack_content = File.read(webpack_config_path)
+        private_path = ::Shakapacker.config.private_output_path
 
-        # Try to extract the path from webpack config
-        webpack_bundle_path = extract_webpack_output_path(webpack_content, webpack_config_path)
+        if private_path
+          relative_path = private_path.to_s.sub("#{Rails.root}/", "")
 
-        return unless webpack_bundle_path
+          if relative_path == rails_bundle_path
+            checker.add_success("\n  ✅ Using Shakapacker 9.0+ private_output_path: '#{relative_path}'")
+            checker.add_info("     Auto-detected from shakapacker.yml - no manual config needed")
+          else
+            checker.add_warning(<<~MSG.strip)
+              \n  ⚠️  Configuration mismatch detected!
 
-        # Normalize and compare paths
-        normalized_webpack_path = normalize_path(webpack_bundle_path)
-        normalized_rails_path = normalize_path(rails_bundle_path)
+              Shakapacker private_output_path: '#{relative_path}'
+              React on Rails server_bundle_output_path: '#{rails_bundle_path}'
 
-        if normalized_webpack_path == normalized_rails_path
-          checker.add_success("\n  ✅ Webpack and Rails configs are in sync (both use '#{rails_bundle_path}')")
+              Recommendation: Remove server_bundle_output_path from your React on Rails
+              initializer and let it auto-detect from shakapacker.yml private_output_path.
+            MSG
+          end
         else
-          checker.add_warning(<<~MSG.strip)
-            \n  ⚠️  Configuration mismatch detected!
+          checker.add_info(<<~MSG.strip)
+            \n  💡 Recommendation: Configure private_output_path in shakapacker.yml
 
-            React on Rails config (config/initializers/react_on_rails.rb):
-              server_bundle_output_path = "#{rails_bundle_path}"
+            Add to config/shakapacker.yml:
+              private_output_path: #{rails_bundle_path}
 
-            Webpack config (#{webpack_config_path}):
-              output.path = "#{webpack_bundle_path}" (relative to Rails.root)
-
-            These must match for server rendering to work correctly.
-
-            To fix:
-            1. Update server_bundle_output_path in config/initializers/react_on_rails.rb, OR
-            2. Update output.path in #{webpack_config_path}
-
-            Make sure both point to the same directory relative to Rails.root.
+            This will:
+            - Keep webpack and Rails configs in sync automatically
+            - Enable auto-detection by React on Rails
+            - Serve as single source of truth for server bundle location
           MSG
         end
       rescue StandardError => e
-        checker.add_info("\n  ℹ️  Could not validate webpack config: #{e.message}")
+        checker.add_info("\n  ℹ️  Could not check Shakapacker config: #{e.message}")
       end
     end
-
-    # Extract output.path from webpack config, supporting multiple patterns
-    def extract_webpack_output_path(webpack_content, _webpack_config_path)
-      # Pattern 1: path: require('path').resolve(__dirname, '../../ssr-generated')
-      # Explicitly match ../../path pattern for clarity
-      hardcoded_pattern = %r{path:\s*require\(['"]path['"]\)\.resolve\(__dirname,\s*['"]\.\./\.\./([^'"]+)['"]\)}
-      if (match = webpack_content.match(hardcoded_pattern))
-        return match[1]
-      end
-
-      # Pattern 2: path: config.outputPath (can't validate - runtime value)
-      if webpack_content.match?(/path:\s*config\.outputPath/)
-        checker.add_info(<<~MSG.strip)
-          \n  ℹ️  Webpack config uses config.outputPath (from shakapacker.yml)
-          Cannot validate sync with Rails config as this is resolved at build time.
-          Ensure your shakapacker.yml public_output_path matches server_bundle_output_path.
-        MSG
-        return nil
-      end
-
-      # Pattern 3: path: some_variable (can't validate)
-      if webpack_content.match?(/path:\s*[a-zA-Z_]\w*/)
-        checker.add_info("\n  ℹ️  Webpack config uses a variable for output.path - cannot validate")
-        return nil
-      end
-
-      checker.add_info("\n  ℹ️  Could not parse webpack server bundle path - skipping validation")
-      nil
-    end
-
-    # Normalize path for comparison (remove leading ./, trailing /)
-    def normalize_path(path)
-      return path unless path.is_a?(String)
-
-      normalized = path.strip
-      normalized = normalized.sub(%r{^\.?/}, "") # Remove leading ./ or /
-      normalized.sub(%r{/$}, "") # Remove trailing /
-    end
+    # rubocop:enable Metrics/MethodLength
   end
   # rubocop:enable Metrics/ClassLength
 end

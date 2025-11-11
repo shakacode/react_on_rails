@@ -45,14 +45,20 @@ const configureServer = () => {
   serverWebpackConfig.plugins.unshift(new bundler.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));
 
   // Custom output for the server-bundle
-  // ⚠️ IMPORTANT: This output.path must match server_bundle_output_path in
-  //              config/initializers/react_on_rails.rb
   //
-  // Both are currently set to 'ssr-generated' (relative to Rails.root)
-  // Keeping these in sync ensures React on Rails can find the server bundle at runtime.
+  // ⚠️ RECOMMENDED: Use Shakapacker 9.0+ for automatic configuration
   //
-  // Server bundles are output to a private directory (not public) for security.
-  // This prevents server-side code from being exposed via the web server.
+  // With Shakapacker 9.0+, use config.privateOutputPath to automatically sync
+  // with shakapacker.yml private_output_path. This eliminates manual path configuration.
+  //
+  // For Shakapacker 9.0+:
+  //   serverWebpackConfig.output = {
+  //     filename: 'server-bundle.js',
+  //     globalObject: 'this',
+  //     path: config.privateOutputPath,
+  //   };
+  //
+  // For older Shakapacker or custom setups, use hardcoded path:
   serverWebpackConfig.output = {
     filename: 'server-bundle.js',
     globalObject: 'this',
