@@ -1,0 +1,289 @@
+#!/usr/bin/env bash
+# Switch between CI test configurations locally
+#
+# Usage:
+#   bin/ci-switch-config minimum   # Ruby 3.2, Node 20, minimum deps
+#   bin/ci-switch-config latest    # Ruby 3.4, Node 22, latest deps
+#   bin/ci-switch-config status    # Show current configuration
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Color codes for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+print_header() {
+  echo -e "${BLUE}==>${NC} $1"
+}
+
+print_success() {
+  echo -e "${GREEN}✓${NC} $1"
+}
+
+print_warning() {
+  echo -e "${YELLOW}⚠${NC} $1"
+}
+
+print_error() {
+  echo -e "${RED}✗${NC} $1"
+}
+
+check_version_manager() {
+  if command -v mise &> /dev/null; then
+    echo "mise"
+  elif command -v asdf &> /dev/null; then
+    echo "asdf"
+  else
+    print_error "No version manager found. Please install mise or asdf:"
+    echo "  mise (recommended): https://mise.jdx.dev/"
+    echo "  asdf (legacy):      https://asdf-vm.com/"
+    exit 1
+  fi
+}
+
+show_status() {
+  print_header "Current Configuration"
+  echo ""
+
+  echo "Runtime versions:"
+  if command -v ruby &> /dev/null; then
+    echo "  Ruby: $(ruby --version | awk '{print $2}')"
+  else
+    echo "  Ruby: not found"
+  fi
+
+  if command -v node &> /dev/null; then
+    echo "  Node: $(node --version)"
+  else
+    echo "  Node: not found"
+  fi
+
+  echo ""
+  echo "Dependency versions:"
+
+  SHAKAPACKER_GEM=""
+  if [ -f "$PROJECT_ROOT/Gemfile.development_dependencies" ]; then
+    SHAKAPACKER_GEM=$(grep 'gem "shakapacker"' "$PROJECT_ROOT/Gemfile.development_dependencies" | sed -E 's/.*"([0-9.]+)".*/\1/' || echo "")
+    echo "  Shakapacker (gem): ${SHAKAPACKER_GEM:-not found}"
+  fi
+
+  SHAKAPACKER_NPM=""
+  if [ -f "$PROJECT_ROOT/spec/dummy/package.json" ]; then
+    SHAKAPACKER_NPM=$(grep '"shakapacker"' "$PROJECT_ROOT/spec/dummy/package.json" | sed -E 's/.*"([0-9.]+)".*/\1/' || echo "")
+    echo "  Shakapacker (npm): ${SHAKAPACKER_NPM:-not found}"
+  fi
+
+  REACT_ROOT=""
+  if [ -f "$PROJECT_ROOT/package.json" ]; then
+    REACT_ROOT=$(grep '"react":' "$PROJECT_ROOT/package.json" | head -1 | sed -E 's/.*"([^"]+)".*/\1/' || echo "")
+    echo "  React (root): ${REACT_ROOT:-not found}"
+  fi
+
+  REACT_DUMMY=""
+  if [ -f "$PROJECT_ROOT/spec/dummy/package.json" ]; then
+    REACT_DUMMY=$(grep '"react":' "$PROJECT_ROOT/spec/dummy/package.json" | sed -E 's/.*"([^"]+)".*/\1/' || echo "")
+    echo "  React (dummy): ${REACT_DUMMY:-not found}"
+  fi
+
+  echo ""
+  if [[ "${SHAKAPACKER_GEM}" == "8.2.0" ]] && [[ "${REACT_ROOT}" == "18.0.0" ]]; then
+    echo -e "Current config: ${GREEN}minimum${NC} (matches CI: Ruby 3.2, Node 20, minimum deps)"
+  elif [[ "${SHAKAPACKER_GEM}" == "9.3.0" ]] && [[ "${REACT_ROOT}" =~ 19 ]]; then
+    echo -e "Current config: ${GREEN}latest${NC} (matches CI: Ruby 3.4, Node 22, latest deps)"
+  else
+    echo -e "Current config: ${YELLOW}unknown/mixed${NC}"
+  fi
+}
+
+switch_to_minimum() {
+  local VERSION_MANAGER=$(check_version_manager)
+
+  print_header "Switching to MINIMUM configuration"
+  echo "  Target: Ruby 3.2, Node 20, Shakapacker 8.2.0, React 18.0.0"
+  echo "  Using version manager: $VERSION_MANAGER"
+  echo ""
+
+  # Check if we have git changes
+  if ! git diff --quiet || ! git diff --cached --quiet; then
+    print_warning "You have uncommitted changes. This script will modify files."
+    read -p "Continue? (y/N) " -n 1 -r REPLY
+    echo
+    if [[ ! "${REPLY}" =~ ^[Yy]$ ]]; then
+      echo "Aborted."
+      exit 1
+    fi
+  fi
+
+  # Set Ruby and Node versions
+  print_header "Setting runtime versions in .tool-versions"
+  cat > "$PROJECT_ROOT/.tool-versions" <<EOF
+ruby 3.2.8
+nodejs 20.18.1
+EOF
+  print_success "Created .tool-versions with Ruby 3.2.8 and Node 20.18.1"
+
+  # Run conversion script
+  print_header "Running script/convert to downgrade dependencies"
+  cd "$PROJECT_ROOT"
+  ruby script/convert
+  print_success "Dependency versions downgraded"
+
+  # Clean and reinstall
+  print_header "Cleaning node_modules and reinstalling"
+  rm -rf node_modules
+  if [ -f yarn.lock ]; then
+    rm yarn.lock
+  fi
+
+  print_header "Installing root dependencies (without --frozen-lockfile)"
+  yarn install --no-progress
+
+  print_header "Cleaning spec/dummy and reinstalling"
+  cd spec/dummy
+  rm -rf node_modules vendor/bundle
+  if [ -f yarn.lock ]; then
+    rm yarn.lock
+  fi
+
+  yarn install --no-progress
+  bundle install --path=vendor/bundle
+
+  print_success "Dependencies installed"
+
+  # Reload version manager to pick up new versions
+  print_header "Reloading $VERSION_MANAGER to use new versions"
+  if [[ "$VERSION_MANAGER" == "mise" ]]; then
+    # mise will auto-detect .tool-versions on next cd
+    :
+  elif [ -f "$HOME/.asdf/asdf.sh" ]; then
+    source "$HOME/.asdf/asdf.sh"
+  fi
+
+  echo ""
+  print_success "Switched to MINIMUM configuration"
+  print_warning "Run these commands to reload your shell and verify:"
+  echo "  cd $PROJECT_ROOT"
+  if [[ "$VERSION_MANAGER" == "mise" ]]; then
+    echo "  mise current"
+  else
+    echo "  asdf current"
+  fi
+  echo ""
+  print_warning "Next steps to build and test:"
+  echo "  rake node_package"
+  echo "  cd spec/dummy && bin/shakapacker-precompile-hook && RAILS_ENV=test bin/shakapacker"
+  echo "  bundle exec rake run_rspec:all_dummy"
+}
+
+restore_to_latest() {
+  local VERSION_MANAGER=$(check_version_manager)
+
+  print_header "Restoring to LATEST configuration"
+  echo "  Target: Ruby 3.4, Node 22, Shakapacker 9.3.0, React 19.0.0"
+  echo "  Using version manager: $VERSION_MANAGER"
+  echo ""
+
+  # Check if we have git changes
+  if ! git diff --quiet || ! git diff --cached --quiet; then
+    print_warning "You have uncommitted changes. This script will restore from git."
+    read -p "Continue? This will discard changes to package.json, Gemfile, etc. (y/N) " -n 1 -r REPLY
+    echo
+    if [[ ! "${REPLY}" =~ ^[Yy]$ ]]; then
+      echo "Aborted."
+      exit 1
+    fi
+  fi
+
+  # Set Ruby and Node versions
+  print_header "Setting runtime versions in .tool-versions"
+  cat > "$PROJECT_ROOT/.tool-versions" <<EOF
+ruby 3.4.3
+nodejs 22.12.0
+EOF
+  print_success "Created .tool-versions with Ruby 3.4.3 and Node 22.12.0"
+
+  # Restore files from git
+  print_header "Restoring dependency files from git"
+  cd "$PROJECT_ROOT"
+  git restore Gemfile.development_dependencies package.json spec/dummy/package.json packages/react-on-rails-pro/package.json 2>/dev/null || true
+  print_success "Files restored from git"
+
+  # Clean and reinstall
+  print_header "Cleaning node_modules and reinstalling"
+  rm -rf node_modules
+  if [ -f yarn.lock ]; then
+    rm yarn.lock
+  fi
+
+  print_header "Installing root dependencies with --frozen-lockfile"
+  yarn install --frozen-lockfile --no-progress
+
+  print_header "Cleaning spec/dummy and reinstalling"
+  cd spec/dummy
+  rm -rf node_modules vendor/bundle
+  if [ -f yarn.lock ]; then
+    rm yarn.lock
+  fi
+
+  yarn install --frozen-lockfile --no-progress
+  bundle install --path=vendor/bundle
+
+  print_success "Dependencies installed"
+
+  # Reload version manager to pick up new versions
+  print_header "Reloading $VERSION_MANAGER to use new versions"
+  if [[ "$VERSION_MANAGER" == "mise" ]]; then
+    # mise will auto-detect .tool-versions on next cd
+    :
+  elif [ -f "$HOME/.asdf/asdf.sh" ]; then
+    source "$HOME/.asdf/asdf.sh"
+  fi
+
+  echo ""
+  print_success "Restored to LATEST configuration"
+  print_warning "Run these commands to reload your shell and verify:"
+  echo "  cd $PROJECT_ROOT"
+  if [[ "$VERSION_MANAGER" == "mise" ]]; then
+    echo "  mise current"
+  else
+    echo "  asdf current"
+  fi
+  echo ""
+  print_warning "Next steps to build and test:"
+  echo "  rake node_package"
+  echo "  cd spec/dummy && bin/shakapacker-precompile-hook && RAILS_ENV=test bin/shakapacker"
+  echo "  bundle exec rake run_rspec:all_dummy"
+}
+
+# Main script
+case "${1:-}" in
+  minimum)
+    switch_to_minimum
+    ;;
+  latest)
+    restore_to_latest
+    ;;
+  status)
+    show_status
+    ;;
+  *)
+    echo "Usage: $0 {minimum|latest|status}"
+    echo ""
+    echo "Commands:"
+    echo "  minimum  - Switch to Ruby 3.2, Node 20, minimum dependencies (Shakapacker 8.2.0, React 18)"
+    echo "  latest   - Switch to Ruby 3.4, Node 22, latest dependencies (Shakapacker 9.3.0, React 19)"
+    echo "  status   - Show current configuration"
+    echo ""
+    echo "Examples:"
+    echo "  $0 status           # Check current config"
+    echo "  $0 minimum          # Switch to minimum deps for testing CI failures"
+    echo "  $0 latest           # Switch back to latest deps"
+    exit 1
+    ;;
+esac
