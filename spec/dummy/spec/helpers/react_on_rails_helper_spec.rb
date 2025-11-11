@@ -77,6 +77,8 @@ describe ReactOnRailsHelper do
       allow(helper).to receive(:append_stylesheet_pack_tag)
       expect { helper.load_pack_for_generated_component("component_name", render_options) }.not_to raise_error
 
+      # Default loading strategy is now always :defer to prevent race conditions
+      # between component registration and hydration, regardless of async support
       expect(helper).to have_received(:append_javascript_pack_tag).with("generated/component_name", { defer: true })
       expect(helper).to have_received(:append_stylesheet_pack_tag).with("generated/component_name")
     end
