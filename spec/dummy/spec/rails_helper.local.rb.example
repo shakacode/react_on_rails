@@ -1,0 +1,25 @@
+# frozen_string_literal: true
+
+# Example local test configuration file
+# Copy this to rails_helper.local.rb to enable environment-specific settings
+# The .local.rb file is gitignored and won't be committed
+
+# ==============================================================================
+# Conductor Workspace Configuration
+# ==============================================================================
+# If you're using Conductor workspaces and experiencing SSL certificate issues
+# with webdrivers, uncomment the following lines:
+
+# require "webdrivers"
+# Webdrivers.cache_time = 86_400 * 365 # Cache for 1 year (disable auto-updates)
+#
+# require "openssl"
+# OpenSSL::SSL::VERIFY_PEER = OpenSSL::SSL::VERIFY_NONE
+#
+# WARNING: Disabling SSL verification is a security risk.
+# Only use this in isolated test environments like Conductor workspaces.
+
+# ==============================================================================
+# Other Environment-Specific Settings
+# ==============================================================================
+# Add your own environment-specific test configuration here

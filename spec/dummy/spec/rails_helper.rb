@@ -15,6 +15,11 @@ require "rspec/rails"
 require "capybara/rails"
 require "capybara-screenshot/rspec"
 
+# Load local test configuration if it exists (for Conductor workspaces, etc.)
+# This file is gitignored and can contain environment-specific workarounds
+local_config = File.expand_path("rails_helper.local.rb", __dir__)
+require local_config if File.exist?(local_config)
+
 # Add additional requires below this line. Rails is not loaded until this point!
 
 # Requires supporting ruby files with custom matchers and macros, etc, in
