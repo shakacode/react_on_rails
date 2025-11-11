@@ -39,11 +39,8 @@ jobs:
   build-dummy-app-webpack-test-bundles:
     needs: detect-changes
     # Run on master, workflow_dispatch, OR when tests needed on PR
-    # For regular PRs: only run latest versions
-    # For master/workflow_dispatch: run all versions
     if: |
-      (github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.run_dummy_tests == 'true') &&
-      (matrix.dependency-level != 'minimum' || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch')
+      github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.run_dummy_tests == 'true'
     strategy:
       matrix:
         include:
@@ -56,11 +53,23 @@ jobs:
             node-version: '20'
             dependency-level: 'minimum'
     runs-on: ubuntu-22.04
+    env:
+      # Skip minimum dependency on regular PRs (only run on master or workflow_dispatch)
+      SKIP_MINIMUM: ${{ matrix.dependency-level == 'minimum' && github.event_name != 'workflow_dispatch' && github.ref != 'refs/heads/master' }}
     steps:
+      - name: Check if job should skip
+        if: env.SKIP_MINIMUM == 'true'
+        run: |
+          echo "Skipping minimum dependency run on regular PR"
+          echo "Use /run-skipped-ci command to run all versions"
+          exit 0
+
       - uses: actions/checkout@v4
+        if: env.SKIP_MINIMUM != 'true'
         with:
           persist-credentials: false
       - name: Setup Ruby
+        if: env.SKIP_MINIMUM != 'true'
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: ${{ matrix.ruby-version }}
@@ -68,8 +77,10 @@ jobs:
       # libyaml-dev is needed for psych v5
       # this gem depends on sdoc which depends on rdoc which depends on psych
       - name: Fix dependency for libyaml-dev
+        if: env.SKIP_MINIMUM != 'true'
         run: sudo apt install libyaml-dev
       - name: Setup Node
+        if: env.SKIP_MINIMUM != 'true'
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
@@ -78,6 +89,7 @@ jobs:
           cache: ${{ matrix.node-version != '22' && 'yarn' || '' }}
           cache-dependency-path: '**/yarn.lock'
       - name: Print system information
+        if: env.SKIP_MINIMUM != 'true'
         run: |
           echo "Linux release: "; cat /etc/issue
           echo "Current user: "; whoami
@@ -90,21 +102,27 @@ jobs:
         if: matrix.dependency-level == 'minimum'
         run: script/convert
       - name: Install Node modules with Yarn for renderer package
+        if: env.SKIP_MINIMUM != 'true'
         run: |
           yarn install --no-progress --no-emoji ${{ matrix.dependency-level == 'latest' && '--frozen-lockfile' || '' }}
           sudo yarn global add yalc
       - name: yalc publish for react-on-rails
+        if: env.SKIP_MINIMUM != 'true'
         run: cd packages/react-on-rails && yalc publish
       - name: yalc add react-on-rails
+        if: env.SKIP_MINIMUM != 'true'
         run: cd spec/dummy && yalc add react-on-rails
       - name: Install Node modules with Yarn for dummy app
+        if: env.SKIP_MINIMUM != 'true'
         run: cd spec/dummy && yarn install --no-progress --no-emoji ${{ matrix.dependency-level == 'latest' && '--frozen-lockfile' || '' }}
       - name: Save dummy app ruby gems to cache
+        if: env.SKIP_MINIMUM != 'true'
         uses: actions/cache@v4
         with:
           path: spec/dummy/vendor/bundle
           key: dummy-app-gem-cache-${{ hashFiles('spec/dummy/Gemfile.lock') }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
       - name: Install Ruby Gems for dummy app
+        if: env.SKIP_MINIMUM != 'true'
         run: |
           cd spec/dummy
           bundle lock --add-platform 'x86_64-linux'
@@ -112,12 +130,15 @@ jobs:
             bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
           fi
       - name: generate file system-based packs
+        if: env.SKIP_MINIMUM != 'true'
         run: cd spec/dummy && RAILS_ENV="test" bundle exec rake react_on_rails:generate_packs
       - name: Build test bundles for dummy app
+        if: env.SKIP_MINIMUM != 'true'
         run: cd spec/dummy && rm -rf public/webpack/test && yarn run build:rescript && RAILS_ENV="test" NODE_ENV="test" bin/shakapacker
       - id: get-sha
         run: echo "sha=\"$(git rev-parse HEAD)\"" >> "$GITHUB_OUTPUT"
       - name: Save test Webpack bundles to cache (for build number checksum used by RSpec job)
+        if: env.SKIP_MINIMUM != 'true'
         uses: actions/cache/save@v4
         with:
           path: spec/dummy/public/webpack
@@ -127,6 +148,8 @@ jobs:
     needs: [detect-changes, build-dummy-app-webpack-test-bundles]
     # Run on master, workflow_dispatch, OR when tests needed on PR
     # For regular PRs: only run latest versions
+    if: |
+      github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.run_dummy_tests == 'true'
     # For master/workflow_dispatch: run all versions
     if: |
       (github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.run_dummy_tests == 'true') &&
@@ -144,16 +167,22 @@ jobs:
             node-version: '20'
             dependency-level: 'minimum'
     runs-on: ubuntu-22.04
+    env:
+      # Skip minimum dependency on regular PRs (only run on master or workflow_dispatch)
+      SKIP_MINIMUM: ${{ matrix.dependency-level == 'minimum' && github.event_name != 'workflow_dispatch' && github.ref != 'refs/heads/master' }}
     steps:
       - uses: actions/checkout@v4
+        if: env.SKIP_MINIMUM != 'true'
         with:
           persist-credentials: false
       - name: Setup Ruby
+        if: env.SKIP_MINIMUM != 'true'
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: ${{ matrix.ruby-version }}
           bundler: 2.5.9
       - name: Setup Node
+        if: env.SKIP_MINIMUM != 'true'
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
@@ -162,6 +191,7 @@ jobs:
           cache: ${{ matrix.node-version != '22' && 'yarn' || '' }}
           cache-dependency-path: '**/yarn.lock'
       - name: Print system information
+        if: env.SKIP_MINIMUM != 'true'
         run: |
           echo "Linux release: "; cat /etc/issue
           echo "Current user: "; whoami
@@ -174,11 +204,13 @@ jobs:
         if: matrix.dependency-level == 'minimum'
         run: script/convert
       - name: Save root ruby gems to cache
+        if: env.SKIP_MINIMUM != 'true'
         uses: actions/cache@v4
         with:
           path: vendor/bundle
           key: package-app-gem-cache-${{ hashFiles('Gemfile.lock') }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
       - name: Save dummy app ruby gems to cache
+        if: env.SKIP_MINIMUM != 'true'
         uses: actions/cache@v4
         with:
           path: spec/dummy/vendor/bundle
@@ -186,31 +218,39 @@ jobs:
       - id: get-sha
         run: echo "sha=\"$(git rev-parse HEAD)\"" >> "$GITHUB_OUTPUT"
       - name: Save test Webpack bundles to cache (for build number checksum used by RSpec job)
+        if: env.SKIP_MINIMUM != 'true'
         uses: actions/cache@v4
         with:
           path: spec/dummy/public/webpack
           key: dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
       - name: Install Node modules with Yarn
+        if: env.SKIP_MINIMUM != 'true'
         run: |
           yarn install --no-progress --no-emoji ${{ matrix.dependency-level == 'latest' && '--frozen-lockfile' || '' }}
           sudo yarn global add yalc
       - name: yalc publish for react-on-rails
+        if: env.SKIP_MINIMUM != 'true'
         run: cd packages/react-on-rails && yalc publish
       - name: yalc add react-on-rails
+        if: env.SKIP_MINIMUM != 'true'
         run: cd spec/dummy && yalc add react-on-rails
       - name: Install Node modules with Yarn for dummy app
+        if: env.SKIP_MINIMUM != 'true'
         run: cd spec/dummy && yarn install --no-progress --no-emoji ${{ matrix.dependency-level == 'latest' && '--frozen-lockfile' || '' }}
       - name: Dummy JS tests
+        if: env.SKIP_MINIMUM != 'true'
         run: |
           cd spec/dummy
           yarn run test:js
       - name: Install Ruby Gems for package
+        if: env.SKIP_MINIMUM != 'true'
         run: |
           bundle lock --add-platform 'x86_64-linux'
           if ! bundle check --path=vendor/bundle; then
             bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
           fi
       - name: Install Ruby Gems for dummy app
+        if: env.SKIP_MINIMUM != 'true'
         run: |
           cd spec/dummy
           bundle lock --add-platform 'x86_64-linux'
@@ -218,6 +258,7 @@ jobs:
             bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
           fi
       - name: Ensure minimum required Chrome version
+        if: env.SKIP_MINIMUM != 'true'
         run: |
           echo -e "Already installed $(google-chrome --version)\n"
           MINIMUM_REQUIRED_CHROME_VERSION=75
@@ -230,8 +271,10 @@ jobs:
             echo -e "\nInstalled $(google-chrome --version)"
           fi
       - name: Increase the amount of inotify watchers
+        if: env.SKIP_MINIMUM != 'true'
         run: echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
       - name: generate file system-based packs
+        if: env.SKIP_MINIMUM != 'true'
         run: cd spec/dummy && RAILS_ENV="test" bundle exec rake react_on_rails:generate_packs
       - name: Git Stuff
         if: matrix.dependency-level == 'minimum'
@@ -241,26 +284,32 @@ jobs:
           git commit -am "stop generators from complaining about uncommitted code"
       - run: cd spec/dummy && bundle info shakapacker
       - name: Set packer version environment variable
+        if: env.SKIP_MINIMUM != 'true'
         run: |
           echo "CI_DEPENDENCY_LEVEL=ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}" >> $GITHUB_ENV
       - name: Main CI
+        if: env.SKIP_MINIMUM != 'true'
         run: bundle exec rake run_rspec:all_dummy
       - name: Store test results
+        if: env.SKIP_MINIMUM != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: main-rspec-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
           path: ~/rspec
       - name: Store artifacts
+        if: env.SKIP_MINIMUM != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: dummy-app-capybara-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
           path: spec/dummy/tmp/capybara
       - name: Store artifacts
+        if: env.SKIP_MINIMUM != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: dummy-app-test-log-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
           path: spec/dummy/log/test.log
       - name: Store artifacts
+        if: env.SKIP_MINIMUM != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: dummy-app-yarn-log-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
