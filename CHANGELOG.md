@@ -35,6 +35,8 @@ Changes since the last non-beta release.
 
 - **Improved RSC Payload Error Handling**: Errors that happen during generation of RSC payload are transferred properly to rails side and logs the error message and stack. [PR #1888](https://github.com/shakacode/react_on_rails/pull/1888) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
+- **Polished Error Messages**: Improved configuration error message wording for loading strategy validation. Error messages now show the preferred `:defer` option first, followed by `:sync`. [PR 1976](https://github.com/shakacode/react_on_rails/pull/1976) by [justin808](https://github.com/justin808).
+
 #### Changed
 
 - **Shakapacker 9.0.0 Upgrade**: Upgraded Shakapacker from 8.2.0 to 9.0.0 with Babel transpiler configuration for compatibility. Key changes include:
@@ -50,6 +52,8 @@ Changes since the last non-beta release.
 - **Shakapacker 9.2.0 Upgrade**: Upgraded Shakapacker from 9.1.0 to 9.2.0. This minor version update adds a new `bin/shakapacker-config` utility for debugging webpack/rspack configurations with doctor mode, save mode, and stdout mode options. Supports YAML, JSON, and Node.js inspect output formats. by [justin808](https://github.com/justin808).
 
 #### Bug Fixes
+
+- **Component Registration Race Condition**: Fixed intermittent component registration errors caused by a race condition with defer script loading. Changed default loading strategy from `:sync` to `:defer` to ensure deterministic script execution order. This ensures component registrations complete before React hydration starts, preventing "Component not registered" errors in CI and production. [PR 1972](https://github.com/shakacode/react_on_rails/pull/1972) by [justin808](https://github.com/justin808).
 
 - **Use as Git dependency**: All packages can now be installed as Git dependencies. This is useful for development and testing purposes. See [CONTRIBUTING.md](./CONTRIBUTING.md#git-dependencies) for documentation. [PR #1873](https://github.com/shakacode/react_on_rails/pull/1873) by [alexeyr-ci2](https://github.com/alexeyr-ci2).
 
