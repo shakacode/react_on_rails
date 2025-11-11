@@ -10,6 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 2. **ALWAYS ensure files end with a newline character**
 3. **NEVER push without running full lint check first**
 4. **ALWAYS let Prettier and RuboCop handle ALL formatting - never manually format**
+5. **ALWAYS run `yarn run eslint --report-unused-disable-directives` before committing** - This matches CI's exact ESLint check
 
 These requirements are non-negotiable. CI will fail if not followed.
 
@@ -37,6 +38,7 @@ Pre-commit hooks automatically run:
   - All tests: `rake` (default task runs lint and all tests except examples)
 - **Linting** (MANDATORY BEFORE EVERY COMMIT):
   - **REQUIRED**: `bundle exec rubocop` - Must pass with zero offenses
+  - **REQUIRED**: `yarn run eslint --report-unused-disable-directives` - Must pass (matches CI exactly)
   - All linters: `rake lint` (runs ESLint and RuboCop)
   - ESLint only: `yarn run lint` or `rake lint:eslint`
   - RuboCop only: `rake lint:rubocop`
