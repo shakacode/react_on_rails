@@ -7,23 +7,30 @@ require "fileutils"
 require "net/http"
 require "uri"
 
+# Helper to get env var with default,
+# treating empty string and "0" as unset since they can come from the benchmark workflow.
+def env_or_default(key, default)
+  value = ENV[key].to_s
+  value.empty? || value == "0" ? default : value
+end
+
 # Benchmark parameters
 PRO = ENV.fetch("PRO", "false") == "true"
 APP_DIR = PRO ? "react_on_rails_pro/spec/dummy" : "spec/dummy"
-ROUTES = ENV.fetch("ROUTES", nil)
-BASE_URL = ENV.fetch("BASE_URL", "localhost:3001")
+ROUTES = env_or_default("ROUTES", nil)
+BASE_URL = env_or_default("BASE_URL", "localhost:3001")
 # requests per second; if "max" will get maximum number of queries instead of a fixed rate
-RATE = ENV.fetch("RATE", "50")
+RATE = env_or_default("RATE", "50")
 # concurrent connections/virtual users
-CONNECTIONS = ENV.fetch("CONNECTIONS", "10").to_i
+CONNECTIONS = env_or_default("CONNECTIONS", 10).to_i
 # maximum connections/virtual users
-MAX_CONNECTIONS = ENV.fetch("MAX_CONNECTIONS", CONNECTIONS).to_i
+MAX_CONNECTIONS = env_or_default("MAX_CONNECTIONS", CONNECTIONS).to_i
 # benchmark duration (duration string like "30s", "1m", "90s")
-DURATION = ENV.fetch("DURATION", "30s")
+DURATION = env_or_default("DURATION", "30s")
 # request timeout (duration string as above)
-REQUEST_TIMEOUT = ENV.fetch("REQUEST_TIMEOUT", "60s")
+REQUEST_TIMEOUT = env_or_default("REQUEST_TIMEOUT", "60s")
 # Tools to run (comma-separated)
-TOOLS = ENV.fetch("TOOLS", "fortio,vegeta,k6").split(",")
+TOOLS = env_or_default("TOOLS", "fortio,vegeta,k6").split(",")
 
 OUTDIR = "bench_results"
 SUMMARY_TXT = "#{OUTDIR}/summary.txt".freeze
@@ -93,10 +100,12 @@ end
 # Get all routes to benchmark
 routes =
   if ROUTES
-    ROUTES.split(",").map(&:strip)
+    ROUTES.split(",").map(&:strip).reject(&:empty?)
   else
     get_benchmark_routes(APP_DIR)
   end
+
+raise "No routes to benchmark" if routes.empty?
 
 validate_rate(RATE)
 validate_positive_integer(CONNECTIONS, "CONNECTIONS")
