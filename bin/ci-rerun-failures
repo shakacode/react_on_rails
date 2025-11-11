@@ -175,11 +175,19 @@ fi
 
 echo -e "${YELLOW}Failed CI jobs:${NC}"
 echo "$FAILED_CHECKS" | while read -r check; do
-  echo -e "${RED}  ✗ $check${NC}"
+  # Try to get version info for the check
+  version_info=""
+  for job_name in "${!JOB_VERSION_MAP[@]}"; do
+    if [[ "$check" == "$job_name"* ]]; then
+      version_info=" (${JOB_VERSION_MAP[$job_name]})"
+      break
+    fi
+  done
+  echo -e "${RED}  ✗ $check${version_info}${NC}"
 done
 echo ""
 
-# Map CI job names to local commands
+# Map CI job names to local commands with version info
 declare -A JOB_MAP
 JOB_MAP["lint-js-and-ruby"]="bundle exec rubocop && yarn run eslint --report-unused-disable-directives && yarn start format.listDifferent"
 JOB_MAP["rspec-package-tests"]="bundle exec rake run_rspec:gem"
@@ -187,6 +195,11 @@ JOB_MAP["package-js-tests"]="yarn test"
 JOB_MAP["dummy-app-integration-tests (3.4, 22, latest)"]="bundle exec rake run_rspec:all_dummy"
 JOB_MAP["dummy-app-integration-tests (3.2, 20, minimum)"]="bundle exec rake run_rspec:all_dummy"
 JOB_MAP["examples"]="bundle exec rake run_rspec:shakapacker_examples"
+
+# Map CI job names to human-readable versions
+declare -A JOB_VERSION_MAP
+JOB_VERSION_MAP["dummy-app-integration-tests (3.4, 22, latest)"]="Ruby 3.4, Node 22, Shakapacker 9.3.0, React 19"
+JOB_VERSION_MAP["dummy-app-integration-tests (3.2, 20, minimum)"]="Ruby 3.2, Node 20, Shakapacker 8.2.0, React 18"
 
 # Track what we'll run (deduplicated)
 declare -A COMMANDS_TO_RUN
@@ -218,7 +231,16 @@ fi
 
 echo -e "${BLUE}Will run the following commands:${NC}"
 for cmd in "${!COMMANDS_TO_RUN[@]}"; do
-  echo -e "${BLUE}  • ${COMMANDS_TO_RUN[$cmd]}:${NC} $cmd"
+  job_name="${COMMANDS_TO_RUN[$cmd]}"
+  # Try to get version info for the job
+  version_info=""
+  for mapped_job_name in "${!JOB_VERSION_MAP[@]}"; do
+    if [[ "$job_name" == "$mapped_job_name"* ]]; then
+      version_info=" (${JOB_VERSION_MAP[$mapped_job_name]})"
+      break
+    fi
+  done
+  echo -e "${BLUE}  • $job_name${version_info}:${NC} $cmd"
 done
 echo ""
 
@@ -251,19 +273,28 @@ FAILED_COMMANDS=()
 
 for cmd in "${!COMMANDS_TO_RUN[@]}"; do
   job_name="${COMMANDS_TO_RUN[$cmd]}"
-  echo -e "${BLUE}▶ Running: $job_name${NC}"
+  # Try to get version info for the job
+  version_info=""
+  for mapped_job_name in "${!JOB_VERSION_MAP[@]}"; do
+    if [[ "$job_name" == "$mapped_job_name"* ]]; then
+      version_info=" (${JOB_VERSION_MAP[$mapped_job_name]})"
+      break
+    fi
+  done
+
+  echo -e "${BLUE}▶ Running: $job_name${version_info}${NC}"
   echo -e "${BLUE}Command: $cmd${NC}"
   echo ""
 
   # Note: Using eval here is safe because $cmd comes from predefined JOB_MAP,
   # not from user input. Commands may contain shell operators like && and ||.
   if eval "$cmd"; then
-    echo -e "${GREEN}✓ $job_name passed${NC}"
+    echo -e "${GREEN}✓ $job_name${version_info} passed${NC}"
     echo ""
   else
-    echo -e "${RED}✗ $job_name failed${NC}"
+    echo -e "${RED}✗ $job_name${version_info} failed${NC}"
     echo ""
-    FAILED_COMMANDS+=("$job_name")
+    FAILED_COMMANDS+=("$job_name$version_info")
   fi
 done
 
