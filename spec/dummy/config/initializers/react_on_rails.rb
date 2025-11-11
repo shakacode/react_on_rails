@@ -42,5 +42,10 @@ ReactOnRails.configure do |config|
   config.components_subdirectory = "startup"
   config.auto_load_bundle = true
   config.immediate_hydration = false
-  config.generated_component_packs_loading_strategy = :defer
+
+  # Use :defer to prevent race conditions with auto-generated component packs.
+  # To test with :async (CI default), set: REACT_ON_RAILS_LOADING_STRATEGY=async
+  # See: spec/dummy/TESTING_LOCALLY.md for reproducing CI failures
+  loading_strategy = ENV.fetch("REACT_ON_RAILS_LOADING_STRATEGY", "defer").to_sym
+  config.generated_component_packs_loading_strategy = loading_strategy
 end
