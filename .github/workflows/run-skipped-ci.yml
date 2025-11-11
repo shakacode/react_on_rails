@@ -15,8 +15,8 @@ jobs:
     if: |
       github.event.issue.pull_request &&
       (
-        startsWith(github.event.comment.body, '/run-full-ci') ||
-        contains(github.event.comment.body, '\n/run-full-ci')
+        startsWith(github.event.comment.body, '/run-skipped-ci') ||
+        contains(github.event.comment.body, '\n/run-skipped-ci')
       )
     runs-on: ubuntu-22.04
     permissions:

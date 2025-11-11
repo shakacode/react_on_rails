@@ -4,12 +4,12 @@ This directory contains GitHub Actions workflows for continuous integration and 
 
 ## PR Comment Commands
 
-### `/run-full-ci` - Run Full CI Suite
+### `/run-skipped-ci` - Run Full CI Suite
 
 When you open a PR, CI automatically runs a subset of tests for faster feedback (latest Ruby/Node versions only). To run the **complete CI suite** including all dependency combinations, add a comment to your PR:
 
 ```
-/run-full-ci
+/run-skipped-ci
 ```
 
 This command will trigger:
@@ -33,7 +33,7 @@ By default, PRs run a subset of CI jobs to provide fast feedback:
 - Skips example generator tests
 - Skips some Pro package tests
 
-This is intentional to keep PR feedback loops fast. However, before merging, you should verify compatibility across all supported versions. The `/run-full-ci` command makes this easy without waiting for the PR to be merged to master.
+This is intentional to keep PR feedback loops fast. However, before merging, you should verify compatibility across all supported versions. The `/run-skipped-ci` command makes this easy without waiting for the PR to be merged to master.
 
 ### Security & Access Control
 
@@ -43,11 +43,11 @@ This is intentional to keep PR feedback loops fast. However, before merging, you
 - Unauthorized access to Pro package tests
 - Potential DoS attacks via repeated CI runs
 
-If an unauthorized user attempts to use `/run-full-ci`, they'll receive a message explaining the restriction.
+If an unauthorized user attempts to use `/run-skipped-ci`, they'll receive a message explaining the restriction.
 
 ### Concurrency Protection
 
-Multiple `/run-full-ci` comments on the same PR will cancel in-progress runs to prevent resource waste and duplicate results.
+Multiple `/run-skipped-ci` comments on the same PR will cancel in-progress runs to prevent resource waste and duplicate results.
 
 ## Testing Comment-Triggered Workflows
 
@@ -82,7 +82,7 @@ For more details, see [GitHub's documentation on issue_comment events](https://d
 
 ### Utility Workflows
 
-- **`run-full-ci.yml`** - Triggered by `/run-full-ci` comment on PRs
+- **`run-skipped-ci.yml`** - Triggered by `/run-skipped-ci` comment on PRs
 - **`pr-welcome-comment.yml`** - Auto-comments on new PRs with helpful info
 - **`detect-changes.yml`** - Detects which parts of the codebase changed
 
@@ -109,6 +109,6 @@ Many workflows use change detection to skip unnecessary jobs:
 
 - Runs all jobs on pushes to `master`
 - Runs only relevant jobs on PRs based on changed files
-- Can be overridden with `workflow_dispatch` or `/run-full-ci` command
+- Can be overridden with `workflow_dispatch` or `/run-skipped-ci` command
 
 See `script/ci-changes-detector` for the change detection logic.

@@ -26,7 +26,7 @@ jobs:
             To run the **complete CI suite** including all dependency combinations and skipped jobs, comment:
 
             ```
-            /run-full-ci
+            /run-skipped-ci
             ```
 
             This will trigger:
