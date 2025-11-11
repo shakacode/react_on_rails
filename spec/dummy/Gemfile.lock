@@ -1,7 +1,7 @@
 PATH
   remote: ../..
   specs:
-    react_on_rails (16.1.1)
+    react_on_rails (16.2.0.beta.0)
       addressable
       connection_pool
       execjs (~> 2.5)
@@ -269,6 +269,8 @@ GEM
     rb-fsevent (0.11.2)
     rb-inotify (0.10.1)
       ffi (~> 1.0)
+    rbs (3.9.5)
+      logger
     rdoc (6.14.2)
       erb
       psych (>= 4.0.0)
@@ -433,6 +435,7 @@ DEPENDENCIES
   pry-rescue
   puma (~> 6.0)
   rails (~> 7.1)
+  rbs
   react_on_rails!
   rspec-rails
   rspec-retry
