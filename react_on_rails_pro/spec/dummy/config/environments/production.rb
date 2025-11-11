@@ -19,8 +19,9 @@ Rails.application.configure do
   config.public_file_server.enabled = true
 
   # Compress JavaScripts and CSS.
-  config.assets.js_compressor = Uglifier.new(harmony: true)
-  config.assets.css_compressor = :csso
+  # JS/CSS compression handled by Webpack/Shakapacker, not needed for Sprockets
+  # config.assets.js_compressor = Uglifier.new(harmony: true)
+  # config.assets.css_compressor = :csso
 
   # Do not fallback to assets pipeline if a precompiled asset is missed.
   config.assets.compile = false
@@ -69,7 +70,7 @@ Rails.application.configure do
   config.active_support.deprecation = :notify
 
   # Use default logging formatter so that PID and timestamp are not suppressed.
-  config.log_formatter = ::Logger::Formatter.new
+  config.log_formatter = Logger::Formatter.new
 
   # Use a different logger for distributed setups.
   # require 'syslog/logger'
