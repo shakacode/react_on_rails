@@ -295,6 +295,18 @@ jobs:
 
           echo "✅ Benchmark suite completed successfully"
 
+      - name: Stop Core production server
+        if: env.RUN_CORE && always()
+        run: |
+          echo "🛑 Stopping Core production server..."
+          # Find and kill the Puma process on port 3001
+          if lsof -ti:3001 > /dev/null 2>&1; then
+            kill $(lsof -ti:3001) || true
+            echo "✅ Server stopped"
+          else
+            echo "ℹ️ No server running on port 3001"
+          fi
+
       - name: Validate Core benchmark results
         if: env.RUN_CORE
         run: |
@@ -446,6 +458,18 @@ jobs:
           fi
 
           echo "✅ Benchmark suite completed successfully"
+
+      - name: Stop Pro production server
+        if: env.RUN_PRO && always()
+        run: |
+          echo "🛑 Stopping Pro production server..."
+          # Find and kill the Puma process on port 3001
+          if lsof -ti:3001 > /dev/null 2>&1; then
+            kill $(lsof -ti:3001) || true
+            echo "✅ Server stopped"
+          else
+            echo "ℹ️ No server running on port 3001"
+          fi
 
       - name: Validate Pro benchmark results
         if: env.RUN_PRO
