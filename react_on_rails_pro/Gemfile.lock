@@ -233,7 +233,6 @@ GEM
     parser (3.3.3.0)
       ast (~> 2.4.1)
       racc
-    pg (1.5.6)
     pp (0.6.2)
       prettyprint
     prettyprint (0.2.0)
@@ -466,7 +465,6 @@ DEPENDENCIES
   net-http
   net-imap
   net-smtp
-  pg
   pry (>= 0.14.1)
   pry-byebug!
   pry-doc
