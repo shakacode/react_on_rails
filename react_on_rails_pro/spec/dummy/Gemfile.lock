@@ -487,8 +487,6 @@ GEM
     turbolinks-source (5.2.0)
     tzinfo (2.0.6)
       concurrent-ruby (~> 1.0)
-    uglifier (4.2.0)
-      execjs (>= 0.3.0, < 3)
     unicode-display_width (2.6.0)
     uri (1.0.3)
     useragent (0.16.11)
@@ -580,7 +578,6 @@ DEPENDENCIES
   sprockets
   sqlite3 (~> 1.4)
   turbolinks
-  uglifier
   web-console
   webdrivers (= 5.3.0)
   webmock
