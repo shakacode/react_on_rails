@@ -73,6 +73,9 @@ env:
   FORTIO_VERSION: "1.73.0"
   K6_VERSION: "1.4.2"
   VEGETA_VERSION: "12.13.0"
+  # Determine which apps to run (default is 'pro_only' for all triggers)
+  RUN_CORE: ${{ (github.event.inputs.app_version || 'pro_only') != 'pro_only' && 'true' || '' }}
+  RUN_PRO: ${{ (github.event.inputs.app_version || 'pro_only') != 'core_only' && 'true' || '' }}
   # Benchmark parameters (defaults in bench.rb unless overridden here for CI)
   ROUTES: ${{ github.event.inputs.routes }}
   RATE: ${{ github.event.inputs.rate || 'max' }}
@@ -233,30 +236,30 @@ jobs:
         run: cd packages/react-on-rails && yarn install --no-progress --no-emoji --frozen-lockfile && yalc publish
 
       - name: yalc add react-on-rails
-        if: github.event.inputs.app_version != 'pro_only'
+        if: env.RUN_CORE
         run: cd spec/dummy && yalc add react-on-rails
 
-      - name: Install Node modules with Yarn for dummy app
-        if: github.event.inputs.app_version != 'pro_only'
+      - name: Install Node modules with Yarn for Core dummy app
+        if: env.RUN_CORE
         run: cd spec/dummy && yarn install --no-progress --no-emoji
 
-      - name: Save dummy app ruby gems to cache
-        if: github.event.inputs.app_version != 'pro_only'
+      - name: Save Core dummy app ruby gems to cache
+        if: env.RUN_CORE
         uses: actions/cache@v4
         with:
           path: spec/dummy/vendor/bundle
           key: dummy-app-gem-cache-${{ hashFiles('spec/dummy/Gemfile.lock') }}
 
-      - name: Install Ruby Gems for dummy app
-        if: github.event.inputs.app_version != 'pro_only'
+      - name: Install Ruby Gems for Core dummy app
+        if: env.RUN_CORE
         run: |
           cd spec/dummy
           bundle lock --add-platform 'x86_64-linux'
           bundle config set path vendor/bundle
           bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
 
-      - name: Prepare production assets
-        if: github.event.inputs.app_version != 'pro_only'
+      - name: Prepare Core production assets
+        if: env.RUN_CORE
         run: |
           set -e  # Exit on any error
           echo "🔨 Building production assets..."
@@ -269,8 +272,8 @@ jobs:
 
           echo "✅ Production assets built successfully"
 
-      - name: Start production server
-        if: github.event.inputs.app_version != 'pro_only'
+      - name: Start Core production server
+        if: env.RUN_CORE
         run: |
           set -e  # Exit on any error
           echo "🚀 Starting production server..."
@@ -299,7 +302,7 @@ jobs:
       # ============================================
 
       - name: Execute Core benchmark suite
-        if: github.event.inputs.app_version != 'pro_only'
+        if: env.RUN_CORE
         timeout-minutes: 120
         run: |
           set -e  # Exit on any error
@@ -313,7 +316,7 @@ jobs:
           echo "✅ Benchmark suite completed successfully"
 
       - name: Validate Core benchmark results
-        if: github.event.inputs.app_version != 'pro_only'
+        if: env.RUN_CORE
         run: |
           set -e  # Exit on any error
           echo "🔍 Validating benchmark output files..."
@@ -353,7 +356,7 @@ jobs:
 
       - name: Upload Core benchmark results
         uses: actions/upload-artifact@v4
-        if: github.event.inputs.app_version != 'pro_only' && always()
+        if: env.RUN_CORE && always()
         with:
           name: benchmark-core-results-${{ github.run_number }}
           path: bench_results/
@@ -364,35 +367,35 @@ jobs:
       # STEP 6: SETUP PRO APPLICATION SERVER
       # ============================================
       - name: Cache Pro package node modules
-        if: github.event.inputs.app_version != 'core_only'
+        if: env.RUN_PRO
         uses: actions/cache@v4
         with:
           path: react_on_rails_pro/node_modules
           key: v4-pro-package-node-modules-cache-${{ hashFiles('react_on_rails_pro/yarn.lock') }}
 
       - name: Cache Pro dummy app node modules
-        if: github.event.inputs.app_version != 'core_only'
+        if: env.RUN_PRO
         uses: actions/cache@v4
         with:
           path: react_on_rails_pro/spec/dummy/node_modules
           key: v4-pro-dummy-app-node-modules-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/yarn.lock') }}
 
       - name: Cache Pro dummy app Ruby gems
-        if: github.event.inputs.app_version != 'core_only'
+        if: env.RUN_PRO
         uses: actions/cache@v4
         with:
           path: react_on_rails_pro/spec/dummy/vendor/bundle
           key: v4-pro-dummy-app-gem-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/Gemfile.lock') }}
 
       - name: Install Node modules with Yarn for Pro package
-        if: github.event.inputs.app_version != 'core_only'
+        if: env.RUN_PRO
         run: |
           cd react_on_rails_pro
           sudo yarn global add yalc
           yarn install --frozen-lockfile --no-progress --no-emoji
 
       - name: Install Node modules with Yarn for Pro dummy app
-        if: github.event.inputs.app_version != 'core_only'
+        if: env.RUN_PRO
         run: cd react_on_rails_pro/spec/dummy && yarn install --frozen-lockfile --no-progress --no-emoji
 
       - name: Cache Pro dummy app Ruby gems
@@ -403,7 +406,7 @@ jobs:
           key: v4-pro-dummy-app-gem-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/Gemfile.lock') }}
 
       - name: Install Ruby Gems for Pro dummy app
-        if: github.event.inputs.app_version != 'core_only'
+        if: env.RUN_PRO
         run: |
           cd react_on_rails_pro/spec/dummy
           bundle lock --add-platform 'x86_64-linux'
@@ -411,11 +414,11 @@ jobs:
           bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
 
       - name: Generate file-system based entrypoints for Pro
-        if: github.event.inputs.app_version != 'core_only'
+        if: env.RUN_PRO
         run: cd react_on_rails_pro/spec/dummy && bundle exec rake react_on_rails:generate_packs
 
       - name: Prepare Pro production assets
-        if: github.event.inputs.app_version != 'core_only'
+        if: env.RUN_PRO
         run: |
           set -e
           echo "🔨 Building Pro production assets..."
@@ -429,7 +432,7 @@ jobs:
           echo "✅ Production assets built successfully"
 
       - name: Start Pro production server
-        if: github.event.inputs.app_version != 'core_only'
+        if: env.RUN_PRO
         run: |
           set -e
           echo "🚀 Starting Pro production server..."
@@ -458,7 +461,7 @@ jobs:
       # ============================================
 
       - name: Execute Pro benchmark suite
-        if: github.event.inputs.app_version != 'core_only'
+        if: env.RUN_PRO
         timeout-minutes: 120
         run: |
           set -e
@@ -472,7 +475,7 @@ jobs:
           echo "✅ Benchmark suite completed successfully"
 
       - name: Validate Pro benchmark results
-        if: github.event.inputs.app_version != 'core_only'
+        if: env.RUN_PRO
         run: |
           set -e
           echo "🔍 Validating Pro benchmark output files..."
@@ -508,7 +511,7 @@ jobs:
 
       - name: Upload Pro benchmark results
         uses: actions/upload-artifact@v4
-        if: github.event.inputs.app_version != 'core_only' && always()
+        if: env.RUN_PRO && always()
         with:
           name: benchmark-pro-results-${{ github.run_number }}
           path: bench_results/
@@ -527,7 +530,8 @@ jobs:
           echo "Run number: ${{ github.run_number }}"
           echo "Triggered by: ${{ github.actor }}"
           echo "Branch: ${{ github.ref_name }}"
-          echo "App version: ${{ github.event.inputs.app_version || 'both' }}"
+          echo "Run Core: ${{ env.RUN_CORE }}"
+          echo "Run Pro: ${{ env.RUN_PRO }}"
           echo ""
           if [ "${{ job.status }}" == "success" ]; then
             echo "✅ All steps completed successfully"
