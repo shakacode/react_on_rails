@@ -18,6 +18,21 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Check required dependencies
+MISSING_DEPS=()
+command -v bundle >/dev/null 2>&1 || MISSING_DEPS+=("bundle (Ruby bundler)")
+
+if [ ${#MISSING_DEPS[@]} -gt 0 ]; then
+  echo -e "${RED}Error: Missing required dependencies:${NC}"
+  for dep in "${MISSING_DEPS[@]}"; do
+    echo "  - $dep"
+  done
+  echo ""
+  echo "Install with:"
+  echo "  gem install bundler"
+  exit 1
+fi
+
 # Show help
 show_help() {
   cat << EOF
@@ -122,30 +137,35 @@ if [[ "${UNIQUE_SPECS[0]}" == *"spec/system"* ]] || [[ "${UNIQUE_SPECS[0]}" == *
   fi
 fi
 
-# Build rspec command
-RSPEC_CMD="bundle exec rspec"
+# Build rspec command as array (safer than eval)
+RSPEC_CMD=("bundle" "exec" "rspec")
 for spec in "${UNIQUE_SPECS[@]}"; do
-  RSPEC_CMD="$RSPEC_CMD '$spec'"
+  RSPEC_CMD+=("$spec")
 done
 
-echo -e "${BLUE}Command:${NC} cd $WORKING_DIR && $RSPEC_CMD"
+# Display command for user
+DISPLAY_CMD="bundle exec rspec"
+for spec in "${UNIQUE_SPECS[@]}"; do
+  DISPLAY_CMD="$DISPLAY_CMD '$spec'"
+done
+echo -e "${BLUE}Command:${NC} cd $WORKING_DIR && $DISPLAY_CMD"
 echo ""
 
 # Confirm (read from /dev/tty to handle piped input)
 if [ -t 0 ]; then
-  read -p "Run these specs now? [Y/n] " -n 1 -r
+  read -p "Run these specs now? [Y/n] " -n 1 -r REPLY
 else
-  read -p "Run these specs now? [Y/n] " -n 1 -r < /dev/tty
+  read -p "Run these specs now? [Y/n] " -n 1 -r REPLY < /dev/tty
 fi
 echo
-if [[ ! $REPLY =~ ^[Yy]$ ]] && [[ ! -z $REPLY ]]; then
+if [[ ! "${REPLY}" =~ ^[Yy]$ ]] && [[ ! -z "${REPLY}" ]]; then
   echo "Cancelled."
   exit 0
 fi
 
-# Run the specs
+# Run the specs directly (no eval - safer)
 cd "$WORKING_DIR"
-eval "$RSPEC_CMD"
+"${RSPEC_CMD[@]}"
 RESULT=$?
 
 echo ""

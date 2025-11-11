@@ -71,6 +71,22 @@ done
 echo -e "${BLUE}=== CI Failure Re-runner ===${NC}"
 echo ""
 
+# Check required dependencies
+MISSING_DEPS=()
+command -v gh >/dev/null 2>&1 || MISSING_DEPS+=("gh (GitHub CLI)")
+command -v jq >/dev/null 2>&1 || MISSING_DEPS+=("jq")
+
+if [ ${#MISSING_DEPS[@]} -gt 0 ]; then
+  echo -e "${RED}Error: Missing required dependencies:${NC}"
+  for dep in "${MISSING_DEPS[@]}"; do
+    echo "  - $dep"
+  done
+  echo ""
+  echo "Install with:"
+  echo "  brew install gh jq"
+  exit 1
+fi
+
 # Fetch PR info
 if [ -z "$PR_NUMBER" ]; then
   if ! gh pr view --json number,commits >/dev/null 2>&1; then
@@ -214,9 +230,9 @@ echo "   3. Run: pbpaste | bin/ci-run-failed-specs"
 echo ""
 
 # Confirm before running
-read -p "Run these tests now? [Y/n] " -n 1 -r
+read -p "Run these tests now? [Y/n] " -n 1 -r REPLY
 echo
-if [[ ! $REPLY =~ ^[Yy]$ ]] && [[ ! -z $REPLY ]]; then
+if [[ ! "${REPLY}" =~ ^[Yy]$ ]] && [[ ! -z "${REPLY}" ]]; then
   echo "Cancelled."
   exit 0
 fi
@@ -239,6 +255,8 @@ for cmd in "${!COMMANDS_TO_RUN[@]}"; do
   echo -e "${BLUE}Command: $cmd${NC}"
   echo ""
 
+  # Note: Using eval here is safe because $cmd comes from predefined JOB_MAP,
+  # not from user input. Commands may contain shell operators like && and ||.
   if eval "$cmd"; then
     echo -e "${GREEN}✓ $job_name passed${NC}"
     echo ""

@@ -100,7 +100,9 @@ When RSpec tests fail, run just those specific examples:
 
 ```bash
 # Copy failure output from GitHub Actions, then:
-pbpaste | bin/ci-run-failed-specs
+pbpaste | bin/ci-run-failed-specs        # macOS
+# xclip -o | bin/ci-run-failed-specs     # Linux (requires: apt install xclip)
+# wl-paste | bin/ci-run-failed-specs     # Wayland (requires: apt install wl-clipboard)
 
 # Or pass spec paths directly:
 bin/ci-run-failed-specs './spec/system/integration_spec.rb[1:1:1:1]'
