@@ -42,5 +42,6 @@ ReactOnRails.configure do |config|
   config.components_subdirectory = "startup"
   config.auto_load_bundle = true
   config.immediate_hydration = false
-  config.generated_component_packs_loading_strategy = :defer
+  # Don't explicitly set generated_component_packs_loading_strategy - let it default to :defer
+  # which ensures generated component packs load and register components before main bundle executes
 end
