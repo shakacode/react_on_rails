@@ -27,15 +27,6 @@ Server Components execute on the server and stream HTML to the client—no serve
 - [geekyants.com Case Study](https://geekyants.com/en-gb/blog/boosting-performance-with-nextjs-and-react-server-components-a-geekyantscom-case-study):
   - **52% smaller** JavaScript and TypeScript codebase
   - Lighthouse scores improved **from ~50 to ~90**
-- [Airbnb's RSC migration results](<https://questlab.pro/blog-posts/web-development/wd-pl-2024-articleId912i1h212818#:~:text=%22Our%20migration%20to%20React%20Server%20Components%20resulted%20in%20a%2015%25%20improvement%20in%20core%20web%20vitals%20and%20a%2023%25%20reduction%20in%20Time%20to%20First%20Byte%20(TTFB)%20across%20all%20markets.%22%20%2D%20Airbnb%20Engineering%20Team>):
-- **15% improvement** in core web vitals
-- **23% reduction** in Time to First Byte
-- [Meta's developer portal migration](https://questlab.pro/blog-posts/web-development/wd-pl-2024-articleId912i1h212818#:~:text=Meta%27s%20RSC%20Implementation%20Results):
-  - **30% reduction** in JavaScript bundle size
-  - **60% improvement** in Time to Interactive
-  - **45% faster** First Contentful Paint
-  - **50% reduction** in server response time
-  - **25% decrease** in overall maintenance complexity
 
 Please note that only the first of these directly compares performance of equivalent applications with and without React Server Components.
 Other migrations may include React or other dependency upgrades and so on.
