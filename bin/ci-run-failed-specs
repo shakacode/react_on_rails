@@ -131,8 +131,12 @@ done
 echo -e "${BLUE}Command:${NC} cd $WORKING_DIR && $RSPEC_CMD"
 echo ""
 
-# Confirm
-read -p "Run these specs now? [Y/n] " -n 1 -r
+# Confirm (read from /dev/tty to handle piped input)
+if [ -t 0 ]; then
+  read -p "Run these specs now? [Y/n] " -n 1 -r
+else
+  read -p "Run these specs now? [Y/n] " -n 1 -r < /dev/tty
+fi
 echo
 if [[ ! $REPLY =~ ^[Yy]$ ]] && [[ ! -z $REPLY ]]; then
   echo "Cancelled."

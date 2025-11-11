@@ -197,7 +197,6 @@ Claude will:
    ```
 
 3. **Separate doc changes from code changes:**
-
    - Docs-only PRs skip CI entirely
    - Mixed PRs run full CI
 
@@ -208,13 +207,11 @@ Claude will:
 ### For Maintainers
 
 1. **Monitor CI performance:**
-
    - Check GitHub Actions usage
    - Identify slow tests
    - Adjust matrix as needed
 
 2. **Update path filters:**
-
    - Add new file patterns as project evolves
    - Keep filters accurate
 

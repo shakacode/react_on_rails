@@ -13,9 +13,8 @@ system_default = system_default_sect
 [system_default_sect]
 Options = UnsafeLegacyRenegotiation
 CipherString = DEFAULT@SECLEVEL=1
-
 # Disable CRL checking - not critical for test environment
 # This prevents "unable to get certificate CRL" errors
-[CRL]
+# Note: For OpenSSL 3.6+, use X509_V_FLAG_CRL_CHECK flags
 crl_check = no
 crl_check_all = no

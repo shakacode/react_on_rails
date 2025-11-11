@@ -16,6 +16,7 @@ const compat = new FlatCompat({
   allConfig: js.configs.all,
 });
 
+// eslint-disable-next-line @typescript-eslint/no-deprecated
 export default tsEslint.config([
   // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
   includeIgnoreFile(path.resolve(__dirname, '.gitignore')),
