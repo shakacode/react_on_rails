@@ -1,0 +1,101 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Shakapacker precompile hook
+# This script runs before Shakapacker compilation in both development and production.
+# See: https://github.com/shakacode/shakapacker/blob/main/docs/precompile_hook.md
+
+require "fileutils"
+
+# Find Rails root by walking upward looking for config/environment.rb
+def find_rails_root
+  dir = Dir.pwd
+  loop do
+    return dir if File.exist?(File.join(dir, "config", "environment.rb"))
+
+    parent = File.dirname(dir)
+    return nil if parent == dir # Reached filesystem root
+
+    dir = parent
+  end
+end
+
+# Build ReScript if needed
+def build_rescript_if_needed
+  # Check for both old (bsconfig.json) and new (rescript.json) config files
+  return unless File.exist?("bsconfig.json") || File.exist?("rescript.json")
+
+  puts "🔧 Building ReScript..."
+
+  # Cross-platform package manager detection
+  yarn_available = system("yarn", "--version", out: File::NULL, err: File::NULL)
+  npm_available = system("npm", "--version", out: File::NULL, err: File::NULL)
+
+  success = if yarn_available
+              system("yarn", "build:rescript")
+            elsif npm_available
+              system("npm", "run", "build:rescript")
+            else
+              warn "⚠️  Warning: Neither yarn nor npm found. Skipping ReScript build."
+              return
+            end
+
+  if success
+    puts "✅ ReScript build completed successfully"
+  else
+    warn "❌ ReScript build failed"
+    exit 1
+  end
+end
+
+# Generate React on Rails packs if needed
+# rubocop:disable Metrics/CyclomaticComplexity
+def generate_packs_if_needed
+  # Find Rails root directory
+  rails_root = find_rails_root
+  return unless rails_root
+
+  # Check if React on Rails initializer exists
+  initializer_path = File.join(rails_root, "config", "initializers", "react_on_rails.rb")
+  return unless File.exist?(initializer_path)
+
+  # Check if auto-pack generation is configured (match actual config assignments, not comments)
+  config_file = File.read(initializer_path)
+  # Match uncommented configuration lines only (lines not starting with #)
+  has_auto_load = config_file =~ /^\s*(?!#).*config\.auto_load_bundle\s*=/
+  has_components_subdir = config_file =~ /^\s*(?!#).*config\.components_subdirectory\s*=/
+  return unless has_auto_load || has_components_subdir
+
+  puts "📦 Generating React on Rails packs..."
+
+  # Cross-platform bundle availability check
+  bundle_available = system("bundle", "--version", out: File::NULL, err: File::NULL)
+  return unless bundle_available
+
+  # Check if rake task exists (use array form for security)
+  task_list = IO.popen(["bundle", "exec", "rails", "-T"], err: [:child, :out], &:read)
+  return unless task_list.include?("react_on_rails:generate_packs")
+
+  # Use array form for better cross-platform support
+  success = system("bundle", "exec", "rails", "react_on_rails:generate_packs")
+
+  if success
+    puts "✅ Pack generation completed successfully"
+  else
+    warn "❌ Pack generation failed"
+    exit 1
+  end
+end
+# rubocop:enable Metrics/CyclomaticComplexity
+
+# Main execution
+begin
+  build_rescript_if_needed
+  generate_packs_if_needed
+
+  exit 0
+rescue StandardError => e
+  warn "❌ Precompile hook failed: #{e.message}"
+  warn e.backtrace.join("\n")
+  exit 1
+end
