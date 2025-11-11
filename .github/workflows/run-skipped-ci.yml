@@ -1,0 +1,121 @@
+name: Run Full CI Suite
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  trigger-full-ci:
+    # Only run on PR comments that match the command
+    if: |
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '/run-full-ci')
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      pull-requests: write
+      actions: write
+    steps:
+      - name: Add reaction to comment
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          comment-id: ${{ github.event.comment.id }}
+          reactions: 'rocket'
+
+      - name: Get PR details
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+            return {
+              ref: pr.data.head.ref,
+              sha: pr.data.head.sha
+            };
+
+      - name: Post acknowledgment comment
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            🚀 **Running full CI suite** on commit `${{ fromJSON(steps.pr.outputs.result).sha }}`
+
+            This will run all CI jobs including those normally skipped on PRs:
+            - ✅ Minimum dependency versions (Ruby 3.2, Node 20)
+            - ✅ All example app tests
+            - ✅ Pro package integration tests
+            - ✅ Pro package unit tests
+
+            View progress in the [Actions tab](${{ github.server_url }}/${{ github.repository }}/actions).
+
+      - name: Trigger main workflow
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prData = ${{ steps.pr.outputs.result }};
+            try {
+              await github.rest.actions.createWorkflowDispatch({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'main.yml',
+                ref: prData.ref
+              });
+              console.log('✅ Triggered main.yml');
+            } catch (error) {
+              console.error('❌ Failed to trigger main.yml:', error.message);
+            }
+
+      - name: Trigger examples workflow
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prData = ${{ steps.pr.outputs.result }};
+            try {
+              await github.rest.actions.createWorkflowDispatch({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'examples.yml',
+                ref: prData.ref
+              });
+              console.log('✅ Triggered examples.yml');
+            } catch (error) {
+              console.error('❌ Failed to trigger examples.yml:', error.message);
+            }
+
+      - name: Trigger Pro integration tests
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prData = ${{ steps.pr.outputs.result }};
+            try {
+              await github.rest.actions.createWorkflowDispatch({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'pro-integration-tests.yml',
+                ref: prData.ref
+              });
+              console.log('✅ Triggered pro-integration-tests.yml');
+            } catch (error) {
+              console.error('❌ Failed to trigger pro-integration-tests.yml:', error.message);
+            }
+
+      - name: Trigger Pro package tests
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prData = ${{ steps.pr.outputs.result }};
+            try {
+              await github.rest.actions.createWorkflowDispatch({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'pro-package-tests.yml',
+                ref: prData.ref
+              });
+              console.log('✅ Triggered pro-package-tests.yml');
+            } catch (error) {
+              console.error('❌ Failed to trigger pro-package-tests.yml:', error.message);
+            }
