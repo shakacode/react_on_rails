@@ -51,7 +51,8 @@ on:
       app_version:
         description: 'Which app version to benchmark'
         required: false
-        default: 'both'
+        # FIXME: for debugging, restore 'both' before merging
+        default: 'pro_only'
         type: choice
         options:
           - 'both'
