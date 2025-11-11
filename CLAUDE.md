@@ -52,6 +52,27 @@ Pre-commit hooks automatically run:
 
 **CRITICAL: NEVER wait for CI to verify fixes. Always replicate failures locally first.**
 
+#### Switch Between CI Configurations
+
+The project tests against two configurations:
+- **Latest**: Ruby 3.4, Node 22, Shakapacker 9.3.0, React 19 (runs on all PRs)
+- **Minimum**: Ruby 3.2, Node 20, Shakapacker 8.2.0, React 18 (runs only on master)
+
+```bash
+# Check your current configuration
+bin/ci-switch-config status
+
+# Switch to minimum dependencies (for debugging minimum CI failures)
+bin/ci-switch-config minimum
+
+# Switch back to latest dependencies
+bin/ci-switch-config latest
+```
+
+**See `SWITCHING_CI_CONFIGS.md` for detailed usage and troubleshooting.**
+
+**See `spec/dummy/TESTING_LOCALLY.md` for local testing tips and known issues.**
+
 #### Re-run Failed CI Jobs
 
 ```bash
