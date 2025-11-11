@@ -15,7 +15,10 @@ declare module 'cluster' {
   }
 }
 
-export = async function restartWorkers(delayBetweenIndividualWorkerRestarts: number) {
+export = async function restartWorkers(
+  delayBetweenIndividualWorkerRestarts: number,
+  gracefulWorkerRestartTimeout: number | undefined,
+) {
   log.info('Started scheduled restart of workers');
 
   if (!cluster.workers) {
@@ -39,12 +42,15 @@ export = async function restartWorkers(delayBetweenIndividualWorkerRestarts: num
       };
       worker.on('exit', onExit);
 
-      timeout = setTimeout(() => {
-        log.debug('Worker #%d timed out, forcing kill it', worker.id);
-        worker.destroy();
-        worker.off('exit', onExit);
-        resolve();
-      }, 100_000);
+      // Zero means no timeout
+      if (gracefulWorkerRestartTimeout) {
+        timeout = setTimeout(() => {
+          log.debug('Worker #%d timed out, forcing kill it', worker.id);
+          worker.destroy();
+          worker.off('exit', onExit);
+          resolve();
+        }, gracefulWorkerRestartTimeout);
+      }
     });
     // eslint-disable-next-line no-await-in-loop
     await new Promise((resolve) => {
