@@ -154,9 +154,9 @@ module ReactOnRails
       raise ReactOnRails::Error, "component_registry_timeout must be a positive integer"
     end
 
-    # rubocop:disable Metrics/CyclomaticComplexity
+    # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
     def validate_generated_component_packs_loading_strategy
-      # rubocop:enable Metrics/CyclomaticComplexity
+      # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
       if defer_generated_component_packs
         if %i[async sync].include?(generated_component_packs_loading_strategy)
@@ -176,11 +176,12 @@ module ReactOnRails
         1. Use :defer or :sync loading strategy instead of :async
         2. Upgrade to Shakapacker v8.2.0 or above to enable async script loading
       MSG
-      if generated_component_packs_loading_strategy.nil?
-        # Use defer as the default to ensure generated component packs load and register
-        # components before main bundle executes, avoiding race conditions with async loading
-        self.generated_component_packs_loading_strategy = :defer
-      elsif generated_component_packs_loading_strategy == :async && !PackerUtils.supports_async_loading?
+      if PackerUtils.supports_async_loading?
+        self.generated_component_packs_loading_strategy ||= :async
+      elsif generated_component_packs_loading_strategy.nil?
+        Rails.logger.warn("**WARNING** #{msg}")
+        self.generated_component_packs_loading_strategy = :sync
+      elsif generated_component_packs_loading_strategy == :async
         raise ReactOnRails::Error, "**ERROR** #{msg}"
       end
 
