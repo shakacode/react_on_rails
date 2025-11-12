@@ -494,7 +494,7 @@ A: Pro adds performance features on top of the open-source gem:
 - Proper Node.js rendering pool
 - React Server Components
 - Streaming SSR
-- Early hydration
+- Immediate hydration
 - Code splitting with SSR support
 
 [See full comparison →](#pro-vs-open-source)
