@@ -34,7 +34,7 @@ jobs:
   # Build webpack test bundles for dummy app
   build-dummy-app-webpack-test-bundles:
     needs: detect-changes
-    if: github.ref == 'refs/heads/master' || needs.detect-changes.outputs.run_pro_tests == 'true'
+    if: github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.run_pro_tests == 'true'
     runs-on: ubuntu-22.04
     env:
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
@@ -124,7 +124,7 @@ jobs:
     needs:
       - detect-changes
       - build-dummy-app-webpack-test-bundles
-    if: github.ref == 'refs/heads/master' || needs.detect-changes.outputs.run_pro_tests == 'true'
+    if: github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.run_pro_tests == 'true'
     runs-on: ubuntu-22.04
     # Redis service container
     services:
@@ -205,7 +205,7 @@ jobs:
   # RSpec tests for Pro package
   rspec-package-specs:
     needs: detect-changes
-    if: github.ref == 'refs/heads/master' || needs.detect-changes.outputs.run_pro_tests == 'true'
+    if: github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.run_pro_tests == 'true'
     strategy:
       matrix:
         ruby-version: ['3.3.7']
