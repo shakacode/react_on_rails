@@ -78,4 +78,17 @@ ReactOnRails.configure do |config|
   # Default is :defer which provides good performance and prevents component registration race conditions.
   # For React on Rails Pro users, :async can provide better performance by loading scripts asynchronously.
   config.generated_component_packs_loading_strategy = :defer
+
+  ################################################################################
+  # REACT ON RAILS PRO FEATURES
+  ################################################################################
+  # The following features require React on Rails Pro and should be configured
+  # in config/initializers/react_on_rails_pro.rb:
+  #
+  # - immediate_hydration: Enables components to hydrate immediately as their
+  #   server-rendered HTML reaches the client, improving time-to-interactive.
+  #   Configure in ReactOnRailsPro.configure block.
+  #
+  # For more information on React on Rails Pro features, visit:
+  # https://www.shakacode.com/react-on-rails-pro
 end
