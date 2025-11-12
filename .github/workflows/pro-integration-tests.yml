@@ -230,32 +230,15 @@ jobs:
       - name: Generate file-system based entrypoints
         run: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
 
-      # Install moreutils for the 'ts' command to add timestamps to logs
-      # This enables synchronized side-by-side log viewing with bin/view-synchronized-logs
-      - name: Install timestamp utility for log synchronization
-        run: sudo apt-get install -y moreutils
-
-      - name: Run Pro Node renderer in background with timestamped logging
+      - name: Run Pro Node renderer in background
         run: |
           cd spec/dummy
-          mkdir -p tmp/ci-logs
-          yarn run node-renderer 2>&1 | ts '[%Y-%m-%d %H:%M:%.S]' | tee tmp/ci-logs/node-renderer.log &
+          yarn run node-renderer &
 
       - name: Run Rails server in background
         run: |
           cd spec/dummy
           RAILS_ENV="test" rails server &
-
-      - name: Tail Rails test log with timestamps in background
-        run: |
-          cd spec/dummy
-          # Wait for log file to be created
-          timeout=10
-          while [ ! -f log/test.log ] && [ $timeout -gt 0 ]; do
-            sleep 0.5
-            timeout=$((timeout - 1))
-          done
-          tail -f log/test.log 2>&1 | ts '[%Y-%m-%d %H:%M:%.S]' > tmp/ci-logs/rails-server.log &
 
       - name: Wait for Rails server to start
         run: |
@@ -315,13 +298,6 @@ jobs:
         with:
           name: pro-rspec-yarn-error-log
           path: react_on_rails_pro/spec/dummy/yarn-error.log
-
-      - name: Store synchronized server logs
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: pro-rspec-synchronized-logs
-          path: react_on_rails_pro/spec/dummy/tmp/ci-logs/
 
   # Playwright E2E tests with Redis service
   dummy-app-node-renderer-e2e-tests:
