@@ -1146,7 +1146,6 @@ module ReactOnRails
       end
     end
 
-    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
     def check_async_usage
       # When Pro is installed, async is fully supported and is the default behavior
       # No need to check for async usage in this case
@@ -1171,24 +1170,13 @@ module ReactOnRails
       return if async_issues.empty?
 
       # Report errors if async usage is found without Pro
-      # Note: immediate_hydration alone is not sufficient - Pro is required for safe async usage
-      immediate_hydration_enabled = check_immediate_hydration_enabled?
-
-      if immediate_hydration_enabled
-        checker.add_warning("⚠️  Using :async without React on Rails Pro may cause race conditions")
-        async_issues.each { |issue| checker.add_warning("  #{issue}") }
-        checker.add_info("  💡 immediate_hydration is enabled but Pro gem is not installed")
-        checker.add_info("  💡 For production-safe async loading, upgrade to React on Rails Pro")
-      else
-        checker.add_error("🚫 :async usage detected without proper configuration")
-        async_issues.each { |issue| checker.add_error("  #{issue}") }
-        checker.add_info("  💡 :async can cause race conditions. Options:")
-        checker.add_info("    1. Upgrade to React on Rails Pro (recommended for :async support)")
-        checker.add_info("    2. Change to :defer or :sync loading strategy")
-        checker.add_info("  📖 https://www.shakacode.com/react-on-rails/docs/guides/configuration/")
-      end
+      checker.add_error("🚫 :async usage detected without React on Rails Pro")
+      async_issues.each { |issue| checker.add_error("  #{issue}") }
+      checker.add_info("  💡 :async can cause race conditions. Options:")
+      checker.add_info("    1. Upgrade to React on Rails Pro (recommended for :async support)")
+      checker.add_info("    2. Change to :defer or :sync loading strategy")
+      checker.add_info("  📖 https://www.shakacode.com/react-on-rails/docs/guides/configuration/")
     end
-    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
 
     def scan_view_files_for_async_pack_tag
       files_with_async = []
@@ -1220,16 +1208,6 @@ module ReactOnRails
       content = File.read(config_path)
       # Check if generated_component_packs_loading_strategy is set to :async
       content.match?(/config\.generated_component_packs_loading_strategy\s*=\s*:async/)
-    rescue StandardError
-      false
-    end
-
-    def check_immediate_hydration_enabled?
-      # Check if immediate_hydration is enabled in configuration
-      return false unless defined?(ReactOnRails)
-
-      config = ReactOnRails.configuration
-      config.immediate_hydration == true
     rescue StandardError
       false
     end

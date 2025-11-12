@@ -406,7 +406,7 @@ module ReactOnRails
             ReactOnRails.configure do |config|
               config.generated_component_packs_loading_strategy = :async
             end
-          end.to raise_error(ReactOnRails::Error, /Pro-only features without React on Rails Pro/)
+          end.to raise_error(ReactOnRails::Error, /Pro-only feature without React on Rails Pro/)
         end
       end
     end
@@ -467,35 +467,13 @@ module ReactOnRails
       end
     end
 
-    describe "Pro-only feature validation" do
+    describe "Pro-only feature validation for :async loading strategy" do
       context "when ReactOnRailsPro is not defined" do
         before do
           # Ensure ReactOnRailsPro is not defined
           hide_const("ReactOnRailsPro") if defined?(ReactOnRailsPro)
           # Mock PackerUtils for generated_component_packs_loading_strategy
           allow(ReactOnRails::PackerUtils).to receive(:supports_async_loading?).and_return(true)
-        end
-
-        context "when immediate_hydration is set to true" do
-          it "raises error in non-production environments" do
-            allow(Rails.env).to receive(:production?).and_return(false)
-            expect do
-              ReactOnRails.configure do |config|
-                config.immediate_hydration = true
-              end
-            end.to raise_error(ReactOnRails::Error, /Pro-only features without React on Rails Pro/)
-          end
-
-          it "logs error in production but does not raise" do
-            allow(Rails.env).to receive(:production?).and_return(true)
-            allow(Rails.logger).to receive(:error)
-            expect do
-              ReactOnRails.configure do |config|
-                config.immediate_hydration = true
-              end
-            end.not_to raise_error
-            expect(Rails.logger).to have_received(:error).with(/Pro-only features/)
-          end
         end
 
         context "when generated_component_packs_loading_strategy is set to :async" do
@@ -505,7 +483,7 @@ module ReactOnRails
               ReactOnRails.configure do |config|
                 config.generated_component_packs_loading_strategy = :async
               end
-            end.to raise_error(ReactOnRails::Error, /Pro-only features without React on Rails Pro/)
+            end.to raise_error(ReactOnRails::Error, /Pro-only feature without React on Rails Pro/)
           end
 
           it "logs error in production but does not raise" do
@@ -516,7 +494,7 @@ module ReactOnRails
                 config.generated_component_packs_loading_strategy = :async
               end
             end.not_to raise_error
-            expect(Rails.logger).to have_received(:error).with(/Pro-only features/)
+            expect(Rails.logger).to have_received(:error).with(/Pro-only feature/)
           end
         end
 
@@ -538,28 +516,6 @@ module ReactOnRails
           end
         end
 
-        context "when both Pro-only features are set" do
-          it "lists both features in error message" do
-            allow(Rails.env).to receive(:production?).and_return(false)
-            expect do
-              ReactOnRails.configure do |config|
-                config.immediate_hydration = true
-                config.generated_component_packs_loading_strategy = :async
-              end
-            end.to raise_error(ReactOnRails::Error, /immediate_hydration.*generated_component_packs_loading_strategy/m)
-          end
-        end
-
-        context "when immediate_hydration is set to false" do
-          it "does not raise error" do
-            expect do
-              ReactOnRails.configure do |config|
-                config.immediate_hydration = false
-              end
-            end.not_to raise_error
-          end
-        end
-
         context "when no Pro-only features are set" do
           it "does not raise error" do
             expect do
@@ -576,15 +532,7 @@ module ReactOnRails
           allow(ReactOnRails::PackerUtils).to receive(:supports_async_loading?).and_return(true)
         end
 
-        it "allows immediate_hydration = true" do
-          expect do
-            ReactOnRails.configure do |config|
-              config.immediate_hydration = true
-            end
-          end.not_to raise_error
-        end
-
-        it "allows generated_component_packs_loading_strategy to be set" do
+        it "allows generated_component_packs_loading_strategy = :async" do
           expect do
             ReactOnRails.configure do |config|
               config.generated_component_packs_loading_strategy = :async

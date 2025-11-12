@@ -150,26 +150,18 @@ module ReactOnRails
     def validate_pro_only_features
       return if defined?(ReactOnRailsPro)
 
-      pro_only_features = []
-
-      pro_only_features << "config.immediate_hydration = true" if immediate_hydration == true
-
       # generated_component_packs_loading_strategy itself is NOT Pro-only
       # However, :async loading specifically requires React on Rails Pro
-      if generated_component_packs_loading_strategy == :async
-        pro_only_features << "config.generated_component_packs_loading_strategy = :async"
-      end
-
-      return if pro_only_features.empty?
+      return unless generated_component_packs_loading_strategy == :async
 
       msg = <<~MSG
-        **ERROR** ReactOnRails: You are using Pro-only features without React on Rails Pro:
+        **ERROR** ReactOnRails: You are using a Pro-only feature without React on Rails Pro:
 
-        #{pro_only_features.map { |f| "  - #{f}" }.join("\n")}
+          - config.generated_component_packs_loading_strategy = :async
 
-        These features are only available with a React on Rails Pro license.
+        Async loading is only available with a React on Rails Pro license.
         Please either:
-        1. Remove these settings from your config/initializers/react_on_rails.rb
+        1. Change to :defer or :sync loading strategy in your config/initializers/react_on_rails.rb
         2. Purchase a React on Rails Pro license at https://www.shakacode.com/react-on-rails-pro
 
         For more information, see: https://www.shakacode.com/react-on-rails/docs/

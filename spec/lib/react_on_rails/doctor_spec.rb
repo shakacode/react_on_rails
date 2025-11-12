@@ -224,13 +224,13 @@ RSpec.describe ReactOnRails::Doctor do
           allow(File).to receive(:read).with("app/views/layouts/application.html.erb")
                                        .and_return('<%= javascript_pack_tag "application", :async %>')
           allow(File).to receive(:exist?).with("config/initializers/react_on_rails.rb").and_return(false)
-          allow(doctor).to receive_messages(relativize_path: "app/views/layouts/application.html.erb",
-                                            check_immediate_hydration_enabled?: false)
+          allow(doctor).to receive(:relativize_path).with("app/views/layouts/application.html.erb")
+                                                    .and_return("app/views/layouts/application.html.erb")
         end
 
         it "reports an error" do
           doctor.send(:check_async_usage)
-          expect(checker).to have_received(:add_error).with("🚫 :async usage detected without proper configuration")
+          expect(checker).to have_received(:add_error).with("🚫 :async usage detected without React on Rails Pro")
           expect(checker).to have_received(:add_error)
             .with("  javascript_pack_tag with :async found in view files:")
         end
@@ -241,30 +241,13 @@ RSpec.describe ReactOnRails::Doctor do
           allow(File).to receive(:exist?).with("config/initializers/react_on_rails.rb").and_return(true)
           allow(File).to receive(:read).with("config/initializers/react_on_rails.rb")
                                        .and_return("config.generated_component_packs_loading_strategy = :async")
-          allow(doctor).to receive(:check_immediate_hydration_enabled?).and_return(false)
         end
 
         it "reports an error" do
           doctor.send(:check_async_usage)
-          expect(checker).to have_received(:add_error).with("🚫 :async usage detected without proper configuration")
+          expect(checker).to have_received(:add_error).with("🚫 :async usage detected without React on Rails Pro")
           expect(checker).to have_received(:add_error)
             .with("  config.generated_component_packs_loading_strategy = :async in initializer")
-        end
-      end
-
-      context "when immediate_hydration is enabled but Pro is not installed" do
-        before do
-          allow(File).to receive(:exist?).with("config/initializers/react_on_rails.rb").and_return(true)
-          allow(File).to receive(:read).with("config/initializers/react_on_rails.rb")
-                                       .and_return("config.generated_component_packs_loading_strategy = :async")
-          allow(doctor).to receive(:check_immediate_hydration_enabled?).and_return(true)
-        end
-
-        it "reports a warning instead of error" do
-          doctor.send(:check_async_usage)
-          expect(checker).to have_received(:add_warning)
-            .with("⚠️  Using :async without React on Rails Pro may cause race conditions")
-          expect(checker).not_to have_received(:add_error)
         end
       end
 
@@ -273,7 +256,6 @@ RSpec.describe ReactOnRails::Doctor do
           allow(File).to receive(:exist?).with("config/initializers/react_on_rails.rb").and_return(true)
           allow(File).to receive(:read).with("config/initializers/react_on_rails.rb")
                                        .and_return("config.generated_component_packs_loading_strategy = :defer")
-          allow(doctor).to receive(:check_immediate_hydration_enabled?).and_return(false)
         end
 
         it "does not report any issues" do
@@ -359,30 +341,6 @@ RSpec.describe ReactOnRails::Doctor do
 
       it "returns false" do
         expect(doctor.send(:config_has_async_loading_strategy?)).to be false
-      end
-    end
-  end
-
-  describe "#check_immediate_hydration_enabled?" do
-    context "when immediate_hydration is enabled" do
-      before do
-        config = instance_double(ReactOnRails::Configuration, immediate_hydration: true)
-        allow(ReactOnRails).to receive(:configuration).and_return(config)
-      end
-
-      it "returns true" do
-        expect(doctor.send(:check_immediate_hydration_enabled?)).to be true
-      end
-    end
-
-    context "when immediate_hydration is disabled" do
-      before do
-        config = instance_double(ReactOnRails::Configuration, immediate_hydration: false)
-        allow(ReactOnRails).to receive(:configuration).and_return(config)
-      end
-
-      it "returns false" do
-        expect(doctor.send(:check_immediate_hydration_enabled?)).to be false
       end
     end
   end
