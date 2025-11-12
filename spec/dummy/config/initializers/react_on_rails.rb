@@ -41,4 +41,9 @@ ReactOnRails.configure do |config|
   config.rendering_props_extension = RenderingPropsExtension
   config.components_subdirectory = "startup"
   config.auto_load_bundle = true
+
+  # For spec/dummy tests, we use :defer to prevent component registration race conditions.
+  # This is explicitly set for testing purposes. Real user apps should rely on the Pro default (:async).
+  # Note: This setting requires React on Rails Pro in production use.
+  config.generated_component_packs_loading_strategy = :defer
 end
