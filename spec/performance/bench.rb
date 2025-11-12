@@ -140,9 +140,9 @@ PARAMS
 # Helper method to check if server is responding
 def server_responding?(uri)
   response = Net::HTTP.get_response(uri)
-  response.is_a?(Net::HTTPSuccess)
-rescue StandardError
-  false
+  { success: response.is_a?(Net::HTTPSuccess), info: "HTTP #{response.code} #{response.message}" }
+rescue StandardError => e
+  { success: false, info: "#{e.class.name}: #{e.message}" }
 end
 
 # Wait for the server to be ready
@@ -150,10 +150,24 @@ TIMEOUT_SEC = 60
 puts "Checking server availability at #{BASE_URL}..."
 test_uri = URI.parse("http://#{BASE_URL}#{routes.first}")
 start_time = Time.now
+attempt_count = 0
 loop do
-  break if server_responding?(test_uri)
+  attempt_count += 1
+  attempt_start = Time.now
+  result = server_responding?(test_uri)
+  attempt_duration = Time.now - attempt_start
+  elapsed = Time.now - start_time
 
-  raise "Server at #{BASE_URL} not responding within #{TIMEOUT_SEC}s" if Time.now - start_time > TIMEOUT_SEC
+  # rubocop:disable Layout/LineLength
+  if result[:success]
+    puts "  ✅ Attempt #{attempt_count} at #{elapsed.round(2)}s: SUCCESS - #{result[:info]} (took #{attempt_duration.round(3)}s)"
+    break
+  else
+    puts "  ❌ Attempt #{attempt_count} at #{elapsed.round(2)}s: FAILED - #{result[:info]} (took #{attempt_duration.round(3)}s)"
+  end
+  # rubocop:enable Layout/LineLength
+
+  raise "Server at #{BASE_URL} not responding within #{TIMEOUT_SEC}s" if elapsed > TIMEOUT_SEC
 
   sleep 1
 end
