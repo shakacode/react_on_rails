@@ -65,7 +65,8 @@ set_ruby_version() {
     rvm|rvm+nvm)
       print_header "Setting Ruby $version with rvm"
       # Check if version exists using rvm list rubies for consistent output
-      if ! rvm list rubies | grep -qE "(ruby-)?${version}"; then
+      # Use word boundaries to avoid matching partial versions (e.g., 3.2.8 shouldn't match 3.2.80)
+      if ! rvm list rubies | grep -qE "(ruby-)?${version}([[:space:]]|$)"; then
         print_warning "Ruby $version not installed. Installing..."
         if ! rvm install "$version"; then
           print_error "Failed to install Ruby $version with rvm"
@@ -225,14 +226,29 @@ switch_to_minimum() {
   fi
 
   # Set Ruby and Node versions
-  if [[ "$VERSION_MANAGER" == "mise" ]] || [[ "$VERSION_MANAGER" == "asdf" ]]; then
-    print_header "Setting runtime versions in .tool-versions"
-    cat > "$PROJECT_ROOT/.tool-versions" <<EOF
+  case "$VERSION_MANAGER" in
+    mise|asdf)
+      print_header "Setting runtime versions in .tool-versions"
+      cat > "$PROJECT_ROOT/.tool-versions" <<EOF
 ruby 3.2.8
 nodejs 20.18.1
 EOF
-    print_success "Created .tool-versions with Ruby 3.2.8 and Node 20.18.1"
-  fi
+      print_success "Created .tool-versions with Ruby 3.2.8 and Node 20.18.1"
+      ;;
+    rvm|rvm+nvm)
+      print_header "Creating .ruby-version for rvm"
+      echo "3.2.8" > "$PROJECT_ROOT/.ruby-version"
+      print_success "Created .ruby-version with Ruby 3.2.8"
+      ;;
+  esac
+
+  case "$VERSION_MANAGER" in
+    nvm|rvm+nvm)
+      print_header "Creating .nvmrc for nvm"
+      echo "20.18.1" > "$PROJECT_ROOT/.nvmrc"
+      print_success "Created .nvmrc with Node 20.18.1"
+      ;;
+  esac
 
   set_ruby_version "3.2.8" "$VERSION_MANAGER"
   set_node_version "20.18.1" "$VERSION_MANAGER"
@@ -290,12 +306,19 @@ EOF
 
   case "$VERSION_MANAGER" in
     rvm+nvm|rvm|nvm)
-      print_warning "Note: Version changes only affect this script's subshell."
-      print_warning "You may need to open a new terminal or source your shell config."
+      print_warning "IMPORTANT: Version changes in this script don't persist to your current shell."
+      print_warning "The rvm/nvm commands run in a subshell and cannot affect your terminal."
+      echo ""
+      print_warning "Choose one of these options to activate the new versions:"
+      echo "  Option 1 (Recommended): Open a new terminal and cd into the project"
+      echo "  Option 2: Source your shell config:"
+      [ "$VERSION_MANAGER" = "rvm" ] || [ "$VERSION_MANAGER" = "rvm+nvm" ] && echo "    source ~/.rvm/scripts/rvm"
+      [ "$VERSION_MANAGER" = "nvm" ] || [ "$VERSION_MANAGER" = "rvm+nvm" ] && echo "    source \$NVM_DIR/nvm.sh"
+      echo ""
       ;;
   esac
 
-  print_warning "Run these commands to reload your shell and verify:"
+  print_warning "After activating versions, verify with:"
   echo "  cd $PROJECT_ROOT"
   case "$VERSION_MANAGER" in
     mise)
@@ -341,14 +364,29 @@ restore_to_latest() {
   fi
 
   # Set Ruby and Node versions
-  if [[ "$VERSION_MANAGER" == "mise" ]] || [[ "$VERSION_MANAGER" == "asdf" ]]; then
-    print_header "Setting runtime versions in .tool-versions"
-    cat > "$PROJECT_ROOT/.tool-versions" <<EOF
+  case "$VERSION_MANAGER" in
+    mise|asdf)
+      print_header "Setting runtime versions in .tool-versions"
+      cat > "$PROJECT_ROOT/.tool-versions" <<EOF
 ruby 3.4.3
 nodejs 22.12.0
 EOF
-    print_success "Created .tool-versions with Ruby 3.4.3 and Node 22.12.0"
-  fi
+      print_success "Created .tool-versions with Ruby 3.4.3 and Node 22.12.0"
+      ;;
+    rvm|rvm+nvm)
+      print_header "Creating .ruby-version for rvm"
+      echo "3.4.3" > "$PROJECT_ROOT/.ruby-version"
+      print_success "Created .ruby-version with Ruby 3.4.3"
+      ;;
+  esac
+
+  case "$VERSION_MANAGER" in
+    nvm|rvm+nvm)
+      print_header "Creating .nvmrc for nvm"
+      echo "22.12.0" > "$PROJECT_ROOT/.nvmrc"
+      print_success "Created .nvmrc with Node 22.12.0"
+      ;;
+  esac
 
   set_ruby_version "3.4.3" "$VERSION_MANAGER"
   set_node_version "22.12.0" "$VERSION_MANAGER"
@@ -406,12 +444,19 @@ EOF
 
   case "$VERSION_MANAGER" in
     rvm+nvm|rvm|nvm)
-      print_warning "Note: Version changes only affect this script's subshell."
-      print_warning "You may need to open a new terminal or source your shell config."
+      print_warning "IMPORTANT: Version changes in this script don't persist to your current shell."
+      print_warning "The rvm/nvm commands run in a subshell and cannot affect your terminal."
+      echo ""
+      print_warning "Choose one of these options to activate the new versions:"
+      echo "  Option 1 (Recommended): Open a new terminal and cd into the project"
+      echo "  Option 2: Source your shell config:"
+      [ "$VERSION_MANAGER" = "rvm" ] || [ "$VERSION_MANAGER" = "rvm+nvm" ] && echo "    source ~/.rvm/scripts/rvm"
+      [ "$VERSION_MANAGER" = "nvm" ] || [ "$VERSION_MANAGER" = "rvm+nvm" ] && echo "    source \$NVM_DIR/nvm.sh"
+      echo ""
       ;;
   esac
 
-  print_warning "Run these commands to reload your shell and verify:"
+  print_warning "After activating versions, verify with:"
   echo "  cd $PROJECT_ROOT"
   case "$VERSION_MANAGER" in
     mise)
