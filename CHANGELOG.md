@@ -51,11 +51,25 @@ Changes since the last non-beta release.
 
 - **Removed Pro Warning Badge**: Removed the visual warning badge that appeared when non-Pro users attempted to enable Pro-only features like `immediate_hydration`. Pro features are now silently disabled when a Pro license is not available, providing a cleaner user experience without intrusive warning banners. [PR 1993](https://github.com/shakacode/react_on_rails/pull/1993) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
+- **`immediate_hydration` now automatically enabled for Pro users**: The `config.immediate_hydration` configuration option has been removed. Immediate hydration is now automatically enabled for React on Rails Pro users and disabled for non-Pro users, simplifying configuration while providing optimal performance by default. Component-level overrides are still supported via the `immediate_hydration` parameter on `react_component`, `redux_store`, and `stream_react_component` helpers. [PR 1997](https://github.com/shakacode/react_on_rails/pull/1997) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 #### Bug Fixes
 
 - **Use as Git dependency**: All packages can now be installed as Git dependencies. This is useful for development and testing purposes. See [CONTRIBUTING.md](./CONTRIBUTING.md#git-dependencies) for documentation. [PR #1873](https://github.com/shakacode/react_on_rails/pull/1873) by [alexeyr-ci2](https://github.com/alexeyr-ci2).
 
 #### Breaking Changes
+
+- **`config.immediate_hydration` configuration removed**: The `config.immediate_hydration` setting in `config/initializers/react_on_rails.rb` has been removed. Immediate hydration is now automatically enabled for React on Rails Pro users and automatically disabled for non-Pro users.
+
+  **Migration steps:**
+
+  - Remove any `config.immediate_hydration = true` or `config.immediate_hydration = false` lines from your `config/initializers/react_on_rails.rb` file
+  - Pro users: No action needed - immediate hydration is now enabled automatically for optimal performance
+  - Non-Pro users: No action needed - standard hydration behavior continues to work as before
+  - Component-level overrides: You can still override behavior per-component using `react_component("MyComponent", immediate_hydration: false)` or `redux_store("MyStore", immediate_hydration: true)`
+  - If a non-Pro user explicitly sets `immediate_hydration: true` on a component, a warning will be logged and the component will fall back to standard hydration
+
+  [PR 1997](https://github.com/shakacode/react_on_rails/pull/1997) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 - **React on Rails Core Package**: Several Pro-only methods have been removed from the core package and are now exclusively available in the `react-on-rails-pro` package. If you're using any of the following methods, you'll need to migrate to React on Rails Pro:
   - `getOrWaitForComponent()`
