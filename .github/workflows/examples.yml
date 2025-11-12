@@ -12,6 +12,12 @@ on:
       - '**.md'
       - 'docs/**'
   workflow_dispatch:
+    inputs:
+      run_minimum_tests:
+        description: 'Run minimum dependency matrix (Ruby 3.2)'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   detect-changes:
@@ -52,9 +58,10 @@ jobs:
           - ruby-version: '3.2'
             dependency-level: 'minimum'
         exclude:
-          # Skip minimum dependency matrix on regular PRs (run only on master/workflow_dispatch)
-          - ruby-version: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && '3.2' || '' }}
-            dependency-level: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && 'minimum' || '' }}
+          # When run_minimum_tests is true, skip latest (run only minimum)
+          - ${{ inputs.run_minimum_tests && fromJSON('{"ruby-version": "3.4", "dependency-level": "latest"}') || fromJSON('{}') }}
+          # When run_minimum_tests is false, skip minimum on regular PRs (run only on master/workflow_dispatch)
+          - ${{ !inputs.run_minimum_tests && github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && fromJSON('{"ruby-version": "3.2", "dependency-level": "minimum"}') || fromJSON('{}') }}
     env:
       SKIP_YARN_COREPACK_CHECK: 0
       BUNDLE_FROZEN: ${{ matrix.dependency-level == 'minimum' && 'false' || 'true' }}

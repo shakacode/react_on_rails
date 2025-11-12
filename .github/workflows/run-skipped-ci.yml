@@ -87,31 +87,47 @@ jobs:
         with:
           script: |
             const prData = ${{ steps.pr.outputs.result }};
-            const workflows = [
-              'main.yml',
-              'examples.yml',
-              'pro-integration-tests.yml',
-              'pro-package-tests.yml'
+
+            // Workflows that support minimum dependency testing
+            const workflowsWithMinimum = [
+              { id: 'main.yml', name: 'Main Tests' },
+              { id: 'examples.yml', name: 'Generator Tests' }
+            ];
+
+            // Pro workflows always run (no minimum matrix)
+            const proWorkflows = [
+              { id: 'pro-integration-tests.yml', name: 'Pro Integration Tests' },
+              { id: 'pro-package-tests.yml', name: 'Pro Package Tests' }
             ];
 
             const succeeded = [];
             const failed = [];
+            const skipped = [];
 
-            // Trigger all workflows
-            for (const workflowId of workflows) {
+            // Trigger workflows with minimum dependency testing
+            for (const workflow of workflowsWithMinimum) {
               try {
                 await github.rest.actions.createWorkflowDispatch({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  workflow_id: workflowId,
-                  ref: prData.ref
+                  workflow_id: workflow.id,
+                  ref: prData.ref,
+                  inputs: {
+                    run_minimum_tests: 'true'
+                  }
                 });
-                console.log(`✅ Triggered ${workflowId}`);
-                succeeded.push(workflowId);
+                console.log(`✅ Triggered ${workflow.id} with run_minimum_tests=true`);
+                succeeded.push(workflow);
               } catch (error) {
-                console.error(`❌ Failed to trigger ${workflowId}:`, error.message);
-                failed.push({ workflow: workflowId, error: error.message });
+                console.error(`❌ Failed to trigger ${workflow.id}:`, error.message);
+                failed.push({ workflow: workflow.name, error: error.message });
               }
+            }
+
+            // Skip Pro workflows (they don't have minimum matrix, always run on PRs if needed)
+            for (const workflow of proWorkflows) {
+              console.log(`⏭️  Skipping ${workflow.id} (no minimum dependency matrix)`);
+              skipped.push(workflow);
             }
 
             // Wait a bit for workflows to queue
@@ -132,23 +148,23 @@ jobs:
                 created: `>${new Date(Date.now() - 60000).toISOString()}`
               });
 
-              for (const workflowId of succeeded) {
+              for (const workflow of succeeded) {
                 const found = runs.data.workflow_runs.some(run =>
-                  run.path === `.github/workflows/${workflowId}` &&
+                  run.path === `.github/workflows/${workflow.id}` &&
                   run.head_sha === prData.sha &&
                   run.event === 'workflow_dispatch'
                 );
 
                 if (found) {
-                  verified.push(workflowId);
+                  verified.push(workflow);
                 } else {
-                  notFound.push(workflowId);
+                  notFound.push(workflow);
                 }
               }
             }
 
             // Build the comment body based on actual results
-            let status = '✅ **Successfully triggered and verified all workflows**';
+            let status = '✅ **Successfully triggered skipped CI tests**';
             if (failed.length > 0 && notFound.length > 0) {
               status = '❌ **Failed to trigger or verify workflows**';
             } else if (failed.length > 0) {
@@ -157,21 +173,22 @@ jobs:
               status = '⚠️ **Workflows triggered but not yet verified**';
             }
 
-            const verifiedList = verified.length > 0 ? verified.map(w => `- ✅ ${w}`).join('\n') : '';
-            const notFoundList = notFound.length > 0 ? `\n\n**Triggered but not yet queued (may still start):**\n${notFound.map(w => `- ⏳ ${w}`).join('\n')}` : '';
+            const verifiedList = verified.length > 0 ? verified.map(w => `- ✅ ${w.name}`).join('\n') : '';
+            const notFoundList = notFound.length > 0 ? `\n\n**Triggered but not yet queued (may still start):**\n${notFound.map(w => `- ⏳ ${w.name}`).join('\n')}` : '';
             const failedList = failed.length > 0 ? `\n\n**Failed to trigger:**\n${failed.map(f => `- ❌ ${f.workflow}: ${f.error}`).join('\n')}` : '';
+            const skippedList = skipped.length > 0 ? `\n\n**Skipped (already run on PRs):**\n${skipped.map(w => `- ⏭️  ${w.name}`).join('\n')}` : '';
 
-            const body = `🚀 **Full CI Suite Results**
+            const body = `🚀 **Skipped CI Tests Triggered**
 
             ${status}
 
-            ${verifiedList ? `**Verified workflows:**\n${verifiedList}` : ''}${notFoundList}${failedList}
+            ${verifiedList ? `**Running minimum dependency tests:**\n${verifiedList}` : ''}${notFoundList}${failedList}${skippedList}
 
-            ${verified.length > 0 ? `\nThese will run all CI jobs including those normally skipped on PRs:
+            ${verified.length > 0 ? `\n**What's running:**
             - ✅ Minimum dependency versions (Ruby 3.2, Node 20)
-            - ✅ All example app tests
-            - ✅ Pro package integration tests
-            - ✅ Pro package unit tests
+            - ✅ Generator tests with minimum dependencies
+
+            **Note:** Pro package tests and latest dependency tests are skipped because they already run on all PRs.
 
             View progress in the [Actions tab](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions).` : ''}`;
 
