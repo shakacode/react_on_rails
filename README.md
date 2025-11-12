@@ -148,6 +148,61 @@ _Requires creating a free account._
 - Node.js >= 20 (CI tested: 20 - 22)
 - A JavaScript package manager (npm, yarn, pnpm, or bun)
 
+# 🔍 Type Safety (RBS)
+
+React on Rails includes [RBS](https://github.com/ruby/rbs) type signatures for improved type safety and IDE support.
+
+## Benefits
+
+- Better autocomplete in supported IDEs
+- Early detection of type errors
+- Improved code documentation through types
+- Enhanced refactoring safety
+
+## IDE Support
+
+RBS signatures work with:
+
+- [Steep](https://github.com/soutaro/steep) - Static type checker for Ruby
+- [Solargraph](https://solargraph.org/) - Ruby language server with RBS support
+- RubyMine - Built-in RBS support
+- VS Code - Via Ruby LSP extensions
+
+## Usage
+
+### Validation
+
+To validate type signatures:
+
+```bash
+bundle exec rake rbs:validate
+```
+
+Or directly using the RBS CLI:
+
+```bash
+bundle exec rbs -I sig validate
+```
+
+### Listing Type Files
+
+To see all available RBS type signature files:
+
+```bash
+bundle exec rake rbs:list
+```
+
+## Location
+
+Type signatures are located in the `sig/` directory, organized to mirror the `lib/` directory structure. For more details, see [sig/README.md](sig/README.md).
+
+## Compatibility
+
+- Ruby >= 3.0 (RBS is included in Ruby 3.0+)
+- RBS gem >= 2.0
+
+For more information about RBS, visit the [official RBS documentation](https://github.com/ruby/rbs).
+
 # 🆘 Get Help & Support
 
 **Need immediate help?** Here are your options, ordered by response time:
