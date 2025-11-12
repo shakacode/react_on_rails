@@ -40,6 +40,7 @@ You can find the **package** version numbers from this repo's tags and below in 
 
 ### Fixed
 - Fixed an issue where, when React Server Components (RSC) support was disabled, the Node Renderer unnecessarily requested bundles on every render. Now, bundles are only requested when actually needed, improving performance and reducing redundant network traffic. [PR 545](https://github.com/shakacode/react_on_rails_pro/pull/545) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **Fix `descriptor closed` error**: The errors happens when the node renderer restarts while it's still handling an in-progress request (especially if it's a streaming request that may take more time to handle). Implemented a fix that makes worker shutdown gracefully after it finishes all active requests. When a worker receives the shutdown message, if it doesn't shut down during the `gracefulWorkerRestartTimeout`, the master forcibly kills it. [PR #1970][https://github.com/shakacode/react_on_rails/pull/1970] by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 ### Changed
 - Upgraded HTTPX dependency from 1.3.4 to ~> 1.5 (currently 1.5.1). [PR 520](https://github.com/shakacode/react_on_rails_pro/pull/520) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
