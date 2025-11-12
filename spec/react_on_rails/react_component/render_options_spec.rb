@@ -9,7 +9,6 @@ describe ReactOnRails::ReactComponent::RenderOptions do
     replay_console
     raise_on_prerender_error
     random_dom_id
-    immediate_hydration
   ].freeze
 
   def the_attrs(react_component_name: "App", options: {})
@@ -161,6 +160,41 @@ describe ReactOnRails::ReactComponent::RenderOptions do
 
           expect(opts.public_send(option)).to be true
         end
+      end
+    end
+  end
+
+  describe "#immediate_hydration" do
+    context "with immediate_hydration option set to true" do
+      it "returns true" do
+        options = { immediate_hydration: true }
+        attrs = the_attrs(options: options)
+
+        opts = described_class.new(**attrs)
+
+        expect(opts.immediate_hydration).to be true
+      end
+    end
+
+    context "with immediate_hydration option set to false" do
+      it "returns false" do
+        options = { immediate_hydration: false }
+        attrs = the_attrs(options: options)
+
+        opts = described_class.new(**attrs)
+
+        expect(opts.immediate_hydration).to be false
+      end
+    end
+
+    context "without immediate_hydration option" do
+      it "returns value from ProUtils.immediate_hydration_enabled?" do
+        allow(ReactOnRails::ProUtils).to receive(:immediate_hydration_enabled?).and_return(true)
+        attrs = the_attrs
+
+        opts = described_class.new(**attrs)
+
+        expect(opts.immediate_hydration).to be true
       end
     end
   end
