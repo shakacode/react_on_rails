@@ -62,12 +62,11 @@ let isPageLifecycleInitialized = false;
 function onPageReady(callback: () => void) {
   if (typeof window === 'undefined') return;
 
-  if (isPageLifecycleInitialized) {
-    return;
-  }
-  isPageLifecycleInitialized = true;
-
   if (document.readyState === 'complete') {
+    if (isPageLifecycleInitialized) {
+      return;
+    }
+    isPageLifecycleInitialized = true;
     callback();
   } else {
     document.addEventListener('readystatechange', function onReadyStateChange() {

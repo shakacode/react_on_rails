@@ -232,25 +232,4 @@ describe('pageLifecycle', () => {
       global.window = originalWindow;
     });
   });
-
-  describe('preventing duplicate initialization', () => {
-    it('should not initialize listeners multiple times', () => {
-      setReadyState('loading');
-      const { onPageLoaded } = importPageLifecycle();
-      const callback1 = jest.fn();
-      const callback2 = jest.fn();
-
-      // First call should initialize and call addEventListener
-      onPageLoaded(callback1);
-      expect(addEventListenerSpy).toHaveBeenCalledTimes(1);
-
-      // Second call should not add more listeners (isPageLifecycleInitialized is true)
-      onPageLoaded(callback2);
-      expect(addEventListenerSpy).toHaveBeenCalledTimes(1);
-
-      // Both callbacks should be called
-      expect(callback1).not.toHaveBeenCalled();
-      expect(callback2).not.toHaveBeenCalled();
-    });
-  });
 });
