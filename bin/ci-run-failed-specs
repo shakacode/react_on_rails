@@ -105,6 +105,15 @@ else
     if [[ "$line" =~ rspec[[:space:]]+(\./spec/[^[:space:]]+) ]]; then
       spec="${BASH_REMATCH[1]}"
       SPECS+=("$spec")
+    # Also handle bare spec paths like "spec/foo.rb[1:2:3]" or "./spec/foo.rb[1:2:3]"
+    # Strip trailing % and whitespace
+    elif [[ "$line" =~ (\.?/?spec/[^[:space:]%]+) ]]; then
+      spec="${BASH_REMATCH[1]}"
+      # Normalize to ./spec/ format
+      if [[ ! "$spec" =~ ^\. ]]; then
+        spec="./$spec"
+      fi
+      SPECS+=("$spec")
     fi
   done
 fi
@@ -153,9 +162,24 @@ echo ""
 
 # Confirm (read from /dev/tty to handle piped input)
 if [ -t 0 ]; then
+  # stdin is a TTY, read directly
   read -p "Run these specs now? [Y/n] " -n 1 -r REPLY
 else
-  read -p "Run these specs now? [Y/n] " -n 1 -r REPLY < /dev/tty
+  # stdin is not a TTY (piped input), try /dev/tty
+  # Check if we can actually open /dev/tty by attempting to use it in a subshell
+  set +e  # Temporarily disable errexit for the check
+  (exec 0</dev/tty) 2>/dev/null
+  TTY_CHECK=$?
+  set -e  # Re-enable errexit
+
+  if [ $TTY_CHECK -eq 0 ]; then
+    # Successfully opened /dev/tty, use it for confirmation
+    read -p "Run these specs now? [Y/n] " -n 1 -r REPLY < /dev/tty
+  else
+    # Cannot open /dev/tty, auto-confirm
+    echo "Run these specs now? [Y/n] Y (auto-confirmed, TTY unavailable)"
+    REPLY="Y"
+  fi
 fi
 echo
 if [[ ! "${REPLY}" =~ ^[Yy]$ ]] && [[ ! -z "${REPLY}" ]]; then
