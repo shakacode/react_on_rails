@@ -12,6 +12,12 @@ on:
       - '**.md'
       - 'docs/**'
   workflow_dispatch:
+    inputs:
+      run_minimum_tests:
+        description: 'Run minimum dependency matrix (Ruby 3.2, Node 20)'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   detect-changes:
@@ -53,10 +59,10 @@ jobs:
             node-version: '20'
             dependency-level: 'minimum'
         exclude:
-          # Skip minimum dependency matrix on regular PRs (run only on master/workflow_dispatch)
-          - ruby-version: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && '3.2' || '' }}
-            node-version: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && '20' || '' }}
-            dependency-level: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && 'minimum' || '' }}
+          # When run_minimum_tests is true, skip latest (run only minimum)
+          - ${{ inputs.run_minimum_tests && fromJSON('{"ruby-version": "3.4", "node-version": "22", "dependency-level": "latest"}') || fromJSON('{}') }}
+          # When run_minimum_tests is false, skip minimum on regular PRs (run only on master/workflow_dispatch)
+          - ${{ !inputs.run_minimum_tests && github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && fromJSON('{"ruby-version": "3.2", "node-version": "20", "dependency-level": "minimum"}') || fromJSON('{}') }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -143,10 +149,10 @@ jobs:
             node-version: '20'
             dependency-level: 'minimum'
         exclude:
-          # Skip minimum dependency matrix on regular PRs (run only on master/workflow_dispatch)
-          - ruby-version: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && '3.2' || '' }}
-            node-version: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && '20' || '' }}
-            dependency-level: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && 'minimum' || '' }}
+          # When run_minimum_tests is true, skip latest (run only minimum)
+          - ${{ inputs.run_minimum_tests && fromJSON('{"ruby-version": "3.4", "node-version": "22", "dependency-level": "latest"}') || fromJSON('{}') }}
+          # When run_minimum_tests is false, skip minimum on regular PRs (run only on master/workflow_dispatch)
+          - ${{ !inputs.run_minimum_tests && github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && fromJSON('{"ruby-version": "3.2", "node-version": "20", "dependency-level": "minimum"}') || fromJSON('{}') }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
