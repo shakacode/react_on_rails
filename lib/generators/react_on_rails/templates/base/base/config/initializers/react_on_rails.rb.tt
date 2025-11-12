@@ -64,4 +64,18 @@ ReactOnRails.configure do |config|
   # generated directory. default is false, you can pass option at the time of individual usage or update the default
   # in the following line
   config.auto_load_bundle = true
+
+  ################################################################################
+  # GENERATED COMPONENT PACKS LOADING STRATEGY
+  ################################################################################
+  # Configure how generated component packs are loaded in the browser.
+  # Options: :defer (default), :sync, :async
+  #
+  # - :defer (recommended for most apps): Scripts load in parallel but execute in order after HTML parsing
+  # - :sync: Scripts block HTML parsing (not recommended)
+  # - :async: Scripts load and execute as soon as available (requires React on Rails Pro for better performance)
+  #
+  # Default is :defer which provides good performance and prevents component registration race conditions.
+  # For React on Rails Pro users, :async can provide better performance by loading scripts asynchronously.
+  config.generated_component_packs_loading_strategy = :defer
 end
