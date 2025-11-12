@@ -2,11 +2,14 @@
 
 React on Rails Pro packages are published publicly on npmjs.org and RubyGems.org. Installation requires a valid **license token** for runtime validation. Contact [justin@shakacode.com](mailto:justin@shakacode.com) to purchase a license.
 
+**Upgrading from GitHub Packages?** See the [Upgrading Guide](./updating.md) for migration instructions.
+
 Check the [CHANGELOG](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) to see what version you want.
 
 ## Version Format
 
 For the below docs, find the desired `<version>` in the CHANGELOG. Note that for pre-release versions:
+
 - Gems use all periods: `16.2.0.beta.1`
 - NPM packages use dashes: `16.2.0-beta.1`
 
@@ -21,7 +24,7 @@ Ensure your **Rails** app is using the **react_on_rails** gem, version 16.0.0 or
 Add the `react_on_rails_pro` gem to your **Gemfile**:
 
 ```ruby
-gem "react_on_rails_pro", "~> 16.1"
+gem "react_on_rails_pro", "~> 16.2"
 ```
 
 Then run:
@@ -92,7 +95,7 @@ yarn add react-on-rails-pro-node-renderer
 ```json
 {
   "dependencies": {
-    "react-on-rails-pro-node-renderer": "16.1.1"
+    "react-on-rails-pro-node-renderer": "^16.2.0"
   }
 }
 ```
@@ -182,6 +185,7 @@ end
 See [Rails Configuration Options](./configuration.md) for all available settings.
 
 Pay attention to:
+
 - `config.server_renderer = "NodeRenderer"` - Required to use node renderer
 - `config.renderer_url` - URL where your node renderer is running
 - `config.renderer_password` - Shared secret for authentication

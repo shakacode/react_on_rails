@@ -129,9 +129,9 @@
   "author": "justin@shakacode.com",
   "license": "UNLICENSED",
   "bugs": {
-    "url": "https://github.com/shakacode/react_on_rails_pro/issues"
+    "url": "https://github.com/shakacode/react_on_rails/issues"
   },
-  "homepage": "https://github.com/shakacode/react_on_rails_pro#readme",
+  "homepage": "https://github.com/shakacode/react_on_rails/tree/master/react_on_rails_pro#readme",
   "jest": {
     "clearMocks": true,
     "collectCoverageFrom": [
