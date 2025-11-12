@@ -58,19 +58,14 @@ function setupPageNavigationListeners(): void {
   }
 }
 
-let isPageLifecycleInitialized = false;
-function initializePageEventListeners(): void {
-  if (typeof window === 'undefined') return;
-
-  if (isPageLifecycleInitialized) {
-    return;
-  }
-  isPageLifecycleInitialized = true;
-
-  if (document.readyState !== 'loading') {
-    setupPageNavigationListeners();
+function onPageReady(callback: () => void) {
+  if (document.readyState === 'complete') {
+    callback();
   } else {
-    document.addEventListener('DOMContentLoaded', setupPageNavigationListeners);
+    document.addEventListener('readystatechange', function onReadyStateChange() {
+      onPageReady(callback);
+      document.removeEventListener('readystatechange', onReadyStateChange);
+    });
   }
 }
 
@@ -79,7 +74,7 @@ export function onPageLoaded(callback: PageLifecycleCallback): void {
     void callback();
   }
   pageLoadedCallbacks.add(callback);
-  initializePageEventListeners();
+  onPageReady(setupPageNavigationListeners);
 }
 
 export function onPageUnloaded(callback: PageLifecycleCallback): void {
@@ -87,5 +82,5 @@ export function onPageUnloaded(callback: PageLifecycleCallback): void {
     void callback();
   }
   pageUnloadedCallbacks.add(callback);
-  initializePageEventListeners();
+  onPageReady(setupPageNavigationListeners);
 }
