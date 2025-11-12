@@ -41,10 +41,6 @@ jobs:
     # Run on master, workflow_dispatch, OR when generators needed
     if: |
       github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.run_generators == 'true'
-    # For master/workflow_dispatch: run all versions
-    if: |
-      (github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.run_generators == 'true') &&
-      (matrix.dependency-level != 'minimum' || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch')
     strategy:
       fail-fast: false
       matrix:
@@ -55,25 +51,24 @@ jobs:
           # Master and workflow_dispatch: Minimum supported versions (full coverage)
           - ruby-version: '3.2'
             dependency-level: 'minimum'
+        exclude:
+          # Skip minimum dependency matrix on regular PRs (run only on master/workflow_dispatch)
+          - ruby-version: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && '3.2' || '' }}
+            dependency-level: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && 'minimum' || '' }}
     env:
-      # Skip minimum dependency on regular PRs (only run on master or workflow_dispatch)
-      SKIP_MINIMUM: ${{ matrix.dependency-level == 'minimum' && github.event_name != 'workflow_dispatch' && github.ref != 'refs/heads/master' }}
       SKIP_YARN_COREPACK_CHECK: 0
       BUNDLE_FROZEN: ${{ matrix.dependency-level == 'minimum' && 'false' || 'true' }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-        if: env.SKIP_MINIMUM != 'true'
         with:
           persist-credentials: false
       - name: Setup Ruby
-        if: env.SKIP_MINIMUM != 'true'
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: ${{ matrix.ruby-version }}
           bundler: 2.5.9
       - name: Setup Node
-        if: env.SKIP_MINIMUM != 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -82,7 +77,6 @@ jobs:
           # cache: yarn
           # cache-dependency-path: '**/yarn.lock'
       - name: Print system information
-        if: env.SKIP_MINIMUM != 'true'
         run: |
           echo "Linux release: "; cat /etc/issue
           echo "Current user: "; whoami
@@ -95,7 +89,6 @@ jobs:
         if: matrix.dependency-level == 'minimum'
         run: script/convert
       - name: Save root ruby gems to cache
-        if: env.SKIP_MINIMUM != 'true'
         uses: actions/cache@v4
         with:
           path: vendor/bundle
@@ -103,22 +96,18 @@ jobs:
       - id: get-sha
         run: echo "sha=\"$(git rev-parse HEAD)\"" >> "$GITHUB_OUTPUT"
       - name: Install Node modules with Yarn for renderer package
-        if: env.SKIP_MINIMUM != 'true'
         run: |
           yarn install --no-progress --no-emoji ${{ matrix.dependency-level == 'latest' && '--frozen-lockfile' || '' }}
           sudo yarn global add yalc
       - name: yalc publish for react-on-rails
-        if: env.SKIP_MINIMUM != 'true'
         run: yalc publish
       - name: Install Ruby Gems for package
-        if: env.SKIP_MINIMUM != 'true'
         run: |
           bundle lock --add-platform 'x86_64-linux'
           if ! bundle check --path=vendor/bundle; then
             bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
           fi
       - name: Ensure minimum required Chrome version
-        if: env.SKIP_MINIMUM != 'true'
         run: |
           echo -e "Already installed $(google-chrome --version)\n"
           MINIMUM_REQUIRED_CHROME_VERSION=75
@@ -131,17 +120,13 @@ jobs:
             echo -e "\nInstalled $(google-chrome --version)"
           fi
       - name: Increase the amount of inotify watchers
-        if: env.SKIP_MINIMUM != 'true'
         run: echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
       - name: Set packer version environment variable
-        if: env.SKIP_MINIMUM != 'true'
         run: |
           echo "CI_DEPENDENCY_LEVEL=${{ matrix.dependency-level }}" >> $GITHUB_ENV
       - name: Main CI
-        if: env.SKIP_MINIMUM != 'true'
         run: bundle exec rake run_rspec:shakapacker_examples
       - name: Store test results
-        if: env.SKIP_MINIMUM != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: main-rspec-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
