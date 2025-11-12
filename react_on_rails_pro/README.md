@@ -41,18 +41,18 @@ React on Rails Pro is a **commercial extension** to the open-source [React on Ra
 
 ```
 ┌─────────────────────────────────────────────────┐
-│ React on Rails Pro (this package)              │
+│ React on Rails Pro (this package)               │
 │ • SSR performance enhancements                  │
 │ • React Server Components                       │
-│ • Advanced caching                               │
-│ • Node.js rendering pool                         │
+│ • Advanced caching                              │
+│ • Node.js rendering pool                        │
 └─────────────────────────────────────────────────┘
                       ↓
 ┌─────────────────────────────────────────────────┐
-│ React on Rails (open-source, required)         │
-│ • Basic SSR                                      │
-│ • Component registration                         │
-│ • Rails integration                              │
+│ React on Rails (open-source, required)          │
+│ • Basic SSR                                     │
+│ • Component registration                        │
+│ • Rails integration                             │
 └─────────────────────────────────────────────────┘
 ```
 
@@ -112,13 +112,13 @@ React on Rails Pro delivers **measurable performance improvements** for producti
 
 Consider React on Rails Pro if you:
 
-✅ Need **faster server-side rendering** for SEO and initial page loads
-✅ Want **advanced caching** to reduce server load
-✅ Require **React Server Components** (RSC) support
-✅ Need **streaming SSR** for progressive rendering
-✅ Want **code splitting** with React Router or loadable-components
-✅ Have **high-traffic applications** where performance matters
-✅ Need **professional support** for your Rails + React stack
+- ✅ Need **faster server-side rendering** for SEO and initial page loads
+- ✅ Want **advanced caching** to reduce server load
+- ✅ Require **React Server Components** (RSC) support
+- ✅ Need **streaming SSR** for progressive rendering
+- ✅ Want **code splitting** with React Router or loadable-components
+- ✅ Have **high-traffic applications** where performance matters
+- ✅ Need **professional support** for your Rails + React stack
 
 ### Pro vs. Open Source
 
@@ -129,7 +129,7 @@ Consider React on Rails Pro if you:
 | Rails Integration       | ✅          | ✅  |
 | Fragment Caching        | ❌          | ✅  |
 | Prerender Caching       | ❌          | ✅  |
-| Node Renderer Pool      | ❌          | ✅  |
+| Proper Node Renderer    | ❌          | ✅  |
 | React Server Components | ❌          | ✅  |
 | Streaming SSR           | ❌          | ✅  |
 | Code Splitting (SSR)    | ❌          | ✅  |
@@ -146,10 +146,14 @@ Cache React components at the Rails view layer with intelligent cache key genera
 
 ```ruby
 # Cache component output with automatic cache key from props
-<%= cached_react_component("UserProfile", props: { user_id: @user.id }) %>
+<%= cached_react_component("UserProfile", cache_key: [@user]) do
+  { user_id: @user.id }
+end %>
 
 # Lazy evaluation of props - only evaluated on cache miss
-<%= cached_react_component("ExpensiveComponent", props: -> { expensive_calculation }) %>
+<%= cached_react_component("ExpensiveComponent", cache_key: [@user, @post]) do
+  expensive_calculation
+end %>
 ```
 
 **Benefits:**
@@ -466,7 +470,7 @@ A: Yes, but it's FREE! Register at [shakacode.com/react-on-rails-pro](https://sh
 
 **Q: Can multiple developers share one license?**
 
-A: Each developer should get their own FREE license for development. For CI/CD, you can share one license via environment variable. [See team setup →](./LICENSE_SETUP.md#team-setup)
+A: Yes! All developers in an organization can share the same license. You can use a shared license via environment variable or configuration file. [See team setup →](./LICENSE_SETUP.md#team-setup)
 
 **Q: What happens when my free license expires?**
 
@@ -487,22 +491,23 @@ A: Pricing is customized based on your needs. Contact [justin@shakacode.com](mai
 A: Pro adds performance features on top of the open-source gem:
 
 - Advanced caching (fragment + prerender)
-- Node.js rendering pool
+- Proper Node.js rendering pool
 - React Server Components
 - Streaming SSR
+- Early hydration
 - Code splitting with SSR support
 
 [See full comparison →](#pro-vs-open-source)
 
 **Q: Do I need the Node Renderer?**
 
-A: No, it's optional. The Node Renderer provides the best performance for high-traffic sites and is required for:
+A: No, it's optional but recommended. The Node Renderer provides the best performance for high-traffic sites and is required for:
 
 - Loadable-components with SSR
 - React Server Components
 - Streaming SSR
 
-For simpler apps, ExecJS (the default) works fine.
+For apps that do not require advanced performance features, ExecJS (the default) works fine.
 
 **Q: Is React on Rails Pro compatible with my React version?**
 
