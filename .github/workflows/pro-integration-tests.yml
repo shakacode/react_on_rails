@@ -233,7 +233,7 @@ jobs:
       - name: Run Pro Node renderer in background
         run: |
           cd spec/dummy
-          RENDERER_LOG_LEVEL=debug yarn run node-renderer 2>&1 | ts '[%Y-%m-%d %H:%M:%.S]' > node-renderer.log &
+          yarn run node-renderer &
 
       - name: Run Rails server in background
         run: |
@@ -291,13 +291,6 @@ jobs:
         with:
           name: pro-rspec-test-log
           path: react_on_rails_pro/spec/dummy/log/test.log
-
-      - name: Store node renderer log
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: pro-rspec-test-log
-          path: react_on_rails_pro/spec/dummy/node-renderer.log
 
       - name: Store yarn error log
         uses: actions/upload-artifact@v4
