@@ -64,8 +64,8 @@ set_ruby_version() {
       ;;
     rvm|rvm+nvm)
       print_header "Setting Ruby $version with rvm"
-      # Check if version exists (with or without ruby- prefix)
-      if ! rvm list strings | grep -qE "^(ruby-)?${version}$"; then
+      # Check if version exists using rvm list rubies for consistent output
+      if ! rvm list rubies | grep -qE "(ruby-)?${version}"; then
         print_warning "Ruby $version not installed. Installing..."
         if ! rvm install "$version"; then
           print_error "Failed to install Ruby $version with rvm"
@@ -124,8 +124,8 @@ set_node_version() {
         fi
       fi
 
-      # Check if version is already installed
-      if ! nvm list | grep -q "v${version}"; then
+      # Check if version is already installed using nvm version for reliability
+      if ! nvm version "$version" &> /dev/null; then
         print_warning "Node $version not installed. Installing..."
         if ! nvm install "$version"; then
           print_error "Failed to install Node $version with nvm"
@@ -287,6 +287,14 @@ EOF
 
   echo ""
   print_success "Switched to MINIMUM configuration"
+
+  case "$VERSION_MANAGER" in
+    rvm+nvm|rvm|nvm)
+      print_warning "Note: Version changes only affect this script's subshell."
+      print_warning "You may need to open a new terminal or source your shell config."
+      ;;
+  esac
+
   print_warning "Run these commands to reload your shell and verify:"
   echo "  cd $PROJECT_ROOT"
   case "$VERSION_MANAGER" in
@@ -395,6 +403,14 @@ EOF
 
   echo ""
   print_success "Restored to LATEST configuration"
+
+  case "$VERSION_MANAGER" in
+    rvm+nvm|rvm|nvm)
+      print_warning "Note: Version changes only affect this script's subshell."
+      print_warning "You may need to open a new terminal or source your shell config."
+      ;;
+  esac
+
   print_warning "Run these commands to reload your shell and verify:"
   echo "  cd $PROJECT_ROOT"
   case "$VERSION_MANAGER" in
