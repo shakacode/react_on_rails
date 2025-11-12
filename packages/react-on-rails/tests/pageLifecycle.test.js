@@ -77,12 +77,12 @@ describe('pageLifecycle', () => {
 
     // Since no navigation library is mocked, callbacks should run immediately
     expect(callback).toHaveBeenCalledTimes(1);
-    // Should not add DOMContentLoaded listener since readyState is not 'loading'
+    // Should not add readystatechange listener since readyState is not 'loading'
     expect(addEventListenerSpy).not.toHaveBeenCalledWith('readystatechange', expect.any(Function));
   });
 
   it('should wait for readystatechange when document.readyState is "interactive"', () => {
-    setReadyState('loading');
+    setReadyState('interactive');
     const callback = jest.fn();
     const { onPageLoaded } = importPageLifecycle();
 
@@ -90,7 +90,7 @@ describe('pageLifecycle', () => {
 
     // Should not call callback immediately since readyState is 'loading'
     expect(callback).not.toHaveBeenCalled();
-    // Verify that a DOMContentLoaded listener was added when readyState is 'loading'
+    // Verify that a readystatechange listener was added when readyState is 'loading'
     expect(addEventListenerSpy).toHaveBeenCalledWith('readystatechange', expect.any(Function));
   });
 
@@ -103,7 +103,7 @@ describe('pageLifecycle', () => {
 
     // Should not call callback immediately since readyState is 'loading'
     expect(callback).not.toHaveBeenCalled();
-    // Verify that a DOMContentLoaded listener was added when readyState is 'loading'
+    // Verify that a readystatechange listener was added when readyState is 'loading'
     expect(addEventListenerSpy).toHaveBeenCalledWith('readystatechange', expect.any(Function));
   });
 
