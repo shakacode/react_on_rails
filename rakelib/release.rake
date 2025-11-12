@@ -213,6 +213,8 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
     puts "=" * 80
 
     # Publish react-on-rails-pro-node-renderer NPM package
+    # Note: Uses plain `yarn publish` (not `yarn workspace`) because the node-renderer
+    # package.json is in react_on_rails_pro/ which is not defined as a workspace
     node_renderer_name = "react-on-rails-pro-node-renderer"
     puts "\nPublishing #{node_renderer_name}@#{actual_npm_version}..."
     puts "Carefully add your OTP for NPM when prompted." unless use_verdaccio
