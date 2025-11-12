@@ -11,27 +11,23 @@ module ReactOnRails
     end
 
     def self.disable_pro_render_options_if_not_licensed(raw_options)
-      if support_pro_features?
-        return {
-          raw_options: raw_options,
-          explicitly_disabled_pro_options: []
-        }
-      end
+      return raw_options if support_pro_features?
 
       raw_options_after_disable = raw_options.dup
 
-      explicitly_disabled_pro_options = PRO_ONLY_OPTIONS.select do |option|
-        # Use global configuration if it's not overridden in the options
-        next ReactOnRails.configuration.send(option) if raw_options[option].nil?
+      PRO_ONLY_OPTIONS.each do |option|
+        # Determine if this option is enabled (either explicitly or via global config)
+        option_enabled = if raw_options[option].nil?
+                           ReactOnRails.configuration.send(option)
+                         else
+                           raw_options[option]
+                         end
 
-        raw_options[option]
+        # Silently disable the option if it's enabled but Pro is not available
+        raw_options_after_disable[option] = false if option_enabled
       end
-      explicitly_disabled_pro_options.each { |option| raw_options_after_disable[option] = false }
 
-      {
-        raw_options: raw_options_after_disable,
-        explicitly_disabled_pro_options: explicitly_disabled_pro_options
-      }
+      raw_options_after_disable
     end
   end
 end
