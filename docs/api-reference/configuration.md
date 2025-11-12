@@ -279,11 +279,22 @@ ReactOnRails.configure do |config|
   # See [16.0.0 Release Notes](docs/release-notes/16.0.0.md) for more details.
   # config.defer_generated_component_packs = false
 
-  # Default is false
-  # React on Rails Pro (licensed) feature: When true, components hydrate immediately as soon as
-  # their server-rendered HTML reaches the client, without waiting for the full page load.
-  # This improves time-to-interactive performance.
-  config.immediate_hydration = false
+  ################################################################################
+  # REACT ON RAILS PRO FEATURES
+  ################################################################################
+  # The following features require React on Rails Pro and should be configured
+  # in config/initializers/react_on_rails_pro.rb using ReactOnRailsPro.configure:
+  #
+  # - immediate_hydration: When true, components hydrate immediately as soon as
+  #   their server-rendered HTML reaches the client, without waiting for the full page load.
+  #   This improves time-to-interactive performance.
+  #
+  # Example (in config/initializers/react_on_rails_pro.rb):
+  #   ReactOnRailsPro.configure do |config|
+  #     config.immediate_hydration = true
+  #   end
+  #
+  # For more information, visit: https://www.shakacode.com/react-on-rails-pro
 
   ################################################################################
   # I18N OPTIONS
