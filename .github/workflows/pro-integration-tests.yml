@@ -239,7 +239,7 @@ jobs:
         run: |
           cd spec/dummy
           mkdir -p tmp/ci-logs
-          RENDERER_LOG_LEVEL=debug yarn run node-renderer 2>&1 | ts '[%Y-%m-%d %H:%M:%.S]' | tee tmp/ci-logs/node-renderer.log &
+          yarn run node-renderer 2>&1 | ts '[%Y-%m-%d %H:%M:%.S]' | tee tmp/ci-logs/node-renderer.log &
 
       - name: Run Rails server in background
         run: |
