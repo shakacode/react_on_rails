@@ -368,6 +368,47 @@ module ReactOnRails
           end.to raise_error(ReactOnRails::Error, /does not support async script loading/)
         end
       end
+
+      context "when ReactOnRailsPro is not available" do
+        before do
+          # Ensure ReactOnRailsPro is not defined
+          hide_const("ReactOnRailsPro") if defined?(ReactOnRailsPro)
+          allow(ReactOnRails::PackerUtils).to receive(:shakapacker_version_requirement_met?)
+            .with("8.2.0").and_return(true)
+        end
+
+        it "defaults to :defer for non-Pro users" do
+          ReactOnRails.configure {} # rubocop:disable Lint/EmptyBlock
+          expect(ReactOnRails.configuration.generated_component_packs_loading_strategy).to eq(:defer)
+        end
+
+        it "accepts :defer value" do
+          expect do
+            ReactOnRails.configure do |config|
+              config.generated_component_packs_loading_strategy = :defer
+            end
+          end.not_to raise_error
+          expect(ReactOnRails.configuration.generated_component_packs_loading_strategy).to eq(:defer)
+        end
+
+        it "accepts :sync value" do
+          expect do
+            ReactOnRails.configure do |config|
+              config.generated_component_packs_loading_strategy = :sync
+            end
+          end.not_to raise_error
+          expect(ReactOnRails.configuration.generated_component_packs_loading_strategy).to eq(:sync)
+        end
+
+        it "raises error for :async value (Pro-only)" do
+          allow(Rails.env).to receive(:production?).and_return(false)
+          expect do
+            ReactOnRails.configure do |config|
+              config.generated_component_packs_loading_strategy = :async
+            end
+          end.to raise_error(ReactOnRails::Error, /Pro-only features without React on Rails Pro/)
+        end
+      end
     end
 
     describe "enforce_private_server_bundles validation" do

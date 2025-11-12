@@ -69,15 +69,26 @@ ReactOnRails.configure do |config|
   # GENERATED COMPONENT PACKS LOADING STRATEGY
   ################################################################################
   # Configure how generated component packs are loaded in the browser.
-  # Options: :defer (default), :sync, :async
+  # Options: :defer (default), :sync, :async (Pro only)
   #
-  # - :defer (recommended for most apps): Scripts load in parallel but execute in order after HTML parsing
-  # - :sync: Scripts block HTML parsing (not recommended)
-  # - :async: Scripts load and execute as soon as available (requires React on Rails Pro for better performance)
+  # - :defer (recommended): Scripts load in parallel but execute in order after HTML parsing.
+  #   This prevents race conditions where components try to render before registration completes.
+  # - :sync: Scripts block HTML parsing while loading (not recommended, slowest option).
+  # - :async: Scripts load and execute as soon as available (React on Rails Pro only).
+  #   Requires immediate_hydration to prevent race conditions.
   #
-  # Default is :defer which provides good performance and prevents component registration race conditions.
-  # For React on Rails Pro users, :async can provide better performance by loading scripts asynchronously.
-  config.generated_component_packs_loading_strategy = :defer
+  # IMPORTANT: :async loading strategy requires React on Rails Pro. Without Pro, :async can cause
+  # race conditions where components attempt to hydrate before their JavaScript is fully loaded.
+  # Pro's immediate_hydration feature ensures components hydrate safely with async loading.
+  #
+  # Default behavior (recommended - no configuration needed):
+  # - Non-Pro: defaults to :defer (safe and performant)
+  # - Pro: defaults to :async (maximum performance with immediate_hydration)
+  #
+  # Only uncomment if you need to override the default:
+  # config.generated_component_packs_loading_strategy = :defer
+  #
+  # See: https://www.shakacode.com/react-on-rails/docs/guides/configuration.html#generated_component_packs_loading_strategy
 
   ################################################################################
   # REACT ON RAILS PRO FEATURES
