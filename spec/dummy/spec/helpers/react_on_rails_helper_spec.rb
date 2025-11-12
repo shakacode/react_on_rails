@@ -392,78 +392,6 @@ describe ReactOnRailsHelper do
         it { is_expected.to include immediate_hydration_script }
       end
     end
-
-    describe "with Pro license warning" do
-      let(:badge_html_string) { "React On Rails Pro Required" }
-
-      before do
-        allow(Rails.logger).to receive(:warn)
-      end
-
-      context "when Pro license is NOT installed and immediate_hydration is true" do
-        subject(:react_app) { react_component("App", props: props, immediate_hydration: true) }
-
-        before do
-          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
-        end
-
-        it { is_expected.to include(badge_html_string) }
-
-        it "logs a warning" do
-          react_app
-          expect(Rails.logger).to have_received(:warn)
-            .with(a_string_matching(/The 'immediate_hydration' feature requires/))
-        end
-      end
-
-      context "when Pro license is NOT installed and global immediate_hydration is true" do
-        subject(:react_app) { react_component("App", props: props) }
-
-        before do
-          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
-        end
-
-        around do |example|
-          ReactOnRails.configure { |config| config.immediate_hydration = true }
-          example.run
-          ReactOnRails.configure { |config| config.immediate_hydration = false }
-        end
-
-        it { is_expected.to include(badge_html_string) }
-      end
-
-      context "when Pro license is NOT installed and immediate_hydration is false" do
-        subject(:react_app) { react_component("App", props: props, immediate_hydration: false) }
-
-        before do
-          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
-        end
-
-        it { is_expected.not_to include(badge_html_string) }
-
-        it "does not log a warning" do
-          react_app
-          expect(Rails.logger).not_to have_received(:warn)
-        end
-      end
-
-      context "when Pro license IS installed and immediate_hydration is true" do
-        subject(:react_app) { react_component("App", props: props, immediate_hydration: true) }
-
-        before do
-          allow(ReactOnRails::Utils).to receive_messages(
-            react_on_rails_pro?: true
-          )
-        end
-
-        it { is_expected.not_to include(badge_html_string) }
-
-        it "does not log a warning" do
-          react_app
-          expect(Rails.logger).not_to have_received(:warn)
-        end
-      end
-    end
   end
 
   describe "#react_component_hash" do
@@ -485,40 +413,6 @@ describe ReactOnRailsHelper do
       expect(react_app).to be_a(Hash)
       expect(react_app).to have_key("componentHtml")
       expect(react_app).to have_key("title")
-    end
-
-    context "with Pro license warning" do
-      let(:badge_html_string) { "React On Rails Pro Required" }
-
-      before do
-        allow(Rails.logger).to receive(:warn)
-      end
-
-      context "when Pro license is NOT installed and immediate_hydration is true" do
-        subject(:react_app) { react_component_hash("App", props: props, immediate_hydration: true) }
-
-        before do
-          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
-        end
-
-        it "adds badge to componentHtml" do
-          expect(react_app["componentHtml"]).to include(badge_html_string)
-        end
-      end
-
-      context "when Pro license IS installed and immediate_hydration is true" do
-        subject(:react_app) { react_component_hash("App", props: props, immediate_hydration: true) }
-
-        before do
-          allow(ReactOnRails::Utils).to receive_messages(
-            react_on_rails_pro?: true
-          )
-        end
-
-        it "does not add badge to componentHtml" do
-          expect(react_app["componentHtml"]).not_to include(badge_html_string)
-        end
-      end
     end
   end
 
@@ -544,52 +438,6 @@ describe ReactOnRailsHelper do
     it {
       expect(expect(store).target).to script_tag_be_included(react_store_script)
     }
-
-    context "with Pro license warning" do
-      let(:badge_html_string) { "React On Rails Pro Required" }
-
-      before do
-        allow(Rails.logger).to receive(:warn)
-      end
-
-      context "when Pro license is NOT installed and immediate_hydration is true" do
-        subject(:store) { redux_store("reduxStore", props: props, immediate_hydration: true) }
-
-        before do
-          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
-        end
-
-        it { is_expected.to include(badge_html_string) }
-
-        it "logs a warning" do
-          store
-          expect(Rails.logger).to have_received(:warn)
-            .with(a_string_matching(/The 'immediate_hydration' feature requires/))
-        end
-      end
-
-      context "when Pro license is NOT installed and immediate_hydration is false" do
-        subject(:store) { redux_store("reduxStore", props: props, immediate_hydration: false) }
-
-        before do
-          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
-        end
-
-        it { is_expected.not_to include(badge_html_string) }
-      end
-
-      context "when Pro license IS installed and immediate_hydration is true" do
-        subject(:store) { redux_store("reduxStore", props: props, immediate_hydration: true) }
-
-        before do
-          allow(ReactOnRails::Utils).to receive_messages(
-            react_on_rails_pro?: true
-          )
-        end
-
-        it { is_expected.not_to include(badge_html_string) }
-      end
-    end
   end
 
   describe "#server_render_js", :js, type: :system do
