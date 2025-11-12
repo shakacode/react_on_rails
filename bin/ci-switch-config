@@ -64,11 +64,29 @@ set_ruby_version() {
       ;;
     rvm|rvm+nvm)
       print_header "Setting Ruby $version with rvm"
-      if ! rvm list strings | grep -q "^ruby-${version}$"; then
+      # Check if version exists (with or without ruby- prefix)
+      if ! rvm list strings | grep -qE "^(ruby-)?${version}$"; then
         print_warning "Ruby $version not installed. Installing..."
-        rvm install "$version"
+        if ! rvm install "$version"; then
+          print_error "Failed to install Ruby $version with rvm"
+          print_warning "Make sure rvm is properly configured. Try running: source ~/.rvm/scripts/rvm"
+          exit 1
+        fi
       fi
-      rvm use "$version"
+      if ! rvm use "$version"; then
+        print_error "Failed to switch to Ruby $version"
+        print_warning "Make sure rvm is properly configured. Try running: source ~/.rvm/scripts/rvm"
+        exit 1
+      fi
+      print_success "Switched to Ruby $version"
+      ;;
+    nvm)
+      print_error "Cannot set Ruby version: nvm doesn't manage Ruby"
+      echo "Please install one of the following to manage Ruby versions:"
+      echo "  - rvm:  https://rvm.io/"
+      echo "  - mise: https://mise.jdx.dev/ (recommended, manages both Ruby and Node)"
+      echo "  - asdf: https://asdf-vm.com/ (manages both Ruby and Node)"
+      exit 1
       ;;
   esac
 }
@@ -83,16 +101,52 @@ set_node_version() {
       ;;
     nvm|rvm+nvm)
       print_header "Setting Node $version with nvm"
-      # Source nvm if not already loaded
-      if [ -z "${NVM_DIR:-}" ]; then
-        export NVM_DIR="$HOME/.nvm"
-        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
+      # Source nvm if not already loaded - try multiple common locations
+      if ! command -v nvm &> /dev/null; then
+        # Try standard nvm location
+        if [ -s "$HOME/.nvm/nvm.sh" ]; then
+          export NVM_DIR="$HOME/.nvm"
+          \. "$NVM_DIR/nvm.sh"
+        # Try Homebrew location (macOS)
+        elif [ -s "/opt/homebrew/opt/nvm/nvm.sh" ]; then
+          export NVM_DIR="/opt/homebrew/opt/nvm"
+          \. "/opt/homebrew/opt/nvm/nvm.sh"
+        # Try XDG config location
+        elif [ -s "${XDG_CONFIG_HOME:-$HOME/.config}/nvm/nvm.sh" ]; then
+          export NVM_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/nvm"
+          \. "$NVM_DIR/nvm.sh"
+        else
+          print_error "Could not find nvm installation"
+          print_warning "Tried locations: ~/.nvm, /opt/homebrew/opt/nvm, ~/.config/nvm"
+          echo "Please source nvm manually or install it from: https://github.com/nvm-sh/nvm"
+          exit 1
+        fi
       fi
-      if ! nvm list "$version" &> /dev/null; then
+
+      # Check if version is already installed
+      if ! nvm list | grep -q "v${version}"; then
         print_warning "Node $version not installed. Installing..."
-        nvm install "$version"
+        if ! nvm install "$version"; then
+          print_error "Failed to install Node $version with nvm"
+          exit 1
+        fi
       fi
-      nvm use "$version"
+
+      if ! nvm use "$version"; then
+        print_error "Failed to switch to Node $version"
+        print_warning "Make sure nvm is properly configured. Try running: nvm use $version"
+        exit 1
+      fi
+      print_success "Switched to Node $version"
+      ;;
+    rvm)
+      print_error "Cannot set Node version: rvm doesn't manage Node"
+      echo "Please install one of the following to manage Node versions:"
+      echo "  - nvm:  https://github.com/nvm-sh/nvm"
+      echo "  - mise: https://mise.jdx.dev/ (recommended, manages both Ruby and Node)"
+      echo "  - asdf: https://asdf-vm.com/ (manages both Ruby and Node)"
+      exit 1
       ;;
   esac
 }
@@ -218,6 +272,7 @@ EOF
       # mise will auto-detect .tool-versions on next cd
       ;;
     asdf)
+      # Note: This only affects the script's subshell, not the user's current shell
       if [ -f "$HOME/.asdf/asdf.sh" ]; then
         source "$HOME/.asdf/asdf.sh"
       fi
@@ -325,6 +380,7 @@ EOF
       # mise will auto-detect .tool-versions on next cd
       ;;
     asdf)
+      # Note: This only affects the script's subshell, not the user's current shell
       if [ -f "$HOME/.asdf/asdf.sh" ]; then
         source "$HOME/.asdf/asdf.sh"
       fi
