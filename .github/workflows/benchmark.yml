@@ -70,17 +70,16 @@ env:
   RUN_CORE: ${{ (github.event.inputs.app_version || 'both') != 'pro_only' && 'true' || '' }}
   RUN_PRO: ${{ (github.event.inputs.app_version || 'both') != 'core_only' && 'true' || '' }}
   # Benchmark parameters (defaults in bench.rb unless overridden here for CI)
-  # FIXME: default ROUTES, TOOLS and DURATION are set to speed up tests, remove before merging
-  ROUTES: ${{ github.event.inputs.routes || '/' }}
+  ROUTES: ${{ github.event.inputs.routes }}
   RATE: ${{ github.event.inputs.rate || 'max' }}
-  DURATION: ${{ github.event.inputs.duration || '5s' }}
+  DURATION: ${{ github.event.inputs.duration }}
   REQUEST_TIMEOUT: ${{ github.event.inputs.request_timeout }}
   CONNECTIONS: ${{ github.event.inputs.connections }}
   MAX_CONNECTIONS: ${{ github.event.inputs.connections }}
   WEB_CONCURRENCY: ${{ github.event.inputs.web_concurrency || 4 }}
   RAILS_MAX_THREADS: ${{ github.event.inputs.rails_threads || 3 }}
   RAILS_MIN_THREADS: ${{ github.event.inputs.rails_threads || 3 }}
-  TOOLS: ${{ github.event.inputs.tools || 'fortio' }}
+  TOOLS: ${{ github.event.inputs.tools }}
 
 jobs:
   benchmark:
