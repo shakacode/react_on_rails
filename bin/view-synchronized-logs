@@ -1,0 +1,243 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require 'time'
+require 'optparse'
+
+# Script to view synchronized logs from CI runs side-by-side
+# Usage: bin/view-synchronized-logs path/to/logs/directory
+#        bin/view-synchronized-logs --rails rails.log --node node.log
+
+class SynchronizedLogViewer
+  TIMESTAMP_REGEX = /^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+)\] (.*)$/
+
+  def initialize(rails_log_path, node_log_path, options = {})
+    @rails_log_path = rails_log_path
+    @node_log_path = node_log_path
+    @filter = options[:filter]
+    @time_window = options[:time_window] || 1.0 # seconds
+    @show_time_gaps = options[:show_time_gaps]
+  end
+
+  def view
+    rails_entries = parse_log_file(@rails_log_path, 'RAILS')
+    node_entries = parse_log_file(@node_log_path, 'NODE')
+
+    if rails_entries.empty? && node_entries.empty?
+      puts "No timestamped log entries found in either file."
+      return
+    end
+
+    display_synchronized_logs(rails_entries, node_entries)
+  end
+
+  private
+
+  def parse_log_file(path, source)
+    entries = []
+    return entries unless File.exist?(path)
+
+    current_timestamp = nil
+    current_lines = []
+
+    File.readlines(path).each do |line|
+      if line =~ TIMESTAMP_REGEX
+        # Save previous entry if exists
+        if current_timestamp && !current_lines.empty?
+          content = current_lines.join
+          entries << { time: current_timestamp, content: content, source: source } if matches_filter?(content)
+        end
+
+        # Start new entry
+        current_timestamp = Time.parse($1)
+        current_lines = [$2]
+      elsif current_timestamp
+        # Continuation of previous entry
+        current_lines << line
+      end
+    end
+
+    # Add final entry
+    if current_timestamp && !current_lines.empty?
+      content = current_lines.join
+      entries << { time: current_timestamp, content: content, source: source } if matches_filter?(content)
+    end
+
+    entries
+  rescue StandardError => e
+    warn "Error parsing #{path}: #{e.message}"
+    []
+  end
+
+  def matches_filter?(content)
+    return true unless @filter
+    content.match?(@filter)
+  end
+
+  def display_synchronized_logs(rails_entries, node_entries)
+    all_entries = (rails_entries + node_entries).sort_by { |e| e[:time] }
+
+    if all_entries.empty?
+      puts "No entries to display (possibly filtered out)."
+      return
+    end
+
+    # Get terminal width
+    terminal_width = `tput cols`.to_i rescue 160
+    column_width = [(terminal_width - 5) / 2, 60].max
+
+    # Print header
+    print_header(column_width)
+
+    # Display entries
+    last_time = nil
+    all_entries.each do |entry|
+      # Show time gap if requested
+      if @show_time_gaps && last_time
+        gap = entry[:time] - last_time
+        if gap > @time_window
+          print_time_gap(gap, column_width)
+        end
+      end
+
+      print_entry(entry, column_width)
+      last_time = entry[:time]
+    end
+
+    # Print summary
+    print_summary(rails_entries, node_entries, all_entries)
+  end
+
+  def print_header(column_width)
+    separator = "=" * (column_width * 2 + 5)
+    puts separator
+    rails_header = "RAILS SERVER".center(column_width)
+    node_header = "NODE RENDERER".center(column_width)
+    puts "#{rails_header} | #{node_header}"
+    puts separator
+  end
+
+  def print_time_gap(gap, column_width)
+    gap_text = format("--- %.1f second gap ---", gap).center(column_width * 2 + 5)
+    puts "\e[90m#{gap_text}\e[0m" # Gray color
+  end
+
+  def print_entry(entry, column_width)
+    timestamp = entry[:time].strftime("%H:%M:%S.%3N")
+    content = entry[:content].strip
+    source = entry[:source]
+
+    # Truncate content if too long
+    max_content_length = column_width - 13 # Account for timestamp
+    if content.length > max_content_length
+      content = content[0...max_content_length - 3] + "..."
+    end
+
+    # Color codes
+    color = source == 'RAILS' ? "\e[34m" : "\e[32m" # Blue for Rails, Green for Node
+    reset = "\e[0m"
+    time_color = "\e[90m" # Gray for timestamp
+
+    # Format entry with timestamp
+    formatted_entry = "#{time_color}#{timestamp}#{reset} #{color}#{content}#{reset}"
+
+    # Print in appropriate column
+    if source == 'RAILS'
+      left_content = formatted_entry.ljust(column_width + 20) # +20 for ANSI codes
+      puts "#{left_content} |"
+    else
+      left_padding = " " * column_width
+      puts "#{left_padding} | #{formatted_entry}"
+    end
+  end
+
+  def print_summary(rails_entries, node_entries, all_entries)
+    puts "\n" + "=" * 80
+    puts "Summary:"
+    puts "  Rails entries: #{rails_entries.size}"
+    puts "  Node entries: #{node_entries.size}"
+    puts "  Total entries: #{all_entries.size}"
+
+    if all_entries.any?
+      duration = all_entries.last[:time] - all_entries.first[:time]
+      puts "  Time span: #{format('%.2f', duration)} seconds"
+      puts "  First entry: #{all_entries.first[:time].strftime('%Y-%m-%d %H:%M:%S.%3N')}"
+      puts "  Last entry: #{all_entries.last[:time].strftime('%Y-%m-%d %H:%M:%S.%3N')}"
+    end
+  end
+end
+
+# Parse command line options
+options = {}
+parser = OptionParser.new do |opts|
+  opts.banner = "Usage: bin/view-synchronized-logs [options] LOGS_DIRECTORY"
+  opts.separator "   or: bin/view-synchronized-logs --rails RAILS_LOG --node NODE_LOG"
+  opts.separator ""
+  opts.separator "View synchronized logs from CI runs side-by-side in chronological order."
+  opts.separator ""
+  opts.separator "Options:"
+
+  opts.on("-r", "--rails FILE", "Path to Rails server log file") do |file|
+    options[:rails] = file
+  end
+
+  opts.on("-n", "--node FILE", "Path to Node renderer log file") do |file|
+    options[:node] = file
+  end
+
+  opts.on("-f", "--filter REGEX", "Filter entries matching regex pattern") do |pattern|
+    options[:filter] = Regexp.new(pattern, Regexp::IGNORECASE)
+  end
+
+  opts.on("-g", "--gaps", "Show time gaps between entries") do
+    options[:show_time_gaps] = true
+  end
+
+  opts.on("-w", "--window SECONDS", Float, "Time window for gap detection (default: 1.0)") do |seconds|
+    options[:time_window] = seconds
+  end
+
+  opts.on("-h", "--help", "Show this help message") do
+    puts opts
+    exit
+  end
+end
+
+parser.parse!
+
+# Determine log file paths
+rails_log = options[:rails]
+node_log = options[:node]
+
+if !rails_log || !node_log
+  # Try to use directory argument
+  if ARGV.empty?
+    puts "Error: Please provide either a logs directory or specify both --rails and --node options"
+    puts parser
+    exit 1
+  end
+
+  logs_dir = ARGV[0]
+  unless Dir.exist?(logs_dir)
+    puts "Error: Directory not found: #{logs_dir}"
+    exit 1
+  end
+
+  rails_log = File.join(logs_dir, 'rails-server.log')
+  node_log = File.join(logs_dir, 'node-renderer.log')
+end
+
+# Validate files exist
+unless File.exist?(rails_log)
+  puts "Error: Rails log file not found: #{rails_log}"
+  exit 1
+end
+
+unless File.exist?(node_log)
+  puts "Error: Node log file not found: #{node_log}"
+  exit 1
+end
+
+# Run viewer
+viewer = SynchronizedLogViewer.new(rails_log, node_log, options)
+viewer.view
