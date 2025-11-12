@@ -154,9 +154,10 @@ module ReactOnRails
 
       pro_only_features << "config.immediate_hydration = true" if immediate_hydration == true
 
-      if generated_component_packs_loading_strategy.present?
-        pro_only_features << "config.generated_component_packs_loading_strategy = " \
-                             ":#{generated_component_packs_loading_strategy}"
+      # generated_component_packs_loading_strategy itself is NOT Pro-only
+      # However, :async loading specifically requires React on Rails Pro
+      if generated_component_packs_loading_strategy == :async
+        pro_only_features << "config.generated_component_packs_loading_strategy = :async"
       end
 
       return if pro_only_features.empty?
@@ -210,19 +211,19 @@ module ReactOnRails
         2. Upgrade to Shakapacker v8.2.0 or above to enable async script loading
       MSG
 
-      # Don't auto-set loading strategy for non-Pro users - this is a Pro-only feature
-      # For Pro users, the setting will be auto-set in ReactOnRailsPro configuration
-      if generated_component_packs_loading_strategy.nil? && !defined?(ReactOnRailsPro)
-        # Leave as nil for non-Pro - the Pro validation will be skipped
-        return
-      end
-
-      if PackerUtils.supports_async_loading?
-        self.generated_component_packs_loading_strategy ||= :async
-      elsif generated_component_packs_loading_strategy.nil?
-        Rails.logger.warn("**WARNING** #{msg}")
-        self.generated_component_packs_loading_strategy = :sync
-      elsif generated_component_packs_loading_strategy == :async
+      # Auto-set default based on Shakapacker version
+      # Note: :async requires React on Rails Pro (validated in validate_pro_only_features)
+      if generated_component_packs_loading_strategy.nil?
+        if PackerUtils.supports_async_loading? && defined?(ReactOnRailsPro)
+          self.generated_component_packs_loading_strategy = :async
+        elsif PackerUtils.supports_async_loading?
+          # For non-Pro users with modern Shakapacker, default to :defer (safe choice)
+          self.generated_component_packs_loading_strategy = :defer
+        else
+          Rails.logger.warn("**WARNING** #{msg}")
+          self.generated_component_packs_loading_strategy = :sync
+        end
+      elsif generated_component_packs_loading_strategy == :async && !PackerUtils.supports_async_loading?
         raise ReactOnRails::Error, "**ERROR** #{msg}"
       end
 

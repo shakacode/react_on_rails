@@ -457,7 +457,7 @@ module ReactOnRails
           end
         end
 
-        context "when generated_component_packs_loading_strategy is explicitly set" do
+        context "when generated_component_packs_loading_strategy is set to :async" do
           it "raises error in non-production environments" do
             allow(Rails.env).to receive(:production?).and_return(false)
             expect do
@@ -472,10 +472,28 @@ module ReactOnRails
             allow(Rails.logger).to receive(:error)
             expect do
               ReactOnRails.configure do |config|
-                config.generated_component_packs_loading_strategy = :defer
+                config.generated_component_packs_loading_strategy = :async
               end
             end.not_to raise_error
             expect(Rails.logger).to have_received(:error).with(/Pro-only features/)
+          end
+        end
+
+        context "when generated_component_packs_loading_strategy is set to :defer or :sync" do
+          it "does not raise error for :defer" do
+            expect do
+              ReactOnRails.configure do |config|
+                config.generated_component_packs_loading_strategy = :defer
+              end
+            end.not_to raise_error
+          end
+
+          it "does not raise error for :sync" do
+            expect do
+              ReactOnRails.configure do |config|
+                config.generated_component_packs_loading_strategy = :sync
+              end
+            end.not_to raise_error
           end
         end
 

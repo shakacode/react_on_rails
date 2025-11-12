@@ -37,7 +37,12 @@ Changes since the last non-beta release.
 
 #### Changed
 
-- **Pro-Only Feature Validation**: The `immediate_hydration` and `generated_component_packs_loading_strategy` configuration options are now validated as React on Rails Pro-only features. Non-Pro users attempting to use these features will receive a clear error message in development/test environments directing them to either remove the settings or purchase a Pro license. In production, errors are logged without crashing the application for graceful degradation. [PR 1983](https://github.com/shakacode/react_on_rails/pull/1983) by [justin808](https://github.com/justin808).
+- **Pro-Only Feature Validation**: Added validation for Pro-only features with clear error messages:
+  - `immediate_hydration = true` requires React on Rails Pro. This setting should be configured in `config/initializers/react_on_rails_pro.rb` for Pro users.
+  - `generated_component_packs_loading_strategy = :async` requires React on Rails Pro. Non-Pro users can use `:defer` or `:sync` loading strategies.
+  - Non-Pro users attempting to use Pro-only features will receive a clear error message in development/test environments directing them to either remove the settings or purchase a Pro license.
+  - In production, errors are logged without crashing the application for graceful degradation.
+  [PR 1983](https://github.com/shakacode/react_on_rails/pull/1983) by [justin808](https://github.com/justin808).
 
 - **Shakapacker 9.0.0 Upgrade**: Upgraded Shakapacker from 8.2.0 to 9.0.0 with Babel transpiler configuration for compatibility. Key changes include:
   - Configured `javascript_transpiler: babel` in shakapacker.yml (Shakapacker 9.0 defaults to SWC which has PropTypes handling issues)
