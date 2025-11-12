@@ -62,6 +62,5 @@ module ReactOnRails
 
       store_hydration_scripts.html_safe
     end
-
   end
 end
