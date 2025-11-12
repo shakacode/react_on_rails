@@ -158,7 +158,7 @@ module ReactOnRails
     #    immediate_hydration: nil -- React on Rails Pro (licensed) feature. When nil (default), Pro users
     #                        get immediate hydration, non-Pro users don't. Can be explicitly overridden.
     def redux_store(store_name, props: {}, defer: false, immediate_hydration: nil)
-      immediate_hydration = ReactOnRails::ProUtils.immediate_hydration_enabled? if immediate_hydration.nil?
+      immediate_hydration = ReactOnRails::Utils.react_on_rails_pro? if immediate_hydration.nil?
 
       redux_store_data = { store_name: store_name,
                            props: props,

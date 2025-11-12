@@ -109,7 +109,7 @@ module ReactOnRails
         end
 
         options.fetch(:immediate_hydration) do
-          ReactOnRails::ProUtils.immediate_hydration_enabled?
+          ReactOnRails::Utils.react_on_rails_pro?
         end
       end
 
