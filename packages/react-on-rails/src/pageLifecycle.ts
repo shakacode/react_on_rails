@@ -70,8 +70,8 @@ function onPageReady(callback: () => void) {
     callback();
   } else {
     document.addEventListener('readystatechange', function onReadyStateChange() {
-      onPageReady(callback);
       document.removeEventListener('readystatechange', onReadyStateChange);
+      onPageReady(callback);
     });
   }
 }

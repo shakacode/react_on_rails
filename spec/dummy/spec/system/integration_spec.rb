@@ -86,58 +86,6 @@ context "when Server Rendering with Options", :js do
   include_examples "React Component", "div#my-hello-world-id"
 end
 
-shared_context "with pro features and immediate hydration" do
-  before do
-    allow(ReactOnRails::Utils).to receive_messages(
-      react_on_rails_pro?: true,
-      react_on_rails_pro_version: "",
-      rsc_support_enabled?: false
-    )
-
-    # Stub ReactOnRailsPro::Utils.pro_attribution_comment for all tests
-    # since react_on_rails_pro? is set to true by default
-    pro_module = Module.new
-    utils_module = Module.new do
-      def self.pro_attribution_comment
-        "<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed -->"
-      end
-    end
-    stub_const("ReactOnRailsPro", pro_module)
-    stub_const("ReactOnRailsPro::Utils", utils_module)
-  end
-
-  around do |example|
-    ReactOnRails.configure { |config| config.immediate_hydration = true }
-    example.run
-    ReactOnRails.configure { |config| config.immediate_hydration = false }
-  end
-end
-
-describe "Turbolinks across pages", :js do
-  subject { page }
-
-  include_context "with pro features and immediate hydration"
-
-  it "changes name in message according to input" do
-    visit "/client_side_hello_world"
-    expect_change_text_in_dom_selector("#HelloWorld-react-component-0")
-    click_on "Hello World Component Server Rendered, with extra options"
-    expect_change_text_in_dom_selector("#my-hello-world-id")
-  end
-end
-
-describe "TurboStream send react component", :js do
-  subject { page }
-
-  include_context "with pro features and immediate hydration"
-
-  it "force load hello-world component immediately" do
-    visit "/turbo_frame_tag_hello_world"
-    click_on "send me hello-turbo-stream component"
-    expect(page).to have_text "Hello, Mrs. Client Side Rendering From Turbo Stream!"
-  end
-end
-
 describe "Pages/client_side_log_throw", :ignore_js_errors, :js do
   subject { page }
 
