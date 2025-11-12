@@ -51,8 +51,7 @@ on:
       app_version:
         description: 'Which app version to benchmark'
         required: false
-        # FIXME: for debugging, restore 'both' before merging
-        default: 'pro_only'
+        default: 'both'
         type: choice
         options:
           - 'both'
@@ -68,19 +67,20 @@ env:
   K6_VERSION: "1.3.0"
   VEGETA_VERSION: "12.13.0"
   # Determine which apps to run (default is 'pro_only' for all triggers)
-  RUN_CORE: ${{ (github.event.inputs.app_version || 'pro_only') != 'pro_only' && 'true' || '' }}
-  RUN_PRO: ${{ (github.event.inputs.app_version || 'pro_only') != 'core_only' && 'true' || '' }}
+  RUN_CORE: ${{ (github.event.inputs.app_version || 'both') != 'pro_only' && 'true' || '' }}
+  RUN_PRO: ${{ (github.event.inputs.app_version || 'both') != 'core_only' && 'true' || '' }}
   # Benchmark parameters (defaults in bench.rb unless overridden here for CI)
-  ROUTES: ${{ github.event.inputs.routes }}
+  # FIXME: default ROUTES, TOOLS and DURATION are set to speed up tests, remove before merging
+  ROUTES: ${{ github.event.inputs.routes || '/' }}
   RATE: ${{ github.event.inputs.rate || 'max' }}
-  DURATION: ${{ github.event.inputs.duration }}
+  DURATION: ${{ github.event.inputs.duration || '5s' }}
   REQUEST_TIMEOUT: ${{ github.event.inputs.request_timeout }}
   CONNECTIONS: ${{ github.event.inputs.connections }}
   MAX_CONNECTIONS: ${{ github.event.inputs.connections }}
   WEB_CONCURRENCY: ${{ github.event.inputs.web_concurrency || 4 }}
   RAILS_MAX_THREADS: ${{ github.event.inputs.rails_threads || 3 }}
   RAILS_MIN_THREADS: ${{ github.event.inputs.rails_threads || 3 }}
-  TOOLS: ${{ github.event.inputs.tools }}
+  TOOLS: ${{ github.event.inputs.tools || 'fortio' }}
 
 jobs:
   benchmark:
