@@ -39,12 +39,118 @@ check_version_manager() {
     echo "mise"
   elif command -v asdf &> /dev/null; then
     echo "asdf"
+  elif command -v rvm &> /dev/null && command -v nvm &> /dev/null; then
+    echo "rvm+nvm"
+  elif command -v rvm &> /dev/null; then
+    echo "rvm"
+  elif command -v nvm &> /dev/null; then
+    echo "nvm"
   else
-    print_error "No version manager found. Please install mise or asdf:"
+    print_error "No version manager found. Please install one of:"
     echo "  mise (recommended): https://mise.jdx.dev/"
-    echo "  asdf (legacy):      https://asdf-vm.com/"
+    echo "  asdf:               https://asdf-vm.com/"
+    echo "  rvm + nvm:          https://rvm.io/ + https://github.com/nvm-sh/nvm"
     exit 1
   fi
+}
+
+set_ruby_version() {
+  local version="$1"
+  local version_manager="$2"
+
+  case "$version_manager" in
+    mise|asdf)
+      # Handled via .tool-versions
+      ;;
+    rvm|rvm+nvm)
+      print_header "Setting Ruby $version with rvm"
+      # Check if version exists using rvm list rubies for consistent output
+      # Anchor to start of line to avoid false matches (e.g., 3.2.8 shouldn't match 13.2.8)
+      # Allow optional leading whitespace and ruby- prefix, no end anchor to allow patch suffixes
+      if ! rvm list rubies | grep -qE "^[[:space:]]*(ruby-)?${version}"; then
+        print_warning "Ruby $version not installed. Installing..."
+        if ! rvm install "$version"; then
+          print_error "Failed to install Ruby $version with rvm"
+          print_warning "Make sure rvm is properly configured. Try running: source ~/.rvm/scripts/rvm"
+          exit 1
+        fi
+      fi
+      if ! rvm use "$version"; then
+        print_error "Failed to switch to Ruby $version"
+        print_warning "Make sure rvm is properly configured. Try running: source ~/.rvm/scripts/rvm"
+        exit 1
+      fi
+      print_success "Switched to Ruby $version"
+      ;;
+    nvm)
+      print_error "Cannot set Ruby version: nvm doesn't manage Ruby"
+      echo "Please install one of the following to manage Ruby versions:"
+      echo "  - rvm:  https://rvm.io/"
+      echo "  - mise: https://mise.jdx.dev/ (recommended, manages both Ruby and Node)"
+      echo "  - asdf: https://asdf-vm.com/ (manages both Ruby and Node)"
+      exit 1
+      ;;
+  esac
+}
+
+set_node_version() {
+  local version="$1"
+  local version_manager="$2"
+
+  case "$version_manager" in
+    mise|asdf)
+      # Handled via .tool-versions
+      ;;
+    nvm|rvm+nvm)
+      print_header "Setting Node $version with nvm"
+
+      # Source nvm if not already loaded - try multiple common locations
+      if ! command -v nvm &> /dev/null; then
+        # Try standard nvm location
+        if [ -s "$HOME/.nvm/nvm.sh" ]; then
+          export NVM_DIR="$HOME/.nvm"
+          \. "$NVM_DIR/nvm.sh"
+        # Try Homebrew location (macOS)
+        elif [ -s "/opt/homebrew/opt/nvm/nvm.sh" ]; then
+          export NVM_DIR="/opt/homebrew/opt/nvm"
+          \. "/opt/homebrew/opt/nvm/nvm.sh"
+        # Try XDG config location
+        elif [ -s "${XDG_CONFIG_HOME:-$HOME/.config}/nvm/nvm.sh" ]; then
+          export NVM_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/nvm"
+          \. "$NVM_DIR/nvm.sh"
+        else
+          print_error "Could not find nvm installation"
+          print_warning "Tried locations: ~/.nvm, /opt/homebrew/opt/nvm, ~/.config/nvm"
+          echo "Please source nvm manually or install it from: https://github.com/nvm-sh/nvm"
+          exit 1
+        fi
+      fi
+
+      # Check if version is already installed using nvm version for reliability
+      if ! nvm version "$version" &> /dev/null; then
+        print_warning "Node $version not installed. Installing..."
+        if ! nvm install "$version"; then
+          print_error "Failed to install Node $version with nvm"
+          exit 1
+        fi
+      fi
+
+      if ! nvm use "$version"; then
+        print_error "Failed to switch to Node $version"
+        print_warning "Make sure nvm is properly configured. Try running: nvm use $version"
+        exit 1
+      fi
+      print_success "Switched to Node $version"
+      ;;
+    rvm)
+      print_error "Cannot set Node version: rvm doesn't manage Node"
+      echo "Please install one of the following to manage Node versions:"
+      echo "  - nvm:  https://github.com/nvm-sh/nvm"
+      echo "  - mise: https://mise.jdx.dev/ (recommended, manages both Ruby and Node)"
+      echo "  - asdf: https://asdf-vm.com/ (manages both Ruby and Node)"
+      exit 1
+      ;;
+  esac
 }
 
 show_status() {
@@ -121,12 +227,32 @@ switch_to_minimum() {
   fi
 
   # Set Ruby and Node versions
-  print_header "Setting runtime versions in .tool-versions"
-  cat > "$PROJECT_ROOT/.tool-versions" <<EOF
+  case "$VERSION_MANAGER" in
+    mise|asdf)
+      print_header "Setting runtime versions in .tool-versions"
+      cat > "$PROJECT_ROOT/.tool-versions" <<EOF
 ruby 3.2.8
 nodejs 20.18.1
 EOF
-  print_success "Created .tool-versions with Ruby 3.2.8 and Node 20.18.1"
+      print_success "Created .tool-versions with Ruby 3.2.8 and Node 20.18.1"
+      ;;
+    rvm|rvm+nvm)
+      print_header "Creating .ruby-version for rvm"
+      echo "3.2.8" > "$PROJECT_ROOT/.ruby-version"
+      print_success "Created .ruby-version with Ruby 3.2.8"
+      ;;
+  esac
+
+  case "$VERSION_MANAGER" in
+    nvm|rvm+nvm)
+      print_header "Creating .nvmrc for nvm"
+      echo "20.18.1" > "$PROJECT_ROOT/.nvmrc"
+      print_success "Created .nvmrc with Node 20.18.1"
+      ;;
+  esac
+
+  set_ruby_version "3.2.8" "$VERSION_MANAGER"
+  set_node_version "20.18.1" "$VERSION_MANAGER"
 
   # Run conversion script
   print_header "Running script/convert to downgrade dependencies"
@@ -158,22 +284,60 @@ EOF
 
   # Reload version manager to pick up new versions
   print_header "Reloading $VERSION_MANAGER to use new versions"
-  if [[ "$VERSION_MANAGER" == "mise" ]]; then
-    # mise will auto-detect .tool-versions on next cd
-    :
-  elif [ -f "$HOME/.asdf/asdf.sh" ]; then
-    source "$HOME/.asdf/asdf.sh"
-  fi
+  case "$VERSION_MANAGER" in
+    mise)
+      # mise will auto-detect .tool-versions on next cd
+      ;;
+    asdf)
+      # Note: This only affects the script's subshell, not the user's current shell
+      if [ -f "$HOME/.asdf/asdf.sh" ]; then
+        source "$HOME/.asdf/asdf.sh"
+      fi
+      ;;
+    rvm|rvm+nvm)
+      # Versions already set via rvm use
+      ;;
+    nvm)
+      # Version already set via nvm use
+      ;;
+  esac
 
   echo ""
   print_success "Switched to MINIMUM configuration"
-  print_warning "Run these commands to reload your shell and verify:"
+
+  case "$VERSION_MANAGER" in
+    rvm+nvm|rvm|nvm)
+      print_warning "IMPORTANT: Version changes in this script don't persist to your current shell."
+      print_warning "The rvm/nvm commands run in a subshell and cannot affect your terminal."
+      echo ""
+      print_warning "Choose one of these options to activate the new versions:"
+      echo "  Option 1 (Recommended): Open a new terminal and cd into the project"
+      echo "  Option 2: Source your shell config:"
+      [ "$VERSION_MANAGER" = "rvm" ] || [ "$VERSION_MANAGER" = "rvm+nvm" ] && echo "    source ~/.rvm/scripts/rvm"
+      [ "$VERSION_MANAGER" = "nvm" ] || [ "$VERSION_MANAGER" = "rvm+nvm" ] && echo "    source \$NVM_DIR/nvm.sh"
+      echo ""
+      ;;
+  esac
+
+  print_warning "After activating versions, verify with:"
   echo "  cd $PROJECT_ROOT"
-  if [[ "$VERSION_MANAGER" == "mise" ]]; then
-    echo "  mise current"
-  else
-    echo "  asdf current"
-  fi
+  case "$VERSION_MANAGER" in
+    mise)
+      echo "  mise current"
+      ;;
+    asdf)
+      echo "  asdf current"
+      ;;
+    rvm+nvm)
+      echo "  rvm current && nvm current"
+      ;;
+    rvm)
+      echo "  rvm current"
+      ;;
+    nvm)
+      echo "  nvm current"
+      ;;
+  esac
   echo ""
   print_warning "Next steps to build and test:"
   echo "  rake node_package"
@@ -201,12 +365,32 @@ restore_to_latest() {
   fi
 
   # Set Ruby and Node versions
-  print_header "Setting runtime versions in .tool-versions"
-  cat > "$PROJECT_ROOT/.tool-versions" <<EOF
+  case "$VERSION_MANAGER" in
+    mise|asdf)
+      print_header "Setting runtime versions in .tool-versions"
+      cat > "$PROJECT_ROOT/.tool-versions" <<EOF
 ruby 3.4.3
 nodejs 22.12.0
 EOF
-  print_success "Created .tool-versions with Ruby 3.4.3 and Node 22.12.0"
+      print_success "Created .tool-versions with Ruby 3.4.3 and Node 22.12.0"
+      ;;
+    rvm|rvm+nvm)
+      print_header "Creating .ruby-version for rvm"
+      echo "3.4.3" > "$PROJECT_ROOT/.ruby-version"
+      print_success "Created .ruby-version with Ruby 3.4.3"
+      ;;
+  esac
+
+  case "$VERSION_MANAGER" in
+    nvm|rvm+nvm)
+      print_header "Creating .nvmrc for nvm"
+      echo "22.12.0" > "$PROJECT_ROOT/.nvmrc"
+      print_success "Created .nvmrc with Node 22.12.0"
+      ;;
+  esac
+
+  set_ruby_version "3.4.3" "$VERSION_MANAGER"
+  set_node_version "22.12.0" "$VERSION_MANAGER"
 
   # Restore files from git
   print_header "Restoring dependency files from git"
@@ -238,22 +422,60 @@ EOF
 
   # Reload version manager to pick up new versions
   print_header "Reloading $VERSION_MANAGER to use new versions"
-  if [[ "$VERSION_MANAGER" == "mise" ]]; then
-    # mise will auto-detect .tool-versions on next cd
-    :
-  elif [ -f "$HOME/.asdf/asdf.sh" ]; then
-    source "$HOME/.asdf/asdf.sh"
-  fi
+  case "$VERSION_MANAGER" in
+    mise)
+      # mise will auto-detect .tool-versions on next cd
+      ;;
+    asdf)
+      # Note: This only affects the script's subshell, not the user's current shell
+      if [ -f "$HOME/.asdf/asdf.sh" ]; then
+        source "$HOME/.asdf/asdf.sh"
+      fi
+      ;;
+    rvm|rvm+nvm)
+      # Versions already set via rvm use
+      ;;
+    nvm)
+      # Version already set via nvm use
+      ;;
+  esac
 
   echo ""
   print_success "Restored to LATEST configuration"
-  print_warning "Run these commands to reload your shell and verify:"
+
+  case "$VERSION_MANAGER" in
+    rvm+nvm|rvm|nvm)
+      print_warning "IMPORTANT: Version changes in this script don't persist to your current shell."
+      print_warning "The rvm/nvm commands run in a subshell and cannot affect your terminal."
+      echo ""
+      print_warning "Choose one of these options to activate the new versions:"
+      echo "  Option 1 (Recommended): Open a new terminal and cd into the project"
+      echo "  Option 2: Source your shell config:"
+      [ "$VERSION_MANAGER" = "rvm" ] || [ "$VERSION_MANAGER" = "rvm+nvm" ] && echo "    source ~/.rvm/scripts/rvm"
+      [ "$VERSION_MANAGER" = "nvm" ] || [ "$VERSION_MANAGER" = "rvm+nvm" ] && echo "    source \$NVM_DIR/nvm.sh"
+      echo ""
+      ;;
+  esac
+
+  print_warning "After activating versions, verify with:"
   echo "  cd $PROJECT_ROOT"
-  if [[ "$VERSION_MANAGER" == "mise" ]]; then
-    echo "  mise current"
-  else
-    echo "  asdf current"
-  fi
+  case "$VERSION_MANAGER" in
+    mise)
+      echo "  mise current"
+      ;;
+    asdf)
+      echo "  asdf current"
+      ;;
+    rvm+nvm)
+      echo "  rvm current && nvm current"
+      ;;
+    rvm)
+      echo "  rvm current"
+      ;;
+    nvm)
+      echo "  nvm current"
+      ;;
+  esac
   echo ""
   print_warning "Next steps to build and test:"
   echo "  rake node_package"

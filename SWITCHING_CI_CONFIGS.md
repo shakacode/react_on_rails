@@ -53,23 +53,52 @@ The project runs tests against two configurations:
 
 ## Prerequisites
 
-You must have a version manager like [mise](https://mise.jdx.dev/) (recommended) or [asdf](https://asdf-vm.com/) installed to manage Ruby and Node versions.
+You must have a version manager installed to manage Ruby and Node versions. The script supports:
+
+- **[mise](https://mise.jdx.dev/)** - Recommended, modern, manages both Ruby and Node
+- **[asdf](https://asdf-vm.com/)** - Legacy option, manages both Ruby and Node
+- **[rvm](https://rvm.io/) + [nvm](https://github.com/nvm-sh/nvm)** - Separate managers for Ruby and Node
+
+### Option 1: mise (Recommended)
 
 ```bash
-# Install mise (recommended, modern alternative to asdf)
+# Install mise
 brew install mise
 echo 'eval "$(mise activate zsh)"' >> ~/.zshrc
 source ~/.zshrc
 
-# OR install asdf (legacy option)
+# mise automatically reads from .tool-versions
+```
+
+### Option 2: asdf
+
+```bash
+# Install asdf
 brew install asdf
 echo -e "\n. $(brew --prefix asdf)/libexec/asdf.sh" >> ~/.zshrc
 source ~/.zshrc
 
-# Install plugins (only needed for asdf, mise reads from mise.toml)
+# Install plugins
 asdf plugin add ruby
 asdf plugin add nodejs
 ```
+
+### Option 3: rvm + nvm
+
+```bash
+# Install rvm for Ruby
+\curl -sSL https://get.rvm.io | bash -s stable
+source ~/.rvm/scripts/rvm
+
+# Install nvm for Node
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+# Add to shell config (the installer usually does this automatically)
+```
+
+**Important Notes:**
+
+- If you only have rvm (no nvm) or only nvm (no rvm), the script will detect this and provide helpful error messages guiding you to install the missing manager or switch to mise/asdf.
+- **Do not mix version managers** (e.g., don't install both mise and rvm). The script prioritizes mise > asdf > rvm+nvm, so mise/asdf will always take precedence. Using multiple managers can cause confusion about which versions are active.
 
 ## Detailed Usage
 
@@ -107,7 +136,9 @@ This will:
 ```bash
 # Reload your shell to pick up new Ruby/Node versions
 cd <project-root>
-mise current  # or: asdf current
+mise current           # For mise users
+# asdf current         # For asdf users
+# rvm current && nvm current  # For rvm+nvm users
 
 # Build and test
 rake node_package
@@ -137,7 +168,9 @@ This will:
 ```bash
 # Reload your shell to pick up new Ruby/Node versions
 cd <project-root>
-mise current  # or: asdf current
+mise current           # For mise users
+# asdf current         # For asdf users
+# rvm current && nvm current  # For rvm+nvm users
 
 # Build and test
 rake node_package
@@ -241,6 +274,22 @@ mise install  # Install missing versions from mise.toml or .tool-versions
 asdf install  # Install missing versions from .tool-versions
 asdf reshim ruby
 asdf reshim nodejs
+```
+
+**For rvm + nvm:**
+
+```bash
+# Install and use specific Ruby version
+rvm install 3.2.8   # or 3.4.3
+rvm use 3.2.8
+
+# Install and use specific Node version
+nvm install 20.18.1  # or 22.12.0
+nvm use 20.18.1
+
+# Verify versions
+ruby --version
+node --version
 ```
 
 ### Yarn install fails
