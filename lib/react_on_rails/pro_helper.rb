@@ -38,9 +38,7 @@ module ReactOnRails
     # Generates the complete store hydration script tag.
     # Handles both immediate hydration (Pro feature) and standard cases.
     def generate_store_script(redux_store_data)
-      pro_options_check_result = ReactOnRails::ProUtils.disable_pro_render_options_if_not_licensed(redux_store_data)
-      redux_store_data = pro_options_check_result[:raw_options]
-      explicitly_disabled_pro_options = pro_options_check_result[:explicitly_disabled_pro_options]
+      redux_store_data = ReactOnRails::ProUtils.disable_pro_render_options_if_not_licensed(redux_store_data)
 
       store_hydration_data = content_tag(:script,
                                          json_safe_and_pretty(redux_store_data[:props]).html_safe,
@@ -62,8 +60,7 @@ module ReactOnRails
                                   store_hydration_data
                                 end
 
-      pro_warning_badge = pro_warning_badge_if_needed(explicitly_disabled_pro_options)
-      "#{pro_warning_badge}\n#{store_hydration_scripts}".html_safe
+      store_hydration_scripts.html_safe
     end
 
   end
