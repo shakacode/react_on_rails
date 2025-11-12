@@ -725,7 +725,7 @@ module ReactOnRails
     end
     # rubocop:enable Metrics/AbcSize
 
-    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
+    # rubocop:disable Metrics/CyclomaticComplexity
     def analyze_performance_config(content)
       checker.add_info("\n⚡ Performance & Loading:")
 
@@ -762,7 +762,7 @@ module ReactOnRails
 
       checker.add_info("  component_registry_timeout: #{timeout_match[1]}ms")
     end
-    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
+    # rubocop:enable Metrics/CyclomaticComplexity
 
     # rubocop:disable Metrics/AbcSize
     def analyze_development_config(content)
