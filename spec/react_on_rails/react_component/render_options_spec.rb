@@ -194,7 +194,6 @@ describe ReactOnRails::ReactComponent::RenderOptions do
 
       context "without immediate_hydration option" do
         it "returns true (Pro default)" do
-          allow(ReactOnRails::ProUtils).to receive(:immediate_hydration_enabled?).and_return(true)
           attrs = the_attrs
 
           opts = described_class.new(**attrs)
@@ -235,7 +234,6 @@ describe ReactOnRails::ReactComponent::RenderOptions do
 
       context "without immediate_hydration option" do
         it "returns false (non-Pro default)" do
-          allow(ReactOnRails::ProUtils).to receive(:immediate_hydration_enabled?).and_return(false)
           attrs = the_attrs
 
           opts = described_class.new(**attrs)
