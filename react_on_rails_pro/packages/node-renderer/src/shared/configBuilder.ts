@@ -58,6 +58,9 @@ export interface Config {
   allWorkersRestartInterval: number | undefined;
   // Time in minutes between each worker restarting when restarting all workers
   delayBetweenIndividualWorkerRestarts: number | undefined;
+  // Time in seconds to wait for worker to restart before killing it
+  // Set it to 0 or undefined to never kill the worker
+  gracefulWorkerRestartTimeout: number | undefined;
   // If the rendering request is longer than this, it will be truncated in exception and logging messages
   maxDebugSnippetLength: number;
   // @deprecated See https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/error-reporting-and-tracing.
@@ -165,6 +168,10 @@ const defaultConfig: Config = {
     ? parseInt(env.RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS, 10)
     : undefined,
 
+  gracefulWorkerRestartTimeout: env.GRACEFUL_WORKER_RESTART_TIMEOUT
+    ? parseInt(env.GRACEFUL_WORKER_RESTART_TIMEOUT, 10)
+    : undefined,
+
   maxDebugSnippetLength: MAX_DEBUG_SNIPPET_LENGTH,
 
   // default to true if empty, otherwise it is set to false
@@ -195,6 +202,8 @@ function envValuesUsed() {
     RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS:
       !userConfig.delayBetweenIndividualWorkerRestarts &&
       env.RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS,
+    GRACEFUL_WORKER_RESTART_TIMEOUT:
+      !userConfig.gracefulWorkerRestartTimeout && env.GRACEFUL_WORKER_RESTART_TIMEOUT,
     INCLUDE_TIMER_POLYFILLS: !('includeTimerPolyfills' in userConfig) && env.INCLUDE_TIMER_POLYFILLS,
     REPLAY_SERVER_ASYNC_OPERATION_LOGS:
       !userConfig.replayServerAsyncOperationLogs && env.REPLAY_SERVER_ASYNC_OPERATION_LOGS,
@@ -209,6 +218,7 @@ function sanitizedSettings(aConfig: Partial<Config> | undefined, defaultValue?: 
         password: aConfig.password != null ? '<MASKED>' : defaultValue,
         allWorkersRestartInterval: aConfig.allWorkersRestartInterval || defaultValue,
         delayBetweenIndividualWorkerRestarts: aConfig.delayBetweenIndividualWorkerRestarts || defaultValue,
+        gracefulWorkerRestartTimeout: aConfig.gracefulWorkerRestartTimeout || defaultValue,
       }
     : {};
 }

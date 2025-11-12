@@ -129,6 +129,9 @@ const config = {
   // allWorkersRestartInterval: 15,
   // time in minutes between each worker restarting when restarting all workers
   // delayBetweenIndividualWorkerRestarts: 2,
+  // Also, you can set he parameter gracefulWorkerRestartTimeout to force the worker to restart
+  // If it's the time for the worker to restart, the worker waits until it serves all active requests before restarting
+  // If a worker stuck because of a memory leakage or an infinite loop, you can set a timeout that master waits for it before killing the worker
 }
 
 // Renderer detects a total number of CPUs on virtual hostings like Heroku

@@ -11,7 +11,7 @@ def change_text_expect_dom_selector(dom_selector, expect_no_change: false)
     find("input").set new_text
     within("h3") do
       if expect_no_change
-        expect(subject).to have_no_content new_text
+        expect(subject).not_to have_content new_text
       else
         expect(subject).to have_content new_text
       end
@@ -110,7 +110,7 @@ describe "Turbolinks across pages", :js do
   it "changes name in message according to input" do
     visit "/client_side_hello_world"
     change_text_expect_dom_selector("#HelloWorld-react-component-0")
-    click_link "Hello World Component Server Rendered, with extra options" # rubocop:disable Capybara/ClickLinkOrButtonStyle
+    click_link "Hello World Component Server Rendered, with extra options"
     change_text_expect_dom_selector("#my-hello-world-id")
   end
 end
@@ -174,19 +174,19 @@ describe "React Router", :js do
 
   before do
     visit "/"
-    click_link "React Router" # rubocop:disable Capybara/ClickLinkOrButtonStyle
+    click_link "React Router"
   end
 
   context "when rendering /react_router" do
     it { is_expected.to have_text("Woohoo, we can use react-router here!") }
 
     it "clicking links correctly renders other pages" do
-      click_link "Router First Page" # rubocop:disable Capybara/ClickLinkOrButtonStyle
+      click_link "Router First Page"
       expect(page).to have_current_path("/react_router/first_page")
       first_page_header_text = page.find(:css, "h2#first-page").text
       expect(first_page_header_text).to eq("React Router First Page")
 
-      click_link "Router Second Page" # rubocop:disable Capybara/ClickLinkOrButtonStyle
+      click_link "Router Second Page"
       expect(page).to have_current_path("/react_router/second_page")
       second_page_header_text = page.find(:css, "h2#second-page").text
       expect(second_page_header_text).to eq("React Router Second Page")
@@ -239,12 +239,12 @@ describe "async render function returns component", :js do
   end
 end
 
-describe "Manual client hydration", :js do
+describe "Manual client hydration", :js, type: :system do
   before { visit "/xhr_refresh" }
 
   it "HelloWorldRehydratable onChange should trigger" do
     within("form") do
-      click_button "refresh" # rubocop:disable Capybara/ClickLinkOrButtonStyle
+      click_button "refresh"
     end
     within("#HelloWorldRehydratable-react-component-1") do
       find("input").set "Should update"
@@ -396,20 +396,20 @@ shared_examples "streamed component tests" do |path, selector|
 
   it "hydrates the component" do
     visit path
-    expect(page.html).to include("client-bundle.js")
+    expect(page.html).to match(/client-bundle[^\"]*.js/)
     change_text_expect_dom_selector(selector)
   end
 
   it "renders the page completely on server and displays content on client even without JavaScript" do
     # Don't add client-bundle.js to the page to ensure that the app is not hydrated
     visit "#{path}?skip_js_packs=true"
-    expect(page.html).not_to include("client-bundle.js")
+    expect(page.html).not_to match(/client-bundle[^\"]*.js/)
     # Ensure that the component state is not updated
     change_text_expect_dom_selector(selector, expect_no_change: true)
 
-    expect(page).to have_no_text "Loading branch1"
-    expect(page).to have_no_text "Loading branch2"
-    expect(page).to have_no_text(/Loading branch1 at level \d+/)
+    expect(page).not_to have_text "Loading branch1"
+    expect(page).not_to have_text "Loading branch2"
+    expect(page).not_to have_text(/Loading branch1 at level \d+/)
     expect(page).to have_text(/branch1 \(level \d+\)/, count: 5)
   end
 
@@ -417,18 +417,17 @@ shared_examples "streamed component tests" do |path, selector|
     # visit waits for the page to load, so we ensure that the page is loaded before checking the hydration status
     visit "#{path}?skip_js_packs=true"
     expect(page).to have_text "HydrationStatus: Streaming server render"
-    expect(page).to have_no_text "HydrationStatus: Hydrated"
-    expect(page).to have_no_text "HydrationStatus: Page loaded"
+    expect(page).not_to have_text "HydrationStatus: Hydrated"
+    expect(page).not_to have_text "HydrationStatus: Page loaded"
   end
 end
 
-describe "Pages/stream_async_components_for_testing", :js,
-         skip: "Flaky test replaced by Playwright E2E tests in e2e-tests/streaming.spec.ts" do
+describe "Pages/stream_async_components_for_testing", :js do
   it_behaves_like "streamed component tests", "/stream_async_components_for_testing",
                   "#AsyncComponentsTreeForTesting-react-component-0"
 end
 
-describe "React Router Sixth Page", :js, skip: "Work in progress in another branch: justin808/fix-body-dup-retry" do
+describe "React Router Sixth Page", :js do
   it_behaves_like "streamed component tests", "/server_router/streaming-server-component",
                   "#ServerComponentRouter-react-component-0"
 end

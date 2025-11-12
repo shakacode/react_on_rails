@@ -19,7 +19,12 @@ export = function masterRun(runningConfig?: Partial<Config>) {
 
   // Store config in app state. From now it can be loaded by any module using getConfig():
   const config = buildConfig(runningConfig);
-  const { workersCount, allWorkersRestartInterval, delayBetweenIndividualWorkerRestarts } = config;
+  const {
+    workersCount,
+    allWorkersRestartInterval,
+    delayBetweenIndividualWorkerRestarts,
+    gracefulWorkerRestartTimeout,
+  } = config;
 
   logSanitizedConfig();
 
@@ -48,9 +53,15 @@ export = function masterRun(runningConfig?: Partial<Config>) {
       allWorkersRestartInterval,
       delayBetweenIndividualWorkerRestarts,
     );
-    setInterval(() => {
-      restartWorkers(delayBetweenIndividualWorkerRestarts);
-    }, allWorkersRestartInterval * MILLISECONDS_IN_MINUTE);
+
+    const allWorkersRestartIntervalMS = allWorkersRestartInterval * MILLISECONDS_IN_MINUTE;
+    const scheduleWorkersRestart = () => {
+      void restartWorkers(delayBetweenIndividualWorkerRestarts, gracefulWorkerRestartTimeout).finally(() => {
+        setTimeout(scheduleWorkersRestart, allWorkersRestartIntervalMS);
+      });
+    };
+
+    setTimeout(scheduleWorkersRestart, allWorkersRestartIntervalMS);
   } else if (allWorkersRestartInterval || delayBetweenIndividualWorkerRestarts) {
     log.error(
       "Misconfiguration, please provide both 'allWorkersRestartInterval' and " +
