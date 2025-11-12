@@ -42,9 +42,8 @@ ReactOnRails.configure do |config|
   config.components_subdirectory = "startup"
   config.auto_load_bundle = true
 
-  # IMPORTANT: generated_component_packs_loading_strategy is a React on Rails PRO feature.
-  # This is set here ONLY for spec/dummy tests which stub ReactOnRailsPro constant.
-  # DO NOT use this setting in production without a Pro license.
-  # We use :defer to prevent component registration race conditions during testing.
+  # For spec/dummy tests, we use :defer to prevent component registration race conditions.
+  # Note: generated_component_packs_loading_strategy supports :defer and :sync for all users.
+  # The :async option requires React on Rails Pro.
   config.generated_component_packs_loading_strategy = :defer
 end
