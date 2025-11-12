@@ -140,7 +140,11 @@ PARAMS
 # Helper method to check if server is responding
 def server_responding?(uri)
   response = Net::HTTP.get_response(uri)
-  { success: response.is_a?(Net::HTTPSuccess), info: "HTTP #{response.code} #{response.message}" }
+  # Accept both success (2xx) and redirect (3xx) responses as "server is responding"
+  success = response.is_a?(Net::HTTPSuccess) || response.is_a?(Net::HTTPRedirection)
+  info = "HTTP #{response.code} #{response.message}"
+  info += " -> #{response['location']}" if response.is_a?(Net::HTTPRedirection) && response["location"]
+  { success: success, info: info }
 rescue StandardError => e
   { success: false, info: "#{e.class.name}: #{e.message}" }
 end
