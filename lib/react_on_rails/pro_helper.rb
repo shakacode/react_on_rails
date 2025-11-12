@@ -38,8 +38,6 @@ module ReactOnRails
     # Generates the complete store hydration script tag.
     # Handles both immediate hydration (Pro feature) and standard cases.
     def generate_store_script(redux_store_data)
-      redux_store_data = ReactOnRails::ProUtils.disable_pro_render_options_if_not_licensed(redux_store_data)
-
       store_hydration_data = content_tag(:script,
                                          json_safe_and_pretty(redux_store_data[:props]).html_safe,
                                          type: "application/json",

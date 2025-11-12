@@ -15,7 +15,7 @@ module ReactOnRails
       # TODO: remove the required for named params
       def initialize(react_component_name: required("react_component_name"), options: required("options"))
         @react_component_name = react_component_name.camelize
-        @options = ReactOnRails::ProUtils.disable_pro_render_options_if_not_licensed(options)
+        @options = options
       end
 
       attr_reader :react_component_name
