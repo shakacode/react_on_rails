@@ -271,7 +271,7 @@ ReactOnRails.configure do |config|
   #
   # - :defer (default for non-Pro, recommended): Scripts load in parallel but execute in order
   #   after HTML parsing. Prevents race conditions where components render before registration.
-  # - :sync: Scripts block HTML parsing while loading (not recommended, slowest option).
+  # - :sync: Scripts block HTML parsing while loading (not recommended, slowest option and can still cause race conditions in the non-pro version if the component is hydrated before its SSR-generated HTML appears in the DOM).
   # - :async (Pro only): Scripts load and execute as soon as available. Requires Pro's
   #   immediate_hydration feature to prevent race conditions.
   #
