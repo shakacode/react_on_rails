@@ -24,8 +24,7 @@ export = async function restartWorkers(
   if (!cluster.workers) {
     throw new Error('No workers to restart');
   }
-  for (const worker of Object.values(cluster.workers)) {
-    if (!worker) return;
+  for (const worker of Object.values(cluster.workers).filter((w) => !!w)) {
     log.debug('Kill worker #%d', worker.id);
     worker.isScheduledRestart = true;
 

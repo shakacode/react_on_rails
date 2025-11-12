@@ -403,7 +403,7 @@ shared_examples "streamed component tests" do |path, selector|
   it "renders the page completely on server and displays content on client even without JavaScript" do
     # Don't add client-bundle.js to the page to ensure that the app is not hydrated
     visit "#{path}?skip_js_packs=true"
-    expect(page.html).not_to include("client-bundle.js")
+    expect(page.html).not_to match(/client-bundle[^\"]*.js/)
     # Ensure that the component state is not updated
     change_text_expect_dom_selector(selector, expect_no_change: true)
 
