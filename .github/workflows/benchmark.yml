@@ -224,7 +224,7 @@ jobs:
 
       - name: Install Node modules with Yarn for Core dummy app
         if: env.RUN_CORE
-        run: cd spec/dummy && yarn install --no-progress --no-emoji
+        run: cd spec/dummy && yarn install --frozen-lockfile --no-progress --no-emoji
 
       - name: Save Core dummy app ruby gems to cache
         if: env.RUN_CORE
@@ -237,9 +237,9 @@ jobs:
         if: env.RUN_CORE
         run: |
           cd spec/dummy
-          bundle lock --add-platform 'x86_64-linux'
           bundle config set path vendor/bundle
-          bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
+          bundle config set frozen true
+          bundle _2.5.4_ install --jobs=4 --retry=3
 
       - name: Prepare Core production assets
         if: env.RUN_CORE
@@ -377,9 +377,9 @@ jobs:
         if: env.RUN_PRO
         run: |
           cd react_on_rails_pro/spec/dummy
-          bundle lock --add-platform 'x86_64-linux'
           bundle config set path vendor/bundle
-          bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
+          bundle config set frozen true
+          bundle _2.5.4_ install --jobs=4 --retry=3
 
       - name: Generate file-system based entrypoints for Pro
         if: env.RUN_PRO
