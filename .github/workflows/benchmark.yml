@@ -330,41 +330,21 @@ jobs:
       - name: Validate Core benchmark results
         if: env.RUN_CORE
         run: |
-          set -e  # Exit on any error
-          echo "🔍 Validating benchmark output files..."
+          set -e
+          echo "🔍 Validating benchmark results..."
 
-          RESULTS_DIR="bench_results"
-          REQUIRED_FILES=("summary.txt")
-          MISSING_FILES=()
-
-          # Check if results directory exists
-          if [ ! -d "${RESULTS_DIR}" ]; then
-            echo "❌ ERROR: Benchmark results directory '${RESULTS_DIR}' not found"
+          if [ ! -f "bench_results/summary.txt" ]; then
+            echo "❌ ERROR: benchmark summary file not found"
             exit 1
           fi
-          
-          # List all generated files
-          echo "Generated files:"
-          ls -lh ${RESULTS_DIR}/ || true
+
+          echo "✅ Benchmark results found"
           echo ""
-
-          # Check for required files
-          for file in "${REQUIRED_FILES[@]}"; do
-            if [ ! -f "${RESULTS_DIR}/${file}" ]; then
-              MISSING_FILES+=("${file}")
-            fi
-          done
-
-          # Report validation results
-          if [ ${#MISSING_FILES[@]} -eq 0 ]; then
-            echo "✅ All required benchmark output files present"
-            echo "📊 Summary preview:"
-            head -20 ${RESULTS_DIR}/summary.txt || true
-          else
-            echo "⚠️ WARNING: Some required files are missing:"
-            printf '  - %s\n' "${MISSING_FILES[@]}"
-            echo "Continuing with available results..."
-          fi
+          echo "📊 Summary:"
+          column -t -s $'\t' bench_results/summary.txt
+          echo ""
+          echo "Generated files:"
+          ls -lh bench_results/
 
       - name: Upload Core benchmark results
         uses: actions/upload-artifact@v4
@@ -502,36 +482,20 @@ jobs:
         if: env.RUN_PRO
         run: |
           set -e
-          echo "🔍 Validating Pro benchmark output files..."
+          echo "🔍 Validating benchmark results..."
 
-          RESULTS_DIR="bench_results"
-          REQUIRED_FILES=("summary.txt")
-          MISSING_FILES=()
-
-          if [ ! -d "${RESULTS_DIR}" ]; then
-            echo "❌ ERROR: Benchmark results directory '${RESULTS_DIR}' not found"
+          if [ ! -f "bench_results/summary.txt" ]; then
+            echo "❌ ERROR: benchmark summary file not found"
             exit 1
           fi
 
-          echo "Generated files:"
-          ls -lh ${RESULTS_DIR}/ || true
+          echo "✅ Benchmark results found"
           echo ""
-
-          for file in "${REQUIRED_FILES[@]}"; do
-            if [ ! -f "${RESULTS_DIR}/${file}" ]; then
-              MISSING_FILES+=("${file}")
-            fi
-          done
-
-          if [ ${#MISSING_FILES[@]} -eq 0 ]; then
-            echo "✅ All required benchmark output files present"
-            echo "📊 Summary preview:"
-            head -20 ${RESULTS_DIR}/summary.txt || true
-          else
-            echo "⚠️ WARNING: Some required files are missing:"
-            printf '  - %s\n' "${MISSING_FILES[@]}"
-            echo "Continuing with available results..."
-          fi
+          echo "📊 Summary:"
+          column -t -s $'\t' bench_results/summary.txt
+          echo ""
+          echo "Generated files:"
+          ls -lh bench_results/
 
       - name: Upload Pro benchmark results
         uses: actions/upload-artifact@v4
