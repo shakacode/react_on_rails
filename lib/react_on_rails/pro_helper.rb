@@ -32,8 +32,7 @@ module ReactOnRails
                    component_specification_tag
                  end
 
-      pro_warning_badge = pro_warning_badge_if_needed(render_options.explicitly_disabled_pro_options)
-      "#{pro_warning_badge}\n#{spec_tag}".html_safe
+      spec_tag.html_safe
     end
 
     # Generates the complete store hydration script tag.
