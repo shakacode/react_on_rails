@@ -173,6 +173,7 @@ module ReactOnRails
       check_procfile_dev
       check_bin_dev_script
       check_gitignore
+      check_async_usage
     end
 
     def check_javascript_bundles
@@ -1143,6 +1144,94 @@ module ReactOnRails
       rescue StandardError => e
         checker.add_info("  #{label}: <error reading value: #{e.message}>")
       end
+    end
+
+    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
+    def check_async_usage
+      # When Pro is installed, async is fully supported and is the default behavior
+      # No need to check for async usage in this case
+      return if ReactOnRails::Utils.react_on_rails_pro?
+
+      async_issues = []
+
+      # Check 1: javascript_pack_tag with :async in view files
+      view_files_with_async = scan_view_files_for_async_pack_tag
+      unless view_files_with_async.empty?
+        async_issues << "javascript_pack_tag with :async found in view files:"
+        view_files_with_async.each do |file|
+          async_issues << "  • #{file}"
+        end
+      end
+
+      # Check 2: generated_component_packs_loading_strategy = :async
+      if config_has_async_loading_strategy?
+        async_issues << "config.generated_component_packs_loading_strategy = :async in initializer"
+      end
+
+      return if async_issues.empty?
+
+      # Report errors if async usage is found without Pro
+      # Note: immediate_hydration alone is not sufficient - Pro is required for safe async usage
+      immediate_hydration_enabled = check_immediate_hydration_enabled?
+
+      if immediate_hydration_enabled
+        checker.add_warning("⚠️  Using :async without React on Rails Pro may cause race conditions")
+        async_issues.each { |issue| checker.add_warning("  #{issue}") }
+        checker.add_info("  💡 immediate_hydration is enabled but Pro gem is not installed")
+        checker.add_info("  💡 For production-safe async loading, upgrade to React on Rails Pro")
+      else
+        checker.add_error("🚫 :async usage detected without proper configuration")
+        async_issues.each { |issue| checker.add_error("  #{issue}") }
+        checker.add_info("  💡 :async can cause race conditions. Options:")
+        checker.add_info("    1. Upgrade to React on Rails Pro (recommended for :async support)")
+        checker.add_info("    2. Change to :defer or :sync loading strategy")
+        checker.add_info("  📖 https://www.shakacode.com/react-on-rails/docs/guides/configuration/")
+      end
+    end
+    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
+
+    def scan_view_files_for_async_pack_tag
+      files_with_async = []
+
+      # Scan app/views for .erb and .haml files
+      view_patterns = ["app/views/**/*.erb", "app/views/**/*.haml"]
+
+      view_patterns.each do |pattern|
+        Dir.glob(pattern).each do |file|
+          next unless File.exist?(file)
+
+          content = File.read(file)
+          # Look for javascript_pack_tag with :async or "async"
+          if content.match?(/javascript_pack_tag.*:async/) || content.match?(/javascript_pack_tag.*["']async["']/)
+            files_with_async << relativize_path(file)
+          end
+        end
+      end
+
+      files_with_async
+    rescue StandardError
+      []
+    end
+
+    def config_has_async_loading_strategy?
+      config_path = "config/initializers/react_on_rails.rb"
+      return false unless File.exist?(config_path)
+
+      content = File.read(config_path)
+      # Check if generated_component_packs_loading_strategy is set to :async
+      content.match?(/config\.generated_component_packs_loading_strategy\s*=\s*:async/)
+    rescue StandardError
+      false
+    end
+
+    def check_immediate_hydration_enabled?
+      # Check if immediate_hydration is enabled in configuration
+      return false unless defined?(ReactOnRails)
+
+      config = ReactOnRails.configuration
+      config.immediate_hydration == true
+    rescue StandardError
+      false
     end
   end
   # rubocop:enable Metrics/ClassLength

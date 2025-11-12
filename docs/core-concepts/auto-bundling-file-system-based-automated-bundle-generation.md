@@ -47,6 +47,36 @@ config.auto_load_bundle = true
 > Example (dummy app): `auto_load_bundle` is set to `true` in the same initializer.
 > [Dummy initializer](https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/config/initializers/react_on_rails.rb)
 
+### Configure `generated_component_packs_loading_strategy`
+
+The `generated_component_packs_loading_strategy` option controls how generated component packs are loaded in the browser. This affects the `async` and `defer` attributes on the `<script>` tags for your component bundles.
+
+Available options:
+
+- `:defer` (default, recommended): Scripts load in parallel but execute in order after HTML parsing. This prevents race conditions where components try to render before registration completes.
+- `:sync`: Scripts block HTML parsing while loading (not recommended, slowest option).
+- `:async`: Scripts load and execute as soon as available (**React on Rails Pro only**). Requires `immediate_hydration` to prevent race conditions.
+
+**IMPORTANT**: The `:async` loading strategy requires React on Rails Pro. Without Pro, `:async` can cause race conditions where components attempt to hydrate before their JavaScript is fully loaded. Pro's `immediate_hydration` feature ensures components hydrate safely with async loading.
+
+Configure in `config/initializers/react_on_rails.rb`:
+
+```rb
+# For most applications (Community and Pro)
+config.generated_component_packs_loading_strategy = :defer
+
+# For React on Rails Pro with immediate_hydration enabled
+# config.generated_component_packs_loading_strategy = :async
+```
+
+**Default behavior:**
+
+- Non-Pro: defaults to `:defer` (safe and performant)
+- Pro: defaults to `:async` (maximum performance with `immediate_hydration`)
+- Requires Shakapacker >= 8.2.0 for `:async` support
+
+See the [Configuration Guide](../api-reference/configuration.md#generated_component_packs_loading_strategy) for more details.
+
 ### Location of generated files
 
 Generated files will go to the following two directories:

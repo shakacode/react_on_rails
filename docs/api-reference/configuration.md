@@ -267,11 +267,17 @@ ReactOnRails.configure do |config|
   config.make_generated_server_bundle_the_entrypoint = false
 
   # Configuration for how generated component packs are loaded.
-  # Options: :sync, :async, :defer
-  # - :sync (default for Shakapacker < 8.2.0): Loads scripts synchronously
-  # - :async (default for Shakapacker ≥ 8.2.0): Loads scripts asynchronously for better performance
-  # - :defer: Defers script execution until after page load
-  config.generated_component_packs_loading_strategy = :async
+  # Options: :defer (default), :sync, :async (Pro only)
+  #
+  # - :defer (default for non-Pro, recommended): Scripts load in parallel but execute in order
+  #   after HTML parsing. Prevents race conditions where components render before registration.
+  # - :sync: Scripts block HTML parsing while loading (not recommended, slowest option).
+  # - :async (Pro only): Scripts load and execute as soon as available. Requires Pro's
+  #   immediate_hydration feature to prevent race conditions.
+  #
+  # Default: :defer (non-Pro) or :async (Pro with Shakapacker >= 8.2.0)
+  # Note: Shakapacker >= 8.2.0 required for :async support
+  config.generated_component_packs_loading_strategy = :defer
 
   # DEPRECATED: Use `generated_component_packs_loading_strategy` instead.
   # Migration: `defer_generated_component_packs: true` → `generated_component_packs_loading_strategy: :defer`
@@ -289,9 +295,19 @@ ReactOnRails.configure do |config|
   #   their server-rendered HTML reaches the client, without waiting for the full page load.
   #   This improves time-to-interactive performance.
   #
+  # - generated_component_packs_loading_strategy = :async: Pro-only loading strategy that
+  #   works with immediate_hydration to load component scripts asynchronously for maximum
+  #   performance. Without Pro, :async can cause race conditions where components attempt
+  #   to hydrate before their JavaScript is loaded.
+  #
   # Example (in config/initializers/react_on_rails_pro.rb):
   #   ReactOnRailsPro.configure do |config|
   #     config.immediate_hydration = true
+  #   end
+  #
+  #   # In config/initializers/react_on_rails.rb:
+  #   ReactOnRails.configure do |config|
+  #     config.generated_component_packs_loading_strategy = :async
   #   end
   #
   # For more information, visit: https://www.shakacode.com/react-on-rails-pro
