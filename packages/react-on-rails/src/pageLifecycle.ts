@@ -59,7 +59,7 @@ function setupPageNavigationListeners(): void {
 }
 
 let isPageLifecycleInitialized = false;
-function initializePageEventListeners(): void {
+function onPageReady(callback: () => void) {
   if (typeof window === 'undefined') return;
 
   if (isPageLifecycleInitialized) {
@@ -68,9 +68,12 @@ function initializePageEventListeners(): void {
   isPageLifecycleInitialized = true;
 
   if (document.readyState === 'complete') {
-    setupPageNavigationListeners();
+    callback();
   } else {
-    document.addEventListener('load', setupPageNavigationListeners);
+    document.addEventListener('readystatechange', function onReadyStateChange() {
+      onPageReady(callback);
+      document.removeEventListener('readystatechange', onReadyStateChange);
+    });
   }
 }
 
@@ -79,7 +82,7 @@ export function onPageLoaded(callback: PageLifecycleCallback): void {
     void callback();
   }
   pageLoadedCallbacks.add(callback);
-  initializePageEventListeners();
+  onPageReady(setupPageNavigationListeners);
 }
 
 export function onPageUnloaded(callback: PageLifecycleCallback): void {
@@ -87,5 +90,5 @@ export function onPageUnloaded(callback: PageLifecycleCallback): void {
     void callback();
   }
   pageUnloadedCallbacks.add(callback);
-  initializePageEventListeners();
+  onPageReady(setupPageNavigationListeners);
 }

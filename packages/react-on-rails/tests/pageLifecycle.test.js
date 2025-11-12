@@ -91,7 +91,7 @@ describe('pageLifecycle', () => {
     // Should not call callback immediately since readyState is 'loading'
     expect(callback).not.toHaveBeenCalled();
     // Verify that a DOMContentLoaded listener was added when readyState is 'loading'
-    expect(addEventListenerSpy).toHaveBeenCalledWith('load', expect.any(Function));
+    expect(addEventListenerSpy).toHaveBeenCalledWith('readystatechange', expect.any(Function));
   });
 
   it('should wait for readystatechange when document.readyState is "loading"', () => {
@@ -104,7 +104,7 @@ describe('pageLifecycle', () => {
     // Should not call callback immediately since readyState is 'loading'
     expect(callback).not.toHaveBeenCalled();
     // Verify that a DOMContentLoaded listener was added when readyState is 'loading'
-    expect(addEventListenerSpy).toHaveBeenCalledWith('load', expect.any(Function));
+    expect(addEventListenerSpy).toHaveBeenCalledWith('readystatechange', expect.any(Function));
   });
 
   describe('with Turbo navigation library', () => {
