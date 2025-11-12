@@ -104,12 +104,9 @@ shared_context "with pro features and immediate hydration" do
     end
     stub_const("ReactOnRailsPro", pro_module)
     stub_const("ReactOnRailsPro::Utils", utils_module)
-  end
 
-  around do |example|
-    ReactOnRails.configure { |config| config.immediate_hydration = true }
-    example.run
-    ReactOnRails.configure { |config| config.immediate_hydration = false }
+    # Stub immediate_hydration_enabled? to return true for tests since they expect that behavior
+    allow(ReactOnRails::ProUtils).to receive(:immediate_hydration_enabled?).and_return(true)
   end
 end
 

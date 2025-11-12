@@ -732,12 +732,6 @@ module ReactOnRails
       auto_load_match = content.match(/config\.auto_load_bundle\s*=\s*([^\s\n,]+)/)
       checker.add_info("  auto_load_bundle: #{auto_load_match[1]}") if auto_load_match
 
-      # Immediate hydration (Pro feature)
-      immediate_hydration_match = content.match(/config\.immediate_hydration\s*=\s*([^\s\n,]+)/)
-      if immediate_hydration_match
-        checker.add_info("  immediate_hydration: #{immediate_hydration_match[1]} (React on Rails Pro)")
-      end
-
       # Component registry timeout
       timeout_match = content.match(/config\.component_registry_timeout\s*=\s*([^\s\n,]+)/)
       return unless timeout_match
