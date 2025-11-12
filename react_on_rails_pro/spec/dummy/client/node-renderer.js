@@ -45,7 +45,7 @@ const config = {
   allWorkersRestartInterval: (env.CI ? 2 : env.RENDERER_ALL_WORKERS_RESTART_INTERVAL) || 10,
 
   // time in minutes between each worker restarting when restarting all workers
-  delayBetweenIndividualWorkerRestarts: 1,
+  delayBetweenIndividualWorkerRestarts: env.CI ? 0.01 : 1,
 
   // If set to true, `supportModules` enables the server-bundle code to call a default set of NodeJS modules
   // that get added to the VM context: { Buffer, process, setTimeout, setInterval, clearTimeout, clearInterval }.
