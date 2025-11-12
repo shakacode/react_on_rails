@@ -67,10 +67,10 @@ function initializePageEventListeners(): void {
   }
   isPageLifecycleInitialized = true;
 
-  if (document.readyState !== 'loading') {
+  if (document.readyState === 'complete') {
     setupPageNavigationListeners();
   } else {
-    document.addEventListener('DOMContentLoaded', setupPageNavigationListeners);
+    document.addEventListener('load', setupPageNavigationListeners);
   }
 }
 
