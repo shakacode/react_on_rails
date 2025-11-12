@@ -9,13 +9,13 @@ module ReactOnRails
     #             JavaScript code.
     # props: Named parameter props which is a Ruby Hash or JSON string which contains the properties
     #        to pass to the redux store.
-    # immediate_hydration: React on Rails Pro (licensed) feature. Pass as true if you wish to hydrate this
-    #                      store immediately instead of waiting for the page to load.
+    # immediate_hydration: React on Rails Pro (licensed) feature. When nil (default), Pro users get
+    #                      immediate hydration, non-Pro users don't. Can be explicitly overridden.
     #
     # Be sure to include view helper `redux_store_hydration_data` at the end of your layout or view
     # or else there will be no client side hydration of your stores.
     def redux_store(store_name, props: {}, immediate_hydration: nil)
-      immediate_hydration = ReactOnRails.configuration.immediate_hydration if immediate_hydration.nil?
+      immediate_hydration = ReactOnRails::ProUtils.immediate_hydration_enabled? if immediate_hydration.nil?
       redux_store_data = { store_name: store_name,
                            props: props,
                            immediate_hydration: immediate_hydration }

@@ -15,7 +15,7 @@ module ReactOnRails
       # TODO: remove the required for named params
       def initialize(react_component_name: required("react_component_name"), options: required("options"))
         @react_component_name = react_component_name.camelize
-        @options = ReactOnRails::ProUtils.disable_pro_render_options_if_not_licensed(options)
+        @options = options
       end
 
       attr_reader :react_component_name
@@ -97,7 +97,20 @@ module ReactOnRails
       end
 
       def immediate_hydration
-        retrieve_configuration_value_for(:immediate_hydration)
+        explicit_value = options[:immediate_hydration]
+
+        # Warn if non-Pro user explicitly sets immediate_hydration: true
+        if explicit_value == true && !ReactOnRails::Utils.react_on_rails_pro?
+          Rails.logger.warn <<~WARNING
+            [REACT ON RAILS] Warning: immediate_hydration: true requires a React on Rails Pro license.
+            Component '#{react_component_name}' will fall back to standard hydration behavior.
+            Visit https://www.shakacode.com/react-on-rails-pro/ for licensing information.
+          WARNING
+        end
+
+        options.fetch(:immediate_hydration) do
+          ReactOnRails::ProUtils.immediate_hydration_enabled?
+        end
       end
 
       def to_s

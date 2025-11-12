@@ -38,15 +38,8 @@ describe ReactOnRailsHelper do
     stub_const("ReactOnRailsPro", pro_module)
     stub_const("ReactOnRailsPro::Utils", utils_module)
 
-    # Configure immediate_hydration to true for tests since they expect that behavior
-    ReactOnRails.configure do |config|
-      config.immediate_hydration = true
-    end
-  end
-
-  after do
-    # Reset to default - avoid validation issues by setting directly
-    ReactOnRails.configuration.immediate_hydration = false
+    # Stub immediate_hydration_enabled? to return true for tests since they expect that behavior
+    allow(ReactOnRails::ProUtils).to receive(:immediate_hydration_enabled?).and_return(true)
   end
 
   let(:hash) do
