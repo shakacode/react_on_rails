@@ -9,9 +9,7 @@ module ReactOnRailsPro
     class << self
       def reset_connection
         @connection&.close
-        @connection_without_retries&.close
         @connection = create_connection
-        @connection_without_retries = create_connection(enable_retries: false)
       end
 
       def render_code(path, js_code, send_bundle)
@@ -84,29 +82,17 @@ module ReactOnRailsPro
 
       private
 
-      # NOTE: We maintain two separate HTTP connection pools to handle streaming vs non-streaming requests.
-      # This doubles the memory footprint (e.g., if renderer_http_pool_size is 10, we use 20 total connections).
-      # This tradeoff is acceptable to prevent body duplication in streaming responses.
-
       def connection
         @connection ||= create_connection
       end
 
-      def connection_without_retries
-        @connection_without_retries ||= create_connection(enable_retries: false)
-      end
-
-      def perform_request(path, **post_options) # rubocop:disable Metrics/AbcSize,Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
-        # For streaming requests, use connection without retries to prevent body duplication
-        # The StreamRequest class handles retries properly by starting fresh requests
-        conn = post_options[:stream] ? connection_without_retries : connection
-
+      def perform_request(path, **post_options) # rubocop:disable Metrics/AbcSize,Metrics/CyclomaticComplexity
         available_retries = ReactOnRailsPro.configuration.renderer_request_retry_limit
         retry_request = true
         while retry_request
           begin
             start_time = Time.now
-            response = conn.post(path, **post_options)
+            response = connection.post(path, **post_options)
             raise response.error if response.is_a?(HTTPX::ErrorResponse)
 
             request_time = Time.now - start_time
@@ -231,20 +217,17 @@ module ReactOnRailsPro
         ReactOnRailsPro::Utils.common_form_data
       end
 
-      def create_connection(enable_retries: true)
+      def create_connection
         url = ReactOnRailsPro.configuration.renderer_url
         Rails.logger.info do
           "[ReactOnRailsPro] Setting up Node Renderer connection to #{url}"
         end
 
-        http_client = HTTPX
-        # For persistent connections we want retries,
-        # so the requests don't just fail if the other side closes the connection
-        # https://honeyryderchuck.gitlab.io/httpx/wiki/Persistent
-        # However, for streaming requests, retries cause body duplication
-        # See https://github.com/shakacode/react_on_rails/issues/1895
-        http_client = http_client.plugin(:retries, max_retries: 1, retry_change_requests: true) if enable_retries
-        http_client
+        HTTPX
+          # For persistent connections we want retries,
+          # so the requests don't just fail if the other side closes the connection
+          # https://honeyryderchuck.gitlab.io/httpx/wiki/Persistent
+          .plugin(:retries, max_retries: 1, retry_change_requests: true)
           .plugin(:stream)
           # See https://www.rubydoc.info/gems/httpx/1.3.3/HTTPX%2FOptions:initialize for the available options
           .with(
