@@ -142,9 +142,42 @@ module ReactOnRails
       check_component_registry_timeout
       validate_generated_component_packs_loading_strategy
       validate_enforce_private_server_bundles
+      validate_pro_only_features
     end
 
     private
+
+    def validate_pro_only_features
+      return if defined?(ReactOnRailsPro)
+
+      pro_only_features = []
+
+      pro_only_features << "config.immediate_hydration = true" if immediate_hydration == true
+
+      if generated_component_packs_loading_strategy.present?
+        pro_only_features << "config.generated_component_packs_loading_strategy = " \
+                             ":#{generated_component_packs_loading_strategy}"
+      end
+
+      return if pro_only_features.empty?
+
+      msg = <<~MSG
+        **ERROR** ReactOnRails: You are using Pro-only features without React on Rails Pro:
+
+        #{pro_only_features.map { |f| "  - #{f}" }.join("\n")}
+
+        These features are only available with a React on Rails Pro license.
+        Please either:
+        1. Remove these settings from your config/initializers/react_on_rails.rb
+        2. Purchase a React on Rails Pro license at https://www.shakacode.com/react-on-rails-pro
+
+        For more information, see: https://www.shakacode.com/react-on-rails/docs/
+      MSG
+
+      return Rails.logger.error(msg) if Rails.env.production?
+
+      raise ReactOnRails::Error, msg
+    end
 
     def check_component_registry_timeout
       self.component_registry_timeout = DEFAULT_COMPONENT_REGISTRY_TIMEOUT if component_registry_timeout.nil?
@@ -176,6 +209,14 @@ module ReactOnRails
         1. Use :defer or :sync loading strategy instead of :async
         2. Upgrade to Shakapacker v8.2.0 or above to enable async script loading
       MSG
+
+      # Don't auto-set loading strategy for non-Pro users - this is a Pro-only feature
+      # For Pro users, the setting will be auto-set in ReactOnRailsPro configuration
+      if generated_component_packs_loading_strategy.nil? && !defined?(ReactOnRailsPro)
+        # Leave as nil for non-Pro - the Pro validation will be skipped
+        return
+      end
+
       if PackerUtils.supports_async_loading?
         self.generated_component_packs_loading_strategy ||= :async
       elsif generated_component_packs_loading_strategy.nil?
