@@ -97,7 +97,9 @@ module ReactOnRails
       end
 
       def immediate_hydration
-        retrieve_configuration_value_for(:immediate_hydration)
+        options.fetch(:immediate_hydration) do
+          ReactOnRails::ProUtils.immediate_hydration_enabled?
+        end
       end
 
       def to_s
