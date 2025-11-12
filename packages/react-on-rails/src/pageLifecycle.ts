@@ -58,7 +58,15 @@ function setupPageNavigationListeners(): void {
   }
 }
 
+let isPageLifecycleInitialized = false;
 function onPageReady(callback: () => void) {
+  if (typeof window === 'undefined') return;
+
+  if (isPageLifecycleInitialized) {
+    return;
+  }
+  isPageLifecycleInitialized = true;
+
   if (document.readyState === 'complete') {
     callback();
   } else {
