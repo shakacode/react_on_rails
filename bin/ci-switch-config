@@ -65,8 +65,9 @@ set_ruby_version() {
     rvm|rvm+nvm)
       print_header "Setting Ruby $version with rvm"
       # Check if version exists using rvm list rubies for consistent output
-      # Use word boundaries to avoid matching partial versions (e.g., 3.2.8 shouldn't match 3.2.80)
-      if ! rvm list rubies | grep -qE "(ruby-)?${version}([[:space:]]|$)"; then
+      # Anchor to start of line to avoid false matches (e.g., 3.2.8 shouldn't match 13.2.8)
+      # Allow optional leading whitespace and ruby- prefix, no end anchor to allow patch suffixes
+      if ! rvm list rubies | grep -qE "^[[:space:]]*(ruby-)?${version}"; then
         print_warning "Ruby $version not installed. Installing..."
         if ! rvm install "$version"; then
           print_error "Failed to install Ruby $version with rvm"
