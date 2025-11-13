@@ -29,7 +29,7 @@ jobs:
       run_ruby_tests: ${{ steps.detect.outputs.run_ruby_tests }}
       run_dummy_tests: ${{ steps.detect.outputs.run_dummy_tests }}
       run_generators: ${{ steps.detect.outputs.run_generators }}
-      has_full_ci_label: ${{ steps.check-label.outputs.has_label }}
+      has_full_ci_label: ${{ steps.check-label.outputs.result }}
     steps:
       - uses: actions/checkout@v4
         with:
