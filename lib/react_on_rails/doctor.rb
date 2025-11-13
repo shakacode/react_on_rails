@@ -1181,26 +1181,46 @@ module ReactOnRails
     end
 
     def scan_view_files_for_async_pack_tag
-      files_with_async = []
-
-      # Scan app/views for .erb and .haml files
       view_patterns = ["app/views/**/*.erb", "app/views/**/*.haml"]
+      files_with_async = view_patterns.flat_map { |pattern| scan_pattern_for_async(pattern) }
+      files_with_async.compact
+    rescue Errno::ENOENT, Encoding::InvalidByteSequenceError, Encoding::UndefinedConversionError => e
+      # Log the error if Rails logger is available
+      Rails.logger.debug("Error scanning view files for async: #{e.message}") if defined?(Rails) && Rails.logger
+      []
+    end
 
-      view_patterns.each do |pattern|
-        Dir.glob(pattern).each do |file|
-          next unless File.exist?(file)
+    def scan_pattern_for_async(pattern)
+      Dir.glob(pattern).filter_map do |file|
+        next unless File.exist?(file)
 
-          content = File.read(file)
-          # Look for javascript_pack_tag with :async or "async"
-          if content.match?(/javascript_pack_tag.*:async/) || content.match?(/javascript_pack_tag.*["']async["']/)
-            files_with_async << relativize_path(file)
-          end
-        end
+        content = File.read(file)
+        next if content_has_only_commented_async?(content)
+        next unless file_has_async_pack_tag?(content)
+
+        relativize_path(file)
+      end
+    end
+
+    def file_has_async_pack_tag?(content)
+      content.match?(/javascript_pack_tag.*:async/) || content.match?(/javascript_pack_tag.*["']async["']/)
+    end
+
+    def content_has_only_commented_async?(content)
+      # Check if all occurrences of javascript_pack_tag with :async are in comments
+      has_uncommented_async = content.each_line.any? do |line|
+        # Skip ERB comments (<%# ... %>)
+        next if line.match?(/<%\s*#.*javascript_pack_tag.*:async/)
+        # Skip HAML comments (-# ...)
+        next if line.match?(/^\s*-#.*javascript_pack_tag.*:async/)
+        # Skip HTML comments (<!-- ... -->)
+        next if line.match?(/<!--.*javascript_pack_tag.*:async.*-->/)
+
+        # Check if line has javascript_pack_tag with :async
+        line.match?(/javascript_pack_tag.*:async/)
       end
 
-      files_with_async
-    rescue StandardError
-      []
+      !has_uncommented_async
     end
 
     def config_has_async_loading_strategy?
@@ -1209,8 +1229,13 @@ module ReactOnRails
 
       content = File.read(config_path)
       # Check if generated_component_packs_loading_strategy is set to :async
-      content.match?(/config\.generated_component_packs_loading_strategy\s*=\s*:async/)
-    rescue StandardError
+      # Filter out commented lines to avoid false positives
+      content.each_line.any? do |line|
+        line !~ /^\s*#/ && line.match?(/config\.generated_component_packs_loading_strategy\s*=\s*:async/)
+      end
+    rescue Errno::ENOENT, Encoding::InvalidByteSequenceError, Encoding::UndefinedConversionError => e
+      # Log the error if Rails logger is available
+      Rails.logger.debug("Error checking async loading strategy: #{e.message}") if defined?(Rails) && Rails.logger
       false
     end
   end

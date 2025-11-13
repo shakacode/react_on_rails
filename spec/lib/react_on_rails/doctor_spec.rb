@@ -307,6 +307,54 @@ RSpec.describe ReactOnRails::Doctor do
         expect(files).to be_empty
       end
     end
+
+    context "when async is only in ERB comments" do
+      before do
+        allow(Dir).to receive(:glob).with("app/views/**/*.erb")
+                                    .and_return(["app/views/layouts/application.html.erb"])
+        allow(Dir).to receive(:glob).with("app/views/**/*.haml").and_return([])
+        allow(File).to receive(:exist?).with("app/views/layouts/application.html.erb").and_return(true)
+        allow(File).to receive(:read).with("app/views/layouts/application.html.erb")
+                                     .and_return('<%# javascript_pack_tag "app", :async %>')
+      end
+
+      it "returns empty array" do
+        files = doctor.send(:scan_view_files_for_async_pack_tag)
+        expect(files).to be_empty
+      end
+    end
+
+    context "when async is only in HAML comments" do
+      before do
+        allow(Dir).to receive(:glob).with("app/views/**/*.erb").and_return([])
+        allow(Dir).to receive(:glob).with("app/views/**/*.haml")
+                                    .and_return(["app/views/layouts/application.html.haml"])
+        allow(File).to receive(:exist?).with("app/views/layouts/application.html.haml").and_return(true)
+        allow(File).to receive(:read).with("app/views/layouts/application.html.haml")
+                                     .and_return('-# javascript_pack_tag "app", :async')
+      end
+
+      it "returns empty array" do
+        files = doctor.send(:scan_view_files_for_async_pack_tag)
+        expect(files).to be_empty
+      end
+    end
+
+    context "when async is only in HTML comments" do
+      before do
+        allow(Dir).to receive(:glob).with("app/views/**/*.erb")
+                                    .and_return(["app/views/layouts/application.html.erb"])
+        allow(Dir).to receive(:glob).with("app/views/**/*.haml").and_return([])
+        allow(File).to receive(:exist?).with("app/views/layouts/application.html.erb").and_return(true)
+        allow(File).to receive(:read).with("app/views/layouts/application.html.erb")
+                                     .and_return('<!-- <%= javascript_pack_tag "app", :async %> -->')
+      end
+
+      it "returns empty array" do
+        files = doctor.send(:scan_view_files_for_async_pack_tag)
+        expect(files).to be_empty
+      end
+    end
   end
 
   describe "#config_has_async_loading_strategy?" do
@@ -337,6 +385,18 @@ RSpec.describe ReactOnRails::Doctor do
     context "when config file does not exist" do
       before do
         allow(File).to receive(:exist?).with("config/initializers/react_on_rails.rb").and_return(false)
+      end
+
+      it "returns false" do
+        expect(doctor.send(:config_has_async_loading_strategy?)).to be false
+      end
+    end
+
+    context "when :async strategy is commented out" do
+      before do
+        allow(File).to receive(:exist?).with("config/initializers/react_on_rails.rb").and_return(true)
+        allow(File).to receive(:read).with("config/initializers/react_on_rails.rb")
+                                     .and_return("# config.generated_component_packs_loading_strategy = :async")
       end
 
       it "returns false" do
