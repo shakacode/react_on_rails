@@ -9,7 +9,7 @@ GIT
 PATH
   remote: ..
   specs:
-    react_on_rails (16.2.0.beta.3)
+    react_on_rails (16.2.0.beta.4)
       addressable
       connection_pool
       execjs (~> 2.5)
@@ -20,14 +20,14 @@ PATH
 PATH
   remote: .
   specs:
-    react_on_rails_pro (16.2.0.beta.3)
+    react_on_rails_pro (16.2.0.beta.4)
       addressable
       connection_pool
       execjs (~> 2.9)
       httpx (~> 1.5)
       jwt (~> 2.7)
       rainbow
-      react_on_rails (= 16.2.0.beta.3)
+      react_on_rails (= 16.2.0.beta.4)
 
 GEM
   remote: https://rubygems.org/
@@ -300,6 +300,8 @@ GEM
     rb-fsevent (0.11.2)
     rb-inotify (0.11.1)
       ffi (~> 1.0)
+    rbs (3.9.5)
+      logger
     rdoc (6.12.0)
       psych (>= 4.0.0)
     regexp_parser (2.9.2)
@@ -476,6 +478,7 @@ DEPENDENCIES
   pry-theme
   puma (~> 6)
   rails (~> 7.1)
+  rbs
   react_on_rails!
   react_on_rails_pro!
   rspec-rails
