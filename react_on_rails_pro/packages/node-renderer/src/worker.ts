@@ -118,7 +118,7 @@ export default function run(config: Partial<Config>) {
   // getConfig():
   buildConfig(config);
 
-  const { bundlePath, logHttpLevel, port, fastifyServerOptions, workersCount } = getConfig();
+  const { serverBundleCachePath, logHttpLevel, port, fastifyServerOptions, workersCount } = getConfig();
 
   const app = fastify({
     http2: useHttp2 as true,
@@ -151,7 +151,7 @@ export default function run(config: Partial<Config>) {
       fileSize: Infinity,
     },
     onFile: async (part) => {
-      const destinationPath = path.join(bundlePath, 'uploads', part.filename);
+      const destinationPath = path.join(serverBundleCachePath, 'uploads', part.filename);
       // TODO: inline here
       await saveMultipartFile(part, destinationPath);
       // eslint-disable-next-line no-param-reassign
