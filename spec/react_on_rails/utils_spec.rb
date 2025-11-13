@@ -898,6 +898,100 @@ module ReactOnRails
     end
 
     # RSC utility method tests moved to react_on_rails_pro/spec/react_on_rails_pro/utils_spec.rb
+
+    describe ".normalize_immediate_hydration" do
+      context "with Pro license" do
+        before do
+          allow(described_class).to receive(:react_on_rails_pro?).and_return(true)
+        end
+
+        it "returns true when value is explicitly true" do
+          result = described_class.normalize_immediate_hydration(true, "TestComponent", "Component")
+          expect(result).to be true
+        end
+
+        it "returns false when value is explicitly false" do
+          result = described_class.normalize_immediate_hydration(false, "TestComponent", "Component")
+          expect(result).to be false
+        end
+
+        it "returns true when value is nil (Pro default)" do
+          result = described_class.normalize_immediate_hydration(nil, "TestComponent", "Component")
+          expect(result).to be true
+        end
+
+        it "does not log a warning for any valid value" do
+          expect(Rails.logger).not_to receive(:warn)
+
+          described_class.normalize_immediate_hydration(true, "TestComponent", "Component")
+          described_class.normalize_immediate_hydration(false, "TestComponent", "Component")
+          described_class.normalize_immediate_hydration(nil, "TestComponent", "Component")
+        end
+      end
+
+      context "without Pro license" do
+        before do
+          allow(described_class).to receive(:react_on_rails_pro?).and_return(false)
+        end
+
+        it "returns false and logs warning when value is explicitly true" do
+          expect(Rails.logger).to receive(:warn)
+            .with(/immediate_hydration: true requires a React on Rails Pro license/)
+
+          result = described_class.normalize_immediate_hydration(true, "TestComponent", "Component")
+          expect(result).to be false
+        end
+
+        it "returns false when value is explicitly false" do
+          expect(Rails.logger).not_to receive(:warn)
+
+          result = described_class.normalize_immediate_hydration(false, "TestComponent", "Component")
+          expect(result).to be false
+        end
+
+        it "returns false when value is nil (non-Pro default)" do
+          expect(Rails.logger).not_to receive(:warn)
+
+          result = described_class.normalize_immediate_hydration(nil, "TestComponent", "Component")
+          expect(result).to be false
+        end
+
+        it "includes component name and type in warning message" do
+          expect(Rails.logger).to receive(:warn) do |message|
+            expect(message).to include("TestStore")
+            expect(message).to include("Store")
+          end
+
+          described_class.normalize_immediate_hydration(true, "TestStore", "Store")
+        end
+      end
+
+      context "with invalid values" do
+        it "raises ArgumentError for string values" do
+          expect do
+            described_class.normalize_immediate_hydration("yes", "TestComponent", "Component")
+          end.to raise_error(ArgumentError, /immediate_hydration must be true, false, or nil/)
+        end
+
+        it "raises ArgumentError for numeric values" do
+          expect do
+            described_class.normalize_immediate_hydration(1, "TestComponent", "Component")
+          end.to raise_error(ArgumentError, /immediate_hydration must be true, false, or nil/)
+        end
+
+        it "raises ArgumentError for hash values" do
+          expect do
+            described_class.normalize_immediate_hydration({}, "TestComponent", "Component")
+          end.to raise_error(ArgumentError, /immediate_hydration must be true, false, or nil/)
+        end
+
+        it "includes the invalid value in error message" do
+          expect do
+            described_class.normalize_immediate_hydration("invalid", "TestComponent", "Component")
+          end.to raise_error(ArgumentError, /Got: "invalid" \(String\)/)
+        end
+      end
+    end
   end
 end
 # rubocop:enable Metrics/ModuleLength, Metrics/BlockLength

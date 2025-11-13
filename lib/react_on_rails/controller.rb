@@ -16,7 +16,6 @@ module ReactOnRails
     # or else there will be no client side hydration of your stores.
     def redux_store(store_name, props: {}, immediate_hydration: nil)
       immediate_hydration = ReactOnRails::Utils.normalize_immediate_hydration(immediate_hydration, store_name, "Store")
-
       redux_store_data = { store_name: store_name,
                            props: props,
                            immediate_hydration: immediate_hydration }
