@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "react_on_rails/utils"
-require "react_on_rails/pro_utils"
 
 module ReactOnRails
   module ReactComponent
