@@ -292,6 +292,40 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when view files contain javascript_pack_tag with async: true" do
+      before do
+        allow(Dir).to receive(:glob).with("app/views/**/*.erb")
+                                    .and_return(["app/views/layouts/application.html.erb"])
+        allow(Dir).to receive(:glob).with("app/views/**/*.haml").and_return([])
+        allow(File).to receive(:exist?).with("app/views/layouts/application.html.erb").and_return(true)
+        allow(File).to receive(:read).with("app/views/layouts/application.html.erb")
+                                     .and_return('<%= javascript_pack_tag "app", async: true %>')
+        allow(doctor).to receive(:relativize_path).with("app/views/layouts/application.html.erb")
+                                                  .and_return("app/views/layouts/application.html.erb")
+      end
+
+      it "returns files with async" do
+        files = doctor.send(:scan_view_files_for_async_pack_tag)
+        expect(files).to include("app/views/layouts/application.html.erb")
+      end
+    end
+
+    context "when view files contain defer: \"async\" (false positive check)" do
+      before do
+        allow(Dir).to receive(:glob).with("app/views/**/*.erb")
+                                    .and_return(["app/views/layouts/application.html.erb"])
+        allow(Dir).to receive(:glob).with("app/views/**/*.haml").and_return([])
+        allow(File).to receive(:exist?).with("app/views/layouts/application.html.erb").and_return(true)
+        allow(File).to receive(:read).with("app/views/layouts/application.html.erb")
+                                     .and_return('<%= javascript_pack_tag "app", defer: "async" %>')
+      end
+
+      it "does not return files (async is a string value, not the option)" do
+        files = doctor.send(:scan_view_files_for_async_pack_tag)
+        expect(files).to be_empty
+      end
+    end
+
     context "when view files do not contain async" do
       before do
         allow(Dir).to receive(:glob).with("app/views/**/*.erb")
@@ -353,6 +387,24 @@ RSpec.describe ReactOnRails::Doctor do
       it "returns empty array" do
         files = doctor.send(:scan_view_files_for_async_pack_tag)
         expect(files).to be_empty
+      end
+    end
+
+    context "when javascript_pack_tag spans multiple lines" do
+      before do
+        allow(Dir).to receive(:glob).with("app/views/**/*.erb")
+                                    .and_return(["app/views/layouts/application.html.erb"])
+        allow(Dir).to receive(:glob).with("app/views/**/*.haml").and_return([])
+        allow(File).to receive(:exist?).with("app/views/layouts/application.html.erb").and_return(true)
+        allow(File).to receive(:read).with("app/views/layouts/application.html.erb")
+                                     .and_return("<%= javascript_pack_tag \"app\",\n  :async %>")
+        allow(doctor).to receive(:relativize_path).with("app/views/layouts/application.html.erb")
+                                                  .and_return("app/views/layouts/application.html.erb")
+      end
+
+      it "returns files with async" do
+        files = doctor.send(:scan_view_files_for_async_pack_tag)
+        expect(files).to include("app/views/layouts/application.html.erb")
       end
     end
   end

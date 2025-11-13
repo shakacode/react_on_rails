@@ -1203,21 +1203,44 @@ module ReactOnRails
     end
 
     def file_has_async_pack_tag?(content)
-      content.match?(/javascript_pack_tag.*:async/) || content.match?(/javascript_pack_tag.*["']async["']/)
+      # Match javascript_pack_tag with :async symbol or async: true hash syntax
+      # Examples that should match:
+      #   - javascript_pack_tag "app", :async
+      #   - javascript_pack_tag "app", async: true
+      #   - javascript_pack_tag "app", :async, other_option: value
+      # Examples that should NOT match:
+      #   - javascript_pack_tag "app", defer: "async" (async is a string value, not the option)
+      #   - javascript_pack_tag "app", :defer
+      # Note: Theoretical edge case `data: { async: true }` would match but is extremely unlikely
+      # in real code and represents a harmless false positive (showing a warning when not needed)
+      # Use word boundary \b to ensure :async is not part of a longer symbol like :async_mode
+      # [^<]* allows matching across newlines within ERB tags but stops at closing ERB tag
+      content.match?(/javascript_pack_tag[^<]*(?::async\b|async:\s*true)/)
     end
 
     def content_has_only_commented_async?(content)
       # Check if all occurrences of javascript_pack_tag with :async are in comments
-      has_uncommented_async = content.each_line.any? do |line|
-        # Skip ERB comments (<%# ... %>)
-        next if line.match?(/<%\s*#.*javascript_pack_tag.*:async/)
-        # Skip HAML comments (-# ...)
-        next if line.match?(/^\s*-#.*javascript_pack_tag.*:async/)
-        # Skip HTML comments (<!-- ... -->)
-        next if line.match?(/<!--.*javascript_pack_tag.*:async.*-->/)
+      # Returns true if ONLY commented async usage exists (no active async usage)
+      # Note: We need to check the full content first (for multi-line tags) before line-by-line filtering
 
-        # Check if line has javascript_pack_tag with :async
-        line.match?(/javascript_pack_tag.*:async/)
+      # First check if there's any javascript_pack_tag with :async in the full content
+      return true unless file_has_async_pack_tag?(content)
+
+      # Now check line-by-line to see if all occurrences are commented
+      # For multi-line tags, we check if the starting line is commented
+      has_uncommented_async = content.each_line.any? do |line|
+        # Skip lines that don't contain javascript_pack_tag
+        next unless line.include?("javascript_pack_tag")
+
+        # Skip ERB comments (<%# ... %>) - matches ERB comment opening with optional whitespace
+        next if line.match?(/<%\s*#.*javascript_pack_tag/)
+        # Skip HAML comments (-# ...) - matches line-starting HAML comments
+        next if line.match?(/^\s*-#.*javascript_pack_tag/)
+        # Skip HTML comments (<!-- ... -->) - matches complete HTML comment blocks
+        next if line.match?(/<!--.*javascript_pack_tag/)
+
+        # If we reach here, this line has an uncommented javascript_pack_tag
+        true
       end
 
       !has_uncommented_async
@@ -1229,9 +1252,14 @@ module ReactOnRails
 
       content = File.read(config_path)
       # Check if generated_component_packs_loading_strategy is set to :async
-      # Filter out commented lines to avoid false positives
+      # Filter out commented lines (lines starting with # after optional whitespace)
       content.each_line.any? do |line|
-        line !~ /^\s*#/ && line.match?(/config\.generated_component_packs_loading_strategy\s*=\s*:async/)
+        # Skip lines that start with # (after optional whitespace)
+        next if line.match?(/^\s*#/)
+
+        # Match: config.generated_component_packs_loading_strategy = :async
+        # Use word boundary \b to ensure :async is the complete symbol, not part of :async_mode etc.
+        line.match?(/config\.generated_component_packs_loading_strategy\s*=\s*:async\b/)
       end
     rescue Errno::ENOENT, Encoding::InvalidByteSequenceError, Encoding::UndefinedConversionError => e
       # Log the error if Rails logger is available
