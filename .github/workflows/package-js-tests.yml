@@ -27,22 +27,37 @@ jobs:
       run_ruby_tests: ${{ steps.detect.outputs.run_ruby_tests }}
       run_dummy_tests: ${{ steps.detect.outputs.run_dummy_tests }}
       run_generators: ${{ steps.detect.outputs.run_generators }}
+      has_full_ci_label: ${{ steps.check-label.outputs.result }}
     steps:
       - uses: actions/checkout@v4
         with:
           # Fetch enough history for change detection (50 commits is usually sufficient for PRs)
           fetch-depth: 50
           persist-credentials: false
+      - name: Check for full-ci label
+        id: check-label
+        uses: ./.github/actions/check-full-ci-label
       - name: Detect relevant changes
         id: detect
         run: |
+          # If full-ci label is present, run everything
+          if [ "${{ steps.check-label.outputs.result }}" = "true" ]; then
+            echo "run_lint=true" >> "$GITHUB_OUTPUT"
+            echo "run_js_tests=true" >> "$GITHUB_OUTPUT"
+            echo "run_ruby_tests=true" >> "$GITHUB_OUTPUT"
+            echo "run_dummy_tests=true" >> "$GITHUB_OUTPUT"
+            echo "run_generators=true" >> "$GITHUB_OUTPUT"
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/master' }}"
           script/ci-changes-detector "$BASE_REF"
         shell: bash
 
   build:
     needs: detect-changes
-    # Run on master OR when JS tests needed on PR (but skip Node 20 on PR)
+    # Run on master OR when JS tests needed on PR
     if: |
       (github.ref == 'refs/heads/master' || needs.detect-changes.outputs.run_js_tests == 'true')
     strategy:
@@ -50,8 +65,11 @@ jobs:
         include:
           # Always run: Latest Node version (fast feedback on PRs)
           - node-version: '22'
-          # Master only: Minimum supported Node version (full coverage)
+          # Master and full-ci label: Minimum supported Node version (full coverage)
           - node-version: '20'
+        exclude:
+          # Skip minimum dependency matrix on regular PRs (run only on master or with full-ci label)
+          - node-version: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && needs.detect-changes.outputs.has_full_ci_label != 'true' && '20' || '' }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4

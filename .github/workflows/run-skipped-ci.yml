@@ -207,13 +207,10 @@ jobs:
               status = '✅ **Successfully triggered skipped CI checks**';
             }
 
-            // List the skipped checks we found
-            const skippedChecksList = skippedChecks.length > 0
-              ? `\n**Skipped checks detected:**\n${skippedChecks.map(c => `- ${c.name} (${c.workflow_name})`).join('\n')}`
-              : '';
-
-            const verifiedList = verified.length > 0 ? `\n**Triggered workflows:**\n${verified.map(w => `- ✅ ${w.name}`).join('\n')}` : '';
-            const notFoundList = notFound.length > 0 ? `\n\n**Triggered but not yet queued (may still start):**\n${notFound.map(w => `- ⏳ ${w.name}`).join('\n')}` : '';
+            // Don't list individual checks - keep it simple
+            const skippedChecksList = '';
+            const verifiedList = '';
+            const notFoundList = '';
             const failedList = failed.length > 0 ? `\n\n**Failed to trigger:**\n${failed.map(f => `- ❌ ${f.workflow}: ${f.error}`).join('\n')}` : '';
 
             // Add full-ci label only if we actually triggered workflows or if checks are already running
