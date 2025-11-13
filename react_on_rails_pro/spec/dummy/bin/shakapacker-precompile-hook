@@ -49,7 +49,6 @@ def build_rescript_if_needed
 end
 
 # Generate React on Rails packs if needed
-# rubocop:disable Metrics/CyclomaticComplexity
 def generate_packs_if_needed
   # Find Rails root directory
   rails_root = find_rails_root
@@ -73,7 +72,7 @@ def generate_packs_if_needed
   return unless bundle_available
 
   # Check if rake task exists (use array form for security)
-  task_list = IO.popen(["bundle", "exec", "rails", "-T"], err: [:child, :out], &:read)
+  task_list = IO.popen(["bundle", "exec", "rails", "-T"], err: %i[child out], &:read)
   return unless task_list.include?("react_on_rails:generate_packs")
 
   # Use array form for better cross-platform support
@@ -86,8 +85,6 @@ def generate_packs_if_needed
     exit 1
   end
 end
-# rubocop:enable Metrics/CyclomaticComplexity
-
 # Main execution
 begin
   build_rescript_if_needed
