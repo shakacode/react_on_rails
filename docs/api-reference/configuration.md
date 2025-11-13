@@ -64,10 +64,8 @@ React on Rails configuration options are organized into two categories:
 
 Options you'll commonly configure for most applications:
 
-- `server_bundle_js_file` - Server rendering bundle
-- `build_test_command` - Test environment build command
-- `components_subdirectory` - File-based component registry (optional)
-- `auto_load_bundle` - Auto-load component bundles (optional)
+- `server_bundle_js_file` - Server rendering bundle (recommended)
+- `build_test_command` - Test environment build command (alternative to Shakapacker compile setting)
 
 ### Advanced Configuration
 
@@ -91,7 +89,7 @@ Here's a representative `/config/initializers/react_on_rails.rb` setup for essen
 
 ReactOnRails.configure do |config|
   ################################################################################
-  # Server Rendering
+  # Server Rendering (Recommended)
   ################################################################################
   # This is the file used for server rendering of React when using `prerender: true`
   # Set to "" if you are not using server rendering
@@ -99,18 +97,10 @@ ReactOnRails.configure do |config|
 
   ################################################################################
   # Test Configuration
-  ################################################################################
   # Used with ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
   # This controls what command is run to build assets during tests
+  ################################################################################
   config.build_test_command = "RAILS_ENV=test bin/shakapacker"
-
-  ################################################################################
-  # File System Based Component Registry (Optional)
-  ################################################################################
-  # Automatically register React components from a specific subdirectory
-  # Uncomment to enable this feature:
-  # config.components_subdirectory = "ror_components"
-  # config.auto_load_bundle = true
 end
 ```
 
@@ -134,43 +124,26 @@ Note: There should be ONE server bundle that can render all your server-rendered
 **Default:** `""`
 **Used with:** `ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)`
 
-The command to run to build webpack assets during test runs. Typically:
+**Note:** It's generally preferred to set `compile: true` in your `config/shakapacker.yml` for the test environment instead of using this configuration option. Use this option only if you need to customize the build command or want explicit control over test asset compilation.
+
+The command to run to build webpack assets during test runs:
 
 ```ruby
 config.build_test_command = "RAILS_ENV=test bin/shakapacker"
 ```
 
-Alternatively, you can set `compile: true` in your `config/shakapacker.yml` for the test environment.
+**Preferred alternative:** Set `compile: true` in `config/shakapacker.yml`:
 
-### components_subdirectory
-
-**Type:** String or nil
-**Default:** `nil`
-**Requires:** Shakapacker 7.0.0+ for full auto-registration
-
-The subdirectory name used to automatically register React components for file-system based component registry.
-
-```ruby
-config.components_subdirectory = "ror_components"
+```yaml
+test:
+  compile: true
 ```
 
-When enabled, React on Rails will automatically:
+## File-Based Component Registry
 
-- Detect components in directories matching this name
-- Generate webpack entry points for these components
-- Make them available via `render_component` helper
+For information about the file-based component registry feature (including `components_subdirectory`, `auto_load_bundle`, and `make_generated_server_bundle_the_entrypoint` configuration options), see:
 
-### auto_load_bundle
-
-**Type:** Boolean
-**Default:** `false`
-**Requires:** `components_subdirectory` to be set, Shakapacker 6.5.1+
-
-When true, `render_component` automatically loads the component's bundle without manually specifying it.
-
-```ruby
-config.auto_load_bundle = true
-```
+[Auto-Bundling: File-System-Based Automated Bundle Generation](../core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md)
 
 ## Advanced Configuration
 
@@ -204,18 +177,17 @@ config.generated_component_packs_loading_strategy = :defer
 
 **Type:** String or nil
 **Default:** `"ssr-generated"`
-**Recommended:** Use default value
 
-Directory (relative to Rails root) where server bundles are output:
+Directory (relative to Rails root) where server bundles are output. **You should not need to set this** - the default value is recommended for all applications.
 
 ```ruby
-config.server_bundle_output_path = "ssr-generated"  # default
+config.server_bundle_output_path = "ssr-generated"  # default (no need to set)
 ```
 
-- When set: Server bundles output to this directory (e.g., `ssr-generated/`)
-- When `nil`: Server bundles loaded from same public directory as client bundles
+- When set to a string: Server bundles output to this directory (e.g., `ssr-generated/`)
+- When `nil`: Server bundles loaded from same public directory as client bundles (not recommended)
 
-**Recommendation:** Use the default `"ssr-generated"` to keep server bundles separate from public assets.
+The default `"ssr-generated"` keeps server bundles separate from public assets for security.
 
 #### enforce_private_server_bundles
 
@@ -253,6 +225,47 @@ config.build_production_command = "RAILS_ENV=production bin/shakapacker"
 
 **Most apps don't need this** - Shakapacker handles asset compilation automatically.
 
+### Common Configuration
+
+These are commonly used configuration options that many applications will need:
+
+#### rendering_extension
+
+**Type:** Module
+**Default:** `nil`
+
+Module that adds custom values to the `railsContext` object passed to all components:
+
+```ruby
+module RenderingExtension
+  def self.custom_context(view_context)
+    {
+      somethingUseful: view_context.session[:something_useful],
+      currentUser: view_context.current_user&.as_json
+    }
+  end
+end
+
+config.rendering_extension = RenderingExtension
+```
+
+#### rendering_props_extension
+
+**Type:** Module
+**Default:** `nil`
+
+Module that modifies props for client-side hydration (useful for stripping server-only props):
+
+```ruby
+module RenderingPropsExtension
+  def self.adjust_props_for_client_side_hydration(component_name, props)
+    component_name == 'HelloWorld' ? props.except(:server_side_only) : props
+  end
+end
+
+config.rendering_props_extension = RenderingPropsExtension
+```
+
 ### Server Rendering Options
 
 #### prerender
@@ -260,13 +273,22 @@ config.build_production_command = "RAILS_ENV=production bin/shakapacker"
 **Type:** Boolean
 **Default:** `false`
 
-Global default for server-side rendering. When true, all `react_component` calls will server render by default:
+Global default for server-side rendering. When true, all `react_component` calls will server render by default.
+
+**Most apps prefer to set this at the `react_component` call level** rather than globally:
+
+```ruby
+# Preferred: Set per-component
+react_component("MyComponent", prerender: true)
+```
+
+To set a global default:
 
 ```ruby
 config.prerender = true  # Server render all components by default
 ```
 
-You can override per-component:
+You can override the global setting per-component:
 
 ```ruby
 react_component("MyComponent", prerender: false)  # Skip SSR for this component
@@ -319,6 +341,8 @@ Logs server rendering messages to `Rails.logger.info`:
 ```ruby
 config.logging_on_server = true  # default
 ```
+
+**Pro Node Renderer Note:** When using the Pro Node Renderer, you might set this to `false` to avoid duplication of logs, as the Node Renderer handles its own logging.
 
 #### raise_on_prerender_error
 
@@ -401,59 +425,6 @@ config.component_registry_timeout = 5000  # default (5 seconds)
 
 Set to `0` to wait indefinitely (not recommended for production).
 
-### Advanced Rendering Customization
-
-#### rendering_extension
-
-**Type:** Module
-**Default:** `nil`
-
-Module that adds custom values to the `railsContext` object passed to all components:
-
-```ruby
-module RenderingExtension
-  def self.custom_context(view_context)
-    {
-      somethingUseful: view_context.session[:something_useful]
-    }
-  end
-end
-
-config.rendering_extension = RenderingExtension
-```
-
-#### rendering_props_extension
-
-**Type:** Module
-**Default:** `nil`
-
-Module that modifies props for client-side hydration (useful for stripping server-only props):
-
-```ruby
-module RenderingPropsExtension
-  def self.adjust_props_for_client_side_hydration(component_name, props)
-    component_name == 'HelloWorld' ? props.except(:server_side_only) : props
-  end
-end
-
-config.rendering_props_extension = RenderingPropsExtension
-```
-
-### File System Based Component Registry (Advanced)
-
-#### make_generated_server_bundle_the_entrypoint
-
-**Type:** Boolean
-**Default:** `false`
-
-When true, PacksGenerator creates a server bundle entrypoint automatically instead of importing components into your existing server bundle:
-
-```ruby
-config.make_generated_server_bundle_the_entrypoint = true
-```
-
-**Most apps should use false** and manually import components into their server bundle.
-
 ### I18n Configuration
 
 #### i18n_dir
@@ -528,7 +499,7 @@ When true, React on Rails reads the server bundle from webpack-dev-server (usefu
 config.same_bundle_for_client_and_server = false  # default
 ```
 
-**Most apps should use false** and have separate client/server bundles.
+**This should almost never be true.** Almost all apps should use separate client/server bundles.
 
 When true, also set in `config/shakapacker.yml`:
 
@@ -538,7 +509,7 @@ dev_server:
   inline: false
 ```
 
-### Internal/Deprecated Options
+### Internal Options
 
 #### node_modules_location
 
@@ -550,14 +521,6 @@ Location of `node_modules` directory. With Shakapacker, this should typically be
 ```ruby
 config.node_modules_location = ""  # Shakapacker default
 ```
-
-#### defer_generated_component_packs
-
-**Type:** Boolean
-**Default:** `false`
-**Status:** ⚠️ DEPRECATED
-
-**Deprecated:** Use `generated_component_packs_loading_strategy = :defer` instead.
 
 #### server_render_method
 
@@ -571,6 +534,8 @@ config.server_render_method = nil  # Uses ExecJS
 ```
 
 For alternative server rendering methods, contact [justin@shakacode.com](mailto:justin@shakacode.com).
+
+For deprecated configuration options, see [configuration-deprecated.md](configuration-deprecated.md).
 
 ## Complete Example
 
@@ -610,36 +575,15 @@ ReactOnRails.configure do |config|
 end
 ```
 
-## React Server Components (Pro Feature)
+## Pro Features
 
-React Server Components and Streaming SSR configuration is documented in the Pro package. See:
-[react_on_rails_pro/docs/configuration.md](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/docs/configuration.md)
-
-Key Pro configurations include:
-
-- `rsc_bundle_js_file` - RSC bundle path
-- `react_client_manifest_file` - Client component manifest
-- `react_server_client_manifest_file` - Server manifest
-- `enable_rsc_support` - Enable React Server Components
+For React Server Components (RSC) and other Pro-specific configuration options, see:
+[configuration-pro.md](configuration-pro.md)
 
 ## Deprecated Options
 
-### immediate_hydration
-
-**Status:** ⚠️ REMOVED in v17.0
-
-This configuration option has been removed. Immediate hydration is now automatically enabled for Pro users and disabled for non-Pro users.
-
-**Migration:** Remove any `config.immediate_hydration` lines from your configuration. Use per-component overrides if needed:
-
-```ruby
-# Pro users can disable for specific components:
-react_component("MyComponent", immediate_hydration: false)
-
-# Non-Pro users: immediate_hydration is ignored
-```
-
-See [CHANGELOG.md](../CHANGELOG.md) for details.
+For deprecated and removed configuration options, see:
+[configuration-deprecated.md](configuration-deprecated.md)
 
 ## Support Examples
 
