@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require_relative "../spec_helper"
+require_relative "spec_helper"
 
 # This spec validates that RBS runtime type checking catches actual type violations
 # when enabled during test execution. These tests should only run when RBS is available.
