@@ -1,9 +1,11 @@
 # frozen_string_literal: true
 
 require "open3"
+require "timeout"
 
 # NOTE: Pro package does not include Steep tasks (:steep, :all) as it does not
 # use Steep type checker. Only RBS validation is performed.
+# rubocop:disable Metrics/BlockLength
 namespace :rbs do
   desc "Validate RBS type signatures"
   task :validate do
@@ -16,7 +18,10 @@ namespace :rbs do
     # This allows us to distinguish between actual validation errors and warnings
     # Note: Must use bundle exec even though rake runs in bundle context because
     # spawned shell commands via Open3.capture3() do NOT inherit bundle context
-    stdout, stderr, status = Open3.capture3("bundle exec rbs -I sig validate")
+    # Wrap in Timeout to prevent hung processes in CI environments (60 second timeout)
+    stdout, stderr, status = Timeout.timeout(60) do
+      Open3.capture3("bundle exec rbs -I sig validate")
+    end
 
     if status.success?
       puts "✓ RBS validation passed"
@@ -39,3 +44,4 @@ namespace :rbs do
     puts "\nTotal: #{sig_files.count} files"
   end
 end
+# rubocop:enable Metrics/BlockLength
