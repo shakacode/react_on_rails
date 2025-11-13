@@ -96,19 +96,11 @@ module ReactOnRails
       end
 
       def immediate_hydration
-        explicit_value = options[:immediate_hydration]
-
-        # If non-Pro user explicitly sets immediate_hydration: true, warn and override to false
-        if explicit_value == true && !ReactOnRails::Utils.react_on_rails_pro?
-          warning = ReactOnRails::Utils.immediate_hydration_pro_license_warning(react_component_name, "Component")
-          Rails.logger.warn warning
-          return false # Force fallback to standard hydration
-        end
-
-        # Return explicit value if provided, otherwise default based on Pro license
-        return explicit_value unless explicit_value.nil?
-
-        ReactOnRails::Utils.react_on_rails_pro?
+        ReactOnRails::Utils.normalize_immediate_hydration(
+          options[:immediate_hydration],
+          react_component_name,
+          "Component"
+        )
       end
 
       def to_s

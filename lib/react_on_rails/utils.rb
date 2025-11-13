@@ -20,6 +20,36 @@ module ReactOnRails
         "Visit https://www.shakacode.com/react-on-rails-pro/ for licensing information."
     end
 
+    # Normalizes the immediate_hydration option value, enforcing Pro license requirements.
+    # Returns the normalized boolean value for immediate_hydration.
+    #
+    # @param value [Boolean, nil] The immediate_hydration option value
+    # @param name [String] The name of the component/store (for warning messages)
+    # @param type [String] The type ("Component" or "Store") for warning messages
+    # @return [Boolean] The normalized immediate_hydration value
+    #
+    # Logic:
+    # - If value is explicitly true (boolean) and no Pro license: warn and return false
+    # - If value is nil: return true for Pro users, false for non-Pro users
+    # - Otherwise: return the value as-is (allows explicit false to work)
+    #
+    # Note: We check for `== true` (not truthy) to only trigger on explicit boolean true,
+    # not on strings like "yes" or other truthy values which should be rejected by Ruby's
+    # type system at the call site.
+    def self.normalize_immediate_hydration(value, name, type = "Component")
+      # Strict equality check: only trigger warning for explicit boolean true
+      if value == true && !react_on_rails_pro?
+        Rails.logger.warn immediate_hydration_pro_license_warning(name, type)
+        return false
+      end
+
+      # If nil, default based on Pro license status
+      return react_on_rails_pro? if value.nil?
+
+      # Return explicit value (including false)
+      value
+    end
+
     # https://forum.shakacode.com/t/yak-of-the-week-ruby-2-4-pathname-empty-changed-to-look-at-file-size/901
     # return object if truthy, else return nil
     def self.truthy_presence(obj)
