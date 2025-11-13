@@ -219,7 +219,8 @@ module ReactOnRails
         2. Upgrade to Shakapacker v8.2.0 or above to enable async script loading
       MSG
       if PackerUtils.supports_async_loading?
-        self.generated_component_packs_loading_strategy ||= :async
+        # Default based on Pro license: Pro users get :async, non-Pro users get :defer
+        self.generated_component_packs_loading_strategy ||= (Utils.react_on_rails_pro? ? :async : :defer)
       elsif generated_component_packs_loading_strategy.nil?
         Rails.logger.warn("**WARNING** #{msg}")
         self.generated_component_packs_loading_strategy = :sync

@@ -284,9 +284,26 @@ module ReactOnRails
             .with("8.2.0").and_return(true)
         end
 
-        it "defaults to :async" do
-          ReactOnRails.configure {} # rubocop:disable Lint/EmptyBlock
-          expect(ReactOnRails.configuration.generated_component_packs_loading_strategy).to eq(:async)
+        context "with Pro license" do
+          before do
+            allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+          end
+
+          it "defaults to :async" do
+            ReactOnRails.configure {} # rubocop:disable Lint/EmptyBlock
+            expect(ReactOnRails.configuration.generated_component_packs_loading_strategy).to eq(:async)
+          end
+        end
+
+        context "without Pro license" do
+          before do
+            allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+          end
+
+          it "defaults to :defer" do
+            ReactOnRails.configure {} # rubocop:disable Lint/EmptyBlock
+            expect(ReactOnRails.configuration.generated_component_packs_loading_strategy).to eq(:defer)
+          end
         end
 
         it "accepts :async value" do

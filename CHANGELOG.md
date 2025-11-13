@@ -53,6 +53,8 @@ Changes since the last non-beta release.
 
 - **`immediate_hydration` now automatically enabled for Pro users**: The `config.immediate_hydration` configuration option has been removed. Immediate hydration is now automatically enabled for React on Rails Pro users and disabled for non-Pro users, simplifying configuration while providing optimal performance by default. Component-level overrides are still supported via the `immediate_hydration` parameter on `react_component`, `redux_store`, and `stream_react_component` helpers. [PR 1997](https://github.com/shakacode/react_on_rails/pull/1997) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
+- **`generated_component_packs_loading_strategy` now defaults based on Pro license**: When using Shakapacker >= 8.2.0, the default loading strategy is now `:async` for Pro users and `:defer` for non-Pro users. This provides optimal performance for Pro users while maintaining compatibility for non-Pro users. You can still explicitly set the strategy in your configuration. [PR #1993](https://github.com/shakacode/react_on_rails/pull/1993) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 #### Bug Fixes
 
 - **Use as Git dependency**: All packages can now be installed as Git dependencies. This is useful for development and testing purposes. See [CONTRIBUTING.md](./CONTRIBUTING.md#git-dependencies) for documentation. [PR #1873](https://github.com/shakacode/react_on_rails/pull/1873) by [alexeyr-ci2](https://github.com/alexeyr-ci2).
