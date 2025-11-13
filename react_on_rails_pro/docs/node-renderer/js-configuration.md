@@ -57,7 +57,7 @@ Create a file './node-renderer.js'
 
 ```js
 import path from 'path';
-import { reactOnRailsProNodeRenderer } from '@shakacode-tools/react-on-rails-pro-node-renderer';
+import { reactOnRailsProNodeRenderer } from 'react-on-rails-pro-node-renderer';
 
 const config = {
   // Save bundles to relative "./.node-renderer-bundles" dir of our app

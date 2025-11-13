@@ -47,7 +47,7 @@ scripts:
         [ -f packages/node-renderer/dist/ReactOnRailsProNodeRenderer.js ] ||
           (nps build >/dev/null 2>&1 || true) &&
           [ -f packages/node-renderer/dist/ReactOnRailsProNodeRenderer.js ] ||
-          { echo 'Building @shakacode-tools/react-on-rails-pro-node-renderer seems to have failed!'; }
+          { echo 'Building react-on-rails-pro-node-renderer seems to have failed!'; }
 
   clean:
     description: Clean the project

@@ -245,7 +245,7 @@ In your `node-renderer.js` file which runs node renderer, you need to specify `s
 ```js
 const path = require('path');
 const env = process.env;
-const { reactOnRailsProNodeRenderer } = require('@shakacode-tools/react-on-rails-pro-node-renderer');
+const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');
 
 const config = {
   ...

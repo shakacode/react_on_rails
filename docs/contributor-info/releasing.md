@@ -58,9 +58,9 @@ The release task publishes 5 packages with unified versioning:
 
 1. **react-on-rails** - NPM package
 2. **react-on-rails-pro** - NPM package
-3. **react_on_rails** - RubyGem
-
-**PRIVATE (GitHub Packages):** 4. **@shakacode-tools/react-on-rails-pro-node-renderer** - NPM package 5. **react_on_rails_pro** - RubyGem
+3. **react-on-rails-pro-node-renderer** - NPM package
+4. **react_on_rails** - RubyGem
+5. **react_on_rails_pro** - RubyGem
 
 ### Version Synchronization
 

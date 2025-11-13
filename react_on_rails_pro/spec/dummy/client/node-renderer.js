@@ -5,14 +5,14 @@ const Sentry = require('@sentry/node');
 const { env } = process;
 
 // Use this for package installation test:
-const { reactOnRailsProNodeRenderer } = require('@shakacode-tools/react-on-rails-pro-node-renderer');
+const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');
 
 Honeybadger.configure({
   // This is a test account for React on Rails Pro. Substitute your own.
   apiKey: 'a602365c',
   environment: process.env.NODE_ENV ?? 'development',
 });
-require('@shakacode-tools/react-on-rails-pro-node-renderer/integrations/honeybadger').init();
+require('react-on-rails-pro-node-renderer/integrations/honeybadger').init();
 
 // This is a test account for React on Rails Pro.
 // Substitute your own DSN.
@@ -25,7 +25,7 @@ Sentry.init({
   // Sentry recommends adjusting this value in production, or using tracesSampler for finer control
   tracesSampleRate: 1.0,
 });
-require('@shakacode-tools/react-on-rails-pro-node-renderer/integrations/sentry').init({ tracing: true });
+require('react-on-rails-pro-node-renderer/integrations/sentry').init({ tracing: true });
 
 const config = {
   // This is the default but avoids searching for the Rails root

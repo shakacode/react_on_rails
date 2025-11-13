@@ -347,24 +347,13 @@ Contact Justin Gordon, [justin@shakacode.com](mailto:justin@shakacode.com) for r
 
 ## Prerequisites
 
-You need authentication for both public and private package registries:
+You need authentication for public package registries:
 
 **Public packages (npmjs.org + rubygems.org):**
 - NPM: Run `npm login`
 - RubyGems: Standard credentials via `gem push`
 
-**Private packages (GitHub Packages):**
-- Get a GitHub personal access token with `write:packages` scope
-- Configure `~/.npmrc`:
-  ```ini
-  //npm.pkg.github.com/:_authToken=<TOKEN>
-  always-auth=true
-  ```
-- Configure `~/.gem/credentials`:
-  ```yaml
-  :github: Bearer <GITHUB_TOKEN>
-  ```
-- Set environment variable: `export GITHUB_TOKEN=<TOKEN>`
+All React on Rails and React on Rails Pro packages are now published publicly to npmjs.org and RubyGems.org.
 
 ## Release Command
 
