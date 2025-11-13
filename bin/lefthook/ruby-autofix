@@ -19,4 +19,4 @@ printf "  %s\n" $files
 
 bundle exec rake autofix
 
-echo "Completed auto-fixing all linting violations"
+echo "✅ Auto-fix complete (fixed files staged automatically)"
