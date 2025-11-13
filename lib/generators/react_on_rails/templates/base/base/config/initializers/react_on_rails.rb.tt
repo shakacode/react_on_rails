@@ -6,24 +6,16 @@
 
 ReactOnRails.configure do |config|
   ################################################################################
-  # Server Rendering Configuration
+  # Server Rendering (Recommended)
   ################################################################################
   # Configure server bundle for server-side rendering with `prerender: true`
   # Set to "" if you're not using server rendering
   config.server_bundle_js_file = "server-bundle.js"
 
   ################################################################################
-  # File System Based Component Registry (Optional)
-  ################################################################################
-  # Automatically register React components from a specific subdirectory
-  # Uncomment to enable this feature:
-  # config.components_subdirectory = "ror_components"
-  # config.auto_load_bundle = true
-
-  ################################################################################
   # Test Configuration
+  # Alternatively, set `compile: true` in config/shakapacker.yml for test env
   ################################################################################
-  # Used with ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
   config.build_test_command = "RAILS_ENV=test bin/shakapacker"
 
   ################################################################################
@@ -31,10 +23,12 @@ ReactOnRails.configure do |config|
   ################################################################################
   # Most configuration options have sensible defaults and don't need to be set.
   # For advanced options including:
+  # - File-based component registry (components_subdirectory, auto_load_bundle)
   # - Component loading strategies (async/defer/sync)
   # - Server bundle security and organization
   # - I18n configuration
   # - Server rendering pool configuration
+  # - Custom rendering extensions
   # - And more...
   #
   # See: https://github.com/shakacode/react_on_rails/blob/master/docs/api-reference/configuration.md
