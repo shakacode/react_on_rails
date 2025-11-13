@@ -14,6 +14,7 @@ During this transition:
 
 - [docs/contributor-info/Releasing](./docs/contributor-info/releasing.md) for instructions on releasing.
 - [docs/contributor-info/pull-requests](./docs/contributor-info/pull-requests.md)
+- [docs/contributor-info/rbs-type-signatures](./docs/contributor-info/rbs-type-signatures.md) for information on RBS type signatures
 - See other docs in [docs/contributor-info](./docs/contributor-info)
 
 ## Prerequisites
