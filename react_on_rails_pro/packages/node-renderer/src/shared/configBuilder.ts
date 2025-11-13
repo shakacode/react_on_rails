@@ -257,8 +257,8 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
     );
     // If serverBundleCachePath is not set, use bundlePath as fallback
     if (
-      !config.serverBundleCachePath ||
-      config.serverBundleCachePath === defaultConfig.serverBundleCachePath
+      userConfig.bundlePath &&
+      (!config.serverBundleCachePath || config.serverBundleCachePath === defaultConfig.serverBundleCachePath)
     ) {
       config.serverBundleCachePath = userConfig.bundlePath;
     }
