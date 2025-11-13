@@ -19,8 +19,4 @@ printf "  %s\n" $files
 
 bundle exec rake autofix
 
-# Re-stage files if running on staged or all-changed context
-if [ "$CONTEXT" = "staged" ] || [ "$CONTEXT" = "all-changed" ]; then
-  echo $files | xargs -r git add
-  echo "✅ Re-staged formatted files"
-fi
+echo "Completed auto-fixing all linting violations"
