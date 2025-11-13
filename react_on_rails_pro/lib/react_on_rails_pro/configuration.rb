@@ -118,6 +118,7 @@ module ReactOnRailsPro
       validate_remote_bundle_cache_adapter
       setup_renderer_password
       setup_assets_to_copy
+      validate_concurrent_component_streaming_buffer_size
       setup_execjs_profiler_if_needed
       check_react_on_rails_support_for_rsc
     end
