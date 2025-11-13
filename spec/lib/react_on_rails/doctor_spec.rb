@@ -188,4 +188,160 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
   end
+
+  describe "#check_async_usage" do
+    let(:checker) { instance_double(ReactOnRails::SystemChecker) }
+
+    before do
+      allow(doctor).to receive(:checker).and_return(checker)
+      allow(checker).to receive_messages(add_error: true, add_warning: true, add_info: true)
+      allow(File).to receive(:exist?).and_call_original
+      allow(Dir).to receive(:glob).and_return([])
+    end
+
+    context "when Pro gem is installed" do
+      before do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+      end
+
+      it "skips the check" do
+        doctor.send(:check_async_usage)
+        expect(checker).not_to have_received(:add_error)
+        expect(checker).not_to have_received(:add_warning)
+      end
+    end
+
+    context "when Pro gem is not installed" do
+      before do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+      end
+
+      context "when async is used in view files" do
+        before do
+          allow(Dir).to receive(:glob).with("app/views/**/*.erb").and_return(["app/views/layouts/application.html.erb"])
+          allow(Dir).to receive(:glob).with("app/views/**/*.haml").and_return([])
+          allow(File).to receive(:exist?).with("app/views/layouts/application.html.erb").and_return(true)
+          allow(File).to receive(:read).with("app/views/layouts/application.html.erb")
+                                       .and_return('<%= javascript_pack_tag "application", :async %>')
+          allow(File).to receive(:exist?).with("config/initializers/react_on_rails.rb").and_return(false)
+          allow(doctor).to receive(:relativize_path).with("app/views/layouts/application.html.erb")
+                                                    .and_return("app/views/layouts/application.html.erb")
+        end
+
+        it "reports an error" do
+          doctor.send(:check_async_usage)
+          expect(checker).to have_received(:add_error).with("🚫 :async usage detected without React on Rails Pro")
+          expect(checker).to have_received(:add_error)
+            .with("  javascript_pack_tag with :async found in view files:")
+        end
+      end
+
+      context "when generated_component_packs_loading_strategy is :async" do
+        before do
+          allow(File).to receive(:exist?).with("config/initializers/react_on_rails.rb").and_return(true)
+          allow(File).to receive(:read).with("config/initializers/react_on_rails.rb")
+                                       .and_return("config.generated_component_packs_loading_strategy = :async")
+        end
+
+        it "reports an error" do
+          doctor.send(:check_async_usage)
+          expect(checker).to have_received(:add_error).with("🚫 :async usage detected without React on Rails Pro")
+          expect(checker).to have_received(:add_error)
+            .with("  config.generated_component_packs_loading_strategy = :async in initializer")
+        end
+      end
+
+      context "when no async usage is detected" do
+        before do
+          allow(File).to receive(:exist?).with("config/initializers/react_on_rails.rb").and_return(true)
+          allow(File).to receive(:read).with("config/initializers/react_on_rails.rb")
+                                       .and_return("config.generated_component_packs_loading_strategy = :defer")
+        end
+
+        it "does not report any issues" do
+          doctor.send(:check_async_usage)
+          expect(checker).not_to have_received(:add_error)
+          expect(checker).not_to have_received(:add_warning)
+        end
+      end
+    end
+  end
+
+  describe "#scan_view_files_for_async_pack_tag" do
+    before do
+      allow(Dir).to receive(:glob).and_call_original
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:read).and_call_original
+    end
+
+    context "when view files contain javascript_pack_tag with :async" do
+      before do
+        allow(Dir).to receive(:glob).with("app/views/**/*.erb")
+                                    .and_return(["app/views/layouts/application.html.erb"])
+        allow(Dir).to receive(:glob).with("app/views/**/*.haml").and_return([])
+        allow(File).to receive(:exist?).with("app/views/layouts/application.html.erb").and_return(true)
+        allow(File).to receive(:read).with("app/views/layouts/application.html.erb")
+                                     .and_return('<%= javascript_pack_tag "app", :async %>')
+        allow(doctor).to receive(:relativize_path).with("app/views/layouts/application.html.erb")
+                                                  .and_return("app/views/layouts/application.html.erb")
+      end
+
+      it "returns files with async" do
+        files = doctor.send(:scan_view_files_for_async_pack_tag)
+        expect(files).to include("app/views/layouts/application.html.erb")
+      end
+    end
+
+    context "when view files do not contain async" do
+      before do
+        allow(Dir).to receive(:glob).with("app/views/**/*.erb")
+                                    .and_return(["app/views/layouts/application.html.erb"])
+        allow(Dir).to receive(:glob).with("app/views/**/*.haml").and_return([])
+        allow(File).to receive(:exist?).with("app/views/layouts/application.html.erb").and_return(true)
+        allow(File).to receive(:read).with("app/views/layouts/application.html.erb")
+                                     .and_return('<%= javascript_pack_tag "app" %>')
+      end
+
+      it "returns empty array" do
+        files = doctor.send(:scan_view_files_for_async_pack_tag)
+        expect(files).to be_empty
+      end
+    end
+  end
+
+  describe "#config_has_async_loading_strategy?" do
+    context "when config file has :async strategy" do
+      before do
+        allow(File).to receive(:exist?).with("config/initializers/react_on_rails.rb").and_return(true)
+        allow(File).to receive(:read).with("config/initializers/react_on_rails.rb")
+                                     .and_return("config.generated_component_packs_loading_strategy = :async")
+      end
+
+      it "returns true" do
+        expect(doctor.send(:config_has_async_loading_strategy?)).to be true
+      end
+    end
+
+    context "when config file has different strategy" do
+      before do
+        allow(File).to receive(:exist?).with("config/initializers/react_on_rails.rb").and_return(true)
+        allow(File).to receive(:read).with("config/initializers/react_on_rails.rb")
+                                     .and_return("config.generated_component_packs_loading_strategy = :defer")
+      end
+
+      it "returns false" do
+        expect(doctor.send(:config_has_async_loading_strategy?)).to be false
+      end
+    end
+
+    context "when config file does not exist" do
+      before do
+        allow(File).to receive(:exist?).with("config/initializers/react_on_rails.rb").and_return(false)
+      end
+
+      it "returns false" do
+        expect(doctor.send(:config_has_async_loading_strategy?)).to be false
+      end
+    end
+  end
 end
