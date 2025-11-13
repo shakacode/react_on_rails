@@ -30,7 +30,9 @@ jobs:
               '  - Removes the `full-ci` label',
               '  - Future commits will only run tests for changed files',
               '',
-              '💡 **Note:** The `full-ci` label will be automatically removed when this PR is merged.',
+              '**Note:**',
+              '- These commands require write access to the repository',
+              '- The `full-ci` label is preserved on merged PRs as a historical record',
               '',
               'View CI progress in the [Actions tab](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions).'
             ].join('\n');

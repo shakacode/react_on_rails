@@ -1,0 +1,29 @@
+name: Check for full-ci label
+description: Checks if the PR has the full-ci label to enable full CI mode
+outputs:
+  result:
+    description: 'Whether the full-ci label is present (string: "true" or "false")'
+    value: ${{ steps.check.outputs.result }}
+runs:
+  using: composite
+  steps:
+    - name: Check for full-ci label
+      id: check
+      uses: actions/github-script@v7
+      with:
+        result-encoding: string
+        script: |
+          // Only check labels on pull requests
+          if (!context.payload.pull_request) {
+            return 'false';
+          }
+
+          const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.payload.pull_request.number
+          });
+
+          const hasLabel = labels.some(label => label.name === 'full-ci');
+          console.log(`full-ci label present: ${hasLabel}`);
+          return hasLabel ? 'true' : 'false';

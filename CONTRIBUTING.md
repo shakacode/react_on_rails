@@ -466,9 +466,7 @@ Removes the `full-ci` label and returns to standard CI behavior:
 - You've validated changes with full CI and want to return to faster feedback
 - Reducing CI time during rapid iteration on a PR
 
-#### Automatic Cleanup
-
-The `full-ci` label is automatically removed when a PR is merged, so you don't need to manually clean it up.
+**Note:** The `full-ci` label is preserved on merged PRs as a historical record of which PRs ran with comprehensive testing.
 
 ### Install Generator
 
