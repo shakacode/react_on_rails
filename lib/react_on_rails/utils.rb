@@ -27,16 +27,20 @@ module ReactOnRails
     # @param name [String] The name of the component/store (for warning messages)
     # @param type [String] The type ("Component" or "Store") for warning messages
     # @return [Boolean] The normalized immediate_hydration value
+    # @raise [ArgumentError] If value is not a boolean or nil
     #
     # Logic:
+    # - Validates that value is true, false, or nil
     # - If value is explicitly true (boolean) and no Pro license: warn and return false
     # - If value is nil: return true for Pro users, false for non-Pro users
     # - Otherwise: return the value as-is (allows explicit false to work)
-    #
-    # Note: We check for `== true` (not truthy) to only trigger on explicit boolean true,
-    # not on strings like "yes" or other truthy values which should be rejected by Ruby's
-    # type system at the call site.
     def self.normalize_immediate_hydration(value, name, type = "Component")
+      # Type validation: only accept boolean or nil
+      unless [true, false, nil].include?(value)
+        raise ArgumentError,
+              "[REACT ON RAILS] immediate_hydration must be true, false, or nil. Got: #{value.inspect} (#{value.class})"
+      end
+
       # Strict equality check: only trigger warning for explicit boolean true
       if value == true && !react_on_rails_pro?
         Rails.logger.warn immediate_hydration_pro_license_warning(name, type)

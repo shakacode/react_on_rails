@@ -66,8 +66,18 @@ module ReactOnRails
                   :component_registry_timeout,
                   :server_bundle_output_path, :enforce_private_server_bundles
 
+    # Class instance variable to track if deprecation warning has been shown
+    @immediate_hydration_warned = false
+
+    class << self
+      attr_accessor :immediate_hydration_warned
+    end
+
     # Deprecated: immediate_hydration configuration has been removed
     def immediate_hydration=(value)
+      return if self.class.immediate_hydration_warned
+
+      self.class.immediate_hydration_warned = true
       Rails.logger.warn <<~WARNING
         [REACT ON RAILS] The 'config.immediate_hydration' configuration option is deprecated and no longer used.
         Immediate hydration is now automatically enabled for React on Rails Pro users.
@@ -77,6 +87,9 @@ module ReactOnRails
     end
 
     def immediate_hydration
+      return nil if self.class.immediate_hydration_warned
+
+      self.class.immediate_hydration_warned = true
       Rails.logger.warn <<~WARNING
         [REACT ON RAILS] The 'config.immediate_hydration' configuration option is deprecated and no longer used.
         Immediate hydration is now automatically enabled for React on Rails Pro users.

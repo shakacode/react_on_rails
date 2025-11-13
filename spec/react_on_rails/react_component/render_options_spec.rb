@@ -241,6 +241,20 @@ describe ReactOnRails::ReactComponent::RenderOptions do
           expect(opts.immediate_hydration).to be false
         end
       end
+
+      context "with invalid immediate_hydration value" do
+        it "raises ArgumentError for non-boolean values" do
+          options = { immediate_hydration: "yes" }
+          attrs = the_attrs(options: options)
+
+          opts = described_class.new(**attrs)
+
+          expect { opts.immediate_hydration }.to raise_error(
+            ArgumentError,
+            /immediate_hydration must be true, false, or nil/
+          )
+        end
+      end
     end
   end
 end
