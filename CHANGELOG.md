@@ -67,7 +67,7 @@ Changes since the last non-beta release.
   - Pro users: No action needed - immediate hydration is now enabled automatically for optimal performance
   - Non-Pro users: No action needed - standard hydration behavior continues to work as before
   - Component-level overrides: You can still override behavior per-component using `react_component("MyComponent", immediate_hydration: false)` or `redux_store("MyStore", immediate_hydration: true)`
-  - If a non-Pro user explicitly sets `immediate_hydration: true` on a component, a warning will be logged and the component will fall back to standard hydration
+  - If a non-Pro user explicitly sets `immediate_hydration: true` on a component or store, a warning will be logged and it will be enforced to fall back to standard hydration (the value will be overridden to `false`)
 
   [PR 1997](https://github.com/shakacode/react_on_rails/pull/1997) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 

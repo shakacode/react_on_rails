@@ -209,7 +209,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
       end
 
       context "with immediate_hydration option set to true (not recommended)" do
-        it "returns true but logs a warning" do
+        it "returns false and logs a warning (enforces fallback)" do
           options = { immediate_hydration: true }
           attrs = the_attrs(options: options)
 
@@ -217,7 +217,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
 
           opts = described_class.new(**attrs)
 
-          expect(opts.immediate_hydration).to be true
+          expect(opts.immediate_hydration).to be false
         end
       end
 

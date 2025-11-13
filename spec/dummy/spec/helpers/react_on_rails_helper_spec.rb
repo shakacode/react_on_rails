@@ -431,6 +431,43 @@ describe ReactOnRailsHelper do
     it {
       expect(expect(store).target).to script_tag_be_included(react_store_script)
     }
+
+    context "without Pro license" do
+      before do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+      end
+
+      context "with immediate_hydration option set to true (not recommended)" do
+        it "returns false for immediate_hydration and logs a warning" do
+          expect(Rails.logger).to receive(:warn).with(/immediate_hydration: true requires a React on Rails Pro license/)
+
+          result = redux_store("reduxStore", props: props, immediate_hydration: true)
+
+          # Verify that the store tag does NOT have immediate hydration enabled
+          expect(result).not_to include('data-immediate-hydration="true"')
+        end
+      end
+
+      context "with immediate_hydration option set to false" do
+        it "returns false for immediate_hydration without warning" do
+          expect(Rails.logger).not_to receive(:warn)
+
+          result = redux_store("reduxStore", props: props, immediate_hydration: false)
+
+          # Verify that the store tag does NOT have immediate hydration enabled
+          expect(result).not_to include('data-immediate-hydration="true"')
+        end
+      end
+
+      context "without immediate_hydration option (nil)" do
+        it "defaults to false for non-Pro users" do
+          result = redux_store("reduxStore", props: props)
+
+          # Verify that the store tag does NOT have immediate hydration enabled
+          expect(result).not_to include('data-immediate-hydration="true"')
+        end
+      end
+    end
   end
 
   describe "#server_render_js", :js, type: :system do
