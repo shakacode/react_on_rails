@@ -75,36 +75,50 @@ jobs:
               console.log('✅ Removed full-ci label from PR');
 
               // Post success comment
+              const successBody = [
+                '✅ **Full CI Mode Disabled**',
+                '',
+                'The `full-ci` label has been removed. Future commits will use the standard CI suite (skipping tests for unchanged code).',
+                '',
+                'To re-enable full CI mode, use the `/run-skipped-ci` command.'
+              ].join('\n');
+
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: context.issue.number,
-                body: `✅ **Full CI Mode Disabled**
-
-The \`full-ci\` label has been removed. Future commits will use the standard CI suite (skipping tests for unchanged code).
-
-To re-enable full CI mode, use the \`/run-skipped-ci\` command.`
+                body: successBody
               });
             } catch (error) {
               if (error.status === 404) {
                 console.log('ℹ️  Label not found - already removed or never added');
+
+                const notFoundBody = [
+                  'ℹ️  **Full CI Mode Already Disabled**',
+                  '',
+                  'The `full-ci` label is not present on this PR. CI is already running in standard mode.'
+                ].join('\n');
+
                 await github.rest.issues.createComment({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   issue_number: context.issue.number,
-                  body: `ℹ️  **Full CI Mode Already Disabled**
-
-The \`full-ci\` label is not present on this PR. CI is already running in standard mode.`
+                  body: notFoundBody
                 });
               } else {
                 console.error('❌ Failed to remove label:', error);
+
+                const errorBody = [
+                  '❌ **Error Removing Label**',
+                  '',
+                  'Failed to remove the `full-ci` label: ' + error.message
+                ].join('\n');
+
                 await github.rest.issues.createComment({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   issue_number: context.issue.number,
-                  body: `❌ **Error Removing Label**
-
-Failed to remove the \`full-ci\` label: ${error.message}`
+                  body: errorBody
                 });
                 throw error;
               }
