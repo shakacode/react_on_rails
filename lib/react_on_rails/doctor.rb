@@ -732,10 +732,12 @@ module ReactOnRails
       auto_load_match = content.match(/config\.auto_load_bundle\s*=\s*([^\s\n,]+)/)
       checker.add_info("  auto_load_bundle: #{auto_load_match[1]}") if auto_load_match
 
-      # Immediate hydration (Pro feature)
+      # Deprecated immediate_hydration setting
       immediate_hydration_match = content.match(/config\.immediate_hydration\s*=\s*([^\s\n,]+)/)
       if immediate_hydration_match
-        checker.add_info("  immediate_hydration: #{immediate_hydration_match[1]} (React on Rails Pro)")
+        checker.add_warning("  ⚠️  immediate_hydration: #{immediate_hydration_match[1]} (DEPRECATED)")
+        checker.add_info("    💡 This setting is no longer used. Immediate hydration is now automatic for Pro users.")
+        checker.add_info("    💡 Remove this line from your config/initializers/react_on_rails.rb file.")
       end
 
       # Component registry timeout

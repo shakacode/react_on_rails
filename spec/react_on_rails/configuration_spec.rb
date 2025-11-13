@@ -284,9 +284,26 @@ module ReactOnRails
             .with("8.2.0").and_return(true)
         end
 
-        it "defaults to :async" do
-          ReactOnRails.configure {} # rubocop:disable Lint/EmptyBlock
-          expect(ReactOnRails.configuration.generated_component_packs_loading_strategy).to eq(:async)
+        context "with Pro license" do
+          before do
+            allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+          end
+
+          it "defaults to :async" do
+            ReactOnRails.configure {} # rubocop:disable Lint/EmptyBlock
+            expect(ReactOnRails.configuration.generated_component_packs_loading_strategy).to eq(:async)
+          end
+        end
+
+        context "without Pro license" do
+          before do
+            allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+          end
+
+          it "defaults to :defer" do
+            ReactOnRails.configure {} # rubocop:disable Lint/EmptyBlock
+            expect(ReactOnRails.configuration.generated_component_packs_loading_strategy).to eq(:defer)
+          end
         end
 
         it "accepts :async value" do
@@ -362,6 +379,118 @@ module ReactOnRails
               config.generated_component_packs_loading_strategy = :async
             end
           end.to raise_error(ReactOnRails::Error, /does not support async script loading/)
+        end
+      end
+    end
+
+    describe ".immediate_hydration (deprecated)" do
+      before do
+        # Reset the warning flag before each test
+        described_class.immediate_hydration_warned = false
+        allow(Rails.logger).to receive(:warn)
+      end
+
+      after do
+        # Reset the warning flag after each test
+        described_class.immediate_hydration_warned = false
+      end
+
+      describe "setter" do
+        it "logs a deprecation warning when setting to true" do
+          ReactOnRails.configure do |config|
+            config.immediate_hydration = true
+          end
+
+          expect(Rails.logger).to have_received(:warn)
+            .with(/immediate_hydration' configuration option is deprecated/)
+        end
+
+        it "logs a deprecation warning when setting to false" do
+          ReactOnRails.configure do |config|
+            config.immediate_hydration = false
+          end
+
+          expect(Rails.logger).to have_received(:warn)
+            .with(/immediate_hydration' configuration option is deprecated/)
+        end
+
+        it "mentions the value in the warning message" do
+          ReactOnRails.configure do |config|
+            config.immediate_hydration = true
+          end
+
+          expect(Rails.logger).to have_received(:warn) do |message|
+            expect(message).to include("config.immediate_hydration = true")
+          end
+        end
+
+        it "only logs the warning once even if called multiple times" do
+          ReactOnRails.configure do |config|
+            config.immediate_hydration = true
+            config.immediate_hydration = false
+            config.immediate_hydration = true
+          end
+
+          expect(Rails.logger).to have_received(:warn).once
+        end
+      end
+
+      describe "getter" do
+        it "logs a deprecation warning when accessed" do
+          ReactOnRails.configure {} # rubocop:disable Lint/EmptyBlock
+
+          ReactOnRails.configuration.immediate_hydration
+
+          expect(Rails.logger).to have_received(:warn)
+            .with(/immediate_hydration' configuration option is deprecated/)
+        end
+
+        it "returns nil" do
+          ReactOnRails.configure {} # rubocop:disable Lint/EmptyBlock
+
+          result = ReactOnRails.configuration.immediate_hydration
+
+          expect(result).to be_nil
+        end
+
+        it "only logs the warning once even if called multiple times" do
+          ReactOnRails.configure {} # rubocop:disable Lint/EmptyBlock
+
+          ReactOnRails.configuration.immediate_hydration
+          ReactOnRails.configuration.immediate_hydration
+          ReactOnRails.configuration.immediate_hydration
+
+          expect(Rails.logger).to have_received(:warn).once
+        end
+      end
+
+      describe "setter and getter interactions" do
+        it "does not warn again on getter if setter already warned" do
+          ReactOnRails.configure do |config|
+            config.immediate_hydration = true
+          end
+
+          expect(Rails.logger).to have_received(:warn).once
+
+          ReactOnRails.configuration.immediate_hydration
+
+          # Still only one warning total
+          expect(Rails.logger).to have_received(:warn).once
+        end
+
+        it "does not warn again on setter if getter already warned" do
+          ReactOnRails.configure {} # rubocop:disable Lint/EmptyBlock
+
+          ReactOnRails.configuration.immediate_hydration
+
+          expect(Rails.logger).to have_received(:warn).once
+
+          ReactOnRails.configure do |config|
+            config.immediate_hydration = true
+          end
+
+          # Still only one warning total
+          expect(Rails.logger).to have_received(:warn).once
         end
       end
     end

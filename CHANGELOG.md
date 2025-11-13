@@ -49,11 +49,29 @@ Changes since the last non-beta release.
 
 - **Shakapacker 9.2.0 Upgrade**: Upgraded Shakapacker from 9.1.0 to 9.2.0. This minor version update adds a new `bin/shakapacker-config` utility for debugging webpack/rspack configurations with doctor mode, save mode, and stdout mode options. Supports YAML, JSON, and Node.js inspect output formats. by [justin808](https://github.com/justin808).
 
+- **Removed Pro Warning Badge**: Removed the visual warning badge that appeared when non-Pro users attempted to enable Pro-only features like `immediate_hydration`. Pro features are now silently disabled when a Pro license is not available, providing a cleaner user experience without intrusive warning banners. [PR #1993](https://github.com/shakacode/react_on_rails/pull/1993) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+- **`immediate_hydration` now automatically enabled for Pro users**: The `config.immediate_hydration` configuration option has been removed. Immediate hydration is now automatically enabled for React on Rails Pro users and disabled for non-Pro users, simplifying configuration while providing optimal performance by default. Component-level overrides are still supported via the `immediate_hydration` parameter on `react_component`, `redux_store`, and `stream_react_component` helpers. [PR 1997](https://github.com/shakacode/react_on_rails/pull/1997) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+- **`generated_component_packs_loading_strategy` now defaults based on Pro license**: When using Shakapacker >= 8.2.0, the default loading strategy is now `:async` for Pro users and `:defer` for non-Pro users. This provides optimal performance for Pro users while maintaining compatibility for non-Pro users. You can still explicitly set the strategy in your configuration. [PR #1993](https://github.com/shakacode/react_on_rails/pull/1993) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 #### Bug Fixes
 
 - **Use as Git dependency**: All packages can now be installed as Git dependencies. This is useful for development and testing purposes. See [CONTRIBUTING.md](./CONTRIBUTING.md#git-dependencies) for documentation. [PR #1873](https://github.com/shakacode/react_on_rails/pull/1873) by [alexeyr-ci2](https://github.com/alexeyr-ci2).
 
 #### Breaking Changes
+
+- **`config.immediate_hydration` configuration removed**: The `config.immediate_hydration` setting in `config/initializers/react_on_rails.rb` has been removed. Immediate hydration is now automatically enabled for React on Rails Pro users and automatically disabled for non-Pro users.
+
+  **Migration steps:**
+
+  - Remove any `config.immediate_hydration = true` or `config.immediate_hydration = false` lines from your `config/initializers/react_on_rails.rb` file
+  - Pro users: No action needed - immediate hydration is now enabled automatically for optimal performance
+  - Non-Pro users: No action needed - standard hydration behavior continues to work as before
+  - Component-level overrides: You can still override behavior per-component using `react_component("MyComponent", immediate_hydration: false)` or `redux_store("MyStore", immediate_hydration: true)`
+  - If a non-Pro user explicitly sets `immediate_hydration: true` on a component or store, a warning will be logged and it will be enforced to fall back to standard hydration (the value will be overridden to `false`)
+
+  [PR 1997](https://github.com/shakacode/react_on_rails/pull/1997) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 - **React on Rails Core Package**: Several Pro-only methods have been removed from the core package and are now exclusively available in the `react-on-rails-pro` package. If you're using any of the following methods, you'll need to migrate to React on Rails Pro:
   - `getOrWaitForComponent()`

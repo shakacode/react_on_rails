@@ -38,15 +38,8 @@ describe ReactOnRailsHelper do
     stub_const("ReactOnRailsPro", pro_module)
     stub_const("ReactOnRailsPro::Utils", utils_module)
 
-    # Configure immediate_hydration to true for tests since they expect that behavior
-    ReactOnRails.configure do |config|
-      config.immediate_hydration = true
-    end
-  end
-
-  after do
-    # Reset to default - avoid validation issues by setting directly
-    ReactOnRails.configuration.immediate_hydration = false
+    # Stub react_on_rails_pro? to return true for tests since they expect that behavior
+    allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
   end
 
   let(:hash) do
@@ -392,78 +385,6 @@ describe ReactOnRailsHelper do
         it { is_expected.to include immediate_hydration_script }
       end
     end
-
-    describe "with Pro license warning" do
-      let(:badge_html_string) { "React On Rails Pro Required" }
-
-      before do
-        allow(Rails.logger).to receive(:warn)
-      end
-
-      context "when Pro license is NOT installed and immediate_hydration is true" do
-        subject(:react_app) { react_component("App", props: props, immediate_hydration: true) }
-
-        before do
-          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
-        end
-
-        it { is_expected.to include(badge_html_string) }
-
-        it "logs a warning" do
-          react_app
-          expect(Rails.logger).to have_received(:warn)
-            .with(a_string_matching(/The 'immediate_hydration' feature requires/))
-        end
-      end
-
-      context "when Pro license is NOT installed and global immediate_hydration is true" do
-        subject(:react_app) { react_component("App", props: props) }
-
-        before do
-          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
-        end
-
-        around do |example|
-          ReactOnRails.configure { |config| config.immediate_hydration = true }
-          example.run
-          ReactOnRails.configure { |config| config.immediate_hydration = false }
-        end
-
-        it { is_expected.to include(badge_html_string) }
-      end
-
-      context "when Pro license is NOT installed and immediate_hydration is false" do
-        subject(:react_app) { react_component("App", props: props, immediate_hydration: false) }
-
-        before do
-          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
-        end
-
-        it { is_expected.not_to include(badge_html_string) }
-
-        it "does not log a warning" do
-          react_app
-          expect(Rails.logger).not_to have_received(:warn)
-        end
-      end
-
-      context "when Pro license IS installed and immediate_hydration is true" do
-        subject(:react_app) { react_component("App", props: props, immediate_hydration: true) }
-
-        before do
-          allow(ReactOnRails::Utils).to receive_messages(
-            react_on_rails_pro?: true
-          )
-        end
-
-        it { is_expected.not_to include(badge_html_string) }
-
-        it "does not log a warning" do
-          react_app
-          expect(Rails.logger).not_to have_received(:warn)
-        end
-      end
-    end
   end
 
   describe "#react_component_hash" do
@@ -485,40 +406,6 @@ describe ReactOnRailsHelper do
       expect(react_app).to be_a(Hash)
       expect(react_app).to have_key("componentHtml")
       expect(react_app).to have_key("title")
-    end
-
-    context "with Pro license warning" do
-      let(:badge_html_string) { "React On Rails Pro Required" }
-
-      before do
-        allow(Rails.logger).to receive(:warn)
-      end
-
-      context "when Pro license is NOT installed and immediate_hydration is true" do
-        subject(:react_app) { react_component_hash("App", props: props, immediate_hydration: true) }
-
-        before do
-          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
-        end
-
-        it "adds badge to componentHtml" do
-          expect(react_app["componentHtml"]).to include(badge_html_string)
-        end
-      end
-
-      context "when Pro license IS installed and immediate_hydration is true" do
-        subject(:react_app) { react_component_hash("App", props: props, immediate_hydration: true) }
-
-        before do
-          allow(ReactOnRails::Utils).to receive_messages(
-            react_on_rails_pro?: true
-          )
-        end
-
-        it "does not add badge to componentHtml" do
-          expect(react_app["componentHtml"]).not_to include(badge_html_string)
-        end
-      end
     end
   end
 
@@ -545,49 +432,40 @@ describe ReactOnRailsHelper do
       expect(expect(store).target).to script_tag_be_included(react_store_script)
     }
 
-    context "with Pro license warning" do
-      let(:badge_html_string) { "React On Rails Pro Required" }
-
+    context "without Pro license" do
       before do
-        allow(Rails.logger).to receive(:warn)
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
       end
 
-      context "when Pro license is NOT installed and immediate_hydration is true" do
-        subject(:store) { redux_store("reduxStore", props: props, immediate_hydration: true) }
+      context "with immediate_hydration option set to true (not recommended)" do
+        it "returns false for immediate_hydration and logs a warning" do
+          expect(Rails.logger).to receive(:warn).with(/immediate_hydration: true requires a React on Rails Pro license/)
 
-        before do
-          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
-        end
+          result = redux_store("reduxStore", props: props, immediate_hydration: true)
 
-        it { is_expected.to include(badge_html_string) }
-
-        it "logs a warning" do
-          store
-          expect(Rails.logger).to have_received(:warn)
-            .with(a_string_matching(/The 'immediate_hydration' feature requires/))
+          # Verify that the store tag does NOT have immediate hydration enabled
+          expect(result).not_to include('data-immediate-hydration="true"')
         end
       end
 
-      context "when Pro license is NOT installed and immediate_hydration is false" do
-        subject(:store) { redux_store("reduxStore", props: props, immediate_hydration: false) }
+      context "with immediate_hydration option set to false" do
+        it "returns false for immediate_hydration without warning" do
+          expect(Rails.logger).not_to receive(:warn)
 
-        before do
-          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+          result = redux_store("reduxStore", props: props, immediate_hydration: false)
+
+          # Verify that the store tag does NOT have immediate hydration enabled
+          expect(result).not_to include('data-immediate-hydration="true"')
         end
-
-        it { is_expected.not_to include(badge_html_string) }
       end
 
-      context "when Pro license IS installed and immediate_hydration is true" do
-        subject(:store) { redux_store("reduxStore", props: props, immediate_hydration: true) }
+      context "without immediate_hydration option (nil)" do
+        it "defaults to false for non-Pro users" do
+          result = redux_store("reduxStore", props: props)
 
-        before do
-          allow(ReactOnRails::Utils).to receive_messages(
-            react_on_rails_pro?: true
-          )
+          # Verify that the store tag does NOT have immediate hydration enabled
+          expect(result).not_to include('data-immediate-hydration="true"')
         end
-
-        it { is_expected.not_to include(badge_html_string) }
       end
     end
   end
