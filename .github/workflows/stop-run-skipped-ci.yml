@@ -1,0 +1,111 @@
+name: Stop Full CI Suite
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  stop-full-ci:
+    # Only run on PR comments that match the command
+    if: |
+      github.event.issue.pull_request &&
+      (
+        startsWith(github.event.comment.body, '/stop-run-skipped-ci') ||
+        contains(github.event.comment.body, '\n/stop-run-skipped-ci')
+      )
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Check if user has write access
+        id: check_access
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              const { data: permission } = await github.rest.repos.getCollaboratorPermissionLevel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                username: context.actor
+              });
+
+              const hasAccess = ['admin', 'write'].includes(permission.permission);
+              console.log(`User ${context.actor} has permission: ${permission.permission}`);
+
+              if (!hasAccess) {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  body: `@${context.actor} Sorry, only repository collaborators with write access can stop full CI runs. 🔒`
+                });
+              }
+
+              return hasAccess;
+            } catch (error) {
+              console.error('Error checking permissions:', error);
+              return false;
+            }
+
+      - name: Exit if no access
+        if: steps.check_access.outputs.result == 'false'
+        run: |
+          echo "User does not have permission to stop full CI"
+          exit 1
+
+      - name: Add reaction to comment
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          comment-id: ${{ github.event.comment.id }}
+          reactions: 'eyes'
+
+      - name: Remove full-ci label
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                name: 'full-ci'
+              });
+              console.log('✅ Removed full-ci label from PR');
+
+              // Post success comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: `✅ **Full CI Mode Disabled**
+
+The \`full-ci\` label has been removed. Future commits will use the standard CI suite (skipping tests for unchanged code).
+
+To re-enable full CI mode, use the \`/run-skipped-ci\` command.`
+              });
+            } catch (error) {
+              if (error.status === 404) {
+                console.log('ℹ️  Label not found - already removed or never added');
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  body: `ℹ️  **Full CI Mode Already Disabled**
+
+The \`full-ci\` label is not present on this PR. CI is already running in standard mode.`
+                });
+              } else {
+                console.error('❌ Failed to remove label:', error);
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  body: `❌ **Error Removing Label**
+
+Failed to remove the \`full-ci\` label: ${error.message}`
+                });
+                throw error;
+              }
+            }

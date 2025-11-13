@@ -29,17 +29,37 @@ jobs:
       run_ruby_tests: ${{ steps.detect.outputs.run_ruby_tests }}
       run_dummy_tests: ${{ steps.detect.outputs.run_dummy_tests }}
       run_generators: ${{ steps.detect.outputs.run_generators }}
+      has_full_ci_label: ${{ steps.check-label.outputs.has_label }}
     steps:
       - uses: actions/checkout@v4
         with:
           # Fetch enough history for change detection (50 commits is usually sufficient for PRs)
           fetch-depth: 50
           persist-credentials: false
+      - name: Check for full-ci label
+        id: check-label
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Only check labels on pull requests
+            if (!context.payload.pull_request) {
+              return false;
+            }
+
+            const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number
+            });
+
+            const hasLabel = labels.some(label => label.name === 'full-ci');
+            console.log(`full-ci label present: ${hasLabel}`);
+            return hasLabel;
       - name: Detect relevant changes
         id: detect
         run: |
-          # If force_run is true, run everything
-          if [ "${{ inputs.force_run }}" = "true" ]; then
+          # If force_run is true OR full-ci label is present, run everything
+          if [ "${{ inputs.force_run }}" = "true" ] || [ "${{ steps.check-label.outputs.result }}" = "true" ]; then
             echo "run_lint=true" >> "$GITHUB_OUTPUT"
             echo "run_js_tests=true" >> "$GITHUB_OUTPUT"
             echo "run_ruby_tests=true" >> "$GITHUB_OUTPUT"
@@ -70,10 +90,10 @@ jobs:
             node-version: '20'
             dependency-level: 'minimum'
         exclude:
-          # Skip minimum dependency matrix on regular PRs (run only on master/workflow_dispatch/force_run)
-          - ruby-version: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && inputs.force_run != true && '3.2' || '' }}
-            node-version: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && inputs.force_run != true && '20' || '' }}
-            dependency-level: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && inputs.force_run != true && 'minimum' || '' }}
+          # Skip minimum dependency matrix on regular PRs (run only on master/workflow_dispatch/force_run/full-ci label)
+          - ruby-version: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && inputs.force_run != true && needs.detect-changes.outputs.has_full_ci_label != 'true' && '3.2' || '' }}
+            node-version: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && inputs.force_run != true && needs.detect-changes.outputs.has_full_ci_label != 'true' && '20' || '' }}
+            dependency-level: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && inputs.force_run != true && needs.detect-changes.outputs.has_full_ci_label != 'true' && 'minimum' || '' }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -160,10 +180,10 @@ jobs:
             node-version: '20'
             dependency-level: 'minimum'
         exclude:
-          # Skip minimum dependency matrix on regular PRs (run only on master/workflow_dispatch/force_run)
-          - ruby-version: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && inputs.force_run != true && '3.2' || '' }}
-            node-version: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && inputs.force_run != true && '20' || '' }}
-            dependency-level: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && inputs.force_run != true && 'minimum' || '' }}
+          # Skip minimum dependency matrix on regular PRs (run only on master/workflow_dispatch/force_run/full-ci label)
+          - ruby-version: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && inputs.force_run != true && needs.detect-changes.outputs.has_full_ci_label != 'true' && '3.2' || '' }}
+            node-version: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && inputs.force_run != true && needs.detect-changes.outputs.has_full_ci_label != 'true' && '20' || '' }}
+            dependency-level: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && inputs.force_run != true && needs.detect-changes.outputs.has_full_ci_label != 'true' && 'minimum' || '' }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
