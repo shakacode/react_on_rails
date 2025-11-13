@@ -47,6 +47,20 @@ module ReactOnRailsPro
 
     private
 
+    # Drains all streaming fibers concurrently using a producer-consumer pattern.
+    #
+    # Producer tasks: Each fiber drains its stream and enqueues chunks to a shared queue.
+    # Consumer task: Single writer dequeues chunks and writes them to the response stream.
+    #
+    # Ordering guarantees:
+    # - Chunks from the same component maintain their order
+    # - Chunks from different components may interleave based on production timing
+    # - The first component to produce a chunk will have it written first
+    #
+    # Memory management:
+    # - Uses a limited queue (configured via concurrent_component_streaming_buffer_size)
+    # - Producers block when the queue is full, providing backpressure
+    # - This prevents unbounded memory growth from fast producers
     def drain_streams_concurrently
       require "async"
       require "async/limited_queue"
@@ -58,7 +72,9 @@ module ReactOnRailsPro
         buffer_size = ReactOnRailsPro.configuration.concurrent_component_streaming_buffer_size
         queue = Async::LimitedQueue.new(buffer_size)
 
+        # Consumer task: Single writer dequeues and writes to response stream
         writer = build_writer_task(parent: parent, queue: queue)
+        # Producer tasks: Each fiber drains its stream and enqueues chunks
         tasks = build_producer_tasks(parent: parent, queue: queue)
 
         # This structure ensures that even if a producer task fails, we always
@@ -78,12 +94,18 @@ module ReactOnRailsPro
       @rorp_rendering_fibers.each_with_index.map do |fiber, idx|
         parent.async do
           loop do
+            # Check if client disconnected before expensive operations
+            break if response.stream.closed?
+
             chunk = fiber.resume
             break unless chunk
 
             # Will be blocked if the queue is full until a chunk is dequeued
             queue.enqueue([idx, chunk])
           end
+        rescue IOError, Errno::EPIPE
+          # Client disconnected - stop producing
+          break
         end
       end
     end
@@ -97,6 +119,9 @@ module ReactOnRailsPro
           _idx_from_queue, item = pair
           response.stream.write(item)
         end
+      rescue IOError, Errno::EPIPE
+        # Client disconnected - stop writing
+        nil
       end
     end
   end
