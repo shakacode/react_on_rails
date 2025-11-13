@@ -81,37 +81,83 @@ jobs:
               sha: pr.data.head.sha
             };
 
-      - name: Trigger all workflows and collect results
+      - name: Get skipped checks and trigger workflows
         id: trigger_workflows
         uses: actions/github-script@v7
         with:
           script: |
             const prData = ${{ steps.pr.outputs.result }};
-            const workflows = [
-              'main.yml',
-              'examples.yml',
-              'pro-integration-tests.yml',
-              'pro-package-tests.yml'
-            ];
+
+            // Fetch PR checks to find skipped ones
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+
+            const checks = await github.rest.checks.listForRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: pr.head.sha,
+              per_page: 100
+            });
+
+            // Find all skipped checks
+            const skippedChecks = checks.data.check_runs.filter(check =>
+              check.conclusion === 'SKIPPED' && check.status === 'COMPLETED'
+            );
+
+            console.log(`Found ${skippedChecks.length} skipped checks:`);
+            skippedChecks.forEach(check => {
+              console.log(`  - ${check.name} (${check.workflow_name})`);
+            });
+
+            // Map workflow names to workflow files
+            const workflowMap = {
+              'Main test': 'main.yml',
+              'Generator tests': 'examples.yml',
+              'React on Rails Pro - Integration Tests': 'pro-integration-tests.yml',
+              'React on Rails Pro - Package Tests': 'pro-package-tests.yml',
+              'React on Rails Pro - Lint': 'pro-lint.yml'
+            };
+
+            // Get unique workflows that have skipped checks
+            const uniqueWorkflows = new Set();
+            skippedChecks.forEach(check => {
+              if (workflowMap[check.workflow_name]) {
+                uniqueWorkflows.add(check.workflow_name);
+              }
+            });
 
             const succeeded = [];
             const failed = [];
+            const notApplicable = [];
 
-            // Trigger all workflows
-            for (const workflowId of workflows) {
+            // Trigger each workflow that has skipped checks
+            for (const workflowName of uniqueWorkflows) {
+              const workflowFile = workflowMap[workflowName];
               try {
                 await github.rest.actions.createWorkflowDispatch({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  workflow_id: workflowId,
-                  ref: prData.ref
+                  workflow_id: workflowFile,
+                  ref: prData.ref,
+                  inputs: {
+                    force_run: 'true'
+                  }
                 });
-                console.log(`✅ Triggered ${workflowId}`);
-                succeeded.push(workflowId);
+                console.log(`✅ Triggered ${workflowFile} (${workflowName})`);
+                succeeded.push({ id: workflowFile, name: workflowName });
               } catch (error) {
-                console.error(`❌ Failed to trigger ${workflowId}:`, error.message);
-                failed.push({ workflow: workflowId, error: error.message });
+                console.error(`❌ Failed to trigger ${workflowFile}:`, error.message);
+                failed.push({ workflow: workflowName, error: error.message });
               }
+            }
+
+            // Note workflows with no skipped checks
+            if (uniqueWorkflows.size === 0) {
+              console.log('ℹ️  No skipped checks found - all tests already running on this PR');
+              notApplicable.push('No skipped checks to run');
             }
 
             // Wait a bit for workflows to queue
@@ -132,48 +178,55 @@ jobs:
                 created: `>${new Date(Date.now() - 60000).toISOString()}`
               });
 
-              for (const workflowId of succeeded) {
+              for (const workflow of succeeded) {
                 const found = runs.data.workflow_runs.some(run =>
-                  run.path === `.github/workflows/${workflowId}` &&
+                  run.path === `.github/workflows/${workflow.id}` &&
                   run.head_sha === prData.sha &&
                   run.event === 'workflow_dispatch'
                 );
 
                 if (found) {
-                  verified.push(workflowId);
+                  verified.push(workflow);
                 } else {
-                  notFound.push(workflowId);
+                  notFound.push(workflow);
                 }
               }
             }
 
             // Build the comment body based on actual results
-            let status = '✅ **Successfully triggered and verified all workflows**';
-            if (failed.length > 0 && notFound.length > 0) {
+            let status;
+            if (notApplicable.length > 0) {
+              status = '✅ **All checks are already running - nothing to do!**';
+            } else if (failed.length > 0 && notFound.length > 0) {
               status = '❌ **Failed to trigger or verify workflows**';
             } else if (failed.length > 0) {
               status = '⚠️ **Some workflows failed to trigger**';
             } else if (notFound.length > 0) {
               status = '⚠️ **Workflows triggered but not yet verified**';
+            } else {
+              status = '✅ **Successfully triggered skipped CI checks**';
             }
 
-            const verifiedList = verified.length > 0 ? verified.map(w => `- ✅ ${w}`).join('\n') : '';
-            const notFoundList = notFound.length > 0 ? `\n\n**Triggered but not yet queued (may still start):**\n${notFound.map(w => `- ⏳ ${w}`).join('\n')}` : '';
+            // List the skipped checks we found
+            const skippedChecksList = skippedChecks.length > 0
+              ? `\n**Skipped checks detected:**\n${skippedChecks.map(c => `- ${c.name} (${c.workflow_name})`).join('\n')}`
+              : '';
+
+            const verifiedList = verified.length > 0 ? `\n**Triggered workflows:**\n${verified.map(w => `- ✅ ${w.name}`).join('\n')}` : '';
+            const notFoundList = notFound.length > 0 ? `\n\n**Triggered but not yet queued (may still start):**\n${notFound.map(w => `- ⏳ ${w.name}`).join('\n')}` : '';
             const failedList = failed.length > 0 ? `\n\n**Failed to trigger:**\n${failed.map(f => `- ❌ ${f.workflow}: ${f.error}`).join('\n')}` : '';
 
-            const body = `🚀 **Full CI Suite Results**
+            const body = `🚀 **Skipped CI Checks - Trigger Results**
 
             ${status}
+            ${skippedChecksList}
+            ${verifiedList}${notFoundList}${failedList}
 
-            ${verifiedList ? `**Verified workflows:**\n${verifiedList}` : ''}${notFoundList}${failedList}
+            ${verified.length > 0 ? `\n**Note:** These workflows will run with \`force_run: true\` to bypass detect-changes logic that caused them to skip.
 
-            ${verified.length > 0 ? `\nThese will run all CI jobs including those normally skipped on PRs:
-            - ✅ Minimum dependency versions (Ruby 3.2, Node 20)
-            - ✅ All example app tests
-            - ✅ Pro package integration tests
-            - ✅ Pro package unit tests
+            View progress in the [Actions tab](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions).` : ''}
 
-            View progress in the [Actions tab](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions).` : ''}`;
+            ${notApplicable.length > 0 ? `\nAll CI checks are already running on this PR. Use this command when you see skipped checks that you want to run.` : ''}`;
 
             // Post the comment
             await github.rest.issues.createComment({

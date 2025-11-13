@@ -6,6 +6,12 @@ on:
       - 'master'
   pull_request:
   workflow_dispatch:
+    inputs:
+      force_run:
+        description: 'Force run all jobs (bypass detect-changes)'
+        required: false
+        type: boolean
+        default: false
 
 defaults:
   run:
@@ -27,6 +33,14 @@ jobs:
         id: detect
         working-directory: .
         run: |
+          # If force_run is true, run everything
+          if [ "${{ inputs.force_run }}" = "true" ]; then
+            echo "run_pro_lint=true" >> "$GITHUB_OUTPUT"
+            echo "run_pro_tests=true" >> "$GITHUB_OUTPUT"
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/master' }}"
           script/ci-changes-detector "$BASE_REF"
         shell: bash

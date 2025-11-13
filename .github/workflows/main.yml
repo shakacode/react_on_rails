@@ -12,6 +12,12 @@ on:
       - '**.md'
       - 'docs/**'
   workflow_dispatch:
+    inputs:
+      force_run:
+        description: 'Force run all jobs (bypass detect-changes)'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   detect-changes:
@@ -32,6 +38,17 @@ jobs:
       - name: Detect relevant changes
         id: detect
         run: |
+          # If force_run is true, run everything
+          if [ "${{ inputs.force_run }}" = "true" ]; then
+            echo "run_lint=true" >> "$GITHUB_OUTPUT"
+            echo "run_js_tests=true" >> "$GITHUB_OUTPUT"
+            echo "run_ruby_tests=true" >> "$GITHUB_OUTPUT"
+            echo "run_dummy_tests=true" >> "$GITHUB_OUTPUT"
+            echo "run_generators=true" >> "$GITHUB_OUTPUT"
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/master' }}"
           script/ci-changes-detector "$BASE_REF"
         shell: bash
@@ -53,10 +70,10 @@ jobs:
             node-version: '20'
             dependency-level: 'minimum'
         exclude:
-          # Skip minimum dependency matrix on regular PRs (run only on master/workflow_dispatch)
-          - ruby-version: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && '3.2' || '' }}
-            node-version: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && '20' || '' }}
-            dependency-level: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && 'minimum' || '' }}
+          # Skip minimum dependency matrix on regular PRs (run only on master/workflow_dispatch/force_run)
+          - ruby-version: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && inputs.force_run != true && '3.2' || '' }}
+            node-version: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && inputs.force_run != true && '20' || '' }}
+            dependency-level: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && inputs.force_run != true && 'minimum' || '' }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -143,10 +160,10 @@ jobs:
             node-version: '20'
             dependency-level: 'minimum'
         exclude:
-          # Skip minimum dependency matrix on regular PRs (run only on master/workflow_dispatch)
-          - ruby-version: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && '3.2' || '' }}
-            node-version: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && '20' || '' }}
-            dependency-level: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && 'minimum' || '' }}
+          # Skip minimum dependency matrix on regular PRs (run only on master/workflow_dispatch/force_run)
+          - ruby-version: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && inputs.force_run != true && '3.2' || '' }}
+            node-version: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && inputs.force_run != true && '20' || '' }}
+            dependency-level: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && inputs.force_run != true && 'minimum' || '' }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
