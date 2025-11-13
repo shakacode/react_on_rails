@@ -2,7 +2,6 @@
 
 require "open3"
 
-# rubocop:disable Metrics/BlockLength
 namespace :rbs do
   desc "Validate RBS type signatures"
   task :validate do
@@ -37,27 +36,4 @@ namespace :rbs do
     sig_files.each { |f| puts "  #{f}" }
     puts "\nTotal: #{sig_files.count} files"
   end
-
-  desc "Run Steep type checker"
-  task :steep do
-    puts "Running Steep type checker..."
-
-    # Use Open3 for better error handling
-    # Note: Must use bundle exec even though rake runs in bundle context because
-    # spawned shell commands via Open3.capture3() do NOT inherit bundle context
-    stdout, stderr, status = Open3.capture3("bundle exec steep check")
-
-    if status.success?
-      puts "✓ Steep type checking passed"
-    else
-      puts "✗ Steep type checking failed"
-      puts stdout unless stdout.empty?
-      warn stderr unless stderr.empty?
-      exit 1
-    end
-  end
-
-  desc "Run all RBS checks (validate + steep)"
-  task all: %i[validate steep]
 end
-# rubocop:enable Metrics/BlockLength

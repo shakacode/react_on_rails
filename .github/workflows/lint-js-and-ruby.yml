@@ -95,8 +95,6 @@ jobs:
       # Currently disabled because 374 type errors need to be fixed first
       # - name: Run Steep type checker
       #   run: bundle exec rake rbs:steep
-      - name: Install Node modules with Yarn for dummy app
-        run: cd spec/dummy && yarn install --no-progress --no-emoji --frozen-lockfile
       - name: Save dummy app ruby gems to cache
         uses: actions/cache@v4
         with:

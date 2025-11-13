@@ -39,7 +39,11 @@ namespace :run_rspec do
 
     begin
       require "rbs"
-      "RBS_TEST_TARGET='ReactOnRails::*' RUBYOPT='-rrbs/test/setup'"
+      # Preserve existing RUBYOPT flags (e.g., --enable-yjit, --jit, warnings toggles)
+      # by appending RBS runtime hook instead of replacing
+      existing_rubyopt = ENV.fetch("RUBYOPT", nil)
+      rubyopt_parts = ["-rrbs/test/setup", existing_rubyopt].compact.reject(&:empty?)
+      "RBS_TEST_TARGET='ReactOnRails::*' RUBYOPT='#{rubyopt_parts.join(' ')}'"
     rescue LoadError
       # RBS not available - silently skip runtime checking
       # This is expected in environments without the rbs gem

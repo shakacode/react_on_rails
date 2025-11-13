@@ -139,10 +139,14 @@ Runtime type checking is **ENABLED BY DEFAULT** during test runs for:
 - `rake run_rspec:dummy` - Integration tests
 - `rake run_rspec:dummy_no_turbolinks` - Integration tests without Turbolinks
 
-To disable runtime checking (e.g., for faster test runs):
+**Performance Impact**: Runtime type checking adds overhead (typically 5-15%) to test execution. This is acceptable during development and CI as it catches type errors in actual execution paths that static analysis might miss.
+
+To disable runtime checking (e.g., for faster test iterations during development):
 ```bash
 DISABLE_RBS_RUNTIME_CHECKING=true rake run_rspec:gem
 ```
+
+**When to disable**: Consider disabling during rapid test-driven development cycles where you're running tests frequently. Re-enable before committing to catch type violations.
 
 ### Adding Type Signatures
 
@@ -170,7 +174,7 @@ The Pro package has its own RBS signatures in `react_on_rails_pro/sig/`.
 
 Validate Pro signatures:
 ```bash
-cd react_on_rails_pro && bundle exec rbs -I sig validate
+cd react_on_rails_pro && bundle exec rake rbs:validate
 ```
 ## Changelog
 

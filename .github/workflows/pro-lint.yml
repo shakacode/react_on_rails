@@ -142,7 +142,7 @@ jobs:
         run: bundle exec rubocop
 
       - name: Validate RBS type signatures
-        run: bundle exec rbs -I sig validate
+        run: bundle exec rake rbs:validate
 
       - name: Lint JS
         run: yarn run nps eslint
