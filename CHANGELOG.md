@@ -37,6 +37,8 @@ Changes since the last non-beta release.
 
 - **Improved RSC Payload Error Handling**: Errors that happen during generation of RSC payload are transferred properly to rails side and logs the error message and stack. [PR #1888](https://github.com/shakacode/react_on_rails/pull/1888) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
+- **Use as Git dependency**: All packages can now be installed as Git dependencies. This is useful for development and testing purposes. See [CONTRIBUTING.md](./CONTRIBUTING.md#git-dependencies) for documentation. [PR #1873](https://github.com/shakacode/react_on_rails/pull/1873) by [alexeyr-ci2](https://github.com/alexeyr-ci2).
+
 #### Changed
 
 - **Shakapacker 9.0.0 Upgrade**: Upgraded Shakapacker from 8.2.0 to 9.0.0 with Babel transpiler configuration for compatibility. Key changes include:
@@ -58,10 +60,6 @@ Changes since the last non-beta release.
 #### Fixed
 
 - **Node Renderer Worker Restart**: Fixed "descriptor closed" error that occurred when the node renderer restarts while handling an in-progress request (especially streaming requests). Workers now perform graceful shutdowns: they disconnect from the cluster to stop receiving new requests, wait for active requests to complete, then shut down cleanly. A configurable `gracefulWorkerRestartTimeout` ensures workers are forcibly killed if they don't shut down in time. [PR 1970](https://github.com/shakacode/react_on_rails/pull/1970) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-
-- **Component Loading Strategy Revert**: Reverted the default component loading strategy change from PR 1972 that had set it to `:defer`. This revert restored the original behavior (`:sync` or `:async` when available). Note: This was subsequently superseded by PR 1993, which implemented a better solution with license-based defaults (`:async` for Pro, `:defer` for non-Pro). [PR 1981](https://github.com/shakacode/react_on_rails/pull/1981) by [justin808](https://github.com/justin808).
-
-- **Use as Git dependency**: All packages can now be installed as Git dependencies. This is useful for development and testing purposes. See [CONTRIBUTING.md](./CONTRIBUTING.md#git-dependencies) for documentation. [PR #1873](https://github.com/shakacode/react_on_rails/pull/1873) by [alexeyr-ci2](https://github.com/alexeyr-ci2).
 
 #### Breaking Changes
 
@@ -1823,7 +1821,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/16.1.1...master
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/16.2.0.beta.4...master
+[16.2.0.beta.4]: https://github.com/shakacode/react_on_rails/compare/16.1.1...16.2.0.beta.4
 [16.1.1]: https://github.com/shakacode/react_on_rails/compare/16.1.0...16.1.1
 [16.1.0]: https://github.com/shakacode/react_on_rails/compare/16.0.0...16.1.0
 [16.0.0]: https://github.com/shakacode/react_on_rails/compare/14.2.0...16.0.0
