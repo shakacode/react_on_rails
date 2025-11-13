@@ -24,17 +24,21 @@ jobs:
       docs_only: ${{ steps.detect.outputs.docs_only }}
       run_pro_lint: ${{ steps.detect.outputs.run_pro_lint }}
       run_pro_tests: ${{ steps.detect.outputs.run_pro_tests }}
+      has_full_ci_label: ${{ steps.check-label.outputs.result }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Check for full-ci label
+        id: check-label
+        uses: ./.github/actions/check-full-ci-label
       - name: Detect relevant changes
         id: detect
         working-directory: .
         run: |
-          # If force_run is true, run everything
-          if [ "${{ inputs.force_run }}" = "true" ]; then
+          # If force_run is true OR full-ci label is present, run everything
+          if [ "${{ inputs.force_run }}" = "true" ] || [ "${{ steps.check-label.outputs.result }}" = "true" ]; then
             echo "run_pro_lint=true" >> "$GITHUB_OUTPUT"
             echo "run_pro_tests=true" >> "$GITHUB_OUTPUT"
             echo "docs_only=false" >> "$GITHUB_OUTPUT"

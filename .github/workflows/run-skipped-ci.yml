@@ -216,17 +216,34 @@ jobs:
             const notFoundList = notFound.length > 0 ? `\n\n**Triggered but not yet queued (may still start):**\n${notFound.map(w => `- ⏳ ${w.name}`).join('\n')}` : '';
             const failedList = failed.length > 0 ? `\n\n**Failed to trigger:**\n${failed.map(f => `- ❌ ${f.workflow}: ${f.error}`).join('\n')}` : '';
 
-            const body = `🚀 **Skipped CI Checks - Trigger Results**
+            // Add full-ci label only if we actually triggered workflows or if checks are already running
+            let labelAdded = false;
+            try {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                labels: ['full-ci']
+              });
+              labelAdded = true;
+              console.log('✅ Added full-ci label to PR');
+            } catch (error) {
+              console.error('⚠️  Failed to add label:', error.message);
+            }
+
+            const body = `🚀 **Full CI Mode Enabled**
 
             ${status}
             ${skippedChecksList}
             ${verifiedList}${notFoundList}${failedList}
 
-            ${verified.length > 0 ? `\n**Note:** These workflows will run with \`force_run: true\` to bypass detect-changes logic that caused them to skip.
+            ${labelAdded && verified.length > 0 ? `\n**Note:** Added the \`full-ci\` label to this PR. All future commits will run the full CI suite (including minimum dependency tests) until the label is removed.
+
+            To disable full CI mode, use the \`/stop-run-skipped-ci\` command.
 
             View progress in the [Actions tab](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions).` : ''}
 
-            ${notApplicable.length > 0 ? `\nAll CI checks are already running on this PR. Use this command when you see skipped checks that you want to run.` : ''}`;
+            ${labelAdded && notApplicable.length > 0 ? `\nAll CI checks are already running on this PR. Added the \`full-ci\` label - future commits will run the full CI suite.` : ''}`;
 
             // Post the comment
             await github.rest.issues.createComment({

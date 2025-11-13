@@ -421,6 +421,53 @@ The CI system intelligently skips unnecessary work:
 
 For more details, see [`docs/CI_OPTIMIZATION.md`](./docs/CI_OPTIMIZATION.md).
 
+### CI Control Commands
+
+React on Rails provides PR comment commands to control CI behavior:
+
+#### `/run-skipped-ci` - Enable Full CI Mode
+
+Runs all skipped CI checks and enables full CI mode for the PR:
+
+```
+/run-skipped-ci
+```
+
+**What it does:**
+
+- Triggers all CI workflows that were skipped due to unchanged code
+- Adds the `full-ci` label to the PR
+- **Persists across future commits** - all subsequent pushes will run the full test suite
+- Runs minimum dependency tests (Ruby 3.2, Node 20, Shakapacker 8.2.0, React 18)
+
+**When to use:**
+
+- You want comprehensive testing across all configurations
+- Testing changes that might affect minimum supported versions
+- Validating generator changes or core functionality
+- Before merging PRs that touch critical paths
+
+#### `/stop-run-skipped-ci` - Disable Full CI Mode
+
+Removes the `full-ci` label and returns to standard CI behavior:
+
+```
+/stop-run-skipped-ci
+```
+
+**What it does:**
+
+- Removes the `full-ci` label from the PR
+- Future commits will use the optimized CI suite (tests only changed code)
+- Does not stop currently running workflows
+
+**When to use:**
+
+- You've validated changes with full CI and want to return to faster feedback
+- Reducing CI time during rapid iteration on a PR
+
+**Note:** The `full-ci` label is preserved on merged PRs as a historical record of which PRs ran with comprehensive testing.
+
 ### Install Generator
 
 In your Rails app add this gem with a path to your fork.
