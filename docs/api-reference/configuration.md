@@ -6,16 +6,7 @@ This document describes all configuration options for React on Rails. Configurat
 
 ## Quick Start
 
-For most applications, your configuration file can be as simple as:
-
-```ruby
-ReactOnRails.configure do |config|
-  config.server_bundle_js_file = "server-bundle.js"
-  config.build_test_command = "RAILS_ENV=test bin/shakapacker"
-end
-```
-
-See [Essential Configuration](#essential-configuration) below for the options you'll commonly use.
+See [Essential Configuration](#essential-configuration) below for the minimal configuration options you'll commonly use. Most applications only need 1-2 settings!
 
 ## Prerequisites
 
@@ -65,7 +56,7 @@ React on Rails configuration options are organized into two categories:
 Options you'll commonly configure for most applications:
 
 - `server_bundle_js_file` - Server rendering bundle (recommended)
-- `build_test_command` - Test environment build command (alternative to Shakapacker compile setting)
+- `build_test_command` - Test environment build command (used with `ReactOnRails::TestHelper.configure_rspec_to_compile_assets`)
 
 ### Advanced Configuration
 
@@ -141,7 +132,9 @@ test:
 
 ## File-Based Component Registry
 
-For information about the file-based component registry feature (including `components_subdirectory`, `auto_load_bundle`, and `make_generated_server_bundle_the_entrypoint` configuration options), see:
+If you have many components and want to avoid manually managing webpack entry points for each one, React on Rails can automatically generate component packs based on your file system structure. This feature is particularly useful for large applications with dozens of components.
+
+For complete information about the file-based component registry feature (including `components_subdirectory`, `auto_load_bundle`, and `make_generated_server_bundle_the_entrypoint` configuration options), see:
 
 [Auto-Bundling: File-System-Based Automated Bundle Generation](../core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md)
 
@@ -165,7 +158,7 @@ Controls how generated component pack scripts are loaded:
 
 **You typically don't need to set this** - React on Rails automatically selects the best strategy based on your Pro license status and Shakapacker version.
 
-To override the default:
+**When to override:** Only change this if you have specific performance requirements or constraints. For example, you might use `:defer` if you need to ensure all page content loads before scripts execute, or `:sync` for testing purposes.
 
 ```ruby
 config.generated_component_packs_loading_strategy = :defer
@@ -178,10 +171,13 @@ config.generated_component_packs_loading_strategy = :defer
 **Type:** String or nil
 **Default:** `"ssr-generated"`
 
-Directory (relative to Rails root) where server bundles are output. **You should not need to set this** - the default value is recommended for all applications.
+> ⚠️ **DO NOT change this setting unless you have a specific reason.** The default is correct for virtually all applications.
+
+Directory (relative to Rails root) where server bundles are output.
 
 ```ruby
-config.server_bundle_output_path = "ssr-generated"  # default (no need to set)
+# No need to set this - the default is recommended
+# config.server_bundle_output_path = "ssr-generated"
 ```
 
 - When set to a string: Server bundles output to this directory (e.g., `ssr-generated/`)
@@ -325,11 +321,13 @@ config.development_mode = Rails.env.development?  # default
 **Type:** Boolean
 **Default:** `true`
 
-When true, server-side console messages replay in the browser console:
+When true, server-side console messages replay in the browser console. This is valuable for debugging server-rendering issues.
 
 ```ruby
 config.replay_console = true  # default
 ```
+
+**When to disable:** You might set this to `false` in production if console logs contain sensitive data or to reduce client-side payload size.
 
 #### logging_on_server
 
@@ -426,6 +424,8 @@ config.component_registry_timeout = 5000  # default (5 seconds)
 Set to `0` to wait indefinitely (not recommended for production).
 
 ### I18n Configuration
+
+These options are for applications using [react-intl](https://formatjs.io/docs/react-intl/) or similar internationalization libraries. If your application doesn't need i18n, you can skip this section.
 
 #### i18n_dir
 

@@ -14,7 +14,8 @@ ReactOnRails.configure do |config|
 
   ################################################################################
   # Test Configuration
-  # Alternatively, set `compile: true` in config/shakapacker.yml for test env
+  # Used with ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+  # Preferred alternative: set `compile: true` in config/shakapacker.yml for test env
   ################################################################################
   config.build_test_command = "RAILS_ENV=test bin/shakapacker"
 

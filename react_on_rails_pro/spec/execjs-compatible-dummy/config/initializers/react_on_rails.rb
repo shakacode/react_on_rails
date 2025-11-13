@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-# ExecJS-compatible dummy app configuration
-# This app tests compatibility with legacy webpacker setup
-# See docs/api-reference/configuration.md for complete documentation
+# ⚠️ TEST CONFIGURATION - Do not copy directly for production apps
+# This is the ExecJS-compatible dummy app for testing legacy webpacker compatibility.
+# See docs/api-reference/configuration.md for production configuration guidance.
 
 ReactOnRails.configure do |config|
   ################################################################################

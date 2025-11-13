@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-# Dummy app configuration for testing React on Rails
-# This demonstrates both essential and advanced configuration options for testing purposes
-# See docs/api-reference/configuration.md for complete documentation
+# ⚠️ TEST CONFIGURATION - Do not copy directly for production apps
+# This is the dummy app configuration used for testing React on Rails features.
+# See docs/api-reference/configuration.md for production configuration guidance.
 
 # Advanced: Custom rendering extension to add values to railsContext
 module RenderingExtension
