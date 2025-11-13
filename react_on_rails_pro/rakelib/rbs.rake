@@ -2,6 +2,8 @@
 
 require "open3"
 
+# NOTE: Pro package does not include Steep tasks (:steep, :all) as it does not
+# use Steep type checker. Only RBS validation is performed.
 namespace :rbs do
   desc "Validate RBS type signatures"
   task :validate do

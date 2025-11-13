@@ -15,6 +15,8 @@ RSpec.describe "RBS Runtime Type Checking", type: :rbs do
     it "catches invalid type assignments to configuration" do
       # This test verifies runtime checking actually works by intentionally
       # violating a type signature and expecting RBS to catch it
+      # Type signature: sig/react_on_rails/configuration.rbs:4
+      # attr_accessor server_bundle_js_file: String
       expect do
         config = ReactOnRails::Configuration.new(
           server_bundle_js_file: 123 # Invalid: should be String, not Integer

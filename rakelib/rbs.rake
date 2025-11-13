@@ -15,7 +15,8 @@ namespace :rbs do
     # This allows us to distinguish between actual validation errors and warnings
     # Note: Must use bundle exec even though rake runs in bundle context because
     # spawned shell commands via Open3.capture3() do NOT inherit bundle context
-    stdout, stderr, status = Open3.capture3("bundle exec rbs -I sig validate")
+    # Timeout after 60 seconds to prevent hung processes in CI environments
+    stdout, stderr, status = Open3.capture3("bundle exec rbs -I sig validate", timeout: 60)
 
     if status.success?
       puts "✓ RBS validation passed"
@@ -45,7 +46,8 @@ namespace :rbs do
     # Use Open3 for better error handling
     # Note: Must use bundle exec even though rake runs in bundle context because
     # spawned shell commands via Open3.capture3() do NOT inherit bundle context
-    stdout, stderr, status = Open3.capture3("bundle exec steep check")
+    # Timeout after 60 seconds to prevent hung processes in CI environments
+    stdout, stderr, status = Open3.capture3("bundle exec steep check", timeout: 60)
 
     if status.success?
       puts "✓ Steep type checking passed"

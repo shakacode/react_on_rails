@@ -66,7 +66,11 @@ namespace :run_rspec do
 
   desc "Runs dummy rspec without turbolinks"
   task dummy_no_turbolinks: ["dummy_apps:dummy_app"] do
-    env_vars = [rbs_runtime_env_vars, "DISABLE_TURBOLINKS=TRUE"].reject(&:empty?).join(" ")
+    # Build env vars array for robustness with complex environment variables
+    env_vars_array = []
+    env_vars_array << rbs_runtime_env_vars unless rbs_runtime_env_vars.empty?
+    env_vars_array << "DISABLE_TURBOLINKS=TRUE"
+    env_vars = env_vars_array.join(" ")
     run_tests_in(spec_dummy_dir,
                  env_vars: env_vars,
                  command_name: "dummy_no_turbolinks")
