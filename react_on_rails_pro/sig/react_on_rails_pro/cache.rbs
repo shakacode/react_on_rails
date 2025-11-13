@@ -1,0 +1,13 @@
+module ReactOnRailsPro
+  class Cache
+    def self.fetch_react_component: (String component_name, Hash[Symbol, untyped] options) { () -> untyped } -> untyped
+
+    def self.use_cache?: (Hash[Symbol, untyped] options) -> bool
+
+    def self.base_cache_key: (String type, ?prerender: bool?) -> Array[String]
+
+    def self.dependencies_cache_key: () -> String?
+
+    def self.react_component_cache_key: (String component_name, Hash[Symbol, untyped] options) -> Array[untyped]
+  end
+end

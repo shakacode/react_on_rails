@@ -89,8 +89,12 @@ jobs:
         run: bundle check --path=vendor/bundle || bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
       - name: Lint Ruby
         run: bundle exec rubocop
-      - name: Install Node modules with Yarn for dummy app
-        run: cd spec/dummy && yarn install --no-progress --no-emoji --frozen-lockfile
+      - name: Validate RBS type signatures
+        run: bundle exec rake rbs:validate
+      # TODO: Re-enable Steep once RBS signatures are complete for all checked files
+      # Currently disabled because 374 type errors need to be fixed first
+      # - name: Run Steep type checker
+      #   run: bundle exec rake rbs:steep
       - name: Save dummy app ruby gems to cache
         uses: actions/cache@v4
         with:
