@@ -157,8 +157,8 @@ export const delay = (milliseconds: number) =>
   });
 
 export function getBundleDirectory(bundleTimestamp: string | number) {
-  const { bundlePath } = getConfig();
-  return path.join(bundlePath, `${bundleTimestamp}`);
+  const { serverBundleCachePath } = getConfig();
+  return path.join(serverBundleCachePath, `${bundleTimestamp}`);
 }
 
 export function getRequestBundleFilePath(bundleTimestamp: string | number) {
