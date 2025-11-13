@@ -39,6 +39,9 @@ ReactOnRails.configure do |config|
   config.auto_load_bundle = true
   config.components_subdirectory = "ror-auto-load-components"
 
+  # Don't explicitly set generated_component_packs_loading_strategy - let it default to :defer
+  # which ensures generated component packs load and register components before main bundle executes
+
   config.enforce_private_server_bundles = true
   config.server_bundle_output_path = "ssr-generated"
 end
