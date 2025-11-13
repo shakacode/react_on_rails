@@ -8,7 +8,7 @@ if (fs.existsSync(BUNDLE_PATH)) {
 
 const config = {
   // This is the default but avoids searching for the Rails root
-  bundlePath: BUNDLE_PATH,
+  serverBundleCachePath: BUNDLE_PATH,
   port: env.RENDERER_PORT || 3800, // Listen at RENDERER_PORT env value or default port 3800
   logLevel: env.RENDERER_LOG_LEVEL || 'info',
 
