@@ -19,20 +19,4 @@ jobs:
           body: |
             👋 Thanks for opening this PR!
 
-            ### 🚀 Running Full CI Suite
-
-            By default, PRs run a subset of CI jobs for faster feedback (latest Ruby/Node versions only).
-
-            To run the **complete CI suite** including all dependency combinations and skipped jobs, comment:
-
-            ```
-            /run-skipped-ci
-            ```
-
-            This will trigger:
-            - ✅ Minimum supported versions (Ruby 3.2, Node 20)
-            - ✅ All example app tests
-            - ✅ Pro package integration tests
-            - ✅ All test matrices
-
-            The full CI suite takes longer but ensures compatibility across all supported versions before merging.
+            **Need full CI coverage?** Comment `/run-skipped-ci` to test against minimum supported versions (Ruby 3.2, Node 20) and all test matrices.
