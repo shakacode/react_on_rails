@@ -14,6 +14,12 @@ module ReactOnRails
       Rainbow('To see the full output, set FULL_TEXT_ERRORS=true.').red
     } ...\n".freeze
 
+    def self.immediate_hydration_pro_license_warning(name, type = "Component")
+      "[REACT ON RAILS] Warning: immediate_hydration: true requires a React on Rails Pro license.\n" \
+        "#{type} '#{name}' will fall back to standard hydration behavior.\n" \
+        "Visit https://www.shakacode.com/react-on-rails-pro/ for licensing information."
+    end
+
     # https://forum.shakacode.com/t/yak-of-the-week-ruby-2-4-pathname-empty-changed-to-look-at-file-size/901
     # return object if truthy, else return nil
     def self.truthy_presence(obj)

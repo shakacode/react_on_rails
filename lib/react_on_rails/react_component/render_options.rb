@@ -100,17 +100,15 @@ module ReactOnRails
 
         # If non-Pro user explicitly sets immediate_hydration: true, warn and override to false
         if explicit_value == true && !ReactOnRails::Utils.react_on_rails_pro?
-          Rails.logger.warn <<~WARNING
-            [REACT ON RAILS] Warning: immediate_hydration: true requires a React on Rails Pro license.
-            Component '#{react_component_name}' will fall back to standard hydration behavior.
-            Visit https://www.shakacode.com/react-on-rails-pro/ for licensing information.
-          WARNING
+          warning = ReactOnRails::Utils.immediate_hydration_pro_license_warning(react_component_name, "Component")
+          Rails.logger.warn warning
           return false # Force fallback to standard hydration
         end
 
-        options.fetch(:immediate_hydration) do
-          ReactOnRails::Utils.react_on_rails_pro?
-        end
+        # Return explicit value if provided, otherwise default based on Pro license
+        return explicit_value unless explicit_value.nil?
+
+        ReactOnRails::Utils.react_on_rails_pro?
       end
 
       def to_s

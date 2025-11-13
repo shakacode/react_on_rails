@@ -66,6 +66,26 @@ module ReactOnRails
                   :component_registry_timeout,
                   :server_bundle_output_path, :enforce_private_server_bundles
 
+    # Deprecated: immediate_hydration configuration has been removed
+    def immediate_hydration=(value)
+      Rails.logger.warn <<~WARNING
+        [REACT ON RAILS] The 'config.immediate_hydration' configuration option is deprecated and no longer used.
+        Immediate hydration is now automatically enabled for React on Rails Pro users.
+        Please remove 'config.immediate_hydration = #{value}' from your config/initializers/react_on_rails.rb file.
+        See CHANGELOG.md for migration instructions.
+      WARNING
+    end
+
+    def immediate_hydration
+      Rails.logger.warn <<~WARNING
+        [REACT ON RAILS] The 'config.immediate_hydration' configuration option is deprecated and no longer used.
+        Immediate hydration is now automatically enabled for React on Rails Pro users.
+        Please remove any references to 'config.immediate_hydration' from your config/initializers/react_on_rails.rb file.
+        See CHANGELOG.md for migration instructions.
+      WARNING
+      nil
+    end
+
     # rubocop:disable Metrics/AbcSize
     def initialize(node_modules_location: nil, server_bundle_js_file: nil, prerender: nil,
                    replay_console: nil, make_generated_server_bundle_the_entrypoint: nil,

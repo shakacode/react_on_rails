@@ -17,11 +17,7 @@ module ReactOnRails
     def redux_store(store_name, props: {}, immediate_hydration: nil)
       # If non-Pro user explicitly sets immediate_hydration: true, warn and override to false
       if immediate_hydration == true && !ReactOnRails::Utils.react_on_rails_pro?
-        Rails.logger.warn <<~WARNING
-          [REACT ON RAILS] Warning: immediate_hydration: true requires a React on Rails Pro license.
-          Store '#{store_name}' will fall back to standard hydration behavior.
-          Visit https://www.shakacode.com/react-on-rails-pro/ for licensing information.
-        WARNING
+        Rails.logger.warn ReactOnRails::Utils.immediate_hydration_pro_license_warning(store_name, "Store")
         immediate_hydration = false
       elsif immediate_hydration.nil?
         immediate_hydration = ReactOnRails::Utils.react_on_rails_pro?
