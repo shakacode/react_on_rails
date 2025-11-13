@@ -1,0 +1,10 @@
+module ReactOnRails
+  class JsonParseError < ::ReactOnRails::Error
+    attr_reader json: String
+
+    def initialize: (parse_error: StandardError, json: String) -> void
+    def to_honeybadger_context: () -> Hash[Symbol, untyped]
+    def raven_context: () -> Hash[Symbol, untyped]
+    def to_error_context: () -> Hash[Symbol, untyped]
+  end
+end
