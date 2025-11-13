@@ -23,14 +23,29 @@ jobs:
       run_ruby_tests: ${{ steps.detect.outputs.run_ruby_tests }}
       run_dummy_tests: ${{ steps.detect.outputs.run_dummy_tests }}
       run_generators: ${{ steps.detect.outputs.run_generators }}
+      has_full_ci_label: ${{ steps.check-label.outputs.result }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Check for full-ci label
+        id: check-label
+        uses: ./.github/actions/check-full-ci-label
       - name: Detect relevant changes
         id: detect
         run: |
+          # If full-ci label is present, run everything
+          if [ "${{ steps.check-label.outputs.result }}" = "true" ]; then
+            echo "run_lint=true" >> "$GITHUB_OUTPUT"
+            echo "run_js_tests=true" >> "$GITHUB_OUTPUT"
+            echo "run_ruby_tests=true" >> "$GITHUB_OUTPUT"
+            echo "run_dummy_tests=true" >> "$GITHUB_OUTPUT"
+            echo "run_generators=true" >> "$GITHUB_OUTPUT"
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/master' }}"
           script/ci-changes-detector "$BASE_REF"
         shell: bash
