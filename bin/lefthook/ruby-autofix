@@ -17,6 +17,7 @@ else
 fi
 printf "  %s\n" $files
 
-bundle exec rake autofix
+# Run RuboCop only on changed files (not the full rake autofix)
+bundle exec rubocop -A --force-exclusion -- $files
 
 echo "✅ Auto-fix complete (fixed files staged automatically)"
