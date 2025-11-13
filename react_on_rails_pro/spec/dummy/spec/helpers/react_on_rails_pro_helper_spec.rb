@@ -512,6 +512,57 @@ describe ReactOnRailsProHelper do
           expect(chunk).not_to include("<h1>Header Rendered In View</h1>")
         end
       end
+
+      it "stops producing when client disconnects" do
+        queue = Async::Queue.new
+        mock_request_and_response(queue)
+
+        # Simulate client disconnect by making stream.write raise IOError
+        call_count = 0
+        allow(mocked_stream).to receive(:write) do |chunk|
+          call_count += 1
+          written_chunks << chunk
+          raise IOError, "client disconnected" if call_count == 2
+        end
+
+        # Configure render_to_string to call stream_react_component
+        allow(self).to receive(:render_to_string) do
+          render_result = stream_react_component(component_name, props: props, **component_options)
+          <<-HTML
+            <div>
+              <h1>Header Rendered In View</h1>
+              #{render_result}
+            </div>
+          HTML
+        end
+
+        Sync do |parent|
+          parent.async do
+            stream_view_containing_react_components(template: template_path)
+          rescue IOError
+            # Expected - client disconnected
+          end
+
+          # Enqueue first chunk - should be written successfully
+          queue.enqueue(chunks[0])
+          sleep 0.05
+
+          # Enqueue second chunk - should trigger disconnect
+          queue.enqueue(chunks[1])
+          sleep 0.05
+
+          # Enqueue third chunk - should not be written (producer stopped)
+          queue.enqueue(chunks[2])
+          sleep 0.05
+
+          queue.close
+          sleep 0.05
+        end
+
+        # Should only have written the first chunk before disconnect
+        expect(written_chunks.count).to eq(1)
+        expect(mocked_stream).to have_received(:write).at_most(2).times
+      end
     end
 
     describe "#cached_stream_react_component", :caching do # rubocop:disable RSpec/MultipleMemoizedHelpers
