@@ -1148,6 +1148,11 @@ module ReactOnRails
       end
     end
 
+    # Comment patterns used for filtering out commented async usage
+    ERB_COMMENT_PATTERN = /<%\s*#.*javascript_pack_tag/
+    HAML_COMMENT_PATTERN = /^\s*-#.*javascript_pack_tag/
+    HTML_COMMENT_PATTERN = /<!--.*javascript_pack_tag/
+
     def check_async_usage
       # When Pro is installed, async is fully supported and is the default behavior
       # No need to check for async usage in this case
@@ -1186,7 +1191,7 @@ module ReactOnRails
       files_with_async.compact
     rescue Errno::ENOENT, Encoding::InvalidByteSequenceError, Encoding::UndefinedConversionError => e
       # Log the error if Rails logger is available
-      Rails.logger.debug("Error scanning view files for async: #{e.message}") if defined?(Rails) && Rails.logger
+      log_debug("Error scanning view files for async: #{e.message}")
       []
     end
 
@@ -1232,12 +1237,12 @@ module ReactOnRails
         # Skip lines that don't contain javascript_pack_tag
         next unless line.include?("javascript_pack_tag")
 
-        # Skip ERB comments (<%# ... %>) - matches ERB comment opening with optional whitespace
-        next if line.match?(/<%\s*#.*javascript_pack_tag/)
-        # Skip HAML comments (-# ...) - matches line-starting HAML comments
-        next if line.match?(/^\s*-#.*javascript_pack_tag/)
-        # Skip HTML comments (<!-- ... -->) - matches complete HTML comment blocks
-        next if line.match?(/<!--.*javascript_pack_tag/)
+        # Skip ERB comments (<%# ... %>)
+        next if line.match?(ERB_COMMENT_PATTERN)
+        # Skip HAML comments (-# ...)
+        next if line.match?(HAML_COMMENT_PATTERN)
+        # Skip HTML comments (<!-- ... -->)
+        next if line.match?(HTML_COMMENT_PATTERN)
 
         # If we reach here, this line has an uncommented javascript_pack_tag
         true
@@ -1263,8 +1268,14 @@ module ReactOnRails
       end
     rescue Errno::ENOENT, Encoding::InvalidByteSequenceError, Encoding::UndefinedConversionError => e
       # Log the error if Rails logger is available
-      Rails.logger.debug("Error checking async loading strategy: #{e.message}") if defined?(Rails) && Rails.logger
+      log_debug("Error checking async loading strategy: #{e.message}")
       false
+    end
+
+    def log_debug(message)
+      return unless defined?(Rails.logger) && Rails.logger
+
+      Rails.logger.debug(message)
     end
   end
   # rubocop:enable Metrics/ClassLength
