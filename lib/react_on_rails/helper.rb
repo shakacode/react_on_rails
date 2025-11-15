@@ -587,6 +587,15 @@ module ReactOnRails
           # It doesn't make any transformation, it listens and raises error if a chunk has errors
           chunk_json_result
         end
+        
+        result.rescue do |err|
+          # This error came from the renderer
+          raise ReactOnRails::PrerenderError.new(component_name: react_component_name,
+                                               # Sanitize as this might be browser logged
+                                               props: sanitized_props_string(props),
+                                               err: err,
+                                               js_code: js_code)
+        end
       elsif result["hasErrors"] && render_options.raise_on_prerender_error
         raise_prerender_error(result, react_component_name, props, js_code)
       end
