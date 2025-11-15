@@ -142,7 +142,6 @@ module ReactOnRailsPro
       validate_remote_bundle_cache_adapter
       setup_renderer_password
       setup_assets_to_copy
-      validate_concurrent_component_streaming_buffer_size
       setup_execjs_profiler_if_needed
       check_react_on_rails_support_for_rsc
     end
@@ -232,14 +231,6 @@ module ReactOnRailsPro
               "config.remote_bundle_cache_adapter must have a class method named 'upload'" \
               "which takes a single named Pathname parameter 'zipped_bundles_filepath' & returns nil"
       end
-    end
-
-    def validate_concurrent_component_streaming_buffer_size
-      return if concurrent_component_streaming_buffer_size.is_a?(Integer) &&
-                concurrent_component_streaming_buffer_size.positive?
-
-      raise ReactOnRailsPro::Error,
-            "config.concurrent_component_streaming_buffer_size must be a positive integer"
     end
 
     def setup_renderer_password
