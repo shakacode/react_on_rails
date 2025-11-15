@@ -485,5 +485,61 @@ RSpec.describe "Streaming API" do
       gaps = write_timestamps.each_cons(2).map { |a, b| b - a }
       expect(gaps.all? { |gap| gap >= 0.04 }).to be true
     end
+
+    it "properly cleans up when client disconnects" do
+      queues, controller, stream = setup_stream_test(component_count: 2)
+
+      chunks_written = []
+      cleanup_checks = {
+        stream_close_called: false,
+        queue_closed: false,
+        writer_stopped: false
+      }
+
+      # Simulate client disconnect after 3 chunks
+      allow(stream).to receive(:write) do |chunk|
+        chunks_written << chunk
+        if chunks_written.length == 3
+          # Simulate client disconnect
+          raise IOError, "client disconnected"
+        end
+      end
+
+      allow(stream).to receive(:close) do
+        cleanup_checks[:stream_close_called] = true
+      end
+
+      # This should raise IOError but still clean up properly
+      expect do
+        run_stream(controller) do |_parent|
+          # Enqueue chunks from both components
+          queues[0].enqueue("A1")
+          queues[0].enqueue("A2")
+          queues[0].enqueue("A3")
+          queues[1].enqueue("B1")
+          queues[1].enqueue("B2")
+          queues[1].enqueue("B3")
+
+          sleep 0.1
+
+          # Close queues
+          queues[0].close
+          queues[1].close
+
+          sleep 0.2
+        end
+      end.to raise_error(IOError, /client disconnected/)
+
+      # Verify cleanup happened
+      expect(cleanup_checks[:stream_close_called]).to be true
+
+      # Verify exactly 3 chunks were written before disconnect
+      expect(chunks_written.length).to eq(3)
+
+      # The test verifies that:
+      # 1. The IOError was raised (error propagation works)
+      # 2. Stream close was still called (ensure block executed)
+      # 3. No more chunks were written after disconnect
+    end
   end
 end
