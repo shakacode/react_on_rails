@@ -91,7 +91,7 @@ module ReactOnRailsPro
     end
 
     def build_producer_tasks(parent:, queue:)
-      @rorp_rendering_fibers.each_with_index.map do |fiber, idx|
+      @rorp_rendering_fibers.map do |fiber|
         parent.async do
           loop do
             # Check if client disconnected before expensive operations
@@ -101,7 +101,7 @@ module ReactOnRailsPro
             break unless chunk
 
             # Will be blocked if the queue is full until a chunk is dequeued
-            queue.enqueue([idx, chunk])
+            queue.enqueue(chunk)
           end
         rescue IOError, Errno::EPIPE
           # Client disconnected - stop producing
@@ -113,11 +113,10 @@ module ReactOnRailsPro
     def build_writer_task(parent:, queue:)
       parent.async do
         loop do
-          pair = queue.dequeue
-          break if pair.nil?
+          chunk = queue.dequeue
+          break if chunk.nil?
 
-          _idx_from_queue, item = pair
-          response.stream.write(item)
+          response.stream.write(chunk)
         end
       rescue IOError, Errno::EPIPE
         # Client disconnected - stop writing
