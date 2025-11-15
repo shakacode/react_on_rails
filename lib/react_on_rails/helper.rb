@@ -591,7 +591,7 @@ module ReactOnRails
         result.rescue do |err|
           # This error came from the renderer
           raise ReactOnRails::PrerenderError.new(component_name: react_component_name,
-                                                   # Sanitize as this might be browser logged
+                                                 # Sanitize as this might be browser logged
                                                  props: sanitized_props_string(props),
                                                  err: err,
                                                  js_code: js_code)
