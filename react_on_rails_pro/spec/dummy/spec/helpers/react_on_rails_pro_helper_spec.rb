@@ -444,6 +444,7 @@ describe ReactOnRailsProHelper do
           written_chunks << chunk
         end
         allow(mocked_stream).to receive(:close)
+        allow(mocked_stream).to receive(:closed?).and_return(false)
         mocked_response = instance_double(ActionDispatch::Response)
         allow(mocked_response).to receive(:stream).and_return(mocked_stream)
         allow(self).to receive(:response).and_return(mocked_response)
@@ -584,6 +585,7 @@ describe ReactOnRailsProHelper do
         written_chunks.clear
         allow(mocked_stream).to receive(:write) { |chunk| written_chunks << chunk }
         allow(mocked_stream).to receive(:close)
+        allow(mocked_stream).to receive(:closed?).and_return(false)
         mocked_response = instance_double(ActionDispatch::Response)
         allow(mocked_response).to receive(:stream).and_return(mocked_stream)
         allow(self).to receive(:response).and_return(mocked_response)
