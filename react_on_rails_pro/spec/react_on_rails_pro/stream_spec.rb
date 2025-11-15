@@ -486,5 +486,46 @@ RSpec.describe "Streaming API" do
       gaps = write_timestamps.each_cons(2).map { |a, b| b - a }
       expect(gaps.all? { |gap| gap >= 0.04 }).to be true
     end
+
+    it "stops producing when client disconnects" do
+      queues, controller, stream = setup_stream_test(component_count: 2)
+
+      written_chunks = []
+      stream_closed = false
+
+      # Simulate client disconnect on third write (after TEMPLATE and first component chunk)
+      allow(stream).to receive(:write) do |chunk|
+        if written_chunks.length == 2
+          stream_closed = true
+          raise IOError, "client disconnected"
+        end
+        written_chunks << chunk
+      end
+
+      # Make closed? return the stream_closed flag
+      allow(stream).to receive(:closed?) { stream_closed }
+
+      run_stream(controller) do |_parent|
+        # First write will be "TEMPLATE" (automatic)
+        sleep 0.05
+
+        # Enqueue chunks from both components
+        queues[0].enqueue("A1")  # Second write
+        sleep 0.05
+
+        queues[1].enqueue("B1")  # Third write - this should trigger disconnect
+        sleep 0.05
+
+        queues[0].enqueue("A2")  # Should not be written (producer stopped)
+        queues[1].enqueue("B2")  # Should not be written (producer stopped)
+        sleep 0.05
+
+        queues.each(&:close)
+      end
+
+      # Should have written TEMPLATE and first component chunk before disconnect
+      expect(written_chunks.length).to eq(2)
+      expect(written_chunks).to eq(["TEMPLATE", "A1"])
+    end
   end
 end
