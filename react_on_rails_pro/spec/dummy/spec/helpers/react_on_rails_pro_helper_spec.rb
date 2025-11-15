@@ -520,11 +520,18 @@ describe ReactOnRailsProHelper do
 
         # Simulate client disconnect by making stream.write raise IOError
         call_count = 0
+        stream_closed = false
         allow(mocked_stream).to receive(:write) do |chunk|
           call_count += 1
+          if call_count == 2
+            stream_closed = true
+            raise IOError, "client disconnected"
+          end
           written_chunks << chunk
-          raise IOError, "client disconnected" if call_count == 2
         end
+
+        # Update the closed? stub to check the stream_closed flag
+        allow(mocked_stream).to receive(:closed?) { stream_closed }
 
         # Configure render_to_string to call stream_react_component
         allow(self).to receive(:render_to_string) do
