@@ -61,6 +61,8 @@ Changes since the last non-beta release.
 
 - **Node Renderer Worker Restart**: Fixed "descriptor closed" error that occurred when the node renderer restarts while handling an in-progress request (especially streaming requests). Workers now perform graceful shutdowns: they disconnect from the cluster to stop receiving new requests, wait for active requests to complete, then shut down cleanly. A configurable `gracefulWorkerRestartTimeout` ensures workers are forcibly killed if they don't shut down in time. [PR 1970](https://github.com/shakacode/react_on_rails/pull/1970) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
+- **Body Duplication Bug On Streaming**: Fixed a bug that happens while streaming if the node renderer connection closed after streaming some chunks to the client. [PR #1995](https://github.com/shakacode/react_on_rails/pull/1995) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 #### Breaking Changes
 
 - **`config.immediate_hydration` configuration removed**: The `config.immediate_hydration` setting in `config/initializers/react_on_rails.rb` has been removed. Immediate hydration is now automatically enabled for React on Rails Pro users and automatically disabled for non-Pro users.
