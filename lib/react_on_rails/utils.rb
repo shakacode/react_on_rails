@@ -403,6 +403,31 @@ module ReactOnRails
       end
     end
 
+    # Converts an absolute path (String or Pathname) to a path relative to Rails.root.
+    # If the path is already relative or doesn't contain Rails.root, returns it as-is.
+    #
+    # @param path [String, Pathname] The path to normalize
+    # @return [String] The relative path as a string
+    #
+    # @example
+    #   normalize_to_relative_path("/app/ssr-generated") # => "ssr-generated"
+    #   normalize_to_relative_path("ssr-generated")      # => "ssr-generated"
+    def self.normalize_to_relative_path(path)
+      return nil if path.nil?
+
+      path_str = path.to_s
+      rails_root_str = Rails.root.to_s
+
+      # If path starts with Rails.root, remove that prefix
+      if path_str.start_with?(rails_root_str)
+        # Remove Rails.root and any leading slash
+        path_str.sub(%r{^#{Regexp.escape(rails_root_str)}/?}, "")
+      else
+        # Path is already relative or doesn't contain Rails.root
+        path_str
+      end
+    end
+
     def self.default_troubleshooting_section
       <<~DEFAULT
         📞 Get Help & Support:

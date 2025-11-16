@@ -1187,7 +1187,7 @@ module ReactOnRails
         private_path = ::Shakapacker.config.private_output_path
 
         if private_path
-          relative_path = private_path.to_s.sub("#{Rails.root}/", "")
+          relative_path = ReactOnRails::Utils.normalize_to_relative_path(private_path)
 
           if relative_path == rails_bundle_path
             checker.add_success("\n  ✅ Using Shakapacker 9.0+ private_output_path: '#{relative_path}'")

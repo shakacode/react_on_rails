@@ -45,20 +45,21 @@ const configureServer = () => {
   serverWebpackConfig.plugins.unshift(new bundler.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));
 
   // Custom output for the server-bundle
-  //
-  // ⚠️ RECOMMENDED: Use Shakapacker 9.0+ for automatic configuration
-  //
-  // With Shakapacker 9.0+, use config.privateOutputPath to automatically sync
-  // with shakapacker.yml private_output_path. This eliminates manual path configuration.
-  //
-  // For Shakapacker 9.0+:
-  //   serverWebpackConfig.output = {
-  //     filename: 'server-bundle.js',
-  //     globalObject: 'this',
-  //     path: config.privateOutputPath,
-  //   };
-  //
-  // For older Shakapacker or custom setups, use hardcoded path:
+  //<% if shakapacker_version_9_or_higher? %>
+  // Using Shakapacker 9.0+ privateOutputPath for automatic sync with shakapacker.yml
+  // This eliminates manual path configuration and keeps configs in sync.
+  serverWebpackConfig.output = {
+    filename: 'server-bundle.js',
+    globalObject: 'this',
+    // If using the React on Rails Pro node server renderer, uncomment the next line
+    // libraryTarget: 'commonjs2',
+    path: config.privateOutputPath,
+    // No publicPath needed since server bundles are not served via web
+    // https://webpack.js.org/configuration/output/#outputglobalobject
+  };<% else %>
+  // Using hardcoded path (Shakapacker < 9.0)
+  // For Shakapacker 9.0+, consider using config.privateOutputPath instead
+  // to automatically sync with shakapacker.yml private_output_path.
   serverWebpackConfig.output = {
     filename: 'server-bundle.js',
     globalObject: 'this',
@@ -67,7 +68,7 @@ const configureServer = () => {
     path: require('path').resolve(__dirname, '../../ssr-generated'),
     // No publicPath needed since server bundles are not served via web
     // https://webpack.js.org/configuration/output/#outputglobalobject
-  };
+  };<% end %>
 
   // Don't hash the server bundle b/c would conflict with the client manifest
   // And no need for the MiniCssExtractPlugin

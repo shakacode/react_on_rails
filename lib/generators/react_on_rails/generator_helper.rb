@@ -95,4 +95,21 @@ module GeneratorHelper
   def component_extension(options)
     options.typescript? ? "tsx" : "jsx"
   end
+
+  # Check if Shakapacker 9.0 or higher is available
+  # Returns true if Shakapacker >= 9.0, false otherwise
+  def shakapacker_version_9_or_higher?
+    return @shakapacker_version_9_or_higher if defined?(@shakapacker_version_9_or_higher)
+
+    @shakapacker_version_9_or_higher = begin
+      # If Shakapacker is not available yet (fresh install), default to true
+      # since we're likely installing the latest version
+      return true unless defined?(ReactOnRails::PackerUtils)
+
+      ReactOnRails::PackerUtils.shakapacker_version_requirement_met?("9.0.0")
+    rescue StandardError
+      # If we can't determine version, assume latest
+      true
+    end
+  end
 end
