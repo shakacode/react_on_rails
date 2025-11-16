@@ -144,10 +144,11 @@ module ReactOnRails
           puts help_troubleshooting
         end
 
+        # rubocop:disable Metrics/AbcSize
         def run_from_command_line(args = ARGV)
           require "optparse"
 
-          options = { route: nil, rails_env: nil }
+          options = { route: nil, rails_env: nil, verbose: false }
 
           OptionParser.new do |opts|
             opts.banner = "Usage: dev [command] [options]"
@@ -158,6 +159,10 @@ module ReactOnRails
 
             opts.on("--rails-env ENV", "Override RAILS_ENV for assets:precompile step only (prod mode only)") do |env|
               options[:rails_env] = env
+            end
+
+            opts.on("-v", "--verbose", "Enable verbose output for pack generation") do
+              options[:verbose] = true
             end
 
             opts.on("-h", "--help", "Prints this help") do
@@ -172,21 +177,23 @@ module ReactOnRails
           # Main execution
           case command
           when "production-assets", "prod"
-            start(:production_like, nil, verbose: false, route: options[:route], rails_env: options[:rails_env])
+            start(:production_like, nil, verbose: options[:verbose], route: options[:route],
+                                         rails_env: options[:rails_env])
           when "static"
-            start(:static, "Procfile.dev-static-assets", verbose: false, route: options[:route])
+            start(:static, "Procfile.dev-static-assets", verbose: options[:verbose], route: options[:route])
           when "kill"
             kill_processes
           when "help", "--help", "-h"
             show_help
           when "hmr", nil
-            start(:development, "Procfile.dev", verbose: false, route: options[:route])
+            start(:development, "Procfile.dev", verbose: options[:verbose], route: options[:route])
           else
             puts "Unknown argument: #{command}"
             puts "Run 'dev help' for usage information"
             exit 1
           end
         end
+        # rubocop:enable Metrics/AbcSize
 
         private
 
