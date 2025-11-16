@@ -10,12 +10,6 @@ on:
     paths: 
       - '.github/workflows/**'
   workflow_dispatch:
-    inputs:
-      force_run:
-        description: 'Force run all jobs (bypass detect-changes)'
-        required: false
-        type: boolean
-        default: false
 
 jobs:
   actionlint:
