@@ -69,15 +69,9 @@ jobs:
     if: |
       (github.ref == 'refs/heads/master' || needs.detect-changes.outputs.run_js_tests == 'true')
     strategy:
+      fail-fast: false
       matrix:
-        include:
-          # Always run: Latest Node version (fast feedback on PRs)
-          - node-version: '22'
-          # Master and full-ci label: Minimum supported Node version (full coverage)
-          - node-version: '20'
-        exclude:
-          # Skip minimum dependency matrix on regular PRs (run only on master or with full-ci label)
-          - node-version: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && needs.detect-changes.outputs.has_full_ci_label != 'true' && '20' || '' }}
+        node-version: ${{ (github.ref == 'refs/heads/master' || inputs.force_run == true || needs.detect-changes.outputs.has_full_ci_label == 'true') && ['20'] || ['22', '20']}}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
