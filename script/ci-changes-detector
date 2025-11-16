@@ -53,14 +53,16 @@ fi
 
 # Initialize flags
 DOCS_ONLY=true
-RUBY_CHANGED=false
-JS_CHANGED=false
-GENERATORS_CHANGED=false
-WORKFLOWS_CHANGED=false
 LINT_CONFIG_CHANGED=false
-SPEC_DUMMY_CHANGED=false
+PRO_LINT_CONFIG_CHANGED=false
+RUBY_CHANGED=false
 RSPEC_CHANGED=false
-PRO_CHANGED=false
+SPEC_DUMMY_CHANGED=false
+JS_CHANGED=false
+GENERATORS_CHANGED=false # needs to be duplicated to pro
+PRO_RUBY_CHANGED=false
+PRO_RSPEC_CHANGED=false
+PRO_JS_CHANGED=false
 PRO_DUMMY_CHANGED=false
 
 # Analyze each changed file
@@ -72,69 +74,69 @@ while IFS= read -r file; do
       ;;
 
     # Ruby source code
-    lib/*.rb|lib/**/*.rb)
+    lib/*.rb|lib/**/*.rb|Gemfile|Gemfile.lock|rakelib/run_rspec.rake|rakelib/node_package.rake|rakelib/dummy_apps.rake)
       DOCS_ONLY=false
       RUBY_CHANGED=true
       ;;
 
-    # Ruby specs (except dummy app)
-    spec/react_on_rails/*|spec/react_on_rails/**/*)
+    # Ruby gem-specific specs
+    spec/react_on_rails/*|spec/react_on_rails/**/*|.github/workflows/gem-tests.yml)
       DOCS_ONLY=false
-      RUBY_CHANGED=true
       RSPEC_CHANGED=true
       ;;
 
     # Generators
-    lib/generators/*|lib/generators/**/*|rakelib/example_type.rb|rakelib/example_config.yml|rakelib/examples.rake)
+    lib/generators/*|lib/generators/**/*|rakelib/example_type.rb|rakelib/examples_config.yml|rakelib/shakapacker_examples.rake|.github/workflows/examples.yml)
       DOCS_ONLY=false
       GENERATORS_CHANGED=true
       ;;
 
     # JavaScript/TypeScript source
-    packages/react-on-rails/src/*|packages/react-on-rails/src/**/*|node_package/src/*|node_package/src/**/*)
+    package.json|yarn.lock|packages/react-on-rails/src/*|packages/react-on-rails/src/**/*|.github/workflows/package-js-tests.yml)
       DOCS_ONLY=false
       JS_CHANGED=true
       ;;
 
     # Dummy app
-    spec/dummy/*)
+    spec/dummy/*|spec/dummy/**/*|.github/workflows/integration-tests.yml)
       DOCS_ONLY=false
       SPEC_DUMMY_CHANGED=true
       ;;
 
-    # React on Rails Pro package / dummy app
-    react_on_rails_pro/spec/dummy/*)
+    # React on Rails Pro source code
+    react_on_rails_pro/lib/*|react_on_rails_pro/lib/**/*)
       DOCS_ONLY=false
-      PRO_CHANGED=true
-      PRO_DUMMY_CHANGED=true
-      ;;
-    react_on_rails_pro/*|react_on_rails_pro/**/*)
-      DOCS_ONLY=false
-      PRO_CHANGED=true
+      PRO_RUBY_CHANGED=true
       ;;
 
-    # GitHub workflows
-    .github/workflows/*)
+    # JavaScript/TypeScript Pro source
+    packages/react-on-rails-pro/src/*|packages/react-on-rails-pro/src/**/*)
       DOCS_ONLY=false
-      WORKFLOWS_CHANGED=true
+      PRO_JS_CHANGED=true
+      ;;
+
+    # Ruby Pro gem-specific specs
+    react_on_rails_pro/spec/react_on_rails/*|react_on_rails_pro/spec/react_on_rails/**/*|.github/workflows/pro-gem-tests.yml)
+      DOCS_ONLY=false
+      PRO_RSPEC_CHANGED=true
+      ;;
+
+    # React on Rails Pro package / dummy app
+    react_on_rails_pro/spec/dummy/*|react_on_rails_pro/spec/dummy/**/*|.github/workflows/pro-integration-tests.yml)
+      DOCS_ONLY=false
+      PRO_DUMMY_CHANGED=true
       ;;
 
     # Lint/format configuration
-    .rubocop.yml|.eslintrc*|.prettierrc*|tsconfig.json|.editorconfig)
+    .rubocop.yml|.eslintrc*|.prettierrc*|tsconfig.json|.editorconfig|.github/workflows/lint-js-and-ruby.yml)
       DOCS_ONLY=false
       LINT_CONFIG_CHANGED=true
       ;;
 
-    # Gemfile, package.json, lockfiles
-    Gemfile|Gemfile.lock|package.json|yarn.lock|spec/dummy/Gemfile|spec/dummy/Gemfile.lock|spec/dummy/package.json|spec/dummy/yarn.lock)
+    # Lint/format configuration
+    react_on_rails_pro/.rubocop.yml|react_on_rails_pro/.eslintrc*|react_on_rails_pro/.prettierrc*|react_on_rails_pro/tsconfig.json|react_on_rails_pro/.editorconfig|.github/workflows/pro-lint.yml)
       DOCS_ONLY=false
-      RUBY_CHANGED=true
-      JS_CHANGED=true
-      ;;
-
-    # Anything else is considered a code change
-    *)
-      DOCS_ONLY=false
+      PRO_LINT_CONFIG_CHANGED=true
       ;;
   esac
 done <<< "$CHANGED_FILES"
@@ -154,15 +156,19 @@ if [ "$DOCS_ONLY" = true ]; then
   exit 0
 fi
 
+# TODO: need to add node-renderer tests
 echo "Changed file categories:"
 [ "$RUBY_CHANGED" = true ] && echo -e "${YELLOW}  • Ruby source code${NC}"
 [ "$JS_CHANGED" = true ] && echo -e "${YELLOW}  • JavaScript/TypeScript code${NC}"
-[ "$GENERATORS_CHANGED" = true ] && echo -e "${YELLOW}  • Generators${NC}"
 [ "$RSPEC_CHANGED" = true ] && echo -e "${YELLOW}  • RSpec tests${NC}"
 [ "$SPEC_DUMMY_CHANGED" = true ] && echo -e "${YELLOW}  • Dummy app${NC}"
-[ "$PRO_CHANGED" = true ] && echo -e "${YELLOW}  • React on Rails Pro${NC}"
-[ "$WORKFLOWS_CHANGED" = true ] && echo -e "${YELLOW}  • GitHub workflows${NC}"
+[ "$GENERATORS_CHANGED" = true ] && echo -e "${YELLOW}  • Generators${NC}"
+[ "$PRO_JS_CHANGED" = true ] && echo -e "${YELLOW}  • React on Rails Pro JavaScript/TypeScript${NC}"
+[ "$PRO_RSPEC_CHANGED" = true ] && echo -e "${YELLOW}  • React on Rails Pro RSpec tests${NC}"
+[ "$PRO_RUBY_CHANGED" = true ] && echo -e "${YELLOW}  • React on Rails Pro Ruby source code${NC}"
+[ "$PRO_DUMMY_CHANGED" = true ] && echo -e "${YELLOW}  • React on Rails Pro Dummy app${NC}"
 [ "$LINT_CONFIG_CHANGED" = true ] && echo -e "${YELLOW}  • Lint/format configuration${NC}"
+[ "$PRO_LINT_CONFIG_CHANGED" = true ] && echo -e "${YELLOW}  • React on Rails Pro lint/format configuration${NC}"
 
 echo ""
 echo "Recommended CI jobs:"
@@ -175,8 +181,9 @@ RUN_DUMMY_TESTS=false
 RUN_GENERATORS=false
 RUN_PRO_LINT=false
 RUN_PRO_TESTS=false
+RUN_PRO_DUMMY_TESTS=false
 
-if [ "$LINT_CONFIG_CHANGED" = true ] || [ "$RUBY_CHANGED" = true ] || [ "$JS_CHANGED" = true ] || [ "$WORKFLOWS_CHANGED" = true ]; then
+if [ "$LINT_CONFIG_CHANGED" = true ] || [ "$RUBY_CHANGED" = true ] || [ "$JS_CHANGED" = true ] || [ "$SPEC_DUMMY_CHANGED" = true ]; then
   RUN_LINT=true
 fi
 
@@ -196,13 +203,16 @@ if [ "$GENERATORS_CHANGED" = true ]; then
   RUN_GENERATORS=true
 fi
 
-if [ "$PRO_CHANGED" = true ]; then
+if [ "$PRO_LINT_CONFIG_CHANGED" = true ] || [ "$PRO_RUBY_CHANGED" = true ] || [ "$PRO_JS_CHANGED" = true ] || [ "$PRO_DUMMY_CHANGED" = true ]; then
   RUN_PRO_LINT=true
+fi
+
+if [ "$PRO_RUBY_CHANGED" = true ] || [ "$PRO_RSPEC_CHANGED" = true ] || [ "$PRO_JS_CHANGED" = true ]; then
   RUN_PRO_TESTS=true
 fi
 
-if [ "$PRO_DUMMY_CHANGED" = true ]; then
-  RUN_PRO_TESTS=true
+if [ "$PRO_DUMMY_CHANGED" = true ] || [ "$PRO_RUBY_CHANGED" = true ] || [ "$PRO_JS_CHANGED" = true ]; then
+  RUN_PRO_DUMMY_TESTS=true
 fi
 
 [ "$RUN_LINT" = true ] && echo "  ✓ Lint (Ruby + JS)"
@@ -210,8 +220,9 @@ fi
 [ "$RUN_JS_TESTS" = true ] && echo "  ✓ JS unit tests"
 [ "$RUN_DUMMY_TESTS" = true ] && echo "  ✓ Dummy app integration tests"
 [ "$RUN_GENERATORS" = true ] && echo "  ✓ Generator tests"
-[ "$RUN_PRO_LINT" = true ] && echo "  ✓ React on Rails Pro lint"
-[ "$RUN_PRO_TESTS" = true ] && echo "  ✓ React on Rails Pro tests"
+[ "$RUN_PRO_LINT" = true ] && echo "  ✓ React on Rails Pro Lint (Ruby + JS)"
+[ "$RUN_PRO_TESTS" = true ] && echo "  ✓ React on Rails Pro RSpec unit tests (Ruby + JS)"
+[ "$RUN_PRO_DUMMY_TESTS" = true ] && echo "  ✓ React on Rails Pro Dummy app integration tests"
 
 # Export as GitHub Actions outputs if running in CI
 if [ -n "${GITHUB_OUTPUT:-}" ]; then
@@ -224,6 +235,7 @@ if [ -n "${GITHUB_OUTPUT:-}" ]; then
     echo "run_generators=$RUN_GENERATORS"
     echo "run_pro_lint=$RUN_PRO_LINT"
     echo "run_pro_tests=$RUN_PRO_TESTS"
+    echo "run_pro_dummy_tests=$RUN_PRO_DUMMY_TESTS"
   } >> "$GITHUB_OUTPUT"
 fi
 
@@ -238,7 +250,8 @@ if [ "${CI_JSON_OUTPUT:-}" = "1" ]; then
   "run_dummy_tests": $RUN_DUMMY_TESTS,
   "run_generators": $RUN_GENERATORS,
   "run_pro_lint": $RUN_PRO_LINT,
-  "run_pro_tests": $RUN_PRO_TESTS
+  "run_pro_tests": $RUN_PRO_TESTS,
+  "run_pro_dummy_tests": $RUN_PRO_DUMMY_TESTS
 }
 EOF
 fi

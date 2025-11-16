@@ -7,11 +7,19 @@ on:
     paths-ignore:
       - '**.md'
       - 'docs/**'
+      - 'react_on_rails_pro/**'
   pull_request:
     paths-ignore:
       - '**.md'
       - 'docs/**'
+      - 'react_on_rails_pro/**'
   workflow_dispatch:
+    inputs:
+      force_run:
+        description: 'Force run all jobs (bypass detect-changes)'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   detect-changes:
@@ -35,8 +43,8 @@ jobs:
       - name: Detect relevant changes
         id: detect
         run: |
-          # If full-ci label is present, run everything
-          if [ "${{ steps.check-label.outputs.result }}" = "true" ]; then
+          # If force_run is true OR full-ci label is present, run everything
+          if [ "${{ inputs.force_run }}" = "true" ] || [ "${{ steps.check-label.outputs.result }}" = "true" ]; then
             echo "run_lint=true" >> "$GITHUB_OUTPUT"
             echo "run_js_tests=true" >> "$GITHUB_OUTPUT"
             echo "run_ruby_tests=true" >> "$GITHUB_OUTPUT"
@@ -71,10 +79,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          # TODO: Re-enable cache when Node.js 22 V8 bug is fixed
-          # Disable cache for Node 22 due to V8 bug in 22.21.0
-          # Track: https://github.com/nodejs/node/issues/56010
-          cache: ''
+          cache: yarn
           cache-dependency-path: '**/yarn.lock'
       - name: Print system information
         run: |
@@ -144,35 +149,3 @@ jobs:
         run: yarn run publint --strict packages/react-on-rails/react-on-rails.tgz
       # We only download and run Actionlint if there is any difference in GitHub Action workflows
       # https://github.com/rhysd/actionlint/blob/main/docs/usage.md#on-github-actions
-      - name: Check GitHub Action changes
-        id: check-workflows
-        run: |
-          git fetch origin ${{ github.event.pull_request.base.sha }}
-          if git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} | grep -q '^.github/workflows'; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-            response=$(curl -sf https://api.github.com/repos/rhysd/actionlint/releases/latest)
-            if [ $? -eq 0 ]; then
-              actionlint_version=$(echo "$response" | jq -r .tag_name)
-              if [ -z "$actionlint_version" ]; then
-                echo "Failed to parse Actionlint version"
-                exit 1
-              fi
-              echo "actionlint_version=\"$actionlint_version\"" >> "$GITHUB_OUTPUT"
-            fi
-          fi
-      - name: Setup Actionlint
-        if: steps.check-workflows.outputs.changed == 'true'
-        uses: actions/cache@v4
-        id: cache-actionlint
-        with:
-          path: ./actionlint
-          key: ${{ runner.os }}-actionlint-${{ steps.check-workflows.outputs.actionlint_version }}
-      - name: Download Actionlint
-        if: steps.check-workflows.outputs.changed == 'true' && steps.cache-actionlint.outputs.cache-hit != 'true'
-        run: bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
-      - name: Lint GitHub Actions
-        if: steps.check-workflows.outputs.changed == 'true'
-        run: |
-          echo "::add-matcher::.github/actionlint-matcher.json"
-          SHELLCHECK_OPTS="-S warning" ./actionlint -color
-        shell: bash

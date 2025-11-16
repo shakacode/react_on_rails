@@ -9,13 +9,21 @@ on:
       - 'docs/**'
       - 'lib/**'
       - 'spec/react_on_rails/**'
+      - 'react_on_rails_pro/**'
   pull_request:
     paths-ignore:
       - '**.md'
       - 'docs/**'
       - 'lib/**'
       - 'spec/react_on_rails/**'
+      - 'react_on_rails_pro/**'
   workflow_dispatch:
+    inputs:
+      force_run:
+        description: 'Force run all jobs (bypass detect-changes)'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   detect-changes:
@@ -40,8 +48,8 @@ jobs:
       - name: Detect relevant changes
         id: detect
         run: |
-          # If full-ci label is present, run everything
-          if [ "${{ steps.check-label.outputs.result }}" = "true" ]; then
+          # If force_run is true OR full-ci label is present, run everything
+          if [ "${{ inputs.force_run }}" = "true" ] || [ "${{ steps.check-label.outputs.result }}" = "true" ]; then
             echo "run_lint=true" >> "$GITHUB_OUTPUT"
             echo "run_js_tests=true" >> "$GITHUB_OUTPUT"
             echo "run_ruby_tests=true" >> "$GITHUB_OUTPUT"

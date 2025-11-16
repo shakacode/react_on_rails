@@ -4,7 +4,19 @@ on:
   push:
     branches:
       - 'master'
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'lib/**'
+      - 'spec/**'
+      - 'packages/react_on_rails/**'
   pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'lib/**'
+      - 'spec/**'
+      - 'packages/react_on_rails/**'
   workflow_dispatch:
     inputs:
       force_run:
@@ -70,10 +82,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          # TODO: Re-enable cache when Node.js 22 V8 bug is fixed
-          # Disable cache for Node 22 due to V8 bug in 22.21.0
-          # Track: https://github.com/nodejs/node/issues/56010
-          cache: ''
+          cache: yarn
           cache-dependency-path: 'react_on_rails_pro/**/yarn.lock'
 
       - name: Print system information
