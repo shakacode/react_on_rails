@@ -55,6 +55,11 @@ default: &default
   # https://webpack.js.org/guides/build-performance/#avoid-production-specific-tooling
   useContentHash: false
 
+  # On-demand compilation of packs when modified. Defaults to false.
+  # Set to false if using bin/shakapacker-dev-server or bin/shakapacker --watch via Procfiles.
+  # Set to true only in test environment for on-demand compilation.
+  compile: false
+
   # Setting the asset host here will override Rails.application.config.asset_host.
   # Here, you can set different asset_host per environment. Note that
   # SHAKAPACKER_ASSET_HOST will override both configurations.
@@ -72,7 +77,6 @@ default: &default
 
 development:
   <<: *default
-  compile: true
   compiler_strategy: mtime
 
   # Reference: https://webpack.js.org/configuration/dev-server/
