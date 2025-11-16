@@ -260,6 +260,7 @@ module ReactOnRails
 
     # Auto-detect server_bundle_output_path from Shakapacker 9.0+ private_output_path
     # Only sets if user hasn't explicitly configured server_bundle_output_path
+    # rubocop:disable Metrics/CyclomaticComplexity
     def auto_detect_server_bundle_path_from_shakapacker
       # Skip if user explicitly set server_bundle_output_path to something other than default
       return if server_bundle_output_path != "ssr-generated"
@@ -275,17 +276,18 @@ module ReactOnRails
         return unless private_path
 
         # Convert from Pathname to relative string path
-        relative_path = private_path.to_s.sub("#{Rails.root}/", "")
+        relative_path = ReactOnRails::Utils.normalize_to_relative_path(private_path)
         self.server_bundle_output_path = relative_path
 
-        Rails.logger.info("ReactOnRails: Auto-detected server_bundle_output_path from " \
-                          "shakapacker.yml private_output_path: '#{relative_path}'")
+        Rails.logger&.info("ReactOnRails: Auto-detected server_bundle_output_path from " \
+                           "shakapacker.yml private_output_path: '#{relative_path}'")
       rescue StandardError => e
         # Fail gracefully - if auto-detection fails, keep the default
-        Rails.logger.debug("ReactOnRails: Could not auto-detect server bundle path from " \
-                           "Shakapacker: #{e.message}")
+        Rails.logger&.debug("ReactOnRails: Could not auto-detect server bundle path from " \
+                            "Shakapacker: #{e.message}")
       end
     end
+    # rubocop:enable Metrics/CyclomaticComplexity
 
     def check_minimum_shakapacker_version
       ReactOnRails::PackerUtils.raise_shakapacker_version_incompatible_for_basic_pack_generation unless
