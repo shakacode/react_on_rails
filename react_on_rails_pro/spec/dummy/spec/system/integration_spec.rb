@@ -110,7 +110,7 @@ describe "Turbolinks across pages", :js do
   it "changes name in message according to input" do
     visit "/client_side_hello_world"
     change_text_expect_dom_selector("#HelloWorld-react-component-0")
-    click_link "Hello World Component Server Rendered, with extra options"
+    click_on "Hello World Component Server Rendered, with extra options"
     change_text_expect_dom_selector("#my-hello-world-id")
   end
 end
@@ -174,19 +174,19 @@ describe "React Router", :js do
 
   before do
     visit "/"
-    click_link "React Router"
+    click_on "React Router"
   end
 
   context "when rendering /react_router" do
     it { is_expected.to have_text("Woohoo, we can use react-router here!") }
 
     it "clicking links correctly renders other pages" do
-      click_link "Router First Page"
+      click_on "Router First Page"
       expect(page).to have_current_path("/react_router/first_page")
       first_page_header_text = page.find(:css, "h2#first-page").text
       expect(first_page_header_text).to eq("React Router First Page")
 
-      click_link "Router Second Page"
+      click_on "Router Second Page"
       expect(page).to have_current_path("/react_router/second_page")
       second_page_header_text = page.find(:css, "h2#second-page").text
       expect(second_page_header_text).to eq("React Router Second Page")
@@ -244,7 +244,7 @@ describe "Manual client hydration", :js do
 
   it "HelloWorldRehydratable onChange should trigger" do
     within("form") do
-      click_button "refresh"
+      click_on "refresh"
     end
     within("#HelloWorldRehydratable-react-component-1") do
       find("input").set "Should update"
@@ -428,12 +428,29 @@ describe "Pages/stream_async_components_for_testing", :js do
 end
 
 describe "React Router Sixth Page", :js do
-  it_behaves_like "streamed component tests", "/server_router/streaming-server-component",
-                  "#ServerComponentRouter-react-component-0"
+  subject { page }
 
-  # Skip the test that fails without JavaScript - being addressed in another PR
-  it "renders the page completely on server and displays content on client even without JavaScript",
-     skip: "Being addressed in another PR" do
-    # This test is overridden to skip it
+  it "renders the component" do
+    visit "/server_router/streaming-server-component"
+    expect(page).to have_text "Header for AsyncComponentsTreeForTesting"
+    expect(page).to have_text "Footer for AsyncComponentsTreeForTesting"
   end
+
+  it "hydrates the component" do
+    visit "/server_router/streaming-server-component"
+    expect(page.html).to match(/client-bundle[^\"]*.js/)
+    change_text_expect_dom_selector("#ServerComponentRouter-react-component-0")
+  end
+
+  it "doesn't hydrate status component if packs are not loaded" do
+    # visit waits for the page to load, so we ensure that the page is loaded before checking the hydration status
+    visit "/server_router/streaming-server-component?skip_js_packs=true"
+    expect(page).to have_text "HydrationStatus: Streaming server render"
+    expect(page).to have_no_text "HydrationStatus: Hydrated"
+    expect(page).to have_no_text "HydrationStatus: Page loaded"
+  end
+
+  # NOTE: The "renders the page completely on server" test is not applicable for React Router
+  # because client-side routing requires JavaScript to navigate to nested routes.
+  # This test only makes sense for direct server-rendered pages like /stream_async_components_for_testing
 end
