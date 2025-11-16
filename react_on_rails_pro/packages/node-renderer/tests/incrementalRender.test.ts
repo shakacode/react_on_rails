@@ -7,6 +7,8 @@ import * as incremental from '../src/worker/handleIncrementalRenderRequest';
 import {
   createVmBundle,
   createSecondaryVmBundle,
+  createIncrementalVmBundle,
+  createIncrementalSecondaryVmBundle,
   BUNDLE_TIMESTAMP,
   SECONDARY_BUNDLE_TIMESTAMP,
   waitFor,
@@ -675,7 +677,7 @@ describe('incremental render NDJSON endpoint', () => {
 
   describe('incremental render update chunk functionality', () => {
     test('basic incremental update - initial request gets value, update chunks set value', async () => {
-      await createVmBundle(TEST_NAME);
+      await createIncrementalVmBundle(TEST_NAME);
       const SERVER_BUNDLE_TIMESTAMP = String(BUNDLE_TIMESTAMP);
 
       // Create the HTTP request
@@ -710,8 +712,8 @@ describe('incremental render NDJSON endpoint', () => {
     });
 
     test('incremental updates work with multiple bundles using runOnOtherBundle', async () => {
-      await createVmBundle(TEST_NAME);
-      await createSecondaryVmBundle(TEST_NAME);
+      await createIncrementalVmBundle(TEST_NAME);
+      await createIncrementalSecondaryVmBundle(TEST_NAME);
       const SERVER_BUNDLE_TIMESTAMP = String(BUNDLE_TIMESTAMP);
       const SECONDARY_BUNDLE_TIMESTAMP_STR = String(SECONDARY_BUNDLE_TIMESTAMP);
 
@@ -764,7 +766,7 @@ describe('incremental render NDJSON endpoint', () => {
     });
 
     test('streaming functionality with incremental updates', async () => {
-      await createVmBundle(TEST_NAME);
+      await createIncrementalVmBundle(TEST_NAME);
       const SERVER_BUNDLE_TIMESTAMP = String(BUNDLE_TIMESTAMP);
 
       // Create the HTTP request
@@ -817,7 +819,7 @@ describe('incremental render NDJSON endpoint', () => {
     });
 
     test('error handling in incremental render updates', async () => {
-      await createVmBundle(TEST_NAME);
+      await createIncrementalVmBundle(TEST_NAME);
       const SERVER_BUNDLE_TIMESTAMP = String(BUNDLE_TIMESTAMP);
 
       // Create the HTTP request
@@ -865,7 +867,7 @@ describe('incremental render NDJSON endpoint', () => {
     });
 
     test('update chunks with non-existent bundle timestamp', async () => {
-      await createVmBundle(TEST_NAME);
+      await createIncrementalVmBundle(TEST_NAME);
       const SERVER_BUNDLE_TIMESTAMP = String(BUNDLE_TIMESTAMP);
       const NON_EXISTENT_TIMESTAMP = '9999999999999';
 
@@ -908,8 +910,8 @@ describe('incremental render NDJSON endpoint', () => {
     });
 
     test('complex multi-bundle streaming scenario', async () => {
-      await createVmBundle(TEST_NAME);
-      await createSecondaryVmBundle(TEST_NAME);
+      await createIncrementalVmBundle(TEST_NAME);
+      await createIncrementalSecondaryVmBundle(TEST_NAME);
       const SERVER_BUNDLE_TIMESTAMP = String(BUNDLE_TIMESTAMP);
       const SECONDARY_BUNDLE_TIMESTAMP_STR = String(SECONDARY_BUNDLE_TIMESTAMP);
 

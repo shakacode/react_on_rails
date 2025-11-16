@@ -27,6 +27,14 @@ export function getFixtureSecondaryBundle() {
   return path.resolve(__dirname, './fixtures/secondary-bundle.js');
 }
 
+export function getFixtureIncrementalBundle() {
+  return path.resolve(__dirname, './fixtures/bundle-incremental.js');
+}
+
+export function getFixtureIncrementalSecondaryBundle() {
+  return path.resolve(__dirname, './fixtures/secondary-bundle-incremental.js');
+}
+
 export function getFixtureAsset() {
   return path.resolve(__dirname, `./fixtures/${ASSET_UPLOAD_FILE}`);
 }
@@ -76,6 +84,28 @@ export async function createSecondaryVmBundle(testName: string) {
     stubTimers: false,
   });
   await safeCopyFileAsync(getFixtureSecondaryBundle(), vmSecondaryBundlePath(testName));
+  await buildExecutionContext([vmSecondaryBundlePath(testName)], /* buildVmsIfNeeded */ true);
+}
+
+export async function createIncrementalVmBundle(testName: string) {
+  // Build config with module support before creating VM bundle
+  buildConfig({
+    serverBundleCachePath: serverBundleCachePath(testName),
+    supportModules: true,
+    stubTimers: false,
+  });
+  await safeCopyFileAsync(getFixtureIncrementalBundle(), vmBundlePath(testName));
+  await buildExecutionContext([vmBundlePath(testName)], /* buildVmsIfNeeded */ true);
+}
+
+export async function createIncrementalSecondaryVmBundle(testName: string) {
+  // Build config with module support before creating VM bundle
+  buildConfig({
+    serverBundleCachePath: serverBundleCachePath(testName),
+    supportModules: true,
+    stubTimers: false,
+  });
+  await safeCopyFileAsync(getFixtureIncrementalSecondaryBundle(), vmSecondaryBundlePath(testName));
   await buildExecutionContext([vmSecondaryBundlePath(testName)], /* buildVmsIfNeeded */ true);
 }
 
