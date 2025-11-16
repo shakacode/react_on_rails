@@ -388,6 +388,7 @@ RSpec.describe "Streaming API" do
       allow(mocked_response).to receive(:stream).and_return(mocked_stream)
       allow(mocked_stream).to receive(:write)
       allow(mocked_stream).to receive(:close)
+      allow(mocked_stream).to receive(:closed?).and_return(false)
       allow(controller).to receive(:response).and_return(mocked_response)
 
       [component_queues, controller, mocked_stream]

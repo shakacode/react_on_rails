@@ -103,8 +103,9 @@ module ReactOnRailsPro
             # Will be blocked if the queue is full until a chunk is dequeued
             queue.enqueue([idx, chunk])
           end
-        rescue IOError, Errno::EPIPE
+        rescue IOError, Errno::EPIPE => e
           # Client disconnected - stop producing
+          log_client_disconnect("producer", e)
           break
         end
       end
@@ -119,9 +120,17 @@ module ReactOnRailsPro
           _idx_from_queue, item = pair
           response.stream.write(item)
         end
-      rescue IOError, Errno::EPIPE
+      rescue IOError, Errno::EPIPE => e
         # Client disconnected - stop writing
-        nil
+        log_client_disconnect("consumer", e)
+      end
+    end
+
+    def log_client_disconnect(context, exception)
+      return unless ReactOnRails.configuration.logging_on_server
+
+      ReactOnRails.configuration.logger.debug do
+        "[React on Rails Pro] Client disconnected during streaming (#{context}): #{exception.class}"
       end
     end
   end
