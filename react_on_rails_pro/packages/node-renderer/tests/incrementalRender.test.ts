@@ -674,7 +674,7 @@ describe('incremental render NDJSON endpoint', () => {
   });
 
   describe('incremental render update chunk functionality', () => {
-    test.only('basic incremental update - initial request gets value, update chunks set value', async () => {
+    test('basic incremental update - initial request gets value, update chunks set value', async () => {
       await createVmBundle(TEST_NAME);
       const SERVER_BUNDLE_TIMESTAMP = String(BUNDLE_TIMESTAMP);
 
