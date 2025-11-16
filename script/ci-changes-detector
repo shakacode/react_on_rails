@@ -114,7 +114,7 @@ while IFS= read -r file; do
       ;;
 
     # GitHub workflows
-    .github/workflows/*)
+    .github/workflows/*|rakelib/*)
       DOCS_ONLY=false
       WORKFLOWS_CHANGED=true
       ;;
