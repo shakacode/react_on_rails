@@ -53,6 +53,10 @@ Changes since the last non-beta release.
 
 - **`generated_component_packs_loading_strategy` now defaults based on Pro license**: When using Shakapacker >= 8.2.0, the default loading strategy is now `:async` for Pro users and `:defer` for non-Pro users. This provides optimal performance for Pro users while maintaining compatibility for non-Pro users. You can still explicitly set the strategy in your configuration. [PR #1993](https://github.com/shakacode/react_on_rails/pull/1993) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
+#### Documentation
+
+- **Simplified Configuration Files**: Improved configuration documentation and generator template for better clarity and usability. Reduced generator template from 67 to 42 lines (37% reduction). Added comprehensive testing configuration guide. Reorganized configuration docs into Essential vs Advanced sections. Enhanced Doctor program with diagnostics for server rendering and test compilation consistency. [PR #2011](https://github.com/shakacode/react_on_rails/pull/2011) by [justin808](https://github.com/justin808).
+
 #### Deprecated
 
 - **Node Renderer Configuration**: Renamed `bundlePath` configuration option to `serverBundleCachePath` in the node renderer to better describe its purpose and avoid confusion with Shakapacker's public bundle path. The old `bundlePath` option continues to work with deprecation warnings. Both `RENDERER_SERVER_BUNDLE_CACHE_PATH` (new) and `RENDERER_BUNDLE_PATH` (deprecated) environment variables are supported. [PR #2008](https://github.com/shakacode/react_on_rails/pull/2008) by [justin808](https://github.com/justin808).
