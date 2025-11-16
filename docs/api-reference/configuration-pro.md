@@ -11,6 +11,8 @@ React Server Components and Streaming SSR are React on Rails Pro features.
 For detailed configuration of RSC and streaming features, see the Pro package documentation:
 [react_on_rails_pro/docs/configuration.md](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/docs/configuration.md)
 
+> **Note:** The Pro documentation is currently maintained separately in the `react_on_rails_pro` directory. We plan to migrate and consolidate Pro documentation into the main docs structure in a future PR for better discoverability and consistency.
+
 ### Key Pro Configurations
 
 These options are configured in the `ReactOnRailsPro.configure` block:

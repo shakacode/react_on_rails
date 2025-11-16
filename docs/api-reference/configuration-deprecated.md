@@ -31,7 +31,7 @@ See [CHANGELOG.md](../CHANGELOG.md) for details.
 **Default:** `false`
 **Status:** ⚠️ DEPRECATED
 
-**Deprecated:** Use `generated_component_packs_loading_strategy = :defer` instead.
+**Renamed to:** `generated_component_packs_loading_strategy = :defer`
 
 **Migration:**
 

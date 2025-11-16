@@ -10,6 +10,8 @@ See [Essential Configuration](#essential-configuration) below for the minimal co
 
 ## Prerequisites
 
+### `/config/shakapacker.yml`
+
 First, you should have a `/config/shakapacker.yml` setup.
 
 Here is the setup when using the recommended `/` directory for your `node_modules` and source files:
@@ -115,20 +117,59 @@ Note: There should be ONE server bundle that can render all your server-rendered
 **Default:** `""`
 **Used with:** `ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)`
 
-**Note:** It's generally preferred to set `compile: true` in your `config/shakapacker.yml` for the test environment instead of using this configuration option. Use this option only if you need to customize the build command or want explicit control over test asset compilation.
+**Important:** This option is only needed if you're using the React on Rails test helper. The two approaches below are **mutually exclusive** - use one or the other, not both.
 
-The command to run to build webpack assets during test runs:
+#### Recommended Approach: Shakapacker Auto-Compilation
 
-```ruby
-config.build_test_command = "RAILS_ENV=test bin/shakapacker"
-```
-
-**Preferred alternative:** Set `compile: true` in `config/shakapacker.yml`:
+Set `compile: true` in `config/shakapacker.yml` for the test environment. Shakapacker will automatically compile assets before running tests:
 
 ```yaml
 test:
   compile: true
+  public_output_path: webpack/test
 ```
+
+**Pros:**
+
+- Simpler configuration (no extra setup in spec helpers)
+- Managed by Shakapacker directly
+- Automatically integrates with Rails test environment
+
+**Cons:**
+
+- Less explicit control over when compilation happens
+- May compile more often than necessary
+
+#### Alternative Approach: React on Rails Test Helper
+
+Use `build_test_command` with `ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)` if you need explicit control:
+
+```ruby
+# config/initializers/react_on_rails.rb
+config.build_test_command = "RAILS_ENV=test bin/shakapacker"
+```
+
+```ruby
+# spec/rails_helper.rb (or spec_helper.rb)
+require "react_on_rails/test_helper"
+
+RSpec.configure do |config|
+  ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+end
+```
+
+**Pros:**
+
+- Explicit control over compilation timing
+- Only compiles once before test suite runs
+- Can customize the build command
+
+**Cons:**
+
+- Requires additional setup in spec helpers
+- More configuration to maintain
+
+For more details on testing configuration, see the [Testing Configuration Guide](../guides/testing-configuration.md).
 
 ## File-Based Component Registry
 

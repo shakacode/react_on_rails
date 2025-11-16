@@ -154,6 +154,7 @@ module ReactOnRails
     def check_configuration_details
       check_shakapacker_configuration_details
       check_react_on_rails_configuration_details
+      check_server_bundle_prerender_consistency
     end
 
     def check_bin_dev_launcher
@@ -166,6 +167,7 @@ module ReactOnRails
 
     def check_testing_setup
       check_rspec_helper_setup
+      check_build_test_configuration
     end
 
     def check_development
@@ -1108,6 +1110,124 @@ module ReactOnRails
         puts Rainbow("🎉 All checks passed! Your React on Rails setup is healthy.").green.bold
         exit(0)
       end
+    end
+
+    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+    def check_server_bundle_prerender_consistency
+      config_path = "config/initializers/react_on_rails.rb"
+      return unless File.exist?(config_path)
+
+      checker.add_info("\n🔍 Server Rendering Consistency:")
+
+      begin
+        content = File.read(config_path)
+
+        # Check for server bundle configuration
+        server_bundle_match = content.match(/config\.server_bundle_js_file\s*=\s*["']([^"']+)["']/)
+        server_bundle_set = server_bundle_match && server_bundle_match[1].present?
+
+        # Check for global prerender setting
+        prerender_match = content.match(/config\.prerender\s*=\s*(true)/)
+        prerender_set = prerender_match
+
+        # Check if prerender is used in views
+        uses_prerender = uses_prerender_in_views?
+
+        # Analyze the configuration
+        if (prerender_set || uses_prerender) && !server_bundle_set
+          checker.add_warning("  ⚠️  Server rendering is enabled but server_bundle_js_file is not configured")
+          checker.add_info("  💡 Set config.server_bundle_js_file = 'server-bundle.js' to enable SSR")
+          checker.add_info("  💡 See: https://www.shakacode.com/react-on-rails/docs/guides/server-rendering")
+        elsif server_bundle_set && !prerender_set && !uses_prerender
+          checker.add_info("  ℹ️  server_bundle_js_file is configured but prerender doesn't appear to be used")
+          checker.add_info("  💡 Either use prerender: true in react_component calls or remove server_bundle_js_file")
+        else
+          checker.add_success("  ✅ Server rendering configuration is consistent")
+        end
+      rescue StandardError => e
+        checker.add_warning("  ⚠️  Could not analyze server rendering configuration: #{e.message}")
+      end
+    end
+    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+
+    def uses_prerender_in_views?
+      # Check view files for prerender: true
+      view_files = Dir.glob("app/views/**/*.{erb,haml,slim}")
+      view_files.any? do |file|
+        next unless File.exist?(file)
+
+        File.read(file).match?(/prerender:\s*true/)
+      end
+    rescue StandardError
+      false
+    end
+
+    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity, Metrics/MethodLength
+    def check_build_test_configuration
+      config_path = "config/initializers/react_on_rails.rb"
+      shakapacker_yml = "config/shakapacker.yml"
+
+      return unless File.exist?(config_path)
+
+      checker.add_info("\n🧪 Test Asset Compilation:")
+
+      begin
+        config_content = File.read(config_path)
+        has_build_test_command = config_content.match(/^\s*config\.build_test_command\s*=\s*["']([^"']+)["']/)
+        uses_test_helper = uses_react_on_rails_test_helper?
+
+        if File.exist?(shakapacker_yml)
+          shakapacker_content = File.read(shakapacker_yml)
+          # Match test section and look for compile: true
+          has_compile_true = shakapacker_content.match(/^test:.*?^\s+compile:\s*true/m)
+
+          if has_build_test_command && has_compile_true
+            checker.add_warning("  ⚠️  Both build_test_command and shakapacker compile: true are configured")
+            checker.add_info("  💡 These are mutually exclusive - use only one approach")
+            checker.add_info("  💡 Recommended: Use compile: true in shakapacker.yml (simpler)")
+            checker.add_info("  💡 Alternative: Use build_test_command with ReactOnRails::TestHelper (explicit control)")
+            checker.add_info("  📖 See: #{Rails.root}/docs/guides/testing-configuration.md")
+          elsif has_build_test_command && !uses_test_helper
+            checker.add_warning("  ⚠️  build_test_command is set but ReactOnRails::TestHelper is not configured")
+            checker.add_info("  💡 Add to spec/rails_helper.rb:")
+            checker.add_info("      ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)")
+            checker.add_info("  💡 Or remove build_test_command and use compile: true in shakapacker.yml")
+          elsif !has_build_test_command && uses_test_helper
+            checker.add_error("  🚫 ReactOnRails::TestHelper is configured but build_test_command is not set")
+            checker.add_info("  💡 Add to config/initializers/react_on_rails.rb:")
+            checker.add_info("      config.build_test_command = 'RAILS_ENV=test bin/shakapacker'")
+            checker.add_info("  💡 Or remove TestHelper and use compile: true in shakapacker.yml")
+          elsif !has_build_test_command && !has_compile_true && !uses_test_helper
+            checker.add_warning("  ⚠️  No test asset compilation configured")
+            checker.add_info("  💡 Recommended: Add to shakapacker.yml test section:")
+            checker.add_info("      compile: true")
+            checker.add_info("  📖 See: #{Rails.root}/docs/guides/testing-configuration.md")
+          elsif has_compile_true
+            checker.add_success("  ✅ Test assets configured via Shakapacker auto-compilation")
+            checker.add_info("      (compile: true in shakapacker.yml)")
+          elsif has_build_test_command && uses_test_helper
+            checker.add_success("  ✅ Test assets configured via React on Rails test helper")
+            checker.add_info("      (build_test_command + ReactOnRails::TestHelper)")
+          end
+        else
+          checker.add_warning("  ⚠️  config/shakapacker.yml not found")
+        end
+      rescue StandardError => e
+        checker.add_warning("  ⚠️  Could not analyze test configuration: #{e.message}")
+      end
+    end
+    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity, Metrics/MethodLength
+
+    def uses_react_on_rails_test_helper?
+      spec_helpers = ["spec/rails_helper.rb", "spec/spec_helper.rb", "test/test_helper.rb"]
+      spec_helpers.any? do |helper|
+        next unless File.exist?(helper)
+
+        content = File.read(helper)
+        content.include?("configure_rspec_to_compile_assets") || content.include?("ensure_assets_compiled")
+      end
+    rescue StandardError
+      false
     end
 
     def relativize_path(absolute_path)
