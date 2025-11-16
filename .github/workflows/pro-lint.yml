@@ -148,7 +148,7 @@ jobs:
         run: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
 
       - name: Lint Ruby
-        run: bundle exec rubocop
+        run: bundle exec rubocop --ignore-parent-exclusion
 
       - name: Validate RBS type signatures
         run: bundle exec rake rbs:validate
