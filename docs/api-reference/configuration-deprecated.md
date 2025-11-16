@@ -43,7 +43,7 @@ config.defer_generated_component_packs = true
 config.generated_component_packs_loading_strategy = :defer
 ```
 
-See the [16.0.0 Release Notes](../upgrading/release-notes/16.0.0.md) for more details.
+See [CHANGELOG.md](../../CHANGELOG.md) for more details.
 
 ## Need Help?
 
