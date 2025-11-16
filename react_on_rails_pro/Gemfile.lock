@@ -250,7 +250,6 @@ GEM
     parser (3.3.3.0)
       ast (~> 2.4.1)
       racc
-    pg (1.5.6)
     pp (0.6.2)
       prettyprint
     prettyprint (0.2.0)
@@ -434,8 +433,6 @@ GEM
     turbolinks-source (5.2.0)
     tzinfo (2.0.6)
       concurrent-ruby (~> 1.0)
-    uglifier (4.2.0)
-      execjs (>= 0.3.0, < 3)
     unicode-display_width (2.5.0)
     uri (1.0.3)
     useragent (0.16.11)
@@ -488,7 +485,6 @@ DEPENDENCIES
   net-http
   net-imap
   net-smtp
-  pg
   pry (>= 0.14.1)
   pry-byebug!
   pry-doc
@@ -514,7 +510,6 @@ DEPENDENCIES
   sprockets
   sqlite3 (~> 1.4)
   turbolinks
-  uglifier
   web-console
   webdrivers (= 5.3.0)
   webmock
