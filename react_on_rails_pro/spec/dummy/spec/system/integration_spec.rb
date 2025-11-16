@@ -428,29 +428,14 @@ describe "Pages/stream_async_components_for_testing", :js do
 end
 
 describe "React Router Sixth Page", :js do
-  subject { page }
+  it_behaves_like "streamed component tests", "/server_router/streaming-server-component",
+                  "#ServerComponentRouter-react-component-0"
 
-  it "renders the component" do
-    visit "/server_router/streaming-server-component"
-    expect(page).to have_text "Header for AsyncComponentsTreeForTesting"
-    expect(page).to have_text "Footer for AsyncComponentsTreeForTesting"
+  # Override: This test is not applicable for React Router because client-side routing
+  # requires JavaScript to navigate to nested routes like /server_router/streaming-server-component.
+  # The test is kept but skipped to document why it doesn't apply to this scenario.
+  it "renders the page completely on server and displays content on client even without JavaScript",
+     skip: "React Router requires JavaScript for client-side routing to nested routes" do
+    # This test is overridden to skip it with explanation
   end
-
-  it "hydrates the component" do
-    visit "/server_router/streaming-server-component"
-    expect(page.html).to match(/client-bundle[^\"]*.js/)
-    change_text_expect_dom_selector("#ServerComponentRouter-react-component-0")
-  end
-
-  it "doesn't hydrate status component if packs are not loaded" do
-    # visit waits for the page to load, so we ensure that the page is loaded before checking the hydration status
-    visit "/server_router/streaming-server-component?skip_js_packs=true"
-    expect(page).to have_text "HydrationStatus: Streaming server render"
-    expect(page).to have_no_text "HydrationStatus: Hydrated"
-    expect(page).to have_no_text "HydrationStatus: Page loaded"
-  end
-
-  # NOTE: The "renders the page completely on server" test is not applicable for React Router
-  # because client-side routing requires JavaScript to navigate to nested routes.
-  # This test only makes sense for direct server-rendered pages like /stream_async_components_for_testing
 end
