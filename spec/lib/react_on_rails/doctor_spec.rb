@@ -220,6 +220,7 @@ RSpec.describe ReactOnRails::Doctor do
         before do
           allow(Dir).to receive(:glob).with("app/views/**/*.erb").and_return(["app/views/layouts/application.html.erb"])
           allow(Dir).to receive(:glob).with("app/views/**/*.haml").and_return([])
+          allow(Dir).to receive(:glob).with("app/views/**/*.slim").and_return([])
           allow(File).to receive(:exist?).with("app/views/layouts/application.html.erb").and_return(true)
           allow(File).to receive(:read).with("app/views/layouts/application.html.erb")
                                        .and_return('<%= javascript_pack_tag "application", :async %>')
@@ -279,6 +280,7 @@ RSpec.describe ReactOnRails::Doctor do
         allow(Dir).to receive(:glob).with("app/views/**/*.erb")
                                     .and_return(["app/views/layouts/application.html.erb"])
         allow(Dir).to receive(:glob).with("app/views/**/*.haml").and_return([])
+        allow(Dir).to receive(:glob).with("app/views/**/*.slim").and_return([])
         allow(File).to receive(:exist?).with("app/views/layouts/application.html.erb").and_return(true)
         allow(File).to receive(:read).with("app/views/layouts/application.html.erb")
                                      .and_return('<%= javascript_pack_tag "app", :async %>')
@@ -297,6 +299,7 @@ RSpec.describe ReactOnRails::Doctor do
         allow(Dir).to receive(:glob).with("app/views/**/*.erb")
                                     .and_return(["app/views/layouts/application.html.erb"])
         allow(Dir).to receive(:glob).with("app/views/**/*.haml").and_return([])
+        allow(Dir).to receive(:glob).with("app/views/**/*.slim").and_return([])
         allow(File).to receive(:exist?).with("app/views/layouts/application.html.erb").and_return(true)
         allow(File).to receive(:read).with("app/views/layouts/application.html.erb")
                                      .and_return('<%= javascript_pack_tag "app", async: true %>')
@@ -315,6 +318,7 @@ RSpec.describe ReactOnRails::Doctor do
         allow(Dir).to receive(:glob).with("app/views/**/*.erb")
                                     .and_return(["app/views/layouts/application.html.erb"])
         allow(Dir).to receive(:glob).with("app/views/**/*.haml").and_return([])
+        allow(Dir).to receive(:glob).with("app/views/**/*.slim").and_return([])
         allow(File).to receive(:exist?).with("app/views/layouts/application.html.erb").and_return(true)
         allow(File).to receive(:read).with("app/views/layouts/application.html.erb")
                                      .and_return('<%= javascript_pack_tag "app", defer: "async" %>')
@@ -331,6 +335,7 @@ RSpec.describe ReactOnRails::Doctor do
         allow(Dir).to receive(:glob).with("app/views/**/*.erb")
                                     .and_return(["app/views/layouts/application.html.erb"])
         allow(Dir).to receive(:glob).with("app/views/**/*.haml").and_return([])
+        allow(Dir).to receive(:glob).with("app/views/**/*.slim").and_return([])
         allow(File).to receive(:exist?).with("app/views/layouts/application.html.erb").and_return(true)
         allow(File).to receive(:read).with("app/views/layouts/application.html.erb")
                                      .and_return('<%= javascript_pack_tag "app" %>')
@@ -347,6 +352,7 @@ RSpec.describe ReactOnRails::Doctor do
         allow(Dir).to receive(:glob).with("app/views/**/*.erb")
                                     .and_return(["app/views/layouts/application.html.erb"])
         allow(Dir).to receive(:glob).with("app/views/**/*.haml").and_return([])
+        allow(Dir).to receive(:glob).with("app/views/**/*.slim").and_return([])
         allow(File).to receive(:exist?).with("app/views/layouts/application.html.erb").and_return(true)
         allow(File).to receive(:read).with("app/views/layouts/application.html.erb")
                                      .and_return('<%= javascript_pack_tag "app", defer: true %>
@@ -364,6 +370,7 @@ RSpec.describe ReactOnRails::Doctor do
         allow(Dir).to receive(:glob).with("app/views/**/*.erb")
                                     .and_return(["app/views/layouts/application.html.erb"])
         allow(Dir).to receive(:glob).with("app/views/**/*.haml").and_return([])
+        allow(Dir).to receive(:glob).with("app/views/**/*.slim").and_return([])
         allow(File).to receive(:exist?).with("app/views/layouts/application.html.erb").and_return(true)
         allow(File).to receive(:read).with("app/views/layouts/application.html.erb")
                                      .and_return('<%# javascript_pack_tag "app", :async %>')
@@ -380,6 +387,7 @@ RSpec.describe ReactOnRails::Doctor do
         allow(Dir).to receive(:glob).with("app/views/**/*.erb").and_return([])
         allow(Dir).to receive(:glob).with("app/views/**/*.haml")
                                     .and_return(["app/views/layouts/application.html.haml"])
+        allow(Dir).to receive(:glob).with("app/views/**/*.slim").and_return([])
         allow(File).to receive(:exist?).with("app/views/layouts/application.html.haml").and_return(true)
         allow(File).to receive(:read).with("app/views/layouts/application.html.haml")
                                      .and_return('-# javascript_pack_tag "app", :async')
@@ -396,6 +404,8 @@ RSpec.describe ReactOnRails::Doctor do
         allow(Dir).to receive(:glob).with("app/views/**/*.erb")
                                     .and_return(["app/views/layouts/application.html.erb"])
         allow(Dir).to receive(:glob).with("app/views/**/*.haml").and_return([])
+        allow(Dir).to receive(:glob).with("app/views/**/*.slim").and_return([])
+        allow(Dir).to receive(:glob).with("app/views/**/*.slim").and_return([])
         allow(File).to receive(:exist?).with("app/views/layouts/application.html.erb").and_return(true)
         allow(File).to receive(:read).with("app/views/layouts/application.html.erb")
                                      .and_return('<!-- <%= javascript_pack_tag "app", :async %> -->')
@@ -407,11 +417,50 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when async is only in Slim comments" do
+      before do
+        allow(Dir).to receive(:glob).with("app/views/**/*.erb").and_return([])
+        allow(Dir).to receive(:glob).with("app/views/**/*.haml").and_return([])
+        allow(Dir).to receive(:glob).with("app/views/**/*.slim").and_return([])
+        allow(Dir).to receive(:glob).with("app/views/**/*.slim")
+                                    .and_return(["app/views/layouts/application.html.slim"])
+        allow(File).to receive(:exist?).with("app/views/layouts/application.html.slim").and_return(true)
+        allow(File).to receive(:read).with("app/views/layouts/application.html.slim")
+                                     .and_return('/ = javascript_pack_tag "app", :async')
+      end
+
+      it "returns empty array" do
+        files = doctor.send(:scan_view_files_for_async_pack_tag)
+        expect(files).to be_empty
+      end
+    end
+
+    context "when view files contain Slim javascript_pack_tag with :async" do
+      before do
+        allow(Dir).to receive(:glob).with("app/views/**/*.erb").and_return([])
+        allow(Dir).to receive(:glob).with("app/views/**/*.haml").and_return([])
+        allow(Dir).to receive(:glob).with("app/views/**/*.slim").and_return([])
+        allow(Dir).to receive(:glob).with("app/views/**/*.slim")
+                                    .and_return(["app/views/layouts/application.html.slim"])
+        allow(File).to receive(:exist?).with("app/views/layouts/application.html.slim").and_return(true)
+        allow(File).to receive(:read).with("app/views/layouts/application.html.slim")
+                                     .and_return('= javascript_pack_tag "app", :async')
+        allow(doctor).to receive(:relativize_path).with("app/views/layouts/application.html.slim")
+                                                  .and_return("app/views/layouts/application.html.slim")
+      end
+
+      it "returns files with async" do
+        files = doctor.send(:scan_view_files_for_async_pack_tag)
+        expect(files).to include("app/views/layouts/application.html.slim")
+      end
+    end
+
     context "when javascript_pack_tag spans multiple lines" do
       before do
         allow(Dir).to receive(:glob).with("app/views/**/*.erb")
                                     .and_return(["app/views/layouts/application.html.erb"])
         allow(Dir).to receive(:glob).with("app/views/**/*.haml").and_return([])
+        allow(Dir).to receive(:glob).with("app/views/**/*.slim").and_return([])
         allow(File).to receive(:exist?).with("app/views/layouts/application.html.erb").and_return(true)
         allow(File).to receive(:read).with("app/views/layouts/application.html.erb")
                                      .and_return("<%= javascript_pack_tag \"app\",\n  :async %>")

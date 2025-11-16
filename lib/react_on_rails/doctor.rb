@@ -1151,6 +1151,7 @@ module ReactOnRails
     # Comment patterns used for filtering out commented async usage
     ERB_COMMENT_PATTERN = /<%\s*#.*javascript_pack_tag/
     HAML_COMMENT_PATTERN = /^\s*-#.*javascript_pack_tag/
+    SLIM_COMMENT_PATTERN = %r{^\s*/.*javascript_pack_tag}
     HTML_COMMENT_PATTERN = /<!--.*javascript_pack_tag/
 
     def check_async_usage
@@ -1186,7 +1187,7 @@ module ReactOnRails
     end
 
     def scan_view_files_for_async_pack_tag
-      view_patterns = ["app/views/**/*.erb", "app/views/**/*.haml"]
+      view_patterns = ["app/views/**/*.erb", "app/views/**/*.haml", "app/views/**/*.slim"]
       files_with_async = view_patterns.flat_map { |pattern| scan_pattern_for_async(pattern) }
       files_with_async.compact
     rescue Errno::ENOENT, Encoding::InvalidByteSequenceError, Encoding::UndefinedConversionError => e
@@ -1235,6 +1236,7 @@ module ReactOnRails
       uncommented_lines = content.each_line.reject do |line|
         line.match?(ERB_COMMENT_PATTERN) ||
           line.match?(HAML_COMMENT_PATTERN) ||
+          line.match?(SLIM_COMMENT_PATTERN) ||
           line.match?(HTML_COMMENT_PATTERN)
       end
 
