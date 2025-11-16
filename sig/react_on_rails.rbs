@@ -8,31 +8,4 @@ module ReactOnRails
 
   def self.configure: () { (Configuration) -> void } -> void
   def self.configuration: () -> Configuration
-
-  class Error < StandardError
-  end
-
-  class PrerenderError < Error
-    attr_reader component_name: String?
-    attr_reader js_code: String?
-    attr_reader err: Hash[Symbol, untyped]?
-    attr_reader props: (Hash[Symbol, untyped] | String)?
-    attr_reader console_messages: Array[String]?
-
-    def initialize: (
-      ?component_name: String?,
-      ?js_code: String?,
-      ?err: Hash[Symbol, untyped]?,
-      ?props: (Hash[Symbol, untyped] | String)?,
-      ?console_messages: Array[String]?
-    ) -> void
-
-    def to_honeybadger_context: () -> Hash[Symbol, untyped]
-    def raven_context: () -> Hash[Symbol, untyped]
-    def to_error_context: () -> Hash[Symbol, untyped]
-  end
-
-  class JsonParseError < Error
-    def initialize: (Hash[Symbol, untyped] err) -> void
-  end
 end
