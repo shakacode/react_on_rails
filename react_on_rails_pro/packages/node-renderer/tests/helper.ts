@@ -60,7 +60,7 @@ export function vmSecondaryBundlePath(testName: string) {
 export async function createVmBundle(testName: string) {
   // Build config with module support before creating VM bundle
   buildConfig({
-    bundlePath: bundlePath(testName),
+    serverBundleCachePath: serverBundleCachePath(testName),
     supportModules: true,
     stubTimers: false,
   });
@@ -71,7 +71,7 @@ export async function createVmBundle(testName: string) {
 export async function createSecondaryVmBundle(testName: string) {
   // Build config with module support before creating VM bundle
   buildConfig({
-    bundlePath: bundlePath(testName),
+    serverBundleCachePath: serverBundleCachePath(testName),
     supportModules: true,
     stubTimers: false,
   });
