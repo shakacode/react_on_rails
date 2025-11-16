@@ -46,9 +46,9 @@ jobs:
         id: determine-matrix
         run: |
           if [ "${{ inputs.force_run }}" = "true" ] || [ "${{ steps.check-label.outputs.result }}" = "true" ] || [ "${{ github.ref }}" = "refs/heads/master" ]; then
-            echo 'result=["latest"]' | jq -c . >> "$GITHUB_OUTPUT"
+            echo "result=[\"latest\"]" >> "$GITHUB_OUTPUT"
           else
-            echo 'result=["latest","minimum"]' | jq -c . >> "$GITHUB_OUTPUT"
+            echo "result=[\"latest\",\"minimum\"]" >> "$GITHUB_OUTPUT"
           fi
       - name: Detect relevant changes
         id: detect
