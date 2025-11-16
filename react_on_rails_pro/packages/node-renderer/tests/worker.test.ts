@@ -483,7 +483,11 @@ describe('worker', () => {
 
     // Verify bundles are placed in their correct directories
     const bundle1Path = path.join(serverBundleCachePathForTest(), bundleHash, `${bundleHash}.js`);
-    const bundle2Path = path.join(serverBundleCachePathForTest(), secondaryBundleHash, `${secondaryBundleHash}.js`);
+    const bundle2Path = path.join(
+      serverBundleCachePathForTest(),
+      secondaryBundleHash,
+      `${secondaryBundleHash}.js`,
+    );
     expect(fs.existsSync(bundle1Path)).toBe(true);
     expect(fs.existsSync(bundle2Path)).toBe(true);
 
@@ -648,8 +652,8 @@ describe('worker', () => {
     expect(files).toHaveLength(1);
     expect(files[0]).toBe(`${bundleHash}.js`);
 
-    // Verify the original content is preserved (1646 bytes from bundle.js, not 1689 from secondary-bundle.js)
-    expect(secondBundleSize).toBe(1646); // Size of getFixtureBundle(), not getFixtureSecondaryBundle()
+    // Verify the original content is preserved (62 bytes from bundle.js, not 84 from secondary-bundle.js)
+    expect(secondBundleSize).toBe(62); // Size of getFixtureBundle(), not getFixtureSecondaryBundle()
   });
 
   test('post /upload-assets with bundles placed in their own hash directories, not targetBundles directories', async () => {

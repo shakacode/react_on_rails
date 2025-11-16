@@ -34,7 +34,7 @@ function normalizeVersion(version: string): string {
   return normalized;
 }
 
-interface RequestBody {
+export interface RequestBody {
   protocolVersion?: string;
   gemVersion?: string;
   railsEnv?: string;

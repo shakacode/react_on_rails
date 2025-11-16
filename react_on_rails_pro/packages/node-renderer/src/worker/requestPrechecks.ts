@@ -3,10 +3,10 @@
  * @module worker/requestPrechecks
  */
 import type { ResponseResult } from '../shared/utils';
-import { checkProtocolVersion, type ProtocolVersionBody } from './checkProtocolVersionHandler';
+import { checkProtocolVersion, type RequestBody } from './checkProtocolVersionHandler';
 import { authenticate, type AuthBody } from './authHandler';
 
-export interface RequestPrechecksBody extends ProtocolVersionBody, AuthBody {
+export interface RequestPrechecksBody extends RequestBody, AuthBody {
   [key: string]: unknown;
 }
 
