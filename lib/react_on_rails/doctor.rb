@@ -173,6 +173,7 @@ module ReactOnRails
       check_procfile_dev
       check_bin_dev_script
       check_gitignore
+      check_async_usage
     end
 
     def check_javascript_bundles
@@ -1145,6 +1146,130 @@ module ReactOnRails
       rescue StandardError => e
         checker.add_info("  #{label}: <error reading value: #{e.message}>")
       end
+    end
+
+    # Comment patterns used for filtering out commented async usage
+    ERB_COMMENT_PATTERN = /<%\s*#.*javascript_pack_tag/
+    HAML_COMMENT_PATTERN = /^\s*-#.*javascript_pack_tag/
+    SLIM_COMMENT_PATTERN = %r{^\s*/.*javascript_pack_tag}
+    HTML_COMMENT_PATTERN = /<!--.*javascript_pack_tag/
+
+    def check_async_usage
+      # When Pro is installed, async is fully supported and is the default behavior
+      # No need to check for async usage in this case
+      return if ReactOnRails::Utils.react_on_rails_pro?
+
+      async_issues = []
+
+      # Check 1: javascript_pack_tag with :async in view files
+      view_files_with_async = scan_view_files_for_async_pack_tag
+      unless view_files_with_async.empty?
+        async_issues << "javascript_pack_tag with :async found in view files:"
+        view_files_with_async.each do |file|
+          async_issues << "  • #{file}"
+        end
+      end
+
+      # Check 2: generated_component_packs_loading_strategy = :async
+      if config_has_async_loading_strategy?
+        async_issues << "config.generated_component_packs_loading_strategy = :async in initializer"
+      end
+
+      return if async_issues.empty?
+
+      # Report errors if async usage is found without Pro
+      checker.add_error("🚫 :async usage detected without React on Rails Pro")
+      async_issues.each { |issue| checker.add_error("  #{issue}") }
+      checker.add_info("  💡 :async can cause race conditions. Options:")
+      checker.add_info("    1. Upgrade to React on Rails Pro (recommended for :async support)")
+      checker.add_info("    2. Change to :defer or :sync loading strategy")
+      checker.add_info("  📖 https://www.shakacode.com/react-on-rails/docs/guides/configuration/")
+    end
+
+    def scan_view_files_for_async_pack_tag
+      view_patterns = ["app/views/**/*.erb", "app/views/**/*.haml", "app/views/**/*.slim"]
+      files_with_async = view_patterns.flat_map { |pattern| scan_pattern_for_async(pattern) }
+      files_with_async.compact
+    rescue Errno::ENOENT, Encoding::InvalidByteSequenceError, Encoding::UndefinedConversionError => e
+      # Log the error if Rails logger is available
+      log_debug("Error scanning view files for async: #{e.message}")
+      []
+    end
+
+    def scan_pattern_for_async(pattern)
+      Dir.glob(pattern).filter_map do |file|
+        next unless File.exist?(file)
+
+        content = File.read(file)
+        next if content_has_only_commented_async?(content)
+        next unless file_has_async_pack_tag?(content)
+
+        relativize_path(file)
+      end
+    end
+
+    def file_has_async_pack_tag?(content)
+      # Match javascript_pack_tag with :async symbol or async: true hash syntax
+      # Examples that should match:
+      #   - javascript_pack_tag "app", :async
+      #   - javascript_pack_tag "app", async: true
+      #   - javascript_pack_tag "app", :async, other_option: value
+      # Examples that should NOT match:
+      #   - javascript_pack_tag "app", defer: "async" (async is a string value, not the option)
+      #   - javascript_pack_tag "app", :defer
+      # Note: Theoretical edge case `data: { async: true }` would match but is extremely unlikely
+      # in real code and represents a harmless false positive (showing a warning when not needed)
+      # Use word boundary \b to ensure :async is not part of a longer symbol like :async_mode
+      # [^<]* allows matching across newlines within ERB tags but stops at closing ERB tag
+      content.match?(/javascript_pack_tag[^<]*(?::async\b|async:\s*true)/)
+    end
+
+    def content_has_only_commented_async?(content)
+      # Check if all occurrences of javascript_pack_tag with :async are in comments
+      # Returns true if ONLY commented async usage exists (no active async usage)
+
+      # First check if there's any javascript_pack_tag with :async in the full content
+      return true unless file_has_async_pack_tag?(content)
+
+      # Strategy: Remove all commented lines, then check if any :async remains
+      # This handles both single-line and multi-line tags correctly
+      uncommented_lines = content.each_line.reject do |line|
+        line.match?(ERB_COMMENT_PATTERN) ||
+          line.match?(HAML_COMMENT_PATTERN) ||
+          line.match?(SLIM_COMMENT_PATTERN) ||
+          line.match?(HTML_COMMENT_PATTERN)
+      end
+
+      uncommented_content = uncommented_lines.join
+      # If no async found in uncommented content, all async usage was commented
+      !file_has_async_pack_tag?(uncommented_content)
+    end
+
+    def config_has_async_loading_strategy?
+      config_path = "config/initializers/react_on_rails.rb"
+      return false unless File.exist?(config_path)
+
+      content = File.read(config_path)
+      # Check if generated_component_packs_loading_strategy is set to :async
+      # Filter out commented lines (lines starting with # after optional whitespace)
+      content.each_line.any? do |line|
+        # Skip lines that start with # (after optional whitespace)
+        next if line.match?(/^\s*#/)
+
+        # Match: config.generated_component_packs_loading_strategy = :async
+        # Use word boundary \b to ensure :async is the complete symbol, not part of :async_mode etc.
+        line.match?(/config\.generated_component_packs_loading_strategy\s*=\s*:async\b/)
+      end
+    rescue Errno::ENOENT, Encoding::InvalidByteSequenceError, Encoding::UndefinedConversionError => e
+      # Log the error if Rails logger is available
+      log_debug("Error checking async loading strategy: #{e.message}")
+      false
+    end
+
+    def log_debug(message)
+      return unless defined?(Rails.logger) && Rails.logger
+
+      Rails.logger.debug(message)
     end
   end
   # rubocop:enable Metrics/ClassLength
