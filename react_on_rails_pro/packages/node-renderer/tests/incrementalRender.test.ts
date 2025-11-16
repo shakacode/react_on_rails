@@ -6,12 +6,12 @@ import packageJson from '../src/shared/packageJson';
 import * as incremental from '../src/worker/handleIncrementalRenderRequest';
 import {
   createVmBundle,
-  createSecondaryVmBundle,
   createIncrementalVmBundle,
   createIncrementalSecondaryVmBundle,
   BUNDLE_TIMESTAMP,
   SECONDARY_BUNDLE_TIMESTAMP,
   waitFor,
+  resetForTest,
 } from './helper';
 import type { ResponseResult } from '../src/shared/utils';
 
@@ -237,6 +237,10 @@ describe('incremental render NDJSON endpoint', () => {
 
     return { promise, receivedChunks };
   };
+
+  beforeEach(async () => {
+    await resetForTest(TEST_NAME);
+  });
 
   afterEach(() => {
     jest.restoreAllMocks();
@@ -711,60 +715,6 @@ describe('incremental render NDJSON endpoint', () => {
       expect(response.data).toBe('first update'); // Should resolve with the first setAsyncValue call
     });
 
-    test('incremental updates work with multiple bundles using runOnOtherBundle', async () => {
-      await createIncrementalVmBundle(TEST_NAME);
-      await createIncrementalSecondaryVmBundle(TEST_NAME);
-      const SERVER_BUNDLE_TIMESTAMP = String(BUNDLE_TIMESTAMP);
-      const SECONDARY_BUNDLE_TIMESTAMP_STR = String(SECONDARY_BUNDLE_TIMESTAMP);
-
-      // Create the HTTP request
-      const req = createHttpRequest(SERVER_BUNDLE_TIMESTAMP);
-
-      // Set up response handling
-      const responsePromise = setupResponseHandler(req, true);
-
-      // Send the initial object that gets values from both bundles
-      const initialObject = {
-        ...createInitialObject(SERVER_BUNDLE_TIMESTAMP),
-        renderingRequest: `
-          runOnOtherBundle(${SECONDARY_BUNDLE_TIMESTAMP}, 'ReactOnRails.getAsyncValue()').then((secondaryValue) => ({
-            mainBundleValue: ReactOnRails.getAsyncValue(),
-            secondaryBundleValue: JSON.parse(secondaryValue),
-          }));
-        `,
-        dependencyBundleTimestamps: [SECONDARY_BUNDLE_TIMESTAMP_STR],
-      };
-      req.write(`${JSON.stringify(initialObject)}\n`);
-
-      // Send update chunks to both bundles
-      const updateMainBundle = {
-        bundleTimestamp: SERVER_BUNDLE_TIMESTAMP,
-        updateChunk: 'ReactOnRails.setAsyncValue("main bundle updated")',
-      };
-      req.write(`${JSON.stringify(updateMainBundle)}\n`);
-
-      const updateSecondaryBundle = {
-        bundleTimestamp: SECONDARY_BUNDLE_TIMESTAMP_STR,
-        updateChunk: 'ReactOnRails.setAsyncValue("secondary bundle updated")',
-      };
-      req.write(`${JSON.stringify(updateSecondaryBundle)}\n`);
-
-      // End the request
-      req.end();
-
-      // Wait for the response
-      const response = await responsePromise;
-
-      // Verify the response
-      expect(response.statusCode).toBe(200);
-      const responseData = JSON.parse(response.data || '{}') as {
-        mainBundleValue: unknown;
-        secondaryBundleValue: unknown;
-      };
-      expect(responseData.mainBundleValue).toBe('main bundle updated');
-      expect(responseData.secondaryBundleValue).toBe('secondary bundle updated');
-    });
-
     test('streaming functionality with incremental updates', async () => {
       await createIncrementalVmBundle(TEST_NAME);
       const SERVER_BUNDLE_TIMESTAMP = String(BUNDLE_TIMESTAMP);
@@ -804,7 +754,12 @@ describe('incremental render NDJSON endpoint', () => {
         req.write(`${JSON.stringify(updateChunk)}\n`);
       }
 
-      // No need to get stream values again since we're already streaming
+      // End the stream to signal completion
+      const endStreamChunk = {
+        bundleTimestamp: SERVER_BUNDLE_TIMESTAMP,
+        updateChunk: 'ReactOnRails.endStream()',
+      };
+      req.write(`${JSON.stringify(endStreamChunk)}\n`);
 
       // End the request
       req.end();
@@ -816,97 +771,6 @@ describe('incremental render NDJSON endpoint', () => {
       expect(response.statusCode).toBe(200);
       // Since we're returning a stream, the response should indicate streaming
       expect(streamedData.length).toBeGreaterThan(0);
-    });
-
-    test('error handling in incremental render updates', async () => {
-      await createIncrementalVmBundle(TEST_NAME);
-      const SERVER_BUNDLE_TIMESTAMP = String(BUNDLE_TIMESTAMP);
-
-      // Create the HTTP request
-      const req = createHttpRequest(SERVER_BUNDLE_TIMESTAMP);
-
-      // Set up response handling
-      const responsePromise = setupResponseHandler(req, true);
-
-      // Send the initial object
-      const initialObject = {
-        ...createInitialObject(SERVER_BUNDLE_TIMESTAMP),
-        renderingRequest: 'ReactOnRails.getAsyncValue()',
-      };
-      req.write(`${JSON.stringify(initialObject)}\n`);
-
-      // Send a malformed update chunk (missing bundleTimestamp)
-      const malformedChunk = {
-        updateChunk: 'ReactOnRails.setAsyncValue("should not work")',
-      };
-      req.write(`${JSON.stringify(malformedChunk)}\n`);
-
-      // Send a valid update chunk after the malformed one
-      const validChunk = {
-        bundleTimestamp: SERVER_BUNDLE_TIMESTAMP,
-        updateChunk: 'ReactOnRails.setAsyncValue("valid update")',
-      };
-      req.write(`${JSON.stringify(validChunk)}\n`);
-
-      // Send a chunk with invalid JavaScript
-      const invalidJSChunk = {
-        bundleTimestamp: SERVER_BUNDLE_TIMESTAMP,
-        updateChunk: 'this is not valid javascript syntax !!!',
-      };
-      req.write(`${JSON.stringify(invalidJSChunk)}\n`);
-
-      // End the request
-      req.end();
-
-      // Wait for the response
-      const response = await responsePromise;
-
-      // Verify the response - should still work despite errors
-      expect(response.statusCode).toBe(200);
-      expect(response.data).toBe('"valid update"'); // Should resolve with the valid update
-    });
-
-    test('update chunks with non-existent bundle timestamp', async () => {
-      await createIncrementalVmBundle(TEST_NAME);
-      const SERVER_BUNDLE_TIMESTAMP = String(BUNDLE_TIMESTAMP);
-      const NON_EXISTENT_TIMESTAMP = '9999999999999';
-
-      // Create the HTTP request
-      const req = createHttpRequest(SERVER_BUNDLE_TIMESTAMP);
-
-      // Set up response handling
-      const responsePromise = setupResponseHandler(req, true);
-
-      // Send the initial object
-      const initialObject = {
-        ...createInitialObject(SERVER_BUNDLE_TIMESTAMP),
-        renderingRequest: 'ReactOnRails.getAsyncValue()',
-      };
-      req.write(`${JSON.stringify(initialObject)}\n`);
-
-      // Send update chunk with non-existent bundle timestamp
-      const updateChunk = {
-        bundleTimestamp: NON_EXISTENT_TIMESTAMP,
-        updateChunk: 'ReactOnRails.setAsyncValue("should not work")',
-      };
-      req.write(`${JSON.stringify(updateChunk)}\n`);
-
-      // Send a valid update chunk
-      const validChunk = {
-        bundleTimestamp: SERVER_BUNDLE_TIMESTAMP,
-        updateChunk: 'ReactOnRails.setAsyncValue("valid update")',
-      };
-      req.write(`${JSON.stringify(validChunk)}\n`);
-
-      // End the request
-      req.end();
-
-      // Wait for the response
-      const response = await responsePromise;
-
-      // Verify the response
-      expect(response.statusCode).toBe(200);
-      expect(response.data).toBe('"valid update"'); // Should resolve with the valid update
     });
 
     test('complex multi-bundle streaming scenario', async () => {

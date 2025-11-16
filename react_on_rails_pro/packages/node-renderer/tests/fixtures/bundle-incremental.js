@@ -3,31 +3,6 @@ const { PassThrough } = require('stream');
 global.ReactOnRails = {
   dummy: { html: 'Dummy Object' },
 
-  // Get or create async value promise
-  getAsyncValue: function () {
-    debugger;
-    if (!sharedExecutionContext.has('asyncPromise')) {
-      const promiseData = {};
-      const promise = new Promise((resolve, reject) => {
-        promiseData.resolve = resolve;
-        promiseData.reject = reject;
-      });
-      promiseData.promise = promise;
-      sharedExecutionContext.set('asyncPromise', promiseData);
-    }
-    return sharedExecutionContext.get('asyncPromise').promise;
-  },
-
-  // Resolve the async value promise
-  setAsyncValue: function (value) {
-    debugger;
-    if (!sharedExecutionContext.has('asyncPromise')) {
-      ReactOnRails.getAsyncValue();
-    }
-    const promiseData = sharedExecutionContext.get('asyncPromise');
-    promiseData.resolve(value);
-  },
-
   // Get or create stream
   getStreamValues: function () {
     if (!sharedExecutionContext.has('stream')) {
@@ -52,6 +27,15 @@ global.ReactOnRails = {
     if (sharedExecutionContext.has('stream')) {
       const { stream } = sharedExecutionContext.get('stream');
       stream.end();
+    }
+  },
+
+  // Clear all stream values
+  clearStreamValues: function () {
+    if (sharedExecutionContext.has('stream')) {
+      const { stream } = sharedExecutionContext.get('stream');
+      stream.destroy();
+      sharedExecutionContext.delete('stream');
     }
   },
 };
