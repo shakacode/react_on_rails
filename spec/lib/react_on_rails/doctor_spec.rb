@@ -342,6 +342,23 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when file has uncommented pack tag without :async and commented one with :async" do
+      before do
+        allow(Dir).to receive(:glob).with("app/views/**/*.erb")
+                                    .and_return(["app/views/layouts/application.html.erb"])
+        allow(Dir).to receive(:glob).with("app/views/**/*.haml").and_return([])
+        allow(File).to receive(:exist?).with("app/views/layouts/application.html.erb").and_return(true)
+        allow(File).to receive(:read).with("app/views/layouts/application.html.erb")
+                                     .and_return('<%= javascript_pack_tag "app", defer: true %>
+<%# javascript_pack_tag "other", :async %>')
+      end
+
+      it "does not return files (only commented line has :async)" do
+        files = doctor.send(:scan_view_files_for_async_pack_tag)
+        expect(files).to be_empty
+      end
+    end
+
     context "when async is only in ERB comments" do
       before do
         allow(Dir).to receive(:glob).with("app/views/**/*.erb")

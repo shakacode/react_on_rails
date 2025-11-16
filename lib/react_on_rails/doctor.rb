@@ -1226,29 +1226,21 @@ module ReactOnRails
     def content_has_only_commented_async?(content)
       # Check if all occurrences of javascript_pack_tag with :async are in comments
       # Returns true if ONLY commented async usage exists (no active async usage)
-      # Note: We need to check the full content first (for multi-line tags) before line-by-line filtering
 
       # First check if there's any javascript_pack_tag with :async in the full content
       return true unless file_has_async_pack_tag?(content)
 
-      # Now check line-by-line to see if all occurrences are commented
-      # For multi-line tags, we check if the starting line is commented
-      has_uncommented_async = content.each_line.any? do |line|
-        # Skip lines that don't contain javascript_pack_tag
-        next unless line.include?("javascript_pack_tag")
-
-        # Skip ERB comments (<%# ... %>)
-        next if line.match?(ERB_COMMENT_PATTERN)
-        # Skip HAML comments (-# ...)
-        next if line.match?(HAML_COMMENT_PATTERN)
-        # Skip HTML comments (<!-- ... -->)
-        next if line.match?(HTML_COMMENT_PATTERN)
-
-        # If we reach here, this line has an uncommented javascript_pack_tag
-        true
+      # Strategy: Remove all commented lines, then check if any :async remains
+      # This handles both single-line and multi-line tags correctly
+      uncommented_lines = content.each_line.reject do |line|
+        line.match?(ERB_COMMENT_PATTERN) ||
+          line.match?(HAML_COMMENT_PATTERN) ||
+          line.match?(HTML_COMMENT_PATTERN)
       end
 
-      !has_uncommented_async
+      uncommented_content = uncommented_lines.join
+      # If no async found in uncommented content, all async usage was commented
+      !file_has_async_pack_tag?(uncommented_content)
     end
 
     def config_has_async_loading_strategy?
