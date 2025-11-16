@@ -27,6 +27,14 @@ export function getFixtureSecondaryBundle() {
   return path.resolve(__dirname, './fixtures/secondary-bundle.js');
 }
 
+export function getFixtureIncrementalBundle() {
+  return path.resolve(__dirname, './fixtures/bundle-incremental.js');
+}
+
+export function getFixtureIncrementalSecondaryBundle() {
+  return path.resolve(__dirname, './fixtures/secondary-bundle-incremental.js');
+}
+
 export function getFixtureAsset() {
   return path.resolve(__dirname, `./fixtures/${ASSET_UPLOAD_FILE}`);
 }
@@ -59,23 +67,35 @@ export function vmSecondaryBundlePath(testName: string) {
 
 export async function createVmBundle(testName: string) {
   // Build config with module support before creating VM bundle
-  buildConfig({
-    bundlePath: bundlePath(testName),
-    supportModules: true,
-    stubTimers: false,
-  });
   await safeCopyFileAsync(getFixtureBundle(), vmBundlePath(testName));
   await buildExecutionContext([vmBundlePath(testName)], /* buildVmsIfNeeded */ true);
 }
 
 export async function createSecondaryVmBundle(testName: string) {
   // Build config with module support before creating VM bundle
+  await safeCopyFileAsync(getFixtureSecondaryBundle(), vmSecondaryBundlePath(testName));
+  await buildExecutionContext([vmSecondaryBundlePath(testName)], /* buildVmsIfNeeded */ true);
+}
+
+export async function createIncrementalVmBundle(testName: string) {
+  // Build config with module support before creating VM bundle
   buildConfig({
-    bundlePath: bundlePath(testName),
+    serverBundleCachePath: serverBundleCachePath(testName),
     supportModules: true,
     stubTimers: false,
   });
-  await safeCopyFileAsync(getFixtureSecondaryBundle(), vmSecondaryBundlePath(testName));
+  await safeCopyFileAsync(getFixtureIncrementalBundle(), vmBundlePath(testName));
+  await buildExecutionContext([vmBundlePath(testName)], /* buildVmsIfNeeded */ true);
+}
+
+export async function createIncrementalSecondaryVmBundle(testName: string) {
+  // Build config with module support before creating VM bundle
+  buildConfig({
+    serverBundleCachePath: serverBundleCachePath(testName),
+    supportModules: true,
+    stubTimers: false,
+  });
+  await safeCopyFileAsync(getFixtureIncrementalSecondaryBundle(), vmSecondaryBundlePath(testName));
   await buildExecutionContext([vmSecondaryBundlePath(testName)], /* buildVmsIfNeeded */ true);
 }
 
@@ -140,10 +160,12 @@ export async function createAsset(testName: string, bundleTimestamp: string) {
   ]);
 }
 
-export async function resetForTest(testName: string) {
+export async function resetForTest(testName: string, resetConfigs = true) {
   await fsExtra.emptyDir(serverBundleCachePath(testName));
   resetVM();
-  setConfig(testName);
+  if (resetConfigs) {
+    setConfig(testName);
+  }
 }
 
 export function readRenderingRequest(projectName: string, commit: string, requestDumpFileName: string) {
@@ -201,5 +223,3 @@ export const waitFor = async (
   const defaultMessage = `Expect condition not met within ${timeout}ms`;
   throw new Error(message || defaultMessage + (lastError ? `\nLast error: ${lastError.message}` : ''));
 };
-
-setConfig('helper');
