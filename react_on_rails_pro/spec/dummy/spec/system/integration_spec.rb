@@ -396,14 +396,14 @@ shared_examples "streamed component tests" do |path, selector|
 
   it "hydrates the component" do
     visit path
-    expect(page.html).to match(/client-bundle[^\"]*.js/)
+    expect(page.html).to match(/client-bundle[^"]*.js/)
     change_text_expect_dom_selector(selector)
   end
 
   it "renders the page completely on server and displays content on client even without JavaScript" do
     # Don't add client-bundle.js to the page to ensure that the app is not hydrated
     visit "#{path}?skip_js_packs=true"
-    expect(page.html).not_to match(/client-bundle[^\"]*.js/)
+    expect(page.html).not_to match(/client-bundle[^"]*.js/)
     # Ensure that the component state is not updated
     change_text_expect_dom_selector(selector, expect_no_change: true)
 
@@ -432,7 +432,7 @@ describe "React Router Sixth Page", :js do
                   "#ServerComponentRouter-react-component-0"
 
   # Skip the test that fails without JavaScript - being addressed in another PR
-  it "renders the page completely on server and displays content on client even without JavaScript",
+  it "renders the page completely on server and displays content on client even without JavaScript", # rubocop:disable RSpec/NoExpectationExample
      skip: "Being addressed in another PR" do
     # This test is overridden to skip it
   end
