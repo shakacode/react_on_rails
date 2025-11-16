@@ -36,9 +36,6 @@ ReactOnRails.configure do |config|
   config.components_subdirectory = "ror-auto-load-components"
   config.auto_load_bundle = true
 
-  # Don't explicitly set generated_component_packs_loading_strategy - let it default to :defer
-  # which ensures generated component packs load and register components before main bundle executes
-
   ################################################################################
   # Pro Feature Testing: Server Bundle Security
   ################################################################################

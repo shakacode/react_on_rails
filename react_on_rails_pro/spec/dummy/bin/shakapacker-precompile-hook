@@ -22,8 +22,17 @@ end
 
 # Build ReScript if needed
 def build_rescript_if_needed
+  # Find Rails root directory
+  rails_root = find_rails_root
+  unless rails_root
+    warn "⚠️  Warning: Could not find Rails root. Skipping ReScript build."
+    return
+  end
+
   # Check for both old (bsconfig.json) and new (rescript.json) config files
-  return unless File.exist?("bsconfig.json") || File.exist?("rescript.json")
+  bsconfig_path = File.join(rails_root, "bsconfig.json")
+  rescript_config_path = File.join(rails_root, "rescript.json")
+  return unless File.exist?(bsconfig_path) || File.exist?(rescript_config_path)
 
   puts "🔧 Building ReScript..."
 
@@ -31,14 +40,17 @@ def build_rescript_if_needed
   yarn_available = system("yarn", "--version", out: File::NULL, err: File::NULL)
   npm_available = system("npm", "--version", out: File::NULL, err: File::NULL)
 
-  success = if yarn_available
-              system("yarn", "build:rescript")
-            elsif npm_available
-              system("npm", "run", "build:rescript")
-            else
-              warn "⚠️  Warning: Neither yarn nor npm found. Skipping ReScript build."
-              return
-            end
+  # Run build command from Rails root directory
+  success = Dir.chdir(rails_root) do
+    if yarn_available
+      system("yarn", "build:rescript")
+    elsif npm_available
+      system("npm", "run", "build:rescript")
+    else
+      warn "⚠️  Warning: Neither yarn nor npm found. Skipping ReScript build."
+      return false
+    end
+  end
 
   if success
     puts "✅ ReScript build completed successfully"
@@ -85,6 +97,7 @@ def generate_packs_if_needed
     exit 1
   end
 end
+
 # Main execution
 begin
   build_rescript_if_needed
