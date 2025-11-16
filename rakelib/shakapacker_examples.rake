@@ -29,31 +29,15 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
     task example_type.gen_task_name_short => example_type.clobber_task_name do
       puts "Running shakapacker_examples:#{example_type.gen_task_name_short}"
       mkdir_p(example_type.dir)
-      example_type.rails_options += "--skip-javascript"
-      sh_in_dir(examples_dir, "rails new #{example_type.name} #{example_type.rails_options}")
+      sh_in_dir(examples_dir, "rails new #{example_type.name} #{example_type.rails_options} --skip-javascript")
       sh_in_dir(example_type.dir, "touch .gitignore")
       sh_in_dir(example_type.dir,
                 "echo \"gem 'react_on_rails', path: '#{relative_gem_root}'\" >> #{example_type.gemfile}")
       sh_in_dir(example_type.dir, "echo \"gem 'shakapacker', '>= 8.2.0'\" >> #{example_type.gemfile}")
       bundle_install_in(example_type.dir)
       sh_in_dir(example_type.dir, "rake shakapacker:install")
-
-      # Skip validation during generator run since npm package isn't installed yet
-      #
-      # ENV Variable Scope: We prefix each shell command with the ENV variable rather than
-      # setting it in the Ruby process for these reasons:
-      #
-      # 1. Each command spawns a new shell process with its own environment
-      # 2. The ENV variable is automatically scoped to each command (no cleanup needed)
-      # 3. This differs from the generator approach in lib/generators/react_on_rails/install_generator.rb
-      #    which sets ENV in the Ruby process and requires explicit cleanup
-      #
-      # This approach is simpler and safer for rake tasks that invoke shell commands.
-      generator_commands = example_type.generator_shell_commands.map do |cmd|
-        "REACT_ON_RAILS_SKIP_VALIDATION=true #{cmd}"
-      end
-      sh_in_dir(example_type.dir, generator_commands)
-      sh_in_dir(example_type.dir, "yarn")
+      sh_in_dir(example_type.dir, example_type.generator_shell_commands)
+      sh_in_dir(example_type.dir, "npm install")
     end
   end
 

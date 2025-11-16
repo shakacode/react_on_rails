@@ -41,8 +41,6 @@ module ReactOnRails
       components_subdirectory: nil,
       make_generated_server_bundle_the_entrypoint: false,
       defer_generated_component_packs: false,
-      # React on Rails Pro (licensed) feature - enables immediate hydration of React components
-      immediate_hydration: false,
       # Maximum time in milliseconds to wait for client-side component registration after page load.
       # If exceeded, an error will be thrown for server-side rendered components not registered on the client.
       # Set to 0 to disable the timeout and wait indefinitely for component registration.
@@ -64,9 +62,54 @@ module ReactOnRails
                   :server_render_method, :random_dom_id, :auto_load_bundle,
                   :same_bundle_for_client_and_server, :rendering_props_extension,
                   :make_generated_server_bundle_the_entrypoint,
-                  :generated_component_packs_loading_strategy, :immediate_hydration,
+                  :generated_component_packs_loading_strategy,
                   :component_registry_timeout,
                   :server_bundle_output_path, :enforce_private_server_bundles
+
+    # Class instance variable and mutex to track if deprecation warning has been shown
+    # Using mutex to ensure thread-safety in multi-threaded environments
+    @immediate_hydration_warned = false
+    @immediate_hydration_mutex = Mutex.new
+
+    class << self
+      attr_accessor :immediate_hydration_warned, :immediate_hydration_mutex
+    end
+
+    # Deprecated: immediate_hydration configuration has been removed
+    def immediate_hydration=(value)
+      warned = false
+      self.class.immediate_hydration_mutex.synchronize do
+        warned = self.class.immediate_hydration_warned
+        self.class.immediate_hydration_warned = true unless warned
+      end
+
+      return if warned
+
+      Rails.logger.warn <<~WARNING
+        [REACT ON RAILS] The 'config.immediate_hydration' configuration option is deprecated and no longer used.
+        Immediate hydration is now automatically enabled for React on Rails Pro users.
+        Please remove 'config.immediate_hydration = #{value}' from your config/initializers/react_on_rails.rb file.
+        See CHANGELOG.md for migration instructions.
+      WARNING
+    end
+
+    def immediate_hydration
+      warned = false
+      self.class.immediate_hydration_mutex.synchronize do
+        warned = self.class.immediate_hydration_warned
+        self.class.immediate_hydration_warned = true unless warned
+      end
+
+      return nil if warned
+
+      Rails.logger.warn <<~WARNING
+        [REACT ON RAILS] The 'config.immediate_hydration' configuration option is deprecated and no longer used.
+        Immediate hydration is now automatically enabled for React on Rails Pro users.
+        Please remove any references to 'config.immediate_hydration' from your config/initializers/react_on_rails.rb file.
+        See CHANGELOG.md for migration instructions.
+      WARNING
+      nil
+    end
 
     # rubocop:disable Metrics/AbcSize
     def initialize(node_modules_location: nil, server_bundle_js_file: nil, prerender: nil,
@@ -81,7 +124,7 @@ module ReactOnRails
                    same_bundle_for_client_and_server: nil,
                    i18n_dir: nil, i18n_yml_dir: nil, i18n_output_format: nil, i18n_yml_safe_load_options: nil,
                    random_dom_id: nil, server_render_method: nil, rendering_props_extension: nil,
-                   components_subdirectory: nil, auto_load_bundle: nil, immediate_hydration: nil,
+                   components_subdirectory: nil, auto_load_bundle: nil,
                    component_registry_timeout: nil, server_bundle_output_path: nil, enforce_private_server_bundles: nil)
       self.node_modules_location = node_modules_location.present? ? node_modules_location : Rails.root
       self.generated_assets_dirs = generated_assets_dirs
@@ -122,7 +165,6 @@ module ReactOnRails
       self.auto_load_bundle = auto_load_bundle
       self.make_generated_server_bundle_the_entrypoint = make_generated_server_bundle_the_entrypoint
       self.defer_generated_component_packs = defer_generated_component_packs
-      self.immediate_hydration = immediate_hydration
       self.generated_component_packs_loading_strategy = generated_component_packs_loading_strategy
       self.server_bundle_output_path = server_bundle_output_path
       self.enforce_private_server_bundles = enforce_private_server_bundles
@@ -173,12 +215,13 @@ module ReactOnRails
 
       msg = <<~MSG
         ReactOnRails: Your current version of shakapacker \
-        does not support async script loading,  which may cause performance issues. Please either:
-        1. Use :sync or :defer loading strategy instead of :async
+        does not support async script loading. Please either:
+        1. Use :defer or :sync loading strategy instead of :async
         2. Upgrade to Shakapacker v8.2.0 or above to enable async script loading
       MSG
       if PackerUtils.supports_async_loading?
-        self.generated_component_packs_loading_strategy ||= :async
+        # Default based on Pro license: Pro users get :async, non-Pro users get :defer
+        self.generated_component_packs_loading_strategy ||= (Utils.react_on_rails_pro? ? :async : :defer)
       elsif generated_component_packs_loading_strategy.nil?
         Rails.logger.warn("**WARNING** #{msg}")
         self.generated_component_packs_loading_strategy = :sync

@@ -112,7 +112,7 @@ export async function runInVM(
   filePath: string,
   vmCluster?: typeof cluster,
 ): Promise<RenderResult> {
-  const { bundlePath } = getConfig();
+  const { serverBundleCachePath } = getConfig();
 
   try {
     // Wait for VM creation if it's in progress
@@ -137,7 +137,7 @@ export async function runInVM(
       const workerId = vmCluster?.worker?.id;
       log.debug(`worker ${workerId ? `${workerId} ` : ''}received render request for bundle ${filePath} with code
 ${smartTrim(renderingRequest)}`);
-      const debugOutputPathCode = path.join(bundlePath, 'code.js');
+      const debugOutputPathCode = path.join(serverBundleCachePath, 'code.js');
       log.debug(`Full code executed written to: ${debugOutputPathCode}`);
       await writeFileAsync(debugOutputPathCode, renderingRequest);
     }
@@ -165,7 +165,7 @@ ${smartTrim(renderingRequest)}`);
     if (log.level === 'debug') {
       log.debug(`result from JS:
 ${smartTrim(result)}`);
-      const debugOutputPathResult = path.join(bundlePath, 'result.json');
+      const debugOutputPathResult = path.join(serverBundleCachePath, 'result.json');
       log.debug(`Wrote result to file: ${debugOutputPathResult}`);
       await writeFileAsync(debugOutputPathResult, result);
     }

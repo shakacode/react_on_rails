@@ -155,10 +155,10 @@ module ReactOnRails
     # props: Ruby Hash or JSON string which contains the properties to pass to the redux store.
     # Options
     #    defer: false -- pass as true if you wish to render this below your component.
-    #    immediate_hydration: false -- React on Rails Pro (licensed) feature. Pass as true if you wish to
-    #                        hydrate this store immediately instead of waiting for the page to load.
+    #    immediate_hydration: nil -- React on Rails Pro (licensed) feature. When nil (default), Pro users
+    #                        get immediate hydration, non-Pro users don't. Can be explicitly overridden.
     def redux_store(store_name, props: {}, defer: false, immediate_hydration: nil)
-      immediate_hydration = ReactOnRails.configuration.immediate_hydration if immediate_hydration.nil?
+      immediate_hydration = ReactOnRails::Utils.normalize_immediate_hydration(immediate_hydration, store_name, "Store")
 
       redux_store_data = { store_name: store_name,
                            props: props,
@@ -586,6 +586,15 @@ module ReactOnRails
           end
           # It doesn't make any transformation, it listens and raises error if a chunk has errors
           chunk_json_result
+        end
+
+        result.rescue do |err|
+          # This error came from the renderer
+          raise ReactOnRails::PrerenderError.new(component_name: react_component_name,
+                                                 # Sanitize as this might be browser logged
+                                                 props: sanitized_props_string(props),
+                                                 err: err,
+                                                 js_code: js_code)
         end
       elsif result["hasErrors"] && render_options.raise_on_prerender_error
         raise_prerender_error(result, react_component_name, props, js_code)

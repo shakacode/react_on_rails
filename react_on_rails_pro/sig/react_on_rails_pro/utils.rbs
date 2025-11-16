@@ -1,0 +1,7 @@
+module ReactOnRailsPro
+  module Utils
+    def self.bundle_js_file_path: (String bundle_name) -> String
+
+    def self.running_on_windows?: () -> bool
+  end
+end

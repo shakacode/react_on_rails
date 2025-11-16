@@ -2,10 +2,6 @@
 
 module ReactOnRails
   module ProHelper
-    IMMEDIATE_HYDRATION_PRO_WARNING = "[REACT ON RAILS] The 'immediate_hydration' feature requires a " \
-                                      "React on Rails Pro license. " \
-                                      "Please visit https://shakacode.com/react-on-rails-pro to learn more."
-
     # Generates the complete component specification script tag.
     # Handles both immediate hydration (Pro feature) and standard cases.
     def generate_component_script(render_options)
@@ -36,17 +32,12 @@ module ReactOnRails
                    component_specification_tag
                  end
 
-      pro_warning_badge = pro_warning_badge_if_needed(render_options.explicitly_disabled_pro_options)
-      "#{pro_warning_badge}\n#{spec_tag}".html_safe
+      spec_tag.html_safe
     end
 
     # Generates the complete store hydration script tag.
     # Handles both immediate hydration (Pro feature) and standard cases.
     def generate_store_script(redux_store_data)
-      pro_options_check_result = ReactOnRails::ProUtils.disable_pro_render_options_if_not_licensed(redux_store_data)
-      redux_store_data = pro_options_check_result[:raw_options]
-      explicitly_disabled_pro_options = pro_options_check_result[:explicitly_disabled_pro_options]
-
       store_hydration_data = content_tag(:script,
                                          json_safe_and_pretty(redux_store_data[:props]).html_safe,
                                          type: "application/json",
@@ -67,40 +58,7 @@ module ReactOnRails
                                   store_hydration_data
                                 end
 
-      pro_warning_badge = pro_warning_badge_if_needed(explicitly_disabled_pro_options)
-      "#{pro_warning_badge}\n#{store_hydration_scripts}".html_safe
-    end
-
-    def pro_warning_badge_if_needed(explicitly_disabled_pro_options)
-      return "" unless explicitly_disabled_pro_options.any?
-
-      disabled_features_message = disabled_pro_features_message(explicitly_disabled_pro_options)
-      warning_message = "[REACT ON RAILS] #{disabled_features_message}\n" \
-                        "Please visit https://shakacode.com/react-on-rails-pro to learn more."
-      puts warning_message
-      Rails.logger.warn warning_message
-
-      tooltip_text = "#{disabled_features_message} Click to learn more."
-
-      <<~HTML.strip
-        <a href="https://shakacode.com/react-on-rails-pro" target="_blank" rel="noopener noreferrer" title="#{tooltip_text}">
-          <div style="position: fixed; top: 0; right: 0; width: 180px; height: 180px; overflow: hidden; z-index: 9999; pointer-events: none;">
-            <div style="position: absolute; top: 50px; right: -40px; transform: rotate(45deg); background-color: rgba(220, 53, 69, 0.85); color: white; padding: 7px 40px; text-align: center; font-weight: bold; font-family: sans-serif; font-size: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); pointer-events: auto;">
-              React On Rails Pro Required
-            </div>
-          </div>
-        </a>
-      HTML
-    end
-
-    def disabled_pro_features_message(explicitly_disabled_pro_options)
-      return "".html_safe unless explicitly_disabled_pro_options.any?
-
-      feature_list = explicitly_disabled_pro_options.join(", ")
-      feature_word = explicitly_disabled_pro_options.size == 1 ? "feature" : "features"
-      "The '#{feature_list}' #{feature_word} " \
-        "#{explicitly_disabled_pro_options.size == 1 ? 'requires' : 'require'} a " \
-        "React on Rails Pro license. "
+      store_hydration_scripts.html_safe
     end
   end
 end

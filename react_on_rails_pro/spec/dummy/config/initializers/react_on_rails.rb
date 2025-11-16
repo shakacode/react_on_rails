@@ -1,9 +1,11 @@
 # frozen_string_literal: true
 
-# For documentation of parameters see: docs/basics/configuration.md
+# ⚠️ TEST CONFIGURATION - Do not copy directly for production apps
+# This is the Pro dummy app configuration used for testing React on Rails Pro features.
+# See docs/api-reference/configuration.md for production configuration guidance.
+
+# Advanced: Custom rendering extension to add values to railsContext
 module RenderingExtension
-  # Return a Hash that contains custom values from the view context that will get passed to
-  # all calls to react_component and redux_store for rendering
   def self.custom_context(view_context)
     if view_context.controller.is_a?(ActionMailer::Base)
       {}
@@ -15,6 +17,7 @@ module RenderingExtension
   end
 end
 
+# Advanced: Custom props extension for client-side hydration
 module RenderingPropsExtension
   def self.adjust_props_for_client_side_hydration(_component_name, props)
     if props.instance_of?(Hash)
@@ -26,19 +29,32 @@ module RenderingPropsExtension
 end
 
 ReactOnRails.configure do |config|
+  ################################################################################
+  # Essential Configuration
+  ################################################################################
   config.server_bundle_js_file = "server-bundle.js"
-  config.random_dom_id = false # default is true
-
-  # Next 2 lines are commented out because we've set test.compile to true
-  # config.build_test_command = "yarn run build:test"
-  # config.webpack_generated_files = %w[server-bundle.js manifest.json]
-  config.rendering_extension = RenderingExtension
-
-  config.rendering_props_extension = RenderingPropsExtension
-
-  config.auto_load_bundle = true
   config.components_subdirectory = "ror-auto-load-components"
+  config.auto_load_bundle = true
 
+  ################################################################################
+  # Pro Feature Testing: Server Bundle Security
+  ################################################################################
+  # Testing private server bundle enforcement (recommended for production)
   config.enforce_private_server_bundles = true
   config.server_bundle_output_path = "ssr-generated"
+
+  ################################################################################
+  # Test-specific Advanced Configuration
+  ################################################################################
+  # Testing with fixed DOM IDs for easier test assertions
+  config.random_dom_id = false # default is true
+
+  # Testing advanced rendering customization
+  config.rendering_extension = RenderingExtension
+  config.rendering_props_extension = RenderingPropsExtension
+
+  # NOTE: build_test_command and webpack_generated_files are commented out
+  # because we've set test.compile to true in shakapacker.yml
+  # config.build_test_command = "yarn run build:test"
+  # config.webpack_generated_files = %w[server-bundle.js manifest.json]
 end

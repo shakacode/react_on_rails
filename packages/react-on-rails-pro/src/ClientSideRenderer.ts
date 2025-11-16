@@ -188,7 +188,6 @@ You should return a React.Component always for the client side entry point.`);
       }
 
       try {
-        // eslint-disable-next-line @typescript-eslint/no-deprecated
         unmountComponentAtNode(domNode);
       } catch (e: unknown) {
         const error = e instanceof Error ? e : new Error('Unknown error');

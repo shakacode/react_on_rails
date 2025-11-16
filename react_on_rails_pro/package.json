@@ -1,6 +1,6 @@
 {
-  "name": "@shakacode-tools/react-on-rails-pro-node-renderer",
-  "version": "16.1.1",
+  "name": "react-on-rails-pro-node-renderer",
+  "version": "16.2.0-beta.4",
   "protocolVersion": "2.0.0",
   "description": "react-on-rails-pro JavaScript for react_on_rails_pro Ruby gem",
   "exports": {
@@ -16,9 +16,6 @@
   },
   "bin": {
     "react-on-rails-pro-node-renderer": "packages/node-renderer/dist/default-node-renderer.js"
-  },
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
   },
   "directories": {
     "doc": "docs"
@@ -119,7 +116,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/shakacode-tools/react_on_rails_pro.git"
+    "url": "git+https://github.com/shakacode/react_on_rails.git"
   },
   "keywords": [
     "react",
@@ -132,9 +129,9 @@
   "author": "justin@shakacode.com",
   "license": "UNLICENSED",
   "bugs": {
-    "url": "https://github.com/shakacode/react_on_rails_pro/issues"
+    "url": "https://github.com/shakacode/react_on_rails/issues"
   },
-  "homepage": "https://github.com/shakacode/react_on_rails_pro#readme",
+  "homepage": "https://github.com/shakacode/react_on_rails/tree/master/react_on_rails_pro#readme",
   "jest": {
     "clearMocks": true,
     "collectCoverageFrom": [

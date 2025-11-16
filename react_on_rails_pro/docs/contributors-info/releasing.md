@@ -35,6 +35,6 @@ rake release[17.0.0,false,verdaccio]
 This unified script releases all 5 packages together:
 - react-on-rails (NPM)
 - react-on-rails-pro (NPM)
+- react-on-rails-pro-node-renderer (NPM)
 - react_on_rails (RubyGem)
-- @shakacode-tools/react-on-rails-pro-node-renderer (NPM, GitHub Packages)
-- react_on_rails_pro (RubyGem, GitHub Packages)
+- react_on_rails_pro (RubyGem)

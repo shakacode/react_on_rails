@@ -154,6 +154,7 @@ module ReactOnRails
     def check_configuration_details
       check_shakapacker_configuration_details
       check_react_on_rails_configuration_details
+      check_server_bundle_prerender_consistency
     end
 
     def check_bin_dev_launcher
@@ -166,6 +167,7 @@ module ReactOnRails
 
     def check_testing_setup
       check_rspec_helper_setup
+      check_build_test_configuration
     end
 
     def check_development
@@ -173,6 +175,7 @@ module ReactOnRails
       check_procfile_dev
       check_bin_dev_script
       check_gitignore
+      check_async_usage
     end
 
     def check_javascript_bundles
@@ -745,10 +748,12 @@ module ReactOnRails
       auto_load_match = content.match(/config\.auto_load_bundle\s*=\s*([^\s\n,]+)/)
       checker.add_info("  auto_load_bundle: #{auto_load_match[1]}") if auto_load_match
 
-      # Immediate hydration (Pro feature)
+      # Deprecated immediate_hydration setting
       immediate_hydration_match = content.match(/config\.immediate_hydration\s*=\s*([^\s\n,]+)/)
       if immediate_hydration_match
-        checker.add_info("  immediate_hydration: #{immediate_hydration_match[1]} (React on Rails Pro)")
+        checker.add_warning("  ⚠️  immediate_hydration: #{immediate_hydration_match[1]} (DEPRECATED)")
+        checker.add_info("    💡 This setting is no longer used. Immediate hydration is now automatic for Pro users.")
+        checker.add_info("    💡 Remove this line from your config/initializers/react_on_rails.rb file.")
       end
 
       # Component registry timeout
@@ -1121,6 +1126,124 @@ module ReactOnRails
       end
     end
 
+    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+    def check_server_bundle_prerender_consistency
+      config_path = "config/initializers/react_on_rails.rb"
+      return unless File.exist?(config_path)
+
+      checker.add_info("\n🔍 Server Rendering Consistency:")
+
+      begin
+        content = File.read(config_path)
+
+        # Check for server bundle configuration
+        server_bundle_match = content.match(/config\.server_bundle_js_file\s*=\s*["']([^"']+)["']/)
+        server_bundle_set = server_bundle_match && server_bundle_match[1].present?
+
+        # Check for global prerender setting
+        prerender_match = content.match(/config\.prerender\s*=\s*(true)/)
+        prerender_set = prerender_match
+
+        # Check if prerender is used in views
+        uses_prerender = uses_prerender_in_views?
+
+        # Analyze the configuration
+        if (prerender_set || uses_prerender) && !server_bundle_set
+          checker.add_warning("  ⚠️  Server rendering is enabled but server_bundle_js_file is not configured")
+          checker.add_info("  💡 Set config.server_bundle_js_file = 'server-bundle.js' to enable SSR")
+          checker.add_info("  💡 See: https://www.shakacode.com/react-on-rails/docs/guides/server-rendering")
+        elsif server_bundle_set && !prerender_set && !uses_prerender
+          checker.add_info("  ℹ️  server_bundle_js_file is configured but prerender doesn't appear to be used")
+          checker.add_info("  💡 Either use prerender: true in react_component calls or remove server_bundle_js_file")
+        else
+          checker.add_success("  ✅ Server rendering configuration is consistent")
+        end
+      rescue StandardError => e
+        checker.add_warning("  ⚠️  Could not analyze server rendering configuration: #{e.message}")
+      end
+    end
+    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+
+    def uses_prerender_in_views?
+      # Check view files for prerender: true
+      view_files = Dir.glob("app/views/**/*.{erb,haml,slim}")
+      view_files.any? do |file|
+        next unless File.exist?(file)
+
+        File.read(file).match?(/prerender:\s*true/)
+      end
+    rescue StandardError
+      false
+    end
+
+    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity, Metrics/MethodLength
+    def check_build_test_configuration
+      config_path = "config/initializers/react_on_rails.rb"
+      shakapacker_yml = "config/shakapacker.yml"
+
+      return unless File.exist?(config_path)
+
+      checker.add_info("\n🧪 Test Asset Compilation:")
+
+      begin
+        config_content = File.read(config_path)
+        has_build_test_command = config_content.match(/^\s*config\.build_test_command\s*=\s*["']([^"']+)["']/)
+        uses_test_helper = uses_react_on_rails_test_helper?
+
+        if File.exist?(shakapacker_yml)
+          shakapacker_content = File.read(shakapacker_yml)
+          # Match test section and look for compile: true
+          has_compile_true = shakapacker_content.match(/^test:.*?^\s+compile:\s*true/m)
+
+          if has_build_test_command && has_compile_true
+            checker.add_warning("  ⚠️  Both build_test_command and shakapacker compile: true are configured")
+            checker.add_info("  💡 These are mutually exclusive - use only one approach")
+            checker.add_info("  💡 Recommended: Use compile: true in shakapacker.yml (simpler)")
+            checker.add_info("  💡 Alternative: Use build_test_command with ReactOnRails::TestHelper (explicit control)")
+            checker.add_info("  📖 See: https://github.com/shakacode/react_on_rails/blob/master/docs/guides/testing-configuration.md")
+          elsif has_build_test_command && !uses_test_helper
+            checker.add_warning("  ⚠️  build_test_command is set but ReactOnRails::TestHelper is not configured")
+            checker.add_info("  💡 Add to spec/rails_helper.rb:")
+            checker.add_info("      ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)")
+            checker.add_info("  💡 Or remove build_test_command and use compile: true in shakapacker.yml")
+          elsif !has_build_test_command && uses_test_helper
+            checker.add_error("  🚫 ReactOnRails::TestHelper is configured but build_test_command is not set")
+            checker.add_info("  💡 Add to config/initializers/react_on_rails.rb:")
+            checker.add_info("      config.build_test_command = 'RAILS_ENV=test bin/shakapacker'")
+            checker.add_info("  💡 Or remove TestHelper and use compile: true in shakapacker.yml")
+          elsif !has_build_test_command && !has_compile_true && !uses_test_helper
+            checker.add_warning("  ⚠️  No test asset compilation configured")
+            checker.add_info("  💡 Recommended: Add to shakapacker.yml test section:")
+            checker.add_info("      compile: true")
+            checker.add_info("  📖 See: https://github.com/shakacode/react_on_rails/blob/master/docs/guides/testing-configuration.md")
+          elsif has_compile_true
+            checker.add_success("  ✅ Test assets configured via Shakapacker auto-compilation")
+            checker.add_info("      (compile: true in shakapacker.yml)")
+          elsif has_build_test_command && uses_test_helper
+            checker.add_success("  ✅ Test assets configured via React on Rails test helper")
+            checker.add_info("      (build_test_command + ReactOnRails::TestHelper)")
+          end
+        else
+          checker.add_warning("  ⚠️  config/shakapacker.yml not found")
+        end
+      rescue StandardError => e
+        checker.add_warning("  ⚠️  Could not analyze test configuration: #{e.message}")
+      end
+    end
+    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity, Metrics/MethodLength
+
+    def uses_react_on_rails_test_helper?
+      spec_helpers = ["spec/rails_helper.rb", "spec/spec_helper.rb", "test/test_helper.rb"]
+      spec_helpers.any? do |helper|
+        next unless File.exist?(helper)
+
+        content = File.read(helper)
+        content.include?("configure_rspec_to_compile_assets") || content.include?("ensure_assets_compiled")
+      end
+    rescue StandardError
+      false
+    end
+
     def relativize_path(absolute_path)
       return absolute_path unless absolute_path.is_a?(String)
 
@@ -1156,6 +1279,130 @@ module ReactOnRails
       rescue StandardError => e
         checker.add_info("  #{label}: <error reading value: #{e.message}>")
       end
+    end
+
+    # Comment patterns used for filtering out commented async usage
+    ERB_COMMENT_PATTERN = /<%\s*#.*javascript_pack_tag/
+    HAML_COMMENT_PATTERN = /^\s*-#.*javascript_pack_tag/
+    SLIM_COMMENT_PATTERN = %r{^\s*/.*javascript_pack_tag}
+    HTML_COMMENT_PATTERN = /<!--.*javascript_pack_tag/
+
+    def check_async_usage
+      # When Pro is installed, async is fully supported and is the default behavior
+      # No need to check for async usage in this case
+      return if ReactOnRails::Utils.react_on_rails_pro?
+
+      async_issues = []
+
+      # Check 1: javascript_pack_tag with :async in view files
+      view_files_with_async = scan_view_files_for_async_pack_tag
+      unless view_files_with_async.empty?
+        async_issues << "javascript_pack_tag with :async found in view files:"
+        view_files_with_async.each do |file|
+          async_issues << "  • #{file}"
+        end
+      end
+
+      # Check 2: generated_component_packs_loading_strategy = :async
+      if config_has_async_loading_strategy?
+        async_issues << "config.generated_component_packs_loading_strategy = :async in initializer"
+      end
+
+      return if async_issues.empty?
+
+      # Report errors if async usage is found without Pro
+      checker.add_error("🚫 :async usage detected without React on Rails Pro")
+      async_issues.each { |issue| checker.add_error("  #{issue}") }
+      checker.add_info("  💡 :async can cause race conditions. Options:")
+      checker.add_info("    1. Upgrade to React on Rails Pro (recommended for :async support)")
+      checker.add_info("    2. Change to :defer or :sync loading strategy")
+      checker.add_info("  📖 https://www.shakacode.com/react-on-rails/docs/guides/configuration/")
+    end
+
+    def scan_view_files_for_async_pack_tag
+      view_patterns = ["app/views/**/*.erb", "app/views/**/*.haml", "app/views/**/*.slim"]
+      files_with_async = view_patterns.flat_map { |pattern| scan_pattern_for_async(pattern) }
+      files_with_async.compact
+    rescue Errno::ENOENT, Encoding::InvalidByteSequenceError, Encoding::UndefinedConversionError => e
+      # Log the error if Rails logger is available
+      log_debug("Error scanning view files for async: #{e.message}")
+      []
+    end
+
+    def scan_pattern_for_async(pattern)
+      Dir.glob(pattern).filter_map do |file|
+        next unless File.exist?(file)
+
+        content = File.read(file)
+        next if content_has_only_commented_async?(content)
+        next unless file_has_async_pack_tag?(content)
+
+        relativize_path(file)
+      end
+    end
+
+    def file_has_async_pack_tag?(content)
+      # Match javascript_pack_tag with :async symbol or async: true hash syntax
+      # Examples that should match:
+      #   - javascript_pack_tag "app", :async
+      #   - javascript_pack_tag "app", async: true
+      #   - javascript_pack_tag "app", :async, other_option: value
+      # Examples that should NOT match:
+      #   - javascript_pack_tag "app", defer: "async" (async is a string value, not the option)
+      #   - javascript_pack_tag "app", :defer
+      # Note: Theoretical edge case `data: { async: true }` would match but is extremely unlikely
+      # in real code and represents a harmless false positive (showing a warning when not needed)
+      # Use word boundary \b to ensure :async is not part of a longer symbol like :async_mode
+      # [^<]* allows matching across newlines within ERB tags but stops at closing ERB tag
+      content.match?(/javascript_pack_tag[^<]*(?::async\b|async:\s*true)/)
+    end
+
+    def content_has_only_commented_async?(content)
+      # Check if all occurrences of javascript_pack_tag with :async are in comments
+      # Returns true if ONLY commented async usage exists (no active async usage)
+
+      # First check if there's any javascript_pack_tag with :async in the full content
+      return true unless file_has_async_pack_tag?(content)
+
+      # Strategy: Remove all commented lines, then check if any :async remains
+      # This handles both single-line and multi-line tags correctly
+      uncommented_lines = content.each_line.reject do |line|
+        line.match?(ERB_COMMENT_PATTERN) ||
+          line.match?(HAML_COMMENT_PATTERN) ||
+          line.match?(SLIM_COMMENT_PATTERN) ||
+          line.match?(HTML_COMMENT_PATTERN)
+      end
+
+      uncommented_content = uncommented_lines.join
+      # If no async found in uncommented content, all async usage was commented
+      !file_has_async_pack_tag?(uncommented_content)
+    end
+
+    def config_has_async_loading_strategy?
+      config_path = "config/initializers/react_on_rails.rb"
+      return false unless File.exist?(config_path)
+
+      content = File.read(config_path)
+      # Check if generated_component_packs_loading_strategy is set to :async
+      # Filter out commented lines (lines starting with # after optional whitespace)
+      content.each_line.any? do |line|
+        # Skip lines that start with # (after optional whitespace)
+        next if line.match?(/^\s*#/)
+
+        # Match: config.generated_component_packs_loading_strategy = :async
+        # Use word boundary \b to ensure :async is the complete symbol, not part of :async_mode etc.
+        line.match?(/config\.generated_component_packs_loading_strategy\s*=\s*:async\b/)
+      end
+    rescue Errno::ENOENT, Encoding::InvalidByteSequenceError, Encoding::UndefinedConversionError => e
+      # Log the error if Rails logger is available
+      log_debug("Error checking async loading strategy: #{e.message}")
+      false
+    end
+
+    def log_debug(message)
+      return unless defined?(Rails.logger) && Rails.logger
+
+      Rails.logger.debug(message)
     end
 
     # Check Shakapacker private_output_path integration and provide recommendations

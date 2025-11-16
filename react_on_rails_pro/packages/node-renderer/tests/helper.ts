@@ -35,23 +35,23 @@ export function getOtherFixtureAsset() {
   return path.resolve(__dirname, `./fixtures/${ASSET_UPLOAD_OTHER_FILE}`);
 }
 
-export function bundlePath(testName: string) {
+export function serverBundleCachePath(testName: string) {
   return path.resolve(__dirname, 'tmp', testName);
 }
 
 export function setConfig(testName: string) {
   buildConfig({
-    bundlePath: bundlePath(testName),
+    serverBundleCachePath: serverBundleCachePath(testName),
   });
 }
 
 export function vmBundlePath(testName: string) {
-  return path.resolve(bundlePath(testName), `${BUNDLE_TIMESTAMP}`, `${BUNDLE_TIMESTAMP}.js`);
+  return path.resolve(serverBundleCachePath(testName), `${BUNDLE_TIMESTAMP}`, `${BUNDLE_TIMESTAMP}.js`);
 }
 
 export function vmSecondaryBundlePath(testName: string) {
   return path.resolve(
-    bundlePath(testName),
+    serverBundleCachePath(testName),
     `${SECONDARY_BUNDLE_TIMESTAMP}`,
     `${SECONDARY_BUNDLE_TIMESTAMP}.js`,
   );
@@ -76,7 +76,7 @@ export function secondaryLockfilePath(testName: string) {
 }
 
 export function uploadedBundleDir(testName: string) {
-  return path.resolve(bundlePath(testName), 'uploads');
+  return path.resolve(serverBundleCachePath(testName), 'uploads');
 }
 
 export function uploadedBundlePath(testName: string) {
@@ -96,11 +96,11 @@ export function uploadedAssetOtherPath(testName: string) {
 }
 
 export function assetPath(testName: string, bundleTimestamp: string) {
-  return path.resolve(bundlePath(testName), bundleTimestamp, ASSET_UPLOAD_FILE);
+  return path.resolve(serverBundleCachePath(testName), bundleTimestamp, ASSET_UPLOAD_FILE);
 }
 
 export function assetPathOther(testName: string, bundleTimestamp: string) {
-  return path.resolve(bundlePath(testName), bundleTimestamp, ASSET_UPLOAD_OTHER_FILE);
+  return path.resolve(serverBundleCachePath(testName), bundleTimestamp, ASSET_UPLOAD_OTHER_FILE);
 }
 
 export async function createUploadedBundle(testName: string) {
@@ -129,7 +129,7 @@ export async function createAsset(testName: string, bundleTimestamp: string) {
 }
 
 export async function resetForTest(testName: string) {
-  await fsExtra.emptyDir(bundlePath(testName));
+  await fsExtra.emptyDir(serverBundleCachePath(testName));
   resetVM();
   setConfig(testName);
 }

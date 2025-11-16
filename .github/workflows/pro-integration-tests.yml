@@ -6,6 +6,12 @@ on:
       - 'master'
   pull_request:
   workflow_dispatch:
+    inputs:
+      force_run:
+        description: 'Force run all jobs (bypass detect-changes)'
+        required: false
+        type: boolean
+        default: false
 
 defaults:
   run:
@@ -18,15 +24,27 @@ jobs:
       docs_only: ${{ steps.detect.outputs.docs_only }}
       run_pro_lint: ${{ steps.detect.outputs.run_pro_lint }}
       run_pro_tests: ${{ steps.detect.outputs.run_pro_tests }}
+      has_full_ci_label: ${{ steps.check-label.outputs.result }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Check for full-ci label
+        id: check-label
+        uses: ./.github/actions/check-full-ci-label
       - name: Detect relevant changes
         id: detect
         working-directory: .
         run: |
+          # If force_run is true OR full-ci label is present, run everything
+          if [ "${{ inputs.force_run }}" = "true" ] || [ "${{ steps.check-label.outputs.result }}" = "true" ]; then
+            echo "run_pro_lint=true" >> "$GITHUB_OUTPUT"
+            echo "run_pro_tests=true" >> "$GITHUB_OUTPUT"
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/master' }}"
           script/ci-changes-detector "$BASE_REF"
         shell: bash
@@ -34,10 +52,10 @@ jobs:
   # Build webpack test bundles for dummy app
   build-dummy-app-webpack-test-bundles:
     needs: detect-changes
-    if: github.ref == 'refs/heads/master' || needs.detect-changes.outputs.run_pro_tests == 'true'
+    if: github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.run_pro_tests == 'true'
     runs-on: ubuntu-22.04
     env:
-      REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE }}
+      REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -124,10 +142,10 @@ jobs:
     needs:
       - detect-changes
       - build-dummy-app-webpack-test-bundles
-    if: github.ref == 'refs/heads/master' || needs.detect-changes.outputs.run_pro_tests == 'true'
+    if: github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.run_pro_tests == 'true'
     runs-on: ubuntu-22.04
     env:
-      REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE }}
+      REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -304,10 +322,10 @@ jobs:
     needs:
       - detect-changes
       - build-dummy-app-webpack-test-bundles
-    if: github.ref == 'refs/heads/master' || needs.detect-changes.outputs.run_pro_tests == 'true'
+    if: github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.run_pro_tests == 'true'
     runs-on: ubuntu-22.04
     env:
-      REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE }}
+      REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
     # Redis service container
     services:
       redis:

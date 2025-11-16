@@ -11,6 +11,8 @@ import type { RenderResult } from '../worker/vm';
 
 export const TRUNCATION_FILLER = '\n... TRUNCATED ...\n';
 
+export const SHUTDOWN_WORKER_MESSAGE = 'NODE_RENDERER_SHUTDOWN_WORKER';
+
 export function workerIdLabel() {
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- worker is nullable in the primary process
   return cluster?.worker?.id || 'NO WORKER ID';
@@ -155,8 +157,8 @@ export const delay = (milliseconds: number) =>
   });
 
 export function getBundleDirectory(bundleTimestamp: string | number) {
-  const { bundlePath } = getConfig();
-  return path.join(bundlePath, `${bundleTimestamp}`);
+  const { serverBundleCachePath } = getConfig();
+  return path.join(serverBundleCachePath, `${bundleTimestamp}`);
 }
 
 export function getRequestBundleFilePath(bundleTimestamp: string | number) {

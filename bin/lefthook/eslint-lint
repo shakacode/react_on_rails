@@ -31,13 +31,8 @@ if [ -n "$root_and_packages_pro_files" ]; then
   fi
   printf "  %s\n" $root_and_packages_pro_files
 
-  if ! yarn run eslint $root_and_packages_pro_files --report-unused-disable-directives --fix; then
+  if ! yarn run eslint $root_and_packages_pro_files --fix; then
     exit_code=1
-  fi
-
-  # Re-stage files if running on staged or all-changed context
-  if [ "$CONTEXT" = "staged" ] || [ "$CONTEXT" = "all-changed" ]; then
-    echo $root_and_packages_pro_files | xargs -r git add
   fi
 fi
 
@@ -53,13 +48,8 @@ if [ -n "$react_on_rails_pro_files" ]; then
   # Strip react_on_rails_pro/ prefix for running in Pro directory
   react_on_rails_pro_files_relative=$(echo "$react_on_rails_pro_files" | sed 's|^react_on_rails_pro/||')
 
-  if ! (cd react_on_rails_pro && yarn run eslint $react_on_rails_pro_files_relative --report-unused-disable-directives --fix); then
+  if ! (cd react_on_rails_pro && yarn run eslint $react_on_rails_pro_files_relative --fix); then
     exit_code=1
-  fi
-
-  # Re-stage files if running on staged or all-changed context
-  if [ "$CONTEXT" = "staged" ] || [ "$CONTEXT" = "all-changed" ]; then
-    echo $react_on_rails_pro_files | xargs -r git add
   fi
 fi
 

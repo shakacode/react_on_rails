@@ -21,7 +21,7 @@ module ReactOnRails
     # Returns html_safe string (ActiveSupport::SafeBuffer)
     def redux_store: (
       String store_name,
-      ?Hash[Symbol, untyped] props
+      ?Hash[Symbol, untyped] | String props
     ) -> safe_buffer
 
     # Returns html_safe string (ActiveSupport::SafeBuffer)
@@ -33,7 +33,7 @@ module ReactOnRails
       ?Hash[Symbol, untyped] options
     ) -> safe_buffer
 
-    def sanitized_props_string: (untyped props) -> String
+    def sanitized_props_string: (Hash[Symbol, untyped] | String props) -> String
 
     def rails_context: (
       ?server_side: bool

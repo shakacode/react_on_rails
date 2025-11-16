@@ -34,8 +34,11 @@ export interface Config {
   // Additional options to pass to the Fastify server factory.
   // See https://fastify.dev/docs/latest/Reference/Server/#factory.
   fastifyServerOptions: FastifyServerOptions<http2.Http2Server>;
-  // Path to a temp directory where uploaded bundle files will be stored.
-  bundlePath: string;
+  // Path to a cache directory where uploaded server bundle files will be stored.
+  // This is distinct from Shakapacker's public asset directory.
+  serverBundleCachePath: string;
+  // @deprecated Use serverBundleCachePath instead. This will be removed in a future version.
+  bundlePath?: string;
   // If set to true, `supportModules` enables the server-bundle code to call a default set of NodeJS
   // global objects and functions that get added to the VM context:
   // `{ Buffer, TextDecoder, TextEncoder, URLSearchParams, ReadableStream, process, setTimeout, setInterval, setImmediate, clearTimeout, clearInterval, clearImmediate, queueMicrotask }`.
@@ -58,6 +61,9 @@ export interface Config {
   allWorkersRestartInterval: number | undefined;
   // Time in minutes between each worker restarting when restarting all workers
   delayBetweenIndividualWorkerRestarts: number | undefined;
+  // Time in seconds to wait for worker to restart before killing it
+  // Set it to 0 or undefined to never kill the worker
+  gracefulWorkerRestartTimeout: number | undefined;
   // If the rendering request is longer than this, it will be truncated in exception and logging messages
   maxDebugSnippetLength: number;
   // @deprecated See https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/error-reporting-and-tracing.
@@ -99,7 +105,7 @@ function defaultWorkersCount() {
 }
 
 // Find the .node-renderer-bundles folder if it exists, otherwise use /tmp
-function defaultBundlePath() {
+function defaultServerBundleCachePath() {
   let currentDir = process.cwd();
   const maxDepth = 10;
   for (let i = 0; i < maxDepth; i += 1) {
@@ -145,7 +151,8 @@ const defaultConfig: Config = {
 
   fastifyServerOptions: {},
 
-  bundlePath: env.RENDERER_BUNDLE_PATH || defaultBundlePath(),
+  serverBundleCachePath:
+    env.RENDERER_SERVER_BUNDLE_CACHE_PATH || env.RENDERER_BUNDLE_PATH || defaultServerBundleCachePath(),
 
   supportModules: truthy(env.RENDERER_SUPPORT_MODULES),
 
@@ -163,6 +170,10 @@ const defaultConfig: Config = {
 
   delayBetweenIndividualWorkerRestarts: env.RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS
     ? parseInt(env.RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS, 10)
+    : undefined,
+
+  gracefulWorkerRestartTimeout: env.GRACEFUL_WORKER_RESTART_TIMEOUT
+    ? parseInt(env.GRACEFUL_WORKER_RESTART_TIMEOUT, 10)
     : undefined,
 
   maxDebugSnippetLength: MAX_DEBUG_SNIPPET_LENGTH,
@@ -185,7 +196,10 @@ function envValuesUsed() {
     RENDERER_PORT: !userConfig.port && env.RENDERER_PORT,
     RENDERER_LOG_LEVEL: !userConfig.logLevel && env.RENDERER_LOG_LEVEL,
     RENDERER_LOG_HTTP_LEVEL: !userConfig.logHttpLevel && env.RENDERER_LOG_HTTP_LEVEL,
-    RENDERER_BUNDLE_PATH: !userConfig.bundlePath && env.RENDERER_BUNDLE_PATH,
+    RENDERER_SERVER_BUNDLE_CACHE_PATH:
+      !userConfig.serverBundleCachePath && env.RENDERER_SERVER_BUNDLE_CACHE_PATH,
+    RENDERER_BUNDLE_PATH:
+      !userConfig.serverBundleCachePath && !userConfig.bundlePath && env.RENDERER_BUNDLE_PATH,
     RENDERER_WORKERS_COUNT: !userConfig.workersCount && env.RENDERER_WORKERS_COUNT,
     RENDERER_PASSWORD: !userConfig.password && env.RENDERER_PASSWORD && '<MASKED>',
     RENDERER_SUPPORT_MODULES: !('supportModules' in userConfig) && env.RENDERER_SUPPORT_MODULES,
@@ -195,6 +209,8 @@ function envValuesUsed() {
     RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS:
       !userConfig.delayBetweenIndividualWorkerRestarts &&
       env.RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS,
+    GRACEFUL_WORKER_RESTART_TIMEOUT:
+      !userConfig.gracefulWorkerRestartTimeout && env.GRACEFUL_WORKER_RESTART_TIMEOUT,
     INCLUDE_TIMER_POLYFILLS: !('includeTimerPolyfills' in userConfig) && env.INCLUDE_TIMER_POLYFILLS,
     REPLAY_SERVER_ASYNC_OPERATION_LOGS:
       !userConfig.replayServerAsyncOperationLogs && env.REPLAY_SERVER_ASYNC_OPERATION_LOGS,
@@ -209,6 +225,7 @@ function sanitizedSettings(aConfig: Partial<Config> | undefined, defaultValue?: 
         password: aConfig.password != null ? '<MASKED>' : defaultValue,
         allWorkersRestartInterval: aConfig.allWorkersRestartInterval || defaultValue,
         delayBetweenIndividualWorkerRestarts: aConfig.delayBetweenIndividualWorkerRestarts || defaultValue,
+        gracefulWorkerRestartTimeout: aConfig.gracefulWorkerRestartTimeout || defaultValue,
       }
     : {};
 }
@@ -230,6 +247,28 @@ export function logSanitizedConfig() {
 export function buildConfig(providedUserConfig?: Partial<Config>): Config {
   userConfig = providedUserConfig || {};
   config = { ...defaultConfig, ...userConfig };
+
+  // Handle bundlePath deprecation
+  if ('bundlePath' in userConfig) {
+    log.warn(
+      'bundlePath is deprecated and will be removed in a future version. ' +
+        'Use serverBundleCachePath instead. This path stores uploaded server bundles for the node renderer, ' +
+        'not client-side webpack assets from Shakapacker.',
+    );
+    // If serverBundleCachePath is not set, use bundlePath as fallback
+    if (
+      userConfig.bundlePath &&
+      (!config.serverBundleCachePath || config.serverBundleCachePath === defaultConfig.serverBundleCachePath)
+    ) {
+      config.serverBundleCachePath = userConfig.bundlePath;
+    }
+  }
+  if (env.RENDERER_BUNDLE_PATH && !env.RENDERER_SERVER_BUNDLE_CACHE_PATH) {
+    log.warn(
+      'RENDERER_BUNDLE_PATH environment variable is deprecated and will be removed in a future version. ' +
+        'Use RENDERER_SERVER_BUNDLE_CACHE_PATH instead.',
+    );
+  }
 
   config.supportModules = truthy(config.supportModules);
 

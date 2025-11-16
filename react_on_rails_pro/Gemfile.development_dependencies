@@ -50,6 +50,7 @@ group :development, :test do
   gem 'pry-rails' # Causes rails console to open pry. `DISABLE_PRY_RAILS=1 rails c` can still open with IRB
   gem 'pry-theme' # An easy way to customize Pry colors via theme files
 
+  gem "rbs", require: false
   gem "rubocop", "1.36.0", require: false
   gem 'rubocop-performance', "1.15.0", require: false
   gem 'rubocop-rspec', "2.13.2", require: false

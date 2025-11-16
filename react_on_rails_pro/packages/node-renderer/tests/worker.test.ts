@@ -15,14 +15,14 @@ import {
   getFixtureAsset,
   getOtherFixtureAsset,
   createAsset,
-  bundlePath,
+  serverBundleCachePath,
   assetPath,
   assetPathOther,
 } from './helper';
 
 const testName = 'worker';
 const createVmBundleForTest = () => createVmBundle(testName);
-const bundlePathForTest = () => bundlePath(testName);
+const serverBundleCachePathForTest = () => serverBundleCachePath(testName);
 
 const gemVersion = packageJson.version;
 const { protocolVersion } = packageJson;
@@ -41,7 +41,7 @@ describe('worker', () => {
 
   test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest when bundle is provided and did not yet exist', async () => {
     const app = worker({
-      bundlePath: bundlePathForTest(),
+      serverBundleCachePath: serverBundleCachePathForTest(),
     });
 
     const form = formAutoContent({
@@ -69,7 +69,7 @@ describe('worker', () => {
 
   test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest', async () => {
     const app = worker({
-      bundlePath: bundlePathForTest(),
+      serverBundleCachePath: serverBundleCachePathForTest(),
     });
 
     const form = formAutoContent({
@@ -105,7 +105,7 @@ describe('worker', () => {
       await createVmBundleForTest();
 
       const app = worker({
-        bundlePath: bundlePathForTest(),
+        serverBundleCachePath: serverBundleCachePathForTest(),
         password: 'password',
       });
 
@@ -132,7 +132,7 @@ describe('worker', () => {
       await createVmBundleForTest();
 
       const app = worker({
-        bundlePath: bundlePathForTest(),
+        serverBundleCachePath: serverBundleCachePathForTest(),
         password: 'password',
       });
 
@@ -159,7 +159,7 @@ describe('worker', () => {
       await createVmBundleForTest();
 
       const app = worker({
-        bundlePath: bundlePathForTest(),
+        serverBundleCachePath: serverBundleCachePathForTest(),
         password: 'my_password',
       });
 
@@ -187,7 +187,7 @@ describe('worker', () => {
       await createVmBundleForTest();
 
       const app = worker({
-        bundlePath: bundlePathForTest(),
+        serverBundleCachePath: serverBundleCachePathForTest(),
       });
 
       const res = await app
@@ -211,7 +211,7 @@ describe('worker', () => {
     await createAsset(testName, bundleHash);
 
     const app = worker({
-      bundlePath: bundlePathForTest(),
+      serverBundleCachePath: serverBundleCachePathForTest(),
       password: 'my_password',
     });
 
@@ -237,7 +237,7 @@ describe('worker', () => {
     await createAsset(testName, bundleHash);
 
     const app = worker({
-      bundlePath: bundlePathForTest(),
+      serverBundleCachePath: serverBundleCachePathForTest(),
       password: 'my_password',
     });
 
@@ -261,7 +261,7 @@ describe('worker', () => {
   test('post /asset-exists requires targetBundles (protocol version 2.0.0)', async () => {
     await createAsset(testName, String(BUNDLE_TIMESTAMP));
     const app = worker({
-      bundlePath: bundlePathForTest(),
+      serverBundleCachePath: serverBundleCachePathForTest(),
       password: 'my_password',
     });
 
@@ -283,7 +283,7 @@ describe('worker', () => {
     const bundleHash = 'some-bundle-hash';
 
     const app = worker({
-      bundlePath: bundlePathForTest(),
+      serverBundleCachePath: serverBundleCachePathForTest(),
       password: 'my_password',
     });
 
@@ -307,7 +307,7 @@ describe('worker', () => {
     const bundleHashOther = 'some-other-bundle-hash';
 
     const app = worker({
-      bundlePath: bundlePathForTest(),
+      serverBundleCachePath: serverBundleCachePathForTest(),
       password: 'my_password',
     });
 
@@ -334,7 +334,7 @@ describe('worker', () => {
       await createVmBundleForTest();
 
       const app = worker({
-        bundlePath: bundlePathForTest(),
+        serverBundleCachePath: serverBundleCachePathForTest(),
       });
 
       const res = await app
@@ -355,7 +355,7 @@ describe('worker', () => {
       await createVmBundleForTest();
 
       const app = worker({
-        bundlePath: bundlePathForTest(),
+        serverBundleCachePath: serverBundleCachePathForTest(),
       });
 
       const res = await app
@@ -379,7 +379,7 @@ describe('worker', () => {
       await createVmBundleForTest();
 
       const app = worker({
-        bundlePath: bundlePathForTest(),
+        serverBundleCachePath: serverBundleCachePathForTest(),
       });
 
       const res = await app
@@ -400,7 +400,7 @@ describe('worker', () => {
       await createVmBundleForTest();
 
       const app = worker({
-        bundlePath: bundlePathForTest(),
+        serverBundleCachePath: serverBundleCachePathForTest(),
       });
 
       // If package version is 4.0.0, this tests that 4.0.0.rc.1 gets normalized to 4.0.0-rc.1
@@ -426,7 +426,7 @@ describe('worker', () => {
       await createVmBundleForTest();
 
       const app = worker({
-        bundlePath: bundlePathForTest(),
+        serverBundleCachePath: serverBundleCachePathForTest(),
       });
 
       const gemVersionUpperCase = packageJson.version.toUpperCase();
@@ -449,7 +449,7 @@ describe('worker', () => {
       await createVmBundleForTest();
 
       const app = worker({
-        bundlePath: bundlePathForTest(),
+        serverBundleCachePath: serverBundleCachePathForTest(),
       });
 
       const gemVersionWithWhitespace = `  ${packageJson.version}  `;

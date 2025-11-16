@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "async"
+require "async/queue"
 require "rails_helper"
 require "support/script_tag_utils"
 
@@ -327,10 +329,10 @@ describe ReactOnRailsProHelper do
       HTML
     end
 
+    # mock_chunks can be an Async::Queue or an Array
     def mock_request_and_response(mock_chunks = chunks, count: 1)
       # Reset connection instance variables to ensure clean state for tests
       ReactOnRailsPro::Request.instance_variable_set(:@connection, nil)
-      ReactOnRailsPro::Request.instance_variable_set(:@connection_without_retries, nil)
       original_httpx_plugin = HTTPX.method(:plugin)
       allow(HTTPX).to receive(:plugin) do |*args|
         original_httpx_plugin.call(:mock_stream).plugin(*args)
@@ -340,9 +342,19 @@ describe ReactOnRailsProHelper do
       chunks_read.clear
       mock_streaming_response(%r{http://localhost:3800/bundles/[a-f0-9]{32}-test/render/[a-f0-9]{32}}, 200,
                               count: count) do |yielder|
-        mock_chunks.each do |chunk|
-          chunks_read << chunk
-          yielder.call("#{chunk.to_json}\n")
+        if mock_chunks.is_a?(Async::Queue)
+          loop do
+            chunk = mock_chunks.dequeue
+            break if chunk.nil?
+
+            chunks_read << chunk
+            yielder.call("#{chunk.to_json}\n")
+          end
+        else
+          mock_chunks.each do |chunk|
+            chunks_read << chunk
+            yielder.call("#{chunk.to_json}\n")
+          end
         end
       end
     end
@@ -429,18 +441,35 @@ describe ReactOnRailsProHelper do
 
         allow(mocked_stream).to receive(:write) do |chunk|
           written_chunks << chunk
-          # Ensures that any chunk received is written immediately to the stream
-          expect(written_chunks.count).to eq(chunks_read.count) # rubocop:disable RSpec/ExpectInHook
         end
         allow(mocked_stream).to receive(:close)
         mocked_response = instance_double(ActionDispatch::Response)
         allow(mocked_response).to receive(:stream).and_return(mocked_stream)
         allow(self).to receive(:response).and_return(mocked_response)
-        mock_request_and_response
+      end
+
+      def execute_stream_view_containing_react_components
+        queue = Async::Queue.new
+        mock_request_and_response(queue)
+
+        Sync do |parent|
+          parent.async { stream_view_containing_react_components(template: template_path) }
+
+          chunks_to_write = chunks.dup
+          while (chunk = chunks_to_write.shift)
+            queue.enqueue(chunk)
+            sleep 0.05
+
+            # Ensures that any chunk received is written immediately to the stream
+            expect(written_chunks.count).to eq(chunks_read.count)
+          end
+          queue.close
+          sleep 0.05
+        end
       end
 
       it "writes the chunk to stream as soon as it is received" do
-        stream_view_containing_react_components(template: template_path)
+        execute_stream_view_containing_react_components
         expect(self).to have_received(:render_to_string).once.with(template: template_path)
         expect(chunks_read.count).to eq(chunks.count)
         expect(written_chunks.count).to eq(chunks.count)
@@ -449,7 +478,7 @@ describe ReactOnRailsProHelper do
       end
 
       it "prepends the rails context to the first chunk only" do
-        stream_view_containing_react_components(template: template_path)
+        execute_stream_view_containing_react_components
         initial_result = written_chunks.first
         expect(initial_result).to script_tag_be_included(rails_context_tag)
 
@@ -465,7 +494,7 @@ describe ReactOnRailsProHelper do
       end
 
       it "prepends the component specification tag to the first chunk only" do
-        stream_view_containing_react_components(template: template_path)
+        execute_stream_view_containing_react_components
         initial_result = written_chunks.first
         expect(initial_result).to script_tag_be_included(react_component_specification_tag)
 
@@ -476,7 +505,7 @@ describe ReactOnRailsProHelper do
       end
 
       it "renders the rails view content in the first chunk" do
-        stream_view_containing_react_components(template: template_path)
+        execute_stream_view_containing_react_components
         initial_result = written_chunks.first
         expect(initial_result).to include("<h1>Header Rendered In View</h1>")
         written_chunks[1..].each do |chunk|
