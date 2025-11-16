@@ -38,12 +38,66 @@ module ReactOnRailsPro
       # So we strip extra newlines from the template string and add a single newline
       response.stream.write(template_string)
 
-      @rorp_rendering_fibers.each do |fiber|
-        while (chunk = fiber.resume)
-          response.stream.write(chunk)
+      begin
+        drain_streams_concurrently
+      ensure
+        response.stream.close if close_stream_at_end
+      end
+    end
+
+    private
+
+    def drain_streams_concurrently
+      require "async"
+      require "async/limited_queue"
+
+      return if @rorp_rendering_fibers.empty?
+
+      Sync do |parent|
+        # To avoid memory bloat, we use a limited queue to buffer chunks in memory.
+        buffer_size = ReactOnRailsPro.configuration.concurrent_component_streaming_buffer_size
+        queue = Async::LimitedQueue.new(buffer_size)
+
+        writer = build_writer_task(parent: parent, queue: queue)
+        tasks = build_producer_tasks(parent: parent, queue: queue)
+
+        # This structure ensures that even if a producer task fails, we always
+        # signal the writer to stop and then wait for it to finish draining
+        # any remaining items from the queue before propagating the error.
+        begin
+          tasks.each(&:wait)
+        ensure
+          # `close` signals end-of-stream; when writer tries to dequeue, it will get nil, so it will exit.
+          queue.close
+          writer.wait
         end
       end
-      response.stream.close if close_stream_at_end
+    end
+
+    def build_producer_tasks(parent:, queue:)
+      @rorp_rendering_fibers.each_with_index.map do |fiber, idx|
+        parent.async do
+          loop do
+            chunk = fiber.resume
+            break unless chunk
+
+            # Will be blocked if the queue is full until a chunk is dequeued
+            queue.enqueue([idx, chunk])
+          end
+        end
+      end
+    end
+
+    def build_writer_task(parent:, queue:)
+      parent.async do
+        loop do
+          pair = queue.dequeue
+          break if pair.nil?
+
+          _idx_from_queue, item = pair
+          response.stream.write(item)
+        end
+      end
     end
   end
 end
