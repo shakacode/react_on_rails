@@ -1186,7 +1186,7 @@ module ReactOnRails
             checker.add_info("  💡 These are mutually exclusive - use only one approach")
             checker.add_info("  💡 Recommended: Use compile: true in shakapacker.yml (simpler)")
             checker.add_info("  💡 Alternative: Use build_test_command with ReactOnRails::TestHelper (explicit control)")
-            checker.add_info("  📖 See: #{Rails.root}/docs/guides/testing-configuration.md")
+            checker.add_info("  📖 See: https://github.com/shakacode/react_on_rails/blob/master/docs/guides/testing-configuration.md")
           elsif has_build_test_command && !uses_test_helper
             checker.add_warning("  ⚠️  build_test_command is set but ReactOnRails::TestHelper is not configured")
             checker.add_info("  💡 Add to spec/rails_helper.rb:")
@@ -1201,7 +1201,7 @@ module ReactOnRails
             checker.add_warning("  ⚠️  No test asset compilation configured")
             checker.add_info("  💡 Recommended: Add to shakapacker.yml test section:")
             checker.add_info("      compile: true")
-            checker.add_info("  📖 See: #{Rails.root}/docs/guides/testing-configuration.md")
+            checker.add_info("  📖 See: https://github.com/shakacode/react_on_rails/blob/master/docs/guides/testing-configuration.md")
           elsif has_compile_true
             checker.add_success("  ✅ Test assets configured via Shakapacker auto-compilation")
             checker.add_info("      (compile: true in shakapacker.yml)")

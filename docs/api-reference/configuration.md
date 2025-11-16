@@ -676,7 +676,7 @@ config.build_production_command = BuildProductionCommand
 
 Recommended directory structure with private server bundles:
 
-```
+```text
 app/
 ├── ssr-generated/           # Private server bundles (never served to browsers)
 │   ├── server-bundle.js
