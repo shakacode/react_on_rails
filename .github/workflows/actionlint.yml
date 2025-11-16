@@ -38,6 +38,11 @@ jobs:
           else
             DIFF_BASE="${{ github.event.before }}"
           fi
+
+          # Handle initial commits where before SHA is all zeros
+          if [[ "$DIFF_BASE" =~ ^0+$ ]]; then
+            DIFF_BASE="origin/master"
+          fi
           
           if git diff --name-only "$DIFF_BASE" ${{ github.sha }} 2>/dev/null | grep -q '^.github/workflows'; then
             echo "changed=true" >> "$GITHUB_OUTPUT"

@@ -86,7 +86,7 @@ while IFS= read -r file; do
       ;;
 
     # Generators
-    lib/generators/*|lib/generators/**/*|rakelib/example_type.rb|rakelib/example_config.yml|rakelib/shakapacker_examples.rake|.github/workflows/examples.yml)
+    lib/generators/*|lib/generators/**/*|rakelib/example_type.rb|rakelib/examples_config.yml|rakelib/shakapacker_examples.rake|.github/workflows/examples.yml)
       DOCS_ONLY=false
       GENERATORS_CHANGED=true
       ;;
