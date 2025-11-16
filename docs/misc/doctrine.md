@@ -4,7 +4,7 @@ By Justin Gordon, January 26, 2016
 
 This document is an extension and complement to [The Rails Doctrine](http://rubyonrails.org/doctrine/). If you haven't read that document, I suggest you do so first.
 
-To paraphrase the [React on Rails Overview](../guides/react-on-rails-overview.md), the project objective is to provide an opinionated and optimal framework for integrating **Ruby on Rails** with modern JavaScript tooling and libraries.
+To paraphrase the [React on Rails Introduction](../introduction.md), the project objective is to provide an opinionated and optimal framework for integrating **Ruby on Rails** with modern JavaScript tooling and libraries.
 
 When considering what goes into **react_on_rails**, we ask ourselves, is the functionality related to the intersection of using Rails and with modern JavaScript? A good example is view helper integration of React components on a Rails view. If the answer is yes, then the functionality belongs right here.
 

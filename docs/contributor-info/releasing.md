@@ -1,77 +1,294 @@
 # Install and Release
 
-We're now releasing this as a combined ruby gem plus npm package. We will keep the version numbers in sync.
+We're releasing this as a unified release with 5 packages total. We keep the version numbers in sync across all packages using unified versioning.
 
 ## Testing the Gem before Release from a Rails App
 
 See [Contributing](https://github.com/shakacode/react_on_rails/tree/master/CONTRIBUTING.md)
 
-## Releasing a new gem version
+## Releasing a New Version
 
 Run `rake -D release` to see instructions on how to release via the rake task.
 
-As of 01-26-2016, this would give you an output like this:
+### Release Command
 
-```
-rake release[gem_version,dry_run,tools_install]
-    Releases both the gem and node package using the given version.
-
-    IMPORTANT: the gem version must be in valid rubygem format (no dashes).
-    It will be automatically converted to a valid npm semver by the rake task
-    for the node package version. This only makes a difference for pre-release
-    versions such as `3.0.0.beta.1` (npm version would be `3.0.0-beta.1`).
-
-    This task will also globally install gem-release (ruby gem) and
-    release-it (node package) unless you specify skip installing tools.
-
-    2nd argument: Perform a dry run by passing 'true' as a second argument.
-    3rd argument: Skip installing tools by passing 'false' as a third argument (default is true).
-
-    Example: `rake release[2.1.0,false,false]`
+```bash
+rake release[version,dry_run,registry,skip_push]
 ```
 
-Running `rake release[2.1.0]` will create a commit that looks like this:
+**Arguments:**
+
+1. **`version`** (required): Version bump type or explicit version
+
+   - Bump types: `patch`, `minor`, `major`
+   - Explicit: `16.2.0`
+   - Pre-release: `16.2.0.beta.1` (rubygem format with dots, converted to `16.2.0-beta.1` for NPM)
+
+2. **`dry_run`** (optional): `true` to preview changes without releasing
+
+   - Default: `false`
+
+3. **`registry`** (optional): Publishing registry for testing
+
+   - `verdaccio`: Publish all NPM packages to local Verdaccio (skips RubyGems)
+   - `npm`: Normal release to npmjs.org + rubygems.org (default)
+
+4. **`skip_push`** (optional): Skip git push to remote
+   - `skip_push`: Don't push commits/tags to remote
+   - Default: pushes to remote
+
+**Examples:**
+
+```bash
+rake release[patch]                          # Bump patch version (16.1.1 → 16.1.2)
+rake release[minor]                          # Bump minor version (16.1.1 → 16.2.0)
+rake release[major]                          # Bump major version (16.1.1 → 17.0.0)
+rake release[16.2.0]                         # Set explicit version
+rake release[16.2.0.beta.1]                  # Set pre-release version (→ 16.2.0-beta.1 for NPM)
+rake release[16.2.0,true]                    # Dry run to preview changes
+rake release[16.2.0,false,verdaccio]         # Test with local Verdaccio
+rake release[patch,false,npm,skip_push]      # Release but don't push to GitHub
+```
+
+### What Gets Released
+
+The release task publishes 5 packages with unified versioning:
+
+**PUBLIC (npmjs.org + rubygems.org):**
+
+1. **react-on-rails** - NPM package
+2. **react-on-rails-pro** - NPM package
+3. **react-on-rails-pro-node-renderer** - NPM package
+4. **react_on_rails** - RubyGem
+5. **react_on_rails_pro** - RubyGem
+
+### Version Synchronization
+
+The task updates versions in all the following files:
+
+**Core package:**
+
+- `lib/react_on_rails/version.rb` (source of truth for all packages)
+- `package.json` (root workspace)
+- `packages/react-on-rails/package.json`
+- `Gemfile.lock` (root)
+- `spec/dummy/Gemfile.lock`
+
+**Pro package:**
+
+- `react_on_rails_pro/lib/react_on_rails_pro/version.rb` (VERSION only, not PROTOCOL_VERSION)
+- `react_on_rails_pro/package.json` (node-renderer)
+- `packages/react-on-rails-pro/package.json` (+ dependency version)
+- `react_on_rails_pro/Gemfile.lock`
+- `react_on_rails_pro/spec/dummy/Gemfile.lock`
+
+**Note:**
+
+- `react_on_rails_pro.gemspec` dynamically references `ReactOnRails::VERSION`
+- `react-on-rails-pro` NPM dependency is pinned to exact version (e.g., `"react-on-rails": "16.2.0"`)
+
+### Pre-release Versions
+
+For pre-release versions, the gem version format is automatically converted to NPM semver format:
+
+- Gem: `3.0.0.beta.1`
+- NPM: `3.0.0-beta.1`
+
+### Release Process
+
+When you run `rake release[X.Y.Z]`, the task will:
+
+1. Check for uncommitted changes (will abort if found)
+2. Pull latest changes from the remote repository
+3. Clean up example directories
+4. Bump the gem version in `lib/react_on_rails/version.rb`
+5. Update all package.json files with the new version
+6. Update the Pro package's dependency on react-on-rails
+7. Update the dummy app's Gemfile.lock
+8. Commit all version changes with message "Bump version to X.Y.Z"
+9. Create a git tag `vX.Y.Z`
+10. Push commits and tags to the remote repository
+11. Publish `react-on-rails` to NPM (requires 2FA token)
+12. Publish `react-on-rails-pro` to NPM (requires 2FA token)
+13. Publish `react_on_rails` to RubyGems (requires 2FA token)
+
+### Two-Factor Authentication
+
+You'll need to enter OTP tokens when prompted:
+
+- Once for publishing `react-on-rails` to NPM
+- Once for publishing `react-on-rails-pro` to NPM
+- Once for publishing `react_on_rails` to RubyGems
+
+### Post-Release Steps
+
+After a successful release, you'll see instructions to:
+
+1. Update the CHANGELOG.md:
+
+   ```bash
+   bundle exec rake update_changelog
+   ```
+
+2. Update the dummy app's Gemfile.lock:
+
+   ```bash
+   cd spec/dummy && bundle update react_on_rails
+   ```
+
+3. Commit the CHANGELOG and Gemfile.lock:
+   ```bash
+   cd /path/to/react_on_rails
+   git commit -a -m 'Update CHANGELOG.md and spec/dummy Gemfile.lock'
+   git push
+   ```
+
+## Requirements
+
+### NPM Publishing
+
+You must be logged in and have publish permissions:
+
+**For public packages (npmjs.org):**
+
+```bash
+npm login
+```
+
+**For private packages (GitHub Packages):**
+
+- Get a GitHub personal access token with `write:packages` scope
+- Add to `~/.npmrc`:
+  ```ini
+  //npm.pkg.github.com/:_authToken=<TOKEN>
+  always-auth=true
+  ```
+- Set environment variable:
+  ```bash
+  export GITHUB_TOKEN=<TOKEN>
+  ```
+
+### RubyGems Publishing
+
+**For public gem (rubygems.org):**
+
+- Standard RubyGems credentials via `gem push`
+
+**For private gem (GitHub Packages):**
+
+- Add to `~/.gem/credentials`:
+  ```
+  :github: Bearer <GITHUB_TOKEN>
+  ```
+
+### Ruby Version Management
+
+The script automatically detects and switches Ruby versions when needed:
+
+- Supports: RVM, rbenv, asdf
+- Set via `RUBY_VERSION_MANAGER` environment variable (default: `rvm`)
+- Example: Pro dummy app requires Ruby 3.3.7, script auto-switches from 3.3.0
+
+### Dependencies
+
+This task depends on the `gem-release` Ruby gem, which is installed via `bundle install`.
+
+## Testing with Verdaccio
+
+Before releasing to production, test the release process locally:
+
+1. Install and start Verdaccio:
+
+   ```bash
+   npm install -g verdaccio
+   verdaccio
+   ```
+
+2. Run release with verdaccio registry:
+
+   ```bash
+   rake release[patch,false,verdaccio]
+   ```
+
+3. This will:
+
+   - Publish all 3 NPM packages to local Verdaccio
+   - Skip RubyGem publishing
+   - Update version files (revert manually after testing)
+
+4. Test installing from Verdaccio:
+   ```bash
+   npm set registry http://localhost:4873/
+   npm install react-on-rails@16.2.0
+   # Reset when done:
+   npm config delete registry
+   ```
+
+## Troubleshooting
+
+### Dry Run First
+
+Always test with a dry run before actually releasing:
+
+```bash
+rake release[16.2.0,true]
+```
+
+This shows you exactly what would be updated without making any changes.
+
+### If Release Fails
+
+If the release fails partway through (e.g., during NPM publish):
+
+1. Check what was published:
+
+   - NPM: `npm view react-on-rails@X.Y.Z`
+   - RubyGems: `gem list react_on_rails -r -a`
+
+2. If the git tag was created but packages weren't published:
+
+   - Delete the tag: `git tag -d vX.Y.Z && git push origin :vX.Y.Z`
+   - Revert the version commit: `git reset --hard HEAD~1 && git push -f`
+   - Start over with `rake release[X.Y.Z]`
+
+3. If some packages were published but not others:
+   - You can manually publish the missing packages:
+     ```bash
+     cd packages/react-on-rails && yarn publish --new-version X.Y.Z
+     cd ../react-on-rails-pro && yarn publish --new-version X.Y.Z
+     gem release
+     ```
+
+## Version History
+
+Running `rake release[X.Y.Z]` will create a commit that looks like this:
 
 ```
-commit d07005cde9784c69e41d73fb9a0ebe8922e556b3
-Author: Rob Wise <robert.wise@outlook.com>
-Date:   Tue Jan 26 19:49:14 2016 -0500
+commit abc123...
+Author: Your Name <your.email@example.com>
+Date:   Mon Jan 1 12:00:00 2024 -0500
 
-    Release 2.1.0
+    Bump version to 16.2.0
 
 diff --git a/lib/react_on_rails/version.rb b/lib/react_on_rails/version.rb
-index 3de9606..b71aa7a 100644
+index 1234567..abcdefg 100644
 --- a/lib/react_on_rails/version.rb
 +++ b/lib/react_on_rails/version.rb
 @@ -1,3 +1,3 @@
  module ReactOnRails
--  VERSION = "2.0.2".freeze
-+  VERSION = "2.1.0".freeze
+-  VERSION = "16.1.1"
++  VERSION = "16.2.0"
  end
+
 diff --git a/package.json b/package.json
-index aa7b000..af8761e 100644
+index 2345678..bcdefgh 100644
 --- a/package.json
 +++ b/package.json
 @@ -1,6 +1,6 @@
  {
-   "name": "react-on-rails",
--  "version": "2.0.2",
-+  "version": "2.1.0",
-   "description": "react-on-rails JavaScript for react_on_rails Ruby gem",
-   "main": "packages/react-on-rails/lib/ReactOnRails.js",
-   "directories": {
-diff --git a/spec/dummy/Gemfile.lock b/spec/dummy/Gemfile.lock
-index 8ef51df..4489bfe 100644
---- a/spec/dummy/Gemfile.lock
-+++ b/spec/dummy/Gemfile.lock
-@@ -1,7 +1,7 @@
- PATH
-   remote: ../..
-   specs:
--    react_on_rails (2.0.2)
-+    react_on_rails (2.1.0)
-       connection_pool
-       execjs (~> 2.5)
-       rails (>= 3.2)
-(END)
+   "name": "react-on-rails-workspace",
+-  "version": "16.1.1",
++  "version": "16.2.0",
+   ...
+}
 ```

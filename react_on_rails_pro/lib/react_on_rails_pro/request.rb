@@ -49,7 +49,7 @@ module ReactOnRailsPro
 
         # Add RSC bundle if enabled
         if ReactOnRailsPro.configuration.enable_rsc_support
-          rsc_bundle_path = ReactOnRails::Utils.rsc_bundle_js_file_path
+          rsc_bundle_path = ReactOnRailsPro::Utils.rsc_bundle_js_file_path
           unless File.exist?(rsc_bundle_path)
             raise ReactOnRailsPro::Error, "RSC bundle not found at #{rsc_bundle_path}. " \
                                           "Please build your bundles before uploading assets."
@@ -154,7 +154,7 @@ module ReactOnRailsPro
         if ReactOnRailsPro.configuration.enable_rsc_support
           add_bundle_to_form(
             form,
-            bundle_path: ReactOnRails::Utils.rsc_bundle_js_file_path,
+            bundle_path: ReactOnRailsPro::Utils.rsc_bundle_js_file_path,
             bundle_file_name: pool.rsc_renderer_bundle_file_name,
             bundle_hash: pool.rsc_bundle_hash,
             check_bundle: check_bundle
@@ -178,8 +178,8 @@ module ReactOnRailsPro
         assets_to_copy = (ReactOnRailsPro.configuration.assets_to_copy || []).dup
         # react_client_manifest and react_server_manifest files are needed to generate react server components payload
         if ReactOnRailsPro.configuration.enable_rsc_support
-          assets_to_copy << ReactOnRails::Utils.react_client_manifest_file_path
-          assets_to_copy << ReactOnRails::Utils.react_server_client_manifest_file_path
+          assets_to_copy << ReactOnRailsPro::Utils.react_client_manifest_file_path
+          assets_to_copy << ReactOnRailsPro::Utils.react_server_client_manifest_file_path
         end
 
         return form unless assets_to_copy.present?
@@ -227,7 +227,31 @@ module ReactOnRailsPro
           # For persistent connections we want retries,
           # so the requests don't just fail if the other side closes the connection
           # https://honeyryderchuck.gitlab.io/httpx/wiki/Persistent
-          .plugin(:retries, max_retries: 1, retry_change_requests: true)
+          .plugin(
+            :retries, max_retries: 1,
+            retry_change_requests: true,
+            # Official HTTPx docs says that we should use the retry_on option to decide if teh request should be retried or not
+            # However, HTTPx assumes that connection errors such as timeout error should be retried by default and it doesn't consider retry_on block at all at that case
+            # So, we have to do the following trick to avoid retries when a Timeout error happens while streaming a component
+            # If the streamed component returned any chunks, it shouldn't retry on errors, as it would cause page duplication
+            # The SSR-generated html will be written to the page two times in this case
+            retry_after: ->(request, response) do
+              if (request.stream.instance_variable_get(:@react_on_rails_received_first_chunk))
+                e = response.error
+                raise ReactOnRailsPro::Error, "An error happened during server side render streaming of a component.\n" \
+                                              "Original error:\n#{e}\n#{e.backtrace}"
+              end
+
+              Rails.logger.info do
+                "[ReactOnRailsPro] An error happneding while making a request to the Node Renderer.\n" \
+                "Error: #{response.error}.\n" \
+                "Retrying by HTTPX \"retries\" plugin..."
+              end
+              # The retry_after block expects to return a delay to wait before retrying the request
+              # nil means no waiting delay
+              nil
+            end
+          )
           .plugin(:stream)
           # See https://www.rubydoc.info/gems/httpx/1.3.3/HTTPX%2FOptions:initialize for the available options
           .with(

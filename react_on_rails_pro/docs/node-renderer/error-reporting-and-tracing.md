@@ -14,10 +14,10 @@ It should initialize the services according to your requirements and then enable
 3. Then load the integration:
 
     ```js
-    require('@shakacode-tools/react-on-rails-pro-node-renderer/integrations/sentry').init();
+    require('react-on-rails-pro-node-renderer/integrations/sentry').init();
    ```
 
-   - Use `@shakacode-tools/react-on-rails-pro-node-renderer/integrations/sentry6` instead of `.../sentry` for versions of Sentry SDK older than 7.63.0.
+   - Use `react-on-rails-pro-node-renderer/integrations/sentry6` instead of `.../sentry` for versions of Sentry SDK older than 7.63.0.
    - For Sentry SDK v8+ you can use `.init({ fastify: true })` to capture additional Fastify-related information.
 
 ### Sentry Tracing
@@ -40,7 +40,7 @@ To enable Sentry Tracing:
 2. Then load the integration:
 
     ```js
-    require('@shakacode-tools/react-on-rails-pro-node-renderer/integrations/honeybadger').init();
+    require('react-on-rails-pro-node-renderer/integrations/honeybadger').init();
     ```
 
     Use `init({ fastify: true })` to capture additional Fastify-related information.
@@ -49,7 +49,7 @@ To enable Sentry Tracing:
 You can create your own integrations in the same way as the provided ones.
 If you have access to the React on Rails Pro repository,
 you can use [their implementations](https://github.com/shakacode/react_on_rails_pro/tree/master/packages/node-renderer/src/integrations) as examples.
-Import these functions from `@shakacode-tools/react-on-rails-pro-node-renderer/integrations/api`:
+Import these functions from `react-on-rails-pro-node-renderer/integrations/api`:
 
 ### Error reporting services
 
@@ -59,7 +59,7 @@ Import these functions from `@shakacode-tools/react-on-rails-pro-node-renderer/i
 For example, integrating with BugSnag can be as simple as
 ```js
 const Bugsnag = require('@bugsnag/js');
-const { addNotifier } = require('@shakacode-tools/react-on-rails-pro-node-renderer/integrations/api');
+const { addNotifier } = require('react-on-rails-pro-node-renderer/integrations/api');
 
 Bugsnag.start({ /* your options */ });
 
@@ -76,7 +76,7 @@ To track requests as [sessions](https://docs.bugsnag.com/platforms/javascript/ca
 the above example becomes
 ```js
 const Bugsnag = require('@bugsnag/js');
-const { addNotifier, setupTracing } = require('@shakacode-tools/react-on-rails-pro-node-renderer/integrations/api');
+const { addNotifier, setupTracing } = require('react-on-rails-pro-node-renderer/integrations/api');
 
 Bugsnag.start({ /* your options */ });
 
@@ -117,7 +117,7 @@ Bugsnag v7 is a bit more complicated:
 
 ```js
 const Bugsnag = require('@bugsnag/js');
-const { addNotifier, setupTracing } = require('@shakacode-tools/react-on-rails-pro-node-renderer/integrations/api');
+const { addNotifier, setupTracing } = require('react-on-rails-pro-node-renderer/integrations/api');
 
 Bugsnag.start({ /* your options */ });
 
@@ -142,7 +142,7 @@ If you want to report HTTP requests from Fastify, you can use `configureFastify`
 Extending the above example:
 
 ```js
-const { configureFastify } = require('@shakacode-tools/react-on-rails-pro-node-renderer/integrations/api');
+const { configureFastify } = require('react-on-rails-pro-node-renderer/integrations/api');
 
 configureFastify((app) => {
   app.addHook('onError', (_req, _reply, error, done) => {

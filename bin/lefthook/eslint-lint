@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# Lint and auto-fix JS/TS files with ESLint
+set -euo pipefail
+
+CONTEXT="${1:-staged}"
+files="$(bin/lefthook/get-changed-files "$CONTEXT" '\.(js|jsx|ts|tsx)$')"
+
+if [ -z "$files" ]; then
+  echo "✅ No JS/TS files to lint with ESLint"
+  exit 0
+fi
+
+# Separate files into different directories
+# react_on_rails_pro/ has its own ESLint config
+# packages/react-on-rails-pro/ uses root ESLint config
+react_on_rails_pro_files=$(echo "$files" | grep '^react_on_rails_pro/' || true)
+packages_pro_files=$(echo "$files" | grep '^packages/react-on-rails-pro/' || true)
+root_files=$(echo "$files" | grep -v '^react_on_rails_pro/' | grep -v '^packages/react-on-rails-pro/' || true)
+
+exit_code=0
+
+# Lint root files (includes packages/react-on-rails-pro)
+root_and_packages_pro_files="$root_files $packages_pro_files"
+root_and_packages_pro_files=$(echo "$root_and_packages_pro_files" | xargs)  # trim whitespace
+
+if [ -n "$root_and_packages_pro_files" ]; then
+  if [ "$CONTEXT" = "all-changed" ]; then
+    echo "🔍 ESLint on root changed files:"
+  else
+    echo "🔍 ESLint on root $CONTEXT files:"
+  fi
+  printf "  %s\n" $root_and_packages_pro_files
+
+  if ! yarn run eslint $root_and_packages_pro_files --fix; then
+    exit_code=1
+  fi
+fi
+
+# Lint react_on_rails_pro files (using Pro gem's ESLint config)
+if [ -n "$react_on_rails_pro_files" ]; then
+  if [ "$CONTEXT" = "all-changed" ]; then
+    echo "🔍 ESLint on react_on_rails_pro changed files:"
+  else
+    echo "🔍 ESLint on react_on_rails_pro $CONTEXT files:"
+  fi
+  printf "  %s\n" $react_on_rails_pro_files
+
+  # Strip react_on_rails_pro/ prefix for running in Pro directory
+  react_on_rails_pro_files_relative=$(echo "$react_on_rails_pro_files" | sed 's|^react_on_rails_pro/||')
+
+  if ! (cd react_on_rails_pro && yarn run eslint $react_on_rails_pro_files_relative --fix); then
+    exit_code=1
+  fi
+fi
+
+if [ $exit_code -eq 0 ]; then
+  echo "✅ ESLint checks passed"
+fi
+
+exit $exit_code

@@ -10,6 +10,7 @@ module ReactOnRailsPro
       # @param position [Symbol] The position of the chunk in the stream (:first, :middle, or :last)
       # The position parameter is used by actions that add content to the beginning or end of the stream
       @actions = [] # List to store all actions
+      @rescue_blocks = []
     end
 
     # Add a prepend action
@@ -39,27 +40,45 @@ module ReactOnRailsPro
       self # Return self to allow chaining
     end
 
+    def rescue(&block)
+      @rescue_blocks << block
+      self # Return self to allow chaining
+    end
+
     def handle_chunk(chunk, position)
       @actions.reduce(chunk) do |acc, action|
         action.call(acc, position)
       end
     end
 
-    def each_chunk
-      return enum_for(:each_chunk) unless block_given?
+    def each_chunk(&block)
+      return enum_for(:each_chunk) unless block
 
       first_chunk = true
       @component.each_chunk do |chunk|
         position = first_chunk ? :first : :middle
         modified_chunk = handle_chunk(chunk, position)
-        yield modified_chunk
+        block.call(modified_chunk)
         first_chunk = false
       end
 
       # The last chunk contains the append content after the transformation
       # All transformations are applied to the append content
       last_chunk = handle_chunk("", :last)
-      yield last_chunk unless last_chunk.empty?
+      block.call(last_chunk) unless last_chunk.empty?
+    rescue StandardError => err
+      current_error = err
+      rescue_block_index = 0
+      while current_error.present? && (rescue_block_index < @rescue_blocks.size)
+        begin
+          @rescue_blocks[rescue_block_index].call(current_error, &block)
+          current_error = nil
+        rescue StandardError => inner_error
+          current_error = inner_error
+        end
+        rescue_block_index += 1
+      end
+      raise current_error if current_error.present?
     end
   end
 
@@ -86,6 +105,9 @@ module ReactOnRailsPro
         break
       rescue HTTPX::HTTPError => e
         send_bundle = handle_http_error(e, error_body, send_bundle)
+      rescue HTTPX::ReadTimeoutError => e
+        raise ReactOnRailsPro::Error, "Time out error while server side render streaming a component.\n" \
+                                      "Original error:\n#{e}\n#{e.backtrace}"
       end
     end
 
@@ -132,6 +154,7 @@ module ReactOnRailsPro
       line = "".b
 
       response.each do |chunk|
+        response.instance_variable_set(:@react_on_rails_received_first_chunk, true)
         line << chunk
 
         while (idx = line.index("\n"))

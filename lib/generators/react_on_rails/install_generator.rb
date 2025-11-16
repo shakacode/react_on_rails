@@ -28,6 +28,12 @@ module ReactOnRails
                    desc: "Generate TypeScript files and install TypeScript dependencies. Default: false",
                    aliases: "-T"
 
+      # --rspack
+      class_option :rspack,
+                   type: :boolean,
+                   default: false,
+                   desc: "Use Rspack instead of Webpack as the bundler. Default: false"
+
       # --ignore-warnings
       class_option :ignore_warnings,
                    type: :boolean,
@@ -36,7 +42,25 @@ module ReactOnRails
 
       # Removed: --skip-shakapacker-install (Shakapacker is now a required dependency)
 
+      # Main generator entry point
+      #
+      # Sets up React on Rails in a Rails application by:
+      # 1. Validating prerequisites
+      # 2. Installing required packages
+      # 3. Generating configuration files
+      # 4. Setting up example components
+      #
+      # @note Validation Skipping: Sets ENV["REACT_ON_RAILS_SKIP_VALIDATION"] to prevent
+      #   version validation from running during generator execution. The npm package
+      #   isn't installed until midway through the generator, so validation would fail
+      #   if run during Rails initialization. The ensure block guarantees cleanup even
+      #   if the generator fails.
       def run_generators
+        # Set environment variable to skip validation during generator run
+        # This is inherited by all invoked generators and persists through Rails initialization
+        # See lib/react_on_rails/engine.rb for the validation skip logic
+        ENV["REACT_ON_RAILS_SKIP_VALIDATION"] = "true"
+
         if installation_prerequisites_met? || options.ignore_warnings?
           invoke_generators
           add_bin_scripts
@@ -55,6 +79,11 @@ module ReactOnRails
           GeneratorMessages.add_error(error)
         end
       ensure
+        # Always clean up ENV variable, even if generator fails
+        # CRITICAL: ENV cleanup must come first to ensure it executes even if
+        # print_generator_messages raises an exception. This prevents ENV pollution
+        # that could affect subsequent processes.
+        ENV.delete("REACT_ON_RAILS_SKIP_VALIDATION")
         print_generator_messages
       end
 
@@ -73,7 +102,8 @@ module ReactOnRails
           create_css_module_types
           create_typescript_config
         end
-        invoke "react_on_rails:base", [], { typescript: options.typescript?, redux: options.redux? }
+        invoke "react_on_rails:base", [],
+               { typescript: options.typescript?, redux: options.redux?, rspack: options.rspack? }
         if options.redux?
           invoke "react_on_rails:react_with_redux", [], { typescript: options.typescript? }
         else
@@ -424,6 +454,7 @@ module ReactOnRails
         add_react_on_rails_package
         add_react_dependencies
         add_css_dependencies
+        add_rspack_dependencies if options.rspack?
         add_dev_dependencies
       end
 
@@ -489,12 +520,36 @@ module ReactOnRails
         handle_npm_failure("CSS dependencies", css_deps) unless success
       end
 
+      def add_rspack_dependencies
+        puts "Installing Rspack core dependencies..."
+        rspack_deps = %w[
+          @rspack/core
+          rspack-manifest-plugin
+        ]
+        if add_npm_dependencies(rspack_deps)
+          @added_dependencies_to_package_json = true
+          return
+        end
+
+        success = system("npm", "install", *rspack_deps)
+        @ran_direct_installs = true if success
+        handle_npm_failure("Rspack dependencies", rspack_deps) unless success
+      end
+
       def add_dev_dependencies
         puts "Installing development dependencies..."
-        dev_deps = %w[
-          @pmmmwh/react-refresh-webpack-plugin
-          react-refresh
-        ]
+        dev_deps = if options.rspack?
+                     %w[
+                       @rspack/cli
+                       @rspack/plugin-react-refresh
+                       react-refresh
+                     ]
+                   else
+                     %w[
+                       @pmmmwh/react-refresh-webpack-plugin
+                       react-refresh
+                     ]
+                   end
         if add_npm_dependencies(dev_deps, dev: true)
           @added_dependencies_to_package_json = true
           return

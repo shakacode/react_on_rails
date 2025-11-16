@@ -1,0 +1,96 @@
+module ReactOnRails
+  class Configuration
+    attr_accessor node_modules_location: String?
+    attr_accessor server_bundle_js_file: String
+    attr_accessor prerender: bool
+    attr_accessor replay_console: bool
+    attr_accessor trace: bool
+    attr_accessor development_mode: bool
+    attr_accessor logging_on_server: bool
+    attr_accessor server_renderer_pool_size: Integer
+    attr_accessor server_renderer_timeout: Integer
+    attr_accessor skip_display_none: bool?
+    attr_accessor raise_on_prerender_error: bool
+    attr_accessor generated_assets_dirs: Array[String]?
+    attr_accessor generated_assets_dir: String
+    attr_accessor components_subdirectory: String?
+    attr_accessor webpack_generated_files: Array[String]
+    attr_accessor rendering_extension: String?
+    attr_accessor build_test_command: String
+    attr_accessor build_production_command: String
+    attr_accessor i18n_dir: String?
+    attr_accessor i18n_yml_dir: String?
+    attr_accessor i18n_output_format: Symbol?
+    attr_accessor i18n_yml_safe_load_options: Hash[Symbol, untyped]?
+    attr_accessor defer_generated_component_packs: bool
+    attr_accessor server_render_method: String?
+    attr_accessor random_dom_id: bool
+    attr_accessor auto_load_bundle: bool
+    attr_accessor same_bundle_for_client_and_server: bool
+    attr_accessor rendering_props_extension: String?
+    attr_accessor make_generated_server_bundle_the_entrypoint: bool
+    attr_accessor generated_component_packs_loading_strategy: Symbol?
+    attr_accessor immediate_hydration: bool
+    attr_accessor component_registry_timeout: Integer
+    attr_accessor server_bundle_output_path: String?
+    attr_accessor enforce_private_server_bundles: bool
+
+    def initialize: (
+      ?node_modules_location: String?,
+      ?server_bundle_js_file: String?,
+      ?prerender: bool?,
+      ?replay_console: bool?,
+      ?make_generated_server_bundle_the_entrypoint: bool?,
+      ?trace: bool?,
+      ?development_mode: bool?,
+      ?defer_generated_component_packs: bool?,
+      ?logging_on_server: bool?,
+      ?server_renderer_pool_size: Integer?,
+      ?server_renderer_timeout: Integer?,
+      ?raise_on_prerender_error: bool?,
+      ?skip_display_none: bool?,
+      ?generated_assets_dirs: Array[String]?,
+      ?generated_assets_dir: String?,
+      ?webpack_generated_files: Array[String]?,
+      ?rendering_extension: String?,
+      ?build_test_command: String?,
+      ?build_production_command: String?,
+      ?generated_component_packs_loading_strategy: Symbol?,
+      ?same_bundle_for_client_and_server: bool?,
+      ?i18n_dir: String?,
+      ?i18n_yml_dir: String?,
+      ?i18n_output_format: Symbol?,
+      ?i18n_yml_safe_load_options: Hash[Symbol, untyped]?,
+      ?random_dom_id: bool?,
+      ?server_render_method: String?,
+      ?rendering_props_extension: String?,
+      ?components_subdirectory: String?,
+      ?auto_load_bundle: bool?,
+      ?immediate_hydration: bool?,
+      ?component_registry_timeout: Integer?,
+      ?server_bundle_output_path: String?,
+      ?enforce_private_server_bundles: bool?
+    ) -> void
+
+    def setup_config_values: () -> void
+
+    private
+
+    def check_component_registry_timeout: () -> void
+    def validate_generated_component_packs_loading_strategy: () -> void
+    def validate_enforce_private_server_bundles: () -> void
+    def check_minimum_shakapacker_version: () -> void
+    def check_autobundling_requirements: () -> void
+    def adjust_precompile_task: () -> void
+    def error_if_using_packer_and_generated_assets_dir_not_match_public_output_path: () -> void
+    def check_server_render_method_is_only_execjs: () -> void
+    def configure_generated_assets_dirs_deprecation: () -> void
+    def ensure_webpack_generated_files_exists: () -> void
+    def configure_skip_display_none_deprecation: () -> void
+    def raise_missing_components_subdirectory: () -> void
+    def compile_command_conflict_message: () -> String
+    def rsc_bundle_js_file: () -> String?
+    def react_client_manifest_file: () -> String?
+    def react_server_client_manifest_file: () -> String?
+  end
+end

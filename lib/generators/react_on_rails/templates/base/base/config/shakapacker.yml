@@ -42,6 +42,11 @@ default: &default
   # Raises an error if there is a mismatch in the shakapacker gem and npm package being used
   ensure_consistent_versioning: true
 
+  # Hook to run before webpack compilation (e.g., for generating dynamic entry points)
+  # SECURITY: Only reference trusted scripts within your project. Ensure the hook path
+  # points to a file within the project root that you control.
+  precompile_hook: 'bin/shakapacker-precompile-hook'
+
   # Select whether the compiler will use SHA digest ('digest' option) or most recent modified timestamp ('mtime') to determine freshness
   compiler_strategy: digest
 

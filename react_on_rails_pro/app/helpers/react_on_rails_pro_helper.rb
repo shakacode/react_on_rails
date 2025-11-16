@@ -6,6 +6,7 @@
 
 require "react_on_rails/helper"
 
+# rubocop:disable Metrics/ModuleLength
 module ReactOnRailsProHelper
   def fetch_react_component(component_name, options)
     if ReactOnRailsPro::Cache.use_cache?(options)
@@ -88,6 +89,104 @@ module ReactOnRailsProHelper
           ReactOnRails.configuration.auto_load_bundle || raw_options[:auto_load_bundle]
         react_component_hash(component_name, sanitized_options)
       end
+    end
+  end
+
+  # Streams a server-side rendered React component using React's `renderToPipeableStream`.
+  # Supports React 18 features like Suspense, concurrent rendering, and selective hydration.
+  # Enables progressive rendering and improved performance for large components.
+  #
+  # Note: This function can only be used with React on Rails Pro.
+  # The view that uses this function must be rendered using the
+  # `stream_view_containing_react_components` method from the React on Rails Pro gem.
+  #
+  # Example of an async React component that can benefit from streaming:
+  #
+  # const AsyncComponent = async () => {
+  #   const data = await fetchData();
+  #   return <div>{data}</div>;
+  # };
+  #
+  # function App() {
+  #   return (
+  #     <Suspense fallback={<div>Loading...</div>}>
+  #       <AsyncComponent />
+  #     </Suspense>
+  #   );
+  # }
+  #
+  # @param [String] component_name Name of your registered component
+  # @param [Hash] options Options for rendering
+  # @option options [Hash] :props Props to pass to the react component
+  # @option options [String] :dom_id DOM ID of the component container
+  # @option options [Hash] :html_options Options passed to content_tag
+  # @option options [Boolean] :trace Set to true to add extra debugging information to the HTML
+  # @option options [Boolean] :raise_on_prerender_error Set to true to raise exceptions during server-side rendering
+  # Any other options are passed to the content tag, including the id.
+  def stream_react_component(component_name, options = {})
+    # stream_react_component doesn't have the prerender option
+    # Because setting prerender to false is equivalent to calling react_component with prerender: false
+    options[:prerender] = true
+    options = options.merge(immediate_hydration: true) unless options.key?(:immediate_hydration)
+    run_stream_inside_fiber do
+      internal_stream_react_component(component_name, options)
+    end
+  end
+
+  # Renders the React Server Component (RSC) payload for a given component. This helper generates
+  # a special format designed by React for serializing server components and transmitting them
+  # to the client.
+  #
+  # @return [String] Returns a Newline Delimited JSON (NDJSON) stream where each line contains a JSON object with:
+  #   - html: The RSC payload containing the rendered server components and client component references
+  #   - consoleReplayScript: JavaScript to replay server-side console logs in the client
+  #   - hasErrors: Boolean indicating if any errors occurred during rendering
+  #   - isShellReady: Boolean indicating if the initial shell is ready for hydration
+  #
+  # Example NDJSON stream:
+  #   {"html":"<RSC Payload>","consoleReplayScript":"","hasErrors":false,"isShellReady":true}
+  #   {"html":"<RSC Payload>","consoleReplayScript":"console.log('Loading...')","hasErrors":false,"isShellReady":true}
+  #
+  # The RSC payload within the html field contains:
+  # - The component's rendered output from the server
+  # - References to client components that need hydration
+  # - Data props passed to client components
+  #
+  # @param component_name [String] The name of the React component to render. This component should
+  #   be a server component or a mixed component tree containing both server and client components.
+  #
+  # @param options [Hash] Options for rendering the component
+  # @option options [Hash] :props Props to pass to the component (default: {})
+  # @option options [Boolean] :trace Enable tracing for debugging (default: false)
+  # @option options [String] :id Custom DOM ID for the component container (optional)
+  #
+  # @example Basic usage with a server component
+  #   <%= rsc_payload_react_component("ReactServerComponentPage") %>
+  #
+  # @example With props and tracing enabled
+  #   <%= rsc_payload_react_component("RSCPostsPage",
+  #         props: { artificialDelay: 1000 },
+  #         trace: true) %>
+  #
+  # @note This helper requires React Server Components support to be enabled in your configuration:
+  #   ReactOnRailsPro.configure do |config|
+  #     config.enable_rsc_support = true
+  #   end
+  #
+  # @raise [ReactOnRailsPro::Error] if RSC support is not enabled in configuration
+  #
+  # @note You don't have to deal directly with this helper function - it's used internally by the
+  # `rsc_payload_route` helper function. The returned data from this function is used internally by
+  # components registered using the `registerServerComponent` function. Don't use it unless you need
+  # more control over the RSC payload generation. To know more about RSC payload, see the following link:
+  # @see https://www.shakacode.com/react-on-rails-pro/docs/how-react-server-components-works.md
+  #   for technical details about the RSC payload format
+  def rsc_payload_react_component(component_name, options = {})
+    # rsc_payload_react_component doesn't have the prerender option
+    # Because setting prerender to false will not do anything
+    options[:prerender] = true
+    run_stream_inside_fiber do
+      internal_rsc_payload_react_component(component_name, options)
     end
   end
 
@@ -191,4 +290,71 @@ module ReactOnRailsProHelper
 
     raise ReactOnRailsPro::Error, "Option 'cache_key' is required for React on Rails caching"
   end
+
+  def run_stream_inside_fiber
+    if @rorp_rendering_fibers.nil?
+      raise ReactOnRails::Error,
+            "You must call stream_view_containing_react_components to render the view containing the react component"
+    end
+
+    rendering_fiber = Fiber.new do
+      stream = yield
+      stream.each_chunk do |chunk|
+        Fiber.yield chunk
+      end
+    end
+
+    @rorp_rendering_fibers << rendering_fiber
+
+    # return the first chunk of the fiber
+    # It contains the initial html of the component
+    # all updates will be appended to the stream sent to browser
+    rendering_fiber.resume
+  end
+
+  def internal_stream_react_component(component_name, options = {})
+    options = options.merge(render_mode: :html_streaming)
+    result = internal_react_component(component_name, options)
+    build_react_component_result_for_server_streamed_content(
+      rendered_html_stream: result[:result],
+      component_specification_tag: result[:tag],
+      render_options: result[:render_options]
+    )
+  end
+
+  def internal_rsc_payload_react_component(react_component_name, options = {})
+    options = options.merge(render_mode: :rsc_payload_streaming)
+    render_options = create_render_options(react_component_name, options)
+    json_stream = server_rendered_react_component(render_options)
+    json_stream.transform do |chunk|
+      "#{chunk.to_json}\n".html_safe
+    end
+  end
+
+  def build_react_component_result_for_server_streamed_content(
+    rendered_html_stream:,
+    component_specification_tag:,
+    render_options:
+  )
+    is_first_chunk = true
+    rendered_html_stream.transform do |chunk_json_result|
+      if is_first_chunk
+        is_first_chunk = false
+        build_react_component_result_for_server_rendered_string(
+          server_rendered_html: chunk_json_result["html"],
+          component_specification_tag: component_specification_tag,
+          console_script: chunk_json_result["consoleReplayScript"],
+          render_options: render_options
+        )
+      else
+        result_console_script = render_options.replay_console ? chunk_json_result["consoleReplayScript"] : ""
+        # No need to prepend component_specification_tag or add rails context again
+        # as they're already included in the first chunk
+        compose_react_component_html_with_spec_and_console(
+          "", chunk_json_result["html"], result_console_script
+        )
+      end
+    end
+  end
 end
+# rubocop:enable Metrics/ModuleLength

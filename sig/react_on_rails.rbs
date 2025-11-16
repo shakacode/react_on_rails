@@ -1,0 +1,17 @@
+# Type signatures for ReactOnRails gem
+
+module ReactOnRails
+  VERSION: String
+
+  DEFAULT_GENERATED_ASSETS_DIR: String
+  DEFAULT_COMPONENT_REGISTRY_TIMEOUT: Integer
+
+  def self.configure: () { (Configuration) -> void } -> void
+  def self.configuration: () -> Configuration
+
+  # Error classes are defined in separate RBS files:
+  # - sig/react_on_rails/prerender_error.rbs
+  # - sig/react_on_rails/json_parse_error.rbs
+  class Error < StandardError
+  end
+end

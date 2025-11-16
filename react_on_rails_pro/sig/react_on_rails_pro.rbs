@@ -1,0 +1,5 @@
+module ReactOnRailsPro
+  def self.configure: () { (Configuration) -> void } -> void
+
+  def self.configuration: () -> Configuration
+end

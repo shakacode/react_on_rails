@@ -1,0 +1,9 @@
+# React on Rails Pro license file
+config/react_on_rails_pro_license.key
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/

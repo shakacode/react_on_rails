@@ -61,6 +61,61 @@ See [Run NPM JS tests](#run-npm-js-tests) for the JS tests and [RSpec Testing](#
 
 See [Dev Initial Setup](#dev-initial-setup) below for, well... initial setup.
 
+## CI Testing and Optimization
+
+React on Rails Pro shares the optimized CI pipeline with the main gem. The CI system intelligently runs only relevant tests based on file changes.
+
+### CI Behavior
+
+- **On PRs/Branches**: Runs reduced test matrix (latest Ruby/Node versions only) for faster feedback
+- **On Master**: Runs full test matrix (all Ruby/Node/dependency combinations) for complete coverage
+- **Docs-only changes**: CI skips entirely when only `.md` files or `docs/` directory change
+
+### Local CI Tools
+
+The repository root provides local CI tools that work with both the main gem and Pro:
+
+#### `bin/ci-local` - Smart Local CI Runner
+
+Run from the **repository root** to test Pro changes:
+
+```bash
+# Navigate to repository root first
+cd ..
+
+# Auto-detect what to test (includes Pro tests if Pro files changed)
+bin/ci-local
+
+# Run all CI checks (same as master branch)
+bin/ci-local --all
+
+# Quick check - only fast tests
+bin/ci-local --fast
+```
+
+The detector automatically identifies Pro-related changes and runs appropriate Pro tests.
+
+#### `script/ci-changes-detector` - Change Analysis
+
+Analyzes changes to both main gem and Pro:
+
+```bash
+# From repository root
+script/ci-changes-detector origin/master
+```
+
+### CI Best Practices for Pro
+
+✅ **DO:**
+- Run `bin/ci-local` from repository root before pushing
+- Test Pro changes alongside main gem changes if modifying both
+- Use `bin/ci-local --fast` during rapid iteration
+
+❌ **DON'T:**
+- Push Pro changes without testing locally first
+- Modify both Pro and main gem without running full tests
+
+For comprehensive CI documentation, see [`../docs/CI_OPTIMIZATION.md`](../docs/CI_OPTIMIZATION.md) in the repository root.
 
 # IDE/Editor Setup
 It's critical to configure your IDE/editor to ignore certain directories. Otherwise your IDE might slow to a crawl!
@@ -282,14 +337,40 @@ TRACE_REACT_ON_RAILS=true && foreman start -f Procfile.dev
 ```
 
 # Releasing
-Contact Justin Gordon, [justin@shakacode.com](mailto:justin@shakacode.com).
 
-> [!NOTE]
-> These files need to include auth tokens to [publish to Github Packages](https://docs.github.com/en/enterprise-server%403.10/packages/working-with-a-github-packages-registry/working-with-the-rubygems-registry):
-> 1. `~/.npmrc`
-> 2. `~/.gem/credentials`
+⚠️ **The release process has moved to the repository root.**
 
-Then run a command like:
+React on Rails Pro is now released together with React on Rails using unified versioning.
+All packages (core + pro) are released together with the same version number.
+
+Contact Justin Gordon, [justin@shakacode.com](mailto:justin@shakacode.com) for release permissions.
+
+## Prerequisites
+
+You need authentication for public package registries:
+
+**Public packages (npmjs.org + rubygems.org):**
+- NPM: Run `npm login`
+- RubyGems: Standard credentials via `gem push`
+
+All React on Rails and React on Rails Pro packages are now published publicly to npmjs.org and RubyGems.org.
+
+## Release Command
+
+From the **repository root**, run:
+
 ```bash
-bundle exec rake release\[4.0.0.rc.1\]
+# Full release
+cd /path/to/react_on_rails
+rake release[17.0.0]
+
+# Dry run first
+rake release[17.0.0,true]
+
+# Test with Verdaccio
+rake release[17.0.0,false,verdaccio]
 ```
+
+For complete documentation, see:
+- [Root Release Documentation](../docs/contributor-info/releasing.md)
+- Run `rake -D release` for inline help

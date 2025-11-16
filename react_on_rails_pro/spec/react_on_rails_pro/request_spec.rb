@@ -21,8 +21,7 @@ describe ReactOnRailsPro::Request do
     File.write(rsc_server_bundle_path, 'console.log("mock RSC bundle");')
 
     clear_stream_mocks
-    allow(ReactOnRailsPro.configuration).to receive(:renderer_url).and_return(renderer_url)
-    allow(ReactOnRailsPro.configuration).to receive(:renderer_http_pool_size).and_return(20)
+    allow(ReactOnRailsPro.configuration).to receive_messages(renderer_url: renderer_url, renderer_http_pool_size: 20)
 
     original_httpx_plugin = HTTPX.method(:plugin)
     allow(HTTPX).to receive(:plugin) do |*args|
@@ -30,13 +29,12 @@ describe ReactOnRailsPro::Request do
     end
     allow(Rails).to receive(:logger).and_return(logger_mock)
 
-    allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool).to receive(:renderer_bundle_file_name)
-      .and_return(renderer_bundle_file_name)
-    allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool).to receive(:rsc_renderer_bundle_file_name)
-      .and_return(rsc_renderer_bundle_file_name)
+    allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool).to receive_messages(
+      renderer_bundle_file_name: renderer_bundle_file_name, rsc_renderer_bundle_file_name: rsc_renderer_bundle_file_name
+    )
     allow(ReactOnRails::Utils).to receive(:server_bundle_js_file_path).and_return(server_bundle_path)
 
-    allow(ReactOnRails::Utils).to receive(:rsc_bundle_js_file_path).and_return(rsc_server_bundle_path)
+    allow(ReactOnRailsPro::Utils).to receive(:rsc_bundle_js_file_path).and_return(rsc_server_bundle_path)
   end
 
   after do

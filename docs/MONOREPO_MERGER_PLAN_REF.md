@@ -11,6 +11,6 @@ This plan outlines the 8-phase implementation for merging the `react_on_rails` a
 - Complete git history preservation
 - CI integrity at every step
 
-**Status:** Phase 3 - Prepare Core Package for Workspace Structure (Complete) ✅
+**Status:** Phase 3 - PR #4: Split JS Pro Code to Separate Package (Complete) ✅
 
 For implementation details, progress tracking, and specific tasks, refer to the main plan document.

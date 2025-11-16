@@ -7,6 +7,7 @@ const ErrorComponent = ({ error }: { error: Error }) => {
     <div>
       <h1>Error happened while rendering RSC Page</h1>
       <p>{error.message}</p>
+      <p>{error.stack}</p>
     </div>
   );
 };

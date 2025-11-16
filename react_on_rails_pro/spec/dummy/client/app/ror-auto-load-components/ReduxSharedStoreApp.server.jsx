@@ -4,7 +4,7 @@
 // Compare this to the ./ClientReduxSharedStoreApp.jsx file which is used for client side rendering.
 
 import React from 'react';
-import ReactOnRails from 'react-on-rails';
+import ReactOnRails from 'react-on-rails-pro';
 import { Provider } from 'react-redux';
 
 import HelloWorldContainer from '../components/HelloWorldContainer';

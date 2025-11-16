@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { Provider } from 'react-redux';
-import ReactOnRails from 'react-on-rails';
+import ReactOnRails from 'react-on-rails-pro';
 import { hydrateRoot, createRoot } from 'react-dom/client';
 
 import HelloWorldContainer from '../components/HelloWorldContainer';

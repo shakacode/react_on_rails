@@ -5,6 +5,9 @@ default: &default
   source_entry_path: packs
   public_root_path: public
 
+  # Using SWC for faster JavaScript transpilation (20x faster than Babel)
+  javascript_transpiler: swc
+
   cache_path: tmp/cache/shakapacker
   webpack_compile_output: false
   ensure_consistent_versioning: true
@@ -16,6 +19,11 @@ default: &default
   # Reload manifest.json on all requests so we reload latest compiled packs
   cache_manifest: false
   nested_entries: true
+
+  # Hook to run before webpack compilation (e.g., for generating dynamic entry points)
+  # SECURITY: Only reference trusted scripts within your project. Ensure the hook path
+  # points to a file within the project root that you control.
+  precompile_hook: 'bin/shakapacker-precompile-hook'
 
 development:
   <<: *default

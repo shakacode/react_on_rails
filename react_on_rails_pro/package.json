@@ -1,6 +1,6 @@
 {
-  "name": "@shakacode-tools/react-on-rails-pro-node-renderer",
-  "version": "4.0.0",
+  "name": "react-on-rails-pro-node-renderer",
+  "version": "16.2.0-beta.4",
   "protocolVersion": "2.0.0",
   "description": "react-on-rails-pro JavaScript for react_on_rails_pro Ruby gem",
   "exports": {
@@ -17,21 +17,6 @@
   "bin": {
     "react-on-rails-pro-node-renderer": "packages/node-renderer/dist/default-node-renderer.js"
   },
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
-  },
-  "release-it": {
-    "git": {
-      "requireCleanWorkingDir": false
-    },
-    "github": {
-      "release": false
-    },
-    "npm": {
-      "publish": true,
-      "skipChecks": true
-    }
-  },
   "directories": {
     "doc": "docs"
   },
@@ -44,6 +29,7 @@
     "@fastify/multipart": "^8.3.1 || ^9.0.3",
     "fastify": "^4.29.0 || ^5.2.1",
     "fs-extra": "^11.2.0",
+    "jsonwebtoken": "^9.0.2",
     "lockfile": "^1.0.4"
   },
   "devDependencies": {
@@ -59,6 +45,7 @@
     "@tsconfig/node14": "^14.1.2",
     "@types/fs-extra": "^11.0.4",
     "@types/jest": "^29.5.12",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/lockfile": "^1.0.4",
     "@types/touch": "^3.1.5",
     "babel-jest": "^29.7.0",
@@ -82,12 +69,12 @@
     "jest-junit": "^16.0.0",
     "jsdom": "^16.5.0",
     "ndb": "^1.1.5",
+    "node-html-parser": "^7.0.1",
     "nps": "^5.9.12",
     "pino-pretty": "^13.0.0",
     "prettier": "^3.2.5",
     "react-on-rails": "link:.yalc/react-on-rails",
     "redis": "^5.0.1",
-    "release-it": "^17.6.0",
     "sentry-testkit": "^5.0.6",
     "touch": "^3.1.0",
     "typescript": "^5.4.3",
@@ -111,10 +98,11 @@
     }
   },
   "files": [
-    "packages/node-renderer/dist"
+    "packages/node-renderer/dist",
+    "script/preinstall.js"
   ],
   "scripts": {
-    "preinstall": "yarn run link-source && yalc add --link react-on-rails",
+    "preinstall": "node ./script/preinstall.js",
     "postinstall": "test -f post-yarn-install.local && ./post-yarn-install.local || true",
     "link-source": "cd ../packages/react-on-rails && yarn && yalc publish",
     "test": "nps test",
@@ -128,7 +116,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/shakacode-tools/react_on_rails_pro.git"
+    "url": "git+https://github.com/shakacode/react_on_rails.git"
   },
   "keywords": [
     "react",
@@ -141,9 +129,9 @@
   "author": "justin@shakacode.com",
   "license": "UNLICENSED",
   "bugs": {
-    "url": "https://github.com/shakacode/react_on_rails_pro/issues"
+    "url": "https://github.com/shakacode/react_on_rails/issues"
   },
-  "homepage": "https://github.com/shakacode/react_on_rails_pro#readme",
+  "homepage": "https://github.com/shakacode/react_on_rails/tree/master/react_on_rails_pro#readme",
   "jest": {
     "clearMocks": true,
     "collectCoverageFrom": [

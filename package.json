@@ -1,11 +1,12 @@
 {
   "name": "react-on-rails-workspace",
-  "version": "16.1.1",
+  "version": "16.2.0-beta.4",
   "description": "react-on-rails monorepo workspace manager",
   "private": true,
   "type": "module",
   "workspaces": [
-    "packages/react-on-rails"
+    "packages/react-on-rails",
+    "packages/react-on-rails-pro"
   ],
   "directories": {
     "doc": "docs"
@@ -18,6 +19,7 @@
     "@babel/preset-react": "^7.26.3",
     "@babel/preset-typescript": "^7.27.1",
     "@eslint/compat": "^1.2.7",
+    "@swc/core": "^1.15.0",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",
@@ -53,6 +55,7 @@
     "react-dom": "^19.0.0",
     "react-on-rails-rsc": "19.0.2",
     "redux": "^4.2.1",
+    "swc-loader": "^0.2.6",
     "ts-jest": "^29.2.5",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.35.0"
@@ -61,7 +64,7 @@
     "test": "yarn workspaces run test",
     "clean": "yarn workspaces run clean",
     "start": "nps",
-    "build": "yarn workspaces run build",
+    "build": "yarn workspace react-on-rails run build && yarn workspace react-on-rails-pro run build",
     "build-watch": "yarn workspaces run build-watch",
     "lint": "nps eslint",
     "check": "yarn run lint && yarn workspaces run check",
@@ -69,9 +72,6 @@
     "yalc:publish": "yarn workspaces run yalc:publish",
     "yalc": "yarn workspaces run yalc",
     "publish": "yarn workspaces run publish",
-    "release:patch": "yarn workspaces run release:patch",
-    "release:minor": "yarn workspaces run release:minor",
-    "release:major": "yarn workspaces run release:major",
     "postinstall": "test -f .lefthook.yml && test -d .git && command -v bundle >/dev/null 2>&1 && bundle exec lefthook install || true"
   },
   "repository": {

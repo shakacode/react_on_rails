@@ -196,6 +196,24 @@ export default defineConfig([
       ],
     },
   },
+  {
+    files: ['spec/dummy/e2e-tests/*'],
+
+    rules: {
+      'no-empty-pattern': [
+        'error',
+        {
+          allowObjectPatternsAsParameters: true,
+        },
+      ],
+    },
+  },
+  {
+    files: ['spec/dummy/e2e-tests/*'],
+    rules: {
+      'react-hooks/rules-of-hooks': ['off'],
+    },
+  },
   // must be the last config in the array
   // https://github.com/prettier/eslint-plugin-prettier?tab=readme-ov-file#configuration-new-eslintconfigjs
   prettierRecommended,

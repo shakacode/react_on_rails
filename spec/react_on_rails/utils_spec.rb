@@ -244,11 +244,31 @@ module ReactOnRails
               let(:public_path) { File.expand_path(File.join(packer_public_output_path, rsc_bundle_name)) }
               let(:ssr_generated_path) { File.expand_path(File.join("ssr-generated", rsc_bundle_name)) }
 
+              before do
+                # Mock Pro gem being available
+                allow(described_class).to receive(:react_on_rails_pro?).and_return(true)
+
+                # Create a mock Pro module with configuration method
+                pro_module = Module.new do
+                  def self.configuration
+                    @configuration
+                  end
+
+                  def self.configuration=(config)
+                    @configuration = config
+                  end
+                end
+                stub_const("ReactOnRailsPro", pro_module)
+
+                pro_config = double("ProConfiguration") # rubocop:disable RSpec/VerifiedDoubles
+                allow(pro_config).to receive_messages(rsc_bundle_js_file: rsc_bundle_name,
+                                                      react_server_client_manifest_file: nil)
+                ReactOnRailsPro.configuration = pro_config
+              end
+
               context "with enforce_private_server_bundles=false" do
                 before do
                   mock_missing_manifest_entry(rsc_bundle_name)
-                  allow(ReactOnRails).to receive_message_chain("configuration.rsc_bundle_js_file")
-                    .and_return(rsc_bundle_name)
                   allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
                     .and_return("ssr-generated")
                   allow(ReactOnRails).to receive_message_chain("configuration.enforce_private_server_bundles")
@@ -283,8 +303,6 @@ module ReactOnRails
               context "with enforce_private_server_bundles=true" do
                 before do
                   mock_missing_manifest_entry(rsc_bundle_name)
-                  allow(ReactOnRails).to receive_message_chain("configuration.rsc_bundle_js_file")
-                    .and_return(rsc_bundle_name)
                   allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
                     .and_return("ssr-generated")
                   allow(ReactOnRails).to receive_message_chain("configuration.enforce_private_server_bundles")
@@ -443,102 +461,6 @@ module ReactOnRails
               mock_dev_server_running
 
               path = described_class.server_bundle_js_file_path
-
-              expect(path).to end_with("/public/webpack/development/server-bundle-123456.js")
-            end
-          end
-        end
-
-        describe ".rsc_bundle_js_file_path with #{packer_type} enabled" do
-          let(:packer_public_output_path) { Pathname.new("public/webpack/development") }
-
-          include_context "with #{packer_type} enabled"
-
-          context "with server file not in manifest", packer_type.to_sym do
-            context "with enforce_private_server_bundles=false" do
-              it "returns the private ssr-generated path for RSC bundles" do
-                server_bundle_name = "rsc-bundle.js"
-                mock_bundle_configs(rsc_bundle_name: server_bundle_name)
-                mock_missing_manifest_entry(server_bundle_name)
-
-                path = described_class.rsc_bundle_js_file_path
-
-                expect(path).to end_with("ssr-generated/#{server_bundle_name}")
-              end
-            end
-
-            context "with enforce_private_server_bundles=true" do
-              it "returns the private ssr-generated path for RSC bundles without checking public paths" do
-                server_bundle_name = "rsc-bundle.js"
-                mock_missing_manifest_entry(server_bundle_name)
-                allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_js_file")
-                  .and_return("server-bundle.js") # Different from RSC bundle name
-                allow(ReactOnRails).to receive_message_chain("configuration.rsc_bundle_js_file")
-                  .and_return(server_bundle_name)
-                allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
-                  .and_return("ssr-generated")
-                allow(ReactOnRails).to receive_message_chain("configuration.enforce_private_server_bundles")
-                  .and_return(true)
-
-                # Should not check public paths when enforcement is enabled
-                public_path = File.expand_path(File.join(packer_public_output_path, server_bundle_name))
-                expect(File).not_to receive(:exist?).with(public_path)
-
-                path = described_class.rsc_bundle_js_file_path
-                expect(path).to end_with("ssr-generated/#{server_bundle_name}")
-              end
-            end
-          end
-
-          context "with server file in the manifest, used for client", packer_type.to_sym do
-            it "returns the correct path hashed server path" do
-              # Use Shakapacker directly instead of packer method
-              mock_bundle_configs(rsc_bundle_name: "webpack-bundle.js")
-              # Clear server_bundle_output_path to test manifest behavior
-              allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
-                .and_return(nil)
-              allow(ReactOnRails).to receive_message_chain("configuration.same_bundle_for_client_and_server")
-                .and_return(true)
-              mock_bundle_in_manifest("webpack-bundle.js", "webpack/development/webpack-bundle-123456.js")
-              allow(Shakapacker).to receive_message_chain("dev_server.running?")
-                .and_return(false)
-
-              path = described_class.rsc_bundle_js_file_path
-              expect(path).to end_with("public/webpack/development/webpack-bundle-123456.js")
-              expect(path).to start_with("/")
-            end
-
-            context "with webpack-dev-server running, and same file used for server and client" do
-              it "returns the correct path hashed server path" do
-                mock_bundle_configs(rsc_bundle_name: "webpack-bundle.js")
-                # Clear server_bundle_output_path to test manifest behavior
-                allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
-                  .and_return(nil)
-                allow(ReactOnRails).to receive_message_chain("configuration.same_bundle_for_client_and_server")
-                  .and_return(true)
-                mock_dev_server_running
-                mock_bundle_in_manifest("webpack-bundle.js", "/webpack/development/webpack-bundle-123456.js")
-
-                path = described_class.rsc_bundle_js_file_path
-
-                expect(path).to eq("http://localhost:3035/webpack/development/webpack-bundle-123456.js")
-              end
-            end
-          end
-
-          context "with dev-server running, and server file in the manifest, and separate client/server files",
-                  packer_type.to_sym do
-            it "returns the correct path hashed server path" do
-              mock_bundle_configs(rsc_bundle_name: "rsc-bundle.js")
-              # Clear server_bundle_output_path to test manifest behavior
-              allow(ReactOnRails).to receive_message_chain("configuration.server_bundle_output_path")
-                .and_return(nil)
-              allow(ReactOnRails).to receive_message_chain("configuration.same_bundle_for_client_and_server")
-                .and_return(false)
-              mock_bundle_in_manifest("rsc-bundle.js", "webpack/development/server-bundle-123456.js")
-              mock_dev_server_running
-
-              path = described_class.rsc_bundle_js_file_path
 
               expect(path).to end_with("/public/webpack/development/server-bundle-123456.js")
             end
@@ -732,108 +654,341 @@ module ReactOnRails
           described_class.gem_available?("nonexistent_gem")
         end
       end
-    end
 
-    describe ".react_client_manifest_file_path" do
-      before do
-        described_class.instance_variable_set(:@react_client_manifest_path, nil)
-        allow(ReactOnRails.configuration).to receive(:react_client_manifest_file)
-          .and_return("react-client-manifest.json")
-      end
-
-      after do
-        described_class.instance_variable_set(:@react_client_manifest_path, nil)
-      end
-
-      context "when using packer" do
-        let(:public_output_path) { "/path/to/public/webpack/dev" }
+      describe ".detect_package_manager" do
+        let(:package_json_path) { File.join(Rails.root, "client", "package.json") }
 
         before do
-          allow(::Shakapacker).to receive_message_chain("config.public_output_path")
-            .and_return(Pathname.new(public_output_path))
-          allow(::Shakapacker).to receive_message_chain("config.public_path")
-            .and_return(Pathname.new("/path/to/public"))
+          allow(ReactOnRails).to receive_message_chain("configuration.node_modules_location")
+            .and_return("client")
+          allow(Rails).to receive(:root).and_return(Rails.root)
         end
 
-        context "when dev server is running" do
-          before do
-            allow(::Shakapacker).to receive(:dev_server).and_return(
-              instance_double(
-                ::Shakapacker::DevServer,
-                running?: true,
-                protocol: "http",
-                host_with_port: "localhost:3035"
-              )
-            )
+        context "when packageManager field exists in package.json" do
+          it "returns :yarn for yarn@3.6.0" do
+            allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+            allow(File).to receive(:read).with(package_json_path)
+                                         .and_return('{"packageManager": "yarn@3.6.0"}')
+
+            expect(described_class.detect_package_manager).to eq(:yarn)
           end
 
-          it "returns manifest URL with dev server path" do
-            expected_url = "http://localhost:3035/webpack/dev/react-client-manifest.json"
-            expect(described_class.react_client_manifest_file_path).to eq(expected_url)
+          it "returns :pnpm for pnpm@8.0.0" do
+            allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+            allow(File).to receive(:read).with(package_json_path)
+                                         .and_return('{"packageManager": "pnpm@8.0.0"}')
+
+            expect(described_class.detect_package_manager).to eq(:pnpm)
+          end
+
+          it "returns :bun for bun@1.0.0" do
+            allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+            allow(File).to receive(:read).with(package_json_path)
+                                         .and_return('{"packageManager": "bun@1.0.0"}')
+
+            expect(described_class.detect_package_manager).to eq(:bun)
+          end
+
+          it "returns :npm for npm@9.0.0" do
+            allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+            allow(File).to receive(:read).with(package_json_path)
+                                         .and_return('{"packageManager": "npm@9.0.0"}')
+
+            expect(described_class.detect_package_manager).to eq(:npm)
+          end
+
+          it "falls back to lock file detection for unknown manager" do
+            allow(File).to receive(:exist?).and_call_original
+            allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+            allow(File).to receive(:read).with(package_json_path)
+                                         .and_return('{"packageManager": "unknown@1.0.0"}')
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "yarn.lock")).and_return(true)
+
+            expect(described_class.detect_package_manager).to eq(:yarn)
           end
         end
 
-        context "when dev server is not running" do
+        context "when packageManager field does not exist" do
           before do
-            allow(::Shakapacker).to receive_message_chain("dev_server.running?")
-              .and_return(false)
+            allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+            allow(File).to receive(:read).with(package_json_path)
+                                         .and_return('{"name": "my-app"}')
           end
 
-          it "returns file path to the manifest" do
-            expected_path = File.join(public_output_path, "react-client-manifest.json")
-            expect(described_class.react_client_manifest_file_path).to eq(expected_path)
+          it "returns :yarn when yarn.lock exists" do
+            allow(File).to receive(:exist?).and_call_original
+            allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "yarn.lock")).and_return(true)
+
+            expect(described_class.detect_package_manager).to eq(:yarn)
+          end
+
+          it "returns :pnpm when pnpm-lock.yaml exists" do
+            allow(File).to receive(:exist?).and_call_original
+            allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "yarn.lock")).and_return(false)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "pnpm-lock.yaml")).and_return(true)
+
+            expect(described_class.detect_package_manager).to eq(:pnpm)
+          end
+
+          it "returns :bun when bun.lockb exists" do
+            allow(File).to receive(:exist?).and_call_original
+            allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "yarn.lock")).and_return(false)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "pnpm-lock.yaml")).and_return(false)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "bun.lockb")).and_return(true)
+
+            expect(described_class.detect_package_manager).to eq(:bun)
+          end
+
+          it "returns :npm when package-lock.json exists" do
+            allow(File).to receive(:exist?).and_call_original
+            allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "yarn.lock")).and_return(false)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "pnpm-lock.yaml")).and_return(false)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "bun.lockb")).and_return(false)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "package-lock.json")).and_return(true)
+
+            expect(described_class.detect_package_manager).to eq(:npm)
+          end
+
+          it "defaults to :yarn when no lock files exist" do
+            allow(File).to receive(:exist?).and_call_original
+            allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "yarn.lock")).and_return(false)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "pnpm-lock.yaml")).and_return(false)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "bun.lockb")).and_return(false)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "package-lock.json")).and_return(false)
+
+            expect(described_class.detect_package_manager).to eq(:yarn)
+          end
+        end
+
+        context "when package.json cannot be parsed" do
+          before do
+            allow(File).to receive(:exist?).and_call_original
+            allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+            allow(File).to receive(:read).with(package_json_path).and_return("invalid json")
+          end
+
+          it "falls back to lock file detection" do
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "yarn.lock")).and_return(true)
+
+            expect(described_class.detect_package_manager).to eq(:yarn)
+          end
+        end
+
+        context "when package.json does not exist" do
+          before do
+            allow(File).to receive(:exist?).and_call_original
+            allow(File).to receive(:exist?).with(package_json_path).and_return(false)
+          end
+
+          it "falls back to lock file detection" do
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "yarn.lock")).and_return(false)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "pnpm-lock.yaml")).and_return(true)
+
+            expect(described_class.detect_package_manager).to eq(:pnpm)
+          end
+        end
+      end
+
+      describe ".package_manager_install_exact_command" do
+        before do
+          allow(described_class).to receive(:detect_package_manager).and_return(package_manager)
+        end
+
+        context "when using yarn" do
+          let(:package_manager) { :yarn }
+
+          it "returns yarn add command with --exact flag" do
+            expect(described_class.package_manager_install_exact_command("react-on-rails", "16.0.0"))
+              .to eq("yarn add react-on-rails@16.0.0 --exact")
+          end
+        end
+
+        context "when using pnpm" do
+          let(:package_manager) { :pnpm }
+
+          it "returns pnpm add command with --save-exact flag" do
+            expect(described_class.package_manager_install_exact_command("react-on-rails", "16.0.0"))
+              .to eq("pnpm add react-on-rails@16.0.0 --save-exact")
+          end
+        end
+
+        context "when using bun" do
+          let(:package_manager) { :bun }
+
+          it "returns bun add command with --exact flag" do
+            expect(described_class.package_manager_install_exact_command("react-on-rails", "16.0.0"))
+              .to eq("bun add react-on-rails@16.0.0 --exact")
+          end
+        end
+
+        context "when using npm" do
+          let(:package_manager) { :npm }
+
+          it "returns npm install command with --save-exact flag" do
+            expect(described_class.package_manager_install_exact_command("react-on-rails", "16.0.0"))
+              .to eq("npm install react-on-rails@16.0.0 --save-exact")
+          end
+        end
+
+        context "when package manager is unknown" do
+          let(:package_manager) { :unknown }
+
+          it "defaults to yarn add command" do
+            expect(described_class.package_manager_install_exact_command("react-on-rails", "16.0.0"))
+              .to eq("yarn add react-on-rails@16.0.0 --exact")
+          end
+        end
+      end
+
+      describe ".package_manager_remove_command" do
+        before do
+          allow(described_class).to receive(:detect_package_manager).and_return(package_manager)
+        end
+
+        context "when using yarn" do
+          let(:package_manager) { :yarn }
+
+          it "returns yarn remove command" do
+            expect(described_class.package_manager_remove_command("react-on-rails"))
+              .to eq("yarn remove react-on-rails")
+          end
+        end
+
+        context "when using pnpm" do
+          let(:package_manager) { :pnpm }
+
+          it "returns pnpm remove command" do
+            expect(described_class.package_manager_remove_command("react-on-rails"))
+              .to eq("pnpm remove react-on-rails")
+          end
+        end
+
+        context "when using bun" do
+          let(:package_manager) { :bun }
+
+          it "returns bun remove command" do
+            expect(described_class.package_manager_remove_command("react-on-rails"))
+              .to eq("bun remove react-on-rails")
+          end
+        end
+
+        context "when using npm" do
+          let(:package_manager) { :npm }
+
+          it "returns npm uninstall command" do
+            expect(described_class.package_manager_remove_command("react-on-rails"))
+              .to eq("npm uninstall react-on-rails")
+          end
+        end
+
+        context "when package manager is unknown" do
+          let(:package_manager) { :unknown }
+
+          it "defaults to yarn remove command" do
+            expect(described_class.package_manager_remove_command("react-on-rails"))
+              .to eq("yarn remove react-on-rails")
           end
         end
       end
     end
 
-    describe ".react_server_client_manifest_file_path" do
-      let(:asset_name) { "react-server-client-manifest.json" }
+    # RSC utility method tests moved to react_on_rails_pro/spec/react_on_rails_pro/utils_spec.rb
 
-      before do
-        described_class.instance_variable_set(:@react_server_manifest_path, nil)
-        allow(ReactOnRails.configuration).to receive(:react_server_client_manifest_file).and_return(asset_name)
-        allow(Rails.env).to receive(:development?).and_return(false)
-      end
-
-      after do
-        described_class.instance_variable_set(:@react_server_manifest_path, nil)
-      end
-
-      it "calls bundle_js_file_path with the correct asset name and returns its value" do
-        allow(described_class).to receive(:bundle_js_file_path).with(asset_name).and_return("/some/path/#{asset_name}")
-        result = described_class.react_server_client_manifest_file_path
-        expect(described_class).to have_received(:bundle_js_file_path).with(asset_name)
-        expect(result).to eq("/some/path/#{asset_name}")
-      end
-
-      it "caches the path when not in development" do
-        allow(described_class).to receive(:bundle_js_file_path).with(asset_name).and_return("/some/path/#{asset_name}")
-        result1 = described_class.react_server_client_manifest_file_path
-        result2 = described_class.react_server_client_manifest_file_path
-        expect(described_class).to have_received(:bundle_js_file_path).once.with(asset_name)
-        expect(result1).to eq("/some/path/#{asset_name}")
-        expect(result2).to eq("/some/path/#{asset_name}")
-      end
-
-      it "does not cache the path in development" do
-        allow(Rails.env).to receive(:development?).and_return(true)
-        allow(described_class).to receive(:bundle_js_file_path).with(asset_name).and_return("/some/path/#{asset_name}")
-        result1 = described_class.react_server_client_manifest_file_path
-        result2 = described_class.react_server_client_manifest_file_path
-        expect(described_class).to have_received(:bundle_js_file_path).twice.with(asset_name)
-        expect(result1).to eq("/some/path/#{asset_name}")
-        expect(result2).to eq("/some/path/#{asset_name}")
-      end
-
-      context "when manifest file name is nil" do
+    describe ".normalize_immediate_hydration" do
+      context "with Pro license" do
         before do
-          allow(ReactOnRails.configuration).to receive(:react_server_client_manifest_file).and_return(nil)
+          allow(described_class).to receive(:react_on_rails_pro?).and_return(true)
         end
 
-        it "raises an error" do
-          expect { described_class.react_server_client_manifest_file_path }
-            .to raise_error(ReactOnRails::Error, /react_server_client_manifest_file is nil/)
+        it "returns true when value is explicitly true" do
+          result = described_class.normalize_immediate_hydration(true, "TestComponent", "Component")
+          expect(result).to be true
+        end
+
+        it "returns false when value is explicitly false" do
+          result = described_class.normalize_immediate_hydration(false, "TestComponent", "Component")
+          expect(result).to be false
+        end
+
+        it "returns true when value is nil (Pro default)" do
+          result = described_class.normalize_immediate_hydration(nil, "TestComponent", "Component")
+          expect(result).to be true
+        end
+
+        it "does not log a warning for any valid value" do
+          expect(Rails.logger).not_to receive(:warn)
+
+          described_class.normalize_immediate_hydration(true, "TestComponent", "Component")
+          described_class.normalize_immediate_hydration(false, "TestComponent", "Component")
+          described_class.normalize_immediate_hydration(nil, "TestComponent", "Component")
+        end
+      end
+
+      context "without Pro license" do
+        before do
+          allow(described_class).to receive(:react_on_rails_pro?).and_return(false)
+        end
+
+        it "returns false and logs warning when value is explicitly true" do
+          expect(Rails.logger).to receive(:warn)
+            .with(/immediate_hydration: true requires a React on Rails Pro license/)
+
+          result = described_class.normalize_immediate_hydration(true, "TestComponent", "Component")
+          expect(result).to be false
+        end
+
+        it "returns false when value is explicitly false" do
+          expect(Rails.logger).not_to receive(:warn)
+
+          result = described_class.normalize_immediate_hydration(false, "TestComponent", "Component")
+          expect(result).to be false
+        end
+
+        it "returns false when value is nil (non-Pro default)" do
+          expect(Rails.logger).not_to receive(:warn)
+
+          result = described_class.normalize_immediate_hydration(nil, "TestComponent", "Component")
+          expect(result).to be false
+        end
+
+        it "includes component name and type in warning message" do
+          expect(Rails.logger).to receive(:warn) do |message|
+            expect(message).to include("TestStore")
+            expect(message).to include("Store")
+          end
+
+          described_class.normalize_immediate_hydration(true, "TestStore", "Store")
+        end
+      end
+
+      context "with invalid values" do
+        it "raises ArgumentError for string values" do
+          expect do
+            described_class.normalize_immediate_hydration("yes", "TestComponent", "Component")
+          end.to raise_error(ArgumentError, /immediate_hydration must be true, false, or nil/)
+        end
+
+        it "raises ArgumentError for numeric values" do
+          expect do
+            described_class.normalize_immediate_hydration(1, "TestComponent", "Component")
+          end.to raise_error(ArgumentError, /immediate_hydration must be true, false, or nil/)
+        end
+
+        it "raises ArgumentError for hash values" do
+          expect do
+            described_class.normalize_immediate_hydration({}, "TestComponent", "Component")
+          end.to raise_error(ArgumentError, /immediate_hydration must be true, false, or nil/)
+        end
+
+        it "includes the invalid value in error message" do
+          expect do
+            described_class.normalize_immediate_hydration("invalid", "TestComponent", "Component")
+          end.to raise_error(ArgumentError, /Got: "invalid" \(String\)/)
         end
       end
     end

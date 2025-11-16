@@ -88,13 +88,25 @@ end
 
 shared_context "with pro features and immediate hydration" do
   before do
-    allow(ReactOnRails::Utils).to receive(:react_on_rails_pro_licence_valid?).and_return(true)
-  end
+    allow(ReactOnRails::Utils).to receive_messages(
+      react_on_rails_pro?: true,
+      react_on_rails_pro_version: "",
+      rsc_support_enabled?: false
+    )
 
-  around do |example|
-    ReactOnRails.configure { |config| config.immediate_hydration = true }
-    example.run
-    ReactOnRails.configure { |config| config.immediate_hydration = false }
+    # Stub ReactOnRailsPro::Utils.pro_attribution_comment for all tests
+    # since react_on_rails_pro? is set to true by default
+    pro_module = Module.new
+    utils_module = Module.new do
+      def self.pro_attribution_comment
+        "<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed -->"
+      end
+    end
+    stub_const("ReactOnRailsPro", pro_module)
+    stub_const("ReactOnRailsPro::Utils", utils_module)
+
+    # Stub react_on_rails_pro? to return true for tests since they expect that behavior
+    allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
   end
 end
 

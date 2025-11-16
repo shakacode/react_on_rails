@@ -1,0 +1,9 @@
+- main:
+  - heading "A list of items received from Redis:" [level=1]
+  - button "Hide Redis Items"
+  - list:
+    - listitem: "Value of \"Item1\": Incremental Value1"
+    - listitem: "Value of \"Item2\": Incremental Value2"
+    - listitem: "Value of \"Item3\": Incremental Value3"
+    - listitem: "Value of \"Item4\": Incremental Value4"
+    - paragraph: Waiting for the key "Item5"

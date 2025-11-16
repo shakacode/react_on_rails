@@ -1,0 +1,8 @@
+module ReactOnRails
+  module GitUtils
+    def self.uncommitted_changes?: (String path) -> bool
+    def self.git_installed?: () -> bool
+    def self.current_branch: () -> String?
+    def self.rspec_fixture_branches: () -> Array[String]
+  end
+end

@@ -68,7 +68,7 @@ module ReactOnRails
           # Ruby version compatibility: match any backtrace reference to the test file
           backtrace_pattern = /prender_error_spec\.rb:\d+:in ['`]block \(\d+ levels\) in <module:ReactOnRails>['`]/
           expect(message).to match(backtrace_pattern)
-          expect(message).to include("The rest of the backtrace is hidden")
+          expect(message).to include("💡 Tip: Set FULL_TEXT_ERRORS=true to see the full backtrace")
         end
       end
     end

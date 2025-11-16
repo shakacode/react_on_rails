@@ -6,6 +6,7 @@ default: &default
   public_root_path: public
   public_output_path: packs
   nested_entries: true
+  javascript_transpiler: babel
 
   cache_path: tmp/cache/webpacker
   check_yarn_integrity: false

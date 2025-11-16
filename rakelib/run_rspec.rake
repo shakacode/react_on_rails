@@ -20,20 +20,59 @@ namespace :run_rspec do
 
   spec_dummy_dir = File.join("spec", "dummy")
 
+  # RBS Runtime Type Checking Configuration
+  # ========================================
+  # Runtime type checking is ENABLED BY DEFAULT when RBS gem is available
+  # Use ENV["DISABLE_RBS_RUNTIME_CHECKING"] = "true" to disable
+  #
+  # Coverage Strategy:
+  # - :gem task - Enables checking for ReactOnRails::* (direct gem unit tests)
+  # - :dummy tasks - Enables checking (integration tests exercise gem code paths)
+  # - :example tasks - No checking (examples are user-facing demo apps)
+  #
+  # Rationale per Evil Martians best practices:
+  # Runtime checking catches type errors in actual execution paths that static
+  # analysis might miss. Dummy/integration tests exercise more code paths than
+  # unit tests alone, providing comprehensive type safety validation.
+  def rbs_runtime_env_vars
+    return "" if ENV["DISABLE_RBS_RUNTIME_CHECKING"] == "true"
+
+    begin
+      require "rbs"
+      # Preserve existing RUBYOPT flags (e.g., --enable-yjit, --jit, warnings toggles)
+      # by appending RBS runtime hook instead of replacing
+      existing_rubyopt = ENV.fetch("RUBYOPT", nil)
+      rubyopt_parts = ["-rrbs/test/setup", existing_rubyopt].compact.reject(&:empty?)
+      "RBS_TEST_TARGET='ReactOnRails::*' RUBYOPT='#{rubyopt_parts.join(' ')}'"
+    rescue LoadError
+      # RBS not available - silently skip runtime checking
+      # This is expected in environments without the rbs gem
+      ""
+    end
+  end
+
   desc "Run RSpec for top level only"
   task :gem do
-    run_tests_in("", rspec_args: File.join("spec", "react_on_rails"))
+    run_tests_in("",
+                 rspec_args: File.join("spec", "react_on_rails"),
+                 env_vars: rbs_runtime_env_vars)
   end
 
   desc "Runs dummy rspec with turbolinks"
   task dummy: ["dummy_apps:dummy_app"] do
-    run_tests_in(spec_dummy_dir)
+    run_tests_in(spec_dummy_dir,
+                 env_vars: rbs_runtime_env_vars)
   end
 
   desc "Runs dummy rspec without turbolinks"
   task dummy_no_turbolinks: ["dummy_apps:dummy_app"] do
+    # Build env vars array for robustness with complex environment variables
+    env_vars_array = []
+    env_vars_array << rbs_runtime_env_vars unless rbs_runtime_env_vars.empty?
+    env_vars_array << "DISABLE_TURBOLINKS=TRUE"
+    env_vars = env_vars_array.join(" ")
     run_tests_in(spec_dummy_dir,
-                 env_vars: "DISABLE_TURBOLINKS=TRUE",
+                 env_vars: env_vars,
                  command_name: "dummy_no_turbolinks")
   end
 

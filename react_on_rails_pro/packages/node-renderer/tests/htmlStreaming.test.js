@@ -1,12 +1,8 @@
-import fs from 'fs';
 import http2 from 'http2';
-import path from 'path';
-import FormData from 'form-data';
 import buildApp from '../src/worker';
 import config from './testingNodeRendererConfigs';
-import { readRenderingRequest } from './helper';
 import * as errorReporter from '../src/shared/errorReporter';
-import packageJson from '../src/shared/packageJson';
+import { createForm, SERVER_BUNDLE_TIMESTAMP } from './httpRequestUtils';
 
 const app = buildApp(config);
 
@@ -21,59 +17,11 @@ afterAll(async () => {
 
 jest.spyOn(errorReporter, 'message').mockImplementation(jest.fn());
 
-const SERVER_BUNDLE_TIMESTAMP = '77777-test';
-// Ensure to match the rscBundleHash at `asyncComponentsTreeForTestingRenderingRequest.js` fixture
-const RSC_BUNDLE_TIMESTAMP = '88888-test';
-
-const createForm = ({ project = 'spec-dummy', commit = '', props = {}, throwJsErrors = false } = {}) => {
-  const form = new FormData();
-  form.append('gemVersion', packageJson.version);
-  form.append('protocolVersion', packageJson.protocolVersion);
-  form.append('password', 'myPassword1');
-  form.append('dependencyBundleTimestamps[]', RSC_BUNDLE_TIMESTAMP);
-
-  let renderingRequestCode = readRenderingRequest(
-    project,
-    commit,
-    'asyncComponentsTreeForTestingRenderingRequest.js',
-  );
-  renderingRequestCode = renderingRequestCode.replace(/\(\s*\)\s*$/, `(undefined, ${JSON.stringify(props)})`);
-  if (throwJsErrors) {
-    renderingRequestCode = renderingRequestCode.replace('throwJsErrors: false', 'throwJsErrors: true');
-  }
-  form.append('renderingRequest', renderingRequestCode);
-
-  const testBundlesDirectory = path.join(__dirname, '../../../spec/dummy/ssr-generated');
-  const testClientBundlesDirectory = path.join(__dirname, '../../../spec/dummy/public/webpack/test');
-  const bundlePath = path.join(testBundlesDirectory, 'server-bundle.js');
-  form.append(`bundle_${SERVER_BUNDLE_TIMESTAMP}`, fs.createReadStream(bundlePath), {
-    contentType: 'text/javascript',
-    filename: 'server-bundle.js',
-  });
-  const rscBundlePath = path.join(testBundlesDirectory, 'rsc-bundle.js');
-  form.append(`bundle_${RSC_BUNDLE_TIMESTAMP}`, fs.createReadStream(rscBundlePath), {
-    contentType: 'text/javascript',
-    filename: 'rsc-bundle.js',
-  });
-  const clientManifestPath = path.join(testClientBundlesDirectory, 'react-client-manifest.json');
-  form.append('asset1', fs.createReadStream(clientManifestPath), {
-    contentType: 'application/json',
-    filename: 'react-client-manifest.json',
-  });
-  const reactServerClientManifestPath = path.join(testBundlesDirectory, 'react-server-client-manifest.json');
-  form.append('asset2', fs.createReadStream(reactServerClientManifestPath), {
-    contentType: 'application/json',
-    filename: 'react-server-client-manifest.json',
-  });
-
-  return form;
-};
-
 const makeRequest = async (options = {}) => {
   const startTime = Date.now();
   const form = createForm(options);
-  const { address, port } = app.server.address();
-  const client = http2.connect(`http://${address}:${port}`);
+  const { port } = app.server.address();
+  const client = http2.connect(`http://localhost:${port}`);
   const request = client.request({
     ':method': 'POST',
     ':path': `/bundles/${SERVER_BUNDLE_TIMESTAMP}/render/454a82526211afdb215352755d36032c`,

@@ -352,35 +352,38 @@ After the initial merge, the following CI adjustments may be needed:
 
 **Tasks:**
 
-- [ ] Extract pro JS features from `packages/react-on-rails/src/pro/` to `packages/react-on-rails-pro/src/`
-- [ ] Create `packages/react-on-rails-pro/package.json` with `"license": "UNLICENSED"`
-- [ ] Move pro JS tests from `packages/react-on-rails/tests/` to `packages/react-on-rails-pro/tests/`
-- [ ] Update root workspace to include `packages/react-on-rails-pro`
-- [ ] Setup proper dependencies between core and pro packages
-- [ ] Update build configurations (pro package output will be at `packages/react-on-rails-pro/lib/`)
-- [ ] Update TypeScript configurations for both packages
-- [ ] Remove pro/ directory from `packages/react-on-rails/src/`
+- [x] Extract pro JS features from `packages/react-on-rails/src/pro/` to `packages/react-on-rails-pro/src/`
+- [x] Create `packages/react-on-rails-pro/package.json` with `"license": "UNLICENSED"`
+- [x] Move pro JS tests from `packages/react-on-rails/tests/` to `packages/react-on-rails-pro/tests/`
+- [x] Update root workspace to include `packages/react-on-rails-pro`
+- [x] Setup proper dependencies between core and pro packages
+- [x] Update build configurations (pro package output will be at `packages/react-on-rails-pro/lib/`)
+- [x] Update TypeScript configurations for both packages
+- [x] Remove pro/ directory from `packages/react-on-rails/src/`
+- [x] Update CHANGELOG.md with breaking changes about Pro package separation
+- [x] Configure CI to exclude internal exports (reactApis, ReactDOMServer) from type checking
+- [x] Implement type system improvements to remove excessive `any` types
+- [x] Fix formatting issues with Prettier
 
 **License Compliance:**
 
-- [ ] **CRITICAL: Update LICENSE.md to remove pro code from MIT package:**
+- [x] **CRITICAL: Update LICENSE.md to remove pro code from MIT package:**
 
   ```md
   ## MIT License applies to:
 
-  - `lib/react_on_rails/` (including specs)
-  - `packages/react-on-rails/` (including tests) - NOW EXCLUDES pro/ subdirectory
+  - `lib/react_on_rails/` (entire directory)
+  - `packages/react-on-rails/` (entire package)
 
   ## React on Rails Pro License applies to:
 
-  - `lib/react_on_rails_pro/` (including specs)
-  - `packages/react-on-rails-pro/` (including tests) (NEW)
-  - `react_on_rails_pro/` (remaining files)
+  - `packages/react-on-rails-pro/` (entire package)
+  - `react_on_rails_pro/` (entire directory)
   ```
 
-- [ ] Add Pro license headers to moved files
-- [ ] Verify react-on-rails-pro package has `"license": "UNLICENSED"` in package.json
-- [ ] Verify react-on-rails package no longer contains pro code
+- [x] Add Pro license headers to moved files
+- [x] Verify react-on-rails-pro package has `"license": "UNLICENSED"` in package.json
+- [x] Verify react-on-rails package no longer contains pro code
 
 **Success Criteria:** ✅ All CI checks pass + Pro JS code cleanly separated + License boundaries established + Both NPM packages build independently
 

@@ -39,6 +39,7 @@ Naming/FileName:
   Exclude:
     - '**/Gemfile'
     - '**/Rakefile'
+    - '**/Steepfile'
 
 Layout/LineLength:
   Max: 120

@@ -2,8 +2,8 @@
 
 import * as React from 'react';
 import { StaticRouter } from 'react-router-dom/server.js';
-import { RailsContext, ReactComponentOrRenderFunction } from 'react-on-rails';
-import wrapServerComponentRenderer from 'react-on-rails/wrapServerComponentRenderer/server';
+import { RailsContext, ReactComponentOrRenderFunction } from 'react-on-rails-pro';
+import wrapServerComponentRenderer from 'react-on-rails-pro/wrapServerComponentRenderer/server';
 import App from '../components/ServerComponentRouter';
 
 function ServerComponentRouter(props: object, railsContext: RailsContext) {

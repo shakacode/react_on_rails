@@ -29,7 +29,10 @@ module ReactOnRailsPro
       profile_server_rendering_js_code: Configuration::DEFAULT_PROFILE_SERVER_RENDERING_JS_CODE,
       raise_non_shell_server_rendering_errors: Configuration::DEFAULT_RAISE_NON_SHELL_SERVER_RENDERING_ERRORS,
       enable_rsc_support: Configuration::DEFAULT_ENABLE_RSC_SUPPORT,
-      rsc_payload_generation_url_path: Configuration::DEFAULT_RSC_PAYLOAD_GENERATION_URL_PATH
+      rsc_payload_generation_url_path: Configuration::DEFAULT_RSC_PAYLOAD_GENERATION_URL_PATH,
+      rsc_bundle_js_file: Configuration::DEFAULT_RSC_BUNDLE_JS_FILE,
+      react_client_manifest_file: Configuration::DEFAULT_REACT_CLIENT_MANIFEST_FILE,
+      react_server_client_manifest_file: Configuration::DEFAULT_REACT_SERVER_CLIENT_MANIFEST_FILE
     )
   end
 
@@ -53,6 +56,9 @@ module ReactOnRailsPro
     DEFAULT_RAISE_NON_SHELL_SERVER_RENDERING_ERRORS = false
     DEFAULT_ENABLE_RSC_SUPPORT = false
     DEFAULT_RSC_PAYLOAD_GENERATION_URL_PATH = "rsc_payload/"
+    DEFAULT_RSC_BUNDLE_JS_FILE = "rsc-bundle.js"
+    DEFAULT_REACT_CLIENT_MANIFEST_FILE = "react-client-manifest.json"
+    DEFAULT_REACT_SERVER_CLIENT_MANIFEST_FILE = "react-server-client-manifest.json"
 
     attr_accessor :renderer_url, :renderer_password, :tracing,
                   :server_renderer, :renderer_use_fallback_exec_js, :prerender_caching,
@@ -61,7 +67,8 @@ module ReactOnRailsPro
                   :remote_bundle_cache_adapter, :ssr_pre_hook_js, :assets_to_copy,
                   :renderer_request_retry_limit, :throw_js_errors, :ssr_timeout,
                   :profile_server_rendering_js_code, :raise_non_shell_server_rendering_errors, :enable_rsc_support,
-                  :rsc_payload_generation_url_path
+                  :rsc_payload_generation_url_path, :rsc_bundle_js_file, :react_client_manifest_file,
+                  :react_server_client_manifest_file
 
     def initialize(renderer_url: nil, renderer_password: nil, server_renderer: nil, # rubocop:disable Metrics/AbcSize
                    renderer_use_fallback_exec_js: nil, prerender_caching: nil,
@@ -71,7 +78,8 @@ module ReactOnRailsPro
                    remote_bundle_cache_adapter: nil, ssr_pre_hook_js: nil, assets_to_copy: nil,
                    renderer_request_retry_limit: nil, throw_js_errors: nil, ssr_timeout: nil,
                    profile_server_rendering_js_code: nil, raise_non_shell_server_rendering_errors: nil,
-                   enable_rsc_support: nil, rsc_payload_generation_url_path: nil)
+                   enable_rsc_support: nil, rsc_payload_generation_url_path: nil,
+                   rsc_bundle_js_file: nil, react_client_manifest_file: nil, react_server_client_manifest_file: nil)
       self.renderer_url = renderer_url
       self.renderer_password = renderer_password
       self.server_renderer = server_renderer
@@ -94,6 +102,9 @@ module ReactOnRailsPro
       self.raise_non_shell_server_rendering_errors = raise_non_shell_server_rendering_errors
       self.enable_rsc_support = enable_rsc_support
       self.rsc_payload_generation_url_path = rsc_payload_generation_url_path
+      self.rsc_bundle_js_file = rsc_bundle_js_file
+      self.react_client_manifest_file = react_client_manifest_file
+      self.react_server_client_manifest_file = react_server_client_manifest_file
     end
 
     def setup_config_values

@@ -17,6 +17,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from './worker/typ
 import checkProtocolVersion from './worker/checkProtocolVersionHandler';
 import authenticate from './worker/authHandler';
 import { handleRenderRequest, type ProvidedNewBundle } from './worker/handleRenderRequest';
+import handleGracefulShutdown from './worker/handleGracefulShutdown';
 import {
   errorResponseResult,
   formatExceptionMessage,
@@ -117,7 +118,7 @@ export default function run(config: Partial<Config>) {
   // getConfig():
   buildConfig(config);
 
-  const { bundlePath, logHttpLevel, port, fastifyServerOptions, workersCount } = getConfig();
+  const { serverBundleCachePath, logHttpLevel, port, fastifyServerOptions, workersCount } = getConfig();
 
   const app = fastify({
     http2: useHttp2 as true,
@@ -126,6 +127,8 @@ export default function run(config: Partial<Config>) {
       logHttpLevel !== 'silent' ? { name: 'RORP HTTP', level: logHttpLevel, ...sharedLoggerOptions } : false,
     ...fastifyServerOptions,
   });
+
+  handleGracefulShutdown(app);
 
   // We shouldn't have unhandled errors here, but just in case
   app.addHook('onError', (req, res, err, done) => {
@@ -148,7 +151,7 @@ export default function run(config: Partial<Config>) {
       fileSize: Infinity,
     },
     onFile: async (part) => {
-      const destinationPath = path.join(bundlePath, 'uploads', part.filename);
+      const destinationPath = path.join(serverBundleCachePath, 'uploads', part.filename);
       // TODO: inline here
       await saveMultipartFile(part, destinationPath);
       // eslint-disable-next-line no-param-reassign

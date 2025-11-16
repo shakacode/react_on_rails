@@ -43,6 +43,7 @@ require "shakapacker"
 Dir[File.join(__dir__, "support", "**", "*.rb")].each { |f| require f }
 
 RSpec.configure do |config|
+  Rails.logger = Logger.new($stdout)
   config.example_status_persistence_file_path = "spec/examples.txt"
   config.run_all_when_everything_filtered = true
 

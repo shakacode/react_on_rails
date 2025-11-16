@@ -4,16 +4,63 @@ on:
   push:
     branches:
       - 'master'
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
   pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  workflow_dispatch:
 
 jobs:
+  detect-changes:
+    runs-on: ubuntu-22.04
+    outputs:
+      docs_only: ${{ steps.detect.outputs.docs_only }}
+      run_lint: ${{ steps.detect.outputs.run_lint }}
+      run_js_tests: ${{ steps.detect.outputs.run_js_tests }}
+      run_ruby_tests: ${{ steps.detect.outputs.run_ruby_tests }}
+      run_dummy_tests: ${{ steps.detect.outputs.run_dummy_tests }}
+      run_generators: ${{ steps.detect.outputs.run_generators }}
+      has_full_ci_label: ${{ steps.check-label.outputs.result }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check for full-ci label
+        id: check-label
+        uses: ./.github/actions/check-full-ci-label
+      - name: Detect relevant changes
+        id: detect
+        run: |
+          # If full-ci label is present, run everything
+          if [ "${{ steps.check-label.outputs.result }}" = "true" ]; then
+            echo "run_lint=true" >> "$GITHUB_OUTPUT"
+            echo "run_js_tests=true" >> "$GITHUB_OUTPUT"
+            echo "run_ruby_tests=true" >> "$GITHUB_OUTPUT"
+            echo "run_dummy_tests=true" >> "$GITHUB_OUTPUT"
+            echo "run_generators=true" >> "$GITHUB_OUTPUT"
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/master' }}"
+          script/ci-changes-detector "$BASE_REF"
+        shell: bash
+
   build:
+    needs: detect-changes
+    if: github.ref == 'refs/heads/master' || needs.detect-changes.outputs.run_lint == 'true'
     env:
       BUNDLE_FROZEN: true
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
         with:
+          # No need for history in lint job
+          fetch-depth: 1
           persist-credentials: false
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
@@ -24,7 +71,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: yarn
+          # TODO: Re-enable cache when Node.js 22 V8 bug is fixed
+          # Disable cache for Node 22 due to V8 bug in 22.21.0
+          # Track: https://github.com/nodejs/node/issues/56010
+          cache: ''
           cache-dependency-path: '**/yarn.lock'
       - name: Print system information
         run: |
@@ -54,8 +104,12 @@ jobs:
         run: bundle check --path=vendor/bundle || bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
       - name: Lint Ruby
         run: bundle exec rubocop
-      - name: Install Node modules with Yarn for dummy app
-        run: cd spec/dummy && yarn install --no-progress --no-emoji --frozen-lockfile
+      - name: Validate RBS type signatures
+        run: bundle exec rake rbs:validate
+      # TODO: Re-enable Steep once RBS signatures are complete for all checked files
+      # Currently disabled because 374 type errors need to be fixed first
+      # - name: Run Steep type checker
+      #   run: bundle exec rake rbs:steep
       - name: Save dummy app ruby gems to cache
         uses: actions/cache@v4
         with:
@@ -72,8 +126,8 @@ jobs:
         run: cd spec/dummy && RAILS_ENV="test" bundle exec rake react_on_rails:generate_packs
       - name: Detect dead code
         run: |
-          yarn run knip
-          yarn run knip --production
+          yarn run knip --exclude binaries
+          yarn run knip --production --exclude binaries
       - name: Lint JS
         run: yarn run eslint --report-unused-disable-directives
       - name: Check formatting
@@ -84,7 +138,8 @@ jobs:
         run: cd packages/react-on-rails && yarn pack -f react-on-rails.tgz
       - name: Lint package types
         # our package is ESM-only
-        run: yarn run attw packages/react-on-rails/react-on-rails.tgz --profile esm-only
+        # Exclude internal exports used for react-on-rails-pro communication
+        run: yarn run attw packages/react-on-rails/react-on-rails.tgz --profile esm-only --exclude-entrypoints reactApis ReactDOMServer
       - name: Lint package publishing
         run: yarn run publint --strict packages/react-on-rails/react-on-rails.tgz
       # We only download and run Actionlint if there is any difference in GitHub Action workflows

@@ -4,15 +4,76 @@ on:
   push:
     branches:
       - 'master'
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'packages/react-on-rails/src/**'
+      - 'node_package/src/**'
   pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'packages/react-on-rails/src/**'
+      - 'node_package/src/**'
+  workflow_dispatch:
 
 jobs:
+  detect-changes:
+    runs-on: ubuntu-22.04
+    outputs:
+      docs_only: ${{ steps.detect.outputs.docs_only }}
+      run_lint: ${{ steps.detect.outputs.run_lint }}
+      run_js_tests: ${{ steps.detect.outputs.run_js_tests }}
+      run_ruby_tests: ${{ steps.detect.outputs.run_ruby_tests }}
+      run_dummy_tests: ${{ steps.detect.outputs.run_dummy_tests }}
+      run_generators: ${{ steps.detect.outputs.run_generators }}
+      has_full_ci_label: ${{ steps.check-label.outputs.result }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Fetch enough history for change detection (50 commits is usually sufficient for PRs)
+          fetch-depth: 50
+          persist-credentials: false
+      - name: Check for full-ci label
+        id: check-label
+        uses: ./.github/actions/check-full-ci-label
+      - name: Detect relevant changes
+        id: detect
+        run: |
+          # If full-ci label is present, run everything
+          if [ "${{ steps.check-label.outputs.result }}" = "true" ]; then
+            echo "run_lint=true" >> "$GITHUB_OUTPUT"
+            echo "run_js_tests=true" >> "$GITHUB_OUTPUT"
+            echo "run_ruby_tests=true" >> "$GITHUB_OUTPUT"
+            echo "run_dummy_tests=true" >> "$GITHUB_OUTPUT"
+            echo "run_generators=true" >> "$GITHUB_OUTPUT"
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/master' }}"
+          script/ci-changes-detector "$BASE_REF"
+        shell: bash
+
   rspec-package-tests:
+    needs: detect-changes
+    # Run on master OR when Ruby tests needed on PR
+    if: |
+      (github.ref == 'refs/heads/master' || needs.detect-changes.outputs.run_ruby_tests == 'true')
     strategy:
       fail-fast: false
       matrix:
-        ruby-version: ['3.2', '3.4']
-        dependency-level: ['minimum', 'latest']
+        include:
+          # Always run: Latest versions (fast feedback on PRs)
+          - ruby-version: '3.4'
+            dependency-level: 'latest'
+          # Master and full-ci label: Minimum supported versions (full coverage)
+          - ruby-version: '3.2'
+            dependency-level: 'minimum'
+        exclude:
+          # Skip minimum dependency matrix on regular PRs (run only on master or with full-ci label)
+          - ruby-version: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && needs.detect-changes.outputs.has_full_ci_label != 'true' && '3.2' || '' }}
+            dependency-level: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && needs.detect-changes.outputs.has_full_ci_label != 'true' && 'minimum' || '' }}
     env:
       BUNDLE_FROZEN: ${{ matrix.dependency-level == 'minimum' && 'false' || 'true' }}
     runs-on: ubuntu-22.04

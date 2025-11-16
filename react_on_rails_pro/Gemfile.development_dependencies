@@ -7,7 +7,7 @@ ruby '3.3.7'
 
 gem "react_on_rails", path: "../"
 
-gem "shakapacker", "8.0.0"
+gem "shakapacker", "9.3.0"
 gem "bootsnap", require: false
 gem "rails", "~> 7.1"
 gem "puma", "~> 6"
@@ -50,6 +50,7 @@ group :development, :test do
   gem 'pry-rails' # Causes rails console to open pry. `DISABLE_PRY_RAILS=1 rails c` can still open with IRB
   gem 'pry-theme' # An easy way to customize Pry colors via theme files
 
+  gem "rbs", require: false
   gem "rubocop", "1.36.0", require: false
   gem 'rubocop-performance', "1.15.0", require: false
   gem 'rubocop-rspec', "2.13.2", require: false

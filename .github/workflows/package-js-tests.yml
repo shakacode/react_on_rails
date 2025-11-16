@@ -4,13 +4,72 @@ on:
   push:
     branches:
       - 'master'
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'lib/**'
+      - 'spec/react_on_rails/**'
   pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'lib/**'
+      - 'spec/react_on_rails/**'
+  workflow_dispatch:
 
 jobs:
+  detect-changes:
+    runs-on: ubuntu-22.04
+    outputs:
+      docs_only: ${{ steps.detect.outputs.docs_only }}
+      run_lint: ${{ steps.detect.outputs.run_lint }}
+      run_js_tests: ${{ steps.detect.outputs.run_js_tests }}
+      run_ruby_tests: ${{ steps.detect.outputs.run_ruby_tests }}
+      run_dummy_tests: ${{ steps.detect.outputs.run_dummy_tests }}
+      run_generators: ${{ steps.detect.outputs.run_generators }}
+      has_full_ci_label: ${{ steps.check-label.outputs.result }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Fetch enough history for change detection (50 commits is usually sufficient for PRs)
+          fetch-depth: 50
+          persist-credentials: false
+      - name: Check for full-ci label
+        id: check-label
+        uses: ./.github/actions/check-full-ci-label
+      - name: Detect relevant changes
+        id: detect
+        run: |
+          # If full-ci label is present, run everything
+          if [ "${{ steps.check-label.outputs.result }}" = "true" ]; then
+            echo "run_lint=true" >> "$GITHUB_OUTPUT"
+            echo "run_js_tests=true" >> "$GITHUB_OUTPUT"
+            echo "run_ruby_tests=true" >> "$GITHUB_OUTPUT"
+            echo "run_dummy_tests=true" >> "$GITHUB_OUTPUT"
+            echo "run_generators=true" >> "$GITHUB_OUTPUT"
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/master' }}"
+          script/ci-changes-detector "$BASE_REF"
+        shell: bash
+
   build:
+    needs: detect-changes
+    # Run on master OR when JS tests needed on PR
+    if: |
+      (github.ref == 'refs/heads/master' || needs.detect-changes.outputs.run_js_tests == 'true')
     strategy:
       matrix:
-        node-version: ['20', '22']
+        include:
+          # Always run: Latest Node version (fast feedback on PRs)
+          - node-version: '22'
+          # Master and full-ci label: Minimum supported Node version (full coverage)
+          - node-version: '20'
+        exclude:
+          # Skip minimum dependency matrix on regular PRs (run only on master or with full-ci label)
+          - node-version: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && needs.detect-changes.outputs.has_full_ci_label != 'true' && '20' || '' }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -20,7 +79,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: yarn
+          # TODO: Re-enable cache when Node.js 22 V8 bug is fixed
+          # Disable cache for Node 22 due to V8 bug in 22.21.0
+          # Track: https://github.com/nodejs/node/issues/56010
+          cache: ${{ matrix.node-version != '22' && 'yarn' || '' }}
           cache-dependency-path: '**/yarn.lock'
       - name: Print system information
         run: |
@@ -36,5 +98,7 @@ jobs:
         run: |
           yarn install --no-progress --no-emoji ${{ matrix.node-version == '22' && '--frozen-lockfile' || '' }}
           sudo yarn global add yalc
+      - name: Build Renderer package
+        run: yarn build
       - name: Run JS unit tests for Renderer package
         run: yarn test

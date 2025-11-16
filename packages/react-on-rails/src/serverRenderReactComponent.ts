@@ -1,7 +1,6 @@
-import * as React from 'react';
-import type { ReactElement } from 'react';
+import { isValidElement, type ReactElement } from 'react';
 
-import * as ComponentRegistry from './pro/ComponentRegistry.ts';
+// ComponentRegistry is accessed via globalThis.ReactOnRails.getComponent for cross-bundle compatibility
 import createReactOutput from './createReactOutput.ts';
 import { isPromise, isServerRenderHash } from './isServerRenderResult.ts';
 import buildConsoleReplay from './buildConsoleReplay.ts';
@@ -69,7 +68,7 @@ function processPromise(
     return '{}';
   }
   return result.then((promiseResult) => {
-    if (React.isValidElement(promiseResult)) {
+    if (isValidElement(promiseResult)) {
       return processReactElement(promiseResult);
     }
     return promiseResult;
@@ -147,7 +146,11 @@ function serverRenderReactComponentInternal(options: RenderParams): null | strin
   let renderState: RenderState;
 
   try {
-    const componentObj = ComponentRegistry.get(componentName);
+    const reactOnRails = globalThis.ReactOnRails;
+    if (!reactOnRails) {
+      throw new Error('ReactOnRails is not defined');
+    }
+    const componentObj = reactOnRails.getComponent(componentName);
     validateComponent(componentObj, componentName);
 
     // Renders the component or executes the render function

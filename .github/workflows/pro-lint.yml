@@ -1,0 +1,154 @@
+name: React on Rails Pro - Lint
+
+on:
+  push:
+    branches:
+      - 'master'
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      force_run:
+        description: 'Force run all jobs (bypass detect-changes)'
+        required: false
+        type: boolean
+        default: false
+
+defaults:
+  run:
+    working-directory: react_on_rails_pro
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-22.04
+    outputs:
+      docs_only: ${{ steps.detect.outputs.docs_only }}
+      run_pro_lint: ${{ steps.detect.outputs.run_pro_lint }}
+      run_pro_tests: ${{ steps.detect.outputs.run_pro_tests }}
+      has_full_ci_label: ${{ steps.check-label.outputs.result }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check for full-ci label
+        id: check-label
+        uses: ./.github/actions/check-full-ci-label
+      - name: Detect relevant changes
+        id: detect
+        working-directory: .
+        run: |
+          # If force_run is true OR full-ci label is present, run everything
+          if [ "${{ inputs.force_run }}" = "true" ] || [ "${{ steps.check-label.outputs.result }}" = "true" ]; then
+            echo "run_pro_lint=true" >> "$GITHUB_OUTPUT"
+            echo "run_pro_tests=true" >> "$GITHUB_OUTPUT"
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/master' }}"
+          script/ci-changes-detector "$BASE_REF"
+        shell: bash
+
+  lint-js-and-ruby:
+    needs: detect-changes
+    if: github.ref == 'refs/heads/master' || needs.detect-changes.outputs.run_pro_lint == 'true'
+    runs-on: ubuntu-22.04
+    env:
+      REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.3.7
+          bundler: 2.5.4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          # TODO: Re-enable cache when Node.js 22 V8 bug is fixed
+          # Disable cache for Node 22 due to V8 bug in 22.21.0
+          # Track: https://github.com/nodejs/node/issues/56010
+          cache: ''
+          cache-dependency-path: 'react_on_rails_pro/**/yarn.lock'
+
+      - name: Print system information
+        run: |
+          echo "Linux release: "; cat /etc/issue
+          echo "Current user: "; whoami
+          echo "Current directory: "; pwd
+          echo "Ruby version: "; ruby -v
+          echo "Node version: "; node -v
+          echo "Yarn version: "; yarn --version
+          echo "Bundler version: "; bundle --version
+
+      - name: Cache Pro package node modules
+        uses: actions/cache@v4
+        with:
+          path: react_on_rails_pro/node_modules
+          key: v4-pro-package-node-modules-cache-${{ hashFiles('react_on_rails_pro/yarn.lock') }}
+
+      - name: Cache Pro package Ruby gems
+        uses: actions/cache@v4
+        with:
+          path: react_on_rails_pro/vendor/bundle
+          key: v4-pro-package-gem-cache-${{ hashFiles('react_on_rails_pro/react_on_rails_pro.gemspec') }}
+
+      - name: Cache Pro dummy app node modules
+        uses: actions/cache@v4
+        with:
+          path: react_on_rails_pro/spec/dummy/node_modules
+          key: v4-pro-dummy-app-node-modules-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/yarn.lock') }}
+
+      - name: Cache Pro dummy app Ruby gems
+        uses: actions/cache@v4
+        with:
+          path: react_on_rails_pro/spec/dummy/vendor/bundle
+          key: v4-pro-dummy-app-gem-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/Gemfile.lock') }}
+
+      - name: Install Ruby Gems for Pro package
+        run: |
+          gem install bundler -v "2.5.4"
+          echo "Bundler version: "; bundle --version
+          bundle config set --local path 'vendor/bundle'
+          bundle config set --local disable_checksum_validation true
+          bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
+
+      - name: Install Node modules with Yarn for Pro package
+        run: |
+          sudo yarn global add yalc
+          yarn install --frozen-lockfile --no-progress --no-emoji
+
+      - name: Install Ruby Gems for Pro dummy app
+        run: |
+          cd spec/dummy
+          bundle lock --add-platform 'x86_64-linux'
+          bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
+
+      - name: Install Node modules with Yarn for Pro dummy app
+        run: cd spec/dummy && yarn install --frozen-lockfile --no-progress --no-emoji
+
+      - name: Install Node modules with Yarn for ExecJS dummy app
+        run: cd spec/execjs-compatible-dummy && yarn install --frozen-lockfile --no-progress --no-emoji
+
+      - name: Generate file-system based entrypoints
+        run: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
+
+      - name: Lint Ruby
+        run: bundle exec rubocop
+
+      - name: Validate RBS type signatures
+        run: bundle exec rake rbs:validate
+
+      - name: Lint JS
+        run: yarn run nps eslint
+
+      - name: Check formatting
+        run: yarn run nps format.listDifferent
+
+      - name: Check TypeScript
+        run: yarn run nps check-typescript

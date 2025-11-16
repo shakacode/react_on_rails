@@ -1,6 +1,10 @@
 import React from 'react';
-import { Route } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 
 import RouterLayout from '../components/RouterLayout';
 
-export default <Route path="/react_router" component={RouterLayout} />;
+export default (
+  <Routes>
+    <Route path="/react_router/*" element={<RouterLayout />} />
+  </Routes>
+);

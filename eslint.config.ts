@@ -8,6 +8,7 @@ import tsEslint from 'typescript-eslint';
 import { includeIgnoreFile } from '@eslint/compat';
 import js from '@eslint/js';
 import { FlatCompat } from '@eslint/eslintrc';
+import noUseClientInServerFiles from './eslint-rules/no-use-client-in-server-files.cjs';
 
 const compat = new FlatCompat({
   baseDirectory: __dirname,
@@ -16,6 +17,7 @@ const compat = new FlatCompat({
 });
 
 const config = tsEslint.config([
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
   includeIgnoreFile(path.resolve(__dirname, '.gitignore')),
   globalIgnores([
     // compiled code
@@ -151,9 +153,22 @@ const config = tsEslint.config([
     },
   },
   {
-    files: ['packages/react-on-rails/src/**/*'],
+    files: ['packages/**/src/**/*'],
     rules: {
       'import/extensions': ['error', 'ignorePackages'],
+    },
+  },
+  {
+    files: ['**/*.server.ts', '**/*.server.tsx'],
+    plugins: {
+      'react-on-rails': {
+        rules: {
+          'no-use-client-in-server-files': noUseClientInServerFiles,
+        },
+      },
+    },
+    rules: {
+      'react-on-rails/no-use-client-in-server-files': 'error',
     },
   },
   {
@@ -181,12 +196,7 @@ const config = tsEslint.config([
 
     languageOptions: {
       parserOptions: {
-        projectService: {
-          allowDefaultProject: ['eslint.config.ts', 'knip.ts', 'packages/*/tests/*.test.{ts,tsx}'],
-          // Needed because `import * as ... from` instead of `import ... from` doesn't work in this file
-          // for some imports.
-          defaultProject: 'tsconfig.eslint.json',
-        },
+        projectService: true,
       },
     },
 
@@ -208,6 +218,26 @@ const config = tsEslint.config([
         },
       ],
       '@typescript-eslint/restrict-template-expressions': 'off',
+    },
+  },
+  {
+    files: ['packages/react-on-rails-pro/**/*'],
+    rules: {
+      // Disable import rules for pro package - can't resolve monorepo workspace imports
+      // TypeScript compiler validates these imports
+      'import/named': 'off',
+      'import/no-unresolved': 'off',
+      // Disable unsafe type rules - Pro package uses internal APIs with complex types
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-redundant-type-constituents': 'off',
+      // Allow deprecated React APIs for backward compatibility with React < 18
+      '@typescript-eslint/no-deprecated': 'off',
+      // Allow unbound methods - needed for method reassignment patterns
+      '@typescript-eslint/unbound-method': 'off',
     },
   },
   {

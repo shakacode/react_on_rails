@@ -139,6 +139,56 @@ module ReactOnRails
         expect(described_class.supports_autobundling?).to be(false)
       end
     end
+
+    describe ".shakapacker_precompile_hook_configured?" do
+      let(:mock_config) { instance_double("::Shakapacker::Config") } # rubocop:disable RSpec/VerifiedDoubleReference
+
+      before do
+        allow(::Shakapacker).to receive(:config).and_return(mock_config)
+      end
+
+      context "when precompile_hook is configured" do
+        it "returns true when hook command contains generate_packs rake task" do
+          hook_value = "bundle exec rake react_on_rails:generate_packs"
+          allow(mock_config).to receive(:send).with(:data)
+                                              .and_return({ precompile_hook: hook_value })
+          expect(described_class.shakapacker_precompile_hook_configured?).to be true
+        end
+
+        it "returns false when hook command doesn't contain generate_packs" do
+          allow(mock_config).to receive(:send).with(:data)
+                                              .and_return({ precompile_hook: "bin/some-other-command" })
+          expect(described_class.shakapacker_precompile_hook_configured?).to be false
+        end
+      end
+
+      context "when precompile_hook is not configured" do
+        it "returns false for nil" do
+          allow(mock_config).to receive(:send).with(:data).and_return({ precompile_hook: nil })
+          expect(described_class.shakapacker_precompile_hook_configured?).to be false
+        end
+
+        it "returns false for empty string" do
+          allow(mock_config).to receive(:send).with(:data).and_return({ precompile_hook: "" })
+          expect(described_class.shakapacker_precompile_hook_configured?).to be false
+        end
+      end
+
+      context "when Shakapacker is not available" do
+        before { hide_const("::Shakapacker") }
+
+        it "returns false" do
+          expect(described_class.shakapacker_precompile_hook_configured?).to be false
+        end
+      end
+
+      context "when config.send raises an error" do
+        it "returns false" do
+          allow(mock_config).to receive(:send).and_raise(NoMethodError)
+          expect(described_class.shakapacker_precompile_hook_configured?).to be false
+        end
+      end
+    end
   end
 
   describe "version constants validation" do

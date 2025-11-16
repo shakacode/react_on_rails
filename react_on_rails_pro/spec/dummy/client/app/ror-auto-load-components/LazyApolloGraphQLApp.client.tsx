@@ -3,7 +3,7 @@
 import React from 'react';
 import { hydrateRoot } from 'react-dom/client';
 import { setSSRCache } from '@shakacode/use-ssr-computation.runtime';
-import { RailsContext } from 'react-on-rails';
+import { RailsContext } from 'react-on-rails-pro';
 import ApolloGraphQL from '../components/LazyApolloGraphQL';
 
 export default (_props: unknown, _railsContext: RailsContext, domNodeId: string) => {

@@ -1,183 +1,203 @@
 # Installation
-Since the repository is private, you will get a **GitHub Personal Access Token** and an account that can access the packages. Substitute that value in the commands below. If you dont' have this, ask [justin@shakacode.com](mailto:justin@shakacode.com) to give you one.
 
-Check the [CHANGELOG](https://github.com/shakacode/react_on_rails_pro/blob/master/CHANGELOG.md) to see what version you want.
+React on Rails Pro packages are published publicly on npmjs.org and RubyGems.org. Installation requires a valid **license token** for runtime validation. Contact [justin@shakacode.com](mailto:justin@shakacode.com) to purchase a license.
 
-# Version
+**Upgrading from GitHub Packages?** See the [Upgrading Guide](./updating.md) for migration instructions.
 
-For the below docs, find the desired `<version>` in the CHANGELOG. Note, for pre-release versions, gems have all periods, and node packages uses a dash, like gem `3.0.0.rc.0` and node package `3.0.0-rc.0`.
+Check the [CHANGELOG](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) to see what version you want.
 
-# Ruby
-## Gem Installation
-1. Ensure your **Rails** app is using the **react_on_rails** gem, version greater than 11.0.7.
-1. Add the `react_on_rails_pro` gem to your **Gemfile**. Substitute the appropriate version number. 
-   
-## Gemfile Change
+## Version Format
 
-Replace the following in the snippet for the Gemfile
-1. `<account>` for the api key
-2. `<api-key>`
-3. `<version>` desired
+For the below docs, find the desired `<version>` in the CHANGELOG. Note that for pre-release versions:
 
-```ruby
-source "https://<rorp-account>:<token>@"\
-  "rubygems.pkg.github.com/shakacode-tools" do
-  gem "react_on_rails_pro", "<version>"
-end
-```
+- Gems use all periods: `16.2.0.beta.1`
+- NPM packages use dashes: `16.2.0-beta.1`
 
-## Alternate installation keeping the key out of your Gemfile
+# Ruby Gem Installation
+
+## Prerequisites
+
+Ensure your **Rails** app is using the **react_on_rails** gem, version 16.0.0 or higher.
+
+## Install react_on_rails_pro Gem
+
+Add the `react_on_rails_pro` gem to your **Gemfile**:
 
 ```ruby
-source "https://rubygems.pkg.github.com/shakacode-tools" do
-  gem "react_on_rails_pro", "<version>"
-end
+gem "react_on_rails_pro", "~> 16.2"
 ```
-Or use the `gem install` command:
+
+Then run:
 
 ```bash
-gem install react_on_rails_pro --version "<version>> --source "https://rubygems.pkg.github.com/shakacode-tools"
+bundle install
 ```
 
-Then edit your permissions for bundler at the command line:
+Or install directly:
 
-```
-bundle config set rubygems.pkg.github.com <username>:<token>
+```bash
+gem install react_on_rails_pro --version "<version>"
 ```
 
-## Using a branch in your Gemfile
-Note, you should probably use an ENV value for the token so that you don't check this into your source code.
-   ```ruby
-   gem "react_on_rails_pro", version: "<version>", git: "https://[your-github-token]:x-oauth-basic@github.com/shakacode/react_on_rails_pro.git", tag: "<version>"
-   ```
+## License Configuration
+
+Set your license token as an environment variable:
+
+```bash
+export REACT_ON_RAILS_PRO_LICENSE="your-license-token-here"
+```
+
+Or configure it in your Rails initializer (not recommended for production):
+
+```ruby
+# config/initializers/react_on_rails_pro.rb
+ReactOnRailsPro.configure do |config|
+  config.license_token = ENV["REACT_ON_RAILS_PRO_LICENSE"]
+end
+```
+
+⚠️ **Security Warning**: Never commit your license token to version control. Always use environment variables or secure secret management systems (like Rails credentials, Heroku config vars, AWS Secrets Manager, etc.).
 
 ## Rails Configuration
-You don't need to create an initializer if you are satisfied with the default as described in 
-[Configuration](./configuration.md)
 
-# Node Package
-Note, you only need to install the Node Package if you are using the standalone node renderer, `NodeRenderer`.
+You don't need to create an initializer if you are satisfied with the defaults as described in [Configuration](./configuration.md).
 
-## Installation
+For basic setup:
 
-1. Create a subdirectory of your rails project for the Node renderer. Let's use `react-on-rails-pro`.
-   
-2. Create a file `react-on-rails-pro/.npmrc` with the following
-```
-always-auth=true
-//npm.pkg.github.com/:_authToken=<token>
-@shakacode-tools:registry=https://npm.pkg.github.com
+```ruby
+# config/initializers/react_on_rails_pro.rb
+ReactOnRailsPro.configure do |config|
+  # Your configuration here
+  # See docs/configuration.md for all options
+end
 ```
 
-3. Create a `react-on-rails-pro/package.json`
+# Node Package Installation
+
+**Note:** You only need to install the Node Package if you are using the standalone node renderer (`NodeRenderer`). If you're using `ExecJS` (the default), skip this section.
+
+## Install react-on-rails-pro-node-renderer
+
+### Using npm:
+
+```bash
+npm install react-on-rails-pro-node-renderer
+```
+
+### Using yarn:
+
+```bash
+yarn add react-on-rails-pro-node-renderer
+```
+
+### Add to package.json:
+
 ```json
 {
-  "private": true,
   "dependencies": {
-    "@shakacode-tools/react-on-rails-pro-node-renderer": "<version>"
-  },
-  "scripts": {
-    "node-renderer": "echo 'Starting React on Rails Pro Node Renderer.' && node ./react-on-rails-pro-node-renderer.js"
+    "react-on-rails-pro-node-renderer": "^16.2.0"
   }
 }
 ```
 
-4. Be sure to run `npm i` **and not** `yarn` as only npm seems to work with the private github packages.
+## Node Renderer Setup
 
-If you really want to use yarn, see [Yarn can't find private Github npm registry](https://stackoverflow.com/questions/58316109/yarn-cant-find-private-github-npm-registry)
-
-5. You can start the renderer with either the executable `node-renderer` or, preferably, with 
-   a startup JS file, say called `react-on-rails-pro/react-on-rails-pro-node-renderer.js` with
-   these contents. _Note the use of the namespaced **`@shakacode-tools/react-on-rails-pro-node-renderer`** for the package.
+Create a JavaScript file to configure and launch the node renderer, for example `react-on-rails-pro-node-renderer.js`:
 
 ```js
-const path = require('path')
-const {
-  reactOnRailsProNodeRenderer,
-} = require('@shakacode-tools/react-on-rails-pro-node-renderer')
+const path = require('path');
+const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');
 
-const env = process.env
+const env = process.env;
 
 const config = {
-  bundlePath: path.resolve(__dirname, '../.node-renderer-bundles'),
+  serverBundleCachePath: path.resolve(__dirname, '../.node-renderer-bundles'),
 
   // Listen at RENDERER_PORT env value or default port 3800
   logLevel: env.RENDERER_LOG_LEVEL || 'debug', // show all logs
 
-  // See value in /config/initializers/react_on_rails_pro.rb. Should use env
-  // value in real app.
-  password: 'myPassword1',
+  // Password for Rails <-> Node renderer communication
+  // See value in /config/initializers/react_on_rails_pro.rb
+  password: env.RENDERER_PASSWORD || 'changeme',
 
-  // Save bundle to "tmp/bundles" dir of our dummy app
-  // This is the default
   port: env.RENDERER_PORT || 3800,
 
   // supportModules should be set to true to allow the server-bundle code to
-  // see require, exports, etc.
-  // `false` is like the ExecJS behavior
-  // this option is required to equal `true` in order to use loadable components
+  // see require, exports, etc. (`false` is like the ExecJS behavior)
+  // This option is required to equal `true` in order to use loadable components
   supportModules: true,
 
   // workersCount defaults to the number of CPUs minus 1
-  workersCount: Number(process.env.NODE_RENDERER_CONCURRENCY || 3),
+  workersCount: Number(env.NODE_RENDERER_CONCURRENCY || 3),
 
-  // Next 2 params, allWorkersRestartInterval and
-  // delayBetweenIndividualWorkerRestarts must both should be set if you wish
-  // to have automatic worker restarting, say to clear memory leaks.
-  // time is in minutes between restarting all workers
-  // Enable next 2 if the renderer is running out of memory
-  // allWorkersRestartInterval: 15,
-  // time in minutes between each worker restarting when restarting all workers
-  // delayBetweenIndividualWorkerRestarts: 2,
-}
+  // Optional: Automatic worker restarting (for memory leak mitigation)
+  // allWorkersRestartInterval: 15, // minutes between restarting all workers
+  // delayBetweenIndividualWorkerRestarts: 2, // minutes between each worker restart
+  // gracefulWorkerRestartTimeout: undefined, // timeout for graceful worker restart; forces restart if worker stuck
+};
 
 // Renderer detects a total number of CPUs on virtual hostings like Heroku
 // or CircleCI instead of CPUs number allocated for current container. This
 // results in spawning many workers while only 1-2 of them really needed.
 if (env.CI) {
-  config.workersCount = 2
+  config.workersCount = 2;
 }
 
-reactOnRailsProNodeRenderer(config)
+reactOnRailsProNodeRenderer(config);
 ```
 
-## Instructions for using a branch
+Add a script to your `package.json`:
 
-Install the node-renderer executable, possibly globally. Substitute the branch name or tag for `master`
+```json
+{
+  "scripts": {
+    "node-renderer": "node ./react-on-rails-pro-node-renderer.js"
+  }
+}
 ```
-yarn global add https://<your-github-token>:x-oauth-basic@github.com/shakacode/react_on_rails_pro.git\#master
-```
 
-This installs a binary `node-renderer`.
-
-### Using Github packages
-
-Login into npm
+Start the renderer:
 
 ```bash
-npm install @shakacode-tools/react-on-rails-pro-node-renderer@<version>
-```                      
+npm run node-renderer
+```
 
-or edit package.json directly
-```json
-"@shakacode-tools/react-on-rails-pro-node-renderer": "<version>"
-```                     
+## Rails Configuration for Node Renderer
 
-### Configuration
-See [NodeRenderer JavaScript Configuration](./node-renderer/js-configuration.md).
+Configure Rails to use the remote node renderer:
 
-#### Webpack Configuration
+```ruby
+# config/initializers/react_on_rails_pro.rb
+ReactOnRailsPro.configure do |config|
+  config.server_renderer = "NodeRenderer"
+
+  # Configure renderer connection
+  config.renderer_url = ENV["REACT_RENDERER_URL"] || "http://localhost:3800"
+  config.renderer_password = ENV["RENDERER_PASSWORD"] || "changeme"
+
+  # Enable prerender caching (recommended)
+  config.prerender_caching = true
+end
+```
+
+### Configuration Options
+
+See [Rails Configuration Options](./configuration.md) for all available settings.
+
+Pay attention to:
+
+- `config.server_renderer = "NodeRenderer"` - Required to use node renderer
+- `config.renderer_url` - URL where your node renderer is running
+- `config.renderer_password` - Shared secret for authentication
+- `config.prerender_caching` - Enable caching (recommended)
+
+## Webpack Configuration
+
 Set your server bundle webpack configuration to use a target of `node` per the [Webpack docs](https://webpack.js.org/concepts/targets/#usage).
 
-## Authentication when using Github packages
-[Auth for the npm package](https://docs.github.com/en/packages/using-github-packages-with-your-projects-ecosystem/configuring-npm-for-use-with-github-packages#authenticating-to-github-packages)
+## Additional Documentation
 
-Create a new ~/.npmrc file if one doesn't exist.
-```
-//npm.pkg.github.com/:_authToken=TOKEN
-```                  
-
-To configure bundler if you don't want the token in your Gemfile:
-```
-bundle config https://rubygems.pkg.github.com/OWNER USERNAME:TOKEN
-``` 
+- [Node Renderer Basics](./node-renderer/basics.md)
+- [Node Renderer JavaScript Configuration](./node-renderer/js-configuration.md)
+- [Rails Configuration Options](./configuration.md)
+- [Error Reporting and Tracing](./node-renderer/error-reporting-and-tracing.md)

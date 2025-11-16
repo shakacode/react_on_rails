@@ -1,0 +1,83 @@
+{
+  "name": "react-on-rails-pro",
+  "version": "16.2.0-beta.4",
+  "description": "React on Rails Pro package with React Server Components support",
+  "type": "module",
+  "scripts": {
+    "build": "yarn run clean &&  yarn run tsc",
+    "build-watch": "yarn run clean && yarn run tsc --watch",
+    "clean": "rm -rf ./lib",
+    "test": "yarn test:non-rsc && yarn test:rsc",
+    "test:non-rsc": "jest tests --testPathIgnorePatterns=\".*(.rsc.test.).*\"",
+    "test:rsc": "NODE_CONDITIONS=react-server jest tests/*.rsc.test.*",
+    "type-check": "yarn run tsc --noEmit --noErrorTruncation",
+    "prepack": "nps build.prepack",
+    "prepare": "nps build.prepack",
+    "prepublishOnly": "yarn run build",
+    "yalc:publish": "yalc publish",
+    "yalc": "yalc"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shakacode/react_on_rails.git"
+  },
+  "keywords": [
+    "react",
+    "react-server-components",
+    "rsc",
+    "server-components",
+    "react-on-rails",
+    "pro"
+  ],
+  "author": "justin.gordon@gmail.com",
+  "license": "UNLICENSED",
+  "exports": {
+    ".": {
+      "react-server": "./lib/ReactOnRailsRSC.js",
+      "node": "./lib/ReactOnRails.node.js",
+      "default": "./lib/ReactOnRails.full.js"
+    },
+    "./client": "./lib/ReactOnRails.client.js",
+    "./ReactOnRails.client": "./lib/ReactOnRails.client.js",
+    "./ReactOnRails.full": "./lib/ReactOnRails.full.js",
+    "./ReactOnRails.node": "./lib/ReactOnRails.node.js",
+    "./registerServerComponent/client": "./lib/registerServerComponent/client.js",
+    "./registerServerComponent/server": {
+      "react-server": "./lib/registerServerComponent/server.rsc.js",
+      "default": "./lib/registerServerComponent/server.js"
+    },
+    "./wrapServerComponentRenderer/client": "./lib/wrapServerComponentRenderer/client.js",
+    "./wrapServerComponentRenderer/server": {
+      "react-server": "./lib/wrapServerComponentRenderer/server.rsc.js",
+      "default": "./lib/wrapServerComponentRenderer/server.js"
+    },
+    "./RSCRoute": "./lib/RSCRoute.js",
+    "./RSCProvider": "./lib/RSCProvider.js",
+    "./ServerComponentFetchError": "./lib/ServerComponentFetchError.js"
+  },
+  "dependencies": {
+    "react-on-rails": "16.2.0-beta.4"
+  },
+  "peerDependencies": {
+    "react": ">= 16",
+    "react-dom": ">= 16",
+    "react-on-rails-rsc": "19.0.2"
+  },
+  "peerDependenciesMeta": {
+    "react-on-rails-rsc": {
+      "optional": true
+    }
+  },
+  "files": [
+    "lib/**/*.js",
+    "lib/**/*.d.ts"
+  ],
+  "bugs": {
+    "url": "https://github.com/shakacode/react_on_rails/issues"
+  },
+  "homepage": "https://github.com/shakacode/react_on_rails#readme",
+  "devDependencies": {
+    "@types/mock-fs": "^4.13.4",
+    "mock-fs": "^5.5.0"
+  }
+}

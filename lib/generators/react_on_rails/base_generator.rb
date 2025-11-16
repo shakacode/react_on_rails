@@ -19,6 +19,12 @@ module ReactOnRails
                    desc: "Install Redux package and Redux version of Hello World Example",
                    aliases: "-R"
 
+      # --rspack
+      class_option :rspack,
+                   type: :boolean,
+                   default: false,
+                   desc: "Use Rspack instead of Webpack as the bundler"
+
       def add_hello_world_route
         route "get 'hello_world', to: 'hello_world#index'"
       end
@@ -37,12 +43,16 @@ module ReactOnRails
                         app/views/layouts/hello_world.html.erb
                         Procfile.dev
                         Procfile.dev-static-assets
-                        Procfile.dev-prod-assets]
+                        Procfile.dev-prod-assets
+                        bin/shakapacker-precompile-hook]
         base_templates = %w[config/initializers/react_on_rails.rb]
         base_files.each { |file| copy_file("#{base_path}#{file}", file) }
         base_templates.each do |file|
           template("#{base_path}/#{file}.tt", file)
         end
+
+        # Make the hook script executable (copy_file guarantees it exists)
+        File.chmod(0o755, File.join(destination_root, "bin/shakapacker-precompile-hook"))
       end
 
       def copy_js_bundle_files
@@ -82,6 +92,7 @@ module ReactOnRails
         if File.exist?(".shakapacker_just_installed")
           puts "Skipping Shakapacker config copy (already installed by Shakapacker installer)"
           File.delete(".shakapacker_just_installed") # Clean up marker
+          configure_rspack_in_shakapacker if options.rspack?
           return
         end
 
@@ -89,6 +100,7 @@ module ReactOnRails
         base_path = "base/base/"
         config = "config/shakapacker.yml"
         copy_file("#{base_path}#{config}", config)
+        configure_rspack_in_shakapacker if options.rspack?
       end
 
       def add_base_gems_to_gemfile
@@ -391,6 +403,30 @@ module ReactOnRails
       def add_configure_rspec_to_compile_assets(helper_file)
         search_str = "RSpec.configure do |config|"
         gsub_file(helper_file, search_str, CONFIGURE_RSPEC_TO_COMPILE_ASSETS)
+      end
+
+      def configure_rspack_in_shakapacker
+        shakapacker_config_path = "config/shakapacker.yml"
+        return unless File.exist?(shakapacker_config_path)
+
+        puts Rainbow("🔧 Configuring Shakapacker for Rspack...").yellow
+
+        # Parse YAML config properly to avoid fragile regex manipulation
+        # Support both old and new Psych versions
+        config = begin
+          YAML.load_file(shakapacker_config_path, aliases: true)
+        rescue ArgumentError
+          # Older Psych versions don't support the aliases parameter
+          YAML.load_file(shakapacker_config_path)
+        end
+        # Update default section
+        config["default"] ||= {}
+        config["default"]["assets_bundler"] = "rspack"
+        config["default"]["webpack_loader"] = "swc"
+
+        # Write back as YAML
+        File.write(shakapacker_config_path, YAML.dump(config))
+        puts Rainbow("✅ Updated shakapacker.yml for Rspack").green
       end
     end
   end

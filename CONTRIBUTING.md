@@ -14,6 +14,7 @@ During this transition:
 
 - [docs/contributor-info/Releasing](./docs/contributor-info/releasing.md) for instructions on releasing.
 - [docs/contributor-info/pull-requests](./docs/contributor-info/pull-requests.md)
+- [docs/contributor-info/rbs-type-signatures](./docs/contributor-info/rbs-type-signatures.md) for information on RBS type signatures
 - See other docs in [docs/contributor-info](./docs/contributor-info)
 
 ## Prerequisites
@@ -49,59 +50,68 @@ It's critical to configure your IDE/editor to ignore certain directories. Otherw
 - /spec/dummy/tmp
 - /spec/react_on_rails/dummy-for-generators
 
-# Configuring your test app to use your local fork
+# Example apps
 
-You can test the `react-on-rails` gem using your own external test app or the gem's internal `spec/dummy` app. The `spec/dummy` app is an example of the various setup techniques you can use with the gem.
+The [`spec/dummy` app](https://github.com/shakacode/react_on_rails/blob/master/spec/dummy) is an example of the various setup techniques you can use with the gem.
 
-```text
-├── test_app
-|    └── client
-└── react_on_rails
-    └── spec
-        └── dummy
-```
+There are also two such apps for React on Rails Pro: [one using the Node renderer](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/spec/dummy) and [one using ExecJS](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/spec/execjs-compatible-dummy).
 
-## Testing the Ruby Gem
+When you add a new feature, consider adding an example demonstrating it to the example apps.
 
-If you want to test the ruby parts of the gem with an application before you release a new version of the gem, you can specify the path to your local version via your test app's Gemfile:
+# Testing your changes in an external application
+
+You may also want to test your React on Rails changes with your own application.
+There are three main ways to do it: using local dependencies, Git dependencies, or tarballs.
+
+## Local version
+
+### Ruby
+
+To make your Rails app use a local version of our gems, use
 
 ```ruby
-gem "react_on_rails", path: "../path-to-react-on-rails"
+gem "react_on_rails", path: "<React on Rails root>"
 ```
 
-Note that you will need to bundle install after making this change, but also that **you will need to restart your Rails application if you make any changes to the gem**.
+and/or
 
-## Testing the Node package for React on Rails via Yalc
+```ruby
+gem "react_on_rails_pro", path: "<React on Rails root>/react_on_rails_pro"
+```
 
-In addition to testing the Ruby parts out, you can also test the Node package parts of the gem with an external application. First, be **sure** to build the NPM package:
+Note that you will need to run `bundle install` after making this change, but also that **you will need to restart your Rails application if you make any changes to the gem**.
+
+### JS
+
+First, be **sure** to build the NPM package:
 
 ```sh
-cd react_on_rails/
+cd <React on Rails root>
 yarn
 
 # Update the lib directory with babel compiled files
 yarn run build-watch
 ```
 
-You need to do this once:
+You need to do this once to make sure your app depends on our package:
 
-```
-# Will send the updates to other folders
+```shell
+cd <React on Rails root>/packages/react-on-rails
 yalc publish
-cd spec/dummy
+cd <your project root>
 yalc add react-on-rails
 ```
 
 The workflow is:
 
 1. Make changes to the node package.
-2. **CRITICAL**: Run yalc push to send updates to all linked apps:
+2. **CRITICAL**: Run `yalc push` to send updates to all linked apps:
 
-```
-cd <top dir>
+```shell
+cd <React on Rails root>/packages/react-on-rails
 # Will send the updates to other folders - MUST DO THIS AFTER ANY CHANGES
 yalc push
-cd spec/dummy
+cd <your project root>
 
 # Will update from yalc
 yarn
@@ -111,18 +121,77 @@ yarn
 
 When you run `yalc push`, you'll get an informative message
 
-```
-✗ yalc push
+```terminaloutput
+$ yalc push
 react-on-rails@12.0.0-12070fd1 published in store.
 Pushing react-on-rails@12.0.0 in /Users/justin/shakacode/react-on-rails/react_on_rails/spec/dummy
 Package react-on-rails@12.0.0-12070fd1 added ==> /Users/justin/shakacode/react-on-rails/react_on_rails/spec/dummy/node_modules/react-on-rails.
 Don't forget you may need to run yarn after adding packages with yalc to install/update dependencies/bin scripts.
 ```
 
-#### Example: Testing NPM changes with the dummy app
+Of course, you can do the same with `react-on-rails-pro` and `react-on-rails-pro-node-renderer` packages.
 
-1. Add `console.log('Hello!')` to [clientStartup.ts, function render](https://github.com/shakacode/react_on_rails/blob/master/packages/react-on-rails/src/clientStartup.ts) in `/packages/react-on-rails/src/clientStartup.ts` to confirm we're getting an update to the node package client side. Do the same for function `serverRenderReactComponent` in [/packages/react-on-rails/src/serverRenderReactComponent.ts](https://github.com/shakacode/react_on_rails/blob/master/packages/react-on-rails/src/serverRenderReactComponent.ts).
-2. Refresh the browser if the server is already running or start the server using `foreman start` from `react_on_rails/spec/dummy` and navigate to `http://localhost:5000/`. You will now see the `Hello!` message printed in the browser's console. If you did not see that message, then review the steps above for the workflow of making changes and pushing them via yalc.
+This is the approach `spec/dummy` apps use, so you can also look at their implementation.
+
+### Example: Testing NPM changes with the dummy app
+
+1. Add `console.log('Hello!')` to [clientStartup.ts, function render](https://github.com/shakacode/react_on_rails/blob/master/packages/react-on-rails/src/clientStartup.ts) in `/packages/react-on-rails/src/clientStartup.ts` to confirm we're getting an update to the node package client-side. Do the same for function `serverRenderReactComponent` in [/packages/react-on-rails/src/serverRenderReactComponent.ts](https://github.com/shakacode/react_on_rails/blob/master/packages/react-on-rails/src/serverRenderReactComponent.ts).
+2. Refresh the browser if the server is already running or start the server using `foreman start` from `react_on_rails/spec/dummy` and navigate to `http://localhost:3000/`. You will now see the `Hello!` message printed in the browser's console. If you did not see that message, then review the steps above for the workflow of making changes and pushing them via yalc.
+
+## Git dependencies
+
+If you push your local changes to Git, you can use them as dependencies as follows:
+
+### Ruby
+
+Adjust depending on the repo you pushed to and commit/branch you want to use, see [Bundler documentation](https://bundler.io/guides/git.html):
+
+```ruby
+gem 'react_on_rails',
+  git: 'https://github.com/shakacode/react_on_rails',
+  branch: 'master'
+gem 'react_on_rails_pro',
+  git: 'https://github.com/shakacode/react_on_rails',
+  glob: 'react_on_rails_pro/react_on_rails_pro.gemspec',
+  branch: 'master'
+```
+
+### JS
+
+Unfortunately, not all package managers allow depending on a single subfolder of a Git repo.
+The examples below are for the `master` branch of `react-on-rails` package.
+
+#### Yarn Berry
+
+See [Yarn Git protocol documentation](https://yarnpkg.com/protocol/git#workspaces-support).
+
+```shell
+yarn add "git@github.com:shakacode/react_on_rails.git#workspace=react-on-rails&head=master"
+```
+
+#### PNPM (starting from v9)
+
+See [this issue](https://github.com/pnpm/pnpm/issues/4765).
+
+```shell
+pnpm add "github:shakacode/react_on_rails/repo#master&path:packages/react-on-rails"
+```
+
+#### NPM
+
+[Explicitly doesn't want to support it.](https://github.com/npm/cli/issues/6253)
+
+## Tarball
+
+This method works only for JS packages, not for Ruby gems.
+
+Run `yarn pack` in the package you modified, copy the generated file into your app or upload it somewhere, and run
+
+```shell
+npm install <tarball path/URL>
+```
+
+or the equivalent command for your package manager.
 
 # Development Setup for Gem and Node Package Contributors
 
@@ -253,6 +322,152 @@ Run `rake -T` or `rake -D` to see testing options.
 `rake all_but_examples` is typically best for developers, except if any generators changed.
 
 See below for verifying changes to the generators.
+
+## CI Testing and Optimization
+
+React on Rails uses an optimized CI pipeline that runs faster on branches while maintaining full coverage on `master`. Contributors have access to local CI tools to validate changes before pushing.
+
+### CI Behavior
+
+- **On PRs/Branches**: Runs reduced test matrix (latest Ruby/Node versions only) for faster feedback (~12 min vs ~45 min)
+- **On Master**: Runs full test matrix (all Ruby/Node/dependency combinations) for complete coverage
+- **Docs-only changes**: CI skips entirely when only `.md` files or `docs/` directory change
+
+### Local CI Tools
+
+#### `bin/ci-local` - Smart Local CI Runner
+
+Analyzes your changes and runs appropriate tests locally before pushing:
+
+```bash
+# Auto-detect what to test based on changed files
+bin/ci-local
+
+# Run all CI checks (same as master branch)
+bin/ci-local --all
+
+# Quick check - only fast tests, skip slow integration tests
+bin/ci-local --fast
+
+# Compare against a different branch
+bin/ci-local origin/develop
+```
+
+**Benefits:**
+
+- Catches CI failures before pushing
+- Skips irrelevant tests (e.g., Ruby tests when only JS changed)
+- Provides clear summary of what passed/failed
+
+#### `script/ci-changes-detector` - Change Analysis
+
+Analyzes git changes and recommends which CI jobs to run:
+
+```bash
+# Check what changed since master
+script/ci-changes-detector origin/master
+
+# JSON output for scripting (requires jq)
+CI_JSON_OUTPUT=1 script/ci-changes-detector origin/master
+```
+
+**Output example:**
+
+```
+=== CI Changes Analysis ===
+Changed file categories:
+  • Ruby source code
+  • JavaScript/TypeScript code
+
+Recommended CI jobs:
+  ✓ Lint (Ruby + JS)
+  ✓ RSpec gem tests
+  ✓ JS unit tests
+```
+
+#### `/run-ci` - Claude Code Command
+
+If using Claude Code, run `/run-ci` for interactive CI execution that:
+
+1. Analyzes your changes
+2. Shows recommended CI jobs
+3. Asks which tests to run
+4. Executes and reports results
+
+### CI Best Practices
+
+✅ **DO:**
+
+- Run `bin/ci-local` before pushing to catch issues early
+- Use `bin/ci-local --fast` during rapid iteration
+- Trust the reduced matrix on PRs - master validates everything
+- Separate docs-only changes into dedicated commits/PRs when possible
+
+❌ **DON'T:**
+
+- Push without running local tests first
+- Mix code and docs changes if you want docs to skip CI
+- Expect PR CI to catch minimum Ruby/Node version issues (use `bin/ci-local --all` for that)
+
+### Understanding CI Optimizations
+
+The CI system intelligently skips unnecessary work:
+
+| Change Type                | CI Behavior           | Time Saved |
+| -------------------------- | --------------------- | ---------- |
+| Docs only (`.md`, `docs/`) | Skips all CI          | 100%       |
+| Ruby code only             | Skips JS tests        | ~30%       |
+| JS code only               | Skips Ruby-only tests | ~30%       |
+| Workflow changes           | Runs lint only        | ~75%       |
+
+For more details, see [`docs/CI_OPTIMIZATION.md`](./docs/CI_OPTIMIZATION.md).
+
+### CI Control Commands
+
+React on Rails provides PR comment commands to control CI behavior:
+
+#### `/run-skipped-ci` - Enable Full CI Mode
+
+Runs all skipped CI checks and enables full CI mode for the PR:
+
+```
+/run-skipped-ci
+```
+
+**What it does:**
+
+- Triggers all CI workflows that were skipped due to unchanged code
+- Adds the `full-ci` label to the PR
+- **Persists across future commits** - all subsequent pushes will run the full test suite
+- Runs minimum dependency tests (Ruby 3.2, Node 20, Shakapacker 8.2.0, React 18)
+
+**When to use:**
+
+- You want comprehensive testing across all configurations
+- Testing changes that might affect minimum supported versions
+- Validating generator changes or core functionality
+- Before merging PRs that touch critical paths
+
+#### `/stop-run-skipped-ci` - Disable Full CI Mode
+
+Removes the `full-ci` label and returns to standard CI behavior:
+
+```
+/stop-run-skipped-ci
+```
+
+**What it does:**
+
+- Removes the `full-ci` label from the PR
+- Future commits will use the optimized CI suite (tests only changed code)
+- Does not stop currently running workflows
+
+**When to use:**
+
+- You've validated changes with full CI and want to return to faster feedback
+- Reducing CI time during rapid iteration on a PR
+
+**Note:** The `full-ci` label is preserved on merged PRs as a historical record of which PRs ran with comprehensive testing.
 
 ### Install Generator
 

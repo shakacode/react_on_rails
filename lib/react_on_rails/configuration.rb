@@ -9,8 +9,6 @@ module ReactOnRails
   end
 
   DEFAULT_GENERATED_ASSETS_DIR = File.join(%w[public webpack], Rails.env).freeze
-  DEFAULT_REACT_CLIENT_MANIFEST_FILE = "react-client-manifest.json"
-  DEFAULT_REACT_SERVER_CLIENT_MANIFEST_FILE = "react-server-client-manifest.json"
   DEFAULT_COMPONENT_REGISTRY_TIMEOUT = 5000
 
   def self.configuration
@@ -20,9 +18,6 @@ module ReactOnRails
       # generated_assets_dirs is deprecated
       generated_assets_dir: "",
       server_bundle_js_file: "",
-      rsc_bundle_js_file: "",
-      react_client_manifest_file: DEFAULT_REACT_CLIENT_MANIFEST_FILE,
-      react_server_client_manifest_file: DEFAULT_REACT_SERVER_CLIENT_MANIFEST_FILE,
       prerender: false,
       auto_load_bundle: false,
       replay_console: true,
@@ -46,8 +41,6 @@ module ReactOnRails
       components_subdirectory: nil,
       make_generated_server_bundle_the_entrypoint: false,
       defer_generated_component_packs: false,
-      # React on Rails Pro (licensed) feature - enables immediate hydration of React components
-      immediate_hydration: false,
       # Maximum time in milliseconds to wait for client-side component registration after page load.
       # If exceeded, an error will be thrown for server-side rendered components not registered on the client.
       # Set to 0 to disable the timeout and wait indefinitely for component registration.
@@ -56,9 +49,6 @@ module ReactOnRails
       server_bundle_output_path: "ssr-generated",
       enforce_private_server_bundles: false
     )
-    # TODO: Add automatic detection of server_bundle_output_path from shakapacker.yml
-    # See feature/shakapacker-yml-integration branch for implementation
-    # Requires Shakapacker v8.5.0+ and semantic version checking
   end
 
   class Configuration
@@ -72,9 +62,54 @@ module ReactOnRails
                   :server_render_method, :random_dom_id, :auto_load_bundle,
                   :same_bundle_for_client_and_server, :rendering_props_extension,
                   :make_generated_server_bundle_the_entrypoint,
-                  :generated_component_packs_loading_strategy, :immediate_hydration, :rsc_bundle_js_file,
-                  :react_client_manifest_file, :react_server_client_manifest_file, :component_registry_timeout,
+                  :generated_component_packs_loading_strategy,
+                  :component_registry_timeout,
                   :server_bundle_output_path, :enforce_private_server_bundles
+
+    # Class instance variable and mutex to track if deprecation warning has been shown
+    # Using mutex to ensure thread-safety in multi-threaded environments
+    @immediate_hydration_warned = false
+    @immediate_hydration_mutex = Mutex.new
+
+    class << self
+      attr_accessor :immediate_hydration_warned, :immediate_hydration_mutex
+    end
+
+    # Deprecated: immediate_hydration configuration has been removed
+    def immediate_hydration=(value)
+      warned = false
+      self.class.immediate_hydration_mutex.synchronize do
+        warned = self.class.immediate_hydration_warned
+        self.class.immediate_hydration_warned = true unless warned
+      end
+
+      return if warned
+
+      Rails.logger.warn <<~WARNING
+        [REACT ON RAILS] The 'config.immediate_hydration' configuration option is deprecated and no longer used.
+        Immediate hydration is now automatically enabled for React on Rails Pro users.
+        Please remove 'config.immediate_hydration = #{value}' from your config/initializers/react_on_rails.rb file.
+        See CHANGELOG.md for migration instructions.
+      WARNING
+    end
+
+    def immediate_hydration
+      warned = false
+      self.class.immediate_hydration_mutex.synchronize do
+        warned = self.class.immediate_hydration_warned
+        self.class.immediate_hydration_warned = true unless warned
+      end
+
+      return nil if warned
+
+      Rails.logger.warn <<~WARNING
+        [REACT ON RAILS] The 'config.immediate_hydration' configuration option is deprecated and no longer used.
+        Immediate hydration is now automatically enabled for React on Rails Pro users.
+        Please remove any references to 'config.immediate_hydration' from your config/initializers/react_on_rails.rb file.
+        See CHANGELOG.md for migration instructions.
+      WARNING
+      nil
+    end
 
     # rubocop:disable Metrics/AbcSize
     def initialize(node_modules_location: nil, server_bundle_js_file: nil, prerender: nil,
@@ -89,8 +124,7 @@ module ReactOnRails
                    same_bundle_for_client_and_server: nil,
                    i18n_dir: nil, i18n_yml_dir: nil, i18n_output_format: nil, i18n_yml_safe_load_options: nil,
                    random_dom_id: nil, server_render_method: nil, rendering_props_extension: nil,
-                   components_subdirectory: nil, auto_load_bundle: nil, immediate_hydration: nil,
-                   rsc_bundle_js_file: nil, react_client_manifest_file: nil, react_server_client_manifest_file: nil,
+                   components_subdirectory: nil, auto_load_bundle: nil,
                    component_registry_timeout: nil, server_bundle_output_path: nil, enforce_private_server_bundles: nil)
       self.node_modules_location = node_modules_location.present? ? node_modules_location : Rails.root
       self.generated_assets_dirs = generated_assets_dirs
@@ -119,9 +153,6 @@ module ReactOnRails
 
       # Server rendering:
       self.server_bundle_js_file = server_bundle_js_file
-      self.rsc_bundle_js_file = rsc_bundle_js_file
-      self.react_client_manifest_file = react_client_manifest_file
-      self.react_server_client_manifest_file = react_server_client_manifest_file
       self.same_bundle_for_client_and_server = same_bundle_for_client_and_server
       self.server_renderer_pool_size = self.development_mode ? 1 : server_renderer_pool_size
       self.server_renderer_timeout = server_renderer_timeout # seconds
@@ -134,7 +165,6 @@ module ReactOnRails
       self.auto_load_bundle = auto_load_bundle
       self.make_generated_server_bundle_the_entrypoint = make_generated_server_bundle_the_entrypoint
       self.defer_generated_component_packs = defer_generated_component_packs
-      self.immediate_hydration = immediate_hydration
       self.generated_component_packs_loading_strategy = generated_component_packs_loading_strategy
       self.server_bundle_output_path = server_bundle_output_path
       self.enforce_private_server_bundles = enforce_private_server_bundles
@@ -184,12 +214,13 @@ module ReactOnRails
 
       msg = <<~MSG
         ReactOnRails: Your current version of shakapacker \
-        does not support async script loading,  which may cause performance issues. Please either:
-        1. Use :sync or :defer loading strategy instead of :async
+        does not support async script loading. Please either:
+        1. Use :defer or :sync loading strategy instead of :async
         2. Upgrade to Shakapacker v8.2.0 or above to enable async script loading
       MSG
       if PackerUtils.supports_async_loading?
-        self.generated_component_packs_loading_strategy ||= :async
+        # Default based on Pro license: Pro users get :async, non-Pro users get :defer
+        self.generated_component_packs_loading_strategy ||= (Utils.react_on_rails_pro? ? :async : :defer)
       elsif generated_component_packs_loading_strategy.nil?
         Rails.logger.warn("**WARNING** #{msg}")
         self.generated_component_packs_loading_strategy = :sync
@@ -247,7 +278,14 @@ module ReactOnRails
       raise(ReactOnRails::Error, compile_command_conflict_message) if ReactOnRails::PackerUtils.precompile?
 
       precompile_tasks = lambda {
-        Rake::Task["react_on_rails:generate_packs"].invoke
+        # Skip generate_packs if shakapacker has a precompile hook configured
+        if ReactOnRails::PackerUtils.shakapacker_precompile_hook_configured?
+          hook_value = ReactOnRails::PackerUtils.shakapacker_precompile_hook_value
+          puts "Skipping react_on_rails:generate_packs (configured in shakapacker precompile hook: #{hook_value})"
+        else
+          Rake::Task["react_on_rails:generate_packs"].invoke
+        end
+
         Rake::Task["react_on_rails:assets:webpack"].invoke
 
         # VERSIONS is per the shakacode/shakapacker clean method definition.

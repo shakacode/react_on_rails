@@ -102,6 +102,16 @@ module ReactOnRails
         expect(generated_server_bundle_content).not_to include("#{component_name}.client.jsx")
         expect(generated_server_bundle_content).not_to include("#{component_name}.server.jsx")
       end
+
+      it "uses react-on-rails package when pro is not available" do
+        generated_server_bundle_content = File.read(generated_server_bundle_file_path)
+        pack_content = File.read(component_pack)
+
+        expect(generated_server_bundle_content).to include("import ReactOnRails from 'react-on-rails';")
+        expect(generated_server_bundle_content).not_to include("import ReactOnRails from 'react-on-rails-pro';")
+        expect(pack_content).to include("import ReactOnRails from 'react-on-rails/client';")
+        expect(pack_content).not_to include("import ReactOnRails from 'react-on-rails-pro/client';")
+      end
     end
 
     context "when component with client and common File" do
@@ -224,8 +234,13 @@ module ReactOnRails
         stub_packer_source_path(component_name: components_directory,
                                 packer_source_path: packer_source_path)
         allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
-        allow(ReactOnRailsPro.configuration).to receive_messages(
-          enable_rsc_support: true
+        stub_const("ReactOnRailsPro::Utils", Class.new do
+          def self.rsc_support_enabled?
+            true
+          end
+        end)
+        allow(ReactOnRailsPro::Utils).to receive_messages(
+          rsc_support_enabled?: true
         )
       end
 
@@ -239,7 +254,7 @@ module ReactOnRails
           component_pack = "#{generated_directory}/#{component_name}.js"
           pack_content = File.read(component_pack)
           expected_content = <<~CONTENT.strip
-            import registerServerComponent from 'react-on-rails/registerServerComponent/client';
+            import registerServerComponent from 'react-on-rails-pro/registerServerComponent/client';
 
             registerServerComponent("#{component_name}");
           CONTENT
@@ -257,7 +272,7 @@ module ReactOnRails
           component_name = "ReactClientComponentWithClientAndServer"
           component_pack = "#{generated_directory}/#{component_name}.js"
           pack_content = File.read(component_pack)
-          expect(pack_content).to include("import ReactOnRails from 'react-on-rails/client';")
+          expect(pack_content).to include("import ReactOnRails from 'react-on-rails-pro/client';")
           expect(pack_content).to include("ReactOnRails.register({#{component_name}});")
           expect(pack_content).not_to include("registerServerComponent")
         end
@@ -273,7 +288,7 @@ module ReactOnRails
           component_pack = "#{generated_directory}/#{component_name}.js"
           pack_content = File.read(component_pack)
           expected_content = <<~CONTENT.strip
-            import registerServerComponent from 'react-on-rails/registerServerComponent/client';
+            import registerServerComponent from 'react-on-rails-pro/registerServerComponent/client';
 
             registerServerComponent("#{component_name}");
           CONTENT
@@ -291,7 +306,7 @@ module ReactOnRails
           component_name = "ReactClientComponent"
           component_pack = "#{generated_directory}/#{component_name}.js"
           pack_content = File.read(component_pack)
-          expect(pack_content).to include("import ReactOnRails from 'react-on-rails/client';")
+          expect(pack_content).to include("import ReactOnRails from 'react-on-rails-pro/client';")
           expect(pack_content).to include("ReactOnRails.register({#{component_name}});")
           expect(pack_content).not_to include("registerServerComponent")
         end
@@ -299,7 +314,7 @@ module ReactOnRails
 
       context "when RSC support is disabled" do
         before do
-          allow(ReactOnRailsPro.configuration).to receive(:enable_rsc_support).and_return(false)
+          allow(ReactOnRailsPro::Utils).to receive(:rsc_support_enabled?).and_return(false)
           described_class.instance.generate_packs_if_stale
         end
 
@@ -307,7 +322,7 @@ module ReactOnRails
           component_name = "ReactServerComponent"
           component_pack = "#{generated_directory}/#{component_name}.js"
           pack_content = File.read(component_pack)
-          expect(pack_content).to include("import ReactOnRails from 'react-on-rails/client';")
+          expect(pack_content).to include("import ReactOnRails from 'react-on-rails-pro/client';")
           expect(pack_content).to include("ReactOnRails.register({#{component_name}});")
           expect(pack_content).not_to include("registerServerComponent")
         end
@@ -341,14 +356,14 @@ module ReactOnRails
           )
           generated_server_bundle_content = File.read(generated_server_bundle_path)
           expected_content = <<~CONTENT.strip
-            import ReactOnRails from 'react-on-rails';
+            import ReactOnRails from 'react-on-rails-pro';
 
             import ReactClientComponent from '../components/ReactServerComponents/ror_components/ReactClientComponent.jsx';
             import ReactServerComponent from '../components/ReactServerComponents/ror_components/ReactServerComponent.jsx';
             import ReactClientComponentWithClientAndServer from '../components/ReactServerComponents/ror_components/ReactClientComponentWithClientAndServer.server.jsx';
             import ReactServerComponentWithClientAndServer from '../components/ReactServerComponents/ror_components/ReactServerComponentWithClientAndServer.server.jsx';
 
-            import registerServerComponent from 'react-on-rails/registerServerComponent/server';
+            import registerServerComponent from 'react-on-rails-pro/registerServerComponent/server';
             registerServerComponent({ReactServerComponent,
             ReactServerComponentWithClientAndServer});
 
@@ -432,6 +447,35 @@ module ReactOnRails
         end.not_to output(GENERATED_PACKS_CONSOLE_OUTPUT_REGEX).to_stdout
         ReactOnRails.configuration.components_subdirectory = old_sub
         ReactOnRails.configuration.auto_load_bundle = old_auto
+      end
+    end
+
+    context "when react_on_rails_pro? is explicitly false" do
+      let(:component_name) { "ComponentWithCommonOnly" }
+      let(:component_pack) { "#{generated_directory}/#{component_name}.js" }
+
+      before do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+        stub_packer_source_path(component_name: component_name,
+                                packer_source_path: packer_source_path)
+        described_class.instance.generate_packs_if_stale
+      end
+
+      it "imports from react-on-rails in server bundle" do
+        generated_server_bundle_content = File.read(generated_server_bundle_file_path)
+        expect(generated_server_bundle_content).to include("import ReactOnRails from 'react-on-rails';")
+        expect(generated_server_bundle_content).not_to include("import ReactOnRails from 'react-on-rails-pro';")
+      end
+
+      it "imports from react-on-rails/client in component pack" do
+        pack_content = File.read(component_pack)
+        expect(pack_content).to include("import ReactOnRails from 'react-on-rails/client';")
+        expect(pack_content).not_to include("import ReactOnRails from 'react-on-rails-pro/client';")
+      end
+
+      it "does not import registerServerComponent" do
+        pack_content = File.read(component_pack)
+        expect(pack_content).not_to include("registerServerComponent")
       end
     end
 

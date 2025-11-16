@@ -1,5 +1,7 @@
 import { createClient, RedisClientType } from 'redis';
 
+const REDIS_LISTENER_TIMEOUT = 15000; // 15 seconds
+
 /**
  * Redis xRead result message structure
  */
@@ -21,321 +23,174 @@ interface RedisStreamResult {
  */
 interface RequestListener {
   getValue: (key: string) => Promise<unknown>;
-  close: () => Promise<void>;
-}
-
-interface PendingPromise {
-  promise: Promise<unknown>;
-  resolve: (value: unknown) => void;
-  reject: (reason: unknown) => void;
-  timer: NodeJS.Timeout;
-  resolved?: boolean;
-}
-
-// Shared Redis client
-let sharedRedisClient: RedisClientType | null = null;
-let isClientConnected = false;
-
-// Store active listeners by requestId
-const activeListeners: Record<string, RequestListener | undefined> = {};
-
-// Store pending promises
-const pendingPromises: Record<string, PendingPromise | undefined> = {};
-
-/**
- * Gets or creates the shared Redis client
- */
-async function getRedisClient() {
-  if (!sharedRedisClient) {
-    const url = process.env.REDIS_URL || 'redis://localhost:6379';
-    sharedRedisClient = createClient({ url });
-  }
-
-  if (!isClientConnected) {
-    await sharedRedisClient.connect();
-    isClientConnected = true;
-  }
-
-  return sharedRedisClient;
-}
-
-/**
- * Closes the shared Redis client
- */
-async function closeRedisClient() {
-  if (sharedRedisClient && isClientConnected) {
-    await sharedRedisClient.quit();
-    isClientConnected = false;
-  }
+  destroy: () => void;
 }
 
 /**
  * Listens to a Redis stream for data based on a requestId
  * @param requestId - The stream key to listen on
- * @returns An object with a getValue function to get values by key
+ * @returns An object with a getValue function to get values by key and a close function
  */
 export function listenToRequestData(requestId: string): RequestListener {
-  // If a listener for this requestId already exists, return it
-  const existingListener = activeListeners[requestId];
-  if (existingListener) {
-    return existingListener;
-  }
-
-  const receivedKeys: string[] = [];
-
-  // Stream key for this request
+  // State - all local to this listener instance
+  const valuesMap = new Map<string, unknown>();
+  const valuePromises = new Map<string, Promise<unknown>>();
   const streamKey = `stream:${requestId}`;
+  let listenToStreamPromise: Promise<void> | null = null;
+  let lastId = '0'; // Start from beginning of stream
+  // True when streams ends and the connection is closed
+  let isClosed = false;
+  // True when user explictly calls destroy, it makes any call to getValue throw immediately
+  let isDestroyed = false;
 
-  // IDs of messages that need to be deleted
-  const messagesToDelete: string[] = [];
-
-  // Track if this listener is active
-  let isActive = true;
-  // Track if we've received the end message
-  let isEnded = false;
+  // Redis client
+  const url = process.env.REDIS_URL || 'redis://localhost:6379';
+  const redisClient: RedisClientType = createClient({ url });
+  let isConnected = false;
 
   /**
-   * Process a message from the Redis stream
+   * Closes the Redis connection and rejects all pending promises
    */
-  function processMessage(message: Record<string, string>, messageId: string) {
-    // Add message to delete queue
-    messagesToDelete.push(messageId);
+  function close() {
+    if (isClosed) return;
+    isClosed = true;
 
-    // Check for end message
-    if ('end' in message) {
-      isEnded = true;
+    // Close client - this will cause xRead to throw, which rejects pending promises
+    try {
+      redisClient.destroy();
+    } finally {
+      isConnected = false;
+    }
+  }
 
-      // Reject any pending promises that haven't been resolved yet
-      Object.entries(pendingPromises).forEach(([key, pendingPromise]) => {
-        if (pendingPromise && !pendingPromise.resolved) {
-          clearTimeout(pendingPromise.timer);
-          pendingPromise.reject(new Error(`Key ${key} not found before stream ended`));
-          pendingPromises[key] = undefined;
-        }
-      });
-
-      return;
+  /**
+   * Listens to the stream for the next batch of messages
+   * Blocks until at least one message arrives
+   * Multiple concurrent calls return the same promise
+   */
+  function listenToStream(): Promise<void> {
+    // Return existing promise if already listening
+    if (listenToStreamPromise) {
+      return listenToStreamPromise;
     }
 
-    // Process each key-value pair in the message
-    Object.entries(message).forEach(([key, value]) => {
-      const parsedValue = JSON.parse(value) as unknown;
-
-      // Remove colon prefix if it exists
-      const normalizedKey = key.startsWith(':') ? key.substring(1) : key;
-      receivedKeys.push(normalizedKey);
-
-      // Resolve any pending promises for this key
-      const pendingPromise = pendingPromises[normalizedKey];
-      if (pendingPromise) {
-        clearTimeout(pendingPromise.timer);
-        pendingPromise.resolve(parsedValue);
-        pendingPromise.resolved = true; // Mark as resolved
-      } else {
-        pendingPromises[normalizedKey] = {
-          promise: Promise.resolve(parsedValue),
-          resolve: () => {},
-          reject: () => {},
-          timer: setTimeout(() => {}, 0),
-          resolved: true, // Mark as resolved immediately
-        };
+    // Create new listening promise
+    const promise = (async (): Promise<void> => {
+      if (isClosed) {
+        throw new Error('Redis Connection is closed');
       }
+
+      // redisClient.connect(); is called only here
+      // And `listenToStream` runs only one promise at a time, so no fear of race condition
+      if (!isConnected) {
+        await redisClient.connect();
+        await redisClient.expire(streamKey, REDIS_LISTENER_TIMEOUT / 1000); // Set TTL to avoid stale streams
+        isConnected = true;
+      }
+
+      // xRead blocks indefinitely until message arrives
+      const result = (await redisClient.xRead(
+        { key: streamKey, id: lastId },
+        { BLOCK: 0 }, // Block indefinitely
+      )) as RedisStreamResult[] | null;
+
+      if (!result || result.length === 0) {
+        return;
+      }
+
+      const [{ messages }] = result;
+
+      let receivedEndMessage = false;
+      for (const { id, message } of messages) {
+        lastId = id;
+
+        // Check for end message
+        if ('end' in message) {
+          receivedEndMessage = true;
+        }
+
+        // Process key-value pairs
+        Object.entries(message).forEach(([key, value]) => {
+          const normalizedKey = key.startsWith(':') ? key.substring(1) : key;
+          const parsedValue = JSON.parse(value) as unknown;
+          valuesMap.set(normalizedKey, parsedValue);
+        });
+      }
+
+      // If end message received, close the connection
+      if (receivedEndMessage) {
+        close();
+      }
+    })();
+
+    listenToStreamPromise = promise.finally(() => {
+      // Reset so next call creates new promise
+      listenToStreamPromise = null;
     });
+
+    return listenToStreamPromise;
   }
 
   /**
-   * Delete processed messages from the stream
+   * Gets a value for a specific key from the Redis stream
+   * Returns the same promise for multiple calls with the same key
+   * @param key - The key to look for in the stream
+   * @returns A promise that resolves when the key is found
    */
-  async function deleteProcessedMessages() {
-    if (messagesToDelete.length === 0 || !isActive) {
-      return;
+  async function getValue(key: string): Promise<unknown> {
+    if (isDestroyed) {
+      throw new Error(`Can't get value for key "${key}" - Redis Connection is destroyed`);
     }
 
-    try {
-      const client = await getRedisClient();
-      await client.xDel(streamKey, messagesToDelete);
-      messagesToDelete.length = 0; // Clear the array
-    } catch (error) {
-      console.error('Error deleting messages from stream:', error);
-    }
-  }
-
-  /**
-   * Check for existing messages in the stream
-   */
-  async function checkExistingMessages() {
-    if (!isActive) {
-      return;
+    // Return existing promise if already requested
+    const valuePromise = valuePromises.get(key);
+    if (valuePromise) {
+      return valuePromise;
     }
 
-    try {
-      const client = await getRedisClient();
-
-      // Read all messages from the beginning of the stream
-      const results = (await client.xRead({ key: streamKey, id: '0' }, { COUNT: 100 })) as
-        | RedisStreamResult[]
-        | null;
-
-      if (results && Array.isArray(results) && results.length > 0) {
-        const [{ messages }] = results;
-
-        // Process each message
-        for (const { id, message } of messages) {
-          processMessage(message, id);
-        }
-
-        // Delete processed messages
-        await deleteProcessedMessages();
-      }
-    } catch (error) {
-      console.error('Error checking existing messages:', error);
-    }
-  }
-
-  /**
-   * Setup a listener for new messages in the stream
-   */
-  async function setupStreamListener() {
-    if (!isActive) {
-      return;
-    }
-
-    try {
-      const client = await getRedisClient();
-
-      // Use $ as the ID to read only new messages
-      let lastId = '$';
-
-      // Start reading from the stream
-      const readStream = async () => {
-        if (!isActive || isEnded) {
-          return;
-        }
-
-        try {
-          const results = (await client.xRead(
-            { key: streamKey, id: lastId },
-            { COUNT: 100, BLOCK: 1000 },
-          )) as RedisStreamResult[] | null;
-
-          if (results && Array.isArray(results) && results.length > 0) {
-            const [{ messages }] = results;
-
-            // Process each message from the stream
-            for (const { id, message } of messages) {
-              lastId = id; // Update the last ID for subsequent reads
-              processMessage(message, id);
-            }
-
-            // Delete processed messages
-            await deleteProcessedMessages();
+    // Create new promise that loops until value is found
+    const promise = (async () => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        while (true) {
+          // Check if value already available
+          if (valuesMap.has(key)) {
+            return valuesMap.get(key);
           }
-        } catch (error) {
-          console.error('Error reading from stream:', error);
-        } finally {
-          void readStream();
-        }
-      };
 
-      void readStream();
-    } catch (error) {
-      console.error('Error setting up stream listener:', error);
-    }
+          // Wait for next batch of messages
+          // eslint-disable-next-line no-await-in-loop
+          await listenToStream();
+        }
+      } catch (error) {
+        throw new Error(
+          `Error getting value for key "${key}": ${(error as Error).message}, stack: ${(error as Error).stack}`,
+        );
+      }
+    })();
+
+    valuePromises.set(key, promise);
+    return promise;
   }
 
-  // Start listening to existing and new messages immediately
-  (async () => {
-    try {
-      await checkExistingMessages();
-      await setupStreamListener();
-    } catch (error) {
-      console.error('Error initializing Redis listener:', error);
-    }
-  })().catch((error: unknown) => {
-    console.error('Error initializing Redis listener:', error);
-  });
+  let globalTimeout: NodeJS.Timeout;
+  /**
+   * Destroys the listener, closing the connection and preventing further getValue calls
+   */
+  function destroy() {
+    if (isDestroyed) return;
+    isDestroyed = true;
 
-  // Create the listener object
-  const listener: RequestListener = {
-    /**
-     * Gets a value for a specific key from the Redis stream
-     * @param key - The key to look for in the stream
-     * @returns A promise that resolves when the key is found
-     */
-    getValue: async (key: string) => {
-      // If we already have a promise for this key, return it
-      const existingPromise = pendingPromises[key];
-      if (existingPromise) {
-        return existingPromise.promise;
-      }
+    // Clear global timeout
+    clearTimeout(globalTimeout);
 
-      // If we've received the end message and don't have this key, reject immediately
-      if (isEnded) {
-        return Promise.reject(new Error(`Key ${key} not available, stream has ended`));
-      }
+    close();
+  }
 
-      // Create a new promise for this key
-      let resolvePromise: ((value: unknown) => void) | undefined;
-      let rejectPromise: ((reason: unknown) => void) | undefined;
+  // Global timeout - destroys listener after 15 seconds
+  globalTimeout = setTimeout(() => {
+    destroy();
+  }, REDIS_LISTENER_TIMEOUT);
 
-      const promise = new Promise<unknown>((resolve, reject) => {
-        resolvePromise = resolve;
-        rejectPromise = reject;
-      });
-
-      // Create a timeout that will reject the promise after 8 seconds
-      const timer = setTimeout(() => {
-        const pendingPromise = pendingPromises[key];
-        if (pendingPromise) {
-          pendingPromise.reject(
-            new Error(`Timeout waiting for key: ${key}, available keys: ${receivedKeys.join(', ')}`),
-          );
-          // Keep the pending promise in the dictionary with the error state
-        }
-      }, 8000);
-
-      // Store the promise and its controllers
-      if (resolvePromise && rejectPromise) {
-        pendingPromises[key] = {
-          promise,
-          resolve: resolvePromise,
-          reject: rejectPromise,
-          timer,
-          resolved: false, // Mark as not resolved initially
-        };
-      }
-
-      return promise;
-    },
-
-    /**
-     * Closes the Redis client connection
-     */
-    close: async () => {
-      isActive = false;
-
-      // Delete this listener from active listeners
-      activeListeners[requestId] = undefined;
-
-      // Reject any pending promises
-      Object.entries(pendingPromises).forEach(([key, pendingPromise]) => {
-        if (pendingPromise) {
-          clearTimeout(pendingPromise.timer);
-          pendingPromise.reject(new Error('Redis connection closed'));
-          pendingPromises[key] = undefined;
-        }
-      });
-
-      // Only close the Redis client if no other listeners are active
-      const hasActiveListeners = Object.values(activeListeners).some(Boolean);
-      if (!hasActiveListeners) {
-        await closeRedisClient();
-      }
-    },
-  };
-
-  // Store the listener in active listeners
-  activeListeners[requestId] = listener;
-
-  return listener;
+  return { getValue, destroy };
 }

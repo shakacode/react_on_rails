@@ -39,10 +39,16 @@ gsub_file_content("../package.json", /"react-dom": "[^"]*",/, '"react-dom": "18.
 gsub_file_content("../spec/dummy/package.json", /"react": "[^"]*",/, '"react": "18.0.0",')
 gsub_file_content("../spec/dummy/package.json", /"react-dom": "[^"]*",/, '"react-dom": "18.0.0",')
 gsub_file_content(
-  "../packages/react-on-rails/package.json",
-  "jest tests",
-  'jest tests --testPathIgnorePatterns=\".*(RSC|stream|' \
-  'registerServerComponent|serverRenderReactComponent|SuspenseHydration).*\"'
+  "../packages/react-on-rails-pro/package.json",
+  /"test:non-rsc": "(?:\\"|[^"])*",/,
+  '"test:non-rsc": "jest tests --testPathIgnorePatterns=\".*(RSC|stream|' \
+  'registerServerComponent|serverRenderReactComponent|SuspenseHydration).*\"",'
+)
+# Make test:rsc script do nothing
+gsub_file_content(
+  "../packages/react-on-rails-pro/package.json",
+  /"test:rsc": "(?:\\"|[^"])*",/,
+  '"test:rsc": "exit 0",'
 )
 # Keep modern JSX transform for React 18+
 # gsub_file_content("../tsconfig.json", "react-jsx", "react")

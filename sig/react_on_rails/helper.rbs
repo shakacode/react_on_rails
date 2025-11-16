@@ -1,0 +1,65 @@
+module ReactOnRails
+  module Helper
+    # Type alias for ActiveSupport::SafeBuffer (html_safe strings)
+    type safe_buffer = String
+
+    COMPONENT_HTML_KEY: String
+
+    # Main helper methods
+    # Returns html_safe string (ActiveSupport::SafeBuffer)
+    def react_component: (
+      String component_name,
+      ?Hash[Symbol, untyped] options
+    ) ?{ () -> untyped } -> safe_buffer
+
+    # Returns hash with html_safe strings (ActiveSupport::SafeBuffer)
+    def react_component_hash: (
+      String component_name,
+      ?Hash[Symbol, untyped] options
+    ) ?{ () -> untyped } -> Hash[String, safe_buffer]
+
+    # Returns html_safe string (ActiveSupport::SafeBuffer)
+    def redux_store: (
+      String store_name,
+      ?Hash[Symbol, untyped] | String props
+    ) -> safe_buffer
+
+    # Returns html_safe string (ActiveSupport::SafeBuffer)
+    def redux_store_hydration_data: () -> safe_buffer
+
+    # Returns html_safe string (ActiveSupport::SafeBuffer)
+    def server_render_js: (
+      String js_expression,
+      ?Hash[Symbol, untyped] options
+    ) -> safe_buffer
+
+    def sanitized_props_string: (Hash[Symbol, untyped] | String props) -> String
+
+    def rails_context: (
+      ?server_side: bool
+    ) -> Hash[Symbol, untyped]
+
+    private
+
+    def internal_react_component: (
+      String component_name,
+      Hash[Symbol, untyped] options
+    ) ?{ () -> untyped } -> Hash[Symbol, untyped]
+
+    def build_react_component_result_for_server_rendered_string: (
+      server_rendered_html: String,
+      component_specification_tag: String,
+      console_script: String,
+      render_options: Hash[Symbol, untyped]
+    ) -> safe_buffer
+
+    def build_react_component_result_for_server_rendered_hash: (
+      server_rendered_html: Hash[String, untyped],
+      component_specification_tag: String,
+      console_script: String,
+      render_options: Hash[Symbol, untyped]
+    ) -> Hash[String, safe_buffer]
+
+    def prepend_render_rails_context: (String result) -> safe_buffer
+  end
+end

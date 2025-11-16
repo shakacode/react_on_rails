@@ -1,6 +1,6 @@
 import React, { Suspense } from 'react';
 import { Routes, Route, Link } from 'react-router-dom';
-import RSCRoute from 'react-on-rails/RSCRoute';
+import RSCRoute from 'react-on-rails-pro/RSCRoute';
 // @ts-expect-error - EchoProps is a JavaScript file without TypeScript types
 import EchoProps from './EchoProps';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -42,6 +42,9 @@ export default function App({ basePath = '/server_router', ...props }: { basePat
             </Link>
           </li>
           <li>
+            <Link to={`${basePath}/redis-receiver-for-testing`}>Redis Receiver For Testing</Link>
+          </li>
+          <li>
             <Link to={`${basePath}/server-component-with-retry`}>Server Component with Retry</Link>
           </li>
         </ul>
@@ -71,6 +74,10 @@ export default function App({ basePath = '/server_router', ...props }: { basePat
             />
             <Route path="client-component" element={<EchoProps {...props} />} />
           </Route>
+          <Route
+            path={`${basePath}/redis-receiver-for-testing`}
+            element={<RSCRoute componentName="RedisReceiver" componentProps={props} />}
+          />
           <Route
             path={`${basePath}/streaming-server-component`}
             element={<RSCRoute componentName="AsyncComponentsTreeForTesting" componentProps={props} />}

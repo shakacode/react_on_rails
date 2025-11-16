@@ -17,6 +17,7 @@ PATH
       connection_pool
       execjs (~> 2.9)
       httpx (~> 1.5)
+      jwt (~> 2.7)
       rainbow
       react_on_rails (>= 16.0.0)
 
@@ -138,6 +139,8 @@ GEM
     jbuilder (2.12.0)
       actionview (>= 5.0.0)
       activesupport (>= 5.0.0)
+    jwt (2.10.2)
+      base64
     logger (1.6.6)
     loofah (2.24.0)
       crass (~> 1.0.2)

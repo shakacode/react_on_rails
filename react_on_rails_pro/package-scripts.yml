@@ -15,7 +15,7 @@ scripts:
     script: nps lint && nps format.listDifferent && nps test && nps check-typescript
   check-typescript:
     description: Check for TypeScript errors
-    script: nps "build --noEmit" && tsc --project packages/node-renderer/tests && cd spec/dummy && yarn run tsc -p client/tsconfig.json --noEmit
+    script: nps "build --noEmit" && tsc --project packages/node-renderer/tests && cd spec/dummy && yarn run tsc -p ./tsconfig.json --noEmit
   fix:
     description: Run all code fixes before committing
     script: nps eslint.fix && nps format
@@ -47,7 +47,7 @@ scripts:
         [ -f packages/node-renderer/dist/ReactOnRailsProNodeRenderer.js ] ||
           (nps build >/dev/null 2>&1 || true) &&
           [ -f packages/node-renderer/dist/ReactOnRailsProNodeRenderer.js ] ||
-          { echo 'Building @shakacode-tools/react-on-rails-pro-node-renderer seems to have failed!'; }
+          { echo 'Building react-on-rails-pro-node-renderer seems to have failed!'; }
 
   clean:
     description: Clean the project

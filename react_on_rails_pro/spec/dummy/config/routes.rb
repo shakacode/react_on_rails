@@ -20,6 +20,8 @@ Rails.application.routes.draw do
   get "apollo_graphql" => "pages#apollo_graphql", as: :apollo_graphql
   get "lazy_apollo_graphql" => "pages#lazy_apollo_graphql", as: :lazy_apollo_graphql
   get "console_logs_in_async_server" => "pages#console_logs_in_async_server", as: :console_logs_in_async_server
+  get "redis_receiver" => "pages#redis_receiver", as: :redis_receiver
+  get "redis_receiver_for_testing" => "pages#redis_receiver_for_testing", as: :redis_receiver_for_testing
   get "stream_async_components" => "pages#stream_async_components", as: :stream_async_components
   get "stream_async_components_for_testing" => "pages#stream_async_components_for_testing",
       as: :stream_async_components_for_testing

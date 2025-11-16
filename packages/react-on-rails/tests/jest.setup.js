@@ -14,31 +14,7 @@ if (typeof window !== 'undefined') {
   // eslint-disable-next-line global-require
   const { TextEncoder, TextDecoder } = require('util');
   // eslint-disable-next-line global-require
-  const { Readable } = require('stream');
-  // eslint-disable-next-line global-require
   const { ReadableStream, ReadableStreamDefaultReader } = require('stream/web');
-
-  // Mock the fetch function to return a ReadableStream instead of Node's Readable stream
-  // This matches browser behavior where fetch responses have ReadableStream bodies
-  // Node's fetch and polyfills like jest-fetch-mock return Node's Readable stream,
-  // so we convert it to a web-standard ReadableStream for consistency
-  // Note: Node's Readable stream exists in node 'stream' built-in module, can be imported as `import { Readable } from 'stream'`
-  jest.mock('../src/utils', () => ({
-    ...jest.requireActual('../src/utils'),
-    fetch: (...args) =>
-      jest
-        .requireActual('../src/utils')
-        .fetch(...args)
-        .then((res) => {
-          const originalBody = res.body;
-          if (originalBody instanceof Readable) {
-            Object.defineProperty(res, 'body', {
-              value: Readable.toWeb(originalBody),
-            });
-          }
-          return res;
-        }),
-  }));
 
   global.TextEncoder = TextEncoder;
   global.TextDecoder = TextDecoder;

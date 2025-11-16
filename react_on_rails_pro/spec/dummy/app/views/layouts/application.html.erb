@@ -22,11 +22,15 @@
   </style>
   <%= stylesheet_pack_tag('client-bundle',
                           media: 'all',
-                          'data-turbolinks-track': true) %>
+                          'data-turbo-track': 'reload') %>
 
-  <%# Used for testing purposes to simulate hydration failure %>
+  <%# async: true is the recommended approach for Shakapacker >= 8.2.0 (currently using 9.3.0).
+      It enables React 18's Selective Hydration and provides optimal Time to Interactive (TTI).
+      Use immediate_hydration feature to control hydration timing for Selective/Immediate Hydration.
+      See docs/building-features/streaming-server-rendering.md
+      skip_js_packs param is used for testing purposes to simulate hydration failure %>
   <% unless params[:skip_js_packs] == 'true' %>
-    <%= javascript_pack_tag('client-bundle', 'data-turbolinks-track': true, defer: false) %>
+    <%= javascript_pack_tag('client-bundle', 'data-turbo-track': 'reload', async: true) %>
   <% end %>
   <%= csrf_meta_tags %>
 </head>

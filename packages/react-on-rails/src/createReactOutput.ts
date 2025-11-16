@@ -1,4 +1,4 @@
-import * as React from 'react';
+import { createElement, isValidElement, type ReactElement } from 'react';
 import type { CreateParams, ReactComponent, RenderFunction, CreateReactOutputResult } from './types/index.ts';
 import { isServerRenderHash, isPromise } from './isServerRenderResult.ts';
 
@@ -6,8 +6,8 @@ function createReactElementFromRenderFunctionResult(
   renderFunctionResult: ReactComponent,
   name: string,
   props: Record<string, unknown> | undefined,
-): React.ReactElement {
-  if (React.isValidElement(renderFunctionResult)) {
+): ReactElement {
+  if (isValidElement(renderFunctionResult)) {
     // If already a ReactElement, then just return it.
     console.error(
       `Warning: ReactOnRails: Your registered render-function (ReactOnRails.register) for ${name}
@@ -19,7 +19,7 @@ work if you return JSX. Update by wrapping the result JSX of ${name} in a fat ar
   }
 
   // If a component, then wrap in an element
-  return React.createElement(renderFunctionResult, props);
+  return createElement(renderFunctionResult, props);
 }
 
 /**
@@ -88,5 +88,5 @@ export default function createReactOutput({
     return createReactElementFromRenderFunctionResult(renderFunctionResult, name, props);
   }
   // else
-  return React.createElement(component as ReactComponent, props);
+  return createElement(component as ReactComponent, props);
 }

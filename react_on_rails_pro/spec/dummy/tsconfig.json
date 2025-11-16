@@ -1,0 +1,17 @@
+{
+  "extends": ["@tsconfig/create-react-app"],
+  "compilerOptions": {
+    "jsx": "react",
+    // overrides create-react-app default
+    "allowJs": false,
+    "strict": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "client/**/*.ts",
+    "client/**/*.tsx",
+    "client/**/*.d.ts",
+    "e2e-tests/*",
+    "./playwright.config.ts"
+  ]
+}

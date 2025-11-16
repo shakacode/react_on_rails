@@ -4,7 +4,7 @@
  * @example
  * ```ts
  * import Bugsnag from '@bugsnag/js';
- * import { addNotifier, setupTracing } from '@shakacode-tools/react-on-rails-pro-node-renderer/integrations/api';
+ * import { addNotifier, setupTracing } from 'react-on-rails-pro-node-renderer/integrations/api';
  * Bugsnag.start({ ... });
  *
  * addNotifier((msg) => { Bugsnag.notify(msg); });

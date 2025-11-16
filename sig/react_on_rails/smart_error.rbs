@@ -1,0 +1,28 @@
+module ReactOnRails
+  class SmartError < Error
+    attr_reader error_type: Symbol
+    attr_reader component_name: String?
+    attr_reader props: String?
+    attr_reader js_code: String?
+    attr_reader additional_context: Hash[Symbol, untyped]
+
+    def initialize: (error_type: Symbol, ?component_name: String?, ?props: String?, ?js_code: String?, **untyped additional_context) -> void
+    def solution: () -> String
+
+    private
+
+    def build_error_message: () -> String
+    def error_type_title: () -> String
+    def error_description: () -> String
+    def component_not_registered_solution: () -> String
+    def missing_auto_loaded_bundle_solution: () -> String
+    def hydration_mismatch_solution: () -> String
+    def server_rendering_error_solution: () -> String
+    def redux_store_not_found_solution: () -> String
+    def configuration_error_solution: () -> String
+    def default_solution: () -> String
+    def additional_info: () -> String
+    def troubleshooting_section: () -> String
+    def find_similar_components: (String name) -> Array[String]
+  end
+end

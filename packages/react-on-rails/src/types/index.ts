@@ -225,7 +225,6 @@ export interface RenderParams extends Params {
 
 export interface RSCRenderParams extends Omit<RenderParams, 'railsContext'> {
   railsContext: RailsContextWithServerStreamingCapabilities;
-  reactClientManifestFileName: string;
 }
 
 export interface CreateParams extends Params {
@@ -272,6 +271,10 @@ export interface ReactOnRailsOptions {
   traceTurbolinks?: boolean;
   /** Turbo (the successor of Turbolinks) events will be registered, if set to true. */
   turbo?: boolean;
+  /** Enable debug mode for detailed logging of React on Rails operations. */
+  debugMode?: boolean;
+  /** Log component registration details including timing and size information. */
+  logComponentRegistration?: boolean;
 }
 
 export interface ReactOnRails {
@@ -481,3 +484,6 @@ export type RenderOptions = {
   trace?: boolean;
   renderingReturnsPromises: boolean;
 };
+
+// Note: Global type declaration for ReactOnRails is in context.ts
+// to avoid circular dependencies with ReactOnRailsInternal

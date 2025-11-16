@@ -1,0 +1,256 @@
+name: Run Full CI Suite
+
+on:
+  issue_comment:
+    types: [created]
+
+# Prevent concurrent runs per PR
+concurrency:
+  group: full-ci-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  trigger-full-ci:
+    # Only run on PR comments that match the command
+    if: |
+      github.event.issue.pull_request &&
+      (
+        startsWith(github.event.comment.body, '/run-skipped-ci') ||
+        contains(github.event.comment.body, '\n/run-skipped-ci')
+      )
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      pull-requests: write
+      actions: write
+    steps:
+      - name: Check if user has write access
+        id: check_access
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              const { data: permission } = await github.rest.repos.getCollaboratorPermissionLevel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                username: context.actor
+              });
+
+              const hasAccess = ['admin', 'write'].includes(permission.permission);
+              console.log(`User ${context.actor} has permission: ${permission.permission}`);
+
+              if (!hasAccess) {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  body: `@${context.actor} Sorry, only repository collaborators with write access can trigger full CI runs. 🔒`
+                });
+              }
+
+              return hasAccess;
+            } catch (error) {
+              console.error('Error checking permissions:', error);
+              return false;
+            }
+
+      - name: Exit if no access
+        if: steps.check_access.outputs.result == 'false'
+        run: |
+          echo "User does not have permission to trigger full CI"
+          exit 1
+
+      - name: Add reaction to comment
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          comment-id: ${{ github.event.comment.id }}
+          reactions: 'rocket'
+
+      - name: Get PR details
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+            return {
+              ref: pr.data.head.ref,
+              sha: pr.data.head.sha
+            };
+
+      - name: Get skipped checks and trigger workflows
+        id: trigger_workflows
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prData = ${{ steps.pr.outputs.result }};
+
+            // Fetch PR checks to find skipped ones
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+
+            const checks = await github.rest.checks.listForRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: pr.head.sha,
+              per_page: 100
+            });
+
+            // Find all skipped checks
+            const skippedChecks = checks.data.check_runs.filter(check =>
+              check.conclusion === 'SKIPPED' && check.status === 'COMPLETED'
+            );
+
+            console.log(`Found ${skippedChecks.length} skipped checks:`);
+            skippedChecks.forEach(check => {
+              console.log(`  - ${check.name} (${check.workflow_name})`);
+            });
+
+            // Map workflow names to workflow files
+            const workflowMap = {
+              'Main test': 'main.yml',
+              'Generator tests': 'examples.yml',
+              'React on Rails Pro - Integration Tests': 'pro-integration-tests.yml',
+              'React on Rails Pro - Package Tests': 'pro-package-tests.yml',
+              'React on Rails Pro - Lint': 'pro-lint.yml'
+            };
+
+            // Get unique workflows that have skipped checks
+            const uniqueWorkflows = new Set();
+            skippedChecks.forEach(check => {
+              if (workflowMap[check.workflow_name]) {
+                uniqueWorkflows.add(check.workflow_name);
+              }
+            });
+
+            const succeeded = [];
+            const failed = [];
+            const notApplicable = [];
+
+            // Trigger each workflow that has skipped checks
+            for (const workflowName of uniqueWorkflows) {
+              const workflowFile = workflowMap[workflowName];
+              try {
+                await github.rest.actions.createWorkflowDispatch({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  workflow_id: workflowFile,
+                  ref: prData.ref,
+                  inputs: {
+                    force_run: 'true'
+                  }
+                });
+                console.log(`✅ Triggered ${workflowFile} (${workflowName})`);
+                succeeded.push({ id: workflowFile, name: workflowName });
+              } catch (error) {
+                console.error(`❌ Failed to trigger ${workflowFile}:`, error.message);
+                failed.push({ workflow: workflowName, error: error.message });
+              }
+            }
+
+            // Note workflows with no skipped checks
+            if (uniqueWorkflows.size === 0) {
+              console.log('ℹ️  No skipped checks found - all tests already running on this PR');
+              notApplicable.push('No skipped checks to run');
+            }
+
+            // Wait a bit for workflows to queue
+            if (succeeded.length > 0) {
+              console.log('Waiting 5 seconds for workflows to queue...');
+              await new Promise(resolve => setTimeout(resolve, 5000));
+            }
+
+            // Verify workflows are queued/running
+            const verified = [];
+            const notFound = [];
+
+            if (succeeded.length > 0) {
+              const runs = await github.rest.actions.listWorkflowRunsForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                per_page: 100,
+                created: `>${new Date(Date.now() - 60000).toISOString()}`
+              });
+
+              for (const workflow of succeeded) {
+                const found = runs.data.workflow_runs.some(run =>
+                  run.path === `.github/workflows/${workflow.id}` &&
+                  run.head_sha === prData.sha &&
+                  run.event === 'workflow_dispatch'
+                );
+
+                if (found) {
+                  verified.push(workflow);
+                } else {
+                  notFound.push(workflow);
+                }
+              }
+            }
+
+            // Build the comment body based on actual results
+            let status;
+            if (notApplicable.length > 0) {
+              status = '✅ **All checks are already running - nothing to do!**';
+            } else if (failed.length > 0 && notFound.length > 0) {
+              status = '❌ **Failed to trigger or verify workflows**';
+            } else if (failed.length > 0) {
+              status = '⚠️ **Some workflows failed to trigger**';
+            } else if (notFound.length > 0) {
+              status = '⚠️ **Workflows triggered but not yet verified**';
+            } else {
+              status = '✅ **Successfully triggered skipped CI checks**';
+            }
+
+            // Don't list individual checks - keep it simple
+            const skippedChecksList = '';
+            const verifiedList = '';
+            const notFoundList = '';
+            const failedList = failed.length > 0 ? `\n\n**Failed to trigger:**\n${failed.map(f => `- ❌ ${f.workflow}: ${f.error}`).join('\n')}` : '';
+
+            // Add full-ci label only if we actually triggered workflows or if checks are already running
+            let labelAdded = false;
+            try {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                labels: ['full-ci']
+              });
+              labelAdded = true;
+              console.log('✅ Added full-ci label to PR');
+            } catch (error) {
+              console.error('⚠️  Failed to add label:', error.message);
+            }
+
+            const body = `🚀 **Full CI Mode Enabled**
+
+            ${status}
+            ${skippedChecksList}
+            ${verifiedList}${notFoundList}${failedList}
+
+            ${labelAdded && verified.length > 0 ? `\n**Note:** Added the \`full-ci\` label to this PR. All future commits will run the full CI suite (including minimum dependency tests) until the label is removed.
+
+            To disable full CI mode, use the \`/stop-run-skipped-ci\` command.
+
+            View progress in the [Actions tab](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions).` : ''}
+
+            ${labelAdded && notApplicable.length > 0 ? `\nAll CI checks are already running on this PR. Added the \`full-ci\` label - future commits will run the full CI suite.` : ''}`;
+
+            // Post the comment
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body
+            });
+
+            // Fail the job if any workflows failed to trigger
+            if (failed.length > 0) {
+              core.setFailed(`Failed to trigger ${failed.length} workflow(s): ${failed.map(f => f.workflow).join(', ')}`);
+            }

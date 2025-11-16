@@ -1,11 +1,11 @@
 {
   "name": "react-on-rails",
-  "version": "16.1.1",
+  "version": "16.2.0-beta.4",
   "description": "react-on-rails JavaScript for react_on_rails Ruby gem",
   "main": "lib/ReactOnRails.full.js",
   "type": "module",
   "scripts": {
-    "build": "yarn run clean && yarn run tsc --declaration",
+    "build": "yarn run clean && yarn run tsc",
     "build-watch": "yarn run clean && yarn run tsc --watch",
     "clean": "rm -rf ./lib",
     "test": "jest tests",
@@ -14,10 +14,7 @@
     "prepare": "nps build.prepack",
     "prepublishOnly": "yarn run build",
     "yalc:publish": "yalc publish",
-    "yalc": "yalc",
-    "release:patch": "./scripts/release patch",
-    "release:minor": "./scripts/release minor",
-    "release:major": "./scripts/release major"
+    "yalc": "yalc"
   },
   "repository": {
     "type": "git",
@@ -35,24 +32,31 @@
   "license": "SEE LICENSE IN LICENSE.md",
   "exports": {
     ".": {
-      "react-server": "./lib/pro/ReactOnRailsRSC.js",
-      "node": "./lib/ReactOnRails.node.js",
       "default": "./lib/ReactOnRails.full.js"
     },
     "./client": "./lib/ReactOnRails.client.js",
-    "./registerServerComponent/client": "./lib/pro/registerServerComponent/client.js",
-    "./registerServerComponent/server": {
-      "react-server": "./lib/pro/registerServerComponent/server.rsc.js",
-      "default": "./lib/pro/registerServerComponent/server.js"
-    },
-    "./wrapServerComponentRenderer/client": "./lib/pro/wrapServerComponentRenderer/client.js",
-    "./wrapServerComponentRenderer/server": {
-      "react-server": "./lib/pro/wrapServerComponentRenderer/server.rsc.js",
-      "default": "./lib/pro/wrapServerComponentRenderer/server.js"
-    },
-    "./RSCRoute": "./lib/pro/RSCRoute.js",
-    "./RSCProvider": "./lib/pro/RSCProvider.js",
-    "./ServerComponentFetchError": "./lib/pro/ServerComponentFetchError.js"
+    "./types": "./lib/types/index.js",
+    "./context": "./lib/context.js",
+    "./pageLifecycle": "./lib/pageLifecycle.js",
+    "./createReactOutput": "./lib/createReactOutput.js",
+    "./isServerRenderResult": "./lib/isServerRenderResult.js",
+    "./reactApis": "./lib/reactApis.cjs",
+    "./reactHydrateOrRender": "./lib/reactHydrateOrRender.js",
+    "./turbolinksUtils": "./lib/turbolinksUtils.js",
+    "./isRenderFunction": "./lib/isRenderFunction.js",
+    "./ReactOnRails.client": "./lib/ReactOnRails.client.js",
+    "./ReactOnRails.full": "./lib/ReactOnRails.full.js",
+    "./handleError": "./lib/handleError.js",
+    "./generateRenderingErrorMessage": "./lib/generateRenderingErrorMessage.js",
+    "./serverRenderUtils": "./lib/serverRenderUtils.js",
+    "./buildConsoleReplay": "./lib/buildConsoleReplay.js",
+    "./ReactDOMServer": "./lib/ReactDOMServer.cjs",
+    "./serverRenderReactComponent": "./lib/serverRenderReactComponent.js",
+    "./@internal/base/client": "./lib/base/client.js",
+    "./@internal/base/full": {
+      "react-server": "./lib/base/full.rsc.js",
+      "default": "./lib/base/full.js"
+    }
   },
   "peerDependencies": {
     "react": ">= 16",
@@ -65,7 +69,10 @@
     }
   },
   "files": [
-    "lib"
+    "lib/**/*.js",
+    "lib/**/*.cjs",
+    "lib/**/*.mjs",
+    "lib/**/*.d.ts"
   ],
   "bugs": {
     "url": "https://github.com/shakacode/react_on_rails/issues"

@@ -1,0 +1,484 @@
+name: React on Rails Pro - Integration Tests
+
+on:
+  push:
+    branches:
+      - 'master'
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      force_run:
+        description: 'Force run all jobs (bypass detect-changes)'
+        required: false
+        type: boolean
+        default: false
+
+defaults:
+  run:
+    working-directory: react_on_rails_pro
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-22.04
+    outputs:
+      docs_only: ${{ steps.detect.outputs.docs_only }}
+      run_pro_lint: ${{ steps.detect.outputs.run_pro_lint }}
+      run_pro_tests: ${{ steps.detect.outputs.run_pro_tests }}
+      has_full_ci_label: ${{ steps.check-label.outputs.result }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check for full-ci label
+        id: check-label
+        uses: ./.github/actions/check-full-ci-label
+      - name: Detect relevant changes
+        id: detect
+        working-directory: .
+        run: |
+          # If force_run is true OR full-ci label is present, run everything
+          if [ "${{ inputs.force_run }}" = "true" ] || [ "${{ steps.check-label.outputs.result }}" = "true" ]; then
+            echo "run_pro_lint=true" >> "$GITHUB_OUTPUT"
+            echo "run_pro_tests=true" >> "$GITHUB_OUTPUT"
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/master' }}"
+          script/ci-changes-detector "$BASE_REF"
+        shell: bash
+
+  # Build webpack test bundles for dummy app
+  build-dummy-app-webpack-test-bundles:
+    needs: detect-changes
+    if: github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.run_pro_tests == 'true'
+    runs-on: ubuntu-22.04
+    env:
+      REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.3.7
+          bundler: 2.5.4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          # TODO: Re-enable cache when Node.js 22 V8 bug is fixed
+          # Disable cache for Node 22 due to V8 bug in 22.21.0
+          # Track: https://github.com/nodejs/node/issues/56010
+          cache: ''
+          cache-dependency-path: 'react_on_rails_pro/**/yarn.lock'
+
+      - name: Print system information
+        run: |
+          echo "Linux release: "; cat /etc/issue
+          echo "Current user: "; whoami
+          echo "Current directory: "; pwd
+          echo "Ruby version: "; ruby -v
+          echo "Node version: "; node -v
+          echo "Yarn version: "; yarn --version
+          echo "Bundler version: "; bundle --version
+
+      - name: Cache Pro package node modules
+        uses: actions/cache@v4
+        with:
+          path: react_on_rails_pro/node_modules
+          key: v4-pro-package-node-modules-cache-${{ hashFiles('react_on_rails_pro/yarn.lock') }}
+
+      - name: Cache Pro dummy app node modules
+        uses: actions/cache@v4
+        with:
+          path: react_on_rails_pro/spec/dummy/node_modules
+          key: v4-pro-dummy-app-node-modules-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/yarn.lock') }}
+
+      - name: Cache Pro dummy app Ruby gems
+        uses: actions/cache@v4
+        with:
+          path: react_on_rails_pro/spec/dummy/vendor/bundle
+          key: v4-pro-dummy-app-gem-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/Gemfile.lock') }}
+
+      - name: Install Node modules with Yarn for Pro package
+        run: |
+          sudo yarn global add yalc
+          yarn install --frozen-lockfile --no-progress --no-emoji
+
+      - name: Install Node modules with Yarn for Pro dummy app
+        run: cd spec/dummy && yarn install --frozen-lockfile --no-progress --no-emoji
+
+      - name: Install Ruby Gems for Pro dummy app
+        run: |
+          gem install bundler -v "2.5.4"
+          cd spec/dummy
+          bundle lock --add-platform 'x86_64-linux'
+          bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
+
+      - name: Generate file-system based entrypoints
+        run: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
+
+      - name: Build test bundles for Pro dummy app
+        run: cd spec/dummy && yarn run build:test
+
+      - id: get-sha
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Save test webpack bundles to cache
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            react_on_rails_pro/spec/dummy/public/webpack/test
+            react_on_rails_pro/spec/dummy/ssr-generated
+          key: v4-pro-dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}
+
+  # RSpec integration tests with Node renderer
+  rspec-dummy-app-node-renderer:
+    needs:
+      - detect-changes
+      - build-dummy-app-webpack-test-bundles
+    if: github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.run_pro_tests == 'true'
+    runs-on: ubuntu-22.04
+    env:
+      REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.3.7
+          bundler: 2.5.4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          # TODO: Re-enable cache when Node.js 22 V8 bug is fixed
+          # Disable cache for Node 22 due to V8 bug in 22.21.0
+          # Track: https://github.com/nodejs/node/issues/56010
+          cache: ''
+          cache-dependency-path: 'react_on_rails_pro/**/yarn.lock'
+
+      - name: Print system information
+        run: |
+          echo "Linux release: "; cat /etc/issue
+          echo "Current user: "; whoami
+          echo "Current directory: "; pwd
+          echo "Ruby version: "; ruby -v
+          echo "Node version: "; node -v
+          echo "Yarn version: "; yarn --version
+          echo "Bundler version: "; bundle --version
+
+      - name: Cache Pro package Ruby gems
+        uses: actions/cache@v4
+        with:
+          path: react_on_rails_pro/vendor/bundle
+          key: v4-pro-package-gem-cache-${{ hashFiles('react_on_rails_pro/react_on_rails_pro.gemspec') }}
+
+      - name: Cache Pro package node modules
+        uses: actions/cache@v4
+        with:
+          path: react_on_rails_pro/node_modules
+          key: v4-pro-package-node-modules-cache-${{ hashFiles('react_on_rails_pro/yarn.lock') }}
+
+      - name: Cache Pro dummy app node modules
+        uses: actions/cache@v4
+        with:
+          path: react_on_rails_pro/spec/dummy/node_modules
+          key: v4-pro-dummy-app-node-modules-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/yarn.lock') }}
+
+      - name: Cache Pro dummy app Ruby gems
+        uses: actions/cache@v4
+        with:
+          path: react_on_rails_pro/spec/dummy/vendor/bundle
+          key: v4-pro-dummy-app-gem-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/Gemfile.lock') }}
+
+      - name: Remove old webpack bundles
+        run: |
+          rm -rf spec/dummy/public/webpack
+          rm -rf spec/dummy/ssr-generated
+
+      - id: get-sha
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore test webpack bundles from cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            react_on_rails_pro/spec/dummy/public/webpack/test
+            react_on_rails_pro/spec/dummy/ssr-generated
+          key: v4-pro-dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}
+
+      - name: Install Ruby Gems for Pro dummy app
+        run: |
+          gem install bundler -v "2.5.4"
+          cd spec/dummy
+          bundle lock --add-platform 'x86_64-linux'
+          bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
+
+      - name: Install Node modules with Yarn for Pro package
+        run: |
+          sudo yarn global add yalc
+          yarn install --frozen-lockfile --no-progress --no-emoji
+
+      - name: Install Node modules with Yarn for Pro dummy app
+        run: cd spec/dummy && yarn install --frozen-lockfile --no-progress --no-emoji
+
+      - name: Ensure minimum required Chrome version
+        run: |
+          echo -e "Installed $(google-chrome --version)\n"
+          MINIMUM_REQUIRED_CHROME_VERSION=75
+          INSTALLED_CHROME_MAJOR_VERSION="$(google-chrome --version | tr ' .' '\t' | cut -f3)"
+          if [[ $INSTALLED_CHROME_MAJOR_VERSION -lt $MINIMUM_REQUIRED_CHROME_VERSION ]]; then
+            wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+            sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
+            sudo apt-get update
+            sudo apt-get install google-chrome-stable
+            echo -e "\nInstalled $(google-chrome --version)"
+          fi
+
+      - name: Generate file-system based entrypoints
+        run: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
+
+      - name: Run Pro Node renderer in background
+        run: |
+          cd spec/dummy
+          yarn run node-renderer &
+
+      - name: Run Rails server in background
+        run: |
+          cd spec/dummy
+          RAILS_ENV="test" rails server &
+
+      - name: Wait for Rails server to start
+        run: |
+          timeout=60
+          elapsed=0
+          while ! curl -s http://localhost:3000 > /dev/null; do
+            sleep 1
+            elapsed=$((elapsed + 1))
+            if [ $elapsed -ge $timeout ]; then
+              echo "Timeout waiting for Rails server to start after ${timeout}s"
+              exit 1
+            fi
+          done
+          echo "Rails server started after ${elapsed}s"
+
+      - name: Run RSpec tests for Pro dummy app
+        run: |
+          cd spec/dummy
+          bundle exec rspec \
+            --profile 10 \
+            --format progress \
+            --format RspecJunitFormatter \
+            --out ~/rspec/rspec.xml \
+            --format documentation
+
+      - name: Store test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pro-rspec-integration-results
+          path: ~/rspec
+
+      - name: Store screenshots
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pro-rspec-screenshots
+          path: react_on_rails_pro/spec/dummy/tmp/screenshots
+
+      - name: Store Capybara artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pro-rspec-capybara
+          path: react_on_rails_pro/spec/dummy/tmp/capybara
+
+      - name: Store test log
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pro-rspec-test-log
+          path: react_on_rails_pro/spec/dummy/log/test.log
+
+      - name: Store yarn error log
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: pro-rspec-yarn-error-log
+          path: react_on_rails_pro/spec/dummy/yarn-error.log
+
+  # Playwright E2E tests with Redis service
+  dummy-app-node-renderer-e2e-tests:
+    needs:
+      - detect-changes
+      - build-dummy-app-webpack-test-bundles
+    if: github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.run_pro_tests == 'true'
+    runs-on: ubuntu-22.04
+    env:
+      REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
+    # Redis service container
+    services:
+      redis:
+        image: cimg/redis:6.2.6
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.3.7
+          bundler: 2.5.4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          # TODO: Re-enable cache when Node.js 22 V8 bug is fixed
+          # Disable cache for Node 22 due to V8 bug in 22.21.0
+          # Track: https://github.com/nodejs/node/issues/56010
+          cache: ''
+          cache-dependency-path: 'react_on_rails_pro/**/yarn.lock'
+
+      - name: Print system information
+        run: |
+          echo "Linux release: "; cat /etc/issue
+          echo "Current user: "; whoami
+          echo "Current directory: "; pwd
+          echo "Ruby version: "; ruby -v
+          echo "Node version: "; node -v
+          echo "Yarn version: "; yarn --version
+          echo "Bundler version: "; bundle --version
+
+      - name: Cache Pro package Ruby gems
+        uses: actions/cache@v4
+        with:
+          path: react_on_rails_pro/vendor/bundle
+          key: v4-pro-package-gem-cache-${{ hashFiles('react_on_rails_pro/react_on_rails_pro.gemspec') }}
+
+      - name: Cache Pro package node modules
+        uses: actions/cache@v4
+        with:
+          path: react_on_rails_pro/node_modules
+          key: v4-pro-package-node-modules-cache-${{ hashFiles('react_on_rails_pro/yarn.lock') }}
+
+      - name: Cache Pro dummy app node modules
+        uses: actions/cache@v4
+        with:
+          path: react_on_rails_pro/spec/dummy/node_modules
+          key: v4-pro-dummy-app-node-modules-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/yarn.lock') }}
+
+      - name: Cache Pro dummy app Ruby gems
+        uses: actions/cache@v4
+        with:
+          path: react_on_rails_pro/spec/dummy/vendor/bundle
+          key: v4-pro-dummy-app-gem-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/Gemfile.lock') }}
+
+      - name: Remove old webpack bundles
+        run: |
+          rm -rf spec/dummy/public/webpack
+          rm -rf spec/dummy/ssr-generated
+
+      - id: get-sha
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore test webpack bundles from cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            react_on_rails_pro/spec/dummy/public/webpack/test
+            react_on_rails_pro/spec/dummy/ssr-generated
+          key: v4-pro-dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}
+
+      - name: Install Ruby Gems for Pro dummy app
+        run: |
+          gem install bundler -v "2.5.4"
+          cd spec/dummy
+          bundle lock --add-platform 'x86_64-linux'
+          bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
+
+      - name: Install Node modules with Yarn for Pro package
+        run: |
+          sudo yarn global add yalc
+          yarn install --frozen-lockfile --no-progress --no-emoji
+
+      - name: Install Node modules with Yarn for Pro dummy app
+        run: cd spec/dummy && yarn install --frozen-lockfile --no-progress --no-emoji
+
+      - name: Ensure minimum required Chrome version
+        run: |
+          echo -e "Installed $(google-chrome --version)\n"
+          MINIMUM_REQUIRED_CHROME_VERSION=75
+          INSTALLED_CHROME_MAJOR_VERSION="$(google-chrome --version | tr ' .' '\t' | cut -f3)"
+          if [[ $INSTALLED_CHROME_MAJOR_VERSION -lt $MINIMUM_REQUIRED_CHROME_VERSION ]]; then
+            wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+            sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
+            sudo apt-get update
+            sudo apt-get install google-chrome-stable
+            echo -e "\nInstalled $(google-chrome --version)"
+          fi
+
+      - name: Generate file-system based entrypoints
+        run: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
+
+      - name: Run Pro Node renderer in background
+        run: |
+          cd spec/dummy
+          yarn run node-renderer &
+
+      - name: Run Rails server in background
+        run: |
+          cd spec/dummy
+          RAILS_ENV="test" rails server &
+
+      - name: Wait for Rails server to start
+        run: |
+          timeout=300
+          elapsed=0
+          while ! curl -s http://localhost:3000 > /dev/null; do
+            sleep 1
+            elapsed=$((elapsed + 1))
+            if [ $elapsed -ge $timeout ]; then
+              echo "Timeout waiting for Rails server to start after ${timeout}s"
+              exit 1
+            fi
+          done
+          echo "Rails server started after ${elapsed}s"
+
+      - name: Install Playwright dependencies
+        run: cd spec/dummy && yarn playwright install --with-deps
+
+      - name: Run Playwright E2E tests for Pro dummy app
+        run: cd spec/dummy && yarn e2e-test
+
+      - name: Store test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pro-playwright-test-results
+          path: react_on_rails_pro/spec/dummy/test-results/results.xml
+
+      - name: Store Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pro-playwright-report
+          path: react_on_rails_pro/spec/dummy/playwright-report

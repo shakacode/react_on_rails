@@ -20,6 +20,7 @@
 
 **🚀 React on Rails v16.0 Released!** Major modernization with ESM support, enhanced React Server Components, and streamlined configuration.
 
+- **⚡ Rspack Support**: New `--rspack` generator flag for ~20x faster builds! Use Rspack instead of Webpack for dramatically improved build performance. See [Rspack documentation](https://www.shakacode.com/react-on-rails/docs/api/generator-details#rspack-support) for details.
 - **ESM-only package**: Modern module system with better tree-shaking and performance
 - **React Server Components**: Improved rendering flow and new `RSCRoute` component for seamless SSR
 - **Performance improvements**: New async loading strategies and optimized bundle generation
@@ -111,8 +112,9 @@ To provide a high-performance framework for integrating Ruby on Rails with React
 
 | Feature                       | Benefit                                                                                                                                                                                      |
 | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ⚡ **Rspack Support**         | [~20x faster builds](./docs/api-reference/generator-details.md#rspack-support) with Rspack bundler - dramatically reduce build times in development and CI                                   |
 | 🎯 **Smart Bundle Loading**   | [Automated bundle optimization](./docs/guides/auto-bundling-file-system-based-automated-bundle-generation.md) based on components used - no more manual `javascript_pack_tags` configuration |
-| ⚡ **Server-Side Rendering**  | Enhanced React Server Components support for better SEO and UX performance                                                                                                                   |
+| 🌟 **Server-Side Rendering**  | Enhanced React Server Components support for better SEO and UX performance                                                                                                                   |
 | 🚀 **Advanced Loading**       | `sync`, `async`, and `defer` options for optimal performance based on your needs                                                                                                             |
 | 🔥 **Hot Module Replacement** | Instant feedback during development with tight [Shakapacker](https://github.com/shakacode/shakapacker) integration                                                                           |
 | 📦 **Easy Props Passing**     | Direct Rails → React data flow without separate API calls                                                                                                                                    |
@@ -206,12 +208,13 @@ The following companies support our open-source projects, and ShakaCode uses the
     <img alt="BrowserStack" src="https://user-images.githubusercontent.com/4244251/184881129-e1edf4b7-3ae1-4ea8-9e6d-3595cf01609e.png" height="55px">
   </picture>
 </a>
-<a href="https://railsautoscale.com">
-  <img src="https://user-images.githubusercontent.com/4244251/184881144-95c2c25c-9879-4069-864d-4e67d6ed39d2.png" alt="Rails Autoscale" height="55px">
-</a>
 <a href="https://www.honeybadger.io">
   <img src="https://user-images.githubusercontent.com/4244251/184881133-79ee9c3c-8165-4852-958e-31687b9536f4.png" alt="Honeybadger" height="55px">
 </a>
-<a href="https://reviewable.io">
-  <img src="https://user-images.githubusercontent.com/20628911/230848305-c94510a4-82d7-468f-bf9f-eeb81d3f2ce0.png" alt="Reviewable" height="55px">
+<a href="https://coderabbit.ai">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://victorious-bubble-f69a016683.media.strapiapp.com/White_Typemark_7229870ac5.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://victorious-bubble-f69a016683.media.strapiapp.com/Orange_Typemark_7958cfa790.svg">
+    <img alt="CodeRabbit" src="https://victorious-bubble-f69a016683.media.strapiapp.com/Orange_Typemark_7958cfa790.svg" height="55px">
+  </picture>
 </a>

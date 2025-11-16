@@ -10,17 +10,35 @@ if [ -z "$files" ]; then
   exit 0
 fi
 
-if [ "$CONTEXT" = "all-changed" ]; then
-  echo "💅 Prettier on all changed files:"
-else
-  echo "💅 Prettier on $CONTEXT files:"
-fi
-printf "  %s\n" $files
+# Separate files into root and Pro directories
+root_files=$(echo "$files" | grep -v '^react_on_rails_pro/' || true)
+pro_files=$(echo "$files" | grep '^react_on_rails_pro/' || true)
 
-yarn run prettier --write $files
+# Format root files
+if [ -n "$root_files" ]; then
+  if [ "$CONTEXT" = "all-changed" ]; then
+    echo "💅 Prettier on root changed files:"
+  else
+    echo "💅 Prettier on root $CONTEXT files:"
+  fi
+  printf "  %s\n" $root_files
 
-# Re-stage files if running on staged or all-changed context
-if [ "$CONTEXT" = "staged" ] || [ "$CONTEXT" = "all-changed" ]; then
-  echo $files | xargs -r git add
-  echo "✅ Re-staged formatted files"
+  yarn run prettier --write $root_files
 fi
+
+# Format Pro files (using Pro's Prettier config)
+if [ -n "$pro_files" ]; then
+  if [ "$CONTEXT" = "all-changed" ]; then
+    echo "💅 Prettier on Pro changed files:"
+  else
+    echo "💅 Prettier on Pro $CONTEXT files:"
+  fi
+  printf "  %s\n" $pro_files
+
+  # Strip react_on_rails_pro/ prefix for running in Pro directory
+  pro_files_relative=$(echo "$pro_files" | sed 's|^react_on_rails_pro/||')
+
+  (cd react_on_rails_pro && yarn run prettier --write $pro_files_relative)
+fi
+
+echo "✅ Prettier formatting complete"

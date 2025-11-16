@@ -23,6 +23,145 @@ After a release, please make sure to run `bundle exec rake update_changelog`. Th
 
 Changes since the last non-beta release.
 
+### [16.2.0.beta.4] - 2025-11-12
+
+#### Added
+
+- **Rspack Support**: Added `--rspack` flag to `react_on_rails:install` generator for significantly faster builds (~20x improvement with SWC). Includes unified webpack/rspack configuration templates and `bin/switch-bundler` utility to switch between bundlers post-installation. [PR #1852](https://github.com/shakacode/react_on_rails/pull/1852) by [justin808](https://github.com/justin808).
+
+- **Attribution Comment**: Added HTML comment attribution to Rails views containing React on Rails functionality. The comment automatically displays which version is in use (open source React on Rails or React on Rails Pro) and, for Pro users, shows the license status. This helps identify React on Rails usage across your application. [PR #1857](https://github.com/shakacode/react_on_rails/pull/1857) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+- **Improved Error Messages**: Error messages for version mismatches and package configuration issues now include package-manager-specific installation commands (npm, yarn, pnpm, bun). [PR #1881](https://github.com/shakacode/react_on_rails/pull/1881) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+- **Smart Error Messages with Actionable Solutions**: Added intelligent Ruby-side error handling with context-aware, actionable solutions for common issues. Features include fuzzy matching for component name typos, environment-specific debugging suggestions, color-coded error formatting, and detailed troubleshooting guides for component registration, auto-bundling, hydration mismatches, server rendering errors, and Redux store issues. See the [Improved Error Messages guide](docs/guides/improved-error-messages.md) for details. [PR 1934](https://github.com/shakacode/react_on_rails/pull/1934) by [justin808](https://github.com/justin808).
+
+- **Improved RSC Payload Error Handling**: Errors that happen during generation of RSC payload are transferred properly to rails side and logs the error message and stack. [PR #1888](https://github.com/shakacode/react_on_rails/pull/1888) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+- **Use as Git dependency**: All packages can now be installed as Git dependencies. This is useful for development and testing purposes. See [CONTRIBUTING.md](./CONTRIBUTING.md#git-dependencies) for documentation. [PR #1873](https://github.com/shakacode/react_on_rails/pull/1873) by [alexeyr-ci2](https://github.com/alexeyr-ci2).
+
+#### Changed
+
+- **Shakapacker 9.0.0 Upgrade**: Upgraded Shakapacker from 8.2.0 to 9.0.0 with Babel transpiler configuration for compatibility. Key changes include:
+
+  - Configured `javascript_transpiler: babel` in shakapacker.yml (Shakapacker 9.0 defaults to SWC which has PropTypes handling issues)
+  - Added precompile hook support via `bin/shakapacker-precompile-hook` for ReScript builds and pack generation
+  - Configured CSS Modules to use default exports (`namedExport: false`) for backward compatibility with existing `import styles from` syntax
+  - Fixed webpack configuration to process SCSS rules and CSS loaders in a single pass for better performance
+    [PR 1904](https://github.com/shakacode/react_on_rails/pull/1904) by [justin808](https://github.com/justin808).
+
+- **`immediate_hydration` now automatically enabled for Pro users**: The `config.immediate_hydration` configuration option has been removed. Immediate hydration is now automatically enabled for React on Rails Pro users and disabled for non-Pro users, simplifying configuration while providing optimal performance by default. Component-level overrides are still supported via the `immediate_hydration` parameter on `react_component`, `redux_store`, and `stream_react_component` helpers. [PR 1997](https://github.com/shakacode/react_on_rails/pull/1997) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+- **`generated_component_packs_loading_strategy` now defaults based on Pro license**: When using Shakapacker >= 8.2.0, the default loading strategy is now `:async` for Pro users and `:defer` for non-Pro users. This provides optimal performance for Pro users while maintaining compatibility for non-Pro users. You can still explicitly set the strategy in your configuration. [PR #1993](https://github.com/shakacode/react_on_rails/pull/1993) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+#### Deprecated
+
+- **Node Renderer Configuration**: Renamed `bundlePath` configuration option to `serverBundleCachePath` in the node renderer to better describe its purpose and avoid confusion with Shakapacker's public bundle path. The old `bundlePath` option continues to work with deprecation warnings. Both `RENDERER_SERVER_BUNDLE_CACHE_PATH` (new) and `RENDERER_BUNDLE_PATH` (deprecated) environment variables are supported. [PR #2008](https://github.com/shakacode/react_on_rails/pull/2008) by [justin808](https://github.com/justin808).
+
+#### Fixed
+
+- **Node Renderer Worker Restart**: Fixed "descriptor closed" error that occurred when the node renderer restarts while handling an in-progress request (especially streaming requests). Workers now perform graceful shutdowns: they disconnect from the cluster to stop receiving new requests, wait for active requests to complete, then shut down cleanly. A configurable `gracefulWorkerRestartTimeout` ensures workers are forcibly killed if they don't shut down in time. [PR 1970](https://github.com/shakacode/react_on_rails/pull/1970) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+- **Body Duplication Bug On Streaming**: Fixed a bug that happens while streaming if the node renderer connection closed after streaming some chunks to the client. [PR #1995](https://github.com/shakacode/react_on_rails/pull/1995) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+#### Breaking Changes
+
+- **`config.immediate_hydration` configuration removed**: The `config.immediate_hydration` setting in `config/initializers/react_on_rails.rb` has been removed. Immediate hydration is now automatically enabled for React on Rails Pro users and automatically disabled for non-Pro users.
+
+  **Migration steps:**
+
+  - Remove any `config.immediate_hydration = true` or `config.immediate_hydration = false` lines from your `config/initializers/react_on_rails.rb` file
+  - Pro users: No action needed - immediate hydration is now enabled automatically for optimal performance
+  - Non-Pro users: No action needed - standard hydration behavior continues to work as before
+  - Component-level overrides: You can still override behavior per-component using `react_component("MyComponent", immediate_hydration: false)` or `redux_store("MyStore", immediate_hydration: true)`
+  - If a non-Pro user explicitly sets `immediate_hydration: true` on a component or store, a warning will be logged and it will be enforced to fall back to standard hydration (the value will be overridden to `false`)
+
+  [PR 1997](https://github.com/shakacode/react_on_rails/pull/1997) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+- **React on Rails Core Package**: Several Pro-only methods have been removed from the core package and are now exclusively available in the `react-on-rails-pro` package. If you're using any of the following methods, you'll need to migrate to React on Rails Pro:
+  - `getOrWaitForComponent()`
+  - `getOrWaitForStore()`
+  - `getOrWaitForStoreGenerator()`
+  - `reactOnRailsStoreLoaded()`
+  - `streamServerRenderedReactComponent()`
+  - `serverRenderRSCReactComponent()`
+
+**Migration Guide:**
+
+To migrate to React on Rails Pro:
+
+1. Install the Pro package:
+
+   ```bash
+   yarn add react-on-rails-pro
+   # or
+   npm install react-on-rails-pro
+   ```
+
+2. Update your imports from `react-on-rails` to `react-on-rails-pro`:
+
+   ```javascript
+   // Before
+   import ReactOnRails from 'react-on-rails';
+
+   // After
+   import ReactOnRails from 'react-on-rails-pro';
+   ```
+
+3. For server-side rendering, update your import paths:
+
+   ```javascript
+   // Before
+   import ReactOnRails from 'react-on-rails';
+
+   // After
+   import ReactOnRails from 'react-on-rails-pro';
+   ```
+
+4. If you're using a free license, you can obtain one at [React on Rails Pro License](https://www.shakacode.com/react-on-rails-pro). **Important: The free 3-month evaluation license is intended for personal, educational, and evaluation purposes only. It should NOT be used for production deployments.** Production use requires a paid license.
+
+**Note:** If you're not using any of the Pro-only methods listed above, no changes are required.
+
+- **Pro-Specific Configurations Moved to Pro Gem**: The following React Server Components (RSC) configurations have been moved from `ReactOnRails.configure` to `ReactOnRailsPro.configure`:
+
+  - `rsc_bundle_js_file` - Path to the RSC bundle file
+  - `react_server_client_manifest_file` - Path to the React server client manifest
+  - `react_client_manifest_file` - Path to the React client manifest
+
+  **Migration:** If you're using RSC features, move these configurations from your `ReactOnRails.configure` block to `ReactOnRailsPro.configure`:
+
+  ```ruby
+  # Before
+  ReactOnRails.configure do |config|
+    config.rsc_bundle_js_file = "rsc-bundle.js"
+    config.react_server_client_manifest_file = "react-server-client-manifest.json"
+    config.react_client_manifest_file = "react-client-manifest.json"
+  end
+
+  # After
+  ReactOnRailsPro.configure do |config|
+    config.rsc_bundle_js_file = "rsc-bundle.js"
+    config.react_server_client_manifest_file = "react-server-client-manifest.json"
+    config.react_client_manifest_file = "react-client-manifest.json"
+  end
+  ```
+
+  See the [React on Rails Pro Configuration docs](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/docs/configuration.md) for more details.
+
+- **Streaming View Helpers Moved to Pro Gem**: The following view helpers have been removed from the open-source gem and are now only available in React on Rails Pro:
+
+  - `stream_react_component` - Progressive SSR using React 18+ streaming
+  - `rsc_payload_react_component` - RSC payload rendering
+
+  These helpers are now defined exclusively in the `react-on-rails-pro` gem.
+
+- **Strict Version Validation at Boot Time**: Applications now fail to boot (instead of logging warnings) when package.json is misconfigured with wrong versions, missing packages, or semver wildcards. Users must use exact versions in package.json (no ^, ~, >, <, \* operators). **Migration**: Update package.json to use exact versions matching installed gem (e.g., `"16.1.1"` not `"^16.1.1"`). [PR #1881](https://github.com/shakacode/react_on_rails/pull/1881) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+- **Node Renderer Version Validation** (Pro users only): Remote node renderer now validates gem version at request time. Version mismatches in development return 412 Precondition Failed (production allows with warning). **Migration**: Ensure react_on_rails_pro gem and @shakacode-tools/react-on-rails-pro-node-renderer package versions match. [PR #1881](https://github.com/shakacode/react_on_rails/pull/1881) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+#### Security
+
+- **Command Injection Protection**: Added security hardening to prevent potential command injection in package manager commands. [PR #1881](https://github.com/shakacode/react_on_rails/pull/1881) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 ### [16.1.1] - 2025-09-24
 
 #### Bug Fixes
@@ -71,7 +210,7 @@ Changes since the last non-beta release.
 
 #### Pro License Features
 
-- **Core/Pro separation**: Moved Pro features into dedicated `lib/react_on_rails/pro/` and `node_package/src/pro/` directories with clear licensing boundaries (now located at `packages/react-on-rails/src/pro/`) [PR 1791](https://github.com/shakacode/react_on_rails/pull/1791) by [AbanoubGhadban](https://github.com/AbanoubGhadban)
+- **Core/Pro separation**: Moved Pro features into dedicated `lib/react_on_rails/pro/` and `node_package/src/pro/` directories with clear licensing boundaries (now separated into `packages/react-on-rails-pro/` package) [PR 1791](https://github.com/shakacode/react_on_rails/pull/1791) by [AbanoubGhadban](https://github.com/AbanoubGhadban)
 - **Runtime license validation**: Implemented Pro license gating with graceful fallback to core functionality when Pro license unavailable [PR 1791](https://github.com/shakacode/react_on_rails/pull/1791) by [AbanoubGhadban](https://github.com/AbanoubGhadban)
 - **Enhanced immediate hydration**: Improved immediate hydration functionality with Pro license validation and warning badges [PR 1791](https://github.com/shakacode/react_on_rails/pull/1791) by [AbanoubGhadban](https://github.com/AbanoubGhadban)
 - **License documentation**: Added NOTICE files in Pro directories referencing canonical `REACT-ON-RAILS-PRO-LICENSE.md` [PR 1791](https://github.com/shakacode/react_on_rails/pull/1791) by [AbanoubGhadban](https://github.com/AbanoubGhadban)
@@ -1684,7 +1823,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/16.1.1...master
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/16.2.0.beta.4...master
+[16.2.0.beta.4]: https://github.com/shakacode/react_on_rails/compare/16.1.1...16.2.0.beta.4
 [16.1.1]: https://github.com/shakacode/react_on_rails/compare/16.1.0...16.1.1
 [16.1.0]: https://github.com/shakacode/react_on_rails/compare/16.0.0...16.1.0
 [16.0.0]: https://github.com/shakacode/react_on_rails/compare/14.2.0...16.0.0

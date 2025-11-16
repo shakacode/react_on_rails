@@ -23,6 +23,12 @@
     },
     {
       "pattern": "^https://github\\.com/shakacode/react-webpack-rails-tutorial/blob/master/client/webpack\\.client\\.base\\.config\\.js"
+    },
+    {
+      "pattern": "^https://reactrails\\.slack\\.com"
+    },
+    {
+      "pattern": "^https://www\\.linkedin\\.com"
     }
   ],
   "replacementPatterns": [
@@ -41,7 +47,7 @@
   ],
   "timeout": "20s",
   "retryOn429": true,
-  "retryCount": 3,
+  "retryCount": 5,
   "fallbackRetryDelay": "30s",
   "aliveStatusCodes": [200, 206]
 }

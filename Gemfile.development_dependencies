@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-gem "shakapacker", "8.2.0"
+gem "shakapacker", "9.3.0"
 gem "bootsnap", require: false
 gem "rails", "~> 7.1"
 
@@ -33,6 +33,8 @@ group :development, :test do
   gem "pry-doc"
   gem "pry-rails"
   gem "pry-rescue"
+  gem "rbs", require: false
+  gem "steep", require: false
   gem "rubocop", "1.61.0", require: false
   gem "rubocop-performance", "~>1.20.0", require: false
   gem "rubocop-rspec", "~>2.26", require: false
@@ -49,6 +51,7 @@ group :test do
   gem "capybara"
   gem "capybara-screenshot"
   gem "coveralls", require: false
+  gem "cypress-on-rails", "~> 1.19"
   gem "equivalent-xml"
   gem "generator_spec"
   gem "launchy"

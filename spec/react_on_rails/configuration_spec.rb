@@ -190,110 +190,6 @@ module ReactOnRails
       end
     end
 
-    describe "RSC configuration options" do
-      before do
-        allow(ReactOnRails::PackerUtils).to receive_messages(
-          supports_autobundling?: true,
-          nested_entries?: true
-        )
-      end
-
-      it "has default values for RSC-related configuration options" do
-        ReactOnRails.configure {} # rubocop:disable Lint/EmptyBlock
-
-        expect(ReactOnRails.configuration.rsc_bundle_js_file).to eq("")
-        expect(ReactOnRails.configuration.react_client_manifest_file).to eq("react-client-manifest.json")
-        expect(ReactOnRails.configuration.react_server_client_manifest_file).to eq("react-server-client-manifest.json")
-      end
-
-      it "allows setting rsc_bundle_js_file" do
-        ReactOnRails.configure do |config|
-          config.rsc_bundle_js_file = "custom-rsc-bundle.js"
-        end
-
-        expect(ReactOnRails.configuration.rsc_bundle_js_file).to eq("custom-rsc-bundle.js")
-      end
-
-      it "allows setting react_client_manifest_file" do
-        ReactOnRails.configure do |config|
-          config.react_client_manifest_file = "custom-client-manifest.json"
-        end
-
-        expect(ReactOnRails.configuration.react_client_manifest_file).to eq("custom-client-manifest.json")
-      end
-
-      it "allows setting react_server_client_manifest_file" do
-        ReactOnRails.configure do |config|
-          config.react_server_client_manifest_file = "custom-server-client-manifest.json"
-        end
-
-        expect(ReactOnRails.configuration.react_server_client_manifest_file).to eq("custom-server-client-manifest.json")
-      end
-
-      it "includes rsc files in webpack_generated_files when not blank" do
-        ReactOnRails.configure do |config|
-          config.rsc_bundle_js_file = "rsc-bundle.js"
-          config.webpack_generated_files = []
-        end
-
-        expect(ReactOnRails.configuration.webpack_generated_files).to include("rsc-bundle.js")
-      end
-
-      it "includes client manifest in webpack_generated_files" do
-        ReactOnRails.configure do |config|
-          config.react_client_manifest_file = "custom-client-manifest.json"
-          config.webpack_generated_files = []
-        end
-
-        expect(ReactOnRails.configuration.webpack_generated_files).to include("custom-client-manifest.json")
-      end
-
-      it "includes server-client manifest in webpack_generated_files" do
-        ReactOnRails.configure do |config|
-          config.react_server_client_manifest_file = "custom-server-client-manifest.json"
-          config.webpack_generated_files = []
-        end
-
-        expect(ReactOnRails.configuration.webpack_generated_files).to include("custom-server-client-manifest.json")
-      end
-
-      it "configures all RSC options together for a typical RSC setup" do
-        ReactOnRails.configure do |config|
-          config.rsc_bundle_js_file = "rsc-bundle.js"
-          config.react_client_manifest_file = "client-manifest.json"
-          config.react_server_client_manifest_file = "server-client-manifest.json"
-          config.webpack_generated_files = []
-        end
-
-        expect(ReactOnRails.configuration.rsc_bundle_js_file).to eq("rsc-bundle.js")
-        expect(ReactOnRails.configuration.react_client_manifest_file).to eq("client-manifest.json")
-        expect(ReactOnRails.configuration.react_server_client_manifest_file).to eq("server-client-manifest.json")
-
-        # All RSC files should be included in webpack_generated_files
-        expect(ReactOnRails.configuration.webpack_generated_files).to include("rsc-bundle.js")
-        expect(ReactOnRails.configuration.webpack_generated_files).to include("client-manifest.json")
-        expect(ReactOnRails.configuration.webpack_generated_files).to include("server-client-manifest.json")
-      end
-
-      it "allows nil values for RSC configuration options" do
-        ReactOnRails.configure do |config|
-          config.rsc_bundle_js_file = nil
-          config.react_client_manifest_file = nil
-          config.react_server_client_manifest_file = nil
-          config.webpack_generated_files = []
-        end
-
-        expect(ReactOnRails.configuration.rsc_bundle_js_file).to be_nil
-        expect(ReactOnRails.configuration.react_client_manifest_file).to be_nil
-        expect(ReactOnRails.configuration.react_server_client_manifest_file).to be_nil
-
-        # Nil values should not be included in webpack_generated_files
-        expect(ReactOnRails.configuration.webpack_generated_files).not_to include(nil)
-        # Only manifest.json should be in the list by default
-        expect(ReactOnRails.configuration.webpack_generated_files).to eq(["manifest.json"])
-      end
-    end
-
     it "changes the configuration of the gem, such as setting the prerender option to false" do
       test_path = File.expand_path("public/webpack/test")
       allow(::Shakapacker).to receive_message_chain("config.public_output_path")
@@ -388,9 +284,26 @@ module ReactOnRails
             .with("8.2.0").and_return(true)
         end
 
-        it "defaults to :async" do
-          ReactOnRails.configure {} # rubocop:disable Lint/EmptyBlock
-          expect(ReactOnRails.configuration.generated_component_packs_loading_strategy).to eq(:async)
+        context "with Pro license" do
+          before do
+            allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+          end
+
+          it "defaults to :async" do
+            ReactOnRails.configure {} # rubocop:disable Lint/EmptyBlock
+            expect(ReactOnRails.configuration.generated_component_packs_loading_strategy).to eq(:async)
+          end
+        end
+
+        context "without Pro license" do
+          before do
+            allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+          end
+
+          it "defaults to :defer" do
+            ReactOnRails.configure {} # rubocop:disable Lint/EmptyBlock
+            expect(ReactOnRails.configuration.generated_component_packs_loading_strategy).to eq(:defer)
+          end
         end
 
         it "accepts :async value" do
@@ -466,6 +379,118 @@ module ReactOnRails
               config.generated_component_packs_loading_strategy = :async
             end
           end.to raise_error(ReactOnRails::Error, /does not support async script loading/)
+        end
+      end
+    end
+
+    describe ".immediate_hydration (deprecated)" do
+      before do
+        # Reset the warning flag before each test
+        described_class.immediate_hydration_warned = false
+        allow(Rails.logger).to receive(:warn)
+      end
+
+      after do
+        # Reset the warning flag after each test
+        described_class.immediate_hydration_warned = false
+      end
+
+      describe "setter" do
+        it "logs a deprecation warning when setting to true" do
+          ReactOnRails.configure do |config|
+            config.immediate_hydration = true
+          end
+
+          expect(Rails.logger).to have_received(:warn)
+            .with(/immediate_hydration' configuration option is deprecated/)
+        end
+
+        it "logs a deprecation warning when setting to false" do
+          ReactOnRails.configure do |config|
+            config.immediate_hydration = false
+          end
+
+          expect(Rails.logger).to have_received(:warn)
+            .with(/immediate_hydration' configuration option is deprecated/)
+        end
+
+        it "mentions the value in the warning message" do
+          ReactOnRails.configure do |config|
+            config.immediate_hydration = true
+          end
+
+          expect(Rails.logger).to have_received(:warn) do |message|
+            expect(message).to include("config.immediate_hydration = true")
+          end
+        end
+
+        it "only logs the warning once even if called multiple times" do
+          ReactOnRails.configure do |config|
+            config.immediate_hydration = true
+            config.immediate_hydration = false
+            config.immediate_hydration = true
+          end
+
+          expect(Rails.logger).to have_received(:warn).once
+        end
+      end
+
+      describe "getter" do
+        it "logs a deprecation warning when accessed" do
+          ReactOnRails.configure {} # rubocop:disable Lint/EmptyBlock
+
+          ReactOnRails.configuration.immediate_hydration
+
+          expect(Rails.logger).to have_received(:warn)
+            .with(/immediate_hydration' configuration option is deprecated/)
+        end
+
+        it "returns nil" do
+          ReactOnRails.configure {} # rubocop:disable Lint/EmptyBlock
+
+          result = ReactOnRails.configuration.immediate_hydration
+
+          expect(result).to be_nil
+        end
+
+        it "only logs the warning once even if called multiple times" do
+          ReactOnRails.configure {} # rubocop:disable Lint/EmptyBlock
+
+          ReactOnRails.configuration.immediate_hydration
+          ReactOnRails.configuration.immediate_hydration
+          ReactOnRails.configuration.immediate_hydration
+
+          expect(Rails.logger).to have_received(:warn).once
+        end
+      end
+
+      describe "setter and getter interactions" do
+        it "does not warn again on getter if setter already warned" do
+          ReactOnRails.configure do |config|
+            config.immediate_hydration = true
+          end
+
+          expect(Rails.logger).to have_received(:warn).once
+
+          ReactOnRails.configuration.immediate_hydration
+
+          # Still only one warning total
+          expect(Rails.logger).to have_received(:warn).once
+        end
+
+        it "does not warn again on setter if getter already warned" do
+          ReactOnRails.configure {} # rubocop:disable Lint/EmptyBlock
+
+          ReactOnRails.configuration.immediate_hydration
+
+          expect(Rails.logger).to have_received(:warn).once
+
+          ReactOnRails.configure do |config|
+            config.immediate_hydration = true
+          end
+
+          # Still only one warning total
+          expect(Rails.logger).to have_received(:warn).once
         end
       end
     end
