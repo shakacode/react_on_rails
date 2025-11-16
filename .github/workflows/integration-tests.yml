@@ -52,11 +52,10 @@ jobs:
             echo "run_dummy_tests=true" >> "$GITHUB_OUTPUT"
             echo "run_generators=true" >> "$GITHUB_OUTPUT"
             echo "docs_only=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/master' }}"
+          else
+            BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/master' }}"
           script/ci-changes-detector "$BASE_REF"
+          fi
         shell: bash
 
   build-dummy-app-webpack-test-bundles:
@@ -66,15 +65,9 @@ jobs:
       github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.run_dummy_tests == 'true'
     strategy:
       matrix:
-        include:
-          # Always run: Latest versions (fast feedback on PRs)
-          - ruby-version: '3.4'
-            node-version: '22'
-            dependency-level: 'latest'
-          # Master and workflow_dispatch: Minimum supported versions (full coverage)
-          - ruby-version: '3.2'
-            node-version: '20'
-            dependency-level: 'minimum'
+        ruby-version: ['3.4', '3.2']
+        node-version: ['22', '20']
+        dependency-level: ['latest', 'minimum']
         exclude:
           # Skip minimum dependency matrix on regular PRs (run only on master/workflow_dispatch/force_run/full-ci label)
           - ruby-version: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && inputs.force_run != true && needs.detect-changes.outputs.has_full_ci_label != 'true' && '3.2' || '' }}
