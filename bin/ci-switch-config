@@ -255,6 +255,9 @@ EOF
   set_node_version "20.18.1" "$VERSION_MANAGER"
 
   # Run conversion script
+  # NOTE: This uses whatever 'ruby' is in PATH after version manager updates above.
+  # The version manager may not have reloaded yet, so ensure your current Ruby is
+  # compatible with script/convert (Ruby 2.6+ should work).
   print_header "Running script/convert to downgrade dependencies"
   cd "$PROJECT_ROOT"
   ruby script/convert
@@ -395,8 +398,11 @@ EOF
   # Restore files from git
   print_header "Restoring dependency files from git"
   cd "$PROJECT_ROOT"
-  git restore Gemfile.development_dependencies package.json spec/dummy/package.json packages/react-on-rails-pro/package.json 2>/dev/null || true
-  print_success "Files restored from git"
+  if ! git restore Gemfile.development_dependencies package.json spec/dummy/package.json packages/react-on-rails-pro/package.json 2>/dev/null; then
+    print_warning "Some files could not be restored (may not exist in git)"
+  else
+    print_success "Files restored from git"
+  fi
 
   # Clean and reinstall
   print_header "Cleaning node_modules and reinstalling"
