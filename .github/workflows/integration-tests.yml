@@ -32,6 +32,7 @@ jobs:
       run_dummy_tests: ${{ steps.detect.outputs.run_dummy_tests }}
       run_generators: ${{ steps.detect.outputs.run_generators }}
       has_full_ci_label: ${{ steps.check-label.outputs.result }}
+      matrix_array: ${{ steps.determine-matrix.outputs.result }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -41,6 +42,14 @@ jobs:
       - name: Check for full-ci label
         id: check-label
         uses: ./.github/actions/check-full-ci-label
+      - name: Determine matrix strategy
+        id: determine-matrix
+        run: |
+          if [ "${{ inputs.force_run }}" = "true" ] || [ "${{ steps.check-label.outputs.result }}" = "true" ] || [ "${{ github.ref }}" = "refs/heads/master" ]; then
+            echo 'result=["latest"]' | jq -c . >> "$GITHUB_OUTPUT"
+          else
+            echo 'result=["latest","minimum"]' | jq -c . >> "$GITHUB_OUTPUT"
+          fi
       - name: Detect relevant changes
         id: detect
         run: |
@@ -66,7 +75,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        dependency-level: ${{ fromJSON((github.ref == 'refs/heads/master' || inputs.force_run == true || needs.detect-changes.outputs.has_full_ci_label == 'true') && toJSON(['minimum']) || toJSON(['latest', 'minimum'])) }}
+        dependency-level: ${{ fromJson(needs.detect-changes.outputs.matrix_array) }}
     runs-on: ubuntu-22.04
     steps:
       - name: Translate matrix for Ruby and Node versions
@@ -153,7 +162,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        dependency-level: ${{ fromJSON((github.ref == 'refs/heads/master' || inputs.force_run == true || needs.detect-changes.outputs.has_full_ci_label == 'true') && toJSON(['minimum']) || toJSON(['latest', 'minimum'])) }}
+        dependency-level: ${{ fromJson(needs.detect-changes.outputs.matrix_array) }}
     runs-on: ubuntu-22.04
     steps:
       - name: Translate matrix for Ruby and Node versions

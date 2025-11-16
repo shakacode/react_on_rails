@@ -36,6 +36,7 @@ jobs:
       run_dummy_tests: ${{ steps.detect.outputs.run_dummy_tests }}
       run_generators: ${{ steps.detect.outputs.run_generators }}
       has_full_ci_label: ${{ steps.check-label.outputs.result }}
+      matrix_array: ${{ steps.determine-matrix.outputs.result }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -45,6 +46,14 @@ jobs:
       - name: Check for full-ci label
         id: check-label
         uses: ./.github/actions/check-full-ci-label
+      - name: Determine matrix strategy
+        id: determine-matrix
+        run: |
+          if [ "${{ inputs.force_run }}" = "true" ] || [ "${{ steps.check-label.outputs.result }}" = "true" ] || [ "${{ github.ref }}" = "refs/heads/master" ]; then
+            echo 'result=["22"]' | jq -c . >> "$GITHUB_OUTPUT"
+          else
+            echo 'result=["22","20"]' | jq -c . >> "$GITHUB_OUTPUT"
+          fi
       - name: Detect relevant changes
         id: detect
         run: |
@@ -71,7 +80,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: ${{ fromJSON((github.ref == 'refs/heads/master' || inputs.force_run == true || needs.detect-changes.outputs.has_full_ci_label == 'true') && toJSON(['20']) || toJSON(['22', '20'])) }}
+        node-version: ${{ fromJson(needs.detect-changes.outputs.matrix_array) }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
