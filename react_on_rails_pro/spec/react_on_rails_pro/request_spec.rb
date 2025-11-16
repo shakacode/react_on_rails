@@ -109,6 +109,13 @@ describe ReactOnRailsPro::Request do
                                                    count: 1) do |yielder|
         yielder.call("Bundle not found\n")
       end
+
+      # Mock the /upload-assets endpoint that gets called when send_bundle is true
+      upload_assets_url = "#{renderer_url}/upload-assets"
+      upload_request_info = mock_streaming_response(upload_assets_url, 200, count: 1) do |yielder|
+        yielder.call("Assets uploaded\n")
+      end
+
       second_request_info = mock_streaming_response(render_full_url, 200) do |yielder|
         yielder.call("Hello, world!\n")
       end
@@ -124,21 +131,33 @@ describe ReactOnRailsPro::Request do
       expect(first_request_info[:request].body.to_s).to include("renderingRequest=console.log")
       expect(first_request_info[:request].body.to_s).not_to include("bundle")
 
-      # Second request should have a bundle
-      # It's a multipart/form-data request, so we can access the form directly
-      second_request_body = second_request_info[:request].body.instance_variable_get(:@body)
-      second_request_form = second_request_body.instance_variable_get(:@form)
+      # The bundle should be sent via the /upload-assets endpoint
+      upload_request_body = upload_request_info[:request].body.instance_variable_get(:@body)
+      upload_request_form = upload_request_body.instance_variable_get(:@form)
 
-      expect(second_request_form).to have_key("bundle_server_bundle.js")
-      expect(second_request_form["bundle_server_bundle.js"][:body]).to be_a(FakeFS::Pathname)
-      expect(second_request_form["bundle_server_bundle.js"][:body].to_s).to eq(server_bundle_path)
+      expect(upload_request_form).to have_key("bundle_server_bundle.js")
+      expect(upload_request_form["bundle_server_bundle.js"][:body]).to be_a(FakeFS::Pathname)
+      expect(upload_request_form["bundle_server_bundle.js"][:body].to_s).to eq(server_bundle_path)
+
+      # Second render request should also not have a bundle
+      expect(second_request_info[:request].body.to_s).to include("renderingRequest=console.log")
+      expect(second_request_info[:request].body.to_s).not_to include("bundle")
     end
 
     it "raises duplicate bundle upload error when server asks for bundle twice" do
-      first_request_info = mock_streaming_response(render_full_url, ReactOnRailsPro::STATUS_SEND_BUNDLE) do |yielder|
+      first_request_info = mock_streaming_response(render_full_url, ReactOnRailsPro::STATUS_SEND_BUNDLE,
+                                                   count: 1) do |yielder|
         yielder.call("Bundle not found\n")
       end
-      second_request_info = mock_streaming_response(render_full_url, ReactOnRailsPro::STATUS_SEND_BUNDLE) do |yielder|
+
+      # Mock the /upload-assets endpoint that gets called when send_bundle is true
+      upload_assets_url = "#{renderer_url}/upload-assets"
+      upload_request_info = mock_streaming_response(upload_assets_url, 200, count: 1) do |yielder|
+        yielder.call("Assets uploaded\n")
+      end
+
+      second_request_info = mock_streaming_response(render_full_url, ReactOnRailsPro::STATUS_SEND_BUNDLE,
+                                                    count: 1) do |yielder|
         yielder.call("Bundle still not found\n")
       end
 
@@ -153,13 +172,17 @@ describe ReactOnRailsPro::Request do
       expect(first_request_info[:request].body.to_s).to include("renderingRequest=console.log")
       expect(first_request_info[:request].body.to_s).not_to include("bundle")
 
-      # Second request should have a bundle
-      second_request_body = second_request_info[:request].body.instance_variable_get(:@body)
-      second_request_form = second_request_body.instance_variable_get(:@form)
+      # The bundle should be sent via the /upload-assets endpoint
+      upload_request_body = upload_request_info[:request].body.instance_variable_get(:@body)
+      upload_request_form = upload_request_body.instance_variable_get(:@form)
 
-      expect(second_request_form).to have_key("bundle_server_bundle.js")
-      expect(second_request_form["bundle_server_bundle.js"][:body]).to be_a(FakeFS::Pathname)
-      expect(second_request_form["bundle_server_bundle.js"][:body].to_s).to eq(server_bundle_path)
+      expect(upload_request_form).to have_key("bundle_server_bundle.js")
+      expect(upload_request_form["bundle_server_bundle.js"][:body]).to be_a(FakeFS::Pathname)
+      expect(upload_request_form["bundle_server_bundle.js"][:body].to_s).to eq(server_bundle_path)
+
+      # Second render request should also not have a bundle
+      expect(second_request_info[:request].body.to_s).to include("renderingRequest=console.log")
+      expect(second_request_info[:request].body.to_s).not_to include("bundle")
     end
 
     it "raises incompatible error when server returns incompatible error" do
