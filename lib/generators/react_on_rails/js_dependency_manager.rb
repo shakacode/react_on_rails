@@ -52,7 +52,9 @@ module ReactOnRails
       private
 
       def setup_js_dependencies
-        @added_dependencies_to_package_json ||= false
+        # Initialize instance variable if not already defined by including class
+        # This ensures safe operation when the module is first included
+        @added_dependencies_to_package_json = false unless defined?(@added_dependencies_to_package_json)
         add_js_dependencies
         install_js_dependencies
       end
@@ -73,7 +75,8 @@ module ReactOnRails
           @added_dependencies_to_package_json = true
         else
           # This should not happen since package_json is always available via shakapacker
-          raise "Failed to add react-on-rails package via package_json gem"
+          raise "Failed to add react-on-rails package via package_json gem. " \
+                "This indicates shakapacker dependency may not be properly installed."
         end
       end
 
@@ -84,7 +87,8 @@ module ReactOnRails
           @added_dependencies_to_package_json = true
         else
           # This should not happen since package_json is always available via shakapacker
-          raise "Failed to add React dependencies via package_json gem"
+          raise "Failed to add React dependencies (#{REACT_DEPENDENCIES.join(', ')}) via package_json gem. " \
+                "This indicates shakapacker dependency may not be properly installed."
         end
       end
 
@@ -95,7 +99,8 @@ module ReactOnRails
           @added_dependencies_to_package_json = true
         else
           # This should not happen since package_json is always available via shakapacker
-          raise "Failed to add CSS dependencies via package_json gem"
+          raise "Failed to add CSS dependencies (#{CSS_DEPENDENCIES.join(', ')}) via package_json gem. " \
+                "This indicates shakapacker dependency may not be properly installed."
         end
       end
 
@@ -106,11 +111,20 @@ module ReactOnRails
           @added_dependencies_to_package_json = true
         else
           # This should not happen since package_json is always available via shakapacker
-          raise "Failed to add development dependencies via package_json gem"
+          raise "Failed to add development dependencies (#{DEV_DEPENDENCIES.join(', ')}) via package_json gem. " \
+                "This indicates shakapacker dependency may not be properly installed."
         end
       end
 
       # Add a single dependency using package_json gem
+      #
+      # This method is used internally for adding the react-on-rails package
+      # with version-specific handling (react-on-rails@VERSION).
+      # For batch operations, use add_js_dependencies_batch instead.
+      #
+      # @param package [String] Package specifier (e.g., "react-on-rails@16.0.0")
+      # @param dev [Boolean] Whether to add as dev dependency
+      # @return [Boolean] true if successful, false otherwise
       def add_js_dependency(package, dev: false)
         pj = package_json
         return false unless pj
@@ -131,6 +145,13 @@ module ReactOnRails
       end
 
       # Add multiple dependencies at once using package_json gem
+      #
+      # This method delegates to GeneratorHelper's add_npm_dependencies for
+      # better package manager abstraction and batch processing efficiency.
+      #
+      # @param packages [Array<String>] Package names to add
+      # @param dev [Boolean] Whether to add as dev dependencies
+      # @return [Boolean] true if successful, false otherwise
       def add_js_dependencies_batch(packages, dev: false)
         # Use the add_npm_dependencies helper from GeneratorHelper
         add_npm_dependencies(packages, dev: dev)
@@ -138,21 +159,19 @@ module ReactOnRails
 
       def install_js_dependencies
         # Use package_json gem's install method (always available via shakapacker)
-        begin
-          package_json.manager.install
-          true
-        rescue StandardError => e
-          GeneratorMessages.add_warning(<<~MSG.strip)
-            ⚠️  JavaScript dependencies installation failed: #{e.message}
+        package_json.manager.install
+        true
+      rescue StandardError => e
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  JavaScript dependencies installation failed: #{e.message}
 
-            This could be due to network issues or package manager problems.
-            You can install dependencies manually later by running:
-            • npm install (if using npm)
-            • yarn install (if using yarn)
-            • pnpm install (if using pnpm)
-          MSG
-          false
-        end
+          This could be due to network issues or package manager problems.
+          You can install dependencies manually later by running:
+          • npm install (if using npm)
+          • yarn install (if using yarn)
+          • pnpm install (if using pnpm)
+        MSG
+        false
       end
 
       # No longer needed since package_json gem handles package manager detection

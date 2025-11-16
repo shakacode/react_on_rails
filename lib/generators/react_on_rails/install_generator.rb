@@ -374,26 +374,14 @@ module ReactOnRails
           @babel/preset-typescript
         ]
 
-        # Try using GeneratorHelper first (package manager agnostic)
-        if add_npm_dependencies(typescript_packages, dev: true)
-          @added_dependencies_to_package_json = true
-          return
+        # Use the shared dependency management approach via GeneratorHelper
+        unless add_npm_dependencies(typescript_packages, dev: true)
+          # This should not happen since package_json is always available via shakapacker
+          raise "Failed to add TypeScript dependencies (#{typescript_packages.join(', ')}) via package_json gem. " \
+                "This indicates shakapacker dependency may not be properly installed."
         end
 
-        # Fallback to npm if GeneratorHelper fails
-        success = system("npm", "install", "--save-dev", *typescript_packages)
-        if success
-          @ran_direct_installs = true
-          return
-        end
-
-        warning = <<~MSG.strip
-          ⚠️  Failed to install TypeScript dependencies automatically.
-
-          Please run manually:
-              npm install --save-dev #{typescript_packages.join(' ')}
-        MSG
-        GeneratorMessages.add_warning(warning)
+        @added_dependencies_to_package_json = true
       end
 
       def create_css_module_types
