@@ -21,7 +21,7 @@ react_component("MyComponent", immediate_hydration: false)
 # Non-Pro users: immediate_hydration is ignored
 ```
 
-See [CHANGELOG.md](../CHANGELOG.md) for details.
+See [CHANGELOG.md](../../CHANGELOG.md) for details.
 
 ## Deprecated Options
 
