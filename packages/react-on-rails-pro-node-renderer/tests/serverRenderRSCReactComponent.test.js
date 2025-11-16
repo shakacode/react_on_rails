@@ -2,7 +2,8 @@ import path from 'path';
 import fs from 'fs';
 import { Readable } from 'stream';
 import { buildExecutionContext, resetVM } from '../src/worker/vm';
-import { getConfig } from '../src/shared/configBuilder';
+import { buildConfig } from '../src/shared/configBuilder';
+import { serverBundleCachePath } from './helper';
 
 const SimpleWorkingComponent = () => 'hello';
 
@@ -18,13 +19,14 @@ const ComponentWithAsyncError = async () => {
 };
 
 describe('serverRenderRSCReactComponent', () => {
+  const testName = 'serverRenderRSCReactComponent';
   let tempDir;
   let tempRscBundlePath;
   let tempManifestPath;
 
   beforeAll(async () => {
-    // Create temporary directory
-    tempDir = path.join(process.cwd(), 'tmp/node-renderer-bundles-test/testing-bundle');
+    // Create temporary directory using helper to ensure unique path
+    tempDir = serverBundleCachePath(testName);
     fs.mkdirSync(tempDir, { recursive: true });
 
     // Copy rsc-bundle.js to temp directory
@@ -52,10 +54,12 @@ describe('serverRenderRSCReactComponent', () => {
   });
 
   beforeEach(async () => {
-    const config = getConfig();
-    config.supportModules = true;
-    config.maxVMPoolSize = 2; // Set a small pool size for testing
-    config.stubTimers = false;
+    buildConfig({
+      serverBundleCachePath: tempDir,
+      supportModules: true,
+      stubTimers: false,
+      maxVMPoolSize: 2,
+    });
   });
 
   afterEach(async () => {
