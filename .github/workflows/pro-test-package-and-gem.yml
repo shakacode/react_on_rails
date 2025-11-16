@@ -9,14 +9,14 @@ on:
       - 'docs/**'
       - 'lib/**'
       - 'spec/**'
-      - 'packages/**'
+      - 'packages/react_on_rails/**'
   pull_request:
     paths-ignore:
       - '**.md'
       - 'docs/**'
       - 'lib/**'
       - 'spec/**'
-      - 'packages/**'
+      - 'packages/react_on_rails/**'
   workflow_dispatch:
     inputs:
       force_run:

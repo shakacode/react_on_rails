@@ -250,7 +250,7 @@ if [ "${CI_JSON_OUTPUT:-}" = "1" ]; then
   "run_dummy_tests": $RUN_DUMMY_TESTS,
   "run_generators": $RUN_GENERATORS,
   "run_pro_lint": $RUN_PRO_LINT,
-  "run_pro_tests": $RUN_PRO_TESTS
+  "run_pro_tests": $RUN_PRO_TESTS,
   "run_pro_dummy_tests": $RUN_PRO_DUMMY_TESTS
 }
 EOF
