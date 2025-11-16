@@ -9,13 +9,21 @@ on:
       - 'docs/**'
       - 'lib/**'
       - 'spec/react_on_rails/**'
+      - 'react_on_rails_pro/**'
   pull_request:
     paths-ignore:
       - '**.md'
       - 'docs/**'
       - 'lib/**'
       - 'spec/react_on_rails/**'
+      - 'react_on_rails_pro/**'
   workflow_dispatch:
+    inputs:
+      force_run:
+        description: 'Force run all jobs (bypass detect-changes)'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   detect-changes:

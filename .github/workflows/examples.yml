@@ -1,4 +1,4 @@
-name: Generator tests
+name: Generator tests # TODO needs to be duplicated for RoR Pro
 
 on:
   push:

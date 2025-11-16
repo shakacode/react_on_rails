@@ -4,7 +4,19 @@ on:
   push:
     branches:
       - 'master'
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'lib/**'
+      - 'spec/**'
+      - 'packages/**'
   pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'lib/**'
+      - 'spec/**'
+      - 'packages/**'
   workflow_dispatch:
     inputs:
       force_run:
