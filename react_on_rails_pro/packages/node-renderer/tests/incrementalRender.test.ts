@@ -239,7 +239,7 @@ describe('incremental render NDJSON endpoint', () => {
   };
 
   beforeEach(async () => {
-    await resetForTest(TEST_NAME);
+    await resetForTest(TEST_NAME, false);
   });
 
   afterEach(() => {
