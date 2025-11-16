@@ -63,7 +63,7 @@ jobs:
           script/ci-changes-detector "$BASE_REF"
         shell: bash
 
-  build:
+  package-js-tests:
     needs: detect-changes
     # Run on master OR when JS tests needed on PR
     if: |

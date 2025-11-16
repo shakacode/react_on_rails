@@ -62,7 +62,7 @@ jobs:
         shell: bash
 
   # Build webpack test bundles for dummy app
-  build-dummy-app-webpack-test-bundles:
+  pro-build-dummy-app-webpack-test-bundles:
     needs: detect-changes
     if: github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.run_pro_tests == 'true'
     runs-on: ubuntu-22.04
@@ -147,7 +147,7 @@ jobs:
           key: v4-pro-dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}
 
   # Jest unit tests for Pro package
-  package-js-tests:
+  pro-package-js-tests:
     needs:
       - detect-changes
       - build-dummy-app-webpack-test-bundles
@@ -227,7 +227,7 @@ jobs:
           path: react_on_rails_pro/jest
 
   # RSpec tests for Pro package
-  rspec-package-specs:
+  pro-gem-tests:
     needs: detect-changes
     if: github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.run_pro_tests == 'true'
     strategy:

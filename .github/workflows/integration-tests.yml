@@ -141,7 +141,7 @@ jobs:
           path: spec/dummy/public/webpack
           key: dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
 
-  dummy-app-integration-tests:
+  spec-dummy-integration-tests:
     needs: [detect-changes, build-dummy-app-webpack-test-bundles]
     # Run on master, workflow_dispatch, OR when tests needed on PR
     if: |

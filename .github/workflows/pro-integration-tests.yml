@@ -62,7 +62,7 @@ jobs:
         shell: bash
 
   # Build webpack test bundles for dummy app
-  build-dummy-app-webpack-test-bundles:
+  pro-build-dummy-app-webpack-test-bundles:
     needs: detect-changes
     if: github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.run_pro_tests == 'true'
     runs-on: ubuntu-22.04
@@ -147,7 +147,7 @@ jobs:
           key: v4-pro-dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}
 
   # RSpec integration tests with Node renderer
-  rspec-dummy-app-node-renderer:
+  pro-dummy-app-node-renderer:
     needs:
       - detect-changes
       - build-dummy-app-webpack-test-bundles
@@ -324,7 +324,7 @@ jobs:
           path: react_on_rails_pro/spec/dummy/yarn-error.log
 
   # Playwright E2E tests with Redis service
-  dummy-app-node-renderer-e2e-tests:
+  node-renderer-e2e-tests:
     needs:
       - detect-changes
       - build-dummy-app-webpack-test-bundles

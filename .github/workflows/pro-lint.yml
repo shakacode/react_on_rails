@@ -61,7 +61,7 @@ jobs:
           script/ci-changes-detector "$BASE_REF"
         shell: bash
 
-  lint-js-and-ruby:
+  pro-lint-js-and-ruby:
     needs: detect-changes
     if: github.ref == 'refs/heads/master' || needs.detect-changes.outputs.run_pro_lint == 'true'
     runs-on: ubuntu-22.04

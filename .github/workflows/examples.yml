@@ -57,7 +57,7 @@ jobs:
           script/ci-changes-detector "$BASE_REF"
         shell: bash
 
-  examples:
+  build-examples-and-test-generators:
     needs: detect-changes
     # Run on master, workflow_dispatch, OR when generators needed
     if: |

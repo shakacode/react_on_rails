@@ -58,7 +58,7 @@ jobs:
           script/ci-changes-detector "$BASE_REF"
         shell: bash
 
-  build:
+  lint-js-and-ruby:
     needs: detect-changes
     if: github.ref == 'refs/heads/master' || needs.detect-changes.outputs.run_lint == 'true'
     env:
