@@ -71,7 +71,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: ${{ (github.ref == 'refs/heads/master' || inputs.force_run == true || needs.detect-changes.outputs.has_full_ci_label == 'true') && ['20'] || ['22', '20']}}
+        node-version: ${{ fromJSON((github.ref == 'refs/heads/master' || inputs.force_run == true || needs.detect-changes.outputs.has_full_ci_label == 'true') && toJSON(['20']) || toJSON(['22', '20'])) }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4

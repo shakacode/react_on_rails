@@ -69,7 +69,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        dependency-level: ${{ (github.ref == 'refs/heads/master' || inputs.force_run == true || needs.detect-changes.outputs.has_full_ci_label == 'true') && ['minimum'] || ['latest', 'minimum']}}
+        dependency-level: ${{ fromJSON((github.ref == 'refs/heads/master' || inputs.force_run == true || needs.detect-changes.outputs.has_full_ci_label == 'true') && toJSON(['minimum']) || toJSON(['latest', 'minimum'])) }}
     env:
       BUNDLE_FROZEN: ${{ matrix.dependency-level == 'minimum' && 'false' || 'true' }}
     runs-on: ubuntu-22.04

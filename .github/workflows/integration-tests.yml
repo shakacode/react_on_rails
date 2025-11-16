@@ -66,7 +66,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        dependency-level: ${{ (github.ref == 'refs/heads/master' || inputs.force_run == true || needs.detect-changes.outputs.has_full_ci_label == 'true') && ['minimum'] || ['latest', 'minimum']}}
+        dependency-level: ${{ fromJSON((github.ref == 'refs/heads/master' || inputs.force_run == true || needs.detect-changes.outputs.has_full_ci_label == 'true') && toJSON(['minimum']) || toJSON(['latest', 'minimum'])) }}
     runs-on: ubuntu-22.04
     steps:
       - name: Translate matrix for Ruby and Node versions
@@ -153,7 +153,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        dependency-level: ${{ (github.ref == 'refs/heads/master' || inputs.force_run == true || needs.detect-changes.outputs.has_full_ci_label == 'true') && ['minimum'] || ['latest', 'minimum']}}
+        dependency-level: ${{ fromJSON((github.ref == 'refs/heads/master' || inputs.force_run == true || needs.detect-changes.outputs.has_full_ci_label == 'true') && toJSON(['minimum']) || toJSON(['latest', 'minimum'])) }}
     runs-on: ubuntu-22.04
     steps:
       - name: Translate matrix for Ruby and Node versions
