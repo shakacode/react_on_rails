@@ -1,0 +1,64 @@
+name: Lint JS and Ruby
+
+on:
+  push:
+    branches:
+      - 'master'
+    paths: 
+      - '.github/workflows/**'
+  pull_request:
+    paths: 
+      - '.github/workflows/**'
+  workflow_dispatch:
+    inputs:
+      force_run:
+        description: 'Force run all jobs (bypass detect-changes)'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  actionlint:
+    env:
+      BUNDLE_FROZEN: true
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # No need for history in lint job
+          fetch-depth: 1
+          persist-credentials: false
+      # We only download and run Actionlint if there is any difference in GitHub Action workflows
+      # https://github.com/rhysd/actionlint/blob/main/docs/usage.md#on-github-actions
+      - name: Check GitHub Action changes
+        id: check-workflows
+        run: |
+          git fetch origin ${{ github.event.pull_request.base.sha }}
+          if git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} | grep -q '^.github/workflows'; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            response=$(curl -sf https://api.github.com/repos/rhysd/actionlint/releases/latest)
+            if [ $? -eq 0 ]; then
+              actionlint_version=$(echo "$response" | jq -r .tag_name)
+              if [ -z "$actionlint_version" ]; then
+                echo "Failed to parse Actionlint version"
+                exit 1
+              fi
+              echo "actionlint_version=\"$actionlint_version\"" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+      - name: Setup Actionlint
+        if: steps.check-workflows.outputs.changed == 'true'
+        uses: actions/cache@v4
+        id: cache-actionlint
+        with:
+          path: ./actionlint
+          key: ${{ runner.os }}-actionlint-${{ steps.check-workflows.outputs.actionlint_version }}
+      - name: Download Actionlint
+        if: steps.check-workflows.outputs.changed == 'true' && steps.cache-actionlint.outputs.cache-hit != 'true'
+        run: bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+      - name: Lint GitHub Actions
+        if: steps.check-workflows.outputs.changed == 'true'
+        run: |
+          echo "::add-matcher::.github/actionlint-matcher.json"
+          SHELLCHECK_OPTS="-S warning" ./actionlint -color
+        shell: bash
