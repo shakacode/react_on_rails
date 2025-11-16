@@ -64,24 +64,28 @@ jobs:
     if: |
       github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.run_dummy_tests == 'true'
     strategy:
+      fail-fast: false
       matrix:
-        ruby-version: ['3.4']
-        node-version: ['22']
-        dependency-level: ['latest']
-        include:
-          # Skip minimum dependency matrix on regular PRs (run only on master/workflow_dispatch/force_run/full-ci label)
-          - ruby-version: ${{ (github.ref == 'refs/heads/master' || inputs.force_run == true || needs.detect-changes.outputs.has_full_ci_label == 'true') && '3.2'}}
-            node-version: ${{ (github.ref == 'refs/heads/master' || inputs.force_run == true || needs.detect-changes.outputs.has_full_ci_label == 'true') && '20'}}
-            dependency-level: ${{ (github.ref == 'refs/heads/master' || inputs.force_run == true || needs.detect-changes.outputs.has_full_ci_label == 'true') && 'minimum'}}
+        dependency-level: ${{ (github.ref == 'refs/heads/master' || inputs.force_run == true || needs.detect-changes.outputs.has_full_ci_label == 'true') && ['minimum'] || ['latest', 'minimum']}}
     runs-on: ubuntu-22.04
     steps:
+      - name: Translate matrix for Ruby and Node versions
+        id: translate-matrix
+        run: |
+          if [ "${{ matrix.dependency-level }}" == "latest" ]; then
+            echo "ruby-version=3.4" >> "$GITHUB_OUTPUT"
+            echo "node-version=22" >> "$GITHUB_OUTPUT"
+          else
+            echo "ruby-version=3.2" >> "$GITHUB_OUTPUT"
+            echo "node-version=20" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: ${{ matrix.ruby-version }}
+          ruby-version: ${{ steps.translate-matrix.outputs.ruby-version }}
           bundler: 2.5.9
       # libyaml-dev is needed for psych v5
       # this gem depends on sdoc which depends on rdoc which depends on psych
@@ -90,10 +94,10 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: ${{ steps.translate-matrix.outputs.node-version }}
           # Disable cache for Node 22 due to V8 bug in 22.21.0
           # https://github.com/nodejs/node/issues/56010
-          cache: ${{ matrix.node-version != '22' && 'yarn' || '' }}
+          cache: yarn
           cache-dependency-path: '**/yarn.lock'
       - name: Print system information
         run: |
@@ -121,7 +125,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: spec/dummy/vendor/bundle
-          key: dummy-app-gem-cache-${{ hashFiles('spec/dummy/Gemfile.lock') }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
+          key: dummy-app-gem-cache-${{ hashFiles('spec/dummy/Gemfile.lock') }}-ruby${{ steps.translate-matrix.outputs.ruby-version }}-${{ matrix.dependency-level }}
       - name: Install Ruby Gems for dummy app
         run: |
           cd spec/dummy
@@ -139,7 +143,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: spec/dummy/public/webpack
-          key: dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
+          key: dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}-ruby${{ steps.translate-matrix.outputs.ruby-version }}-${{ matrix.dependency-level }}
 
   dummy-app-integration-tests:
     needs: [detect-changes, build-dummy-app-webpack-test-bundles]
@@ -147,37 +151,36 @@ jobs:
     if: |
       github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.run_dummy_tests == 'true'
     strategy:
+      fail-fast: false
       matrix:
-        ruby-version: ['3.4']
-        node-version: ['22']
-        dependency-level: ['latest']
-        include:
-          # Skip minimum dependency matrix on regular PRs (run only on master/workflow_dispatch/force_run/full-ci label)
-          - ruby-version: ${{ (github.ref == 'refs/heads/master' || inputs.force_run == true || needs.detect-changes.outputs.has_full_ci_label == 'true') && '3.2'}}
-            node-version: ${{ (github.ref == 'refs/heads/master' || inputs.force_run == true || needs.detect-changes.outputs.has_full_ci_label == 'true') && '20'}}
-            dependency-level: ${{ (github.ref == 'refs/heads/master' || inputs.force_run == true || needs.detect-changes.outputs.has_full_ci_label == 'true') && 'minimum'}}
-        exclude:
-          # Skip minimum dependency matrix on regular PRs (run only on master/workflow_dispatch/force_run/full-ci label)
-          - ruby-version: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && inputs.force_run != true && needs.detect-changes.outputs.has_full_ci_label != 'true' && '3.2' || '' }}
-            node-version: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && inputs.force_run != true && needs.detect-changes.outputs.has_full_ci_label != 'true' && '20' || '' }}
-            dependency-level: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && inputs.force_run != true && needs.detect-changes.outputs.has_full_ci_label != 'true' && 'minimum' || '' }}
+        dependency-level: ${{ (github.ref == 'refs/heads/master' || inputs.force_run == true || needs.detect-changes.outputs.has_full_ci_label == 'true') && ['minimum'] || ['latest', 'minimum']}}
     runs-on: ubuntu-22.04
     steps:
+      - name: Translate matrix for Ruby and Node versions
+        id: translate-matrix
+        run: |
+          if [ "${{ matrix.dependency-level }}" == "latest" ]; then
+            echo "ruby-version=3.4" >> "$GITHUB_OUTPUT"
+            echo "node-version=22" >> "$GITHUB_OUTPUT"
+          else
+            echo "ruby-version=3.2" >> "$GITHUB_OUTPUT"
+            echo "node-version=20" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: ${{ matrix.ruby-version }}
+          ruby-version: ${{ steps.translate-matrix.outputs.ruby-version }}
           bundler: 2.5.9
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: ${{ steps.translate-matrix.outputs.node-version }}
           # Disable cache for Node 22 due to V8 bug in 22.21.0
           # https://github.com/nodejs/node/issues/56010
-          cache: ${{ matrix.node-version != '22' && 'yarn' || '' }}
+          cache: yarn
           cache-dependency-path: '**/yarn.lock'
       - name: Print system information
         run: |
@@ -195,19 +198,19 @@ jobs:
         uses: actions/cache@v4
         with:
           path: vendor/bundle
-          key: package-app-gem-cache-${{ hashFiles('Gemfile.lock') }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
+          key: package-app-gem-cache-${{ hashFiles('Gemfile.lock') }}-ruby${{ steps.translate-matrix.outputs.ruby-version }}-${{ matrix.dependency-level }}
       - name: Save dummy app ruby gems to cache
         uses: actions/cache@v4
         with:
           path: spec/dummy/vendor/bundle
-          key: dummy-app-gem-cache-${{ hashFiles('spec/dummy/Gemfile.lock') }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
+          key: dummy-app-gem-cache-${{ hashFiles('spec/dummy/Gemfile.lock') }}-ruby${{ steps.translate-matrix.outputs.ruby-version }}-${{ matrix.dependency-level }}
       - id: get-sha
         run: echo "sha=\"$(git rev-parse HEAD)\"" >> "$GITHUB_OUTPUT"
       - name: Save test Webpack bundles to cache (for build number checksum used by RSpec job)
         uses: actions/cache@v4
         with:
           path: spec/dummy/public/webpack
-          key: dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
+          key: dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}-ruby${{ steps.translate-matrix.outputs.ruby-version }}-${{ matrix.dependency-level }}
       - name: Install Node modules with Yarn
         run: |
           yarn install --no-progress --no-emoji ${{ matrix.dependency-level == 'latest' && '--frozen-lockfile' || '' }}
@@ -260,26 +263,26 @@ jobs:
       - run: cd spec/dummy && bundle info shakapacker
       - name: Set packer version environment variable
         run: |
-          echo "CI_DEPENDENCY_LEVEL=ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}" >> $GITHUB_ENV
+          echo "CI_DEPENDENCY_LEVEL=ruby${{ steps.translate-matrix.outputs.ruby-version }}-${{ matrix.dependency-level }}" >> $GITHUB_ENV
       - name: Main CI
         run: bundle exec rake run_rspec:all_dummy
       - name: Store test results
         uses: actions/upload-artifact@v4
         with:
-          name: main-rspec-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
+          name: main-rspec-${{ github.run_id }}-${{ github.job }}-ruby${{ steps.translate-matrix.outputs.ruby-version }}-${{ matrix.dependency-level }}
           path: ~/rspec
       - name: Store artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: dummy-app-capybara-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
+          name: dummy-app-capybara-${{ github.run_id }}-${{ github.job }}-ruby${{ steps.translate-matrix.outputs.ruby-version }}-${{ matrix.dependency-level }}
           path: spec/dummy/tmp/capybara
       - name: Store artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: dummy-app-test-log-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
+          name: dummy-app-test-log-${{ github.run_id }}-${{ github.job }}-ruby${{ steps.translate-matrix.outputs.ruby-version }}-${{ matrix.dependency-level }}
           path: spec/dummy/log/test.log
       - name: Store artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: dummy-app-yarn-log-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
+          name: dummy-app-yarn-log-${{ github.run_id }}-${{ github.job }}-ruby${{ steps.translate-matrix.outputs.ruby-version }}-${{ matrix.dependency-level }}
           path: spec/dummy/yarn-error.log

@@ -69,17 +69,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          # Always run: Latest versions (fast feedback on PRs)
-          - ruby-version: '3.4'
-            dependency-level: 'latest'
-          # Master and full-ci label: Minimum supported versions (full coverage)
-          - ruby-version: '3.2'
-            dependency-level: 'minimum'
-        exclude:
-          # Skip minimum dependency matrix on regular PRs (run only on master or with full-ci label)
-          - ruby-version: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && needs.detect-changes.outputs.has_full_ci_label != 'true' && '3.2' || '' }}
-            dependency-level: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && needs.detect-changes.outputs.has_full_ci_label != 'true' && 'minimum' || '' }}
+        dependency-level: ${{ (github.ref == 'refs/heads/master' || inputs.force_run == true || needs.detect-changes.outputs.has_full_ci_label == 'true') && ['minimum'] || ['latest', 'minimum']}}
     env:
       BUNDLE_FROZEN: ${{ matrix.dependency-level == 'minimum' && 'false' || 'true' }}
     runs-on: ubuntu-22.04
@@ -90,7 +80,7 @@ jobs:
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: ${{ matrix.ruby-version }}
+          ruby-version: ${{ steps.translate-matrix.outputs.ruby-version }}
           bundler: 2.5.9
       - name: Print system information
         run: |
@@ -108,7 +98,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: vendor/bundle
-          key: package-app-gem-cache-${{ hashFiles('Gemfile.lock') }}-${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
+          key: package-app-gem-cache-${{ hashFiles('Gemfile.lock') }}-${{ steps.translate-matrix.outputs.ruby-version }}-${{ matrix.dependency-level }}
       - name: Install Ruby Gems for package
         run: bundle check --path=vendor/bundle || bundle  _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
       - name: Git Stuff
@@ -125,10 +115,10 @@ jobs:
       - name: Store test results
         uses: actions/upload-artifact@v4
         with:
-          name: main-rspec-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
+          name: main-rspec-${{ github.run_id }}-${{ github.job }}-ruby${{ steps.translate-matrix.outputs.ruby-version }}-${{ matrix.dependency-level }}
           path: ~/rspec
       - name: Store artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: main-test-log-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
+          name: main-test-log-${{ github.run_id }}-${{ github.job }}-ruby${{ steps.translate-matrix.outputs.ruby-version }}-${{ matrix.dependency-level }}
           path: log/test.log
