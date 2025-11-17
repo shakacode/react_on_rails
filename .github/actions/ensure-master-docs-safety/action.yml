@@ -13,18 +13,25 @@ runs:
     - name: Check previous master commit status
       if: ${{ inputs.docs-only == 'true' && inputs.previous-sha != '' && inputs.previous-sha != '0000000000000000000000000000000000000000' }}
       uses: actions/github-script@v7
+      env:
+        PREVIOUS_SHA: ${{ inputs.previous-sha }}
       with:
         script: |
-          const previousSha = core.getInput('previous-sha');
-          const workflowRuns = await github.paginate(
-            github.rest.actions.listWorkflowRunsForRepo,
-            {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              branch: 'master',
-              per_page: 100
-            }
-          );
+          const previousSha = process.env.PREVIOUS_SHA;
+          if (!previousSha) {
+            core.info('No previous SHA found, skipping safety check.');
+            return;
+          }
+
+          const createdAfter = new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString();
+          const workflowRuns = await github.paginate(github.rest.actions.listWorkflowRunsForRepo, {
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            branch: 'master',
+            event: 'push',
+            per_page: 50,
+            created: `>${createdAfter}`
+          });
 
           const relevantRuns = workflowRuns.filter((run) => run.head_sha === previousSha);
 
@@ -41,11 +48,24 @@ runs:
             }
           }
 
+          const incompleteRuns = Array.from(latestByWorkflow.values()).filter(
+            (run) => run.status !== 'completed'
+          );
+
+          if (incompleteRuns.length > 0) {
+            const details = incompleteRuns
+              .map((run) => `- ${run.name} (run #${run.run_number}) is still ${run.status}`)
+              .join('\n');
+            core.setFailed(
+              [
+                `Cannot skip CI for docs-only commit because previous master commit ${previousSha} still has running workflows:`,
+                details
+              ].join('\n')
+            );
+            return;
+          }
+
           const failingRuns = Array.from(latestByWorkflow.values()).filter((run) => {
-            if (run.status !== 'completed') {
-              core.info(`Workflow ${run.name} (#${run.id}) is still ${run.status}; ignoring for enforcement.`);
-              return false;
-            }
             return ['failure', 'timed_out', 'cancelled', 'action_required'].includes(run.conclusion);
           });
 
