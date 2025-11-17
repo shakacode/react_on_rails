@@ -50,7 +50,7 @@ module ReactOnRails
         package_json = File.join(destination_root, "package.json")
         contents = JSON.parse(File.read(package_json))
         contents["scripts"] ||= {}
-        contents["scripts"]["postinstall"] = "yalc link react-on-rails"
+        contents["scripts"]["postinstall"] = "yarn yalc link react-on-rails"
         File.open(package_json, "w+") { |f| f.puts JSON.pretty_generate(contents) }
       end
     end
