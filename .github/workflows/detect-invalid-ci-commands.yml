@@ -6,10 +6,17 @@ on:
 
 jobs:
   detect-invalid-commands:
-    # Only run on PR comments that contain /ci commands but don't match valid commands
+    # Only run on PR comments that contain potential commands but don't match valid commands
     if: |
       github.event.issue.pull_request &&
-      contains(github.event.comment.body, '/ci') &&
+      (
+        contains(github.event.comment.body, '/ci') ||
+        contains(github.event.comment.body, '/run') ||
+        contains(github.event.comment.body, '/stop') ||
+        contains(github.event.comment.body, '/delete') ||
+        contains(github.event.comment.body, '/deploy') ||
+        contains(github.event.comment.body, '/help')
+      ) &&
       !contains(github.event.comment.body, '/run-skipped-ci') &&
       !contains(github.event.comment.body, '/stop-run-skipped-ci')
     runs-on: ubuntu-22.04
@@ -24,13 +31,13 @@ jobs:
           script: |
             const comment = context.payload.comment.body;
 
-            // Pattern to detect /ci* commands at the start of a line
-            // Matches: /ci, /ci-run, /ci-test, etc. at beginning of comment or after newline
-            const ciCommandPattern = /(?:^|\n)\s*(\/ci[\w-]*)/gi;
-            const matches = [...comment.matchAll(ciCommandPattern)];
+            // Pattern to detect potential command attempts at the start of a line
+            // Matches: /ci*, /run*, /stop*, /delete*, /deploy*, /help* at beginning or after newline
+            const commandPattern = /(?:^|\n)\s*(\/(ci|run|stop|delete|deploy|help)[\w-]*)/gi;
+            const matches = [...comment.matchAll(commandPattern)];
 
             if (matches.length === 0) {
-              console.log('No /ci commands found at line start');
+              console.log('No potential commands found at line start');
               return { shouldRespond: false };
             }
 
@@ -43,7 +50,7 @@ jobs:
               .filter(cmd => !validCommands.includes(cmd));
 
             if (invalidCommands.length > 0) {
-              console.log('Found invalid /ci commands:', invalidCommands);
+              console.log('Found invalid commands:', invalidCommands);
               return {
                 shouldRespond: true,
                 invalidCommands: invalidCommands
