@@ -1,30 +1,122 @@
-#!/usr/bin/env ruby
-# frozen_string_literal: true
-
+#!/bin/sh
 # Shakapacker precompile hook for React on Rails
 #
-# This script runs before webpack compilation to generate pack files
-# for auto-bundled components. It's called automatically by Shakapacker
-# when configured in config/shakapacker.yml:
+# This script runs before webpack compilation to:
+# 1. Build ReScript files (if configured)
+# 2. Generate pack files for auto-bundled components
+#
+# It's called automatically by Shakapacker when configured in config/shakapacker.yml:
 #   precompile_hook: 'bin/shakapacker-precompile-hook'
 #
-# Emoji Scheme:
-#   🔄 = Running/in-progress
-#   ✅ = Success
-#   ❌ = Error
+# See: https://github.com/shakacode/shakapacker/blob/main/docs/precompile_hook.md
 
-# Skip validation during precompile hook execution
-# The hook runs early in the build process, potentially before full Rails initialization,
-# and doesn't need package version validation since it's part of the build itself
-ENV["REACT_ON_RAILS_SKIP_VALIDATION"] = "true"
+set -e
 
-require_relative "../config/environment"
+# Find Rails root by walking upward looking for config/environment.rb
+find_rails_root() {
+  dir="$PWD"
+  while [ "$dir" != "/" ]; do
+    if [ -f "$dir/config/environment.rb" ]; then
+      echo "$dir"
+      return 0
+    fi
+    dir=$(dirname "$dir")
+  done
+  return 1
+}
 
-begin
-  puts Rainbow("🔄 Running React on Rails precompile hook...").cyan
-  ReactOnRails::PacksGenerator.instance.generate_packs_if_stale
-rescue StandardError => e
-  warn Rainbow("❌ Error in precompile hook: #{e.message}").red
-  warn e.backtrace.first(5).join("\n")
-  exit 1
-end
+# Build ReScript if needed
+build_rescript_if_needed() {
+  rails_root=$(find_rails_root)
+  if [ -z "$rails_root" ]; then
+    echo "⚠️  Warning: Could not find Rails root. Skipping ReScript build."
+    return 0
+  fi
+
+  # Check for both old (bsconfig.json) and new (rescript.json) config files
+  if [ ! -f "$rails_root/bsconfig.json" ] && [ ! -f "$rails_root/rescript.json" ]; then
+    return 0
+  fi
+
+  echo "🔧 Building ReScript..."
+
+  # Change to Rails root to run build commands
+  cd "$rails_root" || return 1
+
+  # Cross-platform package manager detection
+  if command -v yarn >/dev/null 2>&1; then
+    if yarn build:rescript; then
+      echo "✅ ReScript build completed successfully"
+      return 0
+    else
+      echo "❌ ReScript build failed" >&2
+      exit 1
+    fi
+  elif command -v npm >/dev/null 2>&1; then
+    if npm run build:rescript; then
+      echo "✅ ReScript build completed successfully"
+      return 0
+    else
+      echo "❌ ReScript build failed" >&2
+      exit 1
+    fi
+  else
+    echo "⚠️  Warning: Neither yarn nor npm found. Skipping ReScript build."
+    return 0
+  fi
+}
+
+# Generate React on Rails packs if needed
+generate_packs_if_needed() {
+  rails_root=$(find_rails_root)
+  if [ -z "$rails_root" ]; then
+    return 0
+  fi
+
+  # Check if React on Rails initializer exists
+  initializer_path="$rails_root/config/initializers/react_on_rails.rb"
+  if [ ! -f "$initializer_path" ]; then
+    return 0
+  fi
+
+  # Check if auto-pack generation is configured (ignore comments)
+  # Look for uncommented config.auto_load_bundle or config.components_subdirectory
+  if ! grep -q "^[[:space:]]*config\.auto_load_bundle[[:space:]]*=" "$initializer_path" && \
+     ! grep -q "^[[:space:]]*config\.components_subdirectory[[:space:]]*=" "$initializer_path"; then
+    return 0
+  fi
+
+  echo "📦 Generating React on Rails packs..."
+
+  # Check if bundle is available
+  if ! command -v bundle >/dev/null 2>&1; then
+    return 0
+  fi
+
+  # Change to Rails root
+  cd "$rails_root" || return 1
+
+  # Check if rake task exists
+  if ! bundle exec rails -T | grep -q "react_on_rails:generate_packs"; then
+    return 0
+  fi
+
+  # Skip validation during precompile hook execution
+  # The hook runs early in the build process and doesn't need package version validation
+  export REACT_ON_RAILS_SKIP_VALIDATION=true
+
+  # Run pack generation
+  if bundle exec rails react_on_rails:generate_packs; then
+    echo "✅ Pack generation completed successfully"
+    return 0
+  else
+    echo "❌ Pack generation failed" >&2
+    exit 1
+  fi
+}
+
+# Main execution
+build_rescript_if_needed
+generate_packs_if_needed
+
+exit 0

@@ -1,101 +1,122 @@
-#!/usr/bin/env ruby
-# frozen_string_literal: true
-
-# Shakapacker precompile hook
-# This script runs before Shakapacker compilation in both development and production.
+#!/bin/sh
+# Shakapacker precompile hook for React on Rails
+#
+# This script runs before webpack compilation to:
+# 1. Build ReScript files (if configured)
+# 2. Generate pack files for auto-bundled components
+#
+# It's called automatically by Shakapacker when configured in config/shakapacker.yml:
+#   precompile_hook: 'bin/shakapacker-precompile-hook'
+#
 # See: https://github.com/shakacode/shakapacker/blob/main/docs/precompile_hook.md
 
-require "fileutils"
+set -e
 
 # Find Rails root by walking upward looking for config/environment.rb
-def find_rails_root
-  dir = Dir.pwd
-  loop do
-    return dir if File.exist?(File.join(dir, "config", "environment.rb"))
-
-    parent = File.dirname(dir)
-    return nil if parent == dir # Reached filesystem root
-
-    dir = parent
-  end
-end
+find_rails_root() {
+  dir="$PWD"
+  while [ "$dir" != "/" ]; do
+    if [ -f "$dir/config/environment.rb" ]; then
+      echo "$dir"
+      return 0
+    fi
+    dir=$(dirname "$dir")
+  done
+  return 1
+}
 
 # Build ReScript if needed
-def build_rescript_if_needed
-  # Check for both old (bsconfig.json) and new (rescript.json) config files
-  return unless File.exist?("bsconfig.json") || File.exist?("rescript.json")
+build_rescript_if_needed() {
+  rails_root=$(find_rails_root)
+  if [ -z "$rails_root" ]; then
+    echo "⚠️  Warning: Could not find Rails root. Skipping ReScript build."
+    return 0
+  fi
 
-  puts "🔧 Building ReScript..."
+  # Check for both old (bsconfig.json) and new (rescript.json) config files
+  if [ ! -f "$rails_root/bsconfig.json" ] && [ ! -f "$rails_root/rescript.json" ]; then
+    return 0
+  fi
+
+  echo "🔧 Building ReScript..."
+
+  # Change to Rails root to run build commands
+  cd "$rails_root" || return 1
 
   # Cross-platform package manager detection
-  yarn_available = system("yarn", "--version", out: File::NULL, err: File::NULL)
-  npm_available = system("npm", "--version", out: File::NULL, err: File::NULL)
-
-  success = if yarn_available
-              system("yarn", "build:rescript")
-            elsif npm_available
-              system("npm", "run", "build:rescript")
-            else
-              warn "⚠️  Warning: Neither yarn nor npm found. Skipping ReScript build."
-              return
-            end
-
-  if success
-    puts "✅ ReScript build completed successfully"
+  if command -v yarn >/dev/null 2>&1; then
+    if yarn build:rescript; then
+      echo "✅ ReScript build completed successfully"
+      return 0
+    else
+      echo "❌ ReScript build failed" >&2
+      exit 1
+    fi
+  elif command -v npm >/dev/null 2>&1; then
+    if npm run build:rescript; then
+      echo "✅ ReScript build completed successfully"
+      return 0
+    else
+      echo "❌ ReScript build failed" >&2
+      exit 1
+    fi
   else
-    warn "❌ ReScript build failed"
-    exit 1
-  end
-end
+    echo "⚠️  Warning: Neither yarn nor npm found. Skipping ReScript build."
+    return 0
+  fi
+}
 
 # Generate React on Rails packs if needed
-# rubocop:disable Metrics/CyclomaticComplexity
-def generate_packs_if_needed
-  # Find Rails root directory
-  rails_root = find_rails_root
-  return unless rails_root
+generate_packs_if_needed() {
+  rails_root=$(find_rails_root)
+  if [ -z "$rails_root" ]; then
+    return 0
+  fi
 
   # Check if React on Rails initializer exists
-  initializer_path = File.join(rails_root, "config", "initializers", "react_on_rails.rb")
-  return unless File.exist?(initializer_path)
+  initializer_path="$rails_root/config/initializers/react_on_rails.rb"
+  if [ ! -f "$initializer_path" ]; then
+    return 0
+  fi
 
-  # Check if auto-pack generation is configured (match actual config assignments, not comments)
-  config_file = File.read(initializer_path)
-  # Match uncommented configuration lines only (lines not starting with #)
-  has_auto_load = config_file =~ /^\s*(?!#).*config\.auto_load_bundle\s*=/
-  has_components_subdir = config_file =~ /^\s*(?!#).*config\.components_subdirectory\s*=/
-  return unless has_auto_load || has_components_subdir
+  # Check if auto-pack generation is configured (ignore comments)
+  # Look for uncommented config.auto_load_bundle or config.components_subdirectory
+  if ! grep -q "^[[:space:]]*config\.auto_load_bundle[[:space:]]*=" "$initializer_path" && \
+     ! grep -q "^[[:space:]]*config\.components_subdirectory[[:space:]]*=" "$initializer_path"; then
+    return 0
+  fi
 
-  puts "📦 Generating React on Rails packs..."
+  echo "📦 Generating React on Rails packs..."
 
-  # Cross-platform bundle availability check
-  bundle_available = system("bundle", "--version", out: File::NULL, err: File::NULL)
-  return unless bundle_available
+  # Check if bundle is available
+  if ! command -v bundle >/dev/null 2>&1; then
+    return 0
+  fi
 
-  # Check if rake task exists (use array form for security)
-  task_list = IO.popen(["bundle", "exec", "rails", "-T"], err: [:child, :out], &:read)
-  return unless task_list.include?("react_on_rails:generate_packs")
+  # Change to Rails root
+  cd "$rails_root" || return 1
 
-  # Use array form for better cross-platform support
-  success = system("bundle", "exec", "rails", "react_on_rails:generate_packs")
+  # Check if rake task exists
+  if ! bundle exec rails -T | grep -q "react_on_rails:generate_packs"; then
+    return 0
+  fi
 
-  if success
-    puts "✅ Pack generation completed successfully"
+  # Skip validation during precompile hook execution
+  # The hook runs early in the build process and doesn't need package version validation
+  export REACT_ON_RAILS_SKIP_VALIDATION=true
+
+  # Run pack generation
+  if bundle exec rails react_on_rails:generate_packs; then
+    echo "✅ Pack generation completed successfully"
+    return 0
   else
-    warn "❌ Pack generation failed"
+    echo "❌ Pack generation failed" >&2
     exit 1
-  end
-end
-# rubocop:enable Metrics/CyclomaticComplexity
+  fi
+}
 
 # Main execution
-begin
-  build_rescript_if_needed
-  generate_packs_if_needed
+build_rescript_if_needed
+generate_packs_if_needed
 
-  exit 0
-rescue StandardError => e
-  warn "❌ Precompile hook failed: #{e.message}"
-  warn e.backtrace.join("\n")
-  exit 1
-end
+exit 0
