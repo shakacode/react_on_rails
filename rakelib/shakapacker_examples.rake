@@ -36,12 +36,19 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
       sh_in_dir(example_type.dir, "echo \"gem 'shakapacker', '>= 8.2.0'\" >> #{example_type.gemfile}")
       bundle_install_in(example_type.dir)
       sh_in_dir(example_type.dir, "rake shakapacker:install")
-      # TODO: Remove REACT_ON_RAILS_SKIP_VALIDATION after generators start using next release
+      # Skip validation when running generators on example apps during development.
+      # The generator validates that certain config options exist in the initializer,
+      # but during example generation, we're often testing against the current gem
+      # codebase which may have new config options not yet in the released version.
+      # This allows examples to be generated without validation errors while still
+      # testing the generator functionality.
       generator_commands = example_type.generator_shell_commands.map do |cmd|
         "REACT_ON_RAILS_SKIP_VALIDATION=true #{cmd}"
       end
       sh_in_dir(example_type.dir, generator_commands)
       sh_in_dir(example_type.dir, "npm install")
+      # Generate the component packs after running the generator to ensure all
+      # auto-bundled components have corresponding pack files created
       sh_in_dir(example_type.dir, "bundle exec rake react_on_rails:generate_packs")
     end
   end

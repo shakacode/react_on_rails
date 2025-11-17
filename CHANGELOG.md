@@ -23,6 +23,16 @@ After a release, please make sure to run `bundle exec rake update_changelog`. Th
 
 Changes since the last non-beta release.
 
+#### Changed
+
+- **Generator Configuration Modernization**: Updated the generator to enable recommended configurations by default for new applications:
+
+  - `config.build_test_command` is now uncommented and set to `"RAILS_ENV=test bin/shakapacker"` by default, enabling automatic asset building during tests for better integration test reliability
+  - `config.auto_load_bundle = true` is now set by default, enabling automatic loading of component bundles
+  - `config.components_subdirectory = "ror_components"` is now set by default, organizing React components in a dedicated subdirectory
+
+  **Note:** These changes only affect newly generated applications. Existing applications are unaffected and do not need to make any changes. If you want to adopt these settings in an existing app, you can manually add them to your `config/initializers/react_on_rails.rb` file. [PR 2039](https://github.com/shakacode/react_on_rails/pull/2039) by [justin808](https://github.com/justin808).
+
 ### [16.2.0.beta.4] - 2025-11-12
 
 #### Added
