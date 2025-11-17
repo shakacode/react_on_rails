@@ -6,21 +6,12 @@ on:
 
 jobs:
   detect-invalid-commands:
-    # Only run on PR comments that contain CI-related keywords but don't match valid commands
+    # Only run on PR comments that contain /ci commands but don't match valid commands
     if: |
       github.event.issue.pull_request &&
+      contains(github.event.comment.body, '/ci') &&
       !contains(github.event.comment.body, '/run-skipped-ci') &&
-      !contains(github.event.comment.body, '/stop-run-skipped-ci') &&
-      (
-        contains(github.event.comment.body, '/run') ||
-        contains(github.event.comment.body, '/skip') ||
-        contains(github.event.comment.body, '/ci') ||
-        contains(github.event.comment.body, '/full-ci') ||
-        contains(github.event.comment.body, '/trigger') ||
-        contains(github.event.comment.body, '/enable') ||
-        contains(github.event.comment.body, '/disable') ||
-        contains(github.event.comment.body, '/test')
-      )
+      !contains(github.event.comment.body, '/stop-run-skipped-ci')
     runs-on: ubuntu-22.04
     permissions:
       contents: read
@@ -31,49 +22,31 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            let comment = context.payload.comment.body;
+            const comment = context.payload.comment.body;
 
-            // Remove code blocks to avoid false positives
-            // Remove fenced code blocks (```...```)
-            comment = comment.replace(/```[\s\S]*?```/g, '');
-            // Remove inline code (`...`) - must have backticks on both sides
-            comment = comment.replace(/`[^`]+?`/g, '');
-            // Remove indented code blocks (4+ spaces at line start)
-            comment = comment.replace(/(?:^|\n)([ ]{4,})[^\n]+/g, '');
-
-            const commentLower = comment.toLowerCase();
-
-            // Pattern to detect slash commands (must be preceded by whitespace or start of string)
-            // This prevents matching URLs like https://example.com/run-tests
-            const slashCommandPattern = /(^|\s)(\/[\w-]+)/g;
-            const matches = [...commentLower.matchAll(slashCommandPattern)];
+            // Pattern to detect /ci* commands at the start of a line
+            // Matches: /ci, /ci-run, /ci-test, etc. at beginning of comment or after newline
+            const ciCommandPattern = /(?:^|\n)\s*(\/ci[\w-]*)/gi;
+            const matches = [...comment.matchAll(ciCommandPattern)];
 
             if (matches.length === 0) {
-              console.log('No slash commands found');
+              console.log('No /ci commands found at line start');
               return { shouldRespond: false };
             }
 
             // Valid commands
             const validCommands = ['/run-skipped-ci', '/stop-run-skipped-ci'];
 
-            // CI-related keywords that might indicate an attempt to use a CI command
-            const ciKeywords = [
-              'run', 'skip', 'ci', 'full', 'trigger', 'enable', 'disable',
-              'test', 'suite', 'check', 'workflow'
-            ];
+            // Check if any command is invalid
+            const invalidCommands = matches
+              .map(m => m[1].toLowerCase())
+              .filter(cmd => !validCommands.includes(cmd));
 
-            // Check if any slash command looks like it might be trying to trigger CI
-            const potentialCICommands = matches.filter(match => {
-              const cmd = match[2].toLowerCase(); // match[2] is the actual command (match[1] is the prefix)
-              return !validCommands.includes(cmd) &&
-                     ciKeywords.some(keyword => cmd.includes(keyword));
-            });
-
-            if (potentialCICommands.length > 0) {
-              console.log('Found potential invalid CI commands:', potentialCICommands.map(m => m[2]));
+            if (invalidCommands.length > 0) {
+              console.log('Found invalid /ci commands:', invalidCommands);
               return {
                 shouldRespond: true,
-                invalidCommands: potentialCICommands.map(m => m[2])
+                invalidCommands: invalidCommands
               };
             }
 
