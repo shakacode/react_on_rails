@@ -38,13 +38,15 @@ module ReactOnRails
     # to handle all JS dependency installation via package_json gem.
     module JsDependencyManager
       # Core React dependencies required for React on Rails
+      # Note: @babel/preset-react and babel plugins are NOT included here because:
+      # - Shakapacker handles webpack loader configuration (babel-loader or swc-loader)
+      # - Users configure their preferred loader via shakapacker.yml webpack_loader setting
+      # - SWC is now the default and doesn't need Babel presets
+      # - For Babel users, shakapacker will install babel-loader and its dependencies
       REACT_DEPENDENCIES = %w[
         react
         react-dom
-        @babel/preset-react
         prop-types
-        babel-plugin-transform-react-remove-prop-types
-        babel-plugin-macros
       ].freeze
 
       # CSS processing dependencies for webpack
@@ -75,11 +77,14 @@ module ReactOnRails
       ].freeze
 
       # TypeScript dependencies (only installed when --typescript flag is used)
+      # Note: @babel/preset-typescript is NOT included because:
+      # - SWC (the default) has built-in TypeScript support
+      # - Shakapacker handles the loader configuration
+      # - For Babel users, they can add @babel/preset-typescript manually if needed
       TYPESCRIPT_DEPENDENCIES = %w[
         typescript
         @types/react
         @types/react-dom
-        @babel/preset-typescript
       ].freeze
 
       private
