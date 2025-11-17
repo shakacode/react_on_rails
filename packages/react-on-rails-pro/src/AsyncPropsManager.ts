@@ -46,6 +46,10 @@ class AsyncPropsManager {
   }
 
   endStream() {
+    if (this.isClosed) {
+      return;
+    }
+
     this.isClosed = true;
     this.propNameToPromiseController.forEach((promiseController, propName) => {
       if (!promiseController.resolved) {

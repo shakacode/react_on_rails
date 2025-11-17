@@ -20,6 +20,13 @@
 
   ReactOnRails.clearHydratedStores();
   var usedProps = typeof props === 'undefined' ? {"helloWorldData":{"name":"Mr. Server Side Rendering","\u003cscript\u003ewindow.alert('xss1');\u003c/script\u003e":"\u003cscript\u003ewindow.alert(\"xss2\");\u003c/script\u003e"}} : props;
+  
+  if (ReactOnRails.isRSCBundle) {
+    var { props: propsWithAsyncProps, asyncPropsManager } = ReactOnRails.addAsyncPropsCapabilityToComponentProps(usedProps);
+    usedProps = propsWithAsyncProps;
+    sharedExecutionContext.set("asyncPropsManager", asyncPropsManager);
+  }
+
   return ReactOnRails[ReactOnRails.isRSCBundle ? 'serverRenderRSCReactComponent' : 'streamServerRenderedReactComponent']({
     name: componentName,
     domNodeId: 'AsyncComponentsTreeForTesting-react-component-0',
