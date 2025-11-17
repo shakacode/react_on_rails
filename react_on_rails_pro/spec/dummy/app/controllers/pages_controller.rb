@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class PagesController < ApplicationController
+class PagesController < ApplicationController # rubocop:disable Metrics/ClassLength
   include ReactOnRailsPro::RSCPayloadRenderer
   include RscPostsPageOverRedisHelper
 
@@ -85,8 +85,8 @@ class PagesController < ApplicationController
     ensure
       begin
         redis&.close
-      rescue StandardError => close_err
-        Rails.logger.warn "Failed to close Redis: #{close_err.message}"
+      rescue StandardError => e
+        Rails.logger.warn "Failed to close Redis: #{e.message}"
       end
     end
 

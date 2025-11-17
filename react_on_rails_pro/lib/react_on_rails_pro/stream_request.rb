@@ -51,23 +51,23 @@ module ReactOnRailsPro
       end
     end
 
-    def each_chunk(&block)
+    def each_chunk(&block) # rubocop:disable Metrics/CyclomaticComplexity
       return enum_for(:each_chunk) unless block
 
       first_chunk = true
       @component.each_chunk do |chunk|
         position = first_chunk ? :first : :middle
         modified_chunk = handle_chunk(chunk, position)
-        block.call(modified_chunk)
+        yield(modified_chunk)
         first_chunk = false
       end
 
       # The last chunk contains the append content after the transformation
       # All transformations are applied to the append content
       last_chunk = handle_chunk("", :last)
-      block.call(last_chunk) unless last_chunk.empty?
-    rescue StandardError => err
-      current_error = err
+      yield(last_chunk) unless last_chunk.empty?
+    rescue StandardError => e
+      current_error = e
       rescue_block_index = 0
       while current_error.present? && (rescue_block_index < @rescue_blocks.size)
         begin

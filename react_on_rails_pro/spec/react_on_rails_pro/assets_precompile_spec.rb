@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require_relative "./spec_helper"
+require_relative "spec_helper"
 require_relative "../../lib/react_on_rails_pro/assets_precompile"
 
 describe ReactOnRailsPro::AssetsPrecompile do
@@ -46,8 +46,6 @@ describe ReactOnRailsPro::AssetsPrecompile do
 
       ror_pro_config = instance_double(ReactOnRailsPro::Configuration)
 
-      allow(ror_pro_config).to receive(:dependency_globs).and_return([expected_parameters.last])
-
       adapter = Module.new do
         def self.cache_keys
           %w[a b]
@@ -58,7 +56,8 @@ describe ReactOnRailsPro::AssetsPrecompile do
         end
       end
 
-      allow(ror_pro_config).to receive(:remote_bundle_cache_adapter).and_return(adapter)
+      allow(ror_pro_config).to receive_messages(dependency_globs: [expected_parameters.last],
+                                                remote_bundle_cache_adapter: adapter)
 
       stub_const("ReactOnRailsPro::VERSION", "2.2.0")
 
@@ -136,11 +135,10 @@ describe ReactOnRailsPro::AssetsPrecompile do
       it "calls build_bundles & cache_bundles if cached bundles can't be fetched" do
         instance = described_class.instance
 
-        allow(instance).to receive(:fetch_and_unzip_cached_bundles).and_return(false)
         expect(instance).to receive(:fetch_and_unzip_cached_bundles).once
-        allow(instance).to receive(:build_bundles).and_return(nil)
         expect(instance).to receive(:build_bundles).once
-        allow(instance).to receive(:cache_bundles).and_return(nil)
+        allow(instance).to receive_messages(fetch_and_unzip_cached_bundles: false, build_bundles: nil,
+                                            cache_bundles: nil)
         expect(instance).to receive(:cache_bundles).once
 
         instance.build_or_fetch_bundles
@@ -179,9 +177,9 @@ describe ReactOnRailsPro::AssetsPrecompile do
       unique_variable = { unique_key: "a unique value" }
 
       instance = described_class.instance
-      allow(instance).to receive(:remote_bundle_cache_adapter).and_return(adapter_double)
-      allow(instance).to receive(:zipped_bundles_filename).and_return(unique_variable)
-      allow(instance).to receive(:zipped_bundles_filepath).and_return("zipped_bundles_filepath")
+      allow(instance).to receive_messages(remote_bundle_cache_adapter: adapter_double,
+                                          zipped_bundles_filename: unique_variable,
+                                          zipped_bundles_filepath: "zipped_bundles_filepath")
 
       allow(File).to receive(:binwrite).and_return(true)
       expect(File).to receive(:binwrite).once
@@ -197,8 +195,7 @@ describe ReactOnRailsPro::AssetsPrecompile do
       allow(File).to receive(:exist?).and_return(false)
 
       instance = described_class.instance
-      allow(instance).to receive(:fetch_bundles).and_return(false)
-      allow(instance).to receive(:zipped_bundles_filepath).and_return("a")
+      allow(instance).to receive_messages(fetch_bundles: false, zipped_bundles_filepath: "a")
 
       expect(instance.fetch_and_unzip_cached_bundles).to be(false)
     end
@@ -256,10 +253,10 @@ describe ReactOnRailsPro::AssetsPrecompile do
       zipped_bundles_filepath = Pathname.new(Dir.tmpdir).join("foobar")
 
       instance = described_class.instance
-      allow(instance).to receive(:remote_bundle_cache_adapter).and_return(adapter_double)
-      allow(instance).to receive(:zipped_bundles_filename).and_return("zipped_bundles_filename")
-      allow(instance).to receive(:zipped_bundles_filepath).and_return(zipped_bundles_filepath)
-      allow(instance).to receive(:remove_extra_files_cache_dir).and_return(nil)
+      allow(instance).to receive_messages(remote_bundle_cache_adapter: adapter_double,
+                                          zipped_bundles_filename: "zipped_bundles_filename",
+                                          zipped_bundles_filepath: zipped_bundles_filepath,
+                                          remove_extra_files_cache_dir: nil)
 
       expect(instance.cache_bundles).to be_truthy
 
@@ -289,8 +286,8 @@ describe ReactOnRailsPro::AssetsPrecompile do
 
       instance = described_class.instance
 
-      allow(instance).to receive(:remote_bundle_cache_adapter).and_return(adapter)
-      allow(instance).to receive(:extra_files_path).and_return(Pathname.new(Dir.pwd).join("extra_files_cache_dir"))
+      allow(instance).to receive_messages(remote_bundle_cache_adapter: adapter,
+                                          extra_files_path: Pathname.new(Dir.pwd).join("extra_files_cache_dir"))
       copied_gemfile_path = Pathname.new(Dir.pwd).join("extra_files_cache_dir", "Gemfile")
       copied_assets_precompile_path = Pathname.new(Dir.pwd).join("extra_files_cache_dir",
                                                                  "lib---react_on_rails_pro---assets_precompile.rb")

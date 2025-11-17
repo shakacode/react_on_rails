@@ -13,9 +13,9 @@ require "uri"
 #   rake react_on_rails_pro:verify_public_key              # Verify current configuration
 #   rake react_on_rails_pro:public_key_help                # Show help
 
-namespace :react_on_rails_pro do
+namespace :react_on_rails_pro do # rubocop:disable Metrics/BlockLength
   desc "Update the public key for React on Rails Pro license validation"
-  task :update_public_key, [:source] do |_task, args|
+  task :update_public_key, [:source] do |_task, args| # rubocop:disable Metrics/BlockLength
     source = args[:source] || "production"
 
     # Determine the API URL based on the source
@@ -68,7 +68,7 @@ namespace :react_on_rails_pro do
             # ShakaCode's public key for React on Rails Pro license verification
             # The private key corresponding to this public key is held by ShakaCode
             # and is never committed to the repository
-            # Last updated: #{Time.now.utc.strftime("%Y-%m-%d %H:%M:%S UTC")}
+            # Last updated: #{Time.now.utc.strftime('%Y-%m-%d %H:%M:%S UTC')}
             # Source: #{api_url}
             #
             # You can update this public key by running the rake task:
@@ -86,12 +86,13 @@ namespace :react_on_rails_pro do
       puts "✅ Updated Ruby public key: #{ruby_file_path}"
 
       # Update Node/TypeScript public key file
-      node_file_path = File.join(File.dirname(__FILE__), "..", "packages", "node-renderer", "src", "shared", "licensePublicKey.ts")
+      node_file_path = File.join(File.dirname(__FILE__), "..", "packages", "node-renderer", "src", "shared",
+                                 "licensePublicKey.ts")
       node_content = <<~TYPESCRIPT
         // ShakaCode's public key for React on Rails Pro license verification
         // The private key corresponding to this public key is held by ShakaCode
         // and is never committed to the repository
-        // Last updated: #{Time.now.utc.strftime("%Y-%m-%d %H:%M:%S UTC")}
+        // Last updated: #{Time.now.utc.strftime('%Y-%m-%d %H:%M:%S UTC')}
         // Source: #{api_url}
         //
         // You can update this public key by running the rake task:
