@@ -65,7 +65,7 @@ RSpec.describe ReactOnRailsPro::StreamDecorator do
 
   describe "#rescue" do
     it "catches the error happens inside the component" do
-      allow(mock_component).to receive(:each_chunk).and_raise(StandardError.new "Fake Error")
+      allow(mock_component).to receive(:each_chunk).and_raise(StandardError.new("Fake Error"))
       mocked_block = mock_block
 
       stream_decorator.rescue(&mocked_block.block)
@@ -80,7 +80,7 @@ RSpec.describe ReactOnRailsPro::StreamDecorator do
     end
 
     it "catches the error happens inside subsequent component calls" do
-      allow(mock_component).to receive(:each_chunk).and_yield("Chunk1").and_raise(ArgumentError.new "Fake Error")
+      allow(mock_component).to receive(:each_chunk).and_yield("Chunk1").and_raise(ArgumentError.new("Fake Error"))
       mocked_block = mock_block
 
       stream_decorator.rescue(&mocked_block.block)
@@ -96,7 +96,7 @@ RSpec.describe ReactOnRailsPro::StreamDecorator do
     end
 
     it "can yield values to the stream" do
-      allow(mock_component).to receive(:each_chunk).and_yield("Chunk1").and_raise(ArgumentError.new "Fake Error")
+      allow(mock_component).to receive(:each_chunk).and_yield("Chunk1").and_raise(ArgumentError.new("Fake Error"))
       mocked_block = mock_block
 
       stream_decorator.rescue(&mocked_block.block)
@@ -115,11 +115,11 @@ RSpec.describe ReactOnRailsPro::StreamDecorator do
     end
 
     it "can convert the error into another error" do
-      allow(mock_component).to receive(:each_chunk).and_raise(StandardError.new "Fake Error")
+      allow(mock_component).to receive(:each_chunk).and_raise(StandardError.new("Fake Error"))
       mocked_block = mock_block do |error|
         expect(error).to be_a(StandardError)
         expect(error.message).to eq("Fake Error")
-        raise ArgumentError.new "Another Error"
+        raise ArgumentError, "Another Error"
       end
 
       stream_decorator.rescue(&mocked_block.block)
@@ -129,12 +129,12 @@ RSpec.describe ReactOnRailsPro::StreamDecorator do
     end
 
     it "chains multiple rescue blocks" do
-      allow(mock_component).to receive(:each_chunk).and_yield("Chunk1").and_raise(StandardError.new "Fake Error")
+      allow(mock_component).to receive(:each_chunk).and_yield("Chunk1").and_raise(StandardError.new("Fake Error"))
       fist_rescue_block = mock_block do |error, &block|
         expect(error).to be_a(StandardError)
         expect(error.message).to eq("Fake Error")
         block.call "Chunk from first rescue block"
-        raise ArgumentError.new "Another Error"
+        raise ArgumentError, "Another Error"
       end
 
       second_rescue_block = mock_block do |error, &block|

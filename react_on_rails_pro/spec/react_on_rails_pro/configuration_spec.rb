@@ -2,7 +2,7 @@
 
 require_relative "spec_helper"
 
-module ReactOnRailsPro
+module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
   RSpec.describe Configuration do
     after do
       ReactOnRailsPro.instance_variable_set(:@configuration, nil)
@@ -205,7 +205,8 @@ module ReactOnRailsPro
 
         expect(ReactOnRailsPro.configuration.rsc_bundle_js_file).to eq("rsc-bundle.js")
         expect(ReactOnRailsPro.configuration.react_client_manifest_file).to eq("react-client-manifest.json")
-        expect(ReactOnRailsPro.configuration.react_server_client_manifest_file).to eq("react-server-client-manifest.json")
+        expect(ReactOnRailsPro.configuration.react_server_client_manifest_file)
+          .to eq("react-server-client-manifest.json")
       end
 
       it "allows setting rsc_bundle_js_file" do
@@ -229,7 +230,8 @@ module ReactOnRailsPro
           config.react_server_client_manifest_file = "custom-server-client-manifest.json"
         end
 
-        expect(ReactOnRailsPro.configuration.react_server_client_manifest_file).to eq("custom-server-client-manifest.json")
+        expect(ReactOnRailsPro.configuration.react_server_client_manifest_file)
+          .to eq("custom-server-client-manifest.json")
       end
 
       it "allows nil values for RSC configuration options" do

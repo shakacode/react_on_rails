@@ -61,7 +61,7 @@ jobs:
           script/ci-changes-detector "$BASE_REF"
         shell: bash
 
-  lint-js-and-ruby:
+  pro-lint-js-and-ruby:
     needs: detect-changes
     if: github.ref == 'refs/heads/master' || needs.detect-changes.outputs.run_pro_lint == 'true'
     runs-on: ubuntu-22.04
@@ -148,7 +148,7 @@ jobs:
         run: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
 
       - name: Lint Ruby
-        run: bundle exec rubocop
+        run: bundle exec rubocop --ignore-parent-exclusion
 
       - name: Validate RBS type signatures
         run: bundle exec rake rbs:validate

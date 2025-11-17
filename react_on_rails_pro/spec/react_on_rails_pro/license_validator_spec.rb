@@ -75,26 +75,30 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
         ENV["REACT_ON_RAILS_PRO_LICENSE"] = expired_token
       end
 
-      context "in development/test environment" do
+      context "when in development/test environment" do
         before do
           allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new("development"))
         end
 
         it "raises error immediately" do
-          expect { described_class.validated_license_data! }.to raise_error(ReactOnRailsPro::Error, /License has expired/)
+          expect do
+            described_class.validated_license_data!
+          end.to raise_error(ReactOnRailsPro::Error, /License has expired/)
         end
 
         it "includes FREE license information in error message" do
-          expect { described_class.validated_license_data! }.to raise_error(ReactOnRailsPro::Error, /FREE evaluation license/)
+          expect do
+            described_class.validated_license_data!
+          end.to raise_error(ReactOnRailsPro::Error, /FREE evaluation license/)
         end
       end
 
-      context "in production environment" do
+      context "when in production environment" do
         before do
           allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new("production"))
         end
 
-        context "within grace period (expired < 1 month ago)" do
+        context "with grace period (expired < 1 month ago)" do
           let(:expired_within_grace) do
             {
               sub: "test@example.com",
@@ -113,7 +117,8 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
           end
 
           it "logs warning with grace period remaining" do
-            expect(mock_logger).to receive(:error).with(/WARNING:.*License has expired.*Grace period:.*day\(s\) remaining/)
+            expect(mock_logger).to receive(:error)
+              .with(/WARNING:.*License has expired.*Grace period:.*day\(s\) remaining/)
             described_class.validated_license_data!
           end
 
@@ -123,7 +128,7 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
           end
         end
 
-        context "outside grace period (expired > 1 month ago)" do
+        context "when outside grace period (expired > 1 month ago)" do
           let(:expired_outside_grace) do
             {
               sub: "test@example.com",
@@ -138,11 +143,15 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
           end
 
           it "raises error" do
-            expect { described_class.validated_license_data! }.to raise_error(ReactOnRailsPro::Error, /License has expired/)
+            expect do
+              described_class.validated_license_data!
+            end.to raise_error(ReactOnRailsPro::Error, /License has expired/)
           end
 
           it "includes FREE license information in error message" do
-            expect { described_class.validated_license_data! }.to raise_error(ReactOnRailsPro::Error, /FREE evaluation license/)
+            expect do
+              described_class.validated_license_data!
+            end.to raise_error(ReactOnRailsPro::Error, /FREE evaluation license/)
           end
         end
       end
@@ -168,7 +177,9 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
       end
 
       it "includes FREE license information in error message" do
-        expect { described_class.validated_license_data! }.to raise_error(ReactOnRailsPro::Error, /FREE evaluation license/)
+        expect do
+          described_class.validated_license_data!
+        end.to raise_error(ReactOnRailsPro::Error, /FREE evaluation license/)
       end
     end
 
@@ -180,11 +191,15 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
       end
 
       it "raises error" do
-        expect { described_class.validated_license_data! }.to raise_error(ReactOnRailsPro::Error, /Invalid license signature/)
+        expect do
+          described_class.validated_license_data!
+        end.to raise_error(ReactOnRailsPro::Error, /Invalid license signature/)
       end
 
       it "includes FREE license information in error message" do
-        expect { described_class.validated_license_data! }.to raise_error(ReactOnRailsPro::Error, /FREE evaluation license/)
+        expect do
+          described_class.validated_license_data!
+        end.to raise_error(ReactOnRailsPro::Error, /FREE evaluation license/)
       end
     end
 
