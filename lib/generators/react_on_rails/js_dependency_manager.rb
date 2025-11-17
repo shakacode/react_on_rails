@@ -39,8 +39,8 @@ module ReactOnRails
     module JsDependencyManager
       # Core React dependencies required for React on Rails
       # Note: @babel/preset-react and babel plugins are NOT included here because:
-      # - Shakapacker handles webpack loader configuration (babel-loader or swc-loader)
-      # - Users configure their preferred loader via shakapacker.yml webpack_loader setting
+      # - Shakapacker handles JavaScript transpiler configuration (babel, swc, or esbuild)
+      # - Users configure their preferred transpiler via shakapacker.yml javascript_transpiler setting
       # - SWC is now the default and doesn't need Babel presets
       # - For Babel users, shakapacker will install babel-loader and its dependencies
       REACT_DEPENDENCIES = %w[
@@ -78,9 +78,9 @@ module ReactOnRails
 
       # TypeScript dependencies (only installed when --typescript flag is used)
       # Note: @babel/preset-typescript is NOT included because:
-      # - SWC is now the default webpack_loader (has built-in TypeScript support)
-      # - Shakapacker handles the loader configuration via shakapacker.yml
-      # - If users choose webpack_loader: 'babel', they should manually add @babel/preset-typescript
+      # - SWC is now the default javascript_transpiler (has built-in TypeScript support)
+      # - Shakapacker handles the transpiler configuration via shakapacker.yml
+      # - If users choose javascript_transpiler: 'babel', they should manually add @babel/preset-typescript
       #   and configure it in their babel.config.js
       TYPESCRIPT_DEPENDENCIES = %w[
         typescript
