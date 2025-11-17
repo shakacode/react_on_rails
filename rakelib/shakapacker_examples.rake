@@ -36,8 +36,13 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
       sh_in_dir(example_type.dir, "echo \"gem 'shakapacker', '>= 8.2.0'\" >> #{example_type.gemfile}")
       bundle_install_in(example_type.dir)
       sh_in_dir(example_type.dir, "rake shakapacker:install")
-      sh_in_dir(example_type.dir, example_type.generator_shell_commands)
+      # TODO: Remove REACT_ON_RAILS_SKIP_VALIDATION after generators start using next release
+      generator_commands = example_type.generator_shell_commands.map do |cmd|
+        "REACT_ON_RAILS_SKIP_VALIDATION=true #{cmd}"
+      end
+      sh_in_dir(example_type.dir, generator_commands)
       sh_in_dir(example_type.dir, "npm install")
+      sh_in_dir(example_type.dir, "bundle exec rake react_on_rails:generate_packs")
     end
   end
 
