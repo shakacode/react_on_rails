@@ -148,11 +148,14 @@ const config: KnipConfig = {
         '@rescript/react',
         // The Babel plugin fails to detect it
         'babel-plugin-transform-react-remove-prop-types',
+        // Runtime helpers injected by our Babel config, but not statically analyzable
+        '@babel/runtime',
         // This one is weird. It's long-deprecated and shouldn't be necessary.
         // Probably need to update the Webpack config.
         'node-libs-browser',
         // The below dependencies are not detected by the Webpack plugin
         // due to the config issue.
+        'mini-css-extract-plugin',
         'expose-loader',
         'file-loader',
         'imports-loader',
