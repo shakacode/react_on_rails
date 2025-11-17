@@ -58,7 +58,7 @@ const configureServer = () => {
     globalObject: 'this',
     // If using the React on Rails Pro node server renderer, uncomment the next line
     // libraryTarget: 'commonjs2',
-    path: <%= shakapacker_version_9_or_higher? ? 'config.privateOutputPath' : "require('path').resolve(__dirname, '../../ssr-generated')" %>,
+    path: <%= shakapacker_version_9_or_higher? ? "config.privateOutputPath || require('path').resolve(__dirname, '../../ssr-generated')" : "require('path').resolve(__dirname, '../../ssr-generated')" %>,
     // No publicPath needed since server bundles are not served via web
     // https://webpack.js.org/configuration/output/#outputglobalobject
   };
