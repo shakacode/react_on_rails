@@ -73,6 +73,11 @@ jobs:
           - ruby-version: ${{ (github.ref == 'refs/heads/master' || inputs.force_run == true || needs.detect-changes.outputs.has_full_ci_label == 'true') && '3.2'}}
             node-version: ${{ (github.ref == 'refs/heads/master' || inputs.force_run == true || needs.detect-changes.outputs.has_full_ci_label == 'true') && '20'}}
             dependency-level: ${{ (github.ref == 'refs/heads/master' || inputs.force_run == true || needs.detect-changes.outputs.has_full_ci_label == 'true') && 'minimum'}}
+        exclude:
+          # Skip minimum dependency matrix on regular PRs (run only on master/workflow_dispatch/force_run/full-ci label)
+          - ruby-version: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && inputs.force_run != true && needs.detect-changes.outputs.has_full_ci_label != 'true' && '3.2' || '' }}
+            node-version: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && inputs.force_run != true && needs.detect-changes.outputs.has_full_ci_label != 'true' && '20' || '' }}
+            dependency-level: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && inputs.force_run != true && needs.detect-changes.outputs.has_full_ci_label != 'true' && 'minimum' || '' }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
