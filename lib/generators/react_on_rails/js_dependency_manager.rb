@@ -78,9 +78,10 @@ module ReactOnRails
 
       # TypeScript dependencies (only installed when --typescript flag is used)
       # Note: @babel/preset-typescript is NOT included because:
-      # - SWC (the default) has built-in TypeScript support
-      # - Shakapacker handles the loader configuration
-      # - For Babel users, they can add @babel/preset-typescript manually if needed
+      # - SWC is now the default webpack_loader (has built-in TypeScript support)
+      # - Shakapacker handles the loader configuration via shakapacker.yml
+      # - If users choose webpack_loader: 'babel', they should manually add @babel/preset-typescript
+      #   and configure it in their babel.config.js
       TYPESCRIPT_DEPENDENCIES = %w[
         typescript
         @types/react
@@ -114,8 +115,17 @@ module ReactOnRails
       end
 
       def add_react_on_rails_package
-        # Always use exact version match between gem and npm package
-        react_on_rails_pkg = "react-on-rails@#{ReactOnRails::VERSION}"
+        # Use exact version match between gem and npm package for stable releases
+        # For pre-release versions (e.g., 16.1.0-rc.1), use latest to avoid installing
+        # a version that may not exist in the npm registry
+        major_minor_patch_only = /\A\d+\.\d+\.\d+\z/
+        react_on_rails_pkg = if ReactOnRails::VERSION.match?(major_minor_patch_only)
+                               "react-on-rails@#{ReactOnRails::VERSION}"
+                             else
+                               puts "Adding the latest react-on-rails NPM module. " \
+                                    "Double check this is correct in package.json"
+                               "react-on-rails"
+                             end
 
         puts "Installing React on Rails package..."
         if add_js_dependency(react_on_rails_pkg)
@@ -237,6 +247,10 @@ module ReactOnRails
 
       def install_js_dependencies
         # Use package_json gem's install method (always available via shakapacker)
+        # package_json is guaranteed to be available because:
+        # 1. react_on_rails gemspec requires shakapacker
+        # 2. shakapacker gemspec requires package_json
+        # 3. GeneratorHelper provides package_json method
         package_json.manager.install
         true
       rescue StandardError => e

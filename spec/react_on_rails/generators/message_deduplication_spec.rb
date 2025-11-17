@@ -83,9 +83,17 @@ describe "Message Deduplication", type: :generator do
 
     context "when using package_json gem (always available via shakapacker)" do
       before do
-        # Mock that the package_json gem methods succeed
-        allow(install_generator).to receive_messages(add_js_dependency: true, add_js_dependencies_batch: true,
-                                                     install_js_dependencies: true)
+        # Mock the actual methods used by JsDependencyManager
+        # add_npm_dependencies is from GeneratorHelper and is used by add_js_dependencies_batch
+        # Mock package_json to prevent actual package manager calls
+        # rubocop:disable RSpec/VerifiedDoubles
+        mock_manager = double("PackageManager", install: true)
+        mock_package_json = double("PackageJson", manager: mock_manager)
+        # rubocop:enable RSpec/VerifiedDoubles
+        allow(install_generator).to receive_messages(
+          add_npm_dependencies: true,
+          package_json: mock_package_json
+        )
       end
 
       it "does not run duplicate install commands" do
