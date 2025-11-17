@@ -134,6 +134,8 @@ jobs:
         run: yarn run eslint --report-unused-disable-directives
       - name: Check formatting
         run: yarn start format.listDifferent
+      - name: Lint SCSS with stylelint
+        run: yarn run lint:scss
       - name: Type-check TypeScript
         run: yarn run type-check
       - name: Pack for attw and publint
