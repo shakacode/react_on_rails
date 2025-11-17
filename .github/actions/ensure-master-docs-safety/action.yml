@@ -1,0 +1,66 @@
+name: Ensure master docs-only skips are safe
+description: Fails if the previous master commit still has failing workflow runs when current push is docs-only
+inputs:
+  docs-only:
+    description: 'String output from ci-changes-detector ("true" or "false")'
+    required: true
+  previous-sha:
+    description: 'SHA of the previous commit on master (github.event.before)'
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Check previous master commit status
+      if: ${{ inputs.docs-only == 'true' && inputs.previous-sha != '' && inputs.previous-sha != '0000000000000000000000000000000000000000' }}
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const previousSha = core.getInput('previous-sha');
+          const workflowRuns = await github.paginate(
+            github.rest.actions.listWorkflowRunsForRepo,
+            {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              branch: 'master',
+              per_page: 100
+            }
+          );
+
+          const relevantRuns = workflowRuns.filter((run) => run.head_sha === previousSha);
+
+          if (relevantRuns.length === 0) {
+            core.info(`No workflow runs found for ${previousSha}. Nothing to enforce.`);
+            return;
+          }
+
+          const latestByWorkflow = new Map();
+          for (const run of relevantRuns) {
+            const existing = latestByWorkflow.get(run.workflow_id);
+            if (!existing || new Date(run.created_at) > new Date(existing.created_at)) {
+              latestByWorkflow.set(run.workflow_id, run);
+            }
+          }
+
+          const failingRuns = Array.from(latestByWorkflow.values()).filter((run) => {
+            if (run.status !== 'completed') {
+              core.info(`Workflow ${run.name} (#${run.id}) is still ${run.status}; ignoring for enforcement.`);
+              return false;
+            }
+            return ['failure', 'timed_out', 'cancelled', 'action_required'].includes(run.conclusion);
+          });
+
+          if (failingRuns.length === 0) {
+            core.info(`Previous master commit ${previousSha} completed without failures. Docs-only skip allowed.`);
+            return;
+          }
+
+          const details = failingRuns
+            .map((run) => `- ${run.name} (run #${run.run_number}) concluded ${run.conclusion}`)
+            .join('\n');
+
+          core.setFailed(
+            [
+              `Cannot skip CI for docs-only commit because previous master commit ${previousSha} still has failing workflows:`,
+              details
+            ].join('\n')
+          );

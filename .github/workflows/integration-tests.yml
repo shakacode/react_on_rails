@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - 'master'
-    # Never skip on master - always run full test suite
+    # Always trigger on master; docs-only detection handles skipping heavy jobs
   pull_request:
     paths-ignore:
       - '**.md'
@@ -20,6 +20,9 @@ on:
 
 jobs:
   detect-changes:
+    permissions:
+      contents: read
+      actions: read
     runs-on: ubuntu-22.04
     outputs:
       docs_only: ${{ steps.detect.outputs.docs_only }}
@@ -51,9 +54,15 @@ jobs:
             echo "docs_only=false" >> "$GITHUB_OUTPUT"
           else
             BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/master' }}"
-          script/ci-changes-detector "$BASE_REF"
+            script/ci-changes-detector "$BASE_REF"
           fi
         shell: bash
+      - name: Guard docs-only master pushes
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: ./.github/actions/ensure-master-docs-safety
+        with:
+          docs-only: ${{ steps.detect.outputs.docs_only }}
+          previous-sha: ${{ github.event.before }}
 
   setup-integration-matrix:
     needs: detect-changes
@@ -79,7 +88,15 @@ jobs:
     needs: [detect-changes, setup-integration-matrix]
     # Run on master, workflow_dispatch, OR when tests needed on PR
     if: |
-      github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.run_dummy_tests == 'true'
+      !(
+        github.event_name == 'push' &&
+        github.ref == 'refs/heads/master' &&
+        needs.detect-changes.outputs.docs_only == 'true'
+      ) && (
+        github.ref == 'refs/heads/master' ||
+        github.event_name == 'workflow_dispatch' ||
+        needs.detect-changes.outputs.run_dummy_tests == 'true'
+      )
     strategy:
       matrix: ${{ fromJson(needs.setup-integration-matrix.outputs.matrix) }}
     runs-on: ubuntu-22.04
@@ -154,7 +171,15 @@ jobs:
     needs: [detect-changes, setup-integration-matrix, build-dummy-app-webpack-test-bundles]
     # Run on master, workflow_dispatch, OR when tests needed on PR
     if: |
-      github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.run_dummy_tests == 'true'
+      !(
+        github.event_name == 'push' &&
+        github.ref == 'refs/heads/master' &&
+        needs.detect-changes.outputs.docs_only == 'true'
+      ) && (
+        github.ref == 'refs/heads/master' ||
+        github.event_name == 'workflow_dispatch' ||
+        needs.detect-changes.outputs.run_dummy_tests == 'true'
+      )
     strategy:
       matrix: ${{ fromJson(needs.setup-integration-matrix.outputs.matrix) }}
     runs-on: ubuntu-22.04

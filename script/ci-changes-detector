@@ -147,6 +147,36 @@ echo "Base: $BASE_REF | Current: $CURRENT_REF"
 echo ""
 
 if [ "$DOCS_ONLY" = true ]; then
+  if [ -n "${GITHUB_OUTPUT:-}" ]; then
+    {
+      echo "docs_only=true"
+      echo "run_lint=false"
+      echo "run_ruby_tests=false"
+      echo "run_js_tests=false"
+      echo "run_dummy_tests=false"
+      echo "run_generators=false"
+      echo "run_pro_lint=false"
+      echo "run_pro_tests=false"
+      echo "run_pro_dummy_tests=false"
+    } >> "$GITHUB_OUTPUT"
+  fi
+
+  if [ "${CI_JSON_OUTPUT:-}" = "1" ]; then
+    cat << EOF
+{
+  "docs_only": true,
+  "run_lint": false,
+  "run_ruby_tests": false,
+  "run_js_tests": false,
+  "run_dummy_tests": false,
+  "run_generators": false,
+  "run_pro_lint": false,
+  "run_pro_tests": false,
+  "run_pro_dummy_tests": false
+}
+EOF
+  fi
+
   echo -e "${GREEN}✓ Documentation-only changes${NC}"
   echo ""
   echo "Recommended CI jobs: NONE (skip CI)"
