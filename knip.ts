@@ -5,13 +5,11 @@ const config: KnipConfig = {
   workspaces: {
     // Root workspace - manages the monorepo and global tooling
     '.': {
-      entry: ['eslint.config.ts'],
+      entry: ['eslint.config.ts', 'jest.config.base.js'],
       project: ['*.{js,mjs,ts}'],
       ignoreBinaries: [
         // Has to be installed globally
         'yalc',
-        // Used in package.json scripts (devDependency, so unlisted in production mode)
-        'nps',
         // Pro package binaries used in Pro workflows
         'playwright',
         'e2e-test',
@@ -41,6 +39,17 @@ const config: KnipConfig = {
         // SWC transpiler dependencies used in dummy apps
         '@swc/core',
         'swc-loader',
+        // Test dependencies used by child workspaces (packages/react-on-rails, packages/react-on-rails-pro)
+        '@testing-library/dom',
+        '@testing-library/jest-dom',
+        '@testing-library/react',
+        '@types/react-dom',
+        'create-react-class',
+        'jest-fetch-mock',
+        'prop-types',
+        'react',
+        'react-dom',
+        'redux',
       ],
     },
 
@@ -89,6 +98,11 @@ const config: KnipConfig = {
         'src/RSCRoute.tsx:RSCRouteProps',
         'src/streamServerRenderedReactComponent.ts:StreamingTrackers',
       ],
+      ignoreDependencies: [
+        // Test dependencies used only in tests
+        '@types/mock-fs',
+        'mock-fs',
+      ],
     },
     'spec/dummy': {
       entry: [
@@ -124,9 +138,6 @@ const config: KnipConfig = {
         'bin/.*',
       ],
       ignoreDependencies: [
-        // Build-time dependencies not detected by Knip in any mode
-        '@babel/runtime',
-        'mini-css-extract-plugin',
         // There's no ReScript plugin for Knip
         '@rescript/react',
         // The Babel plugin fails to detect it
@@ -136,13 +147,10 @@ const config: KnipConfig = {
         'node-libs-browser',
         // The below dependencies are not detected by the Webpack plugin
         // due to the config issue.
-        'css-loader',
         'expose-loader',
         'file-loader',
         'imports-loader',
         'null-loader',
-        'sass',
-        'sass-loader',
         'sass-resources-loader',
         'style-loader',
         'url-loader',
