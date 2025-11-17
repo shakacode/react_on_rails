@@ -26,7 +26,7 @@ ReactOnRails.configure do |config|
   # - Requires adding ReactOnRails::TestHelper to spec/rails_helper.rb
   # - See: https://github.com/shakacode/react_on_rails/blob/master/docs/guides/testing-configuration.md
   #
-  # config.build_test_command = "RAILS_ENV=test bin/shakapacker"
+  config.build_test_command = "RAILS_ENV=test bin/shakapacker"
 
   ################################################################################
   # Advanced Configuration
