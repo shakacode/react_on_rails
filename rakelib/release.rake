@@ -13,6 +13,41 @@ class RaisingMessageHandler
   end
 end
 
+# Helper module for release-specific tasks
+module ReleaseHelpers
+  include ReactOnRails::TaskHelpers
+
+  # Publish a gem with retry logic for OTP failures
+  def publish_gem_with_retry(dir, gem_name, max_retries: 3)
+    puts "\nCarefully add your OTP for Rubygems when prompted."
+    puts "NOTE: OTP codes expire quickly (typically 30 seconds). Generate a fresh code when prompted."
+
+    retry_count = 0
+    success = false
+
+    while retry_count < max_retries && !success
+      begin
+        sh_in_dir(dir, "gem release")
+        success = true
+      rescue StandardError => e
+        retry_count += 1
+        if retry_count < max_retries
+          puts "\n⚠️  #{gem_name} release failed (attempt #{retry_count}/#{max_retries})"
+          puts "Common causes:"
+          puts "  - OTP code expired or already used"
+          puts "  - Network timeout"
+          puts "\nGenerating a FRESH OTP code and retrying in 3 seconds..."
+          sleep 3
+        else
+          puts "\n❌ Failed to publish #{gem_name} after #{max_retries} attempts"
+          raise e
+        end
+      end
+    end
+  end
+  module_function :publish_gem_with_retry
+end
+
 # rubocop:disable Metrics/BlockLength
 
 desc("Unified release script for all React on Rails packages and gems.
@@ -228,18 +263,21 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
       puts "Publishing PUBLIC Ruby gem..."
       puts "=" * 80
 
-      # Publish react_on_rails Ruby gem
-      puts "\nCarefully add your OTP for Rubygems when prompted."
-      sh_in_dir(gem_root, "gem release")
+      # Publish react_on_rails Ruby gem with retry logic
+      ReleaseHelpers.publish_gem_with_retry(gem_root, "react_on_rails")
+
+      # Add delay before next OTP operation to ensure clean separation
+      puts "\n⏳ Waiting 5 seconds before next publication to ensure OTP separation..."
+      sleep 5
 
       puts "\n#{'=' * 80}"
       puts "Publishing PUBLIC Pro Ruby gem to RubyGems.org..."
       puts "=" * 80
 
-      # Publish react_on_rails_pro Ruby gem to RubyGems.org
+      # Publish react_on_rails_pro Ruby gem to RubyGems.org with retry logic
       puts "\nPublishing react_on_rails_pro gem to RubyGems.org..."
-      puts "Carefully add your OTP for Rubygems when prompted."
-      sh_in_dir(pro_gem_root, "gem release")
+      puts "NOTE: Generate a FRESH OTP code (different from the previous one)."
+      ReleaseHelpers.publish_gem_with_retry(pro_gem_root, "react_on_rails_pro")
     end
   end
 
