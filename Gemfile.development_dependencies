@@ -38,7 +38,6 @@ group :development, :test do
   gem "rubocop", "1.61.0", require: false
   gem "rubocop-performance", "~>1.20.0", require: false
   gem "rubocop-rspec", "~>2.26", require: false
-  gem "scss_lint", require: false
   gem "spring", "~> 4.0"
   gem "lefthook", require: false
   # Added for Ruby 3.5+ compatibility to silence warnings
