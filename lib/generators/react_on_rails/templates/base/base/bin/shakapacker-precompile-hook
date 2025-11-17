@@ -11,6 +11,22 @@
 #
 # See: https://github.com/shakacode/shakapacker/blob/main/docs/precompile_hook.md
 
+# Try to use shared implementation from gem if available (during development/testing)
+# This allows the gem's test apps and generated apps to share the same implementation
+begin
+  require "react_on_rails"
+  gem_root = Gem.loaded_specs["react_on_rails"]&.gem_dir
+  shared_hook = File.join(gem_root, "lib", "tasks", "precompile", "shakapacker_precompile_hook_shared.rb") if gem_root
+
+  if shared_hook && File.exist?(shared_hook)
+    load shared_hook
+    exit 0
+  end
+rescue LoadError, StandardError
+  # If we can't load from gem, fall through to inline implementation
+end
+
+# Inline implementation for generated apps (when gem source isn't available)
 require "fileutils"
 
 # Find Rails root by walking upward looking for config/environment.rb
