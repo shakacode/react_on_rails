@@ -42,7 +42,7 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
       end
       sh_in_dir(example_type.dir, generator_commands)
       sh_in_dir(example_type.dir, "npm install")
-      sh_in_dir(example_type.dir, "bin/rake react_on_rails:generate_packs")
+      sh_in_dir(example_type.dir, "bundle exec rake react_on_rails:generate_packs")
     end
   end
 
