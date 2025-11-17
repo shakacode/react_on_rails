@@ -61,25 +61,32 @@ jobs:
           script/ci-changes-detector "$BASE_REF"
         shell: bash
 
-  rspec-package-tests:
+  setup-gem-tests-matrix:
     needs: detect-changes
+    runs-on: ubuntu-22.04
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - id: set-matrix
+        run: |
+          # Determine if we should run full matrix (master or full-ci label)
+          if [[ "${{ github.ref }}" == "refs/heads/master" ]] || \
+             [[ "${{ needs.detect-changes.outputs.has_full_ci_label }}" == "true" ]]; then
+            # Full matrix: test both latest and minimum supported versions
+            echo 'matrix={"include":[{"ruby-version":"3.4","dependency-level":"latest"},{"ruby-version":"3.2","dependency-level":"minimum"}]}' >> $GITHUB_OUTPUT
+          else
+            # PR matrix: test only latest versions for fast feedback
+            echo 'matrix={"include":[{"ruby-version":"3.4","dependency-level":"latest"}]}' >> $GITHUB_OUTPUT
+          fi
+
+  rspec-package-tests:
+    needs: [detect-changes, setup-gem-tests-matrix]
     # Run on master OR when Ruby tests needed on PR
     if: |
       (github.ref == 'refs/heads/master' || needs.detect-changes.outputs.run_ruby_tests == 'true')
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          # Always run: Latest versions (fast feedback on PRs)
-          - ruby-version: '3.4'
-            dependency-level: 'latest'
-          # Master and full-ci label: Minimum supported versions (full coverage)
-          - ruby-version: '3.2'
-            dependency-level: 'minimum'
-        exclude:
-          # Skip minimum dependency matrix on regular PRs (run only on master or with full-ci label)
-          - ruby-version: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && needs.detect-changes.outputs.has_full_ci_label != 'true' && '3.2' || '' }}
-            dependency-level: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && needs.detect-changes.outputs.has_full_ci_label != 'true' && 'minimum' || '' }}
+      matrix: ${{ fromJson(needs.setup-gem-tests-matrix.outputs.matrix) }}
     env:
       BUNDLE_FROZEN: ${{ matrix.dependency-level == 'minimum' && 'false' || 'true' }}
     runs-on: ubuntu-22.04
