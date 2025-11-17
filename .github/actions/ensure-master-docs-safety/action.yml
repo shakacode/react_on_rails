@@ -23,13 +23,15 @@ runs:
             return;
           }
 
+          // Query workflow runs from the last 7 days to avoid excessive API calls
+          // For very old commits, we'll skip the check rather than scan the entire history
           const createdAfter = new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString();
           const workflowRuns = await github.paginate(github.rest.actions.listWorkflowRunsForRepo, {
             owner: context.repo.owner,
             repo: context.repo.repo,
             branch: 'master',
             event: 'push',
-            per_page: 50,
+            per_page: 100,
             created: `>${createdAfter}`
           });
 
@@ -40,6 +42,8 @@ runs:
             return;
           }
 
+          // Deduplicate workflow runs by keeping only the latest run for each workflow_id
+          // This handles cases where workflows are re-run manually
           const latestByWorkflow = new Map();
           for (const run of relevantRuns) {
             const existing = latestByWorkflow.get(run.workflow_id);
@@ -48,6 +52,9 @@ runs:
             }
           }
 
+          // Check for workflows that are still running
+          // We require all workflows to complete before allowing docs-only skip
+          // This prevents skipping CI when the previous commit hasn't been fully validated
           const incompleteRuns = Array.from(latestByWorkflow.values()).filter(
             (run) => run.status !== 'completed'
           );
@@ -59,12 +66,17 @@ runs:
             core.setFailed(
               [
                 `Cannot skip CI for docs-only commit because previous master commit ${previousSha} still has running workflows:`,
-                details
+                details,
+                '',
+                'Wait for these workflows to complete before pushing docs-only changes.'
               ].join('\n')
             );
             return;
           }
 
+          // Check for workflows that failed on the previous commit
+          // We treat cancelled runs as failures to be conservative, since they might indicate
+          // timeouts or other infrastructure issues that should be resolved before skipping CI
           const failingRuns = Array.from(latestByWorkflow.values()).filter((run) => {
             return ['failure', 'timed_out', 'cancelled', 'action_required'].includes(run.conclusion);
           });
@@ -81,6 +93,8 @@ runs:
           core.setFailed(
             [
               `Cannot skip CI for docs-only commit because previous master commit ${previousSha} still has failing workflows:`,
-              details
+              details,
+              '',
+              'Fix these failures before pushing docs-only changes, or push non-docs changes to trigger full CI.'
             ].join('\n')
           );
