@@ -365,23 +365,8 @@ module ReactOnRails
 
       def install_typescript_dependencies
         puts Rainbow("📝 Installing TypeScript dependencies...").yellow
-
-        # Install TypeScript and React type definitions
-        typescript_packages = %w[
-          typescript
-          @types/react
-          @types/react-dom
-          @babel/preset-typescript
-        ]
-
-        # Use the shared dependency management approach via GeneratorHelper
-        unless add_npm_dependencies(typescript_packages, dev: true)
-          # This should not happen since package_json is always available via shakapacker
-          raise "Failed to add TypeScript dependencies (#{typescript_packages.join(', ')}) via package_json gem. " \
-                "This indicates shakapacker dependency may not be properly installed."
-        end
-
-        @added_dependencies_to_package_json = true
+        # Delegate to shared module for consistent dependency management
+        add_typescript_dependencies
       end
 
       def create_css_module_types

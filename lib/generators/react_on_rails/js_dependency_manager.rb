@@ -11,15 +11,27 @@ module ReactOnRails
     # Since react_on_rails requires shakapacker, and shakapacker includes
     # package_json as a dependency, the package_json gem is always available.
     #
-    # == Required Instance Variables
-    # Including classes must support these instance variables:
+    # == Instance Variables
+    # The module initializes and manages these instance variables:
     # - @added_dependencies_to_package_json: Boolean tracking if package_json gem was used
+    #   (initialized by setup_js_dependencies using `unless defined?` pattern)
     #
     # == Required Methods
     # Including classes must include GeneratorHelper module which provides:
     # - add_npm_dependencies(packages, dev: false): Add packages via package_json gem
     # - package_json: Access to PackageJson instance (always available via shakapacker)
     # - destination_root: Generator destination directory
+    #
+    # == Optional Methods
+    # Including classes may define:
+    # - options.rspack?: Returns true if --rspack flag is set (for Rspack support)
+    # - options.typescript?: Returns true if --typescript flag is set (for TypeScript support)
+    #
+    # == Installation Behavior
+    # The module ALWAYS runs package manager install after adding dependencies.
+    # This is safe because package_json gem's install is idempotent - it only
+    # installs what's actually needed from package.json. This prevents edge cases
+    # where package.json was modified but dependencies weren't installed.
     #
     # == Usage
     # Include this module in generator classes and call setup_js_dependencies
@@ -43,10 +55,31 @@ module ReactOnRails
         style-loader
       ].freeze
 
-      # Development-only dependencies for hot reloading
+      # Development-only dependencies for hot reloading (Webpack)
       DEV_DEPENDENCIES = %w[
         @pmmmwh/react-refresh-webpack-plugin
         react-refresh
+      ].freeze
+
+      # Rspack core dependencies (only installed when --rspack flag is used)
+      RSPACK_DEPENDENCIES = %w[
+        @rspack/core
+        rspack-manifest-plugin
+      ].freeze
+
+      # Rspack development dependencies for hot reloading
+      RSPACK_DEV_DEPENDENCIES = %w[
+        @rspack/cli
+        @rspack/plugin-react-refresh
+        react-refresh
+      ].freeze
+
+      # TypeScript dependencies (only installed when --typescript flag is used)
+      TYPESCRIPT_DEPENDENCIES = %w[
+        typescript
+        @types/react
+        @types/react-dom
+        @babel/preset-typescript
       ].freeze
 
       private
@@ -56,6 +89,12 @@ module ReactOnRails
         # This ensures safe operation when the module is first included
         @added_dependencies_to_package_json = false unless defined?(@added_dependencies_to_package_json)
         add_js_dependencies
+
+        # Always run install to ensure all dependencies are properly installed.
+        # The package_json gem's install method is idempotent and safe to call
+        # even if packages were already added - it will only install what's needed.
+        # This ensures edge cases where package.json was modified but install wasn't
+        # run are handled correctly.
         install_js_dependencies
       end
 
@@ -63,6 +102,9 @@ module ReactOnRails
         add_react_on_rails_package
         add_react_dependencies
         add_css_dependencies
+        # Rspack dependencies are only added when --rspack flag is used
+        add_rspack_dependencies if respond_to?(:options) && options.rspack?
+        # Dev dependencies vary based on bundler choice
         add_dev_dependencies
       end
 
@@ -104,14 +146,45 @@ module ReactOnRails
         end
       end
 
-      def add_dev_dependencies
-        puts "Installing development dependencies..."
+      def add_rspack_dependencies
+        puts "Installing Rspack core dependencies..."
 
-        if add_js_dependencies_batch(DEV_DEPENDENCIES, dev: true)
+        if add_js_dependencies_batch(RSPACK_DEPENDENCIES)
           @added_dependencies_to_package_json = true
         else
           # This should not happen since package_json is always available via shakapacker
-          raise "Failed to add development dependencies (#{DEV_DEPENDENCIES.join(', ')}) via package_json gem. " \
+          raise "Failed to add Rspack dependencies (#{RSPACK_DEPENDENCIES.join(', ')}) via package_json gem. " \
+                "This indicates shakapacker dependency may not be properly installed."
+        end
+      end
+
+      def add_typescript_dependencies
+        puts "Installing TypeScript dependencies..."
+
+        if add_js_dependencies_batch(TYPESCRIPT_DEPENDENCIES, dev: true)
+          @added_dependencies_to_package_json = true
+        else
+          # This should not happen since package_json is always available via shakapacker
+          raise "Failed to add TypeScript dependencies (#{TYPESCRIPT_DEPENDENCIES.join(', ')}) via package_json gem. " \
+                "This indicates shakapacker dependency may not be properly installed."
+        end
+      end
+
+      def add_dev_dependencies
+        puts "Installing development dependencies..."
+
+        # Use Rspack-specific dev dependencies if --rspack flag is set
+        dev_deps = if respond_to?(:options) && options.rspack?
+                     RSPACK_DEV_DEPENDENCIES
+                   else
+                     DEV_DEPENDENCIES
+                   end
+
+        if add_js_dependencies_batch(dev_deps, dev: true)
+          @added_dependencies_to_package_json = true
+        else
+          # This should not happen since package_json is always available via shakapacker
+          raise "Failed to add development dependencies (#{dev_deps.join(', ')}) via package_json gem. " \
                 "This indicates shakapacker dependency may not be properly installed."
         end
       end
