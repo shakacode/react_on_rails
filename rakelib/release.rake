@@ -17,8 +17,10 @@ end
 module ReleaseHelpers
   include ReactOnRails::TaskHelpers
 
+  module_function
+
   # Publish a gem with retry logic for OTP failures
-  def publish_gem_with_retry(dir, gem_name, max_retries: 3)
+  def publish_gem_with_retry(dir, gem_name, max_retries: ENV.fetch("GEM_RELEASE_MAX_RETRIES", "3").to_i)
     puts "\nCarefully add your OTP for Rubygems when prompted."
     puts "NOTE: OTP codes expire quickly (typically 30 seconds). Generate a fresh code when prompted."
 
@@ -29,15 +31,15 @@ module ReleaseHelpers
       begin
         sh_in_dir(dir, "gem release")
         success = true
-      rescue StandardError => e
+      rescue Gem::CommandException, IOError => e
         retry_count += 1
         if retry_count < max_retries
           puts "\n⚠️  #{gem_name} release failed (attempt #{retry_count}/#{max_retries})"
           puts "Common causes:"
           puts "  - OTP code expired or already used"
           puts "  - Network timeout"
-          puts "\nGenerating a FRESH OTP code and retrying in 3 seconds..."
-          sleep 3
+          puts "\nGenerating a FRESH OTP code and retrying in 5 seconds..."
+          sleep 5
         else
           puts "\n❌ Failed to publish #{gem_name} after #{max_retries} attempts"
           raise e
@@ -45,7 +47,6 @@ module ReleaseHelpers
       end
     end
   end
-  module_function :publish_gem_with_retry
 end
 
 # rubocop:disable Metrics/BlockLength
