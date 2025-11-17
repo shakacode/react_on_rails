@@ -57,25 +57,34 @@ jobs:
           script/ci-changes-detector "$BASE_REF"
         shell: bash
 
-  examples:
+  setup-matrix:
     needs: detect-changes
+    runs-on: ubuntu-22.04
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - id: set-matrix
+        run: |
+          # Determine if we should run full matrix (master, workflow_dispatch, force_run, or full-ci label)
+          if [[ "${{ github.ref }}" == "refs/heads/master" ]] || \
+             [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || \
+             [[ "${{ inputs.force_run }}" == "true" ]] || \
+             [[ "${{ needs.detect-changes.outputs.has_full_ci_label }}" == "true" ]]; then
+            # Full matrix: test both latest and minimum supported versions
+            echo 'matrix={"include":[{"ruby-version":"3.4","dependency-level":"latest"},{"ruby-version":"3.2","dependency-level":"minimum"}]}' >> $GITHUB_OUTPUT
+          else
+            # PR matrix: test only latest versions for fast feedback
+            echo 'matrix={"include":[{"ruby-version":"3.4","dependency-level":"latest"}]}' >> $GITHUB_OUTPUT
+          fi
+
+  examples:
+    needs: [detect-changes, setup-matrix]
     # Run on master, workflow_dispatch, OR when generators needed
     if: |
       github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.run_generators == 'true'
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          # Always run: Latest versions (fast feedback on PRs)
-          - ruby-version: '3.4'
-            dependency-level: 'latest'
-          # Master and workflow_dispatch: Minimum supported versions (full coverage)
-          - ruby-version: '3.2'
-            dependency-level: 'minimum'
-        exclude:
-          # Skip minimum dependency matrix on regular PRs (run only on master/workflow_dispatch/force_run/full-ci label)
-          - ruby-version: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && inputs.force_run != true && needs.detect-changes.outputs.has_full_ci_label != 'true' && '3.2' || '' }}
-            dependency-level: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && inputs.force_run != true && needs.detect-changes.outputs.has_full_ci_label != 'true' && 'minimum' || '' }}
+      matrix: ${{ fromJson(needs.setup-matrix.outputs.matrix) }}
     env:
       SKIP_YARN_COREPACK_CHECK: 0
       BUNDLE_FROZEN: ${{ matrix.dependency-level == 'minimum' && 'false' || 'true' }}
