@@ -130,7 +130,7 @@ jobs:
           yarn install --no-progress --no-emoji ${{ matrix.dependency-level == 'latest' && '--frozen-lockfile' || '' }}
           sudo yarn global add yalc
       - name: yalc publish for react-on-rails
-        run: yalc publish
+        run: yarn yalc publish
       - name: Install Ruby Gems for package
         run: |
           bundle lock --add-platform 'x86_64-linux'
