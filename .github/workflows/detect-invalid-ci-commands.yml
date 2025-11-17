@@ -31,11 +31,22 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const comment = context.payload.comment.body.toLowerCase();
+            let comment = context.payload.comment.body;
 
-            // Pattern to detect slash commands
-            const slashCommandPattern = /(?:^|\n)\s*(\/[\w-]+)/g;
-            const matches = [...comment.matchAll(slashCommandPattern)];
+            // Remove code blocks to avoid false positives
+            // Remove fenced code blocks (```...```)
+            comment = comment.replace(/```[\s\S]*?```/g, '');
+            // Remove inline code (`...`) - must have backticks on both sides
+            comment = comment.replace(/`[^`]+?`/g, '');
+            // Remove indented code blocks (4+ spaces at line start)
+            comment = comment.replace(/(?:^|\n)([ ]{4,})[^\n]+/g, '');
+
+            const commentLower = comment.toLowerCase();
+
+            // Pattern to detect slash commands (must be preceded by whitespace or start of string)
+            // This prevents matching URLs like https://example.com/run-tests
+            const slashCommandPattern = /(^|\s)(\/[\w-]+)/g;
+            const matches = [...commentLower.matchAll(slashCommandPattern)];
 
             if (matches.length === 0) {
               console.log('No slash commands found');
@@ -53,16 +64,16 @@ jobs:
 
             // Check if any slash command looks like it might be trying to trigger CI
             const potentialCICommands = matches.filter(match => {
-              const cmd = match[1].toLowerCase();
+              const cmd = match[2].toLowerCase(); // match[2] is the actual command (match[1] is the prefix)
               return !validCommands.includes(cmd) &&
                      ciKeywords.some(keyword => cmd.includes(keyword));
             });
 
             if (potentialCICommands.length > 0) {
-              console.log('Found potential invalid CI commands:', potentialCICommands.map(m => m[1]));
+              console.log('Found potential invalid CI commands:', potentialCICommands.map(m => m[2]));
               return {
                 shouldRespond: true,
-                invalidCommands: potentialCICommands.map(m => m[1])
+                invalidCommands: potentialCICommands.map(m => m[2])
               };
             }
 
@@ -70,11 +81,13 @@ jobs:
           result-encoding: string
 
       - name: Post helpful comment
-        if: fromJSON(steps.check_command.outputs.result).shouldRespond
+        if: steps.check_command.outputs.result != '' && fromJSON(steps.check_command.outputs.result).shouldRespond == true
         uses: actions/github-script@v7
+        env:
+          CHECK_RESULT: ${{ steps.check_command.outputs.result }}
         with:
           script: |
-            const result = ${{ steps.check_command.outputs.result }};
+            const result = JSON.parse(process.env.CHECK_RESULT);
             const invalidCommands = result.invalidCommands || [];
 
             const invalidCmdsList = invalidCommands.length > 0
