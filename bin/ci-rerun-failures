@@ -177,7 +177,7 @@ fi
 # NOTE: Version numbers below must match .github/workflows/main.yml matrix configuration
 declare -A JOB_MAP
 JOB_MAP["lint-js-and-ruby"]="lint-js-and-ruby"
-JOB_MAP["rspec-package-tests"]="rspec-package-tests"
+JOB_MAP["basic-gem-tests"]="basic-gem-tests"
 JOB_MAP["package-js-tests"]="package-js-tests"
 JOB_MAP["dummy-app-integration-tests (3.4, 22, latest)"]="dummy-app-integration-tests"
 JOB_MAP["dummy-app-integration-tests (3.2, 20, minimum)"]="dummy-app-integration-tests"
@@ -190,7 +190,7 @@ run_command() {
     "lint-js-and-ruby")
       bundle exec rubocop && yarn run eslint --report-unused-disable-directives && yarn start format.listDifferent
       ;;
-    "rspec-package-tests")
+    "basic-gem-tests")
       bundle exec rake run_rspec:gem
       ;;
     "package-js-tests")
