@@ -1,0 +1,182 @@
+name: Detect Invalid CI Commands
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  detect-invalid-commands:
+    # Only run on PR comments that contain CI-related keywords but don't match valid commands
+    if: |
+      github.event.issue.pull_request &&
+      !contains(github.event.comment.body, '/run-skipped-ci') &&
+      !contains(github.event.comment.body, '/stop-run-skipped-ci') &&
+      (
+        contains(github.event.comment.body, '/run') ||
+        contains(github.event.comment.body, '/skip') ||
+        contains(github.event.comment.body, '/ci') ||
+        contains(github.event.comment.body, '/full-ci') ||
+        contains(github.event.comment.body, '/trigger') ||
+        contains(github.event.comment.body, '/enable') ||
+        contains(github.event.comment.body, '/disable') ||
+        contains(github.event.comment.body, '/test')
+      )
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Check for similar commands
+        id: check_command
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const comment = context.payload.comment.body.toLowerCase();
+
+            // Pattern to detect slash commands
+            const slashCommandPattern = /(?:^|\n)\s*(\/[\w-]+)/g;
+            const matches = [...comment.matchAll(slashCommandPattern)];
+
+            if (matches.length === 0) {
+              console.log('No slash commands found');
+              return { shouldRespond: false };
+            }
+
+            // Valid commands
+            const validCommands = ['/run-skipped-ci', '/stop-run-skipped-ci'];
+
+            // CI-related keywords that might indicate an attempt to use a CI command
+            const ciKeywords = [
+              'run', 'skip', 'ci', 'full', 'trigger', 'enable', 'disable',
+              'test', 'suite', 'check', 'workflow'
+            ];
+
+            // Check if any slash command looks like it might be trying to trigger CI
+            const potentialCICommands = matches.filter(match => {
+              const cmd = match[1].toLowerCase();
+              return !validCommands.includes(cmd) &&
+                     ciKeywords.some(keyword => cmd.includes(keyword));
+            });
+
+            if (potentialCICommands.length > 0) {
+              console.log('Found potential invalid CI commands:', potentialCICommands.map(m => m[1]));
+              return {
+                shouldRespond: true,
+                invalidCommands: potentialCICommands.map(m => m[1])
+              };
+            }
+
+            return { shouldRespond: false };
+          result-encoding: string
+
+      - name: Post helpful comment
+        if: fromJSON(steps.check_command.outputs.result).shouldRespond
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const result = ${{ steps.check_command.outputs.result }};
+            const invalidCommands = result.invalidCommands || [];
+
+            const invalidCmdsList = invalidCommands.length > 0
+              ? `\n\n**Invalid command(s) detected:** ${invalidCommands.map(cmd => \`\\\`${cmd}\\\`\`).join(', ')}`
+              : '';
+
+            const body = \`👋 It looks like you may have tried to use a CI command, but it doesn't match the available commands.${invalidCmdsList}
+
+            ## Available GitHub Comment Commands
+
+            ### 1. \\\`/run-skipped-ci\\\` - Enable Full CI Mode
+            Triggers all CI workflows that were skipped due to unchanged code.
+
+            **What it does:**
+            - Runs tests across all supported versions (Ruby 3.2-3.4, Node 20-22, Shakapacker 8-9, React 18-19)
+            - Adds the \\\`full-ci\\\` label to persist full testing on future commits
+            - Triggers: Main tests, Generator tests, and React on Rails Pro tests
+
+            **Requirements:**
+            - Must have write access to the repository
+            - Use at the start of a comment or after a newline
+
+            **Example:**
+            \\\`\\\`\\\`
+            /run-skipped-ci
+            \\\`\\\`\\\`
+
+            ---
+
+            ### 2. \\\`/stop-run-skipped-ci\\\` - Disable Full CI Mode
+            Returns to standard CI behavior (optimized suite, skips tests for unchanged code).
+
+            **What it does:**
+            - Removes the \\\`full-ci\\\` label from the PR
+            - Future commits will use the fast feedback CI suite
+            - Does NOT stop currently running workflows
+
+            **Requirements:**
+            - Must have write access to the repository
+
+            **Example:**
+            \\\`\\\`\\\`
+            /stop-run-skipped-ci
+            \\\`\\\`\\\`
+
+            ---
+
+            ### 3. \\\`@claude\\\` - Claude Code AI Review
+            Invokes Claude Code AI to perform code review or answer questions.
+
+            **What it does:**
+            - Analyzes code changes and provides feedback
+            - Follows instructions specified in the comment
+            - Can read CI results on PRs
+
+            **Example:**
+            \\\`\\\`\\\`
+            @claude please review the error handling in this PR
+            \\\`\\\`\\\`
+
+            ---
+
+            ## Local CI Debugging
+
+            Instead of using comment commands, you can replicate CI failures locally:
+
+            **Check CI status:**
+            \\\`\\\`\\\`bash
+            gh pr view --json statusCheckRollup
+            \\\`\\\`\\\`
+
+            **Re-run only failed jobs:**
+            \\\`\\\`\\\`bash
+            bin/ci-rerun-failures
+            \\\`\\\`\\\`
+
+            **Run specific failed specs:**
+            \\\`\\\`\\\`bash
+            pbpaste | bin/ci-run-failed-specs  # macOS
+            \\\`\\\`\\\`
+
+            **Switch between CI configurations:**
+            \\\`\\\`\\\`bash
+            bin/ci-switch-config minimum  # Test with Ruby 3.2, Node 20, etc.
+            bin/ci-switch-config latest   # Return to Ruby 3.4, Node 22, etc.
+            \\\`\\\`\\\`
+
+            ---
+
+            📖 For more details, see the [Contributing Guide](https://github.com/shakacode/react_on_rails/blob/master/CONTRIBUTING.md#using-comment-commands-to-trigger-ci)\`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body
+            });
+
+            // Add reaction to original comment
+            await github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: context.payload.comment.id,
+              content: 'eyes'
+            });
