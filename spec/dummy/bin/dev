@@ -2,4 +2,4 @@
 # frozen_string_literal: true
 
 # This script calls the base dev script with a fixed route for the dummy app
-exec File.expand_path("../../../lib/generators/react_on_rails/templates/base/base/bin/dev", __dir__), "--route=/", *ARGV
+exec File.join(__dir__, "../../../lib/generators/react_on_rails/templates/base/base/bin/dev"), "--route=/", *ARGV
