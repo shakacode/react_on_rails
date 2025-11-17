@@ -110,7 +110,7 @@ describe "Turbolinks across pages", :js do
   it "changes name in message according to input" do
     visit "/client_side_hello_world"
     change_text_expect_dom_selector("#HelloWorld-react-component-0")
-    click_link "Hello World Component Server Rendered, with extra options"
+    click_on "Hello World Component Server Rendered, with extra options"
     change_text_expect_dom_selector("#my-hello-world-id")
   end
 end
@@ -174,19 +174,19 @@ describe "React Router", :js do
 
   before do
     visit "/"
-    click_link "React Router"
+    click_on "React Router"
   end
 
   context "when rendering /react_router" do
     it { is_expected.to have_text("Woohoo, we can use react-router here!") }
 
     it "clicking links correctly renders other pages" do
-      click_link "Router First Page"
+      click_on "Router First Page"
       expect(page).to have_current_path("/react_router/first_page")
       first_page_header_text = page.find(:css, "h2#first-page").text
       expect(first_page_header_text).to eq("React Router First Page")
 
-      click_link "Router Second Page"
+      click_on "Router Second Page"
       expect(page).to have_current_path("/react_router/second_page")
       second_page_header_text = page.find(:css, "h2#second-page").text
       expect(second_page_header_text).to eq("React Router Second Page")
@@ -244,7 +244,7 @@ describe "Manual client hydration", :js do
 
   it "HelloWorldRehydratable onChange should trigger" do
     within("form") do
-      click_button "refresh"
+      click_on "refresh"
     end
     within("#HelloWorldRehydratable-react-component-1") do
       find("input").set "Should update"
@@ -396,14 +396,14 @@ shared_examples "streamed component tests" do |path, selector|
 
   it "hydrates the component" do
     visit path
-    expect(page.html).to match(/client-bundle[^\"]*.js/)
+    expect(page.html).to match(/client-bundle[^"]*.js/)
     change_text_expect_dom_selector(selector)
   end
 
   it "renders the page completely on server and displays content on client even without JavaScript" do
     # Don't add client-bundle.js to the page to ensure that the app is not hydrated
     visit "#{path}?skip_js_packs=true"
-    expect(page.html).not_to match(/client-bundle[^\"]*.js/)
+    expect(page.html).not_to match(/client-bundle[^"]*.js/)
     # Ensure that the component state is not updated
     change_text_expect_dom_selector(selector, expect_no_change: true)
 
@@ -432,7 +432,7 @@ describe "React Router Sixth Page", :js do
                   "#ServerComponentRouter-react-component-0"
 
   # Skip the test that fails without JavaScript - being addressed in another PR
-  it "renders the page completely on server and displays content on client even without JavaScript",
+  it "renders the page completely on server and displays content on client even without JavaScript", # rubocop:disable RSpec/NoExpectationExample
      skip: "Being addressed in another PR" do
     # This test is overridden to skip it
   end

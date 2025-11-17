@@ -12,7 +12,7 @@ module MockBlockHelper
   def mock_block(&block)
     double("BlockMock").tap do |mock| # rubocop:disable RSpec/VerifiedDoubles
       allow(mock).to receive(:call) do |*args, &inner_block|
-        block.call(*args, &inner_block) if block
+        block&.call(*args, &inner_block)
       end
       def mock.block
         method(:call).to_proc

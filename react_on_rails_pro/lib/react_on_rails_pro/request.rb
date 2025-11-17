@@ -217,7 +217,7 @@ module ReactOnRailsPro
         ReactOnRailsPro::Utils.common_form_data
       end
 
-      def create_connection
+      def create_connection # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
         url = ReactOnRailsPro.configuration.renderer_url
         Rails.logger.info do
           "[ReactOnRailsPro] Setting up Node Renderer connection to #{url}"
@@ -229,28 +229,37 @@ module ReactOnRailsPro
           # https://honeyryderchuck.gitlab.io/httpx/wiki/Persistent
           .plugin(
             :retries, max_retries: 1,
-            retry_change_requests: true,
-            # Official HTTPx docs says that we should use the retry_on option to decide if teh request should be retried or not
-            # However, HTTPx assumes that connection errors such as timeout error should be retried by default and it doesn't consider retry_on block at all at that case
-            # So, we have to do the following trick to avoid retries when a Timeout error happens while streaming a component
-            # If the streamed component returned any chunks, it shouldn't retry on errors, as it would cause page duplication
-            # The SSR-generated html will be written to the page two times in this case
-            retry_after: ->(request, response) do
-              if (request.stream.instance_variable_get(:@react_on_rails_received_first_chunk))
-                e = response.error
-                raise ReactOnRailsPro::Error, "An error happened during server side render streaming of a component.\n" \
-                                              "Original error:\n#{e}\n#{e.backtrace}"
-              end
+                      retry_change_requests: true,
+                      # Official HTTPx docs says that we should use the retry_on option to decide if the
+                      # request should be retried or not
+                      # However, HTTPx assumes that connection errors such as timeout error should be retried
+                      # by default and it doesn't consider retry_on block at all at that case
+                      # So, we have to do the following trick to avoid retries when a Timeout error happens
+                      # while streaming a component
+                      # If the streamed component returned any chunks, it shouldn't retry on errors, as it
+                      # would cause page duplication
+                      # The SSR-generated html will be written to the page two times in this case
+                      retry_after: lambda do |request, response|
+                                     if request.stream.instance_variable_get(:@react_on_rails_received_first_chunk)
+                                       e = response.error
+                                       raise(
+                                         ReactOnRailsPro::Error,
+                                         "An error happened during server side render streaming " \
+                                         "of a component.\nOriginal error:\n#{e}\n#{e.backtrace}"
+                                       )
+                                     end
 
-              Rails.logger.info do
-                "[ReactOnRailsPro] An error happneding while making a request to the Node Renderer.\n" \
-                "Error: #{response.error}.\n" \
-                "Retrying by HTTPX \"retries\" plugin..."
-              end
-              # The retry_after block expects to return a delay to wait before retrying the request
-              # nil means no waiting delay
-              nil
-            end
+                                     Rails.logger.info do
+                                       "[ReactOnRailsPro] An error occurred while making " \
+                                         "a request to the Node Renderer.\n" \
+                                         "Error: #{response.error}.\n" \
+                                         "Retrying by HTTPX \"retries\" plugin..."
+                                     end
+                                     # The retry_after block expects to return a delay to wait before
+                                     # retrying the request
+                                     # nil means no waiting delay
+                                     nil
+                                   end
           )
           .plugin(:stream)
           # See https://www.rubydoc.info/gems/httpx/1.3.3/HTTPX%2FOptions:initialize for the available options
