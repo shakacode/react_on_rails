@@ -1,9 +1,5 @@
-#!/usr/bin/env bash
+#!/usr/bin/env ruby
+# frozen_string_literal: true
 
-if ! command -v foreman &> /dev/null
-then
-  echo "Installing foreman..."
-  gem install foreman
-fi
-
-foreman start -f Procfile.dev
+# This script calls the base dev script with a fixed route for the dummy app
+exec File.expand_path("../../../../lib/generators/react_on_rails/templates/base/base/bin/dev", __dir__), "--route=/", *ARGV
