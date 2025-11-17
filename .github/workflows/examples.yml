@@ -31,6 +31,7 @@ jobs:
       run_dummy_tests: ${{ steps.detect.outputs.run_dummy_tests }}
       run_generators: ${{ steps.detect.outputs.run_generators }}
       has_full_ci_label: ${{ steps.check-label.outputs.result }}
+      matrix_array: ${{ steps.determine-matrix.outputs.result }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -40,6 +41,14 @@ jobs:
       - name: Check for full-ci label
         id: check-label
         uses: ./.github/actions/check-full-ci-label
+      - name: Determine matrix strategy
+        id: determine-matrix
+        run: |
+          if [ "${{ inputs.force_run }}" = "true" ] || [ "${{ steps.check-label.outputs.result }}" = "true" ] || [ "${{ github.ref }}" = "refs/heads/master" ]; then
+            echo "result=[\"latest\"]" >> "$GITHUB_OUTPUT"
+          else
+            echo "result=[\"latest\",\"minimum\"]" >> "$GITHUB_OUTPUT"
+          fi
       - name: Detect relevant changes
         id: detect
         run: |
@@ -64,28 +73,8 @@ jobs:
           docs-only: ${{ steps.detect.outputs.docs_only }}
           previous-sha: ${{ github.event.before }}
 
-  setup-matrix:
-    needs: detect-changes
-    runs-on: ubuntu-22.04
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-    steps:
-      - id: set-matrix
-        run: |
-          # Determine if we should run full matrix (master, workflow_dispatch, force_run, or full-ci label)
-          if [[ "${{ github.ref }}" == "refs/heads/master" ]] || \
-             [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || \
-             [[ "${{ inputs.force_run }}" == "true" ]] || \
-             [[ "${{ needs.detect-changes.outputs.has_full_ci_label }}" == "true" ]]; then
-            # Full matrix: test both latest and minimum supported versions
-            echo 'matrix={"include":[{"ruby-version":"3.4","dependency-level":"latest"},{"ruby-version":"3.2","dependency-level":"minimum"}]}' >> $GITHUB_OUTPUT
-          else
-            # PR matrix: test only latest versions for fast feedback
-            echo 'matrix={"include":[{"ruby-version":"3.4","dependency-level":"latest"}]}' >> $GITHUB_OUTPUT
-          fi
-
   examples:
-    needs: [detect-changes, setup-matrix]
+    needs: detect-changes
     # Run on master, workflow_dispatch, OR when generators needed
     if: |
       !(
@@ -99,19 +88,30 @@ jobs:
       )
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.setup-matrix.outputs.matrix) }}
+      matrix:
+        dependency-level: ${{ fromJson(needs.detect-changes.outputs.matrix_array) }}
     env:
       SKIP_YARN_COREPACK_CHECK: 0
       BUNDLE_FROZEN: ${{ matrix.dependency-level == 'minimum' && 'false' || 'true' }}
     runs-on: ubuntu-22.04
     steps:
+      - name: Translate matrix for Ruby and Node versions
+        id: translate-matrix
+        run: |
+          if [ "${{ matrix.dependency-level }}" == "latest" ]; then
+            echo "ruby-version=3.4" >> "$GITHUB_OUTPUT"
+            echo "node-version=22" >> "$GITHUB_OUTPUT"
+          else
+            echo "ruby-version=3.2" >> "$GITHUB_OUTPUT"
+            echo "node-version=20" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: ${{ matrix.ruby-version }}
+          ruby-version: ${{ steps.translate-matrix.outputs.ruby-version }}
           bundler: 2.5.9
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -137,7 +137,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: vendor/bundle
-          key: package-app-gem-cache-${{ hashFiles('Gemfile.lock') }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
+          key: package-app-gem-cache-${{ hashFiles('Gemfile.lock') }}-ruby${{ steps.translate-matrix.outputs.ruby-version }}-${{ matrix.dependency-level }}
       - id: get-sha
         run: echo "sha=\"$(git rev-parse HEAD)\"" >> "$GITHUB_OUTPUT"
       - name: Install Node modules with Yarn for renderer package
@@ -145,8 +145,6 @@ jobs:
           yarn install --no-progress --no-emoji ${{ matrix.dependency-level == 'latest' && '--frozen-lockfile' || '' }}
           sudo yarn global add yalc
       - name: yalc publish for react-on-rails
-        # Use yarn workspace script to publish all workspace packages to yalc
-        # Runs the "yalc:publish" script defined in each workspace's package.json
         run: yarn yalc publish
       - name: Install Ruby Gems for package
         run: |
@@ -176,5 +174,5 @@ jobs:
       - name: Store test results
         uses: actions/upload-artifact@v4
         with:
-          name: main-rspec-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
+          name: main-rspec-${{ github.run_id }}-${{ github.job }}-ruby${{ steps.translate-matrix.outputs.ruby-version }}-${{ matrix.dependency-level }}
           path: ~/rspec

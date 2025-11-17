@@ -33,6 +33,7 @@ jobs:
       run_dummy_tests: ${{ steps.detect.outputs.run_dummy_tests }}
       run_generators: ${{ steps.detect.outputs.run_generators }}
       has_full_ci_label: ${{ steps.check-label.outputs.result }}
+      matrix_array: ${{ steps.determine-matrix.outputs.result }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -42,6 +43,14 @@ jobs:
       - name: Check for full-ci label
         id: check-label
         uses: ./.github/actions/check-full-ci-label
+      - name: Determine matrix strategy
+        id: determine-matrix
+        run: |
+          if [ "${{ inputs.force_run }}" = "true" ] || [ "${{ steps.check-label.outputs.result }}" = "true" ] || [ "${{ github.ref }}" = "refs/heads/master" ]; then
+            echo "result=[\"latest\",\"minimum\"]" >> "$GITHUB_OUTPUT"
+          else
+            echo "result=[\"latest\"]" >> "$GITHUB_OUTPUT"
+          fi
       - name: Detect relevant changes
         id: detect
         run: |
@@ -66,26 +75,8 @@ jobs:
           docs-only: ${{ steps.detect.outputs.docs_only }}
           previous-sha: ${{ github.event.before }}
 
-  setup-gem-tests-matrix:
+  basic-gem-tests:
     needs: detect-changes
-    runs-on: ubuntu-22.04
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-    steps:
-      - id: set-matrix
-        run: |
-          # Determine if we should run full matrix (master or full-ci label)
-          if [[ "${{ github.ref }}" == "refs/heads/master" ]] || \
-             [[ "${{ needs.detect-changes.outputs.has_full_ci_label }}" == "true" ]]; then
-            # Full matrix: test both latest and minimum supported versions
-            echo 'matrix={"include":[{"ruby-version":"3.4","dependency-level":"latest"},{"ruby-version":"3.2","dependency-level":"minimum"}]}' >> $GITHUB_OUTPUT
-          else
-            # PR matrix: test only latest versions for fast feedback
-            echo 'matrix={"include":[{"ruby-version":"3.4","dependency-level":"latest"}]}' >> $GITHUB_OUTPUT
-          fi
-
-  rspec-package-tests:
-    needs: [detect-changes, setup-gem-tests-matrix]
     # Skip only if: master push AND docs-only changes
     # Otherwise run if: on master OR Ruby tests needed
     # This allows docs-only commits to skip heavy jobs while ensuring full CI on master for code changes
@@ -100,18 +91,27 @@ jobs:
       )
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.setup-gem-tests-matrix.outputs.matrix) }}
+      matrix:
+        dependency-level: ${{ fromJson(needs.detect-changes.outputs.matrix_array) }}
     env:
       BUNDLE_FROZEN: ${{ matrix.dependency-level == 'minimum' && 'false' || 'true' }}
     runs-on: ubuntu-22.04
     steps:
+      - name: Translate matrix for Ruby and Node versions
+        id: translate-matrix
+        run: |
+          if [ "${{ matrix.dependency-level }}" == "latest" ]; then
+            echo "ruby-version=3.4" >> "$GITHUB_OUTPUT"
+          else
+            echo "ruby-version=3.2" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: ${{ matrix.ruby-version }}
+          ruby-version: ${{ steps.translate-matrix.outputs.ruby-version }}
           bundler: 2.5.9
       - name: Print system information
         run: |
@@ -129,7 +129,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: vendor/bundle
-          key: package-app-gem-cache-${{ hashFiles('Gemfile.lock') }}-${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
+          key: package-app-gem-cache-${{ hashFiles('Gemfile.lock') }}-${{ steps.translate-matrix.outputs.ruby-version }}-${{ matrix.dependency-level }}
       - name: Install Ruby Gems for package
         run: bundle check --path=vendor/bundle || bundle  _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
       - name: Git Stuff
@@ -146,10 +146,10 @@ jobs:
       - name: Store test results
         uses: actions/upload-artifact@v4
         with:
-          name: main-rspec-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
+          name: main-rspec-${{ github.run_id }}-${{ github.job }}-ruby${{ steps.translate-matrix.outputs.ruby-version }}-${{ matrix.dependency-level }}
           path: ~/rspec
       - name: Store artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: main-test-log-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
+          name: main-test-log-${{ github.run_id }}-${{ github.job }}-ruby${{ steps.translate-matrix.outputs.ruby-version }}-${{ matrix.dependency-level }}
           path: log/test.log
