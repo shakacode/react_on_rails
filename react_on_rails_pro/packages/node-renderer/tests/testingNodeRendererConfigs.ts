@@ -1,16 +1,18 @@
 import fs from 'fs';
 import { env } from 'process';
+import { LevelWithSilent } from 'pino';
+import { Config } from '../src/shared/configBuilder';
 
-const BUNDLE_PATH = './tmp/node-renderer-bundles-test';
+export const BUNDLE_PATH = './tmp/node-renderer-bundles-test';
 if (fs.existsSync(BUNDLE_PATH)) {
   fs.rmSync(BUNDLE_PATH, { recursive: true, force: true });
 }
 
-const config = {
+const config: Partial<Config> = {
   // This is the default but avoids searching for the Rails root
   serverBundleCachePath: BUNDLE_PATH,
-  port: env.RENDERER_PORT || 3800, // Listen at RENDERER_PORT env value or default port 3800
-  logLevel: env.RENDERER_LOG_LEVEL || 'info',
+  port: (env.RENDERER_PORT && parseInt(env.RENDERER_PORT, 10)) || 3800, // Listen at RENDERER_PORT env value or default port 3800
+  logLevel: (env.RENDERER_LOG_LEVEL as LevelWithSilent | undefined) || 'info',
 
   // See value in /config/initializers/react_on_rails_pro.rb. Should use env value in real app.
   password: 'myPassword1',

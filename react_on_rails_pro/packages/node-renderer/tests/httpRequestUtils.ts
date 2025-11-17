@@ -19,19 +19,13 @@ type RequestOptions = {
   renderRscPayload: boolean;
 };
 
-export const createForm = ({
+export const createRenderingRequest = ({
   project = 'spec-dummy',
   commit = '',
   props = {},
   throwJsErrors = false,
   componentName = undefined,
 }: Partial<RequestOptions> = {}) => {
-  const form = new FormData();
-  form.append('gemVersion', packageJson.version);
-  form.append('protocolVersion', packageJson.protocolVersion);
-  form.append('password', 'myPassword1');
-  form.append('dependencyBundleTimestamps[]', RSC_BUNDLE_TIMESTAMP);
-
   let renderingRequestCode = readRenderingRequest(
     project,
     commit,
@@ -45,6 +39,29 @@ export const createForm = ({
   if (throwJsErrors) {
     renderingRequestCode = renderingRequestCode.replace('throwJsErrors: false', 'throwJsErrors: true');
   }
+  return renderingRequestCode;
+};
+
+export const createForm = ({
+  project = 'spec-dummy',
+  commit = '',
+  props = {},
+  throwJsErrors = false,
+  componentName = undefined,
+}: Partial<RequestOptions> = {}) => {
+  const form = new FormData();
+  form.append('gemVersion', packageJson.version);
+  form.append('protocolVersion', packageJson.protocolVersion);
+  form.append('password', 'myPassword1');
+  form.append('dependencyBundleTimestamps[]', RSC_BUNDLE_TIMESTAMP);
+
+  const renderingRequestCode = createRenderingRequest({
+    project,
+    commit,
+    props,
+    throwJsErrors,
+    componentName,
+  });
   form.append('renderingRequest', renderingRequestCode);
 
   const testBundlesDirectory = path.join(__dirname, '../../../spec/dummy/ssr-generated');
@@ -73,7 +90,14 @@ export const createForm = ({
   return form;
 };
 
-const getAppUrl = (app: ReturnType<typeof buildApp>) => {
+export const createUploadAssetsForm = (options: Partial<RequestOptions> = {}) => {
+  const requestForm = createForm(options);
+  requestForm.append('targetBundles[]', SERVER_BUNDLE_TIMESTAMP);
+  requestForm.append('targetBundles[]', RSC_BUNDLE_TIMESTAMP);
+  return requestForm;
+};
+
+export const getAppUrl = (app: ReturnType<typeof buildApp>) => {
   const addresssInfo = app.server.address();
   if (!addresssInfo) {
     throw new Error('The app has no address, ensure to run the app before running tests');
