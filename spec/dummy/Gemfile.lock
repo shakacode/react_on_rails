@@ -1,7 +1,7 @@
 PATH
   remote: ../..
   specs:
-    react_on_rails (16.2.0.beta.4)
+    react_on_rails (16.2.0.beta.5)
       addressable
       connection_pool
       execjs (~> 2.5)
@@ -327,11 +327,6 @@ GEM
       rubocop-factory_bot (~> 2.22)
     ruby-progressbar (1.13.0)
     rubyzip (2.3.2)
-    sass (3.7.4)
-      sass-listen (~> 4.0.0)
-    sass-listen (4.0.0)
-      rb-fsevent (~> 0.9, >= 0.9.4)
-      rb-inotify (~> 0.9, >= 0.9.7)
     sass-rails (6.0.0)
       sassc-rails (~> 2.1, >= 2.1.1)
     sassc (2.4.0)
@@ -342,8 +337,6 @@ GEM
       sprockets (> 3.0)
       sprockets-rails
       tilt
-    scss_lint (0.60.0)
-      sass (~> 3.5, >= 3.5.5)
     sdoc (2.6.1)
       rdoc (>= 5.0)
     securerandom (0.4.1)
@@ -466,7 +459,6 @@ DEPENDENCIES
   rubocop-performance (~> 1.20.0)
   rubocop-rspec (~> 2.26)
   sass-rails (~> 6.0)
-  scss_lint
   sdoc
   selenium-webdriver (= 4.9.0)
   shakapacker (= 9.3.0)
