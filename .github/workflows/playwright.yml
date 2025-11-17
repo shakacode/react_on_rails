@@ -3,9 +3,7 @@ name: Playwright E2E Tests
 on:
   push:
     branches: [master]
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
+    # Never skip on master - always run full test suite
   workflow_dispatch:
 
 jobs:

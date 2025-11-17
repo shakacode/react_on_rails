@@ -4,11 +4,7 @@ on:
   push:
     branches:
       - 'master'
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - 'packages/**'
-      - 'react_on_rails_pro/**'
+    # Never skip on master - always run full test suite
   pull_request:
     paths-ignore:
       - '**.md'
