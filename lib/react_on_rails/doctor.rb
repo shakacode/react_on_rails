@@ -681,7 +681,8 @@ module ReactOnRails
 
       # Server bundle output path
       server_bundle_path_match = content.match(/config\.server_bundle_output_path\s*=\s*["']([^"']+)["']/)
-      rails_bundle_path = server_bundle_path_match ? server_bundle_path_match[1] : "ssr-generated"
+      default_path = ReactOnRails::DEFAULT_SERVER_BUNDLE_OUTPUT_PATH
+      rails_bundle_path = server_bundle_path_match ? server_bundle_path_match[1] : default_path
       checker.add_info("  server_bundle_output_path: #{rails_bundle_path}")
 
       # Enforce private server bundles

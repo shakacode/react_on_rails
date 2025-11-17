@@ -10,6 +10,7 @@ module ReactOnRails
 
   DEFAULT_GENERATED_ASSETS_DIR = File.join(%w[public webpack], Rails.env).freeze
   DEFAULT_COMPONENT_REGISTRY_TIMEOUT = 5000
+  DEFAULT_SERVER_BUNDLE_OUTPUT_PATH = "ssr-generated"
 
   def self.configuration
     @configuration ||= Configuration.new(
@@ -46,7 +47,7 @@ module ReactOnRails
       # Set to 0 to disable the timeout and wait indefinitely for component registration.
       component_registry_timeout: DEFAULT_COMPONENT_REGISTRY_TIMEOUT,
       generated_component_packs_loading_strategy: nil,
-      server_bundle_output_path: "ssr-generated",
+      server_bundle_output_path: DEFAULT_SERVER_BUNDLE_OUTPUT_PATH,
       enforce_private_server_bundles: false
     )
   end
@@ -263,7 +264,7 @@ module ReactOnRails
     # rubocop:disable Metrics/CyclomaticComplexity
     def auto_detect_server_bundle_path_from_shakapacker
       # Skip if user explicitly set server_bundle_output_path to something other than default
-      return if server_bundle_output_path != "ssr-generated"
+      return if server_bundle_output_path != ReactOnRails::DEFAULT_SERVER_BUNDLE_OUTPUT_PATH
 
       # Skip if Shakapacker is not available
       return unless defined?(::Shakapacker)
@@ -279,8 +280,8 @@ module ReactOnRails
         relative_path = ReactOnRails::Utils.normalize_to_relative_path(private_path)
         self.server_bundle_output_path = relative_path
 
-        Rails.logger&.info("ReactOnRails: Auto-detected server_bundle_output_path from " \
-                           "shakapacker.yml private_output_path: '#{relative_path}'")
+        Rails.logger&.debug("ReactOnRails: Auto-detected server_bundle_output_path from " \
+                            "shakapacker.yml private_output_path: '#{relative_path}'")
       rescue StandardError => e
         # Fail gracefully - if auto-detection fails, keep the default
         Rails.logger&.debug("ReactOnRails: Could not auto-detect server bundle path from " \
