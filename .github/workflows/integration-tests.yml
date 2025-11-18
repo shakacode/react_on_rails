@@ -122,7 +122,7 @@ jobs:
           node-version: ${{ steps.translate-matrix.outputs.node-version }}
           # Disable cache for Node 22 due to V8 bug in 22.21.0
           # https://github.com/nodejs/node/issues/56010
-          cache: yarn
+          cache: ${{ steps.translate-matrix.outputs.node-version != '22' && 'yarn' || '' }}
           cache-dependency-path: '**/yarn.lock'
       - name: Print system information
         run: |
@@ -213,7 +213,7 @@ jobs:
           node-version: ${{ steps.translate-matrix.outputs.node-version }}
           # Disable cache for Node 22 due to V8 bug in 22.21.0
           # https://github.com/nodejs/node/issues/56010
-          cache: yarn
+          cache: ${{ steps.translate-matrix.outputs.node-version != '22' && 'yarn' || '' }}
           cache-dependency-path: '**/yarn.lock'
       - name: Print system information
         run: |
