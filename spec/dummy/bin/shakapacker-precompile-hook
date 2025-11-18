@@ -3,12 +3,12 @@
 
 # Shakapacker precompile hook for React on Rails test dummy app
 #
-# This script loads the shared precompile hook implementation to avoid duplication.
-# The shared implementation is maintained in lib/tasks/precompile/shakapacker_precompile_hook_shared.rb
+# This script loads the shared test helper implementation.
+# For production apps, use the generator template which includes a standalone implementation.
 
 # Find the gem root directory (three levels up from spec/dummy/bin)
 gem_root = File.expand_path("../../..", __dir__)
-shared_hook = File.join(gem_root, "lib", "tasks", "precompile", "shakapacker_precompile_hook_shared.rb")
+shared_hook = File.join(gem_root, "spec", "support", "shakapacker_precompile_hook_shared.rb")
 
 unless File.exist?(shared_hook)
   warn "❌ Error: Shared precompile hook not found at #{shared_hook}"
