@@ -1401,9 +1401,7 @@ module ReactOnRails
     end
 
     def log_debug(message)
-      return unless defined?(Rails.logger) && Rails.logger
-
-      Rails.logger.debug(message)
+      Rails.logger&.debug(message)
     end
 
     # Check Shakapacker private_output_path integration and provide recommendations
