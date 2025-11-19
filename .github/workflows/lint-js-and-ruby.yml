@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - 'master'
-    # Never skip on master - always run full test suite
+    # Always trigger on master; docs-only detection handles skipping heavy jobs
   pull_request:
     paths-ignore:
       - '**.md'
@@ -20,6 +20,9 @@ on:
 
 jobs:
   detect-changes:
+    permissions:
+      contents: read
+      actions: read
     runs-on: ubuntu-22.04
     outputs:
       docs_only: ${{ steps.detect.outputs.docs_only }}
@@ -54,10 +57,27 @@ jobs:
           BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/master' }}"
           script/ci-changes-detector "$BASE_REF"
         shell: bash
+      - name: Guard docs-only master pushes
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: ./.github/actions/ensure-master-docs-safety
+        with:
+          docs-only: ${{ steps.detect.outputs.docs_only }}
+          previous-sha: ${{ github.event.before }}
 
   build:
     needs: detect-changes
-    if: github.ref == 'refs/heads/master' || needs.detect-changes.outputs.run_lint == 'true'
+    # Skip only if: master push AND docs-only changes
+    # Otherwise run if: on master OR lint needed
+    # This allows docs-only commits to skip linting while ensuring full CI on master for code changes
+    if: |
+      !(
+        github.event_name == 'push' &&
+        github.ref == 'refs/heads/master' &&
+        needs.detect-changes.outputs.docs_only == 'true'
+      ) && (
+        github.ref == 'refs/heads/master' ||
+        needs.detect-changes.outputs.run_lint == 'true'
+      )
     env:
       BUNDLE_FROZEN: true
     runs-on: ubuntu-22.04

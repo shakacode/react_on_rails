@@ -147,6 +147,43 @@ echo "Base: $BASE_REF | Current: $CURRENT_REF"
 echo ""
 
 if [ "$DOCS_ONLY" = true ]; then
+  # Define all CI flags in one place to avoid duplication
+  # Format: "flag_name:value" pairs
+  CI_FLAGS=(
+    "docs_only:true"
+    "run_lint:false"
+    "run_ruby_tests:false"
+    "run_js_tests:false"
+    "run_dummy_tests:false"
+    "run_generators:false"
+    "run_pro_lint:false"
+    "run_pro_tests:false"
+    "run_pro_dummy_tests:false"
+  )
+
+  # Output to GITHUB_OUTPUT if in GitHub Actions
+  if [ -n "${GITHUB_OUTPUT:-}" ]; then
+    for flag in "${CI_FLAGS[@]}"; do
+      echo "${flag//:/=}" >> "$GITHUB_OUTPUT"
+    done
+  fi
+
+  # Output as JSON if requested
+  if [ "${CI_JSON_OUTPUT:-}" = "1" ]; then
+    echo "{"
+    for i in "${!CI_FLAGS[@]}"; do
+      flag_name="${CI_FLAGS[$i]%%:*}"
+      flag_value="${CI_FLAGS[$i]#*:}"
+      # Add comma for all but the last item
+      if [ "$i" -eq $((${#CI_FLAGS[@]} - 1)) ]; then
+        echo "  \"$flag_name\": $flag_value"
+      else
+        echo "  \"$flag_name\": $flag_value,"
+      fi
+    done
+    echo "}"
+  fi
+
   echo -e "${GREEN}✓ Documentation-only changes${NC}"
   echo ""
   echo "Recommended CI jobs: NONE (skip CI)"
