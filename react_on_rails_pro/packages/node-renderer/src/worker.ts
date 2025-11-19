@@ -287,7 +287,7 @@ export default function run(config: Partial<Config>) {
           );
 
           const initial: IncrementalRenderInitialRequest = {
-            renderingRequest: String((tempReqBody as { renderingRequest?: string }).renderingRequest ?? ''),
+            firstRequestChunk: obj,
             bundleTimestamp,
             dependencyBundleTimestamps,
           };
@@ -335,7 +335,12 @@ export default function run(config: Partial<Config>) {
         },
 
         onRequestEnded: () => {
-          // Do nothing
+          if (!incrementalSink) {
+            log.error({ msg: 'Unexpected update chunk received after rendering was aborted', obj });
+            return;
+          }
+
+          incrementalSink.handleRequestClosed();
         },
       });
     } catch (err) {

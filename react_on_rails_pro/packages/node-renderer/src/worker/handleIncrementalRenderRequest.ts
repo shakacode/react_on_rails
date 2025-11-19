@@ -6,6 +6,7 @@ import { getRequestBundleFilePath } from '../shared/utils';
 export type IncrementalRenderSink = {
   /** Called for every subsequent NDJSON object after the first one */
   add: (chunk: unknown) => void;
+  handleRequestClosed: () => void;
 };
 
 export type UpdateChunk = {
@@ -27,10 +28,32 @@ function assertIsUpdateChunk(value: unknown): asserts value is UpdateChunk {
 }
 
 export type IncrementalRenderInitialRequest = {
-  renderingRequest: string;
+  firstRequestChunk: unknown;
   bundleTimestamp: string | number;
   dependencyBundleTimestamps?: string[] | number[];
 };
+
+export type FirstIncrementalRenderRequestChunk = {
+  renderingRequest: string;
+  onRequestClosedUpdateChunk?: string;
+};
+
+function assertFirstIncrementalRenderRequestChunk(
+  chunk: unknown,
+): asserts chunk is FirstIncrementalRenderRequestChunk {
+  if (
+    typeof chunk !== 'object' ||
+    chunk === null ||
+    !('renderingRequest' in chunk) ||
+    typeof chunk.renderingRequest !== 'string' ||
+    // onRequestClosedUpdateChunk is an optional field
+    ('onRequestClosedUpdateChunk' in chunk &&
+      chunk.onRequestClosedUpdateChunk &&
+      typeof chunk.onRequestClosedUpdateChunk !== 'object')
+  ) {
+    throw new Error('Invalid first incremental render request chunk received, missing properties');
+  }
+}
 
 export type IncrementalRenderResult = {
   response: ResponseResult;
@@ -46,7 +69,9 @@ export type IncrementalRenderResult = {
 export async function handleIncrementalRenderRequest(
   initial: IncrementalRenderInitialRequest,
 ): Promise<IncrementalRenderResult> {
-  const { renderingRequest, bundleTimestamp, dependencyBundleTimestamps } = initial;
+  const { firstRequestChunk, bundleTimestamp, dependencyBundleTimestamps } = initial;
+  assertFirstIncrementalRenderRequestChunk(firstRequestChunk);
+  const { renderingRequest, onRequestClosedUpdateChunk } = firstRequestChunk;
 
   try {
     // Call handleRenderRequest internally to handle all validation and VM execution
@@ -77,6 +102,27 @@ export async function handleIncrementalRenderRequest(
             });
           } catch (err) {
             log.error({ msg: 'Invalid incremental render chunk', err, chunk });
+          }
+        },
+        handleRequestClosed: () => {
+          if (!onRequestClosedUpdateChunk) {
+            return;
+          }
+
+          try {
+            assertIsUpdateChunk(onRequestClosedUpdateChunk);
+            const bundlePath = getRequestBundleFilePath(onRequestClosedUpdateChunk.bundleTimestamp);
+            executionContext
+              .runInVM(onRequestClosedUpdateChunk.updateChunk, bundlePath)
+              .catch((err: unknown) => {
+                log.error({
+                  msg: 'Error running onRequestClosedUpdateChunk',
+                  err,
+                  onRequestClosedUpdateChunk,
+                });
+              });
+          } catch (err) {
+            log.error({ msg: 'Invalid onRequestClosedUpdateChunk', err, onRequestClosedUpdateChunk });
           }
         },
       },
