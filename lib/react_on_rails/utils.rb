@@ -446,16 +446,27 @@ module ReactOnRails
     # Converts an absolute path (String or Pathname) to a path relative to Rails.root.
     # If the path is already relative or doesn't contain Rails.root, returns it as-is.
     #
+    # This method is used to normalize paths from Shakapacker's privateOutputPath (which is
+    # absolute) to relative paths suitable for React on Rails configuration.
+    #
     # Note: Absolute paths that don't start with Rails.root are intentionally passed through
-    # unchanged. This allows for explicit absolute paths to directories outside the Rails app.
+    # unchanged. While there's no known use case for server bundles outside Rails.root,
+    # this behavior preserves the original path for debugging and error messages.
     #
     # @param path [String, Pathname] The path to normalize
-    # @return [String] The relative path as a string
+    # @return [String, nil] The relative path as a string, or nil if path is nil
     #
-    # @example
+    # @example Converting absolute paths within Rails.root
+    #   # Assuming Rails.root is "/app"
     #   normalize_to_relative_path("/app/ssr-generated") # => "ssr-generated"
+    #   normalize_to_relative_path("/app/foo/bar")       # => "foo/bar"
+    #
+    # @example Already relative paths pass through
     #   normalize_to_relative_path("ssr-generated")      # => "ssr-generated"
-    #   normalize_to_relative_path("/other/path/bundles") # => "/other/path/bundles" (unchanged)
+    #   normalize_to_relative_path("./ssr-generated")    # => "./ssr-generated"
+    #
+    # @example Absolute paths outside Rails.root (edge case)
+    #   normalize_to_relative_path("/other/path/bundles") # => "/other/path/bundles"
     def self.normalize_to_relative_path(path)
       return nil if path.nil?
 

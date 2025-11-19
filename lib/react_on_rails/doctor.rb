@@ -1407,68 +1407,82 @@ module ReactOnRails
     end
 
     # Check Shakapacker private_output_path integration and provide recommendations
-    # rubocop:disable Metrics/MethodLength
     def check_shakapacker_private_output_path(rails_bundle_path)
-      unless defined?(::Shakapacker)
-        checker.add_info("\n  ℹ️  Shakapacker not detected - using manual configuration")
-        return
-      end
+      return report_no_shakapacker unless defined?(::Shakapacker)
+      return report_upgrade_shakapacker unless ::Shakapacker.config.respond_to?(:private_output_path)
 
-      # Check if Shakapacker 9.0+ with private_output_path support
-      unless ::Shakapacker.config.respond_to?(:private_output_path)
-        checker.add_info(<<~MSG.strip)
-          \n  💡 Recommendation: Upgrade to Shakapacker 9.0+
+      check_shakapacker_9_private_output_path(rails_bundle_path)
+    rescue StandardError => e
+      checker.add_info("\n  ℹ️  Could not check Shakapacker config: #{e.message}")
+    end
 
-          Shakapacker 9.0+ adds 'private_output_path' in shakapacker.yml for server bundles.
-          This eliminates the need to configure server_bundle_output_path separately.
+    def report_no_shakapacker
+      checker.add_info("\n  ℹ️  Shakapacker not detected - using manual configuration")
+    end
 
-          Benefits:
-          - Single source of truth in shakapacker.yml
-          - Automatic detection by React on Rails
-          - No configuration duplication
-        MSG
-        return
-      end
+    def report_upgrade_shakapacker
+      checker.add_info(<<~MSG.strip)
+        \n  💡 Recommendation: Upgrade to Shakapacker 9.0+
 
-      # Shakapacker 9.0+ is available
-      begin
-        private_path = ::Shakapacker.config.private_output_path
+        Shakapacker 9.0+ adds 'private_output_path' in shakapacker.yml for server bundles.
+        This eliminates the need to configure server_bundle_output_path separately.
 
-        if private_path
-          relative_path = ReactOnRails::Utils.normalize_to_relative_path(private_path)
+        Benefits:
+        - Single source of truth in shakapacker.yml
+        - Automatic detection by React on Rails
+        - No configuration duplication
+      MSG
+    end
 
-          if relative_path == rails_bundle_path
-            checker.add_success("\n  ✅ Using Shakapacker 9.0+ private_output_path: '#{relative_path}'")
-            checker.add_info("     Auto-detected from shakapacker.yml - no manual config needed")
-          else
-            checker.add_warning(<<~MSG.strip)
-              \n  ⚠️  Configuration mismatch detected!
+    def check_shakapacker_9_private_output_path(rails_bundle_path)
+      private_path = ::Shakapacker.config.private_output_path
 
-              Shakapacker private_output_path: '#{relative_path}'
-              React on Rails server_bundle_output_path: '#{rails_bundle_path}'
-
-              Recommendation: Remove server_bundle_output_path from your React on Rails
-              initializer and let it auto-detect from shakapacker.yml private_output_path.
-            MSG
-          end
-        else
-          checker.add_info(<<~MSG.strip)
-            \n  💡 Recommendation: Configure private_output_path in shakapacker.yml
-
-            Add to config/shakapacker.yml:
-              private_output_path: #{rails_bundle_path}
-
-            This will:
-            - Keep webpack and Rails configs in sync automatically
-            - Enable auto-detection by React on Rails
-            - Serve as single source of truth for server bundle location
-          MSG
-        end
-      rescue StandardError => e
-        checker.add_info("\n  ℹ️  Could not check Shakapacker config: #{e.message}")
+      if private_path
+        report_shakapacker_path_status(private_path, rails_bundle_path)
+      else
+        report_configure_private_output_path(rails_bundle_path)
       end
     end
-    # rubocop:enable Metrics/MethodLength
+
+    def report_shakapacker_path_status(private_path, rails_bundle_path)
+      relative_path = ReactOnRails::Utils.normalize_to_relative_path(private_path)
+      # Normalize both paths for comparison (remove trailing slashes)
+      normalized_relative = relative_path.to_s.chomp("/")
+      normalized_rails = rails_bundle_path.to_s.chomp("/")
+
+      if normalized_relative == normalized_rails
+        checker.add_success("\n  ✅ Using Shakapacker 9.0+ private_output_path: '#{relative_path}'")
+        checker.add_info("     Auto-detected from shakapacker.yml - no manual config needed")
+      else
+        report_configuration_mismatch(relative_path, rails_bundle_path)
+      end
+    end
+
+    def report_configuration_mismatch(relative_path, rails_bundle_path)
+      checker.add_warning(<<~MSG.strip)
+        \n  ⚠️  Configuration mismatch detected!
+
+        Shakapacker private_output_path: '#{relative_path}'
+        React on Rails server_bundle_output_path: '#{rails_bundle_path}'
+
+        Recommendation: Remove server_bundle_output_path from your React on Rails
+        initializer and let it auto-detect from shakapacker.yml private_output_path.
+      MSG
+    end
+
+    def report_configure_private_output_path(rails_bundle_path)
+      checker.add_info(<<~MSG.strip)
+        \n  💡 Recommendation: Configure private_output_path in shakapacker.yml
+
+        Add to config/shakapacker.yml:
+          private_output_path: #{rails_bundle_path}
+
+        This will:
+        - Keep webpack and Rails configs in sync automatically
+        - Enable auto-detection by React on Rails
+        - Serve as single source of truth for server bundle location
+      MSG
+    end
   end
   # rubocop:enable Metrics/ClassLength
 end
