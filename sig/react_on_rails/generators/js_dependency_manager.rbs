@@ -1,0 +1,123 @@
+# frozen_string_literal: true
+
+module ReactOnRails
+  module Generators
+    # Type signatures for JsDependencyManager module
+    #
+    # This module provides common functionality for managing JavaScript dependencies
+    # in Rails generators using the package_json gem (available via shakapacker).
+    module JsDependencyManager
+      # Core React dependencies required for React on Rails
+      REACT_DEPENDENCIES: Array[String]
+
+      # CSS processing dependencies for webpack
+      CSS_DEPENDENCIES: Array[String]
+
+      # Development-only dependencies for hot reloading (Webpack)
+      DEV_DEPENDENCIES: Array[String]
+
+      # Rspack core dependencies (only installed when --rspack flag is used)
+      RSPACK_DEPENDENCIES: Array[String]
+
+      # Rspack development dependencies for hot reloading
+      RSPACK_DEV_DEPENDENCIES: Array[String]
+
+      # TypeScript dependencies (only installed when --typescript flag is used)
+      TYPESCRIPT_DEPENDENCIES: Array[String]
+
+      private
+
+      # Sets up JavaScript dependencies by adding and installing packages
+      #
+      # This method orchestrates the entire dependency setup process:
+      # 1. Adds all required packages to package.json
+      # 2. Runs package manager install
+      #
+      # @return [void]
+      def setup_js_dependencies: () -> void
+
+      # Adds all JavaScript dependencies to package.json
+      #
+      # This method calls individual add_*_dependencies methods in sequence.
+      # All errors are handled gracefully with warnings rather than exceptions.
+      #
+      # @return [void]
+      def add_js_dependencies: () -> void
+
+      # Adds the react-on-rails package to package.json
+      #
+      # Uses version matching for stable releases, or latest for pre-releases.
+      # Adds error message to GeneratorMessages if package addition fails.
+      #
+      # @return [void]
+      def add_react_on_rails_package: () -> void
+
+      # Adds React dependencies to package.json
+      #
+      # Adds error message to GeneratorMessages if package addition fails.
+      #
+      # @return [void]
+      def add_react_dependencies: () -> void
+
+      # Adds CSS processing dependencies to package.json
+      #
+      # Adds error message to GeneratorMessages if package addition fails.
+      #
+      # @return [void]
+      def add_css_dependencies: () -> void
+
+      # Adds Rspack dependencies to package.json
+      #
+      # Only called when --rspack flag is set.
+      # Adds error message to GeneratorMessages if package addition fails.
+      #
+      # @return [void]
+      def add_rspack_dependencies: () -> void
+
+      # Adds TypeScript dependencies to package.json as dev dependencies
+      #
+      # Only called when --typescript flag is set.
+      # Adds error message to GeneratorMessages if package addition fails.
+      #
+      # @return [void]
+      def add_typescript_dependencies: () -> void
+
+      # Adds development dependencies to package.json
+      #
+      # Chooses between Webpack or Rspack dev dependencies based on --rspack flag.
+      # Adds error message to GeneratorMessages if package addition fails.
+      #
+      # @return [void]
+      def add_dev_dependencies: () -> void
+
+      # Adds a single package using package_json gem
+      #
+      # This method is used internally for adding the react-on-rails package
+      # with version-specific handling (react-on-rails@VERSION).
+      # For batch operations, use add_packages instead.
+      #
+      # @param package [String] Package specifier (e.g., "react-on-rails@16.0.0")
+      # @param dev [bool] Whether to add as dev dependency
+      # @return [bool] true if successful, false otherwise
+      def add_package: (String package, ?dev: bool) -> bool
+
+      # Adds multiple packages at once using package_json gem
+      #
+      # Delegates to GeneratorHelper's add_npm_dependencies for better
+      # package manager abstraction and batch processing efficiency.
+      #
+      # @param packages [Array<String>] Package names to add
+      # @param dev [bool] Whether to add as dev dependencies
+      # @return [bool] true if successful, false otherwise
+      def add_packages: (Array[String] packages, ?dev: bool) -> bool
+
+      # Installs JavaScript dependencies using package_json gem
+      #
+      # Always available via shakapacker dependency chain.
+      # Adds warning to GeneratorMessages if installation fails.
+      #
+      # @return [bool] true if successful, false otherwise
+      def install_js_dependencies: () -> bool
+    end
+  end
+end

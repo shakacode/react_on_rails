@@ -76,20 +76,18 @@ describe "Message Deduplication", type: :generator do
       )
       allow(File).to receive(:exist?).and_return(false)
       allow(File).to receive(:exist?).with(a_string_matching(/package\.json$/)).and_return(true)
-
-      # Initialize instance variables
-      install_generator.instance_variable_set(:@added_dependencies_to_package_json, false)
     end
 
     context "when using package_json gem (always available via shakapacker)" do
+      # rubocop:disable RSpec/VerifiedDoubles
+      let(:mock_manager) { double("PackageManager", install: true, add: true) }
+      let(:mock_package_json) { double("PackageJson", manager: mock_manager) }
+      # rubocop:enable RSpec/VerifiedDoubles
+
       before do
         # Mock the actual methods used by JsDependencyManager
-        # add_npm_dependencies is from GeneratorHelper and is used by add_js_dependencies_batch
+        # add_npm_dependencies is from GeneratorHelper and is used by add_packages
         # Mock package_json to prevent actual package manager calls
-        # rubocop:disable RSpec/VerifiedDoubles
-        mock_manager = double("PackageManager", install: true, add: true)
-        mock_package_json = double("PackageJson", manager: mock_manager)
-        # rubocop:enable RSpec/VerifiedDoubles
         allow(install_generator).to receive_messages(
           add_npm_dependencies: true,
           package_json: mock_package_json
@@ -103,8 +101,8 @@ describe "Message Deduplication", type: :generator do
         # Run the dependency setup
         install_generator.send(:setup_js_dependencies)
 
-        # Verify state was set correctly to indicate package_json was used
-        expect(install_generator.instance_variable_get(:@added_dependencies_to_package_json)).to be true
+        # Verify package_json.manager.install was called exactly once
+        expect(mock_manager).to have_received(:install).once
       end
     end
   end

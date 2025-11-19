@@ -2,6 +2,7 @@
 
 require_relative "generator_messages"
 
+# rubocop:disable Metrics/ModuleLength
 module ReactOnRails
   module Generators
     # Shared module for managing JavaScript dependencies across generators
@@ -10,11 +11,6 @@ module ReactOnRails
     #
     # Since react_on_rails requires shakapacker, and shakapacker includes
     # package_json as a dependency, the package_json gem is always available.
-    #
-    # == Instance Variables
-    # The module initializes and manages these instance variables:
-    # - @added_dependencies_to_package_json: Boolean tracking if package_json gem was used
-    #   (initialized by setup_js_dependencies using `unless defined?` pattern)
     #
     # == Required Methods
     # Including classes must include GeneratorHelper module which provides:
@@ -29,9 +25,18 @@ module ReactOnRails
     #
     # == Installation Behavior
     # The module ALWAYS runs package manager install after adding dependencies.
-    # This is safe because package_json gem's install is idempotent - it only
+    # This is safe because package_json gem's install method is idempotent - it only
     # installs what's actually needed from package.json. This prevents edge cases
     # where package.json was modified but dependencies weren't installed.
+    #
+    # == Error Handling
+    # All dependency addition methods use a tolerant error handling approach:
+    # - Return false on failure instead of raising exceptions
+    # - Catch StandardError and add warnings to GeneratorMessages
+    # - Provide clear manual installation instructions in warnings
+    # This provides better UX - the generator completes successfully even if
+    # dependency installation fails (e.g., network issues), and users can
+    # manually install dependencies afterward.
     #
     # == Usage
     # Include this module in generator classes and call setup_js_dependencies
@@ -91,9 +96,6 @@ module ReactOnRails
       private
 
       def setup_js_dependencies
-        # Initialize instance variable if not already defined by including class
-        # This ensures safe operation when the module is first included
-        @added_dependencies_to_package_json = false unless defined?(@added_dependencies_to_package_json)
         add_js_dependencies
 
         # Always run install to ensure all dependencies are properly installed.
@@ -109,7 +111,7 @@ module ReactOnRails
         add_react_dependencies
         add_css_dependencies
         # Rspack dependencies are only added when --rspack flag is used
-        add_rspack_dependencies if respond_to?(:options) && options.rspack?
+        add_rspack_dependencies if respond_to?(:options) && options&.rspack?
         # Dev dependencies vary based on bundler choice
         add_dev_dependencies
       end
@@ -128,92 +130,148 @@ module ReactOnRails
                              end
 
         puts "Installing React on Rails package..."
-        if add_js_dependency(react_on_rails_pkg)
-          @added_dependencies_to_package_json = true
-        else
-          # This should not happen since package_json is always available via shakapacker
-          raise "Failed to add react-on-rails package via package_json gem. " \
-                "This indicates shakapacker dependency may not be properly installed."
-        end
+        return if add_package(react_on_rails_pkg)
+
+        # This should not happen since package_json is always available via shakapacker
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Failed to add react-on-rails package via package_json gem.
+
+          This indicates shakapacker dependency may not be properly installed.
+          You can install it manually by running:
+            npm install #{react_on_rails_pkg}
+        MSG
+      rescue StandardError => e
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Error adding react-on-rails package: #{e.message}
+
+          You can install it manually by running:
+            npm install #{react_on_rails_pkg}
+        MSG
       end
 
       def add_react_dependencies
         puts "Installing React dependencies..."
+        return if add_packages(REACT_DEPENDENCIES)
 
-        if add_js_dependencies_batch(REACT_DEPENDENCIES)
-          @added_dependencies_to_package_json = true
-        else
-          # This should not happen since package_json is always available via shakapacker
-          raise "Failed to add React dependencies (#{REACT_DEPENDENCIES.join(', ')}) via package_json gem. " \
-                "This indicates shakapacker dependency may not be properly installed."
-        end
+        # This should not happen since package_json is always available via shakapacker
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Failed to add React dependencies via package_json gem.
+
+          This indicates shakapacker dependency may not be properly installed.
+          You can install them manually by running:
+            npm install #{REACT_DEPENDENCIES.join(' ')}
+        MSG
+      rescue StandardError => e
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Error adding React dependencies: #{e.message}
+
+          You can install them manually by running:
+            npm install #{REACT_DEPENDENCIES.join(' ')}
+        MSG
       end
 
       def add_css_dependencies
         puts "Installing CSS handling dependencies..."
+        return if add_packages(CSS_DEPENDENCIES)
 
-        if add_js_dependencies_batch(CSS_DEPENDENCIES)
-          @added_dependencies_to_package_json = true
-        else
-          # This should not happen since package_json is always available via shakapacker
-          raise "Failed to add CSS dependencies (#{CSS_DEPENDENCIES.join(', ')}) via package_json gem. " \
-                "This indicates shakapacker dependency may not be properly installed."
-        end
+        # This should not happen since package_json is always available via shakapacker
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Failed to add CSS dependencies via package_json gem.
+
+          This indicates shakapacker dependency may not be properly installed.
+          You can install them manually by running:
+            npm install #{CSS_DEPENDENCIES.join(' ')}
+        MSG
+      rescue StandardError => e
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Error adding CSS dependencies: #{e.message}
+
+          You can install them manually by running:
+            npm install #{CSS_DEPENDENCIES.join(' ')}
+        MSG
       end
 
       def add_rspack_dependencies
         puts "Installing Rspack core dependencies..."
+        return if add_packages(RSPACK_DEPENDENCIES)
 
-        if add_js_dependencies_batch(RSPACK_DEPENDENCIES)
-          @added_dependencies_to_package_json = true
-        else
-          # This should not happen since package_json is always available via shakapacker
-          raise "Failed to add Rspack dependencies (#{RSPACK_DEPENDENCIES.join(', ')}) via package_json gem. " \
-                "This indicates shakapacker dependency may not be properly installed."
-        end
+        # This should not happen since package_json is always available via shakapacker
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Failed to add Rspack dependencies via package_json gem.
+
+          This indicates shakapacker dependency may not be properly installed.
+          You can install them manually by running:
+            npm install #{RSPACK_DEPENDENCIES.join(' ')}
+        MSG
+      rescue StandardError => e
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Error adding Rspack dependencies: #{e.message}
+
+          You can install them manually by running:
+            npm install #{RSPACK_DEPENDENCIES.join(' ')}
+        MSG
       end
 
       def add_typescript_dependencies
         puts "Installing TypeScript dependencies..."
+        return if add_packages(TYPESCRIPT_DEPENDENCIES, dev: true)
 
-        if add_js_dependencies_batch(TYPESCRIPT_DEPENDENCIES, dev: true)
-          @added_dependencies_to_package_json = true
-        else
-          # This should not happen since package_json is always available via shakapacker
-          raise "Failed to add TypeScript dependencies (#{TYPESCRIPT_DEPENDENCIES.join(', ')}) via package_json gem. " \
-                "This indicates shakapacker dependency may not be properly installed."
-        end
+        # This should not happen since package_json is always available via shakapacker
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Failed to add TypeScript dependencies via package_json gem.
+
+          This indicates shakapacker dependency may not be properly installed.
+          You can install them manually by running:
+            npm install --save-dev #{TYPESCRIPT_DEPENDENCIES.join(' ')}
+        MSG
+      rescue StandardError => e
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Error adding TypeScript dependencies: #{e.message}
+
+          You can install them manually by running:
+            npm install --save-dev #{TYPESCRIPT_DEPENDENCIES.join(' ')}
+        MSG
       end
 
       def add_dev_dependencies
         puts "Installing development dependencies..."
 
         # Use Rspack-specific dev dependencies if --rspack flag is set
-        dev_deps = if respond_to?(:options) && options.rspack?
+        dev_deps = if respond_to?(:options) && options&.rspack?
                      RSPACK_DEV_DEPENDENCIES
                    else
                      DEV_DEPENDENCIES
                    end
 
-        if add_js_dependencies_batch(dev_deps, dev: true)
-          @added_dependencies_to_package_json = true
-        else
-          # This should not happen since package_json is always available via shakapacker
-          raise "Failed to add development dependencies (#{dev_deps.join(', ')}) via package_json gem. " \
-                "This indicates shakapacker dependency may not be properly installed."
-        end
+        return if add_packages(dev_deps, dev: true)
+
+        # This should not happen since package_json is always available via shakapacker
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Failed to add development dependencies via package_json gem.
+
+          This indicates shakapacker dependency may not be properly installed.
+          You can install them manually by running:
+            npm install --save-dev #{dev_deps.join(' ')}
+        MSG
+      rescue StandardError => e
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Error adding development dependencies: #{e.message}
+
+          You can install them manually by running:
+            npm install --save-dev #{dev_deps.join(' ')}
+        MSG
       end
 
       # Add a single dependency using package_json gem
       #
       # This method is used internally for adding the react-on-rails package
       # with version-specific handling (react-on-rails@VERSION).
-      # For batch operations, use add_js_dependencies_batch instead.
+      # For batch operations, use add_packages instead.
       #
       # @param package [String] Package specifier (e.g., "react-on-rails@16.0.0")
       # @param dev [Boolean] Whether to add as dev dependency
       # @return [Boolean] true if successful, false otherwise
-      def add_js_dependency(package, dev: false)
+      def add_package(package, dev: false)
         pj = package_json
         return false unless pj
 
@@ -240,7 +298,7 @@ module ReactOnRails
       # @param packages [Array<String>] Package names to add
       # @param dev [Boolean] Whether to add as dev dependencies
       # @return [Boolean] true if successful, false otherwise
-      def add_js_dependencies_batch(packages, dev: false)
+      def add_packages(packages, dev: false)
         # Use the add_npm_dependencies helper from GeneratorHelper
         add_npm_dependencies(packages, dev: dev)
       end
@@ -270,3 +328,4 @@ module ReactOnRails
     end
   end
 end
+# rubocop:enable Metrics/ModuleLength
