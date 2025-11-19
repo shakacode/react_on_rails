@@ -360,13 +360,12 @@ module ReactOnRails
     def ensure_webpack_generated_files_exists
       return unless webpack_generated_files.empty?
 
-      self.webpack_generated_files = [
-        "manifest.json",
-        server_bundle_js_file,
-        rsc_bundle_js_file,
-        react_client_manifest_file,
-        react_server_client_manifest_file
-      ].compact_blank
+      files = ["manifest.json", server_bundle_js_file]
+      files << rsc_bundle_js_file if respond_to?(:rsc_bundle_js_file)
+      files << react_client_manifest_file if respond_to?(:react_client_manifest_file)
+      files << react_server_client_manifest_file if respond_to?(:react_server_client_manifest_file)
+
+      self.webpack_generated_files = files.compact_blank
     end
 
     def configure_skip_display_none_deprecation
