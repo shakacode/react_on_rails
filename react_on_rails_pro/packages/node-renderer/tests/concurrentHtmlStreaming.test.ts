@@ -7,9 +7,8 @@ import { RSCPayloadChunk } from 'react-on-rails';
 import buildApp from '../src/worker';
 import config from './testingNodeRendererConfigs';
 import { makeRequest } from './httpRequestUtils';
-import { Config } from '../src/shared/configBuilder';
 
-const app = buildApp(config as Partial<Config>);
+const app = buildApp(config);
 const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 const redisClient = createClient({ url: redisUrl });
 
