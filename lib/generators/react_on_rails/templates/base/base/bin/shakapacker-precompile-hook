@@ -8,9 +8,6 @@
 
 set -e
 
-# Skip validation during precompile hook execution
-export REACT_ON_RAILS_SKIP_VALIDATION=true
-
 # Generate packs if React on Rails is configured with auto_load_bundle
 if [ -f "config/initializers/react_on_rails.rb" ]; then
   # Check for uncommented config lines (ignore lines starting with # after optional whitespace)
