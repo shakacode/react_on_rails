@@ -127,8 +127,14 @@ ReactOnRails.configure do |config|
   # `enforce_private_server_bundles` to ensure server bundles are only loaded from private directories
   # config.server_bundle_output_path = "ssr-generated"
 
-  # When set to true, React on Rails will only load server bundles from private, explicitly configured directories (such as `ssr-generated`), and will raise an error if a server bundle is found in a public or untrusted location. This helps prevent accidental or malicious execution of untrusted JavaScript on the server, and is strongly recommended for production environments. And prevent leakage of server-side code to the client (Especially in the case of RSC).
-  # Default is false for backward compatibility, but enabling this option is a best practice for security.
+  # When set to true, React on Rails will only load server bundles from private, explicitly
+  # configured directories (such as `ssr-generated`), and will raise an error if a server
+  # bundle is found in a public or untrusted location. This helps prevent accidental or
+  # malicious execution of untrusted JavaScript on the server, and is strongly recommended
+  # for production environments. Also prevents leakage of server-side code to the client
+  # (especially important for React Server Components).
+  # Default is false for backward compatibility, but enabling this option is a best practice
+  # for security.
   config.enforce_private_server_bundles = false
 
   ################################################################################

@@ -479,6 +479,14 @@ module ReactOnRails
         path_str.sub(%r{^#{Regexp.escape(rails_root_str)}/?}, "")
       else
         # Path is already relative or doesn't contain Rails.root
+        # Warn if it's an absolute path outside Rails.root (edge case)
+        if path_str.start_with?("/") && !path_str.start_with?(rails_root_str)
+          Rails.logger&.warn(
+            "ReactOnRails: Detected absolute path outside Rails.root: '#{path_str}'. " \
+            "Server bundles are typically stored within Rails.root. " \
+            "Verify this is intentional."
+          )
+        end
         path_str
       end
     end

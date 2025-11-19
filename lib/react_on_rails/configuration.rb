@@ -260,34 +260,54 @@ module ReactOnRails
     end
 
     # Auto-detect server_bundle_output_path from Shakapacker 9.0+ private_output_path
-    # Only sets if user hasn't explicitly configured server_bundle_output_path
+    # Checks if user explicitly set a value and warns them to use auto-detection instead
     def auto_detect_server_bundle_path_from_shakapacker
-      # Skip if user explicitly set server_bundle_output_path to something other than default
-      return if server_bundle_output_path != ReactOnRails::DEFAULT_SERVER_BUNDLE_OUTPUT_PATH
-
       # Skip if Shakapacker is not available
       return unless defined?(::Shakapacker)
 
       # Check if Shakapacker config has private_output_path method (9.0+)
       return unless ::Shakapacker.config.respond_to?(:private_output_path)
 
-      apply_shakapacker_private_output_path
-    end
-
-    def apply_shakapacker_private_output_path
+      # Get the private_output_path from Shakapacker
       private_path = ::Shakapacker.config.private_output_path
       return unless private_path
 
-      # Convert from Pathname to relative string path
       relative_path = ReactOnRails::Utils.normalize_to_relative_path(private_path)
-      self.server_bundle_output_path = relative_path
 
-      Rails.logger&.info("ReactOnRails: Auto-detected server_bundle_output_path from " \
-                         "shakapacker.yml private_output_path: '#{relative_path}'")
+      # Check if user explicitly configured server_bundle_output_path
+      if server_bundle_output_path != ReactOnRails::DEFAULT_SERVER_BUNDLE_OUTPUT_PATH
+        warn_about_explicit_configuration(relative_path)
+        return
+      end
+
+      apply_shakapacker_private_output_path(relative_path)
     rescue StandardError => e
       # Fail gracefully - if auto-detection fails, keep the default
       Rails.logger&.debug("ReactOnRails: Could not auto-detect server bundle path from " \
                           "Shakapacker: #{e.message}")
+    end
+
+    def warn_about_explicit_configuration(shakapacker_path)
+      # Normalize both paths for comparison
+      normalized_config = server_bundle_output_path.to_s.chomp("/")
+      normalized_shakapacker = shakapacker_path.to_s.chomp("/")
+
+      # Only warn if there's a mismatch
+      return if normalized_config == normalized_shakapacker
+
+      Rails.logger&.warn(
+        "ReactOnRails: server_bundle_output_path is explicitly set to '#{server_bundle_output_path}' " \
+        "but shakapacker.yml private_output_path is '#{shakapacker_path}'. " \
+        "Consider removing server_bundle_output_path from your React on Rails initializer " \
+        "to use the auto-detected value from shakapacker.yml."
+      )
+    end
+
+    def apply_shakapacker_private_output_path(relative_path)
+      self.server_bundle_output_path = relative_path
+
+      Rails.logger&.debug("ReactOnRails: Auto-detected server_bundle_output_path from " \
+                          "shakapacker.yml private_output_path: '#{relative_path}'")
     end
 
     def check_minimum_shakapacker_version

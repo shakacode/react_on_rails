@@ -98,6 +98,18 @@ module GeneratorHelper
 
   # Check if Shakapacker 9.0 or higher is available
   # Returns true if Shakapacker >= 9.0, false otherwise
+  #
+  # This method is used during code generation to determine which configuration
+  # patterns to use in generated files (e.g., config.privateOutputPath vs hardcoded paths).
+  #
+  # @return [Boolean] true if Shakapacker 9.0+ is available or likely to be installed
+  #
+  # @note Default behavior: Returns true when Shakapacker is not yet installed
+  #   Rationale: During fresh installations, we optimistically assume users will install
+  #   the latest Shakapacker version. This ensures new projects get best-practice configs.
+  #   If users later install an older version, the generated webpack config includes
+  #   fallback logic (e.g., `config.privateOutputPath || hardcodedPath`) that prevents
+  #   breakage, and validation warnings guide them to fix any misconfigurations.
   def shakapacker_version_9_or_higher?
     return @shakapacker_version_9_or_higher if defined?(@shakapacker_version_9_or_higher)
 

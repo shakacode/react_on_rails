@@ -966,6 +966,18 @@ module ReactOnRails
           expect(described_class.normalize_to_relative_path("/other/path/ssr-generated"))
             .to eq("/other/path/ssr-generated")
         end
+
+        it "logs warning for absolute path outside Rails.root" do
+          expect(Rails.logger).to receive(:warn).with(
+            %r{ReactOnRails: Detected absolute path outside Rails\.root: '/other/path/ssr-generated'}
+          )
+          described_class.normalize_to_relative_path("/other/path/ssr-generated")
+        end
+
+        it "does not warn for relative paths" do
+          expect(Rails.logger).not_to receive(:warn)
+          described_class.normalize_to_relative_path("ssr-generated")
+        end
       end
 
       context "with path containing Rails.root as substring" do
