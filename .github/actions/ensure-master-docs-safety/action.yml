@@ -22,8 +22,9 @@ runs:
           // Query workflow runs from the last 7 days to avoid excessive API calls.
           // Why 7 days? This balances API efficiency with practical needs:
           // - Most master commits trigger CI within hours, not days
-          // - Commits older than 7 days are likely stale; better to run full CI anyway
+          // - Commits older than 7 days are likely stale; better to allow the docs-only skip anyway
           // - Reduces pagination load on high-velocity repos
+          // - GitHub API rate limits (1000 req/hr for Actions) make unbounded searches risky
           // For commits outside this window, we skip the check and allow the docs-only skip.
           const createdAfter = new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString();
 
@@ -67,6 +68,8 @@ runs:
           // Deduplicate workflow runs by keeping only the latest run for each workflow_id.
           // This handles cases where workflows are re-run manually.
           // Use run_number as tiebreaker since created_at might be identical for rapid reruns.
+          // Note: If workflows are manually re-run out of order, we use the highest run_number
+          // which represents the most recent attempt, regardless of trigger order.
           const latestByWorkflow = new Map();
           for (const run of workflowRuns) {
             const existing = latestByWorkflow.get(run.workflow_id);
@@ -101,7 +104,9 @@ runs:
           // We treat these conclusions as failures:
           // - 'failure': Obvious failure case
           // - 'timed_out': Infrastructure or performance issue that should be investigated
-          // - 'cancelled': Conservative - might indicate timeout or manual intervention needed
+          // - 'cancelled': Might indicate timeout, CI infrastructure issues, or manual intervention needed
+          //                Being conservative here prevents a green checkmark when the previous commit
+          //                might have real issues that weren't fully validated
           // - 'action_required': Requires manual intervention
           // We treat 'skipped' and 'neutral' as non-blocking since they indicate
           // intentional skips or informational-only workflows.
