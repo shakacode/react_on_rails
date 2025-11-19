@@ -23,11 +23,7 @@ After a release, please make sure to run `bundle exec rake update_changelog`. Th
 
 Changes since the last non-beta release.
 
-#### Fixed
-
-- **Duplicate Rake Task Execution**: Fixed rake tasks executing twice during asset precompilation and other rake operations. Rails Engine was loading task files twice: once via explicit `load` calls in the `rake_tasks` block (Railtie layer) and once via automatic file loading from `lib/tasks/` (Engine layer). This caused `react_on_rails:assets:webpack`, `react_on_rails:generate_packs`, and `react_on_rails:locale` tasks to run twice, significantly increasing build times. Removed explicit `load` calls and now rely on Rails Engine's standard auto-loading behavior. [PR 2052](https://github.com/shakacode/react_on_rails/pull/2052) by [justin808](https://github.com/justin808).
-
-### [v16.2.0.beta.8] - 2025-11-16
+### [v16.2.0.beta.10] - 2025-11-18
 
 #### Added
 
@@ -72,6 +68,8 @@ Changes since the last non-beta release.
 - **Node Renderer Configuration**: Renamed `bundlePath` configuration option to `serverBundleCachePath` in the node renderer to better describe its purpose and avoid confusion with Shakapacker's public bundle path. The old `bundlePath` option continues to work with deprecation warnings. Both `RENDERER_SERVER_BUNDLE_CACHE_PATH` (new) and `RENDERER_BUNDLE_PATH` (deprecated) environment variables are supported. [PR #2008](https://github.com/shakacode/react_on_rails/pull/2008) by [justin808](https://github.com/justin808).
 
 #### Fixed
+
+- **Duplicate Rake Task Execution**: Fixed rake tasks executing twice during asset precompilation and other rake operations. Rails Engine was loading task files twice: once via explicit `load` calls in the `rake_tasks` block (Railtie layer) and once via automatic file loading from `lib/tasks/` (Engine layer). This caused `react_on_rails:assets:webpack`, `react_on_rails:generate_packs`, and `react_on_rails:locale` tasks to run twice, significantly increasing build times. Removed explicit `load` calls and now rely on Rails Engine's standard auto-loading behavior. [PR 2052](https://github.com/shakacode/react_on_rails/pull/2052) by [justin808](https://github.com/justin808).
 
 - **Node Renderer Worker Restart**: Fixed "descriptor closed" error that occurred when the node renderer restarts while handling an in-progress request (especially streaming requests). Workers now perform graceful shutdowns: they disconnect from the cluster to stop receiving new requests, wait for active requests to complete, then shut down cleanly. A configurable `gracefulWorkerRestartTimeout` ensures workers are forcibly killed if they don't shut down in time. [PR 1970](https://github.com/shakacode/react_on_rails/pull/1970) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
@@ -1845,8 +1843,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.2.0.beta.8...master
-[v16.2.0.beta.8]: https://github.com/shakacode/react_on_rails/compare/16.2.0.beta.4...v16.2.0.beta.8
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.2.0.beta.10...master
+[v16.2.0.beta.10]: https://github.com/shakacode/react_on_rails/compare/16.2.0.beta.4...v16.2.0.beta.10
 [16.2.0.beta.4]: https://github.com/shakacode/react_on_rails/compare/16.1.1...16.2.0.beta.4
 [16.1.1]: https://github.com/shakacode/react_on_rails/compare/16.1.0...16.1.1
 [16.1.0]: https://github.com/shakacode/react_on_rails/compare/16.0.0...16.1.0
