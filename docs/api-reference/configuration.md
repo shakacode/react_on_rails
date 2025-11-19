@@ -280,11 +280,23 @@ ReactOnRails.configure do |config|
   # See [16.0.0 Release Notes](docs/release-notes/16.0.0.md) for more details.
   # config.defer_generated_component_packs = false
 
-  # Default is false
-  # React on Rails Pro (licensed) feature: When true, components hydrate immediately as soon as
-  # their server-rendered HTML reaches the client, without waiting for the full page load.
-  # This improves time-to-interactive performance.
-  config.immediate_hydration = false
+  ################################################################################
+  # DEPRECATED CONFIGURATION
+  ################################################################################
+  # 🚫 DEPRECATED: immediate_hydration is no longer used
+  #
+  # This configuration option has been removed. Immediate hydration is now
+  # automatically enabled for React on Rails Pro users and cannot be disabled.
+  #
+  # If you still have this in your config, it will log a deprecation warning:
+  # config.immediate_hydration = false  # ⚠️ Logs warning, has no effect
+  #
+  # Action Required: Remove this line from your config/initializers/react_on_rails.rb
+  # See CHANGELOG.md for migration instructions.
+  #
+  # Historical Context:
+  # Previously controlled whether Pro components hydrated immediately upon their
+  # server-rendered HTML reaching the client, vs waiting for full page load.
 
   ################################################################################
   # I18N OPTIONS
