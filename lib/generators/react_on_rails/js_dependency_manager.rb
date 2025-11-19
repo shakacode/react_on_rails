@@ -279,9 +279,9 @@ module ReactOnRails
           # Ensure package is in array format for package_json gem
           packages_array = [package]
           if dev
-            pj.manager.add(packages_array, type: :dev)
+            pj.manager.add(packages_array, type: :dev, exact: true)
           else
-            pj.manager.add(packages_array)
+            pj.manager.add(packages_array, exact: true)
           end
           true
         rescue StandardError => e
@@ -309,7 +309,13 @@ module ReactOnRails
         # 1. react_on_rails gemspec requires shakapacker
         # 2. shakapacker gemspec requires package_json
         # 3. GeneratorHelper provides package_json method
-        package_json.manager.install
+        pj = package_json
+        unless pj
+          GeneratorMessages.add_warning("package_json not available, skipping dependency installation")
+          return false
+        end
+
+        pj.manager.install
         true
       rescue StandardError => e
         GeneratorMessages.add_warning(<<~MSG.strip)
@@ -323,8 +329,6 @@ module ReactOnRails
         MSG
         false
       end
-
-      # No longer needed since package_json gem handles package manager detection
     end
   end
 end

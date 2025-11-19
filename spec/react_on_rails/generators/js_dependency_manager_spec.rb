@@ -142,13 +142,18 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
     it "adds a single package successfully" do
       result = instance.send(:add_package, "react-on-rails@16.0.0")
       expect(result).to be(true)
-      expect(mock_manager).to have_received(:add).with(["react-on-rails@16.0.0"])
+      expect(mock_manager).to have_received(:add).with(["react-on-rails@16.0.0"], exact: true)
     end
 
     it "adds a dev dependency when dev: true" do
       result = instance.send(:add_package, "typescript", dev: true)
       expect(result).to be(true)
-      expect(mock_manager).to have_received(:add).with(["typescript"], type: :dev)
+      expect(mock_manager).to have_received(:add).with(["typescript"], type: :dev, exact: true)
+    end
+
+    it "uses exact: true flag for consistency with add_npm_dependencies" do
+      instance.send(:add_package, "some-package")
+      expect(mock_manager).to have_received(:add).with(["some-package"], exact: true)
     end
 
     it "returns false when package_json is nil" do
@@ -171,6 +176,16 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       expect(mock_manager).to have_received(:install)
     end
 
+    it "returns false and adds warning when package_json is nil" do
+      instance.package_json = nil
+
+      result = instance.send(:install_js_dependencies)
+
+      expect(result).to be(false)
+      expect(warnings.size).to be > 0
+      expect(warnings.first.to_s).to include("package_json not available")
+    end
+
     it "returns false and adds warning when install fails" do
       allow(mock_manager).to receive(:install).and_raise(StandardError, "Network timeout")
 
@@ -190,13 +205,13 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
     it "adds react-on-rails with version for stable releases" do
       instance.send(:add_react_on_rails_package)
-      expect(mock_manager).to have_received(:add).with(["react-on-rails@16.0.0"])
+      expect(mock_manager).to have_received(:add).with(["react-on-rails@16.0.0"], exact: true)
     end
 
     it "adds react-on-rails without version for pre-releases" do
       stub_const("ReactOnRails::VERSION", "16.0.0-rc.1")
       instance.send(:add_react_on_rails_package)
-      expect(mock_manager).to have_received(:add).with(["react-on-rails"])
+      expect(mock_manager).to have_received(:add).with(["react-on-rails"], exact: true)
     end
 
     it "adds warning when add_package fails" do
