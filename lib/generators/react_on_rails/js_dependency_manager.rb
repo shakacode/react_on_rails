@@ -29,14 +29,20 @@ module ReactOnRails
     # installs what's actually needed from package.json. This prevents edge cases
     # where package.json was modified but dependencies weren't installed.
     #
-    # == Error Handling
-    # All dependency addition methods use a tolerant error handling approach:
-    # - Return false on failure instead of raising exceptions
-    # - Catch StandardError and add warnings to GeneratorMessages
-    # - Provide clear manual installation instructions in warnings
-    # This provides better UX - the generator completes successfully even if
-    # dependency installation fails (e.g., network issues), and users can
-    # manually install dependencies afterward.
+    # == Error Handling Philosophy
+    # All dependency addition methods use a graceful degradation approach:
+    # - Methods return false on failure instead of raising exceptions
+    # - StandardError is caught at the lowest level (add_package) and higher levels (add_*_dependencies)
+    # - Failures trigger user-facing warnings via GeneratorMessages
+    # - Warnings provide clear manual installation instructions
+    #
+    # This ensures the generator ALWAYS completes successfully, even when:
+    # - Network connectivity issues prevent package downloads
+    # - Package manager (npm/yarn/pnpm) has permission errors
+    # - package_json gem encounters unexpected states
+    #
+    # Users can manually run package installation commands after generator completion.
+    # This is preferable to generator crashes that leave Rails apps in incomplete states.
     #
     # == Usage
     # Include this module in generator classes and call setup_js_dependencies
@@ -255,6 +261,9 @@ module ReactOnRails
       # This method is used internally for adding the react-on-rails package
       # with version-specific handling (react-on-rails@VERSION).
       # For batch operations, use add_packages instead.
+      #
+      # The exact: true flag ensures version pinning aligns with the gem version,
+      # preventing version mismatches between the Ruby gem and NPM package.
       #
       # @param package [String] Package specifier (e.g., "react-on-rails@16.0.0")
       # @param dev [Boolean] Whether to add as dev dependency

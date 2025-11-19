@@ -357,4 +357,31 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       expect(warning.to_s).to include("manually")
     end
   end
+
+  describe "graceful degradation" do
+    it "setup_js_dependencies completes successfully even when all package operations fail" do
+      # Simulate complete package installation failure
+      instance.add_npm_dependencies_result = false
+      instance.package_json = nil
+
+      # This should not raise any exceptions
+      expect { instance.send(:setup_js_dependencies) }.not_to raise_error
+
+      # Should have generated warnings for failures
+      expect(warnings.size).to be > 0
+      # But no errors that would crash the generator
+      expect(errors.size).to eq(0)
+    end
+
+    it "setup_js_dependencies completes when install fails but add succeeds" do
+      instance.add_npm_dependencies_result = true
+      allow(mock_manager).to receive(:install).and_raise(StandardError, "Network timeout")
+
+      # Should not raise despite install failure
+      expect { instance.send(:setup_js_dependencies) }.not_to raise_error
+
+      # Should have warning about install failure
+      expect(warnings.any? { |w| w.to_s.include?("installation failed") }).to be(true)
+    end
+  end
 end
