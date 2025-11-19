@@ -7,6 +7,7 @@ import {
   createRenderingRequest,
   createUploadAssetsForm,
   getAppUrl,
+  getNextChunk,
   RSC_BUNDLE_TIMESTAMP,
   SERVER_BUNDLE_TIMESTAMP,
 } from './httpRequestUtils';
@@ -50,6 +51,15 @@ const createInitialObject = (bundleTimestamp: string = RSC_BUNDLE_TIMESTAMP, pas
   protocolVersion: packageJson.protocolVersion,
   password,
   renderingRequest: createRenderingRequest({ componentName: 'AsyncPropsComponent' }),
+  onRequestClosedUpdateChunk: {
+    bundleTimestamp: RSC_BUNDLE_TIMESTAMP,
+    updateChunk: `
+    (function(){
+      var asyncPropsManager = sharedExecutionContext.get("asyncPropsManager");
+      asyncPropsManager.endStream();
+    })()
+    `,
+  },
   dependencyBundleTimestamps: [bundleTimestamp],
 });
 
@@ -97,14 +107,20 @@ const makeRequest = async (options = {}) => {
   };
 };
 
-// it('uploads the bundles', async () => {
-//   const { status, body } = await makeRequest();
-//   expect(body).toBe('');
-//   expect(status).toBe(200);
-// });
+const waitForStatus = (request: http2.ClientHttp2Stream) =>
+  new Promise<number | undefined>((resolve) => {
+    request.on('response', (headers) => {
+      resolve(headers[':status']);
+    });
+  });
+
+it('uploads the bundles', async () => {
+  const { status, body } = await makeRequest();
+  expect(body).toBe('');
+  expect(status).toBe(200);
+});
 
 it('incremental render html', async () => {
-  console.log('starting');
   const { status, body } = await makeRequest();
   expect(body).toBe('');
   expect(status).toBe(200);
@@ -113,13 +129,8 @@ it('incremental render html', async () => {
   const initialRequestObject = createInitialObject();
   request.write(`${JSON.stringify(initialRequestObject)}\n`);
 
-  request.on('response', (headers) => {
-    console.log(headers);
-  });
-
-  request.on('data', (data: Buffer) => {
-    console.log(data.toString());
-  });
+  await expect(waitForStatus(request)).resolves.toBe(200);
+  await expect(getNextChunk(request)).resolves.toContain('AsyncPropsComponent is a renderFunction');
 
   const updateChunk = {
     bundleTimestamp: RSC_BUNDLE_TIMESTAMP,
@@ -130,37 +141,44 @@ it('incremental render html', async () => {
     })()
     `,
   };
-  setTimeout(() => {
-    request.write(`${JSON.stringify(updateChunk)}\n`);
-  }, 1000);
+  request.write(`${JSON.stringify(updateChunk)}\n`);
+  await expect(getNextChunk(request)).resolves.toContain('Tale of two towns');
 
   const updateChunk2 = {
     bundleTimestamp: RSC_BUNDLE_TIMESTAMP,
     updateChunk: `
     (function(){
     var asyncPropsManager = sharedExecutionContext.get("asyncPropsManager");
-    asyncPropsManager.setProp("researches", ["Tale of two towns", "Pro Git"]);
+    asyncPropsManager.setProp("researches", ["AI effect on productivity", "Pro Git"]);
     })()
     `,
   };
-  setTimeout(() => {
-    request.write(`${JSON.stringify(updateChunk2)}\n`);
-    request.end();
-  }, 1500);
+  request.write(`${JSON.stringify(updateChunk2)}\n`);
+  request.end();
+  await expect(getNextChunk(request)).resolves.toContain('AI effect on productivity');
 
-  await new Promise<void>((resolve, reject) => {
-    request.on('end', () => {
-      close();
-      resolve();
-    });
-    request.on('error', (err) => {
-      close();
-      reject(err as Error);
-    });
-  });
-  await new Promise<void>((resolve) => {
-    setTimeout(() => {
-      resolve();
-    }, 100);
-  });
+  await expect(getNextChunk(request)).rejects.toThrow('Stream Closed');
+  close();
+});
+
+// TODO: fix the problem of having a global shared `runOnOtherBundle` function
+it.skip('raises an error if a specific async prop is not sent', async () => {
+  const { status, body } = await makeRequest();
+  expect(body).toBe('');
+  expect(status).toBe(200);
+
+  const { request, close } = createHttpRequest();
+  const initialRequestObject = createInitialObject();
+  request.write(`${JSON.stringify(initialRequestObject)}\n`);
+
+  await expect(waitForStatus(request)).resolves.toBe(200);
+  await expect(getNextChunk(request)).resolves.toContain('AsyncPropsComponent is a renderFunction');
+
+  request.end();
+  await expect(getNextChunk(request)).resolves.toContain(
+    'The async prop \\"researches\\" is not received. Esnure to send the async prop from ruby side',
+  );
+
+  await expect(getNextChunk(request)).rejects.toThrow('Stream Closed');
+  close();
 });

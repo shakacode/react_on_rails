@@ -198,3 +198,66 @@ export const makeRequest = (app: ReturnType<typeof buildApp>, options: Partial<R
     getBuffer,
   };
 };
+
+export const getNextChunkInternal = (
+  stream: NodeJS.ReadableStream,
+  { timeout = 250 }: { timeout?: number } = {},
+) => {
+  return new Promise<string>((resolve, reject) => {
+    let timeoutId: NodeJS.Timeout;
+    let cancelDataListener = () => {};
+    if (timeout) {
+      timeoutId = setTimeout(() => {
+        cancelDataListener();
+        reject(new Error(`Timeout after waiting for ${timeout}ms to get the next stream chunk`));
+      }, timeout);
+    }
+
+    const onData = (chunk: Buffer) => {
+      clearTimeout(timeoutId);
+      cancelDataListener();
+      resolve(chunk.toString());
+    };
+
+    const onError = (error: Error) => {
+      clearTimeout(timeoutId);
+      cancelDataListener();
+      reject(error);
+    };
+
+    const onClose = () => {
+      reject(new Error('Stream Closed'));
+    };
+
+    cancelDataListener = () => {
+      stream.off('data', onData);
+      stream.off('error', onError);
+      stream.off('close', onClose);
+    };
+
+    stream.once('data', onData);
+    stream.once('error', onError);
+    if (stream.closed) {
+      onClose();
+    } else {
+      stream.once('close', onClose);
+    }
+  });
+};
+
+export const getNextChunk = async (stream: NodeJS.ReadableStream, options: { timeout?: number } = {}) => {
+  const receivedChunks: string[] = [];
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  while (true) {
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const chunk = await getNextChunkInternal(stream, options);
+      receivedChunks.push(chunk);
+    } catch (err) {
+      if (receivedChunks.length > 0) {
+        return receivedChunks.join('');
+      }
+      throw err;
+    }
+  }
+};
