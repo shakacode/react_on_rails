@@ -132,11 +132,9 @@ module ReactOnRails
         puts "Installing React on Rails package..."
         return if add_package(react_on_rails_pkg)
 
-        # This should not happen since package_json is always available via shakapacker
         GeneratorMessages.add_warning(<<~MSG.strip)
-          ⚠️  Failed to add react-on-rails package via package_json gem.
+          ⚠️  Failed to add react-on-rails package.
 
-          This indicates shakapacker dependency may not be properly installed.
           You can install it manually by running:
             npm install #{react_on_rails_pkg}
         MSG
@@ -153,11 +151,9 @@ module ReactOnRails
         puts "Installing React dependencies..."
         return if add_packages(REACT_DEPENDENCIES)
 
-        # This should not happen since package_json is always available via shakapacker
         GeneratorMessages.add_warning(<<~MSG.strip)
-          ⚠️  Failed to add React dependencies via package_json gem.
+          ⚠️  Failed to add React dependencies.
 
-          This indicates shakapacker dependency may not be properly installed.
           You can install them manually by running:
             npm install #{REACT_DEPENDENCIES.join(' ')}
         MSG
@@ -174,11 +170,9 @@ module ReactOnRails
         puts "Installing CSS handling dependencies..."
         return if add_packages(CSS_DEPENDENCIES)
 
-        # This should not happen since package_json is always available via shakapacker
         GeneratorMessages.add_warning(<<~MSG.strip)
-          ⚠️  Failed to add CSS dependencies via package_json gem.
+          ⚠️  Failed to add CSS dependencies.
 
-          This indicates shakapacker dependency may not be properly installed.
           You can install them manually by running:
             npm install #{CSS_DEPENDENCIES.join(' ')}
         MSG
@@ -195,11 +189,9 @@ module ReactOnRails
         puts "Installing Rspack core dependencies..."
         return if add_packages(RSPACK_DEPENDENCIES)
 
-        # This should not happen since package_json is always available via shakapacker
         GeneratorMessages.add_warning(<<~MSG.strip)
-          ⚠️  Failed to add Rspack dependencies via package_json gem.
+          ⚠️  Failed to add Rspack dependencies.
 
-          This indicates shakapacker dependency may not be properly installed.
           You can install them manually by running:
             npm install #{RSPACK_DEPENDENCIES.join(' ')}
         MSG
@@ -216,11 +208,9 @@ module ReactOnRails
         puts "Installing TypeScript dependencies..."
         return if add_packages(TYPESCRIPT_DEPENDENCIES, dev: true)
 
-        # This should not happen since package_json is always available via shakapacker
         GeneratorMessages.add_warning(<<~MSG.strip)
-          ⚠️  Failed to add TypeScript dependencies via package_json gem.
+          ⚠️  Failed to add TypeScript dependencies.
 
-          This indicates shakapacker dependency may not be properly installed.
           You can install them manually by running:
             npm install --save-dev #{TYPESCRIPT_DEPENDENCIES.join(' ')}
         MSG
@@ -245,11 +235,9 @@ module ReactOnRails
 
         return if add_packages(dev_deps, dev: true)
 
-        # This should not happen since package_json is always available via shakapacker
         GeneratorMessages.add_warning(<<~MSG.strip)
-          ⚠️  Failed to add development dependencies via package_json gem.
+          ⚠️  Failed to add development dependencies.
 
-          This indicates shakapacker dependency may not be properly installed.
           You can install them manually by running:
             npm install --save-dev #{dev_deps.join(' ')}
         MSG
@@ -284,8 +272,8 @@ module ReactOnRails
             pj.manager.add(packages_array, exact: true)
           end
           true
-        rescue StandardError => e
-          puts "Warning: Could not add #{package} via package_json gem: #{e.message}"
+        rescue StandardError
+          # Return false to trigger warning in calling method
           false
         end
       end
