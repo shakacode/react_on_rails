@@ -83,10 +83,7 @@ module ReactOnRails
       ReactOnRails::ServerRenderingPool.reset_pool
     end
 
-    rake_tasks do
-      load File.expand_path("../tasks/generate_packs.rake", __dir__)
-      load File.expand_path("../tasks/assets.rake", __dir__)
-      load File.expand_path("../tasks/locale.rake", __dir__)
-    end
+    # Rake tasks are automatically loaded from lib/tasks/*.rake by Rails::Engine
+    # No need to explicitly load them here to avoid duplicate loading
   end
 end
