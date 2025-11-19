@@ -51,6 +51,7 @@ export type BaseClientObjectType = Omit<
   | 'reactOnRailsStoreLoaded'
   | 'streamServerRenderedReactComponent'
   | 'serverRenderRSCReactComponent'
+  | 'addAsyncPropsCapabilityToComponentProps'
 >;
 
 // Cache to track created objects and their registries
