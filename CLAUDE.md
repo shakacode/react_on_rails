@@ -178,11 +178,24 @@ cd react_on_rails_pro && bundle exec rake rbs:validate
 ```
 ## Changelog
 
+**IMPORTANT: This is a monorepo with TWO separate changelogs:**
+- **Open Source**: `/CHANGELOG.md` - for react_on_rails gem and npm package
+- **Pro**: `/react_on_rails_pro/CHANGELOG.md` - for react_on_rails_pro gem and npm packages
+
+When making changes, update the **appropriate changelog(s)**:
+- Open-source features/fixes → Update `/CHANGELOG.md`
+- Pro-only features/fixes → Update `/react_on_rails_pro/CHANGELOG.md`
+- Changes affecting both → Update **BOTH** changelogs
+
+### Changelog Guidelines
+
 - **Update CHANGELOG.md for user-visible changes only** (features, bug fixes, breaking changes, deprecations, performance improvements)
 - **Do NOT add entries for**: linting, formatting, refactoring, tests, or documentation fixes
 - **Format**: `[PR 1818](https://github.com/shakacode/react_on_rails/pull/1818) by [username](https://github.com/username)` (no hash in PR number)
 - **Use `/update-changelog` command** for guided changelog updates with automatic formatting
-- **Version management**: Run `bundle exec rake update_changelog` after releases to update version headers
+- **Version management after releases**:
+  - Open source: `bundle exec rake update_changelog`
+  - Pro: `cd react_on_rails_pro && bundle exec rake update_changelog`
 - **Examples**: Run `grep -A 3 "^#### " CHANGELOG.md | head -30` to see real formatting examples
 
 ## ⚠️ FORMATTING RULES
