@@ -75,4 +75,36 @@ console.warn.apply(console, ["other message","{\\"c\\":3,\\"d\\":4}"]);
 
     expect(actual).toEqual(expected);
   });
+
+  it('buildConsoleReplay adds nonce attribute when provided', () => {
+    console.history = [{ arguments: ['test message'], level: 'log' }];
+    const actual = buildConsoleReplay(undefined, 0, 'abc123');
+
+    expect(actual).toContain('nonce="abc123"');
+    expect(actual).toContain('<script id="consoleReplayLog" nonce="abc123">');
+    expect(actual).toContain('console.log.apply(console, ["test message"]);');
+  });
+
+  it('buildConsoleReplay returns empty string when no console messages', () => {
+    console.history = [];
+    const actual = buildConsoleReplay(undefined, 0, 'abc123');
+
+    expect(actual).toEqual('');
+  });
+
+  it('consoleReplay returns only JavaScript without script tags', () => {
+    console.history = [
+      { arguments: ['message 1'], level: 'log' },
+      { arguments: ['message 2'], level: 'error' },
+    ];
+    const actual = consoleReplay();
+
+    // Should not contain script tags
+    expect(actual).not.toContain('<script');
+    expect(actual).not.toContain('</script>');
+
+    // Should contain the JavaScript code
+    expect(actual).toContain('console.log.apply(console, ["message 1"]);');
+    expect(actual).toContain('console.error.apply(console, ["message 2"]);');
+  });
 });

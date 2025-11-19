@@ -437,16 +437,20 @@ module ReactOnRails
       )
     end
 
+    # Wraps console replay JavaScript code in a script tag with CSP nonce if available.
+    # The console_script_code is already sanitized by scriptSanitizedVal() in the JavaScript layer,
+    # so using html_safe here is secure.
     def wrap_console_script_with_nonce(console_script_code)
       return "" if console_script_code.blank?
 
-      # Get the CSP nonce if available
+      # Get the CSP nonce if available (Rails 5.2+)
       nonce = content_security_policy_nonce(:script) if respond_to?(:content_security_policy_nonce)
 
       # Build the script tag with nonce if available
       script_options = { id: "consoleReplayLog" }
       script_options[:nonce] = nonce if nonce.present?
 
+      # Safe to use html_safe because content is pre-sanitized via scriptSanitizedVal()
       content_tag(:script, console_script_code.html_safe, script_options)
     end
 
