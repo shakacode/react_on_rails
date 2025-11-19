@@ -116,11 +116,11 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          # TODO: Re-enable yarn caching once Node.js V8 cache crash is fixed
-          # Tracking: https://github.com/actions/setup-node/issues/1028
-          # cache: yarn
-          # cache-dependency-path: '**/yarn.lock'
+          node-version: ${{ steps.translate-matrix.outputs.node-version }}
+          # Disable cache for Node 22 due to V8 bug in 22.21.0
+          # https://github.com/nodejs/node/issues/56010
+          cache: ${{ steps.translate-matrix.outputs.node-version != '22' && 'yarn' || '' }}
+          cache-dependency-path: '**/yarn.lock'
       - name: Print system information
         run: |
           echo "Linux release: "; cat /etc/issue
@@ -145,7 +145,7 @@ jobs:
           yarn install --no-progress --no-emoji ${{ matrix.dependency-level == 'latest' && '--frozen-lockfile' || '' }}
           sudo yarn global add yalc
       - name: yalc publish for react-on-rails
-        run: yarn yalc publish
+        run: cd packages/react-on-rails && yalc publish
       - name: Install Ruby Gems for package
         run: |
           bundle lock --add-platform 'x86_64-linux'
