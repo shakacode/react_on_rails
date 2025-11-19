@@ -66,6 +66,9 @@ jobs:
 
   build:
     needs: detect-changes
+    # Skip only if: master push AND docs-only changes
+    # Otherwise run if: on master OR lint needed
+    # This allows docs-only commits to skip linting while ensuring full CI on master for code changes
     if: |
       !(
         github.event_name == 'push' &&

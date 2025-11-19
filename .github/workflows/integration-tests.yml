@@ -86,7 +86,9 @@ jobs:
 
   build-dummy-app-webpack-test-bundles:
     needs: [detect-changes, setup-integration-matrix]
-    # Run on master, workflow_dispatch, OR when tests needed on PR
+    # Skip only if: master push AND docs-only changes
+    # Otherwise run if: on master OR workflow_dispatch OR dummy tests needed
+    # This allows docs-only commits to skip heavy jobs while ensuring full CI on master for code changes
     if: |
       !(
         github.event_name == 'push' &&

@@ -18,36 +18,57 @@ runs:
       with:
         script: |
           const previousSha = process.env.PREVIOUS_SHA;
-          if (!previousSha) {
-            core.info('No previous SHA found, skipping safety check.');
-            return;
-          }
 
-          // Query workflow runs from the last 7 days to avoid excessive API calls
-          // For very old commits, we'll skip the check rather than scan the entire history
+          // Query workflow runs from the last 7 days to avoid excessive API calls.
+          // Why 7 days? This balances API efficiency with practical needs:
+          // - Most master commits trigger CI within hours, not days
+          // - Commits older than 7 days are likely stale; better to run full CI anyway
+          // - Reduces pagination load on high-velocity repos
+          // For commits outside this window, we skip the check and allow the docs-only skip.
           const createdAfter = new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString();
-          const workflowRuns = await github.paginate(github.rest.actions.listWorkflowRunsForRepo, {
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            branch: 'master',
-            event: 'push',
-            per_page: 100,
-            created: `>${createdAfter}`
-          });
 
-          const relevantRuns = workflowRuns.filter((run) => run.head_sha === previousSha);
+          // Optimize pagination: use lower per_page and collect only what we need
+          const workflowRuns = [];
+          let foundAllRelevant = false;
 
-          if (relevantRuns.length === 0) {
-            core.info(`No workflow runs found for ${previousSha}. Nothing to enforce.`);
+          for await (const response of github.paginate.iterator(
+            github.rest.actions.listWorkflowRunsForRepo,
+            {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              branch: 'master',
+              event: 'push',
+              per_page: 30,
+              created: `>${createdAfter}`
+            }
+          )) {
+            const pageRuns = response.data;
+            const relevantInPage = pageRuns.filter((run) => run.head_sha === previousSha);
+
+            if (relevantInPage.length > 0) {
+              workflowRuns.push(...relevantInPage);
+            }
+
+            // Early exit: if we found relevant runs and now seeing different SHAs,
+            // we've likely collected all runs for the previous commit
+            if (workflowRuns.length > 0 && relevantInPage.length === 0) {
+              foundAllRelevant = true;
+              break;
+            }
+          }
+
+          if (workflowRuns.length === 0) {
+            core.info(`No workflow runs found for ${previousSha} in the last 7 days. Allowing docs-only skip.`);
             return;
           }
 
-          // Deduplicate workflow runs by keeping only the latest run for each workflow_id
-          // This handles cases where workflows are re-run manually
+          // Deduplicate workflow runs by keeping only the latest run for each workflow_id.
+          // This handles cases where workflows are re-run manually.
+          // Use run_number as tiebreaker since created_at might be identical for rapid reruns.
           const latestByWorkflow = new Map();
-          for (const run of relevantRuns) {
+          for (const run of workflowRuns) {
             const existing = latestByWorkflow.get(run.workflow_id);
-            if (!existing || new Date(run.created_at) > new Date(existing.created_at)) {
+            if (!existing || run.run_number > existing.run_number) {
               latestByWorkflow.set(run.workflow_id, run);
             }
           }
@@ -61,7 +82,7 @@ runs:
 
           if (incompleteRuns.length > 0) {
             const details = incompleteRuns
-              .map((run) => `- ${run.name} (run #${run.run_number}) is still ${run.status}`)
+              .map((run) => `- [${run.name} #${run.run_number}](${run.html_url}) is still ${run.status}`)
               .join('\n');
             core.setFailed(
               [
@@ -74,9 +95,14 @@ runs:
             return;
           }
 
-          // Check for workflows that failed on the previous commit
-          // We treat cancelled runs as failures to be conservative, since they might indicate
-          // timeouts or other infrastructure issues that should be resolved before skipping CI
+          // Check for workflows that failed on the previous commit.
+          // We treat these conclusions as failures:
+          // - 'failure': Obvious failure case
+          // - 'timed_out': Infrastructure or performance issue that should be investigated
+          // - 'cancelled': Conservative - might indicate timeout or manual intervention needed
+          // - 'action_required': Requires manual intervention
+          // We treat 'skipped' and 'neutral' as non-blocking since they indicate
+          // intentional skips or informational-only workflows.
           const failingRuns = Array.from(latestByWorkflow.values()).filter((run) => {
             return ['failure', 'timed_out', 'cancelled', 'action_required'].includes(run.conclusion);
           });
@@ -87,7 +113,7 @@ runs:
           }
 
           const details = failingRuns
-            .map((run) => `- ${run.name} (run #${run.run_number}) concluded ${run.conclusion}`)
+            .map((run) => `- [${run.name} #${run.run_number}](${run.html_url}) concluded ${run.conclusion}`)
             .join('\n');
 
           core.setFailed(
