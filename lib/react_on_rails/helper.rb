@@ -444,7 +444,16 @@ module ReactOnRails
       return "" if console_script_code.blank?
 
       # Get the CSP nonce if available (Rails 5.2+)
-      nonce = content_security_policy_nonce(:script) if respond_to?(:content_security_policy_nonce)
+      # Rails 5.2-6.0 use content_security_policy_nonce with no arguments
+      # Rails 6.1+ accept an optional directive argument
+      nonce = if respond_to?(:content_security_policy_nonce)
+                begin
+                  content_security_policy_nonce(:script)
+                rescue ArgumentError
+                  # Fallback for Rails versions that don't accept arguments
+                  content_security_policy_nonce
+                end
+              end
 
       # Build the script tag with nonce if available
       script_options = { id: "consoleReplayLog" }
