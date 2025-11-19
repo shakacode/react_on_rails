@@ -101,7 +101,8 @@ module ReactOnRails
         puts "Adding Shakapacker #{ReactOnRails::PackerUtils.shakapacker_version} config"
         base_path = "base/base/"
         config = "config/shakapacker.yml"
-        copy_file("#{base_path}#{config}", config)
+        # Use template to enable version-aware configuration
+        template("#{base_path}#{config}.tt", config)
         configure_rspack_in_shakapacker if options.rspack?
       end
 

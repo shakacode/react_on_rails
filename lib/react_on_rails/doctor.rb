@@ -667,6 +667,7 @@ module ReactOnRails
       end
     end
 
+    # rubocop:disable Metrics/CyclomaticComplexity
     def analyze_server_rendering_config(content)
       checker.add_info("\n🖥️  Server Rendering:")
 
@@ -677,6 +678,19 @@ module ReactOnRails
       else
         checker.add_info("  server_bundle_js_file: server-bundle.js (default)")
       end
+
+      # Server bundle output path
+      server_bundle_path_match = content.match(/config\.server_bundle_output_path\s*=\s*["']([^"']+)["']/)
+      default_path = ReactOnRails::DEFAULT_SERVER_BUNDLE_OUTPUT_PATH
+      rails_bundle_path = server_bundle_path_match ? server_bundle_path_match[1] : default_path
+      checker.add_info("  server_bundle_output_path: #{rails_bundle_path}")
+
+      # Enforce private server bundles
+      enforce_private_match = content.match(/config\.enforce_private_server_bundles\s*=\s*([^\s\n,]+)/)
+      checker.add_info("  enforce_private_server_bundles: #{enforce_private_match[1]}") if enforce_private_match
+
+      # Check Shakapacker integration and provide recommendations
+      check_shakapacker_private_output_path(rails_bundle_path)
 
       # RSC bundle file (Pro feature)
       rsc_bundle_match = content.match(/config\.rsc_bundle_js_file\s*=\s*["']([^"']+)["']/)
@@ -702,9 +716,9 @@ module ReactOnRails
 
       checker.add_info("  raise_on_prerender_error: #{raise_on_error_match[1]}")
     end
-    # rubocop:enable Metrics/AbcSize
+    # rubocop:enable Metrics/CyclomaticComplexity
 
-    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
+    # rubocop:disable Metrics/CyclomaticComplexity
     def analyze_performance_config(content)
       checker.add_info("\n⚡ Performance & Loading:")
 
@@ -1387,9 +1401,85 @@ module ReactOnRails
     end
 
     def log_debug(message)
-      return unless defined?(Rails.logger) && Rails.logger
+      Rails.logger&.debug(message)
+    end
 
-      Rails.logger.debug(message)
+    # Check Shakapacker private_output_path integration and provide recommendations
+    def check_shakapacker_private_output_path(rails_bundle_path)
+      return report_no_shakapacker unless defined?(::Shakapacker)
+      return report_upgrade_shakapacker unless ::Shakapacker.config.respond_to?(:private_output_path)
+
+      check_shakapacker_9_private_output_path(rails_bundle_path)
+    rescue StandardError => e
+      checker.add_info("\n  ℹ️  Could not check Shakapacker config: #{e.message}")
+    end
+
+    def report_no_shakapacker
+      checker.add_info("\n  ℹ️  Shakapacker not detected - using manual configuration")
+    end
+
+    def report_upgrade_shakapacker
+      checker.add_info(<<~MSG.strip)
+        \n  💡 Recommendation: Upgrade to Shakapacker 9.0+
+
+        Shakapacker 9.0+ adds 'private_output_path' in shakapacker.yml for server bundles.
+        This eliminates the need to configure server_bundle_output_path separately.
+
+        Benefits:
+        - Single source of truth in shakapacker.yml
+        - Automatic detection by React on Rails
+        - No configuration duplication
+      MSG
+    end
+
+    def check_shakapacker_9_private_output_path(rails_bundle_path)
+      private_path = ::Shakapacker.config.private_output_path
+
+      if private_path
+        report_shakapacker_path_status(private_path, rails_bundle_path)
+      else
+        report_configure_private_output_path(rails_bundle_path)
+      end
+    end
+
+    def report_shakapacker_path_status(private_path, rails_bundle_path)
+      relative_path = ReactOnRails::Utils.normalize_to_relative_path(private_path)
+      # Normalize both paths for comparison (remove trailing slashes)
+      normalized_relative = relative_path.to_s.chomp("/")
+      normalized_rails = rails_bundle_path.to_s.chomp("/")
+
+      if normalized_relative == normalized_rails
+        checker.add_success("\n  ✅ Using Shakapacker 9.0+ private_output_path: '#{relative_path}'")
+        checker.add_info("     Auto-detected from shakapacker.yml - no manual config needed")
+      else
+        report_configuration_mismatch(relative_path, rails_bundle_path)
+      end
+    end
+
+    def report_configuration_mismatch(relative_path, rails_bundle_path)
+      checker.add_warning(<<~MSG.strip)
+        \n  ⚠️  Configuration mismatch detected!
+
+        Shakapacker private_output_path: '#{relative_path}'
+        React on Rails server_bundle_output_path: '#{rails_bundle_path}'
+
+        Recommendation: Remove server_bundle_output_path from your React on Rails
+        initializer and let it auto-detect from shakapacker.yml private_output_path.
+      MSG
+    end
+
+    def report_configure_private_output_path(rails_bundle_path)
+      checker.add_info(<<~MSG.strip)
+        \n  💡 Recommendation: Configure private_output_path in shakapacker.yml
+
+        Add to config/shakapacker.yml:
+          private_output_path: #{rails_bundle_path}
+
+        This will:
+        - Keep webpack and Rails configs in sync automatically
+        - Enable auto-detection by React on Rails
+        - Serve as single source of truth for server bundle location
+      MSG
     end
   end
   # rubocop:enable Metrics/ClassLength

@@ -550,6 +550,82 @@ module ReactOnRails
         end
       end
     end
+
+    describe "auto_detect_server_bundle_path_from_shakapacker" do
+      let(:shakapacker_module) { Module.new }
+      let(:shakapacker_config) { double("ShakapackerConfig") } # rubocop:disable RSpec/VerifiedDoubles
+
+      before do
+        config = shakapacker_config
+        stub_const("::Shakapacker", shakapacker_module)
+        shakapacker_module.define_singleton_method(:config) { config }
+        allow(shakapacker_config).to receive(:respond_to?).with(:private_output_path).and_return(true)
+      end
+
+      context "when user explicitly set server_bundle_output_path to different value" do
+        it "warns about configuration mismatch" do
+          allow(shakapacker_config).to receive(:private_output_path)
+            .and_return(Pathname.new("/fake/rails/root/shakapacker-bundles"))
+
+          expect(Rails.logger).to receive(:warn).with(
+            /server_bundle_output_path is explicitly set.*shakapacker\.yml private_output_path/
+          )
+
+          ReactOnRails.configure do |config|
+            config.server_bundle_output_path = "custom-path"
+          end
+        end
+
+        it "does not warn when paths match after normalization" do
+          allow(shakapacker_config).to receive(:private_output_path)
+            .and_return(Pathname.new("/fake/rails/root/ssr-generated"))
+
+          expect(Rails.logger).not_to receive(:warn)
+
+          ReactOnRails.configure do |config|
+            config.server_bundle_output_path = "ssr-generated"
+          end
+        end
+      end
+
+      context "when user has not explicitly set server_bundle_output_path" do
+        it "auto-detects from Shakapacker private_output_path" do
+          allow(shakapacker_config).to receive(:private_output_path)
+            .and_return(Pathname.new("/fake/rails/root/shakapacker-bundles"))
+
+          config = nil
+          ReactOnRails.configure do |c|
+            config = c
+          end
+
+          expect(config.server_bundle_output_path).to eq("shakapacker-bundles")
+        end
+
+        it "logs debug message on successful auto-detection" do
+          allow(shakapacker_config).to receive(:private_output_path)
+            .and_return(Pathname.new("/fake/rails/root/auto-detected"))
+
+          expect(Rails.logger).to receive(:debug).with(
+            /Auto-detected server_bundle_output_path.*auto-detected/
+          )
+
+          ReactOnRails.configure { |_config| } # rubocop:disable Lint/EmptyBlock
+        end
+      end
+
+      context "when Shakapacker private_output_path is nil" do
+        it "keeps default value" do
+          allow(shakapacker_config).to receive(:private_output_path).and_return(nil)
+
+          config = nil
+          ReactOnRails.configure do |c|
+            config = c
+          end
+
+          expect(config.server_bundle_output_path).to eq("ssr-generated")
+        end
+      end
+    end
   end
 end
 

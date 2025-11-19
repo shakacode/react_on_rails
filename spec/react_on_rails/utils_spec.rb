@@ -899,6 +899,117 @@ module ReactOnRails
 
     # RSC utility method tests moved to react_on_rails_pro/spec/react_on_rails_pro/utils_spec.rb
 
+    describe ".normalize_to_relative_path" do
+      let(:rails_root) { "/app" }
+
+      before do
+        allow(Rails).to receive(:root).and_return(Pathname.new(rails_root))
+      end
+
+      context "with absolute path containing Rails.root" do
+        it "removes Rails.root prefix" do
+          expect(described_class.normalize_to_relative_path("/app/ssr-generated"))
+            .to eq("ssr-generated")
+        end
+
+        it "handles paths with trailing slash in Rails.root" do
+          expect(described_class.normalize_to_relative_path("/app/ssr-generated/nested"))
+            .to eq("ssr-generated/nested")
+        end
+
+        it "removes leading slash after Rails.root" do
+          allow(Rails).to receive(:root).and_return(Pathname.new("/app/"))
+          expect(described_class.normalize_to_relative_path("/app/ssr-generated"))
+            .to eq("ssr-generated")
+        end
+      end
+
+      context "with Pathname object" do
+        it "converts Pathname to relative string" do
+          path = Pathname.new("/app/ssr-generated")
+          expect(described_class.normalize_to_relative_path(path))
+            .to eq("ssr-generated")
+        end
+
+        it "handles already relative Pathname" do
+          path = Pathname.new("ssr-generated")
+          expect(described_class.normalize_to_relative_path(path))
+            .to eq("ssr-generated")
+        end
+      end
+
+      context "with already relative path" do
+        it "returns the path unchanged" do
+          expect(described_class.normalize_to_relative_path("ssr-generated"))
+            .to eq("ssr-generated")
+        end
+
+        it "handles nested relative paths" do
+          expect(described_class.normalize_to_relative_path("config/ssr-generated"))
+            .to eq("config/ssr-generated")
+        end
+
+        it "handles paths with . prefix" do
+          expect(described_class.normalize_to_relative_path("./ssr-generated"))
+            .to eq("./ssr-generated")
+        end
+      end
+
+      context "with nil path" do
+        it "returns nil" do
+          expect(described_class.normalize_to_relative_path(nil)).to be_nil
+        end
+      end
+
+      context "with absolute path not containing Rails.root" do
+        it "returns path unchanged" do
+          expect(described_class.normalize_to_relative_path("/other/path/ssr-generated"))
+            .to eq("/other/path/ssr-generated")
+        end
+
+        it "logs warning for absolute path outside Rails.root" do
+          expect(Rails.logger).to receive(:warn).with(
+            %r{ReactOnRails: Detected absolute path outside Rails\.root: '/other/path/ssr-generated'}
+          )
+          described_class.normalize_to_relative_path("/other/path/ssr-generated")
+        end
+
+        it "does not warn for relative paths" do
+          expect(Rails.logger).not_to receive(:warn)
+          described_class.normalize_to_relative_path("ssr-generated")
+        end
+      end
+
+      context "with path containing Rails.root as substring" do
+        it "only removes Rails.root prefix, not substring matches" do
+          allow(Rails).to receive(:root).and_return(Pathname.new("/app"))
+          # Path contains "/app" but not as prefix
+          expect(described_class.normalize_to_relative_path("/myapp/ssr-generated"))
+            .to eq("/myapp/ssr-generated")
+        end
+      end
+
+      context "with complex Rails.root paths" do
+        it "handles Rails.root with special characters" do
+          allow(Rails).to receive(:root).and_return(Pathname.new("/home/user/my-app"))
+          expect(described_class.normalize_to_relative_path("/home/user/my-app/ssr-generated"))
+            .to eq("ssr-generated")
+        end
+
+        it "handles Rails.root with spaces" do
+          allow(Rails).to receive(:root).and_return(Pathname.new("/home/user/my app"))
+          expect(described_class.normalize_to_relative_path("/home/user/my app/ssr-generated"))
+            .to eq("ssr-generated")
+        end
+
+        it "handles Rails.root with dots" do
+          allow(Rails).to receive(:root).and_return(Pathname.new("/home/user/app.v2"))
+          expect(described_class.normalize_to_relative_path("/home/user/app.v2/ssr-generated"))
+            .to eq("ssr-generated")
+        end
+      end
+    end
+
     describe ".normalize_immediate_hydration" do
       context "with Pro license" do
         before do

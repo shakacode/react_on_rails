@@ -522,4 +522,116 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
   end
+
+  describe "server bundle path Shakapacker integration" do
+    let(:doctor) { described_class.new }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+
+    before do
+      allow(checker).to receive(:add_info)
+      allow(checker).to receive(:add_success)
+      allow(checker).to receive(:add_warning)
+    end
+
+    describe "#check_shakapacker_private_output_path" do
+      context "when Shakapacker is not defined" do
+        before do
+          hide_const("::Shakapacker")
+        end
+
+        it "reports manual configuration" do
+          expect(checker).to receive(:add_info).with("\n  ℹ️  Shakapacker not detected - using manual configuration")
+          doctor.send(:check_shakapacker_private_output_path, "ssr-generated")
+        end
+      end
+
+      context "when Shakapacker does not support private_output_path (pre-9.0)" do
+        let(:shakapacker_module) { Module.new }
+        let(:shakapacker_config) { instance_double(Shakapacker::Configuration) }
+
+        before do
+          config = shakapacker_config
+          stub_const("::Shakapacker", shakapacker_module)
+          shakapacker_module.define_singleton_method(:config) { config }
+          allow(shakapacker_config).to receive(:respond_to?).with(:private_output_path).and_return(false)
+        end
+
+        it "recommends upgrading to Shakapacker 9.0+" do
+          expect(checker).to receive(:add_info).with(/Recommendation: Upgrade to Shakapacker 9\.0\+/)
+          doctor.send(:check_shakapacker_private_output_path, "ssr-generated")
+        end
+      end
+
+      context "when Shakapacker 9.0+ is available" do
+        let(:shakapacker_module) { Module.new }
+        let(:shakapacker_config) { instance_double(Shakapacker::Configuration) }
+        let(:rails_module) { Module.new }
+        let(:rails_root) { instance_double(Pathname, to_s: "/app") }
+
+        before do
+          config = shakapacker_config
+          root = rails_root
+          stub_const("::Shakapacker", shakapacker_module)
+          stub_const("Rails", rails_module)
+          shakapacker_module.define_singleton_method(:config) { config }
+          rails_module.define_singleton_method(:root) { root }
+          allow(shakapacker_config).to receive(:respond_to?).with(:private_output_path).and_return(true)
+        end
+
+        it "reports success when private_output_path matches" do
+          private_path = instance_double(Pathname, to_s: "/app/ssr-generated")
+          allow(shakapacker_config).to receive(:private_output_path).and_return(private_path)
+
+          success_msg = "\n  ✅ Using Shakapacker 9.0+ private_output_path: 'ssr-generated'"
+          info_msg = "     Auto-detected from shakapacker.yml - no manual config needed"
+          expect(checker).to receive(:add_success).with(success_msg)
+          expect(checker).to receive(:add_info).with(info_msg)
+          doctor.send(:check_shakapacker_private_output_path, "ssr-generated")
+        end
+
+        it "warns when private_output_path doesn't match" do
+          private_path = instance_double(Pathname, to_s: "/app/server-bundles")
+          allow(shakapacker_config).to receive(:private_output_path).and_return(private_path)
+
+          expect(checker).to receive(:add_warning).with(/Configuration mismatch detected/)
+          doctor.send(:check_shakapacker_private_output_path, "ssr-generated")
+        end
+
+        it "includes both paths in mismatch warning" do
+          private_path = instance_double(Pathname, to_s: "/app/server-bundles")
+          allow(shakapacker_config).to receive(:private_output_path).and_return(private_path)
+
+          expect(checker).to receive(:add_warning) do |msg|
+            expect(msg).to include("Shakapacker private_output_path: 'server-bundles'")
+            expect(msg).to include("React on Rails server_bundle_output_path: 'ssr-generated'")
+          end
+          doctor.send(:check_shakapacker_private_output_path, "ssr-generated")
+        end
+
+        it "recommends configuring when private_output_path not set" do
+          allow(shakapacker_config).to receive(:private_output_path).and_return(nil)
+
+          recommendation_msg = /Recommendation: Configure private_output_path in shakapacker\.yml/
+          expect(checker).to receive(:add_info).with(recommendation_msg)
+          doctor.send(:check_shakapacker_private_output_path, "ssr-generated")
+        end
+
+        it "provides configuration example when not set" do
+          allow(shakapacker_config).to receive(:private_output_path).and_return(nil)
+
+          expect(checker).to receive(:add_info) do |msg|
+            expect(msg).to include("private_output_path: ssr-generated")
+          end
+          doctor.send(:check_shakapacker_private_output_path, "ssr-generated")
+        end
+
+        it "handles errors gracefully" do
+          allow(shakapacker_config).to receive(:private_output_path).and_raise(StandardError, "Config error")
+
+          expect(checker).to receive(:add_info).with("\n  ℹ️  Could not check Shakapacker config: Config error")
+          doctor.send(:check_shakapacker_private_output_path, "ssr-generated")
+        end
+      end
+    end
+  end
 end
