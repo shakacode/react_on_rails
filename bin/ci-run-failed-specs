@@ -139,10 +139,12 @@ echo ""
 
 # Determine the working directory (check if we need to be in spec/dummy)
 WORKING_DIR="."
-if [ ${#UNIQUE_SPECS[@]} -gt 0 ] && ([[ "${UNIQUE_SPECS[0]}" == *"spec/system"* ]] || [[ "${UNIQUE_SPECS[0]}" == *"spec/helpers"* ]]); then
-  if [ -d "spec/dummy" ]; then
-    WORKING_DIR="spec/dummy"
-    echo -e "${BLUE}Running from spec/dummy directory${NC}"
+if [ ${#UNIQUE_SPECS[@]} -gt 0 ]; then
+  if [[ "${UNIQUE_SPECS[0]}" == *"spec/system"* ]] || [[ "${UNIQUE_SPECS[0]}" == *"spec/helpers"* ]]; then
+    if [ -d "spec/dummy" ]; then
+      WORKING_DIR="spec/dummy"
+      echo -e "${BLUE}Running from spec/dummy directory${NC}"
+    fi
   fi
 fi
 

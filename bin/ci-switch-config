@@ -255,9 +255,10 @@ EOF
   set_node_version "20.18.1" "$VERSION_MANAGER"
 
   # Run conversion script
-  # NOTE: This uses whatever 'ruby' is in PATH after version manager updates above.
-  # The version manager may not have reloaded yet, so ensure your current Ruby is
-  # compatible with script/convert (Ruby 2.6+ should work).
+  # NOTE: This executes 'ruby' before the version manager reloads in your current shell.
+  # The script/convert file requires Ruby 2.6+ and uses basic file I/O operations.
+  # Most modern Ruby versions (2.6+) are compatible. The version manager changes above
+  # only take effect after shell reload, so this uses your current Ruby installation.
   print_header "Running script/convert to downgrade dependencies"
   cd "$PROJECT_ROOT"
   ruby script/convert
