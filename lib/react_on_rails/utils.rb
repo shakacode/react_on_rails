@@ -467,20 +467,25 @@ module ReactOnRails
     #
     # @example Absolute paths outside Rails.root (edge case)
     #   normalize_to_relative_path("/other/path/bundles") # => "/other/path/bundles"
+    # rubocop:disable Metrics/CyclomaticComplexity
     def self.normalize_to_relative_path(path)
       return nil if path.nil?
 
       path_str = path.to_s
-      rails_root_str = Rails.root.to_s
+      rails_root_str = Rails.root.to_s.chomp("/")
 
-      # If path starts with Rails.root, remove that prefix
-      if path_str.start_with?(rails_root_str)
+      # Treat as "inside Rails.root" only for exact match or a subdirectory
+      inside_rails_root = rails_root_str.present? &&
+                          (path_str == rails_root_str || path_str.start_with?("#{rails_root_str}/"))
+
+      # If path is within Rails.root, remove that prefix
+      if inside_rails_root
         # Remove Rails.root and any leading slash
         path_str.sub(%r{^#{Regexp.escape(rails_root_str)}/?}, "")
       else
-        # Path is already relative or doesn't contain Rails.root
+        # Path is already relative or outside Rails.root
         # Warn if it's an absolute path outside Rails.root (edge case)
-        if path_str.start_with?("/") && !path_str.start_with?(rails_root_str)
+        if path_str.start_with?("/") && !inside_rails_root
           Rails.logger&.warn(
             "ReactOnRails: Detected absolute path outside Rails.root: '#{path_str}'. " \
             "Server bundles are typically stored within Rails.root. " \
@@ -490,6 +495,7 @@ module ReactOnRails
         path_str
       end
     end
+    # rubocop:enable Metrics/CyclomaticComplexity
 
     def self.default_troubleshooting_section
       <<~DEFAULT

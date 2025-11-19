@@ -716,9 +716,9 @@ module ReactOnRails
 
       checker.add_info("  raise_on_prerender_error: #{raise_on_error_match[1]}")
     end
-    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
+    # rubocop:enable Metrics/CyclomaticComplexity
 
-    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
+    # rubocop:disable Metrics/CyclomaticComplexity
     def analyze_performance_config(content)
       checker.add_info("\n⚡ Performance & Loading:")
 
