@@ -37,13 +37,11 @@ module ReactOnRailsPro
           rscBundleHash: '#{ReactOnRailsPro::Utils.rsc_bundle_hash}',
         }
         const runOnOtherBundle = globalThis.runOnOtherBundle;
-        if (typeof generateRSCPayload !== 'function') {
-          globalThis.generateRSCPayload = function generateRSCPayload(componentName, props, railsContext) {
-            const { renderingRequest, rscBundleHash } = railsContext.serverSideRSCPayloadParameters;
-            const propsString = JSON.stringify(props);
-            const newRenderingRequest = renderingRequest.replace(/\\(\\s*\\)\\s*$/, `('${componentName}', ${propsString})`);
-            return runOnOtherBundle(rscBundleHash, newRenderingRequest);
-          }
+        const generateRSCPayload = function generateRSCPayload(componentName, props, railsContext) {
+          const { renderingRequest, rscBundleHash } = railsContext.serverSideRSCPayloadParameters;
+          const propsString = JSON.stringify(props);
+          const newRenderingRequest = renderingRequest.replace(/\\(\\s*\\)\\s*$/, `('${componentName}', ${propsString})`);
+          return runOnOtherBundle(rscBundleHash, newRenderingRequest);
         }
         JS
       end
@@ -94,6 +92,7 @@ module ReactOnRailsPro
             railsContext: railsContext,
             throwJsErrors: #{ReactOnRailsPro.configuration.throw_js_errors},
             renderingReturnsPromises: #{ReactOnRailsPro.configuration.rendering_returns_promises},
+            generateRSCPayload: typeof generateRSCPayload !== 'undefined' ? generateRSCPayload : undefined,
           });
         })()
         JS

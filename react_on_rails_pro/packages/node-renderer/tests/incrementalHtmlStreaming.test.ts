@@ -161,8 +161,7 @@ it('incremental render html', async () => {
   close();
 });
 
-// TODO: fix the problem of having a global shared `runOnOtherBundle` function
-it.skip('raises an error if a specific async prop is not sent', async () => {
+it('raises an error if a specific async prop is not sent', async () => {
   const { status, body } = await makeRequest();
   expect(body).toBe('');
   expect(status).toBe(200);

@@ -181,11 +181,19 @@ export const streamServerRenderedComponent = <T, P extends RenderParams>(
   renderStrategy: StreamRenderer<T, P>,
   handleError: (options: ErrorOptions) => PipeableOrReadableStream,
 ): T => {
-  const { name: componentName, domNodeId, trace, props, railsContext, throwJsErrors } = options;
+  const {
+    name: componentName,
+    domNodeId,
+    trace,
+    props,
+    railsContext,
+    throwJsErrors,
+    generateRSCPayload,
+  } = options;
 
   assertRailsContextWithServerComponentMetadata(railsContext);
   const postSSRHookTracker = new PostSSRHookTracker();
-  const rscRequestTracker = new RSCRequestTracker(railsContext);
+  const rscRequestTracker = new RSCRequestTracker(railsContext, generateRSCPayload);
   const streamingTrackers = {
     postSSRHookTracker,
     rscRequestTracker,

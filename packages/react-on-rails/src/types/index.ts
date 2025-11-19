@@ -216,11 +216,18 @@ export interface RegisteredComponent {
 
 export type ItemRegistrationCallback<T> = (component: T) => void;
 
+export type GenerateRSCPayloadFunction = (
+  componentName: string,
+  props: unknown,
+  railsContext: RailsContext,
+) => Promise<NodeJS.ReadableStream>;
+
 interface Params {
   props?: Record<string, unknown>;
   railsContext?: RailsContext;
   domNodeId?: string;
   trace?: boolean;
+  generateRSCPayload?: GenerateRSCPayloadFunction;
 }
 
 export interface RenderParams extends Params {
