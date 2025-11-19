@@ -1,58 +1,22 @@
-#!/usr/bin/env ruby
-# frozen_string_literal: true
-
+#!/bin/sh
 # Shakapacker precompile hook for React on Rails
 #
 # This script runs before webpack compilation to generate pack files
-# for auto-bundled components.
-#
-# It's called automatically by Shakapacker when configured in config/shakapacker.yml:
-#   precompile_hook: 'bin/shakapacker-precompile-hook'
+# for auto-bundled components (if configured).
 #
 # See: https://github.com/shakacode/shakapacker/blob/main/docs/precompile_hook.md
 
-require "fileutils"
+set -e
 
-# Find Rails root by walking upward looking for config/environment.rb
-def find_rails_root
-  dir = Dir.pwd
-  while dir != "/"
-    return dir if File.exist?(File.join(dir, "config", "environment.rb"))
+# Skip validation during precompile hook execution
+export REACT_ON_RAILS_SKIP_VALIDATION=true
 
-    dir = File.dirname(dir)
-  end
-  nil
-end
-
-# Generate React on Rails packs if needed
-def generate_packs_if_needed
-  rails_root = find_rails_root
-  return unless rails_root
-
-  initializer_path = File.join(rails_root, "config", "initializers", "react_on_rails.rb")
-  return unless File.exist?(initializer_path)
-
-  # Check if auto-pack generation is configured
-  initializer_content = File.read(initializer_path)
-  return unless initializer_content.match?(/^\s*config\.auto_load_bundle\s*=/) ||
-                initializer_content.match?(/^\s*config\.components_subdirectory\s*=/)
-
-  puts "📦 Generating React on Rails packs..."
-
-  Dir.chdir(rails_root) do
-    # Skip validation during precompile hook execution
-    ENV["REACT_ON_RAILS_SKIP_VALIDATION"] = "true"
-
-    # Run pack generation
-    system("bundle", "exec", "rails", "react_on_rails:generate_packs", exception: true)
-    puts "✅ Pack generation completed successfully"
-  end
-rescue Errno::ENOENT => e
-  warn "⚠️  Warning: #{e.message}"
-rescue StandardError => e
-  warn "❌ Pack generation failed: #{e.message}"
-  exit 1
-end
-
-# Main execution
-generate_packs_if_needed
+# Generate packs if React on Rails is configured with auto_load_bundle
+if [ -f "config/initializers/react_on_rails.rb" ]; then
+  if grep -q "config\.auto_load_bundle" config/initializers/react_on_rails.rb || \
+     grep -q "config\.components_subdirectory" config/initializers/react_on_rails.rb; then
+    echo "📦 Generating React on Rails packs..."
+    bundle exec rails react_on_rails:generate_packs
+    echo "✅ Pack generation completed successfully"
+  fi
+fi
