@@ -107,4 +107,20 @@ console.warn.apply(console, ["other message","{\\"c\\":3,\\"d\\":4}"]);
     expect(actual).toContain('console.log.apply(console, ["message 1"]);');
     expect(actual).toContain('console.error.apply(console, ["message 2"]);');
   });
+
+  it('buildConsoleReplay sanitizes nonce to prevent XSS', () => {
+    console.history = [{ arguments: ['test'], level: 'log' }];
+    // Attempt attribute injection attack
+    const maliciousNonce = 'abc123" onload="alert(1)';
+    const actual = buildConsoleReplay(undefined, 0, maliciousNonce);
+
+    // Should strip dangerous characters (quotes, parens, spaces)
+    // = is kept as it's valid in base64, but the quotes are stripped making it harmless
+    expect(actual).toContain('nonce="abc123onload=alert1"');
+    // Should NOT contain quotes that would close the attribute
+    expect(actual).not.toContain('nonce="abc123"');
+    expect(actual).not.toContain('alert(1)');
+    // Verify the dangerous parts (quotes and parens) are removed
+    expect(actual).not.toMatch(/nonce="[^"]*"[^>]*onload=/);
+  });
 });
