@@ -287,7 +287,7 @@ export default function run(config: Partial<Config>) {
           );
 
           const initial: IncrementalRenderInitialRequest = {
-            renderingRequest: String((tempReqBody as { renderingRequest?: string }).renderingRequest ?? ''),
+            firstRequestChunk: obj,
             bundleTimestamp,
             dependencyBundleTimestamps,
           };
@@ -322,6 +322,7 @@ export default function run(config: Partial<Config>) {
           }
 
           try {
+            log.info(`Received a new update chunk ${JSON.stringify(obj)}`);
             incrementalSink.add(obj);
           } catch (err) {
             // Log error but don't stop processing
@@ -334,7 +335,11 @@ export default function run(config: Partial<Config>) {
         },
 
         onRequestEnded: () => {
-          // Do nothing
+          if (!incrementalSink) {
+            return;
+          }
+
+          incrementalSink.handleRequestClosed();
         },
       });
     } catch (err) {
