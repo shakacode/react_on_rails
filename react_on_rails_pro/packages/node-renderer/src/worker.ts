@@ -336,7 +336,6 @@ export default function run(config: Partial<Config>) {
 
         onRequestEnded: () => {
           if (!incrementalSink) {
-            log.error({ msg: 'Unexpected update chunk received after rendering was aborted', obj });
             return;
           }
 
