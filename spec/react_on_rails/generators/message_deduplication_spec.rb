@@ -87,7 +87,7 @@ describe "Message Deduplication", type: :generator do
         # add_npm_dependencies is from GeneratorHelper and is used by add_js_dependencies_batch
         # Mock package_json to prevent actual package manager calls
         # rubocop:disable RSpec/VerifiedDoubles
-        mock_manager = double("PackageManager", install: true)
+        mock_manager = double("PackageManager", install: true, add: true)
         mock_package_json = double("PackageJson", manager: mock_manager)
         # rubocop:enable RSpec/VerifiedDoubles
         allow(install_generator).to receive_messages(
