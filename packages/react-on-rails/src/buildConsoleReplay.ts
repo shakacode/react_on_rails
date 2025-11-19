@@ -10,7 +10,11 @@ declare global {
   }
 }
 
-/** @internal Exported only for tests */
+/**
+ * Returns the console replay JavaScript code without wrapping it in script tags.
+ * This is useful when you want to wrap the code in script tags yourself (e.g., with a CSP nonce).
+ * @internal Exported for tests and for Ruby helper to wrap with nonce
+ */
 export function consoleReplay(
   customConsoleHistory: (typeof console)['history'] | undefined = undefined,
   numberOfMessagesToSkip: number = 0,
@@ -53,10 +57,11 @@ export function consoleReplay(
 export default function buildConsoleReplay(
   customConsoleHistory: (typeof console)['history'] | undefined = undefined,
   numberOfMessagesToSkip: number = 0,
+  nonce?: string,
 ): string {
   const consoleReplayJS = consoleReplay(customConsoleHistory, numberOfMessagesToSkip);
   if (consoleReplayJS.length === 0) {
     return '';
   }
-  return wrapInScriptTags('consoleReplayLog', consoleReplayJS);
+  return wrapInScriptTags('consoleReplayLog', consoleReplayJS, nonce);
 }

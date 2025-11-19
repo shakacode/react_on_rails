@@ -437,8 +437,14 @@ export interface ReactOnRailsInternal extends ReactOnRails {
   handleError(options: ErrorOptions): string | undefined;
   /**
    * Used by Rails server rendering to replay console messages.
+   * Returns the console replay script wrapped in script tags.
    */
   buildConsoleReplay(): string;
+  /**
+   * Returns the console replay JavaScript code without wrapping it in script tags.
+   * Useful when you need to add CSP nonce or other attributes to the script tag.
+   */
+  getConsoleReplayScript(): string;
   /**
    * Get a Map containing all registered components. Useful for debugging.
    */

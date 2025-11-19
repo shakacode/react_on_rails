@@ -347,7 +347,8 @@ module ReactOnRailsProHelper
           render_options: render_options
         )
       else
-        result_console_script = render_options.replay_console ? chunk_json_result["consoleReplayScript"] : ""
+        console_script = chunk_json_result["consoleReplayScript"]
+        result_console_script = render_options.replay_console ? wrap_console_script_with_nonce(console_script) : ""
         # No need to prepend component_specification_tag or add rails context again
         # as they're already included in the first chunk
         compose_react_component_html_with_spec_and_console(

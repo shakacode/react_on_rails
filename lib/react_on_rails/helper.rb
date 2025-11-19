@@ -226,7 +226,7 @@ module ReactOnRails
           }
         }
 
-        consoleReplayScript = ReactOnRails.buildConsoleReplay();
+        consoleReplayScript = ReactOnRails.getConsoleReplayScript();
 
         return JSON.stringify({
             html: htmlResult,
@@ -242,8 +242,9 @@ module ReactOnRails
                .server_render_js_with_console_logging(js_code, render_options)
 
       html = result["html"]
-      console_log_script = result["consoleLogScript"]
-      raw("#{html}#{console_log_script if render_options.replay_console}")
+      console_script = result["consoleReplayScript"]
+      console_script_tag = wrap_console_script_with_nonce(console_script) if render_options.replay_console
+      raw("#{html}#{console_script_tag}")
     rescue ExecJS::ProgramError => err
       raise ReactOnRails::PrerenderError.new(component_name: "N/A (server_render_js called)",
                                              err: err,
@@ -394,7 +395,7 @@ module ReactOnRails
                                     server_rendered_html.html_safe,
                                     content_tag_options)
 
-      result_console_script = render_options.replay_console ? console_script : ""
+      result_console_script = render_options.replay_console ? wrap_console_script_with_nonce(console_script) : ""
       result = compose_react_component_html_with_spec_and_console(
         component_specification_tag, rendered_output, result_console_script
       )
@@ -419,7 +420,7 @@ module ReactOnRails
                                     server_rendered_html[COMPONENT_HTML_KEY].html_safe,
                                     content_tag_options)
 
-      result_console_script = render_options.replay_console ? console_script : ""
+      result_console_script = render_options.replay_console ? wrap_console_script_with_nonce(console_script) : ""
       result = compose_react_component_html_with_spec_and_console(
         component_specification_tag, rendered_output, result_console_script
       )
@@ -434,6 +435,19 @@ module ReactOnRails
       { COMPONENT_HTML_KEY => result_with_rails_context }.merge(
         server_rendered_hash_except_component
       )
+    end
+
+    def wrap_console_script_with_nonce(console_script_code)
+      return "" if console_script_code.blank?
+
+      # Get the CSP nonce if available
+      nonce = content_security_policy_nonce(:script) if respond_to?(:content_security_policy_nonce)
+
+      # Build the script tag with nonce if available
+      script_options = { id: "consoleReplayLog" }
+      script_options[:nonce] = nonce if nonce.present?
+
+      content_tag(:script, console_script_code.html_safe, script_options)
     end
 
     def compose_react_component_html_with_spec_and_console(component_specification_tag, rendered_output,
