@@ -361,9 +361,13 @@ module ReactOnRails
       return unless webpack_generated_files.empty?
 
       files = ["manifest.json", server_bundle_js_file]
-      files << rsc_bundle_js_file if respond_to?(:rsc_bundle_js_file)
-      files << react_client_manifest_file if respond_to?(:react_client_manifest_file)
-      files << react_server_client_manifest_file if respond_to?(:react_server_client_manifest_file)
+
+      if ReactOnRails::Utils.react_on_rails_pro?
+        pro_config = ReactOnRailsPro.configuration
+        files << pro_config.rsc_bundle_js_file
+        files << pro_config.react_client_manifest_file
+        files << pro_config.react_server_client_manifest_file
+      end
 
       self.webpack_generated_files = files.compact_blank
     end
