@@ -28,7 +28,7 @@ def find_rails_root
 end
 
 # Build ReScript if needed
-# rubocop:disable Metrics/CyclomaticComplexity
+# rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
 def build_rescript_if_needed
   rails_root = find_rails_root
   unless rails_root
@@ -45,15 +45,17 @@ def build_rescript_if_needed
   # Validate that build:rescript script exists in package.json
   package_json_path = File.join(rails_root, "package.json")
   unless File.exist?(package_json_path)
-    warn "⚠️  Warning: package.json not found. Skipping ReScript build."
-    return
+    warn "❌ Error: ReScript config found but package.json not found"
+    warn "    ReScript requires a package.json with a build:rescript script"
+    exit 1
   end
 
   package_json = JSON.parse(File.read(package_json_path))
   unless package_json.dig("scripts", "build:rescript")
-    warn "⚠️  Warning: ReScript config found but no build:rescript script in package.json"
-    warn "    Add a build:rescript script to your package.json to enable ReScript builds"
-    return
+    warn "❌ Error: ReScript config found but no build:rescript script in package.json"
+    warn "    Add this to your package.json scripts section:"
+    warn '    "build:rescript": "rescript build"'
+    exit 1
   end
 
   Dir.chdir(rails_root) do
@@ -63,17 +65,21 @@ def build_rescript_if_needed
     elsif system("which npm > /dev/null 2>&1")
       system("npm", "run", "build:rescript", exception: true)
     else
-      warn "⚠️  Warning: Neither yarn nor npm found. Skipping ReScript build."
-      return
+      warn "❌ Error: Neither yarn nor npm found but ReScript build required"
+      warn "    Install yarn or npm to build ReScript files"
+      exit 1
     end
 
     puts "✅ ReScript build completed successfully"
   end
+rescue JSON::ParserError => e
+  warn "❌ Error: Invalid package.json: #{e.message}"
+  exit 1
 rescue StandardError => e
   warn "❌ ReScript build failed: #{e.message}"
   exit 1
 end
-# rubocop:enable Metrics/CyclomaticComplexity
+# rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
 
 # Generate React on Rails packs if needed
 def generate_packs_if_needed
@@ -84,9 +90,10 @@ def generate_packs_if_needed
   return unless File.exist?(initializer_path)
 
   # Check if auto-pack generation is configured
+  # Match config lines that aren't commented out and allow flexible spacing
   initializer_content = File.read(initializer_path)
-  return unless initializer_content.match?(/^\s*config\.auto_load_bundle\s*=/) ||
-                initializer_content.match?(/^\s*config\.components_subdirectory\s*=/)
+  return unless initializer_content.match?(/^\s*(?!#).*config\.auto_load_bundle\s*=/) ||
+                initializer_content.match?(/^\s*(?!#).*config\.components_subdirectory\s*=/)
 
   puts "📦 Generating React on Rails packs..."
 

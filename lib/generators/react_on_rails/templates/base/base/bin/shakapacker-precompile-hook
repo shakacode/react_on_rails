@@ -13,8 +13,9 @@ export REACT_ON_RAILS_SKIP_VALIDATION=true
 
 # Generate packs if React on Rails is configured with auto_load_bundle
 if [ -f "config/initializers/react_on_rails.rb" ]; then
-  if grep -q "config\.auto_load_bundle" config/initializers/react_on_rails.rb || \
-     grep -q "config\.components_subdirectory" config/initializers/react_on_rails.rb; then
+  # Check for uncommented config lines (ignore lines starting with # after optional whitespace)
+  if grep -E "^[[:space:]]*[^#]*config\.auto_load_bundle[[:space:]]*=" config/initializers/react_on_rails.rb >/dev/null || \
+     grep -E "^[[:space:]]*[^#]*config\.components_subdirectory[[:space:]]*=" config/initializers/react_on_rails.rb >/dev/null; then
     echo "📦 Generating React on Rails packs..."
     bundle exec rails react_on_rails:generate_packs
     echo "✅ Pack generation completed successfully"
