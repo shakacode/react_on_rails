@@ -1,20 +1,21 @@
-#!/bin/sh
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
 # Shakapacker precompile hook for React on Rails
 #
 # This script runs before webpack compilation to generate pack files
-# for auto-bundled components (if configured).
+# for auto-bundled components. It's called automatically by Shakapacker
+# when configured in config/shakapacker.yml:
+#   precompile_hook: 'bin/shakapacker-precompile-hook'
 #
 # See: https://github.com/shakacode/shakapacker/blob/main/docs/precompile_hook.md
 
-set -e
+require_relative "../config/environment"
 
-# Generate packs if React on Rails is configured with auto_load_bundle
-if [ -f "config/initializers/react_on_rails.rb" ]; then
-  # Check for uncommented config lines (ignore lines starting with # after optional whitespace)
-  if grep -E "^[[:space:]]*[^#]*config\.auto_load_bundle[[:space:]]*=" config/initializers/react_on_rails.rb >/dev/null || \
-     grep -E "^[[:space:]]*[^#]*config\.components_subdirectory[[:space:]]*=" config/initializers/react_on_rails.rb >/dev/null; then
-    echo "📦 Generating React on Rails packs..."
-    bundle exec rails react_on_rails:generate_packs
-    echo "✅ Pack generation completed successfully"
-  fi
-fi
+begin
+  ReactOnRails::PacksGenerator.instance.generate_packs_if_stale
+rescue StandardError => e
+  warn "❌ Error in precompile hook: #{e.message}"
+  warn e.backtrace.first(5).join("\n")
+  exit 1
+end
