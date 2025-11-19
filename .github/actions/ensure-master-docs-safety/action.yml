@@ -39,7 +39,9 @@ runs:
               branch: 'master',
               event: 'push',
               per_page: 30,
-              created: `>${createdAfter}`
+              created: `>${createdAfter}`,
+              sort: 'created',
+              direction: 'desc'
             }
           )) {
             const pageRuns = response.data;
