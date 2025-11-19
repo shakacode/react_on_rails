@@ -70,6 +70,10 @@ runs:
           // Use run_number as tiebreaker since created_at might be identical for rapid reruns.
           // Note: If workflows are manually re-run out of order, we use the highest run_number
           // which represents the most recent attempt, regardless of trigger order.
+          //
+          // IMPORTANT: We need to fetch the latest attempt for each run, not just the run conclusion.
+          // GitHub marks a run as "failed" even if a rerun succeeded, so we must check the actual
+          // latest attempt to see if the failure was resolved.
           const latestByWorkflow = new Map();
           for (const run of workflowRuns) {
             const existing = latestByWorkflow.get(run.workflow_id);
@@ -100,19 +104,50 @@ runs:
             return;
           }
 
-          // Check for workflows that failed on the previous commit.
-          // We treat these conclusions as failures:
-          // - 'failure': Obvious failure case
-          // - 'timed_out': Infrastructure or performance issue that should be investigated
-          // - 'cancelled': Might indicate timeout, CI infrastructure issues, or manual intervention needed
-          //                Being conservative here prevents a green checkmark when the previous commit
-          //                might have real issues that weren't fully validated
-          // - 'action_required': Requires manual intervention
-          // We treat 'skipped' and 'neutral' as non-blocking since they indicate
-          // intentional skips or informational-only workflows.
-          const failingRuns = Array.from(latestByWorkflow.values()).filter((run) => {
-            return ['failure', 'timed_out', 'cancelled', 'action_required'].includes(run.conclusion);
-          });
+          // For each workflow run, fetch the jobs to check the latest attempt's conclusion.
+          // GitHub's run.conclusion reflects the overall run, but if a run was re-run and succeeded,
+          // we want to consider that success, not the original failure.
+          const failingRuns = [];
+
+          for (const run of Array.from(latestByWorkflow.values())) {
+            // Fetch jobs for this run to check the latest attempt
+            const jobsResponse = await github.rest.actions.listJobsForWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: run.id,
+              per_page: 100
+            });
+
+            const jobs = jobsResponse.data.jobs;
+
+            if (jobs.length === 0) {
+              // No jobs found - treat as incomplete
+              failingRuns.push(run);
+              continue;
+            }
+
+            // Get the maximum run_attempt number to find the latest attempt
+            const latestAttempt = Math.max(...jobs.map(job => job.run_attempt));
+
+            // Get all jobs from the latest attempt
+            const latestJobs = jobs.filter(job => job.run_attempt === latestAttempt);
+
+            // Check if any job in the latest attempt has failed
+            // We treat these conclusions as failures:
+            // - 'failure': Obvious failure case
+            // - 'timed_out': Infrastructure or performance issue that should be investigated
+            // - 'cancelled': Might indicate timeout, CI infrastructure issues, or manual intervention needed
+            // - 'action_required': Requires manual intervention
+            // We treat 'skipped' and 'neutral' as non-blocking since they indicate
+            // intentional skips or informational-only workflows.
+            const hasFailedJob = latestJobs.some(job =>
+              ['failure', 'timed_out', 'cancelled', 'action_required'].includes(job.conclusion)
+            );
+
+            if (hasFailedJob) {
+              failingRuns.push(run);
+            }
+          }
 
           if (failingRuns.length === 0) {
             core.info(`Previous master commit ${previousSha} completed without failures. Docs-only skip allowed.`);
