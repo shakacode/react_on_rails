@@ -36,8 +36,15 @@ default: &default
   # Reload manifest.json on all requests so we reload latest compiled packs
   cache_manifest: false
 
-  # Select loader to use, available options are 'babel' (default), 'swc' or 'esbuild'
-  webpack_loader: 'babel'
+  # Select JavaScript transpiler to use
+  # Available options: 'swc' (default, 20x faster), 'babel', 'esbuild', or 'none'
+  # Use 'none' when providing a completely custom webpack configuration
+  # Note: When using rspack, swc is used automatically regardless of this setting
+  javascript_transpiler: "swc"
+
+  # Select assets bundler to use
+  # Available options: 'webpack' (default) or 'rspack'
+  assets_bundler: "webpack"
 
   # Raises an error if there is a mismatch in the shakapacker gem and npm package being used
   ensure_consistent_versioning: true
