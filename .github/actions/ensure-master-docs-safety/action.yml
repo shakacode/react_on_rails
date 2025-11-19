@@ -1,5 +1,5 @@
 name: Ensure master docs-only skips are safe
-description: Fails if the previous master commit still has failing workflow runs when current push is docs-only
+description: Prevents docs-only commits from skipping CI when previous master commit has unresolved test failures
 inputs:
   docs-only:
     description: 'String output from ci-changes-detector ("true" or "false")'
