@@ -23,6 +23,14 @@ After a release, please make sure to run `bundle exec rake update_changelog`. Th
 
 Changes since the last non-beta release.
 
+### [16.1.2] - 2025-11-19
+
+#### Fixed
+
+- **Duplicate Rake Task Execution**: Fixed rake tasks executing twice during asset precompilation and other rake operations. Rails Engine was loading task files twice: once via explicit `load` calls in the `rake_tasks` block (Railtie layer) and once via automatic file loading from `lib/tasks/` (Engine layer). This caused `react_on_rails:assets:webpack`, `react_on_rails:generate_packs`, and `react_on_rails:locale` tasks to run twice, significantly increasing build times. Removed explicit `load` calls and now rely on Rails Engine's standard auto-loading behavior. [PR 2052](https://github.com/shakacode/react_on_rails/pull/2052) by [justin808](https://github.com/justin808).
+
+### [16.1.1] - 2025-09-24
+
 #### Bug Fixes
 
 - **React Server Components**: Fixed bug in resolving `react-server-client-manifest.json` file path. The manifest file path is now correctly resolved using `bundle_js_file_path` for improved configuration flexibility and consistency in bundle management. [PR 1818](https://github.com/shakacode/react_on_rails/pull/1818) by [AbanoubGhadban](https://github.com/AbanoubGhadban)
