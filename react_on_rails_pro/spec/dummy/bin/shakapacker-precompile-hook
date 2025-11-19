@@ -1,13 +1,13 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-# Shakapacker precompile hook for React on Rails test dummy app
+# Shakapacker precompile hook for React on Rails Pro test dummy app
 #
 # This script loads the shared test helper implementation.
 # For production apps, use the generator template which includes a standalone implementation.
 
-# Find the gem root directory (three levels up from spec/dummy/bin)
-gem_root = File.expand_path("../../..", __dir__)
+# Find the gem root directory (four levels up from react_on_rails_pro/spec/dummy/bin)
+gem_root = File.expand_path("../../../..", __dir__)
 shared_hook = File.join(gem_root, "spec", "support", "shakapacker_precompile_hook_shared.rb")
 
 unless File.exist?(shared_hook)
