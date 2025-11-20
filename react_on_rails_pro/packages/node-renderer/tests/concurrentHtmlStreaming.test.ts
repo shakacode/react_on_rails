@@ -5,9 +5,10 @@ import parser from 'node-html-parser';
 // @ts-expect-error TODO: fix later
 import { RSCPayloadChunk } from 'react-on-rails';
 import buildApp from '../src/worker';
-import config from './testingNodeRendererConfigs';
+import { createTestConfig } from './testingNodeRendererConfigs';
 import { makeRequest } from './httpRequestUtils';
 
+const { config } = createTestConfig('concurrentHtmlStreaming');
 const app = buildApp(config);
 const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 const redisClient = createClient({ url: redisUrl });

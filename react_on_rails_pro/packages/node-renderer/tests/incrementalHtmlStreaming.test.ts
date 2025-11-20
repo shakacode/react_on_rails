@@ -1,7 +1,7 @@
 import http2 from 'http2';
 import * as fs from 'fs';
 import buildApp from '../src/worker';
-import config, { BUNDLE_PATH } from './testingNodeRendererConfigs';
+import { createTestConfig } from './testingNodeRendererConfigs';
 import * as errorReporter from '../src/shared/errorReporter';
 import {
   createRenderingRequest,
@@ -13,12 +13,10 @@ import {
 } from './httpRequestUtils';
 import packageJson from '../src/shared/packageJson';
 
+const { config } = createTestConfig('incrementalHtmlStreaming');
 const app = buildApp(config);
 
 beforeAll(async () => {
-  if (fs.existsSync(BUNDLE_PATH)) {
-    fs.rmSync(BUNDLE_PATH, { recursive: true, force: true });
-  }
   await app.ready();
   await app.listen({ port: 0 });
 });
