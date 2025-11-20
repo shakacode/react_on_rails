@@ -347,6 +347,7 @@ export async function buildVM(filePath: string) {
   return vmCreationPromise;
 }
 
+/** @internal Used in tests */
 export function resetVM() {
   // Clear all VM contexts
   vmContexts.clear();
