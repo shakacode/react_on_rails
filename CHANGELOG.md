@@ -39,8 +39,6 @@ Changes since the last non-beta release.
 
 - **Improved RSC Payload Error Handling**: Errors that happen during generation of RSC payload are transferred properly to rails side and logs the error message and stack. [PR #1888](https://github.com/shakacode/react_on_rails/pull/1888) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
-- **Use as Git dependency**: All packages can now be installed as Git dependencies. This is useful for development and testing purposes. See [CONTRIBUTING.md](./CONTRIBUTING.md#git-dependencies) for documentation. [PR #1873](https://github.com/shakacode/react_on_rails/pull/1873) by [alexeyr-ci2](https://github.com/alexeyr-ci2).
-
 - **Doctor Checks for :async Loading Strategy**: Added proactive diagnostic checks to the React on Rails doctor tool to detect usage of the `:async` loading strategy in projects without React on Rails Pro. The feature scans view files and initializer configuration, providing clear guidance to either upgrade to Pro or use alternative loading strategies like `:defer` or `:sync` to avoid component registration race conditions. [PR 2010](https://github.com/shakacode/react_on_rails/pull/2010) by [justin808](https://github.com/justin808).
 
 #### Changed
@@ -71,25 +69,15 @@ Changes since the last non-beta release.
 
 #### Fixed
 
-- **bin/dev NameError**: Fixed `NameError: uninitialized constant ReactOnRails::PackerUtils` that occurred when running `bin/dev`. Missing requires for `PackerUtils` have been added to ensure proper module loading. [PR 2070](https://github.com/shakacode/react_on_rails/pull/2070) by [justin808](https://github.com/justin808).
-
 - **Doctor Command Version Mismatch Detection**: Fixed false version mismatch warnings in `rake react_on_rails:doctor` when using beta/prerelease versions. The command now correctly recognizes that gem version `16.2.0.beta.10` matches npm version `16.2.0-beta.10` using proper semver conversion instead of string normalization that stripped prerelease identifiers. [PR 2064](https://github.com/shakacode/react_on_rails/pull/2064) by [ihabadham](https://github.com/ihabadham).
 
-- **Generator Version Handling for Beta/RC Releases**: Fixed generator installing wrong npm package versions during beta and RC releases. The version detection regex now properly recognizes prerelease formats (e.g., `16.2.0-beta.10`, `16.1.0-rc.1`) instead of only matching stable versions, ensuring the generator installs the exact version matching the gem rather than defaulting to latest stable. [PR 2066](https://github.com/shakacode/react_on_rails/pull/2066) by [justin808](https://github.com/justin808).
-
 - **Rails 5.2-6.0 Compatibility**: Fixed compatibility with Rails 5.2-6.0 by adding polyfill for `compact_blank` method (introduced in Rails 6.1). Also refactored webpack asset handling to conditionally include React on Rails Pro files only when available, preventing NoMethodErrors in open-source installations. [PR 2058](https://github.com/shakacode/react_on_rails/pull/2058) by [justin808](https://github.com/justin808).
-
-- **Yalc Publish Path Resolution**: Fixed broken `yalc publish` workflow by correcting file path references in build script. Updated artifact detection from `packages/react-on-rails/lib/ReactOnRails.full.js` to `lib/ReactOnRails.full.js` in `package-scripts.yml` to match actual build output location. [PR 2054](https://github.com/shakacode/react_on_rails/pull/2054) by [Judahmeek](https://github.com/Judahmeek).
 
 - **Duplicate Rake Task Execution**: Fixed rake tasks executing twice during asset precompilation and other rake operations. Rails Engine was loading task files twice: once via explicit `load` calls in the `rake_tasks` block (Railtie layer) and once via automatic file loading from `lib/tasks/` (Engine layer). This caused `react_on_rails:assets:webpack`, `react_on_rails:generate_packs`, and `react_on_rails:locale` tasks to run twice, significantly increasing build times. Removed explicit `load` calls and now rely on Rails Engine's standard auto-loading behavior. [PR 2052](https://github.com/shakacode/react_on_rails/pull/2052) by [justin808](https://github.com/justin808).
 
 - **Node Renderer Worker Restart**: Fixed "descriptor closed" error that occurred when the node renderer restarts while handling an in-progress request (especially streaming requests). Workers now perform graceful shutdowns: they disconnect from the cluster to stop receiving new requests, wait for active requests to complete, then shut down cleanly. A configurable `gracefulWorkerRestartTimeout` ensures workers are forcibly killed if they don't shut down in time. [PR 1970](https://github.com/shakacode/react_on_rails/pull/1970) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 - **Body Duplication Bug On Streaming**: Fixed a bug that happens while streaming if the node renderer connection closed after streaming some chunks to the client. [PR #1995](https://github.com/shakacode/react_on_rails/pull/1995) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-
-- **bin/dev --verbose Option**: Fixed `OptionParser::InvalidOption` error that occurred when using the `--verbose`/`-v` flag. The flag was documented in help text but not functional. Now properly implemented with flag parsing and passing verbose option through method calls. [PR 2023](https://github.com/shakacode/react_on_rails/pull/2023) by [justin808](https://github.com/justin808).
-
-- **Shakapacker Template Configuration**: Fixed shakapacker.yml template to prevent unnecessary "Slow setup for development" warnings by setting `compile: false` as the default configuration. This allows development environments to inherit the setting instead of forcing on-demand compilation when using Procfiles with `bin/dev` that already run the shakapacker dev server or watch mode. [PR 2021](https://github.com/shakacode/react_on_rails/pull/2021) by [justin808](https://github.com/justin808).
 
 #### Improved
 
