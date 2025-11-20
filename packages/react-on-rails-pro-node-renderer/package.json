@@ -4,7 +4,7 @@
   "protocolVersion": "2.0.0",
   "description": "React on Rails Pro Node Renderer for server-side rendering",
   "type": "module",
-  "main": "lib/index.js",
+  "main": "lib/ReactOnRailsProNodeRenderer.js",
   "scripts": {
     "build": "yarn run clean && tsc --project src",
     "build-watch": "yarn run clean && tsc --project src --watch",
@@ -44,13 +44,21 @@
   },
   "devDependencies": {
     "@honeybadger-io/js": "^6.10.1",
+    "@jest/globals": "^29.7.0",
     "@sentry/node": "^7.120.0",
     "@sentry/types": "^7.120.0",
     "@tsconfig/node14": "^14.1.2",
     "@types/fs-extra": "^11.0.4",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/lockfile": "^1.0.4",
-    "@types/node": "^20.0.0"
+    "@types/node": "^20.0.0",
+    "@types/touch": "^3.1.5",
+    "form-auto-content": "^3.2.1",
+    "form-data": "^4.0.1",
+    "node-html-parser": "^7.0.1",
+    "redis": "^5.0.1",
+    "sentry-testkit": "^5.0.6",
+    "touch": "^3.1.0"
   },
   "peerDependencies": {
     "@honeybadger-io/js": ">=4.0.0",
