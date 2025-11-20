@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - 'master'
-    # Never skip on master - always run full test suite
+    # Always trigger on master; docs-only detection handles skipping heavy jobs
   pull_request:
     paths-ignore:
       - '**.md'
@@ -26,6 +26,9 @@ defaults:
 
 jobs:
   detect-changes:
+    permissions:
+      contents: read
+      actions: read
     runs-on: ubuntu-22.04
     outputs:
       docs_only: ${{ steps.detect.outputs.docs_only }}
@@ -55,10 +58,24 @@ jobs:
           BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/master' }}"
           script/ci-changes-detector "$BASE_REF"
         shell: bash
+      - name: Guard docs-only master pushes
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: ./.github/actions/ensure-master-docs-safety
+        with:
+          docs-only: ${{ steps.detect.outputs.docs_only }}
+          previous-sha: ${{ github.event.before }}
 
   pro-lint-js-and-ruby:
     needs: detect-changes
-    if: github.ref == 'refs/heads/master' || needs.detect-changes.outputs.run_pro_lint == 'true'
+    if: |
+      !(
+        github.event_name == 'push' &&
+        github.ref == 'refs/heads/master' &&
+        needs.detect-changes.outputs.docs_only == 'true'
+      ) && (
+        github.ref == 'refs/heads/master' ||
+        needs.detect-changes.outputs.run_pro_lint == 'true'
+      )
     runs-on: ubuntu-22.04
     env:
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}

@@ -44,18 +44,52 @@ const configureServer = () => {
   };
   serverWebpackConfig.plugins.unshift(new bundler.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));
 
-  // Custom output for the server-bundle that matches the config in
-  // config/initializers/react_on_rails.rb
-  // Server bundles are output to a private directory (not public) for security
+  // Custom output for the server-bundle
+<% if shakapacker_version_9_or_higher? -%>
+  // Using Shakapacker 9.0+ privateOutputPath for automatic sync with shakapacker.yml
+  // This eliminates manual path configuration and keeps configs in sync.
+  // Falls back to hardcoded path if private_output_path is not configured.
+  const serverBundleOutputPath = config.privateOutputPath ||
+    require('path').resolve(__dirname, '../../ssr-generated');
+<% else -%>
+  // Using hardcoded path (Shakapacker < 9.0)
+  // For Shakapacker 9.0+, consider using config.privateOutputPath instead
+  // to automatically sync with shakapacker.yml private_output_path.
+  const serverBundleOutputPath = require('path').resolve(__dirname, '../../ssr-generated');
+<% end -%>
+
   serverWebpackConfig.output = {
     filename: 'server-bundle.js',
     globalObject: 'this',
     // If using the React on Rails Pro node server renderer, uncomment the next line
     // libraryTarget: 'commonjs2',
-    path: require('path').resolve(__dirname, '../../ssr-generated'),
+    path: serverBundleOutputPath,
     // No publicPath needed since server bundles are not served via web
     // https://webpack.js.org/configuration/output/#outputglobalobject
   };
+
+  // Validate server bundle output path configuration
+<% if shakapacker_version_9_or_higher? -%>
+  // For Shakapacker 9.0+, verify privateOutputPath is configured in shakapacker.yml
+  if (!config.privateOutputPath) {
+    console.warn('⚠️  Shakapacker 9.0+ detected but private_output_path not configured in shakapacker.yml');
+    console.warn('   Add to config/shakapacker.yml:');
+    console.warn('     private_output_path: ssr-generated');
+    console.warn('   Run: rails react_on_rails:doctor to validate your configuration');
+  }
+<% else -%>
+  // For Shakapacker < 9.0, verify hardcoded path syncs with Rails config
+  // 1. Ensure config/initializers/react_on_rails.rb has: config.server_bundle_output_path = "ssr-generated"
+  // 2. Run: rails react_on_rails:doctor to verify configuration
+  const fs = require('fs');
+  if (!fs.existsSync(serverBundleOutputPath)) {
+    console.warn(`⚠️  Server bundle output directory does not exist: ${serverBundleOutputPath}`);
+    console.warn('   It will be created during build, but ensure React on Rails is configured:');
+    console.warn('   config.server_bundle_output_path = "ssr-generated" in config/initializers/react_on_rails.rb');
+    console.warn('   Run: rails react_on_rails:doctor to validate your configuration');
+  }
+<% end -%>
+
 
   // Don't hash the server bundle b/c would conflict with the client manifest
   // And no need for the MiniCssExtractPlugin

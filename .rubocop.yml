@@ -96,6 +96,8 @@ Metrics/MethodLength:
 
 Metrics/ModuleLength:
   Max: 180
+  Exclude:
+    - 'spec/react_on_rails/engine_spec.rb'  # Comprehensive engine tests require many examples
 
 Naming/RescuedExceptionsVariableName:
   Enabled: false

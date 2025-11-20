@@ -162,7 +162,7 @@ const config: KnipConfig = {
         'url-loader',
         // Transitive dependency of shakapacker but listed as direct dependency
         'webpack-merge',
-        // Dependencies not detected in production mode
+        // Dependencies not detected in production mode (runtime injected or dynamic imports)
         '@babel/runtime',
         'mini-css-extract-plugin',
         'css-loader',

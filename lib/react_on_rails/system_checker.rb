@@ -213,17 +213,20 @@ module ReactOnRails
 
         return unless npm_version && defined?(ReactOnRails::VERSION)
 
-        # Clean version strings for comparison (remove ^, ~, =, etc.)
-        clean_npm_version = npm_version.gsub(/[^0-9.]/, "")
+        # Normalize NPM version format to Ruby gem format for comparison
+        # Uses existing VersionSyntaxConverter to handle dash/dot differences
+        # (e.g., "16.2.0-beta.10" → "16.2.0.beta.10")
+        converter = ReactOnRails::VersionSyntaxConverter.new
+        normalized_npm_version = converter.npm_to_rubygem(npm_version)
         gem_version = ReactOnRails::VERSION
 
-        if clean_npm_version == gem_version
+        if normalized_npm_version == gem_version
           add_success("✅ React on Rails gem and NPM package versions match (#{gem_version})")
           check_version_patterns(npm_version, gem_version)
         else
           # Check for major version differences
           gem_major = gem_version.split(".")[0].to_i
-          npm_major = clean_npm_version.split(".")[0].to_i
+          npm_major = normalized_npm_version.split(".")[0].to_i
 
           if gem_major != npm_major # rubocop:disable Style/NegatedIfElseCondition
             add_error(<<~MSG.strip)

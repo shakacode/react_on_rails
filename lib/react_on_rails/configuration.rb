@@ -1,5 +1,23 @@
 # frozen_string_literal: true
 
+require "active_support/core_ext/enumerable"
+require "active_support/core_ext/object/blank"
+
+# Polyfill for compact_blank (added in Rails 6.1) to support Rails 5.2-6.0
+unless [].respond_to?(:compact_blank)
+  module Enumerable
+    def compact_blank
+      reject(&:blank?)
+    end
+  end
+
+  class Array
+    def compact_blank
+      reject(&:blank?)
+    end
+  end
+end
+
 # rubocop:disable Metrics/ClassLength
 
 module ReactOnRails
@@ -10,6 +28,7 @@ module ReactOnRails
 
   DEFAULT_GENERATED_ASSETS_DIR = File.join(%w[public webpack], Rails.env).freeze
   DEFAULT_COMPONENT_REGISTRY_TIMEOUT = 5000
+  DEFAULT_SERVER_BUNDLE_OUTPUT_PATH = "ssr-generated"
 
   def self.configuration
     @configuration ||= Configuration.new(
@@ -46,7 +65,7 @@ module ReactOnRails
       # Set to 0 to disable the timeout and wait indefinitely for component registration.
       component_registry_timeout: DEFAULT_COMPONENT_REGISTRY_TIMEOUT,
       generated_component_packs_loading_strategy: nil,
-      server_bundle_output_path: "ssr-generated",
+      server_bundle_output_path: DEFAULT_SERVER_BUNDLE_OUTPUT_PATH,
       enforce_private_server_bundles: false
     )
   end
@@ -184,6 +203,7 @@ module ReactOnRails
       check_component_registry_timeout
       validate_generated_component_packs_loading_strategy
       validate_enforce_private_server_bundles
+      auto_detect_server_bundle_path_from_shakapacker
     end
 
     private
@@ -255,6 +275,57 @@ module ReactOnRails
       raise ReactOnRails::Error, "enforce_private_server_bundles is set to true, but " \
                                  "server_bundle_output_path (#{server_bundle_output_path}) is inside " \
                                  "the public directory. Please set it to a directory outside of public."
+    end
+
+    # Auto-detect server_bundle_output_path from Shakapacker 9.0+ private_output_path
+    # Checks if user explicitly set a value and warns them to use auto-detection instead
+    def auto_detect_server_bundle_path_from_shakapacker
+      # Skip if Shakapacker is not available
+      return unless defined?(::Shakapacker)
+
+      # Check if Shakapacker config has private_output_path method (9.0+)
+      return unless ::Shakapacker.config.respond_to?(:private_output_path)
+
+      # Get the private_output_path from Shakapacker
+      private_path = ::Shakapacker.config.private_output_path
+      return unless private_path
+
+      relative_path = ReactOnRails::Utils.normalize_to_relative_path(private_path)
+
+      # Check if user explicitly configured server_bundle_output_path
+      if server_bundle_output_path != ReactOnRails::DEFAULT_SERVER_BUNDLE_OUTPUT_PATH
+        warn_about_explicit_configuration(relative_path)
+        return
+      end
+
+      apply_shakapacker_private_output_path(relative_path)
+    rescue StandardError => e
+      # Fail gracefully - if auto-detection fails, keep the default
+      Rails.logger&.debug("ReactOnRails: Could not auto-detect server bundle path from " \
+                          "Shakapacker: #{e.message}")
+    end
+
+    def warn_about_explicit_configuration(shakapacker_path)
+      # Normalize both paths for comparison
+      normalized_config = server_bundle_output_path.to_s.chomp("/")
+      normalized_shakapacker = shakapacker_path.to_s.chomp("/")
+
+      # Only warn if there's a mismatch
+      return if normalized_config == normalized_shakapacker
+
+      Rails.logger&.warn(
+        "ReactOnRails: server_bundle_output_path is explicitly set to '#{server_bundle_output_path}' " \
+        "but shakapacker.yml private_output_path is '#{shakapacker_path}'. " \
+        "Consider removing server_bundle_output_path from your React on Rails initializer " \
+        "to use the auto-detected value from shakapacker.yml."
+      )
+    end
+
+    def apply_shakapacker_private_output_path(relative_path)
+      self.server_bundle_output_path = relative_path
+
+      Rails.logger&.debug("ReactOnRails: Auto-detected server_bundle_output_path from " \
+                          "shakapacker.yml private_output_path: '#{relative_path}'")
     end
 
     def check_minimum_shakapacker_version
@@ -360,13 +431,16 @@ module ReactOnRails
     def ensure_webpack_generated_files_exists
       return unless webpack_generated_files.empty?
 
-      self.webpack_generated_files = [
-        "manifest.json",
-        server_bundle_js_file,
-        rsc_bundle_js_file,
-        react_client_manifest_file,
-        react_server_client_manifest_file
-      ].compact_blank
+      files = ["manifest.json", server_bundle_js_file]
+
+      if ReactOnRails::Utils.react_on_rails_pro?
+        pro_config = ReactOnRailsPro.configuration
+        files << pro_config.rsc_bundle_js_file
+        files << pro_config.react_client_manifest_file
+        files << pro_config.react_server_client_manifest_file
+      end
+
+      self.webpack_generated_files = files.compact_blank
     end
 
     def configure_skip_display_none_deprecation

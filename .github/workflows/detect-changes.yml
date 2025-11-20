@@ -25,6 +25,9 @@ on:
 jobs:
   detect:
     runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      actions: read
     outputs:
       docs_only: ${{ steps.changes.outputs.docs_only }}
       run_lint: ${{ steps.changes.outputs.run_lint }}
@@ -41,17 +44,11 @@ jobs:
       - name: Detect changes
         id: changes
         run: |
-          # For master branch, always run everything
-          if [ "${{ github.ref }}" = "refs/heads/master" ]; then
-            echo "docs_only=false" >> "$GITHUB_OUTPUT"
-            echo "run_lint=true" >> "$GITHUB_OUTPUT"
-            echo "run_ruby_tests=true" >> "$GITHUB_OUTPUT"
-            echo "run_js_tests=true" >> "$GITHUB_OUTPUT"
-            echo "run_dummy_tests=true" >> "$GITHUB_OUTPUT"
-            echo "run_generators=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          # For PRs, analyze changes
-          BASE_SHA="${{ github.event.pull_request.base.sha || github.event.before }}"
+          BASE_SHA="${{ github.event.pull_request.base.sha || github.event.before || 'origin/master' }}"
           script/ci-changes-detector "$BASE_SHA"
+      - name: Guard docs-only master pushes
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: ./.github/actions/ensure-master-docs-safety
+        with:
+          docs-only: ${{ steps.changes.outputs.docs_only }}
+          previous-sha: ${{ github.event.before }}

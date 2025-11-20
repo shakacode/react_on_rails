@@ -8,6 +8,7 @@ This guide covers common webpack build errors encountered when using react_on_ra
 - [ProvidePlugin Module Resolution Errors](#provideplugin-module-resolution-errors)
 - [Environment Setup Dependencies](#environment-setup-dependencies)
 - [Shakapacker Compatibility Issues](#shakapacker-compatibility-issues)
+- [Duplicate Build Execution (Versions < 16.2.0)](#duplicate-build-execution-versions--1620)
 - [For Coding Agents](#for-coding-agents)
 
 ## Missing Routes File Error (js-routes gem)
@@ -198,6 +199,66 @@ Some operations require a working Rails environment:
 1. Follow the [Shakapacker upgrade guide](https://github.com/shakacode/shakapacker/blob/main/docs/v6_upgrade.md)
 2. Update webpack configurations
 3. Regenerate configurations with `rails generate react_on_rails:install`
+
+## Duplicate Build Execution (Versions < 16.2.0)
+
+### Symptom
+
+If you're using React on Rails **versions before 16.2.0**, you may notice:
+
+- Asset precompilation takes twice as long as expected
+- Webpack build runs twice during `rake assets:precompile`
+- Console output shows duplicate webpack compilation messages
+- CI builds are slower than necessary
+
+### Root Cause
+
+In versions prior to 16.2.0, a bug in the Rails Engine caused rake task files to be loaded twice:
+
+1. Once via explicit `load` calls in the Engine's `rake_tasks` block
+2. Once via Rails Engine's automatic file loading from `lib/tasks/`
+
+This resulted in tasks like `react_on_rails:assets:webpack`, `react_on_rails:generate_packs`, and `react_on_rails:locale` executing twice.
+
+### Solution
+
+**Upgrade to React on Rails 16.2.0 or later:**
+
+```bash
+# Update Gemfile
+gem 'react_on_rails', '~> 16.2'
+
+# Install
+bundle update react_on_rails
+```
+
+The issue is fixed in version 16.2.0 ([PR #2052](https://github.com/shakacode/react_on_rails/pull/2052)).
+
+### Workaround for Older Versions
+
+If you cannot upgrade immediately, you can temporarily work around this by creating an initializer:
+
+```ruby
+# config/initializers/react_on_rails_fix.rb
+Rails.application.config.after_initialize do
+  # Only apply if using affected versions
+  next unless ReactOnRails::VERSION < '16.2.0'
+
+  # Remove duplicate task actions
+  %w[
+    react_on_rails:assets:webpack
+    react_on_rails:generate_packs
+    react_on_rails:locale
+  ].each do |task_name|
+    next unless Rake::Task.task_defined?(task_name)
+
+    task = Rake::Task[task_name]
+    task.actions.uniq! if task.actions.length > 1
+  end
+end
+```
+
+**Note:** This workaround is not recommended for production. Upgrade to 16.2.0+ for the proper fix.
 
 ## For Coding Agents
 

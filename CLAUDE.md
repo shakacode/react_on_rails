@@ -2,6 +2,22 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Project Structure Guidelines
+
+### Analysis Documents
+
+When creating analysis documents (deep dives, investigations, historical context):
+- **Location**: Place in `/analysis` directory
+- **Format**: Use Markdown (.md)
+- **Naming**: Use descriptive kebab-case names (e.g., `rake-task-duplicate-analysis.md`)
+- **Purpose**: Keep detailed analyses separate from top-level project files
+
+Examples:
+- `/analysis/rake-task-duplicate-analysis.md` - Historical analysis of duplicate rake task bug
+- `/analysis/feature-investigation.md` - Investigation of a specific feature or issue
+
+Top-level documentation (like README.md, CONTRIBUTING.md) should remain at the root.
+
 ## ⚠️ CRITICAL REQUIREMENTS
 
 **BEFORE EVERY COMMIT/PUSH:**
@@ -178,11 +194,24 @@ cd react_on_rails_pro && bundle exec rake rbs:validate
 ```
 ## Changelog
 
+**IMPORTANT: This is a monorepo with TWO separate changelogs:**
+- **Open Source**: `/CHANGELOG.md` - for react_on_rails gem and npm package
+- **Pro**: `/react_on_rails_pro/CHANGELOG.md` - for react_on_rails_pro gem and npm packages
+
+When making changes, update the **appropriate changelog(s)**:
+- Open-source features/fixes → Update `/CHANGELOG.md`
+- Pro-only features/fixes → Update `/react_on_rails_pro/CHANGELOG.md`
+- Changes affecting both → Update **BOTH** changelogs
+
+### Changelog Guidelines
+
 - **Update CHANGELOG.md for user-visible changes only** (features, bug fixes, breaking changes, deprecations, performance improvements)
 - **Do NOT add entries for**: linting, formatting, refactoring, tests, or documentation fixes
 - **Format**: `[PR 1818](https://github.com/shakacode/react_on_rails/pull/1818) by [username](https://github.com/username)` (no hash in PR number)
 - **Use `/update-changelog` command** for guided changelog updates with automatic formatting
-- **Version management**: Run `bundle exec rake update_changelog` after releases to update version headers
+- **Version management after releases**:
+  - Open source: `bundle exec rake update_changelog`
+  - Pro: `cd react_on_rails_pro && bundle exec rake update_changelog`
 - **Examples**: Run `grep -A 3 "^#### " CHANGELOG.md | head -30` to see real formatting examples
 
 ## ⚠️ FORMATTING RULES
@@ -198,12 +227,25 @@ cd react_on_rails_pro && bundle exec rake rbs:validate
 **CRITICAL**: When resolving merge conflicts, follow this exact sequence:
 
 1. **Resolve logical conflicts only** - don't worry about formatting
-2. **Add resolved files**: `git add .` (or specific files)
-3. **Auto-fix everything**: `rake autofix`
-4. **Add any formatting changes**: `git add .`
-5. **Continue rebase/merge**: `git rebase --continue` or `git commit`
+2. **VERIFY FILE PATHS** - if the conflict involved directory structure:
+   - Check if any hardcoded paths need updating
+   - Run: `grep -r "old/path" . --exclude-dir=node_modules`
+   - Pay special attention to package-scripts.yml, webpack configs, package.json
+   - **Test affected scripts:** If package-scripts.yml changed, run `yarn run prepack`
+3. **Add resolved files**: `git add .` (or specific files)
+4. **Auto-fix everything**: `rake autofix`
+5. **Add any formatting changes**: `git add .`
+6. **Continue rebase/merge**: `git rebase --continue` or `git commit`
+7. **TEST CRITICAL SCRIPTS if build configs changed:**
+   ```bash
+   yarn run prepack          # Test prepack script
+   yarn run yalc.publish     # Test yalc publish if package structure changed
+   rake run_rspec:gem        # Run relevant test suites
+   ```
 
 **❌ NEVER manually format during conflict resolution** - this causes formatting wars between tools.
+**❌ NEVER blindly accept path changes** - verify they're correct for current structure.
+**❌ NEVER skip testing after resolving conflicts in build configs** - silent failures are dangerous.
 
 ### Debugging Formatting Issues
 - Check current formatting: `yarn start format.listDifferent`
@@ -222,6 +264,18 @@ cd react_on_rails_pro && bundle exec rake rbs:validate
 - **Dummy app tests**: `rake run_rspec:dummy`
 - **Gem-only tests**: `rake run_rspec:gem`
 - **All tests except examples**: `rake all_but_examples`
+
+## Testing Build and Package Scripts
+
+@.claude/docs/testing-build-scripts.md
+
+## Master Branch Health Monitoring
+
+@.claude/docs/master-health-monitoring.md
+
+## Managing File Paths in Configuration Files
+
+@.claude/docs/managing-file-paths.md
 
 ## Project Architecture
 
@@ -503,6 +557,83 @@ Playwright E2E tests run automatically in CI via GitHub Actions (`.github/workfl
 - Uses GitHub Actions annotations for test failures
 - Uploads HTML reports as artifacts (available for 30 days)
 - Auto-starts Rails server before running tests
+
+## Rails Engine Development Nuances
+
+React on Rails is a **Rails Engine**, which has important implications for development:
+
+### Automatic Rake Task Loading
+
+**CRITICAL**: Rails::Engine automatically loads all `.rake` files from `lib/tasks/` directory. **DO NOT** use a `rake_tasks` block to explicitly load them, as this causes duplicate task execution.
+
+```ruby
+# ❌ WRONG - Causes duplicate execution
+module ReactOnRails
+  class Engine < ::Rails::Engine
+    rake_tasks do
+      load File.expand_path("../tasks/generate_packs.rake", __dir__)
+      load File.expand_path("../tasks/assets.rake", __dir__)
+      load File.expand_path("../tasks/locale.rake", __dir__)
+    end
+  end
+end
+
+# ✅ CORRECT - Rails::Engine loads lib/tasks/*.rake automatically
+module ReactOnRails
+  class Engine < ::Rails::Engine
+    # Rake tasks are automatically loaded from lib/tasks/*.rake by Rails::Engine
+    # No explicit loading needed
+  end
+end
+```
+
+**When to use `rake_tasks` block:**
+- Tasks are in a **non-standard location** (not `lib/tasks/`)
+- You need to **programmatically generate** tasks
+- You need to **pass context** to the tasks
+
+**Historical Context**: PR #1770 added explicit rake task loading, causing webpack builds and pack generation to run twice during `rake assets:precompile`. This was fixed in PR #2052. See `analysis/rake-task-duplicate-analysis.md` for full details.
+
+### Engine Initializers and Hooks
+
+Engines have specific initialization hooks that run at different times:
+
+```ruby
+module ReactOnRails
+  class Engine < ::Rails::Engine
+    # Runs after Rails initializes but before routes are loaded
+    config.to_prepare do
+      ReactOnRails::ServerRenderingPool.reset_pool
+    end
+
+    # Runs during Rails initialization, use for validations
+    initializer "react_on_rails.validate_version" do
+      config.after_initialize do
+        # Validation logic here
+      end
+    end
+  end
+end
+```
+
+### Engine vs Application Code
+
+- **Engine code** (`lib/react_on_rails/`): Runs in the gem context, has limited access to host application
+- **Host application code**: The Rails app that includes the gem
+- **Generators** (`lib/generators/react_on_rails/`): Run in host app context during setup
+
+### Testing Engines
+
+- **Dummy app** (`spec/dummy/`): Full Rails app for integration testing
+- **Unit tests** (`spec/react_on_rails/`): Test gem code in isolation
+- Always test both contexts: gem code alone and gem + host app integration
+
+### Common Pitfalls
+
+1. **Assuming host app structure**: Don't assume `app/javascript/` exists—it might not in older apps
+2. **Path resolution**: Use `Rails.root` for host app paths, not relative paths
+3. **Autoloading**: Engine code follows Rails autoloading rules but with a different load path
+4. **Configuration**: Engine config is separate from host app config—use `ReactOnRails.configure`
 
 ## IDE Configuration
 

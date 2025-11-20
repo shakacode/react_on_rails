@@ -321,6 +321,165 @@ RSpec.describe ReactOnRails::SystemChecker do
     end
   end
 
+  describe "#check_package_version_sync" do
+    before do
+      stub_const("ReactOnRails::VERSION", "16.2.0.beta.10")
+    end
+
+    context "when package.json does not exist" do
+      before do
+        allow(File).to receive(:exist?).with("package.json").and_return(false)
+      end
+
+      it "does not add any messages" do
+        messages_count_before = checker.messages.count
+        checker.send(:check_package_version_sync)
+        expect(checker.messages.count).to eq(messages_count_before)
+      end
+    end
+
+    context "when package.json exists with matching beta versions" do
+      let(:package_json_content) do
+        { "dependencies" => { "react-on-rails" => "16.2.0-beta.10" } }.to_json
+      end
+
+      before do
+        allow(File).to receive(:exist?).with("package.json").and_return(true)
+        allow(File).to receive(:read).with("package.json").and_return(package_json_content)
+      end
+
+      it "adds a success message" do
+        checker.send(:check_package_version_sync)
+        expect(checker.messages.any? do |msg|
+          msg[:type] == :success && msg[:content].include?("versions match")
+        end).to be true
+      end
+    end
+
+    context "when package.json has beta version with caret prefix" do
+      let(:package_json_content) do
+        { "dependencies" => { "react-on-rails" => "^16.2.0-beta.10" } }.to_json
+      end
+
+      before do
+        allow(File).to receive(:exist?).with("package.json").and_return(true)
+        allow(File).to receive(:read).with("package.json").and_return(package_json_content)
+      end
+
+      it "adds a success message and version pattern warning" do
+        checker.send(:check_package_version_sync)
+        expect(checker.messages.any? do |msg|
+          msg[:type] == :success && msg[:content].include?("versions match")
+        end).to be true
+        expect(checker.warnings?).to be true
+      end
+    end
+
+    context "when package.json has alpha version" do
+      let(:package_json_content) do
+        { "dependencies" => { "react-on-rails" => "16.2.0-alpha.5" } }.to_json
+      end
+
+      before do
+        stub_const("ReactOnRails::VERSION", "16.2.0.alpha.5")
+        allow(File).to receive(:exist?).with("package.json").and_return(true)
+        allow(File).to receive(:read).with("package.json").and_return(package_json_content)
+      end
+
+      it "correctly matches alpha versions" do
+        checker.send(:check_package_version_sync)
+        expect(checker.messages.any? do |msg|
+          msg[:type] == :success && msg[:content].include?("versions match")
+        end).to be true
+      end
+    end
+
+    context "when package.json has rc version" do
+      let(:package_json_content) do
+        { "dependencies" => { "react-on-rails" => "16.2.0-rc.1" } }.to_json
+      end
+
+      before do
+        stub_const("ReactOnRails::VERSION", "16.2.0.rc.1")
+        allow(File).to receive(:exist?).with("package.json").and_return(true)
+        allow(File).to receive(:read).with("package.json").and_return(package_json_content)
+      end
+
+      it "correctly matches rc versions" do
+        checker.send(:check_package_version_sync)
+        expect(checker.messages.any? do |msg|
+          msg[:type] == :success && msg[:content].include?("versions match")
+        end).to be true
+      end
+    end
+
+    context "when package.json has stable version" do
+      let(:package_json_content) do
+        { "dependencies" => { "react-on-rails" => "16.2.0" } }.to_json
+      end
+
+      before do
+        stub_const("ReactOnRails::VERSION", "16.2.0")
+        allow(File).to receive(:exist?).with("package.json").and_return(true)
+        allow(File).to receive(:read).with("package.json").and_return(package_json_content)
+      end
+
+      it "correctly matches stable versions" do
+        checker.send(:check_package_version_sync)
+        expect(checker.messages.any? do |msg|
+          msg[:type] == :success && msg[:content].include?("versions match")
+        end).to be true
+      end
+    end
+
+    context "when versions have minor mismatch" do
+      let(:package_json_content) do
+        { "dependencies" => { "react-on-rails" => "16.2.0-beta.9" } }.to_json
+      end
+
+      before do
+        allow(File).to receive(:exist?).with("package.json").and_return(true)
+        allow(File).to receive(:read).with("package.json").and_return(package_json_content)
+      end
+
+      it "adds a warning message" do
+        checker.send(:check_package_version_sync)
+        expect(checker.warnings?).to be true
+        expect(checker.messages.last[:content]).to include("Version mismatch detected")
+      end
+    end
+
+    context "when versions have major mismatch" do
+      let(:package_json_content) do
+        { "dependencies" => { "react-on-rails" => "15.0.0" } }.to_json
+      end
+
+      before do
+        allow(File).to receive(:exist?).with("package.json").and_return(true)
+        allow(File).to receive(:read).with("package.json").and_return(package_json_content)
+      end
+
+      it "adds an error message" do
+        checker.send(:check_package_version_sync)
+        expect(checker.errors?).to be true
+        expect(checker.messages.last[:content]).to include("Major version mismatch")
+      end
+    end
+
+    context "when package.json has invalid JSON" do
+      before do
+        allow(File).to receive(:exist?).with("package.json").and_return(true)
+        allow(File).to receive(:read).with("package.json").and_return("invalid json")
+      end
+
+      it "handles parsing errors gracefully" do
+        expect do
+          checker.send(:check_package_version_sync)
+        end.not_to raise_error
+      end
+    end
+  end
+
   describe "private methods" do
     describe "#cli_exists?" do
       it "returns true when command exists" do

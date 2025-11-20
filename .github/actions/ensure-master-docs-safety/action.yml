@@ -1,0 +1,168 @@
+name: Ensure master docs-only skips are safe
+description: Prevents docs-only commits from skipping CI when previous master commit has unresolved test failures
+inputs:
+  docs-only:
+    description: 'String output from ci-changes-detector ("true" or "false")'
+    required: true
+  previous-sha:
+    description: 'SHA of the previous commit on master (github.event.before)'
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Check previous master commit status
+      if: ${{ inputs.docs-only == 'true' && inputs.previous-sha != '' && inputs.previous-sha != '0000000000000000000000000000000000000000' }}
+      uses: actions/github-script@v7
+      env:
+        PREVIOUS_SHA: ${{ inputs.previous-sha }}
+      with:
+        script: |
+          const previousSha = process.env.PREVIOUS_SHA;
+
+          // Query workflow runs from the last 7 days to avoid excessive API calls.
+          // Why 7 days? This balances API efficiency with practical needs:
+          // - Most master commits trigger CI within hours, not days
+          // - Commits older than 7 days are likely stale; better to allow the docs-only skip anyway
+          // - Reduces pagination load on high-velocity repos
+          // - GitHub API rate limits (1000 req/hr for Actions) make unbounded searches risky
+          // For commits outside this window, we skip the check and allow the docs-only skip.
+          const createdAfter = new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString();
+
+          // Optimize pagination: use lower per_page and collect only what we need
+          const workflowRuns = [];
+          let foundAllRelevant = false;
+
+          for await (const response of github.paginate.iterator(
+            github.rest.actions.listWorkflowRunsForRepo,
+            {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              branch: 'master',
+              event: 'push',
+              per_page: 30,
+              created: `>${createdAfter}`,
+              sort: 'created',
+              direction: 'desc'
+            }
+          )) {
+            const pageRuns = response.data;
+            const relevantInPage = pageRuns.filter((run) => run.head_sha === previousSha);
+
+            if (relevantInPage.length > 0) {
+              workflowRuns.push(...relevantInPage);
+            }
+
+            // Early exit: if we found relevant runs and now seeing different SHAs,
+            // we've likely collected all runs for the previous commit
+            if (workflowRuns.length > 0 && relevantInPage.length === 0) {
+              foundAllRelevant = true;
+              break;
+            }
+          }
+
+          if (workflowRuns.length === 0) {
+            core.info(`No workflow runs found for ${previousSha} in the last 7 days. Allowing docs-only skip.`);
+            return;
+          }
+
+          // Deduplicate workflow runs by keeping only the latest run for each workflow_id.
+          // This handles cases where workflows are re-run manually.
+          // Use run_number as tiebreaker since created_at might be identical for rapid reruns.
+          // Note: If workflows are manually re-run out of order, we use the highest run_number
+          // which represents the most recent attempt, regardless of trigger order.
+          //
+          // IMPORTANT: We need to fetch the latest attempt for each run, not just the run conclusion.
+          // GitHub marks a run as "failed" even if a rerun succeeded, so we must check the actual
+          // latest attempt to see if the failure was resolved.
+          const latestByWorkflow = new Map();
+          for (const run of workflowRuns) {
+            const existing = latestByWorkflow.get(run.workflow_id);
+            if (!existing || run.run_number > existing.run_number) {
+              latestByWorkflow.set(run.workflow_id, run);
+            }
+          }
+
+          // Check for workflows that are still running
+          // We require all workflows to complete before allowing docs-only skip
+          // This prevents skipping CI when the previous commit hasn't been fully validated
+          const incompleteRuns = Array.from(latestByWorkflow.values()).filter(
+            (run) => run.status !== 'completed'
+          );
+
+          if (incompleteRuns.length > 0) {
+            const details = incompleteRuns
+              .map((run) => `- [${run.name} #${run.run_number}](${run.html_url}) is still ${run.status}`)
+              .join('\n');
+            core.setFailed(
+              [
+                `Cannot skip CI for docs-only commit because previous master commit ${previousSha} still has running workflows:`,
+                details,
+                '',
+                'Wait for these workflows to complete before pushing docs-only changes.'
+              ].join('\n')
+            );
+            return;
+          }
+
+          // For each workflow run, fetch the jobs to check the latest attempt's conclusion.
+          // GitHub's run.conclusion reflects the overall run, but if a run was re-run and succeeded,
+          // we want to consider that success, not the original failure.
+          const failingRuns = [];
+
+          for (const run of Array.from(latestByWorkflow.values())) {
+            // Fetch jobs for this run to check the latest attempt
+            const jobsResponse = await github.rest.actions.listJobsForWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: run.id,
+              per_page: 100
+            });
+
+            const jobs = jobsResponse.data.jobs;
+
+            if (jobs.length === 0) {
+              // No jobs found - treat as incomplete
+              failingRuns.push(run);
+              continue;
+            }
+
+            // Get the maximum run_attempt number to find the latest attempt
+            const latestAttempt = Math.max(...jobs.map(job => job.run_attempt));
+
+            // Get all jobs from the latest attempt
+            const latestJobs = jobs.filter(job => job.run_attempt === latestAttempt);
+
+            // Check if any job in the latest attempt has failed
+            // We treat these conclusions as failures:
+            // - 'failure': Obvious failure case
+            // - 'timed_out': Infrastructure or performance issue that should be investigated
+            // - 'cancelled': Might indicate timeout, CI infrastructure issues, or manual intervention needed
+            // - 'action_required': Requires manual intervention
+            // We treat 'skipped' and 'neutral' as non-blocking since they indicate
+            // intentional skips or informational-only workflows.
+            const hasFailedJob = latestJobs.some(job =>
+              ['failure', 'timed_out', 'cancelled', 'action_required'].includes(job.conclusion)
+            );
+
+            if (hasFailedJob) {
+              failingRuns.push(run);
+            }
+          }
+
+          if (failingRuns.length === 0) {
+            core.info(`Previous master commit ${previousSha} completed without failures. Docs-only skip allowed.`);
+            return;
+          }
+
+          const details = failingRuns
+            .map((run) => `- [${run.name} #${run.run_number}](${run.html_url}) concluded ${run.conclusion}`)
+            .join('\n');
+
+          core.setFailed(
+            [
+              `Cannot skip CI for docs-only commit because previous master commit ${previousSha} still has failing workflows:`,
+              details,
+              '',
+              'Fix these failures before pushing docs-only changes, or push non-docs changes to trigger full CI.'
+            ].join('\n')
+          );

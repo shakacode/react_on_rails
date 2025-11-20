@@ -443,6 +443,60 @@ module ReactOnRails
       end
     end
 
+    # Converts an absolute path (String or Pathname) to a path relative to Rails.root.
+    # If the path is already relative or doesn't contain Rails.root, returns it as-is.
+    #
+    # This method is used to normalize paths from Shakapacker's privateOutputPath (which is
+    # absolute) to relative paths suitable for React on Rails configuration.
+    #
+    # Note: Absolute paths that don't start with Rails.root are intentionally passed through
+    # unchanged. While there's no known use case for server bundles outside Rails.root,
+    # this behavior preserves the original path for debugging and error messages.
+    #
+    # @param path [String, Pathname] The path to normalize
+    # @return [String, nil] The relative path as a string, or nil if path is nil
+    #
+    # @example Converting absolute paths within Rails.root
+    #   # Assuming Rails.root is "/app"
+    #   normalize_to_relative_path("/app/ssr-generated") # => "ssr-generated"
+    #   normalize_to_relative_path("/app/foo/bar")       # => "foo/bar"
+    #
+    # @example Already relative paths pass through
+    #   normalize_to_relative_path("ssr-generated")      # => "ssr-generated"
+    #   normalize_to_relative_path("./ssr-generated")    # => "./ssr-generated"
+    #
+    # @example Absolute paths outside Rails.root (edge case)
+    #   normalize_to_relative_path("/other/path/bundles") # => "/other/path/bundles"
+    # rubocop:disable Metrics/CyclomaticComplexity
+    def self.normalize_to_relative_path(path)
+      return nil if path.nil?
+
+      path_str = path.to_s
+      rails_root_str = Rails.root.to_s.chomp("/")
+
+      # Treat as "inside Rails.root" only for exact match or a subdirectory
+      inside_rails_root = rails_root_str.present? &&
+                          (path_str == rails_root_str || path_str.start_with?("#{rails_root_str}/"))
+
+      # If path is within Rails.root, remove that prefix
+      if inside_rails_root
+        # Remove Rails.root and any leading slash
+        path_str.sub(%r{^#{Regexp.escape(rails_root_str)}/?}, "")
+      else
+        # Path is already relative or outside Rails.root
+        # Warn if it's an absolute path outside Rails.root (edge case)
+        if path_str.start_with?("/") && !inside_rails_root
+          Rails.logger&.warn(
+            "ReactOnRails: Detected absolute path outside Rails.root: '#{path_str}'. " \
+            "Server bundles are typically stored within Rails.root. " \
+            "Verify this is intentional."
+          )
+        end
+        path_str
+      end
+    end
+    # rubocop:enable Metrics/CyclomaticComplexity
+
     def self.default_troubleshooting_section
       <<~DEFAULT
         📞 Get Help & Support:

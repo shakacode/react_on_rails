@@ -19,6 +19,11 @@ default: &default
   # Reload manifest.json on all requests so we reload latest compiled packs
   cache_manifest: false
 
+  # Hook to run before webpack compilation (e.g., for generating dynamic entry points)
+  # SECURITY: Only reference trusted scripts within your project. Ensure the hook path
+  # points to a file within the project root that you control.
+  precompile_hook: 'bin/shakapacker-precompile-hook'
+
   # Extract and emit a css file
   extract_css: true
 

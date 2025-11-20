@@ -23,17 +23,7 @@ After a release, please make sure to run `bundle exec rake update_changelog`. Th
 
 Changes since the last non-beta release.
 
-#### Changed
-
-- **Generator Configuration Modernization**: Updated the generator to enable recommended configurations by default for new applications:
-
-  - `config.build_test_command` is now uncommented and set to `"RAILS_ENV=test bin/shakapacker"` by default, enabling automatic asset building during tests for better integration test reliability
-  - `config.auto_load_bundle = true` is now set by default, enabling automatic loading of component bundles
-  - `config.components_subdirectory = "ror_components"` is now set by default, organizing React components in a dedicated subdirectory
-
-  **Note:** These changes only affect newly generated applications. Existing applications are unaffected and do not need to make any changes. If you want to adopt these settings in an existing app, you can manually add them to your `config/initializers/react_on_rails.rb` file. [PR 2039](https://github.com/shakacode/react_on_rails/pull/2039) by [justin808](https://github.com/justin808).
-
-### [16.2.0.beta.4] - 2025-11-12
+### [v16.2.0.beta.10] - 2025-11-18
 
 #### Added
 
@@ -49,6 +39,8 @@ Changes since the last non-beta release.
 
 - **Use as Git dependency**: All packages can now be installed as Git dependencies. This is useful for development and testing purposes. See [CONTRIBUTING.md](./CONTRIBUTING.md#git-dependencies) for documentation. [PR #1873](https://github.com/shakacode/react_on_rails/pull/1873) by [alexeyr-ci2](https://github.com/alexeyr-ci2).
 
+- **Doctor Checks for :async Loading Strategy**: Added proactive diagnostic checks to the React on Rails doctor tool to detect usage of the `:async` loading strategy in projects without React on Rails Pro. The feature scans view files and initializer configuration, providing clear guidance to either upgrade to Pro or use alternative loading strategies like `:defer` or `:sync` to avoid component registration race conditions. [PR 2010](https://github.com/shakacode/react_on_rails/pull/2010) by [justin808](https://github.com/justin808).
+
 #### Changed
 
 - **Shakapacker 9.0.0 Upgrade**: Upgraded Shakapacker from 8.2.0 to 9.0.0 with Babel transpiler configuration for compatibility. Key changes include:
@@ -63,6 +55,10 @@ Changes since the last non-beta release.
 
 - **`generated_component_packs_loading_strategy` now defaults based on Pro license**: When using Shakapacker >= 8.2.0, the default loading strategy is now `:async` for Pro users and `:defer` for non-Pro users. This provides optimal performance for Pro users while maintaining compatibility for non-Pro users. You can still explicitly set the strategy in your configuration. [PR #1993](https://github.com/shakacode/react_on_rails/pull/1993) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
+- **Generator Configuration Modernization**: Updated the generator to enable recommended configurations by default for new applications. `config.build_test_command` is now uncommented and set to `"RAILS_ENV=test bin/shakapacker"` by default, enabling automatic asset building during tests for better integration test reliability. `config.auto_load_bundle = true` is now set by default, enabling automatic loading of component bundles. `config.components_subdirectory = "ror_components"` is now set by default, organizing React components in a dedicated subdirectory. **Note:** These changes only affect newly generated applications. Existing applications are unaffected and do not need to make any changes. If you want to adopt these settings in an existing app, you can manually add them to your `config/initializers/react_on_rails.rb` file. [PR 2039](https://github.com/shakacode/react_on_rails/pull/2039) by [justin808](https://github.com/justin808).
+
+- **Removed Babel Dependency Installation**: The generator no longer installs `@babel/preset-react` or `@babel/preset-typescript` packages. Shakapacker handles JavaScript transpiler configuration (Babel, SWC, or esbuild) via the `javascript_transpiler` setting in `shakapacker.yml`. SWC is now the default transpiler and includes built-in support for React and TypeScript. Users who explicitly choose Babel will need to manually install and configure the required presets. This change reduces unnecessary dependencies and aligns with Shakapacker's modular transpiler approach. [PR 2051](https://github.com/shakacode/react_on_rails/pull/2051) by [justin808](https://github.com/justin808).
+
 #### Documentation
 
 - **Simplified Configuration Files**: Improved configuration documentation and generator template for better clarity and usability. Reduced generator template from 67 to 42 lines (37% reduction). Added comprehensive testing configuration guide. Reorganized configuration docs into Essential vs Advanced sections. Enhanced Doctor program with diagnostics for server rendering and test compilation consistency. [PR #2011](https://github.com/shakacode/react_on_rails/pull/2011) by [justin808](https://github.com/justin808).
@@ -73,9 +69,19 @@ Changes since the last non-beta release.
 
 #### Fixed
 
+- **Duplicate Rake Task Execution**: Fixed rake tasks executing twice during asset precompilation and other rake operations. Rails Engine was loading task files twice: once via explicit `load` calls in the `rake_tasks` block (Railtie layer) and once via automatic file loading from `lib/tasks/` (Engine layer). This caused `react_on_rails:assets:webpack`, `react_on_rails:generate_packs`, and `react_on_rails:locale` tasks to run twice, significantly increasing build times. Removed explicit `load` calls and now rely on Rails Engine's standard auto-loading behavior. [PR 2052](https://github.com/shakacode/react_on_rails/pull/2052) by [justin808](https://github.com/justin808).
+
 - **Node Renderer Worker Restart**: Fixed "descriptor closed" error that occurred when the node renderer restarts while handling an in-progress request (especially streaming requests). Workers now perform graceful shutdowns: they disconnect from the cluster to stop receiving new requests, wait for active requests to complete, then shut down cleanly. A configurable `gracefulWorkerRestartTimeout` ensures workers are forcibly killed if they don't shut down in time. [PR 1970](https://github.com/shakacode/react_on_rails/pull/1970) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 - **Body Duplication Bug On Streaming**: Fixed a bug that happens while streaming if the node renderer connection closed after streaming some chunks to the client. [PR #1995](https://github.com/shakacode/react_on_rails/pull/1995) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+- **bin/dev --verbose Option**: Fixed `OptionParser::InvalidOption` error that occurred when using the `--verbose`/`-v` flag. The flag was documented in help text but not functional. Now properly implemented with flag parsing and passing verbose option through method calls. [PR 2023](https://github.com/shakacode/react_on_rails/pull/2023) by [justin808](https://github.com/justin808).
+
+- **Shakapacker Template Configuration**: Fixed shakapacker.yml template to prevent unnecessary "Slow setup for development" warnings by setting `compile: false` as the default configuration. This allows development environments to inherit the setting instead of forcing on-demand compilation when using Procfiles with `bin/dev` that already run the shakapacker dev server or watch mode. [PR 2021](https://github.com/shakacode/react_on_rails/pull/2021) by [justin808](https://github.com/justin808).
+
+#### Improved
+
+- **Concurrent Streaming Performance**: Implemented concurrent draining of streamed React components using the async gem. Instead of processing components sequentially, the system now uses a producer-consumer pattern with bounded buffering to allow multiple components to stream simultaneously while maintaining per-component chunk ordering. [PR 2015](https://github.com/shakacode/react_on_rails/pull/2015) by [ihabadham](https://github.com/ihabadham).
 
 #### Breaking Changes
 
@@ -1837,8 +1843,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/16.2.0.beta.4...master
-[16.2.0.beta.4]: https://github.com/shakacode/react_on_rails/compare/16.1.1...16.2.0.beta.4
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.2.0.beta.10...master
+[v16.2.0.beta.10]: https://github.com/shakacode/react_on_rails/compare/16.1.1...v16.2.0.beta.10
 [16.1.1]: https://github.com/shakacode/react_on_rails/compare/16.1.0...16.1.1
 [16.1.0]: https://github.com/shakacode/react_on_rails/compare/16.0.0...16.1.0
 [16.0.0]: https://github.com/shakacode/react_on_rails/compare/14.2.0...16.0.0

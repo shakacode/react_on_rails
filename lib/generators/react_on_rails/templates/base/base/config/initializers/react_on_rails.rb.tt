@@ -12,6 +12,25 @@ ReactOnRails.configure do |config|
   # Set to "" if you're not using server rendering
   config.server_bundle_js_file = "server-bundle.js"
 
+  # ⚠️ RECOMMENDED: Use Shakapacker 9.0+ private_output_path instead
+  #
+  # If using Shakapacker 9.0+, add to config/shakapacker.yml:
+  #   private_output_path: ssr-generated
+  #
+  # React on Rails will auto-detect this value, eliminating the need to set it here.
+  # This keeps your webpack and Rails configs in sync automatically.
+  #
+  # For older Shakapacker versions or custom setups, manually configure:
+  # config.server_bundle_output_path = "ssr-generated"
+  #
+  # The path is relative to Rails.root and should point to a private directory
+  # (outside of public/) for security. Run 'rails react_on_rails:doctor' to verify.
+
+  # Enforce that server bundles are only loaded from private (non-public) directories.
+  # When true, server bundles will only be loaded from the configured server_bundle_output_path.
+  # This is recommended for production to prevent server-side code from being exposed.
+  config.enforce_private_server_bundles = true
+
   ################################################################################
   # Test Configuration (Optional)
   ################################################################################

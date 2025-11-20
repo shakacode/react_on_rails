@@ -16,7 +16,9 @@ jobs:
       github.event.issue.pull_request &&
       (
         startsWith(github.event.comment.body, '/run-skipped-ci') ||
-        contains(github.event.comment.body, '\n/run-skipped-ci')
+        contains(github.event.comment.body, '\n/run-skipped-ci') ||
+        startsWith(github.event.comment.body, '/run-skipped-tests') ||
+        contains(github.event.comment.body, '\n/run-skipped-tests')
       )
     runs-on: ubuntu-22.04
     permissions:
@@ -114,10 +116,11 @@ jobs:
 
             // Map workflow names to workflow files
             const workflowMap = {
-              'Main test': 'main.yml',
+              'Integration Tests': 'integration-tests.yml',
+              'Rspec test for gem': 'gem-tests.yml',
               'Generator tests': 'examples.yml',
               'React on Rails Pro - Integration Tests': 'pro-integration-tests.yml',
-              'React on Rails Pro - Package Tests': 'pro-package-tests.yml',
+              'React on Rails Pro - Package Tests': 'pro-test-package-and-gem.yml',
               'React on Rails Pro - Lint': 'pro-lint.yml'
             };
 
@@ -133,8 +136,18 @@ jobs:
             const failed = [];
             const notApplicable = [];
 
-            // Trigger each workflow that has skipped checks
-            for (const workflowName of uniqueWorkflows) {
+            // If no skipped checks found, trigger ALL workflows in the map
+            // This handles the case where workflows haven't run yet (e.g., Pro tests on fresh PRs)
+            const workflowsToTrigger = uniqueWorkflows.size > 0
+              ? Array.from(uniqueWorkflows)
+              : Object.keys(workflowMap);
+
+            if (uniqueWorkflows.size === 0) {
+              console.log('ℹ️  No skipped checks found - triggering all workflows to ensure full coverage');
+            }
+
+            // Trigger each workflow
+            for (const workflowName of workflowsToTrigger) {
               const workflowFile = workflowMap[workflowName];
               try {
                 await github.rest.actions.createWorkflowDispatch({
@@ -152,12 +165,6 @@ jobs:
                 console.error(`❌ Failed to trigger ${workflowFile}:`, error.message);
                 failed.push({ workflow: workflowName, error: error.message });
               }
-            }
-
-            // Note workflows with no skipped checks
-            if (uniqueWorkflows.size === 0) {
-              console.log('ℹ️  No skipped checks found - all tests already running on this PR');
-              notApplicable.push('No skipped checks to run');
             }
 
             // Wait a bit for workflows to queue
@@ -195,14 +202,14 @@ jobs:
 
             // Build the comment body based on actual results
             let status;
-            if (notApplicable.length > 0) {
-              status = '✅ **All checks are already running - nothing to do!**';
-            } else if (failed.length > 0 && notFound.length > 0) {
+            if (failed.length > 0 && notFound.length > 0) {
               status = '❌ **Failed to trigger or verify workflows**';
             } else if (failed.length > 0) {
               status = '⚠️ **Some workflows failed to trigger**';
             } else if (notFound.length > 0) {
               status = '⚠️ **Workflows triggered but not yet verified**';
+            } else if (uniqueWorkflows.size === 0) {
+              status = '✅ **Triggered all workflows for full CI coverage**';
             } else {
               status = '✅ **Successfully triggered skipped CI checks**';
             }
@@ -234,13 +241,11 @@ jobs:
             ${skippedChecksList}
             ${verifiedList}${notFoundList}${failedList}
 
-            ${labelAdded && verified.length > 0 ? `\n**Note:** Added the \`full-ci\` label to this PR. All future commits will run the full CI suite (including minimum dependency tests) until the label is removed.
+            ${labelAdded && succeeded.length > 0 ? `\n**Note:** Added the \`full-ci\` label to this PR. All future commits will run the full CI suite (including minimum dependency tests) until the label is removed.
 
             To disable full CI mode, use the \`/stop-run-skipped-ci\` command.
 
-            View progress in the [Actions tab](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions).` : ''}
-
-            ${labelAdded && notApplicable.length > 0 ? `\nAll CI checks are already running on this PR. Added the \`full-ci\` label - future commits will run the full CI suite.` : ''}`;
+            View progress in the [Actions tab](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions).` : ''}`;
 
             // Post the comment
             await github.rest.issues.createComment({

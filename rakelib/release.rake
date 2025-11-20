@@ -13,37 +13,37 @@ class RaisingMessageHandler
   end
 end
 
-# Helper module for release-specific tasks
-module ReleaseHelpers
-  include ReactOnRails::TaskHelpers
-
-  module_function
-
-  # Publish a gem with retry logic for OTP failures
-  def publish_gem_with_retry(dir, gem_name, max_retries: ENV.fetch("GEM_RELEASE_MAX_RETRIES", "3").to_i)
-    puts "\nCarefully add your OTP for Rubygems when prompted."
+# Helper methods for release-specific tasks
+# These are defined at the top level so they have access to Rake's sh method
+def publish_gem_with_retry(dir, gem_name, otp: nil, max_retries: ENV.fetch("GEM_RELEASE_MAX_RETRIES", "3").to_i)
+  puts "\nPublishing #{gem_name} gem to RubyGems.org..."
+  if otp
+    puts "Using provided OTP code..."
+  else
+    puts "Carefully add your OTP for Rubygems when prompted."
     puts "NOTE: OTP codes expire quickly (typically 30 seconds). Generate a fresh code when prompted."
+  end
 
-    retry_count = 0
-    success = false
+  retry_count = 0
+  success = false
 
-    while retry_count < max_retries && !success
-      begin
-        sh_in_dir(dir, "gem release")
-        success = true
-      rescue Gem::CommandException, IOError => e
-        retry_count += 1
-        if retry_count < max_retries
-          puts "\n⚠️  #{gem_name} release failed (attempt #{retry_count}/#{max_retries})"
-          puts "Common causes:"
-          puts "  - OTP code expired or already used"
-          puts "  - Network timeout"
-          puts "\nGenerating a FRESH OTP code and retrying in 5 seconds..."
-          sleep 5
-        else
-          puts "\n❌ Failed to publish #{gem_name} after #{max_retries} attempts"
-          raise e
-        end
+  while retry_count < max_retries && !success
+    begin
+      otp_flag = otp ? "--otp #{otp}" : ""
+      sh %(cd #{dir} && gem release #{otp_flag})
+      success = true
+    rescue Gem::CommandException, IOError => e
+      retry_count += 1
+      if retry_count < max_retries
+        puts "\n⚠️  #{gem_name} release failed (attempt #{retry_count}/#{max_retries})"
+        puts "Common causes:"
+        puts "  - OTP code expired or already used"
+        puts "  - Network timeout"
+        puts "\nGenerating a FRESH OTP code and retrying in 5 seconds..."
+        sleep 5
+      else
+        puts "\n❌ Failed to publish #{gem_name} after #{max_retries} attempts"
+        raise e
       end
     end
   end
@@ -74,6 +74,12 @@ This will update and release:
 3rd argument: Registry (verdaccio/npm, default: npm)
 4th argument: Skip push (skip_push to skip, default: push)
 
+Environment variables:
+  VERBOSE=1                    # Enable verbose logging (shows all output)
+  NPM_OTP=<code>               # Provide NPM one-time password (reused for all NPM publishes)
+  RUBYGEMS_OTP=<code>          # Provide RubyGems one-time password (reused for both gems)
+  GEM_RELEASE_MAX_RETRIES=<n>  # Override max retry attempts (default: 3)
+
 Examples:
   rake release[patch]                           # Bump patch version (16.1.1 → 16.1.2)
   rake release[minor]                           # Bump minor version (16.1.1 → 16.2.0)
@@ -82,7 +88,9 @@ Examples:
   rake release[16.2.0.beta.1]                   # Set pre-release version (→ 16.2.0-beta.1 for NPM)
   rake release[patch,true]                      # Dry run
   rake release[16.2.0,false,verdaccio]          # Test with Verdaccio
-  rake release[16.2.0,false,npm,skip_push]      # Release without pushing to remote")
+  rake release[16.2.0,false,npm,skip_push]      # Release without pushing to remote
+  VERBOSE=1 rake release[patch]                 # Release with verbose logging
+  NPM_OTP=123456 RUBYGEMS_OTP=789012 rake release[patch]  # Skip OTP prompts")
 task :release, %i[version dry_run registry skip_push] do |_t, args|
   include ReactOnRails::TaskHelpers
 
@@ -91,6 +99,12 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
   args_hash = args.to_hash
 
   is_dry_run = ReactOnRails::Utils.object_to_boolean(args_hash[:dry_run])
+  is_verbose = ENV["VERBOSE"] == "1"
+  npm_otp = ENV.fetch("NPM_OTP", nil)
+  rubygems_otp = ENV.fetch("RUBYGEMS_OTP", nil)
+
+  # Configure output verbosity
+  verbose(is_verbose)
 
   # Validate registry parameter
   registry_value = args_hash.fetch(:registry, "")
@@ -189,14 +203,15 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
     puts "  Updated #{file}"
   end
 
-  bundle_install_in(gem_root)
-  # Update dummy app's Gemfile.lock
-  bundle_install_in(dummy_app_dir)
-  # Update pro dummy app's Gemfile.lock
+  puts "\nUpdating Gemfile.lock files..."
+  bundle_quiet_flag = is_verbose ? "" : " --quiet"
+
+  # Update all Gemfile.lock files
+  unbundled_sh_in_dir(gem_root, "bundle install#{bundle_quiet_flag}")
+  unbundled_sh_in_dir(dummy_app_dir, "bundle install#{bundle_quiet_flag}")
   pro_dummy_app_dir = File.join(gem_root, "react_on_rails_pro", "spec", "dummy")
-  bundle_install_in(pro_dummy_app_dir) if Dir.exist?(pro_dummy_app_dir)
-  # Update pro root Gemfile.lock
-  bundle_install_in(pro_gem_root)
+  unbundled_sh_in_dir(pro_dummy_app_dir, "bundle install#{bundle_quiet_flag}") if Dir.exist?(pro_dummy_app_dir)
+  unbundled_sh_in_dir(pro_gem_root, "bundle install#{bundle_quiet_flag}")
 
   # Prepare NPM registry configuration
   npm_registry_url = use_verdaccio ? "http://localhost:4873/" : "https://registry.npmjs.org/"
@@ -215,31 +230,38 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
   end
 
   unless is_dry_run
-    # Commit all version changes
-    sh_in_dir(gem_root, "git add -A")
-    sh_in_dir(gem_root, "git commit -m 'Bump version to #{actual_gem_version}'")
+    # Commit all version changes (skip git hooks to save time)
+    sh_in_dir(gem_root, "LEFTHOOK=0 git add -A")
+    sh_in_dir(gem_root, "LEFTHOOK=0 git commit -m 'Bump version to #{actual_gem_version}'")
 
     # Create git tag
     sh_in_dir(gem_root, "git tag v#{actual_gem_version}")
 
-    # Push commits and tags
+    # Push commits and tags (skip git hooks)
     unless skip_push
-      sh_in_dir(gem_root, "git push")
-      sh_in_dir(gem_root, "git push --tags")
+      sh_in_dir(gem_root, "LEFTHOOK=0 git push")
+      sh_in_dir(gem_root, "LEFTHOOK=0 git push --tags")
     end
 
     puts "\n#{'=' * 80}"
     puts "Publishing PUBLIC packages to #{use_verdaccio ? 'Verdaccio (local)' : 'npmjs.org'}..."
     puts "=" * 80
 
+    # Configure NPM OTP
+    if npm_otp && !use_verdaccio
+      npm_publish_args += " --otp #{npm_otp}"
+      puts "Using provided NPM OTP for all NPM package publications..."
+    elsif !use_verdaccio
+      puts "\nNOTE: You will be prompted for NPM OTP code for each of the 3 NPM packages."
+      puts "TIP: Set NPM_OTP environment variable to avoid repeated prompts."
+    end
+
     # Publish react-on-rails NPM package
     puts "\nPublishing react-on-rails@#{actual_npm_version}..."
-    puts "Carefully add your OTP for NPM when prompted." unless use_verdaccio
     sh_in_dir(gem_root, "yarn workspace react-on-rails publish --new-version #{actual_npm_version} #{npm_publish_args}")
 
     # Publish react-on-rails-pro NPM package
     puts "\nPublishing react-on-rails-pro@#{actual_npm_version}..."
-    puts "Carefully add your OTP for NPM when prompted." unless use_verdaccio
     sh_in_dir(gem_root,
               "yarn workspace react-on-rails-pro publish --new-version #{actual_npm_version} #{npm_publish_args}")
 
@@ -253,7 +275,6 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
     # package.json is in react_on_rails_pro/ which is not defined as a workspace
     node_renderer_name = "react-on-rails-pro-node-renderer"
     puts "\nPublishing #{node_renderer_name}@#{actual_npm_version}..."
-    puts "Carefully add your OTP for NPM when prompted." unless use_verdaccio
     sh_in_dir(pro_gem_root,
               "yarn publish --new-version #{actual_npm_version} --no-git-tag-version #{npm_publish_args}")
 
@@ -261,24 +282,25 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
       puts "\nSkipping Ruby gem publication (Verdaccio is NPM-only)"
     else
       puts "\n#{'=' * 80}"
-      puts "Publishing PUBLIC Ruby gem..."
+      puts "Publishing PUBLIC Ruby gems..."
       puts "=" * 80
 
+      if rubygems_otp
+        puts "Using provided RubyGems OTP for both gem publications..."
+      else
+        puts "\nNOTE: You will be prompted for RubyGems OTP code for each of the 2 gems."
+        puts "TIP: Set RUBYGEMS_OTP environment variable to avoid repeated prompts."
+      end
+
       # Publish react_on_rails Ruby gem with retry logic
-      ReleaseHelpers.publish_gem_with_retry(gem_root, "react_on_rails")
+      publish_gem_with_retry(gem_root, "react_on_rails", otp: rubygems_otp)
 
       # Add delay before next OTP operation to ensure clean separation
       puts "\n⏳ Waiting 5 seconds before next publication to ensure OTP separation..."
       sleep 5
 
-      puts "\n#{'=' * 80}"
-      puts "Publishing PUBLIC Pro Ruby gem to RubyGems.org..."
-      puts "=" * 80
-
       # Publish react_on_rails_pro Ruby gem to RubyGems.org with retry logic
-      puts "\nPublishing react_on_rails_pro gem to RubyGems.org..."
-      puts "NOTE: Generate a FRESH OTP code (different from the previous one)."
-      ReleaseHelpers.publish_gem_with_retry(pro_gem_root, "react_on_rails_pro")
+      publish_gem_with_retry(pro_gem_root, "react_on_rails_pro", otp: rubygems_otp)
     end
   end
 
