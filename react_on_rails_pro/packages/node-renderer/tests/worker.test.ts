@@ -893,7 +893,7 @@ describe('worker', () => {
         400,
       );
 
-      expect(res.payload).toContain('INVALID NIL or NULL result for rendering');
+      expect(res.payload).toContain('Invalid first incremental render request chunk received');
     });
 
     test('fails when password is missing', async () => {
