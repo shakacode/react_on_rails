@@ -63,10 +63,6 @@ Changes since the last non-beta release.
 
 - **Simplified Configuration Files**: Improved configuration documentation and generator template for better clarity and usability. Reduced generator template from 67 to 42 lines (37% reduction). Added comprehensive testing configuration guide. Reorganized configuration docs into Essential vs Advanced sections. Enhanced Doctor program with diagnostics for server rendering and test compilation consistency. [PR #2011](https://github.com/shakacode/react_on_rails/pull/2011) by [justin808](https://github.com/justin808).
 
-#### Deprecated
-
-- **Node Renderer Configuration**: Renamed `bundlePath` configuration option to `serverBundleCachePath` in the node renderer to better describe its purpose and avoid confusion with Shakapacker's public bundle path. The old `bundlePath` option continues to work with deprecation warnings. Both `RENDERER_SERVER_BUNDLE_CACHE_PATH` (new) and `RENDERER_BUNDLE_PATH` (deprecated) environment variables are supported. [PR #2008](https://github.com/shakacode/react_on_rails/pull/2008) by [justin808](https://github.com/justin808).
-
 #### Fixed
 
 - **Doctor Command Version Mismatch Detection**: Fixed false version mismatch warnings in `rake react_on_rails:doctor` when using beta/prerelease versions. The command now correctly recognizes that gem version `16.2.0.beta.10` matches npm version `16.2.0-beta.10` using proper semver conversion instead of string normalization that stripped prerelease identifiers. [PR 2064](https://github.com/shakacode/react_on_rails/pull/2064) by [ihabadham](https://github.com/ihabadham).
@@ -74,14 +70,6 @@ Changes since the last non-beta release.
 - **Rails 5.2-6.0 Compatibility**: Fixed compatibility with Rails 5.2-6.0 by adding polyfill for `compact_blank` method (introduced in Rails 6.1). Also refactored webpack asset handling to conditionally include React on Rails Pro files only when available, preventing NoMethodErrors in open-source installations. [PR 2058](https://github.com/shakacode/react_on_rails/pull/2058) by [justin808](https://github.com/justin808).
 
 - **Duplicate Rake Task Execution**: Fixed rake tasks executing twice during asset precompilation and other rake operations. Rails Engine was loading task files twice: once via explicit `load` calls in the `rake_tasks` block (Railtie layer) and once via automatic file loading from `lib/tasks/` (Engine layer). This caused `react_on_rails:assets:webpack`, `react_on_rails:generate_packs`, and `react_on_rails:locale` tasks to run twice, significantly increasing build times. Removed explicit `load` calls and now rely on Rails Engine's standard auto-loading behavior. [PR 2052](https://github.com/shakacode/react_on_rails/pull/2052) by [justin808](https://github.com/justin808).
-
-- **Node Renderer Worker Restart**: Fixed "descriptor closed" error that occurred when the node renderer restarts while handling an in-progress request (especially streaming requests). Workers now perform graceful shutdowns: they disconnect from the cluster to stop receiving new requests, wait for active requests to complete, then shut down cleanly. A configurable `gracefulWorkerRestartTimeout` ensures workers are forcibly killed if they don't shut down in time. [PR 1970](https://github.com/shakacode/react_on_rails/pull/1970) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-
-- **Body Duplication Bug On Streaming**: Fixed a bug that happens while streaming if the node renderer connection closed after streaming some chunks to the client. [PR #1995](https://github.com/shakacode/react_on_rails/pull/1995) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-
-#### Improved
-
-- **Concurrent Streaming Performance**: Implemented concurrent draining of streamed React components using the async gem. Instead of processing components sequentially, the system now uses a producer-consumer pattern with bounded buffering to allow multiple components to stream simultaneously while maintaining per-component chunk ordering. [PR 2015](https://github.com/shakacode/react_on_rails/pull/2015) by [ihabadham](https://github.com/ihabadham).
 
 #### Breaking Changes
 
