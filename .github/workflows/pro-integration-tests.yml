@@ -95,9 +95,10 @@ jobs:
       - name: Setup Node
         uses: ./.github/actions/setup-node-with-retry
         with:
-          node-version: 22
-          # Disable cache for Node 22 due to V8 bug in 22.21.0
+          # Pin to 22.11.0 (LTS) to avoid V8 bug in 22.21.0
           # https://github.com/nodejs/node/issues/56010
+          node-version: '22.11.0'
+          cache: yarn
           cache-dependency-path: 'react_on_rails_pro/**/yarn.lock'
 
       - name: Print system information
@@ -192,9 +193,10 @@ jobs:
       - name: Setup Node
         uses: ./.github/actions/setup-node-with-retry
         with:
-          node-version: 22
-          # Disable cache for Node 22 due to V8 bug in 22.21.0
+          # Pin to 22.11.0 (LTS) to avoid V8 bug in 22.21.0
           # https://github.com/nodejs/node/issues/56010
+          node-version: '22.11.0'
+          cache: yarn
           cache-dependency-path: 'react_on_rails_pro/**/yarn.lock'
 
       - name: Print system information
@@ -390,9 +392,10 @@ jobs:
       - name: Setup Node
         uses: ./.github/actions/setup-node-with-retry
         with:
-          node-version: 22
-          # Disable cache for Node 22 due to V8 bug in 22.21.0
+          # Pin to 22.11.0 (LTS) to avoid V8 bug in 22.21.0
           # https://github.com/nodejs/node/issues/56010
+          node-version: '22.11.0'
+          cache: yarn
           cache-dependency-path: 'react_on_rails_pro/**/yarn.lock'
 
       - name: Print system information

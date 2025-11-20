@@ -11,8 +11,8 @@
     "clean": "rm -rf ./lib",
     "test": "jest tests",
     "type-check": "tsc --project src --noEmit --noErrorTruncation",
-    "prepack": "nps build.prepack",
-    "prepare": "nps build.prepack",
+    "prepack": "yarn run build",
+    "prepare": "yarn run build",
     "prepublishOnly": "yarn run build",
     "yalc:publish": "yalc publish",
     "yalc": "yalc"
