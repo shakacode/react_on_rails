@@ -116,10 +116,11 @@ jobs:
 
             // Map workflow names to workflow files
             const workflowMap = {
-              'Main test': 'main.yml',
+              'Integration Tests': 'integration-tests.yml',
+              'Rspec test for gem': 'gem-tests.yml',
               'Generator tests': 'examples.yml',
               'React on Rails Pro - Integration Tests': 'pro-integration-tests.yml',
-              'React on Rails Pro - Package Tests': 'pro-package-tests.yml',
+              'React on Rails Pro - Package Tests': 'pro-test-package-and-gem.yml',
               'React on Rails Pro - Lint': 'pro-lint.yml'
             };
 
