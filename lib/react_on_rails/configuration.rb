@@ -1,5 +1,23 @@
 # frozen_string_literal: true
 
+require "active_support/core_ext/enumerable"
+require "active_support/core_ext/object/blank"
+
+# Polyfill for compact_blank (added in Rails 6.1) to support Rails 5.2-6.0
+unless [].respond_to?(:compact_blank)
+  module Enumerable
+    def compact_blank
+      reject(&:blank?)
+    end
+  end
+
+  class Array
+    def compact_blank
+      reject(&:blank?)
+    end
+  end
+end
+
 # rubocop:disable Metrics/ClassLength
 
 module ReactOnRails
@@ -413,13 +431,16 @@ module ReactOnRails
     def ensure_webpack_generated_files_exists
       return unless webpack_generated_files.empty?
 
-      self.webpack_generated_files = [
-        "manifest.json",
-        server_bundle_js_file,
-        rsc_bundle_js_file,
-        react_client_manifest_file,
-        react_server_client_manifest_file
-      ].compact_blank
+      files = ["manifest.json", server_bundle_js_file]
+
+      if ReactOnRails::Utils.react_on_rails_pro?
+        pro_config = ReactOnRailsPro.configuration
+        files << pro_config.rsc_bundle_js_file
+        files << pro_config.react_client_manifest_file
+        files << pro_config.react_server_client_manifest_file
+      end
+
+      self.webpack_generated_files = files.compact_blank
     end
 
     def configure_skip_display_none_deprecation
