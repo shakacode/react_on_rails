@@ -103,12 +103,6 @@
   "homepage": "https://github.com/shakacode/react_on_rails/tree/master/packages/react-on-rails-pro-node-renderer#readme",
   "jest": {
     "clearMocks": true,
-    "collectCoverageFrom": [
-      "./tests/**/*.{js,jsx,ts,tsx}"
-    ],
-    "coverageReporters": [
-      "lcov"
-    ],
     "moduleNameMapper": {
       "^(\\.{1,2}/.*)\\.js$": "$1"
     },
