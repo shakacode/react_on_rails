@@ -1,5 +1,5 @@
 import cluster from 'cluster';
-import fastifyPackageJson from 'fastify/package.json' with { type: 'json' };
+import fastifyPackageJson from 'fastify/package.json';
 import { Config, buildConfig } from './shared/configBuilder.js';
 
 const { version: fastifyVersion } = fastifyPackageJson;
