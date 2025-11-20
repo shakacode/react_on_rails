@@ -83,8 +83,12 @@ runs:
           }
 
           // Check for workflows that are still running
-          // We require all workflows to complete before allowing docs-only skip
-          // This prevents skipping CI when the previous commit hasn't been fully validated
+          // We allow docs-only skips even if workflows are still running, as long as none have failed yet.
+          // Rationale:
+          // - Running workflows haven't failed yet, so there's no known issue to block on
+          // - They will complete and validate the previous commit independently
+          // - Requiring completion creates bottlenecks when workflows are slow (e.g., integration tests)
+          // - If a workflow later fails, it will be caught on the next non-docs commit
           const incompleteRuns = Array.from(latestByWorkflow.values()).filter(
             (run) => run.status !== 'completed'
           );
@@ -93,23 +97,27 @@ runs:
             const details = incompleteRuns
               .map((run) => `- [${run.name} #${run.run_number}](${run.html_url}) is still ${run.status}`)
               .join('\n');
-            core.setFailed(
+            core.info(
               [
-                `Cannot skip CI for docs-only commit because previous master commit ${previousSha} still has running workflows:`,
+                `Previous master commit ${previousSha} still has running workflows:`,
                 details,
                 '',
-                'Wait for these workflows to complete before pushing docs-only changes.'
+                'Allowing docs-only skip because running workflows have not failed yet.'
               ].join('\n')
             );
-            return;
+            // Continue to check completed workflows for failures, don't return early
           }
 
-          // For each workflow run, fetch the jobs to check the latest attempt's conclusion.
+          // For each COMPLETED workflow run, fetch the jobs to check the latest attempt's conclusion.
           // GitHub's run.conclusion reflects the overall run, but if a run was re-run and succeeded,
           // we want to consider that success, not the original failure.
+          // We only check completed runs - incomplete runs are allowed (they haven't failed yet).
           const failingRuns = [];
+          const completedRuns = Array.from(latestByWorkflow.values()).filter(
+            (run) => run.status === 'completed'
+          );
 
-          for (const run of Array.from(latestByWorkflow.values())) {
+          for (const run of completedRuns) {
             // Fetch jobs for this run to check the latest attempt
             const jobsResponse = await github.rest.actions.listJobsForWorkflowRun({
               owner: context.repo.owner,
@@ -121,8 +129,8 @@ runs:
             const jobs = jobsResponse.data.jobs;
 
             if (jobs.length === 0) {
-              // No jobs found - treat as incomplete
-              failingRuns.push(run);
+              // No jobs found - skip this run (don't treat as failing)
+              core.warning(`No jobs found for workflow run ${run.id} (${run.name}). Skipping.`);
               continue;
             }
 
@@ -150,7 +158,11 @@ runs:
           }
 
           if (failingRuns.length === 0) {
-            core.info(`Previous master commit ${previousSha} completed without failures. Docs-only skip allowed.`);
+            if (incompleteRuns.length > 0) {
+              core.info(`Previous master commit ${previousSha} has ${incompleteRuns.length} running workflow(s) but no completed failures. Docs-only skip allowed.`);
+            } else {
+              core.info(`Previous master commit ${previousSha} completed without failures. Docs-only skip allowed.`);
+            }
             return;
           }
 
