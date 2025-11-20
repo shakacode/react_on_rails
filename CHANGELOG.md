@@ -23,9 +23,11 @@ After a release, please make sure to run `bundle exec rake update_changelog`. Th
 
 Changes since the last non-beta release.
 
-### [v16.2.0.beta.10] - 2025-11-18
+### [v16.2.0.beta.11] - 2025-11-19
 
 #### Added
+
+- **Shakapacker 9.0+ Private Output Path Integration**: Added automatic detection and integration of Shakapacker 9.0+ `private_output_path` configuration. React on Rails now automatically reads `private_output_path` from `shakapacker.yml` and sets server bundle paths, eliminating manual configuration synchronization. Includes version-aware generator templates, enhanced doctor command diagnostics for configuration validation and upgrade recommendations, and improved security with `enforce_private_server_bundles` option. [PR 2028](https://github.com/shakacode/react_on_rails/pull/2028) by [justin808](https://github.com/justin808).
 
 - **Rspack Support**: Added `--rspack` flag to `react_on_rails:install` generator for significantly faster builds (~20x improvement with SWC). Includes unified webpack/rspack configuration templates and `bin/switch-bundler` utility to switch between bundlers post-installation. [PR #1852](https://github.com/shakacode/react_on_rails/pull/1852) by [justin808](https://github.com/justin808).
 
@@ -68,6 +70,16 @@ Changes since the last non-beta release.
 - **Node Renderer Configuration**: Renamed `bundlePath` configuration option to `serverBundleCachePath` in the node renderer to better describe its purpose and avoid confusion with Shakapacker's public bundle path. The old `bundlePath` option continues to work with deprecation warnings. Both `RENDERER_SERVER_BUNDLE_CACHE_PATH` (new) and `RENDERER_BUNDLE_PATH` (deprecated) environment variables are supported. [PR #2008](https://github.com/shakacode/react_on_rails/pull/2008) by [justin808](https://github.com/justin808).
 
 #### Fixed
+
+- **bin/dev NameError**: Fixed `NameError: uninitialized constant ReactOnRails::PackerUtils` that occurred when running `bin/dev`. Missing requires for `PackerUtils` have been added to ensure proper module loading. [PR 2070](https://github.com/shakacode/react_on_rails/pull/2070) by [justin808](https://github.com/justin808).
+
+- **Doctor Command Version Mismatch Detection**: Fixed false version mismatch warnings in `rake react_on_rails:doctor` when using beta/prerelease versions. The command now correctly recognizes that gem version `16.2.0.beta.10` matches npm version `16.2.0-beta.10` using proper semver conversion instead of string normalization that stripped prerelease identifiers. [PR 2064](https://github.com/shakacode/react_on_rails/pull/2064) by [ihabadham](https://github.com/ihabadham).
+
+- **Generator Version Handling for Beta/RC Releases**: Fixed generator installing wrong npm package versions during beta and RC releases. The version detection regex now properly recognizes prerelease formats (e.g., `16.2.0-beta.10`, `16.1.0-rc.1`) instead of only matching stable versions, ensuring the generator installs the exact version matching the gem rather than defaulting to latest stable. [PR 2066](https://github.com/shakacode/react_on_rails/pull/2066) by [justin808](https://github.com/justin808).
+
+- **Rails 5.2-6.0 Compatibility**: Fixed compatibility with Rails 5.2-6.0 by adding polyfill for `compact_blank` method (introduced in Rails 6.1). Also refactored webpack asset handling to conditionally include React on Rails Pro files only when available, preventing NoMethodErrors in open-source installations. [PR 2058](https://github.com/shakacode/react_on_rails/pull/2058) by [justin808](https://github.com/justin808).
+
+- **Yalc Publish Path Resolution**: Fixed broken `yalc publish` workflow by correcting file path references in build script. Updated artifact detection from `packages/react-on-rails/lib/ReactOnRails.full.js` to `lib/ReactOnRails.full.js` in `package-scripts.yml` to match actual build output location. [PR 2054](https://github.com/shakacode/react_on_rails/pull/2054) by [Judahmeek](https://github.com/Judahmeek).
 
 - **Duplicate Rake Task Execution**: Fixed rake tasks executing twice during asset precompilation and other rake operations. Rails Engine was loading task files twice: once via explicit `load` calls in the `rake_tasks` block (Railtie layer) and once via automatic file loading from `lib/tasks/` (Engine layer). This caused `react_on_rails:assets:webpack`, `react_on_rails:generate_packs`, and `react_on_rails:locale` tasks to run twice, significantly increasing build times. Removed explicit `load` calls and now rely on Rails Engine's standard auto-loading behavior. [PR 2052](https://github.com/shakacode/react_on_rails/pull/2052) by [justin808](https://github.com/justin808).
 
@@ -1843,8 +1855,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.2.0.beta.10...master
-[v16.2.0.beta.10]: https://github.com/shakacode/react_on_rails/compare/16.1.1...v16.2.0.beta.10
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.2.0.beta.11...master
+[v16.2.0.beta.11]: https://github.com/shakacode/react_on_rails/compare/16.1.1...v16.2.0.beta.11
 [16.1.1]: https://github.com/shakacode/react_on_rails/compare/16.1.0...16.1.1
 [16.1.0]: https://github.com/shakacode/react_on_rails/compare/16.0.0...16.1.0
 [16.0.0]: https://github.com/shakacode/react_on_rails/compare/14.2.0...16.0.0
