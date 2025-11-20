@@ -28,8 +28,8 @@ describe "Console logging from server" do
       script_node = html_nodes.css("script#consoleReplayLog")
       script_lines = script_node.text.split("\n")
 
-      # First item is a blank line since expected script starts form "\n":
-      script_lines.shift
+      # Remove leading blank line if present (old format had it, new format doesn't)
+      script_lines.shift if script_lines.first && script_lines.first.empty?
 
       # Create external iterators for expected and found console replay script lines:
       expected_lines_iterator = expected_lines.to_enum
