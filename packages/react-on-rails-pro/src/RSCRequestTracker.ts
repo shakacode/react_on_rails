@@ -113,9 +113,9 @@ class RSCRequestTracker {
     // Validate that the generateRSCPayload function is available
     if (!this.generateRSCPayload) {
       throw new Error(
-        'generateRSCPayload is not defined. Please ensure that you are using at least version 4.0.0 of ' +
-          'React on Rails Pro and the Node renderer, and that ReactOnRailsPro.configuration.enable_rsc_support ' +
-          'is set to true.',
+        'generateRSCPayload function is not available. This could mean: ' +
+          '(1) ReactOnRailsPro.configuration.enable_rsc_support is not enabled, or ' +
+          '(2) You are using an incompatible version of React on Rails Pro (requires 4.0.0+).',
       );
     }
 

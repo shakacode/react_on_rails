@@ -219,7 +219,7 @@ export type ItemRegistrationCallback<T> = (component: T) => void;
 export type GenerateRSCPayloadFunction = (
   componentName: string,
   props: unknown,
-  railsContext: RailsContext,
+  railsContext: RailsContextWithServerComponentMetadata,
 ) => Promise<NodeJS.ReadableStream>;
 
 interface Params {

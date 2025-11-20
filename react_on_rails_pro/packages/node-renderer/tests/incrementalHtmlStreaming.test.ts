@@ -1,5 +1,4 @@
 import http2 from 'http2';
-import * as fs from 'fs';
 import buildApp from '../src/worker';
 import { createTestConfig } from './testingNodeRendererConfigs';
 import * as errorReporter from '../src/shared/errorReporter';
