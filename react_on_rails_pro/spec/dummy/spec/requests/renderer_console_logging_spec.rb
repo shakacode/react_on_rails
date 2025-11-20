@@ -21,6 +21,7 @@ describe "Console logging from server" do
         console.log.apply(console, ["[SERVER] Script4\\"</div>\\"(/script <script>alert('WTF4')(/script>"]);
         console.log.apply(console, ["[SERVER] Script5:\\"</div>\\"(/script> <script>alert('WTF5')(/script>"]);
         console.log.apply(console, ["[SERVER] railsContext.serverSide is ","true"]);
+        console.log.apply(console, ["[SERVER] RENDERED ReduxSharedStoreApp to dom node with id: ReduxSharedStoreApp-react-component-1"]);
       JS
 
       expected_lines = expected.split("\n")
