@@ -20,13 +20,12 @@ You can find the **package** version numbers from this repo's tags and below in 
 _Add changes in master not yet tagged._
 
 ### Improved
-- Significantly improved streaming performance by processing React components concurrently instead of sequentially. This reduces latency and improves responsiveness when using `stream_view_containing_react_components`.
+
+- **Concurrent Streaming Performance**: Implemented concurrent draining of streamed React components using the async gem. Instead of processing components sequentially, the system now uses a producer-consumer pattern with bounded buffering to allow multiple components to stream simultaneously while maintaining per-component chunk ordering. This significantly reduces latency and improves responsiveness when using `stream_view_containing_react_components`. [PR 2015](https://github.com/shakacode/react_on_rails/pull/2015) by [ihabadham](https://github.com/ihabadham).
 
 ### Added
+
 - Added `config.concurrent_component_streaming_buffer_size` configuration option to control the memory buffer size for concurrent component streaming (defaults to 64). This allows fine-tuning of memory usage vs. performance for streaming applications.
-
-### Added
-
 - Added `cached_stream_react_component` helper method, similar to `cached_react_component` but for streamed components.
 - **License Validation System**: Implemented comprehensive JWT-based license validation with offline verification using RSA-256 signatures. License validation occurs at startup in both Ruby and Node.js environments. Supports required fields (`sub`, `iat`, `exp`) and optional fields (`plan`, `organization`, `iss`). FREE evaluation licenses are available for 3 months at [shakacode.com/react-on-rails-pro](https://shakacode.com/react-on-rails-pro). [PR #1857](https://github.com/shakacode/react_on_rails/pull/1857) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 - **Pro-Specific Configurations Moved from Open-Source**: The following React Server Components (RSC) configurations are now exclusively in the Pro gem and should be configured in `ReactOnRailsPro.configure`:
@@ -46,9 +45,17 @@ _Add changes in master not yet tagged._
 
 - **Node Renderer Gem Version Validation**: The node renderer now validates that the Ruby gem version (`react_on_rails_pro`) matches the node renderer package version (`@shakacode-tools/react-on-rails-pro-node-renderer`) on every render request. Environment-aware: strict enforcement in development (returns 412 Precondition Failed on mismatch), permissive in production (allows with warning). Includes version normalization to handle Ruby gem vs NPM format differences (e.g., `4.0.0.rc.1` vs `4.0.0-rc.1`). [PR #1881](https://github.com/shakacode/react_on_rails/pull/1881) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
+### Fixed
+
+- **Node Renderer Worker Restart**: Fixed "descriptor closed" error that occurred when the node renderer restarts while handling an in-progress request (especially streaming requests). Workers now perform graceful shutdowns: they disconnect from the cluster to stop receiving new requests, wait for active requests to complete, then shut down cleanly. A configurable `gracefulWorkerRestartTimeout` ensures workers are forcibly killed if they don't shut down in time. [PR 1970](https://github.com/shakacode/react_on_rails/pull/1970) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+- **Body Duplication Bug On Streaming**: Fixed a bug that happens while streaming if the node renderer connection closed after streaming some chunks to the client. [PR 1995](https://github.com/shakacode/react_on_rails/pull/1995) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 ### Changed
 
-- Renamed Node Renderer configuration option `bundlePath` to `serverBundleCachePath` to better clarify its purpose as a cache directory for uploaded server bundles, distinct from Shakapacker's public asset directory. The old `bundlePath` property and `RENDERER_BUNDLE_PATH` environment variable continue to work with deprecation warnings. [PR 2008](https://github.com/shakacode/react_on_rails/pull/2008) by [justin808](https://github.com/justin808).
+### Deprecated
+
+- **Node Renderer Configuration**: Renamed `bundlePath` configuration option to `serverBundleCachePath` in the node renderer to better describe its purpose and avoid confusion with Shakapacker's public bundle path. The old `bundlePath` option continues to work with deprecation warnings. Both `RENDERER_SERVER_BUNDLE_CACHE_PATH` (new) and `RENDERER_BUNDLE_PATH` (deprecated) environment variables are supported. [PR 2008](https://github.com/shakacode/react_on_rails/pull/2008) by [justin808](https://github.com/justin808).
 
 ### Changed (Breaking)
 
