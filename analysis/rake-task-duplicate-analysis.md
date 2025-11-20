@@ -31,11 +31,13 @@ Rails Engines have **two different mechanisms** for loading rake tasks, and this
 2. **Manual Loading (Railtie Layer)**: The `rake_tasks` block explicitly loads specific files
 
 Because the task files existed in `lib/tasks/`:
+
 - `lib/tasks/assets.rake`
 - `lib/tasks/generate_packs.rake`
 - `lib/tasks/locale.rake`
 
 They were being loaded **twice**:
+
 - Once automatically by Rails::Engine from the `lib/tasks/` directory
 - Once explicitly by the `rake_tasks` block
 
@@ -69,11 +71,13 @@ Based on the PR context and commit message, the most likely reasons:
 ## The Impact
 
 Tasks affected by duplicate execution:
+
 - `react_on_rails:assets:webpack` - Webpack builds ran twice
 - `react_on_rails:generate_packs` - Pack generation ran twice
 - `react_on_rails:locale` - Locale file generation ran twice
 
 This meant:
+
 - **2x build times** during asset precompilation
 - **Slower CI** builds
 - **Confusing console output** showing duplicate webpack compilation messages
@@ -98,6 +102,7 @@ end
 ## Key Lesson
 
 **Rails::Engine Best Practice**: If your rake task files are in `lib/tasks/`, you don't need a `rake_tasks` block. Rails will load them automatically. Only use `rake_tasks do` if:
+
 - Tasks are in a non-standard location
 - You need to programmatically generate tasks
 - You need to pass context to the tasks
@@ -112,6 +117,7 @@ end
 ### For Code Reviews
 
 This incident highlights the challenge of reviewing massive PRs:
+
 - **97 files changed** made it nearly impossible to catch subtle issues
 - The `rake_tasks` addition was 6 lines in a file that wasn't the focus of the PR
 - The duplicate loading bug only manifested during asset precompilation, not during normal development
@@ -120,6 +126,7 @@ This incident highlights the challenge of reviewing massive PRs:
 ### For Testing
 
 The duplicate execution bug was subtle:
+
 - **Didn't cause failures**—just slower builds (2x time)
 - **Hard to notice locally**—developers might not realize builds were taking twice as long
 - **Only obvious in CI**—where build times are closely monitored
@@ -128,6 +135,7 @@ The duplicate execution bug was subtle:
 ### For Documentation
 
 Better documentation of Rails::Engine automatic loading would help:
+
 - Many Rails guides show `rake_tasks` blocks without mentioning automatic loading
 - The Rails Engine guide doesn't clearly state when NOT to use `rake_tasks`
 - This leads to cargo-culting of the pattern
