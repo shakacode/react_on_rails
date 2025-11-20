@@ -6,6 +6,17 @@
   "directories": {
     "doc": "docs"
   },
+  "exports": {
+    ".": {
+      "types": "./lib/ReactOnRailsProNodeRenderer.d.ts",
+      "default": "./lib/ReactOnRailsProNodeRenderer.js"
+    },
+    "./integrations/*": {
+      "types": "./lib/integrations/*.d.ts",
+      "default": "./lib/integrations/*.js"
+    },
+    "./package.json": "./package.json"
+  },
   "resolutions": {
     "sentry-testkit/body-parser": "npm:empty-npm-package@1.0.0",
     "sentry-testkit/express": "npm:empty-npm-package@1.0.0"
@@ -89,11 +100,11 @@
   "bugs": {
     "url": "https://github.com/shakacode/react_on_rails/issues"
   },
-  "homepage": "https://github.com/shakacode/react_on_rails/tree/master/react_on_rails_pro#readme",
+  "homepage": "https://github.com/shakacode/react_on_rails/tree/master/packages/react-on-rails-pro-node-renderer#readme",
   "jest": {
     "clearMocks": true,
     "collectCoverageFrom": [
-      "../packages/react-on-rails-pro-node-renderer/tests/**/*.{js,jsx,ts,tsx}"
+      "./tests/**/*.{js,jsx,ts,tsx}"
     ],
     "coverageReporters": [
       "lcov"
@@ -104,10 +115,10 @@
     "resetModules": true,
     "resetMocks": true,
     "roots": [
-      "../react-on-rails-pro-node-renderer"
+      "."
     ],
     "setupFiles": [
-      "../react-on-rails-pro-node-renderer/tests/helper.ts"
+      "./tests/helper.ts"
     ],
     "testEnvironment": "node",
     "transform": {
