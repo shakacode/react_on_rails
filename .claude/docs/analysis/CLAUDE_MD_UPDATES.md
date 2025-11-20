@@ -1,5 +1,17 @@
 # Concrete CLAUDE.md Updates Based on CI Breakage Analysis
 
+## Table of Contents
+
+- [Executive Summary of What Went Wrong](#executive-summary-of-what-went-wrong)
+- [High Priority Updates](#high-priority-add-these-3-sections-immediately)
+  - [Section 1: Testing Build and Package Scripts](#section-1-testing-build-and-package-scripts)
+  - [Section 2: Master Branch Health Monitoring](#section-2-master-branch-health-monitoring)
+  - [Section 3: Managing File Paths in Configuration](#section-3-managing-file-paths-in-configuration)
+- [Medium Priority Updates](#medium-priority-enhanced-merge-conflict-resolution)
+- [Implementation Plan](#implementation-plan)
+- [Validation](#validation)
+- [Key Takeaways](#key-takeaways-for-claudemd-philosophy)
+
 ## Executive Summary of What Went Wrong
 
 **Root Cause Chain:**

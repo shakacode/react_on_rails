@@ -54,11 +54,11 @@ Some failures don't show up in standard CI:
 
 - Re-running a workflow does NOT change its `conclusion` in the GitHub API
 - GitHub marks a run as "failed" even if a manual rerun succeeds
-- Our CI safety checks (as of PR #2062) now handle this correctly
+- Our CI safety checks (as of [PR #2062](https://github.com/shakacode/react_on_rails/pull/2062)) now handle this correctly
 - But be aware: old commits with failed reruns may still block docs-only commits
 
 **What this means:**
 
 - If master workflows fail, reruns alone won't fix the circular dependency
 - You need a new commit that passes to establish a clean baseline
-- See PR #2065 for an example of breaking the cycle
+- See [PR #2065](https://github.com/shakacode/react_on_rails/pull/2065) for an example of breaking the cycle
