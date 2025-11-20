@@ -123,14 +123,20 @@ module ReactOnRails
       end
 
       def add_react_on_rails_package
-        # Use exact version match between gem and npm package for stable releases
-        # For pre-release versions (e.g., 16.1.0-rc.1), use latest to avoid installing
-        # a version that may not exist in the npm registry
-        major_minor_patch_only = /\A\d+\.\d+\.\d+\z/
-        react_on_rails_pkg = if ReactOnRails::VERSION.match?(major_minor_patch_only)
+        # Use exact version match between gem and npm package for all versions including pre-releases
+        # The regex matches:
+        # - Stable: 16.2.0
+        # - Beta: 16.2.0-beta.10
+        # - RC: 16.1.0-rc.1
+        # - Alpha: 16.0.0-alpha.5
+        # This ensures beta/rc versions use the exact version instead of "latest" which would
+        # install the latest stable release and cause version mismatches.
+        version_with_optional_prerelease = /\A\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?\z/
+        react_on_rails_pkg = if ReactOnRails::VERSION.match?(version_with_optional_prerelease)
                                "react-on-rails@#{ReactOnRails::VERSION}"
                              else
-                               puts "Adding the latest react-on-rails NPM module. " \
+                               puts "WARNING: Unrecognized version format #{ReactOnRails::VERSION}. " \
+                                    "Adding the latest react-on-rails NPM module. " \
                                     "Double check this is correct in package.json"
                                "react-on-rails"
                              end
