@@ -1,4 +1,4 @@
-(function () {
+(function() {
   var railsContext = {
     railsEnv: 'development',
     inMailer: false,
