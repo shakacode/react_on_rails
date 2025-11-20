@@ -208,10 +208,37 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       expect(mock_manager).to have_received(:add).with(["react-on-rails@16.0.0"], exact: true)
     end
 
-    it "adds react-on-rails without version for pre-releases" do
+    it "adds react-on-rails with version for RC pre-releases" do
       stub_const("ReactOnRails::VERSION", "16.0.0-rc.1")
       instance.send(:add_react_on_rails_package)
+      expect(mock_manager).to have_received(:add).with(["react-on-rails@16.0.0-rc.1"], exact: true)
+    end
+
+    it "adds react-on-rails with version for beta pre-releases" do
+      stub_const("ReactOnRails::VERSION", "16.2.0-beta.10")
+      instance.send(:add_react_on_rails_package)
+      expect(mock_manager).to have_received(:add).with(["react-on-rails@16.2.0-beta.10"], exact: true)
+    end
+
+    it "adds react-on-rails with version for alpha releases" do
+      stub_const("ReactOnRails::VERSION", "16.0.0-alpha.5")
+      instance.send(:add_react_on_rails_package)
+      expect(mock_manager).to have_received(:add).with(["react-on-rails@16.0.0-alpha.5"], exact: true)
+    end
+
+    it "adds react-on-rails without version for invalid version formats" do
+      stub_const("ReactOnRails::VERSION", "invalid-version")
+      instance.send(:add_react_on_rails_package)
       expect(mock_manager).to have_received(:add).with(["react-on-rails"], exact: true)
+    end
+
+    it "warns about invalid version format when version doesn't match semver" do
+      stub_const("ReactOnRails::VERSION", "invalid-version")
+
+      # Capture stdout to verify the warning message
+      expect do
+        instance.send(:add_react_on_rails_package)
+      end.to output(/WARNING: Unrecognized version format invalid-version/).to_stdout
     end
 
     it "adds warning when add_package fails" do
