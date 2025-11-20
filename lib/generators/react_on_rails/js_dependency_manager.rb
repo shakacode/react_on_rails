@@ -124,16 +124,32 @@ module ReactOnRails
 
       def add_react_on_rails_package
         # Use exact version match between gem and npm package for all versions including pre-releases
+        # Ruby gem versions use dots (16.2.0.beta.10) but npm requires hyphens (16.2.0-beta.10)
+        # This method converts between the two formats.
+        #
         # The regex matches:
         # - Stable: 16.2.0
-        # - Beta: 16.2.0-beta.10
-        # - RC: 16.1.0-rc.1
-        # - Alpha: 16.0.0-alpha.5
+        # - Beta (Ruby): 16.2.0.beta.10 or (npm): 16.2.0-beta.10
+        # - RC (Ruby): 16.1.0.rc.1 or (npm): 16.1.0-rc.1
+        # - Alpha (Ruby): 16.0.0.alpha.5 or (npm): 16.0.0-alpha.5
         # This ensures beta/rc versions use the exact version instead of "latest" which would
         # install the latest stable release and cause version mismatches.
-        version_with_optional_prerelease = /\A\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?\z/
-        react_on_rails_pkg = if ReactOnRails::VERSION.match?(version_with_optional_prerelease)
-                               "react-on-rails@#{ReactOnRails::VERSION}"
+
+        # Accept both dot and hyphen separators for pre-release versions
+        version_with_optional_prerelease = /\A(\d+\.\d+\.\d+)([-.]([a-zA-Z0-9.]+))?\z/
+
+        react_on_rails_pkg = if (match = ReactOnRails::VERSION.match(version_with_optional_prerelease))
+                               base_version = match[1]
+                               prerelease = match[3]
+
+                               # Convert Ruby gem format (dot) to npm semver format (hyphen)
+                               npm_version = if prerelease
+                                               "#{base_version}-#{prerelease}"
+                                             else
+                                               base_version
+                                             end
+
+                               "react-on-rails@#{npm_version}"
                              else
                                puts "WARNING: Unrecognized version format #{ReactOnRails::VERSION}. " \
                                     "Adding the latest react-on-rails NPM module. " \
