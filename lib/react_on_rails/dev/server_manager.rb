@@ -3,6 +3,7 @@
 require "English"
 require "open3"
 require "rainbow"
+require_relative "../packer_utils"
 
 module ReactOnRails
   module Dev
