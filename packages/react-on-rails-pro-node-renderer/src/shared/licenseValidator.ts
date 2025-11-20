@@ -1,7 +1,7 @@
 import * as jwt from 'jsonwebtoken';
 import * as fs from 'fs';
 import * as path from 'path';
-import { PUBLIC_KEY } from './licensePublicKey';
+import { PUBLIC_KEY } from './licensePublicKey.js';
 
 interface LicenseData {
   // Subject (email for whom the license is issued)

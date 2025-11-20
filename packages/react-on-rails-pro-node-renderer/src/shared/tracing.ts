@@ -1,4 +1,4 @@
-import { message } from './errorReporter';
+import { message } from './errorReporter.js';
 
 /* eslint-disable @typescript-eslint/no-empty-object-type -- empty interfaces are used as targets for augmentation */
 /**

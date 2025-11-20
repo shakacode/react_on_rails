@@ -9,15 +9,15 @@ import { mkdir } from 'fs/promises';
 import fastify from 'fastify';
 import fastifyFormbody from '@fastify/formbody';
 import fastifyMultipart from '@fastify/multipart';
-import log, { sharedLoggerOptions } from './shared/log';
-import packageJson from './shared/packageJson';
-import { buildConfig, Config, getConfig } from './shared/configBuilder';
-import fileExistsAsync from './shared/fileExistsAsync';
-import type { FastifyInstance, FastifyReply, FastifyRequest } from './worker/types';
-import checkProtocolVersion from './worker/checkProtocolVersionHandler';
-import authenticate from './worker/authHandler';
-import { handleRenderRequest, type ProvidedNewBundle } from './worker/handleRenderRequest';
-import handleGracefulShutdown from './worker/handleGracefulShutdown';
+import log, { sharedLoggerOptions } from './shared/log.js';
+import packageJson from './shared/packageJson.js';
+import { buildConfig, Config, getConfig } from './shared/configBuilder.js';
+import fileExistsAsync from './shared/fileExistsAsync.js';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from './worker/types.js';
+import checkProtocolVersion from './worker/checkProtocolVersionHandler.js';
+import authenticate from './worker/authHandler.js';
+import { handleRenderRequest, type ProvidedNewBundle } from './worker/handleRenderRequest.js';
+import handleGracefulShutdown from './worker/handleGracefulShutdown.js';
 import {
   errorResponseResult,
   formatExceptionMessage,
@@ -29,13 +29,13 @@ import {
   getAssetPath,
   getBundleDirectory,
   deleteUploadedAssets,
-} from './shared/utils';
-import * as errorReporter from './shared/errorReporter';
-import { lock, unlock } from './shared/locks';
-import { startSsrRequestOptions, trace } from './shared/tracing';
+} from './shared/utils.js';
+import * as errorReporter from './shared/errorReporter.js';
+import { lock, unlock } from './shared/locks.js';
+import { startSsrRequestOptions, trace } from './shared/tracing.js';
 
 // Uncomment the below for testing timeouts:
-// import { delay } from './shared/utils';
+// import { delay } from './shared/utils.js';
 //
 // function getRandomInt(max) {
 //   return Math.floor(Math.random() * Math.floor(max));

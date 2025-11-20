@@ -3,15 +3,15 @@
  * @module master
  */
 import cluster from 'cluster';
-import log from './shared/log';
-import { buildConfig, Config, logSanitizedConfig } from './shared/configBuilder';
-import restartWorkers from './master/restartWorkers';
-import * as errorReporter from './shared/errorReporter';
-import { getValidatedLicenseData } from './shared/licenseValidator';
+import log from './shared/log.js';
+import { buildConfig, Config, logSanitizedConfig } from './shared/configBuilder.js';
+import restartWorkers from './master/restartWorkers.js';
+import * as errorReporter from './shared/errorReporter.js';
+import { getValidatedLicenseData } from './shared/licenseValidator.js';
 
 const MILLISECONDS_IN_MINUTE = 60000;
 
-export = function masterRun(runningConfig?: Partial<Config>) {
+export default function masterRun(runningConfig?: Partial<Config>) {
   // Validate license before starting - required in all environments
   log.info('[React on Rails Pro] Validating license...');
   getValidatedLicenseData();
@@ -71,4 +71,4 @@ export = function masterRun(runningConfig?: Partial<Config>) {
   } else {
     log.info('No schedule for workers restarts');
   }
-};
+}

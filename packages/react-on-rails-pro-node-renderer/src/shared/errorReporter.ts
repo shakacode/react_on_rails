@@ -1,5 +1,5 @@
-import log from './log';
-import type { TracingContext } from './tracing';
+import log from './log.js';
+import type { TracingContext } from './tracing.js';
 
 export type Notifier<T> = (msg: T, tracingContext?: TracingContext) => void;
 export type MessageNotifier = Notifier<string>;

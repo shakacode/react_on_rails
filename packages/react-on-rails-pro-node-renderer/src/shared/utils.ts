@@ -4,17 +4,16 @@ import { MultipartFile } from '@fastify/multipart';
 import { createWriteStream, ensureDir, move, MoveOptions, copy, CopyOptions, unlink } from 'fs-extra';
 import { Readable, pipeline, PassThrough } from 'stream';
 import { promisify } from 'util';
-import * as errorReporter from './errorReporter';
-import { getConfig } from './configBuilder';
-import log from './log';
-import type { RenderResult } from '../worker/vm';
+import * as errorReporter from './errorReporter.js';
+import { getConfig } from './configBuilder.js';
+import log from './log.js';
+import type { RenderResult } from '../worker/vm.js';
 
 export const TRUNCATION_FILLER = '\n... TRUNCATED ...\n';
 
 export const SHUTDOWN_WORKER_MESSAGE = 'NODE_RENDERER_SHUTDOWN_WORKER';
 
 export function workerIdLabel() {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- worker is nullable in the primary process
   return cluster?.worker?.id || 'NO WORKER ID';
 }
 

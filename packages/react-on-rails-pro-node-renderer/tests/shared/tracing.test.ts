@@ -6,7 +6,6 @@ import * as errorReporter from '../../src/shared/errorReporter';
 import { trace } from '../../src/shared/tracing';
 import * as tracingIntegration from '../../src/integrations/sentry';
 
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 const { testkit, sentryTransport } = sentryTestkit();
 
 Sentry.init({
@@ -14,7 +13,7 @@ Sentry.init({
   tracesSampleRate: 1.0,
   transport: sentryTransport,
 });
-/* eslint-enable @typescript-eslint/no-unsafe-assignment */
+
 tracingIntegration.init({ tracing: true });
 
 const spanName = 'TestSpan';

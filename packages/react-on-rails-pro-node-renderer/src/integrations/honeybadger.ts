@@ -1,19 +1,20 @@
-import * as Honeybadger from '@honeybadger-io/js';
-import { addNotifier, configureFastify, message } from './api';
+import Honeybadger from '@honeybadger-io/js';
+import { addNotifier, configureFastify, message } from './api.js';
 
 export function init({ fastify = false } = {}) {
-  addNotifier((msg) => Honeybadger.notify(msg));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  addNotifier((msg: any) => Honeybadger.notify(msg));
 
   if (fastify) {
     if ('requestHandler' in Honeybadger && 'withRequest' in Honeybadger) {
       // https://docs.honeybadger.io/lib/javascript/integration/node/#fastify
-      configureFastify((app) => {
-        // @ts-expect-error Slight type mismatch, but it should work
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      configureFastify((app: any) => {
         app.addHook('preHandler', Honeybadger.requestHandler);
 
         // Better than setErrorHandler in the above documentation
-        app.addHook('onError', (request, _reply, error, done) => {
-          // @ts-expect-error Slight type mismatch, but it should work
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        app.addHook('onError', (request: any, _reply: any, error: any, done: () => void) => {
           Honeybadger.withRequest(request, () => {
             Honeybadger.notify(error);
           });

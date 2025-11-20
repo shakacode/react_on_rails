@@ -15,4 +15,4 @@ const fileExistsAsync = async (assetPath: string) => {
   }
 };
 
-export = fileExistsAsync;
+export default fileExistsAsync;

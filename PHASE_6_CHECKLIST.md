@@ -549,6 +549,7 @@ Most should still work, but verify paths like:
   ```
 
 - [ ] Update LICENSE.md to note this exception:
+
   ```md
   ## React on Rails Pro License applies to:
 

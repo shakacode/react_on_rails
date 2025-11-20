@@ -1,8 +1,10 @@
 import cluster from 'cluster';
-import { version as fastifyVersion } from 'fastify/package.json';
-import { Config, buildConfig } from './shared/configBuilder';
-import log from './shared/log';
-import { majorVersion } from './shared/utils';
+import fastifyPackageJson from 'fastify/package.json' with { type: 'json' };
+import { Config, buildConfig } from './shared/configBuilder.js';
+
+const { version: fastifyVersion } = fastifyPackageJson;
+import log from './shared/log.js';
+import { majorVersion } from './shared/utils.js';
 
 export async function reactOnRailsProNodeRenderer(config: Partial<Config> = {}) {
   const fastify5Supported = majorVersion(process.versions.node) >= 20;
@@ -36,11 +38,11 @@ and for "@fastify/..." dependencies in your package.json. Consider removing them
       log.info('Running renderer in single process mode (workersCount: 0)');
     }
 
-    const worker = require('./worker') as typeof import('./worker');
+    const worker = require('./worker') as typeof import('./worker.js');
     await worker.default(config).ready();
   } else {
-    const master = require('./master') as typeof import('./master');
-    master(config);
+    const master = require('./master') as typeof import('./master.js');
+    master.default(config);
   }
   /* eslint-enable global-require,@typescript-eslint/no-require-imports */
 }

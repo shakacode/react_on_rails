@@ -241,6 +241,33 @@ const config = tsEslint.config([
     },
   },
   {
+    files: ['packages/react-on-rails-pro-node-renderer/**/*'],
+    rules: {
+      // Disable import rules for node-renderer - ESM requires .js extensions but ESLint
+      // can't resolve them for .ts files. TypeScript compiler validates these imports
+      'import/named': 'off',
+      'import/no-unresolved': 'off',
+      'import/prefer-default-export': 'off',
+      // Disable unsafe type rules - node-renderer uses external libs with complex types
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      // Allow missing extensions in require() calls - dynamic imports
+      'import/extensions': 'off',
+    },
+  },
+  {
+    files: ['packages/react-on-rails-pro-node-renderer/tests/**/*'],
+    rules: {
+      // Allow non-null assertions in tests - they're acceptable for test data
+      '@typescript-eslint/no-non-null-assertion': 'off',
+      // Some tests validate error conditions without explicit assertions
+      'jest/expect-expect': 'off',
+    },
+  },
+  {
     files: ['**/app-react16/**/*'],
     rules: {
       'react/no-deprecated': 'off',

@@ -1,7 +1,7 @@
 import cluster from 'cluster';
-import { FastifyInstance } from './types';
-import { SHUTDOWN_WORKER_MESSAGE } from '../shared/utils';
-import log from '../shared/log';
+import { FastifyInstance } from './types.js';
+import { SHUTDOWN_WORKER_MESSAGE } from '../shared/utils.js';
+import log from '../shared/log.js';
 
 const handleGracefulShutdown = (app: FastifyInstance) => {
   const { worker } = cluster;

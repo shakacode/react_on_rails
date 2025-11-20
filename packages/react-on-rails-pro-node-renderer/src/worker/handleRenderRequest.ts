@@ -8,9 +8,9 @@
 import cluster from 'cluster';
 import path from 'path';
 import { mkdir } from 'fs/promises';
-import { lock, unlock } from '../shared/locks';
-import fileExistsAsync from '../shared/fileExistsAsync';
-import log from '../shared/log';
+import { lock, unlock } from '../shared/locks.js';
+import fileExistsAsync from '../shared/fileExistsAsync.js';
+import log from '../shared/log.js';
 import {
   Asset,
   formatExceptionMessage,
@@ -23,10 +23,10 @@ import {
   isErrorRenderResult,
   getRequestBundleFilePath,
   deleteUploadedAssets,
-} from '../shared/utils';
-import { getConfig } from '../shared/configBuilder';
-import * as errorReporter from '../shared/errorReporter';
-import { buildVM, hasVMContextForBundle, runInVM } from './vm';
+} from '../shared/utils.js';
+import { getConfig } from '../shared/configBuilder.js';
+import * as errorReporter from '../shared/errorReporter.js';
+import { buildVM, hasVMContextForBundle, runInVM } from './vm.js';
 
 export type ProvidedNewBundle = {
   timestamp: string | number;
@@ -135,12 +135,10 @@ to ${bundleFilePathPerTimestamp})`,
 
     return undefined;
   } finally {
-    if (lockAcquired) {
-      log.info('About to unlock %s from worker %i', lockfileName, workerIdLabel());
+    if (lockAcquired && lockfileName) {
+      log.info('About to unlock %s from worker %s', lockfileName, workerIdLabel());
       try {
-        if (lockfileName) {
-          await unlock(lockfileName);
-        }
+        await unlock(lockfileName);
       } catch (error) {
         const msg = formatExceptionMessage(
           renderingRequest,

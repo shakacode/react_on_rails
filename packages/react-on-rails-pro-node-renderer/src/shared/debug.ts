@@ -1,3 +1,3 @@
 import { debuglog } from 'util';
 
-export = debuglog('ROR');
+export default debuglog('ROR');

@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-deprecated */
 import { captureException, captureMessage, startTransaction } from '@sentry/node';
 import { CaptureContext, TransactionContext } from '@sentry/types';
-import { addErrorNotifier, addMessageNotifier, message, setupTracing } from './api';
+import { addErrorNotifier, addMessageNotifier, message, setupTracing } from './api.js';
 
-declare module '../shared/tracing' {
+declare module '../shared/tracing.js' {
   interface TracingContext {
     sentry6?: CaptureContext;
   }
@@ -24,7 +24,7 @@ export function init({ tracing = false } = {}) {
 
   if (tracing) {
     try {
-      // eslint-disable-next-line global-require,import/no-unresolved,@typescript-eslint/no-require-imports -- Intentionally absent in our devDependencies
+      // eslint-disable-next-line global-require,@typescript-eslint/no-require-imports -- Intentionally absent in our devDependencies
       require('@sentry/tracing');
     } catch (_e) {
       message("Failed to load '@sentry/tracing'. Tracing is disabled.");
