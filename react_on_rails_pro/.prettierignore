@@ -1,6 +1,6 @@
 node_modules
 **/node_modules/**
-packages/node-renderer/tests/fixtures/projects
+../packages/react-on-rails-pro-node-renderer/tests/fixtures/projects
 **/tmp
 **/public
 **/package.json
