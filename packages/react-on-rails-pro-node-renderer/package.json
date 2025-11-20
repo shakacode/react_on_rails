@@ -1,7 +1,7 @@
 {
-  "name": "react-on-rails-pro-dummy-placeholder",
+  "name": "react-on-rails-pro-node-renderer",
   "version": "16.2.0-beta.11",
-  "description": "Placeholder package.json for react_on_rails_pro dummy app - actual Pro package is at packages/react-on-rails-pro",
+  "description": "React on Rails Pro Node Renderer for server-side rendering",
   "private": true,
   "directories": {
     "doc": "docs"
@@ -37,7 +37,6 @@
     "node-html-parser": "^7.0.1",
     "nps": "^5.9.12",
     "pino-pretty": "^13.0.0",
-    "react-on-rails": "link:.yalc/react-on-rails",
     "redis": "^5.0.1",
     "sentry-testkit": "^5.0.6",
     "touch": "^3.1.0",
@@ -60,17 +59,17 @@
     }
   },
   "scripts": {
-    "preinstall": "node ./script/preinstall.js",
-    "postinstall": "test -f post-yarn-install.local && ./post-yarn-install.local || true",
-    "link-source": "cd ../packages/react-on-rails && yarn && yalc publish",
-    "test": "nps test",
+    "build": "yarn run clean && yarn run tsc",
+    "build-watch": "yarn run clean && yarn run tsc --watch",
+    "clean": "rm -rf ./lib",
+    "developing": "nps node-renderer.debug",
+    "test": "jest tests",
+    "type-check": "yarn run tsc --noEmit --noErrorTruncation",
     "prepack": "nps build.prepack",
     "prepare": "nps build.prepack",
-    "prepublishOnly": "nps build",
-    "start": "nps",
-    "developing": "nps node-renderer.debug",
-    "eslint": "eslint .",
-    "check": "nps lint && nps format && nps test"
+    "prepublishOnly": "yarn run build",
+    "yalc:publish": "yalc publish",
+    "yalc": "yalc"
   },
   "repository": {
     "type": "git",
@@ -104,10 +103,10 @@
     "resetModules": true,
     "resetMocks": true,
     "roots": [
-      "../packages/react-on-rails-pro-node-renderer"
+      "../react-on-rails-pro-node-renderer"
     ],
     "setupFiles": [
-      "../packages/react-on-rails-pro-node-renderer/tests/helper.ts"
+      "../react-on-rails-pro-node-renderer/tests/helper.ts"
     ],
     "testEnvironment": "node",
     "transform": {

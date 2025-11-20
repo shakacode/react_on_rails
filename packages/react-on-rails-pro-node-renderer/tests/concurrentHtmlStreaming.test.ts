@@ -2,8 +2,8 @@ import { randomUUID } from 'crypto';
 import { createClient } from 'redis';
 import parser from 'node-html-parser';
 
-// @ts-expect-error TODO: fix later
-import { RSCPayloadChunk } from 'react-on-rails';
+// eslint-disable-next-line import/no-relative-packages
+import { RSCPayloadChunk } from '../../react-on-rails/lib/types';
 import buildApp from '../src/worker';
 import config from './testingNodeRendererConfigs';
 import { makeRequest } from './httpRequestUtils';
