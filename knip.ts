@@ -65,6 +65,25 @@ const config: KnipConfig = {
       ],
     },
 
+    // React on Rails Pro Node Renderer package workspace
+    'packages/react-on-rails-pro-node-renderer': {
+      entry: ['src/index.ts!', 'src/server.ts!'],
+      project: ['src/**/*.[jt]s{x,}!', 'tests/**/*.[jt]s{x,}', '!lib/**'],
+      ignore: [
+        // Build output directories that should be ignored
+        'lib/**',
+        // Test fixtures
+        'tests/fixtures/**',
+      ],
+      ignoreDependencies: [
+        // These are runtime dependencies needed for the package to work
+        // even though they may not be directly imported in the source
+        'react-on-rails-pro',
+        // Dev dependencies used only in tests
+        '@honeybadger-io/js',
+      ],
+    },
+
     // React on Rails Pro package workspace
     'packages/react-on-rails-pro': {
       entry: [
