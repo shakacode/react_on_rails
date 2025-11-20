@@ -94,7 +94,7 @@ jobs:
             **Example:**
             \\\`\\\`\\\`
             /run-skipped-ci
-            # or use the shorter alias:
+            # or use the alias:
             /run-skipped-tests
             \\\`\\\`\\\`
 

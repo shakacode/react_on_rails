@@ -10,7 +10,7 @@ When you open a PR, CI automatically runs a subset of tests for faster feedback 
 
 ```
 /run-skipped-ci
-# or use the shorter alias:
+# or use the alias:
 /run-skipped-tests
 ```
 

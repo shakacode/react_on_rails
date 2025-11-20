@@ -432,7 +432,7 @@ Runs all skipped CI checks and enables full CI mode for the PR:
 
 ```
 /run-skipped-ci
-# or use the shorter alias:
+# or use the alias:
 /run-skipped-tests
 ```
 
