@@ -353,6 +353,13 @@ Most should still work, but verify paths like:
 
 ### 7.2: Handle Remaining Files
 
+- [ ] **CHANGELOG.md**: Move to root as CHANGELOG_PRO.md:
+
+  ```bash
+  # Move Pro changelog to root as sibling
+  git mv react_on_rails_pro/CHANGELOG.md CHANGELOG_PRO.md
+  ```
+
 - [ ] **README.md**: Move valuable content to root README or docs/:
 
   ```bash
@@ -440,7 +447,9 @@ Most should still work, but verify paths like:
   grep -r "react_on_rails_pro/" docs/ --include="*.md"
   ```
 
-- [ ] Update CLAUDE.md if it references old paths
+- [ ] Update CLAUDE.md:
+  - Update changelog section to reference `/CHANGELOG_PRO.md`
+  - Update any paths referencing old structure
 - [ ] Update CONTRIBUTING.md
 - [ ] Update any README files
 
