@@ -5,17 +5,14 @@
   "description": "react-on-rails-pro JavaScript for react_on_rails_pro Ruby gem",
   "exports": {
     ".": {
-      "types": "./packages/node-renderer/dist/ReactOnRailsProNodeRenderer.d.ts",
-      "default": "./packages/node-renderer/dist/ReactOnRailsProNodeRenderer.js"
+      "types": "../packages/react-on-rails-pro-node-renderer/lib/ReactOnRailsProNodeRenderer.d.ts",
+      "default": "../packages/react-on-rails-pro-node-renderer/lib/ReactOnRailsProNodeRenderer.js"
     },
     "./integrations/*": {
-      "types": "./packages/node-renderer/dist/integrations/*.d.ts",
-      "default": "./packages/node-renderer/dist/integrations/*.js"
+      "types": "../packages/react-on-rails-pro-node-renderer/lib/integrations/*.d.ts",
+      "default": "../packages/react-on-rails-pro-node-renderer/lib/integrations/*.js"
     },
     "./package.json": "./package.json"
-  },
-  "bin": {
-    "react-on-rails-pro-node-renderer": "packages/node-renderer/dist/default-node-renderer.js"
   },
   "directories": {
     "doc": "docs"
@@ -98,7 +95,7 @@
     }
   },
   "files": [
-    "packages/node-renderer/dist",
+    "../packages/react-on-rails-pro-node-renderer/lib",
     "script/preinstall.js"
   ],
   "scripts": {
@@ -135,7 +132,7 @@
   "jest": {
     "clearMocks": true,
     "collectCoverageFrom": [
-      "packages/node-renderer/tests/**/*.{js,jsx,ts,tsx}"
+      "../packages/react-on-rails-pro-node-renderer/tests/**/*.{js,jsx,ts,tsx}"
     ],
     "coverageReporters": [
       "lcov"
@@ -143,7 +140,7 @@
     "resetModules": true,
     "resetMocks": true,
     "setupFiles": [
-      "./packages/node-renderer/tests/helper.ts"
+      "../packages/react-on-rails-pro-node-renderer/tests/helper.ts"
     ],
     "testEnvironment": "node",
     "transform": {

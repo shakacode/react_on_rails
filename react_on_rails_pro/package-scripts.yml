@@ -2,30 +2,30 @@ scripts:
   test:
     default:
       description: Run all JS tests
-      script: jest packages/node-renderer
+      script: jest ../packages/react-on-rails-pro-node-renderer
     ci:
       description: Run all JS tests in CI mode
       # https://circleci.com/docs/collect-test-data/#jest
-      script: jest --ci --runInBand --reporters=default --reporters=jest-junit -- packages/node-renderer
+      script: jest --ci --runInBand --reporters=default --reporters=jest-junit -- ../packages/react-on-rails-pro-node-renderer
     debug:
       description: Debug all JS tests
-      script: ndb jest --runInBand packages/node-renderer
+      script: ndb jest --runInBand ../packages/react-on-rails-pro-node-renderer
   check:
     description: Run all checks
     script: nps lint && nps format.listDifferent && nps test && nps check-typescript
   check-typescript:
     description: Check for TypeScript errors
-    script: nps "build --noEmit" && tsc --project packages/node-renderer/tests && cd spec/dummy && yarn run tsc -p ./tsconfig.json --noEmit
+    script: nps "build --noEmit" && tsc --project ../packages/react-on-rails-pro-node-renderer/tests && cd spec/dummy && yarn run tsc -p ./tsconfig.json --noEmit
   fix:
     description: Run all code fixes before committing
     script: nps eslint.fix && nps format
   node-renderer:
     default:
       description:
-      script: nps build && node --enable-source-maps packages/node-renderer/dist/default-node-renderer.js
+      script: nps build && node --enable-source-maps ../packages/react-on-rails-pro-node-renderer/lib/default-node-renderer.js
     debug:
       description: Debug Node Renderer
-      script: rm -rf /tmp/react-on-rails-pro-node-renderer-bundles && nps build && RENDERER_LOG_LEVEL=info NODE_DEBUG=ROR node --enable-source-maps packages/node-renderer/dist/default-node-renderer.js
+      script: rm -rf /tmp/react-on-rails-pro-node-renderer-bundles && nps build && RENDERER_LOG_LEVEL=info NODE_DEBUG=ROR node --enable-source-maps ../packages/react-on-rails-pro-node-renderer/lib/default-node-renderer.js
   lint:
     description: Run all linters
     script: concurrently --prefix "[{name}]" --names "ESLINT, RUBOCOP, PRETTIER" -c "blue,yellow,magenta,orange" "nps eslint" "bundle exec rubocop" "nps format.listDifferent"
@@ -33,7 +33,7 @@ scripts:
   build:
     default:
       description: Build the project
-      script: echo "building the project" && rm -rf packages/node-renderer/dist && tsc --project packages/node-renderer/src
+      script: echo "building the project" && rm -rf ../packages/react-on-rails-pro-node-renderer/lib && tsc --project ../packages/react-on-rails-pro-node-renderer/src
     prepack:
       description: Build the project in the prepack/prepare scripts
       # This is necessary when used as a Git dependency since we don't have the dist directory in the repo.
@@ -44,14 +44,14 @@ scripts:
       # 3. Check if the project is built now;
       # 4. If it failed, print an error message (still follow https://docs.npmjs.com/cli/v8/using-npm/scripts#best-practices).
       script: >
-        [ -f packages/node-renderer/dist/ReactOnRailsProNodeRenderer.js ] ||
+        [ -f ../packages/react-on-rails-pro-node-renderer/lib/ReactOnRailsProNodeRenderer.js ] ||
           (nps build >/dev/null 2>&1 || true) &&
-          [ -f packages/node-renderer/dist/ReactOnRailsProNodeRenderer.js ] ||
+          [ -f ../packages/react-on-rails-pro-node-renderer/lib/ReactOnRailsProNodeRenderer.js ] ||
           { echo 'Building react-on-rails-pro-node-renderer seems to have failed!'; }
 
   clean:
     description: Clean the project
-    script: rm -rf packages/node-renderer/dist
+    script: rm -rf ../packages/react-on-rails-pro-node-renderer/lib
 
   eslint:
     default:
@@ -95,7 +95,7 @@ scripts:
     json:
       default:
         description: Run prettier on JSON files.
-        script: rm -rf packages/node-renderer/tests/tmp && prettier "**/*.json" --write
+        script: rm -rf ../packages/react-on-rails-pro-node-renderer/tests/tmp && prettier "**/*.json" --write
       listDifferent:
         description: Check if any JSON files would change by running prettier.
         script: prettier "**/*.json" --list-different
@@ -103,7 +103,7 @@ scripts:
   renderer:
     default:
       description: Starts the node renderer.
-      script: nps build && RENDERER_PORT=3800 RENDERER_SUPPORT_MODULES=TRUE node ./packages/node-renderer/dist/default-node-renderer.js
+      script: nps build && RENDERER_PORT=3800 RENDERER_SUPPORT_MODULES=TRUE node ../packages/react-on-rails-pro-node-renderer/lib/default-node-renderer.js
     debug:
       description: Starts the node renderer with debugging enabled. See Node.js V8 --inspector Manager (NiM)
-      script: nps build && RENDERER_WORKERS_COUNT=1 RENDERER_PORT=3800 RENDERER_SUPPORT_MODULES=TRUE ndb ./packages/node-renderer/dist/default-node-renderer.js
+      script: nps build && RENDERER_WORKERS_COUNT=1 RENDERER_PORT=3800 RENDERER_SUPPORT_MODULES=TRUE ndb ../packages/react-on-rails-pro-node-renderer/lib/default-node-renderer.js
