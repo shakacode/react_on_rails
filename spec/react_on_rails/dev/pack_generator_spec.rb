@@ -4,6 +4,15 @@ require_relative "../spec_helper"
 require "react_on_rails/dev/pack_generator"
 
 RSpec.describe ReactOnRails::Dev::PackGenerator do
+  # Integration test: verify PackerUtils is properly required
+  describe "module dependencies" do
+    it "can access ReactOnRails::PackerUtils without errors" do
+      # This test ensures the require statement is present in pack_generator.rb
+      # If the require is missing, this will raise NameError: uninitialized constant
+      expect { ReactOnRails::PackerUtils }.not_to raise_error
+    end
+  end
+
   describe ".generate" do
     context "when shakapacker precompile hook is configured" do
       before do
