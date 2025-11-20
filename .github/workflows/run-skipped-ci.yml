@@ -16,7 +16,9 @@ jobs:
       github.event.issue.pull_request &&
       (
         startsWith(github.event.comment.body, '/run-skipped-ci') ||
-        contains(github.event.comment.body, '\n/run-skipped-ci')
+        contains(github.event.comment.body, '\n/run-skipped-ci') ||
+        startsWith(github.event.comment.body, '/run-skipped-tests') ||
+        contains(github.event.comment.body, '\n/run-skipped-tests')
       )
     runs-on: ubuntu-22.04
     permissions:

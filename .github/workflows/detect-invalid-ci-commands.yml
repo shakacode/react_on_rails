@@ -18,6 +18,7 @@ jobs:
         contains(github.event.comment.body, '/help')
       ) &&
       !contains(github.event.comment.body, '/run-skipped-ci') &&
+      !contains(github.event.comment.body, '/run-skipped-tests') &&
       !contains(github.event.comment.body, '/stop-run-skipped-ci')
     runs-on: ubuntu-22.04
     permissions:
@@ -42,7 +43,7 @@ jobs:
             }
 
             // Valid commands
-            const validCommands = ['/run-skipped-ci', '/stop-run-skipped-ci'];
+            const validCommands = ['/run-skipped-ci', '/run-skipped-tests', '/stop-run-skipped-ci'];
 
             // Check if any command is invalid
             const invalidCommands = matches
@@ -78,7 +79,7 @@ jobs:
 
             ## Available GitHub Comment Commands
 
-            ### 1. \\\`/run-skipped-ci\\\` - Enable Full CI Mode
+            ### 1. \\\`/run-skipped-ci\\\` (or \\\`/run-skipped-tests\\\`) - Enable Full CI Mode
             Triggers all CI workflows that were skipped due to unchanged code.
 
             **What it does:**
@@ -93,6 +94,8 @@ jobs:
             **Example:**
             \\\`\\\`\\\`
             /run-skipped-ci
+            # or use the shorter alias:
+            /run-skipped-tests
             \\\`\\\`\\\`
 
             ---
