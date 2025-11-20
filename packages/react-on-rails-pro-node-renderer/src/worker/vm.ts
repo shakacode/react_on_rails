@@ -354,6 +354,9 @@ export function resetVM() {
 }
 
 // Optional: Add a method to remove a specific VM if needed
+/**
+ * @public TODO: Remove the line below when this function is actually used
+ */
 export function removeVM(bundlePath: string) {
   vmContexts.delete(bundlePath);
 }

@@ -230,6 +230,7 @@ export function getValidatedLicenseData(): LicenseData {
  * Checks if the current license is an evaluation/free license.
  *
  * @returns true if plan is not "paid"
+ * @public TODO: Remove this line when this function is actually used
  */
 export function isEvaluation(): boolean {
   const data = getValidatedLicenseData();
@@ -241,6 +242,7 @@ export function isEvaluation(): boolean {
  * Returns remaining grace period days if license is expired but in grace period.
  *
  * @returns Number of days remaining, or undefined if not in grace period
+ * @public TODO: Remove this line when this function is actually used
  */
 export function getGraceDaysRemaining(): number | undefined {
   // Ensure license is validated and cached
@@ -252,6 +254,7 @@ export function getGraceDaysRemaining(): number | undefined {
 
 /**
  * Resets all cached validation state (primarily for testing).
+ * @public TODO: Remove this line when this function is actually used
  */
 export function reset(): void {
   cachedLicenseData = undefined;
