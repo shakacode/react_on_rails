@@ -426,12 +426,14 @@ For more details, see [`docs/CI_OPTIMIZATION.md`](./docs/CI_OPTIMIZATION.md).
 
 React on Rails provides PR comment commands to control CI behavior:
 
-#### `/run-skipped-ci` - Enable Full CI Mode
+#### `/run-skipped-ci` (or `/run-skipped-tests`) - Enable Full CI Mode
 
 Runs all skipped CI checks and enables full CI mode for the PR:
 
 ```
 /run-skipped-ci
+# or use the shorter alias:
+/run-skipped-tests
 ```
 
 **What it does:**
