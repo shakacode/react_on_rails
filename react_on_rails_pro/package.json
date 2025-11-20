@@ -1,19 +1,8 @@
 {
-  "name": "react-on-rails-pro-node-renderer",
-  "version": "16.2.0-beta.12",
-  "protocolVersion": "2.0.0",
-  "description": "react-on-rails-pro JavaScript for react_on_rails_pro Ruby gem",
-  "exports": {
-    ".": {
-      "types": "../packages/react-on-rails-pro-node-renderer/lib/ReactOnRailsProNodeRenderer.d.ts",
-      "default": "../packages/react-on-rails-pro-node-renderer/lib/ReactOnRailsProNodeRenderer.js"
-    },
-    "./integrations/*": {
-      "types": "../packages/react-on-rails-pro-node-renderer/lib/integrations/*.d.ts",
-      "default": "../packages/react-on-rails-pro-node-renderer/lib/integrations/*.js"
-    },
-    "./package.json": "./package.json"
-  },
+  "name": "react-on-rails-pro-dummy-placeholder",
+  "version": "16.2.0-beta.11",
+  "description": "Placeholder package.json for react_on_rails_pro dummy app - actual Pro package is at packages/react-on-rails-pro",
+  "private": true,
   "directories": {
     "doc": "docs"
   },
@@ -94,10 +83,6 @@
       "optional": true
     }
   },
-  "files": [
-    "../packages/react-on-rails-pro-node-renderer/lib",
-    "script/preinstall.js"
-  ],
   "scripts": {
     "preinstall": "node ./script/preinstall.js",
     "postinstall": "test -f post-yarn-install.local && ./post-yarn-install.local || true",
