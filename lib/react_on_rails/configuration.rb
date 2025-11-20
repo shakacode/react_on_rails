@@ -1,6 +1,22 @@
 # frozen_string_literal: true
 
 require "active_support/core_ext/enumerable"
+require "active_support/core_ext/object/blank"
+
+# Polyfill for compact_blank (added in Rails 6.1) to support Rails 5.2-6.0
+unless [].respond_to?(:compact_blank)
+  module Enumerable
+    def compact_blank
+      reject(&:blank?)
+    end
+  end
+
+  class Array
+    def compact_blank
+      reject(&:blank?)
+    end
+  end
+end
 
 # rubocop:disable Metrics/ClassLength
 
