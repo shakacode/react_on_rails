@@ -66,4 +66,7 @@ ssr-generated
 
 # Claude Code local settings
 .claude/settings.local.json
-packages/
+
+# Workspace package build outputs (but track source code)
+packages/*/lib/
+packages/**/node_modules/
