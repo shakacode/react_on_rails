@@ -9,13 +9,11 @@
   }
 
   const runOnOtherBundle = globalThis.runOnOtherBundle;
-  if (typeof generateRSCPayload !== 'function') {
-    globalThis.generateRSCPayload = function generateRSCPayload(componentName, props, railsContext) {
-      const { renderingRequest, rscBundleHash } = railsContext.serverSideRSCPayloadParameters;
-      const propsString = JSON.stringify(props);
-      const newRenderingRequest = renderingRequest.replace(/\(\s*\)\s*$/, `('${componentName}', ${propsString})`);
-      return runOnOtherBundle(rscBundleHash, newRenderingRequest);
-    }
+  const generateRSCPayload = function generateRSCPayload(componentName, props, railsContext) {
+    const { renderingRequest, rscBundleHash } = railsContext.serverSideRSCPayloadParameters;
+    const propsString = JSON.stringify(props);
+    const newRenderingRequest = renderingRequest.replace(/\(\s*\)\s*$/, `('${componentName}', ${propsString})`);
+    return runOnOtherBundle(rscBundleHash, newRenderingRequest);
   }
 
   ReactOnRails.clearHydratedStores();
@@ -35,5 +33,6 @@
     railsContext: railsContext,
     throwJsErrors: false,
     renderingReturnsPromises: true,
+    generateRSCPayload: typeof generateRSCPayload !== 'undefined' ? generateRSCPayload : undefined,
   });
 })()
