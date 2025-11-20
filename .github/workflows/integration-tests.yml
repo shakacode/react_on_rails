@@ -78,10 +78,12 @@ jobs:
              [[ "${{ inputs.force_run }}" == "true" ]] || \
              [[ "${{ needs.detect-changes.outputs.has_full_ci_label }}" == "true" ]]; then
             # Full matrix: test both latest and minimum supported versions
-            echo 'matrix={"include":[{"ruby-version":"3.4","node-version":"22","dependency-level":"latest"},{"ruby-version":"3.2","node-version":"20","dependency-level":"minimum"}]}' >> $GITHUB_OUTPUT
+            # Pin Node 22 to 22.11.0 (LTS) to avoid V8 bug in 22.21.0
+            echo 'matrix={"include":[{"ruby-version":"3.4","node-version":"22.11.0","dependency-level":"latest"},{"ruby-version":"3.2","node-version":"20","dependency-level":"minimum"}]}' >> $GITHUB_OUTPUT
           else
             # PR matrix: test only latest versions for fast feedback
-            echo 'matrix={"include":[{"ruby-version":"3.4","node-version":"22","dependency-level":"latest"}]}' >> $GITHUB_OUTPUT
+            # Pin Node 22 to 22.11.0 (LTS) to avoid V8 bug in 22.21.0
+            echo 'matrix={"include":[{"ruby-version":"3.4","node-version":"22.11.0","dependency-level":"latest"}]}' >> $GITHUB_OUTPUT
           fi
 
   build-dummy-app-webpack-test-bundles:
@@ -119,9 +121,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          # Disable cache for Node 22 due to V8 bug in 22.21.0
-          # https://github.com/nodejs/node/issues/56010
-          cache: ${{ matrix.node-version != '22' && 'yarn' || '' }}
+          cache: yarn
           cache-dependency-path: '**/yarn.lock'
       - name: Print system information
         run: |
@@ -198,9 +198,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          # Disable cache for Node 22 due to V8 bug in 22.21.0
-          # https://github.com/nodejs/node/issues/56010
-          cache: ${{ matrix.node-version != '22' && 'yarn' || '' }}
+          cache: yarn
           cache-dependency-path: '**/yarn.lock'
       - name: Print system information
         run: |
