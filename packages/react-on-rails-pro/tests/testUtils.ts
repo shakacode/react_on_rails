@@ -9,8 +9,8 @@ import { Readable } from 'stream';
  * }} Object containing the stream and push function
  */
 export const createNodeReadableStream = () => {
-  const pendingChunks = [];
-  let pushFn;
+  const pendingChunks: Buffer[] = [];
+  let pushFn: ((chunk: Buffer | undefined) => void) | null = null;
   const stream = new Readable({
     read() {
       pushFn = this.push.bind(this);
@@ -20,7 +20,7 @@ export const createNodeReadableStream = () => {
     },
   });
 
-  const push = (chunk) => {
+  const push = (chunk: Buffer) => {
     if (pushFn) {
       pushFn(chunk);
     } else {
