@@ -122,8 +122,14 @@
     "coverageReporters": [
       "lcov"
     ],
+    "moduleNameMapper": {
+      "^(\\.{1,2}/.*)\\.js$": "$1"
+    },
     "resetModules": true,
     "resetMocks": true,
+    "roots": [
+      "../packages/react-on-rails-pro-node-renderer"
+    ],
     "setupFiles": [
       "../packages/react-on-rails-pro-node-renderer/tests/helper.ts"
     ],
