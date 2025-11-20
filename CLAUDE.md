@@ -2,6 +2,22 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Project Structure Guidelines
+
+### Analysis Documents
+
+When creating analysis documents (deep dives, investigations, historical context):
+- **Location**: Place in `/analysis` directory
+- **Format**: Use Markdown (.md)
+- **Naming**: Use descriptive kebab-case names (e.g., `rake-task-duplicate-analysis.md`)
+- **Purpose**: Keep detailed analyses separate from top-level project files
+
+Examples:
+- `/analysis/rake-task-duplicate-analysis.md` - Historical analysis of duplicate rake task bug
+- `/analysis/feature-investigation.md` - Investigation of a specific feature or issue
+
+Top-level documentation (like README.md, CONTRIBUTING.md) should remain at the root.
+
 ## ⚠️ CRITICAL REQUIREMENTS
 
 **BEFORE EVERY COMMIT/PUSH:**
@@ -551,7 +567,7 @@ end
 - You need to **programmatically generate** tasks
 - You need to **pass context** to the tasks
 
-**Historical Context**: PR #1770 added explicit rake task loading, causing webpack builds and pack generation to run twice during `rake assets:precompile`. This was fixed in PR #2052. See `RAKE_TASK_DUPLICATE_ANALYSIS.md` for full details.
+**Historical Context**: PR #1770 added explicit rake task loading, causing webpack builds and pack generation to run twice during `rake assets:precompile`. This was fixed in PR #2052. See `analysis/rake-task-duplicate-analysis.md` for full details.
 
 ### Engine Initializers and Hooks
 
