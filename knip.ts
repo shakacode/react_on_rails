@@ -39,17 +39,6 @@ const config: KnipConfig = {
         // SWC transpiler dependencies used in dummy apps
         '@swc/core',
         'swc-loader',
-        // Test dependencies used by child workspaces (packages/react-on-rails, packages/react-on-rails-pro)
-        '@testing-library/dom',
-        '@testing-library/jest-dom',
-        '@testing-library/react',
-        '@types/react-dom',
-        'create-react-class',
-        'jest-fetch-mock',
-        'prop-types',
-        'react',
-        'react-dom',
-        'redux',
       ],
     },
 
@@ -83,9 +72,6 @@ const config: KnipConfig = {
         'tests/httpRequestUtils.ts',
       ],
       ignoreDependencies: [
-        // These are runtime dependencies needed for the package to work
-        // even though they may not be directly imported in the source
-        'react-on-rails-pro',
         // Optional dependencies used in integrations
         '@honeybadger-io/js',
         '@sentry/*',
@@ -124,11 +110,6 @@ const config: KnipConfig = {
         'src/ServerComponentFetchError.ts:isServerComponentFetchError',
         'src/RSCRoute.tsx:RSCRouteProps',
         'src/streamServerRenderedReactComponent.ts:StreamingTrackers',
-      ],
-      ignoreDependencies: [
-        // Test dependencies used only in tests
-        '@types/mock-fs',
-        'mock-fs',
       ],
     },
     'spec/dummy': {
@@ -192,15 +173,6 @@ const config: KnipConfig = {
         // Dependencies not detected in production mode (runtime injected or dynamic imports)
         '@babel/runtime',
         'mini-css-extract-plugin',
-        'css-loader',
-        'sass',
-        'sass-loader',
-        // Dependencies used dynamically by React on Rails
-        'create-react-class',
-        'react-helmet',
-        '@types/react-helmet',
-        'react-redux',
-        'react-router-dom',
       ],
     },
   },
