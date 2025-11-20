@@ -211,12 +211,25 @@ When making changes, update the **appropriate changelog(s)**:
 **CRITICAL**: When resolving merge conflicts, follow this exact sequence:
 
 1. **Resolve logical conflicts only** - don't worry about formatting
-2. **Add resolved files**: `git add .` (or specific files)
-3. **Auto-fix everything**: `rake autofix`
-4. **Add any formatting changes**: `git add .`
-5. **Continue rebase/merge**: `git rebase --continue` or `git commit`
+2. **VERIFY FILE PATHS** - if the conflict involved directory structure:
+   - Check if any hardcoded paths need updating
+   - Run: `grep -r "old/path" . --exclude-dir=node_modules`
+   - Pay special attention to package-scripts.yml, webpack configs, package.json
+   - **Test affected scripts:** If package-scripts.yml changed, run `yarn run prepack`
+3. **Add resolved files**: `git add .` (or specific files)
+4. **Auto-fix everything**: `rake autofix`
+5. **Add any formatting changes**: `git add .`
+6. **Continue rebase/merge**: `git rebase --continue` or `git commit`
+7. **TEST CRITICAL SCRIPTS if build configs changed:**
+   ```bash
+   yarn run prepack          # Test prepack script
+   yarn run yalc.publish     # Test yalc publish if package structure changed
+   rake run_rspec:gem        # Run relevant test suites
+   ```
 
 **❌ NEVER manually format during conflict resolution** - this causes formatting wars between tools.
+**❌ NEVER blindly accept path changes** - verify they're correct for current structure.
+**❌ NEVER skip testing after resolving conflicts in build configs** - silent failures are dangerous.
 
 ### Debugging Formatting Issues
 - Check current formatting: `yarn start format.listDifferent`
@@ -235,6 +248,18 @@ When making changes, update the **appropriate changelog(s)**:
 - **Dummy app tests**: `rake run_rspec:dummy`
 - **Gem-only tests**: `rake run_rspec:gem`
 - **All tests except examples**: `rake all_but_examples`
+
+## Testing Build and Package Scripts
+
+@.claude/docs/testing-build-scripts.md
+
+## Master Branch Health Monitoring
+
+@.claude/docs/master-health-monitoring.md
+
+## Managing File Paths in Configuration Files
+
+@.claude/docs/managing-file-paths.md
 
 ## Project Architecture
 
