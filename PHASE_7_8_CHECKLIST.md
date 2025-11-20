@@ -7,6 +7,7 @@
 ## Phase 7: CI/CD Polish
 
 ### ✅ Already Completed
+
 - CircleCI to GitHub Actions migration
 - Unified workflows for both packages
 - Matrix builds for Ruby/Node versions
@@ -131,6 +132,7 @@ jobs:
 #### 7.4: Update Status Badges (If Needed)
 
 - [ ] Check if README.md has correct CI badge:
+
   ```markdown
   [![CI](https://github.com/shakacode/react_on_rails/actions/workflows/main.yml/badge.svg)](https://github.com/shakacode/react_on_rails/actions)
   ```
@@ -165,6 +167,7 @@ This monorepo contains packages under different licenses:
 - **Location:** `lib/react_on_rails_pro/`, `packages/react-on-rails-pro*/`
 
 Pro features include:
+
 - React Server Components (RSC)
 - Advanced caching and optimization
 - Node-based renderer for better SSR performance
@@ -184,16 +187,21 @@ See [LICENSE.md](LICENSE.md) for full details.
 This project uses Yarn workspaces to manage multiple packages:
 
 \`\`\`bash
+
 # Install all dependencies
+
 yarn install
 
 # Build all packages
+
 yarn build
 
 # Run all tests
+
 yarn test
 
 # Work on specific package
+
 yarn workspace react-on-rails build
 yarn workspace react-on-rails-pro test
 \`\`\`
@@ -263,12 +271,12 @@ react_on_rails/
 \`\`\`
 react_on_rails/
 ├── lib/
-│   ├── react_on_rails/          # MIT gem
-│   └── react_on_rails_pro/      # Pro gem
+│ ├── react_on_rails/ # MIT gem
+│ └── react_on_rails_pro/ # Pro gem
 ├── packages/
-│   ├── react-on-rails/          # MIT package
-│   ├── react-on-rails-pro/      # Pro package
-│   └── react-on-rails-pro-node-renderer/
+│ ├── react-on-rails/ # MIT package
+│ ├── react-on-rails-pro/ # Pro package
+│ └── react-on-rails-pro-node-renderer/
 ├── react_on_rails.gemspec
 └── react_on_rails_pro.gemspec
 \`\`\`
@@ -278,29 +286,38 @@ react_on_rails/
 If you contribute to React on Rails:
 
 \`\`\`bash
+
 # Pull latest changes
+
 git pull origin master
 
 # Clean old node_modules
-rm -rf node_modules packages/*/node_modules
+
+rm -rf node_modules packages/\*/node_modules
 
 # Reinstall
+
 yarn install
 
 # Rebuild
+
 yarn build
 \`\`\`
 
 ## New Development Commands
 
 \`\`\`bash
+
 # Build specific package
+
 yarn workspace react-on-rails build
 
 # Test specific package
+
 yarn workspace react-on-rails-pro test
 
 # Lint everything
+
 yarn lint
 \`\`\`
 
@@ -355,16 +372,21 @@ This repository is organized as a monorepo containing:
 ### Working with the Monorepo
 
 \`\`\`bash
+
 # Install dependencies for all packages
+
 yarn install
 
 # Build all packages
+
 yarn build
 
 # Run all tests
+
 yarn test
 
 # Work on specific package
+
 yarn workspace <package-name> <command>
 \`\`\`
 
@@ -391,22 +413,26 @@ All Pro files must have proper license headers.
 Before considering Phases 7 & 8 complete:
 
 ### Documentation Review
+
 - [ ] README.md clearly explains licensing
 - [ ] All package READMEs created
 - [ ] Migration guide is helpful and accurate
 - [ ] CONTRIBUTING.md reflects monorepo structure
 
 ### CI Verification
+
 - [ ] License check workflow created and passing
 - [ ] All CI badges updated
 - [ ] No references to CircleCI remain
 
 ### User Experience
+
 - [ ] Installation instructions are clear
 - [ ] No breaking changes for gem/package users
 - [ ] Examples work correctly
 
 ### Contributor Experience
+
 - [ ] Development setup is documented
 - [ ] Workspace commands are clear
 - [ ] License boundaries are obvious

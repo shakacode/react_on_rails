@@ -14,6 +14,7 @@
 
 - [ ] Verify Phase 5 is complete (all 3 NPM packages in workspace)
 - [ ] Verify current structure:
+
   ```bash
   # Should exist:
   ls -la react_on_rails_pro/lib/react_on_rails_pro/
@@ -25,6 +26,7 @@
   ```
 
 - [ ] Create feature branch:
+
   ```bash
   git checkout -b restructure-ruby-gems
   ```
@@ -48,16 +50,19 @@
 ### 1.2: Move Pro Lib Files
 
 - [ ] Count files being moved:
+
   ```bash
   find react_on_rails_pro/lib/react_on_rails_pro -type f | wc -l
   ```
 
 - [ ] Move pro lib directory with git mv (preserves history):
+
   ```bash
   git mv react_on_rails_pro/lib/react_on_rails_pro lib/
   ```
 
 - [ ] Verify files moved:
+
   ```bash
   ls -la lib/react_on_rails_pro/
   git status
@@ -76,6 +81,7 @@
 ## Step 2: Move Pro Specs
 
 **Decision Point:** Where should Pro specs live?
+
 - **Option A:** `lib/react_on_rails_pro/spec/` (with gem code)
 - **Option B:** `spec/pro/` (separate from gem code)
 - **Option C:** Keep at current location for now
@@ -92,11 +98,13 @@
 ### 2.2: Move Pro Specs
 
 - [ ] Count spec files:
+
   ```bash
   find react_on_rails_pro/spec -name "*_spec.rb" | wc -l
   ```
 
 - [ ] Move spec files:
+
   ```bash
   git mv react_on_rails_pro/spec/* spec/pro/
   ```
@@ -122,6 +130,7 @@
 ### 3.1: Move Gemspec File
 
 - [ ] Move gemspec to root:
+
   ```bash
   git mv react_on_rails_pro/react_on_rails_pro.gemspec ./
   ```
@@ -139,6 +148,7 @@
 - [ ] Open `react_on_rails_pro.gemspec`
 
 - [ ] Update `lib` path (used to be at `react_on_rails_pro/`, now at root):
+
   ```ruby
   # OLD:
   lib = File.expand_path("lib", __dir__)
@@ -150,6 +160,7 @@
   ```
 
 - [ ] Update require path for version (if needed):
+
   ```ruby
   # OLD:
   require "react_on_rails_pro/version"
@@ -160,6 +171,7 @@
   ```
 
 - [ ] Update core version dependency path:
+
   ```ruby
   # OLD:
   require_relative "../lib/react_on_rails/version"
@@ -179,11 +191,13 @@
 ### 3.3: Test Gemspec Validity
 
 - [ ] Test gemspec loads:
+
   ```bash
   gem build react_on_rails_pro.gemspec
   ```
 
 - [ ] Verify gem contents:
+
   ```bash
   gem spec react_on_rails_pro-*.gem --ruby | grep files
   ```
@@ -202,6 +216,7 @@
 - [ ] Open root `Gemfile`
 
 - [ ] Update to include both gemspecs:
+
   ```ruby
   # OLD (likely just had one gemspec):
   gemspec
@@ -217,11 +232,13 @@
 ### 4.2: Update Bundle Configuration
 
 - [ ] Run bundle install:
+
   ```bash
   bundle install
   ```
 
 - [ ] Verify both gems are in bundle:
+
   ```bash
   bundle list | grep react_on_rails
   # Should show:
@@ -241,6 +258,7 @@
 ### 5.1: Find Files with Require Statements
 
 - [ ] Find all Ruby files that require pro code:
+
   ```bash
   grep -r "require.*react_on_rails_pro" --include="*.rb" .
   ```
@@ -279,6 +297,7 @@ Most should still work, but verify paths like:
 - [ ] Remove old `react_on_rails_pro/` directory reference
 
 - [ ] Update to final structure:
+
   ```md
   ## MIT License applies to:
 
@@ -298,6 +317,7 @@ Most should still work, but verify paths like:
 ### 6.2: Verify License Compliance
 
 - [ ] No pro files in MIT directories:
+
   ```bash
   # This should find nothing:
   find lib/react_on_rails packages/react-on-rails -type f -name "*pro*"
@@ -319,6 +339,7 @@ Most should still work, but verify paths like:
 ### 7.1: Verify Directory is Empty
 
 - [ ] Check what's left in react_on_rails_pro/:
+
   ```bash
   ls -la react_on_rails_pro/
   ```
@@ -333,12 +354,14 @@ Most should still work, but verify paths like:
 ### 7.2: Handle Remaining Files
 
 - [ ] **README.md**: Move valuable content to root README or docs/:
+
   ```bash
   # If valuable, preserve content:
   cat react_on_rails_pro/README.md >> docs/pro/README.md
   ```
 
 - [ ] **Config files**: Remove or move to root if needed:
+
   ```bash
   # If has unique rubocop rules, merge into root .rubocop.yml
   # Otherwise delete
@@ -352,11 +375,13 @@ Most should still work, but verify paths like:
 ### 7.3: Remove Directory
 
 - [ ] Verify again it's safe to delete:
+
   ```bash
   ls -la react_on_rails_pro/
   ```
 
 - [ ] Remove the directory:
+
   ```bash
   git rm -rf react_on_rails_pro/
   ```
@@ -374,6 +399,7 @@ Most should still work, but verify paths like:
 ### 8.1: Update Rake Tasks
 
 - [ ] Find rake tasks referencing old path:
+
   ```bash
   grep -r "react_on_rails_pro/" rakelib/
   ```
@@ -386,6 +412,7 @@ Most should still work, but verify paths like:
 ### 8.2: Update GitHub Actions Workflows
 
 - [ ] Find workflows with old paths:
+
   ```bash
   grep -r "react_on_rails_pro/" .github/workflows/
   ```
@@ -395,6 +422,7 @@ Most should still work, but verify paths like:
 ### 8.3: Update Shell Scripts
 
 - [ ] Check bin/ scripts:
+
   ```bash
   grep -r "react_on_rails_pro/" bin/
   ```
@@ -407,6 +435,7 @@ Most should still work, but verify paths like:
 ### 8.4: Update Documentation
 
 - [ ] Update all markdown files:
+
   ```bash
   grep -r "react_on_rails_pro/" docs/ --include="*.md"
   ```
@@ -424,6 +453,7 @@ Most should still work, but verify paths like:
 - [ ] Open `.rubocop.yml`
 
 - [ ] Update exclusions to use new paths:
+
   ```yaml
   AllCops:
     Exclude:
@@ -431,14 +461,15 @@ Most should still work, but verify paths like:
       # - 'react_on_rails_pro/**/*'
 
       # These should stay:
-      - 'lib/react_on_rails_pro/**/*'  # Still excluded (different config)
-      - 'spec/pro/**/*'                # Pro specs
-      - 'packages/**/*'                # NPM packages
+      - 'lib/react_on_rails_pro/**/*' # Still excluded (different config)
+      - 'spec/pro/**/*' # Pro specs
+      - 'packages/**/*' # NPM packages
   ```
 
 ### 9.2: Test RuboCop
 
 - [ ] Run RuboCop on all Ruby files:
+
   ```bash
   bundle exec rubocop
   ```
@@ -455,6 +486,7 @@ Most should still work, but verify paths like:
 ### 10.1: Update Test Paths
 
 - [ ] Update GitHub Actions workflows for new spec paths:
+
   ```yaml
   # OLD:
   - run: bundle exec rspec react_on_rails_pro/spec
@@ -471,6 +503,7 @@ Most should still work, but verify paths like:
 ### 10.3: Update Pro Dummy App Paths (if in CI)
 
 - [ ] Check if CI references pro dummy app:
+
   ```bash
   grep -r "react_on_rails_pro/spec/dummy" .github/
   ```
@@ -484,6 +517,7 @@ Most should still work, but verify paths like:
 **Decision Point:** Where should Pro dummy app live?
 
 **Options:**
+
 - **A:** Keep at `react_on_rails_pro/spec/dummy` (least disruptive, but inconsistent)
 - **B:** Move to `spec/pro/dummy` (consistent with pro specs location)
 - **C:** Move to `spec/dummy_pro` (sibling to main dummy)
@@ -493,11 +527,13 @@ Most should still work, but verify paths like:
 ### 11.1: If Keeping in Place (Option A)
 
 - [ ] Recreate `react_on_rails_pro/` directory just for dummy app:
+
   ```bash
   mkdir -p react_on_rails_pro
   ```
 
 - [ ] Move dummy app back if it was deleted:
+
   ```bash
   # If you deleted it in step 7, restore from git:
   git checkout react_on_rails_pro/spec/dummy
@@ -506,13 +542,16 @@ Most should still work, but verify paths like:
 - [ ] Update LICENSE.md to note this exception:
   ```md
   ## React on Rails Pro License applies to:
+
   ...
+
   - react_on_rails_pro/spec/dummy/ (Pro test application)
   ```
 
 ### 11.2: If Moving (Option B/C)
 
 - [ ] Move pro dummy app:
+
   ```bash
   git mv react_on_rails_pro/spec/dummy spec/pro/dummy
   ```
@@ -528,16 +567,19 @@ Most should still work, but verify paths like:
 ### 12.1: Build Both Gems
 
 - [ ] Build core gem:
+
   ```bash
   gem build react_on_rails.gemspec
   ```
 
 - [ ] Build pro gem:
+
   ```bash
   gem build react_on_rails_pro.gemspec
   ```
 
 - [ ] Verify both gems built:
+
   ```bash
   ls -la *.gem
   ```
@@ -550,12 +592,14 @@ Most should still work, but verify paths like:
 ### 12.2: Run Ruby Tests
 
 - [ ] Run core specs:
+
   ```bash
   bundle exec rspec spec/react_on_rails/
   # Or whatever path core specs are at
   ```
 
 - [ ] Run pro specs:
+
   ```bash
   bundle exec rspec spec/pro/
   ```
@@ -568,6 +612,7 @@ Most should still work, but verify paths like:
 ### 12.3: Test Dummy Apps
 
 - [ ] Test core dummy app:
+
   ```bash
   cd spec/dummy
   bundle install
@@ -586,6 +631,7 @@ Most should still work, but verify paths like:
 ### 12.4: Integration Testing
 
 - [ ] Test full build:
+
   ```bash
   bundle && yarn
   yarn build
@@ -646,12 +692,14 @@ Most should still work, but verify paths like:
 ### 14.3: Pre-Commit Checks
 
 - [ ] Run linters:
+
   ```bash
   bundle exec rubocop
   yarn lint
   ```
 
 - [ ] Run tests:
+
   ```bash
   bundle exec rake
   yarn test
@@ -667,16 +715,19 @@ Most should still work, but verify paths like:
 ## Commit & Push
 
 - [ ] Stage all changes:
+
   ```bash
   git add -A
   ```
 
 - [ ] Review diff one more time:
+
   ```bash
   git diff --staged --stat
   ```
 
 - [ ] Commit with detailed message:
+
   ```bash
   git commit -m "Phase 6: Restructure Ruby Gems to Final Layout
 
@@ -712,6 +763,7 @@ Most should still work, but verify paths like:
 ## Create Pull Request
 
 - [ ] Create PR:
+
   ```bash
   gh pr create --title "Phase 6: Restructure Ruby Gems to Final Layout" \
                --body "$(cat <<'EOF'
@@ -802,11 +854,13 @@ git revert -m 1 <merge-commit-sha>
 After merging to master:
 
 - [ ] Delete old tag:
+
   ```bash
   git tag -d pre-phase-6-restructure
   ```
 
 - [ ] Create new stable tag:
+
   ```bash
   git tag monorepo-phase-6-complete
   git push --tags

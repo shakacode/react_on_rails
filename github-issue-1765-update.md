@@ -7,6 +7,7 @@
 The monorepo merger has been successfully completed with full git history preservation! Both repositories now exist in a unified monorepo structure.
 
 **Branches:**
+
 - **master**: Contains backward-compatible `node_package/` structure
 - **justin808/surabaya-v1**: Contains target `packages/` workspace structure (ready for Phase 3)
 
@@ -22,11 +23,13 @@ The monorepo merger has been successfully completed with full git history preser
 ### ⚠️ Critical Issues Requiring Immediate Attention
 
 1. **YALC Publishing - Not All Packages Published**
+
    - Currently only publishes main package
    - Need to publish: `react-on-rails`, `react-on-rails-pro`, `react-on-rails-pro-rsc`
    - Path mismatch in `package-scripts.yml` could cause silent failures
 
 2. **Directory Structure Confusion**
+
    - Pro package nested inside main package (`react_on_rails_pro/` subdirectory)
    - Should be siblings under `/packages/` for clearer separation
    - Affects mental model and license boundaries
@@ -43,6 +46,7 @@ The monorepo merger has been successfully completed with full git history preser
 ### Phase 3: Pre-Monorepo Structure Preparation ⏳
 
 #### Critical Path Updates Required
+
 - [ ] Fix `package-scripts.yml` path from `node_package/lib/` to `packages/react-on-rails/lib/`
 - [ ] Update all `package.json` "main", "exports", "files" fields
 - [ ] Fix `.github/workflows/*.yml` cache and artifact paths
@@ -51,6 +55,7 @@ The monorepo merger has been successfully completed with full git history preser
 - [ ] Search/replace ALL `node_package/` references: `grep -r "node_package" . --exclude-dir=node_modules`
 
 #### YALC Publishing Improvements
+
 - [ ] Implement YALC publishing for ALL packages:
   - [ ] `packages/react-on-rails`
   - [ ] `packages/react-on-rails-pro`
@@ -60,6 +65,7 @@ The monorepo merger has been successfully completed with full git history preser
 - [ ] Document multi-package YALC workflow
 
 #### YALC Alternatives Research
+
 - [ ] Evaluate modern npm/yarn link improvements
 - [ ] Test Verdaccio (local npm registry)
 - [ ] Investigate pnpm's superior linking
@@ -67,6 +73,7 @@ The monorepo merger has been successfully completed with full git history preser
 - [ ] Document pros/cons and migration path
 
 #### Validation Requirements
+
 - [ ] `yarn run prepack` succeeds
 - [ ] `yarn run yalc.publish` works for each package
 - [ ] `yarn build` outputs to correct directories
@@ -78,6 +85,7 @@ The monorepo merger has been successfully completed with full git history preser
 ### Phase 4: Final Monorepo Restructuring 🏗️
 
 #### Directory Restructuring - Siblings Not Nested
+
 - [ ] Create new structure:
   ```
   /packages/
@@ -91,6 +99,7 @@ The monorepo merger has been successfully completed with full git history preser
 - [ ] Update workspace configuration in root package.json
 
 #### Package Consolidation
+
 - [ ] Merge duplicate Pro configurations
 - [ ] Remove redundant config files
 - [ ] Unify linting/formatting rules
@@ -101,6 +110,7 @@ The monorepo merger has been successfully completed with full git history preser
   - [ ] `publish:all` - publish all packages
 
 #### CI/CD Consolidation
+
 - [ ] Merge CircleCI into GitHub Actions
 - [ ] Create matrix builds for all packages
 - [ ] Set up parallel testing
@@ -112,6 +122,7 @@ The monorepo merger has been successfully completed with full git history preser
 ### Phase 5: Testing & Validation ✅
 
 #### Integration Testing
+
 - [ ] Test fresh clone and setup
 - [ ] Verify all packages build independently
 - [ ] Test cross-package imports
@@ -120,6 +131,7 @@ The monorepo merger has been successfully completed with full git history preser
 - [ ] Verify backward compatibility
 
 #### Performance Testing
+
 - [ ] Benchmark build times vs old structure
 - [ ] Test CI/CD pipeline performance
 - [ ] Measure install times
@@ -127,6 +139,7 @@ The monorepo merger has been successfully completed with full git history preser
 - [ ] Check bundle sizes
 
 #### User Acceptance Testing
+
 - [ ] Test with real-world app using yalc
 - [ ] Verify Pro features work
 - [ ] Test RSC package functionality
@@ -138,12 +151,14 @@ The monorepo merger has been successfully completed with full git history preser
 ### Phase 6: Release Preparation 📦
 
 #### Version Management
+
 - [ ] Decide versioning strategy (independent vs synchronized)
 - [ ] Update version bump scripts
 - [ ] Create changelog generation per package
 - [ ] Set up automated release notes
 
 #### Publishing Pipeline
+
 - [ ] Configure npm publishing per package
 - [ ] Set up GitHub releases for monorepo
 - [ ] Create publish automation
@@ -151,6 +166,7 @@ The monorepo merger has been successfully completed with full git history preser
 - [ ] Validate package contents
 
 #### Migration Documentation
+
 - [ ] Create user migration guide
 - [ ] Document breaking changes
 - [ ] Provide upgrade scripts
@@ -162,6 +178,7 @@ The monorepo merger has been successfully completed with full git history preser
 ### Phase 7: Production Deployment 🚀
 
 #### Final Validation
+
 - [ ] Comprehensive test suite
 - [ ] Security audit
 - [ ] License compliance check
@@ -169,6 +186,7 @@ The monorepo merger has been successfully completed with full git history preser
 - [ ] Team sign-off
 
 #### Deployment
+
 - [ ] Tag release candidate
 - [ ] Deploy to beta channel
 - [ ] Monitor for 1-2 weeks
@@ -178,6 +196,7 @@ The monorepo merger has been successfully completed with full git history preser
 - [ ] Announce release
 
 #### Post-Deployment
+
 - [ ] Monitor npm downloads
 - [ ] Track GitHub issues
 - [ ] Gather user feedback
@@ -189,12 +208,14 @@ The monorepo merger has been successfully completed with full git history preser
 ## 🔧 Quick Wins - Can Do Now (30 minutes)
 
 1. **Fix package-scripts.yml path** (5 min)
+
    ```bash
    # Change from: node_package/lib/ReactOnRails.full.js
    # Change to: packages/react-on-rails/lib/ReactOnRails.full.js
    ```
 
 2. **Test current YALC publishing** (10 min)
+
    ```bash
    yarn run yalc.publish
    # Verify success and check published location
@@ -215,6 +236,7 @@ The monorepo merger has been successfully completed with full git history preser
 ## 📊 Success Metrics
 
 ### Must Have
+
 - ✅ All packages publish via YALC
 - ✅ Pro and open-source are sibling directories
 - ✅ All tests pass in new structure
@@ -224,6 +246,7 @@ The monorepo merger has been successfully completed with full git history preser
 - ✅ License boundaries maintained
 
 ### Nice to Have
+
 - ✅ Improved build performance
 - ✅ Better developer experience
 - ✅ Cleaner separation of concerns
@@ -235,12 +258,14 @@ The monorepo merger has been successfully completed with full git history preser
 ## 🚨 Risk Mitigation
 
 ### Known Risks
+
 1. **Silent Path Failures** - Test all build scripts manually after path changes
 2. **License Violations** - Automated checks in CI to verify boundaries
 3. **Breaking Changes** - Extensive testing before merge to master
 4. **YALC Confusion** - Consider migration to alternative tool
 
 ### Mitigation Strategies
+
 - Keep backward compatibility during transition
 - Test extensively before merging to master
 - Have rollback plan ready
@@ -263,6 +288,7 @@ The monorepo merger has been successfully completed with full git history preser
 ## 🔗 Related Documentation
 
 Created comprehensive analysis documents in `.conductor/surabaya-v1/.claude/docs/analysis/`:
+
 - **MONOREPO_MIGRATION_ANALYSIS.md** - Full technical analysis (522 lines)
 - **MIGRATION_QUICK_REFERENCE.md** - Quick lookup guide (201 lines)
 - **INDEX.md** - Navigation hub (184 lines)
