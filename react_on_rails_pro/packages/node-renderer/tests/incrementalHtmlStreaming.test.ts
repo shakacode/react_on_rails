@@ -178,3 +178,56 @@ it('raises an error if a specific async prop is not sent', async () => {
   await expect(getNextChunk(request)).rejects.toThrow('Stream Closed');
   close();
 });
+
+describe('concurrent incremental HTML streaming', () => {
+  it('handles multiple parallel requests without race conditions', async () => {
+    await makeRequest();
+
+    const numRequests = 5;
+    const requests = [];
+
+    // Start all requests
+    for (let i = 0; i < numRequests; i += 1) {
+      const { request, close } = createHttpRequest(RSC_BUNDLE_TIMESTAMP, `concurrent-test-${i}`);
+      request.write(`${JSON.stringify(createInitialObject())}\n`);
+      requests.push({ request, close, id: i });
+    }
+
+    // Wait for all to connect and get initial chunks
+    await Promise.all(requests.map(({ request }) => waitForStatus(request)));
+    await Promise.all(requests.map(({ request }) => getNextChunk(request)));
+
+    // Send update chunks to ALL requests before waiting for any responses
+    // If sequential: second request wouldn't process until first completes
+    // If concurrent: all process simultaneously
+    requests.forEach(({ request, id }) => {
+      request.write(
+        `${JSON.stringify({
+          bundleTimestamp: RSC_BUNDLE_TIMESTAMP,
+          updateChunk: `
+          (function(){
+            var asyncPropsManager = sharedExecutionContext.get("asyncPropsManager");
+            asyncPropsManager.setProp("books", ["Request-${id}-Book"]);
+            asyncPropsManager.setProp("researches", ["Request-${id}-Research"]);
+          })()
+          `,
+        })}\n`,
+      );
+      request.end();
+    });
+
+    // Now wait for all responses - they should all succeed
+    const results = await Promise.all(
+      requests.map(async ({ request, close, id }) => {
+        const chunk = await getNextChunk(request);
+        close();
+        return { id, chunk };
+      }),
+    );
+
+    results.forEach(({ id, chunk }) => {
+      expect(chunk).toContain(`Request-${id}-Book`);
+      expect(chunk).toContain(`Request-${id}-Research`);
+    });
+  });
+});
