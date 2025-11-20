@@ -11,6 +11,7 @@
 ## Pre-Phase Verification
 
 - [ ] Verify current state:
+
   ```bash
   # Should exist:
   ls -la react_on_rails_pro/packages/node-renderer/
@@ -29,6 +30,7 @@
 ## Step 1: Create Package Structure
 
 ### 1.1: Create Directory
+
 ```bash
 mkdir -p packages/react-on-rails-pro-node-renderer/{src,tests}
 ```
@@ -68,13 +70,7 @@ mkdir -p packages/react-on-rails-pro-node-renderer/{src,tests}
     "type": "git",
     "url": "git+https://github.com/shakacode/react_on_rails.git"
   },
-  "keywords": [
-    "react",
-    "react-on-rails",
-    "node-renderer",
-    "server-side-rendering",
-    "ssr"
-  ],
+  "keywords": ["react", "react-on-rails", "node-renderer", "server-side-rendering", "ssr"],
   "author": "justin.gordon@gmail.com",
   "license": "UNLICENSED",
   "dependencies": {
@@ -85,10 +81,7 @@ mkdir -p packages/react-on-rails-pro-node-renderer/{src,tests}
     "react": ">= 16",
     "react-dom": ">= 16"
   },
-  "files": [
-    "lib/**/*.js",
-    "lib/**/*.d.ts"
-  ],
+  "files": ["lib/**/*.js", "lib/**/*.d.ts"],
   "bugs": {
     "url": "https://github.com/shakacode/react_on_rails/issues"
   },
@@ -125,11 +118,13 @@ mkdir -p packages/react-on-rails-pro-node-renderer/{src,tests}
 ### 2.1: Move Source Code
 
 - [ ] Count files to move:
+
   ```bash
   find react_on_rails_pro/packages/node-renderer/src -type f | wc -l
   ```
 
 - [ ] Move source files with git mv (preserves history):
+
   ```bash
   git mv react_on_rails_pro/packages/node-renderer/src/* \
          packages/react-on-rails-pro-node-renderer/src/
@@ -144,11 +139,13 @@ mkdir -p packages/react-on-rails-pro-node-renderer/{src,tests}
 ### 2.2: Move Test Files
 
 - [ ] Count test files:
+
   ```bash
   find react_on_rails_pro/packages/node-renderer/tests -type f | wc -l
   ```
 
 - [ ] Move test files with git mv:
+
   ```bash
   git mv react_on_rails_pro/packages/node-renderer/tests/* \
          packages/react-on-rails-pro-node-renderer/tests/
@@ -162,6 +159,7 @@ mkdir -p packages/react-on-rails-pro-node-renderer/{src,tests}
 ### 2.3: Move Configuration Files (if any)
 
 - [ ] Check for additional config files:
+
   ```bash
   ls -la react_on_rails_pro/packages/node-renderer/
   ```
@@ -176,6 +174,7 @@ mkdir -p packages/react-on-rails-pro-node-renderer/{src,tests}
 ### 3.1: Update Imports in Moved Files
 
 - [ ] Find all imports that need updating:
+
   ```bash
   grep -r "from ['\"]react-on-rails" packages/react-on-rails-pro-node-renderer/src/
   ```
@@ -186,18 +185,20 @@ mkdir -p packages/react-on-rails-pro-node-renderer/{src,tests}
 ### 3.2: Update Imports in Other Packages
 
 - [ ] Find files importing node-renderer:
+
   ```bash
   grep -r "node-renderer" packages/react-on-rails-pro/src/
   grep -r "node-renderer" react_on_rails_pro/lib/
   ```
 
 - [ ] Update import paths to use new package name:
+
   ```typescript
   // Old:
-  import { something } from '../packages/node-renderer/...'
+  import { something } from '../packages/node-renderer/...';
 
   // New:
-  import { something } from 'react-on-rails-pro-node-renderer'
+  import { something } from 'react-on-rails-pro-node-renderer';
   ```
 
 ---
@@ -207,6 +208,7 @@ mkdir -p packages/react-on-rails-pro-node-renderer/{src,tests}
 ### 4.1: Add to Root Workspace
 
 - [ ] Update root `package.json` workspaces array:
+
   ```json
   "workspaces": [
     "packages/react-on-rails",
@@ -223,6 +225,7 @@ mkdir -p packages/react-on-rails-pro-node-renderer/{src,tests}
 ### 4.2: Install Dependencies
 
 - [ ] Install dependencies for new package:
+
   ```bash
   yarn install
   ```
@@ -243,17 +246,20 @@ mkdir -p packages/react-on-rails-pro-node-renderer/{src,tests}
 ### 5.2: Test Package Builds
 
 - [ ] Test node-renderer builds:
+
   ```bash
   cd packages/react-on-rails-pro-node-renderer
   yarn build
   ```
 
 - [ ] Verify output in `lib/` directory:
+
   ```bash
   ls -la packages/react-on-rails-pro-node-renderer/lib/
   ```
 
 - [ ] Test from workspace root:
+
   ```bash
   yarn workspace react-on-rails-pro-node-renderer run build
   ```
@@ -271,6 +277,7 @@ mkdir -p packages/react-on-rails-pro-node-renderer/{src,tests}
 
 - [ ] Open LICENSE.md
 - [ ] Add new package to Pro license section:
+
   ```md
   ## React on Rails Pro License applies to:
 
@@ -284,6 +291,7 @@ mkdir -p packages/react-on-rails-pro-node-renderer/{src,tests}
 ### 6.2: Verify License Headers
 
 - [ ] Check all moved files have Pro license headers:
+
   ```bash
   find packages/react-on-rails-pro-node-renderer/src -name "*.ts" -o -name "*.js" | \
   while read file; do
@@ -302,6 +310,7 @@ mkdir -p packages/react-on-rails-pro-node-renderer/{src,tests}
 ### 7.1: Update GitHub Actions
 
 - [ ] Find CI workflows that test packages:
+
   ```bash
   grep -r "packages/react-on-rails" .github/workflows/
   ```
@@ -321,6 +330,7 @@ mkdir -p packages/react-on-rails-pro-node-renderer/{src,tests}
 ### 8.1: Test Individual YALC Publish
 
 - [ ] Test node-renderer yalc publish:
+
   ```bash
   cd packages/react-on-rails-pro-node-renderer
   yarn yalc:publish
@@ -334,6 +344,7 @@ mkdir -p packages/react-on-rails-pro-node-renderer/{src,tests}
 ### 8.2: Test Workspace YALC Publish
 
 - [ ] Test from root:
+
   ```bash
   yarn yalc:publish
   ```
@@ -354,17 +365,20 @@ mkdir -p packages/react-on-rails-pro-node-renderer/{src,tests}
 ### 9.1: Remove Old Directories
 
 - [ ] Verify old directory is empty:
+
   ```bash
   ls -la react_on_rails_pro/packages/node-renderer/
   # Should only show src/, tests/ as empty
   ```
 
 - [ ] Remove old node-renderer directory:
+
   ```bash
   git rm -r react_on_rails_pro/packages/node-renderer/
   ```
 
 - [ ] Check if packages/ directory is now empty:
+
   ```bash
   ls -la react_on_rails_pro/packages/
   ```
@@ -377,6 +391,7 @@ mkdir -p packages/react-on-rails-pro-node-renderer/{src,tests}
 ### 9.2: Update References
 
 - [ ] Find any remaining references to old path:
+
   ```bash
   grep -r "react_on_rails_pro/packages/node-renderer" .
   ```
@@ -390,6 +405,7 @@ mkdir -p packages/react-on-rails-pro-node-renderer/{src,tests}
 ### 10.1: Build Tests
 
 - [ ] Clean and rebuild all packages:
+
   ```bash
   yarn clean
   yarn build
@@ -403,6 +419,7 @@ mkdir -p packages/react-on-rails-pro-node-renderer/{src,tests}
 ### 10.2: Unit Tests
 
 - [ ] Run node-renderer tests:
+
   ```bash
   yarn workspace react-on-rails-pro-node-renderer run test
   ```
@@ -415,6 +432,7 @@ mkdir -p packages/react-on-rails-pro-node-renderer/{src,tests}
 ### 10.3: Type Checking
 
 - [ ] Run type check on node-renderer:
+
   ```bash
   yarn workspace react-on-rails-pro-node-renderer run type-check
   ```
@@ -427,6 +445,7 @@ mkdir -p packages/react-on-rails-pro-node-renderer/{src,tests}
 ### 10.4: Linting
 
 - [ ] Run linting:
+
   ```bash
   yarn lint
   ```
@@ -439,6 +458,7 @@ mkdir -p packages/react-on-rails-pro-node-renderer/{src,tests}
 ### 10.5: Integration Testing
 
 - [ ] Test in Pro dummy app:
+
   ```bash
   cd react_on_rails_pro/spec/dummy
   yarn install
@@ -496,11 +516,13 @@ yarn test
 ### 12.1: Pre-Commit Checks
 
 - [ ] Run full test suite:
+
   ```bash
   bundle exec rake
   ```
 
 - [ ] Verify git status is clean of unintended changes:
+
   ```bash
   git status
   ```
@@ -521,6 +543,7 @@ yarn test
 ## Commit & Push
 
 - [ ] Commit changes:
+
   ```bash
   git add -A
   git commit -m "Phase 5: Add Pro Node Renderer Package to workspace
@@ -546,6 +569,7 @@ yarn test
 ## Create Pull Request
 
 - [ ] Create PR:
+
   ```bash
   gh pr create --title "Phase 5: Add Pro Node Renderer Package" \
                --body "$(cat <<'EOF'

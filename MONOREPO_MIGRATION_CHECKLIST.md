@@ -1,12 +1,15 @@
 # Monorepo Migration - Comprehensive Task Checklist
 
 ## Executive Summary
+
 The monorepo migration is in **Phase 2 (Git Merger) - COMPLETE**. We've successfully merged repositories but need to complete Phases 3-7 to achieve the final monorepo structure with proper YALC publishing, directory organization, and CI/CD consolidation.
 
 ## 🚨 Critical Issues to Address First
 
 ### 1. YALC Publishing - All Packages
+
 **Priority: CRITICAL** ⚠️
+
 - [ ] Fix `package-scripts.yml` path reference from `node_package/lib/` to `packages/react-on-rails/lib/`
 - [ ] Implement YALC publishing for ALL packages:
   - [ ] `packages/react-on-rails` (open-source core)
@@ -18,7 +21,9 @@ The monorepo migration is in **Phase 2 (Git Merger) - COMPLETE**. We've successf
 - [ ] Document yalc workflow for all packages
 
 ### 2. Evaluate YALC Alternatives
+
 **Priority: HIGH**
+
 - [ ] Research npm/yarn link improvements in recent versions
 - [ ] Evaluate Verdaccio (local npm registry)
 - [ ] Consider yarn workspaces with `file:` protocol
@@ -27,7 +32,9 @@ The monorepo migration is in **Phase 2 (Git Merger) - COMPLETE**. We've successf
 - [ ] Create migration plan if switching tools
 
 ### 3. Directory Restructuring - Siblings Not Nested
+
 **Priority: HIGH**
+
 - [ ] Create new structure:
   ```
   /packages/
@@ -44,6 +51,7 @@ The monorepo migration is in **Phase 2 (Git Merger) - COMPLETE**. We've successf
 ## 📋 Phase 3: Pre-Monorepo Structure Preparation
 
 ### Path Reference Updates
+
 - [ ] Update `package-scripts.yml` all paths
 - [ ] Fix `package.json` "main", "exports", "files" fields
 - [ ] Update `.github/workflows/*.yml` cache and artifact paths
@@ -54,6 +62,7 @@ The monorepo migration is in **Phase 2 (Git Merger) - COMPLETE**. We've successf
 - [ ] Verify with: `grep -r "node_package" . --exclude-dir=node_modules`
 
 ### Build System Validation
+
 - [ ] Test `yarn run prepack` succeeds
 - [ ] Test `yarn run yalc.publish` for each package
 - [ ] Verify `yarn build` outputs to correct directories
@@ -62,6 +71,7 @@ The monorepo migration is in **Phase 2 (Git Merger) - COMPLETE**. We've successf
 - [ ] Validate `rake node_package` generates correct structure
 
 ### Testing Infrastructure
+
 - [ ] Run full test suite: `rake`
 - [ ] Test dummy app: `rake run_rspec:dummy`
 - [ ] Test examples: `rake run_rspec:example_basic`
@@ -72,6 +82,7 @@ The monorepo migration is in **Phase 2 (Git Merger) - COMPLETE**. We've successf
 ## 📋 Phase 4: Final Monorepo Restructuring
 
 ### Package Organization
+
 - [ ] Consolidate duplicate Pro configurations:
   - [ ] Merge `react_on_rails_pro/` and `packages/react-on-rails-pro/`
   - [ ] Remove redundant config files
@@ -85,6 +96,7 @@ The monorepo migration is in **Phase 2 (Git Merger) - COMPLETE**. We've successf
 - [ ] Verify independent versioning works
 
 ### CI/CD Consolidation
+
 - [ ] Merge CircleCI configuration into GitHub Actions
 - [ ] Create matrix builds for all packages
 - [ ] Set up parallel testing for packages
@@ -93,6 +105,7 @@ The monorepo migration is in **Phase 2 (Git Merger) - COMPLETE**. We've successf
 - [ ] Verify all CI checks pass
 
 ### Documentation Updates
+
 - [ ] Update `CONTRIBUTING.md`:
   - [ ] New setup instructions for monorepo
   - [ ] Package development workflow
@@ -111,6 +124,7 @@ The monorepo migration is in **Phase 2 (Git Merger) - COMPLETE**. We've successf
 ## 📋 Phase 5: Testing & Validation
 
 ### Integration Testing
+
 - [ ] Test fresh clone and setup
 - [ ] Verify all packages build independently
 - [ ] Test cross-package imports work correctly
@@ -119,6 +133,7 @@ The monorepo migration is in **Phase 2 (Git Merger) - COMPLETE**. We've successf
 - [ ] Verify backward compatibility maintained
 
 ### Performance Testing
+
 - [ ] Benchmark build times vs old structure
 - [ ] Test CI/CD pipeline performance
 - [ ] Measure install times for consumers
@@ -126,6 +141,7 @@ The monorepo migration is in **Phase 2 (Git Merger) - COMPLETE**. We've successf
 - [ ] Check bundle sizes haven't increased
 
 ### User Acceptance Testing
+
 - [ ] Test with real-world app using yalc
 - [ ] Verify Pro features work correctly
 - [ ] Test RSC package functionality
@@ -135,6 +151,7 @@ The monorepo migration is in **Phase 2 (Git Merger) - COMPLETE**. We've successf
 ## 📋 Phase 6: Release Preparation
 
 ### Version Management
+
 - [ ] Decide on versioning strategy:
   - [ ] Independent versions per package?
   - [ ] Synchronized versions?
@@ -144,6 +161,7 @@ The monorepo migration is in **Phase 2 (Git Merger) - COMPLETE**. We've successf
 - [ ] Set up automated release notes
 
 ### Publishing Pipeline
+
 - [ ] Configure npm publishing for each package
 - [ ] Set up GitHub releases for monorepo
 - [ ] Create publish checklist/automation
@@ -152,6 +170,7 @@ The monorepo migration is in **Phase 2 (Git Merger) - COMPLETE**. We've successf
 - [ ] Validate installation from npm works
 
 ### Migration Guide
+
 - [ ] Create migration guide for users
 - [ ] Document breaking changes
 - [ ] Provide upgrade scripts if needed
@@ -161,6 +180,7 @@ The monorepo migration is in **Phase 2 (Git Merger) - COMPLETE**. We've successf
 ## 📋 Phase 7: Production Deployment
 
 ### Final Validation
+
 - [ ] Run comprehensive test suite
 - [ ] Perform security audit
 - [ ] Check for license compliance
@@ -168,6 +188,7 @@ The monorepo migration is in **Phase 2 (Git Merger) - COMPLETE**. We've successf
 - [ ] Get team sign-off
 
 ### Deployment
+
 - [ ] Tag release candidate
 - [ ] Deploy to staging/beta channel
 - [ ] Monitor for issues (1-2 weeks)
@@ -177,6 +198,7 @@ The monorepo migration is in **Phase 2 (Git Merger) - COMPLETE**. We've successf
 - [ ] Announce release
 
 ### Post-Deployment
+
 - [ ] Monitor npm downloads
 - [ ] Track GitHub issues
 - [ ] Gather user feedback
@@ -186,6 +208,7 @@ The monorepo migration is in **Phase 2 (Git Merger) - COMPLETE**. We've successf
 ## 🔍 Success Criteria
 
 ### Must Have
+
 - ✅ All packages publish via YALC successfully
 - ✅ Pro and open-source are sibling directories
 - ✅ All tests pass in new structure
@@ -195,6 +218,7 @@ The monorepo migration is in **Phase 2 (Git Merger) - COMPLETE**. We've successf
 - ✅ License boundaries maintained
 
 ### Nice to Have
+
 - ✅ Improved build performance
 - ✅ Better developer experience
 - ✅ Cleaner separation of concerns
@@ -212,11 +236,13 @@ The monorepo migration is in **Phase 2 (Git Merger) - COMPLETE**. We've successf
 ## 📝 Notes and Considerations
 
 ### YALC vs Alternatives
+
 - **YALC Pros**: Battle-tested, works with current setup, good isolation
 - **YALC Cons**: Extra tool, requires manual publishing, can be confusing
 - **Consider**: yarn 2+ workspaces, pnpm, Verdaccio, or npm workspaces
 
 ### Directory Structure Philosophy
+
 - Siblings show equal importance and independence
 - Clearer license boundaries
 - Easier to split repositories later if needed
@@ -224,6 +250,7 @@ The monorepo migration is in **Phase 2 (Git Merger) - COMPLETE**. We've successf
 - Clearer mental model for developers
 
 ### Risk Mitigation
+
 - Keep backward compatibility during transition
 - Test extensively before merging to master
 - Have rollback plan ready
