@@ -30,6 +30,9 @@ export {
   addNotifier,
   error,
   message,
+  Notifier,
+  ErrorNotifier,
+  MessageNotifier,
 } from '../shared/errorReporter.js';
 export {
   setupTracing,

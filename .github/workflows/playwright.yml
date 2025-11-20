@@ -78,11 +78,11 @@ jobs:
 
       - name: Build test assets
         working-directory: spec/dummy
-        run: yarn build:test
+        run: yarn run build:test
 
       - name: Run Playwright tests
         working-directory: spec/dummy
-        run: yarn test:e2e
+        run: yarn run test:e2e
 
       - uses: actions/upload-artifact@v4
         if: always()

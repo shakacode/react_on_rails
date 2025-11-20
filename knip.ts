@@ -70,8 +70,7 @@ const config: KnipConfig = {
       entry: [
         'src/ReactOnRailsProNodeRenderer.ts!',
         'src/default-node-renderer.ts!',
-        'src/master.ts!',
-        'src/worker.ts!',
+        'src/integrations/*.ts!',
       ],
       project: ['src/**/*.[jt]s{x,}!', 'tests/**/*.[jt]s{x,}', '!lib/**'],
       ignore: [
@@ -87,8 +86,9 @@ const config: KnipConfig = {
         // These are runtime dependencies needed for the package to work
         // even though they may not be directly imported in the source
         'react-on-rails-pro',
-        // Dev dependencies used only in tests
+        // Optional dependencies used in integrations
         '@honeybadger-io/js',
+        '@sentry/*',
       ],
     },
 
@@ -204,6 +204,7 @@ const config: KnipConfig = {
       ],
     },
   },
+  ignoreExportsUsedInFile: true,
 };
 
 export default config;
