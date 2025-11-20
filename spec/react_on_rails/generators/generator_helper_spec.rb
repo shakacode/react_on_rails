@@ -13,6 +13,9 @@ RSpec.describe GeneratorHelper, type: :generator do
       let(:mock_manager) { instance_double("PackageJson::Manager") } # rubocop:disable RSpec/VerifiedDoubleReference
 
       before do
+        # Stub PackageJson constant so instance_double can reference it
+        stub_const("PackageJson", Class.new) unless defined?(PackageJson)
+
         allow(self).to receive(:package_json).and_return(mock_package_json)
         allow(mock_package_json).to receive(:manager).and_return(mock_manager)
       end

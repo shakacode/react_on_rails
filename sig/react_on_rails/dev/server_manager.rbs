@@ -1,0 +1,39 @@
+module ReactOnRails
+  module Dev
+    class ServerManager
+      type mode = :development | :production_like | :static | :hmr
+
+      def self.start: (mode, String?, ?verbose: bool, ?route: String?, ?rails_env: String?) -> void
+      def self.kill_processes: () -> void
+      def self.development_processes: () -> Hash[String, String]
+      def self.kill_running_processes: () -> bool
+      def self.find_process_pids: (String) -> Array[Integer]
+      def self.terminate_processes: (Array[Integer]) -> void
+      def self.kill_port_processes: (Array[Integer]) -> bool
+      def self.find_port_pids: (Integer) -> Array[Integer]
+      def self.cleanup_socket_files: () -> bool
+      def self.print_kill_summary: (bool) -> void
+      def self.show_help: () -> void
+      def self.run_from_command_line: (?Array[String]) -> void
+
+      private
+
+      def self.help_usage: () -> String
+      def self.help_commands: () -> String
+      def self.help_options: () -> String
+      def self.help_customization: () -> String
+      def self.help_mode_details: () -> String
+      def self.help_troubleshooting: () -> String
+      def self.run_production_like: (?_verbose: bool, ?route: String?, ?rails_env: String?) -> void
+      def self.run_static_development: (String, ?verbose: bool, ?route: String?) -> void
+      def self.run_development: (String, ?verbose: bool, ?route: String?) -> void
+      def self.print_server_info: (String, Array[String], ?Integer, ?route: String?) -> void
+      def self.print_procfile_info: (String, ?route: String?) -> void
+      def self.procfile_port: (String) -> Integer
+      def self.box_border: (Integer) -> String
+      def self.box_bottom: (Integer) -> String
+      def self.box_empty_line: (Integer) -> String
+      def self.format_box_line: (String, Integer) -> String
+    end
+  end
+end

@@ -1,0 +1,22 @@
+module ReactOnRails
+  module Dev
+    class ProcessManager
+      VERSION_CHECK_TIMEOUT: Integer
+
+      def self.installed?: (String) -> bool
+      def self.ensure_procfile: (String) -> void
+      def self.run_with_process_manager: (String) -> void
+
+      private
+
+      def self.installed_in_current_context?: (String) -> bool
+      def self.version_flags_for: (String) -> Array[String]
+      def self.run_process_if_available: (String, Array[String]) -> bool
+      def self.run_process_outside_bundle: (String, Array[String]) -> bool
+      def self.process_available_in_system?: (String) -> bool
+      def self.with_unbundled_context: () { () -> untyped } -> untyped
+      def self.show_process_manager_installation_help: () -> void
+      def self.valid_procfile_path?: (String) -> bool
+    end
+  end
+end

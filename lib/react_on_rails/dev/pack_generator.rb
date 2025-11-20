@@ -2,6 +2,7 @@
 
 require "English"
 require "stringio"
+require_relative "../packer_utils"
 
 module ReactOnRails
   module Dev

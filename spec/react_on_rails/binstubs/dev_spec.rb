@@ -4,6 +4,7 @@ require "react_on_rails/dev"
 
 RSpec.describe "bin/dev script" do
   let(:script_path) { "lib/generators/react_on_rails/templates/base/base/bin/dev" }
+  let(:dummy_dev_path) { "spec/dummy/bin/dev" }
 
   # To suppress stdout during tests
   original_stderr = $stderr
@@ -57,5 +58,29 @@ RSpec.describe "bin/dev script" do
     expect(ReactOnRails::Dev::ServerManager).to receive(:run_from_command_line)
 
     load script_path
+  end
+
+  # Integration test: verify bin/dev can load without NameError
+  describe "integration test" do
+    it "spec/dummy/bin/dev can load the template script without errors" do
+      # This test verifies that all required dependencies are properly loaded
+      # when bin/dev is executed, catching issues like missing require statements
+      expect(File.exist?(dummy_dev_path)).to be true
+      expect(File.exist?(script_path)).to be true
+
+      # Verify the dummy script references the template
+      dummy_content = File.read(dummy_dev_path)
+      expect(dummy_content).to include(script_path)
+    end
+
+    it "can require react_on_rails/dev and access all necessary modules" do
+      # This catches missing require statements in pack_generator.rb and other files
+      # If PackerUtils isn't required, this would fail with NameError
+      require "react_on_rails/dev"
+
+      expect { ReactOnRails::Dev::ServerManager }.not_to raise_error
+      expect { ReactOnRails::Dev::PackGenerator }.not_to raise_error
+      expect { ReactOnRails::PackerUtils }.not_to raise_error
+    end
   end
 end
