@@ -237,7 +237,7 @@ export const getNextChunkInternal = (
 
     stream.once('data', onData);
     stream.once('error', onError);
-    if (stream.closed) {
+    if ('closed' in stream && stream.closed) {
       onClose();
     } else {
       stream.once('close', onClose);
