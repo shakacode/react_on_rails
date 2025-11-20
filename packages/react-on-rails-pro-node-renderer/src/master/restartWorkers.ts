@@ -4,8 +4,8 @@
  */
 
 import cluster from 'cluster';
-import log from '../shared/log';
-import { SHUTDOWN_WORKER_MESSAGE } from '../shared/utils';
+import log from '../shared/log.js';
+import { SHUTDOWN_WORKER_MESSAGE } from '../shared/utils.js';
 
 const MILLISECONDS_IN_MINUTE = 60000;
 
@@ -15,7 +15,7 @@ declare module 'cluster' {
   }
 }
 
-export = async function restartWorkers(
+export default async function restartWorkers(
   delayBetweenIndividualWorkerRestarts: number,
   gracefulWorkerRestartTimeout: number | undefined,
 ) {
@@ -58,4 +58,4 @@ export = async function restartWorkers(
   }
 
   log.info('Finished scheduled restart of workers');
-};
+}

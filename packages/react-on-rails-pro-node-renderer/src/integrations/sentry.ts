@@ -7,9 +7,9 @@ import {
   setupTracing,
   configureFastify,
   FastifyConfigFunction,
-} from './api';
+} from './api.js';
 
-declare module '../shared/tracing' {
+declare module '../shared/tracing.js' {
   interface UnitOfWorkOptions {
     sentry?: StartSpanOptions;
   }

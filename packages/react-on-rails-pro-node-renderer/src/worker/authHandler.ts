@@ -6,10 +6,10 @@
  */
 // TODO: Replace with fastify-basic-auth per https://github.com/shakacode/react_on_rails_pro/issues/110
 
-import type { FastifyRequest } from './types';
-import { getConfig } from '../shared/configBuilder';
+import type { FastifyRequest } from './types.js';
+import { getConfig } from '../shared/configBuilder.js';
 
-export = function authenticate(req: FastifyRequest) {
+export default function authenticate(req: FastifyRequest) {
   const { password } = getConfig();
 
   if (password && password !== (req.body as { password?: string }).password) {
@@ -21,4 +21,4 @@ export = function authenticate(req: FastifyRequest) {
   }
 
   return undefined;
-};
+}

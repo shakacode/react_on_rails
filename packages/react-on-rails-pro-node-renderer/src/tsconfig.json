@@ -6,6 +6,7 @@
     "declaration": true,
     "declarationMap": true,
     "incremental": true,
+    "module": "nodenext",
     "noUncheckedIndexedAccess": true,
     "outDir": "../lib",
     "resolveJsonModule": true,

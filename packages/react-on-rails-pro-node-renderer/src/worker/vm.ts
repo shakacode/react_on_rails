@@ -14,17 +14,17 @@ import { promisify, TextEncoder } from 'util';
 import type { ReactOnRails as ROR } from 'react-on-rails' with { 'resolution-mode': 'import' };
 import type { Context } from 'vm';
 
-import SharedConsoleHistory from '../shared/sharedConsoleHistory';
-import log from '../shared/log';
-import { getConfig } from '../shared/configBuilder';
+import SharedConsoleHistory from '../shared/sharedConsoleHistory.js';
+import log from '../shared/log.js';
+import { getConfig } from '../shared/configBuilder.js';
 import {
   formatExceptionMessage,
   smartTrim,
   isReadableStream,
   getRequestBundleFilePath,
   handleStreamError,
-} from '../shared/utils';
-import * as errorReporter from '../shared/errorReporter';
+} from '../shared/utils.js';
+import * as errorReporter from '../shared/errorReporter.js';
 
 const readFileAsync = promisify(fs.readFile);
 const writeFileAsync = promisify(fs.writeFile);
@@ -173,7 +173,7 @@ ${smartTrim(result)}`);
     return result;
   } catch (exception) {
     const exceptionMessage = formatExceptionMessage(renderingRequest, exception);
-    log.debug('Caught exception in rendering request', exceptionMessage);
+    log.debug('Caught exception in rendering request: %s', exceptionMessage);
     return Promise.resolve({ exceptionMessage });
   }
 }
@@ -293,7 +293,6 @@ export async function buildVM(filePath: string) {
       // If node-specific code is provided then it must be wrapped into a module wrapper. The bundle
       // may need the `require` function, which is not available when running in vm unless passed in.
       if (additionalContextIsObject || supportModules) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         vm.runInContext(m.wrap(bundleContents), context)(
           exports,
           require,
@@ -333,7 +332,7 @@ export async function buildVM(filePath: string) {
 
       return true;
     } catch (error) {
-      log.error('Caught Error when creating context in buildVM, %O', error);
+      log.error({ error }, 'Caught Error when creating context in buildVM');
       errorReporter.error(error as Error);
       throw error;
     } finally {

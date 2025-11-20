@@ -1,8 +1,8 @@
 import { AsyncLocalStorage } from 'async_hooks';
-import { getConfig } from './configBuilder';
-import log from './log';
-import { isPromise, isReadableStream } from './utils';
-import type { RenderCodeResult } from '../worker/vm';
+import { getConfig } from './configBuilder.js';
+import log from './log.js';
+import { isPromise, isReadableStream } from './utils.js';
+import type { RenderCodeResult } from '../worker/vm.js';
 
 type ConsoleMessage = { level: 'error' | 'log' | 'info' | 'warn'; arguments: unknown[] };
 
@@ -31,7 +31,9 @@ const canUseAsyncLocalStorage = (): boolean =>
 
 class SharedConsoleHistory {
   private asyncLocalStorageIfEnabled: AsyncLocalStorage<{ consoleHistory: ConsoleMessage[] }> | undefined;
+
   private isRunningSyncOperation: boolean;
+
   private syncHistory: ConsoleMessage[];
 
   constructor() {

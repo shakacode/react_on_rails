@@ -2,8 +2,8 @@ import formAutoContent from 'form-auto-content';
 import fs from 'fs';
 import querystring from 'querystring';
 import { createReadStream } from 'fs-extra';
+import packageJson from 'react-on-rails-workspace/package.json';
 import worker, { disableHttp2 } from '../src/worker';
-import packageJson from '../../../package.json';
 import {
   BUNDLE_TIMESTAMP,
   SECONDARY_BUNDLE_TIMESTAMP,

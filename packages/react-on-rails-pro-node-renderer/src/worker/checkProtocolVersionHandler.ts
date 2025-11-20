@@ -2,9 +2,9 @@
  * Logic for checking protocol version.
  * @module worker/checkProtocVersionHandler
  */
-import type { FastifyRequest } from './types';
-import packageJson from '../shared/packageJson';
-import log from '../shared/log';
+import type { FastifyRequest } from './types.js';
+import packageJson from '../shared/packageJson.js';
+import log from '../shared/log.js';
 
 const NODE_ENV = process.env.NODE_ENV || 'production';
 
@@ -41,7 +41,7 @@ interface RequestBody {
   railsEnv?: string;
 }
 
-export = function checkProtocolVersion(req: FastifyRequest) {
+export default function checkProtocolVersion(req: FastifyRequest) {
   const { protocolVersion: reqProtocolVersion, gemVersion, railsEnv } = req.body as RequestBody;
 
   // Check protocol version
@@ -108,4 +108,4 @@ Update either the gem or the node renderer package to match versions.`,
   }
 
   return undefined;
-};
+}
