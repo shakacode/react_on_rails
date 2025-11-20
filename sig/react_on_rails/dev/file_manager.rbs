@@ -1,0 +1,15 @@
+module ReactOnRails
+  module Dev
+    class FileManager
+      def self.cleanup_stale_files: () -> bool
+
+      private
+
+      def self.cleanup_overmind_sockets: () -> bool
+      def self.cleanup_rails_pid_file: () -> bool
+      def self.overmind_running?: () -> bool
+      def self.process_running?: (Integer) -> bool
+      def self.remove_file_if_exists: (String, String) -> bool
+    end
+  end
+end

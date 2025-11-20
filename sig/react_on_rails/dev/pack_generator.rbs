@@ -1,0 +1,19 @@
+module ReactOnRails
+  module Dev
+    class PackGenerator
+      def self.generate: (?verbose: bool) -> void
+
+      private
+
+      def self.run_pack_generation: (?silent: bool) -> bool
+      def self.should_run_directly?: () -> bool
+      def self.rails_available?: () -> bool
+      def self.run_rake_task_directly: (?silent: bool) -> bool
+      def self.load_rake_tasks: () -> void
+      def self.prepare_rake_task: () -> untyped
+      def self.capture_output: (bool) { () -> bool } -> bool
+      def self.handle_rake_error: (Exception, bool) -> void
+      def self.run_via_bundle_exec: (?silent: bool) -> (bool | nil)
+    end
+  end
+end
