@@ -7,7 +7,7 @@
     "declarationMap": true,
     "incremental": true,
     "noUncheckedIndexedAccess": true,
-    "outDir": "../dist",
+    "outDir": "../lib",
     "resolveJsonModule": true,
     "rootDir": ".",
     "sourceMap": true

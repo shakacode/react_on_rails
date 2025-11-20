@@ -20,6 +20,7 @@ The following directories and all their contents are licensed under the **MIT Li
 The following directories and all their contents are licensed under the **React on Rails Pro License**:
 
 - `packages/react-on-rails-pro/` (entire package)
+- `packages/react-on-rails-pro-node-renderer/` (entire package)
 - `react_on_rails_pro/` (entire directory)
 
 See [REACT-ON-RAILS-PRO-LICENSE.md](./REACT-ON-RAILS-PRO-LICENSE.md) for complete Pro license terms.

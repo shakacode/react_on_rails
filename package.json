@@ -6,7 +6,8 @@
   "type": "module",
   "workspaces": [
     "packages/react-on-rails",
-    "packages/react-on-rails-pro"
+    "packages/react-on-rails-pro",
+    "packages/react-on-rails-pro-node-renderer"
   ],
   "directories": {
     "doc": "docs"
@@ -66,7 +67,7 @@
     "test": "yarn workspaces run test",
     "clean": "yarn workspaces run clean",
     "start": "nps",
-    "build": "yarn workspace react-on-rails run build && yarn workspace react-on-rails-pro run build",
+    "build": "yarn workspace react-on-rails run build && yarn workspace react-on-rails-pro run build && yarn workspace react-on-rails-pro-node-renderer run build",
     "build-watch": "yarn workspaces run build-watch",
     "lint": "nps eslint",
     "lint:scss": "stylelint \"spec/dummy/app/assets/stylesheets/**/*.scss\" \"spec/dummy/client/**/*.scss\"",

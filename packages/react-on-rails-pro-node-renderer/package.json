@@ -1,0 +1,48 @@
+{
+  "name": "react-on-rails-pro-node-renderer",
+  "version": "16.2.0-beta.10",
+  "description": "React on Rails Pro Node Renderer for server-side rendering",
+  "type": "module",
+  "main": "lib/index.js",
+  "scripts": {
+    "build": "yarn run clean && tsc --project src",
+    "build-watch": "yarn run clean && tsc --project src --watch",
+    "clean": "rm -rf ./lib",
+    "test": "jest tests",
+    "type-check": "tsc --project src --noEmit --noErrorTruncation",
+    "prepack": "nps build.prepack",
+    "prepare": "nps build.prepack",
+    "prepublishOnly": "yarn run build",
+    "yalc:publish": "yalc publish",
+    "yalc": "yalc"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shakacode/react_on_rails.git"
+  },
+  "keywords": [
+    "react",
+    "react-on-rails",
+    "node-renderer",
+    "server-side-rendering",
+    "ssr"
+  ],
+  "author": "justin.gordon@gmail.com",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "react-on-rails": "16.2.0-beta.10",
+    "react-on-rails-pro": "16.2.0-beta.10"
+  },
+  "peerDependencies": {
+    "react": ">= 16",
+    "react-dom": ">= 16"
+  },
+  "files": [
+    "lib/**/*.js",
+    "lib/**/*.d.ts"
+  ],
+  "bugs": {
+    "url": "https://github.com/shakacode/react_on_rails/issues"
+  },
+  "homepage": "https://github.com/shakacode/react_on_rails#readme"
+}
