@@ -220,5 +220,48 @@ module ReactOnRails
         end
       end
     end
+
+    describe "automatic rake task loading" do
+      # Rails::Engine automatically loads all .rake files from lib/tasks/
+      # This test verifies that our rake tasks are loaded without needing
+      # an explicit rake_tasks block in engine.rb (which would cause duplicate loading)
+      #
+      # Historical context: PR #1770 added explicit loading via rake_tasks block,
+      # causing tasks to run twice. Fixed in PR #2052 by relying on automatic loading.
+      # See RAKE_TASK_DUPLICATE_ANALYSIS.md for full details.
+
+      it "verifies engine.rb does not have a rake_tasks block" do
+        # Read the engine.rb file
+        engine_file = File.read(File.expand_path("../../lib/react_on_rails/engine.rb", __dir__))
+
+        # Check that there's no rake_tasks block
+        expect(engine_file).not_to match(/rake_tasks\s+do/),
+                                   "Found rake_tasks block in engine.rb. This is unnecessary because " \
+                                   "Rails::Engine automatically loads all .rake files from lib/tasks/. Having an " \
+                                   "explicit rake_tasks block causes duplicate task execution (tasks run twice " \
+                                   "during operations like rake assets:precompile). Remove the rake_tasks block " \
+                                   "and rely on automatic loading."
+      end
+
+      it "verifies all task files exist in lib/tasks/" do
+        # Verify that task files exist in the standard location
+        expected_task_files = %w[
+          assets.rake
+          generate_packs.rake
+          locale.rake
+          doctor.rake
+        ]
+
+        lib_tasks_dir = File.expand_path("../../lib/tasks", __dir__)
+
+        expected_task_files.each do |task_file|
+          full_path = File.join(lib_tasks_dir, task_file)
+          expect(File.exist?(full_path)).to be(true),
+                                            "Expected rake task file '#{task_file}' to exist in lib/tasks/, " \
+                                            "but it was not found at #{full_path}. Rails::Engine automatically loads " \
+                                            "all .rake files from lib/tasks/ without needing explicit loading."
+        end
+      end
+    end
   end
 end
