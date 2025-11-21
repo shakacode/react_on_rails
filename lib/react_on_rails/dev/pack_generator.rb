@@ -141,13 +141,34 @@ module ReactOnRails
         end
 
         def run_via_bundle_exec(silent: false)
-          if silent
-            system(
-              "bundle", "exec", "rake", "react_on_rails:generate_packs",
-              out: File::NULL, err: File::NULL
-            )
+          # Need to unbundle to prevent Bundler from intercepting our bundle exec call
+          # when already running inside a Bundler context (e.g., from bin/dev)
+          with_unbundled_context do
+            if silent
+              system(
+                "bundle", "exec", "rake", "react_on_rails:generate_packs",
+                out: File::NULL, err: File::NULL
+              )
+            else
+              system("bundle", "exec", "rake", "react_on_rails:generate_packs")
+            end
+          end
+        end
+
+        # DRY helper method for Bundler context switching with API compatibility
+        # Supports both new (with_unbundled_env) and legacy (with_clean_env) Bundler APIs
+        def with_unbundled_context(&block)
+          if defined?(Bundler)
+            if Bundler.respond_to?(:with_unbundled_env)
+              Bundler.with_unbundled_env(&block)
+            elsif Bundler.respond_to?(:with_clean_env)
+              Bundler.with_clean_env(&block)
+            else
+              # Fallback if neither method is available (very old Bundler versions)
+              yield
+            end
           else
-            system("bundle", "exec", "rake", "react_on_rails:generate_packs")
+            yield
           end
         end
       end
