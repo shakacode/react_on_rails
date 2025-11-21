@@ -1,4 +1,22 @@
 scripts:
+  test:
+    default:
+      description: Run all JS tests
+      script: jest
+    ci:
+      description: Run all JS tests in CI mode
+      # https://circleci.com/docs/collect-test-data/#jest
+      script: jest --ci --runInBand --reporters=default --reporters=jest-junit
+    debug:
+      description: Debug all JS tests
+      script: ndb jest --runInBand
+  check:
+    description: Run all checks
+    script: nps lint && nps format.listDifferent && nps test && nps check-typescript
+  check-typescript:
+    description: Check for TypeScript errors
+    script: nps "build --noEmit" && tsc --project ../packages/react-on-rails-pro-node-renderer/tests
+
   lint:
     description: Run all linters (eslint, tsc)
     script: nps eslint
