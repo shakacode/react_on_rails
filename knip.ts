@@ -45,7 +45,12 @@ const config: KnipConfig = {
 
     // React on Rails core package workspace
     'packages/react-on-rails': {
-      entry: ['src/ReactOnRails.full.ts!', 'src/ReactOnRails.client.ts!', 'src/base/full.rsc.ts!'],
+      entry: [
+        'src/ReactOnRails.full.ts!',
+        'src/ReactOnRails.client.ts!',
+        'src/base/full.rsc.ts!',
+        'src/context.ts!',
+      ],
       project: ['src/**/*.[jt]s{x,}!', 'tests/**/*.[jt]s{x,}', '!lib/**'],
       ignore: [
         // Jest setup and test utilities - not detected by Jest plugin in workspace setup
@@ -159,6 +164,10 @@ const config: KnipConfig = {
         '@rescript/react',
         // The Babel plugin fails to detect it
         'babel-plugin-transform-react-remove-prop-types',
+        // Required by @babel/plugin-transform-runtime for polyfills
+        '@babel/runtime',
+        // Used in webpack server config to filter out MiniCssExtractPlugin
+        'mini-css-extract-plugin',
         // This one is weird. It's long-deprecated and shouldn't be necessary.
         // Probably need to update the Webpack config.
         'node-libs-browser',
@@ -173,6 +182,12 @@ const config: KnipConfig = {
         'url-loader',
         // Transitive dependency of shakapacker but listed as direct dependency
         'webpack-merge',
+        // Used in ignored client/app components (dynamically loaded by React on Rails)
+        'create-react-class',
+        'react-helmet',
+        '@types/react-helmet',
+        'react-redux',
+        'react-router-dom',
       ],
     },
   },
