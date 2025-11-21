@@ -38,7 +38,7 @@ module ReactOnRails
 
           if verbose
             puts "📦 Generating React on Rails packs..."
-            success = run_pack_generation(verbose: true)
+            success = run_pack_generation(silent: false, verbose: true)
           else
             print "📦 Generating packs... "
             success = run_pack_generation(silent: true, verbose: false)
@@ -67,7 +67,7 @@ module ReactOnRails
           if should_run_directly?
             run_rake_task_directly(silent: silent)
           else
-            run_via_bundle_exec(silent: silent)
+            run_via_bundle_exec(silent: silent, verbose: verbose)
           end
         ensure
           # Clean up environment variable
@@ -151,17 +151,22 @@ module ReactOnRails
           # rubocop:enable Style/StderrPuts, Style/GlobalStdStream
         end
 
-        def run_via_bundle_exec(silent: false)
+        def run_via_bundle_exec(silent: false, verbose: false)
+          # Environment variable is already set in run_pack_generation, but we make it explicit here
+          # for clarity and to ensure it's passed to the subprocess
+          env = { "REACT_ON_RAILS_VERBOSE" => verbose ? "true" : "false" }
+
           # Need to unbundle to prevent Bundler from intercepting our bundle exec call
           # when already running inside a Bundler context (e.g., from bin/dev)
           with_unbundled_context do
             if silent
               system(
+                env,
                 "bundle", "exec", "rake", "react_on_rails:generate_packs",
                 out: File::NULL, err: File::NULL
               )
             else
-              system("bundle", "exec", "rake", "react_on_rails:generate_packs")
+              system(env, "bundle", "exec", "rake", "react_on_rails:generate_packs")
             end
           end
         end
