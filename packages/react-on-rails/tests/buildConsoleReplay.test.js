@@ -75,4 +75,52 @@ console.warn.apply(console, ["other message","{\\"c\\":3,\\"d\\":4}"]);
 
     expect(actual).toEqual(expected);
   });
+
+  it('buildConsoleReplay adds nonce attribute when provided', () => {
+    console.history = [{ arguments: ['test message'], level: 'log' }];
+    const actual = buildConsoleReplay(undefined, 0, 'abc123');
+
+    expect(actual).toContain('nonce="abc123"');
+    expect(actual).toContain('<script id="consoleReplayLog" nonce="abc123">');
+    expect(actual).toContain('console.log.apply(console, ["test message"]);');
+  });
+
+  it('buildConsoleReplay returns empty string when no console messages', () => {
+    console.history = [];
+    const actual = buildConsoleReplay(undefined, 0, 'abc123');
+
+    expect(actual).toEqual('');
+  });
+
+  it('consoleReplay returns only JavaScript without script tags', () => {
+    console.history = [
+      { arguments: ['message 1'], level: 'log' },
+      { arguments: ['message 2'], level: 'error' },
+    ];
+    const actual = consoleReplay();
+
+    // Should not contain script tags
+    expect(actual).not.toContain('<script');
+    expect(actual).not.toContain('</script>');
+
+    // Should contain the JavaScript code
+    expect(actual).toContain('console.log.apply(console, ["message 1"]);');
+    expect(actual).toContain('console.error.apply(console, ["message 2"]);');
+  });
+
+  it('buildConsoleReplay sanitizes nonce to prevent XSS', () => {
+    console.history = [{ arguments: ['test'], level: 'log' }];
+    // Attempt attribute injection attack
+    const maliciousNonce = 'abc123" onload="alert(1)';
+    const actual = buildConsoleReplay(undefined, 0, maliciousNonce);
+
+    // Should strip dangerous characters (quotes, parens, spaces)
+    // = is kept as it's valid in base64, but the quotes are stripped making it harmless
+    expect(actual).toContain('nonce="abc123onload=alert1"');
+    // Should NOT contain quotes that would close the attribute
+    expect(actual).not.toContain('nonce="abc123"');
+    expect(actual).not.toContain('alert(1)');
+    // Verify the dangerous parts (quotes and parens) are removed
+    expect(actual).not.toMatch(/nonce="[^"]*"[^>]*onload=/);
+  });
 });

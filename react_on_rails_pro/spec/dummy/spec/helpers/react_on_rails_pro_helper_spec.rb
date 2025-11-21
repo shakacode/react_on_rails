@@ -295,13 +295,13 @@ describe ReactOnRailsProHelper do
     let(:chunks) do
       [
         { html: "<div>Chunk 1: Stream React Server Components</div>",
-          consoleReplayScript: "<script>console.log.apply(console, " \
-                               "['Chunk 1: Console Message'])</script>" },
+          consoleReplayScript: "console.log.apply(console, " \
+                               "['Chunk 1: Console Message'])" },
         { html: "<div>Chunk 2: More content</div>",
-          consoleReplayScript: "<script>console.log.apply(console, " \
+          consoleReplayScript: "console.log.apply(console, " \
                                "['Chunk 2: Console Message']);\n" \
                                "console.error.apply(console, " \
-                               "['Chunk 2: Console Error']);</script>" },
+                               "['Chunk 2: Console Error']);" },
         { html: "<div>Chunk 3: Final content</div>", consoleReplayScript: "" }
       ]
     end
@@ -373,7 +373,12 @@ describe ReactOnRailsProHelper do
         mock_request_and_response
         initial_result = stream_react_component(component_name, props: props, **component_options)
         expect(initial_result).to include(react_component_div_with_initial_chunk)
-        expect(initial_result).to include(chunks.first[:consoleReplayScript])
+        # consoleReplayScript is now wrapped in a script tag with id="consoleReplayLog"
+        if chunks.first[:consoleReplayScript].present?
+          script = chunks.first[:consoleReplayScript]
+          wrapped = "<script id=\"consoleReplayLog\">#{script}</script>"
+          expect(initial_result).to include(wrapped)
+        end
         expect(initial_result).not_to include("More content", "Final content")
         expect(chunks_read.count).to eq(1)
       end
@@ -386,9 +391,12 @@ describe ReactOnRailsProHelper do
         expect(fiber).to be_alive
 
         second_result = fiber.resume
-        # regex that matches the html and consoleReplayScript and allows for any amount of whitespace between them
+        # regex that matches the html and wrapped consoleReplayScript
+        # Note: consoleReplayScript is now wrapped in a script tag with id="consoleReplayLog"
+        script = chunks[1][:consoleReplayScript]
+        wrapped = script.present? ? "<script id=\"consoleReplayLog\">#{script}</script>" : ""
         expect(second_result).to match(
-          /#{Regexp.escape(chunks[1][:html])}\s+#{Regexp.escape(chunks[1][:consoleReplayScript])}/
+          /#{Regexp.escape(chunks[1][:html])}\s+#{Regexp.escape(wrapped)}/
         )
         expect(second_result).not_to include("Stream React Server Components", "Final content")
         expect(chunks_read.count).to eq(2)

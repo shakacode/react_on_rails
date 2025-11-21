@@ -10,7 +10,7 @@ import type {
   ReactOnRailsInternal,
 } from '../types/index.ts';
 import * as Authenticity from '../Authenticity.ts';
-import buildConsoleReplay from '../buildConsoleReplay.ts';
+import buildConsoleReplay, { consoleReplay } from '../buildConsoleReplay.ts';
 import reactHydrateOrRender from '../reactHydrateOrRender.ts';
 import createReactOutput from '../createReactOutput.ts';
 
@@ -173,6 +173,10 @@ Fix: Use only react-on-rails OR react-on-rails-pro, not both.`);
 
     buildConsoleReplay(): string {
       return buildConsoleReplay();
+    },
+
+    getConsoleReplayScript(): string {
+      return consoleReplay();
     },
 
     resetOptions(): void {

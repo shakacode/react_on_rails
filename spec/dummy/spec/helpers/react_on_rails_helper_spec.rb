@@ -751,5 +751,124 @@ describe ReactOnRailsHelper do
       end
     end
   end
+
+  describe "#wrap_console_script_with_nonce" do
+    let(:helper) { PlainReactOnRailsHelper.new }
+    let(:console_script) { "console.log.apply(console, ['[SERVER] test message']);" }
+
+    context "when CSP nonce is available" do
+      before do
+        def helper.respond_to?(method_name, *args)
+          return true if method_name == :content_security_policy_nonce
+
+          super
+        end
+
+        def helper.content_security_policy_nonce(_directive = nil)
+          "abc123"
+        end
+      end
+
+      it "wraps script with nonce attribute" do
+        result = helper.send(:wrap_console_script_with_nonce, console_script)
+        expect(result).to include('nonce="abc123"')
+        expect(result).to include('id="consoleReplayLog"')
+        expect(result).to include(console_script)
+      end
+
+      it "creates a valid script tag" do
+        result = helper.send(:wrap_console_script_with_nonce, console_script)
+        expect(result).to match(%r{<script.*id="consoleReplayLog".*>.*</script>})
+      end
+    end
+
+    context "when CSP is not configured" do
+      before do
+        allow(helper).to receive(:respond_to?).and_call_original
+        allow(helper).to receive(:respond_to?).with(:content_security_policy_nonce).and_return(false)
+      end
+
+      it "wraps script without nonce attribute" do
+        result = helper.send(:wrap_console_script_with_nonce, console_script)
+        expect(result).not_to include("nonce=")
+        expect(result).to include('id="consoleReplayLog"')
+        expect(result).to include(console_script)
+      end
+    end
+
+    context "with Rails 5.2-6.0 compatibility (ArgumentError fallback)" do
+      before do
+        def helper.respond_to?(method_name, *args)
+          return true if method_name == :content_security_policy_nonce
+
+          super
+        end
+
+        def helper.content_security_policy_nonce(*args)
+          raise ArgumentError if args.any?
+
+          "fallback123"
+        end
+      end
+
+      it "falls back to no-argument method" do
+        result = helper.send(:wrap_console_script_with_nonce, console_script)
+        expect(result).to include('nonce="fallback123"')
+      end
+    end
+
+    context "with blank input" do
+      it "returns empty string for empty input" do
+        expect(helper.send(:wrap_console_script_with_nonce, "")).to eq("")
+      end
+
+      it "returns empty string for nil input" do
+        expect(helper.send(:wrap_console_script_with_nonce, nil)).to eq("")
+      end
+
+      it "returns empty string for whitespace-only input" do
+        expect(helper.send(:wrap_console_script_with_nonce, "   ")).to eq("")
+      end
+    end
+
+    context "with multiple console statements" do
+      let(:multi_line_script) do
+        <<~JS.strip
+          console.log.apply(console, ['[SERVER] line 1']);
+          console.log.apply(console, ['[SERVER] line 2']);
+          console.error.apply(console, ['[SERVER] error']);
+        JS
+      end
+
+      before do
+        allow(helper).to receive(:respond_to?).and_call_original
+        allow(helper).to receive(:respond_to?).with(:content_security_policy_nonce).and_return(false)
+      end
+
+      it "preserves newlines in multi-line script" do
+        result = helper.send(:wrap_console_script_with_nonce, multi_line_script)
+        expect(result).to include("line 1")
+        expect(result).to include("line 2")
+        expect(result).to include("error")
+        # Verify newlines are preserved (not collapsed)
+        expect(result.scan(/console\.(log|error)\.apply/).count).to eq(3)
+      end
+    end
+
+    context "with special characters in script" do
+      let(:script_with_quotes) { %q{console.log.apply(console, ['[SERVER] "quoted" text']);} }
+
+      before do
+        allow(helper).to receive(:respond_to?).and_call_original
+        allow(helper).to receive(:respond_to?).with(:content_security_policy_nonce).and_return(false)
+      end
+
+      it "properly escapes content in script tag" do
+        result = helper.send(:wrap_console_script_with_nonce, script_with_quotes)
+        expect(result).to include(script_with_quotes)
+        expect(result).to match(%r{<script.*>.*"quoted".*</script>})
+      end
+    end
+  end
 end
 # rubocop:enable Metrics/BlockLength
