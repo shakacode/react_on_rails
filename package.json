@@ -47,6 +47,7 @@
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
     "jest-fetch-mock": "^3.0.3",
+    "jest-junit": "^16.0.0",
     "jsdom": "^22.1.0",
     "knip": "^5.46.0",
     "nps": "^5.9.3",

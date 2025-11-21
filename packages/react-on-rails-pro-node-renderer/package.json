@@ -33,7 +33,9 @@
   "devDependencies": {
     "@babel/core": "^7.26.10",
     "@babel/eslint-parser": "^7.27.0",
+    "@babel/preset-env": "^7.20.2",
     "@babel/preset-react": "^7.26.3",
+    "@babel/preset-typescript": "^7.27.1",
     "@honeybadger-io/js": "^6.10.1",
     "@sentry/node": "^7.120.0",
     "@types/fs-extra": "^11.0.4",
