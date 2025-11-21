@@ -33,6 +33,7 @@ const config: KnipConfig = {
         '@eslint/js',
         // used by Jest
         'jsdom',
+        'jest-junit',
         // This is an optional peer dependency because users without RSC don't need it
         // but Knip doesn't like such dependencies to be referenced directly in code
         'react-on-rails-rsc',
@@ -75,6 +76,8 @@ const config: KnipConfig = {
         // Optional dependencies used in integrations
         '@honeybadger-io/js',
         '@sentry/*',
+        // Jest reporter used in CI
+        'jest-junit',
       ],
     },
 
@@ -170,9 +173,6 @@ const config: KnipConfig = {
         'url-loader',
         // Transitive dependency of shakapacker but listed as direct dependency
         'webpack-merge',
-        // Dependencies not detected in production mode (runtime injected or dynamic imports)
-        '@babel/runtime',
-        'mini-css-extract-plugin',
       ],
     },
   },
