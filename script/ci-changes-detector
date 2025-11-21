@@ -64,6 +64,7 @@ PRO_RUBY_CHANGED=false
 PRO_RSPEC_CHANGED=false
 PRO_JS_CHANGED=false
 PRO_DUMMY_CHANGED=false
+PRO_NODE_RENDERER_CHANGED=false
 UNCATEGORIZED_CHANGED=false
 
 # Analyze each changed file
@@ -126,6 +127,12 @@ while IFS= read -r file; do
     react_on_rails_pro/spec/dummy/*|react_on_rails_pro/spec/dummy/**/*|.github/workflows/pro-integration-tests.yml)
       DOCS_ONLY=false
       PRO_DUMMY_CHANGED=true
+      ;;
+
+    # React on Rails Pro Node Renderer package (JS/TS source, tests, configs)
+    packages/react-on-rails-pro-node-renderer/src/*|packages/react-on-rails-pro-node-renderer/src/**/*|packages/react-on-rails-pro-node-renderer/tests/*|packages/react-on-rails-pro-node-renderer/tests/**/*|packages/react-on-rails-pro-node-renderer/scripts/*|packages/react-on-rails-pro-node-renderer/scripts/**/*|packages/react-on-rails-pro-node-renderer/package.json|packages/react-on-rails-pro-node-renderer/tsconfig.json|.github/workflows/node-renderer-tests.yml)
+      DOCS_ONLY=false
+      PRO_NODE_RENDERER_CHANGED=true
       ;;
 
     # Lint/format configuration
@@ -215,7 +222,6 @@ if [ "$DOCS_ONLY" = true ]; then
   exit 0
 fi
 
-# TODO: need to add node-renderer tests
 echo "Changed file categories:"
 [ "$RUBY_CHANGED" = true ] && echo -e "${YELLOW}  • Ruby source code${NC}"
 [ "$JS_CHANGED" = true ] && echo -e "${YELLOW}  • JavaScript/TypeScript code${NC}"
@@ -226,6 +232,7 @@ echo "Changed file categories:"
 [ "$PRO_RSPEC_CHANGED" = true ] && echo -e "${YELLOW}  • React on Rails Pro RSpec tests${NC}"
 [ "$PRO_RUBY_CHANGED" = true ] && echo -e "${YELLOW}  • React on Rails Pro Ruby source code${NC}"
 [ "$PRO_DUMMY_CHANGED" = true ] && echo -e "${YELLOW}  • React on Rails Pro Dummy app${NC}"
+[ "$PRO_NODE_RENDERER_CHANGED" = true ] && echo -e "${YELLOW}  • React on Rails Pro Node Renderer package${NC}"
 [ "$LINT_CONFIG_CHANGED" = true ] && echo -e "${YELLOW}  • Lint/format configuration${NC}"
 [ "$PRO_LINT_CONFIG_CHANGED" = true ] && echo -e "${YELLOW}  • React on Rails Pro lint/format configuration${NC}"
 [ "$UNCATEGORIZED_CHANGED" = true ] && echo -e "${YELLOW}  • Uncategorized changes (running full suite for safety)${NC}"
@@ -242,6 +249,7 @@ RUN_GENERATORS=false
 RUN_PRO_LINT=false
 RUN_PRO_TESTS=false
 RUN_PRO_DUMMY_TESTS=false
+RUN_PRO_NODE_RENDERER_TESTS=false
 
 if [ "$LINT_CONFIG_CHANGED" = true ] || [ "$RUBY_CHANGED" = true ] || [ "$JS_CHANGED" = true ] || [ "$SPEC_DUMMY_CHANGED" = true ]; then
   RUN_LINT=true
@@ -275,6 +283,10 @@ if [ "$PRO_DUMMY_CHANGED" = true ] || [ "$PRO_RUBY_CHANGED" = true ] || [ "$PRO_
   RUN_PRO_DUMMY_TESTS=true
 fi
 
+if [ "$PRO_NODE_RENDERER_CHANGED" = true ] || [ "$PRO_JS_CHANGED" = true ] || [ "$RUBY_CHANGED" = true ]; then
+  RUN_PRO_NODE_RENDERER_TESTS=true
+fi
+
 # If we encounter a change that isn't explicitly categorized, default to running everything
 if [ "$UNCATEGORIZED_CHANGED" = true ]; then
   RUN_LINT=true
@@ -285,6 +297,7 @@ if [ "$UNCATEGORIZED_CHANGED" = true ]; then
   RUN_PRO_LINT=true
   RUN_PRO_TESTS=true
   RUN_PRO_DUMMY_TESTS=true
+  RUN_PRO_NODE_RENDERER_TESTS=true
 fi
 
 [ "$RUN_LINT" = true ] && echo "  ✓ Lint (Ruby + JS)"
@@ -295,6 +308,7 @@ fi
 [ "$RUN_PRO_LINT" = true ] && echo "  ✓ React on Rails Pro Lint (Ruby + JS)"
 [ "$RUN_PRO_TESTS" = true ] && echo "  ✓ React on Rails Pro RSpec unit tests (Ruby + JS)"
 [ "$RUN_PRO_DUMMY_TESTS" = true ] && echo "  ✓ React on Rails Pro Dummy app integration tests"
+[ "$RUN_PRO_NODE_RENDERER_TESTS" = true ] && echo "  ✓ React on Rails Pro Node Renderer tests"
 
 # Export as GitHub Actions outputs if running in CI
 if [ -n "${GITHUB_OUTPUT:-}" ]; then
@@ -308,6 +322,7 @@ if [ -n "${GITHUB_OUTPUT:-}" ]; then
     echo "run_pro_lint=$RUN_PRO_LINT"
     echo "run_pro_tests=$RUN_PRO_TESTS"
     echo "run_pro_dummy_tests=$RUN_PRO_DUMMY_TESTS"
+    echo "run_pro_node_renderer_tests=$RUN_PRO_NODE_RENDERER_TESTS"
   } >> "$GITHUB_OUTPUT"
 fi
 
@@ -323,7 +338,8 @@ if [ "${CI_JSON_OUTPUT:-}" = "1" ]; then
   "run_generators": $RUN_GENERATORS,
   "run_pro_lint": $RUN_PRO_LINT,
   "run_pro_tests": $RUN_PRO_TESTS,
-  "run_pro_dummy_tests": $RUN_PRO_DUMMY_TESTS
+  "run_pro_dummy_tests": $RUN_PRO_DUMMY_TESTS,
+  "run_pro_node_renderer_tests": $RUN_PRO_NODE_RENDERER_TESTS
 }
 EOF
 fi
