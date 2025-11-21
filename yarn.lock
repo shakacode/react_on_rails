@@ -7004,6 +7004,9 @@ react-on-rails-rsc@19.0.2:
     neo-async "^2.6.1"
     webpack-sources "^3.2.0"
 
+react-on-rails@./packages/react-on-rails:
+  version "16.2.0-beta.11"
+
 react@^19.0.0:
   version "19.0.0"
   resolved "https://registry.npmjs.org/react/-/react-19.0.0.tgz"
