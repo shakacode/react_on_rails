@@ -11,7 +11,7 @@ module ReactOnRails
 
       def self.installed_in_current_context?: (String) -> bool
       def self.version_flags_for: (String) -> Array[String]
-      def self.run_process_if_available: (String, Array[String]) -> bool
+      def self.run_process_if_available: (String, Array[String]) -> (bool | nil)
       def self.run_process_outside_bundle: (String, Array[String]) -> bool
       def self.process_available_in_system?: (String) -> bool
       def self.with_unbundled_context: () { () -> untyped } -> untyped

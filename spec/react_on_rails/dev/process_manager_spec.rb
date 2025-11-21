@@ -72,18 +72,62 @@ RSpec.describe ReactOnRails::Dev::ProcessManager do
 
     it "uses foreman when overmind not available and foreman is available" do
       expect(described_class).to receive(:run_process_if_available)
-        .with("overmind", ["start", "-f", "Procfile.dev"]).and_return(false)
+        .with("overmind", ["start", "-f", "Procfile.dev"]).and_return(nil)
       expect(described_class).to receive(:run_process_if_available)
         .with("foreman", ["start", "-f", "Procfile.dev"]).and_return(true)
 
       described_class.run_with_process_manager("Procfile.dev")
     end
 
-    it "exits with error when no process manager available" do
+    it "exits silently when overmind is installed but exits with error (foreman not found)" do
+      expect(described_class).to receive(:run_process_if_available)
+        .with("overmind", ["start", "-f", "Procfile.dev"]).and_return(false)
+      expect(described_class).to receive(:run_process_if_available)
+        .with("foreman", ["start", "-f", "Procfile.dev"]).and_return(nil)
+      expect(described_class).not_to receive(:show_process_manager_installation_help)
+      expect_any_instance_of(Kernel).to receive(:exit).with(1).and_raise(SystemExit)
+
+      expect { described_class.run_with_process_manager("Procfile.dev") }.to raise_error(SystemExit)
+    end
+
+    it "exits silently when overmind fails but foreman succeeds" do
+      expect(described_class).to receive(:run_process_if_available)
+        .with("overmind", ["start", "-f", "Procfile.dev"]).and_return(false)
+      expect(described_class).to receive(:run_process_if_available)
+        .with("foreman", ["start", "-f", "Procfile.dev"]).and_return(true)
+      expect(described_class).not_to receive(:show_process_manager_installation_help)
+      expect_any_instance_of(Kernel).not_to receive(:exit)
+
+      described_class.run_with_process_manager("Procfile.dev")
+    end
+
+    it "exits silently when overmind fails and foreman also fails" do
       expect(described_class).to receive(:run_process_if_available)
         .with("overmind", ["start", "-f", "Procfile.dev"]).and_return(false)
       expect(described_class).to receive(:run_process_if_available)
         .with("foreman", ["start", "-f", "Procfile.dev"]).and_return(false)
+      expect(described_class).not_to receive(:show_process_manager_installation_help)
+      expect_any_instance_of(Kernel).to receive(:exit).with(1).and_raise(SystemExit)
+
+      expect { described_class.run_with_process_manager("Procfile.dev") }.to raise_error(SystemExit)
+    end
+
+    it "exits silently when overmind not found but foreman exits with error" do
+      expect(described_class).to receive(:run_process_if_available)
+        .with("overmind", ["start", "-f", "Procfile.dev"]).and_return(nil)
+      expect(described_class).to receive(:run_process_if_available)
+        .with("foreman", ["start", "-f", "Procfile.dev"]).and_return(false)
+      expect(described_class).not_to receive(:show_process_manager_installation_help)
+      expect_any_instance_of(Kernel).to receive(:exit).with(1).and_raise(SystemExit)
+
+      expect { described_class.run_with_process_manager("Procfile.dev") }.to raise_error(SystemExit)
+    end
+
+    it "exits with error when no process manager available" do
+      expect(described_class).to receive(:run_process_if_available)
+        .with("overmind", ["start", "-f", "Procfile.dev"]).and_return(nil)
+      expect(described_class).to receive(:run_process_if_available)
+        .with("foreman", ["start", "-f", "Procfile.dev"]).and_return(nil)
       expect(described_class).to receive(:show_process_manager_installation_help)
       expect_any_instance_of(Kernel).to receive(:exit).with(1)
 
@@ -117,12 +161,12 @@ RSpec.describe ReactOnRails::Dev::ProcessManager do
       expect(result).to be true
     end
 
-    it "returns false when process not available anywhere" do
+    it "returns nil when process not available anywhere" do
       allow(described_class).to receive(:installed?).with("nonexistent").and_return(false)
       allow(described_class).to receive(:process_available_in_system?).with("nonexistent").and_return(false)
 
       result = described_class.send(:run_process_if_available, "nonexistent", ["start"])
-      expect(result).to be false
+      expect(result).to be_nil
     end
   end
 
