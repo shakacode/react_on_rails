@@ -91,8 +91,8 @@ while IFS= read -r file; do
       GENERATORS_CHANGED=true
       ;;
 
-    # JavaScript/TypeScript source
-    package.json|yarn.lock|packages/react-on-rails/src/*|packages/react-on-rails/src/**/*|.github/workflows/package-js-tests.yml)
+    # JavaScript/TypeScript source (including tests, scripts, and package files)
+    package.json|yarn.lock|packages/react-on-rails/src/*|packages/react-on-rails/src/**/*|packages/react-on-rails/tests/*|packages/react-on-rails/tests/**/*|packages/react-on-rails/scripts/*|packages/react-on-rails/scripts/**/*|packages/react-on-rails/package.json|packages/react-on-rails/tsconfig.json|.github/workflows/package-js-tests.yml)
       DOCS_ONLY=false
       JS_CHANGED=true
       ;;
@@ -109,8 +109,8 @@ while IFS= read -r file; do
       PRO_RUBY_CHANGED=true
       ;;
 
-    # JavaScript/TypeScript Pro source
-    packages/react-on-rails-pro/src/*|packages/react-on-rails-pro/src/**/*)
+    # JavaScript/TypeScript Pro source (including tests, scripts, and package files)
+    packages/react-on-rails-pro/src/*|packages/react-on-rails-pro/src/**/*|packages/react-on-rails-pro/tests/*|packages/react-on-rails-pro/tests/**/*|packages/react-on-rails-pro/scripts/*|packages/react-on-rails-pro/scripts/**/*|packages/react-on-rails-pro/package.json|packages/react-on-rails-pro/tsconfig.json)
       DOCS_ONLY=false
       PRO_JS_CHANGED=true
       ;;
