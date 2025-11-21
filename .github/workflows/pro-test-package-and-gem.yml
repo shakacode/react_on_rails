@@ -93,7 +93,7 @@ jobs:
           bundler: 2.5.4
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: ./.github/actions/setup-node-with-retry
         with:
           node-version: 22
           cache: yarn
@@ -194,7 +194,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: ./.github/actions/setup-node-with-retry
         with:
           node-version: 22
           cache: yarn

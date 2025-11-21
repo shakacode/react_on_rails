@@ -116,12 +116,12 @@ jobs:
       - name: Fix dependency for libyaml-dev
         run: sudo apt install libyaml-dev
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: ./.github/actions/setup-node-with-retry
         with:
           node-version: ${{ matrix.node-version }}
-          # Disable cache for Node 22 due to V8 bug in 22.21.0
+          # Retry logic now handles V8 crashes automatically
           # https://github.com/nodejs/node/issues/56010
-          cache: ${{ matrix.node-version != '22' && 'yarn' || '' }}
+          cache: yarn
           cache-dependency-path: '**/yarn.lock'
       - name: Print system information
         run: |
@@ -195,12 +195,12 @@ jobs:
           ruby-version: ${{ matrix.ruby-version }}
           bundler: 2.5.9
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: ./.github/actions/setup-node-with-retry
         with:
           node-version: ${{ matrix.node-version }}
-          # Disable cache for Node 22 due to V8 bug in 22.21.0
+          # Retry logic now handles V8 crashes automatically
           # https://github.com/nodejs/node/issues/56010
-          cache: ${{ matrix.node-version != '22' && 'yarn' || '' }}
+          cache: yarn
           cache-dependency-path: '**/yarn.lock'
       - name: Print system information
         run: |

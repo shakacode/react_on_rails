@@ -1,0 +1,115 @@
+name: 'Setup Node with V8 Crash Retry'
+description: 'Setup Node.js with automatic retry on V8 bytecode deserialization errors'
+inputs:
+  node-version:
+    description: 'Version Spec of the version to use. Examples: 12.x, 10.15.1, >=10.15.0'
+    required: true
+  cache:
+    description: 'Used to specify a package manager for caching in the default directory. Supported values: npm, yarn, pnpm.'
+    required: false
+    default: ''
+  cache-dependency-path:
+    description: 'Used to specify the path to a dependency file: package-lock.json, yarn.lock, etc. Supports wildcards or a list of file names for caching multiple dependencies.'
+    required: false
+    default: ''
+  max-retries:
+    description: 'Maximum number of retry attempts on V8 crash'
+    required: false
+    default: '3'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Node.js with retry
+      shell: bash
+      env:
+        NODE_VERSION: ${{ inputs.node-version }}
+        CACHE_TYPE: ${{ inputs.cache }}
+        CACHE_PATH: ${{ inputs.cache-dependency-path }}
+        MAX_RETRIES: ${{ inputs.max-retries }}
+      run: |
+        # This script pre-validates yarn cache works before setup-node runs
+        # The V8 crash manifests during 'yarn cache dir' execution
+        # Note: This catches the crash early but doesn't prevent it from potentially
+        # occurring again in setup-node. However, in practice, if yarn cache dir
+        # succeeds here, it typically succeeds in setup-node as well.
+
+        ATTEMPT=1
+
+        # Function to test yarn cache dir
+        test_yarn_cache() {
+          echo "::group::Testing yarn cache (attempt $ATTEMPT of $MAX_RETRIES)"
+
+          if [ -n "$CACHE_TYPE" ] && [ "$CACHE_TYPE" = "yarn" ]; then
+            # Test if yarn cache dir works (this is where V8 crashes occur)
+            TEMP_OUTPUT=$(mktemp)
+
+            if timeout 30 yarn cache dir > "$TEMP_OUTPUT" 2>&1; then
+              echo "✓ Yarn cache dir command succeeded"
+              cat "$TEMP_OUTPUT"
+              rm -f "$TEMP_OUTPUT"
+              echo "::endgroup::"
+              return 0
+            else
+              EXIT_CODE=$?
+
+              # Check for timeout
+              if [ $EXIT_CODE -eq 124 ] || [ $EXIT_CODE -eq 143 ]; then
+                echo "::warning::yarn cache dir timed out after 30s"
+                cat "$TEMP_OUTPUT"
+                rm -f "$TEMP_OUTPUT"
+                echo "::endgroup::"
+                return 1
+              # Check for V8 crash in output
+              elif grep -q "Fatal error in.*Check failed: ReadSingleBytecodeData" "$TEMP_OUTPUT"; then
+                echo "::warning::V8 bytecode deserialization error detected"
+                cat "$TEMP_OUTPUT"
+                rm -f "$TEMP_OUTPUT"
+                echo "::endgroup::"
+                return 1
+              else
+                echo "::error::Different error occurred (exit code: $EXIT_CODE):"
+                cat "$TEMP_OUTPUT"
+                rm -f "$TEMP_OUTPUT"
+                echo "::endgroup::"
+                # Don't retry non-V8 errors
+                return $EXIT_CODE
+              fi
+            fi
+          else
+            # No cache or non-yarn cache, nothing to validate
+            echo "Cache type '$CACHE_TYPE' does not require pre-validation"
+            echo "::endgroup::"
+            return 0
+          fi
+        }
+
+        # Retry loop
+        while [ $ATTEMPT -le $MAX_RETRIES ]; do
+          if test_yarn_cache; then
+            echo "✓ Yarn cache validation passed"
+            break
+          else
+            RETRY_EXIT_CODE=$?
+            # Exit immediately for non-retryable errors (exit codes > 1)
+            if [ $RETRY_EXIT_CODE -gt 1 ]; then
+              exit $RETRY_EXIT_CODE
+            fi
+
+            if [ $ATTEMPT -lt $MAX_RETRIES ]; then
+              echo "::warning::Attempt $ATTEMPT failed. Waiting 5 seconds before retry..."
+              sleep 5
+              ATTEMPT=$((ATTEMPT + 1))
+            else
+              echo "::error::All $MAX_RETRIES retry attempts failed"
+              exit 1
+            fi
+          fi
+        done
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: ${{ inputs.cache }}
+        cache-dependency-path: ${{ inputs.cache-dependency-path }}
