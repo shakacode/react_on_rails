@@ -104,6 +104,43 @@ RSpec.describe ReactOnRails::Dev::PackGenerator do
         expect(error_output.join("\n")).to match(/Error generating packs: Task failed/)
       end
 
+      it "suggests --verbose flag when pack generation fails in quiet mode" do
+        allow(mock_task).to receive(:invoke).and_raise(StandardError.new("Task failed"))
+
+        # Mock STDERR.puts to suppress error output
+        # rubocop:disable Style/GlobalStdStream
+        allow(STDERR).to receive(:puts)
+        # rubocop:enable Style/GlobalStdStream
+
+        expect { described_class.generate(verbose: false) }
+          .to output(/Run with.*--verbose.*flag for detailed output/).to_stdout_from_any_process
+          .and raise_error(SystemExit)
+      end
+
+      it "does not suggest --verbose flag when already in verbose mode" do
+        allow(mock_task).to receive(:invoke).and_raise(StandardError.new("Task failed"))
+
+        # Mock STDERR.puts to suppress error output
+        # rubocop:disable Style/GlobalStdStream
+        allow(STDERR).to receive(:puts)
+        # rubocop:enable Style/GlobalStdStream
+
+        # Capture output to verify --verbose suggestion is not shown
+        output = StringIO.new
+        # rubocop:disable RSpec/ExpectOutput
+        begin
+          $stdout = output
+          described_class.generate(verbose: true)
+        rescue SystemExit
+          # Expected to exit
+        ensure
+          $stdout = STDOUT
+        end
+        # rubocop:enable RSpec/ExpectOutput
+
+        expect(output.string).not_to match(/Run with.*--verbose/)
+      end
+
       it "outputs errors to stderr even in silent mode" do
         allow(mock_task).to receive(:invoke).and_raise(StandardError.new("Silent mode error"))
 

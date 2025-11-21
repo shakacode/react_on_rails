@@ -38,22 +38,30 @@ module ReactOnRails
 
           if verbose
             puts "📦 Generating React on Rails packs..."
-            success = run_pack_generation
+            success = run_pack_generation(verbose: true)
           else
             print "📦 Generating packs... "
-            success = run_pack_generation(silent: true)
+            success = run_pack_generation(silent: true, verbose: false)
             puts success ? "✅" : "❌"
           end
 
           return if success
 
           puts "❌ Pack generation failed"
+          unless verbose
+            puts ""
+            puts "💡 Run with #{Rainbow('--verbose').cyan.bold} flag for detailed output:"
+            puts "   #{Rainbow('bin/dev --verbose').green.bold}"
+          end
           exit 1
         end
 
         private
 
-        def run_pack_generation(silent: false)
+        def run_pack_generation(silent: false, verbose: false)
+          # Set environment variable for child processes to respect verbose mode
+          ENV["REACT_ON_RAILS_VERBOSE"] = verbose ? "true" : "false"
+
           # If we're already inside a Bundler context AND Rails is available (e.g., called from bin/dev),
           # we can directly require and run the task. Otherwise, use bundle exec.
           if should_run_directly?
@@ -61,6 +69,9 @@ module ReactOnRails
           else
             run_via_bundle_exec(silent: silent)
           end
+        ensure
+          # Clean up environment variable
+          ENV.delete("REACT_ON_RAILS_VERBOSE")
         end
 
         def should_run_directly?

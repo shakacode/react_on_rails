@@ -25,40 +25,42 @@ module ReactOnRails
     def generate_packs_if_stale
       return unless ReactOnRails.configuration.auto_load_bundle
 
+      verbose = ENV["REACT_ON_RAILS_VERBOSE"] == "true"
+
       add_generated_pack_to_server_bundle
 
       # Clean any non-generated files from directories
-      clean_non_generated_files_with_feedback
+      clean_non_generated_files_with_feedback(verbose: verbose)
 
       are_generated_files_present_and_up_to_date = Dir.exist?(generated_packs_directory_path) &&
                                                    File.exist?(generated_server_bundle_file_path) &&
                                                    !stale_or_missing_packs?
 
       if are_generated_files_present_and_up_to_date
-        puts Rainbow("✅ Generated packs are up to date, no regeneration needed").green
+        puts Rainbow("✅ Generated packs are up to date, no regeneration needed").green if verbose
         return
       end
 
-      clean_generated_directories_with_feedback
-      generate_packs
+      clean_generated_directories_with_feedback(verbose: verbose)
+      generate_packs(verbose: verbose)
     end
 
     private
 
-    def generate_packs
-      common_component_to_path.each_value { |component_path| create_pack(component_path) }
-      client_component_to_path.each_value { |component_path| create_pack(component_path) }
+    def generate_packs(verbose: false)
+      common_component_to_path.each_value { |component_path| create_pack(component_path, verbose: verbose) }
+      client_component_to_path.each_value { |component_path| create_pack(component_path, verbose: verbose) }
 
-      create_server_pack if ReactOnRails.configuration.server_bundle_js_file.present?
+      create_server_pack(verbose: verbose) if ReactOnRails.configuration.server_bundle_js_file.present?
     end
 
-    def create_pack(file_path)
+    def create_pack(file_path, verbose: false)
       output_path = generated_pack_path(file_path)
       content = pack_file_contents(file_path)
 
       File.write(output_path, content)
 
-      puts(Rainbow("Generated Packs: #{output_path}").yellow)
+      puts(Rainbow("Generated Packs: #{output_path}").yellow) if verbose
     end
 
     def first_js_statement_in_code(content) # rubocop:disable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
@@ -126,11 +128,11 @@ module ReactOnRails
       FILE_CONTENT
     end
 
-    def create_server_pack
+    def create_server_pack(verbose: false)
       File.write(generated_server_bundle_file_path, generated_server_pack_file_content)
 
       add_generated_pack_to_server_bundle
-      puts(Rainbow("Generated Server Bundle: #{generated_server_bundle_file_path}").orange)
+      puts(Rainbow("Generated Server Bundle: #{generated_server_bundle_file_path}").orange) if verbose
     end
 
     def build_server_pack_content(component_on_server_imports, server_components, client_components)
@@ -200,17 +202,17 @@ module ReactOnRails
       "#{generated_nonentrypoints_path}/#{generated_server_bundle_file_name}.js"
     end
 
-    def clean_non_generated_files_with_feedback
+    def clean_non_generated_files_with_feedback(verbose: false)
       directories_to_clean = [generated_packs_directory_path, generated_server_bundle_directory_path].compact.uniq
       expected_files = build_expected_files_set
 
-      puts Rainbow("🧹 Cleaning non-generated files...").yellow
+      puts Rainbow("🧹 Cleaning non-generated files...").yellow if verbose
 
       total_deleted = directories_to_clean.sum do |dir_path|
-        clean_unexpected_files_from_directory(dir_path, expected_files)
+        clean_unexpected_files_from_directory(dir_path, expected_files, verbose: verbose)
       end
 
-      display_cleanup_summary(total_deleted)
+      display_cleanup_summary(total_deleted, verbose: verbose) if verbose
     end
 
     def build_expected_files_set
@@ -225,17 +227,17 @@ module ReactOnRails
       { pack_files: expected_pack_files, server_bundle: expected_server_bundle }
     end
 
-    def clean_unexpected_files_from_directory(dir_path, expected_files)
+    def clean_unexpected_files_from_directory(dir_path, expected_files, verbose: false)
       return 0 unless Dir.exist?(dir_path)
 
       existing_files = Dir.glob("#{dir_path}/**/*").select { |f| File.file?(f) }
       unexpected_files = find_unexpected_files(existing_files, dir_path, expected_files)
 
       if unexpected_files.any?
-        delete_unexpected_files(unexpected_files, dir_path)
+        delete_unexpected_files(unexpected_files, dir_path, verbose: verbose)
         unexpected_files.length
       else
-        puts Rainbow("   No unexpected files found in #{dir_path}").cyan
+        puts Rainbow("   No unexpected files found in #{dir_path}").cyan if verbose
         0
       end
     end
@@ -250,15 +252,21 @@ module ReactOnRails
       end
     end
 
-    def delete_unexpected_files(unexpected_files, dir_path)
-      puts Rainbow("   Deleting #{unexpected_files.length} unexpected files from #{dir_path}:").cyan
-      unexpected_files.each do |file|
-        puts Rainbow("     - #{File.basename(file)}").blue
-        File.delete(file)
+    def delete_unexpected_files(unexpected_files, dir_path, verbose: false)
+      if verbose
+        puts Rainbow("   Deleting #{unexpected_files.length} unexpected files from #{dir_path}:").cyan
+        unexpected_files.each do |file|
+          puts Rainbow("     - #{File.basename(file)}").blue
+          File.delete(file)
+        end
+      else
+        unexpected_files.each { |file| File.delete(file) }
       end
     end
 
-    def display_cleanup_summary(total_deleted)
+    def display_cleanup_summary(total_deleted, verbose: false)
+      return unless verbose
+
       if total_deleted.positive?
         puts Rainbow("🗑️  Deleted #{total_deleted} unexpected files total").red
       else
@@ -266,15 +274,17 @@ module ReactOnRails
       end
     end
 
-    def clean_generated_directories_with_feedback
+    def clean_generated_directories_with_feedback(verbose: false)
       directories_to_clean = [
         generated_packs_directory_path,
         generated_server_bundle_directory_path
       ].compact.uniq
 
-      puts Rainbow("🧹 Cleaning generated directories...").yellow
+      puts Rainbow("🧹 Cleaning generated directories...").yellow if verbose
 
-      total_deleted = directories_to_clean.sum { |dir_path| clean_directory_with_feedback(dir_path) }
+      total_deleted = directories_to_clean.sum { |dir_path| clean_directory_with_feedback(dir_path, verbose: verbose) }
+
+      return unless verbose
 
       if total_deleted.positive?
         puts Rainbow("🗑️  Deleted #{total_deleted} generated files total").red
@@ -283,27 +293,29 @@ module ReactOnRails
       end
     end
 
-    def clean_directory_with_feedback(dir_path)
-      return create_directory_with_feedback(dir_path) unless Dir.exist?(dir_path)
+    def clean_directory_with_feedback(dir_path, verbose: false)
+      return create_directory_with_feedback(dir_path, verbose: verbose) unless Dir.exist?(dir_path)
 
       files = Dir.glob("#{dir_path}/**/*").select { |f| File.file?(f) }
 
       if files.any?
-        puts Rainbow("   Deleting #{files.length} files from #{dir_path}:").cyan
-        files.each { |file| puts Rainbow("     - #{File.basename(file)}").blue }
+        if verbose
+          puts Rainbow("   Deleting #{files.length} files from #{dir_path}:").cyan
+          files.each { |file| puts Rainbow("     - #{File.basename(file)}").blue }
+        end
         FileUtils.rm_rf(dir_path)
         FileUtils.mkdir_p(dir_path)
         files.length
       else
-        puts Rainbow("   Directory #{dir_path} is already empty").cyan
+        puts Rainbow("   Directory #{dir_path} is already empty").cyan if verbose
         FileUtils.rm_rf(dir_path)
         FileUtils.mkdir_p(dir_path)
         0
       end
     end
 
-    def create_directory_with_feedback(dir_path)
-      puts Rainbow("   Directory #{dir_path} does not exist, creating...").cyan
+    def create_directory_with_feedback(dir_path, verbose: false)
+      puts Rainbow("   Directory #{dir_path} does not exist, creating...").cyan if verbose
       FileUtils.mkdir_p(dir_path)
       0
     end

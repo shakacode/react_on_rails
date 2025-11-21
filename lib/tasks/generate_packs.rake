@@ -17,18 +17,24 @@ namespace :react_on_rails do
   DESC
 
   task generate_packs: :environment do
-    puts Rainbow("🚀 Starting React on Rails pack generation...").bold
-    puts Rainbow("📁 Auto-load bundle: #{ReactOnRails.configuration.auto_load_bundle}").cyan
-    puts Rainbow("📂 Components subdirectory: #{ReactOnRails.configuration.components_subdirectory}").cyan
-    puts ""
+    verbose = ENV["REACT_ON_RAILS_VERBOSE"] == "true"
+
+    if verbose
+      puts Rainbow("🚀 Starting React on Rails pack generation...").bold
+      puts Rainbow("📁 Auto-load bundle: #{ReactOnRails.configuration.auto_load_bundle}").cyan
+      puts Rainbow("📂 Components subdirectory: #{ReactOnRails.configuration.components_subdirectory}").cyan
+      puts ""
+    end
 
     begin
       start_time = Time.now
       ReactOnRails::PacksGenerator.instance.generate_packs_if_stale
       end_time = Time.now
 
-      puts ""
-      puts Rainbow("✨ Pack generation completed in #{((end_time - start_time) * 1000).round(1)}ms").green
+      if verbose
+        puts ""
+        puts Rainbow("✨ Pack generation completed in #{((end_time - start_time) * 1000).round(1)}ms").green
+      end
     rescue ReactOnRails::Error => e
       handle_react_on_rails_error(e)
       exit 1
