@@ -23,13 +23,21 @@ After a release, please make sure to run `bundle exec rake update_changelog`. Th
 
 Changes since the last non-beta release.
 
+### [v16.2.0.beta.12] - 2025-11-20
+
 #### Added
 
 - **CSP Nonce Support for Console Replay**: Added Content Security Policy (CSP) nonce support for the `consoleReplay` script generated during server-side rendering. When Rails CSP is configured, the console replay script will automatically include the nonce attribute, allowing it to execute under restrictive CSP policies like `script-src: 'self'`. The implementation includes cross-version Rails compatibility (5.2-7.x) and defense-in-depth nonce sanitization to prevent attribute injection attacks. [PR 2059](https://github.com/shakacode/react_on_rails/pull/2059) by [justin808](https://github.com/justin808).
 
-#### Bug Fixes
+#### Improved
 
-- [PR 2085](https://github.com/shakacode/react_on_rails/pull/2085) by [justin808](https://github.com/justin808): Fix pack generation in bin/dev when running from Bundler context. Pack generation was failing with "Could not find command 'react_on_rails:generate_packs'" because Bundler was intercepting the subprocess call. The fix wraps the bundle exec call with `Bundler.with_unbundled_env` to prevent interception.
+- **Enhanced bin/dev Error Messages**: Improved error messages when `bin/dev` fails by suggesting the `--verbose` flag for detailed debugging output. The verbose flag now properly cascades to child processes via the `REACT_ON_RAILS_VERBOSE` environment variable, making troubleshooting pack generation failures significantly easier. [PR 2083](https://github.com/shakacode/react_on_rails/pull/2083) by [justin808](https://github.com/justin808).
+
+#### Fixed
+
+- **RSpec Helper Optimization with Private SSR Directories**: Fixed RSpec helper optimization bug that caused tests to run with stale server-side code when server bundles are stored in private `ssr-generated/` directories. The helper now automatically monitors server bundles and other critical files, ensuring proper rebuild detection even when assets are in separate directories from the manifest. [PR 1838](https://github.com/shakacode/react_on_rails/pull/1838) by [justin808](https://github.com/justin808).
+
+- **Pack Generation in bin/dev from Bundler Context**: Fixed pack generation failing with "Could not find command 'react_on_rails:generate_packs'" when running `bin/dev` from within a Bundler context. The fix wraps the bundle exec call with `Bundler.with_unbundled_env` to prevent interception. [PR 2085](https://github.com/shakacode/react_on_rails/pull/2085) by [justin808](https://github.com/justin808).
 
 ### [v16.2.0.beta.11] - 2025-11-19
 
