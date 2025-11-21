@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
 module ReactOnRailsPro
-  VERSION = "16.2.0.beta.11"
+  VERSION = "16.2.0.beta.12"
   PROTOCOL_VERSION = "2.0.0"
 end
