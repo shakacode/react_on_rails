@@ -95,7 +95,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: ./.github/actions/setup-node-with-retry
         with:
           node-version: ${{ matrix.node-version }}
           # TODO: Re-enable cache when Node.js 22 V8 bug is fixed

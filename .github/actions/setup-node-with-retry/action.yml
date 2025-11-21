@@ -1,0 +1,106 @@
+name: 'Setup Node with V8 Crash Retry'
+description: 'Setup Node.js with automatic retry on V8 bytecode deserialization errors'
+inputs:
+  node-version:
+    description: 'Version Spec of the version to use. Examples: 12.x, 10.15.1, >=10.15.0'
+    required: true
+  cache:
+    description: 'Used to specify a package manager for caching in the default directory. Supported values: npm, yarn, pnpm.'
+    required: false
+    default: ''
+  cache-dependency-path:
+    description: 'Used to specify the path to a dependency file: package-lock.json, yarn.lock, etc. Supports wildcards or a list of file names for caching multiple dependencies.'
+    required: false
+    default: ''
+  max-retries:
+    description: 'Maximum number of retry attempts on V8 crash'
+    required: false
+    default: '3'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Node.js with retry
+      shell: bash
+      env:
+        NODE_VERSION: ${{ inputs.node-version }}
+        CACHE_TYPE: ${{ inputs.cache }}
+        CACHE_PATH: ${{ inputs.cache-dependency-path }}
+        MAX_RETRIES: ${{ inputs.max-retries }}
+      run: |
+        # This script wraps the setup-node action with retry logic for V8 crashes
+        # The V8 crash manifests during 'yarn cache dir' execution in setup-node
+
+        ATTEMPT=1
+        SUCCESS=false
+
+        # Function to setup node
+        setup_node_attempt() {
+          echo "::group::Node.js setup attempt $ATTEMPT of $MAX_RETRIES"
+
+          # We need to manually do what setup-node does, since we can't retry an action from within a composite action
+          # 1. Ensure Node.js is available (it should be pre-installed on GitHub runners)
+          # 2. Setup the cache (this is where the V8 crash happens)
+
+          if [ -n "$CACHE_TYPE" ] && [ "$CACHE_TYPE" = "yarn" ]; then
+            # Test if yarn cache dir works (this is where V8 crashes occur)
+            TEMP_OUTPUT=$(mktemp)
+
+            if timeout 30 yarn cache dir > "$TEMP_OUTPUT" 2>&1; then
+              echo "Yarn cache dir command succeeded"
+              cat "$TEMP_OUTPUT"
+              rm -f "$TEMP_OUTPUT"
+              echo "::endgroup::"
+              return 0
+            else
+              EXIT_CODE=$?
+              # Check for V8 crash in output
+              if grep -q "Fatal error in.*Check failed: ReadSingleBytecodeData" "$TEMP_OUTPUT"; then
+                echo "::warning::V8 bytecode deserialization error detected"
+                cat "$TEMP_OUTPUT"
+                rm -f "$TEMP_OUTPUT"
+                echo "::endgroup::"
+                return 1
+              else
+                echo "::error::Different error occurred (exit code: $EXIT_CODE):"
+                cat "$TEMP_OUTPUT"
+                rm -f "$TEMP_OUTPUT"
+                echo "::endgroup::"
+                return $EXIT_CODE
+              fi
+            fi
+          else
+            # No cache or non-yarn cache, nothing to retry
+            echo "::endgroup::"
+            return 0
+          fi
+        }
+
+        # Retry loop
+        while [ $ATTEMPT -le $MAX_RETRIES ]; do
+          if setup_node_attempt; then
+            SUCCESS=true
+            break
+          else
+            if [ $ATTEMPT -lt $MAX_RETRIES ]; then
+              echo "::warning::Retry attempt $ATTEMPT failed. Waiting 5 seconds before retry..."
+              sleep 5
+              ATTEMPT=$((ATTEMPT + 1))
+            else
+              echo "::error::All $MAX_RETRIES retry attempts failed"
+              exit 1
+            fi
+          fi
+        done
+
+        if [ "$SUCCESS" != true ]; then
+          echo "::error::Failed to setup Node.js after $MAX_RETRIES attempts"
+          exit 1
+        fi
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: ${{ inputs.cache }}
+        cache-dependency-path: ${{ inputs.cache-dependency-path }}

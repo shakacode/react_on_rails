@@ -114,13 +114,13 @@ jobs:
           ruby-version: ${{ matrix.ruby-version }}
           bundler: 2.5.9
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: ./.github/actions/setup-node-with-retry
         with:
           node-version: 20
-          # TODO: Re-enable yarn caching once Node.js V8 cache crash is fixed
+          # Retry logic now handles V8 crashes automatically
           # Tracking: https://github.com/actions/setup-node/issues/1028
-          # cache: yarn
-          # cache-dependency-path: '**/yarn.lock'
+          cache: yarn
+          cache-dependency-path: '**/yarn.lock'
       - name: Print system information
         run: |
           echo "Linux release: "; cat /etc/issue
