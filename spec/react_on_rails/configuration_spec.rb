@@ -287,6 +287,17 @@ module ReactOnRails
         context "with Pro license" do
           before do
             allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+
+            # Mock Pro configuration to avoid dependency on Pro being installed
+            pro_module = Module.new
+            pro_config = double("ProConfiguration") # rubocop:disable RSpec/VerifiedDoubles
+            allow(pro_config).to receive_messages(
+              rsc_bundle_js_file: "",
+              react_client_manifest_file: "react-client-manifest.json",
+              react_server_client_manifest_file: "react-server-client-manifest.json"
+            )
+            pro_module.define_singleton_method(:configuration) { pro_config }
+            stub_const("ReactOnRailsPro", pro_module)
           end
 
           it "defaults to :async" do
@@ -623,6 +634,117 @@ module ReactOnRails
           end
 
           expect(config.server_bundle_output_path).to eq("ssr-generated")
+        end
+      end
+    end
+
+    describe "#ensure_webpack_generated_files_exists" do
+      let(:config) { described_class.new }
+
+      before do
+        # Reset to test defaults
+        config.server_bundle_js_file = "server-bundle.js"
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+      end
+
+      context "when webpack_generated_files has default manifest.json only" do
+        it "automatically includes server bundle when configured" do
+          config.webpack_generated_files = %w[manifest.json]
+
+          config.send(:ensure_webpack_generated_files_exists)
+
+          expect(config.webpack_generated_files).to eq(%w[manifest.json server-bundle.js])
+        end
+
+        it "does not duplicate manifest.json" do
+          config.webpack_generated_files = %w[manifest.json]
+
+          config.send(:ensure_webpack_generated_files_exists)
+
+          expect(config.webpack_generated_files.count("manifest.json")).to eq(1)
+        end
+      end
+
+      context "when webpack_generated_files is empty" do
+        it "populates with all required files" do
+          config.webpack_generated_files = []
+
+          config.send(:ensure_webpack_generated_files_exists)
+
+          expect(config.webpack_generated_files).to eq(%w[manifest.json server-bundle.js])
+        end
+      end
+
+      context "when server bundle already included" do
+        it "does not duplicate entries" do
+          config.webpack_generated_files = %w[manifest.json server-bundle.js]
+
+          config.send(:ensure_webpack_generated_files_exists)
+
+          expect(config.webpack_generated_files).to eq(%w[manifest.json server-bundle.js])
+          expect(config.webpack_generated_files.count("server-bundle.js")).to eq(1)
+        end
+      end
+
+      context "when custom files are configured" do
+        it "preserves custom files and adds missing critical files" do
+          config.webpack_generated_files = %w[manifest.json custom-bundle.js]
+
+          config.send(:ensure_webpack_generated_files_exists)
+
+          expect(config.webpack_generated_files).to include("manifest.json")
+          expect(config.webpack_generated_files).to include("custom-bundle.js")
+          expect(config.webpack_generated_files).to include("server-bundle.js")
+        end
+      end
+
+      context "when server bundle is not configured" do
+        it "does not add empty server bundle" do
+          config.server_bundle_js_file = ""
+          config.webpack_generated_files = %w[manifest.json]
+
+          config.send(:ensure_webpack_generated_files_exists)
+
+          expect(config.webpack_generated_files).not_to include("")
+          expect(config.webpack_generated_files).to eq(%w[manifest.json])
+        end
+
+        it "does not add nil server bundle" do
+          config.server_bundle_js_file = nil
+          config.webpack_generated_files = %w[manifest.json]
+
+          config.send(:ensure_webpack_generated_files_exists)
+
+          expect(config.webpack_generated_files).not_to include(nil)
+          expect(config.webpack_generated_files).to eq(%w[manifest.json])
+        end
+      end
+
+      context "when ensuring server bundle monitoring for RSpec optimization" do
+        it "ensures server bundle in private directory is monitored with default config" do
+          # Simulate default generator configuration
+          config.webpack_generated_files = %w[manifest.json]
+          config.server_bundle_js_file = "server-bundle.js"
+          config.server_bundle_output_path = "ssr-generated"
+
+          config.send(:ensure_webpack_generated_files_exists)
+
+          # Critical: server bundle must be included for RSpec helper optimization to work
+          expect(config.webpack_generated_files).to include("server-bundle.js")
+        end
+
+        it "handles all files being in different directories" do
+          # Simulate cross-directory scenario
+          config.webpack_generated_files = %w[manifest.json]
+          config.server_bundle_js_file = "server-bundle.js"
+          config.server_bundle_output_path = "ssr-generated"
+          config.generated_assets_dir = "public/packs"
+
+          config.send(:ensure_webpack_generated_files_exists)
+
+          # All critical files should be monitored regardless of directory
+          expect(config.webpack_generated_files).to include("manifest.json")
+          expect(config.webpack_generated_files).to include("server-bundle.js")
         end
       end
     end
