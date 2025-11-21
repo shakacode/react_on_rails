@@ -104,6 +104,43 @@ RSpec.describe ReactOnRails::Dev::PackGenerator do
         expect(error_output.join("\n")).to match(/Error generating packs: Task failed/)
       end
 
+      it "suggests --verbose flag when pack generation fails in quiet mode" do
+        allow(mock_task).to receive(:invoke).and_raise(StandardError.new("Task failed"))
+
+        # Mock STDERR.puts to suppress error output
+        # rubocop:disable Style/GlobalStdStream
+        allow(STDERR).to receive(:puts)
+        # rubocop:enable Style/GlobalStdStream
+
+        expect { described_class.generate(verbose: false) }
+          .to output(/Run with.*--verbose.*flag for detailed output/).to_stdout_from_any_process
+          .and raise_error(SystemExit)
+      end
+
+      it "does not suggest --verbose flag when already in verbose mode" do
+        allow(mock_task).to receive(:invoke).and_raise(StandardError.new("Task failed"))
+
+        # Mock STDERR.puts to suppress error output
+        # rubocop:disable Style/GlobalStdStream
+        allow(STDERR).to receive(:puts)
+        # rubocop:enable Style/GlobalStdStream
+
+        # Capture output to verify --verbose suggestion is not shown
+        output = StringIO.new
+        # rubocop:disable RSpec/ExpectOutput
+        begin
+          $stdout = output
+          described_class.generate(verbose: true)
+        rescue SystemExit
+          # Expected to exit
+        ensure
+          $stdout = STDOUT
+        end
+        # rubocop:enable RSpec/ExpectOutput
+
+        expect(output.string).not_to match(/Run with.*--verbose/)
+      end
+
       it "outputs errors to stderr even in silent mode" do
         allow(mock_task).to receive(:invoke).and_raise(StandardError.new("Silent mode error"))
 
@@ -140,6 +177,46 @@ RSpec.describe ReactOnRails::Dev::PackGenerator do
         expect { described_class.generate(verbose: false) }
           .not_to output(/This should be suppressed/).to_stdout_from_any_process
       end
+
+      it "sets REACT_ON_RAILS_VERBOSE environment variable when verbose is true" do
+        env_value = nil
+        allow(mock_task).to receive(:invoke) do
+          env_value = ENV.fetch("REACT_ON_RAILS_VERBOSE", nil)
+        end
+
+        described_class.generate(verbose: true)
+
+        expect(env_value).to eq("true")
+        # Ensure cleanup happened
+        expect(ENV.fetch("REACT_ON_RAILS_VERBOSE", nil)).to be_nil
+      end
+
+      it "sets REACT_ON_RAILS_VERBOSE environment variable to false when verbose is false" do
+        env_value = nil
+        allow(mock_task).to receive(:invoke) do
+          env_value = ENV.fetch("REACT_ON_RAILS_VERBOSE", nil)
+        end
+
+        described_class.generate(verbose: false)
+
+        expect(env_value).to eq("false")
+        # Ensure cleanup happened
+        expect(ENV.fetch("REACT_ON_RAILS_VERBOSE", nil)).to be_nil
+      end
+
+      it "cleans up REACT_ON_RAILS_VERBOSE environment variable even when task fails" do
+        allow(mock_task).to receive(:invoke).and_raise(StandardError.new("Task failed"))
+
+        # Mock STDERR.puts to suppress error output
+        # rubocop:disable Style/GlobalStdStream
+        allow(STDERR).to receive(:puts)
+        # rubocop:enable Style/GlobalStdStream
+
+        expect { described_class.generate(verbose: true) }.to raise_error(SystemExit)
+
+        # Ensure cleanup happened even on failure
+        expect(ENV.fetch("REACT_ON_RAILS_VERBOSE", nil)).to be_nil
+      end
     end
 
     context "when not in Bundler context" do
@@ -150,19 +227,22 @@ RSpec.describe ReactOnRails::Dev::PackGenerator do
 
       it "runs pack generation successfully in verbose mode using bundle exec" do
         allow(described_class).to receive(:system)
-          .with("bundle", "exec", "rake", "react_on_rails:generate_packs")
+          .with({ "REACT_ON_RAILS_VERBOSE" => "true" },
+                "bundle", "exec", "rake", "react_on_rails:generate_packs")
           .and_return(true)
 
         expect { described_class.generate(verbose: true) }
           .to output(/📦 Generating React on Rails packs.../).to_stdout_from_any_process
 
         expect(described_class).to have_received(:system)
-          .with("bundle", "exec", "rake", "react_on_rails:generate_packs")
+          .with({ "REACT_ON_RAILS_VERBOSE" => "true" },
+                "bundle", "exec", "rake", "react_on_rails:generate_packs")
       end
 
       it "runs pack generation successfully in quiet mode using bundle exec" do
         allow(described_class).to receive(:system)
-          .with("bundle", "exec", "rake", "react_on_rails:generate_packs",
+          .with({ "REACT_ON_RAILS_VERBOSE" => "false" },
+                "bundle", "exec", "rake", "react_on_rails:generate_packs",
                 out: File::NULL, err: File::NULL)
           .and_return(true)
 
@@ -170,13 +250,15 @@ RSpec.describe ReactOnRails::Dev::PackGenerator do
           .to output(/📦 Generating packs\.\.\. ✅/).to_stdout_from_any_process
 
         expect(described_class).to have_received(:system)
-          .with("bundle", "exec", "rake", "react_on_rails:generate_packs",
+          .with({ "REACT_ON_RAILS_VERBOSE" => "false" },
+                "bundle", "exec", "rake", "react_on_rails:generate_packs",
                 out: File::NULL, err: File::NULL)
       end
 
       it "exits with error when pack generation fails" do
         allow(described_class).to receive(:system)
-          .with("bundle", "exec", "rake", "react_on_rails:generate_packs",
+          .with({ "REACT_ON_RAILS_VERBOSE" => "false" },
+                "bundle", "exec", "rake", "react_on_rails:generate_packs",
                 out: File::NULL, err: File::NULL)
           .and_return(false)
 
@@ -196,14 +278,16 @@ RSpec.describe ReactOnRails::Dev::PackGenerator do
 
       it "falls back to bundle exec when Rails is not defined" do
         allow(described_class).to receive(:system)
-          .with("bundle", "exec", "rake", "react_on_rails:generate_packs")
+          .with({ "REACT_ON_RAILS_VERBOSE" => "true" },
+                "bundle", "exec", "rake", "react_on_rails:generate_packs")
           .and_return(true)
 
         expect { described_class.generate(verbose: true) }
           .to output(/📦 Generating React on Rails packs.../).to_stdout_from_any_process
 
         expect(described_class).to have_received(:system)
-          .with("bundle", "exec", "rake", "react_on_rails:generate_packs")
+          .with({ "REACT_ON_RAILS_VERBOSE" => "true" },
+                "bundle", "exec", "rake", "react_on_rails:generate_packs")
       end
     end
 
@@ -228,7 +312,8 @@ RSpec.describe ReactOnRails::Dev::PackGenerator do
 
         allow(bundler_module).to receive(:with_unbundled_env).and_yield
         allow(described_class).to receive(:system)
-          .with("bundle", "exec", "rake", "react_on_rails:generate_packs")
+          .with({ "REACT_ON_RAILS_VERBOSE" => "true" },
+                "bundle", "exec", "rake", "react_on_rails:generate_packs")
           .and_return(true)
 
         described_class.generate(verbose: true)
@@ -250,7 +335,8 @@ RSpec.describe ReactOnRails::Dev::PackGenerator do
 
         allow(bundler_module).to receive(:with_clean_env).and_yield
         allow(described_class).to receive(:system)
-          .with("bundle", "exec", "rake", "react_on_rails:generate_packs")
+          .with({ "REACT_ON_RAILS_VERBOSE" => "true" },
+                "bundle", "exec", "rake", "react_on_rails:generate_packs")
           .and_return(true)
 
         described_class.generate(verbose: true)
@@ -267,28 +353,32 @@ RSpec.describe ReactOnRails::Dev::PackGenerator do
         stub_const("Bundler", bundler_module)
 
         allow(described_class).to receive(:system)
-          .with("bundle", "exec", "rake", "react_on_rails:generate_packs")
+          .with({ "REACT_ON_RAILS_VERBOSE" => "true" },
+                "bundle", "exec", "rake", "react_on_rails:generate_packs")
           .and_return(true)
 
         expect { described_class.generate(verbose: true) }
           .to output(/📦 Generating React on Rails packs.../).to_stdout_from_any_process
 
         expect(described_class).to have_received(:system)
-          .with("bundle", "exec", "rake", "react_on_rails:generate_packs")
+          .with({ "REACT_ON_RAILS_VERBOSE" => "true" },
+                "bundle", "exec", "rake", "react_on_rails:generate_packs")
       end
 
       it "executes directly when Bundler is not defined" do
         hide_const("Bundler") if defined?(Bundler)
 
         allow(described_class).to receive(:system)
-          .with("bundle", "exec", "rake", "react_on_rails:generate_packs")
+          .with({ "REACT_ON_RAILS_VERBOSE" => "true" },
+                "bundle", "exec", "rake", "react_on_rails:generate_packs")
           .and_return(true)
 
         expect { described_class.generate(verbose: true) }
           .to output(/📦 Generating React on Rails packs.../).to_stdout_from_any_process
 
         expect(described_class).to have_received(:system)
-          .with("bundle", "exec", "rake", "react_on_rails:generate_packs")
+          .with({ "REACT_ON_RAILS_VERBOSE" => "true" },
+                "bundle", "exec", "rake", "react_on_rails:generate_packs")
       end
     end
   end

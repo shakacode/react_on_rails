@@ -413,9 +413,12 @@ module ReactOnRails
       it "generate packs if a new component is added" do
         create_new_component("NewComponent")
 
+        # Set verbose mode to see pack generation output
+        ENV["REACT_ON_RAILS_VERBOSE"] = "true"
         expect do
           described_class.instance.generate_packs_if_stale
         end.to output(GENERATED_PACKS_CONSOLE_OUTPUT_REGEX).to_stdout
+        ENV.delete("REACT_ON_RAILS_VERBOSE")
         FileUtils.rm "#{packer_source_path}/components/ComponentWithCommonOnly/ror_components/NewComponent.jsx"
       end
 
@@ -423,9 +426,12 @@ module ReactOnRails
         FileUtils.rm component_pack
         create_new_component(component_name)
 
+        # Set verbose mode to see pack generation output
+        ENV["REACT_ON_RAILS_VERBOSE"] = "true"
         expect do
           described_class.instance.generate_packs_if_stale
         end.to output(GENERATED_PACKS_CONSOLE_OUTPUT_REGEX).to_stdout
+        ENV.delete("REACT_ON_RAILS_VERBOSE")
       end
 
       def create_new_component(name)
