@@ -64,6 +64,7 @@ PRO_RUBY_CHANGED=false
 PRO_RSPEC_CHANGED=false
 PRO_JS_CHANGED=false
 PRO_DUMMY_CHANGED=false
+UNCATEGORIZED_CHANGED=false
 
 # Analyze each changed file
 while IFS= read -r file; do
@@ -133,7 +134,7 @@ while IFS= read -r file; do
       LINT_CONFIG_CHANGED=true
       ;;
 
-    # Lint/format configuration
+    # React on Rails Pro lint/format configuration
     react_on_rails_pro/.rubocop.yml|react_on_rails_pro/.eslintrc*|react_on_rails_pro/.prettierrc*|react_on_rails_pro/tsconfig.json|react_on_rails_pro/.editorconfig|.github/workflows/pro-lint.yml)
       DOCS_ONLY=false
       PRO_LINT_CONFIG_CHANGED=true
@@ -150,6 +151,14 @@ while IFS= read -r file; do
       PRO_RUBY_CHANGED=true
       PRO_JS_CHANGED=true
       PRO_DUMMY_CHANGED=true
+      ;;
+
+    # Catch-all: any file not explicitly categorized above
+    # Philosophy: When in doubt, run everything to ensure safety
+    # This prevents new file types or directories from being silently ignored by CI
+    *)
+      DOCS_ONLY=false
+      UNCATEGORIZED_CHANGED=true
       ;;
   esac
 done <<< "$CHANGED_FILES"
@@ -219,6 +228,7 @@ echo "Changed file categories:"
 [ "$PRO_DUMMY_CHANGED" = true ] && echo -e "${YELLOW}  • React on Rails Pro Dummy app${NC}"
 [ "$LINT_CONFIG_CHANGED" = true ] && echo -e "${YELLOW}  • Lint/format configuration${NC}"
 [ "$PRO_LINT_CONFIG_CHANGED" = true ] && echo -e "${YELLOW}  • React on Rails Pro lint/format configuration${NC}"
+[ "$UNCATEGORIZED_CHANGED" = true ] && echo -e "${YELLOW}  • Uncategorized changes (running full suite for safety)${NC}"
 
 echo ""
 echo "Recommended CI jobs:"
@@ -262,6 +272,18 @@ if [ "$PRO_RUBY_CHANGED" = true ] || [ "$PRO_RSPEC_CHANGED" = true ] || [ "$PRO_
 fi
 
 if [ "$PRO_DUMMY_CHANGED" = true ] || [ "$PRO_RUBY_CHANGED" = true ] || [ "$PRO_JS_CHANGED" = true ]; then
+  RUN_PRO_DUMMY_TESTS=true
+fi
+
+# If we encounter a change that isn't explicitly categorized, default to running everything
+if [ "$UNCATEGORIZED_CHANGED" = true ]; then
+  RUN_LINT=true
+  RUN_RUBY_TESTS=true
+  RUN_JS_TESTS=true
+  RUN_DUMMY_TESTS=true
+  RUN_GENERATORS=true
+  RUN_PRO_LINT=true
+  RUN_PRO_TESTS=true
   RUN_PRO_DUMMY_TESTS=true
 fi
 
