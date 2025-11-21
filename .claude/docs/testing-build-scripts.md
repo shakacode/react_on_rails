@@ -16,36 +16,63 @@
 
 **If you modify package.json, package-scripts.yml, or build configs:**
 
-1. **Test the prepack script:**
+### Step 1: ALWAYS Test Clean Install First
 
-   ```bash
-   yarn run prepack
-   # Should succeed without errors
-   ```
+This is the **MOST CRITICAL** test - it's what CI does first, and installation failures block everything else.
 
-2. **Test yalc publish (CRITICAL):**
+```bash
+# Remove node_modules to simulate CI environment
+rm -rf node_modules
 
-   ```bash
-   yarn run yalc.publish
-   # Should publish successfully
-   ```
+# Test the exact command CI uses
+yarn install --frozen-lockfile
 
-3. **Verify build artifacts exist at expected paths:**
+# If this fails, STOP and fix it before testing anything else
+```
 
-   ```bash
-   # Check the path referenced in package-scripts.yml
-   ls -la lib/ReactOnRails.full.js
+**Why this matters:** Your local `node_modules` may mask dependency issues. CI starts fresh, so you must too.
 
-   # If package-scripts.yml references packages/*, check that too
-   ls -la packages/*/lib/*.js
-   ```
+### Step 2: Test Build Scripts
 
-4. **Test clean install:**
-   ```bash
-   rm -rf node_modules
-   yarn install
-   # Should install without errors
-   ```
+```bash
+# Build all packages
+yarn run build
+
+# Should succeed without errors
+```
+
+### Step 3: Test Package-Specific Scripts
+
+```bash
+# Test prepack/prepare scripts work
+yarn nps build.prepack
+
+# Test yalc publish (CRITICAL for local development)
+yarn run yalc:publish
+
+# Should publish all workspace packages successfully
+```
+
+### Step 4: Verify Build Artifacts
+
+```bash
+# Check that build outputs exist at expected paths
+ls -la packages/react-on-rails/lib/ReactOnRails.full.js
+ls -la packages/react-on-rails-pro/lib/ReactOnRails.full.js
+ls -la packages/react-on-rails-pro-node-renderer/lib/ReactOnRailsProNodeRenderer.js
+
+# If any are missing, investigate why
+```
+
+### Step 5: Run Linting
+
+```bash
+# Ruby linting
+bundle exec rubocop
+
+# JS/TS formatting
+yarn start format.listDifferent
+```
 
 ## When Directory Structure Changes
 
@@ -56,10 +83,72 @@ If you rename/move directories that contain build artifacts:
 3. **Test in a fresh clone to ensure no local assumptions**
 4. **Consider adding a CI job to validate artifact paths**
 
-## Real Example: What Went Wrong
+## Workspace Dependencies: Yarn Classic vs Yarn Berry
 
-In Sep 2024, we moved `node_package/` → `packages/react-on-rails/`. The path in
+**CRITICAL: This project uses Yarn Classic (v1.x), not Yarn Berry (v2+)**
+
+Check `package.json` for: `"packageManager": "yarn@1.22.22"`
+
+### Correct Workspace Dependency Syntax
+
+For Yarn Classic workspaces:
+
+```json
+{
+  "dependencies": {
+    "react-on-rails": "*"
+  }
+}
+```
+
+**DO NOT USE:**
+
+- `"workspace:*"` - This is Yarn Berry v2+ syntax, will cause installation errors
+- `"file:../react-on-rails"` - This bypasses workspace resolution
+
+### Why `*` Works
+
+In Yarn Classic workspaces:
+
+- `"*"` tells Yarn to resolve to the local workspace package
+- Yarn automatically links to the workspace version
+- This is the official Yarn v1 workspace syntax
+
+### Testing Workspace Changes
+
+When modifying workspace dependencies in package.json:
+
+```bash
+# 1. Remove node_modules to test fresh install
+rm -rf node_modules
+
+# 2. Test CI command - this will fail immediately if syntax is wrong
+yarn install --frozen-lockfile
+
+# 3. Verify workspace linking worked
+yarn workspaces info
+
+# 4. Test that packages can import each other
+yarn run build
+```
+
+## Real Examples: What Went Wrong
+
+### Example 1: Path Reference Issue (Sep 2024)
+
+We moved `node_package/` → `packages/react-on-rails/`. The path in
 package-scripts.yml was updated to `packages/react-on-rails/lib/ReactOnRails.full.js`.
 Later, the structure was partially reverted to `lib/` at root, but package-scripts.yml
 wasn't updated. This broke yalc publish silently for 7 weeks. Manual testing of
 `yarn run yalc.publish` would have caught this immediately.
+
+### Example 2: Workspace Protocol Issue (Nov 2024)
+
+Changed workspace dependencies from `"*"` to `"workspace:*"` without testing clean install.
+This caused CI to fail with: `Couldn't find any versions for "react-on-rails" that matches "workspace:*"`
+
+**Root cause:** Assumed `workspace:*` was standard, but it's only supported in Yarn Berry v2+.
+This project uses Yarn Classic v1.x which requires `"*"` for workspace dependencies.
+
+**Lesson:** ALWAYS test `yarn install --frozen-lockfile` after modifying workspace dependencies.
+Your local node_modules masked the issue - CI starts fresh and caught it immediately.
