@@ -134,11 +134,12 @@ while IFS= read -r file; do
       LINT_CONFIG_CHANGED=true
       ;;
 
-    # Lint/format configuration
+    # React on Rails Pro lint/format configuration
     react_on_rails_pro/.rubocop.yml|react_on_rails_pro/.eslintrc*|react_on_rails_pro/.prettierrc*|react_on_rails_pro/tsconfig.json|react_on_rails_pro/.editorconfig|.github/workflows/pro-lint.yml)
       DOCS_ONLY=false
       PRO_LINT_CONFIG_CHANGED=true
       ;;
+
     # CI infrastructure files (scripts, workflows, CI configs)
     # Changes to CI infrastructure should trigger tests to validate the changes work
     script/*|script/**/*|bin/*|bin/**/*|.github/workflows/*|.github/actions/*|.github/actions/**/*|lefthook.yml)
@@ -151,7 +152,10 @@ while IFS= read -r file; do
       PRO_JS_CHANGED=true
       PRO_DUMMY_CHANGED=true
       ;;
-    # Any other file counts as a non-doc change; run the full suite for safety
+
+    # Catch-all: any file not explicitly categorized above
+    # Philosophy: When in doubt, run everything to ensure safety
+    # This prevents new file types or directories from being silently ignored by CI
     *)
       DOCS_ONLY=false
       UNCATEGORIZED_CHANGED=true
