@@ -36,9 +36,20 @@ module ReactOnRails
           FileManager.cleanup_stale_files
 
           # Try process managers in order of preference
-          return if run_process_if_available("overmind", ["start", "-f", procfile])
-          return if run_process_if_available("foreman", ["start", "-f", procfile])
+          # run_process_if_available returns:
+          #   - true/false (exit status) if process was found and executed
+          #   - nil if process was not found
+          overmind_result = run_process_if_available("overmind", ["start", "-f", procfile])
+          return if overmind_result == true # Overmind ran successfully
 
+          foreman_result = run_process_if_available("foreman", ["start", "-f", procfile])
+          return if foreman_result == true # Foreman ran successfully
+
+          # If either process was found but exited with error, don't show "not found" message
+          # The process manager itself will have shown its own error message
+          exit 1 if overmind_result == false || foreman_result == false
+
+          # Neither process manager was found
           show_process_manager_installation_help
           exit 1
         end
@@ -73,7 +84,10 @@ module ReactOnRails
         end
 
         # Try to run a process if it's available, with intelligent fallback strategy
-        # Returns true if process was found and executed, false if not available
+        # Returns:
+        #   - true if process ran and exited successfully (exit code 0)
+        #   - false if process ran but exited with error (non-zero exit code)
+        #   - nil if process was not found/available
         def run_process_if_available(process, args)
           # First attempt: try in current context (works for bundled processes)
           return system(process, *args) if installed?(process)
@@ -82,7 +96,7 @@ module ReactOnRails
           return run_process_outside_bundle(process, args) if process_available_in_system?(process)
 
           # Process not available in either context
-          false
+          nil
         end
 
         # Run a process outside of bundler context
