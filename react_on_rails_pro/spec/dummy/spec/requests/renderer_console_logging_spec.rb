@@ -26,8 +26,12 @@ describe "Console logging from server" do
 
       expected_lines = expected.split("\n")
 
-      script_node = html_nodes.css("script#consoleReplayLog")
-      script_lines = script_node.text.split("\n")
+      # When multiple components with replay_console are rendered, each creates its own script tag
+      # with id="consoleReplayLog". Nokogiri's .text concatenates them without separators, which
+      # breaks parsing. Instead, we explicitly join them with newlines.
+      script_nodes = html_nodes.css("script#consoleReplayLog")
+      script_text = script_nodes.map(&:text).join("\n")
+      script_lines = script_text.split("\n")
 
       # Remove leading blank line if present (old format had it, new format doesn't)
       script_lines.shift if script_lines.first && script_lines.first.empty?
