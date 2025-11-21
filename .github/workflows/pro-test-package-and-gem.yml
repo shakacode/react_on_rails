@@ -240,7 +240,7 @@ jobs:
           yarn install --frozen-lockfile --no-progress --no-emoji
 
       - name: Run JS unit tests for Pro package
-        run: yarn run nps test.ci
+        run: yarn workspace react-on-rails-pro-node-renderer run ci
         env:
           JEST_JUNIT_OUTPUT_DIR: ./jest
           JEST_JUNIT_ADD_FILE_ATTRIBUTE: "true"

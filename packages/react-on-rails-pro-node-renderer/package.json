@@ -74,6 +74,7 @@
     "build": "yarn run clean && yarn run tsc --project src/tsconfig.json",
     "build-watch": "yarn run clean && yarn run tsc --watch --project src/tsconfig.json",
     "clean": "rm -rf ./lib",
+    "ci": "jest --ci --runInBand --reporters=default --reporters=jest-junit",
     "developing": "nps node-renderer.debug",
     "test": "jest tests",
     "type-check": "yarn run tsc --noEmit --noErrorTruncation  --project src/tsconfig.json",
