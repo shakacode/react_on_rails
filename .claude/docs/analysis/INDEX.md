@@ -94,14 +94,14 @@ Suggested improvements for developer experience in monorepo context.
 
 ## Key Facts at a Glance
 
-**Current Phase**: Phase 2 (Git Merger) - COMPLETE
-**Next Phase**: Phase 3 (Pre-Monorepo Structure Preparation)
-**Estimated Timeline**: 4-5 weeks total (across 7 phases)
+**Current Phase**: Phase 5 (Pro Node Renderer Package) - COMPLETE
+**Next Phase**: Phase 6 (Documentation & Polish)
+**Estimated Timeline**: Phases 1-5 complete, Phases 6-7 remaining
 
 **Directory Structures**:
 
-- Master: `node_package/` (backward compatible)
-- Target: `packages/` (workspace structure)
+- Surabaya-v1: `packages/` workspaces (fully implemented)
+- Three packages: react-on-rails, react-on-rails-pro, react-on-rails-pro-node-renderer
 
 **Critical Risk**: Path validation for yalc publish
 
@@ -179,27 +179,41 @@ Updates to analysis:
 - New issues/findings during implementation
 - Success criteria validation
 
+## Completed Phases
+
+**Phase 3**: ✅ Pre-Monorepo Structure Preparation (Completed)
+
+- Validated surabaya-v1 state
+- Updated all paths
+- Tested workspace commands
+
+**Phase 4**: ✅ Final Monorepo Restructuring (Completed)
+
+- Consolidated Pro package
+- Merged CI systems
+- Updated publishing process
+
+**Phase 5**: ✅ Pro Node Renderer Package Extraction (Completed - PR #2069)
+
+- Extracted node-renderer as separate workspace package
+- Updated build and publishing workflows
+- Verified CI/CD integration
+
 ## Future Phases
 
-**Phase 3**: Pre-Monorepo Structure Preparation
+**Phase 6**: ⏳ Documentation & Polish (Planned)
 
-- Validate surabaya-v1 state
-- Update all paths
-- Test workspace commands
+- Documentation consolidation
+- Developer experience improvements
+- Final polish and refinements
 
-**Phase 4**: Final Monorepo Restructuring
+**Phase 7**: ⏳ Post-Migration Cleanup & Deprecation (Planned)
 
-- Consolidate Pro package
-- Merge CI systems
-- Update publishing process
-
-**Phases 5-7**: Unification, Polish, and Cleanup
-
-- Full CI/CD consolidation
-- Documentation updates
 - Legacy structure removal
+- Deprecation notices
+- Migration guide finalization
 
 ---
 
-Last Updated: 2025-11-19
-Status: Ready for Phase 3 Planning
+Last Updated: 2025-11-20
+Status: Phase 5 Complete - Ready for Phase 6 Planning

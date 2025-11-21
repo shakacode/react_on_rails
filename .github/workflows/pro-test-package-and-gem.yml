@@ -99,7 +99,7 @@ jobs:
           # https://github.com/nodejs/node/issues/56010
           node-version: '22.11.0'
           cache: yarn
-          cache-dependency-path: 'react_on_rails_pro/**/yarn.lock'
+          cache-dependency-path: '**/yarn.lock'
 
       - name: Print system information
         run: |
@@ -202,7 +202,7 @@ jobs:
           # https://github.com/nodejs/node/issues/56010
           node-version: '22.11.0'
           cache: yarn
-          cache-dependency-path: 'react_on_rails_pro/**/yarn.lock'
+          cache-dependency-path: '**/yarn.lock'
 
       - name: Print system information
         run: |

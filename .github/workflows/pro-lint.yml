@@ -163,7 +163,7 @@ jobs:
 
       - name: Build react-on-rails package (required for Pro eslint import resolution)
         working-directory: .
-        run: yarn build
+        run: yarn workspace react-on-rails-pro build
 
       - name: Lint Ruby
         run: bundle exec rubocop --ignore-parent-exclusion
