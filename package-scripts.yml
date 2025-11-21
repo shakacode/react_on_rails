@@ -15,7 +15,7 @@ scripts:
     script: nps lint && nps format.listDifferent && nps test && nps check-typescript
   check-typescript:
     description: Check for TypeScript errors
-    script: nps "build --noEmit" && tsc --project ../packages/react-on-rails-pro-node-renderer/tests
+    script: yarn workspace react-on-rails run type-check && yarn workspace react-on-rails-pro run type-check && yarn workspace react-on-rails-pro-node-renderer run type-check
 
   lint:
     description: Run all linters (eslint, tsc)
