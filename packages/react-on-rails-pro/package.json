@@ -11,8 +11,7 @@
     "test:non-rsc": "jest tests --testPathIgnorePatterns=\".*(.rsc.test.).*\"",
     "test:rsc": "NODE_CONDITIONS=react-server jest tests/*.rsc.test.*",
     "type-check": "yarn run tsc --noEmit --noErrorTruncation",
-    "prepack": "nps build.prepack",
-    "prepare": "nps build.prepack",
+    "prepare": "[ -f lib/ReactOnRails.full.js ] || yarn run build",
     "prepublishOnly": "yarn run build",
     "yalc:publish": "yalc publish",
     "yalc": "yalc"
@@ -56,7 +55,7 @@
     "./ServerComponentFetchError": "./lib/ServerComponentFetchError.js"
   },
   "dependencies": {
-    "react-on-rails": "file:../react-on-rails"
+    "react-on-rails": "workspace:*"
   },
   "peerDependencies": {
     "react": ">= 16",

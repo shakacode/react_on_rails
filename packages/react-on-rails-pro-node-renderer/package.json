@@ -51,7 +51,7 @@
     "node-html-parser": "^7.0.1",
     "nps": "^5.9.12",
     "pino-pretty": "^13.0.0",
-    "react-on-rails": "file:../react-on-rails",
+    "react-on-rails": "workspace:*",
     "redis": "^5.0.1",
     "sentry-testkit": "^5.0.6",
     "touch": "^3.1.0",
@@ -81,8 +81,7 @@
     "developing": "nps node-renderer.debug",
     "test": "jest tests",
     "type-check": "yarn run tsc --noEmit --noErrorTruncation  --project src/tsconfig.json",
-    "prepack": "nps build.prepack",
-    "prepare": "nps build.prepack",
+    "prepare": "[ -f lib/ReactOnRailsProNodeRenderer.js ] || yarn run build",
     "prepublishOnly": "yarn run build",
     "yalc:publish": "yalc publish",
     "yalc": "yalc"

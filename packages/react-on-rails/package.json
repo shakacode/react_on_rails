@@ -10,8 +10,7 @@
     "clean": "rm -rf ./lib",
     "test": "jest tests",
     "type-check": "yarn run tsc --noEmit --noErrorTruncation",
-    "prepack": "nps build.prepack",
-    "prepare": "nps build.prepack",
+    "prepare": "[ -f lib/ReactOnRails.full.js ] || yarn run build",
     "prepublishOnly": "yarn run build",
     "yalc:publish": "yalc publish",
     "yalc": "yalc"
