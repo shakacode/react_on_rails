@@ -70,3 +70,6 @@ ssr-generated
 # Workspace package build outputs (but track source code)
 packages/*/lib/
 packages/**/node_modules/
+
+# Jest test reports
+junit.xml
