@@ -55,7 +55,7 @@
     "./ServerComponentFetchError": "./lib/ServerComponentFetchError.js"
   },
   "dependencies": {
-    "react-on-rails": "workspace:*"
+    "react-on-rails": "*"
   },
   "peerDependencies": {
     "react": ">= 16",

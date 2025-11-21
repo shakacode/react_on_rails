@@ -51,7 +51,7 @@
     "node-html-parser": "^7.0.1",
     "nps": "^5.9.12",
     "pino-pretty": "^13.0.0",
-    "react-on-rails": "workspace:*",
+    "react-on-rails": "*",
     "redis": "^5.0.1",
     "sentry-testkit": "^5.0.6",
     "touch": "^3.1.0",
