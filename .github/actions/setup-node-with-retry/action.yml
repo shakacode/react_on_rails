@@ -28,34 +28,40 @@ runs:
         CACHE_PATH: ${{ inputs.cache-dependency-path }}
         MAX_RETRIES: ${{ inputs.max-retries }}
       run: |
-        # This script wraps the setup-node action with retry logic for V8 crashes
-        # The V8 crash manifests during 'yarn cache dir' execution in setup-node
+        # This script pre-validates yarn cache works before setup-node runs
+        # The V8 crash manifests during 'yarn cache dir' execution
+        # Note: This catches the crash early but doesn't prevent it from potentially
+        # occurring again in setup-node. However, in practice, if yarn cache dir
+        # succeeds here, it typically succeeds in setup-node as well.
 
         ATTEMPT=1
-        SUCCESS=false
 
-        # Function to setup node
-        setup_node_attempt() {
-          echo "::group::Node.js setup attempt $ATTEMPT of $MAX_RETRIES"
-
-          # We need to manually do what setup-node does, since we can't retry an action from within a composite action
-          # 1. Ensure Node.js is available (it should be pre-installed on GitHub runners)
-          # 2. Setup the cache (this is where the V8 crash happens)
+        # Function to test yarn cache dir
+        test_yarn_cache() {
+          echo "::group::Testing yarn cache (attempt $ATTEMPT of $MAX_RETRIES)"
 
           if [ -n "$CACHE_TYPE" ] && [ "$CACHE_TYPE" = "yarn" ]; then
             # Test if yarn cache dir works (this is where V8 crashes occur)
             TEMP_OUTPUT=$(mktemp)
 
             if timeout 30 yarn cache dir > "$TEMP_OUTPUT" 2>&1; then
-              echo "Yarn cache dir command succeeded"
+              echo "✓ Yarn cache dir command succeeded"
               cat "$TEMP_OUTPUT"
               rm -f "$TEMP_OUTPUT"
               echo "::endgroup::"
               return 0
             else
               EXIT_CODE=$?
+
+              # Check for timeout
+              if [ $EXIT_CODE -eq 124 ] || [ $EXIT_CODE -eq 143 ]; then
+                echo "::warning::yarn cache dir timed out after 30s"
+                cat "$TEMP_OUTPUT"
+                rm -f "$TEMP_OUTPUT"
+                echo "::endgroup::"
+                return 1
               # Check for V8 crash in output
-              if grep -q "Fatal error in.*Check failed: ReadSingleBytecodeData" "$TEMP_OUTPUT"; then
+              elif grep -q "Fatal error in.*Check failed: ReadSingleBytecodeData" "$TEMP_OUTPUT"; then
                 echo "::warning::V8 bytecode deserialization error detected"
                 cat "$TEMP_OUTPUT"
                 rm -f "$TEMP_OUTPUT"
@@ -66,11 +72,13 @@ runs:
                 cat "$TEMP_OUTPUT"
                 rm -f "$TEMP_OUTPUT"
                 echo "::endgroup::"
+                # Don't retry non-V8 errors
                 return $EXIT_CODE
               fi
             fi
           else
-            # No cache or non-yarn cache, nothing to retry
+            # No cache or non-yarn cache, nothing to validate
+            echo "Cache type '$CACHE_TYPE' does not require pre-validation"
             echo "::endgroup::"
             return 0
           fi
@@ -78,12 +86,18 @@ runs:
 
         # Retry loop
         while [ $ATTEMPT -le $MAX_RETRIES ]; do
-          if setup_node_attempt; then
-            SUCCESS=true
+          if test_yarn_cache; then
+            echo "✓ Yarn cache validation passed"
             break
           else
+            RETRY_EXIT_CODE=$?
+            # Exit immediately for non-retryable errors (exit codes > 1)
+            if [ $RETRY_EXIT_CODE -gt 1 ]; then
+              exit $RETRY_EXIT_CODE
+            fi
+
             if [ $ATTEMPT -lt $MAX_RETRIES ]; then
-              echo "::warning::Retry attempt $ATTEMPT failed. Waiting 5 seconds before retry..."
+              echo "::warning::Attempt $ATTEMPT failed. Waiting 5 seconds before retry..."
               sleep 5
               ATTEMPT=$((ATTEMPT + 1))
             else
@@ -92,11 +106,6 @@ runs:
             fi
           fi
         done
-
-        if [ "$SUCCESS" != true ]; then
-          echo "::error::Failed to setup Node.js after $MAX_RETRIES attempts"
-          exit 1
-        fi
 
     - name: Setup Node.js
       uses: actions/setup-node@v4
