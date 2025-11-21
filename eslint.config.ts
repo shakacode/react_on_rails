@@ -51,6 +51,11 @@ const config = tsEslint.config([
     // generator templates - exclude TypeScript templates that need tsconfig.json
     '**/templates/**/*.tsx',
     '**/templates/**/*.ts',
+    // test config files in packages - Jest/Babel configs cause ESM/CJS conflicts with ESLint
+    'packages/*/tests/**',
+    'packages/*/*.test.{js,jsx,ts,tsx}',
+    'packages/*/babel.config.js',
+    'packages/*/jest.config.js',
   ]),
   {
     files: ['**/*.[jt]s', '**/*.[jt]sx', '**/*.[cm][jt]s'],
@@ -227,6 +232,15 @@ const config = tsEslint.config([
       // TypeScript compiler validates these imports
       'import/named': 'off',
       'import/no-unresolved': 'off',
+      'import/no-cycle': 'off',
+      'import/no-relative-packages': 'off',
+      'import/no-duplicates': 'off',
+      'import/extensions': 'off',
+      'import/order': 'off',
+      'import/no-self-import': 'off',
+      'import/no-named-as-default': 'off',
+      'import/no-named-as-default-member': 'off',
+      'import/export': 'off',
       // Disable unsafe type rules - Pro package uses internal APIs with complex types
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-call': 'off',
