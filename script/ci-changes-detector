@@ -138,6 +138,19 @@ while IFS= read -r file; do
       DOCS_ONLY=false
       PRO_LINT_CONFIG_CHANGED=true
       ;;
+
+    # CI infrastructure files (scripts, workflows, CI configs)
+    # Changes to CI infrastructure should trigger tests to validate the changes work
+    script/*|script/**/*|bin/*|bin/**/*|.github/workflows/*|.github/actions/*|.github/actions/**/*|lefthook.yml)
+      DOCS_ONLY=false
+      RUBY_CHANGED=true  # Trigger all tests for CI infrastructure changes
+      JS_CHANGED=true
+      SPEC_DUMMY_CHANGED=true
+      GENERATORS_CHANGED=true
+      PRO_RUBY_CHANGED=true
+      PRO_JS_CHANGED=true
+      PRO_DUMMY_CHANGED=true
+      ;;
   esac
 done <<< "$CHANGED_FILES"
 
