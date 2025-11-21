@@ -259,15 +259,6 @@ const config = tsEslint.config([
     },
   },
   {
-    files: ['packages/react-on-rails-pro-node-renderer/tests/**/*'],
-    rules: {
-      // Allow non-null assertions in tests - they're acceptable for test data
-      '@typescript-eslint/no-non-null-assertion': 'off',
-      // Some tests validate error conditions without explicit assertions
-      'jest/expect-expect': 'off',
-    },
-  },
-  {
     files: ['**/app-react16/**/*'],
     rules: {
       'react/no-deprecated': 'off',
@@ -287,6 +278,15 @@ const config = tsEslint.config([
       'import/first': 'off',
       // Avoiding these methods complicates tests and isn't useful for our purposes
       'testing-library/no-node-access': 'off',
+    },
+  },
+  {
+    files: ['packages/react-on-rails-pro-node-renderer/tests/**/*'],
+    rules: {
+      // Allow non-null assertions in tests - they're acceptable for test data
+      '@typescript-eslint/no-non-null-assertion': 'off',
+      // Some tests validate error conditions without explicit assertions
+      'jest/expect-expect': 'off',
     },
   },
   // must be the last config in the array
