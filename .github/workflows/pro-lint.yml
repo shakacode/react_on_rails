@@ -161,6 +161,10 @@ jobs:
       - name: Generate file-system based entrypoints
         run: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
 
+      - name: Build react-on-rails package (required for Pro eslint import resolution)
+        working-directory: .
+        run: yarn build
+
       - name: Lint Ruby
         run: bundle exec rubocop --ignore-parent-exclusion
 
