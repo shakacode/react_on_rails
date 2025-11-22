@@ -26,6 +26,7 @@ Changes since the last non-beta release.
 #### Improved
 
 - **Automatic Precompile Hook Coordination in bin/dev**: The `bin/dev` command now automatically runs Shakapacker's `precompile_hook` once before starting development processes and sets `SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true` to prevent duplicate execution in spawned webpack processes. This eliminates the need for manual coordination, sleep hacks, and duplicate task calls in Procfile.dev. Users can now configure expensive build tasks (like locale generation or ReScript compilation) once in `config/shakapacker.yml` and `bin/dev` will handle the coordination automatically. The feature includes a warning for users on Shakapacker versions below 9.4.0, as the `SHAKAPACKER_SKIP_PRECOMPILE_HOOK` environment variable is only supported in 9.4.0+. Addresses [2091](https://github.com/shakacode/react_on_rails/issues/2091) by [justin808](https://github.com/justin808).
+
 ### [v16.2.0.beta.12] - 2025-11-20
 
 #### Added
