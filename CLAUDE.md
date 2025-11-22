@@ -29,6 +29,32 @@ Top-level documentation (like README.md, CONTRIBUTING.md) should remain at the r
 
 These requirements are non-negotiable. CI will fail if not followed.
 
+**CRITICAL - LOCAL TESTING REQUIREMENTS:**
+
+1. **NEVER claim a test is "fixed" without running it locally first**
+   - If working in Conductor workspace or similar isolated environment, clearly state: "Cannot test locally in isolated workspace"
+   - If test requires specific environment (database, Redis, etc.), state: "Requires [X] setup not available in current environment"
+
+2. **Distinguish hypothetical fixes from confirmed fixes:**
+   - ✅ Use "This fixes..." or "Fixed" ONLY after local verification
+   - ⚠️ Use "This SHOULD fix..." or "Proposed fix (UNTESTED)" when you haven't verified
+   - 📋 Use "Analysis suggests..." or "Root cause appears to be..." for investigation without fixes
+
+3. **When analyzing CI failures:**
+   - Clearly mark all analysis as "UNTESTED - requires local reproduction" unless verified
+   - Provide exact commands to reproduce and test the fix locally
+   - State why you cannot test if applicable (workspace restrictions, missing services, etc.)
+
+4. **Prefer local testing over CI iteration:**
+   - Don't push "hopeful" fixes and wait for CI feedback
+   - Test locally first whenever technically possible
+   - Document what you tested and what results you got
+
+5. **Document your testing:**
+   - Include test commands in commit messages for complex fixes
+   - Note in PR descriptions which fixes were tested locally vs. which are hypothetical
+   - Explain any testing limitations encountered
+
 **🚀 AUTOMATIC: Git hooks are installed automatically during setup**
 
 Git hooks will automatically run linting on **all changed files (staged + unstaged + untracked)** before each commit - making it fast while preventing CI failures!
@@ -72,6 +98,21 @@ Pre-commit hooks automatically run:
 ### Replicating CI Failures Locally
 
 **CRITICAL: NEVER wait for CI to verify fixes. Always replicate failures locally first.**
+
+**When Analyzing CI Failures:**
+
+1. **First, reproduce the failure locally** using the tools below
+2. **If you cannot reproduce locally**, clearly state why:
+   - "Working in Conductor isolated workspace - cannot run full Rails app"
+   - "Requires Docker/Redis/PostgreSQL not available in current environment"
+   - "Integration tests need full webpack build pipeline not set up locally"
+3. **Mark all proposed fixes as UNTESTED** until they can be verified:
+   - ❌ DON'T: "This fixes the integration test failures"
+   - ✅ DO: "This SHOULD fix the integration test failures (UNTESTED - requires local Rails app with webpack)"
+4. **Provide reproduction steps** even if you can't execute them:
+   - Include exact commands to run
+   - Document environment requirements
+   - Explain what success looks like
 
 #### Switch Between CI Configurations
 
@@ -196,11 +237,11 @@ cd react_on_rails_pro && bundle exec rake rbs:validate
 
 **IMPORTANT: This is a monorepo with TWO separate changelogs:**
 - **Open Source**: `/CHANGELOG.md` - for react_on_rails gem and npm package
-- **Pro**: `/react_on_rails_pro/CHANGELOG.md` - for react_on_rails_pro gem and npm packages
+- **Pro**: `/CHANGELOG_PRO.md` - for react_on_rails_pro gem and npm packages
 
 When making changes, update the **appropriate changelog(s)**:
 - Open-source features/fixes → Update `/CHANGELOG.md`
-- Pro-only features/fixes → Update `/react_on_rails_pro/CHANGELOG.md`
+- Pro-only features/fixes → Update `/CHANGELOG_PRO.md`
 - Changes affecting both → Update **BOTH** changelogs
 
 ### Changelog Guidelines
@@ -211,7 +252,7 @@ When making changes, update the **appropriate changelog(s)**:
 - **Use `/update-changelog` command** for guided changelog updates with automatic formatting
 - **Version management after releases**:
   - Open source: `bundle exec rake update_changelog`
-  - Pro: `cd react_on_rails_pro && bundle exec rake update_changelog`
+  - Pro: `bundle exec rake update_changelog CHANGELOG=CHANGELOG_PRO.md`
 - **Examples**: Run `grep -A 3 "^#### " CHANGELOG.md | head -30` to see real formatting examples
 
 ### Beta Release Changelog Curation
