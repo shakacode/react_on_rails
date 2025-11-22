@@ -113,13 +113,11 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
     transform(chunk: Buffer, _, callback) {
       const htmlChunk = chunk.toString();
       // Get unwrapped console replay JavaScript (not wrapped in <script> tags)
+      // We use consoleReplay() instead of buildConsoleReplay() because streaming
+      // contexts handle script tag wrapping separately (e.g., with CSP nonces).
+      // This returns pure JavaScript without wrapping, which is then embedded
+      // into the result object JSON payload.
       const consoleReplayScript = consoleReplay(previouslyReplayedConsoleMessages, consoleHistory);
-
-      // DEBUG: Log to verify we're using the unwrapped version
-      if (consoleReplayScript && consoleReplayScript.startsWith('<script')) {
-        console.error('ERROR: Console replay is wrapped when it should be unwrapped!');
-        console.error('First 100 chars:', consoleReplayScript.substring(0, 100));
-      }
 
       previouslyReplayedConsoleMessages = consoleHistory?.length || 0;
       const jsonChunk = JSON.stringify(createResultObject(htmlChunk, consoleReplayScript, renderState));

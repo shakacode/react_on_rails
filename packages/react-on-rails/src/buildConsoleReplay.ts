@@ -57,7 +57,7 @@ export function consoleReplay(
 export default function buildConsoleReplay(
   numberOfMessagesToSkip = 0,
   customConsoleHistory: (typeof console)['history'] | undefined = undefined,
-  nonce: string | undefined = undefined,
+  nonce?: string,
 ): string {
   const consoleReplayJS = consoleReplay(numberOfMessagesToSkip, customConsoleHistory);
   if (consoleReplayJS.length === 0) {
