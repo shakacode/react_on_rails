@@ -95,7 +95,9 @@ jobs:
       - name: Setup Node
         uses: ./.github/actions/setup-node-with-retry
         with:
-          node-version: 22
+          # Pin to 22.11.0 (LTS) to avoid V8 bug in 22.21.0
+          # https://github.com/nodejs/node/issues/56010
+          node-version: '22.11.0'
           cache: yarn
           cache-dependency-path: '**/yarn.lock'
       - name: Print system information
