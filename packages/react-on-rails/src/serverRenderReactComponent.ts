@@ -3,7 +3,7 @@ import { isValidElement, type ReactElement } from 'react';
 // ComponentRegistry is accessed via globalThis.ReactOnRails.getComponent for cross-bundle compatibility
 import createReactOutput from './createReactOutput.ts';
 import { isPromise, isServerRenderHash } from './isServerRenderResult.ts';
-import { consoleReplay } from './buildConsoleReplay.ts';
+import buildConsoleReplay from './buildConsoleReplay.ts';
 import handleError from './handleError.ts';
 import { renderToString } from './ReactDOMServer.cts';
 import { createResultObject, convertToError, validateComponent } from './serverRenderUtils.ts';
@@ -109,11 +109,11 @@ async function createPromiseResult(
   const consoleHistory = console.history;
   try {
     const html = await renderState.result;
-    const consoleReplayScript = consoleReplay(consoleHistory);
+    const consoleReplayScript = buildConsoleReplay(0, consoleHistory);
     return createResultObject(html, consoleReplayScript, renderState);
   } catch (e: unknown) {
     const errorRenderState = handleRenderingError(e, { componentName, throwJsErrors });
-    const consoleReplayScript = consoleReplay(consoleHistory);
+    const consoleReplayScript = buildConsoleReplay(0, consoleHistory);
     return createResultObject(errorRenderState.result, consoleReplayScript, errorRenderState);
   }
 }
@@ -128,7 +128,7 @@ function createFinalResult(
     return createPromiseResult({ ...renderState, result }, componentName, throwJsErrors);
   }
 
-  const consoleReplayScript = consoleReplay();
+  const consoleReplayScript = buildConsoleReplay();
   return JSON.stringify(createResultObject(result, consoleReplayScript, renderState));
 }
 

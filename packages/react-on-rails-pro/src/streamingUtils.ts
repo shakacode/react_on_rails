@@ -17,7 +17,7 @@ import { PassThrough, Readable } from 'stream';
 
 import createReactOutput from 'react-on-rails/createReactOutput';
 import { isPromise, isServerRenderHash } from 'react-on-rails/isServerRenderResult';
-import buildConsoleReplay from 'react-on-rails/buildConsoleReplay';
+import { consoleReplay } from 'react-on-rails/buildConsoleReplay';
 import { createResultObject, convertToError, validateComponent } from 'react-on-rails/serverRenderUtils';
 import {
   RenderParams,
@@ -112,7 +112,15 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
   const transformStream = new PassThrough({
     transform(chunk: Buffer, _, callback) {
       const htmlChunk = chunk.toString();
-      const consoleReplayScript = buildConsoleReplay(consoleHistory, previouslyReplayedConsoleMessages);
+      // Get unwrapped console replay JavaScript (not wrapped in <script> tags)
+      const consoleReplayScript = consoleReplay(previouslyReplayedConsoleMessages, consoleHistory);
+
+      // DEBUG: Log to verify we're using the unwrapped version
+      if (consoleReplayScript && consoleReplayScript.startsWith('<script')) {
+        console.error('ERROR: Console replay is wrapped when it should be unwrapped!');
+        console.error('First 100 chars:', consoleReplayScript.substring(0, 100));
+      }
+
       previouslyReplayedConsoleMessages = consoleHistory?.length || 0;
       const jsonChunk = JSON.stringify(createResultObject(htmlChunk, consoleReplayScript, renderState));
       this.push(`${jsonChunk}\n`);
