@@ -5,6 +5,33 @@
 **Analyst**: Claude Code Review
 **Status**: 🔴 NOT READY TO MERGE - Multiple Test Failures
 
+---
+
+## ⚠️ CRITICAL DISCLAIMER
+
+**This analysis contains UNTESTED hypotheses only.**
+
+**Environment**: Analysis performed in Conductor isolated workspace with limited capabilities:
+
+- ❌ Cannot run full Rails application
+- ❌ Cannot execute integration tests
+- ❌ Cannot test webpack build pipeline
+- ❌ Cannot verify fixes against actual failing tests
+- ✅ Can analyze CI logs and source code
+- ✅ Can identify suspicious commits
+- ✅ Can provide reproduction steps
+
+**What this means**:
+
+- All "fixes" below are **hypotheses that MUST be tested locally**
+- Do NOT assume any proposed fix will work without verification
+- All investigation is based on log analysis and code inspection only
+- Actual root causes may differ from analysis after local testing
+
+**Before implementing any fix**: Test it locally in the actual React on Rails repository first.
+
+---
+
 ## Executive Summary
 
 **All tests PASSED on merge base** (`5e033c716` - v16.2.0.beta.12) ✅
@@ -324,7 +351,22 @@ git bisect good/bad
 
 ## Fix Recommendations
 
+**⚠️ IMPORTANT: All recommendations below are UNTESTED hypotheses based on CI log analysis.**
+
+**Testing Limitation**: This analysis was performed in a Conductor isolated workspace without:
+
+- Full Rails application environment
+- Webpack build pipeline
+- Database/Redis services
+- Integration test infrastructure
+
+**All proposed fixes MUST be tested locally in the actual React on Rails repository before claiming they work.**
+
+---
+
 ### Priority 1: Integration Test Asset Loading (CRITICAL) 🔥
+
+**Status**: ⚠️ UNTESTED HYPOTHESIS
 
 **Hypothesis**: Prepare scripts don't run correctly in workspace context, OR webpack output paths changed.
 
@@ -354,6 +396,8 @@ bundle exec rspec spec/system/integration_spec.rb:23
 
 ### Priority 2: Pro Console Replay Test 🟡
 
+**Status**: ⚠️ UNTESTED HYPOTHESIS
+
 **Hypothesis**: buildConsoleReplay parameter fix changed output format OR test HTML parsing broken.
 
 **Investigation**:
@@ -379,6 +423,8 @@ bundle exec rspec spec/requests/renderer_console_logging_spec.rb:13 --format doc
 ---
 
 ### Priority 3: Hung Pro JS Tests 🟡
+
+**Status**: ⚠️ UNTESTED HYPOTHESIS
 
 **Immediate**: Cancel the 80+ minute CI run
 
