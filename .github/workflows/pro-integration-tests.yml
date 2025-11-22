@@ -95,7 +95,9 @@ jobs:
       - name: Setup Node
         uses: ./.github/actions/setup-node-with-retry
         with:
-          node-version: 22
+          # Pin to 22.12.x (LTS) - V8 bug from issue #56010 was fixed in 22.12.0
+          # https://github.com/nodejs/node/issues/56010
+          node-version: '22.12.x'
           cache: yarn
           cache-dependency-path: 'react_on_rails_pro/**/yarn.lock'
 
@@ -191,7 +193,9 @@ jobs:
       - name: Setup Node
         uses: ./.github/actions/setup-node-with-retry
         with:
-          node-version: 22
+          # Pin to 22.12.x (LTS) - V8 bug from issue #56010 was fixed in 22.12.0
+          # https://github.com/nodejs/node/issues/56010
+          node-version: '22.12.x'
           cache: yarn
           cache-dependency-path: 'react_on_rails_pro/**/yarn.lock'
 
@@ -388,7 +392,9 @@ jobs:
       - name: Setup Node
         uses: ./.github/actions/setup-node-with-retry
         with:
-          node-version: 22
+          # Pin to 22.12.x (LTS) - V8 bug from issue #56010 was fixed in 22.12.0
+          # https://github.com/nodejs/node/issues/56010
+          node-version: '22.12.x'
           cache: yarn
           cache-dependency-path: 'react_on_rails_pro/**/yarn.lock'
 

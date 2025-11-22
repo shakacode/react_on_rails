@@ -95,9 +95,11 @@ jobs:
       - name: Setup Node
         uses: ./.github/actions/setup-node-with-retry
         with:
-          node-version: 22
+          # Pin to 22.11.0 (LTS) to avoid V8 bug in 22.21.0
+          # https://github.com/nodejs/node/issues/56010
+          node-version: '22.11.0'
           cache: yarn
-          cache-dependency-path: 'react_on_rails_pro/**/yarn.lock'
+          cache-dependency-path: '**/yarn.lock'
 
       - name: Print system information
         run: |
@@ -196,9 +198,11 @@ jobs:
       - name: Setup Node
         uses: ./.github/actions/setup-node-with-retry
         with:
-          node-version: 22
+          # Pin to 22.11.0 (LTS) to avoid V8 bug in 22.21.0
+          # https://github.com/nodejs/node/issues/56010
+          node-version: '22.11.0'
           cache: yarn
-          cache-dependency-path: 'react_on_rails_pro/**/yarn.lock'
+          cache-dependency-path: '**/yarn.lock'
 
       - name: Print system information
         run: |
@@ -214,29 +218,14 @@ jobs:
           path: react_on_rails_pro/node_modules
           key: v4-pro-package-node-modules-cache-${{ hashFiles('react_on_rails_pro/yarn.lock') }}
 
-      - name: Remove old webpack bundles
-        run: |
-          rm -rf spec/dummy/public/webpack
-          rm -rf spec/dummy/ssr-generated
-
-      - id: get-sha
-        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-
-      - name: Restore test webpack bundles from cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            react_on_rails_pro/spec/dummy/public/webpack/test
-            react_on_rails_pro/spec/dummy/ssr-generated
-          key: v4-pro-dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}
-
       - name: Install Node modules with Yarn for Pro package
+        working-directory: .
         run: |
           sudo yarn global add yalc
           yarn install --frozen-lockfile --no-progress --no-emoji
 
       - name: Run JS unit tests for Pro package
-        run: yarn run nps test.ci
+        run: yarn workspace react-on-rails-pro-node-renderer run ci
         env:
           JEST_JUNIT_OUTPUT_DIR: ./jest
           JEST_JUNIT_ADD_FILE_ATTRIBUTE: "true"
@@ -246,10 +235,10 @@ jobs:
         if: always()
         with:
           name: pro-jest-results
-          path: react_on_rails_pro/jest
+          path: packages/react-on-rails-pro-node-renderer/jest
 
   # RSpec tests for Pro package
-  rspec-package-specs:
+  rspec-gem-specs:
     needs: detect-changes
     if: |
       !(
