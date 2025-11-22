@@ -86,8 +86,8 @@ GEM
       minitest (>= 5.1)
       mutex_m
       tzinfo (~> 2.0)
-    addressable (2.8.6)
-      public_suffix (>= 2.0.2, < 6.0)
+    addressable (2.8.7)
+      public_suffix (>= 2.0.2, < 7.0)
     amazing_print (1.6.0)
     ast (2.4.2)
     base64 (0.3.0)
@@ -177,7 +177,7 @@ GEM
       net-pop
       net-smtp
     marcel (1.0.4)
-    matrix (0.4.2)
+    matrix (0.4.3)
     method_source (1.1.0)
     mini_mime (1.1.5)
     mini_portile2 (2.8.9)
@@ -223,7 +223,7 @@ GEM
     psych (5.2.6)
       date
       stringio
-    public_suffix (5.0.5)
+    public_suffix (6.0.2)
     puma (6.4.2)
       nio4r (~> 2.0)
     racc (1.8.1)
@@ -277,7 +277,7 @@ GEM
       erb
       psych (>= 4.0.0)
       tsort
-    regexp_parser (2.9.2)
+    regexp_parser (2.11.3)
     reline (0.6.2)
       io-console (~> 0.5)
     rexml (3.2.7)
@@ -434,7 +434,7 @@ DEPENDENCIES
   amazing_print
   benchmark
   bootsnap
-  capybara
+  capybara (~> 3.40)
   capybara-screenshot
   coveralls
   cypress-on-rails (~> 1.19)
