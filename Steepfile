@@ -32,6 +32,7 @@ target :lib do
   check "lib/react_on_rails/dev/pack_generator.rb"
   check "lib/react_on_rails/dev/process_manager.rb"
   check "lib/react_on_rails/dev/server_manager.rb"
+  check "lib/react_on_rails/dev/service_checker.rb"
   check "lib/react_on_rails/git_utils.rb"
   check "lib/react_on_rails/helper.rb"
   check "lib/react_on_rails/packer_utils.rb"

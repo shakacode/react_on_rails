@@ -184,6 +184,55 @@ RSpec.describe ReactOnRails::Dev::ServiceChecker do
         end
       end
     end
+
+    context "when check_command outputs to stderr" do
+      it "captures stderr in output" do
+        config = {
+          "services" => {
+            "test_service" => {
+              "check_command" => "echo 'ERROR' >&2",
+              "expected_output" => "ERROR"
+            }
+          }
+        }
+
+        with_temp_config(config) do |path|
+          expect(described_class.check_services(config_path: path)).to be true
+        end
+      end
+    end
+
+    context "when check_command outputs to both stdout and stderr" do
+      it "captures both streams" do
+        config = {
+          "services" => {
+            "test_service" => {
+              "check_command" => "echo 'OUT' && echo 'ERR' >&2",
+              "expected_output" => "OUT"
+            }
+          }
+        }
+
+        with_temp_config(config) do |path|
+          expect(described_class.check_services(config_path: path)).to be true
+        end
+      end
+
+      it "can match against stderr output" do
+        config = {
+          "services" => {
+            "test_service" => {
+              "check_command" => "echo 'OUT' && echo 'ERR' >&2",
+              "expected_output" => "ERR"
+            }
+          }
+        }
+
+        with_temp_config(config) do |path|
+          expect(described_class.check_services(config_path: path)).to be true
+        end
+      end
+    end
   end
 
   # Helper methods

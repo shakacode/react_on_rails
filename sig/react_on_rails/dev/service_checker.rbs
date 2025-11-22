@@ -1,0 +1,22 @@
+module ReactOnRails
+  module Dev
+    class ServiceChecker
+      def self.check_services: (?config_path: String) -> bool
+
+      private
+
+      def self.config_has_services?: (Hash[String, untyped]?) -> bool
+      def self.check_and_report_services: (Hash[String, untyped], String) -> bool
+      def self.collect_service_failures: (Hash[String, untyped]) -> Array[Hash[Symbol, untyped]]
+      def self.report_results: (Array[Hash[Symbol, untyped]]) -> bool
+      def self.load_config: (String) -> Hash[String, untyped]?
+      def self.check_service: (String, Hash[String, untyped]) -> bool
+      def self.run_check_command: (String) -> [String, Process::Status?]
+      def self.print_services_header: (String) -> void
+      def self.print_service_ok: (String, String?) -> void
+      def self.print_service_failed: (String, String?) -> void
+      def self.print_all_services_ok: () -> void
+      def self.print_failures_summary: (Array[Hash[Symbol, untyped]]) -> void
+    end
+  end
+end

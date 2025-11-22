@@ -7,6 +7,12 @@
 # If any service is not running, it will display helpful error messages with
 # instructions on how to start the service.
 #
+# ⚠️  SECURITY WARNING:
+# Commands in this file are executed during bin/dev startup. Only add commands
+# from trusted sources. This file should not be committed if it contains
+# sensitive information or custom paths specific to your machine. Consider
+# adding .dev-services.yml to .gitignore if it contains machine-specific config.
+#
 # For the React on Rails dummy app, we typically don't require external services,
 # but here are some common examples you might use in a real application:
 
