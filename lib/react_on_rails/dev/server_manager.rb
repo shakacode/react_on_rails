@@ -4,6 +4,7 @@ require "English"
 require "open3"
 require "rainbow"
 require_relative "../packer_utils"
+require_relative "service_checker"
 
 module ReactOnRails
   module Dev
@@ -514,6 +515,9 @@ module ReactOnRails
         def run_static_development(procfile, verbose: false, route: nil)
           print_procfile_info(procfile, route: route)
 
+          # Check required services before starting
+          exit 1 unless ServiceChecker.check_services
+
           features = [
             "Using shakapacker --watch (no HMR)",
             "CSS extracted to separate files (no FOUC)",
@@ -539,6 +543,10 @@ module ReactOnRails
 
         def run_development(procfile, verbose: false, route: nil)
           print_procfile_info(procfile, route: route)
+
+          # Check required services before starting
+          exit 1 unless ServiceChecker.check_services
+
           PackGenerator.generate(verbose: verbose)
           ProcessManager.ensure_procfile(procfile)
           ProcessManager.run_with_process_manager(procfile)
