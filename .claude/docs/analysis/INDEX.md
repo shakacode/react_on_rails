@@ -4,7 +4,26 @@ This directory contains comprehensive analysis of the React on Rails monorepo mi
 
 ## Documents Overview
 
-### 1. MONOREPO_MIGRATION_ANALYSIS.md (PRIMARY - 16 KB)
+### 1. CI_FAILURES_2024-11-21.md (CURRENT BLOCKER - 24 KB) 🔴
+
+**Critical CI failure analysis for justin808/monorepo-completion branch**
+
+**Status**: NOT READY TO MERGE - 3 failing test suites, 1 hung test
+
+Contains:
+
+- Executive summary of all test failures
+- Root cause analysis for each failure
+- Comparison with base commit (all tests passing)
+- Suspicious commits that likely introduced issues
+- Detailed debugging strategy and fix recommendations
+- Prevention strategies for future regressions
+
+**Use when**: Debugging current CI failures, planning fixes, understanding what broke
+
+---
+
+### 2. MONOREPO_MIGRATION_ANALYSIS.md (PRIMARY - 16 KB)
 
 **Comprehensive technical analysis of the entire monorepo migration**
 
@@ -25,7 +44,7 @@ Contains 12 detailed sections:
 
 **Use when**: You need complete technical details, planning next phases, or understanding dependencies
 
-### 2. MIGRATION_QUICK_REFERENCE.md (REFERENCE - 6.8 KB)
+### 3. MIGRATION_QUICK_REFERENCE.md (REFERENCE - 6.8 KB)
 
 **Quick lookup guide with status dashboards and checklists**
 
@@ -43,7 +62,7 @@ Contains:
 
 **Use when**: You need quick answers, status updates, or testing guidance
 
-### 3. CLAUDE_MD_UPDATES.md (SUPPORTING - 11 KB)
+### 4. CLAUDE_MD_UPDATES.md (SUPPORTING - 11 KB)
 
 **Documentation of CLAUDE.md improvements for monorepo**
 
@@ -56,7 +75,7 @@ Details improvements to project guidelines including:
 
 **Use when**: Learning about updated developer guidelines
 
-### 4. claude-md-improvements.md (SUPPORTING - 8 KB)
+### 5. claude-md-improvements.md (SUPPORTING - 8 KB)
 
 **Additional CLAUDE.md enhancement recommendations**
 
@@ -67,6 +86,9 @@ Suggested improvements for developer experience in monorepo context.
 ## Quick Navigation
 
 ### I Need To...
+
+**Fix current CI failures**
+→ Read: CI_FAILURES_2024-11-21.md (MOST URGENT)
 
 **Understand the current state**
 → Read: Executive Summary in MONOREPO_MIGRATION_ANALYSIS.md
@@ -193,11 +215,12 @@ Updates to analysis:
 - Merged CI systems
 - Updated publishing process
 
-**Phase 5**: ✅ Pro Node Renderer Package Extraction (Completed - PR #2069)
+**Phase 5**: 🔴 Pro Node Renderer Package Extraction (IN PROGRESS - PR #2069 - CI FAILING)
 
-- Extracted node-renderer as separate workspace package
-- Updated build and publishing workflows
-- Verified CI/CD integration
+- ✅ Extracted node-renderer as separate workspace package
+- ✅ Updated build and publishing workflows
+- ❌ CI/CD integration BROKEN - 3 test failures + 1 hung test
+- **Status**: NOT READY TO MERGE - See CI_FAILURES_2024-11-21.md
 
 ## Future Phases
 
@@ -215,5 +238,6 @@ Updates to analysis:
 
 ---
 
-Last Updated: 2025-11-20
-Status: Phase 5 Complete - Ready for Phase 6 Planning
+Last Updated: 2025-11-21
+Status: Phase 5 IN PROGRESS - CI Failures Must Be Fixed Before Merge
+**BLOCKER**: See CI_FAILURES_2024-11-21.md for complete failure analysis
