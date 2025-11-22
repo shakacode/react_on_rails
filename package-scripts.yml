@@ -43,9 +43,9 @@ scripts:
       # 3. Check if the project is built now;
       # 4. If it failed, print an error message (still follow https://docs.npmjs.com/cli/v8/using-npm/scripts#best-practices).
       script: >
-        [ -f packages/react-on-rails/lib/ReactOnRails.full.js ] || [ -f packages/react-on-rails-pro-node-renderer/lib/ReactOnRailsProNodeRenderer.js ] ||
+        ([ -f packages/react-on-rails/lib/ReactOnRails.full.js ] && [ -f packages/react-on-rails-pro/lib/ReactOnRails.full.js ] && [ -f packages/react-on-rails-pro-node-renderer/lib/ReactOnRailsProNodeRenderer.js ]) ||
           (npm run build >/dev/null 2>&1 || true) &&
-          [ -f packages/react-on-rails/lib/ReactOnRails.full.js ] || [ -f packages/react-on-rails-pro-node-renderer/lib/ReactOnRailsProNodeRenderer.js ] ||
+          ([ -f packages/react-on-rails/lib/ReactOnRails.full.js ] && [ -f packages/react-on-rails-pro/lib/ReactOnRails.full.js ] && [ -f packages/react-on-rails-pro-node-renderer/lib/ReactOnRailsProNodeRenderer.js ]) ||
           { echo 'Building this package seems to have failed!'; }
 
   format:
