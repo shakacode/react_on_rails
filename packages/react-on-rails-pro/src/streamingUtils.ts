@@ -117,7 +117,7 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
       // contexts handle script tag wrapping separately (e.g., with CSP nonces).
       // This returns pure JavaScript without wrapping, which is then embedded
       // into the result object JSON payload.
-      const consoleReplayScript = consoleReplay(previouslyReplayedConsoleMessages, consoleHistory);
+      const consoleReplayScript = consoleReplay(consoleHistory, previouslyReplayedConsoleMessages);
 
       previouslyReplayedConsoleMessages = consoleHistory?.length || 0;
       const jsonChunk = JSON.stringify(createResultObject(htmlChunk, consoleReplayScript, renderState));

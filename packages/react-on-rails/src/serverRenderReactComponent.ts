@@ -109,11 +109,11 @@ async function createPromiseResult(
   const consoleHistory = console.history;
   try {
     const html = await renderState.result;
-    const consoleReplayScript = buildConsoleReplay(0, consoleHistory);
+    const consoleReplayScript = buildConsoleReplay(consoleHistory);
     return createResultObject(html, consoleReplayScript, renderState);
   } catch (e: unknown) {
     const errorRenderState = handleRenderingError(e, { componentName, throwJsErrors });
-    const consoleReplayScript = buildConsoleReplay(0, consoleHistory);
+    const consoleReplayScript = buildConsoleReplay(consoleHistory);
     return createResultObject(errorRenderState.result, consoleReplayScript, errorRenderState);
   }
 }
