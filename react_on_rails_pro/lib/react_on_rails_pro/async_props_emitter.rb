@@ -21,6 +21,15 @@ module ReactOnRailsPro
       # Continue - don't abort entire render because one prop failed
     end
 
+    # Generates the chunk that should be executed when the request stream closes
+    # This tells the asyncPropsManager to end the stream
+    def end_stream_chunk
+      {
+        bundleTimestamp: @bundle_timestamp,
+        updateChunk: generate_end_stream_js
+      }
+    end
+
     private
 
     def generate_update_chunk(prop_name, value)
@@ -35,6 +44,15 @@ module ReactOnRailsPro
         (function(){
           var asyncPropsManager = sharedExecutionContext.get("asyncPropsManager");
           asyncPropsManager.setProp(#{prop_name.to_json}, #{value.to_json});
+        })()
+      JS
+    end
+
+    def generate_end_stream_js
+      <<~JS.strip
+        (function(){
+          var asyncPropsManager = sharedExecutionContext.get("asyncPropsManager");
+          asyncPropsManager.endStream();
         })()
       JS
     end
