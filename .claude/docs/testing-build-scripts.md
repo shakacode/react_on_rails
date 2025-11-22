@@ -12,6 +12,26 @@
 - If these fail, users can't install or use the package
 - Failures are often silent - they don't show up in normal CI
 
+## Before You Start: Check CI Status
+
+**CRITICAL: Before investigating failures, check if they're pre-existing:**
+
+```bash
+# Get the commit SHA before your changes
+git log --oneline -20 | grep "your-branch-base"
+
+# Check CI status for that commit
+gh run list --commit <SHA> --json conclusion,workflowName
+
+# Compare to current commit
+gh run list --commit HEAD --json conclusion,workflowName
+
+# Or check PR status changes over time
+gh pr view --json statusCheckRollup | jq '.statusCheckRollup[] | select(.conclusion == "FAILURE") | .name'
+```
+
+**Don't waste time debugging pre-existing failures.** If the tests were already failing before your changes, document this and focus on your actual changes.
+
 ## Mandatory Testing After ANY Changes
 
 **If you modify package.json, package-scripts.yml, or build configs:**
