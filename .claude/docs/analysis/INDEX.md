@@ -83,12 +83,45 @@ Suggested improvements for developer experience in monorepo context.
 
 **Use when**: Reviewing documentation enhancement opportunities
 
+### 6. pr-splitting-strategy.md (STRATEGIC - 12 KB)
+
+**Strategy guide for breaking large PRs into smaller ones**
+
+Contains:
+
+- When to split a large PR (indicators and decision criteria)
+- Strategy for identifying independent commits
+- Step-by-step splitting process
+- Real-world example: How to split PR #2069
+- Benefits, anti-patterns, and decision tree
+- Template for announcing PR splits
+
+**Use when**: Facing complex CI failures in large PRs, planning PR strategy, deciding whether to split
+
+---
+
+## Related Documentation
+
+Outside the analysis directory:
+
+- **PR Splitting Strategy**: `/.claude/docs/pr-splitting-strategy.md` (splitting large PRs)
+- **Main Migration Plan**: `/docs/MONOREPO_MERGER_PLAN.md` (authoritative source)
+- **Path Management Guide**: `/.claude/docs/managing-file-paths.md` (validation procedures)
+- **Build Script Testing**: `/.claude/docs/testing-build-scripts.md` (artifact verification)
+- **CI Monitoring**: `/.claude/docs/master-health-monitoring.md` (CI status checks)
+- **Contributing Guide**: `/CONTRIBUTING.md` (developer instructions)
+
+---
+
 ## Quick Navigation
 
 ### I Need To...
 
 **Fix current CI failures**
 → Read: CI_FAILURES_2024-11-21.md (MOST URGENT)
+
+**Decide whether to split a large PR**
+→ Read: pr-splitting-strategy.md (for complex PRs with multiple failures)
 
 **Understand the current state**
 → Read: Executive Summary in MONOREPO_MIGRATION_ANALYSIS.md
