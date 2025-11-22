@@ -17,18 +17,24 @@
 **CRITICAL: Before investigating failures, check if they're pre-existing:**
 
 ```bash
-# Get the commit SHA before your changes
-git log --oneline -20 | grep "your-branch-base"
+# 1. Check if master is passing for the same workflow
+gh run list --workflow="Integration Tests" --branch master --limit 5 --json conclusion,createdAt --jq '.[] | "\(.createdAt) \(.conclusion)"'
 
-# Check CI status for that commit
-gh run list --commit <SHA> --json conclusion,workflowName
+# 2. Check your PR branch history for this workflow
+gh run list --workflow="Integration Tests" --branch your-branch --limit 10 --json conclusion,headSha,createdAt --jq '.[] | "\(.createdAt) \(.headSha[0:7]) \(.conclusion)"'
 
-# Compare to current commit
-gh run list --commit HEAD --json conclusion,workflowName
+# 3. Find when failures started vs when your commits were made
+git log --oneline --all | grep your-commit-sha
 
-# Or check PR status changes over time
+# 4. Check all failing workflows on current PR
 gh pr view --json statusCheckRollup | jq '.statusCheckRollup[] | select(.conclusion == "FAILURE") | .name'
 ```
+
+**Key Questions to Answer:**
+
+1. **Is master passing?** If yes, the failures are PR-specific
+2. **When did failures start?** Compare timestamps of failing runs vs your commits
+3. **Did your commits introduce the failures?** If failures started AFTER your commits, they're not from your changes
 
 **Don't waste time debugging pre-existing failures.** If the tests were already failing before your changes, document this and focus on your actual changes.
 
