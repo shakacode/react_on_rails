@@ -50,6 +50,24 @@ module ReactOnRails
           described_class.new
           expect(File.mtime(translations_path)).to eq(ref_time)
         end
+
+        it "updates files when force is true" do
+          # Get initial mtime after first generation
+          initial_mtime = File.mtime(translations_path)
+
+          # Touch files to make them newer than YAML (up-to-date)
+          sleep 0.01 # Ensure timestamp difference
+          future_time = Time.current + 1.minute
+          FileUtils.touch(translations_path, mtime: future_time)
+          FileUtils.touch(default_path, mtime: future_time)
+
+          # Force regeneration even though files are up-to-date
+          described_class.new(force: true)
+
+          # New mtime should be different from the future_time we set
+          expect(File.mtime(translations_path)).not_to eq(future_time)
+          expect(File.mtime(translations_path)).to be > initial_mtime
+        end
       end
     end
 

@@ -36,6 +36,22 @@ module ReactOnRails
 
         described_class.compile
       end
+
+      it "passes force parameter to ToJson" do
+        ReactOnRails.configuration.i18n_output_format = nil
+
+        expect(ReactOnRails::Locales::ToJson).to receive(:new).with(force: true)
+
+        described_class.compile(force: true)
+      end
+
+      it "passes force parameter to ToJs" do
+        ReactOnRails.configuration.i18n_output_format = "js"
+
+        expect(ReactOnRails::Locales::ToJs).to receive(:new).with(force: true)
+
+        described_class.compile(force: true)
+      end
     end
   end
 end
