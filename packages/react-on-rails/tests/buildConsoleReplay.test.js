@@ -89,7 +89,7 @@ console.warn.apply(console, ["other message","{\\"c\\":3,\\"d\\":4}"]);
     console.history = [];
     const actual = buildConsoleReplay(undefined, 0, 'abc123');
 
-    expect(actual).toEqual('');
+    expect(actual).toBe('');
   });
 
   it('consoleReplay returns only JavaScript without script tags', () => {

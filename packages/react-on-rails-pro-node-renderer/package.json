@@ -1,0 +1,131 @@
+{
+  "name": "react-on-rails-pro-node-renderer",
+  "version": "16.2.0-beta.12",
+  "protocolVersion": "2.0.0",
+  "description": "React on Rails Pro Node Renderer for server-side rendering",
+  "directories": {
+    "doc": "docs"
+  },
+  "exports": {
+    ".": {
+      "types": "./lib/ReactOnRailsProNodeRenderer.d.ts",
+      "default": "./lib/ReactOnRailsProNodeRenderer.js"
+    },
+    "./integrations/*": {
+      "types": "./lib/integrations/*.d.ts",
+      "default": "./lib/integrations/*.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "resolutions": {
+    "sentry-testkit/body-parser": "npm:empty-npm-package@1.0.0",
+    "sentry-testkit/express": "npm:empty-npm-package@1.0.0"
+  },
+  "dependencies": {
+    "@fastify/formbody": "^7.4.0 || ^8.0.2",
+    "@fastify/multipart": "^8.3.1 || ^9.0.3",
+    "fastify": "^4.29.0 || ^5.2.1",
+    "fs-extra": "^11.2.0",
+    "jsonwebtoken": "^9.0.2",
+    "lockfile": "^1.0.4",
+    "pino": "^9.0.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.26.10",
+    "@babel/eslint-parser": "^7.27.0",
+    "@babel/preset-env": "^7.20.2",
+    "@babel/preset-react": "^7.26.3",
+    "@babel/preset-typescript": "^7.27.1",
+    "@honeybadger-io/js": "^6.10.1",
+    "@sentry/node": "^7.120.0",
+    "@types/fs-extra": "^11.0.4",
+    "@types/jest": "^29.5.12",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/lockfile": "^1.0.4",
+    "@types/touch": "^3.1.5",
+    "babel-jest": "^29.7.0",
+    "form-auto-content": "^3.2.1",
+    "form-data": "^4.0.1",
+    "jest-junit": "^16.0.0",
+    "jsdom": "^16.5.0",
+    "node-html-parser": "^7.0.1",
+    "nps": "^5.9.12",
+    "pino-pretty": "^13.0.0",
+    "react-on-rails": "*",
+    "redis": "^5.0.1",
+    "sentry-testkit": "^5.0.6",
+    "touch": "^3.1.0",
+    "typescript": "^5.4.3"
+  },
+  "peerDependencies": {
+    "@honeybadger-io/js": ">=4.0.0",
+    "@sentry/node": ">=5.0.0 <9.0.0",
+    "@sentry/tracing": ">=5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@honeybadger-io/js": {
+      "optional": true
+    },
+    "@sentry/node": {
+      "optional": true
+    },
+    "@sentry/tracing": {
+      "optional": true
+    }
+  },
+  "scripts": {
+    "build": "yarn run clean && yarn run tsc --project src/tsconfig.json",
+    "build-watch": "yarn run clean && yarn run tsc --watch --project src/tsconfig.json",
+    "clean": "rm -rf ./lib",
+    "ci": "jest --ci --runInBand --reporters=default --reporters=jest-junit",
+    "developing": "nps node-renderer.debug",
+    "test": "jest tests",
+    "type-check": "yarn run tsc --noEmit --noErrorTruncation  --project src/tsconfig.json",
+    "prepare": "[ -f lib/ReactOnRailsProNodeRenderer.js ] || yarn run build",
+    "prepublishOnly": "yarn run build",
+    "yalc:publish": "yalc publish",
+    "yalc": "yalc"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shakacode/react_on_rails.git"
+  },
+  "keywords": [
+    "react",
+    "webpack",
+    "JavaScript",
+    "Ruby",
+    "on",
+    "Rails"
+  ],
+  "author": "justin@shakacode.com",
+  "license": "UNLICENSED",
+  "bugs": {
+    "url": "https://github.com/shakacode/react_on_rails/issues"
+  },
+  "homepage": "https://github.com/shakacode/react_on_rails/tree/master/packages/react-on-rails-pro-node-renderer#readme",
+  "jest": {
+    "clearMocks": true,
+    "moduleNameMapper": {
+      "^(\\.{1,2}/.*)\\.js$": "$1"
+    },
+    "resetModules": true,
+    "resetMocks": true,
+    "roots": [
+      "."
+    ],
+    "setupFiles": [
+      "./tests/helper.ts"
+    ],
+    "testEnvironment": "node",
+    "transform": {
+      "^.+\\.[jt]sx?$": "babel-jest"
+    }
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "yalc check"
+    }
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+}

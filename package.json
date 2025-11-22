@@ -6,7 +6,8 @@
   "type": "module",
   "workspaces": [
     "packages/react-on-rails",
-    "packages/react-on-rails-pro"
+    "packages/react-on-rails-pro",
+    "packages/react-on-rails-pro-node-renderer"
   ],
   "directories": {
     "doc": "docs"
@@ -19,6 +20,7 @@
     "@babel/preset-react": "^7.26.3",
     "@babel/preset-typescript": "^7.27.1",
     "@eslint/compat": "^1.2.7",
+    "@jest/globals": "^29.7.0",
     "@swc/core": "^1.15.0",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
@@ -45,6 +47,7 @@
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
     "jest-fetch-mock": "^3.0.3",
+    "jest-junit": "^16.0.0",
     "jsdom": "^22.1.0",
     "knip": "^5.46.0",
     "nps": "^5.9.3",
@@ -65,10 +68,10 @@
   "scripts": {
     "test": "yarn workspaces run test",
     "clean": "yarn workspaces run clean",
-    "start": "nps",
-    "build": "yarn workspace react-on-rails run build && yarn workspace react-on-rails-pro run build",
+    "start": "yarn run nps",
+    "build": "yarn workspace react-on-rails run build && yarn workspace react-on-rails-pro run build && yarn workspace react-on-rails-pro-node-renderer run build",
     "build-watch": "yarn workspaces run build-watch",
-    "lint": "nps eslint",
+    "lint": "yarn run nps eslint",
     "lint:scss": "stylelint \"spec/dummy/app/assets/stylesheets/**/*.scss\" \"spec/dummy/client/**/*.scss\"",
     "check": "yarn run lint && yarn workspaces run check",
     "type-check": "yarn workspaces run type-check",

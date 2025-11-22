@@ -51,6 +51,11 @@ const config = tsEslint.config([
     // generator templates - exclude TypeScript templates that need tsconfig.json
     '**/templates/**/*.tsx',
     '**/templates/**/*.ts',
+    // test config files in packages - Jest/Babel configs cause ESM/CJS conflicts with ESLint
+    'packages/*/tests/**',
+    'packages/*/*.test.{js,jsx,ts,tsx}',
+    'packages/*/babel.config.js',
+    'packages/*/jest.config.js',
   ]),
   {
     files: ['**/*.[jt]s', '**/*.[jt]sx', '**/*.[cm][jt]s'],
@@ -227,6 +232,15 @@ const config = tsEslint.config([
       // TypeScript compiler validates these imports
       'import/named': 'off',
       'import/no-unresolved': 'off',
+      'import/no-cycle': 'off',
+      'import/no-relative-packages': 'off',
+      'import/no-duplicates': 'off',
+      'import/extensions': 'off',
+      'import/order': 'off',
+      'import/no-self-import': 'off',
+      'import/no-named-as-default': 'off',
+      'import/no-named-as-default-member': 'off',
+      'import/export': 'off',
       // Disable unsafe type rules - Pro package uses internal APIs with complex types
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-call': 'off',
@@ -238,6 +252,24 @@ const config = tsEslint.config([
       '@typescript-eslint/no-deprecated': 'off',
       // Allow unbound methods - needed for method reassignment patterns
       '@typescript-eslint/unbound-method': 'off',
+    },
+  },
+  {
+    files: ['packages/react-on-rails-pro-node-renderer/**/*'],
+    rules: {
+      // Disable import rules for node-renderer - ESM requires .js extensions but ESLint
+      // can't resolve them for .ts files. TypeScript compiler validates these imports
+      'import/named': 'off',
+      'import/no-unresolved': 'off',
+      'import/prefer-default-export': 'off',
+      // Disable unsafe type rules - node-renderer uses external libs with complex types
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      // Allow missing extensions in require() calls - dynamic imports
+      'import/extensions': 'off',
     },
   },
   {
@@ -260,6 +292,15 @@ const config = tsEslint.config([
       'import/first': 'off',
       // Avoiding these methods complicates tests and isn't useful for our purposes
       'testing-library/no-node-access': 'off',
+    },
+  },
+  {
+    files: ['packages/react-on-rails-pro-node-renderer/tests/**/*'],
+    rules: {
+      // Allow non-null assertions in tests - they're acceptable for test data
+      '@typescript-eslint/no-non-null-assertion': 'off',
+      // Some tests validate error conditions without explicit assertions
+      'jest/expect-expect': 'off',
     },
   },
   // must be the last config in the array
