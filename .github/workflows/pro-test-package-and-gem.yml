@@ -219,7 +219,7 @@ jobs:
           key: v4-pro-package-node-modules-cache-${{ hashFiles('react_on_rails_pro/yarn.lock') }}
 
       - name: Install Node modules with Yarn for Pro package
-        working-directory: packages/react-on-rails-pro-node-renderer
+        working-directory: .
         run: |
           sudo yarn global add yalc
           yarn install --frozen-lockfile --no-progress --no-emoji
