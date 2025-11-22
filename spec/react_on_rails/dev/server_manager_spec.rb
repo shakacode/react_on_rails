@@ -289,10 +289,10 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       end
 
       it "runs the hook and sets environment variable for development mode" do
-        expect_any_instance_of(Kernel)
-          .to receive(:system)
+        status_double = instance_double(Process::Status, success?: true)
+        expect(Open3).to receive(:capture3)
           .with("bundle exec rake react_on_rails:locale")
-          .and_return(true)
+          .and_return(["", "", status_double])
 
         described_class.run_from_command_line([])
 
@@ -300,10 +300,10 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       end
 
       it "runs the hook and sets environment variable for static mode" do
-        expect_any_instance_of(Kernel)
-          .to receive(:system)
+        status_double = instance_double(Process::Status, success?: true)
+        expect(Open3).to receive(:capture3)
           .with("bundle exec rake react_on_rails:locale")
-          .and_return(true)
+          .and_return(["", "", status_double])
 
         described_class.run_from_command_line(["static"])
 
@@ -313,13 +313,16 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       it "runs the hook and sets environment variable for prod mode" do
         env = { "NODE_ENV" => "production" }
         argv = ["bundle", "exec", "rails", "assets:precompile"]
-        status_double = instance_double(Process::Status, success?: true)
-        expect(Open3).to receive(:capture3).with(env, *argv).and_return(["output", "", status_double])
+        assets_status_double = instance_double(Process::Status, success?: true)
+        hook_status_double = instance_double(Process::Status, success?: true)
 
-        expect_any_instance_of(Kernel)
-          .to receive(:system)
+        # Expect both Open3.capture3 calls: one for the hook, one for assets:precompile
+        expect(Open3).to receive(:capture3)
           .with("bundle exec rake react_on_rails:locale")
-          .and_return(true)
+          .and_return(["", "", hook_status_double])
+        expect(Open3).to receive(:capture3)
+          .with(env, *argv)
+          .and_return(["output", "", assets_status_double])
 
         described_class.run_from_command_line(["prod"])
 
@@ -327,17 +330,17 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       end
 
       it "exits when hook fails" do
-        expect_any_instance_of(Kernel)
-          .to receive(:system)
+        status_double = instance_double(Process::Status, success?: false)
+        expect(Open3).to receive(:capture3)
           .with("bundle exec rake react_on_rails:locale")
-          .and_return(false)
+          .and_return(["", "", status_double])
         expect_any_instance_of(Kernel).to receive(:exit).with(1)
 
         described_class.run_from_command_line([])
       end
 
       it "does not run hook or set environment variable for kill command" do
-        expect_any_instance_of(Kernel).not_to receive(:system).with("bundle exec rake react_on_rails:locale")
+        expect(Open3).not_to receive(:capture3)
 
         described_class.run_from_command_line(["kill"])
 
@@ -345,7 +348,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       end
 
       it "does not run hook or set environment variable for help command" do
-        expect_any_instance_of(Kernel).not_to receive(:system).with("bundle exec rake react_on_rails:locale")
+        expect(Open3).not_to receive(:capture3)
 
         described_class.run_from_command_line(["help"])
 
@@ -353,7 +356,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       end
 
       it "does not run hook or set environment variable for -h flag" do
-        expect_any_instance_of(Kernel).not_to receive(:system).with("bundle exec rake react_on_rails:locale")
+        expect(Open3).not_to receive(:capture3)
 
         # The -h flag is handled by OptionParser and calls exit during option parsing
         # We need to mock exit to prevent the test from actually exiting
@@ -374,10 +377,10 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         end
 
         it "displays warning about unsupported SHAKAPACKER_SKIP_PRECOMPILE_HOOK" do
-          expect_any_instance_of(Kernel)
-            .to receive(:system)
+          status_double = instance_double(Process::Status, success?: true)
+          expect(Open3).to receive(:capture3)
             .with("bundle exec rake react_on_rails:locale")
-            .and_return(true)
+            .and_return(["", "", status_double])
 
           expect do
             described_class.run_from_command_line([])
@@ -397,10 +400,10 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         end
 
         it "does not display warning" do
-          expect_any_instance_of(Kernel)
-            .to receive(:system)
+          status_double = instance_double(Process::Status, success?: true)
+          expect(Open3).to receive(:capture3)
             .with("bundle exec rake react_on_rails:locale")
-            .and_return(true)
+            .and_return(["", "", status_double])
 
           expect do
             described_class.run_from_command_line([])
@@ -414,7 +417,9 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         allow(ReactOnRails::PackerUtils).to receive(:shakapacker_precompile_hook_value).and_return(nil)
       end
 
-      it "does not run any hook but still sets environment variable for development mode" do
+      it "sets environment variable even when no hook is configured (provides consistent signal)" do
+        # The environment variable is intentionally set even when no hook exists
+        # to provide a consistent signal that bin/dev is managing the precompile lifecycle
         expect_any_instance_of(Kernel).not_to receive(:system)
 
         described_class.run_from_command_line([])
