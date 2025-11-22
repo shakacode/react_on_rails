@@ -276,6 +276,12 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       ENV.delete("SHAKAPACKER_SKIP_PRECOMPILE_HOOK")
     end
 
+    after do
+      # Clean up environment variable after each test to ensure test isolation
+      # This ensures cleanup even if tests fail
+      ENV.delete("SHAKAPACKER_SKIP_PRECOMPILE_HOOK")
+    end
+
     context "when precompile hook is configured" do
       before do
         # Default to a version that supports the skip flag (no warning)
@@ -291,7 +297,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       it "runs the hook and sets environment variable for development mode" do
         status_double = instance_double(Process::Status, success?: true)
         expect(Open3).to receive(:capture3)
-          .with("bundle exec rake react_on_rails:locale")
+          .with("bundle", "exec", "rake", "react_on_rails:locale")
           .and_return(["", "", status_double])
 
         described_class.run_from_command_line([])
@@ -302,7 +308,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       it "runs the hook and sets environment variable for static mode" do
         status_double = instance_double(Process::Status, success?: true)
         expect(Open3).to receive(:capture3)
-          .with("bundle exec rake react_on_rails:locale")
+          .with("bundle", "exec", "rake", "react_on_rails:locale")
           .and_return(["", "", status_double])
 
         described_class.run_from_command_line(["static"])
@@ -318,7 +324,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
         # Expect both Open3.capture3 calls: one for the hook, one for assets:precompile
         expect(Open3).to receive(:capture3)
-          .with("bundle exec rake react_on_rails:locale")
+          .with("bundle", "exec", "rake", "react_on_rails:locale")
           .and_return(["", "", hook_status_double])
         expect(Open3).to receive(:capture3)
           .with(env, *argv)
@@ -332,7 +338,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       it "exits when hook fails" do
         status_double = instance_double(Process::Status, success?: false)
         expect(Open3).to receive(:capture3)
-          .with("bundle exec rake react_on_rails:locale")
+          .with("bundle", "exec", "rake", "react_on_rails:locale")
           .and_return(["", "", status_double])
         expect_any_instance_of(Kernel).to receive(:exit).with(1)
 
@@ -379,7 +385,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         it "displays warning about unsupported SHAKAPACKER_SKIP_PRECOMPILE_HOOK" do
           status_double = instance_double(Process::Status, success?: true)
           expect(Open3).to receive(:capture3)
-            .with("bundle exec rake react_on_rails:locale")
+            .with("bundle", "exec", "rake", "react_on_rails:locale")
             .and_return(["", "", status_double])
 
           expect do
@@ -402,7 +408,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         it "does not display warning" do
           status_double = instance_double(Process::Status, success?: true)
           expect(Open3).to receive(:capture3)
-            .with("bundle exec rake react_on_rails:locale")
+            .with("bundle", "exec", "rake", "react_on_rails:locale")
             .and_return(["", "", status_double])
 
           expect do

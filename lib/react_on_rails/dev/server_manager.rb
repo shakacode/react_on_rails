@@ -216,6 +216,7 @@ module ReactOnRails
 
         def run_precompile_hook_if_present
           require "open3"
+          require "shellwords"
 
           hook_value = PackerUtils.shakapacker_precompile_hook_value
           return unless hook_value
@@ -228,7 +229,9 @@ module ReactOnRails
           puts ""
 
           # Capture stdout and stderr for better error reporting
-          stdout, stderr, status = Open3.capture3(hook_value.to_s)
+          # Use Shellwords.split for safer command execution (prevents shell metacharacter interpretation)
+          command_args = Shellwords.split(hook_value.to_s)
+          stdout, stderr, status = Open3.capture3(*command_args)
 
           if status.success?
             puts Rainbow("✅ Precompile hook completed successfully").green
