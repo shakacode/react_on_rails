@@ -16,9 +16,46 @@ React on Rails includes `bin/dev` which automatically uses Overmind or Foreman:
 
 This script will:
 
-1. Try to use Overmind (if installed)
-2. Fall back to Foreman (if installed)
-3. Show installation instructions if neither is found
+1. Run Shakapacker's `precompile_hook` once (if configured in `config/shakapacker.yml`)
+2. Set `SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true` to prevent duplicate execution
+3. Try to use Overmind (if installed)
+4. Fall back to Foreman (if installed)
+5. Show installation instructions if neither is found
+
+### Precompile Hook Integration
+
+If you have configured a `precompile_hook` in `config/shakapacker.yml`, `bin/dev` will automatically:
+
+- Execute the hook **once** before starting development processes
+- Set the `SHAKAPACKER_SKIP_PRECOMPILE_HOOK` environment variable
+- Pass this environment variable to all spawned processes (Rails, webpack, etc.)
+- Prevent webpack processes from re-running the hook independently
+
+**Note:** The `SHAKAPACKER_SKIP_PRECOMPILE_HOOK` environment variable is supported in Shakapacker 9.4.0 and later. If you're using an earlier version, `bin/dev` will display a warning recommending you upgrade to avoid duplicate hook execution.
+
+This eliminates the need for manual coordination in your `Procfile.dev`. For example:
+
+**Before (manual coordination with sleep hacks):**
+
+```procfile
+# Procfile.dev
+wp-server: sleep 15 && bundle exec rake react_on_rails:locale && bin/shakapacker --watch
+```
+
+**After (automatic coordination via bin/dev):**
+
+```procfile
+# Procfile.dev
+wp-server: bin/shakapacker --watch
+```
+
+```yaml
+# config/shakapacker.yml
+default: &default
+  precompile_hook: 'bundle exec rake react_on_rails:locale'
+```
+
+See the [i18n documentation](./i18n.md#internationalization) for more details on configuring the precompile hook.
 
 ## Installing a Process Manager
 
