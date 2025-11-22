@@ -53,12 +53,27 @@ module ReactOnRailsPro
         end
 
         def eval_streaming_js(js_code, render_options)
-          path = prepare_render_path(js_code, render_options)
-          ReactOnRailsPro::Request.render_code_as_stream(
-            path,
-            js_code,
-            is_rsc_payload: ReactOnRailsPro.configuration.enable_rsc_support && render_options.rsc_payload_streaming?
-          )
+          is_rsc_payload = ReactOnRailsPro.configuration.enable_rsc_support && render_options.rsc_payload_streaming?
+          async_props_block = render_options.internal_option(:async_props_block)
+
+          if async_props_block
+            # Use incremental rendering when async props block is provided
+            path = prepare_incremental_render_path(js_code, render_options)
+            ReactOnRailsPro::Request.render_code_with_incremental_updates(
+              path,
+              js_code,
+              async_props_block: async_props_block,
+              is_rsc_payload: is_rsc_payload
+            )
+          else
+            # Use standard streaming when no async props block
+            path = prepare_render_path(js_code, render_options)
+            ReactOnRailsPro::Request.render_code_as_stream(
+              path,
+              js_code,
+              is_rsc_payload: is_rsc_payload
+            )
+          end
         end
 
         def eval_js(js_code, render_options, send_bundle: false)
