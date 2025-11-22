@@ -1,0 +1,46 @@
+module ReactOnRails
+  module Locales
+    def self.compile: (?force: bool) -> (ToJs | ToJson)
+    def self.check_config_directory_exists: (directory: String?, key_name: String, remove_if: String) -> void
+
+    class Base
+      def initialize: (?force: bool) -> void
+
+      private
+
+      def file_format: () -> String?
+      def obsolete?: () -> bool
+      def exist_files: () -> Array[String]
+      def files_are_outdated: () -> bool
+      def file_names: () -> Array[String]
+      def files: () -> Array[String]
+      def file: (String name) -> String
+      def locale_files: () -> Array[String]
+      def i18n_dir: () -> String?
+      def i18n_yml_dir: () -> String?
+      def default_locale: () -> String
+      def convert: () -> void
+      def generate_file: (String template, String path) -> void
+      def generate_translations: () -> [String, String]
+      def format: (untyped input) -> Symbol
+      def flatten_defaults: (Hash[untyped, untyped] val) -> Hash[Symbol, Hash[Symbol, untyped]]
+      def flatten: (Hash[untyped, untyped] translations) -> Hash[Symbol, untyped]
+      def template_translations: () -> String
+      def template_default: () -> String
+    end
+
+    class ToJs < Base
+      private
+
+      def file_format: () -> String
+    end
+
+    class ToJson < Base
+      private
+
+      def file_format: () -> String
+      def template_translations: () -> String
+      def template_default: () -> String
+    end
+  end
+end

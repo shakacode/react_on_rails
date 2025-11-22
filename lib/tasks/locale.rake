@@ -15,7 +15,7 @@ namespace :react_on_rails do
                    Example: rake react_on_rails:locale force=true
   DESC
   task locale: :environment do
-    force = ENV["force"] == "true"
+    force = %w[true 1 yes].include?(ENV["force"]&.downcase)
     ReactOnRails::Locales.compile(force: force)
   end
 end

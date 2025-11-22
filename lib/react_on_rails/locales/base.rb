@@ -64,6 +64,8 @@ module ReactOnRails
       end
 
       def files_are_outdated
+        return true if locale_files.empty?
+
         latest_yml = locale_files.map { |file| File.mtime(file) }.max
         earliest = exist_files.map { |file| File.mtime(file) }.min
         latest_yml > earliest
