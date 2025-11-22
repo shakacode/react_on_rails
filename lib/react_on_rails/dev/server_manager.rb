@@ -8,6 +8,8 @@ require_relative "../packer_utils"
 module ReactOnRails
   module Dev
     class ServerManager
+      HELP_FLAGS = ["-h", "--help"].freeze
+
       class << self
         def start(mode = :development, procfile = nil, verbose: false, route: nil, rails_env: nil)
           case mode
@@ -145,9 +147,16 @@ module ReactOnRails
           puts help_troubleshooting
         end
 
-        # rubocop:disable Metrics/AbcSize
+        # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
         def run_from_command_line(args = ARGV)
           require "optparse"
+
+          # Get the command early to check for help/kill before running hooks
+          # We need to do this before OptionParser processes flags like -h/--help
+          command = args.find { |arg| !arg.start_with?("--") && !arg.start_with?("-") }
+
+          # Check if help flags are present in args (before OptionParser processes them)
+          help_requested = args.any? { |arg| HELP_FLAGS.include?(arg) }
 
           options = { route: nil, rails_env: nil, verbose: false }
 
@@ -172,8 +181,15 @@ module ReactOnRails
             end
           end.parse!(args)
 
-          # Get the command (anything that's not parsed as an option)
-          command = args[0]
+          # Run precompile hook once before starting any mode (except kill/help)
+          # Then set environment variable to prevent duplicate execution in spawned processes.
+          # Note: We always set SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true (even when no hook is configured)
+          # to provide a consistent signal that bin/dev is managing the precompile lifecycle.
+          # This allows custom scripts to detect bin/dev's presence and adjust behavior accordingly.
+          unless %w[kill help].include?(command) || help_requested
+            run_precompile_hook_if_present
+            ENV["SHAKAPACKER_SKIP_PRECOMPILE_HOOK"] = "true"
+          end
 
           # Main execution
           case command
@@ -184,7 +200,7 @@ module ReactOnRails
             start(:static, "Procfile.dev-static-assets", verbose: options[:verbose], route: options[:route])
           when "kill"
             kill_processes
-          when "help", "--help", "-h"
+          when "help"
             show_help
           when "hmr", nil
             start(:development, "Procfile.dev", verbose: options[:verbose], route: options[:route])
@@ -194,9 +210,85 @@ module ReactOnRails
             exit 1
           end
         end
-        # rubocop:enable Metrics/AbcSize
+        # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
 
         private
+
+        def run_precompile_hook_if_present
+          require "open3"
+          require "shellwords"
+
+          hook_value = PackerUtils.shakapacker_precompile_hook_value
+          return unless hook_value
+
+          # Warn if Shakapacker version doesn't support SHAKAPACKER_SKIP_PRECOMPILE_HOOK
+          warn_if_shakapacker_version_too_old
+
+          puts Rainbow("🔧 Running Shakapacker precompile hook...").cyan
+          puts Rainbow("   Command: #{hook_value}").cyan
+          puts ""
+
+          # Capture stdout and stderr for better error reporting
+          # Use Shellwords.split for safer command execution (prevents shell metacharacter interpretation)
+          command_args = Shellwords.split(hook_value.to_s)
+          stdout, stderr, status = Open3.capture3(*command_args)
+
+          if status.success?
+            puts Rainbow("✅ Precompile hook completed successfully").green
+            puts ""
+          else
+            handle_precompile_hook_failure(hook_value, stdout, stderr)
+          end
+        end
+
+        # rubocop:disable Metrics/AbcSize
+        def handle_precompile_hook_failure(hook_value, stdout, stderr)
+          puts ""
+          puts Rainbow("❌ Precompile hook failed!").red.bold
+          puts Rainbow("   Command: #{hook_value}").red
+          puts ""
+
+          if stdout && !stdout.strip.empty?
+            puts Rainbow("   Output:").yellow
+            stdout.strip.split("\n").each { |line| puts Rainbow("   #{line}").yellow }
+            puts ""
+          end
+
+          if stderr && !stderr.strip.empty?
+            puts Rainbow("   Error:").red
+            stderr.strip.split("\n").each { |line| puts Rainbow("   #{line}").red }
+            puts ""
+          end
+
+          puts Rainbow("💡 Fix the hook command in config/shakapacker.yml or remove it to continue").yellow
+          exit 1
+        end
+        # rubocop:enable Metrics/AbcSize
+
+        # rubocop:disable Metrics/AbcSize
+        def warn_if_shakapacker_version_too_old
+          # Only warn for Shakapacker versions in the range 9.0.0 to 9.3.x
+          # Versions below 9.0.0 don't use the precompile_hook feature
+          # Versions 9.4.0+ support SHAKAPACKER_SKIP_PRECOMPILE_HOOK environment variable
+          has_precompile_hook_support = PackerUtils.shakapacker_version_requirement_met?("9.0.0")
+          has_skip_env_var_support = PackerUtils.shakapacker_version_requirement_met?("9.4.0")
+
+          return unless has_precompile_hook_support
+          return if has_skip_env_var_support
+
+          puts ""
+          puts Rainbow("⚠️  Warning: Shakapacker #{PackerUtils.shakapacker_version} detected").yellow.bold
+          puts ""
+          puts Rainbow("   The SHAKAPACKER_SKIP_PRECOMPILE_HOOK environment variable is not").yellow
+          puts Rainbow("   supported in Shakapacker versions below 9.4.0. This may cause the").yellow
+          puts Rainbow("   precompile_hook to run multiple times (once by bin/dev, and again").yellow
+          puts Rainbow("   by each webpack process).").yellow
+          puts ""
+          puts Rainbow("   Recommendation: Upgrade to Shakapacker 9.4.0 or later:").cyan
+          puts Rainbow("   bundle update shakapacker").cyan.bold
+          puts ""
+        end
+        # rubocop:enable Metrics/AbcSize
 
         def help_usage
           Rainbow("📋 Usage: bin/dev [command] [options]").bold

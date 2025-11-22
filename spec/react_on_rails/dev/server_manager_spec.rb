@@ -268,4 +268,176 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       expect { described_class.show_help }.to output(%r{Usage: bin/dev \[command\]}).to_stdout_from_any_process
     end
   end
+
+  describe ".run_from_command_line with precompile hook" do
+    before do
+      mock_system_calls
+      # Clear environment variable before each test
+      ENV.delete("SHAKAPACKER_SKIP_PRECOMPILE_HOOK")
+    end
+
+    after do
+      # Clean up environment variable after each test to ensure test isolation
+      # This ensures cleanup even if tests fail
+      ENV.delete("SHAKAPACKER_SKIP_PRECOMPILE_HOOK")
+    end
+
+    context "when precompile hook is configured" do
+      before do
+        # Default to a version that supports the skip flag (no warning)
+        allow(ReactOnRails::PackerUtils).to receive_messages(
+          shakapacker_precompile_hook_value: "bundle exec rake react_on_rails:locale", shakapacker_version: "9.4.0"
+        )
+        allow(ReactOnRails::PackerUtils).to receive(:shakapacker_version_requirement_met?)
+          .with("9.0.0").and_return(true)
+        allow(ReactOnRails::PackerUtils).to receive(:shakapacker_version_requirement_met?)
+          .with("9.4.0").and_return(true)
+      end
+
+      it "runs the hook and sets environment variable for development mode" do
+        status_double = instance_double(Process::Status, success?: true)
+        expect(Open3).to receive(:capture3)
+          .with("bundle", "exec", "rake", "react_on_rails:locale")
+          .and_return(["", "", status_double])
+
+        described_class.run_from_command_line([])
+
+        expect(ENV.fetch("SHAKAPACKER_SKIP_PRECOMPILE_HOOK", nil)).to eq("true")
+      end
+
+      it "runs the hook and sets environment variable for static mode" do
+        status_double = instance_double(Process::Status, success?: true)
+        expect(Open3).to receive(:capture3)
+          .with("bundle", "exec", "rake", "react_on_rails:locale")
+          .and_return(["", "", status_double])
+
+        described_class.run_from_command_line(["static"])
+
+        expect(ENV.fetch("SHAKAPACKER_SKIP_PRECOMPILE_HOOK", nil)).to eq("true")
+      end
+
+      it "runs the hook and sets environment variable for prod mode" do
+        env = { "NODE_ENV" => "production" }
+        argv = ["bundle", "exec", "rails", "assets:precompile"]
+        assets_status_double = instance_double(Process::Status, success?: true)
+        hook_status_double = instance_double(Process::Status, success?: true)
+
+        # Expect both Open3.capture3 calls: one for the hook, one for assets:precompile
+        expect(Open3).to receive(:capture3)
+          .with("bundle", "exec", "rake", "react_on_rails:locale")
+          .and_return(["", "", hook_status_double])
+        expect(Open3).to receive(:capture3)
+          .with(env, *argv)
+          .and_return(["output", "", assets_status_double])
+
+        described_class.run_from_command_line(["prod"])
+
+        expect(ENV.fetch("SHAKAPACKER_SKIP_PRECOMPILE_HOOK", nil)).to eq("true")
+      end
+
+      it "exits when hook fails" do
+        status_double = instance_double(Process::Status, success?: false)
+        expect(Open3).to receive(:capture3)
+          .with("bundle", "exec", "rake", "react_on_rails:locale")
+          .and_return(["", "", status_double])
+        expect_any_instance_of(Kernel).to receive(:exit).with(1)
+
+        described_class.run_from_command_line([])
+      end
+
+      it "does not run hook or set environment variable for kill command" do
+        expect(Open3).not_to receive(:capture3)
+
+        described_class.run_from_command_line(["kill"])
+
+        expect(ENV.fetch("SHAKAPACKER_SKIP_PRECOMPILE_HOOK", nil)).to be_nil
+      end
+
+      it "does not run hook or set environment variable for help command" do
+        expect(Open3).not_to receive(:capture3)
+
+        described_class.run_from_command_line(["help"])
+
+        expect(ENV.fetch("SHAKAPACKER_SKIP_PRECOMPILE_HOOK", nil)).to be_nil
+      end
+
+      it "does not run hook or set environment variable for -h flag" do
+        expect(Open3).not_to receive(:capture3)
+
+        # The -h flag is handled by OptionParser and calls exit during option parsing
+        # We need to mock exit to prevent the test from actually exiting
+        allow_any_instance_of(Kernel).to receive(:exit)
+
+        described_class.run_from_command_line(["-h"])
+
+        expect(ENV.fetch("SHAKAPACKER_SKIP_PRECOMPILE_HOOK", nil)).to be_nil
+      end
+
+      context "with Shakapacker version below 9.4.0" do
+        before do
+          allow(ReactOnRails::PackerUtils).to receive(:shakapacker_version).and_return("9.3.0")
+          allow(ReactOnRails::PackerUtils).to receive(:shakapacker_version_requirement_met?)
+            .with("9.0.0").and_return(true)
+          allow(ReactOnRails::PackerUtils).to receive(:shakapacker_version_requirement_met?)
+            .with("9.4.0").and_return(false)
+        end
+
+        it "displays warning about unsupported SHAKAPACKER_SKIP_PRECOMPILE_HOOK" do
+          status_double = instance_double(Process::Status, success?: true)
+          expect(Open3).to receive(:capture3)
+            .with("bundle", "exec", "rake", "react_on_rails:locale")
+            .and_return(["", "", status_double])
+
+          expect do
+            described_class.run_from_command_line([])
+          end.to output(/Warning: Shakapacker 9\.3\.0 detected/).to_stdout_from_any_process
+
+          expect(ENV.fetch("SHAKAPACKER_SKIP_PRECOMPILE_HOOK", nil)).to eq("true")
+        end
+      end
+
+      context "with Shakapacker version 9.4.0 or later" do
+        before do
+          allow(ReactOnRails::PackerUtils).to receive(:shakapacker_version).and_return("9.4.0")
+          allow(ReactOnRails::PackerUtils).to receive(:shakapacker_version_requirement_met?)
+            .with("9.0.0").and_return(true)
+          allow(ReactOnRails::PackerUtils).to receive(:shakapacker_version_requirement_met?)
+            .with("9.4.0").and_return(true)
+        end
+
+        it "does not display warning" do
+          status_double = instance_double(Process::Status, success?: true)
+          expect(Open3).to receive(:capture3)
+            .with("bundle", "exec", "rake", "react_on_rails:locale")
+            .and_return(["", "", status_double])
+
+          expect do
+            described_class.run_from_command_line([])
+          end.not_to output(/Warning: Shakapacker/).to_stdout_from_any_process
+        end
+      end
+    end
+
+    context "when no precompile hook is configured" do
+      before do
+        allow(ReactOnRails::PackerUtils).to receive(:shakapacker_precompile_hook_value).and_return(nil)
+      end
+
+      it "sets environment variable even when no hook is configured (provides consistent signal)" do
+        # The environment variable is intentionally set even when no hook exists
+        # to provide a consistent signal that bin/dev is managing the precompile lifecycle
+        expect_any_instance_of(Kernel).not_to receive(:system)
+
+        described_class.run_from_command_line([])
+
+        expect(ENV.fetch("SHAKAPACKER_SKIP_PRECOMPILE_HOOK", nil)).to eq("true")
+      end
+
+      it "does not set environment variable for kill command" do
+        described_class.run_from_command_line(["kill"])
+
+        expect(ENV.fetch("SHAKAPACKER_SKIP_PRECOMPILE_HOOK", nil)).to be_nil
+      end
+    end
+  end
 end
