@@ -55,6 +55,9 @@ module ReactOnRails
           # Get initial mtime after first generation
           initial_mtime = File.mtime(translations_path)
 
+          # Sleep to ensure different timestamp on fast filesystems
+          sleep 0.01
+
           # Touch files to make them newer than YAML (up-to-date)
           future_time = Time.current + 1.minute
           FileUtils.touch(translations_path, mtime: future_time)

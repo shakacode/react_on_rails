@@ -40,7 +40,8 @@ module ReactOnRails
         return if i18n_dir.nil?
 
         if !force && !obsolete?
-          puts "Locale files are up to date, skipping generation. Use force=true to regenerate."
+          puts "Locale files are up to date, skipping generation. " \
+               "Use 'rake react_on_rails:locale force=true' to force regeneration."
           return
         end
 
@@ -64,7 +65,7 @@ module ReactOnRails
       end
 
       def files_are_outdated
-        return true if locale_files.empty?
+        return false if locale_files.empty? # No source files = nothing to generate
 
         latest_yml = locale_files.map { |file| File.mtime(file) }.max
         earliest = exist_files.map { |file| File.mtime(file) }.min
