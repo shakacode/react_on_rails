@@ -55,6 +55,10 @@ These requirements are non-negotiable. CI will fail if not followed.
    - Note in PR descriptions which fixes were tested locally vs. which are hypothetical
    - Explain any testing limitations encountered
 
+**See also**: When facing complex PRs with multiple CI failures, refer to `.claude/docs/pr-splitting-strategy.md` for guidance on splitting large PRs into smaller, more manageable pieces.
+
+---
+
 **🚀 AUTOMATIC: Git hooks are installed automatically during setup**
 
 Git hooks will automatically run linting on **all changed files (staged + unstaged + untracked)** before each commit - making it fast while preventing CI failures!
