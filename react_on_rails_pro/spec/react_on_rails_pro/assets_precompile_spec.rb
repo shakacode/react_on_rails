@@ -177,8 +177,11 @@ describe ReactOnRailsPro::AssetsPrecompile do
       unique_variable = { unique_key: "a unique value" }
 
       instance = described_class.instance
-      allow(instance).to receive_messages(remote_bundle_cache_adapter: adapter_double,
-                                          zipped_bundles_filename: unique_variable, zipped_bundles_filepath: "zipped_bundles_filepath")
+      allow(instance).to receive_messages(
+        remote_bundle_cache_adapter: adapter_double,
+        zipped_bundles_filename: unique_variable,
+        zipped_bundles_filepath: "zipped_bundles_filepath"
+      )
 
       allow(File).to receive(:binwrite).and_return(true)
       expect(File).to receive(:binwrite).once
@@ -252,8 +255,12 @@ describe ReactOnRailsPro::AssetsPrecompile do
       zipped_bundles_filepath = Pathname.new(Dir.tmpdir).join("foobar")
 
       instance = described_class.instance
-      allow(instance).to receive_messages(remote_bundle_cache_adapter: adapter_double,
-                                          zipped_bundles_filename: "zipped_bundles_filename", zipped_bundles_filepath: zipped_bundles_filepath, remove_extra_files_cache_dir: nil)
+      allow(instance).to receive_messages(
+        remote_bundle_cache_adapter: adapter_double,
+        zipped_bundles_filename: "zipped_bundles_filename",
+        zipped_bundles_filepath: zipped_bundles_filepath,
+        remove_extra_files_cache_dir: nil
+      )
 
       expect(instance.cache_bundles).to be_truthy
 

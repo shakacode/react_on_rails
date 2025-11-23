@@ -78,8 +78,8 @@ module ReactOnRailsPro
               allow(Shakapacker).to receive_message_chain("manifest.lookup!")
                 .and_return(rsc_bundle_js_file)
               allow(ReactOnRails::Utils).to receive_messages(
-                server_bundle_js_file_path: rsc_bundle_js_file_path.gsub("rsc-",
-                                                                         ""), rsc_bundle_js_file_path: rsc_bundle_js_file_path
+                server_bundle_js_file_path: rsc_bundle_js_file_path.gsub("rsc-", ""),
+                rsc_bundle_js_file_path: rsc_bundle_js_file_path
               )
               allow(ReactOnRails.configuration)
                 .to receive_messages(server_bundle_js_file: "webpack-bundle.js",

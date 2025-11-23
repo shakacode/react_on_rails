@@ -43,6 +43,11 @@ Naming/FileName:
     - '**/Rakefile'
     - '**/Steepfile'
 
+Layout/ArgumentAlignment:
+  # Disabled due to RuboCop bug with Ruby 3.4: uninitialized constant StringIO
+  # See: https://github.com/rubocop/rubocop/issues
+  Enabled: false
+
 Layout/LineLength:
   Max: 120
 
