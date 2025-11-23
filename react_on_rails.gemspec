@@ -20,6 +20,7 @@ Gem::Specification.new do |s|
     f.match(%r{^(docs|test|spec|features|gen-examples|tmp|node_modules|packages|coverage|rakelib|script)/}) ||
       f.match(/^(jest\.config\.js|book\.json|package\.json|package-scripts\.yml|yarn\.lock|\..*)/) ||
       # Exclude Pro-only files from MIT gem
+      f.match(/^react_on_rails_pro/) ||
       f.match(%r{^lib/react_on_rails_pro}) ||
       f.match(%r{^lib/tasks/(assets_pro|v8_log_processor)\.rake$})
   end
