@@ -17,6 +17,7 @@
 **Jump to Section:**
 
 - [When to Use This Agent](#when-to-use-this-agent)
+- [Using with Claude Code](#using-with-claude-code)
 - [Testing Requirements by Change Type](#testing-requirements-by-change-type)
 - [Pre-Merge Testing Checklist](#pre-merge-testing-checklist)
 - [Success Criteria](#success-criteria-well-tested-pr)
@@ -60,6 +61,286 @@
 
 "Apply PR Testing Agent criteria: Is this PR ready to merge from a testing perspective?"
 ```
+
+## Using with Claude Code
+
+### Quick Start
+
+**The easiest way to use this agent with Claude Code is to explicitly reference it in your prompts:**
+
+```
+"Use the PR Testing Agent guidelines from .claude/docs/pr-testing-agent.md to validate my testing"
+
+"I changed package.json. According to PR Testing Agent Section 3, what testing is required?"
+
+"Generate a testing checklist for my changes using the PR Testing Agent Pre-Merge Checklist"
+```
+
+### Common Workflows
+
+#### 1. Before Creating a PR
+
+```
+# After making changes and committing:
+"I modified lib/react_on_rails/helper.rb. According to the PR Testing Agent,
+what testing do I need before creating a PR?"
+
+# Claude Code will reference Section 1 (Ruby Code Changes) and provide checklist
+```
+
+#### 2. Validating Your Testing
+
+```
+"Based on PR Testing Agent success criteria, is my testing adequate?
+Here's what I tested: [paste your test output]"
+
+# Claude Code will check against the 7 Success Criteria
+```
+
+#### 3. Generating PR Testing Documentation
+
+```
+"Generate a Testing Status section for my PR description using the
+PR Testing Agent template from 'Communicating Test Status'"
+
+# Claude Code will create formatted testing documentation
+```
+
+#### 4. Investigating CI Failures
+
+```
+"CI is failing on integration tests. Help me reproduce locally following
+PR Testing Agent process."
+
+# Claude Code will guide you through Section 5 (CI Configuration Changes)
+```
+
+#### 5. Code Review
+
+```
+"Review this PR description and identify missing testing according to
+PR Testing Agent standards"
+
+# Claude Code applies skeptical stance and identifies gaps
+```
+
+### Referencing Specific Sections
+
+**For targeted help, reference specific sections by number or name:**
+
+```
+# By section number:
+"Show me the MANDATORY testing checklist from PR Testing Agent Section 3"
+
+# By change type:
+"I modified webpack.config.js. Use PR Testing Agent Section 4
+(Webpack/Shakapacker Configuration Changes) to tell me what to test"
+
+# By checklist:
+"Generate the Pre-Merge Testing Checklist for build configuration changes"
+
+# By success criteria:
+"Does this PR meet PR Testing Agent Success Criteria #4 (Testing Documentation)?"
+```
+
+### Complete Example Workflow
+
+Here's a full example of using the agent throughout the PR lifecycle:
+
+```bash
+# 1. Make changes
+vim lib/react_on_rails/helper.rb
+git add .
+git commit -m "Fix helper method"
+
+# 2. Ask Claude Code for testing guidance
+```
+
+**Prompt to Claude Code:**
+
+```
+"I changed lib/react_on_rails/helper.rb. According to PR Testing Agent
+Section 1 (Ruby Code Changes), what testing do I need?"
+```
+
+**Claude Code responds with checklist:**
+
+````markdown
+Based on PR Testing Agent Section 1, you need:
+
+### Automated (will run in CI):
+
+- ✅ RSpec unit tests
+- ✅ RuboCop linting
+- ✅ RBS type validation
+
+### Manual verification required:
+
+- [ ] Run unit tests locally: `bundle exec rake run_rspec:gem`
+- [ ] If helper affects browser behavior: Test in dummy app
+- [ ] Ensure RuboCop passes: `bundle exec rubocop`
+
+### Before declaring "fixed":
+
+```bash
+bundle exec rubocop
+bundle exec rake run_rspec:gem
+bundle exec rake rbs:validate
+```
+````
+
+````
+
+```bash
+# 3. Complete the testing
+bundle exec rubocop
+bundle exec rake run_rspec:gem
+# (tests pass)
+
+# 4. Ask for validation
+````
+
+**Prompt to Claude Code:**
+
+```
+"Based on PR Testing Agent Success Criteria, is my testing adequate?
+I ran: bundle exec rubocop (0 violations), rake run_rspec:gem (all passed)"
+```
+
+**Claude Code validates:**
+
+```markdown
+Checking against PR Testing Agent Success Criteria:
+
+✅ 1. Automated Testing - RuboCop and RSpec passed
+✅ 2. Local Verification - Tests run before pushing
+⚠️ 3. Manual Testing - Did you test in browser if helper affects UI?
+❌ 4. Testing Documentation - Need to document in PR description
+...
+
+Recommendation: Add testing documentation to PR description before creating PR.
+```
+
+```bash
+# 5. Generate PR documentation
+```
+
+**Prompt to Claude Code:**
+
+```
+"Generate a Testing Status section for my PR using PR Testing Agent template"
+```
+
+**Claude Code provides:**
+
+```markdown
+## Testing Status
+
+### ✅ Verified Locally
+
+- [x] RuboCop: 0 violations
+- [x] RSpec unit tests: 15 examples, 0 failures
+- [x] RBS validation: Types valid
+
+### Manual Testing
+
+- [x] Unit tests cover helper method changes
+- [x] No browser-facing changes - UI testing not required
+
+### CI Status
+
+- All checks pending (will run after push)
+```
+
+```bash
+# 6. Create PR with documentation
+git push
+gh pr create  # Include generated testing section
+
+# 7. If CI fails, investigate
+```
+
+**Prompt to Claude Code:**
+
+```
+"CI failing on dummy app integration tests. Use PR Testing Agent to help
+me reproduce locally."
+```
+
+**Claude Code guides:**
+
+```bash
+# Following PR Testing Agent Section 5 (CI Configuration Changes):
+
+# Step 1: Check if pre-existing
+gh run list --workflow="Integration Tests" --branch master --limit 5
+
+# Step 2: Reproduce locally
+bin/ci-rerun-failures
+
+# Step 3: If specific failures
+pbpaste | bin/ci-run-failed-specs
+```
+
+### Tips for Effective Use
+
+**1. Be specific about sections:**
+
+```
+✅ "Use PR Testing Agent Section 3 Build Configuration checklist"
+❌ "What testing do I need?"
+```
+
+**2. Reference by change type:**
+
+```
+✅ "I changed package.json. PR Testing Agent guidelines?"
+❌ "Should I test this?"
+```
+
+**3. Ask for validation:**
+
+```
+✅ "Does this meet PR Testing Agent Success Criteria?"
+❌ "Is this good enough?"
+```
+
+**4. Request templates:**
+
+```
+✅ "Generate testing documentation using PR Testing Agent template"
+❌ "Write a testing section"
+```
+
+### What Claude Code Can Do
+
+**Claude Code can:**
+
+- ✅ Read the PR Testing Agent document directly when referenced
+- ✅ Apply guidelines to your specific changes
+- ✅ Generate checklists based on files you modified
+- ✅ Validate testing against the 7 Success Criteria
+- ✅ Create formatted testing documentation
+- ✅ Identify testing gaps using the skeptical approach
+- ✅ Suggest specific commands from the relevant section
+
+**Claude Code cannot:**
+
+- ❌ Automatically run the tests for you (you still need to execute commands)
+- ❌ Access your browser to verify UI changes
+- ❌ Know if tests passed without you providing the output
+- ❌ Push commits or create PRs automatically
+
+### Automatic Context
+
+**The PR Testing Agent guidelines are automatically available when:**
+
+- You reference `.claude/docs/pr-testing-agent.md` in prompts
+- You mention "PR Testing Agent" or "testing checklist"
+- You ask about testing requirements for specific file types
+- CLAUDE.md is loaded (which references this documentation)
+
+**No special setup needed** - just reference it in your prompts!
 
 ## Integration with Existing Workflows
 
