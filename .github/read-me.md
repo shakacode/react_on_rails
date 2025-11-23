@@ -148,11 +148,10 @@ gh run list --workflow=package-js-tests.yml
 The following workflows can be manually triggered with `workflow_dispatch`:
 
 - **`package-js-tests.yml`** - Accepts `force_run` parameter (boolean) to bypass change detection
-- **`main.yml`** - Accepts `force_run` parameter (boolean) to bypass change detection
 - **`lint-js-and-ruby.yml`** - Accepts `force_run` parameter (boolean) to bypass change detection
-- **`rspec-package-specs.yml`** - Accepts `force_run` parameter (boolean) to bypass change detection
-- **`playwright.yml`** - Can be triggered manually
-- And others - check individual workflow files for `workflow_dispatch` configuration
+- **`playwright.yml`** - Can be triggered manually (does not accept `force_run` parameter)
+
+Other workflows may also support `workflow_dispatch`. Check individual workflow files in `.github/workflows/` for `workflow_dispatch` configuration and available input parameters.
 
 ### Why Use Manual Triggers?
 
