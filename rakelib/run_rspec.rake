@@ -60,8 +60,14 @@ namespace :run_rspec do
 
   desc "Runs dummy rspec with turbolinks"
   task dummy: ["dummy_apps:dummy_app"] do
+    # Build env vars array for robustness with complex environment variables
+    env_vars_array = []
+    env_vars_array << rbs_runtime_env_vars unless rbs_runtime_env_vars.empty?
+    # Skip validation since dummy app only has base gem/package but Pro may be available in parent bundle
+    env_vars_array << "REACT_ON_RAILS_SKIP_VALIDATION=true"
+    env_vars = env_vars_array.join(" ")
     run_tests_in(spec_dummy_dir,
-                 env_vars: rbs_runtime_env_vars)
+                 env_vars: env_vars)
   end
 
   desc "Runs dummy rspec without turbolinks"
@@ -70,6 +76,8 @@ namespace :run_rspec do
     env_vars_array = []
     env_vars_array << rbs_runtime_env_vars unless rbs_runtime_env_vars.empty?
     env_vars_array << "DISABLE_TURBOLINKS=TRUE"
+    # Skip validation since dummy app only has base gem/package but Pro may be available in parent bundle
+    env_vars_array << "REACT_ON_RAILS_SKIP_VALIDATION=true"
     env_vars = env_vars_array.join(" ")
     run_tests_in(spec_dummy_dir,
                  env_vars: env_vars,
