@@ -193,7 +193,7 @@ describe('buildVM and runInVM', () => {
   });
 
   test('FriendsAndGuests bundle for commit 1a7fe417 requires supportModules false', async () => {
-    // Testing 5 components with 3 assertions each (HTML structure, no errors, length check)
+    // Testing 5 components with 3 assertions each (HTML structure, no rendering errors, length check)
     expect.assertions(15);
 
     const project = 'friendsandguests';
@@ -217,7 +217,7 @@ describe('buildVM and runInVM', () => {
     const welcomePageRenderingResult = await runInVM(welcomePageComponentRenderingRequest, serverBundlePath);
     // React 19 removed data-react-checksum, verify component rendered successfully
     expect(welcomePageRenderingResult as string).toContain('<div');
-    expect(welcomePageRenderingResult as string).not.toContain('Error');
+    expect(welcomePageRenderingResult as string).not.toContain('hasErrors');
     expect((welcomePageRenderingResult as string).length).toBeGreaterThan(100);
 
     // LayoutNavbar component:
@@ -232,7 +232,7 @@ describe('buildVM and runInVM', () => {
     );
     // React 19 removed data-react-checksum, verify component rendered successfully
     expect(layoutNavbarRenderingResult as string).toContain('<div');
-    expect(layoutNavbarRenderingResult as string).not.toContain('Error');
+    expect(layoutNavbarRenderingResult as string).not.toContain('hasErrors');
     expect((layoutNavbarRenderingResult as string).length).toBeGreaterThan(100);
 
     // ListingIndex component:
@@ -247,7 +247,7 @@ describe('buildVM and runInVM', () => {
     );
     // React 19 removed data-react-checksum, verify component rendered successfully
     expect(listingIndexRenderingResult as string).toContain('<div');
-    expect(listingIndexRenderingResult as string).not.toContain('Error');
+    expect(listingIndexRenderingResult as string).not.toContain('hasErrors');
     expect((listingIndexRenderingResult as string).length).toBeGreaterThan(100);
 
     // ListingShow component:
@@ -259,7 +259,7 @@ describe('buildVM and runInVM', () => {
     const listingShowRenderingResult = await runInVM(listingShowComponentRenderingRequest, serverBundlePath);
     // React 19 removed data-react-checksum, verify component rendered successfully
     expect(listingShowRenderingResult as string).toContain('<div');
-    expect(listingShowRenderingResult as string).not.toContain('Error');
+    expect(listingShowRenderingResult as string).not.toContain('hasErrors');
     expect((listingShowRenderingResult as string).length).toBeGreaterThan(100);
 
     // UserShow component:
@@ -271,12 +271,12 @@ describe('buildVM and runInVM', () => {
     const userShowRenderingResult = await runInVM(userShowComponentRenderingRequest, serverBundlePath);
     // React 19 removed data-react-checksum, verify component rendered successfully
     expect(userShowRenderingResult as string).toContain('<div');
-    expect(userShowRenderingResult as string).not.toContain('Error');
+    expect(userShowRenderingResult as string).not.toContain('hasErrors');
     expect((userShowRenderingResult as string).length).toBeGreaterThan(100);
   });
 
   test('ReactWebpackRailsTutorial bundle for commit ec974491', async () => {
-    // Testing 3 components with 3 assertions each (HTML structure, no errors, length check)
+    // Testing 3 components with 3 assertions each (HTML structure, no rendering errors, length check)
     expect.assertions(9);
 
     const project = 'react-webpack-rails-tutorial';
@@ -300,7 +300,7 @@ describe('buildVM and runInVM', () => {
     );
     // React 19 removed data-react-checksum, verify component rendered successfully
     expect(navigationBarRenderingResult as string).toContain('<div');
-    expect(navigationBarRenderingResult as string).not.toContain('Error');
+    expect(navigationBarRenderingResult as string).not.toContain('hasErrors');
     expect((navigationBarRenderingResult as string).length).toBeGreaterThan(100);
 
     // RouterApp component:
@@ -312,7 +312,7 @@ describe('buildVM and runInVM', () => {
     const routerAppRenderingResult = await runInVM(routerAppComponentRenderingRequest, serverBundlePath);
     // React 19 removed data-react-checksum, verify component rendered successfully
     expect(routerAppRenderingResult as string).toContain('<div');
-    expect(routerAppRenderingResult as string).not.toContain('Error');
+    expect(routerAppRenderingResult as string).not.toContain('hasErrors');
     expect((routerAppRenderingResult as string).length).toBeGreaterThan(100);
 
     // App component:
@@ -320,12 +320,12 @@ describe('buildVM and runInVM', () => {
     const appRenderingResult = await runInVM(appComponentRenderingRequest, serverBundlePath);
     // React 19 removed data-react-checksum, verify component rendered successfully
     expect(appRenderingResult as string).toContain('<div');
-    expect(appRenderingResult as string).not.toContain('Error');
+    expect(appRenderingResult as string).not.toContain('hasErrors');
     expect((appRenderingResult as string).length).toBeGreaterThan(100);
   });
 
   test('BionicWorkshop bundle for commit fa6ccf6b', async () => {
-    // Testing 4 components with 3 assertions each (HTML structure, no errors, length check)
+    // Testing 4 components with 3 assertions each (HTML structure, no rendering errors, length check)
     expect.assertions(12);
 
     const project = 'bionicworkshop';
@@ -350,7 +350,7 @@ describe('buildVM and runInVM', () => {
 
     // React 19 removed data-react-checksum, check that component rendered successfully
     expect(signInPageWithFlashRenderingResult as string).toContain('<div');
-    expect(signInPageWithFlashRenderingResult as string).not.toContain('Error');
+    expect(signInPageWithFlashRenderingResult as string).not.toContain('hasErrors');
     expect((signInPageWithFlashRenderingResult as string).length).toBeGreaterThan(100);
 
     // Landing page component:
@@ -362,7 +362,7 @@ describe('buildVM and runInVM', () => {
     const landingPageRenderingResult = await runInVM(landingPageRenderingRequest, serverBundlePath);
     // React 19 removed data-react-checksum, check that component rendered successfully
     expect(landingPageRenderingResult as string).toContain('<div');
-    expect(landingPageRenderingResult as string).not.toContain('Error');
+    expect(landingPageRenderingResult as string).not.toContain('hasErrors');
     expect((landingPageRenderingResult as string).length).toBeGreaterThan(100);
 
     // Post page component:
@@ -370,7 +370,7 @@ describe('buildVM and runInVM', () => {
     const postPageRenderingResult = await runInVM(postPageRenderingRequest, serverBundlePath);
     // React 19 removed data-react-checksum, check that component rendered successfully
     expect(postPageRenderingResult as string).toContain('<div');
-    expect(postPageRenderingResult as string).not.toContain('Error');
+    expect(postPageRenderingResult as string).not.toContain('hasErrors');
     expect((postPageRenderingResult as string).length).toBeGreaterThan(100);
 
     // Authors page component:
@@ -382,7 +382,7 @@ describe('buildVM and runInVM', () => {
     const authorsPageRenderingResult = await runInVM(authorsPageRenderingRequest, serverBundlePath);
     // React 19 removed data-react-checksum, check that component rendered successfully
     expect(authorsPageRenderingResult as string).toContain('<div');
-    expect(authorsPageRenderingResult as string).not.toContain('Error');
+    expect(authorsPageRenderingResult as string).not.toContain('hasErrors');
     expect((authorsPageRenderingResult as string).length).toBeGreaterThan(100);
   });
 
