@@ -5,11 +5,11 @@ import parser from 'node-html-parser';
 // eslint-disable-next-line import/no-relative-packages
 import { RSCPayloadChunk } from '../../react-on-rails/lib/types';
 import buildApp from '../src/worker';
-import config from './testingNodeRendererConfigs';
+import { createTestConfig } from './testingNodeRendererConfigs';
 import { makeRequest } from './httpRequestUtils';
-import { Config } from '../src/shared/configBuilder';
 
-const app = buildApp(config as Partial<Config>);
+const { config } = createTestConfig('concurrentHtmlStreaming');
+const app = buildApp(config);
 const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 const redisClient = createClient({ url: redisUrl });
 
