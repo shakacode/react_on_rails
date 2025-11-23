@@ -55,6 +55,28 @@ These requirements are non-negotiable. CI will fail if not followed.
    - Note in PR descriptions which fixes were tested locally vs. which are hypothetical
    - Explain any testing limitations encountered
 
+**CRITICAL - AUTOMATIC PUSHING FOR TEST FIXES:**
+
+When the user asks you to "fix the tests" or "fix failing tests":
+
+1. **ALWAYS push immediately after making test fixes** - don't wait to be asked
+2. **Test fixes workflow:**
+   - Run linting: `bundle exec rubocop` and `yarn start format`
+   - Run the specific tests locally if possible
+   - Create commit with descriptive message about what was fixed
+   - Push immediately using `git push`
+3. **Commit message format for test fixes:**
+   - Use clear, descriptive messages like "Fix RuboCop violations in helper_spec.rb"
+   - Include test command if relevant: "Fix failing integration tests (spec/system/integration_spec.rb)"
+   - Reference CI failure if applicable: "Fix CI failures in minimum config tests"
+4. **After pushing:**
+   - Check CI status with `gh pr view --json statusCheckRollup`
+   - If there's a PR, optionally use `gh run watch` to monitor the workflow
+5. **Exception:** Only skip auto-push if:
+   - You cannot test locally AND the fix is highly speculative
+   - The user explicitly asks you NOT to push
+   - There are multiple unrelated changes that need to be separated into different commits
+
 **See also**: When facing complex PRs with multiple CI failures, refer to `.claude/docs/pr-splitting-strategy.md` for guidance on splitting large PRs into smaller, more manageable pieces.
 
 ---
