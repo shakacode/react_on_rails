@@ -4,14 +4,19 @@ require "English"
 
 module ReactOnRails
   module TaskHelpers
+    # Returns the root folder of the monorepo
+    def monorepo_root
+      File.expand_path("..", __dir__)
+    end
+
     # Returns the root folder of the react_on_rails gem
     def gem_root
-      File.expand_path("..", __dir__)
+      File.join(monorepo_root, "react_on_rails")
     end
 
     # Returns the folder where examples are located
     def examples_dir
-      File.join(gem_root, "gen-examples", "examples")
+      File.join(monorepo_root, "gen-examples", "examples")
     end
 
     def dummy_app_dir

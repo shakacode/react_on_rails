@@ -142,7 +142,7 @@ jobs:
         run: |
           echo "CI_DEPENDENCY_LEVEL=${{ matrix.dependency-level }}" >> $GITHUB_ENV
       - name: Run rspec tests
-        run: bundle exec rspec spec/react_on_rails
+        run: bundle exec rspec react_on_rails/spec/react_on_rails
       - name: Store test results
         uses: actions/upload-artifact@v4
         with:

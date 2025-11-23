@@ -1,5 +1,5 @@
 PATH
-  remote: .
+  remote: react_on_rails
   specs:
     react_on_rails (16.2.0.beta.12)
       addressable

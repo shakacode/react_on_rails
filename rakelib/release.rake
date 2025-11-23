@@ -317,7 +317,7 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
     puts "Version would be bumped to: #{actual_gem_version} (gem) / #{actual_npm_version} (npm)"
     puts "NPM Registry: #{npm_registry_note}"
     puts "\nFiles that would be updated:"
-    puts "  - lib/react_on_rails/version.rb"
+    puts "  - react_on_rails/lib/react_on_rails/version.rb"
     puts "  - react_on_rails_pro/lib/react_on_rails_pro/version.rb"
     puts "  - package.json (root)"
     puts "  - packages/react-on-rails/package.json"

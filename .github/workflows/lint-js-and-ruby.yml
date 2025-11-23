@@ -121,9 +121,9 @@ jobs:
       - name: yalc publish for react-on-rails
         run: cd packages/react-on-rails && yalc publish
       - name: yalc add react-on-rails
-        run: cd spec/dummy && yalc add react-on-rails
+        run: cd react_on_rails/spec/dummy && yalc add react-on-rails
       - name: Install Node modules with Yarn for dummy app
-        run: cd spec/dummy && yarn install --no-progress --no-emoji --frozen-lockfile
+        run: cd react_on_rails/spec/dummy && yarn install --no-progress --no-emoji --frozen-lockfile
       - name: Install Ruby Gems for package
         run: bundle check --path=vendor/bundle || bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
       - name: Lint Ruby
@@ -137,17 +137,17 @@ jobs:
       - name: Save dummy app ruby gems to cache
         uses: actions/cache@v4
         with:
-          path: spec/dummy/vendor/bundle
-          key: dummy-app-gem-cache-${{ hashFiles('spec/dummy/Gemfile.lock') }}-lint
+          path: react_on_rails/spec/dummy/vendor/bundle
+          key: dummy-app-gem-cache-${{ hashFiles('react_on_rails/spec/dummy/Gemfile.lock') }}-lint
       - name: Install Ruby Gems for dummy app
         run: |
-          cd spec/dummy
+          cd react_on_rails/spec/dummy
           bundle lock --add-platform 'x86_64-linux'
           if ! bundle check --path=vendor/bundle; then
             bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
           fi
       - name: generate file system-based packs
-        run: cd spec/dummy && RAILS_ENV="test" bundle exec rake react_on_rails:generate_packs
+        run: cd react_on_rails/spec/dummy && RAILS_ENV="test" bundle exec rake react_on_rails:generate_packs
       - name: Detect dead code
         run: |
           yarn run knip --exclude binaries

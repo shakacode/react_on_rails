@@ -9,8 +9,8 @@ on:
     paths-ignore:
       - '**.md'
       - 'docs/**'
-      - 'lib/**'
-      - 'spec/react_on_rails/**'
+      - 'react_on_rails/lib/**'
+      - 'react_on_rails/spec/react_on_rails/**'
       - 'react_on_rails_pro/**'
   workflow_dispatch:
     inputs:
