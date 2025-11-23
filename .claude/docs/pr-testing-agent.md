@@ -4,6 +4,116 @@
 
 **Core Principle:** Be deeply suspicious of claims that tests passed unless you have concrete evidence. Assume automated tests have gaps. Manual testing is often required.
 
+## When to Use This Agent
+
+### Automatic Invocation (Recommended)
+
+**Invoke this agent automatically when:**
+
+- Creating a PR (before `gh pr create`)
+- Responding to PR review comments about testing
+- CI failures occur and need investigation
+- Asked to verify if a PR is "ready to merge"
+
+### Manual Invocation
+
+**Explicitly request this agent when:**
+
+- Validating testing claims in PR descriptions
+- Reviewing someone else's PR for testing adequacy
+- Unsure what testing is needed for specific changes
+- Need a comprehensive testing checklist
+
+### Usage Pattern
+
+```bash
+# Before creating PR:
+# "Use the PR Testing Agent to validate my testing before I create this PR"
+
+# During PR review:
+# "Use the PR Testing Agent to check if this PR has adequate testing coverage"
+
+# When investigating failures:
+# "Use the PR Testing Agent to help me debug these CI failures"
+```
+
+## Integration with Existing Workflows
+
+### Relationship to Code Review
+
+**This agent complements but does not replace:**
+
+- Standard code review for logic, design, and maintainability
+- The `code-reviewer` agent (focuses on code quality, security)
+- CI automated checks (provides guidance when they fail)
+
+**This agent specializes in:**
+
+- Testing verification and validation
+- Identifying untested code paths
+- Catching silent failures in build/infrastructure
+- Providing testing checklists based on change type
+- Translating CI failures to local reproduction steps
+
+### Integration with Development Workflow
+
+**Pre-commit:**
+
+- Git hooks handle linting/formatting automatically
+- Agent focuses on which tests to run manually
+
+**Pre-push:**
+
+- Agent validates testing claims before PR creation
+- Generates comprehensive testing checklist
+- Identifies environmental testing limitations
+
+**During CI:**
+
+- Agent helps reproduce CI failures locally
+- Distinguishes pre-existing vs. new failures
+- Maps CI failures to local test commands
+
+**Pre-merge:**
+
+- Agent validates all testing completed
+- Ensures manual testing gaps documented
+- Reviews PR description for testing claims
+
+### Workflow Example
+
+```bash
+# 1. Make code changes
+vim lib/react_on_rails/helper.rb
+
+# 2. Run relevant tests locally (agent suggests which)
+bundle exec rspec spec/react_on_rails/helper_spec.rb
+
+# 3. Commit (hooks auto-lint)
+git commit -m "Fix helper method"
+
+# 4. Before pushing, consult agent
+# "What testing do I need before creating a PR for helper.rb changes?"
+# Agent responds with checklist
+
+# 5. Complete testing checklist
+cd spec/dummy
+bin/dev
+# Test in browser...
+
+# 6. Create PR with testing documentation
+git push
+gh pr create  # Include testing summary from agent
+
+# 7. If CI fails, consult agent again
+# "CI is failing on integration tests, help me reproduce locally"
+# Agent provides exact commands
+
+# 8. Before merge, final validation
+# "Is this PR ready to merge from a testing perspective?"
+# Agent reviews what was tested vs. what's still needed
+```
+
 ## Agent Behavior
 
 ### Default Stance: Skeptical
@@ -415,7 +525,7 @@ bundle exec rspec spec/system/integration_spec.rb
 
 **Template for test status comment:**
 
-````markdown
+```markdown
 ## Testing Status
 
 ### ✅ Verified Locally
@@ -429,15 +539,15 @@ bundle exec rspec spec/system/integration_spec.rb
 
 - [ ] **Build scripts** - CRITICAL: Clean install test in full environment
       `bash
-    rm -rf node_modules && yarn install --frozen-lockfile
-    yarn run yalc:publish
-    `
+  rm -rf node_modules && yarn install --frozen-lockfile
+  yarn run yalc:publish
+  `
 - [ ] **Browser testing** - Dummy app visual inspection
       `bash
-    cd spec/dummy && bin/dev
-    # Visit http://localhost:3000/hello_world
-    # Check console for errors
-    `
+      cd spec/dummy && bin/dev
+  # Visit http://localhost:3000/hello_world
+  # Check console for errors
+  `
 
 ### ❌ Cannot Test (Environment Limitation)
 
@@ -449,7 +559,7 @@ bundle exec rspec spec/system/integration_spec.rb
 - Latest workflow: [link]
 - Known pre-existing failures: None (master passing)
 - New failures introduced: None
-````
+```
 
 ### In Commit Messages
 
