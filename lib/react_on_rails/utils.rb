@@ -272,9 +272,8 @@ module ReactOnRails
         return false unless gem_available?("react_on_rails_pro")
         return false unless pro_gem_in_bundle?
 
-        # Guard against edge cases where constant exists but module isn't fully loaded
+        # Ensure Pro gem is loaded (handles uninitialized constant errors)
         require "react_on_rails_pro" unless defined?(ReactOnRailsPro)
-        return false unless defined?(ReactOnRailsPro::Utils)
 
         ReactOnRailsPro::Utils.validated_license_data!.present?
       rescue NameError, LoadError
