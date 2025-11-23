@@ -2,6 +2,7 @@
 
 require "async"
 require "async/queue"
+require "async/variable"
 require_relative "spec_helper"
 
 class StreamController
@@ -15,13 +16,16 @@ class StreamController
   end
 
   def render_to_string(**_opts)
-    @rorp_rendering_fibers = @component_queues.map do |queue|
-      Fiber.new do
+    # Simulate component helpers creating async tasks
+    # In real implementation, first chunks are part of template HTML
+    # For testing, we enqueue all chunks including first ones
+    @component_queues.each do |queue|
+      @async_barrier.async do
         loop do
           chunk = queue.dequeue
           break if chunk.nil?
 
-          Fiber.yield chunk
+          @main_output_queue.enqueue(chunk)
         end
       end
     end
