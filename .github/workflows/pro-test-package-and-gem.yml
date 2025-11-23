@@ -241,7 +241,10 @@ jobs:
           yarn install --frozen-lockfile --no-progress --no-emoji
 
       - name: Setup test environment for node-renderer tests
-        run: bash packages/react-on-rails-pro-node-renderer/scripts/setup-test-env.sh
+        run: |
+          pwd
+          ls -la packages/react-on-rails-pro-node-renderer/scripts/
+          bash packages/react-on-rails-pro-node-renderer/scripts/setup-test-env.sh
 
       - name: Run JS unit tests for Pro package
         run: yarn workspace react-on-rails-pro-node-renderer run ci
