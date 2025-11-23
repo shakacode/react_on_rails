@@ -81,7 +81,8 @@ namespace :run_rspec do
     puts "Creating #{example_type.rspec_task_name} task"
     desc "Runs RSpec for #{example_type.name_pretty} only"
     task example_type.rspec_task_name_short => example_type.gen_task_name do
-      run_tests_in(File.join(examples_dir, example_type.name)) # have to use relative path
+      # Skip validation since example apps only have base gem but Pro may be available in parent bundle
+      run_tests_in(File.join(examples_dir, example_type.name), env_vars: "REACT_ON_RAILS_SKIP_VALIDATION=true")
     end
   end
 
