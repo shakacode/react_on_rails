@@ -65,9 +65,9 @@ module ReactOnRailsPro
           # Create emitter and use it to generate initial request data
           emitter = ReactOnRailsPro::AsyncPropsEmitter.new(bundle_timestamp, request)
           initial_data = build_initial_incremental_request(js_code, emitter)
-          request.write("#{initial_data.to_json}\n")
 
           response = incremental_connection.request(request, stream: true)
+          request << "#{initial_data.to_json}\n"
 
           # Execute async props block in background using barrier
           barrier.async do

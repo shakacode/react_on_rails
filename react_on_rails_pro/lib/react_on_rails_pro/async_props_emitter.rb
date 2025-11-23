@@ -13,7 +13,7 @@ module ReactOnRailsPro
     # Sends an update chunk to the node renderer to resolve an async prop
     def call(prop_name, prop_value)
       update_chunk = generate_update_chunk(prop_name, prop_value)
-      @request_stream.write("#{update_chunk.to_json}\n")
+      @request_stream << "#{update_chunk.to_json}\n"
     rescue StandardError => e
       Rails.logger.error do
         "[ReactOnRailsPro] Failed to send async prop '#{prop_name}': #{e.message}"
