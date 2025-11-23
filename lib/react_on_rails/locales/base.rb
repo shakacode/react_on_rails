@@ -39,6 +39,11 @@ module ReactOnRails
       def initialize(force: false)
         return if i18n_dir.nil?
 
+        if locale_files.empty?
+          puts "Warning: No locale files found in #{i18n_yml_dir || 'Rails i18n load path'}"
+          return
+        end
+
         if !force && !obsolete?
           puts "Locale files are up to date, skipping generation. " \
                "Use 'rake react_on_rails:locale force=true' to force regeneration."
@@ -55,6 +60,7 @@ module ReactOnRails
       def file_format; end
 
       def obsolete?
+        return true if exist_files.length != files.length # Some files missing
         return true if exist_files.empty?
 
         files_are_outdated
@@ -65,8 +71,6 @@ module ReactOnRails
       end
 
       def files_are_outdated
-        return false if locale_files.empty? # No source files = nothing to generate
-
         latest_yml = locale_files.map { |file| File.mtime(file) }.max
         earliest = exist_files.map { |file| File.mtime(file) }.min
         latest_yml > earliest
