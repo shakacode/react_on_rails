@@ -47,8 +47,11 @@ export const createForm = ({
   }
   form.append('renderingRequest', renderingRequestCode);
 
-  const testBundlesDirectory = path.join(__dirname, '../../../spec/dummy/ssr-generated');
-  const testClientBundlesDirectory = path.join(__dirname, '../../../spec/dummy/public/webpack/test');
+  const testBundlesDirectory = path.join(__dirname, '../../../react_on_rails_pro/spec/dummy/ssr-generated');
+  const testClientBundlesDirectory = path.join(
+    __dirname,
+    '../../../react_on_rails_pro/spec/dummy/public/webpack/test',
+  );
   const bundlePath = path.join(testBundlesDirectory, 'server-bundle.js');
   form.append(`bundle_${SERVER_BUNDLE_TIMESTAMP}`, fs.createReadStream(bundlePath), {
     contentType: 'text/javascript',

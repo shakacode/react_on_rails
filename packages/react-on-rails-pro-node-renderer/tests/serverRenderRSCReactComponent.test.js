@@ -28,14 +28,17 @@ describe('serverRenderRSCReactComponent', () => {
     fs.mkdirSync(tempDir, { recursive: true });
 
     // Copy rsc-bundle.js to temp directory
-    const originalRscBundlePath = path.join(__dirname, '../../../spec/dummy/ssr-generated/rsc-bundle.js');
+    const originalRscBundlePath = path.join(
+      __dirname,
+      '../../../react_on_rails_pro/spec/dummy/ssr-generated/rsc-bundle.js',
+    );
     tempRscBundlePath = path.join(tempDir, 'rsc-bundle.js');
     fs.copyFileSync(originalRscBundlePath, tempRscBundlePath);
 
     // Copy react-client-manifest.json to temp directory
     const originalManifestPath = path.join(
       __dirname,
-      '../../../spec/dummy/public/webpack/test/react-client-manifest.json',
+      '../../../react_on_rails_pro/spec/dummy/public/webpack/test/react-client-manifest.json',
     );
     tempManifestPath = path.join(tempDir, 'react-client-manifest.json');
     fs.copyFileSync(originalManifestPath, tempManifestPath);
