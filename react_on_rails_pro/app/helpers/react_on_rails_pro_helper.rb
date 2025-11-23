@@ -266,7 +266,7 @@ module ReactOnRailsProHelper
 
   def handle_stream_cache_miss(component_name, raw_options, auto_load_bundle, view_cache_key, &block)
     cache_aware_options = raw_options.merge(
-      on_complete: ->(chunks) {
+      on_complete: lambda { |chunks|
         Rails.cache.write(view_cache_key, chunks, raw_options[:cache_options] || {})
       }
     )
@@ -308,7 +308,7 @@ module ReactOnRailsProHelper
 
     # Create a variable to hold the first chunk for synchronous return
     first_chunk_var = Async::Variable.new
-    all_chunks = [] if on_complete  # Only collect if callback provided
+    all_chunks = [] if on_complete # Only collect if callback provided
 
     # Start an async task on the barrier to stream all chunks
     @async_barrier.async do
@@ -316,7 +316,7 @@ module ReactOnRailsProHelper
       is_first = true
 
       stream.each_chunk do |chunk|
-        all_chunks << chunk if on_complete  # Collect for callback
+        all_chunks << chunk if on_complete # Collect for callback
 
         if is_first
           # Store first chunk in variable for synchronous access
@@ -332,7 +332,7 @@ module ReactOnRailsProHelper
       first_chunk_var.value = nil if is_first
 
       # Call callback with all chunks when streaming completes
-      on_complete&.call(all_chunks) if on_complete
+      on_complete&.call(all_chunks)
     end
 
     # Wait for and return the first chunk (blocking)

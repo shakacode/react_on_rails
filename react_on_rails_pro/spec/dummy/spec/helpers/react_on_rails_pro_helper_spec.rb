@@ -8,6 +8,8 @@ require "support/script_tag_utils"
 
 RequestDetails = Struct.new(:original_url, :env)
 
+# rubocop:disable RSpec/InstanceVariable
+
 # This module is created to provide stub methods for `render_to_string` and `response`
 # These methods will be mocked in the tests to prevent "<object> does not implement <method>" errors
 # when these methods are called during testing.
@@ -387,7 +389,7 @@ describe ReactOnRailsProHelper do
           expect(initial_result).to include(wrapped)
         end
         expect(initial_result).not_to include("More content", "Final content")
-        # Note: With async architecture, chunks are consumed in background immediately,
+        # NOTE: With async architecture, chunks are consumed in background immediately,
         expect(chunks_read.count).to eq(3)
       end
 
@@ -736,7 +738,7 @@ describe ReactOnRailsProHelper do
           @main_output_queue.close
 
           # Drain the queue
-          while (chunk = @main_output_queue.dequeue)
+          while @main_output_queue.dequeue
             # Just consume all remaining chunks
           end
         end
@@ -815,3 +817,4 @@ describe ReactOnRailsProHelper do
     end
   end
 end
+# rubocop:enable RSpec/InstanceVariable
