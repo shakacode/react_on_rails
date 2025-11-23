@@ -145,6 +145,10 @@ jobs:
         run: |
           yarn install --no-progress --no-emoji ${{ matrix.dependency-level == 'latest' && '--frozen-lockfile' || '' }}
           sudo yarn global add yalc
+      - name: Build packages before yalc publish
+        # Build all workspace packages (react-on-rails, react-on-rails-pro, react-on-rails-pro-node-renderer)
+        # This ensures the lib/ directories are populated with compiled JS before yalc publish
+        run: yarn workspaces run build
       - name: yalc publish for react-on-rails
         # Use yarn workspace script to publish all workspace packages to yalc
         # Runs the "yalc:publish" script defined in each workspace's package.json

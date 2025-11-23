@@ -118,6 +118,8 @@ jobs:
         run: |
           yarn install --no-progress --no-emoji --frozen-lockfile
           sudo yarn global add yalc
+      - name: Build react-on-rails package
+        run: cd packages/react-on-rails && yarn build
       - name: yalc publish for react-on-rails
         run: cd packages/react-on-rails && yalc publish
       - name: yalc add react-on-rails
