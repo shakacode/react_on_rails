@@ -105,6 +105,62 @@ Most workflows use minimal permissions. The comment-triggered workflows require:
 - `pull-requests: write` - To post comments and reactions
 - `actions: write` - To trigger other workflows
 
+## Manually Triggering Workflows
+
+Many workflows support manual triggering via `workflow_dispatch`, which allows you to run them on-demand from any branch.
+
+### Using the GitHub UI
+
+**Important**: The "Run workflow" button only appears for workflows that exist on the **default branch (master)**. If you've added or modified a workflow in a feature branch, you won't see the button until the workflow is merged to master.
+
+To manually trigger a workflow in the GitHub UI:
+
+1. Go to the **Actions** tab in the repository
+2. Select the workflow from the left sidebar (e.g., "JS unit tests for Renderer package")
+3. Click the **"Run workflow"** dropdown button (top right)
+4. Select the branch you want to run it on
+5. Configure any input parameters (e.g., `force_run` to bypass change detection)
+6. Click **"Run workflow"**
+
+### Using the GitHub CLI
+
+You can trigger workflows from the command line without waiting for them to be merged to master:
+
+```bash
+# Basic manual trigger on current branch
+gh workflow run package-js-tests.yml
+
+# Trigger on a specific branch (e.g., master)
+gh workflow run package-js-tests.yml --ref master
+
+# Trigger with force_run parameter to bypass change detection
+gh workflow run package-js-tests.yml --ref master -f force_run=true
+
+# List available workflows
+gh workflow list
+
+# View recent workflow runs
+gh run list --workflow=package-js-tests.yml
+```
+
+### Workflows Supporting Manual Triggers
+
+The following workflows can be manually triggered with `workflow_dispatch`:
+
+- **`package-js-tests.yml`** - Accepts `force_run` parameter (boolean) to bypass change detection
+- **`main.yml`** - Accepts `force_run` parameter (boolean) to bypass change detection
+- **`lint-js-and-ruby.yml`** - Accepts `force_run` parameter (boolean) to bypass change detection
+- **`rspec-package-specs.yml`** - Accepts `force_run` parameter (boolean) to bypass change detection
+- **`playwright.yml`** - Can be triggered manually
+- And others - check individual workflow files for `workflow_dispatch` configuration
+
+### Why Use Manual Triggers?
+
+- **Test workflow changes** before merging (via CLI only until merged to master)
+- **Re-run CI on master** without making a new commit
+- **Force full test suite** on a branch using `force_run=true`
+- **Debug CI issues** by running workflows on specific commits
+
 ## Conditional Execution
 
 Many workflows use change detection to skip unnecessary jobs:
