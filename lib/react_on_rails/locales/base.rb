@@ -4,7 +4,7 @@ require "erb"
 
 module ReactOnRails
   module Locales
-    def self.compile
+    def self.compile(force: false)
       config = ReactOnRails.configuration
       check_config_directory_exists(
         directory: config.i18n_dir, key_name: "config.i18n_dir",
@@ -15,9 +15,9 @@ module ReactOnRails
         remove_if: "not using this i18n with React on Rails, or if you want to use all translation files"
       )
       if config.i18n_output_format&.downcase == "js"
-        ReactOnRails::Locales::ToJs.new
+        ReactOnRails::Locales::ToJs.new(force: force)
       else
-        ReactOnRails::Locales::ToJson.new
+        ReactOnRails::Locales::ToJson.new(force: force)
       end
     end
 
@@ -36,12 +36,23 @@ module ReactOnRails
     private_class_method :check_config_directory_exists
 
     class Base
-      def initialize
+      def initialize(force: false)
         return if i18n_dir.nil?
-        return unless obsolete?
+
+        if locale_files.empty?
+          puts "Warning: No locale files found in #{i18n_yml_dir || 'Rails i18n load path'}"
+          return
+        end
+
+        if !force && !obsolete?
+          puts "Locale files are up to date, skipping generation. " \
+               "Use 'rake react_on_rails:locale force=true' to force regeneration."
+          return
+        end
 
         @translations, @defaults = generate_translations
         convert
+        puts "Generated locale files in #{i18n_dir}"
       end
 
       private
@@ -49,6 +60,7 @@ module ReactOnRails
       def file_format; end
 
       def obsolete?
+        return true if exist_files.length != files.length # Some files missing
         return true if exist_files.empty?
 
         files_are_outdated
