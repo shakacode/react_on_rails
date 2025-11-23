@@ -292,24 +292,39 @@ module ReactOnRailsProHelper
   end
 
   def run_stream_inside_fiber
-    if @rorp_rendering_fibers.nil?
+    require "async/variable"
+
+    if @async_barrier.nil?
       raise ReactOnRails::Error,
             "You must call stream_view_containing_react_components to render the view containing the react component"
     end
 
-    rendering_fiber = Fiber.new do
+    # Create a variable to hold the first chunk for synchronous return
+    first_chunk_var = Async::Variable.new
+
+    # Start an async task on the barrier to stream all chunks
+    @async_barrier.async do
       stream = yield
+      is_first = true
+
       stream.each_chunk do |chunk|
-        Fiber.yield chunk
+        if is_first
+          # Store first chunk in variable for synchronous access
+          first_chunk_var.value = chunk
+          is_first = false
+        else
+          # Enqueue remaining chunks to main output queue
+          @main_output_queue.enqueue(chunk)
+        end
       end
+
+      # Handle case where stream has no chunks
+      first_chunk_var.value = nil if is_first
     end
 
-    @rorp_rendering_fibers << rendering_fiber
-
-    # return the first chunk of the fiber
-    # It contains the initial html of the component
-    # all updates will be appended to the stream sent to browser
-    rendering_fiber.resume
+    # Wait for and return the first chunk (blocking)
+    first_chunk_var.wait
+    first_chunk_var.value
   end
 
   def internal_stream_react_component(component_name, options = {})
