@@ -163,7 +163,7 @@ GEM
       fiber-storage
     fiber-storage (1.0.1)
     fileutils (1.8.0)
-    gem-release (2.2.2)
+    gem-release (2.2.4)
     generator_spec (0.10.0)
       activesupport (>= 3.0.0)
       railties (>= 3.0.0)
