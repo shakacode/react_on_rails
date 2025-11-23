@@ -168,8 +168,10 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
 
   # Update react_on_rails_pro gem version to match
   puts "\nUpdating react_on_rails_pro gem version to #{actual_gem_version}..."
-  pro_gem_root = File.join(gem_root, "react_on_rails_pro")
-  pro_version_file = File.join(pro_gem_root, "lib", "react_on_rails_pro", "version.rb")
+  # After Phase 6 restructuring, Pro gem files are at root alongside core gem
+  # but react_on_rails_pro/ directory still exists for Pro-specific development/testing infrastructure
+  pro_dev_dir = File.join(gem_root, "react_on_rails_pro")
+  pro_version_file = File.join(gem_root, "lib", "react_on_rails_pro", "version.rb")
   pro_version_content = File.read(pro_version_file)
   # We use gsub instead of `gem bump` here because the git tree is already dirty
   # from bumping the core gem version above, and `gem bump` fails with uncommitted changes
@@ -186,7 +188,7 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
     File.join(gem_root, "package.json"),
     File.join(gem_root, "packages", "react-on-rails", "package.json"),
     File.join(gem_root, "packages", "react-on-rails-pro", "package.json"),
-    File.join(gem_root, "react_on_rails_pro", "package.json")
+    File.join(gem_root, "packages", "react-on-rails-pro-node-renderer", "package.json")
   ]
 
   package_json_files.each do |file|
@@ -211,7 +213,8 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
   unbundled_sh_in_dir(dummy_app_dir, "bundle install#{bundle_quiet_flag}")
   pro_dummy_app_dir = File.join(gem_root, "react_on_rails_pro", "spec", "dummy")
   unbundled_sh_in_dir(pro_dummy_app_dir, "bundle install#{bundle_quiet_flag}") if Dir.exist?(pro_dummy_app_dir)
-  unbundled_sh_in_dir(pro_gem_root, "bundle install#{bundle_quiet_flag}")
+  # Pro development Gemfile is in react_on_rails_pro/ and references root gemspec
+  unbundled_sh_in_dir(pro_dev_dir, "bundle install#{bundle_quiet_flag}")
 
   # Prepare NPM registry configuration
   npm_registry_url = use_verdaccio ? "http://localhost:4873/" : "https://registry.npmjs.org/"
@@ -271,12 +274,10 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
     puts "=" * 80
 
     # Publish react-on-rails-pro-node-renderer NPM package
-    # Note: Uses plain `yarn publish` (not `yarn workspace`) because the node-renderer
-    # package.json is in react_on_rails_pro/ which is not defined as a workspace
     node_renderer_name = "react-on-rails-pro-node-renderer"
     puts "\nPublishing #{node_renderer_name}@#{actual_npm_version}..."
-    sh_in_dir(pro_gem_root,
-              "yarn publish --new-version #{actual_npm_version} --no-git-tag-version #{npm_publish_args}")
+    sh_in_dir(gem_root,
+              "yarn workspace #{node_renderer_name} publish --new-version #{actual_npm_version} #{npm_publish_args}")
 
     if use_verdaccio
       puts "\nSkipping Ruby gem publication (Verdaccio is NPM-only)"
@@ -300,7 +301,8 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
       sleep 5
 
       # Publish react_on_rails_pro Ruby gem to RubyGems.org with retry logic
-      publish_gem_with_retry(pro_gem_root, "react_on_rails_pro", otp: rubygems_otp)
+      # After Phase 6, Pro gemspec is at repository root alongside core gem
+      publish_gem_with_retry(gem_root, "react_on_rails_pro", otp: rubygems_otp)
     end
   end
 
@@ -322,7 +324,7 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
     puts "  - package.json (root)"
     puts "  - packages/react-on-rails/package.json"
     puts "  - packages/react-on-rails-pro/package.json (version + dependency)"
-    puts "  - react_on_rails_pro/package.json (node-renderer)"
+    puts "  - packages/react-on-rails-pro-node-renderer/package.json"
     puts "  - Gemfile.lock files (root, dummy apps, pro)"
     puts "\nAuto-synced (no write needed):"
     puts "  - react_on_rails_pro.gemspec (uses ReactOnRails::VERSION)"
