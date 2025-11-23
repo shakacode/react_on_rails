@@ -119,7 +119,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: react_on_rails_pro/vendor/bundle
-          key: v4-pro-package-gem-cache-${{ hashFiles('react_on_rails_pro/react_on_rails_pro.gemspec') }}
+          key: v4-pro-package-gem-cache-${{ hashFiles('react_on_rails_pro.gemspec') }}
 
       - name: Cache Pro dummy app node modules
         uses: actions/cache@v4
