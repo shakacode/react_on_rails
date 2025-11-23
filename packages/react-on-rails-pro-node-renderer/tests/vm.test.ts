@@ -193,7 +193,7 @@ describe('buildVM and runInVM', () => {
   });
 
   test('FriendsAndGuests bundle for commit 1a7fe417 requires supportModules false', async () => {
-    expect.assertions(5);
+    expect.assertions(10);
 
     const project = 'friendsandguests';
     const commit = '1a7fe417';
@@ -214,8 +214,9 @@ describe('buildVM and runInVM', () => {
       'welcomePageRenderingRequest.js',
     );
     const welcomePageRenderingResult = await runInVM(welcomePageComponentRenderingRequest, serverBundlePath);
-    // React 19 removed data-react-checksum, so check for actual component HTML content
-    expect((welcomePageRenderingResult as string).includes('<div')).toBeTruthy();
+    // React 19 removed data-react-checksum, check for component-specific DOM ID
+    expect(welcomePageRenderingResult as string).toContain('id="WelcomePage-react-component-');
+    expect(welcomePageRenderingResult as string).toMatch(/<div[^>]*>/);
 
     // LayoutNavbar component:
     const layoutNavbarComponentRenderingRequest = readRenderingRequest(
@@ -227,8 +228,9 @@ describe('buildVM and runInVM', () => {
       layoutNavbarComponentRenderingRequest,
       serverBundlePath,
     );
-    // React 19 removed data-react-checksum, so check for actual component HTML content
-    expect((layoutNavbarRenderingResult as string).includes('<div')).toBeTruthy();
+    // React 19 removed data-react-checksum, check for component-specific DOM ID
+    expect(layoutNavbarRenderingResult as string).toContain('id="LayoutNavbar-react-component-');
+    expect(layoutNavbarRenderingResult as string).toMatch(/<div[^>]*>/);
 
     // ListingIndex component:
     const listingIndexComponentRenderingRequest = readRenderingRequest(
@@ -240,8 +242,9 @@ describe('buildVM and runInVM', () => {
       listingIndexComponentRenderingRequest,
       serverBundlePath,
     );
-    // React 19 removed data-react-checksum, so check for actual component HTML content
-    expect((listingIndexRenderingResult as string).includes('<div')).toBeTruthy();
+    // React 19 removed data-react-checksum, check for component-specific DOM ID
+    expect(listingIndexRenderingResult as string).toContain('id="ListingsIndex-react-component-');
+    expect(listingIndexRenderingResult as string).toMatch(/<div[^>]*>/);
 
     // ListingShow component:
     const listingShowComponentRenderingRequest = readRenderingRequest(
@@ -250,8 +253,9 @@ describe('buildVM and runInVM', () => {
       'listingsShowRenderingRequest.js',
     );
     const listingShowRenderingResult = await runInVM(listingShowComponentRenderingRequest, serverBundlePath);
-    // React 19 removed data-react-checksum, so check for actual component HTML content
-    expect((listingShowRenderingResult as string).includes('<div')).toBeTruthy();
+    // React 19 removed data-react-checksum, check for component-specific DOM ID
+    expect(listingShowRenderingResult as string).toContain('id="ListingsShow-react-component-');
+    expect(listingShowRenderingResult as string).toMatch(/<div[^>]*>/);
 
     // UserShow component:
     const userShowComponentRenderingRequest = readRenderingRequest(
@@ -260,12 +264,13 @@ describe('buildVM and runInVM', () => {
       'userShowRenderingRequest.js',
     );
     const userShowRenderingResult = await runInVM(userShowComponentRenderingRequest, serverBundlePath);
-    // React 19 removed data-react-checksum, so check for actual component HTML content
-    expect((userShowRenderingResult as string).includes('<div')).toBeTruthy();
+    // React 19 removed data-react-checksum, check for component-specific DOM ID
+    expect(userShowRenderingResult as string).toContain('id="UsersShow-react-component-');
+    expect(userShowRenderingResult as string).toMatch(/<div[^>]*>/);
   });
 
   test('ReactWebpackRailsTutorial bundle for commit ec974491', async () => {
-    expect.assertions(3);
+    expect.assertions(6);
 
     const project = 'react-webpack-rails-tutorial';
     const commit = 'ec974491';
@@ -286,8 +291,9 @@ describe('buildVM and runInVM', () => {
       navigationBarComponentRenderingRequest,
       serverBundlePath,
     );
-    // React 19 removed data-react-checksum, so check for actual component HTML content
-    expect((navigationBarRenderingResult as string).includes('<div')).toBeTruthy();
+    // React 19 removed data-react-checksum, check for component-specific DOM ID
+    expect(navigationBarRenderingResult as string).toContain('id="NavigationBarApp-react-component-');
+    expect(navigationBarRenderingResult as string).toMatch(/<div[^>]*>/);
 
     // RouterApp component:
     const routerAppComponentRenderingRequest = readRenderingRequest(
@@ -296,18 +302,20 @@ describe('buildVM and runInVM', () => {
       'routerAppRenderingRequest.js',
     );
     const routerAppRenderingResult = await runInVM(routerAppComponentRenderingRequest, serverBundlePath);
-    // React 19 removed data-react-checksum, so check for actual component HTML content
-    expect((routerAppRenderingResult as string).includes('<div')).toBeTruthy();
+    // React 19 removed data-react-checksum, check for component-specific DOM ID
+    expect(routerAppRenderingResult as string).toContain('id="RouterApp-react-component-');
+    expect(routerAppRenderingResult as string).toMatch(/<div[^>]*>/);
 
     // App component:
     const appComponentRenderingRequest = readRenderingRequest(project, commit, 'appRenderingRequest.js');
     const appRenderingResult = await runInVM(appComponentRenderingRequest, serverBundlePath);
-    // React 19 removed data-react-checksum, so check for actual component HTML content
-    expect((appRenderingResult as string).includes('<div')).toBeTruthy();
+    // React 19 removed data-react-checksum, check for component-specific DOM ID
+    expect(appRenderingResult as string).toContain('id="App-react-component-');
+    expect(appRenderingResult as string).toMatch(/<div[^>]*>/);
   });
 
   test('BionicWorkshop bundle for commit fa6ccf6b', async () => {
-    expect.assertions(4);
+    expect.assertions(8);
 
     const project = 'bionicworkshop';
     const commit = 'fa6ccf6b';
@@ -329,8 +337,9 @@ describe('buildVM and runInVM', () => {
       serverBundlePath,
     );
 
-    // React 19 removed data-react-checksum, so check for actual component HTML content
-    expect((signInPageWithFlashRenderingResult as string).includes('<div')).toBeTruthy();
+    // React 19 removed data-react-checksum, check that component rendered successfully
+    expect(signInPageWithFlashRenderingResult as string).toContain('<div');
+    expect((signInPageWithFlashRenderingResult as string).length).toBeGreaterThan(100);
 
     // Landing page component:
     const landingPageRenderingRequest = readRenderingRequest(
@@ -339,14 +348,16 @@ describe('buildVM and runInVM', () => {
       'landingPageRenderingRequest.js',
     );
     const landingPageRenderingResult = await runInVM(landingPageRenderingRequest, serverBundlePath);
-    // React 19 removed data-react-checksum, so check for actual component HTML content
-    expect((landingPageRenderingResult as string).includes('<div')).toBeTruthy();
+    // React 19 removed data-react-checksum, check that component rendered successfully
+    expect(landingPageRenderingResult as string).toContain('<div');
+    expect((landingPageRenderingResult as string).length).toBeGreaterThan(100);
 
     // Post page component:
     const postPageRenderingRequest = readRenderingRequest(project, commit, 'postPageRenderingRequest.js');
     const postPageRenderingResult = await runInVM(postPageRenderingRequest, serverBundlePath);
-    // React 19 removed data-react-checksum, so check for actual component HTML content
-    expect((postPageRenderingResult as string).includes('<div')).toBeTruthy();
+    // React 19 removed data-react-checksum, check that component rendered successfully
+    expect(postPageRenderingResult as string).toContain('<div');
+    expect((postPageRenderingResult as string).length).toBeGreaterThan(100);
 
     // Authors page component:
     const authorsPageRenderingRequest = readRenderingRequest(
@@ -355,8 +366,9 @@ describe('buildVM and runInVM', () => {
       'authorsPageRenderingRequest.js',
     );
     const authorsPageRenderingResult = await runInVM(authorsPageRenderingRequest, serverBundlePath);
-    // React 19 removed data-react-checksum, so check for actual component HTML content
-    expect((authorsPageRenderingResult as string).includes('<div')).toBeTruthy();
+    // React 19 removed data-react-checksum, check that component rendered successfully
+    expect(authorsPageRenderingResult as string).toContain('<div');
+    expect((authorsPageRenderingResult as string).length).toBeGreaterThan(100);
   });
 
   // Testing using a bundle that used a web target for the server bundle
