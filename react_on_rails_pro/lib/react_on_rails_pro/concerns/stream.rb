@@ -35,7 +35,7 @@ module ReactOnRailsPro
       require "async/barrier"
       require "async/limited_queue"
 
-      Sync do
+      Sync do |parent_task|
         # Initialize async primitives for concurrent component streaming
         @async_barrier = Async::Barrier.new
         buffer_size = ReactOnRailsPro.configuration.concurrent_component_streaming_buffer_size
@@ -49,7 +49,7 @@ module ReactOnRailsPro
         response.stream.write(template_string)
 
         begin
-          drain_streams_concurrently
+          drain_streams_concurrently(parent_task)
         ensure
           response.stream.close if close_stream_at_end
         end
@@ -58,17 +58,20 @@ module ReactOnRailsPro
 
     private
 
-    def drain_streams_concurrently
+    def drain_streams_concurrently(parent_task)
+      writing_task = parent_task.async do
+        # Drain all remaining chunks from the queue to the response stream
+        while (chunk = @main_output_queue.dequeue)
+          response.stream.write(chunk)
+        end
+      end
+
       # Wait for all component streaming tasks to complete
       @async_barrier.wait
 
       # Close the queue to signal end of streaming
       @main_output_queue.close
-
-      # Drain all remaining chunks from the queue to the response stream
-      while (chunk = @main_output_queue.dequeue)
-        response.stream.write(chunk)
-      end
+      writing_task.wait
     end
   end
 end
