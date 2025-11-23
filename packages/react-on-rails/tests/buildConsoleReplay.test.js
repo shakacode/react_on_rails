@@ -123,4 +123,52 @@ console.warn.apply(console, ["other message","{\\"c\\":3,\\"d\\":4}"]);
     // Verify the dangerous parts (quotes and parens) are removed
     expect(actual).not.toMatch(/nonce="[^"]*"[^>]*onload=/);
   });
+
+  it('consoleReplay skips specified number of messages', () => {
+    console.history = [
+      { arguments: ['skip 1'], level: 'log' },
+      { arguments: ['skip 2'], level: 'log' },
+      { arguments: ['keep 1'], level: 'log' },
+      { arguments: ['keep 2'], level: 'warn' },
+    ];
+    const actual = consoleReplay(undefined, 2); // Skip first 2 messages
+
+    // Should not contain skipped messages
+    expect(actual).not.toContain('skip 1');
+    expect(actual).not.toContain('skip 2');
+
+    // Should contain kept messages
+    expect(actual).toContain('console.log.apply(console, ["keep 1"]);');
+    expect(actual).toContain('console.warn.apply(console, ["keep 2"]);');
+  });
+
+  it('consoleReplay uses custom console history when provided', () => {
+    console.history = [{ arguments: ['ignored'], level: 'log' }];
+    const customHistory = [
+      { arguments: ['custom message 1'], level: 'warn' },
+      { arguments: ['custom message 2'], level: 'error' },
+    ];
+    const actual = consoleReplay(customHistory);
+
+    // Should not contain global console.history
+    expect(actual).not.toContain('ignored');
+
+    // Should contain custom history
+    expect(actual).toContain('console.warn.apply(console, ["custom message 1"]);');
+    expect(actual).toContain('console.error.apply(console, ["custom message 2"]);');
+  });
+
+  it('consoleReplay combines numberOfMessagesToSkip with custom history', () => {
+    const customHistory = [
+      { arguments: ['skip this'], level: 'log' },
+      { arguments: ['keep this'], level: 'warn' },
+    ];
+    const actual = consoleReplay(customHistory, 1);
+
+    // Should skip first message
+    expect(actual).not.toContain('skip this');
+
+    // Should keep second message
+    expect(actual).toContain('console.warn.apply(console, ["keep this"]);');
+  });
 });
