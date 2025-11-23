@@ -22,6 +22,7 @@ export default defineConfig([
     'spec/react_on_rails/dummy-for-generators',
     // includes some generated code
     'spec/dummy/client/app/packs/server-bundle.js',
+    '../packages/react-on-rails/', // Ignore open-source package (has its own linting)
     '../packages/react-on-rails-pro-node-renderer/lib/',
     '../packages/react-on-rails-pro-node-renderer/tests/fixtures',
     '**/node_modules/',
