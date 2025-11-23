@@ -259,6 +259,7 @@ module ReactOnRails
       @react_on_rails_pro = begin
         return false unless gem_available?("react_on_rails_pro")
 
+        # Guard against edge cases where constant exists but module isn't fully loaded
         require "react_on_rails_pro" unless defined?(ReactOnRailsPro)
         ReactOnRailsPro::Utils.validated_license_data!.present?
       end

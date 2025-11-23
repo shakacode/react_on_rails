@@ -5,6 +5,7 @@ source "https://rubygems.org"
 ENV["SPEC_DUMMY"] = "yes"
 eval_gemfile File.expand_path("../../Gemfile.loader", __dir__)
 
+# Points to repository root where react_on_rails_pro.gemspec is located
 gem "react_on_rails_pro", path: "../../.."
 
 gem "graphql"
