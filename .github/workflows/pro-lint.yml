@@ -20,9 +20,8 @@ on:
         type: boolean
         default: false
 
-defaults:
-  run:
-    working-directory: react_on_rails_pro
+# No default working-directory to avoid path confusion
+# Each step explicitly sets working-directory as needed
 
 jobs:
   detect-changes:
@@ -100,6 +99,7 @@ jobs:
           cache-dependency-path: 'react_on_rails_pro/**/yarn.lock'
 
       - name: Print system information
+        working-directory: .
         run: |
           echo "Linux release: "; cat /etc/issue
           echo "Current user: "; whoami
@@ -143,23 +143,28 @@ jobs:
           bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
 
       - name: Install Node modules with Yarn for Pro package
+        working-directory: react_on_rails_pro
         run: |
           sudo yarn global add yalc
           yarn install --frozen-lockfile --no-progress --no-emoji
 
       - name: Install Ruby Gems for Pro dummy app
+        working-directory: react_on_rails_pro
         run: |
           cd spec/dummy
           bundle lock --add-platform 'x86_64-linux'
           bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
 
       - name: Install Node modules with Yarn for Pro dummy app
+        working-directory: react_on_rails_pro
         run: cd spec/dummy && yarn install --frozen-lockfile --no-progress --no-emoji
 
       - name: Install Node modules with Yarn for ExecJS dummy app
+        working-directory: react_on_rails_pro
         run: cd spec/execjs-compatible-dummy && yarn install --frozen-lockfile --no-progress --no-emoji
 
       - name: Generate file-system based entrypoints
+        working-directory: react_on_rails_pro
         run: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
 
       - name: Build react-on-rails package (required for Pro eslint import resolution)
@@ -175,10 +180,13 @@ jobs:
         run: bundle exec rake rbs:validate
 
       - name: Lint JS
+        working-directory: react_on_rails_pro
         run: yarn run nps eslint
 
       - name: Check formatting
+        working-directory: react_on_rails_pro
         run: yarn run nps format.listDifferent
 
       - name: Check TypeScript
+        working-directory: react_on_rails_pro
         run: yarn run nps check-typescript
