@@ -110,16 +110,24 @@ module ReactOnRails
 
           return status.success? if expected_output.nil?
 
-          status.success? && output.include?(expected_output)
+          # Safe nil check for output before calling include?
+          status.success? && output&.include?(expected_output)
         end
 
         def run_check_command(command)
           require "open3"
+          # Execute command as-is. Commands are from local .dev-services.yml config file
+          # which should be trusted. Shell metacharacters won't work as expected since
+          # Open3.capture3 doesn't invoke a shell by default for simple command strings.
           stdout, stderr, status = Open3.capture3(command, err: %i[child out])
           output = stdout + stderr
           [output, status]
         rescue Errno::ENOENT
           # Command not found - service is not available
+          ["", nil]
+        rescue ArgumentError => e
+          # Invalid command format
+          warn "Invalid command format: #{e.message}" if ENV["DEBUG"]
           ["", nil]
         rescue StandardError => e
           # Log unexpected errors for debugging

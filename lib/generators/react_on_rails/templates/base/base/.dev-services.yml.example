@@ -14,10 +14,12 @@
 # adding .dev-services.yml to .gitignore if it contains machine-specific config.
 #
 # Security best practices:
-# - Use simple commands without shell metacharacters when possible
-# - Avoid complex shell scripts or chained commands (&&, ||, |, etc.)
+# - Commands are executed without shell expansion (shell metacharacters won't work)
+# - Use simple, single commands (e.g., "redis-cli ping", "pg_isready")
+# - Do NOT use shell features: &&, ||, |, $, ;, backticks, etc. will fail
 # - Only include services you trust
 # - Keep commands simple and focused on service health checks
+# - Consider adding .dev-services.yml to .gitignore (commit .example instead)
 #
 # Example configuration:
 #

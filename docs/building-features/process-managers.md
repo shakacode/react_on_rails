@@ -144,7 +144,24 @@ redis
 
 #### Security Note
 
-⚠️ Commands in `.dev-services.yml` are executed during `bin/dev` startup. Only add commands from trusted sources. Consider adding `.dev-services.yml` to `.gitignore` if it contains machine-specific paths or sensitive information.
+⚠️ **IMPORTANT**: Commands in `.dev-services.yml` are executed during `bin/dev` startup without shell expansion for safety. However, you should still:
+
+- **Only add commands from trusted sources**
+- **Avoid shell metacharacters** (&&, ||, ;, |, $, etc.) - they won't work and indicate an anti-pattern
+- **Review changes carefully** if .dev-services.yml is committed to version control
+- **Consider adding to .gitignore** if it contains machine-specific paths or sensitive information
+
+**Recommended approach:**
+
+- Commit `.dev-services.yml.example` to version control (safe, documentation)
+- Add `.dev-services.yml` to `.gitignore` (developers copy from example)
+- This prevents accidental execution of untrusted commands from compromised dependencies
+
+**Execution order:**
+
+1. Service dependency checks (`.dev-services.yml`)
+2. Precompile hook (if configured in `config/shakapacker.yml`)
+3. Process manager starts processes from Procfile
 
 ## Installing a Process Manager
 
