@@ -16,11 +16,12 @@ React on Rails includes `bin/dev` which automatically uses Overmind or Foreman:
 
 This script will:
 
-1. Run Shakapacker's `precompile_hook` once (if configured in `config/shakapacker.yml`)
-2. Set `SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true` to prevent duplicate execution
-3. Try to use Overmind (if installed)
-4. Fall back to Foreman (if installed)
-5. Show installation instructions if neither is found
+1. Check required external services (if `.dev-services.yml` exists)
+2. Run Shakapacker's `precompile_hook` once (if configured in `config/shakapacker.yml`)
+3. Set `SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true` to prevent duplicate execution
+4. Try to use Overmind (if installed)
+5. Fall back to Foreman (if installed)
+6. Show installation instructions if neither is found
 
 ### Precompile Hook Integration
 
@@ -56,6 +57,111 @@ default: &default
 ```
 
 See the [i18n documentation](./i18n.md#internationalization) for more details on configuring the precompile hook.
+
+### Service Dependency Checking
+
+`bin/dev` can automatically verify that required external services (like Redis, PostgreSQL, Elasticsearch) are running before starting your development server. This prevents cryptic error messages and provides clear instructions on how to start missing services.
+
+#### Configuration
+
+Create a `.dev-services.yml` file in your project root:
+
+```yaml
+services:
+  redis:
+    check_command: 'redis-cli ping'
+    expected_output: 'PONG'
+    start_command: 'redis-server'
+    install_hint: 'brew install redis (macOS) or apt-get install redis-server (Linux)'
+    description: 'Redis (for caching and background jobs)'
+
+  postgresql:
+    check_command: 'pg_isready'
+    expected_output: 'accepting connections'
+    start_command: 'pg_ctl -D /usr/local/var/postgres start'
+    install_hint: 'brew install postgresql (macOS)'
+    description: 'PostgreSQL database'
+```
+
+A `.dev-services.yml.example` file with common service configurations is created when you run the React on Rails generator.
+
+#### Configuration Fields
+
+- **check_command** (required): Shell command to check if the service is running
+- **expected_output** (optional): String that must appear in the command output
+- **start_command** (optional): Command to start the service (shown in error messages)
+- **install_hint** (optional): How to install the service if not found
+- **description** (optional): Human-readable description of the service
+
+#### Behavior
+
+If `.dev-services.yml` exists, `bin/dev` will:
+
+1. Check each configured service before starting
+2. Show a success message if all services are running
+3. Show helpful error messages with start commands if any service is missing
+4. Exit before starting the Procfile if services are unavailable
+
+If `.dev-services.yml` doesn't exist, `bin/dev` works exactly as before (zero impact on existing installations).
+
+#### Example Output
+
+**When services are running:**
+
+```
+🔍 Checking required services (.dev-services.yml)...
+
+   ✓ redis - Redis (for caching and background jobs)
+   ✓ postgresql - PostgreSQL database
+
+✅ All services are running
+```
+
+**When services are missing:**
+
+```
+🔍 Checking required services (.dev-services.yml)...
+
+   ✗ redis - Redis (for caching and background jobs)
+
+❌ Some services are not running
+
+Please start these services before running bin/dev:
+
+redis
+   Redis (for caching and background jobs)
+
+   To start:
+   redis-server
+
+   Not installed? brew install redis (macOS) or apt-get install redis-server (Linux)
+
+💡 Tips:
+   • Start services manually, then run bin/dev again
+   • Or remove service from .dev-services.yml if not needed
+   • Or add service to Procfile.dev to start automatically
+```
+
+#### Security Note
+
+⚠️ **IMPORTANT**: Commands in `.dev-services.yml` are executed during `bin/dev` startup without shell expansion for safety. However, you should still:
+
+- **Only add commands from trusted sources**
+- **Avoid shell metacharacters** (&&, ||, ;, |, $, etc.) - they won't work and indicate an anti-pattern
+- **Review changes carefully** if .dev-services.yml is committed to version control
+- **Consider adding to .gitignore** if it contains machine-specific paths or sensitive information
+
+**Recommended approach:**
+
+- Commit `.dev-services.yml.example` to version control (safe, documentation)
+- Add `.dev-services.yml` to `.gitignore` (developers copy from example)
+- This prevents accidental execution of untrusted commands from compromised dependencies
+
+**Execution order:**
+
+1. Service dependency checks (`.dev-services.yml`)
+2. Precompile hook (if configured in `config/shakapacker.yml`)
+3. Process manager starts processes from Procfile
 
 ## Installing a Process Manager
 

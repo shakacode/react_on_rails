@@ -46,6 +46,7 @@ module ReactOnRails
                         Procfile.dev
                         Procfile.dev-static-assets
                         Procfile.dev-prod-assets
+                        .dev-services.yml.example
                         bin/shakapacker-precompile-hook]
         base_templates = %w[config/initializers/react_on_rails.rb]
         base_files.each { |file| copy_file("#{base_path}#{file}", file) }

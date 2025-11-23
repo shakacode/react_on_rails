@@ -4,6 +4,7 @@ require "English"
 require "open3"
 require "rainbow"
 require_relative "../packer_utils"
+require_relative "service_checker"
 
 module ReactOnRails
   module Dev
@@ -330,6 +331,7 @@ module ReactOnRails
         end
         # rubocop:enable Metrics/AbcSize
 
+        # rubocop:disable Metrics/AbcSize
         def help_customization
           <<~CUSTOMIZATION
             #{Rainbow('🔧 CUSTOMIZATION:').cyan.bold}
@@ -340,8 +342,24 @@ module ReactOnRails
             #{Rainbow('•').yellow} #{Rainbow('Procfile.dev-prod-assets').green.bold}     - Production-optimized assets (port 3001)
 
             #{Rainbow('Edit these files to customize the development environment for your needs.').white}
+
+            #{Rainbow('🔍 SERVICE DEPENDENCIES:').cyan.bold}
+            #{Rainbow('Configure required external services in').white} #{Rainbow('.dev-services.yml').green.bold}#{Rainbow(':').white}
+
+            #{Rainbow('•').yellow} #{Rainbow('bin/dev').white} #{Rainbow('checks services before starting (optional)').white}
+            #{Rainbow('•').yellow} #{Rainbow('Copy from').white} #{Rainbow('.dev-services.yml.example').green.bold} #{Rainbow('to get started').white}
+            #{Rainbow('•').yellow} #{Rainbow('Supports Redis, PostgreSQL, Elasticsearch, and custom services').white}
+            #{Rainbow('•').yellow} #{Rainbow('Shows helpful errors with start commands if services are missing').white}
+
+            #{Rainbow('Example .dev-services.yml:').white}
+            #{Rainbow('  services:').cyan}
+            #{Rainbow('    redis:').cyan}
+            #{Rainbow('      check_command: "redis-cli ping"').cyan}
+            #{Rainbow('      expected_output: "PONG"').cyan}
+            #{Rainbow('      start_command: "redis-server"').cyan}
           CUSTOMIZATION
         end
+        # rubocop:enable Metrics/AbcSize
 
         # rubocop:disable Metrics/AbcSize
         def help_mode_details
@@ -392,6 +410,10 @@ module ReactOnRails
           # either via precompile hook or via the configuration.rb adjust_precompile_task
 
           print_procfile_info(procfile, route: route)
+
+          # Check required services before starting
+          exit 1 unless ServiceChecker.check_services
+
           print_server_info(
             "🏭 Starting production-like development server...",
             features,
@@ -514,6 +536,9 @@ module ReactOnRails
         def run_static_development(procfile, verbose: false, route: nil)
           print_procfile_info(procfile, route: route)
 
+          # Check required services before starting
+          exit 1 unless ServiceChecker.check_services
+
           features = [
             "Using shakapacker --watch (no HMR)",
             "CSS extracted to separate files (no FOUC)",
@@ -539,6 +564,10 @@ module ReactOnRails
 
         def run_development(procfile, verbose: false, route: nil)
           print_procfile_info(procfile, route: route)
+
+          # Check required services before starting
+          exit 1 unless ServiceChecker.check_services
+
           PackGenerator.generate(verbose: verbose)
           ProcessManager.ensure_procfile(procfile)
           ProcessManager.run_with_process_manager(procfile)
