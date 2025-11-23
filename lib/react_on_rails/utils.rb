@@ -261,7 +261,11 @@ module ReactOnRails
 
         # Guard against edge cases where constant exists but module isn't fully loaded
         require "react_on_rails_pro" unless defined?(ReactOnRailsPro)
+        return false unless defined?(ReactOnRailsPro::Utils)
+
         ReactOnRailsPro::Utils.validated_license_data!.present?
+      rescue NameError, LoadError
+        false
       end
     end
 
