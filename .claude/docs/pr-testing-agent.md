@@ -4,6 +4,24 @@
 
 **Core Principle:** Be deeply suspicious of claims that tests passed unless you have concrete evidence. Assume automated tests have gaps. Manual testing is often required.
 
+## Quick Reference
+
+**Related Documentation:**
+
+- [Testing Build Scripts](.claude/docs/testing-build-scripts.md) - Build/package testing requirements
+- [CI Config Switching](../SWITCHING_CI_CONFIGS.md) - Testing minimum vs latest dependencies
+- [Local Testing Issues](../spec/dummy/TESTING_LOCALLY.md) - Environment-specific testing issues
+- [Master Health Monitoring](.claude/docs/master-health-monitoring.md) - Post-merge CI monitoring
+- [CLAUDE.md](../CLAUDE.md) - Full development guide with CI debugging
+
+**Jump to Section:**
+
+- [When to Use This Agent](#when-to-use-this-agent)
+- [Testing Requirements by Change Type](#testing-requirements-by-change-type)
+- [Pre-Merge Testing Checklist](#pre-merge-testing-checklist)
+- [Success Criteria](#success-criteria-well-tested-pr)
+- [Real-World Scenarios](#real-world-testing-scenarios)
+
 ## When to Use This Agent
 
 ### Automatic Invocation (Recommended)
@@ -24,17 +42,23 @@
 - Unsure what testing is needed for specific changes
 - Need a comprehensive testing checklist
 
-### Usage Pattern
+### How to Invoke
 
-```bash
-# Before creating PR:
-# "Use the PR Testing Agent to validate my testing before I create this PR"
+**This is a documentation reference, not an automated tool.** Use it by:
 
-# During PR review:
-# "Use the PR Testing Agent to check if this PR has adequate testing coverage"
+1. **Manual reference**: Read this document when creating PRs or reviewing testing
+2. **AI assistant prompt**: Ask your AI coding assistant to "follow the PR Testing Agent guidelines" or "validate testing using PR Testing Agent criteria"
+3. **Code review checklist**: Reference specific sections during PR reviews
+4. **CI failure investigation**: Use the testing checklists when debugging failures
 
-# When investigating failures:
-# "Use the PR Testing Agent to help me debug these CI failures"
+**Example prompts for AI assistants:**
+
+```
+"Use the PR Testing Agent guidelines to validate my testing before I create this PR"
+
+"Following the PR Testing Agent checklist, what testing is missing for these build config changes?"
+
+"Apply PR Testing Agent criteria: Is this PR ready to merge from a testing perspective?"
 ```
 
 ## Integration with Existing Workflows
@@ -358,7 +382,51 @@ bin/dev
 - ✅ bin/dev starts without errors
 - ✅ Example component renders in browser
 
-### 7. Rails Engine Changes
+### 7. Playwright E2E Testing Changes
+
+**When E2E tests are required:**
+
+Changes affecting user-facing behavior require Playwright E2E verification:
+
+- React component rendering/behavior changes
+- Server-side rendering modifications
+- React on Rails integration features (component registry, store registry)
+- Rails view helpers (`react_component`, `react_component_hash`)
+- Generator changes that affect generated code behavior
+
+**Running Playwright tests:**
+
+```bash
+cd spec/dummy
+
+# Install browsers (one-time setup):
+yarn playwright install --with-deps
+
+# Run all E2E tests (Rails server auto-starts):
+yarn test:e2e
+
+# Run in UI mode (interactive debugging):
+yarn test:e2e:ui
+
+# Run specific test file:
+yarn test:e2e e2e/playwright/e2e/react_on_rails/basic_components.spec.js
+```
+
+**What to verify:**
+
+- [ ] Components render in browser
+- [ ] Server-side rendering produces correct HTML
+- [ ] Client-side hydration works
+- [ ] No JavaScript console errors
+- [ ] Component interactions work as expected
+
+**See CLAUDE.md "Playwright E2E Testing" section for:**
+
+- Writing new tests with Rails integration
+- Using factory_bot and database cleanup
+- Debugging test failures
+
+### 8. Rails Engine Changes
 
 **Engine-specific testing:**
 
@@ -497,6 +565,14 @@ bundle exec rspec spec/system/integration_spec.rb
 - [ ] Test in example: `rake run_rspec:example_basic`
 - [ ] Test in fresh Rails app (see checklist above)
 
+#### If user-facing behavior changed (React components, SSR, view helpers):
+
+- [ ] Run Playwright E2E tests: `cd spec/dummy && yarn test:e2e`
+- [ ] Verify components render in browser
+- [ ] Check server-side rendering in view source
+- [ ] No JavaScript console errors
+- [ ] Component interactions work as expected
+
 #### If Rails engine changed:
 
 - [ ] Check rake tasks not duplicated: `bundle exec rake -T | grep react`
@@ -519,6 +595,91 @@ bundle exec rspec spec/system/integration_spec.rb
 **Reviewer**: Please verify these items manually.
 ```
 
+## Success Criteria: Well-Tested PR
+
+**A PR is well-tested when it meets ALL of these criteria:**
+
+### 1. Automated Testing
+
+✅ **All CI checks pass:**
+
+- RuboCop: 0 violations
+- RSpec unit tests: All passing
+- Jest tests: All passing
+- TypeScript: Compiles without errors
+- RBS validation: Types valid
+- Prettier: All files formatted
+
+### 2. Local Verification
+
+✅ **Tests run locally before pushing:**
+
+- Relevant test suite executed (unit, integration, or E2E based on changes)
+- Test results documented in PR description or commit message
+- Any test failures investigated and resolved
+
+### 3. Manual Testing (Change-Dependent)
+
+✅ **Appropriate manual testing completed:**
+
+- **For build changes**: Clean install, prepack, yalc publish tested
+- **For UI changes**: Browser testing with visual inspection
+- **For SSR changes**: View source to verify HTML output
+- **For generator changes**: Tested generation in fresh Rails app
+- **For webpack changes**: Debug script created, config verified
+
+### 4. Testing Documentation
+
+✅ **PR includes clear testing documentation:**
+
+```markdown
+## Testing
+
+### Automated Tests
+
+- [x] RuboCop: 0 violations
+- [x] RSpec: 42 examples, 0 failures
+- [x] Jest: 15 tests passed
+
+### Manual Testing
+
+- [x] Tested in browser: Components render correctly
+- [x] Server-side rendering verified in view source
+- [x] No console errors
+
+### Environment Limitations
+
+- [ ] Integration tests require full Rails app (not available in Conductor)
+      Documented commands for reviewer verification below
+```
+
+### 5. Clear Communication
+
+✅ **Testing status is explicit and honest:**
+
+- Uses "UNTESTED" label when verification not possible
+- Distinguishes verified fixes from hypothetical fixes
+- Documents environmental limitations clearly
+- Provides exact reproduction steps for reviewers
+
+### 6. No Regressions
+
+✅ **Changes don't break existing functionality:**
+
+- Existing tests still pass
+- No new console errors introduced
+- Build artifacts still generated correctly
+- No performance degradation (if measurable)
+
+### 7. CI Failure Investigation
+
+✅ **If CI fails, proper investigation done:**
+
+- Checked if failures pre-existed on master
+- Reproduced failures locally (or documented why not possible)
+- Identified root cause (not just "fixed randomly")
+- Verified fix locally before pushing
+
 ## Communicating Test Status
 
 ### In PR Comments
@@ -537,17 +698,16 @@ bundle exec rspec spec/system/integration_spec.rb
 
 ### ⚠️ Requires Manual Verification
 
-- [ ] **Build scripts** - CRITICAL: Clean install test in full environment
-      `bash
-  rm -rf node_modules && yarn install --frozen-lockfile
-  yarn run yalc:publish
-  `
-- [ ] **Browser testing** - Dummy app visual inspection
-      `bash
-      cd spec/dummy && bin/dev
-  # Visit http://localhost:3000/hello_world
-  # Check console for errors
-  `
+**Build scripts** - CRITICAL: Clean install test in full environment
+
+    rm -rf node_modules && yarn install --frozen-lockfile
+    yarn run yalc:publish
+
+**Browser testing** - Dummy app visual inspection
+
+    cd spec/dummy && bin/dev
+    # Visit http://localhost:3000/hello_world
+    # Check console for errors
 
 ### ❌ Cannot Test (Environment Limitation)
 
