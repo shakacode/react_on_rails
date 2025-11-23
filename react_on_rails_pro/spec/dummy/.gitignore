@@ -7,3 +7,6 @@ config/react_on_rails_pro_license.key
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+
+# Generated files
+client/app/generated/
