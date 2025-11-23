@@ -248,8 +248,20 @@ module ReactOnRails
       end
     end
 
+    # Checks if react_on_rails_pro is in the current Bundler context
+    # @return [Boolean] true if Pro gem is in the Gemfile
+    def self.pro_gem_in_bundle?
+      return true unless defined?(Bundler)
+
+      Bundler.locked_gems&.dependencies&.key?("react_on_rails_pro") ||
+        Bundler.definition.dependencies.any? { |dep| dep.name == "react_on_rails_pro" }
+    end
+
     # Checks if React on Rails Pro is installed and licensed.
     # This method validates the license and will raise an exception if invalid.
+    #
+    # In a sibling gem structure, both gems may be loaded, but we should only
+    # consider Pro as "active" if it's explicitly requested in the application's Gemfile.
     #
     # @return [Boolean] true if Pro is available with valid license
     # @raise [ReactOnRailsPro::Error] if license is invalid
@@ -258,6 +270,7 @@ module ReactOnRails
 
       @react_on_rails_pro = begin
         return false unless gem_available?("react_on_rails_pro")
+        return false unless pro_gem_in_bundle?
 
         # Guard against edge cases where constant exists but module isn't fully loaded
         require "react_on_rails_pro" unless defined?(ReactOnRailsPro)
