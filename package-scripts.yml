@@ -1,4 +1,22 @@
 scripts:
+  test:
+    default:
+      description: Run all JS tests
+      script: jest
+    ci:
+      description: Run all JS tests in CI mode
+      # https://circleci.com/docs/collect-test-data/#jest
+      script: jest --ci --runInBand --reporters=default --reporters=jest-junit
+    debug:
+      description: Debug all JS tests
+      script: ndb jest --runInBand
+  check:
+    description: Run all checks
+    script: nps lint && nps format.listDifferent && nps test && nps check-typescript
+  check-typescript:
+    description: Check for TypeScript errors
+    script: yarn workspace react-on-rails run type-check && yarn workspace react-on-rails-pro run type-check && yarn workspace react-on-rails-pro-node-renderer run type-check
+
   lint:
     description: Run all linters (eslint, tsc)
     script: nps eslint
@@ -25,10 +43,10 @@ scripts:
       # 3. Check if the project is built now;
       # 4. If it failed, print an error message (still follow https://docs.npmjs.com/cli/v8/using-npm/scripts#best-practices).
       script: >
-        [ -f lib/ReactOnRails.full.js ] ||
+        ([ -f packages/react-on-rails/lib/ReactOnRails.full.js ] && [ -f packages/react-on-rails-pro/lib/ReactOnRails.full.js ] && [ -f packages/react-on-rails-pro-node-renderer/lib/ReactOnRailsProNodeRenderer.js ]) ||
           (npm run build >/dev/null 2>&1 || true) &&
-          [ -f lib/ReactOnRails.full.js ] ||
-          { echo 'Building react-on-rails seems to have failed!'; }
+          ([ -f packages/react-on-rails/lib/ReactOnRails.full.js ] && [ -f packages/react-on-rails-pro/lib/ReactOnRails.full.js ] && [ -f packages/react-on-rails-pro-node-renderer/lib/ReactOnRailsProNodeRenderer.js ]) ||
+          { echo 'Building this package seems to have failed!'; }
 
   format:
     default:

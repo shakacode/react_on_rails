@@ -93,7 +93,9 @@ jobs:
       - name: Setup Node
         uses: ./.github/actions/setup-node-with-retry
         with:
-          node-version: 22
+          # Pin to 22.11.0 (LTS) to avoid V8 bug in 22.21.0
+          # https://github.com/nodejs/node/issues/56010
+          node-version: '22.11.0'
           cache: yarn
           cache-dependency-path: 'react_on_rails_pro/**/yarn.lock'
 
@@ -158,6 +160,10 @@ jobs:
 
       - name: Generate file-system based entrypoints
         run: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
+
+      - name: Build react-on-rails package (required for Pro eslint import resolution)
+        working-directory: .
+        run: yarn workspace react-on-rails-pro build
 
       - name: Lint Ruby
         run: bundle exec rubocop --ignore-parent-exclusion

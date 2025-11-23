@@ -33,35 +33,56 @@ const config: KnipConfig = {
         '@eslint/js',
         // used by Jest
         'jsdom',
+        'jest-junit',
         // This is an optional peer dependency because users without RSC don't need it
         // but Knip doesn't like such dependencies to be referenced directly in code
         'react-on-rails-rsc',
         // SWC transpiler dependencies used in dummy apps
         '@swc/core',
         'swc-loader',
-        // Test dependencies used by child workspaces (packages/react-on-rails, packages/react-on-rails-pro)
-        '@testing-library/dom',
-        '@testing-library/jest-dom',
-        '@testing-library/react',
-        '@types/react-dom',
-        'create-react-class',
-        'jest-fetch-mock',
-        'prop-types',
-        'react',
-        'react-dom',
-        'redux',
       ],
     },
 
     // React on Rails core package workspace
     'packages/react-on-rails': {
-      entry: ['src/ReactOnRails.full.ts!', 'src/ReactOnRails.client.ts!', 'src/base/full.rsc.ts!'],
+      entry: [
+        'src/ReactOnRails.full.ts!',
+        'src/ReactOnRails.client.ts!',
+        'src/base/full.rsc.ts!',
+        'src/context.ts!',
+      ],
       project: ['src/**/*.[jt]s{x,}!', 'tests/**/*.[jt]s{x,}', '!lib/**'],
       ignore: [
         // Jest setup and test utilities - not detected by Jest plugin in workspace setup
         'tests/jest.setup.js',
         // Build output directories that should be ignored
         'lib/**',
+      ],
+    },
+
+    // React on Rails Pro Node Renderer package workspace
+    'packages/react-on-rails-pro-node-renderer': {
+      entry: [
+        'src/ReactOnRailsProNodeRenderer.ts!',
+        'src/default-node-renderer.ts!',
+        'src/integrations/*.ts!',
+      ],
+      project: ['src/**/*.[jt]s{x,}!', 'tests/**/*.[jt]s{x,}', '!lib/**'],
+      ignore: [
+        // Build output directories that should be ignored
+        'lib/**',
+        // Test fixtures
+        'tests/fixtures/**',
+        // Test helper utilities
+        'tests/helper.ts',
+        'tests/httpRequestUtils.ts',
+      ],
+      ignoreDependencies: [
+        // Optional dependencies used in integrations
+        '@honeybadger-io/js',
+        '@sentry/*',
+        // Jest reporter used in CI
+        'jest-junit',
       ],
     },
 
@@ -97,11 +118,6 @@ const config: KnipConfig = {
         'src/ServerComponentFetchError.ts:isServerComponentFetchError',
         'src/RSCRoute.tsx:RSCRouteProps',
         'src/streamServerRenderedReactComponent.ts:StreamingTrackers',
-      ],
-      ignoreDependencies: [
-        // Test dependencies used only in tests
-        '@types/mock-fs',
-        'mock-fs',
       ],
     },
     'spec/dummy': {
@@ -148,6 +164,10 @@ const config: KnipConfig = {
         '@rescript/react',
         // The Babel plugin fails to detect it
         'babel-plugin-transform-react-remove-prop-types',
+        // Required by @babel/plugin-transform-runtime for polyfills
+        '@babel/runtime',
+        // Used in webpack server config to filter out MiniCssExtractPlugin
+        'mini-css-extract-plugin',
         // This one is weird. It's long-deprecated and shouldn't be necessary.
         // Probably need to update the Webpack config.
         'node-libs-browser',
@@ -162,13 +182,7 @@ const config: KnipConfig = {
         'url-loader',
         // Transitive dependency of shakapacker but listed as direct dependency
         'webpack-merge',
-        // Dependencies not detected in production mode (runtime injected or dynamic imports)
-        '@babel/runtime',
-        'mini-css-extract-plugin',
-        'css-loader',
-        'sass',
-        'sass-loader',
-        // Dependencies used dynamically by React on Rails
+        // Used in ignored client/app components (dynamically loaded by React on Rails)
         'create-react-class',
         'react-helmet',
         '@types/react-helmet',
@@ -177,6 +191,7 @@ const config: KnipConfig = {
       ],
     },
   },
+  ignoreExportsUsedInFile: true,
 };
 
 export default config;

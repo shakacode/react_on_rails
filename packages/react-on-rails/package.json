@@ -10,8 +10,7 @@
     "clean": "rm -rf ./lib",
     "test": "jest tests",
     "type-check": "yarn run tsc --noEmit --noErrorTruncation",
-    "prepack": "nps build.prepack",
-    "prepare": "nps build.prepack",
+    "prepare": "[ -f lib/ReactOnRails.full.js ] || (rm -rf ./lib && tsc)",
     "prepublishOnly": "yarn run build",
     "yalc:publish": "yalc publish",
     "yalc": "yalc"
@@ -28,7 +27,7 @@
     "on",
     "Rails"
   ],
-  "author": "justin.gordon@gmail.com",
+  "author": "justin@shakacode.com",
   "license": "SEE LICENSE IN LICENSE.md",
   "exports": {
     ".": {

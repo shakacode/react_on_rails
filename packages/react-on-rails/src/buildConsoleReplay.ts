@@ -15,7 +15,6 @@ declare global {
  * This is useful when you want to wrap the code in script tags yourself (e.g., with a CSP nonce).
  * @internal Exported for tests and for Ruby helper to wrap with nonce
  */
-// eslint-disable-next-line @typescript-eslint/default-param-last
 export function consoleReplay(
   customConsoleHistory: (typeof console)['history'] | undefined = undefined,
   numberOfMessagesToSkip = 0,
@@ -55,7 +54,7 @@ export function consoleReplay(
   return lines.join('\n');
 }
 
-// eslint-disable-next-line @typescript-eslint/default-param-last
+/* eslint-disable default-param-last */
 export default function buildConsoleReplay(
   customConsoleHistory: (typeof console)['history'] | undefined = undefined,
   numberOfMessagesToSkip = 0,
@@ -67,3 +66,4 @@ export default function buildConsoleReplay(
   }
   return wrapInScriptTags('consoleReplayLog', consoleReplayJS, nonce);
 }
+/* eslint-enable default-param-last */

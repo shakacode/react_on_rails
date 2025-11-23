@@ -48,7 +48,7 @@ junit.xml
 
 node_modules
 
-/packages/node-renderer/tests/tmp
+/../packages/react-on-rails-pro-node-renderer/tests/tmp
 
 yarn-debug.*
 spec/dummy/client/yarn-debug.log*
