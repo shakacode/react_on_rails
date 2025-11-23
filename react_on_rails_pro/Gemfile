@@ -2,7 +2,7 @@
 
 source "https://rubygems.org"
 
-# Specify your gem"s dependencies in react_on_rails.gemspec
-gemspec
+# Specify your gem"s dependencies in react_on_rails_pro.gemspec (at repository root)
+gemspec name: "react_on_rails_pro", path: ".."
 
 eval_gemfile File.expand_path("./Gemfile.loader", __dir__)

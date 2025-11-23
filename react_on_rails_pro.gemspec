@@ -20,12 +20,15 @@ Gem::Specification.new do |s|
   s.license       = "UNLICENSED"
   s.metadata["rubygems_mfa_required"] = "true"
 
-  s.files         = `git ls-files -z`.split("\x0")
-                                     .reject { |f|
-                                       f.match(
-                                         %r{^(test|spec|features|tmp|node_modules|packages|coverage|Gemfile.lock|lib/tasks)/}
-                                       )
-                                     }
+  # Explicitly whitelist Pro files to ensure we only include what belongs in this gem
+  s.files         = Dir.glob("{lib/react_on_rails_pro.rb,lib/react_on_rails_pro/**/*}") +
+                    Dir.glob("lib/tasks/{assets_pro.rake,v8_log_processor.rake}") +
+                    %w[
+                      react_on_rails_pro.gemspec
+                      CHANGELOG_PRO.md
+                      LICENSE
+                      README.md
+                    ].select { |f| File.exist?(f) }
   s.bindir        = "exe"
   s.executables   = s.files.grep(%r{^exe/}) { |f| File.basename(f) }
   s.require_paths = ["lib"]
