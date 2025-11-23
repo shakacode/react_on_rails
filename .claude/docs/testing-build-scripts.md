@@ -137,8 +137,12 @@ For Yarn Classic workspaces:
 In Yarn Classic workspaces:
 
 - `"*"` tells Yarn to resolve to the local workspace package
-- Yarn automatically links to the workspace version
+- Yarn automatically hoists the workspace package to root node_modules
 - This is the official Yarn v1 workspace syntax
+
+**Note:** You may see `react-on-rails@*` with a version like `16.1.2` in yarn.lock.
+This is normal - Yarn caches the resolution, but still uses workspace hoisting at
+install time. The workspace package won't have its own node_modules subfolder.
 
 ### Testing Workspace Changes
 

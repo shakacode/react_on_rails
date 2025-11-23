@@ -76,7 +76,7 @@ gem "react_on_rails", path: "<React on Rails root>"
 and/or
 
 ```ruby
-gem "react_on_rails_pro", path: "<React on Rails root>/react_on_rails_pro"
+gem "react_on_rails_pro", path: "<React on Rails root>"
 ```
 
 Note that you will need to run `bundle install` after making this change, but also that **you will need to restart your Rails application if you make any changes to the gem**.
