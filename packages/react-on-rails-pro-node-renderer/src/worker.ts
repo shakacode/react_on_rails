@@ -92,7 +92,11 @@ function assertAsset(value: unknown, key: string): asserts value is Asset {
 // Remove after this issue is resolved: https://github.com/fastify/light-my-request/issues/315
 let useHttp2 = true;
 
-// Call before any test using `app.inject()`
+/**
+ * Test utility to disable HTTP/2 before calling `app.inject()`
+ * Workaround for https://github.com/fastify/light-my-request/issues/315
+ * @public
+ */
 export const disableHttp2 = () => {
   useHttp2 = false;
 };
