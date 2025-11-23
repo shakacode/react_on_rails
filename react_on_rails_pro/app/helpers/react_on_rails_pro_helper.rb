@@ -239,6 +239,8 @@ module ReactOnRailsProHelper
   end
 
   def handle_stream_cache_hit(component_name, raw_options, auto_load_bundle, cached_chunks)
+    require "async/variable"
+
     render_options = ReactOnRails::ReactComponent::RenderOptions.new(
       react_component_name: component_name,
       options: { auto_load_bundle: auto_load_bundle }.merge(raw_options)
@@ -246,29 +248,32 @@ module ReactOnRailsProHelper
     load_pack_for_generated_component(component_name, render_options)
 
     initial_result, *rest_chunks = cached_chunks
-    hit_fiber = Fiber.new do
-      rest_chunks.each { |chunk| Fiber.yield(chunk) }
-      nil
+    first_chunk_var = Async::Variable.new
+
+    # Create async task to replay cached chunks
+    @async_barrier.async do
+      # Set first chunk (already have it from cache)
+      first_chunk_var.value = initial_result
+
+      # Enqueue remaining cached chunks
+      rest_chunks.each { |chunk| @main_output_queue.enqueue(chunk) }
     end
-    @rorp_rendering_fibers << hit_fiber
-    initial_result
+
+    # Wait for and return first chunk
+    first_chunk_var.wait
+    first_chunk_var.value
   end
 
   def handle_stream_cache_miss(component_name, raw_options, auto_load_bundle, view_cache_key, &block)
-    # Kick off the normal streaming helper to get the initial result and the original fiber
-    initial_result = render_stream_component_with_props(component_name, raw_options, auto_load_bundle, &block)
-    original_fiber = @rorp_rendering_fibers.pop
+    # Enable caching mode
+    @rorp_cache_buffering = { key: view_cache_key, chunks: [], options: raw_options[:cache_options] || {} }
 
-    buffered_chunks = [initial_result]
-    wrapper_fiber = Fiber.new do
-      while (chunk = original_fiber.resume)
-        buffered_chunks << chunk
-        Fiber.yield(chunk)
-      end
-      Rails.cache.write(view_cache_key, buffered_chunks, raw_options[:cache_options] || {})
-      nil
-    end
-    @rorp_rendering_fibers << wrapper_fiber
+    # Call normal streaming (which will buffer chunks due to @rorp_cache_buffering flag)
+    initial_result = render_stream_component_with_props(component_name, raw_options, auto_load_bundle, &block)
+
+    # Disable caching mode
+    @rorp_cache_buffering = nil
+
     initial_result
   end
 
@@ -302,12 +307,18 @@ module ReactOnRailsProHelper
     # Create a variable to hold the first chunk for synchronous return
     first_chunk_var = Async::Variable.new
 
+    # Check if we're in caching mode
+    cache_config = @rorp_cache_buffering
+
     # Start an async task on the barrier to stream all chunks
     @async_barrier.async do
       stream = yield
       is_first = true
 
       stream.each_chunk do |chunk|
+        # Buffer chunk for caching if enabled
+        cache_config[:chunks] << chunk if cache_config
+
         if is_first
           # Store first chunk in variable for synchronous access
           first_chunk_var.value = chunk
@@ -320,6 +331,11 @@ module ReactOnRailsProHelper
 
       # Handle case where stream has no chunks
       first_chunk_var.value = nil if is_first
+
+      # Write to cache if caching is enabled
+      if cache_config
+        Rails.cache.write(cache_config[:key], cache_config[:chunks], cache_config[:options])
+      end
     end
 
     # Wait for and return the first chunk (blocking)
