@@ -128,7 +128,11 @@ module ReactOnRailsProHelper
     # Because setting prerender to false is equivalent to calling react_component with prerender: false
     options[:prerender] = true
     options = options.merge(immediate_hydration: true) unless options.key?(:immediate_hydration)
-    run_stream_inside_fiber do
+
+    # Extract streaming-specific callback
+    on_complete = options.delete(:on_complete)
+
+    run_stream_inside_fiber(on_complete: on_complete) do
       internal_stream_react_component(component_name, options)
     end
   end
@@ -185,7 +189,11 @@ module ReactOnRailsProHelper
     # rsc_payload_react_component doesn't have the prerender option
     # Because setting prerender to false will not do anything
     options[:prerender] = true
-    run_stream_inside_fiber do
+
+    # Extract streaming-specific callback
+    on_complete = options.delete(:on_complete)
+
+    run_stream_inside_fiber(on_complete: on_complete) do
       internal_rsc_payload_react_component(component_name, options)
     end
   end
@@ -239,8 +247,6 @@ module ReactOnRailsProHelper
   end
 
   def handle_stream_cache_hit(component_name, raw_options, auto_load_bundle, cached_chunks)
-    require "async/variable"
-
     render_options = ReactOnRails::ReactComponent::RenderOptions.new(
       react_component_name: component_name,
       options: { auto_load_bundle: auto_load_bundle }.merge(raw_options)
@@ -248,33 +254,29 @@ module ReactOnRailsProHelper
     load_pack_for_generated_component(component_name, render_options)
 
     initial_result, *rest_chunks = cached_chunks
-    first_chunk_var = Async::Variable.new
 
-    # Create async task to replay cached chunks
+    # Enqueue remaining chunks asynchronously
     @async_barrier.async do
-      # Set first chunk (already have it from cache)
-      first_chunk_var.value = initial_result
-
-      # Enqueue remaining cached chunks
       rest_chunks.each { |chunk| @main_output_queue.enqueue(chunk) }
     end
 
-    # Wait for and return first chunk
-    first_chunk_var.wait
-    first_chunk_var.value
+    # Return first chunk directly
+    initial_result
   end
 
   def handle_stream_cache_miss(component_name, raw_options, auto_load_bundle, view_cache_key, &block)
-    # Enable caching mode
-    @rorp_cache_buffering = { key: view_cache_key, chunks: [], options: raw_options[:cache_options] || {} }
+    cache_aware_options = raw_options.merge(
+      on_complete: ->(chunks) {
+        Rails.cache.write(view_cache_key, chunks, raw_options[:cache_options] || {})
+      }
+    )
 
-    # Call normal streaming (which will buffer chunks due to @rorp_cache_buffering flag)
-    initial_result = render_stream_component_with_props(component_name, raw_options, auto_load_bundle, &block)
-
-    # Disable caching mode
-    @rorp_cache_buffering = nil
-
-    initial_result
+    render_stream_component_with_props(
+      component_name,
+      cache_aware_options,
+      auto_load_bundle,
+      &block
+    )
   end
 
   def render_stream_component_with_props(component_name, raw_options, auto_load_bundle)
@@ -296,7 +298,7 @@ module ReactOnRailsProHelper
     raise ReactOnRailsPro::Error, "Option 'cache_key' is required for React on Rails caching"
   end
 
-  def run_stream_inside_fiber
+  def run_stream_inside_fiber(on_complete:)
     require "async/variable"
 
     if @async_barrier.nil?
@@ -306,9 +308,7 @@ module ReactOnRailsProHelper
 
     # Create a variable to hold the first chunk for synchronous return
     first_chunk_var = Async::Variable.new
-
-    # Check if we're in caching mode
-    cache_config = @rorp_cache_buffering
+    all_chunks = [] if on_complete  # Only collect if callback provided
 
     # Start an async task on the barrier to stream all chunks
     @async_barrier.async do
@@ -316,8 +316,7 @@ module ReactOnRailsProHelper
       is_first = true
 
       stream.each_chunk do |chunk|
-        # Buffer chunk for caching if enabled
-        cache_config[:chunks] << chunk if cache_config
+        all_chunks << chunk if on_complete  # Collect for callback
 
         if is_first
           # Store first chunk in variable for synchronous access
@@ -332,10 +331,8 @@ module ReactOnRailsProHelper
       # Handle case where stream has no chunks
       first_chunk_var.value = nil if is_first
 
-      # Write to cache if caching is enabled
-      if cache_config
-        Rails.cache.write(cache_config[:key], cache_config[:chunks], cache_config[:options])
-      end
+      # Call callback with all chunks when streaming completes
+      on_complete&.call(all_chunks) if on_complete
     end
 
     # Wait for and return the first chunk (blocking)
