@@ -52,6 +52,7 @@ group :test do
   gem "coveralls", require: false
   gem "cypress-on-rails", "~> 1.19"
   gem "equivalent-xml"
+  gem "fakefs", require: false
   gem "generator_spec"
   gem "launchy"
   gem "rspec_junit_formatter"
