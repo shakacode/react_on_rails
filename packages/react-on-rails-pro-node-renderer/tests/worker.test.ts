@@ -2,8 +2,7 @@ import formAutoContent from 'form-auto-content';
 import fs from 'fs';
 import querystring from 'querystring';
 import { createReadStream } from 'fs-extra';
-// eslint-disable-next-line import/no-relative-packages
-import packageJson from '../../../package.json';
+import packageJson from '../package.json';
 import worker, { disableHttp2 } from '../src/worker';
 import {
   BUNDLE_TIMESTAMP,
