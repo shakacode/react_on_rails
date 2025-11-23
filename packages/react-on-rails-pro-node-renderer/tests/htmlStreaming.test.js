@@ -1,9 +1,10 @@
 import http2 from 'http2';
 import buildApp from '../src/worker';
-import config from './testingNodeRendererConfigs';
+import { createTestConfig } from './testingNodeRendererConfigs';
 import * as errorReporter from '../src/shared/errorReporter';
 import { createForm, SERVER_BUNDLE_TIMESTAMP } from './httpRequestUtils';
 
+const { config } = createTestConfig('htmlStreaming');
 const app = buildApp(config);
 
 beforeAll(async () => {
