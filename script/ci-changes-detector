@@ -106,7 +106,7 @@ while IFS= read -r file; do
       ;;
 
     # React on Rails Pro source code
-    react_on_rails_pro/lib/*|react_on_rails_pro/lib/**/*)
+    lib/react_on_rails_pro/*|lib/react_on_rails_pro/**/*)
       DOCS_ONLY=false
       PRO_RUBY_CHANGED=true
       ;;
@@ -118,7 +118,7 @@ while IFS= read -r file; do
       ;;
 
     # Ruby Pro gem-specific specs
-    react_on_rails_pro/spec/react_on_rails/*|react_on_rails_pro/spec/react_on_rails/**/*|.github/workflows/pro-gem-tests.yml)
+    spec/pro/*|spec/pro/**/*|.github/workflows/pro-gem-tests.yml)
       DOCS_ONLY=false
       PRO_RSPEC_CHANGED=true
       ;;

@@ -27,9 +27,11 @@ AllCops:
     - '**/tmp/**/*'
     - 'coverage/**/*'
     - 'gen-examples/examples/**/*'
+    - 'lib/react_on_rails_pro/**/*'  # Exclude Pro Ruby code (has its own linting)
     - 'node_modules/**/*'
-    - 'react_on_rails_pro/**/*'  # Exclude pro package (has its own linting)
+    - 'react_on_rails_pro/**/*'  # Exclude Pro dummy app and test infrastructure
     - 'spec/dummy/bin/*'
+    - 'spec/pro/**/*'  # Exclude Pro specs (has its own linting)
     - 'spec/fixtures/**/*'
     - 'spec/react_on_rails/dummy-for-generators/**/*'
     - 'tmp/**/*'

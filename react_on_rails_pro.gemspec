@@ -6,7 +6,7 @@ require "react_on_rails_pro/version"
 
 # Load the core react_on_rails version for dependency
 # This is evaluated at build time, not on user machines
-require_relative "../lib/react_on_rails/version"
+require_relative "lib/react_on_rails/version"
 
 Gem::Specification.new do |s|
   s.name          = "react_on_rails_pro"

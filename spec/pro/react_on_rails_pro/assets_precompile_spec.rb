@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "spec_helper"
-require_relative "../../lib/react_on_rails_pro/assets_precompile"
+require_relative "../../../lib/react_on_rails_pro/assets_precompile"
 
 describe ReactOnRailsPro::AssetsPrecompile do
   describe ".zipped_bundles_filename" do

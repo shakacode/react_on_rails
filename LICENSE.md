@@ -19,9 +19,12 @@ The following directories and all their contents are licensed under the **MIT Li
 
 The following directories and all their contents are licensed under the **React on Rails Pro License**:
 
+- `lib/react_on_rails_pro/` (Pro Ruby gem code)
+- `spec/pro/` (Pro test files)
 - `packages/react-on-rails-pro/` (entire package)
 - `packages/react-on-rails-pro-node-renderer/` (entire package)
-- `react_on_rails_pro/` (entire directory)
+- `react_on_rails_pro/` (Pro dummy app and remaining test infrastructure)
+- `react_on_rails_pro.gemspec` (Pro gemspec)
 
 See [REACT-ON-RAILS-PRO-LICENSE.md](./REACT-ON-RAILS-PRO-LICENSE.md) for complete Pro license terms.
 

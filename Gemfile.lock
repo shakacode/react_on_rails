@@ -8,6 +8,15 @@ PATH
       rails (>= 5.2)
       rainbow (~> 3.0)
       shakapacker (>= 6.0)
+    react_on_rails_pro (16.2.0.beta.12)
+      addressable
+      async (>= 2.6)
+      connection_pool
+      execjs (~> 2.9)
+      httpx (~> 1.5)
+      jwt (~> 2.7)
+      rainbow
+      react_on_rails (= 16.2.0.beta.12)
 
 GEM
   remote: https://rubygems.org/
@@ -90,6 +99,12 @@ GEM
       public_suffix (>= 2.0.2, < 7.0)
     amazing_print (1.6.0)
     ast (2.4.2)
+    async (2.34.0)
+      console (~> 1.29)
+      fiber-annotation
+      io-event (~> 1.11)
+      metrics (~> 0.12)
+      traces (~> 0.18)
     base64 (0.3.0)
     benchmark (0.4.1)
     bigdecimal (3.3.1)
@@ -111,8 +126,14 @@ GEM
       launchy
     childprocess (5.0.0)
     coderay (1.1.3)
+    commonmarker (2.5.0)
+      rb_sys (~> 0.9)
     concurrent-ruby (1.3.5)
     connection_pool (2.5.4)
+    console (1.34.2)
+      fiber-annotation
+      fiber-local (~> 1.1)
+      json
     coveralls (0.8.23)
       json (>= 1.8, < 3)
       simplecov (~> 0.16.1)
@@ -136,6 +157,10 @@ GEM
     erubi (1.13.1)
     execjs (2.9.1)
     ffi (1.16.3)
+    fiber-annotation (0.2.0)
+    fiber-local (1.1.0)
+      fiber-storage
+    fiber-storage (1.0.1)
     fileutils (1.8.0)
     gem-release (2.2.2)
     generator_spec (0.10.0)
@@ -143,10 +168,14 @@ GEM
       railties (>= 3.0.0)
     globalid (1.2.1)
       activesupport (>= 6.1)
+    http-2 (1.1.1)
+    httpx (1.6.3)
+      http-2 (>= 1.0.0)
     i18n (1.14.7)
       concurrent-ruby (~> 1.0)
     interception (0.5)
     io-console (0.8.1)
+    io-event (1.14.2)
     irb (1.15.3)
       pp (>= 0.6.0)
       rdoc (>= 4.0.0)
@@ -159,6 +188,8 @@ GEM
       railties (>= 4.2.0)
       thor (>= 0.14, < 2.0)
     json (2.7.2)
+    jwt (2.10.2)
+      base64
     language_server-protocol (3.17.0.3)
     launchy (3.0.1)
       addressable (~> 2.8)
@@ -179,6 +210,7 @@ GEM
     marcel (1.0.4)
     matrix (0.4.3)
     method_source (1.1.0)
+    metrics (0.15.0)
     mini_mime (1.1.5)
     mini_portile2 (2.8.9)
     minitest (5.26.0)
@@ -268,9 +300,12 @@ GEM
       zeitwerk (~> 2.6)
     rainbow (3.1.1)
     rake (13.3.1)
+    rake-compiler-dock (1.9.1)
     rb-fsevent (0.11.2)
     rb-inotify (0.10.1)
       ffi (~> 1.0)
+    rb_sys (0.9.117)
+      rake-compiler-dock (= 1.9.1)
     rbs (3.9.5)
       logger
     rdoc (6.15.1)
@@ -400,6 +435,7 @@ GEM
     tins (1.33.0)
       bigdecimal
       sync
+    traces (0.18.2)
     tsort (0.2.0)
     turbo-rails (2.0.6)
       actionpack (>= 6.0.0)
@@ -434,8 +470,10 @@ DEPENDENCIES
   amazing_print
   benchmark
   bootsnap
+  bundler
   capybara (~> 3.40)
   capybara-screenshot
+  commonmarker
   coveralls
   cypress-on-rails (~> 1.19)
   debug
@@ -459,6 +497,7 @@ DEPENDENCIES
   rails (~> 7.1)
   rbs
   react_on_rails!
+  react_on_rails_pro!
   rspec-rails
   rspec-retry
   rspec_junit_formatter
@@ -477,6 +516,7 @@ DEPENDENCIES
   turbolinks
   uglifier
   webdrivers (= 5.3.0)
+  yard
 
 BUNDLED WITH
    2.5.9
