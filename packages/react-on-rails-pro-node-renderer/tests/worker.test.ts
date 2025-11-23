@@ -2,6 +2,7 @@ import formAutoContent from 'form-auto-content';
 import fs from 'fs';
 import querystring from 'querystring';
 import { createReadStream } from 'fs-extra';
+// Import this package's version and protocolVersion, not the workspace root's
 import packageJson from '../package.json';
 import worker, { disableHttp2 } from '../src/worker';
 import {

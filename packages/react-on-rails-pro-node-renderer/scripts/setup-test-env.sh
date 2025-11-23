@@ -1,6 +1,16 @@
 #!/bin/bash
 set -e
 
+# The node-renderer tests expect webpack bundles at spec/dummy/ssr-generated/
+# but they're only built in react_on_rails_pro/spec/dummy/ssr-generated/
+# This script copies them to the expected location for testing.
+#
+# This is necessary because:
+# 1. The Pro dummy app (react_on_rails_pro/spec/dummy) has webpack configured
+# 2. The node-renderer tests need to reference those built bundles
+# 3. Tests run in packages/react-on-rails-pro-node-renderer/tests/
+# 4. Test fixtures reference bundles at spec/dummy/ssr-generated (workspace root dummy app)
+
 echo "Setting up test environment for react-on-rails-pro-node-renderer..."
 
 # Determine the script's directory
