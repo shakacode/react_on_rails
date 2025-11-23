@@ -306,7 +306,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: vendor/bundle
-          key: v4-pro-package-gem-cache-ruby${{ matrix.ruby-version }}-${{ hashFiles('react_on_rails_pro.gemspec') }}
+          key: v5-pro-package-gem-cache-ruby${{ matrix.ruby-version }}-${{ hashFiles('Gemfile.lock') }}
 
       - name: Install Ruby Gems for Pro package
         working-directory: .
