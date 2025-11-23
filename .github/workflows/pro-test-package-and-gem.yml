@@ -315,6 +315,7 @@ jobs:
           echo "Bundler version: "; bundle --version
           bundle config set --local path 'vendor/bundle'
           bundle config set --local disable_checksum_validation true
+          bundle lock --add-platform 'x86_64-linux'
           bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
 
       - name: Run RSpec tests for Pro package
