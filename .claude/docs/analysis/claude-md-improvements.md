@@ -7,21 +7,18 @@ Based on the CI breakage analysis, here are specific additions to prevent simila
 **CRITICAL: When working on PRs that change directory structure or move files:**
 
 1. **Create a comprehensive checklist** of all places that reference the old paths:
-
    - Search for hardcoded paths in all config files (grep -r "old/path" .)
    - Check package.json, package-scripts.yml, webpack configs, CI workflows
    - Check documentation and example code
    - Check generator templates
 
 2. **Run ALL test suites** after directory changes:
-
    - `rake` (all tests)
    - `rake run_rspec:example_basic` (generator tests)
    - Manual test of `yalc publish` if changing package structure
    - Build and test in a fresh clone to catch path issues
 
 3. **Add temporary validation** in CI:
-
    - Add a CI job that explicitly tests the changed paths
    - Keep this validation for 2-3 releases after the refactor
 
@@ -38,7 +35,6 @@ Based on the CI breakage analysis, here are specific additions to prevent simila
 **CRITICAL: Build scripts in package.json and package-scripts.yml need validation:**
 
 1. **The prepack/prepare scripts are CRITICAL** - they run during:
-
    - `npm install` / `yarn install` (for git dependencies)
    - `yalc publish`
    - `npm publish`
@@ -59,7 +55,6 @@ Based on the CI breakage analysis, here are specific additions to prevent simila
    ```
 
 3. **If you change directory structure:**
-
    - Update ALL path checks in package-scripts.yml
    - Test with a clean install: `rm -rf node_modules && yarn install`
    - Test yalc publish to ensure it works for users
@@ -73,13 +68,11 @@ Based on the CI breakage analysis, here are specific additions to prevent simila
 **CRITICAL: Don't let master stay broken:**
 
 1. **If CI fails on master after your PR merges:**
-
    - Check GitHub Actions within 30 minutes of merge
    - Run `gh pr view <pr-number> --json statusCheckRollup` after merge
    - Set up GitHub notifications for master branch failures
 
 2. **If you discover master is broken:**
-
    - Investigate IMMEDIATELY - don't assume "someone else will fix it"
    - Use `gh run list --branch master --limit 10` to see recent failures
    - Check if it's a recurring failure or a new issue
@@ -88,7 +81,6 @@ Based on the CI breakage analysis, here are specific additions to prevent simila
      - Consider reverting your PR and re-submitting with the fix
 
 3. **Silent failures are the most dangerous:**
-
    - yalc publish failures won't show up in most CI runs
    - Build artifact path issues may only surface during actual usage
    - Always test the actual use case (yalc publish, npm install from git, etc.)
@@ -135,13 +127,11 @@ Based on the CI breakage analysis, here are specific additions to prevent simila
 **CRITICAL: Hardcoded paths are a major source of bugs:**
 
 1. **Before committing changes to any config file with paths:**
-
    - Verify the path actually exists: `ls -la <path>`
    - Test that operations using the path work
    - If changing package structure, search for ALL references to old paths
 
 2. **Common files with path references:**
-
    - `package-scripts.yml` - build artifact paths
    - `package.json` - "files", "main", "types" fields
    - Webpack configs - output.path, resolve.modules

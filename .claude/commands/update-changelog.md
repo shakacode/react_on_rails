@@ -5,7 +5,6 @@ You are helping to add an entry to the CHANGELOG.md file for the React on Rails 
 ## Critical Requirements
 
 1. **User-visible changes only**: Only add changelog entries for user-visible changes:
-
    - New features
    - Bug fixes
    - Breaking changes
@@ -118,13 +117,11 @@ When a new version is released:
 ### For Regular Changelog Updates
 
 1. **ALWAYS fetch latest changes first**:
-
    - **CRITICAL**: Run `git fetch origin master` to ensure you have the latest commits
    - The workspace may be behind origin/master, causing you to miss recently merged PRs
    - After fetching, use `origin/master` for all comparisons, NOT local `master` branch
 
 2. **Determine the correct version tag to compare against**:
-
    - First, check the tag dates: `git log --tags --simplify-by-decoration --pretty="format:%ai %d" | head -10`
    - Find the latest version tag and its date
    - Compare origin/master branch date to the tag date
@@ -132,7 +129,6 @@ When a new version is released:
    - **CRITICAL**: Always use `git log TAG..BRANCH` to find commits that are in the tag but not in the branch, as the tag may be ahead
 
 3. **Check commits and version boundaries**:
-
    - **IMPORTANT**: Use `origin/master` in all commands below, not local `master`
    - Run `git log --oneline LAST_TAG..origin/master` to see commits since the last release
    - Also check `git log --oneline origin/master..LAST_TAG` to see if the tag is ahead of origin/master
@@ -148,20 +144,17 @@ When a new version is released:
 5. **Read the current CHANGELOG.md** to understand the existing structure and formatting.
 
 6. **Determine where entries should go**:
-
    - If the latest version tag is NEWER than origin/master branch, move entries from "Unreleased" to that version section
    - If origin/master is ahead of the latest tag, add new entries to "Unreleased"
    - Always verify the version date in CHANGELOG.md matches the actual tag date
 
 7. **Add or move entries** to the appropriate section under appropriate category headings.
-
    - **CRITICAL**: When moving entries from "Unreleased" to a version section, merge them with existing entries under the same category heading
    - **NEVER create duplicate section headings** (e.g., don't create two "### Fixed" sections)
    - If the version section already has a category heading (e.g., "### Fixed"), add the moved entries to that existing section
    - Maintain the category order as defined above
 
 8. **Verify formatting**:
-
    - Bold description with period
    - Proper PR link (NO hash symbol)
    - Proper author link
@@ -181,12 +174,10 @@ When a new version is released:
 When releasing from beta to a stable version (e.g., v16.1.0-beta.3 → v16.1.0):
 
 1. **Remove all beta version labels** from the changelog:
-
    - Change `### [v16.1.0-beta.1]`, `### [v16.1.0-beta.2]`, etc. to a single `### [v16.1.0]` section
    - Combine all beta entries into the stable release section
 
 2. **Consolidate duplicate entries**:
-
    - If bug fixes or changes were made to features introduced in earlier betas, keep only the final state
    - Remove redundant changelog entries for fixes to beta features
    - Keep the most recent/accurate description of each change

@@ -63,7 +63,6 @@ rails generate react_on_rails:install
    ```
 
 4. **Review and Apply Changes**
-
    - Check webpack configuration exports (function naming may have changed)
    - Review `shakapacker.yml` settings
    - Update `bin/dev` if needed
@@ -333,7 +332,6 @@ const { output } = webpackConfigLoader(configPath);
 For an example of upgrading, see [react-webpack-rails-tutorial/pull/416](https://github.com/shakacode/react-webpack-rails-tutorial/pull/416).
 
 - Breaking Configuration Changes
-
   1. Added `config.node_modules_location` which defaults to `""` if Webpacker is installed. You may want to set this to `'client'` in `config/initializers/react_on_rails.rb` to keep your `node_modules` inside the `/client` directory.
   2. Renamed
      - config.npm_build_test_command ==> config.build_test_command
@@ -347,7 +345,6 @@ gem "webpacker"
 
 - Update for the renaming in the `WebpackConfigLoader` in your Webpack configuration.
   You will need to rename the following object properties:
-
   - webpackOutputPath ==> output.path
   - webpackPublicOutputDir ==> output.publicPath
   - hotReloadingUrl ==> output.publicPathWithHost
@@ -359,7 +356,6 @@ gem "webpacker"
   - devBuild ==> Use `const devBuild = process.env.NODE_ENV !== 'production';`
 
 - Edit your Webpack.config files:
-
   - Change your Webpack output to be like this. **Be sure to have the hash or chunkhash in the filename,** unless the bundle is server side.:
 
     ```
@@ -389,7 +385,6 @@ gem "webpacker"
     ```
 
 - Find your `webpacker_lite.yml` and rename it to `webpacker.yml`
-
   - Consider copying a default webpacker.yml setup such as https://github.com/shakacode/react-on-rails-v9-rc-generator/blob/master/config/webpacker.yml
   - If you are not using the webpacker Webpack setup, be sure to put in `compile: false` in the `default` section.
   - Alternately, if you are updating from webpacker_lite, you can manually change these:

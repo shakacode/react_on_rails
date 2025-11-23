@@ -236,7 +236,6 @@ The doctor will check:
 **Solutions:**
 
 1. **If using Shakapacker auto-compilation:**
-
    - Switch to React on Rails test helper for one-time compilation
    - Or ensure `cache_manifest: true` in shakapacker.yml
 
