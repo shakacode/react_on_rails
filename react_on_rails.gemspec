@@ -18,7 +18,10 @@ Gem::Specification.new do |s|
 
   s.files = `git ls-files -z`.split("\x0").reject do |f|
     f.match(%r{^(docs|test|spec|features|gen-examples|tmp|node_modules|packages|coverage|rakelib|script)/}) ||
-      f.match(%r{^(jest\.config\.js|book\.json|package\.json|package-scripts\.yml|yarn\.lock|\..*)})
+      f.match(/^(jest\.config\.js|book\.json|package\.json|package-scripts\.yml|yarn\.lock|\..*)/) ||
+      # Exclude Pro-only files from MIT gem
+      f.match(%r{^lib/react_on_rails_pro}) ||
+      f.match(%r{^lib/tasks/(assets_pro|v8_log_processor)\.rake$})
   end
   s.bindir        = "exe"
   s.executables   = s.files.grep(%r{^exe/}) { |f| File.basename(f) }
@@ -33,7 +36,9 @@ Gem::Specification.new do |s|
   s.add_dependency "rainbow", "~> 3.0"
   s.add_dependency "shakapacker", ">= 6.0"
 
+  # rubocop:disable Gemspec/DevelopmentDependencies
   s.add_development_dependency "gem-release"
+  # rubocop:enable Gemspec/DevelopmentDependencies
   s.post_install_message = '
 --------------------------------------------------------------------------------
 Checkout https://www.shakacode.com/react-on-rails-pro for information about
@@ -41,5 +46,6 @@ Checkout https://www.shakacode.com/react-on-rails-pro for information about
 node rendering server, support for React 19, and much more.
 --------------------------------------------------------------------------------
 '
+  s.metadata["rubygems_mfa_required"] = "true"
 end
 # rubocop:enable Metrics/BlockLength

@@ -48,7 +48,10 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
       sh_in_dir(example_type.dir, generator_commands)
       sh_in_dir(example_type.dir, "npm install")
       # Generate the component packs after running the generator to ensure all
-      # auto-bundled components have corresponding pack files created
+      # auto-bundled components have corresponding pack files created.
+      # REACT_ON_RAILS_SKIP_VALIDATION is still needed here because generate_packs
+      # initializes the Rails app, which triggers version validation. Since the npm
+      # package was just installed, we skip validation to avoid version mismatch errors.
       sh_in_dir(example_type.dir, "REACT_ON_RAILS_SKIP_VALIDATION=true bundle exec rake react_on_rails:generate_packs")
     end
   end
