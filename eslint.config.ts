@@ -16,7 +16,7 @@ const compat = new FlatCompat({
   allConfig: js.configs.all,
 });
 
-const config = tsEslint.config([
+const config = [
   // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
   includeIgnoreFile(path.resolve(__dirname, '.gitignore')),
   globalIgnores([
@@ -61,7 +61,7 @@ const config = tsEslint.config([
     files: ['**/*.[jt]s', '**/*.[jt]sx', '**/*.[cm][jt]s'],
   },
   js.configs.recommended,
-  compat.extends('eslint-config-shakacode'),
+  ...compat.extends('eslint-config-shakacode'),
   {
     languageOptions: {
       globals: {
@@ -194,10 +194,18 @@ const config = tsEslint.config([
       'import/no-unresolved': 'off',
     },
   },
+  ...tsEslint.configs.strictTypeChecked.map((c) => {
+    // Only apply type-checked rules to TypeScript files
+    if (c.files) {
+      return c;
+    }
+    return {
+      ...c,
+      files: ['**/*.ts', '**/*.tsx', '**/*.mts', '**/*.cts'],
+    };
+  }),
   {
     files: ['**/*.ts{x,}', '**/*.[cm]ts'],
-
-    extends: tsEslint.configs.strictTypeChecked,
 
     languageOptions: {
       parserOptions: {
@@ -279,13 +287,19 @@ const config = tsEslint.config([
     },
   },
   {
+    ...jest.configs['flat/recommended'],
     files: ['packages/*/tests/**', '**/*.test.{js,jsx,ts,tsx}'],
-
-    extends: [
-      jest.configs['flat/recommended'],
-      jest.configs['flat/style'],
-      testingLibrary.configs['flat/dom'],
-    ],
+  },
+  {
+    ...jest.configs['flat/style'],
+    files: ['packages/*/tests/**', '**/*.test.{js,jsx,ts,tsx}'],
+  },
+  {
+    ...testingLibrary.configs['flat/dom'],
+    files: ['packages/*/tests/**', '**/*.test.{js,jsx,ts,tsx}'],
+  },
+  {
+    files: ['packages/*/tests/**', '**/*.test.{js,jsx,ts,tsx}'],
 
     rules: {
       // Allows Jest mocks before import
@@ -306,6 +320,6 @@ const config = tsEslint.config([
   // must be the last config in the array
   // https://github.com/prettier/eslint-plugin-prettier?tab=readme-ov-file#configuration-new-eslintconfigjs
   prettierRecommended,
-]);
+];
 
 export default config;

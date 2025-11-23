@@ -234,7 +234,7 @@ export function getValidatedLicenseData(): LicenseData {
  */
 export function isEvaluation(): boolean {
   const data = getValidatedLicenseData();
-  const plan = String(data.plan || '');
+  const plan = data.plan || '';
   return plan !== 'paid' && !plan.startsWith('paid_');
 }
 

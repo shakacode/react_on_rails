@@ -54,7 +54,6 @@ export function consoleReplay(
   return lines.join('\n');
 }
 
-/* eslint-disable default-param-last */
 export default function buildConsoleReplay(
   customConsoleHistory: (typeof console)['history'] | undefined = undefined,
   numberOfMessagesToSkip = 0,
@@ -66,4 +65,3 @@ export default function buildConsoleReplay(
   }
   return wrapInScriptTags('consoleReplayLog', consoleReplayJS, nonce);
 }
-/* eslint-enable default-param-last */

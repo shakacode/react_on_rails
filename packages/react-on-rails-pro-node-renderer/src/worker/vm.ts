@@ -71,7 +71,7 @@ export type RenderResult = string | Readable | { exceptionMessage: string };
 declare global {
   // This works on node 16+
   // https://stackoverflow.com/questions/35074713/extending-typescript-global-object-in-node-js/68328575#68328575
-  // eslint-disable-next-line vars-on-top, no-var
+  // eslint-disable-next-line vars-on-top
   var ReactOnRails: ROR | undefined;
 }
 
