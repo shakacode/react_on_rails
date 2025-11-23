@@ -118,7 +118,7 @@ jobs:
       - name: Cache Pro package Ruby gems
         uses: actions/cache@v4
         with:
-          path: react_on_rails_pro/vendor/bundle
+          path: vendor/bundle
           key: v4-pro-package-gem-cache-${{ hashFiles('react_on_rails_pro.gemspec') }}
 
       - name: Cache Pro dummy app node modules
@@ -134,6 +134,7 @@ jobs:
           key: v4-pro-dummy-app-gem-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/Gemfile.lock') }}
 
       - name: Install Ruby Gems for Pro package
+        working-directory: .
         run: |
           gem install bundler -v "2.5.4"
           echo "Bundler version: "; bundle --version
@@ -166,9 +167,11 @@ jobs:
         run: yarn workspace react-on-rails-pro build
 
       - name: Lint Ruby
-        run: bundle exec rubocop --ignore-parent-exclusion
+        working-directory: .
+        run: bundle exec rubocop --ignore-parent-exclusion lib/react_on_rails_pro spec/pro
 
       - name: Validate RBS type signatures
+        working-directory: .
         run: bundle exec rake rbs:validate
 
       - name: Lint JS

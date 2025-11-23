@@ -102,6 +102,7 @@ jobs:
           cache-dependency-path: '**/yarn.lock'
 
       - name: Print system information
+        working-directory: .
         run: |
           echo "Linux release: "; cat /etc/issue
           echo "Current user: "; whoami
@@ -205,6 +206,7 @@ jobs:
           cache-dependency-path: '**/yarn.lock'
 
       - name: Print system information
+        working-directory: .
         run: |
           echo "Linux release: "; cat /etc/issue
           echo "Current user: "; whoami
@@ -284,6 +286,7 @@ jobs:
           bundler: 2.5.4
 
       - name: Print system information
+        working-directory: .
         run: |
           echo "Linux release: "; cat /etc/issue
           echo "Current user: "; whoami
@@ -294,10 +297,11 @@ jobs:
       - name: Cache Pro package Ruby gems
         uses: actions/cache@v4
         with:
-          path: react_on_rails_pro/vendor/bundle
+          path: vendor/bundle
           key: v4-pro-package-gem-cache-ruby${{ matrix.ruby-version }}-${{ hashFiles('react_on_rails_pro.gemspec') }}
 
       - name: Install Ruby Gems for Pro package
+        working-directory: .
         run: |
           gem install bundler -v "2.5.4"
           echo "Bundler version: "; bundle --version
@@ -306,7 +310,8 @@ jobs:
           bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
 
       - name: Run RSpec tests for Pro package
-        run: bundle exec rspec spec/react_on_rails_pro
+        working-directory: .
+        run: bundle exec rspec spec/pro/react_on_rails_pro
 
       - name: Store test results
         uses: actions/upload-artifact@v4
@@ -320,4 +325,4 @@ jobs:
         if: always()
         with:
           name: pro-rspec-package-log-ruby${{ matrix.ruby-version }}
-          path: react_on_rails_pro/log/test.log
+          path: log/test.log
