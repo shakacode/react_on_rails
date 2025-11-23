@@ -184,6 +184,8 @@ jobs:
       )
     strategy:
       matrix: ${{ fromJson(needs.setup-integration-matrix.outputs.matrix) }}
+    env:
+      REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
