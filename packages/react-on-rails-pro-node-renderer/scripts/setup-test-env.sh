@@ -26,10 +26,19 @@ mkdir -p "$ROOT_DUMMY/public/webpack/test"
 echo "Copying bundles to test locations..."
 cp "$PRO_DUMMY/ssr-generated"/*.js "$ROOT_DUMMY/ssr-generated/"
 
-# Create stub manifest files
-echo "Creating stub manifest files..."
-echo "{}" > "$ROOT_DUMMY/public/webpack/test/react-client-manifest.json"
-echo "{}" > "$ROOT_DUMMY/ssr-generated/react-server-client-manifest.json"
+# Copy or create manifest files
+echo "Copying manifest files..."
+if [ -f "$PRO_DUMMY/public/webpack/test/react-client-manifest.json" ]; then
+  cp "$PRO_DUMMY/public/webpack/test/react-client-manifest.json" "$ROOT_DUMMY/public/webpack/test/"
+else
+  echo "{}" > "$ROOT_DUMMY/public/webpack/test/react-client-manifest.json"
+fi
+
+if [ -f "$PRO_DUMMY/ssr-generated/react-server-client-manifest.json" ]; then
+  cp "$PRO_DUMMY/ssr-generated/react-server-client-manifest.json" "$ROOT_DUMMY/ssr-generated/"
+else
+  echo "{}" > "$ROOT_DUMMY/ssr-generated/react-server-client-manifest.json"
+fi
 
 echo "✓ Test environment setup complete!"
 echo ""
