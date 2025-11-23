@@ -18,7 +18,7 @@ This guide shows you **how to use** the PR Testing Agent with Claude Code, inclu
 **Related Documentation:**
 
 - **[PR Testing Agent](pr-testing-agent.md)** - Core agent behavior and requirements
-- [Testing Build Scripts](testing-build-scripts.md) - Build/package testing requirements
+- [Testing Build Scripts](../docs/testing-build-scripts.md) - Build/package testing requirements
 - [CI Config Switching](../../SWITCHING_CI_CONFIGS.md) - Testing minimum vs latest dependencies
 - [CLAUDE.md](../../CLAUDE.md) - Full development guide
 
@@ -68,7 +68,7 @@ This guide shows you **how to use** the PR Testing Agent with Claude Code, inclu
 **The easiest way to use this agent with Claude Code is to explicitly reference it in your prompts:**
 
 ```
-"Use the PR Testing Agent from .claude/docs/pr-testing-agent.md to validate my testing"
+"Use the PR Testing Agent from .claude/agents/pr-testing-agent.md to validate my testing"
 
 "I changed package.json. According to PR Testing Agent Section 3, what testing is required?"
 
@@ -334,7 +334,7 @@ pbpaste | bin/ci-run-failed-specs
 
 **The PR Testing Agent guidelines are automatically available when:**
 
-- You reference `.claude/docs/pr-testing-agent.md` in prompts
+- You reference `.claude/agents/pr-testing-agent.md` in prompts
 - You mention "PR Testing Agent" or "testing checklist"
 - You ask about testing requirements for specific file types
 - CLAUDE.md is loaded (which references this documentation)
@@ -686,8 +686,8 @@ gh pr view --json statusCheckRollup
 
 **Reference documentation:**
 
-- Testing build scripts: [testing-build-scripts.md](testing-build-scripts.md)
+- Testing build scripts: [../docs/testing-build-scripts.md](../docs/testing-build-scripts.md)
 - CI debugging: [CLAUDE.md](../../CLAUDE.md) "Replicating CI Failures Locally"
 - Config switching: [SWITCHING_CI_CONFIGS.md](../../SWITCHING_CI_CONFIGS.md)
 - Local testing issues: [spec/dummy/TESTING_LOCALLY.md](../../spec/dummy/TESTING_LOCALLY.md)
-- Master health: [master-health-monitoring.md](master-health-monitoring.md)
+- Master health: [../docs/master-health-monitoring.md](../docs/master-health-monitoring.md)

@@ -9,10 +9,10 @@
 **See Also:**
 
 - **[PR Testing Guide](pr-testing-guide.md)** - How to use this agent with Claude Code
-- [Testing Build Scripts](testing-build-scripts.md) - Build/package testing requirements
+- [Testing Build Scripts](../docs/testing-build-scripts.md) - Build/package testing requirements
 - [CI Config Switching](../../SWITCHING_CI_CONFIGS.md) - Testing minimum vs latest dependencies
 - [Local Testing Issues](../../spec/dummy/TESTING_LOCALLY.md) - Environment-specific testing issues
-- [Master Health Monitoring](master-health-monitoring.md) - Post-merge CI monitoring
+- [Master Health Monitoring](../docs/master-health-monitoring.md) - Post-merge CI monitoring
 - [CLAUDE.md](../../CLAUDE.md) - Full development guide with CI debugging
 
 ## Agent Behavior
@@ -146,7 +146,7 @@ bundle exec rake
 
 **Why this matters:**
 
-- See [testing-build-scripts.md](testing-build-scripts.md) for real examples of silent failures
+- See [../docs/testing-build-scripts.md](../docs/testing-build-scripts.md) for real examples of silent failures
 - Build scripts run during `npm install`, `yalc publish`, and package installation
 - Failures are often SILENT in CI but break users completely
 
@@ -211,7 +211,7 @@ gh run list --workflow="Integration Tests" --branch <pr-branch> --limit 10 --jso
 # Key question: Did MY commits break it, or was it already broken?
 ```
 
-**See [testing-build-scripts.md](testing-build-scripts.md) "Before You Start: Check CI Status"**
+**See [../docs/testing-build-scripts.md](../docs/testing-build-scripts.md) "Before You Start: Check CI Status"**
 
 **Reproduce failures locally:**
 
