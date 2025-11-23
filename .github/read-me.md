@@ -105,6 +105,36 @@ Most workflows use minimal permissions. The comment-triggered workflows require:
 - `pull-requests: write` - To post comments and reactions
 - `actions: write` - To trigger other workflows
 
+## Required Secrets for Pro Workflows
+
+Workflows that test React on Rails Pro features require the following repository secret:
+
+### `REACT_ON_RAILS_PRO_LICENSE_V2`
+
+This secret contains the Pro license key needed to run Pro features during CI. It must be configured as a repository secret in GitHub Actions.
+
+**Workflows that require this secret:**
+
+- `examples.yml` - When generating/testing examples with Pro features
+- `integration-tests.yml` - When running integration tests that may use Pro features
+- Any workflow that runs example apps or tests that might invoke Pro functionality
+
+**Setting up the secret:**
+
+1. Go to repository Settings → Secrets and variables → Actions
+2. Add a new secret named `REACT_ON_RAILS_PRO_LICENSE_V2`
+3. Set the value to a valid React on Rails Pro license key
+
+**When adding new workflows:**
+If your workflow runs any Rails application that might have the Pro gem available (example apps, dummy apps, integration tests), add this environment variable:
+
+```yaml
+env:
+  REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
+```
+
+This prevents license validation failures during test runs in the monorepo where both MIT and Pro packages are present.
+
 ## Conditional Execution
 
 Many workflows use change detection to skip unnecessary jobs:

@@ -22,7 +22,9 @@ Gem::Specification.new do |s|
       # Exclude Pro-only files from MIT gem
       f.match(/^react_on_rails_pro/) ||
       f.match(%r{^lib/react_on_rails_pro}) ||
-      f.match(%r{^lib/tasks/(assets_pro|v8_log_processor)\.rake$})
+      f.match(%r{^lib/tasks/(assets_pro|v8_log_processor)\.rake$}) ||
+      f == "CHANGELOG_PRO.md" ||
+      f == "react_on_rails_pro.gemspec"
   end
   s.bindir        = "exe"
   s.executables   = s.files.grep(%r{^exe/}) { |f| File.basename(f) }

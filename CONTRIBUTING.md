@@ -193,6 +193,60 @@ npm install <tarball path/URL>
 
 or the equivalent command for your package manager.
 
+## Gemspec File Management
+
+**Important for Pro package contributors:**
+
+The React on Rails Pro gemspec (`react_on_rails_pro.gemspec`) uses **explicit whitelisting** for included files rather than blacklisting. This is a security measure to ensure no unintended files are included in the Pro gem.
+
+### What this means
+
+When you add new Ruby files to the Pro package (`lib/react_on_rails_pro/`), they will **NOT** be automatically included in the gem. You must explicitly add them to the gemspec.
+
+### How to update the gemspec
+
+When adding new files to the Pro package:
+
+1. **Add new Ruby files** to `lib/react_on_rails_pro/` as needed
+2. **Update `react_on_rails_pro.gemspec`** to include them:
+
+```ruby
+s.files = Dir.glob("{lib/react_on_rails_pro.rb,lib/react_on_rails_pro/**/*}") +
+          Dir.glob("lib/tasks/{assets_pro.rake,v8_log_processor.rake}") +
+          # ... other files
+```
+
+The glob patterns should automatically pick up new files under `lib/react_on_rails_pro/`, but if you add new directories or file types, verify they're included.
+
+3. **Run the gemspec validation test** to ensure your files are included:
+
+```bash
+bundle exec rspec spec/react_on_rails/gemspec_file_inclusion_spec.rb
+```
+
+This test verifies:
+
+- MIT gem doesn't include any Pro files
+- Pro gem includes all intended Pro files
+- No cross-contamination between MIT and Pro packages
+
+### Why whitelisting?
+
+The previous blacklist approach accidentally included Pro files in the MIT gem, which is a licensing violation. Whitelisting ensures:
+
+- ✅ Only intended files are included
+- ✅ New files require conscious decision to include
+- ✅ Prevents licensing violations
+- ✅ CI will catch missing files via automated tests
+
+### Troubleshooting
+
+If you see test failures about missing files in the Pro gem:
+
+1. Check if your new files are under `lib/react_on_rails_pro/`
+2. Verify the glob patterns in `react_on_rails_pro.gemspec` match your file structure
+3. Run `gem build react_on_rails_pro.gemspec` and inspect the built gem with `gem specification <gem-file>.gem files`
+
 # Development Setup for Gem and Node Package Contributors
 
 ## Dev Initial Setup
