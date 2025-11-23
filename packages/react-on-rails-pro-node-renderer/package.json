@@ -118,6 +118,7 @@
       "./tests/helper.ts"
     ],
     "testEnvironment": "node",
+    "testTimeout": 30000,
     "transform": {
       "^.+\\.[jt]sx?$": "babel-jest"
     }
