@@ -24,8 +24,19 @@ module ReactOnRails
     #     description: "PostgreSQL database"
     #
     class ServiceChecker
+      # Configuration file keys
+      CONFIG_KEYS = {
+        services: "services",
+        check_command: "check_command",
+        expected_output: "expected_output",
+        start_command: "start_command",
+        install_hint: "install_hint",
+        description: "description"
+      }.freeze
+
       class << self
         # Check all required services and provide helpful output
+        #
         # @param config_path [String] Path to .dev-services.yml (default: ./.dev-services.yml)
         # @return [Boolean] true if all services are running or no config exists
         def check_services(config_path: ".dev-services.yml")
@@ -40,13 +51,13 @@ module ReactOnRails
         private
 
         def config_has_services?(config)
-          config && config["services"] && !config["services"].empty?
+          config && config[CONFIG_KEYS[:services]] && !config[CONFIG_KEYS[:services]].empty?
         end
 
         def check_and_report_services(config, config_path)
           print_services_header(config_path)
 
-          failures = collect_service_failures(config["services"])
+          failures = collect_service_failures(config[CONFIG_KEYS[:services]])
 
           report_results(failures)
         end
@@ -56,10 +67,10 @@ module ReactOnRails
 
           services.each do |name, service_config|
             if check_service(name, service_config)
-              print_service_ok(name, service_config["description"])
+              print_service_ok(name, service_config[CONFIG_KEYS[:description]])
             else
               failures << { name: name, config: service_config }
-              print_service_failed(name, service_config["description"])
+              print_service_failed(name, service_config[CONFIG_KEYS[:description]])
             end
           end
 
@@ -86,8 +97,8 @@ module ReactOnRails
         end
 
         def check_service(_name, config)
-          check_command = config["check_command"]
-          expected_output = config["expected_output"]
+          check_command = config[CONFIG_KEYS[:check_command]]
+          expected_output = config[CONFIG_KEYS[:expected_output]]
 
           return false if check_command.nil?
 
@@ -105,7 +116,12 @@ module ReactOnRails
           stdout, stderr, status = Open3.capture3(command, err: %i[child out])
           output = stdout + stderr
           [output, status]
-        rescue StandardError
+        rescue Errno::ENOENT
+          # Command not found - service is not available
+          ["", nil]
+        rescue StandardError => e
+          # Log unexpected errors for debugging
+          warn "Unexpected error checking service: #{e.message}" if ENV["DEBUG"]
           ["", nil]
         end
 
@@ -142,20 +158,20 @@ module ReactOnRails
           failures.each do |failure|
             name = failure[:name]
             config = failure[:config]
-            description = config["description"] || name
+            description = config[CONFIG_KEYS[:description]] || name
 
             puts Rainbow(name.to_s).cyan.bold
-            puts "   #{description}" if config["description"]
+            puts "   #{description}" if config[CONFIG_KEYS[:description]]
 
-            if config["start_command"]
+            if config[CONFIG_KEYS[:start_command]]
               puts ""
               puts "   #{Rainbow('To start:').yellow}"
-              puts "   #{Rainbow(config['start_command']).green}"
+              puts "   #{Rainbow(config[CONFIG_KEYS[:start_command]]).green}"
             end
 
-            if config["install_hint"]
+            if config[CONFIG_KEYS[:install_hint]]
               puts ""
-              puts "   #{Rainbow('Not installed?').yellow} #{config['install_hint']}"
+              puts "   #{Rainbow('Not installed?').yellow} #{config[CONFIG_KEYS[:install_hint]]}"
             end
 
             puts ""

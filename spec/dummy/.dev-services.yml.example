@@ -13,6 +13,12 @@
 # sensitive information or custom paths specific to your machine. Consider
 # adding .dev-services.yml to .gitignore if it contains machine-specific config.
 #
+# Security best practices:
+# - Use simple commands without shell metacharacters when possible
+# - Avoid complex shell scripts or chained commands (&&, ||, |, etc.)
+# - Only include services you trust
+# - Keep commands simple and focused on service health checks
+#
 # For the React on Rails dummy app, we typically don't require external services,
 # but here are some common examples you might use in a real application:
 
