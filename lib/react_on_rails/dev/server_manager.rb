@@ -410,6 +410,10 @@ module ReactOnRails
           # either via precompile hook or via the configuration.rb adjust_precompile_task
 
           print_procfile_info(procfile, route: route)
+
+          # Check required services before starting
+          exit 1 unless ServiceChecker.check_services
+
           print_server_info(
             "🏭 Starting production-like development server...",
             features,

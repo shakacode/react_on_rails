@@ -3,6 +3,7 @@
 require "react_on_rails/dev/service_checker"
 require "tempfile"
 require "yaml"
+require "stringio"
 
 RSpec.describe ReactOnRails::Dev::ServiceChecker do
   describe ".check_services" do

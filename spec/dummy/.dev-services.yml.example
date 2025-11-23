@@ -35,7 +35,7 @@ services:
   # postgresql:
   #   check_command: "pg_isready"
   #   expected_output: "accepting connections"
-  #   start_command: "pg_ctl -D /usr/local/var/postgres start"
+  #   start_command: "pg_ctl -D /usr/local/var/postgres start"  # macOS; Linux: sudo service postgresql start
   #   install_hint: "brew install postgresql (macOS) or apt-get install postgresql (Linux)"
   #   description: "PostgreSQL database"
 

@@ -51,7 +51,9 @@ module ReactOnRails
         private
 
         def config_has_services?(config)
-          config && config[CONFIG_KEYS[:services]] && !config[CONFIG_KEYS[:services]].empty?
+          config &&
+            config[CONFIG_KEYS[:services]].is_a?(Hash) &&
+            !config[CONFIG_KEYS[:services]].empty?
         end
 
         def check_and_report_services(config, config_path)
