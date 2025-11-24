@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+require "async"
+require "async/barrier"
+
 module ReactOnRailsPro
   class StreamDecorator
     def initialize(component)
@@ -92,22 +95,28 @@ module ReactOnRailsPro
     def each_chunk(&block)
       return enum_for(:each_chunk) unless block
 
-      send_bundle = false
-      error_body = +""
-      loop do
-        stream_response = @request_executor.call(send_bundle)
+      Sync do
+        barrier = Async::Barrier.new
 
-        # Chunks can be merged during streaming, so we separate them by newlines
-        # Also, we check the status code inside the loop block because calling `status` outside the loop block
-        # is blocking, it will wait for the response to be fully received
-        # Look at the spec of `status` in `spec/react_on_rails_pro/stream_spec.rb` for more details
-        process_response_chunks(stream_response, error_body, &block)
-        break
-      rescue HTTPX::HTTPError => e
-        send_bundle = handle_http_error(e, error_body, send_bundle)
-      rescue HTTPX::ReadTimeoutError => e
-        raise ReactOnRailsPro::Error, "Time out error while server side render streaming a component.\n" \
-                                      "Original error:\n#{e}\n#{e.backtrace}"
+        send_bundle = false
+        error_body = +""
+        loop do
+          stream_response = @request_executor.call(send_bundle, barrier)
+
+          # Chunks can be merged during streaming, so we separate them by newlines
+          # Also, we check the status code inside the loop block because calling `status` outside the loop block
+          # is blocking, it will wait for the response to be fully received
+          # Look at the spec of `status` in `spec/react_on_rails_pro/stream_spec.rb` for more details
+          process_response_chunks(stream_response, error_body, &block)
+          break
+        rescue HTTPX::HTTPError => e
+          send_bundle = handle_http_error(e, error_body, send_bundle)
+        rescue HTTPX::ReadTimeoutError => e
+          raise ReactOnRailsPro::Error, "Time out error while server side render streaming a component.\n" \
+                                        "Original error:\n#{e}\n#{e.backtrace}"
+        end
+
+        barrier.wait
       end
     end
 

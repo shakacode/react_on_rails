@@ -2,6 +2,9 @@
 
 require "rails"
 
+# Apply HTTPX bug fix for stream_bidi plugin
+require "react_on_rails_pro/httpx_stream_bidi_patch"
+
 require "react_on_rails_pro/request"
 require "react_on_rails_pro/version"
 require "react_on_rails_pro/constants"
