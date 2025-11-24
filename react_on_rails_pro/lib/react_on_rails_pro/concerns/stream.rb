@@ -50,7 +50,9 @@ module ReactOnRailsPro
 
         begin
           drain_streams_concurrently(parent_task)
-        ensure
+          # Do not close the response stream in an ensure block.
+          # If an error occurs we may need the stream open to send diagnostic/error details
+          # (for example, ApplicationController#rescue_from in the dummy app).
           response.stream.close if close_stream_at_end
         end
       end
@@ -67,8 +69,13 @@ module ReactOnRailsPro
       end
 
       # Wait for all component streaming tasks to complete
-      @async_barrier.wait
-
+      begin
+        @async_barrier.wait
+      rescue StandardError => e
+        @async_barrier.stop
+        raise e
+      end
+    ensure
       # Close the queue to signal end of streaming
       @main_output_queue.close
       writing_task.wait
