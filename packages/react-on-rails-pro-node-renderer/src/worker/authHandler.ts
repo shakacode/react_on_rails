@@ -10,11 +10,15 @@ import { timingSafeEqual } from 'crypto';
 import type { FastifyRequest } from './types.js';
 import { getConfig } from '../shared/configBuilder.js';
 
-export default function authenticate(req: FastifyRequest) {
+export interface AuthBody {
+  password?: string;
+}
+
+export function authenticate(body: AuthBody) {
   const { password } = getConfig();
 
   if (password) {
-    const reqPassword = (req.body as { password?: string }).password || '';
+    const reqPassword = body.password || '';
 
     // Use timing-safe comparison to prevent timing attacks
     // Both strings must be converted to buffers of the same length

@@ -376,7 +376,7 @@ export async function buildExecutionContext(
       return result;
     } catch (exception) {
       const exceptionMessage = formatExceptionMessage(renderingRequest, exception);
-      log.debug('Caught exception in rendering request', exceptionMessage);
+      log.debug('Caught exception in rendering request: %s', exceptionMessage);
       return Promise.resolve({ exceptionMessage });
     }
   };
