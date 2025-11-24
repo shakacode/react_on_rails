@@ -26,7 +26,7 @@ const config = tsEslint.config([
     'react_on_rails_pro/',
     // used for tests only
     'spec/react_on_rails/dummy-for-generators',
-    'react_on_rails/spec/react_on_rails/dummy-for-generators',
+    'react_on_rails/spec/dummy-for-generators',
     // temporary and generated files
     'react_on_rails/spec/dummy/.yalc',
     'react_on_rails_pro/spec/dummy/.yalc',
@@ -132,13 +132,8 @@ const config = tsEslint.config([
           ignore: ['\\.res\\.js$'],
         },
       ],
-      'react/destructuring-assignment': [
-        'error',
-        'always',
-        {
-          ignoreClassFields: true,
-        },
-      ],
+      // Disabled for flexibility with React 19 - allows both destructured and non-destructured props
+      'react/destructuring-assignment': 'off',
       'react/forbid-prop-types': 'off',
       'react/function-component-definition': [
         'error',
@@ -184,9 +179,7 @@ const config = tsEslint.config([
     },
   },
   {
-    files: [
-      'react_on_rails/lib/generators/react_on_rails/templates/**/*',
-    ],
+    files: ['react_on_rails/lib/generators/react_on_rails/templates/**/*'],
     rules: {
       // It doesn't use package.json from the template
       'import/no-unresolved': 'off',
