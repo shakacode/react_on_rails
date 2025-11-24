@@ -2,6 +2,9 @@
 
 require_relative "spec_helper"
 require "fakefs/safe"
+require "httpx"
+
+HTTPX::Plugins.load_plugin(:stream)
 
 describe ReactOnRailsPro::Request do
   let(:logger_mock) { instance_double(ActiveSupport::Logger).as_null_object }
@@ -311,4 +314,102 @@ describe ReactOnRailsPro::Request do
       expect(described_class.send(:connection)).to eq(new_connection)
     end
   end
+
+  # Unverified doubles are required for HTTPX bidirectional streaming because:
+  # 1. HTTPX::StreamResponse doesn't define status in its interface (causes verified double failures)
+  # 2. The :stream_bidi plugin adds methods (#write, #close, #build_request) not in standard interfaces
+  # 3. Using double(ClassName) documents the class while allowing interface flexibility
+  # rubocop:disable RSpec/VerifiedDoubles, RSpec/MultipleMemoizedHelpers
+  describe "render_code_with_incremental_updates" do
+    let(:js_code) { "console.log('incremental rendering');" }
+    let(:async_props_block) { proc { |_emitter| } }
+    let(:mock_request) { double(HTTPX::Request) }
+    let(:mock_response) { double(HTTPX::StreamResponse, status: 200) }
+    let(:mock_connection) { double(HTTPX::Session) }
+
+    before do
+      allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool).to receive_messages(
+        server_bundle_hash: "server_bundle.js",
+        rsc_bundle_hash: "rsc_bundle.js"
+      )
+
+      allow(mock_connection).to receive_messages(build_request: mock_request, request: mock_response)
+      allow(mock_request).to receive(:close)
+      allow(mock_request).to receive(:write)
+      allow(mock_response).to receive(:is_a?).with(HTTPX::ErrorResponse).and_return(false)
+      allow(mock_response).to receive(:each).and_yield("chunk\n")
+      allow(described_class).to receive(:incremental_connection).and_return(mock_connection)
+
+      # Stub AsyncPropsEmitter to return a mock with end_stream_chunk
+      allow(ReactOnRailsPro::AsyncPropsEmitter).to receive(:new) do |_bundle_timestamp, _request|
+        double(
+          ReactOnRailsPro::AsyncPropsEmitter,
+          end_stream_chunk: { bundleTimestamp: "mocked", updateChunk: "mocked_js" }
+        )
+      end
+    end
+
+    it "creates NDJSON request with correct initial data" do
+      stream = described_class.render_code_with_incremental_updates(
+        "/render-incremental",
+        js_code,
+        async_props_block: async_props_block,
+        is_rsc_payload: false
+      )
+
+      stream.each_chunk(&:itself)
+
+      expect(mock_connection).to have_received(:build_request).with(
+        "POST",
+        "/render-incremental",
+        headers: { "content-type" => "application/x-ndjson" },
+        body: []
+      )
+      expect(mock_request).to have_received(:write).at_least(:once)
+    end
+
+    it "spawns barrier.async task and passes emitter to async_props_block" do
+      emitter_received = nil
+      test_async_props_block = proc { |emitter| emitter_received = emitter }
+
+      # Allow real emitter to be created for this test
+      allow(ReactOnRailsPro::AsyncPropsEmitter).to receive(:new).and_call_original
+
+      stream = described_class.render_code_with_incremental_updates(
+        "/render-incremental",
+        js_code,
+        async_props_block: test_async_props_block,
+        is_rsc_payload: false
+      )
+
+      stream.each_chunk(&:itself)
+
+      expect(emitter_received).to be_a(ReactOnRailsPro::AsyncPropsEmitter)
+    end
+
+    it "uses rsc_bundle_hash when is_rsc_payload is true" do
+      allow(ReactOnRailsPro.configuration).to receive(:enable_rsc_support).and_return(true)
+
+      emitter_captured = nil
+      allow(ReactOnRailsPro::AsyncPropsEmitter).to receive(:new) do |bundle_timestamp, request_stream|
+        emitter_captured = { bundle_timestamp: bundle_timestamp, request_stream: request_stream }
+        double(
+          ReactOnRailsPro::AsyncPropsEmitter,
+          end_stream_chunk: { bundleTimestamp: bundle_timestamp, updateChunk: "mocked_js" }
+        )
+      end
+
+      stream = described_class.render_code_with_incremental_updates(
+        "/render-incremental",
+        js_code,
+        async_props_block: async_props_block,
+        is_rsc_payload: true
+      )
+
+      stream.each_chunk(&:itself)
+
+      expect(emitter_captured[:bundle_timestamp]).to eq("rsc_bundle.js")
+    end
+  end
+  # rubocop:enable RSpec/VerifiedDoubles, RSpec/MultipleMemoizedHelpers
 end
