@@ -40,13 +40,8 @@ export interface RequestBody {
   railsEnv?: string;
 }
 
-<<<<<<< HEAD:packages/react-on-rails-pro-node-renderer/src/worker/checkProtocolVersionHandler.ts
-export default function checkProtocolVersion(req: FastifyRequest) {
-  const { protocolVersion: reqProtocolVersion, gemVersion, railsEnv } = req.body as RequestBody;
-=======
 export function checkProtocolVersion(body: RequestBody) {
   const { protocolVersion: reqProtocolVersion, gemVersion, railsEnv } = body;
->>>>>>> 7b1608e57 (Refactor request handling by consolidating prechecks):react_on_rails_pro/packages/node-renderer/src/worker/checkProtocolVersionHandler.ts
 
   // Check protocol version
   if (reqProtocolVersion !== packageJson.protocolVersion) {
