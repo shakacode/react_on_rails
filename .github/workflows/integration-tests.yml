@@ -217,8 +217,8 @@ jobs:
       - name: Save root ruby gems to cache
         uses: actions/cache@v4
         with:
-          path: vendor/bundle
-          key: package-app-gem-cache-${{ hashFiles('Gemfile.lock') }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
+          path: react_on_rails/vendor/bundle
+          key: package-app-gem-cache-${{ hashFiles('react_on_rails/Gemfile.lock') }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
       - name: Save dummy app ruby gems to cache
         uses: actions/cache@v4
         with:
@@ -247,6 +247,7 @@ jobs:
           yarn run test:js
       - name: Install Ruby Gems for package
         run: |
+          cd react_on_rails
           bundle lock --add-platform 'x86_64-linux'
           if ! bundle check --path=vendor/bundle; then
             bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
@@ -285,7 +286,7 @@ jobs:
         run: |
           echo "CI_DEPENDENCY_LEVEL=ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}" >> $GITHUB_ENV
       - name: Main CI
-        run: bundle exec rake run_rspec:all_dummy
+        run: cd react_on_rails && bundle exec rake run_rspec:all_dummy
       - name: Store test results
         uses: actions/upload-artifact@v4
         with:

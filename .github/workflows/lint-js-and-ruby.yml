@@ -123,7 +123,7 @@ jobs:
       - name: yalc add react-on-rails
         run: cd react_on_rails/spec/dummy && yalc add react-on-rails
       - name: Install Node modules with Yarn for dummy app
-        run: cd react_on_rails/spec/dummy && yarn install --no-progress --no-emoji --frozen-lockfile
+        run: cd react_on_rails/spec/dummy && yarn install --no-progress --no-emoji
       - name: Install Ruby Gems for package
         run: cd react_on_rails && bundle check --path=vendor/bundle || bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
       - name: Lint Ruby
