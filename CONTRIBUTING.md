@@ -54,7 +54,7 @@ It's critical to configure your IDE/editor to ignore certain directories. Otherw
 
 The [`react_on_rails/spec/dummy` app](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails/spec/dummy) is an example of the various setup techniques you can use with the gem.
 
-There are also two such apps for React on Rails Pro: [one using the Node renderer](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/react_on_rails/spec/dummy) and [one using ExecJS](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/spec/execjs-compatible-dummy).
+There are also two such apps for React on Rails Pro: [one using the Node renderer](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/spec/dummy) and [one using ExecJS](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/spec/execjs-compatible-dummy).
 
 When you add a new feature, consider adding an example demonstrating it to the example apps.
 
@@ -124,8 +124,8 @@ When you run `yalc push`, you'll get an informative message
 ```terminaloutput
 $ yalc push
 react-on-rails@12.0.0-12070fd1 published in store.
-Pushing react-on-rails@12.0.0 in /Users/justin/shakacode/react-on-rails/react_on_rails/react_on_rails/spec/dummy
-Package react-on-rails@12.0.0-12070fd1 added ==> /Users/justin/shakacode/react-on-rails/react_on_rails/react_on_rails/spec/dummy/node_modules/react-on-rails.
+Pushing react-on-rails@12.0.0 in /Users/justin/shakacode/react-on-rails/react_on_rails/spec/dummy
+Package react-on-rails@12.0.0-12070fd1 added ==> /Users/justin/shakacode/react-on-rails/react_on_rails/spec/dummy/node_modules/react-on-rails.
 Don't forget you may need to run yarn after adding packages with yalc to install/update dependencies/bin scripts.
 ```
 
@@ -136,7 +136,7 @@ This is the approach `react_on_rails/spec/dummy` apps use, so you can also look 
 ### Example: Testing NPM changes with the dummy app
 
 1. Add `console.log('Hello!')` to [clientStartup.ts, function render](https://github.com/shakacode/react_on_rails/blob/master/packages/react-on-rails/src/clientStartup.ts) in `/packages/react-on-rails/src/clientStartup.ts` to confirm we're getting an update to the node package client-side. Do the same for function `serverRenderReactComponent` in [/packages/react-on-rails/src/serverRenderReactComponent.ts](https://github.com/shakacode/react_on_rails/blob/master/packages/react-on-rails/src/serverRenderReactComponent.ts).
-2. Refresh the browser if the server is already running or start the server using `foreman start` from `react_on_rails/react_on_rails/spec/dummy` and navigate to `http://localhost:3000/`. You will now see the `Hello!` message printed in the browser's console. If you did not see that message, then review the steps above for the workflow of making changes and pushing them via yalc.
+2. Refresh the browser if the server is already running or start the server using `foreman start` from `react_on_rails/spec/dummy` and navigate to `http://localhost:3000/`. You will now see the `Hello!` message printed in the browser's console. If you did not see that message, then review the steps above for the workflow of making changes and pushing them via yalc.
 
 ## Git dependencies
 
@@ -256,7 +256,7 @@ yarn run test
 ### react_on_rails/spec/dummy tests
 
 ```sh
-cd react_on_rails/react_on_rails/spec/dummy
+cd react_on_rails/spec/dummy
 rspec
 ```
 
