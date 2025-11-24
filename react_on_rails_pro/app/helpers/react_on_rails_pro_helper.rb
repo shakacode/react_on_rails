@@ -132,7 +132,7 @@ module ReactOnRailsProHelper
     # Extract streaming-specific callback
     on_complete = options.delete(:on_complete)
 
-    run_stream_inside_fiber(on_complete: on_complete) do
+    consumer_stream_async(on_complete: on_complete) do
       internal_stream_react_component(component_name, options)
     end
   end
@@ -193,7 +193,7 @@ module ReactOnRailsProHelper
     # Extract streaming-specific callback
     on_complete = options.delete(:on_complete)
 
-    run_stream_inside_fiber(on_complete: on_complete) do
+    consumer_stream_async(on_complete: on_complete) do
       internal_rsc_payload_react_component(component_name, options)
     end
   end
@@ -298,7 +298,7 @@ module ReactOnRailsProHelper
     raise ReactOnRailsPro::Error, "Option 'cache_key' is required for React on Rails caching"
   end
 
-  def run_stream_inside_fiber(on_complete:)
+  def consumer_stream_async(on_complete:)
     require "async/variable"
 
     if @async_barrier.nil?
