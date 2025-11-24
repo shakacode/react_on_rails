@@ -2,10 +2,13 @@
 
 require "async"
 require "async/queue"
+require "async/barrier"
 require "rails_helper"
 require "support/script_tag_utils"
 
 RequestDetails = Struct.new(:original_url, :env)
+
+# rubocop:disable RSpec/InstanceVariable
 
 # This module is created to provide stub methods for `render_to_string` and `response`
 # These methods will be mocked in the tests to prevent "<object> does not implement <method>" errors
@@ -360,13 +363,19 @@ describe ReactOnRailsProHelper do
     end
 
     describe "#stream_react_component" do
-      before do
-        # Initialize @rorp_rendering_fibers to mock the behavior of stream_view_containing_react_components.
-        # This instance variable is normally set by stream_view_containing_react_components method.
-        # By setting it here, we simulate that the view is being rendered using that method.
-        # This setup is necessary because stream_react_component relies on @rorp_rendering_fibers
-        # to function correctly within the streaming context.
-        @rorp_rendering_fibers = []
+      around do |example|
+        # Wrap each test in Sync block to provide async context
+        Sync do
+          # Initialize async primitives to mock the behavior of stream_view_containing_react_components.
+          # These instance variables are normally set by stream_view_containing_react_components method.
+          # By setting them here, we simulate that the view is being rendered using that method.
+          # This setup is necessary because stream_react_component relies on @async_barrier and @main_output_queue
+          # to function correctly within the streaming context.
+          @async_barrier = Async::Barrier.new
+          @main_output_queue = Async::Queue.new
+
+          example.run
+        end
       end
 
       it "returns the component shell that exist in the initial chunk with the consoleReplayScript" do
@@ -380,35 +389,39 @@ describe ReactOnRailsProHelper do
           expect(initial_result).to include(wrapped)
         end
         expect(initial_result).not_to include("More content", "Final content")
-        expect(chunks_read.count).to eq(1)
+        # NOTE: With async architecture, chunks are consumed in background immediately,
+        expect(chunks_read.count).to eq(3)
       end
 
-      it "creates a fiber to read subsequent chunks" do
+      it "streams subsequent chunks to the output queue" do
         mock_request_and_response
-        stream_react_component(component_name, props: props, **component_options)
-        expect(@rorp_rendering_fibers.count).to eq(1) # rubocop:disable RSpec/InstanceVariable
-        fiber = @rorp_rendering_fibers.first # rubocop:disable RSpec/InstanceVariable
-        expect(fiber).to be_alive
+        initial_result = stream_react_component(component_name, props: props, **component_options)
 
-        second_result = fiber.resume
-        # regex that matches the html and wrapped consoleReplayScript
-        # Note: consoleReplayScript is now wrapped in a script tag with id="consoleReplayLog"
+        # First chunk is returned synchronously
+        expect(initial_result).to include(react_component_div_with_initial_chunk)
+
+        # Wait for async task to complete
+        @async_barrier.wait
+        @main_output_queue.close
+
+        # Subsequent chunks should be in the output queue
+        collected_chunks = []
+        while (chunk = @main_output_queue.dequeue)
+          collected_chunks << chunk
+        end
+
+        # Should have received the remaining chunks (chunks 2 and 3)
+        expect(collected_chunks.length).to eq(2)
+
+        # Verify second chunk content
         script = chunks[1][:consoleReplayScript]
         wrapped = script.present? ? "<script id=\"consoleReplayLog\">#{script}</script>" : ""
-        expect(second_result).to match(
+        expect(collected_chunks[0]).to match(
           /#{Regexp.escape(chunks[1][:html])}\s+#{Regexp.escape(wrapped)}/
         )
-        expect(second_result).not_to include("Stream React Server Components", "Final content")
-        expect(chunks_read.count).to eq(2)
 
-        third_result = fiber.resume
-        expect(third_result).to eq(chunks[2][:html].to_s)
-        expect(third_result).not_to include("Stream React Server Components", "More content")
-        expect(chunks_read.count).to eq(3)
-
-        expect(fiber.resume).to be_nil
-        expect(fiber).not_to be_alive
-        expect(chunks_read.count).to eq(chunks.count)
+        # Verify third chunk content
+        expect(collected_chunks[1]).to eq(chunks[2][:html].to_s)
       end
 
       it "does not trim whitespaces from html" do
@@ -420,12 +433,24 @@ describe ReactOnRailsProHelper do
           { html: "\t\t\t<div>Chunk 4: with mixed whitespaces</div>  \n\n\n" }
         ].map { |chunk| chunk.merge(consoleReplayScript: "") }
         mock_request_and_response(chunks_with_whitespaces)
+
         initial_result = stream_react_component(component_name, props: props, **component_options)
         expect(initial_result).to include(chunks_with_whitespaces.first[:html])
-        fiber = @rorp_rendering_fibers.first # rubocop:disable RSpec/InstanceVariable
-        expect(fiber.resume).to include(chunks_with_whitespaces[1][:html])
-        expect(fiber.resume).to include(chunks_with_whitespaces[2][:html])
-        expect(fiber.resume).to include(chunks_with_whitespaces[3][:html])
+
+        # Wait for async task to complete
+        @async_barrier.wait
+        @main_output_queue.close
+
+        # Collect remaining chunks from queue
+        collected_chunks = []
+        while (chunk = @main_output_queue.dequeue)
+          collected_chunks << chunk
+        end
+
+        # Verify whitespaces are preserved in all chunks
+        expect(collected_chunks[0]).to include(chunks_with_whitespaces[1][:html])
+        expect(collected_chunks[1]).to include(chunks_with_whitespaces[2][:html])
+        expect(collected_chunks[2]).to include(chunks_with_whitespaces[3][:html])
       end
     end
 
@@ -698,15 +723,25 @@ describe ReactOnRailsProHelper do
       # we need this setup because we can't use the helper outside of stream_view_containing_react_components
       def render_cached_random_value(cache_key)
         # Streaming helpers require this context normally provided by stream_view_containing_react_components
-        @rorp_rendering_fibers = []
+        result = nil
+        Sync do
+          @async_barrier = Async::Barrier.new
+          @main_output_queue = Async::Queue.new
 
-        result = cached_stream_react_component("RandomValue", cache_key: cache_key,
-                                                              id: "RandomValue-react-component-0") do
-          { a: 1, b: 2 }
+          result = cached_stream_react_component("RandomValue", cache_key: cache_key,
+                                                                id: "RandomValue-react-component-0") do
+            { a: 1, b: 2 }
+          end
+
+          # Complete the streaming lifecycle to trigger cache writes
+          @async_barrier.wait
+          @main_output_queue.close
+
+          # Drain the queue
+          while @main_output_queue.dequeue
+            # Just consume all remaining chunks
+          end
         end
-
-        # Complete the streaming lifecycle to trigger cache writes
-        @rorp_rendering_fibers.each { |fiber| fiber.resume while fiber.alive? } # rubocop:disable RSpec/InstanceVariable
 
         result
       end
@@ -746,8 +781,15 @@ describe ReactOnRailsProHelper do
       ]
     end
 
+    around do |example|
+      Sync do
+        @async_barrier = Async::Barrier.new
+        @main_output_queue = Async::Queue.new
+        example.run
+      end
+    end
+
     before do
-      @rorp_rendering_fibers = []
       ReactOnRailsPro::Request.instance_variable_set(:@connection, nil)
       original_httpx_plugin = HTTPX.method(:plugin)
       allow(HTTPX).to receive(:plugin) do |*args|
@@ -775,3 +817,4 @@ describe ReactOnRailsProHelper do
     end
   end
 end
+# rubocop:enable RSpec/InstanceVariable

@@ -128,7 +128,11 @@ module ReactOnRailsProHelper
     # Because setting prerender to false is equivalent to calling react_component with prerender: false
     options[:prerender] = true
     options = options.merge(immediate_hydration: true) unless options.key?(:immediate_hydration)
-    run_stream_inside_fiber do
+
+    # Extract streaming-specific callback
+    on_complete = options.delete(:on_complete)
+
+    consumer_stream_async(on_complete: on_complete) do
       internal_stream_react_component(component_name, options)
     end
   end
@@ -185,7 +189,11 @@ module ReactOnRailsProHelper
     # rsc_payload_react_component doesn't have the prerender option
     # Because setting prerender to false will not do anything
     options[:prerender] = true
-    run_stream_inside_fiber do
+
+    # Extract streaming-specific callback
+    on_complete = options.delete(:on_complete)
+
+    consumer_stream_async(on_complete: on_complete) do
       internal_rsc_payload_react_component(component_name, options)
     end
   end
@@ -246,30 +254,29 @@ module ReactOnRailsProHelper
     load_pack_for_generated_component(component_name, render_options)
 
     initial_result, *rest_chunks = cached_chunks
-    hit_fiber = Fiber.new do
-      rest_chunks.each { |chunk| Fiber.yield(chunk) }
-      nil
+
+    # Enqueue remaining chunks asynchronously
+    @async_barrier.async do
+      rest_chunks.each { |chunk| @main_output_queue.enqueue(chunk) }
     end
-    @rorp_rendering_fibers << hit_fiber
+
+    # Return first chunk directly
     initial_result
   end
 
   def handle_stream_cache_miss(component_name, raw_options, auto_load_bundle, view_cache_key, &block)
-    # Kick off the normal streaming helper to get the initial result and the original fiber
-    initial_result = render_stream_component_with_props(component_name, raw_options, auto_load_bundle, &block)
-    original_fiber = @rorp_rendering_fibers.pop
+    cache_aware_options = raw_options.merge(
+      on_complete: lambda { |chunks|
+        Rails.cache.write(view_cache_key, chunks, raw_options[:cache_options] || {})
+      }
+    )
 
-    buffered_chunks = [initial_result]
-    wrapper_fiber = Fiber.new do
-      while (chunk = original_fiber.resume)
-        buffered_chunks << chunk
-        Fiber.yield(chunk)
-      end
-      Rails.cache.write(view_cache_key, buffered_chunks, raw_options[:cache_options] || {})
-      nil
-    end
-    @rorp_rendering_fibers << wrapper_fiber
-    initial_result
+    render_stream_component_with_props(
+      component_name,
+      cache_aware_options,
+      auto_load_bundle,
+      &block
+    )
   end
 
   def render_stream_component_with_props(component_name, raw_options, auto_load_bundle)
@@ -291,25 +298,46 @@ module ReactOnRailsProHelper
     raise ReactOnRailsPro::Error, "Option 'cache_key' is required for React on Rails caching"
   end
 
-  def run_stream_inside_fiber
-    if @rorp_rendering_fibers.nil?
+  def consumer_stream_async(on_complete:)
+    require "async/variable"
+
+    if @async_barrier.nil?
       raise ReactOnRails::Error,
             "You must call stream_view_containing_react_components to render the view containing the react component"
     end
 
-    rendering_fiber = Fiber.new do
+    # Create a variable to hold the first chunk for synchronous return
+    first_chunk_var = Async::Variable.new
+    all_chunks = [] if on_complete # Only collect if callback provided
+
+    # Start an async task on the barrier to stream all chunks
+    @async_barrier.async do
       stream = yield
+      is_first = true
+
       stream.each_chunk do |chunk|
-        Fiber.yield chunk
+        all_chunks << chunk if on_complete # Collect for callback
+
+        if is_first
+          # Store first chunk in variable for synchronous access
+          first_chunk_var.value = chunk
+          is_first = false
+        else
+          # Enqueue remaining chunks to main output queue
+          @main_output_queue.enqueue(chunk)
+        end
       end
+
+      # Handle case where stream has no chunks
+      first_chunk_var.value = nil if is_first
+
+      # Call callback with all chunks when streaming completes
+      on_complete&.call(all_chunks)
     end
 
-    @rorp_rendering_fibers << rendering_fiber
-
-    # return the first chunk of the fiber
-    # It contains the initial html of the component
-    # all updates will be appended to the stream sent to browser
-    rendering_fiber.resume
+    # Wait for and return the first chunk (blocking)
+    first_chunk_var.wait
+    first_chunk_var.value
   end
 
   def internal_stream_react_component(component_name, options = {})
