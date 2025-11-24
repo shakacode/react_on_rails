@@ -187,7 +187,10 @@ const config = tsEslint.config([
     },
   },
   {
-    files: ['lib/generators/react_on_rails/templates/**/*', 'react_on_rails/lib/generators/react_on_rails/templates/**/*'],
+    files: [
+      'lib/generators/react_on_rails/templates/**/*',
+      'react_on_rails/lib/generators/react_on_rails/templates/**/*',
+    ],
     rules: {
       // It doesn't use package.json from the template
       'import/no-unresolved': 'off',
