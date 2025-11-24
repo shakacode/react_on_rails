@@ -37,7 +37,7 @@ AllCops:
 
 Naming/FileName:
   Exclude:
-    - '**/Gemfile'
+    - '**/Gemfile*'
     - '**/Rakefile'
     - '**/Steepfile'
 

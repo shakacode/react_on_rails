@@ -26,13 +26,20 @@ const config = tsEslint.config([
     'react_on_rails_pro/',
     // used for tests only
     'spec/react_on_rails/dummy-for-generators',
+    'react_on_rails/spec/react_on_rails/dummy-for-generators',
     // temporary and generated files
     'spec/dummy/.yalc',
+    'react_on_rails/spec/dummy/.yalc',
     'spec/dummy/public',
+    'react_on_rails/spec/dummy/public',
     'spec/dummy/vendor',
+    'react_on_rails/spec/dummy/vendor',
     'spec/dummy/tmp',
+    'react_on_rails/spec/dummy/tmp',
     'spec/dummy/app/assets/config/manifest.js',
+    'react_on_rails/spec/dummy/app/assets/config/manifest.js',
     'spec/dummy/client/app/packs/server-bundle.js',
+    'react_on_rails/spec/dummy/client/app/packs/server-bundle.js',
     '**/*.res.js',
     '**/coverage',
     '**/assets/webpack/',
@@ -82,7 +89,10 @@ const config = tsEslint.config([
       'import/core-modules': ['react-redux'],
 
       'import/resolver': {
-        alias: [['Assets', './spec/dummy/client/app/assets']],
+        alias: [
+          ['Assets', './spec/dummy/client/app/assets'],
+          ['Assets', './react_on_rails/spec/dummy/client/app/assets'],
+        ],
 
         node: {
           extensions: ['.js', '.jsx', '.ts', '.tsx', '.d.ts'],
@@ -177,7 +187,7 @@ const config = tsEslint.config([
     },
   },
   {
-    files: ['lib/generators/react_on_rails/templates/**/*'],
+    files: ['lib/generators/react_on_rails/templates/**/*', 'react_on_rails/lib/generators/react_on_rails/templates/**/*'],
     rules: {
       // It doesn't use package.json from the template
       'import/no-unresolved': 'off',
@@ -188,9 +198,16 @@ const config = tsEslint.config([
     },
   },
   {
-    files: ['spec/dummy/**/*'],
+    files: ['spec/dummy/**/*', 'react_on_rails/spec/dummy/**/*'],
     rules: {
       // The dummy app dependencies are managed separately and may not be installed
+      'import/no-unresolved': 'off',
+    },
+  },
+  {
+    files: ['**/e2e/playwright/**/*', '**/playwright/**/*.spec.{js,ts}'],
+    rules: {
+      // Playwright dependencies may not be installed during linting
       'import/no-unresolved': 'off',
     },
   },

@@ -4,8 +4,8 @@ require "rake"
 
 RSpec.describe "RBS Rake Tasks" do
   before do
-    # Load the rake tasks file
-    load File.expand_path("../../rakelib/rbs.rake", __dir__)
+    # Load the rake tasks file from monorepo root (3 levels up from react_on_rails/spec/react_on_rails/)
+    load File.expand_path("../../../rakelib/rbs.rake", __dir__)
   end
 
   describe "rake rbs:validate" do

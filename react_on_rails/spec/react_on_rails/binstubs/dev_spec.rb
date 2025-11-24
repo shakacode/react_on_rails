@@ -3,8 +3,8 @@
 require "react_on_rails/dev"
 
 RSpec.describe "bin/dev script" do
-  let(:script_path) { "lib/generators/react_on_rails/templates/base/base/bin/dev" }
-  let(:dummy_dev_path) { "spec/dummy/bin/dev" }
+  let(:script_path) { "react_on_rails/lib/generators/react_on_rails/templates/base/base/bin/dev" }
+  let(:dummy_dev_path) { "react_on_rails/spec/dummy/bin/dev" }
 
   # To suppress stdout during tests
   original_stderr = $stderr
@@ -68,9 +68,9 @@ RSpec.describe "bin/dev script" do
       expect(File.exist?(dummy_dev_path)).to be true
       expect(File.exist?(script_path)).to be true
 
-      # Verify the dummy script references the template
+      # Verify the dummy script references the template (using relative path from dummy/bin)
       dummy_content = File.read(dummy_dev_path)
-      expect(dummy_content).to include(script_path)
+      expect(dummy_content).to include("../../../lib/generators/react_on_rails/templates/base/base/bin/dev")
     end
 
     it "can require react_on_rails/dev and access all necessary modules" do
