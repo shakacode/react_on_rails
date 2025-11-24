@@ -3,6 +3,6 @@
 source "https://rubygems.org"
 
 # Specify your gem"s dependencies in react_on_rails.gemspec
-gemspec path: "react_on_rails"
+gemspec
 
 eval_gemfile File.expand_path("./Gemfile.development_dependencies", __dir__)
