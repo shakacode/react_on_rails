@@ -15,11 +15,11 @@ def move(old_path, new_path)
 end
 
 # Keep shakapacker.yml since we're using Shakapacker 8+
-# move("../spec/dummy/config/shakapacker.yml", "../spec/dummy/config/webpacker.yml")
+# move("../react_on_rails/spec/dummy/config/shakapacker.yml", "../react_on_rails/spec/dummy/config/webpacker.yml")
 
 # Shakapacker - use version with async script loading support (8.2.0+)
 gsub_file_content("../Gemfile.development_dependencies", /gem "shakapacker", "[^"]*"/, 'gem "shakapacker", "8.2.0"')
-gsub_file_content("../spec/dummy/package.json", /"shakapacker": "[^"]*",/, '"shakapacker": "8.2.0",')
+gsub_file_content("../react_on_rails/spec/dummy/package.json", /"shakapacker": "[^"]*",/, '"shakapacker": "8.2.0",')
 
 # The below packages don't work on the oldest supported Node version and aren't needed there anyway
 # Note: All dev dependencies remain in root package.json even after workspace migration
@@ -36,8 +36,8 @@ gsub_file_content("../package.json", /,(\s*})/, "\\1")
 # Switch to minimum supported React version (React 18 since we removed PropTypes)
 gsub_file_content("../package.json", /"react": "[^"]*",/, '"react": "18.0.0",')
 gsub_file_content("../package.json", /"react-dom": "[^"]*",/, '"react-dom": "18.0.0",')
-gsub_file_content("../spec/dummy/package.json", /"react": "[^"]*",/, '"react": "18.0.0",')
-gsub_file_content("../spec/dummy/package.json", /"react-dom": "[^"]*",/, '"react-dom": "18.0.0",')
+gsub_file_content("../react_on_rails/spec/dummy/package.json", /"react": "[^"]*",/, '"react": "18.0.0",')
+gsub_file_content("../react_on_rails/spec/dummy/package.json", /"react-dom": "[^"]*",/, '"react-dom": "18.0.0",')
 gsub_file_content(
   "../packages/react-on-rails-pro/package.json",
   /"test:non-rsc": "(?:\\"|[^"])*",/,
