@@ -138,7 +138,7 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
   sh_in_dir(gem_root, "find . -mindepth 3 -name 'react_on_rails_pro.gemspec' -delete")
 
   # Pull latest changes (skip in dry-run mode or when skip_push is set)
-  sh_in_dir(gem_root, "git pull --rebase") unless is_dry_run || skip_push
+  sh_in_dir(monorepo_root, "git pull --rebase") unless is_dry_run || skip_push
 
   # Determine if version_input is semver keyword or explicit version
   semver_keywords = %w[patch minor major]
@@ -231,16 +231,16 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
 
   unless is_dry_run
     # Commit all version changes (skip git hooks to save time)
-    sh_in_dir(gem_root, "LEFTHOOK=0 git add -A")
-    sh_in_dir(gem_root, "LEFTHOOK=0 git commit -m 'Bump version to #{actual_gem_version}'")
+    sh_in_dir(monorepo_root, "LEFTHOOK=0 git add -A")
+    sh_in_dir(monorepo_root, "LEFTHOOK=0 git commit -m 'Bump version to #{actual_gem_version}'")
 
     # Create git tag
-    sh_in_dir(gem_root, "git tag v#{actual_gem_version}")
+    sh_in_dir(monorepo_root, "git tag v#{actual_gem_version}")
 
     # Push commits and tags (skip git hooks)
     unless skip_push
-      sh_in_dir(gem_root, "LEFTHOOK=0 git push")
-      sh_in_dir(gem_root, "LEFTHOOK=0 git push --tags")
+      sh_in_dir(monorepo_root, "LEFTHOOK=0 git push")
+      sh_in_dir(monorepo_root, "LEFTHOOK=0 git push --tags")
     end
 
     puts "\n#{'=' * 80}"
