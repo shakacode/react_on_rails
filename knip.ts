@@ -37,7 +37,7 @@ const config: KnipConfig = {
         // This is an optional peer dependency because users without RSC don't need it
         // but Knip doesn't like such dependencies to be referenced directly in code
         'react-on-rails-rsc',
-        // SWC transpiler dependencies used in dummy apps
+        // SWC transpiler dependencies used by Shakapacker in dummy apps
         '@swc/core',
         'swc-loader',
       ],
@@ -154,6 +154,8 @@ const config: KnipConfig = {
         'client/app/routes/**',
         'client/app/startup/**',
         'client/app/store/**',
+        // ReScript entry files that import compiled .res.js files (compiled at build time)
+        'client/app/packs/rescript-components.js',
       ],
       project: ['**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}!', 'config/webpack/*.js'],
       paths: {
@@ -186,14 +188,14 @@ const config: KnipConfig = {
         'sass-resources-loader',
         'style-loader',
         'url-loader',
-        // Transitive dependency of shakapacker but listed as direct dependency
-        'webpack-merge',
         // Used in ignored client/app components (dynamically loaded by React on Rails)
         'create-react-class',
         'react-helmet',
         '@types/react-helmet',
         'react-redux',
         'react-router-dom',
+        // Transitive dependency of shakapacker but listed as direct dependency
+        'webpack-merge',
       ],
     },
   },
