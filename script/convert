@@ -18,7 +18,7 @@ end
 # move("../react_on_rails/spec/dummy/config/shakapacker.yml", "../react_on_rails/spec/dummy/config/webpacker.yml")
 
 # Shakapacker - use version with async script loading support (8.2.0+)
-gsub_file_content("../Gemfile.development_dependencies", /gem "shakapacker", "[^"]*"/, 'gem "shakapacker", "8.2.0"')
+gsub_file_content("../react_on_rails/Gemfile.development_dependencies", /gem "shakapacker", "[^"]*"/, 'gem "shakapacker", "8.2.0"')
 gsub_file_content("../react_on_rails/spec/dummy/package.json", /"shakapacker": "[^"]*",/, '"shakapacker": "8.2.0",')
 
 # The below packages don't work on the oldest supported Node version and aren't needed there anyway
