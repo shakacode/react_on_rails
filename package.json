@@ -72,7 +72,7 @@
     "build": "yarn workspace react-on-rails run build && yarn workspace react-on-rails-pro run build && yarn workspace react-on-rails-pro-node-renderer run build",
     "build-watch": "yarn workspaces run build-watch",
     "lint": "yarn run nps eslint",
-    "lint:scss": "stylelint \"spec/dummy/app/assets/stylesheets/**/*.scss\" \"spec/dummy/client/**/*.scss\"",
+    "lint:scss": "stylelint \"react_on_rails/spec/dummy/app/assets/stylesheets/**/*.scss\" \"react_on_rails/spec/dummy/client/**/*.scss\"",
     "check": "yarn run lint && yarn workspaces run check",
     "type-check": "yarn workspaces run type-check",
     "yalc:publish": "yarn workspaces run yalc:publish",
