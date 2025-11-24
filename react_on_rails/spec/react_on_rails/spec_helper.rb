@@ -45,7 +45,7 @@ Test::Unit.run = true if defined?(Test::Unit) && Test::Unit.respond_to?(:run=)
 RSpec.configure do |config|
   Rails.logger = Logger.new($stdout)
 
-  config.example_status_persistence_file_path = "spec/examples.txt"
+  config.example_status_persistence_file_path = File.join(__dir__, "../examples.txt")
   config.run_all_when_everything_filtered = true
 
   # rspec-expectations config goes here. You can use an alternate

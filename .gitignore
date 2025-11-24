@@ -9,6 +9,9 @@ coverage/
 *.gem
 /vendor/
 
+# Root-level spec directory (should not exist with monorepo structure)
+/spec/
+
 react_on_rails/spec/examples.txt
 react_on_rails/spec/react_on_rails/dummy-for-generators/
 react_on_rails_pro/spec/examples.txt
