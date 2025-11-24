@@ -3,6 +3,15 @@
 
 def gsub_file_content(path, old_content, new_content)
   path = File.expand_path(path, __dir__)
+
+  # Support both old structure (files at root) and new structure (files in react_on_rails/)
+  # This allows the script to work before and after the monorepo reorganization
+  unless File.exist?(path)
+    # Try the old location by removing one level of nesting
+    old_path = path.sub(%r{/react_on_rails/Gemfile}, "/Gemfile")
+    path = old_path if File.exist?(old_path)
+  end
+
   content = File.binread(path)
   content.gsub!(old_content, new_content)
   File.binwrite(path, content)
