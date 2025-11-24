@@ -18,7 +18,7 @@ namespace :run_rspec do
     ExampleType.new(packer_type: "shakapacker_examples", **symbolize_keys(example_type_data))
   end
 
-  spec_dummy_dir = File.join("spec", "dummy")
+  spec_dummy_dir = File.join(gem_root, "spec", "dummy")
 
   # RBS Runtime Type Checking Configuration
   # ========================================

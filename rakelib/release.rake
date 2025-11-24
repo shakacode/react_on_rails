@@ -168,7 +168,7 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
 
   # Update react_on_rails_pro gem version to match
   puts "\nUpdating react_on_rails_pro gem version to #{actual_gem_version}..."
-  pro_gem_root = File.join(gem_root, "react_on_rails_pro")
+  pro_gem_root = File.join(monorepo_root, "react_on_rails_pro")
   pro_version_file = File.join(pro_gem_root, "lib", "react_on_rails_pro", "version.rb")
   pro_version_content = File.read(pro_version_file)
   # We use gsub instead of `gem bump` here because the git tree is already dirty
