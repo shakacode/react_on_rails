@@ -89,9 +89,7 @@ const config = tsEslint.config([
       'import/core-modules': ['react-redux'],
 
       'import/resolver': {
-        alias: [
-          ['Assets', './react_on_rails/spec/dummy/client/app/assets'],
-        ],
+        alias: [['Assets', './react_on_rails/spec/dummy/client/app/assets']],
 
         node: {
           extensions: ['.js', '.jsx', '.ts', '.tsx', '.d.ts'],

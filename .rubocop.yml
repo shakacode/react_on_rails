@@ -71,7 +71,7 @@ Lint/SuppressedException:
 Metrics/AbcSize:
   Max: 28
   Exclude:
-    - 'lib/generators/react_on_rails/install_generator.rb'  # Generator setup methods require comprehensive error handling
+    - 'react_on_rails/lib/generators/react_on_rails/install_generator.rb'  # Generator setup methods require comprehensive error handling
 
 Metrics/CyclomaticComplexity:
   Max: 7
@@ -82,8 +82,8 @@ Metrics/PerceivedComplexity:
 Metrics/ClassLength:
   Max: 150
   Exclude:
-    - 'lib/generators/react_on_rails/base_generator.rb'  # Generator complexity justified
-    - 'lib/react_on_rails/dev/server_manager.rb'  # Dev tool with comprehensive help system
+    - 'react_on_rails/lib/generators/react_on_rails/base_generator.rb'  # Generator complexity justified
+    - 'react_on_rails/lib/react_on_rails/dev/server_manager.rb'  # Dev tool with comprehensive help system
 
 Metrics/ParameterLists:
   Max: 5
@@ -92,7 +92,7 @@ Metrics/ParameterLists:
 Metrics/MethodLength:
   Max: 41
   Exclude:
-    - 'lib/generators/react_on_rails/install_generator.rb'  # Generator setup methods require comprehensive error handling
+    - 'react_on_rails/lib/generators/react_on_rails/install_generator.rb'  # Generator setup methods require comprehensive error handling
 
 Metrics/ModuleLength:
   Max: 180

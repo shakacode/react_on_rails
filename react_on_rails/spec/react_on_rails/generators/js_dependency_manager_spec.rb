@@ -182,7 +182,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       result = instance.send(:install_js_dependencies)
 
       expect(result).to be(false)
-      expect(warnings.size).to be > 0
+      expect(warnings.size).to be.positive?
       expect(warnings.first.to_s).to include("package_json not available")
     end
 
@@ -192,7 +192,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       result = instance.send(:install_js_dependencies)
 
       expect(result).to be(false)
-      expect(warnings.size).to be > 0
+      expect(warnings.size).to be.positive?
       expect(warnings.first.to_s).to include("JavaScript dependencies installation failed")
     end
   end
@@ -265,7 +265,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
       instance.send(:add_react_on_rails_package)
 
-      expect(warnings.size).to be > 0
+      expect(warnings.size).to be.positive?
       expect(warnings.first.to_s).to include("Failed to add react-on-rails package")
     end
 
@@ -274,7 +274,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
       instance.send(:add_react_on_rails_package)
 
-      expect(warnings.size).to be > 0
+      expect(warnings.size).to be.positive?
       # When add_package catches exception, it returns false, triggering the "Failed to add" warning
       expect(warnings.first.to_s).to include("Failed to add react-on-rails package")
     end
@@ -291,7 +291,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
       instance.send(:add_react_dependencies)
 
-      expect(warnings.size).to be > 0
+      expect(warnings.size).to be.positive?
       expect(warnings.first.to_s).to include("Failed to add React dependencies")
     end
   end
@@ -307,7 +307,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
       instance.send(:add_css_dependencies)
 
-      expect(warnings.size).to be > 0
+      expect(warnings.size).to be.positive?
       expect(warnings.first.to_s).to include("Failed to add CSS dependencies")
     end
   end
@@ -336,7 +336,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
       instance.send(:add_dev_dependencies)
 
-      expect(warnings.size).to be > 0
+      expect(warnings.size).to be.positive?
       expect(warnings.first.to_s).to include("Failed to add development dependencies")
     end
   end
@@ -352,7 +352,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
       instance.send(:add_rspack_dependencies)
 
-      expect(warnings.size).to be > 0
+      expect(warnings.size).to be.positive?
       expect(warnings.first.to_s).to include("Failed to add Rspack dependencies")
     end
   end
@@ -369,7 +369,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
       instance.send(:add_typescript_dependencies)
 
-      expect(warnings.size).to be > 0
+      expect(warnings.size).to be.positive?
       expect(warnings.first.to_s).to include("Failed to add TypeScript dependencies")
     end
   end
@@ -413,7 +413,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       expect { instance.send(:setup_js_dependencies) }.not_to raise_error
 
       # Should have generated warnings for failures
-      expect(warnings.size).to be > 0
+      expect(warnings.size).to be.positive?
       # But no errors that would crash the generator
       expect(errors.size).to eq(0)
     end
