@@ -90,7 +90,6 @@ const config = tsEslint.config([
 
       'import/resolver': {
         alias: [
-          ['Assets', './spec/dummy/client/app/assets'],
           ['Assets', './react_on_rails/spec/dummy/client/app/assets'],
         ],
 
