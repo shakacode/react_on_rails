@@ -147,7 +147,7 @@ jobs:
       - name: yalc publish for react-on-rails
         # Use yarn workspace script to publish all workspace packages to yalc
         # Runs the "yalc:publish" script defined in each workspace's package.json
-        run: yarn yalc publish
+        run: yarn run yalc:publish
       - name: Install Ruby Gems for package
         run: |
           cd react_on_rails
