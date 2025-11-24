@@ -365,7 +365,7 @@ export async function buildExecutionContext(
         const objectResult = await result;
         result = JSON.stringify(objectResult);
       }
-      if (log.level === 'debug') {
+      if (log.level === 'debug' && result) {
         log.debug(`result from JS:
   ${smartTrim(result)}`);
         const debugOutputPathResult = path.join(serverBundleCachePath, 'result.json');
