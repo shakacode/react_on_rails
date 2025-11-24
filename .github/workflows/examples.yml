@@ -173,7 +173,7 @@ jobs:
         run: |
           echo "CI_DEPENDENCY_LEVEL=${{ matrix.dependency-level }}" >> $GITHUB_ENV
       - name: Main CI
-        run: bundle exec rake run_rspec:shakapacker_examples
+        run: cd react_on_rails && bundle exec rake run_rspec:shakapacker_examples
       - name: Store test results
         uses: actions/upload-artifact@v4
         with:
