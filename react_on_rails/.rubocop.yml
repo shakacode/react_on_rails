@@ -18,9 +18,6 @@ AllCops:
     - '**/*.rake'
 
   Exclude:
-  <% `git status --ignored --porcelain`.lines.grep(/^!! /).each do |path| %>
-    - <%= path.sub(/^!! /, '') %>
-  <% end %>
     - '**/*.js'
     - '**/node_modules/**/*'
     - '**/public/**/*'
@@ -28,10 +25,10 @@ AllCops:
     - 'coverage/**/*'
     - 'gen-examples/examples/**/*'
     - 'node_modules/**/*'
-    - 'react_on_rails_pro/**/*'  # Exclude pro package (has its own linting)
-    - 'react_on_rails/spec/dummy/bin/*'
-    - 'react_on_rails/spec/fixtures/**/*'
-    - 'react_on_rails/spec/react_on_rails/dummy-for-generators/**/*'
+    - '../react_on_rails_pro/**/*'  # Exclude pro package (has its own linting)
+    - 'spec/dummy/bin/*'
+    - 'spec/fixtures/**/*'
+    - 'spec/react_on_rails/dummy-for-generators/**/*'
     - 'tmp/**/*'
     - 'vendor/**/*'
 
@@ -61,17 +58,17 @@ Style/HashTransformValues:
 
 Lint/AssignmentInCondition:
   Exclude:
-    - 'react_on_rails/spec/dummy/bin/spring'
+    - 'spec/dummy/bin/spring'
 
 Lint/SuppressedException:
   Exclude:
-    - 'react_on_rails/spec/dummy/bin/rails'
-    - 'react_on_rails/spec/dummy/bin/rake'
+    - 'spec/dummy/bin/rails'
+    - 'spec/dummy/bin/rake'
 
 Metrics/AbcSize:
   Max: 28
   Exclude:
-    - 'react_on_rails/lib/generators/react_on_rails/install_generator.rb'  # Generator setup methods require comprehensive error handling
+    - 'lib/generators/react_on_rails/install_generator.rb'  # Generator setup methods require comprehensive error handling
 
 Metrics/CyclomaticComplexity:
   Max: 7
@@ -82,8 +79,8 @@ Metrics/PerceivedComplexity:
 Metrics/ClassLength:
   Max: 150
   Exclude:
-    - 'react_on_rails/lib/generators/react_on_rails/base_generator.rb'  # Generator complexity justified
-    - 'react_on_rails/lib/react_on_rails/dev/server_manager.rb'  # Dev tool with comprehensive help system
+    - 'lib/generators/react_on_rails/base_generator.rb'  # Generator complexity justified
+    - 'lib/react_on_rails/dev/server_manager.rb'  # Dev tool with comprehensive help system
 
 Metrics/ParameterLists:
   Max: 5
@@ -92,23 +89,23 @@ Metrics/ParameterLists:
 Metrics/MethodLength:
   Max: 41
   Exclude:
-    - 'react_on_rails/lib/generators/react_on_rails/install_generator.rb'  # Generator setup methods require comprehensive error handling
+    - 'lib/generators/react_on_rails/install_generator.rb'  # Generator setup methods require comprehensive error handling
 
 Metrics/ModuleLength:
   Max: 180
   Exclude:
-    - 'react_on_rails/spec/react_on_rails/engine_spec.rb'  # Comprehensive engine tests require many examples
+    - 'spec/react_on_rails/engine_spec.rb'  # Comprehensive engine tests require many examples
 
 Naming/RescuedExceptionsVariableName:
   Enabled: false
 
 RSpec/AnyInstance:
   Exclude:
-    - 'react_on_rails/spec/react_on_rails/git_utils_spec.rb'
-    - 'react_on_rails/spec/react_on_rails/locales_to_js_spec.rb'
-    - 'react_on_rails/spec/react_on_rails/binstubs/dev_spec.rb'
-    - 'react_on_rails/spec/react_on_rails/binstubs/dev_static_spec.rb'
-    - 'react_on_rails/spec/react_on_rails/dev/**/*_spec.rb'  # Dev module tests require system mocking
+    - 'spec/react_on_rails/git_utils_spec.rb'
+    - 'spec/react_on_rails/locales_to_js_spec.rb'
+    - 'spec/react_on_rails/binstubs/dev_spec.rb'
+    - 'spec/react_on_rails/binstubs/dev_static_spec.rb'
+    - 'spec/react_on_rails/dev/**/*_spec.rb'  # Dev module tests require system mocking
 
 RSpec/DescribeClass:
   Enabled: false
@@ -124,11 +121,11 @@ RSpec/NestedGroups:
 
 RSpec/BeforeAfterAll:
   Exclude:
-    - 'react_on_rails/spec/react_on_rails/generators/dev_tests_generator_spec.rb'
-    - 'react_on_rails/spec/react_on_rails/generators/install_generator_spec.rb'
-    - 'react_on_rails/spec/react_on_rails/binstubs/dev_spec.rb'
-    - 'react_on_rails/spec/react_on_rails/binstubs/dev_static_spec.rb'
-    - 'react_on_rails/spec/react_on_rails/dev/**/*_spec.rb'  # Dev module tests require global setup
+    - 'spec/react_on_rails/generators/dev_tests_generator_spec.rb'
+    - 'spec/react_on_rails/generators/install_generator_spec.rb'
+    - 'spec/react_on_rails/binstubs/dev_spec.rb'
+    - 'spec/react_on_rails/binstubs/dev_static_spec.rb'
+    - 'spec/react_on_rails/dev/**/*_spec.rb'  # Dev module tests require global setup
 
 RSpec/MessageChain:
   Enabled: false
@@ -138,14 +135,14 @@ RSpec/MultipleExpectations:
 
 RSpec/MultipleDescribes:
   Exclude:
-    - 'react_on_rails/spec/dummy/spec/system/integration_spec.rb'
+    - 'spec/dummy/spec/system/integration_spec.rb'
 
 RSpec/MultipleMemoizedHelpers:
   Max: 12
 
 Style/GlobalVars:
   Exclude:
-    - 'react_on_rails/spec/dummy/config/environments/development.rb'
+    - 'spec/dummy/config/environments/development.rb'
 
 RSpec/NoExpectationExample:
   AllowedPatterns:
@@ -154,9 +151,9 @@ RSpec/NoExpectationExample:
 
 RSpec/InstanceVariable:
   Exclude:
-    - 'react_on_rails/spec/react_on_rails/dev/**/*_spec.rb'  # Dev module tests require global variable management
+    - 'spec/react_on_rails/dev/**/*_spec.rb'  # Dev module tests require global variable management
 
 RSpec/StubbedMock:
   Exclude:
-    - 'react_on_rails/spec/react_on_rails/dev/**/*_spec.rb'  # Dev module tests use mixed stub/mock patterns
+    - 'spec/react_on_rails/dev/**/*_spec.rb'  # Dev module tests use mixed stub/mock patterns
 
