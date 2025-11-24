@@ -137,6 +137,11 @@ module ReactOnRailsProHelper
     end
   end
 
+  def stream_react_component_with_async_props(component_name, options = {}, &props_block)
+    options[:async_props_block] = props_block
+    stream_react_component(component_name, options)
+  end
+
   # Renders the React Server Component (RSC) payload for a given component. This helper generates
   # a special format designed by React for serializing server components and transmitting them
   # to the client.

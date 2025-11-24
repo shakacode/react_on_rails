@@ -46,6 +46,21 @@ module ReactOnRailsPro
         JS
       end
 
+      # Generates JavaScript code for async props setup when incremental rendering is enabled
+      # @param render_options [Object] Options that control the rendering behavior
+      # @return [String] JavaScript code that sets up AsyncPropsManager or empty string
+      def async_props_setup_js(render_options)
+        return "" unless render_options.internal_option(:async_props_block)
+
+        <<-JS
+          if (ReactOnRails.isRSCBundle) {
+            var { props: propsWithAsyncProps, asyncPropManager } = ReactOnRails.addAsyncPropsCapabilityToComponentProps(usedProps);
+            usedProps = propsWithAsyncProps;
+            sharedExecutionContext.set("asyncPropsManager", asyncPropManager);
+          }
+        JS
+      end
+
       # Main rendering function that generates JavaScript code for server-side rendering
       # @param props_string [String] JSON string of props to pass to the React component
       # @param rails_context [String] JSON string of Rails context data
@@ -84,6 +99,7 @@ module ReactOnRailsPro
           #{ssr_pre_hook_js}
           #{redux_stores}
           var usedProps = typeof props === 'undefined' ? #{props_string} : props;
+          #{async_props_setup_js(render_options)}
           return ReactOnRails[#{render_function_name}]({
             name: componentName,
             domNodeId: '#{render_options.dom_id}',
