@@ -28,18 +28,18 @@ const config = tsEslint.config([
     'spec/react_on_rails/dummy-for-generators',
     'react_on_rails/spec/react_on_rails/dummy-for-generators',
     // temporary and generated files
-    'spec/dummy/.yalc',
     'react_on_rails/spec/dummy/.yalc',
-    'spec/dummy/public',
+    'react_on_rails_pro/spec/dummy/.yalc',
     'react_on_rails/spec/dummy/public',
-    'spec/dummy/vendor',
+    'react_on_rails_pro/spec/dummy/public',
     'react_on_rails/spec/dummy/vendor',
-    'spec/dummy/tmp',
+    'react_on_rails_pro/spec/dummy/vendor',
     'react_on_rails/spec/dummy/tmp',
-    'spec/dummy/app/assets/config/manifest.js',
+    'react_on_rails_pro/spec/dummy/tmp',
     'react_on_rails/spec/dummy/app/assets/config/manifest.js',
-    'spec/dummy/client/app/packs/server-bundle.js',
+    'react_on_rails_pro/spec/dummy/app/assets/config/manifest.js',
     'react_on_rails/spec/dummy/client/app/packs/server-bundle.js',
+    'react_on_rails_pro/spec/dummy/client/app/packs/server-bundle.js',
     '**/*.res.js',
     '**/coverage',
     '**/assets/webpack/',
@@ -185,7 +185,6 @@ const config = tsEslint.config([
   },
   {
     files: [
-      'lib/generators/react_on_rails/templates/**/*',
       'react_on_rails/lib/generators/react_on_rails/templates/**/*',
     ],
     rules: {
@@ -198,7 +197,7 @@ const config = tsEslint.config([
     },
   },
   {
-    files: ['spec/dummy/**/*', 'react_on_rails/spec/dummy/**/*'],
+    files: ['react_on_rails/spec/dummy/**/*', 'react_on_rails_pro/spec/dummy/**/*'],
     rules: {
       // The dummy app dependencies are managed separately and may not be installed
       'import/no-unresolved': 'off',
