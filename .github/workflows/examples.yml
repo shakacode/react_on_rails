@@ -150,6 +150,7 @@ jobs:
         run: yarn yalc publish
       - name: Install Ruby Gems for package
         run: |
+          cd react_on_rails
           bundle lock --add-platform 'x86_64-linux'
           if ! bundle check --path=vendor/bundle; then
             bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
