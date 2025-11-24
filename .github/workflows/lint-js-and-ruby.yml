@@ -112,8 +112,8 @@ jobs:
       - name: Save root ruby gems to cache
         uses: actions/cache@v4
         with:
-          path: vendor/bundle
-          key: package-app-gem-cache-${{ hashFiles('Gemfile.lock') }}-lint
+          path: react_on_rails/vendor/bundle
+          key: package-app-gem-cache-${{ hashFiles('react_on_rails/Gemfile.lock') }}-lint
       - name: Install Node modules with Yarn for renderer package
         run: |
           yarn install --no-progress --no-emoji --frozen-lockfile
@@ -125,11 +125,11 @@ jobs:
       - name: Install Node modules with Yarn for dummy app
         run: cd react_on_rails/spec/dummy && yarn install --no-progress --no-emoji --frozen-lockfile
       - name: Install Ruby Gems for package
-        run: bundle check --path=vendor/bundle || bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
+        run: cd react_on_rails && bundle check --path=vendor/bundle || bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
       - name: Lint Ruby
-        run: bundle exec rubocop
+        run: cd react_on_rails && bundle exec rubocop
       - name: Validate RBS type signatures
-        run: bundle exec rake rbs:validate
+        run: cd react_on_rails && bundle exec rake rbs:validate
       # TODO: Re-enable Steep once RBS signatures are complete for all checked files
       # Currently disabled because 374 type errors need to be fixed first
       # - name: Run Steep type checker
