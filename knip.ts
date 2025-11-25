@@ -69,6 +69,8 @@ const config: KnipConfig = {
         'src/ReactOnRailsProNodeRenderer.ts!',
         'src/default-node-renderer.ts!',
         'src/integrations/*.ts!',
+        // Export disableHttp2 for test utilities
+        'src/worker.ts!',
       ],
       project: ['src/**/*.[jt]s{x,}!', 'tests/**/*.[jt]s{x,}', '!lib/**'],
       ignore: [
@@ -79,8 +81,6 @@ const config: KnipConfig = {
         // Test helper utilities
         'tests/helper.ts',
         'tests/httpRequestUtils.ts',
-        // Test-only exports used for test setup (disableHttp2 is used in tests/worker.test.ts)
-        'src/worker.ts:disableHttp2',
       ],
       ignoreDependencies: [
         // Optional dependencies used in integrations
@@ -176,10 +176,6 @@ const config: KnipConfig = {
         '@rescript/react',
         // The Babel plugin fails to detect it
         'babel-plugin-transform-react-remove-prop-types',
-        // Required by @babel/plugin-transform-runtime for polyfills (used in webpack build)
-        '@babel/runtime',
-        // Used in webpack server config to filter out MiniCssExtractPlugin
-        'mini-css-extract-plugin',
         // This one is weird. It's long-deprecated and shouldn't be necessary.
         // Probably need to update the Webpack config.
         'node-libs-browser',
