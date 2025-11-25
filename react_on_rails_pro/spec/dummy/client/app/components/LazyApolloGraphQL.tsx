@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-return */
 import React, { useState, useRef } from 'react';
 import { useSSRComputation } from '@shakacode/use-ssr-computation.macro';
 import { setErrorHandler } from '@shakacode/use-ssr-computation.runtime';
@@ -78,9 +77,7 @@ const UserPanel = () => {
       </button>
 
       {updating && <div>Updating...</div>}
-      {updateError && (
-        <div style={{ color: 'red' }}>Error while updating User: {JSON.stringify(updateError)}</div>
-      )}
+      {updateError && <div style={{ color: 'red' }}>Error while updating User: {updateError.toString()}</div>}
     </div>
   );
 };
