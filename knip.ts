@@ -23,11 +23,15 @@ const config: KnipConfig = {
         '@babel/eslint-parser',
         '@babel/preset-react',
         'eslint-config-shakacode',
-        'eslint-import-resolver-alias',
-        'eslint-plugin-import',
         'eslint-plugin-jsx-a11y',
         'eslint-plugin-react',
         'eslint-plugin-react-hooks',
+        // nps is used via scripts that are not directly detected
+        'nps',
+        // @arethetypeswrong/cli used for validating package exports
+        '@arethetypeswrong/cli',
+        // publint for validating published packages
+        'publint',
         // These are used as transitive dependencies and missing from package.json
         '@eslint/eslintrc',
         '@eslint/js',
@@ -92,7 +96,6 @@ const config: KnipConfig = {
         'src/ReactOnRails.node.ts!',
         'src/ReactOnRails.full.ts!',
         'src/ReactOnRails.client.ts!',
-        'src/index.ts!',
         'src/ReactOnRailsRSC.ts!',
         'src/registerServerComponent/client.tsx!',
         'src/registerServerComponent/server.tsx!',
@@ -172,10 +175,6 @@ const config: KnipConfig = {
         '@rescript/react',
         // The Babel plugin fails to detect it
         'babel-plugin-transform-react-remove-prop-types',
-        // Required by @babel/plugin-transform-runtime for polyfills
-        '@babel/runtime',
-        // Used in webpack server config to filter out MiniCssExtractPlugin
-        'mini-css-extract-plugin',
         // This one is weird. It's long-deprecated and shouldn't be necessary.
         // Probably need to update the Webpack config.
         'node-libs-browser',
@@ -188,14 +187,8 @@ const config: KnipConfig = {
         'sass-resources-loader',
         'style-loader',
         'url-loader',
-        // Used in ignored client/app components (dynamically loaded by React on Rails)
-        'create-react-class',
-        'react-helmet',
-        '@types/react-helmet',
-        'react-redux',
-        'react-router-dom',
-        // Transitive dependency of shakapacker but listed as direct dependency
-        'webpack-merge',
+        // Jest is used via pnpm exec / scripts
+        'jest',
       ],
     },
   },

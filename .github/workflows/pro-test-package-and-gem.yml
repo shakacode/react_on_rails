@@ -250,7 +250,7 @@ jobs:
           pnpm install --frozen-lockfile
 
       - name: Run JS unit tests for Pro package
-        run: pnpm --filter react-on-rails-pro-node-renderer ci
+        run: pnpm --filter react-on-rails-pro-node-renderer run ci
 
         env:
           JEST_JUNIT_OUTPUT_DIR: ./jest
