@@ -77,7 +77,7 @@ const UserPanel = () => {
       </button>
 
       {updating && <div>Updating...</div>}
-      {updateError && <div style={{ color: 'red' }}>Error while updating User: {updateError.toString()}</div>}
+      {updateError && <div style={{ color: 'red' }}>Error while updating User: {String(updateError)}</div>}
     </div>
   );
 };
