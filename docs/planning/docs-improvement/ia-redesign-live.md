@@ -330,13 +330,11 @@ After Steps 1-8, found 12 files not in original plan. Investigated and reorganiz
 ### Actions Completed:
 
 1. **✅ Deleted orphaned `docs/guides/advanced/README.md`**
-
    - Navigation index left behind after reorganization
    - Linked to files now in core-concepts/
    - Redundant, deleted
 
 2. **✅ Created `docs/introduction.md`** - New unified homepage
-
    - Explains what React on Rails is and why use it
    - When to use / when not to use decision guide
    - Three clear paths: Quick Start, Installation, Tutorial
@@ -350,14 +348,12 @@ After Steps 1-8, found 12 files not in original plan. Investigated and reorganiz
    - Built from: overview.md, doctrine.md, README.md structure
 
 3. **✅ Deleted `docs/core-concepts/react-on-rails-overview.md`**
-
    - Content consolidated into introduction.md
    - Outdated prerequisites (Rails >=5 vs current Rails 7+)
    - Created confusion with two similar entry points
    - Updated 2 links: home.md and doctrine.md
 
 4. **✅ Simplified `docs/README.md`** for GitHub users
-
    - Reduced from 173 lines to 65 lines
    - Directs to website first
    - Kept valuable learning paths from PR #1813
@@ -367,14 +363,12 @@ After Steps 1-8, found 12 files not in original plan. Investigated and reorganiz
    - Purpose: Serves GitHub users browsing repo, not website visitors
 
 5. **✅ Deleted `docs/home.md`**
-
    - Was the current website homepage (29 lines of links)
    - Replaced by introduction.md
    - All valuable content already in introduction.md or README.md
    - No unique content lost
 
 6. **✅ Transformed `docs/getting-started.md` → `docs/getting-started/using-react-on-rails.md`**
-
    - Reduced from 253 to 238 lines (still comprehensive but focused)
    - Removed: Choose Starting Point (redundant), System Requirements (duplicate), More Reading (navigation)
    - Transformed installation section to conceptual overview with links

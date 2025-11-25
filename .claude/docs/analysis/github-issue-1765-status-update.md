@@ -165,7 +165,6 @@ react_on_rails/
    ```
 
 2. **Create Workspace Scripts** (20 minutes)
-
    - Add to root `package.json`:
 
    ```json

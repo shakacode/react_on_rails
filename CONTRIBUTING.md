@@ -229,7 +229,6 @@ pnpm run build
 Or run this, which builds the package, then the Webpack files for `spec/dummy`, and runs tests in
 `spec/dummy`.
 
-
 ```sh
 # Optionally change default capybara driver
 export DRIVER=selenium_firefox

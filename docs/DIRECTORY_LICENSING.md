@@ -78,7 +78,6 @@ react_on_rails/ (monorepo root)
 ### Package-Level Compliance
 
 1. **Gemspec Files**:
-
    - `react_on_rails.gemspec`: `s.license = "MIT"`
    - `react_on_rails_pro.gemspec`: `s.license = "UNLICENSED"`
 
