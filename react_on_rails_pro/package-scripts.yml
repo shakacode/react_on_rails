@@ -39,13 +39,13 @@ scripts:
   eslint:
     default:
       description: Run eslint.
-      script: npx eslint . --report-unused-disable-directives
+      script: npx eslint . --config eslint.config.mjs --report-unused-disable-directives
     fix:
       description: Run eslint and auto-fix.
-      script: npx eslint . --report-unused-disable-directives --fix
+      script: npx eslint . --config eslint.config.mjs --report-unused-disable-directives --fix
     debug:
       description: Run eslint in debug mode.
-      script: DEBUG=eslint:cli-engine npx eslint . --report-unused-disable-directives
+      script: DEBUG=eslint:cli-engine npx eslint . --config eslint.config.mjs --report-unused-disable-directives
 
   format:
     default:
