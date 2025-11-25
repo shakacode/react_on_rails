@@ -181,5 +181,6 @@ jobs:
         run: pnpm run nps format.listDifferent
 
       - name: Check TypeScript
+        working-directory: .
         run: pnpm run nps check-typescript
 
