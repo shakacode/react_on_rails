@@ -1,8 +1,8 @@
 // Top level component for simple client side only rendering
 import React from 'react';
 import { renderToString } from 'react-dom/server';
-import { Helmet } from 'react-helmet';
-import ReactHelmet from '../components/ReactHelmet';
+import { Helmet, HelmetProvider } from '@dr.pogodin/react-helmet';
+import HelloWorld from './HelloWorld';
 
 /*
  *  Export a function that takes the props and returns an object with { renderedHtml }
@@ -16,12 +16,27 @@ import ReactHelmet from '../components/ReactHelmet';
  *  the function could get the property of `.renderFunction = true` added to it.
  */
 export default (props, _railsContext) => {
-  const componentHtml = renderToString(<ReactHelmet {...props} />);
-  const helmet = Helmet.renderStatic();
+  // For server-side rendering with @dr.pogodin/react-helmet, we pass a context object
+  // to HelmetProvider to capture the helmet data per-request (thread-safe)
+  const helmetContext = {};
+
+  const componentHtml = renderToString(
+    <HelmetProvider context={helmetContext}>
+      <div>
+        <Helmet>
+          <title>Custom page title</title>
+        </Helmet>
+        Props: {JSON.stringify(props)}
+        <HelloWorld {...props} />
+      </div>
+    </HelmetProvider>,
+  );
+
+  const { helmet } = helmetContext;
 
   const renderedHtml = {
     componentHtml,
-    title: helmet.title.toString(),
+    title: helmet ? helmet.title.toString() : '',
   };
 
   // Note that this function returns an Object for server rendering.
