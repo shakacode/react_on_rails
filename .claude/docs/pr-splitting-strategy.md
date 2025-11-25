@@ -5,19 +5,16 @@
 ### Indicators That Splitting Makes Sense
 
 1. **Multiple Independent Test Failures**
-
    - Different test suites failing for different reasons
    - Failures span multiple subsystems (integration, unit, Pro package, etc.)
    - Each failure requires significant debugging time
 
 2. **Long Git History**
-
    - 50+ commits in the branch
    - Multiple feature changes mixed together
    - Hard to bisect or identify which commit broke what
 
 3. **Mixed Concerns**
-
    - Infrastructure changes + feature changes
    - Multiple unrelated fixes bundled together
    - Refactoring mixed with new functionality
@@ -86,19 +83,16 @@ Group 4 (Monorepo Node Renderer):
 **Principle**: Merge least risky changes first
 
 1. **Documentation-only changes** (safest)
-
    - No code changes
    - No risk of breaking tests
    - Provides value immediately
 
 2. **Bug fixes with tests** (safe if tests pass)
-
    - Clear, focused changes
    - Well-tested
    - Doesn't change infrastructure
 
 3. **Refactoring with no behavior change** (moderate risk)
-
    - Keep tests passing
    - No API changes
    - Can be verified by running existing tests
@@ -392,19 +386,16 @@ This PR has been split into smaller, more focused PRs for easier review and debu
 ### New PRs (in merge order):
 
 1. **#XXXX: Documentation & Testing Requirements** ✅ READY
-
    - CI failure analysis
    - Testing requirement documentation
    - Zero risk (docs only)
 
 2. **#YYYY: Build Console Replay Parameter Fix** 🔄 IN REVIEW
-
    - Focused bug fix
    - All tests passing
    - Addresses one of the three failures
 
 3. **#ZZZZ: Workspace Dependencies Fix** ⏳ DRAFT
-
    - Yarn Classic compatibility
    - Small infrastructure fix
    - Easy to verify

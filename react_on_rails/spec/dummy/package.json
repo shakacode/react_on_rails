@@ -67,25 +67,25 @@
     "fs": false
   },
   "scripts": {
-    "preinstall": "yarn run link-source && yalc add --link react-on-rails",
-    "link-source": "cd ../../.. && yarn run build && cd packages/react-on-rails && yalc publish",
-    "lint": "cd ../../.. && yarn run lint",
-    "format": "cd ../../.. && yarn run nps format",
-    "test:js": "yarn run jest ./tests",
-    "test": "yarn run build:test && yarn run lint && bin/rspec",
+    "preinstall": "pnpm run link-source && yalc add --link react-on-rails",
+    "link-source": "cd ../../.. && pnpm run build && cd packages/react-on-rails && yalc publish",
+    "lint": "cd ../../.. && pnpm run lint",
+    "format": "cd ../../.. && pnpm run nps format",
+    "test:js": "pnpm run jest ./tests",
+    "test": "pnpm run build:test && pnpm run lint && bin/rspec",
     "test:e2e": "playwright test --config=e2e/playwright.config.js",
     "test:e2e:ui": "playwright test --config=e2e/playwright.config.js --ui",
     "test:e2e:headed": "playwright test --config=e2e/playwright.config.js --headed",
     "test:e2e:debug": "playwright test --config=e2e/playwright.config.js --debug",
     "test:e2e:report": "playwright show-report e2e/playwright-report",
-    "build:test": "rm -rf public/webpack/test && yarn build:rescript && RAILS_ENV=test NODE_ENV=test bin/shakapacker",
-    "build:dev": "rm -rf public/webpack/development && yarn build:rescript && RAILS_ENV=development NODE_ENV=development bin/shakapacker",
-    "build:dev:server": "rm -rf public/webpack/development && yarn build:rescript && RAILS_ENV=development NODE_ENV=development bin/shakapacker --watch",
+    "build:test": "rm -rf public/webpack/test && pnpm run build:rescript && RAILS_ENV=test NODE_ENV=test bin/shakapacker",
+    "build:dev": "rm -rf public/webpack/development && pnpm run build:rescript && RAILS_ENV=development NODE_ENV=development bin/shakapacker",
+    "build:dev:server": "rm -rf public/webpack/development && pnpm run build:rescript && RAILS_ENV=development NODE_ENV=development bin/shakapacker --watch",
     "build:dev:watch": "rescript build -w && RAILS_ENV=development NODE_ENV=development bin/shakapacker --watch",
-    "build:clean": "yarn build:rescript && rm -rf public/webpack || true",
+    "build:clean": "pnpm run build:rescript && rm -rf public/webpack || true",
     "build:rescript": "rescript clean && rescript build -with-deps",
     "build:rescript:dev": "rescript build -w"
   },
   "version": "0.0.0",
-  "packageManager": "yarn@1.22.19"
+  "packageManager": "pnpm@9.14.2"
 }

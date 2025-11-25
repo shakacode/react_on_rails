@@ -67,22 +67,19 @@
     "typescript-eslint": "^8.29.1"
   },
   "scripts": {
-    "test": "yarn workspaces run test",
-    "clean": "yarn workspaces run clean",
-    "start": "yarn run nps",
-    "build": "yarn workspace react-on-rails run build && yarn workspace react-on-rails-pro run build && yarn workspace react-on-rails-pro-node-renderer run build",
-    "build-watch": "yarn workspaces run build-watch",
-    "lint": "yarn run nps eslint",
-    "lint:scss": "stylelint \"react_on_rails/spec/dummy/app/assets/stylesheets/**/*.scss\" \"react_on_rails/spec/dummy/client/**/*.scss\"",
-    "check": "yarn run lint && yarn workspaces run check",
-    "type-check": "yarn workspaces run type-check",
-    "yalc:publish": "yarn workspaces run yalc:publish",
-    "yalc": "yarn workspaces run yalc",
-    "publish": "yarn workspaces run publish",
-    "knip": "knip",
-    "eslint": "eslint",
-    "attw": "attw",
-    "publint": "publint",
+    "test": "pnpm -r run test",
+    "clean": "pnpm -r run clean",
+    "start": "pnpm run nps",
+    "build": "pnpm --filter react-on-rails run build && pnpm --filter react-on-rails-pro run build && pnpm --filter react-on-rails-pro-node-renderer run build",
+    "build-watch": "pnpm -r run build-watch",
+    "lint": "pnpm run nps eslint",
+    "lint:scss": "stylelint \"spec/dummy/app/assets/stylesheets/**/*.scss\" \"spec/dummy/client/**/*.scss\"",
+    "check": "pnpm run lint && pnpm -r run check",
+    "type-check": "pnpm -r run type-check",
+    "yalc:publish": "pnpm -r run yalc:publish",
+    "yalc": "pnpm -r run yalc",
+    "publish": "pnpm -r run publish",
+
     "postinstall": "test -f .lefthook.yml && test -d .git && command -v bundle >/dev/null 2>&1 && bundle exec lefthook install || true"
   },
   "repository": {
@@ -103,5 +100,11 @@
     "url": "https://github.com/shakacode/react_on_rails/issues"
   },
   "homepage": "https://github.com/shakacode/react_on_rails#readme",
-  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+  "packageManager": "pnpm@9.14.2",
+  "pnpm": {
+    "overrides": {
+      "sentry-testkit>body-parser": "npm:empty-npm-package@1.0.0",
+      "sentry-testkit>express": "npm:empty-npm-package@1.0.0"
+    }
+  }
 }

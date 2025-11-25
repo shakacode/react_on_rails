@@ -5,13 +5,13 @@
   "main": "lib/ReactOnRails.full.js",
   "type": "module",
   "scripts": {
-    "build": "yarn run clean && yarn run tsc",
-    "build-watch": "yarn run clean && yarn run tsc --watch",
+    "build": "pnpm run clean && tsc",
+    "build-watch": "pnpm run clean && tsc --watch",
     "clean": "rm -rf ./lib",
     "test": "jest tests",
-    "type-check": "yarn run tsc --noEmit --noErrorTruncation",
+    "type-check": "tsc --noEmit --noErrorTruncation",
     "prepare": "[ -f lib/ReactOnRails.full.js ] || (rm -rf ./lib && tsc)",
-    "prepublishOnly": "yarn run build",
+    "prepublishOnly": "pnpm run build",
     "yalc:publish": "yalc publish",
     "yalc": "yalc"
   },

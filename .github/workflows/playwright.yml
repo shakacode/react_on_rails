@@ -52,23 +52,40 @@ jobs:
       - uses: ./.github/actions/setup-node-with-retry
         with:
           node-version: '20'
-          cache: 'yarn'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
 
       - name: Install yalc globally
-        run: yarn global add yalc
+        run: pnpm add -g yalc
 
       - name: Install root dependencies
-        run: yarn install
+        run: pnpm install
 
       - name: Install dummy app dependencies
         working-directory: react_on_rails/spec/dummy
         run: |
           bundle install
-          yarn install
+          pnpm install
 
       - name: Install Playwright browsers
-        working-directory: react_on_rails/spec/dummy
-        run: yarn playwright install --with-deps
+        working-directory: spec/dummy
+        run: pnpm exec playwright install --with-deps
+
 
       - name: Generate React on Rails packs
         working-directory: react_on_rails/spec/dummy
@@ -77,12 +94,13 @@ jobs:
         run: bundle exec rake react_on_rails:generate_packs
 
       - name: Build test assets
-        working-directory: react_on_rails/spec/dummy
-        run: yarn run build:test
+        working-directory: spec/dummy
+        run: pnpm run build:test
 
       - name: Run Playwright tests
-        working-directory: react_on_rails/spec/dummy
-        run: yarn run test:e2e
+        working-directory: spec/dummy
+        run: pnpm run test:e2e
+
 
       - uses: actions/upload-artifact@v4
         if: always()

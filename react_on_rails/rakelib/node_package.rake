@@ -7,7 +7,7 @@ namespace :node_package do
 
   task :build do
     puts "Building Node Package and running 'yalc publish'"
-    sh "yarn run build && yarn yalc publish"
+    sh "pnpm run build && pnpm yalc:publish"
   end
 end
 

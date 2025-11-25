@@ -95,12 +95,12 @@
     "fs": false
   },
   "scripts": {
-    "test": "yarn run build:test && yarn run lint && rspec",
+    "test": "pnpm run build:test && pnpm run lint && rspec",
     "lint": "cd ../.. && nps lint",
     "e2e-test": "playwright test",
-    "preinstall": "yarn run link-source && yalc add --link react-on-rails-pro && cd .yalc/react-on-rails-pro && yalc add --link react-on-rails && cd ../.. && yalc add --link react-on-rails-pro-node-renderer",
-    "link-source": "cd ../../.. && yarn && yarn run yalc:publish && cd react_on_rails_pro && yarn && yalc publish",
-    "postinstall": "test -f post-yarn-install.local && ./post-yarn-install.local || true",
+    "preinstall": "pnpm run link-source && yalc add --link react-on-rails-pro && cd .yalc/react-on-rails-pro && yalc add --link react-on-rails && cd ../.. && yalc add --link react-on-rails-pro-node-renderer",
+    "link-source": "cd ../../.. && pnpm install && pnpm run yalc:publish && cd react_on_rails_pro && pnpm install && yalc publish",
+    "postinstall": "test -f post-pnpm-install.local && ./post-pnpm-install.local || true",
     "build:test": "rm -rf public/webpack/test && rm -rf ssr-generated && RAILS_ENV=test NODE_ENV=test bin/shakapacker",
     "build:dev": "rm -rf public/webpack/development && rm -rf ssr-generated && RAILS_ENV=development NODE_ENV=development bin/shakapacker",
     "build:dev:watch": "RAILS_ENV=development NODE_ENV=development bin/shakapacker --watch",
@@ -125,5 +125,5 @@
   "bugs": {
     "url": "https://github.com/shakacode/react_on_rails_pro/issues"
   },
-  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+  "packageManager": "pnpm@9.14.2"
 }
