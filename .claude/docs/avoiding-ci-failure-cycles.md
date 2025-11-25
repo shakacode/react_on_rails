@@ -201,8 +201,14 @@ Tested with:
 **After Pushing**:
 
 ```bash
-# Within 30 minutes: Check CI status
-gh pr view --json statusCheckRollup
+# Poll CI status every 30 seconds until completion
+while true; do
+  gh pr view --json statusCheckRollup --jq '.statusCheckRollup | group_by(.conclusion) | map({conclusion: .[0].conclusion, count: length})'
+  sleep 30
+done
+
+# Or use the automated tool (polls every 30s):
+bin/ci-rerun-failures
 
 # If failures occur:
 # 1. Check if they're new (not pre-existing)
@@ -210,6 +216,8 @@ gh pr view --json statusCheckRollup
 # 3. Fix and test locally
 # 4. Don't push "hopeful" fixes
 ```
+
+**IMPORTANT: Poll every 30 seconds, NOT 180 seconds.** CI jobs typically complete in 3-15 minutes, so 30-second polling gives responsive feedback.
 
 **See**: [master-health-monitoring.md](master-health-monitoring.md)
 
