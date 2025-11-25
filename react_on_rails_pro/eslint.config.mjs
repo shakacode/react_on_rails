@@ -23,7 +23,6 @@ export default defineConfig([
     // includes some generated code
     'spec/dummy/client/app/packs/server-bundle.js',
     '../packages/react-on-rails/', // Ignore open-source package (has its own linting)
-    '../react_on_rails/', // Ignore open-source package in new monorepo structure
     '../packages/react-on-rails-pro-node-renderer/lib/',
     '../packages/react-on-rails-pro-node-renderer/tests/fixtures',
     '**/node_modules/',
@@ -38,10 +37,6 @@ export default defineConfig([
     '**/dist/',
     '**/.yalc/',
     '**/*.chunk.js',
-    // Config files with ESM syntax that @babel/eslint-parser can't handle synchronously
-    '**/babel.config.js',
-    '**/eslint.config.mjs',
-    '**/manifest.js',
   ]),
   {
     files: ['**/*.[jt]s', '**/*.[cm][jt]s', '**/*.[jt]sx'],

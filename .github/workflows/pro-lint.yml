@@ -141,8 +141,7 @@ jobs:
           bundle config set --local disable_checksum_validation true
           bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
 
-      - name: Install Node modules with Yarn for root workspace
-        working-directory: .
+      - name: Install Node modules with Yarn for Pro package
         run: |
           sudo yarn global add yalc
           yarn install --frozen-lockfile --no-progress --no-emoji
@@ -173,10 +172,10 @@ jobs:
         run: bundle exec rake rbs:validate
 
       - name: Lint JS
-        run: npx nps eslint
+        run: yarn run nps eslint
 
       - name: Check formatting
-        run: npx nps format.listDifferent
+        run: yarn run nps format.listDifferent
 
       - name: Check TypeScript
         working-directory: .
