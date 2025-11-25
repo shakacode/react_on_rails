@@ -17,11 +17,16 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
   include ReactOnRails::TaskHelpers
 
   # Updates package.json to use minimum supported versions for compatibility testing
-  def apply_minimum_versions(dir)
+  def apply_minimum_versions(dir) # rubocop:disable Metrics/CyclomaticComplexity
     package_json_path = File.join(dir, "package.json")
     return unless File.exist?(package_json_path)
 
-    package_json = JSON.parse(File.read(package_json_path))
+    begin
+      package_json = JSON.parse(File.read(package_json_path))
+    rescue JSON::ParserError => e
+      puts "  ERROR: Failed to parse package.json in #{dir}: #{e.message}"
+      raise
+    end
 
     # Update React versions to minimum supported
     if package_json["dependencies"]
