@@ -31,6 +31,8 @@ Changes since the last non-beta release.
 
 - **Monorepo Structure Reorganization**: Restructured the monorepo to use two top-level product directories (`react_on_rails/` and `react_on_rails_pro/`) instead of mixing source files at the root level. This improves organization and clarity for contributors working on either the open-source or Pro versions. **Important for contributors**: If you have an existing clone of the repository, you may need to update your IDE exclusion patterns and paths. See the updated `CLAUDE.md` for current project structure. [PR 2114](https://github.com/shakacode/react_on_rails/pull/2114) by [justin808](https://github.com/justin808).
 
+- **Package Manager Migration to pnpm (Contributors Only)**: Migrated the monorepo from Yarn Classic to pnpm for improved dependency management and faster installs. **This only affects contributors** - end users can continue using any package manager (npm, yarn, pnpm) with their applications. Contributors should reinstall dependencies with `pnpm install` after pulling this change. [PR 2121](https://github.com/shakacode/react_on_rails/pull/2121) by [justin808](https://github.com/justin808).
+
 #### Improved
 
 - **Automatic Precompile Hook Coordination in bin/dev**: The `bin/dev` command now automatically runs Shakapacker's `precompile_hook` once before starting development processes and sets `SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true` to prevent duplicate execution in spawned webpack processes.
