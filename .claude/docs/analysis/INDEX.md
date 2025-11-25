@@ -188,16 +188,6 @@ Outside the analysis directory:
 - 📝 Recommendations
 - ✓ Checklists and criteria
 
-## Related Documentation
-
-Outside this analysis directory:
-
-- **Main Migration Plan**: `/docs/MONOREPO_MERGER_PLAN.md` (authoritative source)
-- **Path Management Guide**: `/managing-file-paths.md` (validation procedures)
-- **Build Script Testing**: `/testing-build-scripts.md` (artifact verification)
-- **CI Monitoring**: `/master-health-monitoring.md` (CI status checks)
-- **Contributing Guide**: `/CONTRIBUTING.md` (developer instructions)
-
 ## Workflow Tips
 
 ### Before Starting Work

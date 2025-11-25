@@ -603,7 +603,7 @@ end
 
 ### Test Organization
 
-```
+```text
 spec/dummy/e2e/
 ├── playwright.config.js          # Playwright configuration
 ├── playwright/
@@ -627,7 +627,7 @@ spec/dummy/e2e/
 
 - Use `app('clean')` in `beforeEach` to ensure clean state
 - Leverage Rails helpers (`appFactories`, `appEval`) instead of UI setup
-- Test React on Rails specific features: SSR, hydration, component registry
+- Test React on Rails-specific features: SSR, hydration, component registry
 - Use component IDs like `#ComponentName-react-component-0` for selectors
 - Monitor console errors during tests
 - Test across different browsers with `--project` flag
