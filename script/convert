@@ -53,12 +53,8 @@ gsub_file_content(
   '"test:non-rsc": "jest tests --testPathIgnorePatterns=\".*(RSC|stream|' \
   'registerServerComponent|serverRenderReactComponent|SuspenseHydration).*\"",'
 )
-# Make test:rsc script do nothing
-gsub_file_content(
-  "../packages/react-on-rails-pro/package.json",
-  /"test:rsc": "(?:\\"|[^"])*",/,
-  '"test:rsc": "exit 0",'
-)
+# test:rsc script now automatically detects React version and skips on React 18
+# No override needed - the script checks React version and exits cleanly if < 19
 # Keep modern JSX transform for React 18+
 # gsub_file_content("../tsconfig.json", "react-jsx", "react")
 # gsub_file_content("../spec/dummy/babel.config.js", "runtime: 'automatic'", "runtime: 'classic'")
