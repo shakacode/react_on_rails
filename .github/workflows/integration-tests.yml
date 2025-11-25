@@ -119,10 +119,18 @@ jobs:
         uses: ./.github/actions/setup-node-with-retry
         with:
           node-version: ${{ matrix.node-version }}
-          # Retry logic now handles V8 crashes automatically
-          # https://github.com/nodejs/node/issues/56010
-          cache: yarn
-          cache-dependency-path: '**/yarn.lock'
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
       - name: Print system information
         run: |
           echo "Linux release: "; cat /etc/issue
@@ -130,21 +138,23 @@ jobs:
           echo "Current directory: "; pwd
           echo "Ruby version: "; ruby -v
           echo "Node version: "; node -v
-          echo "Yarn version: "; yarn --version
+          echo "pnpm version: "; pnpm --version
           echo "Bundler version: "; bundle --version
       - name: run conversion script to support shakapacker v6
         if: matrix.dependency-level == 'minimum'
         run: script/convert
-      - name: Install Node modules with Yarn for renderer package
+      - name: Install Node modules with pnpm for renderer package
         run: |
-          yarn install --no-progress --no-emoji ${{ matrix.dependency-level == 'latest' && '--frozen-lockfile' || '' }}
-          sudo yarn global add yalc
+          pnpm install ${{ matrix.dependency-level == 'latest' && '--frozen-lockfile' || '--no-frozen-lockfile' }}
+          pnpm add -g yalc
       - name: yalc publish for react-on-rails
         run: cd packages/react-on-rails && yalc publish
       - name: yalc add react-on-rails
         run: cd react_on_rails/spec/dummy && yalc add react-on-rails
-      - name: Install Node modules with Yarn for dummy app
-        run: cd react_on_rails/spec/dummy && yarn install --no-progress --no-emoji ${{ matrix.dependency-level == 'latest' && '--frozen-lockfile' || '' }}
+      - name: Install Node modules with pnpm for dummy app
+        # --ignore-workspace prevents pnpm from treating this as part of the parent workspace
+        # The dummy app doesn't have a pnpm-lock.yaml and shouldn't use frozen lockfile
+        run: cd react_on_rails/spec/dummy && pnpm install --ignore-workspace
       - name: Save dummy app ruby gems to cache
         uses: actions/cache@v4
         with:
@@ -160,7 +170,7 @@ jobs:
       - name: generate file system-based packs
         run: cd react_on_rails/spec/dummy && RAILS_ENV="test" bundle exec rake react_on_rails:generate_packs
       - name: Build test bundles for dummy app
-        run: cd react_on_rails/spec/dummy && rm -rf public/webpack/test && yarn run build:rescript && RAILS_ENV="test" NODE_ENV="test" bin/shakapacker
+        run: cd react_on_rails/spec/dummy && rm -rf public/webpack/test && pnpm run build:rescript && RAILS_ENV="test" NODE_ENV="test" bin/shakapacker
       - id: get-sha
         run: echo "sha=\"$(git rev-parse HEAD)\"" >> "$GITHUB_OUTPUT"
       - name: Save test Webpack bundles to cache (for build number checksum used by RSpec job)
@@ -198,10 +208,18 @@ jobs:
         uses: ./.github/actions/setup-node-with-retry
         with:
           node-version: ${{ matrix.node-version }}
-          # Retry logic now handles V8 crashes automatically
-          # https://github.com/nodejs/node/issues/56010
-          cache: yarn
-          cache-dependency-path: '**/yarn.lock'
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
       - name: Print system information
         run: |
           echo "Linux release: "; cat /etc/issue
@@ -209,7 +227,7 @@ jobs:
           echo "Current directory: "; pwd
           echo "Ruby version: "; ruby -v
           echo "Node version: "; node -v
-          echo "Yarn version: "; yarn --version
+          echo "pnpm version: "; pnpm --version
           echo "Bundler version: "; bundle --version
       - name: run conversion script to support shakapacker v6
         if: matrix.dependency-level == 'minimum'
@@ -217,8 +235,8 @@ jobs:
       - name: Save root ruby gems to cache
         uses: actions/cache@v4
         with:
-          path: react_on_rails/vendor/bundle
-          key: package-app-gem-cache-${{ hashFiles('react_on_rails/Gemfile.lock') }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
+          path: vendor/bundle
+          key: package-app-gem-cache-${{ hashFiles('Gemfile.lock') }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
       - name: Save dummy app ruby gems to cache
         uses: actions/cache@v4
         with:
@@ -231,20 +249,22 @@ jobs:
         with:
           path: react_on_rails/spec/dummy/public/webpack
           key: dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
-      - name: Install Node modules with Yarn
+      - name: Install Node modules with pnpm
         run: |
-          yarn install --no-progress --no-emoji ${{ matrix.dependency-level == 'latest' && '--frozen-lockfile' || '' }}
-          sudo yarn global add yalc
+          pnpm install ${{ matrix.dependency-level == 'latest' && '--frozen-lockfile' || '--no-frozen-lockfile' }}
+          pnpm add -g yalc
       - name: yalc publish for react-on-rails
         run: cd packages/react-on-rails && yalc publish
       - name: yalc add react-on-rails
         run: cd react_on_rails/spec/dummy && yalc add react-on-rails
-      - name: Install Node modules with Yarn for dummy app
-        run: cd react_on_rails/spec/dummy && yarn install --no-progress --no-emoji ${{ matrix.dependency-level == 'latest' && '--frozen-lockfile' || '' }}
+      - name: Install Node modules with pnpm for dummy app
+        # --ignore-workspace prevents pnpm from treating this as part of the parent workspace
+        # The dummy app doesn't have a pnpm-lock.yaml and shouldn't use frozen lockfile
+        run: cd react_on_rails/spec/dummy && pnpm install --ignore-workspace
       - name: Dummy JS tests
         run: |
           cd react_on_rails/spec/dummy
-          yarn run test:js
+          pnpm run test:js
       - name: Install Ruby Gems for package
         run: |
           cd react_on_rails
@@ -305,5 +325,5 @@ jobs:
       - name: Store artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: dummy-app-yarn-log-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
-          path: react_on_rails/spec/dummy/yarn-error.log
+          name: dummy-app-pnpm-log-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
+          path: react_on_rails/spec/dummy/pnpm-debug.log

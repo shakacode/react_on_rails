@@ -26,17 +26,14 @@ commit: "Fix bundle commands"           → CI fails (...)
 ### Why This Happens
 
 1. **Large-scale changes made without comprehensive testing**
-
    - Directory structure changes affect MANY files
    - Not understanding full scope of impact
 
 2. **Using CI as the test environment**
-
    - Treating CI like a linter that tells you what to fix
    - Not running equivalent tests locally first
 
 3. **Incremental fixing without holistic testing**
-
    - Fix one thing, break another
    - Each fix tested in isolation
    - Missing interaction effects

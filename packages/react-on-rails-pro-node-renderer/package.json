@@ -17,10 +17,6 @@
     },
     "./package.json": "./package.json"
   },
-  "resolutions": {
-    "sentry-testkit/body-parser": "npm:empty-npm-package@1.0.0",
-    "sentry-testkit/express": "npm:empty-npm-package@1.0.0"
-  },
   "dependencies": {
     "@fastify/formbody": "^7.4.0 || ^8.0.2",
     "@fastify/multipart": "^8.3.1 || ^9.0.3",
@@ -51,7 +47,7 @@
     "node-html-parser": "^7.0.1",
     "nps": "^5.9.12",
     "pino-pretty": "^13.0.0",
-    "react-on-rails": "*",
+    "react-on-rails": "workspace:*",
     "redis": "^5.0.1",
     "sentry-testkit": "^5.0.6",
     "touch": "^3.1.0",
@@ -74,15 +70,15 @@
     }
   },
   "scripts": {
-    "build": "yarn run clean && yarn run tsc --project src/tsconfig.json",
-    "build-watch": "yarn run clean && yarn run tsc --watch --project src/tsconfig.json",
+    "build": "pnpm run clean && tsc --project src/tsconfig.json",
+    "build-watch": "pnpm run clean && tsc --watch --project src/tsconfig.json",
     "clean": "rm -rf ./lib",
     "ci": "jest --ci --runInBand --reporters=default --reporters=jest-junit",
     "developing": "nps node-renderer.debug",
     "test": "jest tests",
-    "type-check": "yarn run tsc --noEmit --noErrorTruncation  --project src/tsconfig.json",
+    "type-check": "tsc --noEmit --noErrorTruncation  --project src/tsconfig.json",
     "prepare": "[ -f lib/ReactOnRailsProNodeRenderer.js ] || (rm -rf ./lib && tsc --project src/tsconfig.json)",
-    "prepublishOnly": "yarn run build",
+    "prepublishOnly": "pnpm run build",
     "yalc:publish": "yalc publish",
     "yalc": "yalc"
   },
@@ -127,5 +123,5 @@
       "pre-commit": "yalc check"
     }
   },
-  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+  "packageManager": "pnpm@9.14.2"
 }

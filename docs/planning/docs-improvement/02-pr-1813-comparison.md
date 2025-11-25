@@ -581,7 +581,6 @@ For all options and parameters, see [react_component API Reference](/api/view-he
 **Completely unchanged.** All these still in main navigation:
 
 1. **`contributor-info/` folder** - 5 files:
-
    - `linters.md`
    - `coding-agents-guide.md` (newly created in PR #1813)
    - `errors-with-hooks.md`
@@ -590,7 +589,6 @@ For all options and parameters, see [react_component API Reference](/api/view-he
    - `pull-requests.md`
 
 2. **Planning documents:**
-
    - `docs/planning/DOCUMENTATION_IMPROVEMENT_PLAN.md` (created in PR #1813)
    - `docs/planning/DOCS_PR_SUMMARY.md` (created in PR #1813)
 
@@ -756,14 +754,12 @@ Navigation restructuring not in scope.
 These require changes to **both** `react_on_rails` repo **and** `sc-website` repo:
 
 1. **Information Architecture Redesign**
-
    - Restructure 11 categories → 6-7 logical groups
    - Hide internal docs from main navigation
    - Remove "Outdated" and "Testimonials" categories
    - **Files to change:** `sc-website/gatsby-node.js:31-44`
 
 2. **Entry Point Consolidation**
-
    - Establish ONE canonical starting point
    - Clarify purpose of each remaining entry doc
    - Decision tree for "which guide to follow"
@@ -780,7 +776,6 @@ These require changes to **both** `react_on_rails` repo **and** `sc-website` rep
 These only require changes to `react_on_rails` repo:
 
 4. **Conceptual Guides**
-
    - "Understanding Server-Side Rendering"
    - "How Bundling Works"
    - "Component Registration Explained"
@@ -788,7 +783,6 @@ These only require changes to `react_on_rails` repo:
    - **New files:** `docs/concepts/*.md`
 
 5. **Value Proposition Introduction**
-
    - "Why React on Rails?"
    - Comparison with alternatives
    - When to use / when not to use
@@ -803,7 +797,6 @@ These only require changes to `react_on_rails` repo:
 ### Phase 3: Polish and Enhance (Medium Priority)
 
 7. **Installation Decision Tree**
-
    - Clear signposting for different user journeys
    - Consistent steps across all installation paths
 

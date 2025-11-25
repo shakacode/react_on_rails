@@ -23,8 +23,6 @@ const config: KnipConfig = {
         '@babel/eslint-parser',
         '@babel/preset-react',
         'eslint-config-shakacode',
-        'eslint-import-resolver-alias',
-        'eslint-plugin-import',
         'eslint-plugin-jsx-a11y',
         'eslint-plugin-react',
         'eslint-plugin-react-hooks',
@@ -40,6 +38,11 @@ const config: KnipConfig = {
         // SWC transpiler dependencies used by Shakapacker in dummy apps
         '@swc/core',
         'swc-loader',
+        // Used via nps (package-scripts.yml) which knip doesn't fully analyze
+        'nps',
+        // Used for package validation but not directly imported
+        '@arethetypeswrong/cli',
+        'publint',
       ],
     },
 
@@ -66,6 +69,8 @@ const config: KnipConfig = {
         'src/ReactOnRailsProNodeRenderer.ts!',
         'src/default-node-renderer.ts!',
         'src/integrations/*.ts!',
+        // Export disableHttp2 for test utilities
+        'src/worker.ts!',
       ],
       project: ['src/**/*.[jt]s{x,}!', 'tests/**/*.[jt]s{x,}', '!lib/**'],
       ignore: [
@@ -92,7 +97,6 @@ const config: KnipConfig = {
         'src/ReactOnRails.node.ts!',
         'src/ReactOnRails.full.ts!',
         'src/ReactOnRails.client.ts!',
-        'src/index.ts!',
         'src/ReactOnRailsRSC.ts!',
         'src/registerServerComponent/client.tsx!',
         'src/registerServerComponent/server.tsx!',
@@ -172,9 +176,9 @@ const config: KnipConfig = {
         '@rescript/react',
         // The Babel plugin fails to detect it
         'babel-plugin-transform-react-remove-prop-types',
-        // Required by @babel/plugin-transform-runtime for polyfills
+        // Required by @babel/plugin-transform-runtime for polyfills (used by webpack)
         '@babel/runtime',
-        // Used in webpack server config to filter out MiniCssExtractPlugin
+        // Used in webpack server config for CSS extraction
         'mini-css-extract-plugin',
         // This one is weird. It's long-deprecated and shouldn't be necessary.
         // Probably need to update the Webpack config.
@@ -188,14 +192,6 @@ const config: KnipConfig = {
         'sass-resources-loader',
         'style-loader',
         'url-loader',
-        // Used in ignored client/app components (dynamically loaded by React on Rails)
-        'create-react-class',
-        'react-helmet',
-        '@types/react-helmet',
-        'react-redux',
-        'react-router-dom',
-        // Transitive dependency of shakapacker but listed as direct dependency
-        'webpack-merge',
       ],
     },
   },

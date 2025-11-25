@@ -120,7 +120,6 @@ jobs:
           echo "Current directory: "; pwd
           echo "Ruby version: "; ruby -v
           echo "Node version: "; node -v
-          echo "Yarn version: "; yarn --version
           echo "Bundler version: "; bundle --version
       - name: run conversion script to use minimum supported dependency versions
         if: matrix.dependency-level == 'minimum'

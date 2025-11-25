@@ -132,29 +132,29 @@ Pre-commit hooks automatically run:
 
 ### Essential Commands
 
-- **Install dependencies**: `bundle && yarn`
+- **Install dependencies**: `bundle && pnpm install`
 - **Run tests**:
   - Ruby tests: `rake run_rspec`
-  - JavaScript tests: `yarn run test` or `rake js_tests`
+  - JavaScript tests: `pnpm run test` or `rake js_tests`
   - Playwright E2E tests: See Playwright section below
   - All tests: `rake` (default task runs lint and all tests except examples)
 - **Linting** (MANDATORY BEFORE EVERY COMMIT):
   - **REQUIRED**: `bundle exec rubocop` - Must pass with zero offenses
   - All linters: `rake lint` (runs ESLint and RuboCop)
-  - ESLint only: `yarn run lint` or `rake lint:eslint`
+  - ESLint only: `pnpm run lint` or `rake lint:eslint`
   - RuboCop only: `rake lint:rubocop`
 - **Code Formatting**:
   - Format code with Prettier: `rake autofix`
-  - Check formatting without fixing: `yarn start format.listDifferent`
-- **Build**: `yarn run build` (compiles TypeScript to JavaScript in packages/react-on-rails/lib)
-- **Type checking**: `yarn run type-check`
+  - Check formatting without fixing: `pnpm run format.listDifferent`
+- **Build**: `pnpm run build` (compiles TypeScript to JavaScript in packages/react-on-rails/lib)
+- **Type checking**: `pnpm run type-check`
 - **RBS Type Checking**:
   - Validate RBS signatures: `bundle exec rake rbs:validate`
   - Run Steep type checker: `bundle exec rake rbs:steep`
   - Run both: `bundle exec rake rbs:all`
   - List RBS files: `bundle exec rake rbs:list`
 - **⚠️ MANDATORY BEFORE GIT PUSH**: `bundle exec rubocop` and fix ALL violations + ensure trailing newlines
-- Never run `npm` commands, only equivalent Yarn Classic ones
+- Never run `npm` commands, only equivalent pnpm ones
 
 ### Replicating CI Failures Locally
 
@@ -366,7 +366,7 @@ For each suspicious entry:
 
 ### Standard Workflow
 1. Make code changes
-2. Run `rake autofix` or `yarn start format`
+2. Run `rake autofix` or `pnpm run format`
 3. Commit changes
 
 ### Merge Conflict Resolution Workflow
@@ -376,16 +376,16 @@ For each suspicious entry:
 2. **VERIFY FILE PATHS** - if the conflict involved directory structure:
    - Check if any hardcoded paths need updating
    - Run: `grep -r "old/path" . --exclude-dir=node_modules`
-   - Pay special attention to package-scripts.yml, webpack configs, package.json
-   - **Test affected scripts:** If package-scripts.yml changed, run `yarn run prepack`
+   - Pay special attention to package.json, webpack configs
+   - **Test affected scripts:** If package.json changed, run `pnpm run prepack`
 3. **Add resolved files**: `git add .` (or specific files)
 4. **Auto-fix everything**: `rake autofix`
 5. **Add any formatting changes**: `git add .`
 6. **Continue rebase/merge**: `git rebase --continue` or `git commit`
 7. **TEST CRITICAL SCRIPTS if build configs changed:**
    ```bash
-   yarn run prepack          # Test prepack script
-   yarn run yalc.publish     # Test yalc publish if package structure changed
+   pnpm run prepack          # Test prepack script
+   pnpm run yalc.publish     # Test yalc publish if package structure changed
    rake run_rspec:gem        # Run relevant test suites
    ```
 
@@ -394,13 +394,13 @@ For each suspicious entry:
 **❌ NEVER skip testing after resolving conflicts in build configs** - silent failures are dangerous.
 
 ### Debugging Formatting Issues
-- Check current formatting: `yarn start format.listDifferent`
+- Check current formatting: `pnpm run format.listDifferent`
 - Fix all formatting: `rake autofix`
 - If CI fails on formatting, always run automated fixes, never manual fixes
 
 ### Development Setup Commands
 
-- **Initial setup**: `bundle && yarn && rake shakapacker_examples:gen_all && rake node_package && rake`
+- **Initial setup**: `bundle && pnpm install && rake shakapacker_examples:gen_all && rake node_package && rake`
 - **Prepare examples**: `rake shakapacker_examples:gen_all`
 - **Generate node package**: `rake node_package`
 - **Run single test example**: `rake run_rspec:example_basic`
@@ -560,7 +560,7 @@ rm debug-*.js
 - Server-side rendering uses isolated Node.js processes
 - React Server Components support available in Pro version
 - Generated examples are in `gen-examples/` (ignored by git)
-- Only use `yarn` as the JS package manager, never `npm`
+- Only use `pnpm` as the JS package manager, never `npm` or `yarn`
 
 ## Playwright E2E Testing
 
@@ -572,7 +572,7 @@ The gem and Playwright are already configured. To install Playwright browsers:
 
 ```bash
 cd spec/dummy
-yarn playwright install --with-deps
+pnpm playwright install --with-deps
 ```
 
 ### Running Playwright Tests
@@ -583,22 +583,22 @@ yarn playwright install --with-deps
 cd spec/dummy
 
 # Run all tests (Rails server auto-starts)
-yarn test:e2e
+pnpm test:e2e
 
 # Run tests in UI mode (interactive debugging)
-yarn test:e2e:ui
+pnpm test:e2e:ui
 
 # Run tests with visible browser
-yarn test:e2e:headed
+pnpm test:e2e:headed
 
 # Debug a specific test
-yarn test:e2e:debug
+pnpm test:e2e:debug
 
 # View test report
-yarn test:e2e:report
+pnpm test:e2e:report
 
 # Run specific test file
-yarn test:e2e e2e/playwright/e2e/react_on_rails/basic_components.spec.js
+pnpm test:e2e e2e/playwright/e2e/react_on_rails/basic_components.spec.js
 ```
 
 ### Writing Tests
@@ -691,7 +691,7 @@ spec/dummy/e2e/
 
 ### Debugging
 
-- Run in UI mode: `yarn test:e2e:ui`
+- Run in UI mode: `pnpm test:e2e:ui`
 - Use `page.pause()` to pause execution
 - Check `playwright-report/` for detailed results after test failures
 - Enable debug logging in `playwright.config.js`

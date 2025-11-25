@@ -17,7 +17,7 @@ namespace :lint do # rubocop:disable Metrics/BlockLength
 
   desc "Run eslint as shell"
   task :eslint do
-    sh_in_dir(gem_root, "yarn run eslint --version", "yarn run eslint .")
+    sh_in_dir(gem_root, "pnpm run eslint --version", "pnpm run eslint .")
   end
 
   desc "Run all eslint, rubocop & stylelint linters"
@@ -27,8 +27,8 @@ namespace :lint do # rubocop:disable Metrics/BlockLength
 
   desc "Auto-fix all linting violations"
   task :autofix do
-    sh_in_dir(gem_root, "yarn run eslint . --fix")
-    sh_in_dir(gem_root, "yarn run prettier --write .")
+    sh_in_dir(gem_root, "pnpm run eslint . --fix")
+    sh_in_dir(gem_root, "pnpm run prettier --write .")
     sh_in_dir(gem_root, stylelint_fix_command)
     sh_in_dir(gem_root, "bundle exec rubocop -A")
     puts "Completed auto-fixing all linting violations"
@@ -37,7 +37,7 @@ namespace :lint do # rubocop:disable Metrics/BlockLength
   private
 
   def stylelint_command
-    "yarn run stylelint \"spec/dummy/app/assets/stylesheets/**/*.scss\" \"spec/dummy/client/**/*.scss\""
+    "pnpm run stylelint \"spec/dummy/app/assets/stylesheets/**/*.scss\" \"spec/dummy/client/**/*.scss\""
   end
 
   def stylelint_fix_command

@@ -4,8 +4,8 @@
 
 ## Why This Matters
 
-- The `prepack`/`prepare` scripts in package.json/package-scripts.yml run during:
-  - `npm install` / `yarn install` (for git dependencies)
+- The `prepack`/`prepare` scripts in package.json run during:
+  - `npm install` / `pnpm install` (for git dependencies)
   - `yalc publish` (critical for local development)
   - `npm publish`
   - Package manager prepare phase
@@ -40,7 +40,7 @@ gh pr view --json statusCheckRollup | jq '.statusCheckRollup[] | select(.conclus
 
 ## Mandatory Testing After ANY Changes
 
-**If you modify package.json, package-scripts.yml, or build configs:**
+**If you modify package.json or build configs:**
 
 ### Step 1: ALWAYS Test Clean Install First
 
@@ -51,7 +51,7 @@ This is the **MOST CRITICAL** test - it's what CI does first, and installation f
 rm -rf node_modules
 
 # Test the exact command CI uses
-yarn install --frozen-lockfile
+pnpm install --frozen-lockfile
 
 # If this fails, STOP and fix it before testing anything else
 ```
@@ -62,7 +62,7 @@ yarn install --frozen-lockfile
 
 ```bash
 # Build all packages
-yarn run build
+pnpm run build
 
 # Should succeed without errors
 ```
@@ -71,10 +71,10 @@ yarn run build
 
 ```bash
 # Test prepack/prepare scripts work
-yarn nps build.prepack
+pnpm run prepack
 
 # Test yalc publish (CRITICAL for local development)
-yarn run yalc:publish
+pnpm run yalc:publish
 
 # Should publish all workspace packages successfully
 ```
@@ -97,48 +97,48 @@ ls -la packages/react-on-rails-pro-node-renderer/lib/ReactOnRailsProNodeRenderer
 bundle exec rubocop
 
 # JS/TS formatting
-yarn start format.listDifferent
+pnpm run format.listDifferent
 ```
 
 ## When Directory Structure Changes
 
 If you rename/move directories that contain build artifacts:
 
-1. **Update ALL path references in package-scripts.yml**
+1. **Update ALL path references in package.json**
 2. **Test yalc publish BEFORE pushing**
 3. **Test in a fresh clone to ensure no local assumptions**
 4. **Consider adding a CI job to validate artifact paths**
 
-## Workspace Dependencies: Yarn Classic vs Yarn Berry
+## Workspace Dependencies: PNPM
 
-**CRITICAL: This project uses Yarn Classic (v1.x), not Yarn Berry (v2+)**
+**CRITICAL: This project uses PNPM (v9+)**
 
-Check `package.json` for: `"packageManager": "yarn@1.22.22"`
+Check `package.json` for: `"packageManager": "pnpm@9.x.x"`
 
 ### Correct Workspace Dependency Syntax
 
-For Yarn Classic workspaces:
+For PNPM workspaces:
 
 ```json
 {
   "dependencies": {
-    "react-on-rails": "*"
+    "react-on-rails": "workspace:*"
   }
 }
 ```
 
 **DO NOT USE:**
 
-- `"workspace:*"` - This is Yarn Berry v2+ syntax, will cause installation errors
+- `"*"` - This is Yarn Classic v1.x syntax
 - `"file:../react-on-rails"` - This bypasses workspace resolution
 
-### Why `*` Works
+### Why `workspace:*` Works
 
-In Yarn Classic workspaces:
+In PNPM workspaces:
 
-- `"*"` tells Yarn to resolve to the local workspace package
-- Yarn automatically links to the workspace version
-- This is the official Yarn v1 workspace syntax
+- `"workspace:*"` tells PNPM to resolve to the local workspace package
+- PNPM automatically links to the workspace version
+- This is the official PNPM workspace syntax
 
 ### Testing Workspace Changes
 
@@ -149,13 +149,13 @@ When modifying workspace dependencies in package.json:
 rm -rf node_modules
 
 # 2. Test CI command - this will fail immediately if syntax is wrong
-yarn install --frozen-lockfile
+pnpm install --frozen-lockfile
 
 # 3. Verify workspace linking worked
-yarn workspaces info
+pnpm -r list
 
 # 4. Test that packages can import each other
-yarn run build
+pnpm run build
 ```
 
 ## Real Examples: What Went Wrong
@@ -163,18 +163,20 @@ yarn run build
 ### Example 1: Path Reference Issue (Sep 2024)
 
 We moved `node_package/` → `packages/react-on-rails/`. The path in
-package-scripts.yml was updated to `packages/react-on-rails/lib/ReactOnRails.full.js`.
-Later, the structure was partially reverted to `lib/` at root, but package-scripts.yml
+package.json was updated to `packages/react-on-rails/lib/ReactOnRails.full.js`.
+Later, the structure was partially reverted to `lib/` at root, but package.json
 wasn't updated. This broke yalc publish silently for 7 weeks. Manual testing of
-`yarn run yalc.publish` would have caught this immediately.
+`pnpm run yalc:publish` would have caught this immediately.
 
-### Example 2: Workspace Protocol Issue (Nov 2024)
+### Example 2: Workspace Protocol Migration (2024)
 
-Changed workspace dependencies from `"*"` to `"workspace:*"` without testing clean install.
-This caused CI to fail with: `Couldn't find any versions for "react-on-rails" that matches "workspace:*"`
+When migrating from Yarn to PNPM, workspace dependencies needed to change from `"*"` to `"workspace:*"`.
 
-**Root cause:** Assumed `workspace:*` was standard, but it's only supported in Yarn Berry v2+.
-This project uses Yarn Classic v1.x which requires `"*"` for workspace dependencies.
+**Root cause:** Different package managers use different workspace protocols:
 
-**Lesson:** ALWAYS test `yarn install --frozen-lockfile` after modifying workspace dependencies.
+- Yarn Classic v1.x uses `"*"` for workspace dependencies
+- PNPM uses `"workspace:*"` for workspace dependencies
+- Yarn Berry v2+ also uses `"workspace:*"`
+
+**Lesson:** ALWAYS test `pnpm install --frozen-lockfile` after modifying workspace dependencies.
 Your local node_modules masked the issue - CI starts fresh and caught it immediately.

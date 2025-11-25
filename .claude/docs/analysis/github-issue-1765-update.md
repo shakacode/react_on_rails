@@ -23,13 +23,11 @@ The monorepo merger has been successfully completed with full git history preser
 ### ⚠️ Critical Issues Requiring Immediate Attention
 
 1. **YALC Publishing - Not All Packages Published**
-
    - Currently only publishes main package
    - Need to publish: `react-on-rails`, `react-on-rails-pro`, `react-on-rails-pro-rsc`
    - Path mismatch in `package-scripts.yml` could cause silent failures
 
 2. **Directory Structure Confusion**
-
    - Pro package nested inside main package (`react_on_rails_pro/` subdirectory)
    - Should be siblings under `/packages/` for clearer separation
    - Affects mental model and license boundaries

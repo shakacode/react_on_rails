@@ -19,6 +19,8 @@ During this transition:
 
 ## Prerequisites
 
+**Note for users**: End users of react_on_rails can continue using their preferred package manager (npm, yarn, pnpm, or bun). The generators automatically detect your package manager. The pnpm commands below are for contributors working on the react_on_rails codebase itself.
+
 - [Yalc](https://github.com/whitecolor/yalc) must be installed globally for most local development.
 - **Git hooks setup** (automatic during normal setup):
 
@@ -28,7 +30,7 @@ Git hooks are installed automatically when you run the standard setup commands. 
 
 ```sh
 cd react_on_rails/
-bundle && yarn && rake shakapacker_examples:gen_all && rake node_package && rake
+bundle && pnpm install && rake shakapacker_examples:gen_all && rake node_package && rake
 ```
 
 See [Dev Initial Setup](#dev-initial-setup) below for, well... initial setup,
@@ -87,10 +89,10 @@ First, be **sure** to build the NPM package:
 
 ```sh
 cd <React on Rails root>
-yarn
+pnpm install
 
 # Update the lib directory with babel compiled files
-yarn run build-watch
+pnpm run build-watch
 ```
 
 You need to do this once to make sure your app depends on our package:
@@ -114,7 +116,7 @@ yalc push
 cd <your project root>
 
 # Will update from yalc
-yarn
+pnpm install
 ```
 
 **⚠️ Common Mistake**: Forgetting to run `yalc push` after making changes to React on Rails source code will result in test apps not receiving updates, making it appear that your changes have no effect.
@@ -126,7 +128,7 @@ $ yalc push
 react-on-rails@12.0.0-12070fd1 published in store.
 Pushing react-on-rails@12.0.0 in /Users/justin/shakacode/react-on-rails/react_on_rails/spec/dummy
 Package react-on-rails@12.0.0-12070fd1 added ==> /Users/justin/shakacode/react-on-rails/react_on_rails/spec/dummy/node_modules/react-on-rails.
-Don't forget you may need to run yarn after adding packages with yalc to install/update dependencies/bin scripts.
+Don't forget you may need to run pnpm install after adding packages with yalc to install/update dependencies/bin scripts.
 ```
 
 Of course, you can do the same with `react-on-rails-pro` and `react-on-rails-pro-node-renderer` packages.
@@ -161,20 +163,20 @@ gem 'react_on_rails_pro',
 Unfortunately, not all package managers allow depending on a single subfolder of a Git repo.
 The examples below are for the `master` branch of `react-on-rails` package.
 
+#### PNPM (recommended, v9+)
+
+See [this issue](https://github.com/pnpm/pnpm/issues/4765).
+
+```shell
+pnpm add "github:shakacode/react_on_rails/repo#master&path:packages/react-on-rails"
+```
+
 #### Yarn Berry
 
 See [Yarn Git protocol documentation](https://yarnpkg.com/protocol/git#workspaces-support).
 
 ```shell
 yarn add "git@github.com:shakacode/react_on_rails.git#workspace=react-on-rails&head=master"
-```
-
-#### PNPM (starting from v9)
-
-See [this issue](https://github.com/pnpm/pnpm/issues/4765).
-
-```shell
-pnpm add "github:shakacode/react_on_rails/repo#master&path:packages/react-on-rails"
 ```
 
 #### NPM
@@ -185,7 +187,7 @@ pnpm add "github:shakacode/react_on_rails/repo#master&path:packages/react-on-rai
 
 This method works only for JS packages, not for Ruby gems.
 
-Run `yarn pack` in the package you modified, copy the generated file into your app or upload it somewhere, and run
+Run `pnpm pack` in the package you modified, copy the generated file into your app or upload it somewhere, and run
 
 ```shell
 npm install <tarball path/URL>
@@ -220,18 +222,18 @@ _Side note: It's critical to use the alias section of the Webpack config to avoi
 
 ```sh
 cd react_on_rails/
-yarn
-yarn build
+pnpm install
+pnpm run build
 ```
 
-Or run this, which builds the Yarn package, then the Webpack files for `react_on_rails/spec/dummy`, and runs tests in
-`react_on_rails/spec/dummy`.
+Or run this, which builds the package, then the Webpack files for `spec/dummy`, and runs tests in
+`spec/dummy`.
 
 ```sh
 # Optionally change default capybara driver
 export DRIVER=selenium_firefox
 cd react_on_rails/
-yarn run dummy:spec
+pnpm run dummy:spec
 ```
 
 To convert the development environment over to Shakapacker v6 instead of the default Shakapacker v8:
@@ -241,7 +243,7 @@ To convert the development environment over to Shakapacker v6 instead of the def
 export DRIVER=selenium_firefox
 cd react_on_rails/
 script/convert
-yarn run dummy:spec
+pnpm run dummy:spec
 ```
 
 ## Running tests
@@ -250,7 +252,7 @@ yarn run dummy:spec
 
 ```sh
 cd react_on_rails/
-yarn run test
+pnpm run test
 ```
 
 ### react_on_rails/spec/dummy tests
@@ -264,7 +266,7 @@ rspec
 
 ```sh
 cd react_on_rails/
-yarn run check
+pnpm run check
 ```
 
 ## Development Commands
@@ -274,13 +276,13 @@ yarn run check
 To format JavaScript/TypeScript files with Prettier:
 
 ```sh
-yarn start format
+pnpm run format
 ```
 
 To check formatting without fixing:
 
 ```sh
-yarn start format.listDifferent
+pnpm run format.listDifferent
 ```
 
 ### Linting
@@ -300,12 +302,12 @@ rake lint:rubocop
 Run only ESLint:
 
 ```sh
-yarn run lint
+pnpm run lint
 ```
 
 ### Starting the Dummy App
 
-To run the dummy app, it's **CRITICAL** to not just run `rails s`. You have to run `foreman start` with one of the Procfiles. If you don't do this, then `webpack` will not generate a new bundle, and you will be seriously confused when you change JavaScript and the app does not change. If you change the Webpack configs, then you need to restart Foreman. If you change the JS code for react-on-rails, you need to run `yarn run build` in the project root.
+To run the dummy app, it's **CRITICAL** to not just run `rails s`. You have to run `foreman start` with one of the Procfiles. If you don't do this, then `webpack` will not generate a new bundle, and you will be seriously confused when you change JavaScript and the app does not change. If you change the Webpack configs, then you need to restart Foreman. If you change the JS code for react-on-rails, you need to run `pnpm run build` in the project root.
 
 ### RSpec Testing
 
@@ -657,22 +659,18 @@ This approach:
 **Common Issues and Solutions:**
 
 1. **React components not rendering (empty divs)**
-
    - **Cause**: Missing yalc setup for JavaScript package
    - **Solution**: Follow yalc setup steps above after running generator
 
 2. **Generator fails with Shakapacker errors**
-
    - **Cause**: Conflicting Shakapacker versions or incomplete installation
    - **Solution**: Clean reset and ensure consistent Shakapacker version across tests
 
 3. **Babel configuration conflicts during yalc development**
-
    - **Cause**: Both `babel.config.js` and `package.json` "babel" section defining presets
    - **Solution**: Remove "babel" section from `package.json`, keep only `babel.config.js`
 
 4. **"Package.json not found" errors**
-
    - **Cause**: Generator trying to access non-existent package.json files
    - **Solution**: Test with commits that fix this specific issue (e.g., bc69dcd0)
 
@@ -699,10 +697,10 @@ This approach:
 cd react_on_rails/
 
 # Run Prettier for JavaScript/TypeScript formatting
-yarn run format
+pnpm run format
 
 # Run ESLint for JavaScript/TypeScript linting
-yarn run lint
+pnpm run lint
 
 # Run RuboCop for Ruby linting and formatting
 rake lint:rubocop
@@ -751,7 +749,7 @@ rake autofix
 When creating new template files (`.jsx`, `.rb`, etc.):
 
 1. Copy existing template structure and patterns
-2. Run `yarn run eslint . --fix` immediately after creation
+2. Run `pnpm run eslint . --fix` immediately after creation
 3. Verify with `rake lint` before committing
 
 ### 5. **RuboCop Complexity Issues**
@@ -770,7 +768,7 @@ end
 
 ### Linting
 
-All linting is performed from the docker container for CI. You will need docker and docker-compose installed locally to lint code changes via the lint container. You can lint locally by running `npm run lint && npm run flow`
+All linting is performed from the docker container for CI. You will need docker and docker-compose installed locally to lint code changes via the lint container. You can lint locally by running `pnpm run lint`
 
 - [Install Docker Toolbox for Mac](https://www.docker.com/toolbox)
 - [Install Docker Compose for Linux](https://docs.docker.com/compose/install/)

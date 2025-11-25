@@ -7,31 +7,26 @@
 ### ✅ Successfully Completed
 
 1. **Created package structure**
-
    - `packages/react-on-rails-pro-node-renderer/` directory
    - package.json with correct dependencies
    - tsconfig.json configurations
 
 2. **Moved all files with git history preserved**
-
    - 29 source files moved from `react_on_rails_pro/packages/node-renderer/src/`
    - 43 test files moved from `react_on_rails_pro/packages/node-renderer/tests/`
    - All files tracked as renames (preserves git blame/history)
 
 3. **Updated workspace configuration**
-
    - Added `packages/react-on-rails-pro-node-renderer` to root package.json workspaces
    - Updated build script to include node-renderer
    - Workspace recognizes all 3 packages with correct dependencies
 
 4. **Fixed .gitignore**
-
    - Removed blanket `packages/` ignore
    - Now only ignores `packages/*/lib/` (build outputs)
    - Source code is properly tracked
 
 5. **Updated LICENSE.md**
-
    - Added `packages/react-on-rails-pro-node-renderer/` to Pro license section
    - License boundaries clear
 
@@ -51,18 +46,15 @@
 The node-renderer package has **pre-existing TypeScript errors** unrelated to the file move:
 
 1. **Missing .js extensions in imports** (ESM requirement)
-
    - ~30+ imports need `.js` extension added
    - Example: `import { foo } from './bar'` → `import { foo } from './bar.js'`
 
 2. **Missing type declarations**
-
    - `fastify` - needs `@types/fastify`
    - `@sentry/node` - needs `@sentry/node` installed
    - `@honeybadger-io/js` - needs `@honeybadger-io/js` installed
 
 3. **Module export format issues**
-
    - Some files use `export =` which doesn't work with ESM
    - Need to convert to `export default`
 

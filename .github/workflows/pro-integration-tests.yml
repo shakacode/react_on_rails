@@ -98,8 +98,21 @@ jobs:
           # Pin to 22.12.x (LTS) - V8 bug from issue #56010 was fixed in 22.12.0
           # https://github.com/nodejs/node/issues/56010
           node-version: '22.12.x'
-          cache: yarn
-          cache-dependency-path: 'react_on_rails_pro/**/yarn.lock'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
 
       - name: Print system information
         run: |
@@ -108,20 +121,8 @@ jobs:
           echo "Current directory: "; pwd
           echo "Ruby version: "; ruby -v
           echo "Node version: "; node -v
-          echo "Yarn version: "; yarn --version
+          echo "pnpm version: "; pnpm --version
           echo "Bundler version: "; bundle --version
-
-      - name: Cache Pro package node modules
-        uses: actions/cache@v4
-        with:
-          path: react_on_rails_pro/node_modules
-          key: v4-pro-package-node-modules-cache-${{ hashFiles('react_on_rails_pro/yarn.lock') }}
-
-      - name: Cache Pro dummy app node modules
-        uses: actions/cache@v4
-        with:
-          path: react_on_rails_pro/spec/dummy/node_modules
-          key: v4-pro-dummy-app-node-modules-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/yarn.lock') }}
 
       - name: Cache Pro dummy app Ruby gems
         uses: actions/cache@v4
@@ -129,13 +130,15 @@ jobs:
           path: react_on_rails_pro/spec/dummy/vendor/bundle
           key: v4-pro-dummy-app-gem-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/Gemfile.lock') }}
 
-      - name: Install Node modules with Yarn for Pro package
+      - name: Install Node modules with pnpm for Pro package
         run: |
-          sudo yarn global add yalc
-          yarn install --frozen-lockfile --no-progress --no-emoji
+          pnpm add -g yalc
+          pnpm install --frozen-lockfile
 
-      - name: Install Node modules with Yarn for Pro dummy app
-        run: cd spec/dummy && yarn install --frozen-lockfile --no-progress --no-emoji
+      - name: Install Node modules with pnpm for Pro dummy app
+        # --ignore-workspace prevents pnpm from treating this as part of the parent workspace
+        # The Pro dummy app has its own dependencies and uses yalc links
+        run: cd spec/dummy && pnpm install --ignore-workspace
 
       - name: Install Ruby Gems for Pro dummy app
         run: |
@@ -148,7 +151,7 @@ jobs:
         run: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
 
       - name: Build test bundles for Pro dummy app
-        run: cd spec/dummy && yarn run build:test
+        run: cd spec/dummy && pnpm run build:test
 
       - id: get-sha
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
@@ -196,8 +199,21 @@ jobs:
           # Pin to 22.12.x (LTS) - V8 bug from issue #56010 was fixed in 22.12.0
           # https://github.com/nodejs/node/issues/56010
           node-version: '22.12.x'
-          cache: yarn
-          cache-dependency-path: 'react_on_rails_pro/**/yarn.lock'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
 
       - name: Print system information
         run: |
@@ -206,7 +222,7 @@ jobs:
           echo "Current directory: "; pwd
           echo "Ruby version: "; ruby -v
           echo "Node version: "; node -v
-          echo "Yarn version: "; yarn --version
+          echo "pnpm version: "; pnpm --version
           echo "Bundler version: "; bundle --version
 
       - name: Cache Pro package Ruby gems
@@ -214,18 +230,6 @@ jobs:
         with:
           path: react_on_rails_pro/vendor/bundle
           key: v4-pro-package-gem-cache-${{ hashFiles('react_on_rails_pro/react_on_rails_pro.gemspec') }}
-
-      - name: Cache Pro package node modules
-        uses: actions/cache@v4
-        with:
-          path: react_on_rails_pro/node_modules
-          key: v4-pro-package-node-modules-cache-${{ hashFiles('react_on_rails_pro/yarn.lock') }}
-
-      - name: Cache Pro dummy app node modules
-        uses: actions/cache@v4
-        with:
-          path: react_on_rails_pro/spec/dummy/node_modules
-          key: v4-pro-dummy-app-node-modules-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/yarn.lock') }}
 
       - name: Cache Pro dummy app Ruby gems
         uses: actions/cache@v4
@@ -256,13 +260,15 @@ jobs:
           bundle lock --add-platform 'x86_64-linux'
           bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
 
-      - name: Install Node modules with Yarn for Pro package
+      - name: Install Node modules with pnpm for Pro package
         run: |
-          sudo yarn global add yalc
-          yarn install --frozen-lockfile --no-progress --no-emoji
+          pnpm add -g yalc
+          pnpm install --frozen-lockfile
 
-      - name: Install Node modules with Yarn for Pro dummy app
-        run: cd spec/dummy && yarn install --frozen-lockfile --no-progress --no-emoji
+      - name: Install Node modules with pnpm for Pro dummy app
+        # --ignore-workspace prevents pnpm from treating this as part of the parent workspace
+        # The Pro dummy app has its own dependencies and uses yalc links
+        run: cd spec/dummy && pnpm install --ignore-workspace
 
       - name: Ensure minimum required Chrome version
         run: |
@@ -283,7 +289,7 @@ jobs:
       - name: Run Pro Node renderer in background
         run: |
           cd spec/dummy
-          yarn run node-renderer &
+          pnpm run node-renderer &
 
       - name: Run Rails server in background
         run: |
@@ -342,12 +348,12 @@ jobs:
           name: pro-rspec-test-log
           path: react_on_rails_pro/spec/dummy/log/test.log
 
-      - name: Store yarn error log
+      - name: Store pnpm debug log
         uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: pro-rspec-yarn-error-log
-          path: react_on_rails_pro/spec/dummy/yarn-error.log
+          name: pro-rspec-pnpm-debug-log
+          path: react_on_rails_pro/spec/dummy/pnpm-debug.log
 
   # Playwright E2E tests with Redis service
   dummy-app-node-renderer-e2e-tests:
@@ -395,8 +401,21 @@ jobs:
           # Pin to 22.12.x (LTS) - V8 bug from issue #56010 was fixed in 22.12.0
           # https://github.com/nodejs/node/issues/56010
           node-version: '22.12.x'
-          cache: yarn
-          cache-dependency-path: 'react_on_rails_pro/**/yarn.lock'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
 
       - name: Print system information
         run: |
@@ -405,7 +424,7 @@ jobs:
           echo "Current directory: "; pwd
           echo "Ruby version: "; ruby -v
           echo "Node version: "; node -v
-          echo "Yarn version: "; yarn --version
+          echo "pnpm version: "; pnpm --version
           echo "Bundler version: "; bundle --version
 
       - name: Cache Pro package Ruby gems
@@ -413,18 +432,6 @@ jobs:
         with:
           path: react_on_rails_pro/vendor/bundle
           key: v4-pro-package-gem-cache-${{ hashFiles('react_on_rails_pro/react_on_rails_pro.gemspec') }}
-
-      - name: Cache Pro package node modules
-        uses: actions/cache@v4
-        with:
-          path: react_on_rails_pro/node_modules
-          key: v4-pro-package-node-modules-cache-${{ hashFiles('react_on_rails_pro/yarn.lock') }}
-
-      - name: Cache Pro dummy app node modules
-        uses: actions/cache@v4
-        with:
-          path: react_on_rails_pro/spec/dummy/node_modules
-          key: v4-pro-dummy-app-node-modules-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/yarn.lock') }}
 
       - name: Cache Pro dummy app Ruby gems
         uses: actions/cache@v4
@@ -455,13 +462,15 @@ jobs:
           bundle lock --add-platform 'x86_64-linux'
           bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
 
-      - name: Install Node modules with Yarn for Pro package
+      - name: Install Node modules with pnpm for Pro package
         run: |
-          sudo yarn global add yalc
-          yarn install --frozen-lockfile --no-progress --no-emoji
+          pnpm add -g yalc
+          pnpm install --frozen-lockfile
 
-      - name: Install Node modules with Yarn for Pro dummy app
-        run: cd spec/dummy && yarn install --frozen-lockfile --no-progress --no-emoji
+      - name: Install Node modules with pnpm for Pro dummy app
+        # --ignore-workspace prevents pnpm from treating this as part of the parent workspace
+        # The Pro dummy app has its own dependencies and uses yalc links
+        run: cd spec/dummy && pnpm install --ignore-workspace
 
       - name: Ensure minimum required Chrome version
         run: |
@@ -482,7 +491,7 @@ jobs:
       - name: Run Pro Node renderer in background
         run: |
           cd spec/dummy
-          yarn run node-renderer &
+          pnpm run node-renderer &
 
       - name: Run Rails server in background
         run: |
@@ -504,10 +513,10 @@ jobs:
           echo "Rails server started after ${elapsed}s"
 
       - name: Install Playwright dependencies
-        run: cd spec/dummy && yarn playwright install --with-deps
+        run: cd spec/dummy && pnpm playwright install --with-deps
 
       - name: Run Playwright E2E tests for Pro dummy app
-        run: cd spec/dummy && yarn e2e-test
+        run: cd spec/dummy && pnpm e2e-test
 
       - name: Store test results
         uses: actions/upload-artifact@v4

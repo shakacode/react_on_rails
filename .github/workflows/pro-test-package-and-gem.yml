@@ -98,8 +98,21 @@ jobs:
           # Pin to 22.11.0 (LTS) to avoid V8 bug in 22.21.0
           # https://github.com/nodejs/node/issues/56010
           node-version: '22.11.0'
-          cache: yarn
-          cache-dependency-path: '**/yarn.lock'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
 
       - name: Print system information
         run: |
@@ -108,20 +121,8 @@ jobs:
           echo "Current directory: "; pwd
           echo "Ruby version: "; ruby -v
           echo "Node version: "; node -v
-          echo "Yarn version: "; yarn --version
+          echo "pnpm version: "; pnpm --version
           echo "Bundler version: "; bundle --version
-
-      - name: Cache Pro package node modules
-        uses: actions/cache@v4
-        with:
-          path: react_on_rails_pro/node_modules
-          key: v4-pro-package-node-modules-cache-${{ hashFiles('react_on_rails_pro/yarn.lock') }}
-
-      - name: Cache Pro dummy app node modules
-        uses: actions/cache@v4
-        with:
-          path: react_on_rails_pro/spec/dummy/node_modules
-          key: v4-pro-dummy-app-node-modules-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/yarn.lock') }}
 
       - name: Cache Pro dummy app Ruby gems
         uses: actions/cache@v4
@@ -129,13 +130,14 @@ jobs:
           path: react_on_rails_pro/spec/dummy/vendor/bundle
           key: v4-pro-dummy-app-gem-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/Gemfile.lock') }}
 
-      - name: Install Node modules with Yarn for Pro package
+      - name: Install Node modules with pnpm for Pro package
         run: |
-          sudo yarn global add yalc
-          yarn install --frozen-lockfile --no-progress --no-emoji
+          pnpm add -g yalc
+          pnpm install --frozen-lockfile
 
-      - name: Install Node modules with Yarn for Pro dummy app
-        run: cd spec/dummy && yarn install --frozen-lockfile --no-progress --no-emoji
+      - name: Install Node modules with pnpm for Pro dummy app
+        # --ignore-workspace prevents pnpm from treating this as part of the parent workspace
+        run: cd spec/dummy && pnpm install --ignore-workspace
 
       - name: Install Ruby Gems for Pro dummy app
         run: |
@@ -148,7 +150,7 @@ jobs:
         run: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
 
       - name: Build test bundles for Pro dummy app
-        run: cd spec/dummy && yarn run build:test
+        run: cd spec/dummy && pnpm run build:test
 
       - id: get-sha
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
@@ -201,8 +203,21 @@ jobs:
           # Pin to 22.11.0 (LTS) to avoid V8 bug in 22.21.0
           # https://github.com/nodejs/node/issues/56010
           node-version: '22.11.0'
-          cache: yarn
-          cache-dependency-path: '**/yarn.lock'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
 
       - name: Print system information
         run: |
@@ -210,13 +225,7 @@ jobs:
           echo "Current user: "; whoami
           echo "Current directory: "; pwd
           echo "Node version: "; node -v
-          echo "Yarn version: "; yarn --version
-
-      - name: Cache Pro package node modules
-        uses: actions/cache@v4
-        with:
-          path: react_on_rails_pro/node_modules
-          key: v4-pro-package-node-modules-cache-${{ hashFiles('react_on_rails_pro/yarn.lock') }}
+          echo "pnpm version: "; pnpm --version
 
       - name: Remove old webpack bundles
         run: |
@@ -234,15 +243,15 @@ jobs:
             react_on_rails_pro/spec/dummy/ssr-generated
           key: v4-pro-dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}
 
-      - name: Install Node modules with Yarn for Pro package
+      - name: Install Node modules with pnpm for Pro package
         working-directory: .
         run: |
-          sudo yarn global add yalc
-          yarn install --frozen-lockfile --no-progress --no-emoji
+          pnpm add -g yalc
+          pnpm install --frozen-lockfile
 
       - name: Run JS unit tests for Pro package
-        working-directory: .
-        run: yarn workspace react-on-rails-pro-node-renderer run ci
+        run: pnpm --filter react-on-rails-pro-node-renderer run ci
+
         env:
           JEST_JUNIT_OUTPUT_DIR: ./jest
           JEST_JUNIT_ADD_FILE_ATTRIBUTE: "true"

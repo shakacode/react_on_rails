@@ -110,9 +110,9 @@ namespace :run_rspec do
 end
 # rubocop:enable Metrics/BlockLength
 
-desc "js tests (same as 'yarn run test')"
+desc "js tests (same as 'pnpm run test')"
 task :js_tests do
-  sh "yarn run test"
+  sh "pnpm run test"
 end
 
 msg = <<-DESC.strip_heredoc

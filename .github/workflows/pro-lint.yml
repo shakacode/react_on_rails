@@ -96,8 +96,21 @@ jobs:
           # Pin to 22.11.0 (LTS) to avoid V8 bug in 22.21.0
           # https://github.com/nodejs/node/issues/56010
           node-version: '22.11.0'
-          cache: yarn
-          cache-dependency-path: 'react_on_rails_pro/**/yarn.lock'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
 
       - name: Print system information
         run: |
@@ -106,26 +119,14 @@ jobs:
           echo "Current directory: "; pwd
           echo "Ruby version: "; ruby -v
           echo "Node version: "; node -v
-          echo "Yarn version: "; yarn --version
+          echo "pnpm version: "; pnpm --version
           echo "Bundler version: "; bundle --version
-
-      - name: Cache Pro package node modules
-        uses: actions/cache@v4
-        with:
-          path: react_on_rails_pro/node_modules
-          key: v4-pro-package-node-modules-cache-${{ hashFiles('react_on_rails_pro/yarn.lock') }}
 
       - name: Cache Pro package Ruby gems
         uses: actions/cache@v4
         with:
           path: react_on_rails_pro/vendor/bundle
           key: v4-pro-package-gem-cache-${{ hashFiles('react_on_rails_pro/react_on_rails_pro.gemspec') }}
-
-      - name: Cache Pro dummy app node modules
-        uses: actions/cache@v4
-        with:
-          path: react_on_rails_pro/spec/dummy/node_modules
-          key: v4-pro-dummy-app-node-modules-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/yarn.lock') }}
 
       - name: Cache Pro dummy app Ruby gems
         uses: actions/cache@v4
@@ -141,10 +142,10 @@ jobs:
           bundle config set --local disable_checksum_validation true
           bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
 
-      - name: Install Node modules with Yarn for Pro package
+      - name: Install Node modules with pnpm for Pro package
         run: |
-          sudo yarn global add yalc
-          yarn install --frozen-lockfile --no-progress --no-emoji
+          pnpm add -g yalc
+          pnpm install --frozen-lockfile
 
       - name: Install Ruby Gems for Pro dummy app
         run: |
@@ -152,18 +153,20 @@ jobs:
           bundle lock --add-platform 'x86_64-linux'
           bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
 
-      - name: Install Node modules with Yarn for Pro dummy app
-        run: cd spec/dummy && yarn install --frozen-lockfile --no-progress --no-emoji
+      - name: Install Node modules with pnpm for Pro dummy app
+        # --ignore-workspace prevents pnpm from treating this as part of the parent workspace
+        run: cd spec/dummy && pnpm install --ignore-workspace
 
-      - name: Install Node modules with Yarn for ExecJS dummy app
-        run: cd spec/execjs-compatible-dummy && yarn install --frozen-lockfile --no-progress --no-emoji
+      - name: Install Node modules with pnpm for ExecJS dummy app
+        # --ignore-workspace prevents pnpm from treating this as part of the parent workspace
+        run: cd spec/execjs-compatible-dummy && pnpm install --ignore-workspace
 
       - name: Generate file-system based entrypoints
         run: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
 
       - name: Build react-on-rails package (required for Pro eslint import resolution)
         working-directory: .
-        run: yarn workspace react-on-rails-pro build
+        run: pnpm --filter react-on-rails-pro build
 
       - name: Lint Ruby
         run: bundle exec rubocop --ignore-parent-exclusion
@@ -172,11 +175,12 @@ jobs:
         run: bundle exec rake rbs:validate
 
       - name: Lint JS
-        run: yarn run nps eslint
+        run: pnpm run nps eslint
 
       - name: Check formatting
-        run: yarn run nps format.listDifferent
+        run: pnpm run nps format.listDifferent
 
       - name: Check TypeScript
         working-directory: .
-        run: yarn run nps check-typescript
+        run: pnpm run nps check-typescript
+

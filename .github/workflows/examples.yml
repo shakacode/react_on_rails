@@ -101,7 +101,6 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.setup-matrix.outputs.matrix) }}
     env:
-      SKIP_YARN_COREPACK_CHECK: 0
       BUNDLE_FROZEN: ${{ matrix.dependency-level == 'minimum' && 'false' || 'true' }}
     runs-on: ubuntu-22.04
     steps:
@@ -117,10 +116,18 @@ jobs:
         uses: ./.github/actions/setup-node-with-retry
         with:
           node-version: 20
-          # Retry logic now handles V8 crashes automatically
-          # Tracking: https://github.com/actions/setup-node/issues/1028
-          cache: yarn
-          cache-dependency-path: '**/yarn.lock'
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
       - name: Print system information
         run: |
           echo "Linux release: "; cat /etc/issue
@@ -128,7 +135,7 @@ jobs:
           echo "Current directory: "; pwd
           echo "Ruby version: "; ruby -v
           echo "Node version: "; node -v
-          echo "Yarn version: "; yarn --version
+          echo "pnpm version: "; pnpm --version
           echo "Bundler version: "; bundle --version
       - name: run conversion script to support shakapacker v6
         if: matrix.dependency-level == 'minimum'
@@ -140,14 +147,15 @@ jobs:
           key: package-app-gem-cache-${{ hashFiles('react_on_rails/Gemfile.lock') }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
       - id: get-sha
         run: echo "sha=\"$(git rev-parse HEAD)\"" >> "$GITHUB_OUTPUT"
-      - name: Install Node modules with Yarn for renderer package
+      - name: Install Node modules with pnpm for renderer package
         run: |
-          yarn install --no-progress --no-emoji ${{ matrix.dependency-level == 'latest' && '--frozen-lockfile' || '' }}
-          sudo yarn global add yalc
+          pnpm install ${{ matrix.dependency-level == 'latest' && '--frozen-lockfile' || '--no-frozen-lockfile' }}
+          pnpm add -g yalc
       - name: yalc publish for react-on-rails
-        # Use yarn workspace script to publish all workspace packages to yalc
+        # Use pnpm workspace script to publish all workspace packages to yalc
         # Runs the "yalc:publish" script defined in each workspace's package.json
-        run: yarn run yalc:publish
+        run: pnpm yalc:publish
+
       - name: Install Ruby Gems for package
         run: |
           cd react_on_rails
