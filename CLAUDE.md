@@ -59,6 +59,63 @@ These requirements are non-negotiable. CI will fail if not followed.
 
 ---
 
+## 🚨 AVOIDING CI FAILURE CYCLES
+
+**CRITICAL**: Large-scale changes (directory structure, configs, workflows) require comprehensive local testing BEFORE pushing.
+
+**⚠️ If you're making changes that affect**:
+- Directory structure or file paths
+- Build configurations (package.json, webpack, etc.)
+- CI workflows (.github/workflows/*.yml)
+- Multiple files across the codebase
+
+**STOP and read** → [`.claude/docs/avoiding-ci-failure-cycles.md`](.claude/docs/avoiding-ci-failure-cycles.md)
+
+### The 15-Minute Rule
+
+Before pushing ANY commit, ask yourself:
+
+> "If I spent 15 more minutes testing locally, would I discover this issue before CI does?"
+
+If **YES**, spend the 15 minutes. CI iteration is expensive (10-30 min/cycle). Local testing is fast (seconds to minutes).
+
+### Red Flags - You're Using CI as a Test Environment
+
+🚩 Multiple "Fix" commits in a row
+🚩 CI keeps failing on different tests each push
+🚩 Commit messages like "This should fix it" without local verification
+🚩 Changing configs without testing build scripts
+🚩 Path changes without comprehensive grep
+
+**If you see these patterns**: STOP pushing, test comprehensively locally, then push once.
+
+### Mandatory Local Testing Checklist
+
+**For infrastructure/config changes**:
+
+```bash
+# 1. Find all affected files FIRST
+grep -r "old/path" . --exclude-dir=node_modules --exclude-dir=.git
+
+# 2. Test build pipeline
+rm -rf node_modules && yarn install --frozen-lockfile
+yarn run build
+yarn run yalc:publish
+
+# 3. Test relevant specs
+bundle exec rake run_rspec:gem          # If you changed gem code
+bundle exec rake run_rspec:dummy        # If you changed configs
+bundle exec rake run_rspec:shakapacker_examples  # If you changed generators
+
+# 4. Lint everything
+bundle exec rubocop
+yarn run lint
+```
+
+**See full guide**: [`.claude/docs/avoiding-ci-failure-cycles.md`](.claude/docs/avoiding-ci-failure-cycles.md)
+
+---
+
 **🚀 AUTOMATIC: Git hooks are installed automatically during setup**
 
 Git hooks will automatically run linting on **all changed files (staged + unstaged + untracked)** before each commit - making it fast while preventing CI failures!

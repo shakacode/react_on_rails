@@ -11,7 +11,7 @@ This repository contains code under two different licenses:
 
 The following directories and all their contents are licensed under the **MIT License** (see full text below):
 
-- `lib/react_on_rails/` (entire directory)
+- `react_on_rails/` (entire directory, including lib/, spec/, sig/)
 - `packages/react-on-rails/` (entire package)
 - All other directories in this repository not explicitly listed as Pro-licensed
 
@@ -77,7 +77,7 @@ For Pro-licensed code (as defined in the "License Scope" section above), see:
 **License validation mechanisms** include but are not limited to:
 
 - Runtime checks for valid Pro subscriptions
-- Authentication systems in `lib/react_on_rails/utils.rb` and Pro TypeScript modules
+- Authentication systems in `react_on_rails/lib/react_on_rails/utils.rb` and Pro TypeScript modules
 - The `react_on_rails_pro?` method and `rorPro` field generation
 
 While MIT-licensed code may be modified under MIT terms, using such modifications to access Pro features without a valid license violates the React on Rails Pro License.

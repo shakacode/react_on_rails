@@ -21,6 +21,31 @@ Within 30 minutes of your PR merging to master:
    - Don't assume "someone else will fix it"
    - You are responsible for ensuring your PR doesn't break master
 
+## Polling CI Status While Waiting
+
+**When actively monitoring CI, poll every 30 seconds (not 180 seconds):**
+
+```bash
+# Poll every 30 seconds while CI is running
+while true; do
+  gh pr view --json statusCheckRollup --jq '.statusCheckRollup | group_by(.conclusion) | map({conclusion: .[0].conclusion, count: length})'
+  sleep 30
+done
+```
+
+Or use the automated tool which polls at 30-second intervals:
+
+```bash
+bin/ci-rerun-failures  # Automatically waits for in-progress CI, polling every 30s
+```
+
+**Why 30 seconds?**
+
+- CI jobs typically complete in 3-15 minutes
+- 30-second polling gives responsive feedback without excessive API calls
+- 180 seconds (3 minutes) is too slow—you waste time waiting unnecessarily
+- GitHub API rate limits are 5000 requests/hour, so 30-second polls are fine
+
 ## When You Discover Master is Broken
 
 1. **Determine if it's from your PR:**

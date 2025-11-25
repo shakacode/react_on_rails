@@ -1,8 +1,7 @@
 # frozen_string_literal: true
 
-source "https://rubygems.org"
+# Root Gemfile for developer convenience
+# Delegates to the react_on_rails gem for development
 
-# Specify your gem"s dependencies in react_on_rails.gemspec
-gemspec
-
-eval_gemfile File.expand_path("./Gemfile.development_dependencies", __dir__)
+# Use the open-source gem's Gemfile
+eval_gemfile File.expand_path('react_on_rails/Gemfile', __dir__)

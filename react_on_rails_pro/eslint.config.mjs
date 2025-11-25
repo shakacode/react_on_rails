@@ -3,7 +3,6 @@ import { includeIgnoreFile } from '@eslint/compat';
 import js from '@eslint/js';
 import { FlatCompat } from '@eslint/eslintrc';
 import { defineConfig, globalIgnores } from 'eslint/config';
-import importPlugin from 'eslint-plugin-import';
 import jest from 'eslint-plugin-jest';
 import prettierRecommended from 'eslint-plugin-prettier/recommended';
 import globals from 'globals';
@@ -130,7 +129,7 @@ export default defineConfig([
   },
   {
     files: ['**/*.ts{x,}'],
-    extends: [importPlugin.flatConfigs.typescript, typescriptEslint.configs.strictTypeChecked],
+    extends: [typescriptEslint.configs.strictTypeChecked],
 
     languageOptions: {
       parserOptions: {
@@ -213,6 +212,25 @@ export default defineConfig([
     files: ['spec/dummy/e2e-tests/*'],
     rules: {
       'react-hooks/rules-of-hooks': ['off'],
+    },
+  },
+  {
+    // Dummy apps have dependencies managed separately and may not be installed
+    files: ['spec/dummy/**/*', 'spec/execjs-compatible-dummy/**/*'],
+    rules: {
+      'import/no-unresolved': 'off',
+      'import/named': 'off',
+    },
+  },
+  {
+    // Pro packages use monorepo workspace imports that ESLint can't resolve
+    // TypeScript compiler validates these imports
+    files: ['../packages/react-on-rails-pro/**/*', '../packages/react-on-rails-pro-node-renderer/**/*'],
+    rules: {
+      'import/named': 'off',
+      'import/no-unresolved': 'off',
+      'import/no-cycle': 'off',
+      'import/extensions': 'off',
     },
   },
   // must be the last config in the array

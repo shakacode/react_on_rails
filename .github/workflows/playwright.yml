@@ -61,32 +61,32 @@ jobs:
         run: yarn install
 
       - name: Install dummy app dependencies
-        working-directory: spec/dummy
+        working-directory: react_on_rails/spec/dummy
         run: |
           bundle install
           yarn install
 
       - name: Install Playwright browsers
-        working-directory: spec/dummy
+        working-directory: react_on_rails/spec/dummy
         run: yarn playwright install --with-deps
 
       - name: Generate React on Rails packs
-        working-directory: spec/dummy
+        working-directory: react_on_rails/spec/dummy
         env:
           RAILS_ENV: test
         run: bundle exec rake react_on_rails:generate_packs
 
       - name: Build test assets
-        working-directory: spec/dummy
+        working-directory: react_on_rails/spec/dummy
         run: yarn run build:test
 
       - name: Run Playwright tests
-        working-directory: spec/dummy
+        working-directory: react_on_rails/spec/dummy
         run: yarn run test:e2e
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: playwright-report
-          path: spec/dummy/e2e/playwright-report/
+          path: react_on_rails/spec/dummy/e2e/playwright-report/
           retention-days: 30

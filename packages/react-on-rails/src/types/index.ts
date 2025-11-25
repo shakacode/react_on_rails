@@ -362,7 +362,7 @@ export interface ReactOnRailsInternal extends ReactOnRails {
    * @param key
    * @returns option value
    */
-  option<K extends keyof ReactOnRailsOptions>(key: K): ReactOnRailsOptions[K] | undefined;
+  option<K extends keyof ReactOnRailsOptions>(key: K): ReactOnRailsOptions[K];
   /**
    * Allows retrieval of the store generator by name. This is used internally by ReactOnRails after
    * a Rails form loads to prepare stores.

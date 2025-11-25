@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { globalIgnores } from 'eslint/config';
+import { defineConfig, globalIgnores } from 'eslint/config';
 import jest from 'eslint-plugin-jest';
 import prettierRecommended from 'eslint-plugin-prettier/recommended';
 import testingLibrary from 'eslint-plugin-testing-library';
@@ -16,7 +16,7 @@ const compat = new FlatCompat({
   allConfig: js.configs.all,
 });
 
-const config = tsEslint.config([
+const config = defineConfig([
   // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
   includeIgnoreFile(path.resolve(__dirname, '.gitignore')),
   globalIgnores([
@@ -26,13 +26,20 @@ const config = tsEslint.config([
     'react_on_rails_pro/',
     // used for tests only
     'spec/react_on_rails/dummy-for-generators',
+    'react_on_rails/spec/dummy-for-generators',
     // temporary and generated files
-    'spec/dummy/.yalc',
-    'spec/dummy/public',
-    'spec/dummy/vendor',
-    'spec/dummy/tmp',
-    'spec/dummy/app/assets/config/manifest.js',
-    'spec/dummy/client/app/packs/server-bundle.js',
+    'react_on_rails/spec/dummy/.yalc',
+    'react_on_rails_pro/spec/dummy/.yalc',
+    'react_on_rails/spec/dummy/public',
+    'react_on_rails_pro/spec/dummy/public',
+    'react_on_rails/spec/dummy/vendor',
+    'react_on_rails_pro/spec/dummy/vendor',
+    'react_on_rails/spec/dummy/tmp',
+    'react_on_rails_pro/spec/dummy/tmp',
+    'react_on_rails/spec/dummy/app/assets/config/manifest.js',
+    'react_on_rails_pro/spec/dummy/app/assets/config/manifest.js',
+    'react_on_rails/spec/dummy/client/app/packs/server-bundle.js',
+    'react_on_rails_pro/spec/dummy/client/app/packs/server-bundle.js',
     '**/*.res.js',
     '**/coverage',
     '**/assets/webpack/',
@@ -82,7 +89,7 @@ const config = tsEslint.config([
       'import/core-modules': ['react-redux'],
 
       'import/resolver': {
-        alias: [['Assets', './spec/dummy/client/app/assets']],
+        alias: [['Assets', './react_on_rails/spec/dummy/client/app/assets']],
 
         node: {
           extensions: ['.js', '.jsx', '.ts', '.tsx', '.d.ts'],
@@ -125,13 +132,8 @@ const config = tsEslint.config([
           ignore: ['\\.res\\.js$'],
         },
       ],
-      'react/destructuring-assignment': [
-        'error',
-        'always',
-        {
-          ignoreClassFields: true,
-        },
-      ],
+      // Disabled for flexibility with React 19 - allows both destructured and non-destructured props
+      'react/destructuring-assignment': 'off',
       'react/forbid-prop-types': 'off',
       'react/function-component-definition': [
         'error',
@@ -177,7 +179,7 @@ const config = tsEslint.config([
     },
   },
   {
-    files: ['lib/generators/react_on_rails/templates/**/*'],
+    files: ['react_on_rails/lib/generators/react_on_rails/templates/**/*'],
     rules: {
       // It doesn't use package.json from the template
       'import/no-unresolved': 'off',
@@ -188,9 +190,16 @@ const config = tsEslint.config([
     },
   },
   {
-    files: ['spec/dummy/**/*'],
+    files: ['react_on_rails/spec/dummy/**/*', 'react_on_rails_pro/spec/dummy/**/*'],
     rules: {
       // The dummy app dependencies are managed separately and may not be installed
+      'import/no-unresolved': 'off',
+    },
+  },
+  {
+    files: ['**/e2e/playwright/**/*', '**/playwright/**/*.spec.{js,ts}'],
+    rules: {
+      // Playwright dependencies may not be installed during linting
       'import/no-unresolved': 'off',
     },
   },

@@ -16,7 +16,7 @@ declare global {
  * @internal Exported for tests and for Ruby helper to wrap with nonce
  */
 export function consoleReplay(
-  customConsoleHistory: (typeof console)['history'] | undefined = undefined,
+  customConsoleHistory: (typeof console)['history'] = undefined,
   numberOfMessagesToSkip = 0,
 ): string {
   // console.history is a global polyfill used in server rendering.
@@ -54,9 +54,8 @@ export function consoleReplay(
   return lines.join('\n');
 }
 
-/* eslint-disable default-param-last */
 export default function buildConsoleReplay(
-  customConsoleHistory: (typeof console)['history'] | undefined = undefined,
+  customConsoleHistory: (typeof console)['history'] = undefined,
   numberOfMessagesToSkip = 0,
   nonce?: string,
 ): string {
@@ -66,4 +65,3 @@ export default function buildConsoleReplay(
   }
   return wrapInScriptTags('consoleReplayLog', consoleReplayJS, nonce);
 }
-/* eslint-enable default-param-last */

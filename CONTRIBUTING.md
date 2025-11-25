@@ -43,16 +43,16 @@ It's critical to configure your IDE/editor to ignore certain directories. Otherw
 - /gen-examples
 - /packages/react-on-rails/lib
 - /node_modules
-- /spec/dummy/app/assets/webpack
-- /spec/dummy/log
-- /spec/dummy/node_modules
-- /spec/dummy/client/node_modules
-- /spec/dummy/tmp
-- /spec/react_on_rails/dummy-for-generators
+- /react_on_rails/spec/dummy/app/assets/webpack
+- /react_on_rails/spec/dummy/log
+- /react_on_rails/spec/dummy/node_modules
+- /react_on_rails/spec/dummy/client/node_modules
+- /react_on_rails/spec/dummy/tmp
+- /react_on_rails/spec/react_on_rails/dummy-for-generators
 
 # Example apps
 
-The [`spec/dummy` app](https://github.com/shakacode/react_on_rails/blob/master/spec/dummy) is an example of the various setup techniques you can use with the gem.
+The [`react_on_rails/spec/dummy` app](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails/spec/dummy) is an example of the various setup techniques you can use with the gem.
 
 There are also two such apps for React on Rails Pro: [one using the Node renderer](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/spec/dummy) and [one using ExecJS](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/spec/execjs-compatible-dummy).
 
@@ -131,7 +131,7 @@ Don't forget you may need to run yarn after adding packages with yalc to install
 
 Of course, you can do the same with `react-on-rails-pro` and `react-on-rails-pro-node-renderer` packages.
 
-This is the approach `spec/dummy` apps use, so you can also look at their implementation.
+This is the approach `react_on_rails/spec/dummy` apps use, so you can also look at their implementation.
 
 ### Example: Testing NPM changes with the dummy app
 
@@ -199,7 +199,7 @@ or the equivalent command for your package manager.
 
 ### Prereqs
 
-After checking out the repo, making sure you have Ruby and Node version managers set up (such as rvm and nvm, or rbenv and nodenv, etc.), cd to `spec/dummy` and run `bin/setup` to install ruby dependencies. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
+After checking out the repo, making sure you have Ruby and Node version managers set up (such as rvm and nvm, or rbenv and nodenv, etc.), cd to `react_on_rails/spec/dummy` and run `bin/setup` to install ruby dependencies. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
 
 ### Local Node Package
 
@@ -224,8 +224,8 @@ yarn
 yarn build
 ```
 
-Or run this, which builds the Yarn package, then the Webpack files for `spec/dummy`, and runs tests in
-`spec/dummy`.
+Or run this, which builds the Yarn package, then the Webpack files for `react_on_rails/spec/dummy`, and runs tests in
+`react_on_rails/spec/dummy`.
 
 ```sh
 # Optionally change default capybara driver
@@ -253,7 +253,7 @@ cd react_on_rails/
 yarn run test
 ```
 
-### spec/dummy tests
+### react_on_rails/spec/dummy tests
 
 ```sh
 cd react_on_rails/spec/dummy
@@ -309,7 +309,7 @@ To run the dummy app, it's **CRITICAL** to not just run `rails s`. You have to r
 
 ### RSpec Testing
 
-Run `rake` for testing the gem and `spec/dummy`. Otherwise, the `rspec` command only works for testing within the sample apps, like `spec/dummy`.
+Run `rake` for testing the gem and `react_on_rails/spec/dummy`. Otherwise, the `rspec` command only works for testing within the sample apps, like `react_on_rails/spec/dummy`.
 
 If you run `rspec` at the top level, you'll see this message: `require': cannot load such file -- rails_helper (LoadError)`
 
@@ -794,7 +794,7 @@ You can run specific linting for directories or files by using `docker-compose r
 2 files require updating to update the Rubocop version:
 
 1. `react_on_rails.gemspec`
-2. `spec/dummy/Gemfile`
+2. `react_on_rails/spec/dummy/Gemfile`
 
 ### Docker CI - Test and Linting
 

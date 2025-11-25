@@ -27,6 +27,10 @@ Changes since the last non-beta release.
 
 - **Service Dependency Checking for bin/dev**: Added optional `.dev-services.yml` configuration to validate required external services (Redis, PostgreSQL, Elasticsearch, etc.) are running before `bin/dev` starts the development server. Provides clear error messages with start commands and install hints when services are missing. Zero impact if not configured - backwards compatible with all existing installations. [PR 2098](https://github.com/shakacode/react_on_rails/pull/2098) by [justin808](https://github.com/justin808).
 
+#### Changed
+
+- **Monorepo Structure Reorganization**: Restructured the monorepo to use two top-level product directories (`react_on_rails/` and `react_on_rails_pro/`) instead of mixing source files at the root level. This improves organization and clarity for contributors working on either the open-source or Pro versions. **Important for contributors**: If you have an existing clone of the repository, you may need to update your IDE exclusion patterns and paths. See the updated `CLAUDE.md` for current project structure. [PR 2114](https://github.com/shakacode/react_on_rails/pull/2114) by [justin808](https://github.com/justin808).
+
 #### Improved
 
 - **Automatic Precompile Hook Coordination in bin/dev**: The `bin/dev` command now automatically runs Shakapacker's `precompile_hook` once before starting development processes and sets `SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true` to prevent duplicate execution in spawned webpack processes.
