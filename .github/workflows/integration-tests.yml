@@ -140,7 +140,7 @@ jobs:
           echo "Node version: "; node -v
           echo "pnpm version: "; pnpm --version
           echo "Bundler version: "; bundle --version
-      - name: run conversion script to support shakapacker v6
+      - name: Run conversion script for older Node compatibility
         if: matrix.dependency-level == 'minimum'
         run: script/convert
       - name: Install Node modules with pnpm for renderer package
@@ -229,7 +229,7 @@ jobs:
           echo "Node version: "; node -v
           echo "pnpm version: "; pnpm --version
           echo "Bundler version: "; bundle --version
-      - name: run conversion script to support shakapacker v6
+      - name: Run conversion script for older Node compatibility
         if: matrix.dependency-level == 'minimum'
         run: script/convert
       - name: Save root ruby gems to cache

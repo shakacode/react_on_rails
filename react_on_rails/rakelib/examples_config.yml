@@ -7,3 +7,10 @@ example_type_data:
     generator_options: --redux
   - name: redux-server-rendering
     generator_options: --redux --example-server-rendering
+  # Minimum version compatibility tests - tests React 18 and Shakapacker 8.2.0
+  - name: basic-minimum
+    generator_options: ''
+    minimum_versions: true
+  - name: basic-server-rendering-minimum
+    generator_options: --example-server-rendering
+    minimum_versions: true

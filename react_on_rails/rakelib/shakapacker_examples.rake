@@ -8,12 +8,39 @@
 require "yaml"
 require "rails/version"
 require "pathname"
+require "json"
 
 require_relative "example_type"
 require_relative "task_helpers"
 
 namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
   include ReactOnRails::TaskHelpers
+
+  # Updates package.json to use minimum supported versions for compatibility testing
+  def apply_minimum_versions(dir)
+    package_json_path = File.join(dir, "package.json")
+    return unless File.exist?(package_json_path)
+
+    package_json = JSON.parse(File.read(package_json_path))
+
+    # Update React versions to minimum supported
+    if package_json["dependencies"]
+      package_json["dependencies"]["react"] = ExampleType::MINIMUM_REACT_VERSION
+      package_json["dependencies"]["react-dom"] = ExampleType::MINIMUM_REACT_VERSION
+    end
+
+    # Update Shakapacker to minimum supported version
+    if package_json["devDependencies"]&.key?("shakapacker")
+      package_json["devDependencies"]["shakapacker"] = ExampleType::MINIMUM_SHAKAPACKER_VERSION
+    elsif package_json["dependencies"]&.key?("shakapacker")
+      package_json["dependencies"]["shakapacker"] = ExampleType::MINIMUM_SHAKAPACKER_VERSION
+    end
+
+    File.write(package_json_path, "#{JSON.pretty_generate(package_json)}\n")
+    puts "  Updated package.json with minimum versions:"
+    puts "    React: #{ExampleType::MINIMUM_REACT_VERSION}"
+    puts "    Shakapacker: #{ExampleType::MINIMUM_SHAKAPACKER_VERSION}"
+  end
 
   # Define tasks for each example type
   ExampleType.all[:shakapacker_examples].each do |example_type|
@@ -46,6 +73,10 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
         "REACT_ON_RAILS_SKIP_VALIDATION=true #{cmd}"
       end
       sh_in_dir(example_type.dir, generator_commands)
+
+      # Apply minimum versions for compatibility testing examples
+      apply_minimum_versions(example_type.dir) if example_type.minimum_versions
+
       sh_in_dir(example_type.dir, "npm install")
       # Generate the component packs after running the generator to ensure all
       # auto-bundled components have corresponding pack files created

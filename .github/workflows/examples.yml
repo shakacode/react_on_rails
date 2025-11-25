@@ -137,7 +137,7 @@ jobs:
           echo "Node version: "; node -v
           echo "pnpm version: "; pnpm --version
           echo "Bundler version: "; bundle --version
-      - name: run conversion script to support shakapacker v6
+      - name: Run conversion script for older Node compatibility
         if: matrix.dependency-level == 'minimum'
         run: script/convert
       - name: Save root ruby gems to cache
@@ -180,8 +180,12 @@ jobs:
       - name: Set packer version environment variable
         run: |
           echo "CI_DEPENDENCY_LEVEL=${{ matrix.dependency-level }}" >> $GITHUB_ENV
-      - name: Main CI
-        run: cd react_on_rails && bundle exec rake run_rspec:shakapacker_examples
+      - name: Main CI - Latest version examples
+        if: matrix.dependency-level == 'latest'
+        run: cd react_on_rails && bundle exec rake run_rspec:shakapacker_examples_latest
+      - name: Main CI - Minimum version examples
+        if: matrix.dependency-level == 'minimum'
+        run: cd react_on_rails && bundle exec rake run_rspec:shakapacker_examples_minimum
       - name: Store test results
         uses: actions/upload-artifact@v4
         with:

@@ -91,6 +91,25 @@ namespace :run_rspec do
     ExampleType.all[:shakapacker_examples].each { |example_type| Rake::Task[example_type.rspec_task_name].invoke }
   end
 
+  # Helper methods for filtering examples
+  def latest_examples
+    ExampleType.all[:shakapacker_examples].reject(&:minimum_versions)
+  end
+
+  def minimum_examples
+    ExampleType.all[:shakapacker_examples].select(&:minimum_versions)
+  end
+
+  desc "Runs Rspec for latest version example apps only (excludes minimum version tests)"
+  task shakapacker_examples_latest: latest_examples.map(&:gen_task_name) do
+    latest_examples.each { |example_type| Rake::Task[example_type.rspec_task_name].invoke }
+  end
+
+  desc "Runs Rspec for minimum version example apps only (React 18, Shakapacker 8.2.0)"
+  task shakapacker_examples_minimum: minimum_examples.map(&:gen_task_name) do
+    minimum_examples.each { |example_type| Rake::Task[example_type.rspec_task_name].invoke }
+  end
+
   Coveralls::RakeTask.new if ENV["USE_COVERALLS"] == "TRUE"
 
   desc "run all tests no examples"

@@ -14,12 +14,17 @@ module ReactOnRails
         @all ||= { shakapacker_examples: [] }
       end
 
-      attr_reader :packer_type, :name, :generator_options
+      # Minimum supported versions for compatibility testing
+      MINIMUM_REACT_VERSION = "18.0.0"
+      MINIMUM_SHAKAPACKER_VERSION = "8.2.0"
 
-      def initialize(packer_type: nil, name: nil, generator_options: nil)
+      attr_reader :packer_type, :name, :generator_options, :minimum_versions
+
+      def initialize(packer_type: nil, name: nil, generator_options: nil, minimum_versions: false)
         @packer_type = packer_type
         @name = name
         @generator_options = generator_options
+        @minimum_versions = minimum_versions
         self.class.all[packer_type.to_sym] << self
       end
 

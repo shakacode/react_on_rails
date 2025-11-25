@@ -1,6 +1,14 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+# This script converts the codebase to use minimum supported dependency versions.
+# It's run during CI when testing the "minimum" dependency matrix to ensure
+# backward compatibility.
+#
+# React/Shakapacker version compatibility is now tested through generator smoke tests
+# (see examples_config.yml for minimum version examples like basic-minimum).
+# This script only handles Node.js/tooling compatibility and Pro package test adjustments.
+
 def gsub_file_content(path, old_content, new_content)
   path = File.expand_path(path, __dir__)
 
@@ -17,19 +25,6 @@ def gsub_file_content(path, old_content, new_content)
   File.binwrite(path, content)
 end
 
-def move(old_path, new_path)
-  old_path = File.expand_path(old_path, __dir__)
-  new_path = File.expand_path(new_path, __dir__)
-  File.rename(old_path, new_path)
-end
-
-# Keep shakapacker.yml since we're using Shakapacker 8+
-# move("../react_on_rails/spec/dummy/config/shakapacker.yml", "../react_on_rails/spec/dummy/config/webpacker.yml")
-
-# Shakapacker - use version with async script loading support (8.2.0+)
-gsub_file_content("../react_on_rails/Gemfile.development_dependencies", /gem "shakapacker", "[^"]*"/, 'gem "shakapacker", "8.2.0"')
-gsub_file_content("../react_on_rails/spec/dummy/package.json", /"shakapacker": "[^"]*",/, '"shakapacker": "8.2.0",')
-
 # The below packages don't work on the oldest supported Node version and aren't needed there anyway
 # Note: All dev dependencies remain in root package.json even after workspace migration
 gsub_file_content("../package.json", /"[^"]*eslint[^"]*": "[^"]*",?/, "")
@@ -42,13 +37,7 @@ gsub_file_content("../package.json", %r{"@testing-library/[^"]*": "[^"]*",}, "")
 # Clean up any trailing commas before closing braces
 gsub_file_content("../package.json", /,(\s*})/, "\\1")
 
-# Switch to minimum supported React version (React 18 since we removed PropTypes)
-gsub_file_content("../package.json", /"react": "[^"]*",/, '"react": "18.0.0",')
-gsub_file_content("../package.json", /"react-dom": "[^"]*",/, '"react-dom": "18.0.0",')
-gsub_file_content("../packages/react-on-rails-pro/package.json", /"react": "[^"]*",/, '"react": "18.0.0",')
-gsub_file_content("../packages/react-on-rails-pro/package.json", /"react-dom": "[^"]*",/, '"react-dom": "18.0.0",')
-gsub_file_content("../react_on_rails/spec/dummy/package.json", /"react": "[^"]*",/, '"react": "18.0.0",')
-gsub_file_content("../react_on_rails/spec/dummy/package.json", /"react-dom": "[^"]*",/, '"react-dom": "18.0.0",')
+# Pro package: Skip RSC tests on React 18 since RSC requires React 19
 gsub_file_content(
   "../packages/react-on-rails-pro/package.json",
   /"test:non-rsc": "(?:\\"|[^"])*",/,
