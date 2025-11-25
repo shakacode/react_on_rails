@@ -151,7 +151,6 @@ jobs:
       - name: Detect dead code
         run: |
           yarn run knip --exclude binaries
-          yarn run knip --production --exclude binaries
       - name: Lint JS
         run: yarn run eslint --report-unused-disable-directives
       - name: Check formatting

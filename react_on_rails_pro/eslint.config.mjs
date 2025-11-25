@@ -38,6 +38,10 @@ export default defineConfig([
     '**/dist/',
     '**/.yalc/',
     '**/*.chunk.js',
+    // Config files with ESM syntax that @babel/eslint-parser can't handle synchronously
+    '**/babel.config.js',
+    '**/eslint.config.mjs',
+    '**/manifest.js',
   ]),
   {
     files: ['**/*.[jt]s', '**/*.[cm][jt]s', '**/*.[jt]sx'],
