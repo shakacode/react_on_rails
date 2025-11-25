@@ -5,7 +5,7 @@ import { getRequestBundleFilePath } from '../shared/utils';
 
 export type IncrementalRenderSink = {
   /** Called for every subsequent NDJSON object after the first one */
-  add: (chunk: unknown) => void;
+  add: (chunk: unknown) => Promise<void>;
   handleRequestClosed: () => void;
 };
 
@@ -93,11 +93,11 @@ export async function handleIncrementalRenderRequest(
     return {
       response,
       sink: {
-        add: (chunk: unknown) => {
+        add: async (chunk: unknown) => {
           try {
             assertIsUpdateChunk(chunk);
             const bundlePath = getRequestBundleFilePath(chunk.bundleTimestamp);
-            executionContext.runInVM(chunk.updateChunk, bundlePath).catch((err: unknown) => {
+            await executionContext.runInVM(chunk.updateChunk, bundlePath).catch((err: unknown) => {
               log.error({ msg: 'Error running incremental render chunk', err, chunk });
             });
           } catch (err) {
