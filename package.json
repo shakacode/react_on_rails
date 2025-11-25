@@ -69,17 +69,21 @@
   "scripts": {
     "test": "pnpm -r run test",
     "clean": "pnpm -r run clean",
-    "start": "pnpm run nps",
+    "start": "nps",
+    "nps": "nps",
     "build": "pnpm --filter react-on-rails run build && pnpm --filter react-on-rails-pro run build && pnpm --filter react-on-rails-pro-node-renderer run build",
     "build-watch": "pnpm -r run build-watch",
-    "lint": "pnpm run nps eslint",
+    "lint": "nps eslint",
     "lint:scss": "stylelint \"spec/dummy/app/assets/stylesheets/**/*.scss\" \"spec/dummy/client/**/*.scss\"",
     "check": "pnpm run lint && pnpm -r run check",
     "type-check": "pnpm -r run type-check",
     "yalc:publish": "pnpm -r run yalc:publish",
     "yalc": "pnpm -r run yalc",
     "publish": "pnpm -r run publish",
-
+    "knip": "knip",
+    "eslint": "eslint",
+    "attw": "attw",
+    "publint": "publint",
     "postinstall": "test -f .lefthook.yml && test -d .git && command -v bundle >/dev/null 2>&1 && bundle exec lefthook install || true"
   },
   "repository": {

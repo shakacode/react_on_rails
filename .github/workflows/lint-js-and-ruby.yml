@@ -168,7 +168,7 @@ jobs:
           pnpm exec knip --production --exclude binaries
 
       - name: Lint JS
-        run: pnpm run nps eslint -- --report-unused-disable-directives
+        run: pnpm run eslint --report-unused-disable-directives
       - name: Check formatting
         run: pnpm start format.listDifferent
       - name: Lint SCSS with stylelint
