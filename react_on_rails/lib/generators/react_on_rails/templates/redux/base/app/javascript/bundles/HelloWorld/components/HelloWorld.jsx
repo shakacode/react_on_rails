@@ -1,5 +1,4 @@
 import React from 'react';
-import PropTypes from 'prop-types';
 import * as style from './HelloWorld.module.css';
 
 const HelloWorld = ({ name, updateName }) => (
@@ -17,10 +16,5 @@ const HelloWorld = ({ name, updateName }) => (
     </form>
   </div>
 );
-
-HelloWorld.propTypes = {
-  name: PropTypes.string.isRequired,
-  updateName: PropTypes.func.isRequired,
-};
 
 export default HelloWorld;

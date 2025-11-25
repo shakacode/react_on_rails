@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import PropTypes from 'prop-types';
 import * as style from './HelloWorld.module.css';
 
-const HelloWorld = ({ name: initialName }) => {
-  const [name, setName] = useState(initialName);
+const HelloWorld = (props) => {
+  const [name, setName] = useState(props.name);
 
   return (
     <div>
@@ -17,10 +16,6 @@ const HelloWorld = ({ name: initialName }) => {
       </form>
     </div>
   );
-};
-
-HelloWorld.propTypes = {
-  name: PropTypes.string.isRequired,
 };
 
 export default HelloWorld;
