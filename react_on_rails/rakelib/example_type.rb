@@ -20,6 +20,11 @@ module ReactOnRails
 
       attr_reader :packer_type, :name, :generator_options, :minimum_versions
 
+      # Ruby convention: predicate method with ? suffix for boolean checks
+      def minimum_versions?
+        minimum_versions
+      end
+
       def initialize(packer_type: nil, name: nil, generator_options: nil, minimum_versions: false)
         @packer_type = packer_type
         @name = name

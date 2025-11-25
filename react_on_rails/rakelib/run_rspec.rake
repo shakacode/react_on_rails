@@ -93,11 +93,11 @@ namespace :run_rspec do
 
   # Helper methods for filtering examples
   def latest_examples
-    ExampleType.all[:shakapacker_examples].reject(&:minimum_versions)
+    ExampleType.all[:shakapacker_examples].reject(&:minimum_versions?)
   end
 
   def minimum_examples
-    ExampleType.all[:shakapacker_examples].select(&:minimum_versions)
+    ExampleType.all[:shakapacker_examples].select(&:minimum_versions?)
   end
 
   desc "Runs Rspec for latest version example apps only (excludes minimum version tests)"
