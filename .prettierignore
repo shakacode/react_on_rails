@@ -1,5 +1,7 @@
 node_modules/
 package.json
+# pnpm config file (INI format, not parseable by prettier)
+.npmrc
 # Exclude pro package (has its own formatting)
 react_on_rails_pro/
 packages/react-on-rails-pro-node-renderer/tests/fixtures/projects
