@@ -258,12 +258,11 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
 
     # Publish react-on-rails NPM package
     puts "\nPublishing react-on-rails@#{actual_npm_version}..."
-    sh_in_dir(gem_root, "yarn workspace react-on-rails publish --new-version #{actual_npm_version} #{npm_publish_args}")
+    sh_in_dir(File.join(gem_root, "packages", "react-on-rails"), "pnpm publish #{npm_publish_args}")
 
     # Publish react-on-rails-pro NPM package
     puts "\nPublishing react-on-rails-pro@#{actual_npm_version}..."
-    sh_in_dir(gem_root,
-              "yarn workspace react-on-rails-pro publish --new-version #{actual_npm_version} #{npm_publish_args}")
+    sh_in_dir(File.join(gem_root, "packages", "react-on-rails-pro"), "pnpm publish #{npm_publish_args}")
 
     # Publish node-renderer NPM package (PUBLIC on npmjs.org)
     puts "\n#{'=' * 80}"
@@ -271,12 +270,11 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
     puts "=" * 80
 
     # Publish react-on-rails-pro-node-renderer NPM package
-    # Note: Uses plain `yarn publish` (not `yarn workspace`) because the node-renderer
+    # Note: Uses plain `pnpm publish` because the node-renderer
     # package.json is in react_on_rails_pro/ which is not defined as a workspace
     node_renderer_name = "react-on-rails-pro-node-renderer"
     puts "\nPublishing #{node_renderer_name}@#{actual_npm_version}..."
-    sh_in_dir(pro_gem_root,
-              "yarn publish --new-version #{actual_npm_version} --no-git-tag-version #{npm_publish_args}")
+    sh_in_dir(pro_gem_root, "pnpm publish --no-git-checks #{npm_publish_args}")
 
     if use_verdaccio
       puts "\nSkipping Ruby gem publication (Verdaccio is NPM-only)"
