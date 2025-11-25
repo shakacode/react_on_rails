@@ -80,6 +80,8 @@ const config: KnipConfig = {
         // Test helper utilities
         'tests/helper.ts',
         'tests/httpRequestUtils.ts',
+        // Test-only exports used for test setup
+        'src/worker.ts:disableHttp2',
       ],
       ignoreDependencies: [
         // Optional dependencies used in integrations
@@ -175,6 +177,10 @@ const config: KnipConfig = {
         '@rescript/react',
         // The Babel plugin fails to detect it
         'babel-plugin-transform-react-remove-prop-types',
+        // Required by @babel/plugin-transform-runtime for polyfills
+        '@babel/runtime',
+        // Used in webpack server config to filter out MiniCssExtractPlugin
+        'mini-css-extract-plugin',
         // This one is weird. It's long-deprecated and shouldn't be necessary.
         // Probably need to update the Webpack config.
         'node-libs-browser',
@@ -187,8 +193,6 @@ const config: KnipConfig = {
         'sass-resources-loader',
         'style-loader',
         'url-loader',
-        // Jest is used via pnpm exec / scripts
-        'jest',
       ],
     },
   },
