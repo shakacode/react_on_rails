@@ -59,7 +59,7 @@ Look for commits that:
 
 **Example groups from PR #2069**:
 
-```
+```text
 Group 1 (Documentation & Analysis):
 - CI failure analysis documents
 - Testing requirement documentation
@@ -149,13 +149,13 @@ Group 4 (Monorepo Node Renderer):
 
 ### Step 4: Handle the Original PR
 
-**Option A: Close and Replace**
+#### Option A: Close and Replace
 
 - Close original PR with note: "Split into smaller PRs for easier review"
 - Link to all new PRs
 - Advantage: Clean history, easier to review
 
-**Option B: Rebase and Reduce**
+#### Option B: Rebase and Reduce
 
 - Remove commits that went into other PRs
 - Rebase remaining commits
@@ -344,7 +344,7 @@ ls packages/*/lib/
 
 ## Decision Tree
 
-```
+```text
 Is PR failing CI?
 ├─ YES → Continue
 └─ NO → No need to split

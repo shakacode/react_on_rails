@@ -55,7 +55,7 @@ This is a **REGRESSION** introduced by changes in this branch related to:
 
 #### Error Pattern
 
-```
+```text
 Uncaught SyntaxError: Unexpected token '<'
 ```
 
@@ -81,7 +81,7 @@ The webpack infrastructure partially works, but specific bundles aren't being ge
 
 #### Sample Failing Tests
 
-```
+```text
 Pages/Index when rendering All in one page
   with Server Rendered/Cached React/Redux Component
     ✗ is expected to have visible css "div#ReduxApp-react-component-0"
@@ -225,7 +225,7 @@ buildConsoleReplay(previouslyReplayedConsoleMessages, consoleHistory, nonce);
 
 **Files Changed**:
 
-```
+```text
 package-scripts.yml (path updates)
 packages/react-on-rails-pro-node-renderer/package.json
 packages/react-on-rails-pro/package.json
