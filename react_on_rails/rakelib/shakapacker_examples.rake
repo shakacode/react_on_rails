@@ -16,49 +16,64 @@ require_relative "task_helpers"
 namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
   include ReactOnRails::TaskHelpers
 
-  # Updates package.json to use minimum supported versions for compatibility testing
-  # rubocop:disable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
+  # Updates package.json and Gemfile to use minimum supported versions for compatibility testing
+  # rubocop:disable Metrics/AbcSize,Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
   def apply_minimum_versions(dir)
+    # Update package.json
     package_json_path = File.join(dir, "package.json")
-    return unless File.exist?(package_json_path)
+    if File.exist?(package_json_path)
+      begin
+        package_json = JSON.parse(File.read(package_json_path))
+      rescue JSON::ParserError => e
+        puts "  ERROR: Failed to parse package.json in #{dir}: #{e.message}"
+        raise
+      end
 
-    begin
-      package_json = JSON.parse(File.read(package_json_path))
-    rescue JSON::ParserError => e
-      puts "  ERROR: Failed to parse package.json in #{dir}: #{e.message}"
-      raise
+      deps = package_json["dependencies"]
+      dev_deps = package_json["devDependencies"]
+
+      # Update React versions to minimum supported
+      if deps
+        deps["react"] = ExampleType::MINIMUM_REACT_VERSION
+        deps["react-dom"] = ExampleType::MINIMUM_REACT_VERSION
+        # Shakapacker 8.2.0 requires webpack-assets-manifest ^5.x
+        deps["webpack-assets-manifest"] = "^5.0.6" if deps.key?("webpack-assets-manifest")
+      end
+
+      # Shakapacker 8.2.0 requires webpack-assets-manifest ^5.x (check devDependencies too)
+      dev_deps["webpack-assets-manifest"] = "^5.0.6" if dev_deps&.key?("webpack-assets-manifest")
+
+      # Update Shakapacker to minimum supported version in package.json
+      if dev_deps&.key?("shakapacker")
+        dev_deps["shakapacker"] = ExampleType::MINIMUM_SHAKAPACKER_VERSION
+      elsif deps&.key?("shakapacker")
+        deps["shakapacker"] = ExampleType::MINIMUM_SHAKAPACKER_VERSION
+      end
+
+      File.write(package_json_path, "#{JSON.pretty_generate(package_json)}\n")
     end
 
-    deps = package_json["dependencies"]
-    dev_deps = package_json["devDependencies"]
-
-    # Update React versions to minimum supported
-    if deps
-      deps["react"] = ExampleType::MINIMUM_REACT_VERSION
-      deps["react-dom"] = ExampleType::MINIMUM_REACT_VERSION
-      # Shakapacker 8.2.0 requires webpack-assets-manifest ^5.x
-      deps["webpack-assets-manifest"] = "^5.0.6" if deps.key?("webpack-assets-manifest")
+    # Update Gemfile to pin shakapacker to minimum version
+    # (must match the npm package version exactly)
+    gemfile_path = File.join(dir, "Gemfile")
+    if File.exist?(gemfile_path)
+      gemfile_content = File.read(gemfile_path)
+      # Replace any shakapacker gem line with exact version pin
+      gemfile_content = gemfile_content.gsub(
+        /gem ['"]shakapacker['"].*$/,
+        "gem 'shakapacker', '#{ExampleType::MINIMUM_SHAKAPACKER_VERSION}'"
+      )
+      File.write(gemfile_path, gemfile_content)
     end
 
-    # Shakapacker 8.2.0 requires webpack-assets-manifest ^5.x (check devDependencies too)
-    dev_deps["webpack-assets-manifest"] = "^5.0.6" if dev_deps&.key?("webpack-assets-manifest")
-
-    # Update Shakapacker to minimum supported version
-    if dev_deps&.key?("shakapacker")
-      dev_deps["shakapacker"] = ExampleType::MINIMUM_SHAKAPACKER_VERSION
-    elsif deps&.key?("shakapacker")
-      deps["shakapacker"] = ExampleType::MINIMUM_SHAKAPACKER_VERSION
-    end
-
-    File.write(package_json_path, "#{JSON.pretty_generate(package_json)}\n")
     puts "  Updated package.json with minimum versions:"
     puts "    React: #{ExampleType::MINIMUM_REACT_VERSION}"
     puts "    Shakapacker: #{ExampleType::MINIMUM_SHAKAPACKER_VERSION}"
   end
-  # rubocop:enable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
+  # rubocop:enable Metrics/AbcSize,Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
 
   # Define tasks for each example type
-  ExampleType.all[:shakapacker_examples].each do |example_type|
+  ExampleType.all[:shakapacker_examples].each do |example_type| # rubocop:disable Metrics/BlockLength
     relative_gem_root = Pathname(gem_root).relative_path_from(Pathname(example_type.dir))
     # CLOBBER
     desc "Clobbers (deletes) #{example_type.name_pretty}"
@@ -90,7 +105,11 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
       sh_in_dir(example_type.dir, generator_commands)
 
       # Apply minimum versions for compatibility testing examples
-      apply_minimum_versions(example_type.dir) if example_type.minimum_versions
+      if example_type.minimum_versions
+        apply_minimum_versions(example_type.dir)
+        # Re-run bundle install since Gemfile was updated with pinned shakapacker version
+        bundle_install_in(example_type.dir)
+      end
 
       sh_in_dir(example_type.dir, "npm install")
       # Generate the component packs after running the generator to ensure all
