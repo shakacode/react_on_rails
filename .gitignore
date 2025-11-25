@@ -1,3 +1,6 @@
+# Root Gemfile.lock (delegates to react_on_rails/Gemfile, lock is there)
+/Gemfile.lock
+
 .bundle/
 /.yardoc
 /_yardoc/
