@@ -24,12 +24,11 @@ export type ReactOnRailsFullSpecificFunctions = Pick<
 /**
  * Full object type that includes all base methods plus real SSR implementations.
  * Derived from ReactOnRailsInternal by picking base methods and SSR methods.
+ * Note: BaseClientObjectType already includes serverRenderReactComponent and handleError,
+ * so ReactOnRailsFullSpecificFunctions is a subset.
  * @public
  */
-export type BaseFullObjectType = Pick<
-  ReactOnRailsInternal,
-  keyof BaseClientObjectType | keyof ReactOnRailsFullSpecificFunctions
->;
+export type BaseFullObjectType = Pick<ReactOnRailsInternal, keyof BaseClientObjectType>;
 
 export function createBaseFullObject(
   registries: Parameters<typeof createBaseClientObject>[0],

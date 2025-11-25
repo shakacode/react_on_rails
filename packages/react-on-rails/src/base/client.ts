@@ -167,7 +167,7 @@ Fix: Use only react-on-rails OR react-on-rails-pro, not both.`);
       }
     },
 
-    option<K extends keyof ReactOnRailsOptions>(key: K): ReactOnRailsOptions[K] | undefined {
+    option<K extends keyof ReactOnRailsOptions>(key: K): ReactOnRailsOptions[K] {
       return this.options[key];
     },
 

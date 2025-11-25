@@ -12,7 +12,6 @@ const HelloWorldES5 = createReactClass({
   },
 
   getInitialState() {
-    // eslint-disable-next-line react/destructuring-assignment
     return this.props.helloWorldData;
   },
 
