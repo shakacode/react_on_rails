@@ -3,7 +3,7 @@
 // function. The point of this is to provide a good error.
 import React from 'react';
 import { renderToString } from 'react-dom/server';
-import { Helmet } from 'react-helmet';
+import { HelmetProvider } from '@dr.pogodin/react-helmet';
 import ReactHelmet from '../components/ReactHelmet';
 
 /*
@@ -18,12 +18,17 @@ import ReactHelmet from '../components/ReactHelmet';
  *  Alternately, the function could get the property of `.renderFunction = true` added to it.
  */
 export default (props) => {
-  const componentHtml = renderToString(<ReactHelmet {...props} />);
-  const helmet = Helmet.renderStatic();
+  const helmetContext = {};
+  const componentHtml = renderToString(
+    <HelmetProvider context={helmetContext}>
+      <ReactHelmet {...props} />
+    </HelmetProvider>,
+  );
+  const { helmet } = helmetContext;
 
   const renderedHtml = {
     componentHtml,
-    title: helmet.title.toString(),
+    title: helmet ? helmet.title.toString() : '',
   };
   return { renderedHtml };
 };
