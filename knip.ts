@@ -14,7 +14,7 @@ const config: KnipConfig = {
         'playwright',
         'e2e-test',
       ],
-      ignore: ['react_on_rails_pro/**'],
+      ignore: ['react_on_rails_pro/**', 'react_on_rails/vendor/**'],
       ignoreDependencies: [
         // Required for TypeScript compilation, but we don't depend on Turbolinks itself.
         '@types/turbolinks',
