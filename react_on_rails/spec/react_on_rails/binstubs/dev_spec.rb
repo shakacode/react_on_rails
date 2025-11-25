@@ -3,8 +3,8 @@
 require "react_on_rails/dev"
 
 RSpec.describe "bin/dev script" do
-  let(:script_path) { "react_on_rails/lib/generators/react_on_rails/templates/base/base/bin/dev" }
-  let(:dummy_dev_path) { "react_on_rails/spec/dummy/bin/dev" }
+  let(:script_path) { File.expand_path("../../../lib/generators/react_on_rails/templates/base/base/bin/dev", __dir__) }
+  let(:dummy_dev_path) { File.expand_path("../../dummy/bin/dev", __dir__) }
 
   # To suppress stdout during tests
   original_stderr = $stderr

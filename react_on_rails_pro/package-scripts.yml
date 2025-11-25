@@ -1,22 +1,22 @@
 scripts:
   fix:
     description: Run all code fixes before committing
-    script: nps eslint.fix && nps format
+    script: npx nps eslint.fix && npx nps format
   node-renderer:
     default:
       description:
-      script: nps build && node --enable-source-maps ../packages/react-on-rails-pro-node-renderer/lib/default-node-renderer.js
+      script: npx nps build && node --enable-source-maps ../packages/react-on-rails-pro-node-renderer/lib/default-node-renderer.js
     debug:
       description: Debug Node Renderer
-      script: rm -rf /tmp/react-on-rails-pro-node-renderer-bundles && nps build && RENDERER_LOG_LEVEL=info NODE_DEBUG=ROR node --enable-source-maps ../packages/react-on-rails-pro-node-renderer/lib/default-node-renderer.js
+      script: rm -rf /tmp/react-on-rails-pro-node-renderer-bundles && npx nps build && RENDERER_LOG_LEVEL=info NODE_DEBUG=ROR node --enable-source-maps ../packages/react-on-rails-pro-node-renderer/lib/default-node-renderer.js
   lint:
     description: Run all linters
-    script: concurrently --prefix "[{name}]" --names "ESLINT, RUBOCOP, PRETTIER" -c "blue,yellow,magenta,orange" "nps eslint" "bundle exec rubocop" "nps format.listDifferent"
+    script: npx concurrently --prefix "[{name}]" --names "ESLINT, RUBOCOP, PRETTIER" -c "blue,yellow,magenta,orange" "npx nps eslint" "bundle exec rubocop" "npx nps format.listDifferent"
 
   build:
     default:
       description: Build the project
-      script: echo "building the project" && rm -rf ../packages/react-on-rails-pro-node-renderer/lib && tsc --project ../packages/react-on-rails-pro-node-renderer/src
+      script: echo "building the project" && rm -rf ../packages/react-on-rails-pro-node-renderer/lib && npx tsc --project ../packages/react-on-rails-pro-node-renderer/src
     prepack:
       description: Build the project in the prepack/prepare scripts
       # This is necessary when used as a Git dependency since we don't have the dist directory in the repo.
@@ -28,7 +28,7 @@ scripts:
       # 4. If it failed, print an error message (still follow https://docs.npmjs.com/cli/v8/using-npm/scripts#best-practices).
       script: >
         [ -f ../packages/react-on-rails-pro-node-renderer/lib/ReactOnRailsProNodeRenderer.js ] ||
-          (nps build >/dev/null 2>&1 || true) &&
+          (npx nps build >/dev/null 2>&1 || true) &&
           [ -f ../packages/react-on-rails-pro-node-renderer/lib/ReactOnRailsProNodeRenderer.js ] ||
           { echo 'Building react-on-rails-pro-node-renderer seems to have failed!'; }
 
@@ -39,54 +39,54 @@ scripts:
   eslint:
     default:
       description: Run eslint.
-      script: eslint . --report-unused-disable-directives
+      script: npx eslint . --report-unused-disable-directives
     fix:
       description: Run eslint and auto-fix.
-      script: nps "eslint --fix"
+      script: npx eslint . --report-unused-disable-directives --fix
     debug:
       description: Run eslint in debug mode.
-      script: DEBUG=eslint:cli-engine nps eslint
+      script: DEBUG=eslint:cli-engine npx eslint . --report-unused-disable-directives
 
   format:
     default:
       description: Format files using prettier.
-      script: concurrently --prefix "[{name}]" --names "js,ts,json" -c "yellow,magenta,green" "nps format.js" "nps format.ts" "nps format.json"
+      script: npx concurrently --prefix "[{name}]" --names "js,ts,json" -c "yellow,magenta,green" "npx nps format.js" "npx nps format.ts" "npx nps format.json"
     listDifferent:
       description: Check that all files were formatted using prettier.
       script: |
-        concurrently \
+        npx concurrently \
           --prefix "[{name}]" \
           --names "js,ts,json" \
           -c "yellow,magenta,green" \
-          "nps format.js.listDifferent" \
-          "nps format.ts.listDifferent" \
-          "nps format.json.listDifferent"
+          "npx nps format.js.listDifferent" \
+          "npx nps format.ts.listDifferent" \
+          "npx nps format.json.listDifferent"
     js:
       default:
         description: Run prettier on JS.
-        script: prettier "**/*.@(js|jsx|mjs)" --write
+        script: npx prettier "**/*.@(js|jsx|mjs)" --write
       listDifferent:
         description: Check if any JS files would change by running prettier.
-        script: prettier "**/*.@(js|jsx|mjs)" --list-different
+        script: npx prettier "**/*.@(js|jsx|mjs)" --list-different
     ts:
       default:
         description: Run prettier on TS.
-        script: prettier "**/*.@(ts|tsx)" --write
+        script: npx prettier "**/*.@(ts|tsx)" --write
       listDifferent:
         description: Check if any TS files would change by running prettier.
-        script: prettier "**/*.@(ts|tsx)" --list-different
+        script: npx prettier "**/*.@(ts|tsx)" --list-different
     json:
       default:
         description: Run prettier on JSON files.
-        script: rm -rf ../packages/react-on-rails-pro-node-renderer/tests/tmp && prettier "**/*.json" --write
+        script: rm -rf ../packages/react-on-rails-pro-node-renderer/tests/tmp && npx prettier "**/*.json" --write
       listDifferent:
         description: Check if any JSON files would change by running prettier.
-        script: prettier "**/*.json" --list-different
+        script: npx prettier "**/*.json" --list-different
 
   renderer:
     default:
       description: Starts the node renderer.
-      script: nps build && RENDERER_PORT=3800 RENDERER_SUPPORT_MODULES=TRUE node ../packages/react-on-rails-pro-node-renderer/lib/default-node-renderer.js
+      script: npx nps build && RENDERER_PORT=3800 RENDERER_SUPPORT_MODULES=TRUE node ../packages/react-on-rails-pro-node-renderer/lib/default-node-renderer.js
     debug:
       description: Starts the node renderer with debugging enabled. See Node.js V8 --inspector Manager (NiM)
-      script: nps build && RENDERER_WORKERS_COUNT=1 RENDERER_PORT=3800 RENDERER_SUPPORT_MODULES=TRUE ndb ../packages/react-on-rails-pro-node-renderer/lib/default-node-renderer.js
+      script: npx nps build && RENDERER_WORKERS_COUNT=1 RENDERER_PORT=3800 RENDERER_SUPPORT_MODULES=TRUE ndb ../packages/react-on-rails-pro-node-renderer/lib/default-node-renderer.js

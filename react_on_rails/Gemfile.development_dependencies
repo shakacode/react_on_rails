@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-gem "shakapacker", "9.3.0"
+gem "shakapacker", "9.4.0"
 gem "bootsnap", require: false
 gem "rails", "~> 7.1"
 

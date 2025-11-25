@@ -16,11 +16,8 @@ Gem::Specification.new do |s|
   s.homepage      = "https://github.com/shakacode/react_on_rails"
   s.license       = "MIT"
 
-  repo_root = File.expand_path("..", __dir__)
-  s.files = Dir.chdir(repo_root) do
-    `git ls-files -z`.split("\x0").select do |f|
-      f.start_with?("react_on_rails/")
-    end.map { |f| f.sub(%r{^react_on_rails/}, "") }.reject do |f|
+  s.files = Dir.chdir(__dir__) do
+    `git ls-files -z`.split("\x0").reject do |f|
       f.match(%r{^(spec|tmp)/})
     end
   end
