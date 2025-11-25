@@ -23,7 +23,7 @@ if [ -n "$root_files" ]; then
   fi
   printf "  %s\n" $root_files
 
-  yarn run prettier --write $root_files
+  pnpm run prettier --write $root_files
 fi
 
 # Format Pro files (using Pro's Prettier config)
@@ -38,7 +38,7 @@ if [ -n "$pro_files" ]; then
   # Strip react_on_rails_pro/ prefix for running in Pro directory
   pro_files_relative=$(echo "$pro_files" | sed 's|^react_on_rails_pro/||')
 
-  (cd react_on_rails_pro && yarn run prettier --write $pro_files_relative)
+  (cd react_on_rails_pro && pnpm run prettier --write $pro_files_relative)
 fi
 
 echo "✅ Prettier formatting complete"

@@ -101,8 +101,6 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - name: Get pnpm store directory
         shell: bash
@@ -138,7 +136,9 @@ jobs:
           pnpm install --frozen-lockfile
 
       - name: Install Node modules with pnpm for Pro dummy app
-        run: cd spec/dummy && pnpm install --frozen-lockfile
+        # --ignore-workspace prevents pnpm from treating this as part of the parent workspace
+        # The Pro dummy app has its own dependencies and uses yalc links
+        run: cd spec/dummy && pnpm install --ignore-workspace
 
       - name: Install Ruby Gems for Pro dummy app
         run: |
@@ -202,8 +202,6 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - name: Get pnpm store directory
         shell: bash
@@ -268,7 +266,9 @@ jobs:
           pnpm install --frozen-lockfile
 
       - name: Install Node modules with pnpm for Pro dummy app
-        run: cd spec/dummy && pnpm install --frozen-lockfile
+        # --ignore-workspace prevents pnpm from treating this as part of the parent workspace
+        # The Pro dummy app has its own dependencies and uses yalc links
+        run: cd spec/dummy && pnpm install --ignore-workspace
 
       - name: Ensure minimum required Chrome version
         run: |
@@ -404,8 +404,6 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - name: Get pnpm store directory
         shell: bash
@@ -470,7 +468,9 @@ jobs:
           pnpm install --frozen-lockfile
 
       - name: Install Node modules with pnpm for Pro dummy app
-        run: cd spec/dummy && pnpm install --frozen-lockfile
+        # --ignore-workspace prevents pnpm from treating this as part of the parent workspace
+        # The Pro dummy app has its own dependencies and uses yalc links
+        run: cd spec/dummy && pnpm install --ignore-workspace
 
       - name: Ensure minimum required Chrome version
         run: |

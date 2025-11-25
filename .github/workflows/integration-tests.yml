@@ -145,37 +145,38 @@ jobs:
         run: script/convert
       - name: Install Node modules with pnpm for renderer package
         run: |
-          pnpm install ${{ matrix.dependency-level == 'latest' && '--frozen-lockfile' || '' }}
+          pnpm install ${{ matrix.dependency-level == 'latest' && '--frozen-lockfile' || '--no-frozen-lockfile' }}
           pnpm add -g yalc
       - name: yalc publish for react-on-rails
         run: cd packages/react-on-rails && yalc publish
       - name: yalc add react-on-rails
-        run: cd spec/dummy && yalc add react-on-rails
+        run: cd react_on_rails/spec/dummy && yalc add react-on-rails
       - name: Install Node modules with pnpm for dummy app
         # --ignore-workspace prevents pnpm from treating this as part of the parent workspace
-        run: cd spec/dummy && pnpm install --ignore-workspace ${{ matrix.dependency-level == 'latest' && '--frozen-lockfile' || '' }}
+        # The dummy app doesn't have a pnpm-lock.yaml and shouldn't use frozen lockfile
+        run: cd react_on_rails/spec/dummy && pnpm install --ignore-workspace
       - name: Save dummy app ruby gems to cache
         uses: actions/cache@v4
         with:
-          path: spec/dummy/vendor/bundle
-          key: dummy-app-gem-cache-${{ hashFiles('spec/dummy/Gemfile.lock') }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
+          path: react_on_rails/spec/dummy/vendor/bundle
+          key: dummy-app-gem-cache-${{ hashFiles('react_on_rails/spec/dummy/Gemfile.lock') }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
       - name: Install Ruby Gems for dummy app
         run: |
-          cd spec/dummy
+          cd react_on_rails/spec/dummy
           bundle lock --add-platform 'x86_64-linux'
           if ! bundle check --path=vendor/bundle; then
             bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
           fi
       - name: generate file system-based packs
-        run: cd spec/dummy && RAILS_ENV="test" bundle exec rake react_on_rails:generate_packs
+        run: cd react_on_rails/spec/dummy && RAILS_ENV="test" bundle exec rake react_on_rails:generate_packs
       - name: Build test bundles for dummy app
-        run: cd spec/dummy && rm -rf public/webpack/test && pnpm run build:rescript && RAILS_ENV="test" NODE_ENV="test" bin/shakapacker
+        run: cd react_on_rails/spec/dummy && rm -rf public/webpack/test && pnpm run build:rescript && RAILS_ENV="test" NODE_ENV="test" bin/shakapacker
       - id: get-sha
         run: echo "sha=\"$(git rev-parse HEAD)\"" >> "$GITHUB_OUTPUT"
       - name: Save test Webpack bundles to cache (for build number checksum used by RSpec job)
         uses: actions/cache/save@v4
         with:
-          path: spec/dummy/public/webpack
+          path: react_on_rails/spec/dummy/public/webpack
           key: dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
 
   dummy-app-integration-tests:
@@ -239,39 +240,41 @@ jobs:
       - name: Save dummy app ruby gems to cache
         uses: actions/cache@v4
         with:
-          path: spec/dummy/vendor/bundle
-          key: dummy-app-gem-cache-${{ hashFiles('spec/dummy/Gemfile.lock') }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
+          path: react_on_rails/spec/dummy/vendor/bundle
+          key: dummy-app-gem-cache-${{ hashFiles('react_on_rails/spec/dummy/Gemfile.lock') }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
       - id: get-sha
         run: echo "sha=\"$(git rev-parse HEAD)\"" >> "$GITHUB_OUTPUT"
       - name: Save test Webpack bundles to cache (for build number checksum used by RSpec job)
         uses: actions/cache@v4
         with:
-          path: spec/dummy/public/webpack
+          path: react_on_rails/spec/dummy/public/webpack
           key: dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
       - name: Install Node modules with pnpm
         run: |
-          pnpm install ${{ matrix.dependency-level == 'latest' && '--frozen-lockfile' || '' }}
+          pnpm install ${{ matrix.dependency-level == 'latest' && '--frozen-lockfile' || '--no-frozen-lockfile' }}
           pnpm add -g yalc
       - name: yalc publish for react-on-rails
         run: cd packages/react-on-rails && yalc publish
       - name: yalc add react-on-rails
-        run: cd spec/dummy && yalc add react-on-rails
+        run: cd react_on_rails/spec/dummy && yalc add react-on-rails
       - name: Install Node modules with pnpm for dummy app
         # --ignore-workspace prevents pnpm from treating this as part of the parent workspace
-        run: cd spec/dummy && pnpm install --ignore-workspace ${{ matrix.dependency-level == 'latest' && '--frozen-lockfile' || '' }}
+        # The dummy app doesn't have a pnpm-lock.yaml and shouldn't use frozen lockfile
+        run: cd react_on_rails/spec/dummy && pnpm install --ignore-workspace
       - name: Dummy JS tests
         run: |
-          cd spec/dummy
+          cd react_on_rails/spec/dummy
           pnpm run test:js
       - name: Install Ruby Gems for package
         run: |
+          cd react_on_rails
           bundle lock --add-platform 'x86_64-linux'
           if ! bundle check --path=vendor/bundle; then
             bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
           fi
       - name: Install Ruby Gems for dummy app
         run: |
-          cd spec/dummy
+          cd react_on_rails/spec/dummy
           bundle lock --add-platform 'x86_64-linux'
           if ! bundle check --path=vendor/bundle; then
             bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
@@ -291,19 +294,19 @@ jobs:
       - name: Increase the amount of inotify watchers
         run: echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
       - name: generate file system-based packs
-        run: cd spec/dummy && RAILS_ENV="test" bundle exec rake react_on_rails:generate_packs
+        run: cd react_on_rails/spec/dummy && RAILS_ENV="test" bundle exec rake react_on_rails:generate_packs
       - name: Git Stuff
         if: matrix.dependency-level == 'minimum'
         run: |
           git config user.email "you@example.com"
           git config user.name "Your Name"
           git commit -am "stop generators from complaining about uncommitted code"
-      - run: cd spec/dummy && bundle info shakapacker
+      - run: cd react_on_rails/spec/dummy && bundle info shakapacker
       - name: Set packer version environment variable
         run: |
           echo "CI_DEPENDENCY_LEVEL=ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}" >> $GITHUB_ENV
       - name: Main CI
-        run: bundle exec rake run_rspec:all_dummy
+        run: cd react_on_rails && bundle exec rake run_rspec:all_dummy
       - name: Store test results
         uses: actions/upload-artifact@v4
         with:
@@ -313,14 +316,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dummy-app-capybara-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
-          path: spec/dummy/tmp/capybara
+          path: react_on_rails/spec/dummy/tmp/capybara
       - name: Store artifacts
         uses: actions/upload-artifact@v4
         with:
           name: dummy-app-test-log-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
-          path: spec/dummy/log/test.log
+          path: react_on_rails/spec/dummy/log/test.log
       - name: Store artifacts
         uses: actions/upload-artifact@v4
         with:
           name: dummy-app-pnpm-log-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
-          path: spec/dummy/pnpm-debug.log
+          path: react_on_rails/spec/dummy/pnpm-debug.log

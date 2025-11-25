@@ -100,8 +100,6 @@ jobs:
           node-version: '22.11.0'
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 9
       - name: Get pnpm store directory
         shell: bash
         run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
@@ -136,7 +134,9 @@ jobs:
       - name: yalc add react-on-rails
         run: cd react_on_rails/spec/dummy && yalc add react-on-rails
       - name: Install Node modules with pnpm for dummy app
-        run: cd react_on_rails/spec/dummy && pnpm install --frozen-lockfile
+        # --ignore-workspace prevents pnpm from treating this as part of the parent workspace
+        # The dummy app has its own dependencies and uses yalc links
+        run: cd react_on_rails/spec/dummy && pnpm install --ignore-workspace
 
       - name: Install Ruby Gems for package
         run: cd react_on_rails && bundle check --path=vendor/bundle || bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
@@ -164,8 +164,8 @@ jobs:
         run: cd react_on_rails/spec/dummy && RAILS_ENV="test" bundle exec rake react_on_rails:generate_packs
       - name: Detect dead code
         run: |
-          pnpm run knip --exclude binaries
-          pnpm run knip --production --exclude binaries
+          pnpm exec knip --exclude binaries
+          pnpm exec knip --production --exclude binaries
 
       - name: Lint JS
         run: pnpm run eslint --report-unused-disable-directives

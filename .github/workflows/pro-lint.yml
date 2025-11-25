@@ -99,8 +99,6 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - name: Get pnpm store directory
         shell: bash
@@ -156,10 +154,12 @@ jobs:
           bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
 
       - name: Install Node modules with pnpm for Pro dummy app
-        run: cd spec/dummy && pnpm install --frozen-lockfile
+        # --ignore-workspace prevents pnpm from treating this as part of the parent workspace
+        run: cd spec/dummy && pnpm install --ignore-workspace
 
       - name: Install Node modules with pnpm for ExecJS dummy app
-        run: cd spec/execjs-compatible-dummy && pnpm install --frozen-lockfile
+        # --ignore-workspace prevents pnpm from treating this as part of the parent workspace
+        run: cd spec/execjs-compatible-dummy && pnpm install --ignore-workspace
 
       - name: Generate file-system based entrypoints
         run: cd spec/dummy && bundle exec rake react_on_rails:generate_packs

@@ -118,8 +118,6 @@ jobs:
           node-version: 20
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 9
       - name: Get pnpm store directory
         shell: bash
         run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
@@ -151,7 +149,7 @@ jobs:
         run: echo "sha=\"$(git rev-parse HEAD)\"" >> "$GITHUB_OUTPUT"
       - name: Install Node modules with pnpm for renderer package
         run: |
-          pnpm install ${{ matrix.dependency-level == 'latest' && '--frozen-lockfile' || '' }}
+          pnpm install ${{ matrix.dependency-level == 'latest' && '--frozen-lockfile' || '--no-frozen-lockfile' }}
           pnpm add -g yalc
       - name: yalc publish for react-on-rails
         # Use pnpm workspace script to publish all workspace packages to yalc
