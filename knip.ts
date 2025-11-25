@@ -176,6 +176,10 @@ const config: KnipConfig = {
         '@rescript/react',
         // The Babel plugin fails to detect it
         'babel-plugin-transform-react-remove-prop-types',
+        // Required by @babel/plugin-transform-runtime for polyfills (used by webpack)
+        '@babel/runtime',
+        // Used in webpack server config for CSS extraction
+        'mini-css-extract-plugin',
         // This one is weird. It's long-deprecated and shouldn't be necessary.
         // Probably need to update the Webpack config.
         'node-libs-browser',
