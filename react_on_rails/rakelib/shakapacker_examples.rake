@@ -17,7 +17,8 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
   include ReactOnRails::TaskHelpers
 
   # Updates package.json to use minimum supported versions for compatibility testing
-  def apply_minimum_versions(dir) # rubocop:disable Metrics/CyclomaticComplexity
+  # rubocop:disable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
+  def apply_minimum_versions(dir)
     package_json_path = File.join(dir, "package.json")
     return unless File.exist?(package_json_path)
 
@@ -28,17 +29,25 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
       raise
     end
 
+    deps = package_json["dependencies"]
+    dev_deps = package_json["devDependencies"]
+
     # Update React versions to minimum supported
-    if package_json["dependencies"]
-      package_json["dependencies"]["react"] = ExampleType::MINIMUM_REACT_VERSION
-      package_json["dependencies"]["react-dom"] = ExampleType::MINIMUM_REACT_VERSION
+    if deps
+      deps["react"] = ExampleType::MINIMUM_REACT_VERSION
+      deps["react-dom"] = ExampleType::MINIMUM_REACT_VERSION
+      # Shakapacker 8.2.0 requires webpack-assets-manifest ^5.x
+      deps["webpack-assets-manifest"] = "^5.0.6" if deps.key?("webpack-assets-manifest")
     end
 
+    # Shakapacker 8.2.0 requires webpack-assets-manifest ^5.x (check devDependencies too)
+    dev_deps["webpack-assets-manifest"] = "^5.0.6" if dev_deps&.key?("webpack-assets-manifest")
+
     # Update Shakapacker to minimum supported version
-    if package_json["devDependencies"]&.key?("shakapacker")
-      package_json["devDependencies"]["shakapacker"] = ExampleType::MINIMUM_SHAKAPACKER_VERSION
-    elsif package_json["dependencies"]&.key?("shakapacker")
-      package_json["dependencies"]["shakapacker"] = ExampleType::MINIMUM_SHAKAPACKER_VERSION
+    if dev_deps&.key?("shakapacker")
+      dev_deps["shakapacker"] = ExampleType::MINIMUM_SHAKAPACKER_VERSION
+    elsif deps&.key?("shakapacker")
+      deps["shakapacker"] = ExampleType::MINIMUM_SHAKAPACKER_VERSION
     end
 
     File.write(package_json_path, "#{JSON.pretty_generate(package_json)}\n")
@@ -46,6 +55,7 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
     puts "    React: #{ExampleType::MINIMUM_REACT_VERSION}"
     puts "    Shakapacker: #{ExampleType::MINIMUM_SHAKAPACKER_VERSION}"
   end
+  # rubocop:enable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
 
   # Define tasks for each example type
   ExampleType.all[:shakapacker_examples].each do |example_type|
