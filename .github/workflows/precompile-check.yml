@@ -128,6 +128,8 @@ jobs:
           if ! bundle check --path=vendor/bundle; then
             bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
           fi
+      - name: Generate file system-based packs
+        run: cd react_on_rails/spec/dummy && RAILS_ENV=production bundle exec rake react_on_rails:generate_packs
       - name: Run assets:precompile and check output
         run: |
           cd react_on_rails/spec/dummy
