@@ -1,0 +1,226 @@
+name: Assets Precompile Check
+
+on:
+  push:
+    branches:
+      - 'master'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'react_on_rails_pro/**'
+  workflow_dispatch:
+    inputs:
+      force_run:
+        description: 'Force run all jobs (bypass detect-changes)'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  detect-changes:
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-22.04
+    outputs:
+      docs_only: ${{ steps.detect.outputs.docs_only }}
+      run_dummy_tests: ${{ steps.detect.outputs.run_dummy_tests }}
+      has_full_ci_label: ${{ steps.check-label.outputs.result }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 50
+          persist-credentials: false
+      - name: Check for full-ci label
+        id: check-label
+        uses: ./.github/actions/check-full-ci-label
+      - name: Detect relevant changes
+        id: detect
+        run: |
+          if [ "${{ inputs.force_run }}" = "true" ] || [ "${{ steps.check-label.outputs.result }}" = "true" ]; then
+            echo "run_dummy_tests=true" >> "$GITHUB_OUTPUT"
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/master' }}"
+          script/ci-changes-detector "$BASE_REF"
+        shell: bash
+      - name: Guard docs-only master pushes
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: ./.github/actions/ensure-master-docs-safety
+        with:
+          docs-only: ${{ steps.detect.outputs.docs_only }}
+          previous-sha: ${{ github.event.before }}
+
+  precompile-check:
+    needs: detect-changes
+    # Skip only if: master push AND docs-only changes
+    # Otherwise run if: on master OR workflow_dispatch OR dummy tests needed
+    if: |
+      !(
+        github.event_name == 'push' &&
+        github.ref == 'refs/heads/master' &&
+        needs.detect-changes.outputs.docs_only == 'true'
+      ) && (
+        github.ref == 'refs/heads/master' ||
+        github.event_name == 'workflow_dispatch' ||
+        needs.detect-changes.outputs.run_dummy_tests == 'true'
+      )
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4'
+          bundler: 2.5.9
+      # libyaml-dev is needed for psych v5
+      - name: Fix dependency for libyaml-dev
+        run: sudo apt install libyaml-dev
+      - name: Setup Node
+        uses: ./.github/actions/setup-node-with-retry
+        with:
+          node-version: '22'
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+      - name: Print system information
+        run: |
+          echo "Linux release: "; cat /etc/issue
+          echo "Current user: "; whoami
+          echo "Current directory: "; pwd
+          echo "Ruby version: "; ruby -v
+          echo "Node version: "; node -v
+          echo "pnpm version: "; pnpm --version
+          echo "Bundler version: "; bundle --version
+      - name: Install Node modules with pnpm for renderer package
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm add -g yalc
+      - name: yalc publish for react-on-rails
+        run: cd packages/react-on-rails && yalc publish
+      - name: yalc add react-on-rails
+        run: cd react_on_rails/spec/dummy && yalc add react-on-rails
+      - name: Install Node modules with pnpm for dummy app
+        run: cd react_on_rails/spec/dummy && pnpm install --ignore-workspace
+      - name: Save dummy app ruby gems to cache
+        uses: actions/cache@v4
+        with:
+          path: react_on_rails/spec/dummy/vendor/bundle
+          key: dummy-app-gem-cache-${{ hashFiles('react_on_rails/spec/dummy/Gemfile.lock') }}-precompile
+      - name: Install Ruby Gems for dummy app
+        run: |
+          cd react_on_rails/spec/dummy
+          bundle lock --add-platform 'x86_64-linux'
+          if ! bundle check --path=vendor/bundle; then
+            bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
+          fi
+      - name: Run assets:precompile and check output
+        run: |
+          cd react_on_rails/spec/dummy
+
+          echo "Running RAILS_ENV=production bin/rake assets:precompile..."
+          echo "=========================================="
+
+          # Run precompile and capture both stdout and stderr
+          RAILS_ENV=production bin/rake assets:precompile 2>&1 | tee precompile_output.txt
+
+          echo "=========================================="
+          echo "Precompile finished. Checking output for known issues..."
+          echo ""
+
+          # Check for known failure patterns
+          FAILURES_FOUND=0
+
+          # Pattern 1: Duplicate webpack compilation (indicates rake tasks running twice)
+          WEBPACK_COMPILE_COUNT=$(grep -c "Compiled" precompile_output.txt || true)
+          if [ "$WEBPACK_COMPILE_COUNT" -gt 1 ]; then
+            # Check if these are genuinely different compilations or duplicates
+            # If the same "Compiled" message appears multiple times for the same bundle, it's a problem
+            DUPLICATE_COMPILES=$(sort precompile_output.txt | uniq -d | grep -c "Compiled" || true)
+            if [ "$DUPLICATE_COMPILES" -gt 0 ]; then
+              echo "::error::FAILURE: Detected duplicate webpack compilations. Tasks may be running twice."
+              echo "  Found $DUPLICATE_COMPILES duplicate compilation messages."
+              FAILURES_FOUND=1
+            fi
+          fi
+
+          # Pattern 2: Duplicate task execution messages
+          if grep -q "react_on_rails:generate_packs" precompile_output.txt; then
+            GENERATE_PACKS_COUNT=$(grep -c "react_on_rails:generate_packs" precompile_output.txt || true)
+            if [ "$GENERATE_PACKS_COUNT" -gt 1 ]; then
+              echo "::error::FAILURE: react_on_rails:generate_packs task ran $GENERATE_PACKS_COUNT times (should only run once)."
+              FAILURES_FOUND=1
+            fi
+          fi
+
+          # Pattern 3: Module not found errors
+          if grep -Ei "module not found|cannot find module|can't resolve" precompile_output.txt; then
+            echo "::error::FAILURE: Module resolution errors detected in precompile output."
+            FAILURES_FOUND=1
+          fi
+
+          # Pattern 4: Webpack build errors
+          if grep -Ei "error in |failed to compile|compilation failed" precompile_output.txt; then
+            echo "::error::FAILURE: Webpack compilation errors detected."
+            FAILURES_FOUND=1
+          fi
+
+          # Pattern 5: Ruby/Rails errors during precompile
+          if grep -Ei "NameError|LoadError|NoMethodError|SyntaxError" precompile_output.txt; then
+            echo "::error::FAILURE: Ruby errors detected during precompile."
+            FAILURES_FOUND=1
+          fi
+
+          # Pattern 6: Asset pipeline errors
+          if grep -Ei "sprockets::filenotfound|asset .* was not declared" precompile_output.txt; then
+            echo "::error::FAILURE: Asset pipeline errors detected."
+            FAILURES_FOUND=1
+          fi
+
+          # Pattern 7: Memory issues
+          if grep -Ei "javascript heap out of memory|killed|out of memory" precompile_output.txt; then
+            echo "::error::FAILURE: Memory-related errors detected."
+            FAILURES_FOUND=1
+          fi
+
+          # Pattern 8: Check for warnings that might indicate problems
+          WARNING_COUNT=$(grep -ci "warning" precompile_output.txt || true)
+          if [ "$WARNING_COUNT" -gt 10 ]; then
+            echo "::warning::High number of warnings detected: $WARNING_COUNT warnings found. Please review."
+          fi
+
+          if [ "$FAILURES_FOUND" -eq 1 ]; then
+            echo ""
+            echo "=========================================="
+            echo "PRECOMPILE CHECK FAILED"
+            echo "=========================================="
+            echo "Review the output above for details."
+            exit 1
+          fi
+
+          echo ""
+          echo "=========================================="
+          echo "PRECOMPILE CHECK PASSED"
+          echo "=========================================="
+          echo "No known failure patterns detected in precompile output."
+      - name: Upload precompile output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: precompile-output-${{ github.run_id }}
+          path: react_on_rails/spec/dummy/precompile_output.txt
+          retention-days: 7
