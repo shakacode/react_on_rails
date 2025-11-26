@@ -473,6 +473,11 @@ Removes the `full-ci` label and returns to standard CI behavior:
 
 **Note:** The `full-ci` label is preserved on merged PRs as a historical record of which PRs ran with comprehensive testing.
 
+#### Important Notes
+
+- **Force-pushes:** The workflow runs against the commit SHA at the time of the comment. If you force-push after commenting, the workflow will test the old commit. Comment `/run-skipped-ci` again to test the new commit.
+- **Branch operations:** Avoid deleting or force-pushing branches while workflows are running, as this may cause failures.
+
 ### Install Generator
 
 In your Rails app add this gem with a path to your fork.
