@@ -491,40 +491,61 @@ RSpec.describe "Streaming API" do
       expect(gaps.all? { |gap| gap >= 0.04 }).to be true
     end
 
-    it "stops writing when client disconnects" do
-      queues, controller, stream = setup_stream_test(component_count: 1)
+    describe "client disconnect handling" do
+      it "stops writing on IOError" do
+        queues, controller, stream = setup_stream_test(component_count: 1)
 
-      written_chunks = []
-      write_count = 0
+        written_chunks = []
+        write_count = 0
 
-      # Simulate client disconnect: IOError on third write
-      allow(stream).to receive(:write) do |chunk|
-        write_count += 1
-        raise IOError, "client disconnected" if write_count == 3
+        allow(stream).to receive(:write) do |chunk|
+          write_count += 1
+          raise IOError, "client disconnected" if write_count == 3
 
-        written_chunks << chunk
+          written_chunks << chunk
+        end
+
+        run_stream(controller) do |_parent|
+          queues[0].enqueue("Chunk1")
+          sleep 0.05
+          queues[0].enqueue("Chunk2")
+          sleep 0.05
+          queues[0].enqueue("Chunk3")
+          sleep 0.05
+          queues[0].enqueue("Chunk4")
+          queues[0].close
+          sleep 0.1
+        end
+
+        # Write 1: TEMPLATE, Write 2: Chunk1, Write 3: Chunk2 (raises IOError)
+        expect(written_chunks).to eq(%w[TEMPLATE Chunk1])
       end
 
-      # closed? stub required by setup but not used by StreamController's simple enqueue logic
-      allow(stream).to receive(:closed?).and_return(false)
+      it "stops writing on Errno::EPIPE" do
+        queues, controller, stream = setup_stream_test(component_count: 1)
 
-      run_stream(controller) do |_parent|
-        queues[0].enqueue("Chunk1")
-        sleep 0.05
-        queues[0].enqueue("Chunk2")
-        sleep 0.05
-        queues[0].enqueue("Chunk3") # This write will raise IOError
-        sleep 0.05
-        queues[0].enqueue("Chunk4") # Should not be written
-        queues[0].close
-        sleep 0.1
+        written_chunks = []
+        write_count = 0
+
+        allow(stream).to receive(:write) do |chunk|
+          write_count += 1
+          raise Errno::EPIPE, "broken pipe" if write_count == 3
+
+          written_chunks << chunk
+        end
+
+        run_stream(controller) do |_parent|
+          queues[0].enqueue("Chunk1")
+          sleep 0.05
+          queues[0].enqueue("Chunk2")
+          sleep 0.05
+          queues[0].enqueue("Chunk3")
+          queues[0].close
+          sleep 0.1
+        end
+
+        expect(written_chunks).to eq(%w[TEMPLATE Chunk1])
       end
-
-      # Writer catches IOError and stops - only successful writes recorded
-      # Write 1: TEMPLATE (success), Write 2: Chunk1 (success), Write 3: Chunk2 (IOError)
-      expect(written_chunks.length).to eq(2)
-      expect(written_chunks).to include("TEMPLATE")
-      expect(written_chunks).to include("Chunk1")
     end
   end
 end
