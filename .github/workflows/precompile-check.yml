@@ -140,7 +140,10 @@ jobs:
           echo "=========================================="
 
           # Run precompile and capture both stdout and stderr
+          # Use pipefail to catch rake failures even when piped through tee
+          set -o pipefail
           RAILS_ENV=production bin/rake assets:precompile 2>&1 | tee precompile_output.txt
+          PRECOMPILE_EXIT=${PIPESTATUS[0]}
 
           echo "=========================================="
           echo "Precompile finished. Checking output for known issues..."
@@ -149,15 +152,20 @@ jobs:
           # Check for known failure patterns
           FAILURES_FOUND=0
 
+          # Check if rake command itself failed
+          if [ "$PRECOMPILE_EXIT" -ne 0 ]; then
+            echo "::error::Precompile command failed with exit code $PRECOMPILE_EXIT"
+            FAILURES_FOUND=1
+          fi
+
           # Pattern 1: Duplicate webpack compilation (indicates rake tasks running twice)
-          WEBPACK_COMPILE_COUNT=$(grep -c "Compiled" precompile_output.txt || true)
-          if [ "$WEBPACK_COMPILE_COUNT" -gt 1 ]; then
-            # Check if these are genuinely different compilations or duplicates
-            # If the same "Compiled" message appears multiple times for the same bundle, it's a problem
-            DUPLICATE_COMPILES=$(sort precompile_output.txt | uniq -d | grep -c "Compiled" || true)
-            if [ "$DUPLICATE_COMPILES" -gt 0 ]; then
-              echo "::error::FAILURE: Detected duplicate webpack compilations. Tasks may be running twice."
-              echo "  Found $DUPLICATE_COMPILES duplicate compilation messages."
+          # Look for webpack's "Compiled successfully" message which appears once per compilation
+          if grep -q "Compiled successfully" precompile_output.txt; then
+            COMPILE_SUCCESS_COUNT=$(grep -c "Compiled successfully" precompile_output.txt || true)
+            if [ "$COMPILE_SUCCESS_COUNT" -gt 1 ]; then
+              echo "::error::FAILURE: Detected $COMPILE_SUCCESS_COUNT webpack compilations (expected 1). Tasks may be running twice."
+              echo "  Matching lines:"
+              grep -n "Compiled successfully" precompile_output.txt | head -5
               FAILURES_FOUND=1
             fi
           fi
@@ -167,6 +175,8 @@ jobs:
             GENERATE_PACKS_COUNT=$(grep -c "react_on_rails:generate_packs" precompile_output.txt || true)
             if [ "$GENERATE_PACKS_COUNT" -gt 1 ]; then
               echo "::error::FAILURE: react_on_rails:generate_packs task ran $GENERATE_PACKS_COUNT times (should only run once)."
+              echo "  Matching lines:"
+              grep -n "react_on_rails:generate_packs" precompile_output.txt
               FAILURES_FOUND=1
             fi
           fi
@@ -174,30 +184,40 @@ jobs:
           # Pattern 3: Module not found errors
           if grep -Ei "module not found|cannot find module|can't resolve" precompile_output.txt; then
             echo "::error::FAILURE: Module resolution errors detected in precompile output."
+            echo "  Sample matching lines:"
+            grep -Ei "module not found|cannot find module|can't resolve" precompile_output.txt | head -3
             FAILURES_FOUND=1
           fi
 
-          # Pattern 4: Webpack build errors
-          if grep -Ei "error in |failed to compile|compilation failed" precompile_output.txt; then
+          # Pattern 4: Webpack build errors (use specific webpack error markers)
+          if grep -Ei "webpack.*error|failed to compile|compilation failed|ERROR in" precompile_output.txt; then
             echo "::error::FAILURE: Webpack compilation errors detected."
+            echo "  Sample matching lines:"
+            grep -Ei "webpack.*error|failed to compile|compilation failed|ERROR in" precompile_output.txt | head -3
             FAILURES_FOUND=1
           fi
 
-          # Pattern 5: Ruby/Rails errors during precompile
-          if grep -Ei "NameError|LoadError|NoMethodError|SyntaxError" precompile_output.txt; then
+          # Pattern 5: Ruby/Rails errors during precompile (match error class format)
+          if grep -E "(NameError|LoadError|NoMethodError|SyntaxError):" precompile_output.txt; then
             echo "::error::FAILURE: Ruby errors detected during precompile."
+            echo "  Sample matching lines:"
+            grep -E "(NameError|LoadError|NoMethodError|SyntaxError):" precompile_output.txt | head -3
             FAILURES_FOUND=1
           fi
 
           # Pattern 6: Asset pipeline errors
-          if grep -Ei "sprockets::filenotfound|asset .* was not declared" precompile_output.txt; then
+          if grep -Ei "Sprockets::FileNotFound|Asset.*was not declared" precompile_output.txt; then
             echo "::error::FAILURE: Asset pipeline errors detected."
+            echo "  Sample matching lines:"
+            grep -Ei "Sprockets::FileNotFound|Asset.*was not declared" precompile_output.txt | head -3
             FAILURES_FOUND=1
           fi
 
           # Pattern 7: Memory issues
           if grep -Ei "javascript heap out of memory|killed|out of memory" precompile_output.txt; then
             echo "::error::FAILURE: Memory-related errors detected."
+            echo "  Sample matching lines:"
+            grep -Ei "javascript heap out of memory|killed|out of memory" precompile_output.txt | head -3
             FAILURES_FOUND=1
           fi
 
@@ -205,6 +225,8 @@ jobs:
           WARNING_COUNT=$(grep -ci "warning" precompile_output.txt || true)
           if [ "$WARNING_COUNT" -gt 10 ]; then
             echo "::warning::High number of warnings detected: $WARNING_COUNT warnings found. Please review."
+            echo "  Sample warnings:"
+            grep -i "warning" precompile_output.txt | head -5
           fi
 
           if [ "$FAILURES_FOUND" -eq 1 ]; then
