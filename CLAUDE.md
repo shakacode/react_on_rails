@@ -59,6 +59,19 @@ These requirements are non-negotiable. CI will fail if not followed.
 
 ---
 
+## 🚀 COMMIT AND PUSH BY DEFAULT
+
+**When confident in your changes, commit and push without asking for permission.**
+
+- After completing a task successfully, commit and push immediately
+- Run relevant tests locally first to verify changes work
+- Don't wait for explicit user approval if you've tested and are confident
+- Monitor CI after pushing and address any failures proactively
+
+This saves time and keeps the workflow moving efficiently.
+
+---
+
 ## 🚨 AVOIDING CI FAILURE CYCLES
 
 **CRITICAL**: Large-scale changes (directory structure, configs, workflows) require comprehensive local testing BEFORE pushing.
