@@ -114,17 +114,9 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
       sh_in_dir(example_type.dir, "npm install")
       # Generate the component packs after running the generator to ensure all
       # auto-bundled components have corresponding pack files created.
-      if example_type.minimum_versions
-        # For minimum version examples, use BUNDLE_GEMFILE to ensure bundler uses
-        # the generated app's Gemfile and not any parent workspace's bundle,
-        # which could have different gem versions. Also use BUNDLE_FROZEN=false
-        # to allow the lockfile to be updated.
-        gemfile_path = File.join(example_type.dir, "Gemfile")
-        sh_in_dir(example_type.dir,
-                  "BUNDLE_GEMFILE=#{gemfile_path} BUNDLE_FROZEN=false bundle exec rake react_on_rails:generate_packs")
-      else
-        sh_in_dir(example_type.dir, "bundle exec rake react_on_rails:generate_packs")
-      end
+      # Use unbundled_sh_in_dir to ensure we're using the generated app's Gemfile
+      # and gem versions, not the parent workspace's bundle context.
+      unbundled_sh_in_dir(example_type.dir, "bundle exec rake react_on_rails:generate_packs")
     end
   end
 
