@@ -26,6 +26,13 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
         "/test/path"
       end
 
+      # Mock using_swc? from GeneratorHelper (defaults to true for SWC testing)
+      def using_swc?
+        @using_swc.nil? ? true : @using_swc
+      end
+
+      attr_writer :using_swc
+
       # Test helpers
       attr_writer :add_npm_dependencies_result
 
@@ -107,6 +114,12 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
                                                                                              @types/react
                                                                                              @types/react-dom
                                                                                            ])
+    end
+
+    it "defines SWC_DEPENDENCIES" do
+      expect(ReactOnRails::Generators::JsDependencyManager::SWC_DEPENDENCIES).to(
+        eq(%w[@swc/core swc-loader])
+      )
     end
 
     it "does not include Babel presets in REACT_DEPENDENCIES" do
