@@ -1,5 +1,5 @@
 import React from 'react';
-import { Helmet } from 'react-helmet';
+import { Helmet } from '@dr.pogodin/react-helmet';
 import HelloWorld from '../ror-auto-load-components/HelloWorld';
 import { consistentKeysReplacer } from '../utils/json';
 
