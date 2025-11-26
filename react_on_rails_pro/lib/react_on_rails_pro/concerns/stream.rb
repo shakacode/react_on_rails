@@ -93,12 +93,16 @@ module ReactOnRailsPro
         raise e
       end
     ensure
+      # Close the queue first to unblock writing_task (it may be waiting on dequeue)
+      @main_output_queue.close
+
+      # Wait for writing_task to ensure client_disconnected flag is set
+      # before we check it (fixes race condition where ensure runs before
+      # writing_task's rescue block sets the flag)
+      writing_task.wait
+
       # If client disconnected, stop all producer tasks to avoid wasted work
       @async_barrier.stop if client_disconnected
-
-      # Close the queue to signal end of streaming
-      @main_output_queue.close
-      writing_task.wait
     end
 
     def log_client_disconnect(context, exception)
