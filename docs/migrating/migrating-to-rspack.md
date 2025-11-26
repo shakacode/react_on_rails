@@ -53,9 +53,23 @@ console.log(css.someClass); // undefined!
 - SSR: `Cannot read properties of undefined (reading 'someClassName')`
 - Build: `ESModulesLinkingWarning: export 'default' (imported as 'css') was not found in './Component.module.scss'`
 
-### The Solution
+### The Solution (Shakapacker 9.3.1+)
 
-Configure CSS loader to preserve default export behavior in your webpack config:
+The simplest solution is to use the `css_modules_export_mode` setting in `shakapacker.yml`:
+
+```yaml
+# config/shakapacker.yml
+default: &default # ... existing configuration ...
+  css_modules_export_mode: default # Use v8-style default exports
+```
+
+This single setting restores the previous behavior without any webpack config changes.
+
+See the [Shakapacker CSS Modules Export Mode documentation](https://github.com/shakacode/shakapacker/blob/main/docs/css-modules-export-mode.md) for more details.
+
+### Alternative: Manual Webpack Configuration
+
+If you're on an older Shakapacker version (< 9.3.1) or need more control, configure the CSS loader directly:
 
 ```javascript
 // config/webpack/commonWebpackConfig.js
@@ -238,6 +252,8 @@ Add to `package.json`:
 
 ## Complete Configuration Example
 
+> **Note:** If using Shakapacker 9.3.1+, you can skip the CSS modules webpack config by setting `css_modules_export_mode: default` in `shakapacker.yml` (see Step 2).
+
 Here's a complete example of a dual Webpack/Rspack compatible configuration:
 
 ```javascript
@@ -364,7 +380,7 @@ module.exports = configureServer;
 
 **Cause:** Shakapacker 9's `namedExport: true` default.
 
-**Solution:** Apply the CSS modules fix in Step 2.
+**Solution:** Set `css_modules_export_mode: default` in `shakapacker.yml` (Shakapacker 9.3.1+), or apply the manual webpack configuration fix in Step 2.
 
 ## Performance Benefits
 
@@ -376,6 +392,7 @@ After migrating to Rspack, you should see significant build time improvements:
 
 ## Additional Resources
 
+- [Shakapacker CSS Modules Export Mode](https://github.com/shakacode/shakapacker/blob/main/docs/css-modules-export-mode.md) - Configuration for CSS modules export behavior
 - [Shakapacker Rspack Support Issue](https://github.com/shakacode/shakapacker/issues/693)
 - [Rspack Documentation](https://rspack.dev/)
 - [Shakapacker Documentation](https://github.com/shakacode/shakapacker)
