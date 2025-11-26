@@ -109,4 +109,78 @@ RSpec.describe GeneratorHelper, type: :generator do
       end
     end
   end
+
+  describe "#using_swc?" do
+    let(:shakapacker_yml_path) { File.join(destination_root, "config/shakapacker.yml") }
+
+    before do
+      # Clear memoized value before each test
+      remove_instance_variable(:@using_swc) if instance_variable_defined?(:@using_swc)
+      FileUtils.mkdir_p(File.join(destination_root, "config"))
+    end
+
+    after do
+      FileUtils.rm_rf(File.join(destination_root, "config"))
+    end
+
+    context "when shakapacker.yml exists with javascript_transpiler: swc" do
+      before do
+        File.write(shakapacker_yml_path, <<~YAML)
+          default: &default
+            javascript_transpiler: swc
+        YAML
+      end
+
+      it "returns true" do
+        expect(using_swc?).to be true
+      end
+    end
+
+    context "when shakapacker.yml exists with javascript_transpiler: babel" do
+      before do
+        File.write(shakapacker_yml_path, <<~YAML)
+          default: &default
+            javascript_transpiler: babel
+        YAML
+      end
+
+      it "returns false" do
+        expect(using_swc?).to be false
+      end
+    end
+
+    context "when shakapacker.yml exists without javascript_transpiler setting" do
+      before do
+        File.write(shakapacker_yml_path, <<~YAML)
+          default: &default
+            source_path: app/javascript
+        YAML
+      end
+
+      it "returns true for Shakapacker 9.3.0+ (SWC is default)" do
+        # The method assumes latest Shakapacker when version detection fails
+        expect(using_swc?).to be true
+      end
+    end
+
+    context "when shakapacker.yml does not exist" do
+      before do
+        FileUtils.rm_f(shakapacker_yml_path)
+      end
+
+      it "returns true for fresh installations (SWC is recommended)" do
+        expect(using_swc?).to be true
+      end
+    end
+
+    context "when shakapacker.yml has parse errors" do
+      before do
+        File.write(shakapacker_yml_path, "invalid: yaml: [}")
+      end
+
+      it "returns true (assumes latest Shakapacker with SWC default)" do
+        expect(using_swc?).to be true
+      end
+    end
+  end
 end
