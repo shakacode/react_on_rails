@@ -1,0 +1,16 @@
+module ReactOnRails
+  module Dev
+    class DatabaseChecker
+      def self.check_database: () -> bool
+
+      private
+
+      def self.rails_available?: () -> bool
+      def self.check_and_report_database: () -> bool
+      def self.database_ready?: () -> Hash[Symbol, untyped]
+      def self.print_check_header: () -> void
+      def self.print_database_ok: () -> void
+      def self.print_database_failed: (Symbol?, String?) -> void
+    end
+  end
+end

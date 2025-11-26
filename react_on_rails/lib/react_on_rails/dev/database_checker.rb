@@ -30,11 +30,12 @@ module ReactOnRails
         def check_and_report_database
           print_check_header
 
-          if database_ready?
+          result = database_ready?
+          if result[:ready]
             print_database_ok
             true
           else
-            print_database_failed
+            print_database_failed(result[:error_type], result[:error_message])
             false
           end
         end
@@ -42,26 +43,22 @@ module ReactOnRails
         def database_ready?
           # Try to establish connection and run a simple query
           ActiveRecord::Base.connection.execute("SELECT 1")
-          true
+          { ready: true }
         rescue ActiveRecord::NoDatabaseError
           # Database doesn't exist
-          @error_type = :no_database
-          false
+          { ready: false, error_type: :no_database }
         rescue ActiveRecord::PendingMigrationError
           # Database exists but migrations are pending
-          @error_type = :pending_migrations
-          false
+          { ready: false, error_type: :pending_migrations }
         rescue ActiveRecord::ConnectionNotEstablished,
                ActiveRecord::StatementInvalid => e
           # Connection failed or other database error
-          @error_type = :connection_error
-          @error_message = e.message
-          false
+          { ready: false, error_type: :connection_error, error_message: e.message }
         rescue StandardError => e
           # Unexpected error - log but don't block startup
           # This allows apps without databases to still use bin/dev
           warn "Database check warning: #{e.message}" if ENV["DEBUG"]
-          true
+          { ready: true }
         end
 
         def print_check_header
@@ -76,13 +73,13 @@ module ReactOnRails
         end
 
         # rubocop:disable Metrics/AbcSize
-        def print_database_failed
+        def print_database_failed(error_type, error_message)
           puts "   #{Rainbow('✗').red} Database is not ready"
           puts ""
           puts Rainbow("❌ Database not set up!").red.bold
           puts ""
 
-          case @error_type
+          case error_type
           when :no_database
             puts Rainbow("The database does not exist.").yellow
             puts ""
@@ -96,9 +93,9 @@ module ReactOnRails
             puts "   #{Rainbow('bin/rails db:migrate').green}   # Run pending migrations"
           when :connection_error
             puts Rainbow("Could not connect to the database.").yellow
-            if @error_message
+            if error_message
               puts ""
-              puts Rainbow("Error: #{@error_message}").red
+              puts Rainbow("Error: #{error_message}").red
             end
             puts ""
             puts Rainbow("Possible solutions:").cyan.bold

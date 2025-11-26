@@ -140,6 +140,11 @@ RSpec.describe ReactOnRails::Dev::DatabaseChecker do
           allow(ENV).to receive(:[]).with("DEBUG").and_return("true")
           expect { described_class.check_database }.to output(/Database check warning/).to_stderr
         end
+
+        it "does not output a warning when DEBUG is not enabled" do
+          allow(ENV).to receive(:[]).with("DEBUG").and_return(nil)
+          expect { described_class.check_database }.not_to output(/Database check warning/).to_stderr
+        end
       end
     end
   end
