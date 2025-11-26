@@ -66,7 +66,8 @@ These requirements are non-negotiable. CI will fail if not followed.
 - After completing a task successfully, commit and push immediately
 - Run relevant tests locally first to verify changes work
 - Don't wait for explicit user approval if you've tested and are confident
-- Monitor CI after pushing and address any failures proactively
+- **ALWAYS monitor CI after pushing** - check status and address any failures proactively
+- Keep monitoring until CI passes or issues are resolved
 
 This saves time and keeps the workflow moving efficiently.
 
