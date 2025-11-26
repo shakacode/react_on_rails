@@ -1,8 +1,8 @@
 // Top level component for simple client side only rendering
 import React from 'react';
 import { renderToString } from 'react-dom/server';
-import { Helmet, HelmetProvider } from '@dr.pogodin/react-helmet';
-import HelloWorld from './HelloWorld';
+import { HelmetProvider } from '@dr.pogodin/react-helmet';
+import ReactHelmet from '../components/ReactHelmet';
 
 /*
  *  Export a function that takes the props and returns an object with { renderedHtml }
@@ -22,13 +22,7 @@ export default (props, _railsContext) => {
 
   const componentHtml = renderToString(
     <HelmetProvider context={helmetContext}>
-      <div>
-        <Helmet>
-          <title>Custom page title</title>
-        </Helmet>
-        Props: {JSON.stringify(props)}
-        <HelloWorld {...props} />
-      </div>
+      <ReactHelmet {...props} />
     </HelmetProvider>,
   );
 
