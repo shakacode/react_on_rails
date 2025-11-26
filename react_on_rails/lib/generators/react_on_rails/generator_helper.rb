@@ -124,4 +124,64 @@ module GeneratorHelper
       true
     end
   end
+
+  # Check if SWC is configured as the JavaScript transpiler in shakapacker.yml
+  #
+  # @return [Boolean] true if SWC is configured or should be used by default
+  #
+  # Detection logic:
+  # 1. If shakapacker.yml exists and specifies javascript_transpiler: parse it
+  # 2. For Shakapacker 9.3.0+, SWC is the default if not specified
+  # 3. Returns true for fresh installations (SWC is recommended default)
+  #
+  # @note This method is used to determine whether to install SWC dependencies
+  #   (@swc/core, swc-loader) instead of Babel dependencies during generation.
+  def using_swc?
+    return @using_swc if defined?(@using_swc)
+
+    @using_swc = detect_swc_configuration
+  end
+
+  private
+
+  def detect_swc_configuration
+    shakapacker_yml_path = File.join(destination_root, "config/shakapacker.yml")
+
+    if File.exist?(shakapacker_yml_path)
+      config = parse_shakapacker_yml(shakapacker_yml_path)
+      transpiler = config.dig("default", "javascript_transpiler")
+
+      # Explicit configuration takes precedence
+      return transpiler == "swc" if transpiler
+
+      # For Shakapacker 9.3.0+, SWC is the default
+      return shakapacker_version_9_3_or_higher?
+    end
+
+    # Fresh install: SWC is recommended default for Shakapacker 9.3.0+
+    shakapacker_version_9_3_or_higher?
+  end
+
+  def parse_shakapacker_yml(path)
+    require "yaml"
+    # Support both old and new Psych versions
+    YAML.load_file(path, aliases: true)
+  rescue ArgumentError
+    # Older Psych versions don't support the aliases parameter
+    YAML.load_file(path)
+  rescue StandardError
+    # If we can't parse the file, return empty config
+    {}
+  end
+
+  # Check if Shakapacker 9.3.0 or higher is available
+  # This version made SWC the default JavaScript transpiler
+  def shakapacker_version_9_3_or_higher?
+    return true unless defined?(ReactOnRails::PackerUtils)
+
+    ReactOnRails::PackerUtils.shakapacker_version_requirement_met?("9.3.0")
+  rescue StandardError
+    # If we can't determine version, assume latest (which uses SWC)
+    true
+  end
 end
