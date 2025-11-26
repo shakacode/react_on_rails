@@ -31,7 +31,8 @@ module ReactOnRails
 
       def add_test_related_gems_to_gemfile
         gem("rspec-rails", group: :test)
-        gem("chromedriver-helper", group: :test)
+        # NOTE: chromedriver-helper was deprecated in 2019. Modern selenium-webdriver (4.x)
+        # and GitHub Actions have built-in driver management, so no driver helper is needed.
         gem("coveralls", require: false)
       end
 
