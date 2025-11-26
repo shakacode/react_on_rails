@@ -1,3 +1,8 @@
+import { TextEncoder, TextDecoder } from 'util';
+import { Readable } from 'stream';
+import { ReadableStream, ReadableStreamDefaultReader } from 'stream/web';
+import { jest } from '@jest/globals';
+
 // If jsdom environment is set and TextEncoder is not defined, then define TextEncoder and TextDecoder
 // The current version of jsdom does not support TextEncoder and TextDecoder
 // The following code will tell us when jsdom supports TextEncoder and TextDecoder
@@ -11,13 +16,6 @@ if (typeof window !== 'undefined' && typeof window.MessageChannel !== 'undefined
 }
 
 if (typeof window !== 'undefined') {
-  // eslint-disable-next-line global-require
-  const { TextEncoder, TextDecoder } = require('util');
-  // eslint-disable-next-line global-require
-  const { Readable } = require('stream');
-  // eslint-disable-next-line global-require
-  const { ReadableStream, ReadableStreamDefaultReader } = require('stream/web');
-
   // Mock the fetch function to return a ReadableStream instead of Node's Readable stream
   // This matches browser behavior where fetch responses have ReadableStream bodies
   // Node's fetch and polyfills like jest-fetch-mock return Node's Readable stream,

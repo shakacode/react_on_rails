@@ -9,7 +9,7 @@
     "clean": "rm -rf ./lib",
     "test": "pnpm run test:non-rsc && pnpm run test:rsc",
     "test:non-rsc": "jest tests --testPathIgnorePatterns=\".*(RSC|stream|registerServerComponent|serverRenderReactComponent|SuspenseHydration).*\"",
-    "test:rsc": "echo 'TODO: RSC tests disabled - jest.setup.js uses require() incompatible with ESM mode. Re-enable after converting setup to ESM.' && exit 0",
+    "test:rsc": "node scripts/check-react-version.cjs || NODE_CONDITIONS=react-server jest tests/*.rsc.test.*",
     "type-check": "tsc --noEmit --noErrorTruncation",
     "prepare": "[ -f lib/ReactOnRails.full.js ] || (rm -rf ./lib && tsc)",
     "prepublishOnly": "pnpm run build",
