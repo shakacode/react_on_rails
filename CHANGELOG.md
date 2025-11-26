@@ -25,7 +25,7 @@ Changes since the last non-beta release.
 
 #### Added
 
-- **Suppress Unused Component Warnings**: Added `suppress_unused_component_warnings` configuration option to disable console warnings about registered components that are not used on a page. This is useful for production environments where many components are registered globally but only a subset are used on each page. Set `config.suppress_unused_component_warnings = true` in your React on Rails initializer. Note: This only affects React on Rails Pro users. [PR 2125](https://github.com/shakacode/react_on_rails/pull/2125) by [justin808](https://github.com/justin808).
+- **Suppress Unused Component Warnings**: Added `suppress_unused_component_warnings` configuration option to disable console warnings about registered components that are not used on a page. This is useful for production environments where many components are registered globally but only a subset are used on each page. Set `config.suppress_unused_component_warnings = true` in your React on Rails initializer. Note: This only affects React on Rails Pro users. [PR 2136](https://github.com/shakacode/react_on_rails/pull/2136) by [justin808](https://github.com/justin808).
 
 - **Service Dependency Checking for bin/dev**: Added optional `.dev-services.yml` configuration to validate required external services (Redis, PostgreSQL, Elasticsearch, etc.) are running before `bin/dev` starts the development server. Provides clear error messages with start commands and install hints when services are missing. Zero impact if not configured - backwards compatible with all existing installations. [PR 2098](https://github.com/shakacode/react_on_rails/pull/2098) by [justin808](https://github.com/justin808).
 
