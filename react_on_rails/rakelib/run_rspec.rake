@@ -82,7 +82,10 @@ namespace :run_rspec do
     puts "Creating #{example_type.rspec_task_name} task"
     desc "Runs RSpec for #{example_type.name_pretty} only"
     task example_type.rspec_task_name_short => example_type.gen_task_name do
-      run_tests_in(File.join(examples_dir, example_type.name)) # have to use relative path
+      # Use unbundled mode for minimum version examples to ensure the example app's
+      # Gemfile and gem versions are used, not the parent workspace's bundle
+      run_tests_in(File.join(examples_dir, example_type.name),
+                   unbundled: example_type.minimum_versions?)
     end
   end
 
@@ -158,11 +161,17 @@ end
 # If string is passed and it's not absolute, it's converted relative to root of the gem.
 # TEST_ENV_COMMAND_NAME is used to make SimpleCov.command_name unique in order to
 # prevent a name collision. Defaults to the given directory's name.
+# Options:
+#   :command_name - name for SimpleCov (default: dir basename)
+#   :rspec_args - additional rspec arguments (default: "")
+#   :env_vars - additional environment variables (default: "")
+#   :unbundled - run with unbundled_sh_in_dir for Bundler isolation (default: false)
 def run_tests_in(dir, options = {})
   path = calc_path(dir)
 
   command_name = options.fetch(:command_name, path.basename)
   rspec_args = options.fetch(:rspec_args, "")
+  unbundled = options.fetch(:unbundled, false)
 
   # Build environment variables as an array for proper spacing
   env_tokens = []
@@ -171,5 +180,11 @@ def run_tests_in(dir, options = {})
   env_tokens << "COVERAGE=true" if ENV["USE_COVERALLS"]
 
   env_vars = env_tokens.join(" ")
-  sh_in_dir(path.realpath, "#{env_vars} bundle exec rspec #{rspec_args}")
+  command = "#{env_vars} bundle exec rspec #{rspec_args}"
+
+  if unbundled
+    unbundled_sh_in_dir(path.realpath, command)
+  else
+    sh_in_dir(path.realpath, command)
+  end
 end
