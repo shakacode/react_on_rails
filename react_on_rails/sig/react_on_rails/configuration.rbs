@@ -32,6 +32,7 @@ module ReactOnRails
     attr_accessor generated_component_packs_loading_strategy: Symbol?
     attr_accessor immediate_hydration: bool
     attr_accessor component_registry_timeout: Integer
+    attr_accessor suppress_unused_component_warnings: bool
     attr_accessor server_bundle_output_path: String?
     attr_accessor enforce_private_server_bundles: bool
 
@@ -68,6 +69,7 @@ module ReactOnRails
       ?auto_load_bundle: bool?,
       ?immediate_hydration: bool?,
       ?component_registry_timeout: Integer?,
+      ?suppress_unused_component_warnings: bool?,
       ?server_bundle_output_path: String?,
       ?enforce_private_server_bundles: bool?
     ) -> void
