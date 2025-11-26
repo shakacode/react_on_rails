@@ -260,5 +260,42 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
         expect(ReactOnRailsPro.configuration.react_server_client_manifest_file).to eq("server-client-manifest.json")
       end
     end
+
+    describe ".concurrent_component_streaming_buffer_size" do
+      it "accepts positive integers" do
+        ReactOnRailsPro.configure do |config|
+          config.concurrent_component_streaming_buffer_size = 128
+        end
+
+        expect(ReactOnRailsPro.configuration.concurrent_component_streaming_buffer_size).to eq(128)
+      end
+
+      it "raises error for non-positive integers" do
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.concurrent_component_streaming_buffer_size = 0
+          end
+        end.to raise_error(ReactOnRailsPro::Error,
+                           /must be a positive integer/)
+      end
+
+      it "raises error for negative integers" do
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.concurrent_component_streaming_buffer_size = -1
+          end
+        end.to raise_error(ReactOnRailsPro::Error,
+                           /must be a positive integer/)
+      end
+
+      it "raises error for non-integers" do
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.concurrent_component_streaming_buffer_size = "64"
+          end
+        end.to raise_error(ReactOnRailsPro::Error,
+                           /must be a positive integer/)
+      end
+    end
   end
 end

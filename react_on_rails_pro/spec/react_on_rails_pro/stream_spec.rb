@@ -392,6 +392,7 @@ RSpec.describe "Streaming API" do
       allow(mocked_response).to receive(:stream).and_return(mocked_stream)
       allow(mocked_stream).to receive(:write)
       allow(mocked_stream).to receive(:close)
+      allow(mocked_stream).to receive(:closed?).and_return(false)
       allow(controller).to receive(:response).and_return(mocked_response)
 
       [component_queues, controller, mocked_stream]
@@ -488,6 +489,42 @@ RSpec.describe "Streaming API" do
       expect(write_timestamps.length).to be >= 2
       gaps = write_timestamps.each_cons(2).map { |a, b| b - a }
       expect(gaps.all? { |gap| gap >= 0.04 }).to be true
+    end
+
+    it "stops writing when client disconnects" do
+      queues, controller, stream = setup_stream_test(component_count: 1)
+
+      written_chunks = []
+      write_count = 0
+
+      # Simulate client disconnect: IOError on third write
+      allow(stream).to receive(:write) do |chunk|
+        write_count += 1
+        raise IOError, "client disconnected" if write_count == 3
+
+        written_chunks << chunk
+      end
+
+      # closed? stub required by setup but not used by StreamController's simple enqueue logic
+      allow(stream).to receive(:closed?).and_return(false)
+
+      run_stream(controller) do |_parent|
+        queues[0].enqueue("Chunk1")
+        sleep 0.05
+        queues[0].enqueue("Chunk2")
+        sleep 0.05
+        queues[0].enqueue("Chunk3") # This write will raise IOError
+        sleep 0.05
+        queues[0].enqueue("Chunk4") # Should not be written
+        queues[0].close
+        sleep 0.1
+      end
+
+      # Writer catches IOError and stops - only successful writes recorded
+      # Write 1: TEMPLATE (success), Write 2: Chunk1 (success), Write 3: Chunk2 (IOError)
+      expect(written_chunks.length).to eq(2)
+      expect(written_chunks).to include("TEMPLATE")
+      expect(written_chunks).to include("Chunk1")
     end
   end
 end

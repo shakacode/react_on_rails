@@ -70,7 +70,26 @@ module ReactOnRailsPro
                   :renderer_request_retry_limit, :throw_js_errors, :ssr_timeout,
                   :profile_server_rendering_js_code, :raise_non_shell_server_rendering_errors, :enable_rsc_support,
                   :rsc_payload_generation_url_path, :rsc_bundle_js_file, :react_client_manifest_file,
-                  :react_server_client_manifest_file, :concurrent_component_streaming_buffer_size
+                  :react_server_client_manifest_file
+
+    attr_reader :concurrent_component_streaming_buffer_size
+
+    # Sets the buffer size for concurrent component streaming.
+    #
+    # This value controls how many chunks can be buffered in memory during
+    # concurrent streaming operations. When producers generate chunks faster
+    # than they can be written to the client, this buffer prevents unbounded
+    # memory growth by blocking producers when the buffer is full.
+    #
+    # @param value [Integer] A positive integer specifying the buffer size
+    # @raise [ReactOnRailsPro::Error] if value is not a positive integer
+    def concurrent_component_streaming_buffer_size=(value)
+      unless value.is_a?(Integer) && value.positive?
+        raise ReactOnRailsPro::Error,
+              "config.concurrent_component_streaming_buffer_size must be a positive integer"
+      end
+      @concurrent_component_streaming_buffer_size = value
+    end
 
     def initialize(renderer_url: nil, renderer_password: nil, server_renderer: nil, # rubocop:disable Metrics/AbcSize
                    renderer_use_fallback_exec_js: nil, prerender_caching: nil,
