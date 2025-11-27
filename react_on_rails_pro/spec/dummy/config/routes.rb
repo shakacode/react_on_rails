@@ -38,6 +38,7 @@ Rails.application.routes.draw do
   get "server_router_client_render/(*all)" => "pages#server_router_client_render", as: :server_router_client_render
   get "async_render_function_returns_string" => "pages#async_render_function_returns_string"
   get "async_render_function_returns_component" => "pages#async_render_function_returns_component"
+  get "async_components_demo" => "pages#async_components_demo", as: :async_components_demo
   rsc_payload_route controller: "pages"
 
   # routes copied over from react on rails

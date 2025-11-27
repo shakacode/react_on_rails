@@ -45,9 +45,24 @@ module ReactOnRailsPro
       Sync do
         @react_on_rails_async_barrier = Async::Barrier.new
         yield
+        check_for_unresolved_async_components
       ensure
+        @react_on_rails_async_barrier&.stop
         @react_on_rails_async_barrier = nil
       end
+    end
+
+    def check_for_unresolved_async_components
+      return if @react_on_rails_async_barrier.nil?
+
+      pending_tasks = @react_on_rails_async_barrier.size
+      return if pending_tasks.zero?
+
+      Rails.logger.error(
+        "[React on Rails Pro] #{pending_tasks} async component(s) were started but never resolved. " \
+        "Make sure to call .value on all AsyncValue objects returned by async_react_component " \
+        "or cached_async_react_component. Unresolved tasks will be stopped."
+      )
     end
   end
 end
