@@ -816,5 +816,181 @@ describe ReactOnRailsProHelper do
       expect(comment_count).to eq(1)
     end
   end
+
+  describe "#async_react_component", :requires_webpack_assets do
+    context "without async context" do
+      it "raises an error when called outside async context" do
+        expect do
+          async_react_component("App", props: { a: 1 })
+        end.to raise_error(ReactOnRailsPro::Error, /AsyncRendering concern/)
+      end
+    end
+
+    context "with async context" do
+      around do |example|
+        Sync do
+          @react_on_rails_async_barrier = Async::Barrier.new
+          example.run
+        ensure
+          @react_on_rails_async_barrier = nil
+        end
+      end
+
+      it "returns an AsyncValue" do
+        result = async_react_component("App", props: { a: 1 })
+        expect(result).to be_a(ReactOnRailsPro::AsyncValue)
+      end
+
+      it "renders the component when value is accessed" do
+        async_value = async_react_component("App", props: { a: 1, b: 2 })
+        html = async_value.value
+
+        expect(html).to include('id="App-react-component')
+      end
+
+      it "executes multiple components concurrently" do
+        call_count = 0
+        max_concurrent = 0
+        mutex = Mutex.new
+
+        allow(self).to receive(:react_component) do |_name, _opts|
+          mutex.synchronize do
+            call_count += 1
+            max_concurrent = [max_concurrent, call_count].max
+          end
+
+          # Yield to other fibers to allow concurrent execution
+          Async::Task.current.yield
+
+          mutex.synchronize { call_count -= 1 }
+          "<div>rendered</div>"
+        end
+
+        value1 = async_react_component("App", props: { a: 1 })
+        value2 = async_react_component("App", props: { b: 2 })
+
+        value1.value
+        value2.value
+
+        # If concurrent, both calls should have been active at the same time
+        expect(max_concurrent).to eq(2)
+        expect(call_count).to eq(0)
+      end
+
+      it "re-raises exceptions from react_component" do
+        allow(self).to receive(:react_component).and_raise(StandardError, "Render error")
+
+        async_value = async_react_component("BadComponent", props: {})
+
+        expect { async_value.value }.to raise_error(StandardError, "Render error")
+      end
+    end
+  end
+
+  describe "#cached_async_react_component", :caching, :requires_webpack_assets do
+    context "without async context" do
+      it "raises an error when called outside async context" do
+        expect do
+          cached_async_react_component("App", cache_key: "test") { { a: 1 } }
+        end.to raise_error(ReactOnRailsPro::Error, /AsyncRendering concern/)
+      end
+    end
+
+    context "with async context" do
+      around do |example|
+        Sync do
+          @react_on_rails_async_barrier = Async::Barrier.new
+          example.run
+        ensure
+          @react_on_rails_async_barrier = nil
+        end
+      end
+
+      it "returns an AsyncValue on cache miss" do
+        result = cached_async_react_component("App", cache_key: "async-test-miss") { { a: 1 } }
+        expect(result).to be_a(ReactOnRailsPro::AsyncValue)
+      end
+
+      it "returns an ImmediateAsyncValue on cache hit" do
+        # First call - cache miss
+        first_result = cached_async_react_component("App", cache_key: "async-test-hit") { { a: 1 } }
+        first_result.value # Wait for render and cache write
+
+        # Second call - cache hit
+        second_result = cached_async_react_component("App", cache_key: "async-test-hit") { { a: 1 } }
+        expect(second_result).to be_a(ReactOnRailsPro::ImmediateAsyncValue)
+      end
+
+      it "caches the rendered component" do
+        cache_key = "async-cache-test-#{SecureRandom.hex(4)}"
+
+        # First render
+        first_value = cached_async_react_component("RandomValue", cache_key: cache_key) { { a: 1 } }
+        first_html = first_value.value
+
+        # Second render should return cached content
+        second_value = cached_async_react_component("RandomValue", cache_key: cache_key) { { a: 1 } }
+        second_html = second_value.value
+
+        expect(second_html).to eq(first_html)
+      end
+
+      it "doesn't call the block on cache hit" do
+        cache_key = "async-block-test-#{SecureRandom.hex(4)}"
+
+        # Prime the cache
+        first_value = cached_async_react_component("App", cache_key: cache_key) { { a: 1 } }
+        first_value.value
+
+        # Second call should not yield
+        expect do |block|
+          cached_async_react_component("App", cache_key: cache_key, &block)
+        end.not_to yield_control
+      end
+
+      it "respects :if option for conditional caching" do
+        cache_key = "async-if-test-#{SecureRandom.hex(4)}"
+
+        # With if: false, should not cache
+        first_value = cached_async_react_component("RandomValue", cache_key: cache_key, if: false) { { a: 1 } }
+        first_html = first_value.value
+
+        second_value = cached_async_react_component("RandomValue", cache_key: cache_key, if: false) { { a: 1 } }
+        second_html = second_value.value
+
+        # Both should be AsyncValue (not ImmediateAsyncValue) since caching is disabled
+        expect(first_value).to be_a(ReactOnRailsPro::AsyncValue)
+        expect(second_value).to be_a(ReactOnRailsPro::AsyncValue)
+
+        # RandomValue generates different values each render when not cached
+        expect(second_html).not_to eq(first_html)
+      end
+
+      it "respects :unless option for conditional caching" do
+        cache_key = "async-unless-test-#{SecureRandom.hex(4)}"
+
+        # With unless: true, should not cache
+        first_value = cached_async_react_component("RandomValue", cache_key: cache_key, unless: true) { { a: 1 } }
+        first_html = first_value.value
+
+        second_value = cached_async_react_component("RandomValue", cache_key: cache_key, unless: true) { { a: 1 } }
+        second_html = second_value.value
+
+        expect(second_html).not_to eq(first_html)
+      end
+
+      it "raises error when props are passed directly instead of as block" do
+        expect do
+          cached_async_react_component("App", cache_key: "test", props: { a: 1 })
+        end.to raise_error(ReactOnRailsPro::Error, /Pass 'props' as a block/)
+      end
+
+      it "raises error when cache_key is missing" do
+        expect do
+          cached_async_react_component("App") { { a: 1 } }
+        end.to raise_error(ReactOnRailsPro::Error, /cache_key.*required/)
+      end
+    end
+  end
 end
 # rubocop:enable RSpec/InstanceVariable
