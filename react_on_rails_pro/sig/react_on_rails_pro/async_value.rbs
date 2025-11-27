@@ -1,0 +1,18 @@
+module ReactOnRailsPro
+  class AsyncValue
+    attr_reader component_name: String
+
+    @task: untyped
+    @component_name: String
+
+    def initialize: (component_name: String, task: untyped) -> void
+
+    def value: () -> untyped
+
+    def resolved?: () -> bool
+
+    def to_s: () -> String
+
+    def html_safe: () -> untyped
+  end
+end

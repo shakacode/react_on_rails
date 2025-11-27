@@ -1,0 +1,15 @@
+module ReactOnRailsPro
+  class ImmediateAsyncValue
+    attr_reader value: untyped
+
+    @value: untyped
+
+    def initialize: (untyped value) -> void
+
+    def resolved?: () -> bool
+
+    def to_s: () -> String
+
+    def html_safe: () -> untyped
+  end
+end
