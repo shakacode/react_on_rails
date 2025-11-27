@@ -21,7 +21,57 @@ rails generate react_on_rails:install
 - `shakapacker.yml` settings
 - other configuration files
 
-## Upgrading to v16
+## Upgrading to v16.1.x (from v16.0.x)
+
+For detailed upgrade instructions, see the [v16.1.x Release Notes](release-notes/16.1.0.md).
+
+### Quick Summary
+
+v16.1.x is a minor release with new features and bug fixes:
+
+- **New `rake react_on_rails:doctor` command** for diagnosing setup issues
+- **Server bundle security enhancements** with `server_bundle_output_path` and `enforce_private_server_bundles` options
+- **Generator improvements** with modern TypeScript patterns and better defaults
+- **Bug fix (v16.1.1)**: Fixed RSC manifest file path resolution
+
+### Upgrade Steps
+
+1. Update dependencies:
+
+   ```ruby
+   # Gemfile
+   gem "react_on_rails", "~> 16.1.1"
+   gem "shakapacker", "~> 8.2.0"
+   ```
+
+   ```json
+   // package.json - versions must match exactly
+   {
+     "dependencies": {
+       "react-on-rails": "16.1.1",
+       "shakapacker": "8.2.0"
+     }
+   }
+   ```
+
+2. Install and verify:
+
+   ```bash
+   bundle update react_on_rails shakapacker
+   yarn install
+   rake react_on_rails:doctor  # New diagnostic command
+   ```
+
+3. Optionally run generator for latest improvements:
+   ```bash
+   rails generate react_on_rails:install
+   ```
+
+### Deprecation Notice
+
+Remove `config.generated_assets_dirs` from your configuration - asset paths are now automatically determined from `shakapacker.yml`.
+
+## Upgrading to v16 (from v14/v15)
 
 ### Breaking Changes
 
