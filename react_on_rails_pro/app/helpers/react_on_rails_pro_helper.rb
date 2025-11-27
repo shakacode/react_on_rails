@@ -313,31 +313,36 @@ module ReactOnRailsProHelper
     # Start an async task on the barrier to stream all chunks
     @async_barrier.async do
       stream = yield
-      is_first = true
-
-      stream.each_chunk do |chunk|
-        all_chunks << chunk if on_complete # Collect for callback
-
-        if is_first
-          # Store first chunk in variable for synchronous access
-          first_chunk_var.value = chunk
-          is_first = false
-        else
-          # Enqueue remaining chunks to main output queue
-          @main_output_queue.enqueue(chunk)
-        end
-      end
-
-      # Handle case where stream has no chunks
-      first_chunk_var.value = nil if is_first
-
-      # Call callback with all chunks when streaming completes
+      process_stream_chunks(stream, first_chunk_var, all_chunks)
       on_complete&.call(all_chunks)
     end
 
     # Wait for and return the first chunk (blocking)
     first_chunk_var.wait
     first_chunk_var.value
+  end
+
+  def process_stream_chunks(stream, first_chunk_var, all_chunks)
+    is_first = true
+
+    stream.each_chunk do |chunk|
+      # Check if client disconnected before processing chunk
+      break if response.stream.closed?
+
+      all_chunks&.push(chunk)
+
+      if is_first
+        # Store first chunk in variable for synchronous return
+        first_chunk_var.value = chunk
+        is_first = false
+      else
+        # Enqueue remaining chunks to main output queue
+        @main_output_queue.enqueue(chunk)
+      end
+    end
+
+    # Handle case where stream has no chunks
+    first_chunk_var.value = nil if is_first
   end
 
   def internal_stream_react_component(component_name, options = {})

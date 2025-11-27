@@ -362,7 +362,9 @@ describe ReactOnRailsProHelper do
       end
     end
 
-    describe "#stream_react_component" do
+    describe "#stream_react_component" do # rubocop:disable RSpec/MultipleMemoizedHelpers
+      let(:mocked_rails_stream) { instance_double(ActionController::Live::Buffer) }
+
       around do |example|
         # Wrap each test in Sync block to provide async context
         Sync do
@@ -376,6 +378,14 @@ describe ReactOnRailsProHelper do
 
           example.run
         end
+      end
+
+      before do
+        # Mock response.stream.closed? for client disconnect detection
+        allow(mocked_rails_stream).to receive(:closed?).and_return(false)
+        mocked_rails_response = instance_double(ActionDispatch::Response)
+        allow(mocked_rails_response).to receive(:stream).and_return(mocked_rails_stream)
+        allow(self).to receive(:response).and_return(mocked_rails_response)
       end
 
       it "returns the component shell that exist in the initial chunk with the consoleReplayScript" do
@@ -452,6 +462,38 @@ describe ReactOnRailsProHelper do
         expect(collected_chunks[1]).to include(chunks_with_whitespaces[2][:html])
         expect(collected_chunks[2]).to include(chunks_with_whitespaces[3][:html])
       end
+
+      it "stops processing chunks when client disconnects" do
+        many_chunks = Array.new(10) do |i|
+          { html: "<div>Chunk #{i}</div>", consoleReplayScript: "" }
+        end
+        mock_request_and_response(many_chunks)
+
+        # Simulate client disconnect after first chunk
+        call_count = 0
+        allow(mocked_rails_stream).to receive(:closed?) do
+          call_count += 1
+          call_count > 1 # false for first call, true after
+        end
+
+        # Start streaming - first chunk returned synchronously
+        initial_result = stream_react_component(component_name, props: props, **component_options)
+        expect(initial_result).to include("<div>Chunk 0</div>")
+
+        # Wait for async task to complete
+        @async_barrier.wait
+        @main_output_queue.close
+
+        # Collect chunks that were enqueued to output
+        collected_chunks = []
+        while (chunk = @main_output_queue.dequeue)
+          collected_chunks << chunk
+        end
+
+        # Should have stopped early - not all chunks processed
+        # The exact count depends on timing, but should be less than 9 (all remaining)
+        expect(collected_chunks.length).to be < 9
+      end
     end
 
     describe "stream_view_containing_react_components" do # rubocop:disable RSpec/MultipleMemoizedHelpers
@@ -476,6 +518,7 @@ describe ReactOnRailsProHelper do
           written_chunks << chunk
         end
         allow(mocked_stream).to receive(:close)
+        allow(mocked_stream).to receive(:closed?).and_return(false)
         mocked_response = instance_double(ActionDispatch::Response)
         allow(mocked_response).to receive(:stream).and_return(mocked_stream)
         allow(self).to receive(:response).and_return(mocked_response)
@@ -565,6 +608,7 @@ describe ReactOnRailsProHelper do
         written_chunks.clear
         allow(mocked_stream).to receive(:write) { |chunk| written_chunks << chunk }
         allow(mocked_stream).to receive(:close)
+        allow(mocked_stream).to receive(:closed?).and_return(false)
         mocked_response = instance_double(ActionDispatch::Response)
         allow(mocked_response).to receive(:stream).and_return(mocked_stream)
         allow(self).to receive(:response).and_return(mocked_response)
@@ -709,7 +753,9 @@ describe ReactOnRailsProHelper do
       end
     end
 
-    describe "cached_stream_react_component integration with RandomValue", :caching do
+    describe "cached_stream_react_component integration with RandomValue", :caching do # rubocop:disable RSpec/MultipleMemoizedHelpers
+      let(:mocked_stream) { instance_double(ActionController::Live::Buffer) }
+
       around do |example|
         original_prerender_caching = ReactOnRailsPro.configuration.prerender_caching
         ReactOnRailsPro.configuration.prerender_caching = true
@@ -718,6 +764,13 @@ describe ReactOnRailsProHelper do
       ensure
         ReactOnRailsPro.configuration.prerender_caching = original_prerender_caching
         Rails.cache.clear
+      end
+
+      before do
+        allow(mocked_stream).to receive(:closed?).and_return(false)
+        mocked_response = instance_double(ActionDispatch::Response)
+        allow(mocked_response).to receive(:stream).and_return(mocked_stream)
+        allow(self).to receive(:response).and_return(mocked_response)
       end
 
       # we need this setup because we can't use the helper outside of stream_view_containing_react_components
@@ -780,6 +833,7 @@ describe ReactOnRailsProHelper do
         { html: "<div>Test Content</div>", consoleReplayScript: "" }
       ]
     end
+    let(:mocked_stream) { instance_double(ActionController::Live::Buffer) }
 
     around do |example|
       Sync do
@@ -790,6 +844,12 @@ describe ReactOnRailsProHelper do
     end
 
     before do
+      # Mock response.stream.closed? for client disconnect detection
+      allow(mocked_stream).to receive(:closed?).and_return(false)
+      mocked_response = instance_double(ActionDispatch::Response)
+      allow(mocked_response).to receive(:stream).and_return(mocked_stream)
+      allow(self).to receive(:response).and_return(mocked_response)
+
       ReactOnRailsPro::Request.instance_variable_set(:@connection, nil)
       original_httpx_plugin = HTTPX.method(:plugin)
       allow(HTTPX).to receive(:plugin) do |*args|

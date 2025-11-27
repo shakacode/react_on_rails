@@ -392,6 +392,7 @@ RSpec.describe "Streaming API" do
       allow(mocked_response).to receive(:stream).and_return(mocked_stream)
       allow(mocked_stream).to receive(:write)
       allow(mocked_stream).to receive(:close)
+      allow(mocked_stream).to receive(:closed?).and_return(false)
       allow(controller).to receive(:response).and_return(mocked_response)
 
       [component_queues, controller, mocked_stream]
@@ -488,6 +489,63 @@ RSpec.describe "Streaming API" do
       expect(write_timestamps.length).to be >= 2
       gaps = write_timestamps.each_cons(2).map { |a, b| b - a }
       expect(gaps.all? { |gap| gap >= 0.04 }).to be true
+    end
+
+    describe "client disconnect handling" do
+      it "stops writing on IOError" do
+        queues, controller, stream = setup_stream_test(component_count: 1)
+
+        written_chunks = []
+        write_count = 0
+
+        allow(stream).to receive(:write) do |chunk|
+          write_count += 1
+          raise IOError, "client disconnected" if write_count == 3
+
+          written_chunks << chunk
+        end
+
+        run_stream(controller) do |_parent|
+          queues[0].enqueue("Chunk1")
+          sleep 0.05
+          queues[0].enqueue("Chunk2")
+          sleep 0.05
+          queues[0].enqueue("Chunk3")
+          sleep 0.05
+          queues[0].enqueue("Chunk4")
+          queues[0].close
+          sleep 0.1
+        end
+
+        # Write 1: TEMPLATE, Write 2: Chunk1, Write 3: Chunk2 (raises IOError)
+        expect(written_chunks).to eq(%w[TEMPLATE Chunk1])
+      end
+
+      it "stops writing on Errno::EPIPE" do
+        queues, controller, stream = setup_stream_test(component_count: 1)
+
+        written_chunks = []
+        write_count = 0
+
+        allow(stream).to receive(:write) do |chunk|
+          write_count += 1
+          raise Errno::EPIPE, "broken pipe" if write_count == 3
+
+          written_chunks << chunk
+        end
+
+        run_stream(controller) do |_parent|
+          queues[0].enqueue("Chunk1")
+          sleep 0.05
+          queues[0].enqueue("Chunk2")
+          sleep 0.05
+          queues[0].enqueue("Chunk3")
+          queues[0].close
+          sleep 0.1
+        end
+
+        expect(written_chunks).to eq(%w[TEMPLATE Chunk1])
+      end
     end
   end
 end
