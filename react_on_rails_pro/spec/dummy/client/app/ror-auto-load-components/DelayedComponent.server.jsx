@@ -15,7 +15,9 @@ export default async (props, _railsContext) => {
   const { delayMs = 1000 } = props;
 
   // Simulate slow server-side data fetching
-  await new Promise((resolve) => setTimeout(resolve, delayMs));
+  await new Promise((resolve) => {
+    setTimeout(resolve, delayMs);
+  });
 
   return () => <DelayedComponent {...props} />;
 };
