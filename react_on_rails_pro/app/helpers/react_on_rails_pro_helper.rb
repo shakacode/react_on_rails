@@ -217,6 +217,63 @@ module ReactOnRailsProHelper
     end
   end
 
+  # Renders a React component asynchronously, returning an AsyncValue immediately.
+  # Multiple async_react_component calls will execute their HTTP rendering requests
+  # concurrently instead of sequentially.
+  #
+  # Requires the controller to include ReactOnRailsPro::AsyncRendering and call
+  # enable_async_react_rendering.
+  #
+  # @param component_name [String] Name of your registered component
+  # @param options [Hash] Same options as react_component
+  # @return [ReactOnRailsPro::AsyncValue] Call .value to get the rendered HTML
+  #
+  # @example
+  #   <% header = async_react_component("Header", props: @header_props) %>
+  #   <% sidebar = async_react_component("Sidebar", props: @sidebar_props) %>
+  #   <%= header.value %>
+  #   <%= sidebar.value %>
+  #
+  def async_react_component(component_name, options = {})
+    unless defined?(@react_on_rails_async_barrier) && @react_on_rails_async_barrier
+      raise ReactOnRailsPro::Error,
+            "async_react_component requires AsyncRendering concern. " \
+            "Include ReactOnRailsPro::AsyncRendering in your controller and call enable_async_react_rendering."
+    end
+
+    task = @react_on_rails_async_barrier.async do
+      react_component(component_name, options)
+    end
+
+    ReactOnRailsPro::AsyncValue.new(task: task)
+  end
+
+  # Renders a React component asynchronously with caching support.
+  # Cache lookup is synchronous - cache hits return immediately without async.
+  # Cache misses trigger async render and cache the result on completion.
+  #
+  # All the same options as cached_react_component apply:
+  # 1. You must pass the props as a block (evaluated only on cache miss)
+  # 2. Provide the cache_key option
+  # 3. Optionally provide :cache_options for Rails.cache (expires_in, etc.)
+  # 4. Provide :if or :unless for conditional caching
+  #
+  # @param component_name [String] Name of your registered component
+  # @param options [Hash] Options including cache_key and cache_options
+  # @yield Block that returns props (evaluated only on cache miss)
+  # @return [ReactOnRailsPro::AsyncValue, ReactOnRailsPro::ImmediateAsyncValue]
+  #
+  # @example
+  #   <% card = cached_async_react_component("ProductCard", cache_key: @product) { @product.to_props } %>
+  #   <%= card.value %>
+  #
+  def cached_async_react_component(component_name, raw_options = {}, &block)
+    ReactOnRailsPro::Utils.with_trace(component_name) do
+      check_caching_options!(raw_options, block)
+      fetch_async_react_component(component_name, raw_options, &block)
+    end
+  end
+
   if defined?(ScoutApm)
     include ScoutApm::Tracer
     instrument_method :cached_react_component, type: "ReactOnRails", name: "cached_react_component"
@@ -296,6 +353,72 @@ module ReactOnRailsProHelper
     return if raw_options.key?(:cache_key)
 
     raise ReactOnRailsPro::Error, "Option 'cache_key' is required for React on Rails caching"
+  end
+
+  # Async version of fetch_react_component. Handles cache lookup synchronously,
+  # returns ImmediateAsyncValue on hit, AsyncValue on miss.
+  def fetch_async_react_component(component_name, raw_options, &block)
+    unless defined?(@react_on_rails_async_barrier) && @react_on_rails_async_barrier
+      raise ReactOnRailsPro::Error,
+            "cached_async_react_component requires AsyncRendering concern. " \
+            "Include ReactOnRailsPro::AsyncRendering in your controller and call enable_async_react_rendering."
+    end
+
+    # Check conditional caching (:if / :unless options)
+    unless ReactOnRailsPro::Cache.use_cache?(raw_options)
+      return render_async_react_component_uncached(component_name, raw_options, &block)
+    end
+
+    cache_key = ReactOnRailsPro::Cache.react_component_cache_key(component_name, raw_options)
+    cache_options = raw_options[:cache_options] || {}
+    Rails.logger.debug { "React on Rails Pro async cache_key is #{cache_key.inspect}" }
+
+    # Synchronous cache lookup
+    cached_result = Rails.cache.read(cache_key, cache_options)
+    if cached_result
+      Rails.logger.debug { "React on Rails Pro async cache HIT for #{cache_key.inspect}" }
+      render_options = ReactOnRails::ReactComponent::RenderOptions.new(
+        react_component_name: component_name,
+        options: raw_options
+      )
+      load_pack_for_generated_component(component_name, render_options)
+      return ReactOnRailsPro::ImmediateAsyncValue.new(cached_result)
+    end
+
+    Rails.logger.debug { "React on Rails Pro async cache MISS for #{cache_key.inspect}" }
+    render_async_react_component_with_cache(component_name, raw_options, cache_key, cache_options, &block)
+  end
+
+  # Renders async without caching (when :if/:unless conditions disable cache)
+  def render_async_react_component_uncached(component_name, raw_options, &block)
+    options = prepare_async_render_options(raw_options, &block)
+
+    task = @react_on_rails_async_barrier.async do
+      react_component(component_name, options)
+    end
+
+    ReactOnRailsPro::AsyncValue.new(task: task)
+  end
+
+  # Renders async and writes to cache on completion
+  def render_async_react_component_with_cache(component_name, raw_options, cache_key, cache_options, &block)
+    options = prepare_async_render_options(raw_options, &block)
+
+    task = @react_on_rails_async_barrier.async do
+      result = react_component(component_name, options)
+      Rails.cache.write(cache_key, result, cache_options)
+      result
+    end
+
+    ReactOnRailsPro::AsyncValue.new(task: task)
+  end
+
+  def prepare_async_render_options(raw_options)
+    raw_options.merge(
+      props: yield,
+      skip_prerender_cache: true,
+      auto_load_bundle: ReactOnRails.configuration.auto_load_bundle || raw_options[:auto_load_bundle]
+    )
   end
 
   def consumer_stream_async(on_complete:)

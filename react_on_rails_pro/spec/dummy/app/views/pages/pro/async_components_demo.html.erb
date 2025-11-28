@@ -1,0 +1,34 @@
+<h1>Async React Components Demo</h1>
+<p>
+  This page renders 10 React components, each with a 1-second delay.
+  <br>
+  <strong>Sequential rendering:</strong> ~10 seconds
+  <br>
+  <strong>Concurrent rendering (async_react_component):</strong> ~1 second
+</p>
+
+<% start_time = Time.now %>
+
+<%
+  # Start all 10 async renders immediately (non-blocking)
+  components = 10.times.map do |i|
+    async_react_component(
+      "DelayedComponent",
+      props: { index: i + 1, delayMs: 1000 },
+      prerender: true
+    )
+  end
+%>
+
+<div id="components-container">
+  <% components.each do |component| %>
+    <%= component.value %>
+  <% end %>
+</div>
+
+<% elapsed = Time.now - start_time %>
+<p>
+  <strong>Total render time:</strong> <%= (elapsed * 1000).round %>ms
+  <br>
+  <em>If this is close to 1 second instead of 10 seconds, concurrent rendering is working!</em>
+</p>

@@ -1,0 +1,15 @@
+module ReactOnRailsPro
+  class AsyncValue
+    @task: untyped
+
+    def initialize: (task: untyped) -> void
+
+    def value: () -> untyped
+
+    def resolved?: () -> bool
+
+    def to_s: () -> String
+
+    def html_safe: () -> untyped
+  end
+end
