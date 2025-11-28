@@ -506,6 +506,27 @@ module ReactOnRails
       end
     end
 
+    describe ".suppress_unused_component_warnings" do
+      it "defaults to false" do
+        ReactOnRails.configure {} # rubocop:disable Lint/EmptyBlock
+        expect(ReactOnRails.configuration.suppress_unused_component_warnings).to be(false)
+      end
+
+      it "can be set to true" do
+        ReactOnRails.configure do |config|
+          config.suppress_unused_component_warnings = true
+        end
+        expect(ReactOnRails.configuration.suppress_unused_component_warnings).to be(true)
+      end
+
+      it "can be set to false explicitly" do
+        ReactOnRails.configure do |config|
+          config.suppress_unused_component_warnings = false
+        end
+        expect(ReactOnRails.configuration.suppress_unused_component_warnings).to be(false)
+      end
+    end
+
     describe "enforce_private_server_bundles validation" do
       context "when enforce_private_server_bundles is true" do
         before do

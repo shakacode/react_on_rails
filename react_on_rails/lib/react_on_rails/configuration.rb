@@ -64,6 +64,10 @@ module ReactOnRails
       # If exceeded, an error will be thrown for server-side rendered components not registered on the client.
       # Set to 0 to disable the timeout and wait indefinitely for component registration.
       component_registry_timeout: DEFAULT_COMPONENT_REGISTRY_TIMEOUT,
+      # Set to true to suppress warnings about registered components not being used on a page.
+      # This can be useful in production environments where many components are registered globally
+      # but only a subset are used on each page.
+      suppress_unused_component_warnings: false,
       generated_component_packs_loading_strategy: nil,
       server_bundle_output_path: DEFAULT_SERVER_BUNDLE_OUTPUT_PATH,
       enforce_private_server_bundles: false
@@ -82,7 +86,7 @@ module ReactOnRails
                   :same_bundle_for_client_and_server, :rendering_props_extension,
                   :make_generated_server_bundle_the_entrypoint,
                   :generated_component_packs_loading_strategy,
-                  :component_registry_timeout,
+                  :component_registry_timeout, :suppress_unused_component_warnings,
                   :server_bundle_output_path, :enforce_private_server_bundles
 
     # Class instance variable and mutex to track if deprecation warning has been shown
@@ -144,7 +148,8 @@ module ReactOnRails
                    i18n_dir: nil, i18n_yml_dir: nil, i18n_output_format: nil, i18n_yml_safe_load_options: nil,
                    random_dom_id: nil, server_render_method: nil, rendering_props_extension: nil,
                    components_subdirectory: nil, auto_load_bundle: nil,
-                   component_registry_timeout: nil, server_bundle_output_path: nil, enforce_private_server_bundles: nil)
+                   component_registry_timeout: nil, suppress_unused_component_warnings: nil,
+                   server_bundle_output_path: nil, enforce_private_server_bundles: nil)
       self.node_modules_location = node_modules_location.present? ? node_modules_location : Rails.root
       self.generated_assets_dirs = generated_assets_dirs
       self.generated_assets_dir = generated_assets_dir
@@ -169,6 +174,7 @@ module ReactOnRails
       self.skip_display_none = skip_display_none
       self.rendering_props_extension = rendering_props_extension
       self.component_registry_timeout = component_registry_timeout
+      self.suppress_unused_component_warnings = suppress_unused_component_warnings || false
 
       # Server rendering:
       self.server_bundle_js_file = server_bundle_js_file

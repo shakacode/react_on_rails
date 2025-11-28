@@ -323,7 +323,7 @@ describe ReactOnRailsProHelper do
     end
     let(:rails_context_tag) do
       <<-SCRIPT.strip_heredoc
-        <script type="application/json" id="js-react-on-rails-context">{"componentRegistryTimeout":5000,"railsEnv":"test","inMailer":false,"i18nLocale":"en","i18nDefaultLocale":"en","rorVersion":"#{ReactOnRails::VERSION}","rorPro":true,"rorProVersion":"#{ReactOnRailsPro::VERSION}","rscPayloadGenerationUrlPath":"rsc_payload/","href":"http://foobar.com/development","location":"/development","scheme":"http","host":"foobar.com","port":null,"pathname":"/development","search":null,"httpAcceptLanguage":"en","somethingUseful":null,"serverSide":false}</script>
+        <script type="application/json" id="js-react-on-rails-context">{"componentRegistryTimeout":5000,"suppressUnusedComponentWarnings":false,"railsEnv":"test","inMailer":false,"i18nLocale":"en","i18nDefaultLocale":"en","rorVersion":"#{ReactOnRails::VERSION}","rorPro":true,"rorProVersion":"#{ReactOnRailsPro::VERSION}","rscPayloadGenerationUrlPath":"rsc_payload/","href":"http://foobar.com/development","location":"/development","scheme":"http","host":"foobar.com","port":null,"pathname":"/development","search":null,"httpAcceptLanguage":"en","somethingUseful":null,"serverSide":false}</script>
       SCRIPT
     end
     let(:react_component_div_with_initial_chunk) do

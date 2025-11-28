@@ -53,11 +53,16 @@ export default class CallbackRegistry<T> {
       this.waitingPromises.forEach((waitingPromiseInfo, itemName) => {
         waitingPromiseInfo.reject(this.createNotFoundError(itemName));
       });
-      this.notUsedItems.forEach((itemName) => {
-        console.warn(
-          `Warning: ${this.registryType} '${itemName}' was registered but never used. This may indicate unused code that can be removed.`,
-        );
-      });
+
+      // Only log warnings if not suppressed via configuration
+      const suppressWarnings = getRailsContext()?.suppressUnusedComponentWarnings;
+      if (!suppressWarnings) {
+        this.notUsedItems.forEach((itemName) => {
+          console.warn(
+            `Warning: ${this.registryType} '${itemName}' was registered but never used. This may indicate unused code that can be removed.`,
+          );
+        });
+      }
     };
 
     onPageLoaded(() => {

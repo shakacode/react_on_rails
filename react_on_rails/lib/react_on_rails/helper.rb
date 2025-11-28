@@ -274,6 +274,7 @@ module ReactOnRails
       @rails_context ||= begin
         result = {
           componentRegistryTimeout: ReactOnRails.configuration.component_registry_timeout,
+          suppressUnusedComponentWarnings: ReactOnRails.configuration.suppress_unused_component_warnings,
           railsEnv: Rails.env,
           inMailer: in_mailer?,
           # Locale settings

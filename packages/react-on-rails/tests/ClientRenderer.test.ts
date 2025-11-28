@@ -59,6 +59,7 @@ describe('ClientRenderer', () => {
         httpAcceptLanguage: 'en',
         serverSide: false,
         componentRegistryTimeout: 0,
+        suppressUnusedComponentWarnings: false,
       });
       document.body.appendChild(railsContextElement);
 
@@ -116,6 +117,7 @@ describe('ClientRenderer', () => {
         httpAcceptLanguage: 'en',
         serverSide: false,
         componentRegistryTimeout: 0,
+        suppressUnusedComponentWarnings: false,
       });
       document.body.appendChild(railsContextElement);
 
@@ -145,6 +147,7 @@ describe('ClientRenderer', () => {
         httpAcceptLanguage: 'en',
         serverSide: false,
         componentRegistryTimeout: 0,
+        suppressUnusedComponentWarnings: false,
       });
       document.body.appendChild(railsContextElement);
 
@@ -195,6 +198,7 @@ describe('ClientRenderer', () => {
         httpAcceptLanguage: 'en',
         serverSide: false,
         componentRegistryTimeout: 0,
+        suppressUnusedComponentWarnings: false,
       });
       document.body.appendChild(railsContextElement);
 
