@@ -245,7 +245,7 @@ module ReactOnRailsProHelper
       react_component(component_name, options)
     end
 
-    ReactOnRailsPro::AsyncValue.new(component_name: component_name, task: task)
+    ReactOnRailsPro::AsyncValue.new(task: task)
   end
 
   # Renders a React component asynchronously with caching support.
@@ -397,7 +397,7 @@ module ReactOnRailsProHelper
       react_component(component_name, options)
     end
 
-    ReactOnRailsPro::AsyncValue.new(component_name: component_name, task: task)
+    ReactOnRailsPro::AsyncValue.new(task: task)
   end
 
   # Renders async and writes to cache on completion
@@ -410,7 +410,7 @@ module ReactOnRailsProHelper
       result
     end
 
-    ReactOnRailsPro::AsyncValue.new(component_name: component_name, task: task)
+    ReactOnRailsPro::AsyncValue.new(task: task)
   end
 
   def prepare_async_render_options(raw_options)

@@ -10,10 +10,7 @@ module ReactOnRailsPro
   #   html = async_value.value  # blocks until result is ready
   #
   class AsyncValue
-    attr_reader :component_name
-
-    def initialize(component_name:, task:)
-      @component_name = component_name
+    def initialize(task:)
       @task = task
     end
 

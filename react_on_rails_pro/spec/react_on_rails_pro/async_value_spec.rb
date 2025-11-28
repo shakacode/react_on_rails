@@ -6,15 +6,6 @@ require "async/barrier"
 
 module ReactOnRailsPro
   RSpec.describe AsyncValue do
-    describe "#initialize" do
-      it "stores the component name and task" do
-        task = instance_double(Async::Task)
-        async_value = described_class.new(component_name: "MyComponent", task: task)
-
-        expect(async_value.component_name).to eq("MyComponent")
-      end
-    end
-
     describe "#value" do
       it "returns the task result when task completes successfully" do
         Sync do
@@ -22,7 +13,7 @@ module ReactOnRailsPro
             "<div>Hello</div>"
           end
 
-          async_value = described_class.new(component_name: "MyComponent", task: task)
+          async_value = described_class.new(task: task)
           expect(async_value.value).to eq("<div>Hello</div>")
         end
       end
@@ -33,7 +24,7 @@ module ReactOnRailsPro
             raise StandardError, "Render failed"
           end
 
-          async_value = described_class.new(component_name: "MyComponent", task: task)
+          async_value = described_class.new(task: task)
           expect { async_value.value }.to raise_error(StandardError, "Render failed")
         end
       end
@@ -49,7 +40,7 @@ module ReactOnRailsPro
             "result"
           end
 
-          async_value = described_class.new(component_name: "MyComponent", task: task)
+          async_value = described_class.new(task: task)
           expect(async_value.resolved?).to be false
 
           barrier.wait
@@ -63,7 +54,7 @@ module ReactOnRailsPro
           end
 
           task.wait
-          async_value = described_class.new(component_name: "MyComponent", task: task)
+          async_value = described_class.new(task: task)
           expect(async_value.resolved?).to be true
         end
       end
@@ -76,7 +67,7 @@ module ReactOnRailsPro
             "<div>Content</div>"
           end
 
-          async_value = described_class.new(component_name: "MyComponent", task: task)
+          async_value = described_class.new(task: task)
           expect(async_value.to_s).to eq("<div>Content</div>")
         end
       end
@@ -89,7 +80,7 @@ module ReactOnRailsPro
             "<div>Content</div>"
           end
 
-          async_value = described_class.new(component_name: "MyComponent", task: task)
+          async_value = described_class.new(task: task)
           result = async_value.html_safe
 
           expect(result).to be_html_safe
