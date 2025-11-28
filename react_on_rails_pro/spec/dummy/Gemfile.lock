@@ -25,6 +25,7 @@ PATH
       async (>= 2.6)
       connection_pool
       execjs (~> 2.9)
+      http-2 (>= 1.1.1)
       httpx (~> 1.5)
       jwt (~> 2.7)
       rainbow
@@ -192,8 +193,8 @@ GEM
       fiber-storage
       logger
     hashdiff (1.1.0)
-    http-2 (1.0.2)
-    httpx (1.5.1)
+    http-2 (1.1.1)
+    httpx (1.6.3)
       http-2 (>= 1.0.0)
     i18n (1.14.7)
       concurrent-ruby (~> 1.0)
