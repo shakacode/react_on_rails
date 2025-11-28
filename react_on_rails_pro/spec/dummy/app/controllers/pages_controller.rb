@@ -3,6 +3,9 @@
 class PagesController < ApplicationController # rubocop:disable Metrics/ClassLength
   include ReactOnRailsPro::RSCPayloadRenderer
   include RscPostsPageOverRedisHelper
+  include ReactOnRailsPro::AsyncRendering
+
+  enable_async_react_rendering only: [:async_components_demo]
 
   XSS_PAYLOAD = { "<script>window.alert('xss1');</script>" => '<script>window.alert("xss2");</script>' }.freeze
   PROPS_NAME = "Mr. Server Side Rendering"
@@ -155,6 +158,12 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
 
   def console_logs_in_async_server
     render "/pages/pro/console_logs_in_async_server"
+  end
+
+  # Demo page showing 10 async components rendering concurrently
+  # Each component delays 1 second - sequential would take ~10s, concurrent takes ~1s
+  def async_components_demo
+    render "/pages/pro/async_components_demo"
   end
 
   # See files in spec/dummy/app/views/pages

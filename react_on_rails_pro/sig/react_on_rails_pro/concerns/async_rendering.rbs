@@ -1,0 +1,15 @@
+module ReactOnRailsPro
+  module AsyncRendering
+    module ClassMethods
+      def enable_async_react_rendering: (**untyped options) -> void
+    end
+
+    @react_on_rails_async_barrier: untyped
+
+    private
+
+    def wrap_in_async_react_context: () { () -> untyped } -> untyped
+
+    def check_for_unresolved_async_components: () -> void
+  end
+end
