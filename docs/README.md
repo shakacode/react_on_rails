@@ -27,6 +27,7 @@ Jump straight to what you need
 ### 🏗️ **Migrating from Other Solutions**
 
 - **[From react-rails](./migrating/migrating-from-react-rails.md)** - Switch from the react-rails gem
+- **[From Webpack to Rspack](./migrating/migrating-to-rspack.md)** - Migrate to Rspack with Shakapacker 9
 - **[Upgrading React on Rails](./upgrading/upgrading-react-on-rails.md)** - Version upgrade guide
 
 ## 🎯 Popular Use Cases
