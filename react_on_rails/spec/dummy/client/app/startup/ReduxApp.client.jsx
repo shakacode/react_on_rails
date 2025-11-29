@@ -5,7 +5,7 @@
 import React from 'react';
 import { combineReducers, applyMiddleware, createStore } from 'redux';
 import { Provider } from 'react-redux';
-import thunkMiddleware from 'redux-thunk';
+import { thunk } from 'redux-thunk';
 import ReactDOMClient from 'react-dom/client';
 
 import reducers from '../reducers/reducersIndex';
@@ -34,7 +34,7 @@ export default (props, railsContext, domNodeId) => {
 
   // This is where we'll put in the middleware for the async function. Placeholder.
   // store will have helloWorldData as a top level property
-  const store = createStore(combinedReducer, combinedProps, applyMiddleware(thunkMiddleware));
+  const store = createStore(combinedReducer, combinedProps, applyMiddleware(thunk));
 
   // renderApp is a function required for hot reloading. see
   // https://github.com/retroalgic/react-on-rails-hot-minimal/blob/master/client/src/entry.js
