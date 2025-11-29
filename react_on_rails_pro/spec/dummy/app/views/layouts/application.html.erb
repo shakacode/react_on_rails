@@ -16,10 +16,39 @@
   <% end %>
   <%= yield :head %>
   <style>
+      /* Critical CSS inlined to prevent FOUC (Flash of Unstyled Content)
+         These styles ensure the layout renders correctly before the main CSS loads.
+         See: https://github.com/shakacode/react_on_rails/issues/2100 */
       html {
           font-size: 16px !important;
       }
+      /* Base layout styles */
+      .flex { display: flex; }
+      .flex-row { flex-direction: row; }
+      .flex-col { flex-direction: column; }
+      .flex-1 { flex: 1 1 0%; }
+      .h-screen { height: 100vh; }
+      .w-screen { width: 100vw; }
+      /* Sidebar styles */
+      .min-w-\[400px\] { min-width: 400px; }
+      .max-w-\[400px\] { max-width: 400px; }
+      .bg-slate-100 { background-color: #f1f5f9; }
+      .bg-white { background-color: #ffffff; }
+      .border-solid { border-style: solid; }
+      .border-r-2 { border-right-width: 2px; }
+      .border-slate-700 { border-color: #334155; }
+      /* Spacing */
+      .p-5 { padding: 1.25rem; }
+      .px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
+      /* Overflow handling */
+      .overflow-y-auto { overflow-y: auto; }
+      .overflow-x-hidden { overflow-x: hidden; }
+      /* Typography (minimal for initial render) */
+      .text-red-700 { color: #b91c1c; }
+      .underline { text-decoration: underline; }
   </style>
+  <!-- Preload CSS for faster loading -->
+  <%= preload_pack_asset('client-bundle.css', as: 'style') %>
   <%= stylesheet_pack_tag('client-bundle',
                           media: 'all',
                           'data-turbo-track': 'reload') %>
