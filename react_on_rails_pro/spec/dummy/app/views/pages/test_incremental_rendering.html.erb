@@ -1,0 +1,11 @@
+<h1>Incremental Rendering Test</h1>
+<p>Testing AsyncPropsComponent with incremental rendering</p>
+
+<%= stream_react_component_with_async_props("AsyncPropsComponent", props: { name: "John Doe", age: 30, description: "Software Engineer" }) do |emit|
+  # Simulate fetching async props
+  sleep 1
+  emit.call("books", ["The Pragmatic Programmer", "Clean Code", "Design Patterns"])
+
+  sleep 1
+  emit.call("researches", ["Machine Learning Study", "React Performance Optimization", "Database Indexing Strategies"])
+end %>
