@@ -4,6 +4,7 @@ require "English"
 require "open3"
 require "rainbow"
 require_relative "../packer_utils"
+require_relative "database_checker"
 require_relative "service_checker"
 
 module ReactOnRails
@@ -411,8 +412,9 @@ module ReactOnRails
 
           print_procfile_info(procfile, route: route)
 
-          # Check required services before starting
+          # Check required services and database before starting
           exit 1 unless ServiceChecker.check_services
+          exit 1 unless DatabaseChecker.check_database
 
           print_server_info(
             "🏭 Starting production-like development server...",
@@ -536,8 +538,9 @@ module ReactOnRails
         def run_static_development(procfile, verbose: false, route: nil)
           print_procfile_info(procfile, route: route)
 
-          # Check required services before starting
+          # Check required services and database before starting
           exit 1 unless ServiceChecker.check_services
+          exit 1 unless DatabaseChecker.check_database
 
           features = [
             "Using shakapacker --watch (no HMR)",
@@ -565,8 +568,9 @@ module ReactOnRails
         def run_development(procfile, verbose: false, route: nil)
           print_procfile_info(procfile, route: route)
 
-          # Check required services before starting
+          # Check required services and database before starting
           exit 1 unless ServiceChecker.check_services
+          exit 1 unless DatabaseChecker.check_database
 
           PackGenerator.generate(verbose: verbose)
           ProcessManager.ensure_procfile(procfile)
