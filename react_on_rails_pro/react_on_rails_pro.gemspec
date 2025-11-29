@@ -35,6 +35,9 @@ Gem::Specification.new do |s|
   s.add_runtime_dependency "connection_pool"
   s.add_runtime_dependency "execjs", "~> 2.9"
   s.add_runtime_dependency "httpx", "~> 1.5"
+  # Needed to avoid this bug at httpx versions >= 1.6.0:
+  #   https://github.com/HoneyryderChuck/httpx/issues/118
+  s.add_runtime_dependency "http-2", ">= 1.1.1"
   s.add_runtime_dependency "jwt", "~> 2.7"
   s.add_runtime_dependency "async", ">= 2.6"
   s.add_runtime_dependency "rainbow"
