@@ -1,21 +1,28 @@
 import React from 'react';
 import { renderToString } from 'react-dom/server';
-import { Helmet } from 'react-helmet';
+import { HelmetProvider } from '@dr.pogodin/react-helmet';
 
 import App from './LoadableApp';
 
 // Version of the consumer app to use without loadable components to enable HMR
 const hmrApp = (props, railsContext) => {
-  const componentHtml = renderToString(React.createElement(App, { ...props, path: railsContext.pathname }));
-  const helmet = Helmet.renderStatic();
+  // For server-side rendering with @dr.pogodin/react-helmet, we pass a context object
+  // to HelmetProvider to capture the helmet data per-request (thread-safe)
+  const helmetContext = {};
+  const componentHtml = renderToString(
+    <HelmetProvider context={helmetContext}>
+      {React.createElement(App, { ...props, path: railsContext.pathname })}
+    </HelmetProvider>,
+  );
+  const { helmet } = helmetContext;
 
   return {
     renderedHtml: {
       componentHtml,
-      link: helmet.link.toString(),
-      meta: helmet.meta.toString(),
-      style: helmet.style.toString(),
-      title: helmet.title.toString(),
+      link: helmet ? helmet.link.toString() : '',
+      meta: helmet ? helmet.meta.toString() : '',
+      style: helmet ? helmet.style.toString() : '',
+      title: helmet ? helmet.title.toString() : '',
     },
   };
 };
