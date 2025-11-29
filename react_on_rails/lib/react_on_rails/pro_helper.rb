@@ -16,9 +16,7 @@ module ReactOnRails
                                                 "data-trace" => (render_options.trace ? true : nil),
                                                 "data-dom-id" => render_options.dom_id,
                                                 "data-store-dependencies" =>
-                                                  render_options.store_dependencies&.to_json,
-                                                "data-immediate-hydration" =>
-                                                  (render_options.immediate_hydration ? true : nil))
+                                                  render_options.store_dependencies&.to_json)
 
       # Add immediate invocation script if immediate hydration is enabled
       spec_tag = if render_options.immediate_hydration
@@ -41,9 +39,7 @@ module ReactOnRails
       store_hydration_data = content_tag(:script,
                                          json_safe_and_pretty(redux_store_data[:props]).html_safe,
                                          type: "application/json",
-                                         "data-js-react-on-rails-store" => redux_store_data[:store_name].html_safe,
-                                         "data-immediate-hydration" =>
-                                           (redux_store_data[:immediate_hydration] ? true : nil))
+                                         "data-js-react-on-rails-store" => redux_store_data[:store_name].html_safe)
 
       # Add immediate invocation script if immediate hydration is enabled and Pro license is valid
       store_hydration_scripts = if redux_store_data[:immediate_hydration]

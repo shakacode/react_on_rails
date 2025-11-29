@@ -14,7 +14,7 @@
 
 import { ItemRegistrationCallback } from 'react-on-rails/types';
 import { onPageLoaded, onPageUnloaded } from 'react-on-rails/pageLifecycle';
-import { getRailsContext } from 'react-on-rails/context';
+import { getRailsContext } from './railsContext.ts';
 
 /**
  * Represents information about a registered item including its value,

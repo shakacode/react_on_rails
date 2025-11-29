@@ -15,27 +15,23 @@
 /* eslint-disable max-classes-per-file */
 
 import type { ReactElement } from 'react';
-import type { RailsContext, RegisteredComponent, RenderFunction, Root } from 'react-on-rails/types';
+import type { RegisteredComponent, RenderFunction, Root } from 'react-on-rails/types';
 
-import { getRailsContext, resetRailsContext } from 'react-on-rails/context';
+import { getRailsContext, RailsContextPro, resetRailsContext } from './railsContext.ts';
 import createReactOutput from 'react-on-rails/createReactOutput';
 import { isServerRenderHash } from 'react-on-rails/isServerRenderResult';
 import { supportsHydrate, supportsRootApi, unmountComponentAtNode } from 'react-on-rails/reactApis';
 import reactHydrateOrRender from 'react-on-rails/reactHydrateOrRender';
 import { debugTurbolinks } from 'react-on-rails/turbolinksUtils';
-import { onPageLoaded } from 'react-on-rails/pageLifecycle';
 import * as StoreRegistry from './StoreRegistry.ts';
 import * as ComponentRegistry from './ComponentRegistry.ts';
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
-const IMMEDIATE_HYDRATION_PRO_WARNING =
-  "[REACT ON RAILS] The 'immediate_hydration' feature requires a React on Rails Pro license. " +
-  'Please visit https://shakacode.com/react-on-rails-pro to get a license.';
 
 async function delegateToRenderer(
   componentObj: RegisteredComponent,
   props: Record<string, unknown>,
-  railsContext: RailsContext,
+  railsContext: RailsContextPro,
   domNodeId: string,
   trace: boolean,
 ): Promise<boolean> {
@@ -97,22 +93,7 @@ class ComponentRenderer {
    * Used for client rendering by ReactOnRails. Either calls ReactDOM.hydrate, ReactDOM.render, or
    * delegates to a renderer registered by the user.
    */
-  private async render(el: Element, railsContext: RailsContext): Promise<void> {
-    const isImmediateHydrationRequested = el.getAttribute('data-immediate-hydration') === 'true';
-    const hasProLicense = railsContext.rorPro;
-
-    // Handle immediate_hydration feature usage without Pro license
-    if (isImmediateHydrationRequested && !hasProLicense) {
-      console.warn(IMMEDIATE_HYDRATION_PRO_WARNING);
-
-      // Fallback to standard behavior: wait for page load before hydrating
-      if (document.readyState === 'loading') {
-        await new Promise<void>((resolve) => {
-          onPageLoaded(resolve);
-        });
-      }
-    }
-
+  private async render(el: Element, railsContext: RailsContextPro): Promise<void> {
     // This must match lib/react_on_rails/helper.rb
     const name = el.getAttribute('data-component-name') || '';
     const { domNodeId } = this;
@@ -228,7 +209,7 @@ class StoreRenderer {
     this.hydratePromise = this.hydrate(railsContext, name, props);
   }
 
-  private async hydrate(railsContext: RailsContext, name: string, props: Record<string, unknown>) {
+  private async hydrate(railsContext: RailsContextPro, name: string, props: Record<string, unknown>) {
     const storeGenerator = await StoreRegistry.getOrWaitForStoreGenerator(name);
     if (this.state === 'unmounted') {
       return;
@@ -272,13 +253,7 @@ async function forAllElementsAsync(
   await Promise.all(Array.from(els).map(callback));
 }
 
-export const renderOrHydrateImmediateHydratedComponents = () =>
-  forAllElementsAsync(
-    '.js-react-on-rails-component[data-immediate-hydration="true"]',
-    renderOrHydrateComponent,
-  );
-
-export const renderOrHydrateAllComponents = () =>
+export const renderOrHydratePageComponents = () =>
   forAllElementsAsync('.js-react-on-rails-component', renderOrHydrateComponent);
 
 function unmountAllComponents(): void {
@@ -310,10 +285,7 @@ export async function hydrateStore(storeNameOrElement: string | Element) {
   await storeRenderer.waitUntilHydrated();
 }
 
-export const hydrateImmediateHydratedStores = () =>
-  forAllElementsAsync(`[${REACT_ON_RAILS_STORE_ATTRIBUTE}][data-immediate-hydration="true"]`, hydrateStore);
-
-export const hydrateAllStores = () =>
+export const hydratePageStores = () =>
   forAllElementsAsync(`[${REACT_ON_RAILS_STORE_ATTRIBUTE}]`, hydrateStore);
 
 function unmountAllStores(): void {

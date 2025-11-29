@@ -14,7 +14,7 @@
 
 import { createBaseClientObject, type BaseClientObjectType } from 'react-on-rails/@internal/base/client';
 import { createBaseFullObject } from 'react-on-rails/@internal/base/full';
-import { onPageLoaded, onPageUnloaded } from 'react-on-rails/pageLifecycle';
+import { onPageUnloaded } from 'react-on-rails/pageLifecycle';
 import { debugTurbolinks } from 'react-on-rails/turbolinksUtils';
 import type { ReactOnRailsInternal, RegisteredComponent, Store, StoreGenerator } from 'react-on-rails/types';
 import * as ProComponentRegistry from './ComponentRegistry.ts';
@@ -22,10 +22,8 @@ import * as ProStoreRegistry from './StoreRegistry.ts';
 import {
   renderOrHydrateComponent,
   hydrateStore,
-  renderOrHydrateAllComponents,
-  hydrateAllStores,
-  renderOrHydrateImmediateHydratedComponents,
-  hydrateImmediateHydratedStores,
+  renderOrHydratePageComponents,
+  hydratePageStores,
   unmountAll,
 } from './ClientSideRenderer.ts';
 
@@ -47,12 +45,6 @@ type ReactOnRailsProSpecificFunctions = Pick<
   | 'serverRenderRSCReactComponent'
 >;
 
-// Pro client startup with immediate hydration support
-async function reactOnRailsPageLoaded() {
-  debugTurbolinks('reactOnRailsPageLoaded [PRO]');
-  await Promise.all([hydrateAllStores(), renderOrHydrateAllComponents()]);
-}
-
 function reactOnRailsPageUnloaded(): void {
   debugTurbolinks('reactOnRailsPageUnloaded [PRO]');
   unmountAll();
@@ -71,10 +63,9 @@ function clientStartup() {
   // eslint-disable-next-line no-underscore-dangle
   globalThis.__REACT_ON_RAILS_EVENT_HANDLERS_RAN_ONCE__ = true;
 
-  void renderOrHydrateImmediateHydratedComponents();
-  void hydrateImmediateHydratedStores();
+  void renderOrHydratePageComponents();
+  void hydratePageStores();
 
-  onPageLoaded(reactOnRailsPageLoaded);
   onPageUnloaded(reactOnRailsPageUnloaded);
 }
 
@@ -96,7 +87,8 @@ export default function createReactOnRailsPro(
   const reactOnRailsProSpecificFunctions: ReactOnRailsProSpecificFunctions = {
     // Override core implementations with Pro implementations
     reactOnRailsPageLoaded(): Promise<void> {
-      return reactOnRailsPageLoaded();
+      // Do nothing, the pro package doesn't wait until page load to hydrate components and stores
+      return Promise.resolve();
     },
 
     reactOnRailsComponentLoaded(domId: string): Promise<void> {
@@ -164,7 +156,7 @@ export default function createReactOnRailsPro(
     // Reset options to defaults (only on first initialization)
     reactOnRailsPro.resetOptions();
 
-    // Run Pro client startup with immediate hydration support (only on first initialization)
+    // Run Pro client startup that hydrates components and stores immediately without waiting for full page load
     clientStartup();
   }
 

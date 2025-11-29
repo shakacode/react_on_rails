@@ -210,8 +210,7 @@ describe ReactOnRailsHelper do
       <<-SCRIPT.strip_heredoc
         <script type="application/json" class="js-react-on-rails-component" \
         id="js-react-on-rails-component-App-react-component" \
-        data-component-name="App" data-dom-id="App-react-component"
-        data-immediate-hydration="true">{"name":"My Test Name"}</script>
+        data-component-name="App" data-dom-id="App-react-component">{"name":"My Test Name"}</script>
       SCRIPT
     end
 
@@ -219,8 +218,7 @@ describe ReactOnRailsHelper do
       <<-SCRIPT.strip_heredoc
         <script type="application/json" class="js-react-on-rails-component" \
         id="js-react-on-rails-component-App-react-component" \
-        data-component-name="App" data-dom-id="App-react-component"
-        data-immediate-hydration="true">{}</script>
+        data-component-name="App" data-dom-id="App-react-component">{}</script>
       SCRIPT
     end
 
@@ -268,8 +266,7 @@ describe ReactOnRailsHelper do
         <<-SCRIPT.strip_heredoc
           <script type="application/json" class="js-react-on-rails-component" \
           id="js-react-on-rails-component-App-react-component" \
-          data-component-name="App" data-dom-id="App-react-component"
-          data-immediate-hydration="true">{"name":"My Test Name"}</script>
+          data-component-name="App" data-dom-id="App-react-component">{"name":"My Test Name"}</script>
         SCRIPT
       end
 
@@ -284,8 +281,7 @@ describe ReactOnRailsHelper do
         <<-SCRIPT.strip_heredoc
           <script type="application/json" class="js-react-on-rails-component" \
           id="js-react-on-rails-component-App-react-component-0" \
-          data-component-name="App" data-dom-id="App-react-component-0"
-          data-immediate-hydration="true">{"name":"My Test Name"}</script>
+          data-component-name="App" data-dom-id="App-react-component-0">{"name":"My Test Name"}</script>
         SCRIPT
       end
 
@@ -306,8 +302,7 @@ describe ReactOnRailsHelper do
         <<-SCRIPT.strip_heredoc
           <script type="application/json" class="js-react-on-rails-component" \
           id="js-react-on-rails-component-App-react-component" \
-          data-component-name="App" data-dom-id="App-react-component"
-          data-immediate-hydration="true">{"name":"My Test Name"}</script>
+          data-component-name="App" data-dom-id="App-react-component">{"name":"My Test Name"}</script>
         SCRIPT
       end
 
@@ -324,8 +319,7 @@ describe ReactOnRailsHelper do
         <<-SCRIPT.strip_heredoc
           <script type="application/json" class="js-react-on-rails-component" \
           id="js-react-on-rails-component-shaka_div" \
-          data-component-name="App" data-dom-id="shaka_div"
-          data-immediate-hydration="true">{"name":"My Test Name"}</script>
+          data-component-name="App" data-dom-id="shaka_div">{"name":"My Test Name"}</script>
         SCRIPT
       end
 
@@ -417,7 +411,7 @@ describe ReactOnRailsHelper do
     end
 
     let(:react_store_script) do
-      '<script type="application/json" data-js-react-on-rails-store="reduxStore" data-immediate-hydration="true">' \
+      '<script type="application/json" data-js-react-on-rails-store="reduxStore">' \
         '{"name":"My Test Name"}' \
         "</script>"
     end
