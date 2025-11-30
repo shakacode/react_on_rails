@@ -20,8 +20,6 @@ CURRENT_BRANCH=$(git branch --show-current)
 STASHED=false
 
 # Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
@@ -56,7 +54,7 @@ pnpm install --frozen-lockfile 2>&1 | grep -v "^$" | head -5 || true
 pnpm run build 2>&1 | grep -v "^$" | tail -3 || true
 
 echo -e "${BLUE}Measuring base branch sizes...${NC}"
-BASE_SIZES=$(pnpm exec size-limit --json 2>/dev/null)
+pnpm exec size-limit --json > /tmp/base-sizes.json
 
 # Get current branch sizes
 echo -e "${BLUE}Building current branch ($CURRENT_BRANCH)...${NC}"
@@ -65,69 +63,7 @@ pnpm install --frozen-lockfile 2>&1 | grep -v "^$" | head -5 || true
 pnpm run build 2>&1 | grep -v "^$" | tail -3 || true
 
 echo -e "${BLUE}Measuring current branch sizes...${NC}"
-CURRENT_SIZES=$(pnpm exec size-limit --json 2>/dev/null)
+pnpm exec size-limit --json > /tmp/current-sizes.json
 
-# Compare sizes using Node.js
-echo ""
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BLUE}Bundle Size Report${NC}"
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-
-node -e "
-const baseSizes = $BASE_SIZES;
-const currentSizes = $CURRENT_SIZES;
-
-const THRESHOLD = 512; // 0.5 KB
-
-const formatSize = (bytes) => {
-  if (bytes >= 1024) {
-    return (bytes / 1024).toFixed(2) + ' kB';
-  }
-  return bytes + ' B';
-};
-
-const formatDiff = (diff, percent) => {
-  if (diff === 0) return '0%';
-  const sign = diff > 0 ? '+' : '';
-  return sign + formatSize(Math.abs(diff)) + ' (' + sign + percent.toFixed(2) + '%)';
-};
-
-let hasExceeded = false;
-let maxNameLen = Math.max(...currentSizes.map(e => e.name.length));
-
-console.log('');
-console.log('Package'.padEnd(maxNameLen + 2) + 'Base'.padStart(12) + 'Current'.padStart(12) + 'Diff'.padStart(20) + '  Status');
-console.log('─'.repeat(maxNameLen + 2 + 12 + 12 + 20 + 10));
-
-currentSizes.forEach(current => {
-  const base = baseSizes.find(b => b.name === current.name) || { size: 0 };
-  const diff = current.size - base.size;
-  const percent = base.size > 0 ? (diff / base.size) * 100 : 0;
-  const exceeded = diff > THRESHOLD;
-
-  if (exceeded) hasExceeded = true;
-
-  const status = exceeded ? '\x1b[31m❌ EXCEEDED\x1b[0m' : '\x1b[32m✅ OK\x1b[0m';
-  const diffColor = diff > THRESHOLD ? '\x1b[31m' : diff > 0 ? '\x1b[33m' : '\x1b[32m';
-
-  console.log(
-    current.name.padEnd(maxNameLen + 2) +
-    formatSize(base.size).padStart(12) +
-    formatSize(current.size).padStart(12) +
-    (diffColor + formatDiff(diff, percent) + '\x1b[0m').padStart(20 + 9) +
-    '  ' + status
-  );
-});
-
-console.log('');
-console.log('─'.repeat(maxNameLen + 2 + 12 + 12 + 20 + 10));
-console.log('Threshold: ' + formatSize(THRESHOLD) + ' (base + 0.5 kB)');
-console.log('');
-
-if (hasExceeded) {
-  console.log('\x1b[31m❌ Some packages exceeded the size threshold!\x1b[0m');
-  process.exit(1);
-} else {
-  console.log('\x1b[32m✅ All packages within threshold.\x1b[0m');
-}
-"
+# Compare sizes using the bundle-size script
+node scripts/bundle-size.mjs compare --base /tmp/base-sizes.json --current /tmp/current-sizes.json
