@@ -1,59 +1,17 @@
 [
   {
-    "name": "react-on-rails (raw)",
-    "path": "packages/react-on-rails/lib/*.js",
-    "gzip": false,
-    "brotli": false,
-    "limit": "50 kB"
-  },
-  {
     "name": "react-on-rails (gzip)",
     "path": "packages/react-on-rails/lib/*.js",
-    "gzip": true,
-    "limit": "20 kB"
-  },
-  {
-    "name": "react-on-rails (brotli)",
-    "path": "packages/react-on-rails/lib/*.js",
-    "brotli": true,
-    "limit": "15 kB"
-  },
-  {
-    "name": "react-on-rails-pro (raw)",
-    "path": "packages/react-on-rails-pro/lib/*.js",
-    "gzip": false,
-    "brotli": false,
-    "limit": "100 kB"
+    "gzip": true
   },
   {
     "name": "react-on-rails-pro (gzip)",
     "path": "packages/react-on-rails-pro/lib/*.js",
-    "gzip": true,
-    "limit": "45 kB"
-  },
-  {
-    "name": "react-on-rails-pro (brotli)",
-    "path": "packages/react-on-rails-pro/lib/*.js",
-    "brotli": true,
-    "limit": "40 kB"
-  },
-  {
-    "name": "react-on-rails-pro-node-renderer (raw)",
-    "path": "packages/react-on-rails-pro-node-renderer/lib/*.js",
-    "gzip": false,
-    "brotli": false,
-    "limit": "35 kB"
+    "gzip": true
   },
   {
     "name": "react-on-rails-pro-node-renderer (gzip)",
     "path": "packages/react-on-rails-pro-node-renderer/lib/*.js",
-    "gzip": true,
-    "limit": "15 kB"
-  },
-  {
-    "name": "react-on-rails-pro-node-renderer (brotli)",
-    "path": "packages/react-on-rails-pro-node-renderer/lib/*.js",
-    "brotli": true,
-    "limit": "12 kB"
+    "gzip": true
   }
 ]
