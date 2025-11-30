@@ -53,11 +53,21 @@ jobs:
         with:
           version: 9
 
-      # 1. Get base branch sizes first
+      # 1. Get PR's size-limit config first (base branch may not have it)
+      - name: Checkout PR branch for config
+        uses: actions/checkout@v4
+
+      - name: Save size-limit config
+        run: cp .size-limit.json /tmp/size-limit-config.json
+
+      # 2. Get base branch sizes
       - name: Checkout base branch
         uses: actions/checkout@v4
         with:
           ref: ${{ github.base_ref }}
+
+      - name: Copy size-limit config to base branch
+        run: cp /tmp/size-limit-config.json .size-limit.json
 
       - name: Install base dependencies
         run: pnpm install --frozen-lockfile
@@ -69,7 +79,7 @@ jobs:
           echo "Base branch sizes:"
           cat /tmp/base-sizes.json
 
-      # 2. Checkout PR and set dynamic limits
+      # 3. Checkout PR and set dynamic limits
       - name: Checkout PR branch
         uses: actions/checkout@v4
 
@@ -79,7 +89,7 @@ jobs:
       - name: Set dynamic limits (base + 0.5KB)
         run: node scripts/bundle-size.mjs set-limits --base /tmp/base-sizes.json
 
-      # 3. Run the action with dynamic limits
+      # 4. Run the action with dynamic limits
       - name: Check bundle size
         uses: andresz1/size-limit-action@v1
         with:
