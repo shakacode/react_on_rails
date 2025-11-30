@@ -2,17 +2,6 @@ name: Bundle Size
 
 on:
   pull_request:
-    branches:
-      - master
-    paths:
-      - 'packages/**'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - '.size-limit.json'
-      - '.github/workflows/bundle-size.yml'
-  push:
-    branches:
-      - master
     paths:
       - 'packages/**'
       - 'package.json'
@@ -29,11 +18,6 @@ jobs:
     env:
       CI_JOB_NUMBER: 1
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -41,22 +25,67 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-
-      - name: Get pnpm store directory
-        shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-
-      - name: Setup pnpm cache
-        uses: actions/cache@v4
         with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
+          version: 9
 
+      # 1. Get base branch sizes first
+      - name: Checkout base branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.base_ref }}
+
+      - name: Install base dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and measure base branch
+        run: |
+          pnpm run build
+          npx size-limit --json > /tmp/base-sizes.json
+          echo "Base branch sizes:"
+          cat /tmp/base-sizes.json
+
+      # 2. Checkout PR and set dynamic limits
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+
+      - name: Install PR dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Set dynamic limits (base + 0.5KB)
+        run: |
+          node -e "
+            const fs = require('fs');
+            const baseSizes = JSON.parse(fs.readFileSync('/tmp/base-sizes.json', 'utf8'));
+            const config = JSON.parse(fs.readFileSync('.size-limit.json', 'utf8'));
+
+            const THRESHOLD = 512; // 0.5 KB in bytes
+
+            console.log('Setting dynamic limits (base + 0.5KB):');
+            console.log('');
+
+            config.forEach(entry => {
+              const baseEntry = baseSizes.find(b => b.name === entry.name);
+              if (baseEntry) {
+                const limit = baseEntry.size + THRESHOLD;
+                entry.limit = limit + ' B';
+                console.log(entry.name + ':');
+                console.log('  base size: ' + (baseEntry.size / 1024).toFixed(2) + ' kB');
+                console.log('  limit:     ' + (limit / 1024).toFixed(2) + ' kB');
+                console.log('');
+              } else {
+                console.log(entry.name + ': No base entry found, keeping original limit');
+              }
+            });
+
+            fs.writeFileSync('.size-limit.json', JSON.stringify(config, null, 2));
+            console.log('Updated .size-limit.json');
+          "
+
+      # 3. Run the action with dynamic limits
       - name: Check bundle size
         uses: andresz1/size-limit-action@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           package_manager: pnpm
           build_script: build
+          skip_step: install
