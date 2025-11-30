@@ -17,7 +17,9 @@
 
 import fs from 'fs';
 
-// Default threshold: 0.5 KB
+// Default threshold: 0.5 KB (512 bytes)
+// Intentionally strict to catch any bundle size changes early.
+// For intentional size increases, use bin/skip-bundle-size-check to bypass the CI check.
 const DEFAULT_THRESHOLD = 512;
 const DEFAULT_CONFIG = '.size-limit.json';
 
