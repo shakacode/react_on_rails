@@ -39,6 +39,9 @@ importers:
       '@size-limit/file':
         specifier: ^12.0.0
         version: 12.0.0(size-limit@12.0.0(jiti@2.6.1))
+      '@size-limit/webpack':
+        specifier: ^12.0.0
+        version: 12.0.0(@swc/core@1.15.3)(size-limit@12.0.0(jiti@2.6.1))
       '@swc/core':
         specifier: ^1.15.0
         version: 1.15.3
@@ -1417,6 +1420,12 @@ packages:
 
   '@size-limit/file@12.0.0':
     resolution: {integrity: sha512-OzKYpDzWJ2jo6cAIzVsaPuvzZTmMLDoVCViEvsctmImxpXzwJZcuBEpPohFKKdgVdZuNTU8WstmvywPq55Njdw==}
+    engines: {node: ^20.0.0 || ^22.0.0 || >=24.0.0}
+    peerDependencies:
+      size-limit: 12.0.0
+
+  '@size-limit/webpack@12.0.0':
+    resolution: {integrity: sha512-AB8izqxfPsMtB0Jvfqqd8Q+YTGLlgk2ulePFdAwUKAIu4NCSmbzhwyYPPPrycV4Gm8gA3sf5Udu6diXn5CNaHg==}
     engines: {node: ^20.0.0 || ^22.0.0 || >=24.0.0}
     peerDependencies:
       size-limit: 12.0.0
@@ -3858,6 +3867,11 @@ packages:
   nanoid@3.3.11:
     resolution: {integrity: sha512-N8SpfPUnUp1bK+PMYW8qSWdl9U+wwNWI4QKxOYDy9JAro3WMX7p2OeVRF9v+347pnakNevPmiHhNmZ2HbFA76w==}
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
+    hasBin: true
+
+  nanoid@5.1.6:
+    resolution: {integrity: sha512-c7+7RQ+dMB5dPwwCp4ee1/iV/q2P6aK1mTZcfr1BTuVlyW9hJYiMPybJCcnBlQtuSmTIWNeazm/zqNoZSSElBg==}
+    engines: {node: ^18 || >=20}
     hasBin: true
 
   nanospinner@1.2.2:
@@ -6519,6 +6533,17 @@ snapshots:
   '@size-limit/file@12.0.0(size-limit@12.0.0(jiti@2.6.1))':
     dependencies:
       size-limit: 12.0.0(jiti@2.6.1)
+
+  '@size-limit/webpack@12.0.0(@swc/core@1.15.3)(size-limit@12.0.0(jiti@2.6.1))':
+    dependencies:
+      nanoid: 5.1.6
+      size-limit: 12.0.0(jiti@2.6.1)
+      webpack: 5.103.0(@swc/core@1.15.3)
+    transitivePeerDependencies:
+      - '@swc/core'
+      - esbuild
+      - uglify-js
+      - webpack-cli
 
   '@swc/core-darwin-arm64@1.15.3':
     optional: true
@@ -9430,6 +9455,8 @@ snapshots:
       thenify-all: 1.6.0
 
   nanoid@3.3.11: {}
+
+  nanoid@5.1.6: {}
 
   nanospinner@1.2.2:
     dependencies:
