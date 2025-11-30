@@ -1,0 +1,32 @@
+[
+  {
+    "name": "react-on-rails (full)",
+    "path": "packages/react-on-rails/lib/*.js",
+    "gzip": true,
+    "limit": "20 kB"
+  },
+  {
+    "name": "react-on-rails (client)",
+    "path": "packages/react-on-rails/lib/ReactOnRails.client.js",
+    "gzip": true,
+    "limit": "1 kB"
+  },
+  {
+    "name": "react-on-rails-pro (full)",
+    "path": "packages/react-on-rails-pro/lib/*.js",
+    "gzip": true,
+    "limit": "45 kB"
+  },
+  {
+    "name": "react-on-rails-pro (client)",
+    "path": "packages/react-on-rails-pro/lib/ReactOnRails.client.js",
+    "gzip": true,
+    "limit": "2 kB"
+  },
+  {
+    "name": "react-on-rails-pro-node-renderer",
+    "path": "packages/react-on-rails-pro-node-renderer/lib/*.js",
+    "gzip": true,
+    "limit": "15 kB"
+  }
+]
