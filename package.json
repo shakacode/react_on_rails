@@ -21,6 +21,8 @@
     "@babel/preset-typescript": "^7.27.1",
     "@eslint/compat": "^1.2.8",
     "@jest/globals": "^29.7.0",
+    "@size-limit/file": "^12.0.0",
+    "@size-limit/webpack": "^12.0.0",
     "@swc/core": "^1.15.0",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
@@ -59,6 +61,7 @@
     "react-dom": "18.0.0",
     "react-on-rails-rsc": "19.0.2",
     "redux": "^4.2.1",
+    "size-limit": "^12.0.0",
     "stylelint": "^16.14.0",
     "stylelint-config-standard-scss": "^13.1.0",
     "swc-loader": "^0.2.6",
@@ -84,6 +87,8 @@
     "eslint": "eslint",
     "attw": "attw",
     "publint": "publint",
+    "size": "pnpm run build && size-limit",
+    "size:json": "pnpm run build && size-limit --json",
     "postinstall": "test -f .lefthook.yml && test -d .git && command -v bundle >/dev/null 2>&1 && bundle exec lefthook install || true"
   },
   "repository": {
