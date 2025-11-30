@@ -4,3 +4,4 @@
 # Usage: Run `bin/skip-bundle-size-check` to set the current branch, then commit and push.
 #
 # This is useful when you have an intentional size increase that exceeds the 0.5KB threshold.
+feature/bundle-size-ci
