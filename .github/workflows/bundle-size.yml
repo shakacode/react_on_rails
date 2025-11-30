@@ -72,9 +72,25 @@ jobs:
       - name: Install base dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build and measure base branch
+      - name: Build base branch
+        run: pnpm run build
+
+      - name: Verify build artifacts
         run: |
-          pnpm run build
+          missing=0
+          for pkg in react-on-rails react-on-rails-pro react-on-rails-pro-node-renderer; do
+            if ! ls packages/$pkg/lib/*.js >/dev/null 2>&1; then
+              echo "::error::Missing build artifacts in packages/$pkg/lib/"
+              missing=1
+            fi
+          done
+          if [ $missing -eq 1 ]; then
+            exit 1
+          fi
+          echo "All build artifacts verified"
+
+      - name: Measure base branch sizes
+        run: |
           pnpm exec size-limit --json > /tmp/base-sizes.json
           echo "Base branch sizes:"
           cat /tmp/base-sizes.json

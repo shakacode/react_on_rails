@@ -88,7 +88,7 @@ function readJsonFileOrExit(filePath) {
     return readJsonFile(filePath);
   } catch (error) {
     console.error(`${colors.red}Error reading ${filePath}: ${error.message}${colors.reset}`);
-    return process.exit(1);
+    process.exit(1);
   }
 }
 
