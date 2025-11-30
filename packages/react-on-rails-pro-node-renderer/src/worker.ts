@@ -135,7 +135,6 @@ export default function run(config: Partial<Config>) {
     bodyLimit: 104857600, // 100 MB
     logger:
       logHttpLevel !== 'silent' ? { name: 'RORP HTTP', level: logHttpLevel, ...sharedLoggerOptions } : false,
-    requestIdLogLabel: 'trackingId',
     ...fastifyServerOptions,
   });
 
