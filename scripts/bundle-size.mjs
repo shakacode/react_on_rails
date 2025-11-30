@@ -83,6 +83,7 @@ function readJsonFile(filePath) {
 /**
  * Try to read and parse JSON file, exit on error
  */
+// eslint-disable-next-line consistent-return
 function readJsonFileOrExit(filePath) {
   try {
     return readJsonFile(filePath);
