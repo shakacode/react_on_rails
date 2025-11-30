@@ -1,0 +1,76 @@
+# Dependabot configuration
+# - Only security updates (version updates disabled via open-pull-requests-limit: 0)
+# - Dependencies grouped within each ecosystem/directory
+# - 3-day minimum release age for new versions (so they can't be unpublished in NPM)
+#
+# Note: For pnpm workspaces (root /), all workspace packages are updated together.
+# Separate directories with their own lock files get separate PRs.
+
+version: 2
+
+updates:
+  # NPM/PNPM packages - root workspace (covers packages/react-on-rails, etc.)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    # Disable version update PRs - only security updates will be created
+    open-pull-requests-limit: 0
+    minimum-release-age: 3
+    groups:
+      npm-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+
+  # Generator dummy app (uses yarn, separate from main workspace)
+  - package-ecosystem: "npm"
+    directory: "/spec/react_on_rails/dummy-for-generators"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 0
+    minimum-release-age: 3
+    groups:
+      npm-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+
+  # Ruby gems - Open source gem
+  - package-ecosystem: "bundler"
+    directory: "/react_on_rails"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 0
+    minimum-release-age: 3
+    groups:
+      bundler-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+
+  # Ruby gems - Pro gem
+  - package-ecosystem: "bundler"
+    directory: "/react_on_rails_pro"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 0
+    minimum-release-age: 3
+    groups:
+      bundler-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 0
+    minimum-release-age: 3
+    groups:
+      actions-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
