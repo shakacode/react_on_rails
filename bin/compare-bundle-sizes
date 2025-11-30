@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+#
+# Compare bundle sizes between current branch and a base branch
+#
+# Usage:
+#   bin/compare-bundle-sizes [base-branch]
+#
+# Arguments:
+#   base-branch  The branch to compare against (default: master)
+#
+# Examples:
+#   bin/compare-bundle-sizes                    # Compare against master
+#   bin/compare-bundle-sizes develop            # Compare against develop
+#   bin/compare-bundle-sizes feature/some-branch
+
+set -e
+
+BASE_BRANCH="${1:-master}"
+CURRENT_BRANCH=$(git branch --show-current)
+STASHED=false
+
+# Colors for output
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+cleanup() {
+  echo -e "\n${BLUE}Cleaning up...${NC}"
+  git checkout "$CURRENT_BRANCH" --quiet 2>/dev/null || true
+  if [ "$STASHED" = true ]; then
+    git stash pop --quiet 2>/dev/null || true
+  fi
+}
+
+trap cleanup EXIT
+
+echo -e "${BLUE}📦 Bundle Size Comparison${NC}"
+echo -e "   Current branch: ${YELLOW}$CURRENT_BRANCH${NC}"
+echo -e "   Base branch:    ${YELLOW}$BASE_BRANCH${NC}"
+echo ""
+
+# Check for uncommitted changes
+if ! git diff --quiet || ! git diff --cached --quiet; then
+  echo -e "${YELLOW}Stashing uncommitted changes...${NC}"
+  git stash push -m "compare-bundle-sizes temp stash" --quiet
+  STASHED=true
+fi
+
+# Get base branch sizes
+echo -e "${BLUE}Building base branch ($BASE_BRANCH)...${NC}"
+git fetch origin "$BASE_BRANCH" --quiet 2>/dev/null || true
+git checkout "$BASE_BRANCH" --quiet 2>/dev/null || git checkout "origin/$BASE_BRANCH" --quiet
+pnpm install --frozen-lockfile 2>&1 | grep -v "^$" | head -5 || true
+pnpm run build 2>&1 | grep -v "^$" | tail -3 || true
+
+echo -e "${BLUE}Measuring base branch sizes...${NC}"
+pnpm exec size-limit --json > /tmp/base-sizes.json
+
+# Get current branch sizes
+echo -e "${BLUE}Building current branch ($CURRENT_BRANCH)...${NC}"
+git checkout "$CURRENT_BRANCH" --quiet
+pnpm install --frozen-lockfile 2>&1 | grep -v "^$" | head -5 || true
+pnpm run build 2>&1 | grep -v "^$" | tail -3 || true
+
+echo -e "${BLUE}Measuring current branch sizes...${NC}"
+pnpm exec size-limit --json > /tmp/current-sizes.json
+
+# Compare sizes using the bundle-size script
+node scripts/bundle-size.mjs compare --base /tmp/base-sizes.json --current /tmp/current-sizes.json
