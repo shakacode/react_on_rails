@@ -33,6 +33,7 @@ import {
 import * as errorReporter from './shared/errorReporter.js';
 import { lock, unlock } from './shared/locks.js';
 import { startSsrRequestOptions, trace } from './shared/tracing.js';
+import { onMessageReceived } from './workerMessagesRouter.js';
 
 // Uncomment the below for testing timeouts:
 // import { delay } from './shared/utils.js';
@@ -49,6 +50,15 @@ declare module '@fastify/multipart' {
 }
 
 export type FastifyConfigFunction = (app: FastifyInstance) => void;
+
+export type RenderOnOtherBundleRequest = {
+  type: 'render-on-other-bundle-request';
+  renderingRequest: string;
+  bundleTimestamp: string | number;
+};
+
+export const isRenderOnOtherBundleRequest = (msg: unknown): msg is RenderOnOtherBundleRequest =>
+  typeof msg === 'object' && !!msg && 'type' in msg && msg.type === 'render-on-other-bundle-request';
 
 const fastifyConfigFunctions: FastifyConfigFunction[] = [];
 
@@ -125,6 +135,7 @@ export default function run(config: Partial<Config>) {
     bodyLimit: 104857600, // 100 MB
     logger:
       logHttpLevel !== 'silent' ? { name: 'RORP HTTP', level: logHttpLevel, ...sharedLoggerOptions } : false,
+    requestIdLogLabel: 'trackingId',
     ...fastifyServerOptions,
   });
 
@@ -269,6 +280,49 @@ export default function run(config: Partial<Config>) {
       const exceptionMessage = formatExceptionMessage(renderingRequest, theErr);
       errorReporter.message(`Unhandled top level error: ${exceptionMessage}`);
       await setResponse(errorResponseResult(exceptionMessage), res);
+    }
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-misused-promises
+  onMessageReceived(async ({ payload, reply }) => {
+    if (!isRenderOnOtherBundleRequest(payload)) {
+      return;
+    }
+
+    const { renderingRequest, bundleTimestamp } = payload;
+    try {
+      await trace(async (context) => {
+        try {
+          const result = await handleRenderRequest({
+            renderingRequest,
+            bundleTimestamp,
+          });
+          if (result.data) {
+            reply(result.data, true);
+          } else if (result.stream) {
+            result.stream.on('data', (chunk) => {
+              reply(chunk.toString());
+            });
+            result.stream.on('end', () => {
+              reply(undefined, true);
+            });
+          }
+        } catch (err) {
+          const exceptionMessage = formatExceptionMessage(
+            renderingRequest,
+            err,
+            'UNHANDLED error in handleRenderRequest',
+          );
+          errorReporter.message(exceptionMessage, context);
+          // eslint-disable-next-line @typescript-eslint/only-throw-error
+          throw exceptionMessage;
+        }
+      }, startSsrRequestOptions({ renderingRequest }));
+    } catch (theErr) {
+      const exceptionMessage = formatExceptionMessage(renderingRequest, theErr);
+      errorReporter.message(`Unhandled top level error: ${exceptionMessage}`);
+      // eslint-disable-next-line @typescript-eslint/only-throw-error
+      throw exceptionMessage;
     }
   });
 

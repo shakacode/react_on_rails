@@ -17,14 +17,10 @@ import type { Context } from 'vm';
 import SharedConsoleHistory from '../shared/sharedConsoleHistory.js';
 import log from '../shared/log.js';
 import { getConfig } from '../shared/configBuilder.js';
-import {
-  formatExceptionMessage,
-  smartTrim,
-  isReadableStream,
-  getRequestBundleFilePath,
-  handleStreamError,
-} from '../shared/utils.js';
+import { formatExceptionMessage, smartTrim, isReadableStream, handleStreamError } from '../shared/utils.js';
+import { RenderOnOtherBundleRequest } from '../worker';
 import * as errorReporter from '../shared/errorReporter.js';
+import { sendMessage } from '../workerMessagesRouter.js';
 
 const readFileAsync = promisify(fs.readFile);
 const writeFileAsync = promisify(fs.writeFile);
@@ -200,9 +196,14 @@ export async function buildVM(filePath: string) {
         additionalContext !== null && additionalContext.constructor === Object;
       const sharedConsoleHistory = new SharedConsoleHistory();
 
+      // eslint-disable-next-line @typescript-eslint/require-await
       const runOnOtherBundle = async (bundleTimestamp: string | number, renderingRequest: string) => {
-        const bundlePath = getRequestBundleFilePath(bundleTimestamp);
-        return runInVM(renderingRequest, bundlePath, cluster);
+        const msg: RenderOnOtherBundleRequest = {
+          type: 'render-on-other-bundle-request',
+          bundleTimestamp,
+          renderingRequest,
+        };
+        return sendMessage(msg);
       };
 
       const contextObject = { sharedConsoleHistory, runOnOtherBundle };

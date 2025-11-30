@@ -8,6 +8,7 @@ import { buildConfig, Config, logSanitizedConfig } from './shared/configBuilder.
 import restartWorkers from './master/restartWorkers.js';
 import * as errorReporter from './shared/errorReporter.js';
 import { getValidatedLicenseData } from './shared/licenseValidator.js';
+import { routeMessagesFromWorker } from './workerMessagesRouter.js';
 
 const MILLISECONDS_IN_MINUTE = 60000;
 
@@ -29,7 +30,8 @@ export default function masterRun(runningConfig?: Partial<Config>) {
   logSanitizedConfig();
 
   for (let i = 0; i < workersCount; i += 1) {
-    cluster.fork();
+    const worker = cluster.fork();
+    routeMessagesFromWorker(worker);
   }
 
   // Listen for dying workers:
@@ -43,7 +45,8 @@ export default function masterRun(runningConfig?: Partial<Config>) {
       errorReporter.message(msg);
     }
     // Replace the dead worker:
-    cluster.fork();
+    const newWorker = cluster.fork();
+    routeMessagesFromWorker(newWorker);
   });
 
   // Schedule regular restarts of workers
