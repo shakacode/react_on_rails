@@ -1,8 +1,25 @@
 [
   {
+    "name": "react-on-rails (raw)",
+    "path": "packages/react-on-rails/lib/*.js",
+    "gzip": false,
+    "brotli": false
+  },
+  {
     "name": "react-on-rails (gzip)",
     "path": "packages/react-on-rails/lib/*.js",
     "gzip": true
+  },
+  {
+    "name": "react-on-rails (brotli)",
+    "path": "packages/react-on-rails/lib/*.js",
+    "brotli": true
+  },
+  {
+    "name": "react-on-rails-pro (raw)",
+    "path": "packages/react-on-rails-pro/lib/*.js",
+    "gzip": false,
+    "brotli": false
   },
   {
     "name": "react-on-rails-pro (gzip)",
@@ -10,8 +27,24 @@
     "gzip": true
   },
   {
+    "name": "react-on-rails-pro (brotli)",
+    "path": "packages/react-on-rails-pro/lib/*.js",
+    "brotli": true
+  },
+  {
+    "name": "react-on-rails-pro-node-renderer (raw)",
+    "path": "packages/react-on-rails-pro-node-renderer/lib/*.js",
+    "gzip": false,
+    "brotli": false
+  },
+  {
     "name": "react-on-rails-pro-node-renderer (gzip)",
     "path": "packages/react-on-rails-pro-node-renderer/lib/*.js",
     "gzip": true
+  },
+  {
+    "name": "react-on-rails-pro-node-renderer (brotli)",
+    "path": "packages/react-on-rails-pro-node-renderer/lib/*.js",
+    "brotli": true
   }
 ]
