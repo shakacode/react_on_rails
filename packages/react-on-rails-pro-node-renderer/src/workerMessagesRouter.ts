@@ -25,17 +25,21 @@ export const routeMessagesFromWorker = (worker: Worker) => {
     if (!isInterWorkerMessage(msg)) {
       return;
     }
-    const { workers } = cluster;
-    if (!workers) {
+    const workers = Object.values(cluster.workers ?? {}).filter((w) => {
+      return worker.id === w?.id || (w?.isConnected() && !w.isScheduledRestart);
+    });
+    if (workers.length === 0) {
       return;
     }
 
     const { requestId, messageType } = msg;
     if (messageType === 'initiate') {
-      const workerIds = Object.keys(workers);
-      const workersCount = workerIds.length;
-      const workerIndex = workerIds.indexOf(worker.id.toString());
+      const workersCount = workers.length;
+      const workerIndex = workers.findIndex((w) => w?.id === worker.id);
       const otherWorker = workers[workersCount - 1 - workerIndex];
+      if (!otherWorker) {
+        throw new Error("Can't find a worker to forward the message to");
+      }
 
       if (!otherWorker) {
         return;
@@ -65,6 +69,17 @@ type ReceivedMessage = {
   reply: (payload: unknown, close?: boolean) => void;
 };
 
+const onMessageInitiatedCallbacks: (() => void)[] = [];
+const onMessageEndedCallbacks: (() => void)[] = [];
+
+export const onMessageInitiated = (callback: () => void) => {
+  onMessageInitiatedCallbacks.push(callback);
+};
+
+export const onMessageEnded = (callback: () => void) => {
+  onMessageEndedCallbacks.push(callback);
+};
+
 export const onMessageReceived = (callback: (receivedMessage: ReceivedMessage) => void) => {
   process.on('message', (msg) => {
     if (!isInterWorkerMessage(msg)) {
@@ -83,7 +98,17 @@ export const onMessageReceived = (callback: (receivedMessage: ReceivedMessage) =
             requestId,
           };
           process.send?.(replyMsg);
+
+          if (close) {
+            onMessageEndedCallbacks.forEach((onMessageEndedCallback) => {
+              setTimeout(onMessageEndedCallback, 0);
+            });
+          }
         },
+      });
+
+      onMessageInitiatedCallbacks.forEach((onMessageInitiatedCallback) => {
+        setTimeout(onMessageInitiatedCallback, 0);
       });
     }
   });
@@ -93,8 +118,14 @@ export const sendMessage = (initialPayload: unknown): Readable => {
   const requestId = randomUUID();
   const reveivedStream = new PassThrough();
 
+  onMessageInitiatedCallbacks.forEach((onMessageInitiatedCallback) => {
+    setTimeout(onMessageInitiatedCallback, 0);
+  });
+
   process.on('message', function messageReceivedCallback(msg) {
-    if (!isInterWorkerMessage(msg) || msg.requestId !== requestId) {
+    // If number of workers are small (1 or 2), the request can be redirected to the same worker
+    // So, ignore initiate message, it should be handled by the onMessageReceived not the sendMessage function
+    if (!isInterWorkerMessage(msg) || msg.requestId !== requestId || msg.messageType === 'initiate') {
       return;
     }
 
@@ -105,6 +136,9 @@ export const sendMessage = (initialPayload: unknown): Readable => {
     if (messageType === 'end') {
       reveivedStream.push(null);
       process.off('message', messageReceivedCallback);
+      onMessageEndedCallbacks.forEach((onMessageEndedCallback) => {
+        setTimeout(onMessageEndedCallback, 0);
+      });
     }
   });
 
