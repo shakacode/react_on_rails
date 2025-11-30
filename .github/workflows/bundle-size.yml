@@ -40,7 +40,7 @@ jobs:
       - name: Build and measure base branch
         run: |
           pnpm run build
-          npx size-limit --json > /tmp/base-sizes.json
+          pnpm exec size-limit --json > /tmp/base-sizes.json
           echo "Base branch sizes:"
           cat /tmp/base-sizes.json
 
