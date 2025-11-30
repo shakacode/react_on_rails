@@ -86,8 +86,8 @@
     "eslint": "eslint",
     "attw": "attw",
     "publint": "publint",
-    "size": "size-limit",
-    "size:json": "size-limit --json",
+    "size": "pnpm run build && size-limit",
+    "size:json": "pnpm run build && size-limit --json",
     "postinstall": "test -f .lefthook.yml && test -d .git && command -v bundle >/dev/null 2>&1 && bundle exec lefthook install || true"
   },
   "repository": {
