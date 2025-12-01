@@ -12,15 +12,6 @@ AllCops:
     - 'spec/dummy/bin/**/*'
     - 'bin/**/*'
 
-Metrics/CyclomaticComplexity:
-  Max: 8
-
-Metrics/ClassLength:
-  Max: 140
-
-RSpec/NestedGroups:
-  Max: 5
-
 RSpec/BeforeAfterAll:
   Exclude:
     - 'spec/react_on_rails/generators/dev_tests_generator_spec.rb'

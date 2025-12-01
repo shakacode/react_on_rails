@@ -55,6 +55,12 @@ Style/HashTransformValues:
 Metrics/AbcSize:
   Max: 28
 
+Metrics/ClassLength:
+  Max: 150
+
+Metrics/CyclomaticComplexity:
+  Max: 8
+
 Metrics/PerceivedComplexity:
   Max: 10
 
@@ -85,6 +91,9 @@ RSpec/MultipleExpectations:
 
 RSpec/MultipleMemoizedHelpers:
   Max: 12
+
+RSpec/NestedGroups:
+  Max: 5
 
 Style/FrozenStringLiteralComment:
   EnforcedStyle: always

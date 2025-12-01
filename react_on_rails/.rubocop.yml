@@ -26,11 +26,7 @@ Metrics/AbcSize:
   Exclude:
     - 'lib/generators/react_on_rails/install_generator.rb'  # Generator setup methods require comprehensive error handling
 
-Metrics/CyclomaticComplexity:
-  Max: 7
-
 Metrics/ClassLength:
-  Max: 150
   Exclude:
     - 'lib/generators/react_on_rails/base_generator.rb'  # Generator complexity justified
     - 'lib/react_on_rails/dev/server_manager.rb'  # Dev tool with comprehensive help system
@@ -53,9 +49,6 @@ RSpec/AnyInstance:
     - 'spec/react_on_rails/binstubs/dev_spec.rb'
     - 'spec/react_on_rails/binstubs/dev_static_spec.rb'
     - 'spec/react_on_rails/dev/**/*_spec.rb'  # Dev module tests require system mocking
-
-RSpec/NestedGroups:
-  Max: 4
 
 RSpec/BeforeAfterAll:
   Exclude:
