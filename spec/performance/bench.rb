@@ -16,7 +16,7 @@ end
 
 # Benchmark parameters
 PRO = ENV.fetch("PRO", "false") == "true"
-APP_DIR = PRO ? "react_on_rails_pro/spec/dummy" : "spec/dummy"
+APP_DIR = PRO ? "react_on_rails_pro/spec/dummy" : "react_on_rails/spec/dummy"
 ROUTES = env_or_default("ROUTES", nil)
 BASE_URL = env_or_default("BASE_URL", "localhost:3001")
 # requests per second; if "max" will get maximum number of queries instead of a fixed rate
