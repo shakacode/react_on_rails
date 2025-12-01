@@ -37,6 +37,7 @@ group :development, :test do
   gem "steep", require: false
   gem "rubocop", "1.61.0", require: false
   gem "rubocop-performance", "~>1.20.0", require: false
+  gem "rubocop-rails-omakase", "~>1.0.0", require: false
   gem "rubocop-rspec", "~>2.26", require: false
   gem "spring", "~> 4.0"
   gem "lefthook", require: false
