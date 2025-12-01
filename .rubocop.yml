@@ -1,0 +1,9 @@
+# Root config reuses the one from react_on_rails for now,
+# later it should be the other way around
+inherit_from: react_on_rails/.rubocop.yml
+
+AllCops:
+  Exclude:
+    - 'gen-examples/**/*'
+    - 'react_on_rails/**/*'
+    - 'react_on_rails_pro/**/*'
