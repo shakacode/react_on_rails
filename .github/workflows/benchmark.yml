@@ -240,23 +240,23 @@ jobs:
 
       - name: yalc add react-on-rails
         if: env.RUN_CORE
-        run: cd spec/dummy && yalc add react-on-rails
+        run: cd react_on_rails/spec/dummy && yalc add react-on-rails
 
       - name: Install Node modules with Yarn for Core dummy app
         if: env.RUN_CORE
-        run: cd spec/dummy && yarn install --frozen-lockfile --no-progress --no-emoji
+        run: cd react_on_rails/spec/dummy && yarn install --frozen-lockfile --no-progress --no-emoji
 
       - name: Save Core dummy app ruby gems to cache
         if: env.RUN_CORE
         uses: actions/cache@v4
         with:
-          path: spec/dummy/vendor/bundle
-          key: dummy-app-gem-cache-${{ hashFiles('spec/dummy/Gemfile.lock') }}
+          path: react_on_rails/spec/dummy/vendor/bundle
+          key: v4-core-dummy-app-gem-cache-${{ hashFiles('react_on_rails/spec/dummy/Gemfile.lock') }}
 
       - name: Install Ruby Gems for Core dummy app
         if: env.RUN_CORE
         run: |
-          cd spec/dummy
+          cd react_on_rails/spec/dummy
           bundle config set path vendor/bundle
           bundle config set frozen true
           bundle _${BUNDLER_VERSION}_ install --jobs=4 --retry=3
@@ -266,7 +266,7 @@ jobs:
         run: |
           set -e  # Exit on any error
           echo "🔨 Building production assets..."
-          cd spec/dummy
+          cd react_on_rails/spec/dummy
 
           if ! bin/prod-assets; then
             echo "❌ ERROR: Failed to build production assets"
@@ -280,7 +280,7 @@ jobs:
         run: |
           set -e  # Exit on any error
           echo "🚀 Starting production server..."
-          cd spec/dummy
+          cd react_on_rails/spec/dummy
 
           # Start server in background
           bin/prod &
