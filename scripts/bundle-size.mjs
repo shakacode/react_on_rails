@@ -18,6 +18,8 @@ import fs from 'fs';
 // Intentionally strict to catch any bundle size changes early.
 // For intentional size increases, use bin/skip-bundle-size-check to bypass the CI check.
 const DEFAULT_THRESHOLD = 512;
+// 20% is a big ration, but the current approach is not accurate enough to detect rations less than that
+// Later, we will implement performance tests that will use more accurate mechanisms and can detect smaller performance regressions
 const DEFAULT_TIME_PERCENTAGE_THRESHOLD = 0.2;
 const DEFAULT_CONFIG = '.size-limit.json';
 
