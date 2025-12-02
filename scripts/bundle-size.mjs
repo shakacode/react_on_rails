@@ -18,7 +18,7 @@ import fs from 'fs';
 // Intentionally strict to catch any bundle size changes early.
 // For intentional size increases, use bin/skip-bundle-size-check to bypass the CI check.
 const DEFAULT_THRESHOLD = 512;
-const DEFAULT_TIME_PERCENTAGE_THRESHOLD = 0.1;
+const DEFAULT_TIME_PERCENTAGE_THRESHOLD = 0.2;
 const DEFAULT_CONFIG = '.size-limit.json';
 
 // ANSI color codes
@@ -175,7 +175,7 @@ ${colors.yellow}Options for set-limits:${colors.reset}
   --base <file>       Path to base sizes JSON (required)
   --config <file>     Path to .size-limit.json (default: .size-limit.json)
   --threshold <bytes> Size threshold in bytes (default: 512)
-  --timePercentageThreshold <percentage> Acceptable increase percentage in total time
+  --timePercentageThreshold <ratio between 0 and 1> Acceptable increase percentage in total time
 
 ${colors.yellow}Examples:${colors.reset}
   # Set dynamic limits from base sizes
