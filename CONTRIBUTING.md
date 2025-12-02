@@ -305,6 +305,69 @@ Run only ESLint:
 pnpm run lint
 ```
 
+### Bundle Size Checks
+
+React on Rails monitors bundle sizes in CI to prevent unexpected size increases. The CI compares your PR's bundle sizes against the base branch and fails if any package increases by more than 0.5KB.
+
+#### Running Locally
+
+Check current bundle sizes:
+
+```sh
+pnpm run size
+```
+
+Get JSON output for programmatic use:
+
+```sh
+pnpm run size:json
+```
+
+Compare your branch against the base branch:
+
+```sh
+bin/compare-bundle-sizes
+```
+
+This script automatically:
+
+1. Stashes any uncommitted changes
+2. Checks out and builds the base branch (default: `master`)
+3. Checks out and builds your current branch
+4. Compares the sizes and shows a detailed report
+
+Options:
+
+```sh
+bin/compare-bundle-sizes main        # Compare against 'main' instead of 'master'
+bin/compare-bundle-sizes --hierarchical  # Group results by package
+```
+
+#### Bypassing the Check
+
+If your PR intentionally increases bundle size (e.g., adding a new feature), you can skip the bundle size check:
+
+```sh
+# Run from your PR branch
+bin/skip-bundle-size-check
+git add .bundle-size-skip-branch
+git commit -m "Skip bundle size check for intentional size increase"
+git push
+```
+
+This sets your branch to skip the size check. The skip only applies to the specific branch name written to `.bundle-size-skip-branch`.
+
+**Important**: Only skip the check when the size increase is justified. Document why the increase is acceptable in your PR description.
+
+#### What Gets Measured
+
+The CI measures sizes for:
+
+- **react-on-rails**: Raw, gzip, and brotli compressed sizes
+- **react-on-rails-pro**: Raw, gzip, and brotli compressed sizes
+- **react-on-rails-pro-node-renderer**: Raw, gzip, and brotli compressed sizes
+- **Webpack bundled imports**: Client-side bundle sizes when importing via webpack
+
 ### Starting the Dummy App
 
 To run the dummy app, it's **CRITICAL** to not just run `rails s`. You have to run `foreman start` with one of the Procfiles. If you don't do this, then `webpack` will not generate a new bundle, and you will be seriously confused when you change JavaScript and the app does not change. If you change the Webpack configs, then you need to restart Foreman. If you change the JS code for react-on-rails, you need to run `pnpm run build` in the project root.

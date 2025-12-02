@@ -1,0 +1,6 @@
+# This file allows skipping the bundle size CI check for a specific branch.
+# When a branch name in this file matches the PR branch, the size check is skipped.
+#
+# Usage: Run `bin/skip-bundle-size-check` to set the current branch, then commit and push.
+#
+# This is useful when you have an intentional size increase that exceeds the 0.5KB threshold.
