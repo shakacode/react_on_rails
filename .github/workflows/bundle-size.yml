@@ -1,0 +1,115 @@
+name: Bundle Size
+
+on:
+  pull_request:
+    paths:
+      - 'packages/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.size-limit.json'
+      - '.github/workflows/bundle-size.yml'
+      - '.bundle-size-skip-branch'
+
+jobs:
+  check-skip:
+    runs-on: ubuntu-22.04
+    outputs:
+      skip: ${{ steps.skip-check.outputs.skip }}
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+
+      - name: Check if branch should skip size check
+        id: skip-check
+        env:
+          BRANCH: ${{ github.head_ref }}
+        run: |
+          SKIP_FILE=".bundle-size-skip-branch"
+          SKIP_BRANCH=$(grep -v '^[[:space:]]*#' "$SKIP_FILE" 2>/dev/null | grep -v '^[[:space:]]*$' | tr -d '[:space:]' || echo "")
+          if [ "$SKIP_BRANCH" = "$BRANCH" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "::notice::Branch '$BRANCH' is set to skip size check"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+  size:
+    needs: check-skip
+    if: needs.check-skip.outputs.skip != 'true'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      CI_JOB_NUMBER: 1
+    steps:
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      # 1. Get PR's size-limit config first (base branch may not have it)
+      - name: Checkout PR branch for config
+        uses: actions/checkout@v4
+
+      - name: Save size-limit config
+        run: cp .size-limit.json /tmp/size-limit-config.json
+
+      # 2. Get base branch sizes
+      - name: Checkout base branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.base_ref }}
+
+      - name: Copy size-limit config to base branch
+        run: cp /tmp/size-limit-config.json .size-limit.json
+
+      - name: Install base dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build base branch
+        run: pnpm run build
+
+      - name: Verify build artifacts
+        run: |
+          missing=0
+          for pkg in react-on-rails react-on-rails-pro react-on-rails-pro-node-renderer; do
+            if ! ls packages/$pkg/lib/*.js >/dev/null 2>&1; then
+              echo "::error::Missing build artifacts in packages/$pkg/lib/"
+              missing=1
+            fi
+          done
+          if [ $missing -eq 1 ]; then
+            exit 1
+          fi
+          echo "All build artifacts verified"
+
+      - name: Measure base branch sizes
+        run: |
+          pnpm exec size-limit --json > /tmp/base-sizes.json
+          echo "Base branch sizes:"
+          cat /tmp/base-sizes.json
+
+      # 3. Checkout PR and set dynamic limits
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+
+      - name: Install PR dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Set dynamic limits (base + 0.5KB)
+        run: node scripts/bundle-size.mjs set-limits --base /tmp/base-sizes.json
+
+      # 4. Run the action with dynamic limits
+      - name: Check bundle size
+        uses: andresz1/size-limit-action@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          package_manager: pnpm
+          build_script: build
+          skip_step: install
