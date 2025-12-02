@@ -22,6 +22,7 @@
     "@eslint/compat": "^1.2.8",
     "@jest/globals": "^29.7.0",
     "@size-limit/file": "^12.0.0",
+    "@size-limit/time": "^12.0.0",
     "@size-limit/webpack": "^12.0.0",
     "@swc/core": "^1.15.0",
     "@testing-library/dom": "^10.4.0",
