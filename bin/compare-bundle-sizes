@@ -63,7 +63,8 @@ git checkout "$CURRENT_BRANCH" --quiet
 pnpm install --frozen-lockfile 2>&1 | grep -v "^$" | head -5 || true
 pnpm run build 2>&1 | grep -v "^$" | tail -3 || true
 
-echo -e "${BLUE}Updating limits${NC}"
+echo -e "${BLUE}Updating limits of current branch relative to the results of the base branch...${NC}"
 node scripts/bundle-size.mjs set-limits --base /tmp/base-sizes.json
 
+# Run size-limit that will use the dynamic limits created after checking base branch results
 pnpm exec size-limit
