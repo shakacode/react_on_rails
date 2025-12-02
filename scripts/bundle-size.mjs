@@ -21,6 +21,7 @@ import fs from 'fs';
 // Intentionally strict to catch any bundle size changes early.
 // For intentional size increases, use bin/skip-bundle-size-check to bypass the CI check.
 const DEFAULT_THRESHOLD = 512;
+const DEFAULT_TIME_PERCENTAGE_THRESHOLD = 0.1;
 const DEFAULT_CONFIG = '.size-limit.json';
 
 // ANSI color codes
@@ -40,6 +41,16 @@ function formatSize(bytes) {
     return `${(bytes / 1024).toFixed(2)} kB`;
   }
   return `${bytes} B`;
+}
+
+/**
+ * Format time to human-readable string
+ */
+function formatTime(ms) {
+  if (ms >= 1000) {
+    return `${(ms / 1000).toFixed(2)} s`;
+  }
+  return `${ms.toFixed(0)} ms`;
 }
 
 /**
@@ -95,6 +106,32 @@ function readJsonFileOrExit(filePath) {
   }
 }
 
+function createLimitEntry(entry, baseEntry, threshold, timePercentageThreshold) {
+  const limit = baseEntry.size + threshold;
+  console.log(`${entry.name}:`);
+  console.log(`  base size: ${formatSize(baseEntry.size)}`);
+  console.log(`  limit:     ${formatSize(limit)}\n`);
+  const sizeLimitEntry = { ...entry, limit: `${limit} B` };
+  if (!sizeLimitEntry.running) {
+    return sizeLimitEntry;
+  }
+
+  const { loading, running } = baseEntry;
+  const loadingMs = loading * 1000;
+  const runningMs = running * 1000;
+  console.log(`  base loading time: ${formatTime(loadingMs)}`);
+  console.log(`  base running time: ${formatTime(runningMs)}`);
+  const totalTime = loadingMs + runningMs;
+  return [
+    sizeLimitEntry,
+    {
+      ...entry,
+      name: `${entry.name} (time)`,
+      limit: `${(totalTime * (1 + timePercentageThreshold)).toFixed(0)} ms`,
+    },
+  ];
+}
+
 /**
  * Command: set-limits
  * Updates .size-limit.json with dynamic limits based on base sizes
@@ -103,6 +140,8 @@ function setLimits(options) {
   const basePath = options.base;
   const configPath = options.config || DEFAULT_CONFIG;
   const threshold = parseInt(options.threshold, 10) || DEFAULT_THRESHOLD;
+  const timePercentageThreshold =
+    Number(options.timePercentageThreshold) || DEFAULT_TIME_PERCENTAGE_THRESHOLD;
 
   if (!basePath) {
     console.error(`${colors.red}Error: --base <file> is required${colors.reset}`);
@@ -114,18 +153,18 @@ function setLimits(options) {
 
   console.log(`${colors.blue}Setting dynamic limits (base + ${formatSize(threshold)}):${colors.reset}\n`);
 
-  const updatedConfig = config.map((entry) => {
-    const baseEntry = baseSizes.find((b) => b.name === entry.name);
-    if (baseEntry) {
-      const limit = baseEntry.size + threshold;
-      console.log(`${entry.name}:`);
-      console.log(`  base size: ${formatSize(baseEntry.size)}`);
-      console.log(`  limit:     ${formatSize(limit)}\n`);
-      return { ...entry, limit: `${limit} B` };
-    }
-    console.log(`${colors.yellow}${entry.name}: No base entry found, keeping original limit${colors.reset}`);
-    return entry;
-  });
+  const updatedConfig = config
+    .map((entry) => {
+      const baseEntry = baseSizes.find((b) => b.name === entry.name);
+      if (baseEntry) {
+        return createLimitEntry(entry, baseEntry, threshold, timePercentageThreshold);
+      }
+      console.log(
+        `${colors.yellow}${entry.name}: No base entry found, keeping original limit${colors.reset}`,
+      );
+      return entry;
+    })
+    .flat();
 
   fs.writeFileSync(configPath, `${JSON.stringify(updatedConfig, null, 2)}\n`);
   console.log(`${colors.green}Updated ${configPath}${colors.reset}`);
