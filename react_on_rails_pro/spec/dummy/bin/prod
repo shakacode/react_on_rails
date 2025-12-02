@@ -21,8 +21,8 @@ if find client config -type f \( -name "*.[jt]s" -o -name "*.[jt]sx" \) -newer "
   echo "Consider running ./bin/prod-assets to rebuild"
 fi
 
-if [ -f "yarn.lock" ] && [ "yarn.lock" -nt "$MANIFEST" ]; then
-  echo "WARNING: yarn.lock is newer than compiled assets"
+if [ -f "pnpm-lock.yaml" ] && [ "pnpm-lock.yaml" -nt "$MANIFEST" ]; then
+  echo "WARNING: pnpm-lock.yaml is newer than compiled assets"
   echo "Consider running ./bin/prod-assets to rebuild"
 fi
 

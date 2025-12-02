@@ -5,5 +5,5 @@ export RAILS_ENV=production
 if [ "$CI" = "true" ]; then
   bundle exec bootsnap precompile --gemfile app/ lib/ config/
 fi
-yarn run build:rescript
+pnpm run build:rescript
 bundle exec rails assets:precompile
