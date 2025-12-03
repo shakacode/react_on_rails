@@ -111,5 +111,5 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           package_manager: pnpm
-          build_script: build
+          build_script: build-for-size-limit
           skip_step: install
