@@ -33,7 +33,7 @@ jobs:
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
 
-  size:
+  check-bundle-size:
     needs: check-skip
     if: needs.check-skip.outputs.skip != 'true'
     runs-on: ubuntu-22.04
