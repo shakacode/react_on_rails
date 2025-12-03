@@ -84,41 +84,41 @@
     "path": "packages/react-on-rails-pro/lib/ReactOnRails.client.js",
     "import": "ReactOnRails",
     "gzip": true,
-    "running": true
+    "running": false
   },
   {
     "name": "react-on-rails-pro/client bundled (brotli)",
     "path": "packages/react-on-rails-pro/lib/ReactOnRails.client.js",
     "import": "ReactOnRails",
     "brotli": true,
-    "running": true
+    "running": false
   },
   {
     "name": "registerServerComponent/client bundled (gzip)",
     "path": "packages/react-on-rails-pro/lib/registerServerComponent/client.js",
     "import": "registerServerComponent",
     "gzip": true,
-    "running": true
+    "running": false
   },
   {
     "name": "registerServerComponent/client bundled (brotli)",
     "path": "packages/react-on-rails-pro/lib/registerServerComponent/client.js",
     "import": "registerServerComponent",
     "brotli": true,
-    "running": true
+    "running": false
   },
   {
     "name": "wrapServerComponentRenderer/client bundled (gzip)",
     "path": "packages/react-on-rails-pro/lib/wrapServerComponentRenderer/client.js",
     "import": "wrapServerComponentRenderer",
     "gzip": true,
-    "running": true
+    "running": false
   },
   {
     "name": "wrapServerComponentRenderer/client bundled (brotli)",
     "path": "packages/react-on-rails-pro/lib/wrapServerComponentRenderer/client.js",
     "import": "wrapServerComponentRenderer",
     "brotli": true,
-    "running": true
+    "running": false
   }
 ]
