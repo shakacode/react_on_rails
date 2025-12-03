@@ -76,7 +76,7 @@
     "start": "nps",
     "nps": "nps",
     "build": "pnpm --filter react-on-rails run build && pnpm --filter react-on-rails-pro run build && pnpm --filter react-on-rails-pro-node-renderer run build",
-    "build-for-size-limit": "cp /tmp/size-limit-config.json .size-limit.json && pnpm build",
+    "build-for-size-limit": "cp /tmp/.size-limit-with-limits.json .size-limit.json && pnpm build",
     "build-watch": "pnpm -r run build-watch",
     "lint": "nps eslint",
     "lint:scss": "stylelint \"react_on_rails/spec/dummy/app/assets/stylesheets/**/*.scss\" \"react_on_rails/spec/dummy/client/**/*.scss\"",
