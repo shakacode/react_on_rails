@@ -101,8 +101,8 @@ function createLimitEntry(entry, baseEntry, threshold, timePercentageThreshold) 
   console.log(`${entry.name}:`);
   console.log(`  base size: ${formatSize(baseEntry.size)}`);
   console.log(`  limit:     ${formatSize(limit)}\n`);
-  const sizeLimitEntry = { ...entry, limit: `${limit} B` };
-  if (!sizeLimitEntry.running) {
+  const sizeLimitEntry = { ...entry, running: false, limit: `${limit} B` };
+  if (!baseEntry.running) {
     return sizeLimitEntry;
   }
 
