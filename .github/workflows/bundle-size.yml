@@ -36,8 +36,7 @@ jobs:
   size:
     needs: check-skip
     if: needs.check-skip.outputs.skip != 'true'
-    runs:
-      using: 'node20'
+    runs-on: node20
     permissions:
       contents: read
       pull-requests: write
