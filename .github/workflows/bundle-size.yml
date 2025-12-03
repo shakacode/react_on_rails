@@ -104,7 +104,7 @@ jobs:
 
       - name: Set dynamic limits (base + 0.5KB)
         run: node scripts/bundle-size.mjs set-limits --base /tmp/base-sizes.json
-      
+
       - name: Copy .size-limit.json file with limits to tmp directory
         run: cp .size-limit.json /tmp/.size-limit-with-limits.json
 
