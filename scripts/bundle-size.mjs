@@ -102,10 +102,7 @@ function createLimitEntry(entry, baseEntry, threshold, timePercentageThreshold) 
   console.log(`  base size: ${formatSize(baseEntry.size)}`);
   console.log(`  limit:     ${formatSize(limit)}\n`);
   const sizeLimitEntry = { ...entry, limit: `${limit} B` };
-  // Skip time limit on CI because this script runs on a different environment than the `andresz1/size-limit-action`
-  // So, this script calculate different timing values than that got by the `andresz1/size-limit-action` action
-  // TODO: fork `andresz1/size-limit-action` and make it time limits on the same environment used to run the check
-  if (!baseEntry.running || process.env.CI) {
+  if (!baseEntry.running) {
     return sizeLimitEntry;
   }
 
