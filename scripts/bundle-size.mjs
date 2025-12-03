@@ -102,11 +102,11 @@ function createLimitEntry(entry, baseEntry, threshold, timePercentageThreshold) 
   console.log(`  base size: ${formatSize(baseEntry.size)}`);
   console.log(`  limit:     ${formatSize(limit)}\n`);
   const sizeLimitEntry = { ...entry, limit: `${limit} B` };
-  if (!baseEntry.running) {
+  if (!baseEntry.running && !baseEntry.loading) {
     return sizeLimitEntry;
   }
 
-  const { loading, running } = baseEntry;
+  const { loading = 0, running = 0 } = baseEntry;
   const loadingMs = loading * 1000;
   const runningMs = running * 1000;
   console.log(`  base loading time: ${formatTime(loadingMs)}`);
