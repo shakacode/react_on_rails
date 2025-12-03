@@ -36,13 +36,18 @@ jobs:
   size:
     needs: check-skip
     if: needs.check-skip.outputs.skip != 'true'
-    runs-on: node20
+    runs-on: ubuntu-22.04
     permissions:
       contents: read
       pull-requests: write
     env:
       CI_JOB_NUMBER: 1
     steps:
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
