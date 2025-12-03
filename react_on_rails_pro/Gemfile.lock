@@ -25,6 +25,7 @@ PATH
       async (>= 2.6)
       connection_pool
       execjs (~> 2.9)
+      http-2 (>= 1.1.1)
       httpx (~> 1.5)
       jwt (~> 2.7)
       rainbow
@@ -182,7 +183,7 @@ GEM
     graphiql-rails (1.10.0)
       railties
     hashdiff (1.1.0)
-    http-2 (1.0.2)
+    http-2 (1.1.1)
     httpx (1.5.1)
       http-2 (>= 1.0.0)
     i18n (1.14.7)
