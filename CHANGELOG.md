@@ -25,7 +25,7 @@ Changes since the last non-beta release.
 
 #### Added
 
-- **Total Execution Time CI Monitoring**: Added automated execution time tracking to CI using size-limit. Compares PR client import execution times against the base branch and fails if any import increases by more than 20%. [PR 2160](https://github.com/shakacode/react_on_rails/pull/2160) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **Download Time CI Monitoring**: Added automated download time tracking to CI using size-limit. Compares PR client import download times against the base branch and fails if any import increases by more than 10%. And added ability to compare the total execution time (download + running time) to the `bin/compare-bundle-sizes` script. [PR 2160](https://github.com/shakacode/react_on_rails/pull/2160) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 - **Bundle Size CI Monitoring**: Added automated bundle size tracking to CI using size-limit. Compares PR bundle sizes against the base branch and fails if any package increases by more than 0.5KB. Includes local comparison tool (`bin/compare-bundle-sizes`) and bypass mechanism (`bin/skip-bundle-size-check`) for intentional size increases. [PR 2149](https://github.com/shakacode/react_on_rails/pull/2149) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 

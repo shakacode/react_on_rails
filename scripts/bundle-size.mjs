@@ -18,9 +18,9 @@ import fs from 'fs';
 // Intentionally strict to catch any bundle size changes early.
 // For intentional size increases, use bin/skip-bundle-size-check to bypass the CI check.
 const DEFAULT_THRESHOLD = 512;
-// 20% is a big ration, but the current approach is not accurate enough to detect rations less than that
+// 10% is a big ratio, but the current approach is not accurate enough to detect rations less than that
 // Later, we will implement performance tests that will use more accurate mechanisms and can detect smaller performance regressions
-const DEFAULT_TIME_PERCENTAGE_THRESHOLD = 0.2;
+const DEFAULT_TIME_PERCENTAGE_THRESHOLD = 0.1;
 const DEFAULT_CONFIG = '.size-limit.json';
 
 // ANSI color codes
@@ -102,11 +102,11 @@ function createLimitEntry(entry, baseEntry, threshold, timePercentageThreshold) 
   console.log(`  base size: ${formatSize(baseEntry.size)}`);
   console.log(`  limit:     ${formatSize(limit)}\n`);
   const sizeLimitEntry = { ...entry, limit: `${limit} B` };
-  if (!sizeLimitEntry.running) {
+  if (!baseEntry.running && !baseEntry.loading) {
     return sizeLimitEntry;
   }
 
-  const { loading, running } = baseEntry;
+  const { loading = 0, running = 0 } = baseEntry;
   const loadingMs = loading * 1000;
   const runningMs = running * 1000;
   console.log(`  base loading time: ${formatTime(loadingMs)}`);
