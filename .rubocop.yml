@@ -27,7 +27,7 @@ AllCops:
     - 'node_modules/**/*'
     - 'spec/fixtures/**/*'
     - 'spec/react_on_rails/dummy-for-generators/**/*'
-    - 'vendor/**/*'
+    - '**/vendor/**/*'
 
 Naming/FileName:
   Exclude:
