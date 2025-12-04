@@ -338,7 +338,6 @@ module ReactOnRails
       private
 
       # Resolve version from lockfiles if available, otherwise use package.json version
-      # rubocop:disable Metrics/CyclomaticComplexity
       def resolve_version(package_json_version, package_name)
         # If package.json specifies a local path or URL, don't try to resolve from lockfiles
         # Lockfiles may contain placeholder versions like "0.0.0" for local links

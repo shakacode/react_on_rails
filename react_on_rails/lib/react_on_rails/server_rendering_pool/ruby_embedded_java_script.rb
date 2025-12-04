@@ -50,7 +50,6 @@ module ReactOnRails
         # Note, js_code does not have to be based on React.
         # js_code MUST RETURN json stringify Object
         # Calling code will probably call 'html_safe' on return value before rendering to the view.
-        # rubocop:disable Metrics/CyclomaticComplexity
         def exec_server_render_js(js_code, render_options, js_evaluator = nil)
           js_evaluator ||= self
           if render_options.trace

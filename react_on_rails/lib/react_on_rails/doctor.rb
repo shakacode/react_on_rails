@@ -468,7 +468,6 @@ module ReactOnRails
       check_npm_wildcards
     end
 
-    # rubocop:disable Metrics/CyclomaticComplexity
     def check_gem_wildcards
       gemfile_path = ENV["BUNDLE_GEMFILE"] || "Gemfile"
       return unless File.exist?(gemfile_path)
@@ -492,7 +491,6 @@ module ReactOnRails
     end
     # rubocop:enable Metrics/CyclomaticComplexity
 
-    # rubocop:disable Metrics/CyclomaticComplexity
     def check_npm_wildcards
       return unless File.exist?("package.json")
 
@@ -538,7 +536,6 @@ module ReactOnRails
       check_server_rendering_engine
     end
 
-    # rubocop:disable Metrics/CyclomaticComplexity
     def check_layout_files
       layout_files = Dir.glob("app/views/layouts/**/*.erb")
       return if layout_files.empty?
@@ -603,7 +600,6 @@ module ReactOnRails
     end
     # rubocop:enable Metrics/CyclomaticComplexity
 
-    # rubocop:disable Metrics/CyclomaticComplexity
     def check_shakapacker_configuration_details
       return unless File.exist?("config/shakapacker.yml")
 
