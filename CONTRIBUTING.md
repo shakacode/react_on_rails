@@ -334,7 +334,7 @@ This script automatically:
 1. Stashes any uncommitted changes
 2. Checks out and builds the base branch (default: `master`)
 3. Checks out and builds your current branch
-4. Compares the sizes and shows a detailed report
+4. Compares the size and total execution time (loading + running) and shows a detailed report
 
 Options:
 

@@ -1,107 +1,58 @@
 [
   {
-    "name": "react-on-rails (raw)",
-    "path": "packages/react-on-rails/lib/*.js",
-    "webpack": false,
-    "gzip": false,
-    "brotli": false
-  },
-  {
-    "name": "react-on-rails (gzip)",
-    "path": "packages/react-on-rails/lib/*.js",
-    "webpack": false,
-    "gzip": true
-  },
-  {
-    "name": "react-on-rails (brotli)",
-    "path": "packages/react-on-rails/lib/*.js",
-    "webpack": false,
-    "brotli": true
-  },
-  {
-    "name": "react-on-rails-pro (raw)",
-    "path": "packages/react-on-rails-pro/lib/*.js",
-    "webpack": false,
-    "gzip": false,
-    "brotli": false
-  },
-  {
-    "name": "react-on-rails-pro (gzip)",
-    "path": "packages/react-on-rails-pro/lib/*.js",
-    "webpack": false,
-    "gzip": true
-  },
-  {
-    "name": "react-on-rails-pro (brotli)",
-    "path": "packages/react-on-rails-pro/lib/*.js",
-    "webpack": false,
-    "brotli": true
-  },
-  {
-    "name": "react-on-rails-pro-node-renderer (raw)",
-    "path": "packages/react-on-rails-pro-node-renderer/lib/*.js",
-    "webpack": false,
-    "gzip": false,
-    "brotli": false
-  },
-  {
-    "name": "react-on-rails-pro-node-renderer (gzip)",
-    "path": "packages/react-on-rails-pro-node-renderer/lib/*.js",
-    "webpack": false,
-    "gzip": true
-  },
-  {
-    "name": "react-on-rails-pro-node-renderer (brotli)",
-    "path": "packages/react-on-rails-pro-node-renderer/lib/*.js",
-    "webpack": false,
-    "brotli": true
-  },
-  {
     "name": "react-on-rails/client bundled (gzip)",
     "path": "packages/react-on-rails/lib/ReactOnRails.client.js",
     "import": "ReactOnRails",
-    "gzip": true
+    "gzip": true,
+    "running": false
   },
   {
     "name": "react-on-rails/client bundled (brotli)",
     "path": "packages/react-on-rails/lib/ReactOnRails.client.js",
     "import": "ReactOnRails",
-    "brotli": true
+    "brotli": true,
+    "running": false
   },
   {
     "name": "react-on-rails-pro/client bundled (gzip)",
     "path": "packages/react-on-rails-pro/lib/ReactOnRails.client.js",
     "import": "ReactOnRails",
-    "gzip": true
+    "gzip": true,
+    "running": false
   },
   {
     "name": "react-on-rails-pro/client bundled (brotli)",
     "path": "packages/react-on-rails-pro/lib/ReactOnRails.client.js",
     "import": "ReactOnRails",
-    "brotli": true
+    "brotli": true,
+    "running": false
   },
   {
     "name": "registerServerComponent/client bundled (gzip)",
     "path": "packages/react-on-rails-pro/lib/registerServerComponent/client.js",
     "import": "registerServerComponent",
-    "gzip": true
+    "gzip": true,
+    "running": false
   },
   {
     "name": "registerServerComponent/client bundled (brotli)",
     "path": "packages/react-on-rails-pro/lib/registerServerComponent/client.js",
     "import": "registerServerComponent",
-    "brotli": true
+    "brotli": true,
+    "running": false
   },
   {
     "name": "wrapServerComponentRenderer/client bundled (gzip)",
     "path": "packages/react-on-rails-pro/lib/wrapServerComponentRenderer/client.js",
     "import": "wrapServerComponentRenderer",
-    "gzip": true
+    "gzip": true,
+    "running": false
   },
   {
     "name": "wrapServerComponentRenderer/client bundled (brotli)",
     "path": "packages/react-on-rails-pro/lib/wrapServerComponentRenderer/client.js",
     "import": "wrapServerComponentRenderer",
-    "brotli": true
+    "brotli": true,
+    "running": false
   }
 ]
