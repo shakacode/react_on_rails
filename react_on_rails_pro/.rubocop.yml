@@ -2,7 +2,6 @@
 inherit_from: ../.rubocop.yml
 
 AllCops:
-  EnableNewCops: true
   Exclude:
   <% `git status --ignored --porcelain`.lines.grep(/^!! /).each do |path| %>
     - <%= path.sub(/^!! /, '') %>
