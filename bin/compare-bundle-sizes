@@ -25,6 +25,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 cleanup() {
+  git restore .size-limit.json
   echo -e "\n${BLUE}Cleaning up...${NC}"
   git checkout "$CURRENT_BRANCH" --quiet 2>/dev/null || true
   if [ "$STASHED" = true ]; then
@@ -62,8 +63,8 @@ git checkout "$CURRENT_BRANCH" --quiet
 pnpm install --frozen-lockfile 2>&1 | grep -v "^$" | head -5 || true
 pnpm run build 2>&1 | grep -v "^$" | tail -3 || true
 
-echo -e "${BLUE}Measuring current branch sizes...${NC}"
-pnpm exec size-limit --json > /tmp/current-sizes.json
+echo -e "${BLUE}Updating limits of current branch relative to the results of the base branch...${NC}"
+node scripts/bundle-size.mjs set-limits --base /tmp/base-sizes.json
 
-# Compare sizes using the bundle-size script
-node scripts/bundle-size.mjs compare --base /tmp/base-sizes.json --current /tmp/current-sizes.json
+# Run size-limit that will use the dynamic limits created after checking base branch results
+pnpm exec size-limit
