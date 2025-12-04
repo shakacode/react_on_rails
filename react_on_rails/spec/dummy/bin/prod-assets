@@ -6,4 +6,5 @@ if [ "$CI" = "true" ]; then
   bundle exec bootsnap precompile --gemfile app/ lib/ config/
 fi
 pnpm run build:rescript
+bundle exec rake react_on_rails:generate_packs
 bundle exec rails assets:precompile
