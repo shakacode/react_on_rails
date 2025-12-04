@@ -78,7 +78,7 @@ console.warn.apply(console, ["other message","{\\"c\\":3,\\"d\\":4}"]);
 
   it('buildConsoleReplay adds nonce attribute when provided', () => {
     console.history = [{ arguments: ['test message'], level: 'log' }];
-    const actual = buildConsoleReplay(0, undefined, 'abc123');
+    const actual = buildConsoleReplay(undefined, 0, 'abc123');
 
     expect(actual).toContain('nonce="abc123"');
     expect(actual).toContain('<script id="consoleReplayLog" nonce="abc123">');
@@ -87,7 +87,7 @@ console.warn.apply(console, ["other message","{\\"c\\":3,\\"d\\":4}"]);
 
   it('buildConsoleReplay returns empty string when no console messages', () => {
     console.history = [];
-    const actual = buildConsoleReplay(0, undefined, 'abc123');
+    const actual = buildConsoleReplay(undefined, 0, 'abc123');
 
     expect(actual).toEqual('');
   });
@@ -112,7 +112,7 @@ console.warn.apply(console, ["other message","{\\"c\\":3,\\"d\\":4}"]);
     console.history = [{ arguments: ['test'], level: 'log' }];
     // Attempt attribute injection attack
     const maliciousNonce = 'abc123" onload="alert(1)';
-    const actual = buildConsoleReplay(0, undefined, maliciousNonce);
+    const actual = buildConsoleReplay(undefined, 0, maliciousNonce);
 
     // Should strip dangerous characters (quotes, parens, spaces)
     // = is kept as it's valid in base64, but the quotes are stripped making it harmless
