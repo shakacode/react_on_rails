@@ -1,6 +1,11 @@
 # Inherits from root config
 inherit_from: ../.rubocop.yml
 
+# Merge Exclude arrays with parent instead of replacing them
+inherit_mode:
+  merge:
+    - Exclude
+
 AllCops:
   Exclude:
   <% `git status --ignored --porcelain`.lines.grep(/^!! /).each do |path| %>
