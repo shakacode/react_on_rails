@@ -3,6 +3,9 @@
 Rails.application.configure do
   # Settings specified here will take precedence over those in config/application.rb.
 
+  # Use a hardcoded secret for this test/dummy app (not for real production use)
+  config.secret_key_base = ENV.fetch("SECRET_KEY_BASE", "dummy-secret-key-base-for-testing-only")
+
   # Code is not reloaded between requests.
   config.cache_classes = true
 
@@ -19,8 +22,9 @@ Rails.application.configure do
   config.public_file_server.enabled = true
 
   # Compress JavaScripts and CSS.
-  config.assets.js_compressor = Uglifier.new(harmony: true)
-  config.assets.css_compressor = :csso
+  # JS/CSS compression handled by Webpack/Shakapacker, not needed for Sprockets
+  # config.assets.js_compressor = Uglifier.new(harmony: true)
+  # config.assets.css_compressor = :csso
 
   # Do not fallback to assets pipeline if a precompiled asset is missed.
   config.assets.compile = false

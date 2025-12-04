@@ -13,6 +13,8 @@ const config: KnipConfig = {
         // Pro package binaries used in Pro workflows
         'playwright',
         'e2e-test',
+        // Local binaries
+        'bin/.*',
       ],
       ignore: ['react_on_rails_pro/**', 'react_on_rails/vendor/**'],
       ignoreDependencies: [

@@ -197,6 +197,8 @@ GEM
     nokogiri (1.18.10)
       mini_portile2 (~> 2.8.2)
       racc (~> 1.4)
+    nokogiri (1.18.10-x86_64-linux-gnu)
+      racc (~> 1.4)
     ostruct (0.6.3)
     package_json (0.1.0)
     parallel (1.24.0)
@@ -345,7 +347,7 @@ GEM
       rubyzip (>= 1.2.2, < 3.0)
       websocket (~> 1.0)
     semantic_range (3.1.0)
-    shakapacker (9.3.0)
+    shakapacker (9.4.0)
       activesupport (>= 5.2)
       package_json
       rack-proxy (>= 0.6.1)
@@ -423,6 +425,7 @@ GEM
 
 PLATFORMS
   ruby
+  x86_64-linux
 
 DEPENDENCIES
   amazing_print
@@ -461,7 +464,7 @@ DEPENDENCIES
   sass-rails (~> 6.0)
   sdoc
   selenium-webdriver (= 4.9.0)
-  shakapacker (= 9.3.0)
+  shakapacker (= 9.4.0)
   spring (~> 4.0)
   sprockets (~> 4.0)
   sqlite3 (~> 1.6)
