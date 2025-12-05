@@ -1,60 +1,22 @@
-# This is the configuration used to check the rubocop source code.
-# Check out: https://github.com/bbatsov/rubocop
-require:
-  - rubocop-performance
-  - rubocop-rspec
+# Inherits from root config
+inherit_from: ../.rubocop.yml
+
+# Merge Exclude arrays with parent instead of replacing them
+inherit_mode:
+  merge:
+    - Exclude
 
 AllCops:
-  NewCops: enable
-  DisplayCopNames: true
-  TargetRubyVersion: 3.0.0
   SuggestExtensions: false
 
-  Include:
-    - '**/Rakefile'
-    - '**/config.ru'
-    - 'Gemfile'
-    - '**/*.rb'
-    - '**/*.rake'
-
   Exclude:
-    - '**/*.js'
-    - '**/node_modules/**/*'
-    - '**/public/**/*'
-    - '**/tmp/**/*'
-    - 'coverage/**/*'
-    - 'gen-examples/examples/**/*'
-    - 'node_modules/**/*'
-    - '../react_on_rails_pro/**/*'  # Exclude pro package (has its own linting)
     - 'spec/dummy/bin/*'
-    - 'spec/fixtures/**/*'
-    - 'spec/react_on_rails/dummy-for-generators/**/*'
-    - 'tmp/**/*'
-    - 'vendor/**/*'
 
 Naming/FileName:
   Exclude:
     - '**/Gemfile*'
     - '**/Rakefile'
     - '**/Steepfile'
-
-Layout/LineLength:
-  Max: 120
-
-Style/StringLiterals:
-  EnforcedStyle: double_quotes
-
-Style/Documentation:
-  Enabled: false
-
-Style/HashEachMethods:
-  Enabled: true
-
-Style/HashTransformKeys:
-  Enabled: true
-
-Style/HashTransformValues:
-  Enabled: true
 
 Lint/AssignmentInCondition:
   Exclude:
@@ -66,33 +28,19 @@ Lint/SuppressedException:
     - 'spec/dummy/bin/rake'
 
 Metrics/AbcSize:
-  Max: 28
   Exclude:
     - 'lib/generators/react_on_rails/install_generator.rb'  # Generator setup methods require comprehensive error handling
 
-Metrics/CyclomaticComplexity:
-  Max: 7
-
-Metrics/PerceivedComplexity:
-  Max: 10
-
 Metrics/ClassLength:
-  Max: 150
   Exclude:
     - 'lib/generators/react_on_rails/base_generator.rb'  # Generator complexity justified
     - 'lib/react_on_rails/dev/server_manager.rb'  # Dev tool with comprehensive help system
 
-Metrics/ParameterLists:
-  Max: 5
-  CountKeywordArgs: false
-
 Metrics/MethodLength:
-  Max: 41
   Exclude:
     - 'lib/generators/react_on_rails/install_generator.rb'  # Generator setup methods require comprehensive error handling
 
 Metrics/ModuleLength:
-  Max: 180
   Exclude:
     - 'spec/react_on_rails/engine_spec.rb'  # Comprehensive engine tests require many examples
 
@@ -107,18 +55,6 @@ RSpec/AnyInstance:
     - 'spec/react_on_rails/binstubs/dev_static_spec.rb'
     - 'spec/react_on_rails/dev/**/*_spec.rb'  # Dev module tests require system mocking
 
-RSpec/DescribeClass:
-  Enabled: false
-
-RSpec/ExampleLength:
-  Enabled: false
-
-RSpec/MessageSpies:
-  Enabled: false
-
-RSpec/NestedGroups:
-  Max: 4
-
 RSpec/BeforeAfterAll:
   Exclude:
     - 'spec/react_on_rails/generators/dev_tests_generator_spec.rb'
@@ -127,18 +63,9 @@ RSpec/BeforeAfterAll:
     - 'spec/react_on_rails/binstubs/dev_static_spec.rb'
     - 'spec/react_on_rails/dev/**/*_spec.rb'  # Dev module tests require global setup
 
-RSpec/MessageChain:
-  Enabled: false
-
-RSpec/MultipleExpectations:
-  Enabled: false
-
 RSpec/MultipleDescribes:
   Exclude:
     - 'spec/dummy/spec/system/integration_spec.rb'
-
-RSpec/MultipleMemoizedHelpers:
-  Max: 12
 
 Style/GlobalVars:
   Exclude:
@@ -156,4 +83,3 @@ RSpec/InstanceVariable:
 RSpec/StubbedMock:
   Exclude:
     - 'spec/react_on_rails/dev/**/*_spec.rb'  # Dev module tests use mixed stub/mock patterns
-

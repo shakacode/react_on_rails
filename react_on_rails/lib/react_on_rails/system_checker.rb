@@ -203,7 +203,7 @@ module ReactOnRails
       add_warning("⚠️  Could not parse package.json")
     end
 
-    def check_package_version_sync # rubocop:disable Metrics/CyclomaticComplexity
+    def check_package_version_sync
       return unless File.exist?("package.json")
 
       begin
@@ -540,7 +540,6 @@ module ReactOnRails
       MSG
     end
 
-    # rubocop:disable Metrics/CyclomaticComplexity
     def check_gemfile_version_patterns
       gemfile_path = ENV["BUNDLE_GEMFILE"] || "Gemfile"
       return unless File.exist?(gemfile_path)
@@ -571,9 +570,7 @@ module ReactOnRails
         # Ignore errors reading Gemfile
       end
     end
-    # rubocop:enable Metrics/CyclomaticComplexity
 
-    # rubocop:disable Metrics/CyclomaticComplexity
     def report_dependency_versions(package_json)
       all_deps = package_json["dependencies"]&.merge(package_json["devDependencies"] || {}) || {}
 
@@ -590,7 +587,6 @@ module ReactOnRails
         add_success("✅ React DOM #{react_dom_version}")
       end
     end
-    # rubocop:enable Metrics/CyclomaticComplexity
 
     def report_shakapacker_version
       return unless File.exist?("Gemfile.lock")

@@ -19,7 +19,6 @@ spec/dummy/public
 *.res.js
 
 # Prettier doesn't understand ERB syntax in YAML files and can damage templates
-.rubocop.yml
 *.yml
 *.yaml
 # Intentionally invalid

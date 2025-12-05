@@ -467,7 +467,6 @@ module ReactOnRails
     #
     # @example Absolute paths outside Rails.root (edge case)
     #   normalize_to_relative_path("/other/path/bundles") # => "/other/path/bundles"
-    # rubocop:disable Metrics/CyclomaticComplexity
     def self.normalize_to_relative_path(path)
       return nil if path.nil?
 
@@ -495,7 +494,6 @@ module ReactOnRails
         path_str
       end
     end
-    # rubocop:enable Metrics/CyclomaticComplexity
 
     def self.default_troubleshooting_section
       <<~DEFAULT
