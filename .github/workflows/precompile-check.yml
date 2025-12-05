@@ -170,7 +170,7 @@ jobs:
             fi
           fi
 
-          # Pattern 2: Duplicate task execution messages
+          # Pattern 2: Duplicate task execution messages (generate_packs)
           if grep -q "react_on_rails:generate_packs" precompile_output.txt; then
             GENERATE_PACKS_COUNT=$(grep -c "react_on_rails:generate_packs" precompile_output.txt || true)
             if [ "$GENERATE_PACKS_COUNT" -gt 1 ]; then
@@ -181,11 +181,39 @@ jobs:
             fi
           fi
 
+          # Pattern 2b: Duplicate locale generation
+          if grep -q "react_on_rails:locale" precompile_output.txt; then
+            LOCALE_COUNT=$(grep -c "react_on_rails:locale" precompile_output.txt || true)
+            if [ "$LOCALE_COUNT" -gt 1 ]; then
+              echo "::error::FAILURE: react_on_rails:locale task ran $LOCALE_COUNT times (should only run once)."
+              echo "  Matching lines:"
+              grep -n "react_on_rails:locale" precompile_output.txt
+              FAILURES_FOUND=1
+            fi
+          fi
+
+          # Pattern 2c: Duplicate webpack builds (check "Built at:" messages)
+          BUILT_AT_COUNT=$(grep -c "Built at:" precompile_output.txt || true)
+          if [ "$BUILT_AT_COUNT" -gt 1 ]; then
+            echo "::error::FAILURE: Detected $BUILT_AT_COUNT webpack builds (expected 1). Tasks may be running twice."
+            echo "  Matching lines:"
+            grep -n "Built at:" precompile_output.txt | head -5
+            FAILURES_FOUND=1
+          fi
+
           # Pattern 3: Module not found errors
           if grep -Ei "module not found|cannot find module|can't resolve" precompile_output.txt; then
             echo "::error::FAILURE: Module resolution errors detected in precompile output."
             echo "  Sample matching lines:"
             grep -Ei "module not found|cannot find module|can't resolve" precompile_output.txt | head -3
+            FAILURES_FOUND=1
+          fi
+
+          # Pattern 3b: ENOENT errors (missing files/directories)
+          if grep -q "Error: ENOENT" precompile_output.txt; then
+            echo "::error::FAILURE: Missing file or directory errors detected."
+            echo "  Sample matching lines:"
+            grep -n "Error: ENOENT" precompile_output.txt | head -3
             FAILURES_FOUND=1
           fi
 
@@ -227,6 +255,14 @@ jobs:
             echo "::warning::High number of warnings detected: $WARNING_COUNT warnings found. Please review."
             echo "  Sample warnings:"
             grep -i "warning" precompile_output.txt | head -5
+          fi
+
+          # Pattern 9: Deprecation warnings (log for visibility, don't fail)
+          DEPRECATION_COUNT=$(grep -c "DEPRECATION" precompile_output.txt || true)
+          if [ "$DEPRECATION_COUNT" -gt 0 ]; then
+            echo "::warning::Found $DEPRECATION_COUNT deprecation warnings. These may indicate future breakage."
+            echo "  Deprecation messages:"
+            grep -n "DEPRECATION" precompile_output.txt | head -5
           fi
 
           if [ "$FAILURES_FOUND" -eq 1 ]; then
