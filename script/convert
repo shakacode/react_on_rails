@@ -15,9 +15,26 @@ def gsub_file_content(path, old_content, new_content)
   # Support both old structure (files at root) and new structure (files in react_on_rails/)
   # This allows the script to work before and after the monorepo reorganization
   unless File.exist?(path)
-    # Try the old location by removing one level of nesting
-    old_path = path.sub(%r{/react_on_rails/Gemfile}, "/Gemfile")
-    path = old_path if File.exist?(old_path)
+    # Try alternate locations:
+    # 1. For react_on_rails subdirectory paths, try removing that nesting
+    # 2. For packages/* paths, try the old node_package/ location
+    alternate_paths = [
+      path.sub(%r{/react_on_rails/}, "/"),
+      path.sub(%r{/packages/react-on-rails/}, "/node_package/"),
+      path.sub(%r{/packages/react-on-rails-pro/}, "/react_on_rails_pro/node_package/")
+    ]
+
+    alternate_paths.each do |alt_path|
+      if File.exist?(alt_path)
+        path = alt_path
+        break
+      end
+    end
+  end
+
+  unless File.exist?(path)
+    warn "Warning: File not found: #{path}"
+    return
   end
 
   content = File.binread(path)

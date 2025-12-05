@@ -166,6 +166,12 @@ end
 #   :rspec_args - additional rspec arguments (default: "")
 #   :env_vars - additional environment variables (default: "")
 #   :unbundled - run with unbundled_sh_in_dir for Bundler isolation (default: false)
+#                This is required for minimum version examples because they have different
+#                gem versions (e.g., Shakapacker 8.2.0) pinned in their Gemfile than the
+#                parent workspace (Shakapacker 9.x). Without bundle isolation, Bundler
+#                would inherit the parent's gem resolution and use the wrong versions.
+#                Latest version examples don't need this because they use the same versions
+#                as the parent workspace.
 def run_tests_in(dir, options = {})
   path = calc_path(dir)
 

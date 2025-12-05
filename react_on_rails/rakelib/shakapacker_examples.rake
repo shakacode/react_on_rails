@@ -59,8 +59,12 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
     if File.exist?(gemfile_path)
       gemfile_content = File.read(gemfile_path)
       # Replace any shakapacker gem line with exact version pin
+      # Handle both single-line: gem 'shakapacker', '>= 8.2.0'
+      # And multi-line declarations:
+      #   gem 'shakapacker',
+      #       '>= 8.2.0'
       gemfile_content = gemfile_content.gsub(
-        /gem ['"]shakapacker['"].*$/,
+        /gem ['"]shakapacker['"][^\n]*(?:\n\s+[^g\n][^\n]*)*$/m,
         "gem 'shakapacker', '#{ExampleType::MINIMUM_SHAKAPACKER_VERSION}'"
       )
       File.write(gemfile_path, gemfile_content)
