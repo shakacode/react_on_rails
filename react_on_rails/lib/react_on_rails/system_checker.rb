@@ -570,7 +570,6 @@ module ReactOnRails
         # Ignore errors reading Gemfile
       end
     end
-    # rubocop:enable Metrics/CyclomaticComplexity
 
     def report_dependency_versions(package_json)
       all_deps = package_json["dependencies"]&.merge(package_json["devDependencies"] || {}) || {}
@@ -588,7 +587,6 @@ module ReactOnRails
         add_success("✅ React DOM #{react_dom_version}")
       end
     end
-    # rubocop:enable Metrics/CyclomaticComplexity
 
     def report_shakapacker_version
       return unless File.exist?("Gemfile.lock")

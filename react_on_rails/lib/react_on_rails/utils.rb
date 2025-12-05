@@ -494,7 +494,6 @@ module ReactOnRails
         path_str
       end
     end
-    # rubocop:enable Metrics/CyclomaticComplexity
 
     def self.default_troubleshooting_section
       <<~DEFAULT

@@ -86,7 +86,6 @@ module ReactOnRails
           # We need to parse each chunk and replay the console messages.
           result.transform { |chunk| parse_result_and_replay_console_messages(chunk, render_options) }
         end
-        # rubocop:enable Metrics/CyclomaticComplexity
 
         def trace_js_code_used(msg, js_code, file_name = "tmp/server-generated.js", force: false)
           return unless ReactOnRails.configuration.trace || force

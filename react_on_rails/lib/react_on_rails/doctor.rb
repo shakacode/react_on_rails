@@ -489,7 +489,6 @@ module ReactOnRails
         # Ignore errors reading Gemfile
       end
     end
-    # rubocop:enable Metrics/CyclomaticComplexity
 
     def check_npm_wildcards
       return unless File.exist?("package.json")
@@ -512,7 +511,6 @@ module ReactOnRails
         # Ignore other errors
       end
     end
-    # rubocop:enable Metrics/CyclomaticComplexity
 
     def check_key_configuration_files
       files_to_check = {
@@ -562,7 +560,6 @@ module ReactOnRails
         end
       end
     end
-    # rubocop:enable Metrics/CyclomaticComplexity
 
     # rubocop:disable Metrics/CyclomaticComplexity
     def check_server_rendering_engine
@@ -628,7 +625,6 @@ module ReactOnRails
         checker.add_warning("  ⚠️  Could not run 'rake shakapacker:info': #{e.message}")
       end
     end
-    # rubocop:enable Metrics/CyclomaticComplexity
 
     def check_react_on_rails_configuration_details
       check_react_on_rails_initializer

@@ -358,7 +358,6 @@ module ReactOnRails
         # Fall back to package.json version
         package_json_version
       end
-      # rubocop:enable Metrics/CyclomaticComplexity
 
       # Check if a version string represents a local path or URL
       def local_path_or_url_version?(version)
