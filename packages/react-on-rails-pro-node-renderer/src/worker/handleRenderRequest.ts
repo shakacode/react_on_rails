@@ -23,10 +23,11 @@ import {
   isErrorRenderResult,
   getRequestBundleFilePath,
   deleteUploadedAssets,
+  validateBundlesExist,
 } from '../shared/utils.js';
 import { getConfig } from '../shared/configBuilder.js';
 import * as errorReporter from '../shared/errorReporter.js';
-import { buildVM, hasVMContextForBundle, runInVM } from './vm.js';
+import { buildExecutionContext, ExecutionContext, VMContextNotFoundError } from './vm.js';
 
 export type ProvidedNewBundle = {
   timestamp: string | number;
@@ -36,9 +37,10 @@ export type ProvidedNewBundle = {
 async function prepareResult(
   renderingRequest: string,
   bundleFilePathPerTimestamp: string,
+  executionContext: ExecutionContext,
 ): Promise<ResponseResult> {
   try {
-    const result = await runInVM(renderingRequest, bundleFilePathPerTimestamp, cluster);
+    const result = await executionContext.runInVM(renderingRequest, bundleFilePathPerTimestamp, cluster);
 
     let exceptionMessage = null;
     if (!result) {
@@ -151,7 +153,7 @@ to ${bundleFilePathPerTimestamp})`,
   }
 }
 
-async function handleNewBundlesProvided(
+export async function handleNewBundlesProvided(
   renderingRequest: string,
   providedNewBundles: ProvidedNewBundle[],
   assetsToCopy: Asset[] | null | undefined,
@@ -188,7 +190,7 @@ export async function handleRenderRequest({
   dependencyBundleTimestamps?: string[] | number[];
   providedNewBundles?: ProvidedNewBundle[] | null;
   assetsToCopy?: Asset[] | null;
-}): Promise<ResponseResult> {
+}): Promise<{ response: ResponseResult; executionContext?: ExecutionContext }> {
   try {
     // const bundleFilePathPerTimestamp = getRequestBundleFilePath(bundleTimestamp);
     const allBundleFilePaths = Array.from(
@@ -200,52 +202,54 @@ export async function handleRenderRequest({
 
     if (allBundleFilePaths.length > maxVMPoolSize) {
       return {
-        headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
-        status: 410,
-        data: `Too many bundles uploaded. The maximum allowed is ${maxVMPoolSize}. Please reduce the number of bundles or increase maxVMPoolSize in your configuration.`,
+        response: {
+          headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
+          status: 410,
+          data: `Too many bundles uploaded. The maximum allowed is ${maxVMPoolSize}. Please reduce the number of bundles or increase maxVMPoolSize in your configuration.`,
+        },
       };
     }
 
-    // If the current VM has the correct bundle and is ready
-    if (allBundleFilePaths.every((bundleFilePath) => hasVMContextForBundle(bundleFilePath))) {
-      return await prepareResult(renderingRequest, entryBundleFilePath);
+    try {
+      const executionContext = await buildExecutionContext(allBundleFilePaths, /* buildVmsIfNeeded */ false);
+      return {
+        response: await prepareResult(renderingRequest, entryBundleFilePath, executionContext),
+        executionContext,
+      };
+    } catch (e) {
+      // Ignore VMContextNotFoundError, it means the bundle does not exist.
+      // The following code will handle this case.
+      if (!(e instanceof VMContextNotFoundError)) {
+        throw e;
+      }
     }
 
     // If gem has posted updated bundle:
     if (providedNewBundles && providedNewBundles.length > 0) {
       const result = await handleNewBundlesProvided(renderingRequest, providedNewBundles, assetsToCopy);
       if (result) {
-        return result;
+        return { response: result };
       }
     }
 
     // Check if the bundle exists:
-    const missingBundles = (
-      await Promise.all(
-        [...(dependencyBundleTimestamps ?? []), bundleTimestamp].map(async (timestamp) => {
-          const bundleFilePath = getRequestBundleFilePath(timestamp);
-          const fileExists = await fileExistsAsync(bundleFilePath);
-          return fileExists ? null : timestamp;
-        }),
-      )
-    ).filter((timestamp) => timestamp !== null);
-
-    if (missingBundles.length > 0) {
-      const missingBundlesText = missingBundles.length > 1 ? 'bundles' : 'bundle';
-      log.info(`No saved ${missingBundlesText}: ${missingBundles.join(', ')}`);
-      return {
-        headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
-        status: 410,
-        data: 'No bundle uploaded',
-      };
+    const missingBundleError = await validateBundlesExist(bundleTimestamp, dependencyBundleTimestamps);
+    if (missingBundleError) {
+      return { response: missingBundleError };
     }
 
     // The bundle exists, but the VM has not yet been created.
     // Another worker must have written it or it was saved during deployment.
-    log.info('Bundle %s exists. Building VM for worker %s.', entryBundleFilePath, workerIdLabel());
-    await Promise.all(allBundleFilePaths.map((bundleFilePath) => buildVM(bundleFilePath)));
-
-    return await prepareResult(renderingRequest, entryBundleFilePath);
+    log.info(
+      'Bundle %s exists. Building ExecutionContext for worker %s.',
+      entryBundleFilePath,
+      workerIdLabel(),
+    );
+    const executionContext = await buildExecutionContext(allBundleFilePaths, /* buildVmsIfNeeded */ true);
+    return {
+      response: await prepareResult(renderingRequest, entryBundleFilePath, executionContext),
+      executionContext,
+    };
   } catch (error) {
     const msg = formatExceptionMessage(
       renderingRequest,
