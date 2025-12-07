@@ -185,12 +185,12 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
 
   puts "\nUpdating package.json files to version #{actual_npm_version}..."
 
-  # Update all package.json files
+  # Update all package.json files (only publishable packages)
   package_json_files = [
     File.join(monorepo_root, "package.json"),
     File.join(monorepo_root, "packages", "react-on-rails", "package.json"),
     File.join(monorepo_root, "packages", "react-on-rails-pro", "package.json"),
-    File.join(pro_gem_root, "package.json")
+    File.join(monorepo_root, "packages", "react-on-rails-pro-node-renderer", "package.json")
   ]
 
   package_json_files.each do |file|
@@ -292,11 +292,10 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
     puts "=" * 80
 
     # Publish react-on-rails-pro-node-renderer NPM package
-    # Note: Uses plain `pnpm publish` because the node-renderer
-    # package.json is in react_on_rails_pro/ which is not defined as a workspace
     node_renderer_name = "react-on-rails-pro-node-renderer"
+    node_renderer_dir = File.join(monorepo_root, "packages", "react-on-rails-pro-node-renderer")
     puts "\nPublishing #{node_renderer_name}@#{actual_npm_version}..."
-    sh_in_dir(pro_gem_root, "pnpm publish --no-git-checks #{npm_publish_args}")
+    sh_in_dir(node_renderer_dir, "pnpm publish #{npm_publish_args}")
 
     if use_verdaccio
       puts "\nSkipping Ruby gem publication (Verdaccio is NPM-only)"
@@ -342,7 +341,7 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
     puts "  - package.json (root)"
     puts "  - packages/react-on-rails/package.json"
     puts "  - packages/react-on-rails-pro/package.json (version + dependency)"
-    puts "  - react_on_rails_pro/package.json (node-renderer)"
+    puts "  - packages/react-on-rails-pro-node-renderer/package.json"
     puts "  - Gemfile.lock files (root, dummy apps, pro)"
     puts "\nAuto-synced (no write needed):"
     puts "  - react_on_rails_pro/react_on_rails_pro.gemspec (uses ReactOnRails::VERSION)"
