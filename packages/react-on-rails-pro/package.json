@@ -1,6 +1,6 @@
 {
   "name": "react-on-rails-pro",
-  "version": "16.2.0-test.3",
+  "version": "16.2.0-test.4",
   "description": "React on Rails Pro package with React Server Components support",
   "type": "module",
   "scripts": {
@@ -55,7 +55,7 @@
     "./ServerComponentFetchError": "./lib/ServerComponentFetchError.js"
   },
   "dependencies": {
-    "react-on-rails": "16.2.0-test.3"
+    "react-on-rails": "16.2.0-test.4"
   },
   "peerDependencies": {
     "react": ">= 16",
