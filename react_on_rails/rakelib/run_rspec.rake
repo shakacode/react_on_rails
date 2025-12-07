@@ -103,7 +103,7 @@ namespace :run_rspec do
     ExampleType.all[:shakapacker_examples].select(&:minimum_versions?)
   end
 
-  desc "Runs Rspec for latest version example apps only (excludes minimum version tests)"
+  desc "Runs Rspec for latest version example apps only (React 19, Shakapacker 9.4.0)"
   task shakapacker_examples_latest: latest_examples.map(&:gen_task_name) do
     latest_examples.each { |example_type| Rake::Task[example_type.rspec_task_name].invoke }
   end
