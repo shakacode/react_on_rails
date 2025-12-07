@@ -1,6 +1,6 @@
 {
   "name": "react-on-rails-pro-dev",
-  "version": "16.2.0-test.0",
+  "version": "16.2.0-test.1",
   "private": true,
   "description": "Development workspace for react-on-rails-pro (not published)",
   "scripts": {
