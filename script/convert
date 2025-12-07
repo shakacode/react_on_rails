@@ -45,6 +45,8 @@ gsub_file_content("../package.json", /,(\s*})/, "\\1")
 # Switch to minimum supported React version (React 18 since we removed PropTypes)
 gsub_file_content("../package.json", /"react": "[^"]*",/, '"react": "18.0.0",')
 gsub_file_content("../package.json", /"react-dom": "[^"]*",/, '"react-dom": "18.0.0",')
+gsub_file_content("../packages/react-on-rails-pro/package.json", /"react": "[^"]*",/, '"react": "18.0.0",')
+gsub_file_content("../packages/react-on-rails-pro/package.json", /"react-dom": "[^"]*",/, '"react-dom": "18.0.0",')
 gsub_file_content("../react_on_rails/spec/dummy/package.json", /"react": "[^"]*",/, '"react": "18.0.0",')
 gsub_file_content("../react_on_rails/spec/dummy/package.json", /"react-dom": "[^"]*",/, '"react-dom": "18.0.0",')
 gsub_file_content(
