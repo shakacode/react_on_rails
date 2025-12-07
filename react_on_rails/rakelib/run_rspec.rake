@@ -3,6 +3,7 @@
 require "coveralls/rake/task" if ENV["USE_COVERALLS"] == "TRUE"
 
 require "pathname"
+require "yaml"
 
 require_relative "task_helpers"
 require_relative "example_type"
