@@ -19,7 +19,7 @@ After a release, please make sure to run `bundle exec rake update_changelog`. Th
 
 ## Versions
 
-### [Unreleased]
+### [v16.2.0.beta.13] - 2025-12-07
 
 Changes since the last non-beta release.
 
@@ -31,6 +31,8 @@ Changes since the last non-beta release.
 
 - **Service Dependency Checking for bin/dev**: Added optional `.dev-services.yml` configuration to validate required external services (Redis, PostgreSQL, Elasticsearch, etc.) are running before `bin/dev` starts the development server. Provides clear error messages with start commands and install hints when services are missing. Zero impact if not configured - backwards compatible with all existing installations. [PR 2098](https://github.com/shakacode/react_on_rails/pull/2098) by [justin808](https://github.com/justin808).
 
+- **CSP Nonce Support for Console Replay**: Added Content Security Policy (CSP) nonce support for the `consoleReplay` script generated during server-side rendering. When Rails CSP is configured, the console replay script will automatically include the nonce attribute, allowing it to execute under restrictive CSP policies like `script-src: 'self'`. The implementation includes cross-version Rails compatibility (5.2-7.x) and defense-in-depth nonce sanitization to prevent attribute injection attacks. [PR 2059](https://github.com/shakacode/react_on_rails/pull/2059) by [justin808](https://github.com/justin808).
+
 #### Changed
 
 - **Monorepo Structure Reorganization**: Restructured the monorepo to use two top-level product directories (`react_on_rails/` and `react_on_rails_pro/`) instead of mixing source files at the root level. This improves organization and clarity for contributors working on either the open-source or Pro versions. **Important for contributors**: If you have an existing clone of the repository, you may need to update your IDE exclusion patterns and paths. See the updated `CLAUDE.md` for current project structure. [PR 2114](https://github.com/shakacode/react_on_rails/pull/2114) by [justin808](https://github.com/justin808).
@@ -38,6 +40,8 @@ Changes since the last non-beta release.
 - **Package Manager Migration to pnpm (Contributors Only)**: Migrated the monorepo from Yarn Classic to pnpm for improved dependency management and faster installs. **This only affects contributors** - end users can continue using any package manager (npm, yarn, pnpm) with their applications. Contributors should reinstall dependencies with `pnpm install` after pulling this change. [PR 2121](https://github.com/shakacode/react_on_rails/pull/2121) by [justin808](https://github.com/justin808).
 
 #### Improved
+
+- **Enhanced bin/dev Error Messages**: Improved error messages when `bin/dev` fails by suggesting the `--verbose` flag for detailed debugging output. The verbose flag now properly cascades to child processes via the `REACT_ON_RAILS_VERBOSE` environment variable, making troubleshooting pack generation failures significantly easier. [PR 2083](https://github.com/shakacode/react_on_rails/pull/2083) by [justin808](https://github.com/justin808).
 
 - **Automatic Precompile Hook Coordination in bin/dev**: The `bin/dev` command now automatically runs Shakapacker's `precompile_hook` once before starting development processes and sets `SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true` to prevent duplicate execution in spawned webpack processes.
   - Eliminates the need for manual coordination, sleep hacks, and duplicate task calls in Procfile.dev
@@ -47,16 +51,6 @@ Changes since the last non-beta release.
   - Addresses [2091](https://github.com/shakacode/react_on_rails/issues/2091) by [justin808](https://github.com/justin808)
 
 - **Idempotent Locale Generation**: The `react_on_rails:locale` rake task is now idempotent, automatically skipping generation when locale files are already up-to-date. This makes it safe to call multiple times (e.g., in Shakapacker's `precompile_hook`) without duplicate work. Added `force=true` option to override timestamp checking. [PR 2090](https://github.com/shakacode/react_on_rails/pull/2090) by [justin808](https://github.com/justin808).
-
-### [v16.2.0.beta.12] - 2025-11-20
-
-#### Added
-
-- **CSP Nonce Support for Console Replay**: Added Content Security Policy (CSP) nonce support for the `consoleReplay` script generated during server-side rendering. When Rails CSP is configured, the console replay script will automatically include the nonce attribute, allowing it to execute under restrictive CSP policies like `script-src: 'self'`. The implementation includes cross-version Rails compatibility (5.2-7.x) and defense-in-depth nonce sanitization to prevent attribute injection attacks. [PR 2059](https://github.com/shakacode/react_on_rails/pull/2059) by [justin808](https://github.com/justin808).
-
-#### Improved
-
-- **Enhanced bin/dev Error Messages**: Improved error messages when `bin/dev` fails by suggesting the `--verbose` flag for detailed debugging output. The verbose flag now properly cascades to child processes via the `REACT_ON_RAILS_VERBOSE` environment variable, making troubleshooting pack generation failures significantly easier. [PR 2083](https://github.com/shakacode/react_on_rails/pull/2083) by [justin808](https://github.com/justin808).
 
 #### Fixed
 
