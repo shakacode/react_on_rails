@@ -61,6 +61,9 @@ Version argument can be:
   - Explicit version: '16.2.0'
   - Pre-release version: '16.2.0.beta.1' (rubygem format with dots, converted to 16.2.0-beta.1 for NPM)
 
+Note: Pre-release versions (containing .test., .beta., .alpha., .rc., or .pre.) automatically
+skip git branch checks, allowing releases from non-master branches.
+
 This will update and release:
   PUBLIC (npmjs.org + rubygems.org):
     - react-on-rails NPM package
@@ -71,10 +74,8 @@ This will update and release:
 
 1st argument: Version (patch/minor/major OR explicit version like 16.2.0)
 2nd argument: Dry run (true/false, default: false)
-3rd argument: Skip branch check (true/false, default: false)
-             Set to true to release from non-master branches (for test/pre-release versions)
-4th argument: Registry (verdaccio/npm, default: npm)
-5th argument: Skip push (skip_push to skip, default: push)
+3rd argument: Registry (verdaccio/npm, default: npm)
+4th argument: Skip push (skip_push to skip, default: push)
 
 Environment variables:
   VERBOSE=1                    # Enable verbose logging (shows all output)
@@ -83,18 +84,17 @@ Environment variables:
   GEM_RELEASE_MAX_RETRIES=<n>  # Override max retry attempts (default: 3)
 
 Examples:
-  rake release[patch]                              # Bump patch version (16.1.1 → 16.1.2)
-  rake release[minor]                              # Bump minor version (16.1.1 → 16.2.0)
-  rake release[major]                              # Bump major version (16.1.1 → 17.0.0)
-  rake release[16.2.0]                             # Set explicit version
-  rake release[16.2.0.beta.1]                      # Set pre-release version (→ 16.2.0-beta.1 for NPM)
-  rake release[patch,true]                         # Dry run
-  rake release[16.2.0.beta.1,false,true]           # Release from non-master branch
-  rake release[16.2.0,false,false,verdaccio]       # Test with Verdaccio
-  rake release[16.2.0,false,true,npm,skip_push]    # Release from non-master, skip push
-  VERBOSE=1 rake release[patch]                    # Release with verbose logging
+  rake release[patch]                           # Bump patch version (16.1.1 → 16.1.2)
+  rake release[minor]                           # Bump minor version (16.1.1 → 16.2.0)
+  rake release[major]                           # Bump major version (16.1.1 → 17.0.0)
+  rake release[16.2.0]                          # Set explicit version
+  rake release[16.2.0.beta.1]                   # Set pre-release version (→ 16.2.0-beta.1 for NPM)
+  rake release[patch,true]                      # Dry run
+  rake release[16.2.0,false,verdaccio]          # Test with Verdaccio
+  rake release[16.2.0,false,npm,skip_push]      # Release without pushing to remote
+  VERBOSE=1 rake release[patch]                 # Release with verbose logging
   NPM_OTP=123456 RUBYGEMS_OTP=789012 rake release[patch]  # Skip OTP prompts")
-task :release, %i[version dry_run skip_branch_check registry skip_push] do |_t, args|
+task :release, %i[version dry_run registry skip_push] do |_t, args|
   include ReactOnRails::TaskHelpers
 
   # Check if there are uncommitted changes
@@ -102,7 +102,6 @@ task :release, %i[version dry_run skip_branch_check registry skip_push] do |_t, 
   args_hash = args.to_hash
 
   is_dry_run = ReactOnRails::Utils.object_to_boolean(args_hash[:dry_run])
-  skip_branch_check = ReactOnRails::Utils.object_to_boolean(args_hash[:skip_branch_check])
   is_verbose = ENV["VERBOSE"] == "1"
   npm_otp = ENV.fetch("NPM_OTP", nil)
   rubygems_otp = ENV.fetch("RUBYGEMS_OTP", nil)
@@ -127,7 +126,9 @@ task :release, %i[version dry_run skip_branch_check registry skip_push] do |_t, 
 
   skip_push = skip_push_value == "skip_push"
 
+  # Detect if this is a test/pre-release version (contains test, beta, alpha, rc, etc.)
   version_input = args_hash.fetch(:version, "")
+  is_prerelease = version_input.match?(/\.(test|beta|alpha|rc|pre)\./i)
 
   if version_input.strip.empty?
     raise ArgumentError,
@@ -271,10 +272,10 @@ task :release, %i[version dry_run skip_branch_check registry skip_push] do |_t, 
       puts "TIP: Set NPM_OTP environment variable to avoid repeated prompts."
     end
 
-    # Skip git branch checks if explicitly requested (for releasing from non-master branches)
-    if skip_branch_check
+    # For pre-release versions, skip git branch checks (allows releasing from non-master branches)
+    if is_prerelease
       npm_publish_args += " --no-git-checks"
-      puts "Skipping git branch checks for NPM publish (skip_branch_check=true)"
+      puts "Pre-release version detected - skipping git branch checks for NPM publish"
     end
 
     # Publish react-on-rails NPM package
