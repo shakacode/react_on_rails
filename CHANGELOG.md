@@ -1856,7 +1856,7 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.2.0.beta.11...master
+[v16.2.0.beta.13]: https://github.com/shakacode/react_on_rails/compare/v16.2.0.beta.11...v16.2.0.beta.13
 [v16.2.0.beta.11]: https://github.com/shakacode/react_on_rails/compare/16.1.1...v16.2.0.beta.11
 [16.1.1]: https://github.com/shakacode/react_on_rails/compare/16.1.0...16.1.1
 [16.1.0]: https://github.com/shakacode/react_on_rails/compare/16.0.0...16.1.0
