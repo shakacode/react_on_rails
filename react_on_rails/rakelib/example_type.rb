@@ -3,6 +3,7 @@
 require "rake"
 
 require_relative "task_helpers"
+require_relative File.join(__dir__, "..", "lib", "react_on_rails", "utils")
 
 # Defines the ExampleType class, where each object represents a unique type of example
 # app that we can generate.
