@@ -126,5 +126,7 @@ jobs:
           pnpm add -g yalc
       - name: Build Renderer package
         run: pnpm build
-      - name: Run JS unit tests for Renderer package
-        run: pnpm test
+      - name: Run JS unit tests for react-on-rails package
+        run: pnpm test --filter react-on-rails run test
+      - name: Run JS unit tests for react-on-rails-pro package
+        run: pnpm test --filter react-on-rails-pro run test
