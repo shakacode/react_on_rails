@@ -230,10 +230,23 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
   unless is_dry_run
     # Commit all version changes (skip git hooks to save time)
     sh_in_dir(monorepo_root, "LEFTHOOK=0 git add -A")
-    sh_in_dir(monorepo_root, "LEFTHOOK=0 git commit -m 'Bump version to #{actual_gem_version}'")
 
-    # Create git tag
-    sh_in_dir(monorepo_root, "git tag v#{actual_gem_version}")
+    # Only commit if there are staged changes (version might already be set)
+    git_status = `cd #{monorepo_root} && git diff --cached --quiet; echo $?`.strip
+    if git_status == "0"
+      puts "No version changes to commit (version already set to #{actual_gem_version})"
+    else
+      sh_in_dir(monorepo_root, "LEFTHOOK=0 git commit -m 'Bump version to #{actual_gem_version}'")
+    end
+
+    # Create git tag (skip if it already exists)
+    tag_name = "v#{actual_gem_version}"
+    tag_exists = system("cd #{monorepo_root} && git rev-parse #{tag_name} >/dev/null 2>&1")
+    if tag_exists
+      puts "Git tag #{tag_name} already exists, skipping tag creation"
+    else
+      sh_in_dir(monorepo_root, "git tag #{tag_name}")
+    end
 
     # Push commits and tags (skip git hooks)
     unless skip_push
