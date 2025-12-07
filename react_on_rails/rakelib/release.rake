@@ -183,10 +183,10 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
 
   # Update all package.json files
   package_json_files = [
-    File.join(gem_root, "package.json"),
-    File.join(gem_root, "packages", "react-on-rails", "package.json"),
-    File.join(gem_root, "packages", "react-on-rails-pro", "package.json"),
-    File.join(gem_root, "react_on_rails_pro", "package.json")
+    File.join(monorepo_root, "package.json"),
+    File.join(monorepo_root, "packages", "react-on-rails", "package.json"),
+    File.join(monorepo_root, "packages", "react-on-rails-pro", "package.json"),
+    File.join(monorepo_root, "react_on_rails_pro", "package.json")
   ]
 
   package_json_files.each do |file|
@@ -209,7 +209,7 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
   # Update all Gemfile.lock files
   unbundled_sh_in_dir(gem_root, "bundle install#{bundle_quiet_flag}")
   unbundled_sh_in_dir(dummy_app_dir, "bundle install#{bundle_quiet_flag}")
-  pro_dummy_app_dir = File.join(gem_root, "react_on_rails_pro", "spec", "dummy")
+  pro_dummy_app_dir = File.join(monorepo_root, "react_on_rails_pro", "spec", "dummy")
   unbundled_sh_in_dir(pro_dummy_app_dir, "bundle install#{bundle_quiet_flag}") if Dir.exist?(pro_dummy_app_dir)
   unbundled_sh_in_dir(pro_gem_root, "bundle install#{bundle_quiet_flag}")
 
@@ -258,11 +258,11 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
 
     # Publish react-on-rails NPM package
     puts "\nPublishing react-on-rails@#{actual_npm_version}..."
-    sh_in_dir(File.join(gem_root, "packages", "react-on-rails"), "pnpm publish #{npm_publish_args}")
+    sh_in_dir(File.join(monorepo_root, "packages", "react-on-rails"), "pnpm publish #{npm_publish_args}")
 
     # Publish react-on-rails-pro NPM package
     puts "\nPublishing react-on-rails-pro@#{actual_npm_version}..."
-    sh_in_dir(File.join(gem_root, "packages", "react-on-rails-pro"), "pnpm publish #{npm_publish_args}")
+    sh_in_dir(File.join(monorepo_root, "packages", "react-on-rails-pro"), "pnpm publish #{npm_publish_args}")
 
     # Publish node-renderer NPM package (PUBLIC on npmjs.org)
     puts "\n#{'=' * 80}"
