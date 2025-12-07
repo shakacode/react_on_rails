@@ -116,7 +116,7 @@ task :js_tests do
   sh "pnpm run test"
 end
 
-msg = <<-DESC.strip_heredoc
+msg = <<~DESC
   Runs all tests, run `rake -D run_rspec` to see all available test options.
   "rake run_rspec:example_basic" is a good way to run only one generator test.
 DESC
