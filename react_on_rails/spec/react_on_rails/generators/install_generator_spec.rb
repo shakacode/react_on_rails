@@ -12,6 +12,15 @@ describe InstallGenerator, type: :generator do
 
     include_examples "base_generator", application_js: true
     include_examples "no_redux_generator"
+
+    it "installs SWC dependencies by default (Shakapacker 9.3.0+ default transpiler)" do
+      assert_file "package.json" do |content|
+        package_json = JSON.parse(content)
+        # SWC is the default transpiler for Shakapacker 9.3.0+
+        expect(package_json["devDependencies"]).to include("@swc/core")
+        expect(package_json["devDependencies"]).to include("swc-loader")
+      end
+    end
   end
 
   context "with --redux" do

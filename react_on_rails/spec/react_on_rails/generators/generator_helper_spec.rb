@@ -182,5 +182,57 @@ RSpec.describe GeneratorHelper, type: :generator do
         expect(using_swc?).to be true
       end
     end
+
+    context "with version boundary scenarios" do
+      before do
+        File.write(shakapacker_yml_path, <<~YAML)
+          default: &default
+            source_path: app/javascript
+        YAML
+      end
+
+      context "when Shakapacker version is 9.3.0+ (SWC default)" do
+        before do
+          stub_const("ReactOnRails::PackerUtils", Class.new do
+            def self.shakapacker_version_requirement_met?(version)
+              version == "9.3.0"
+            end
+          end)
+        end
+
+        it "returns true when no transpiler is specified" do
+          expect(using_swc?).to be true
+        end
+      end
+
+      context "when Shakapacker version is below 9.3.0 (Babel default)" do
+        before do
+          stub_const("ReactOnRails::PackerUtils", Class.new do
+            def self.shakapacker_version_requirement_met?(version)
+              # Only meets requirements for versions below 9.3.0
+              version != "9.3.0"
+            end
+          end)
+        end
+
+        it "returns false when no transpiler is specified" do
+          expect(using_swc?).to be false
+        end
+      end
+
+      context "when PackerUtils raises an error during version check" do
+        before do
+          stub_const("ReactOnRails::PackerUtils", Class.new do
+            def self.shakapacker_version_requirement_met?(_version)
+              raise StandardError, "Cannot determine version"
+            end
+          end)
+        end
+
+        it "defaults to true (assumes latest Shakapacker)" do
+          expect(using_swc?).to be true
+        end
+      end
+    end
   end
 end

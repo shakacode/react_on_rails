@@ -136,6 +136,10 @@ module GeneratorHelper
   #
   # @note This method is used to determine whether to install SWC dependencies
   #   (@swc/core, swc-loader) instead of Babel dependencies during generation.
+  #
+  # @note Caching: The result is memoized for the lifetime of the generator instance.
+  #   If shakapacker.yml changes during generator execution (unlikely), the cached
+  #   value will not update. This is acceptable since generators run quickly.
   def using_swc?
     return @using_swc if defined?(@using_swc)
 
@@ -164,11 +168,18 @@ module GeneratorHelper
 
   def parse_shakapacker_yml(path)
     require "yaml"
-    # Support both old and new Psych versions
-    YAML.load_file(path, aliases: true)
+    # Use safe_load_file for security (defense-in-depth, even though this is user's own config)
+    # permitted_classes: [Symbol] allows symbol keys which shakapacker.yml may use
+    # aliases: true allows YAML anchors (&default, *default) commonly used in Rails configs
+    YAML.safe_load_file(path, permitted_classes: [Symbol], aliases: true)
   rescue ArgumentError
-    # Older Psych versions don't support the aliases parameter
-    YAML.load_file(path)
+    # Older Psych versions don't support all parameters - try without aliases
+    begin
+      YAML.safe_load_file(path, permitted_classes: [Symbol])
+    rescue ArgumentError
+      # Very old Psych - fall back to safe_load with File.read
+      YAML.safe_load(File.read(path), permitted_classes: [Symbol]) # rubocop:disable Style/YAMLFileRead
+    end
   rescue StandardError
     # If we can't parse the file, return empty config
     {}
