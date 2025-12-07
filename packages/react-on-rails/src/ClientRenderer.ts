@@ -174,7 +174,6 @@ function unmountAllComponents(): void {
         root.unmount();
       } else {
         // React 16-17 legacy API
-        // eslint-disable-next-line @typescript-eslint/no-deprecated
         unmountComponentAtNode(domNode);
       }
     } catch (error) {

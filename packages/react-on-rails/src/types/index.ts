@@ -125,9 +125,9 @@ interface ServerRenderResult {
   error?: Error;
 }
 
-type CreateReactOutputSyncResult = ServerRenderResult | ReactElement<unknown>;
+type CreateReactOutputSyncResult = ServerRenderResult | ReactElement;
 
-type CreateReactOutputAsyncResult = Promise<string | ServerRenderHashRenderedHtml | ReactElement<unknown>>;
+type CreateReactOutputAsyncResult = Promise<string | ServerRenderHashRenderedHtml | ReactElement>;
 
 type CreateReactOutputResult = CreateReactOutputSyncResult | CreateReactOutputAsyncResult;
 
