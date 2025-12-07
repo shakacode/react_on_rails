@@ -168,7 +168,6 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
 
   # Update react_on_rails_pro gem version to match
   puts "\nUpdating react_on_rails_pro gem version to #{actual_gem_version}..."
-  pro_gem_root = File.join(monorepo_root, "react_on_rails_pro")
   pro_version_file = File.join(pro_gem_root, "lib", "react_on_rails_pro", "version.rb")
   pro_version_content = File.read(pro_version_file)
   # We use gsub instead of `gem bump` here because the git tree is already dirty
@@ -186,7 +185,7 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
     File.join(monorepo_root, "package.json"),
     File.join(monorepo_root, "packages", "react-on-rails", "package.json"),
     File.join(monorepo_root, "packages", "react-on-rails-pro", "package.json"),
-    File.join(monorepo_root, "react_on_rails_pro", "package.json")
+    File.join(pro_gem_root, "package.json")
   ]
 
   package_json_files.each do |file|
@@ -209,7 +208,6 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
   # Update all Gemfile.lock files
   unbundled_sh_in_dir(gem_root, "bundle install#{bundle_quiet_flag}")
   unbundled_sh_in_dir(dummy_app_dir, "bundle install#{bundle_quiet_flag}")
-  pro_dummy_app_dir = File.join(monorepo_root, "react_on_rails_pro", "spec", "dummy")
   unbundled_sh_in_dir(pro_dummy_app_dir, "bundle install#{bundle_quiet_flag}") if Dir.exist?(pro_dummy_app_dir)
   unbundled_sh_in_dir(pro_gem_root, "bundle install#{bundle_quiet_flag}")
 
