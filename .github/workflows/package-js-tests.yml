@@ -122,7 +122,7 @@ jobs:
         run: script/convert
       - name: Install Node modules with pnpm for renderer package
         run: |
-          pnpm install ${{ matrix.node-version == '22' && '--frozen-lockfile' || '' }}
+          pnpm install ${{ matrix.node-version == '22' && '--frozen-lockfile' || '--no-frozen-lockfile' }}
           pnpm add -g yalc
       - name: Build Renderer package
         run: pnpm build
