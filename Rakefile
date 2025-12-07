@@ -26,6 +26,6 @@ load File.expand_path("Rakefile", gem_root)
 # so we must explicitly load from the subdirectory.
 Dir[File.join(gem_root, "rakelib", "*.rake")].each { |rake_file| load rake_file }
 
-# Load monorepo-level rake tasks (e.g., unified release task)
-# These are loaded LAST so they can override gem-level tasks if needed
-Dir[File.join(__dir__, "rakelib", "*.rake")].each { |rake_file| load rake_file }
+# NOTE: Monorepo-level rake tasks from ./rakelib/ are auto-loaded by Rake.
+# Do NOT explicitly load them here, as that would cause tasks to be defined twice
+# and their bodies would run twice (Rake appends duplicate task definitions).
