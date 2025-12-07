@@ -196,12 +196,8 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
   package_json_files.each do |file|
     content = JSON.parse(File.read(file))
     content["version"] = actual_npm_version
-
-    # For react-on-rails-pro package, also update the react-on-rails dependency to exact version
-    if content["name"] == "react-on-rails-pro"
-      content["dependencies"] ||= {}
-      content["dependencies"]["react-on-rails"] = actual_npm_version
-    end
+    # Note: workspace:* dependencies (e.g., in react-on-rails-pro) are automatically
+    # converted to exact versions by pnpm during publish. No manual conversion needed.
 
     File.write(file, "#{JSON.pretty_generate(content)}\n")
     puts "  Updated #{file}"
@@ -340,7 +336,7 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
     puts "  - react_on_rails_pro/lib/react_on_rails_pro/version.rb"
     puts "  - package.json (root)"
     puts "  - packages/react-on-rails/package.json"
-    puts "  - packages/react-on-rails-pro/package.json (version + dependency)"
+    puts "  - packages/react-on-rails-pro/package.json (version only; workspace:* converted by pnpm)"
     puts "  - packages/react-on-rails-pro-node-renderer/package.json"
     puts "  - Gemfile.lock files (root, dummy apps, pro)"
     puts "\nAuto-synced (no write needed):"
