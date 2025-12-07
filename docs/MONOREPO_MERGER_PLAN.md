@@ -556,6 +556,10 @@ After the initial merge, the following CI adjustments may be needed:
 - [ ] Remove duplicate CI configurations (either .github/workflows or .circleci)
 - [ ] Update build and release scripts for monorepo
 - [ ] Add independent package release workflows
+- [ ] Make sure linting is done with the same versions and configuration for core and pro
+- [ ] Remove separate .github/workflows/pro-lint.yml workflow (.github/workflows/pro-test-package-and-gem.yml and .github/workflows/pro-integration-tests.yml may be unified with the corresponding core ones as well)
+- [ ] Make sure there is one `pnpm test` instead of separate `pnpm test --filter` calls in CI, to be more robust if packages need to be added/removed
+- [ ] Minimize other cases where 3 packages or 2 gems need to be handled separately in CI
 - [ ] Update status badges in README
 
 **License Compliance:**
