@@ -61,6 +61,9 @@ Version argument can be:
   - Explicit version: '16.2.0'
   - Pre-release version: '16.2.0.beta.1' (rubygem format with dots, converted to 16.2.0-beta.1 for NPM)
 
+Note: Pre-release versions (containing .test., .beta., .alpha., .rc., or .pre.) automatically
+skip git branch checks, allowing releases from non-master branches.
+
 This will update and release:
   PUBLIC (npmjs.org + rubygems.org):
     - react-on-rails NPM package
@@ -123,7 +126,9 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
 
   skip_push = skip_push_value == "skip_push"
 
+  # Detect if this is a test/pre-release version (contains test, beta, alpha, rc, etc.)
   version_input = args_hash.fetch(:version, "")
+  is_prerelease = version_input.match?(/\.(test|beta|alpha|rc|pre)\./i)
 
   if version_input.strip.empty?
     raise ArgumentError,
@@ -265,6 +270,12 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
     elsif !use_verdaccio
       puts "\nNOTE: You will be prompted for NPM OTP code for each of the 3 NPM packages."
       puts "TIP: Set NPM_OTP environment variable to avoid repeated prompts."
+    end
+
+    # For pre-release versions, skip git branch checks (allows releasing from non-master branches)
+    if is_prerelease
+      npm_publish_args += " --no-git-checks"
+      puts "Pre-release version detected - skipping git branch checks for NPM publish"
     end
 
     # Publish react-on-rails NPM package
