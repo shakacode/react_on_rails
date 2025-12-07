@@ -1,7 +1,15 @@
 # frozen_string_literal: true
 
-# Root Rakefile for developer convenience
-# Delegates to the react_on_rails gem's Rakefile for development
+# Root Rakefile for monorepo development
+#
+# This file enables running rake tasks from the monorepo root directory.
+# It delegates to the react_on_rails gem's Rakefile and loads all rake tasks
+# from the gem's rakelib directory.
+#
+# Usage: bundle exec rake -T (from monorepo root)
+#
+# Note: This is for development only. When the gem is installed in a Rails app,
+# Rails::Engine handles rake task loading automatically from lib/tasks/.
 
 gem_root = File.expand_path("react_on_rails", __dir__)
 
@@ -9,5 +17,6 @@ gem_root = File.expand_path("react_on_rails", __dir__)
 load File.expand_path("Rakefile", gem_root)
 
 # Load all rake tasks from the gem's rakelib directory
-# Rake auto-loads from ./rakelib but not from subdirectories
+# Rake only auto-loads from ./rakelib in the current working directory,
+# so we must explicitly load from the subdirectory.
 Dir[File.join(gem_root, "rakelib", "*.rake")].each { |rake_file| load rake_file }
