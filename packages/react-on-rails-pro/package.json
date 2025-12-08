@@ -78,8 +78,8 @@
   "devDependencies": {
     "@types/mock-fs": "^4.13.4",
     "mock-fs": "^5.5.0",
-    "react": "19.0.0",
-    "react-dom": "19.0.0",
+    "react": "19.0.1",
+    "react-dom": "19.0.1",
     "react-on-rails-rsc": "git+https://github.com/shakacode/react_on_rails_rsc.git#add-support-for-ssr-using-generated-rsc-payload-for-v19.0.1"
   }
 }
