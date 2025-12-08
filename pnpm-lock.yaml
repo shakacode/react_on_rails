@@ -200,14 +200,14 @@ importers:
         specifier: ^5.5.0
         version: 5.5.0
       react:
-        specifier: 19.0.0
-        version: 19.0.0
+        specifier: ^19.0.1
+        version: 19.2.0
       react-dom:
-        specifier: 19.0.0
-        version: 19.0.0(react@19.0.0)
+        specifier: ^19.0.1
+        version: 19.2.0(react@19.2.0)
       react-on-rails-rsc:
-        specifier: 19.0.2
-        version: 19.0.2(react-dom@19.0.0(react@19.0.0))(react@19.0.0)(webpack@5.103.0(@swc/core@1.15.3))
+        specifier: ^19.0.3
+        version: 19.0.3(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(webpack@5.103.0(@swc/core@1.15.3))
 
   packages/react-on-rails-pro-node-renderer:
     dependencies:
@@ -4419,11 +4419,6 @@ packages:
     peerDependencies:
       react: ^18.0.0
 
-  react-dom@19.0.0:
-    resolution: {integrity: sha512-4GV5sHFG0e/0AD4X+ySy6UJd3jVl1iNsNHdpad0qhABJ11twS3TTBnseqsKurKcsNqCEFeGL3uLpVChpIO3QfQ==}
-    peerDependencies:
-      react: ^19.0.0
-
   react-dom@19.2.0:
     resolution: {integrity: sha512-UlbRu4cAiGaIewkPyiRGJk0imDN2T3JjieT6spoL2UeSf5od4n5LB/mQ4ejmxhCFT1tYe8IvaFulzynWovsEFQ==}
     peerDependencies:
@@ -4438,19 +4433,15 @@ packages:
   react-is@18.3.1:
     resolution: {integrity: sha512-/LLMVyas0ljjAtoYiPqYiL8VWXzUUdThrmU5+n20DZv+a+ClRoevUzw5JxU+Ieh5/c87ytoTBV9G1FiKfNJdmg==}
 
-  react-on-rails-rsc@19.0.2:
-    resolution: {integrity: sha512-0q26jcWcr6v9nfYfB4wxtAdTwEC4PCDSb/5U7TPperP4Ac9U2K7nt3uLOSVh7BX4bacX3PrpDeI1C30cIkBPog==}
+  react-on-rails-rsc@19.0.3:
+    resolution: {integrity: sha512-g+89U83+WjZDbtLvYQbjld0pWdUXpKageSoeKsX8cj1SkmULMAzbxgvH6vdzOuQUSwchkbDgwFO9umlHDhiyug==}
     peerDependencies:
-      react: ^19.0.0
-      react-dom: ^19.0.0
+      react: ^19.0.1
+      react-dom: ^19.0.1
       webpack: ^5.59.0
 
   react@18.0.0:
     resolution: {integrity: sha512-x+VL6wbT4JRVPm7EGxXhZ8w8LTROaxPXOqhlGyVSrv0sB1jkyFGgXxJ8LVoPRLvPR6/CIZGFmfzqUa2NYeMr2A==}
-    engines: {node: '>=0.10.0'}
-
-  react@19.0.0:
-    resolution: {integrity: sha512-V8AVnmPIICiWpGfm6GLzCR/W5FXLchHop40W4nXBmdlEceh16rCN8O8LNWm5bh5XUX91fh7KpA+W0TgMKmgTpQ==}
     engines: {node: '>=0.10.0'}
 
   react@19.2.0:
@@ -4600,9 +4591,6 @@ packages:
 
   scheduler@0.21.0:
     resolution: {integrity: sha512-1r87x5fz9MXqswA2ERLo0EbOAU74DpIUO090gIasYTqlVoJeMcl+Z1Rg7WHz+qtPujhS/hGIt9kxZOYBV3faRQ==}
-
-  scheduler@0.25.0:
-    resolution: {integrity: sha512-xFVuu11jh+xcO7JOAGJNOXld8/TcEHK/4CituBUeUb5hqxJLj9YuemAEuvm9gQ/+pgXYfbQuqAkiYu+u7YEsNA==}
 
   scheduler@0.27.0:
     resolution: {integrity: sha512-eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==}
@@ -10373,11 +10361,6 @@ snapshots:
       react: 18.0.0
       scheduler: 0.21.0
 
-  react-dom@19.0.0(react@19.0.0):
-    dependencies:
-      react: 19.0.0
-      scheduler: 0.25.0
-
   react-dom@19.2.0(react@19.2.0):
     dependencies:
       react: 19.2.0
@@ -10389,20 +10372,18 @@ snapshots:
 
   react-is@18.3.1: {}
 
-  react-on-rails-rsc@19.0.2(react-dom@19.0.0(react@19.0.0))(react@19.0.0)(webpack@5.103.0(@swc/core@1.15.3)):
+  react-on-rails-rsc@19.0.3(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(webpack@5.103.0(@swc/core@1.15.3)):
     dependencies:
       acorn-loose: 8.5.2
       neo-async: 2.6.2
-      react: 19.0.0
-      react-dom: 19.0.0(react@19.0.0)
+      react: 19.2.0
+      react-dom: 19.2.0(react@19.2.0)
       webpack: 5.103.0(@swc/core@1.15.3)
       webpack-sources: 3.3.3
 
   react@18.0.0:
     dependencies:
       loose-envify: 1.4.0
-
-  react@19.0.0: {}
 
   react@19.2.0: {}
 
@@ -10556,8 +10537,6 @@ snapshots:
   scheduler@0.21.0:
     dependencies:
       loose-envify: 1.4.0
-
-  scheduler@0.25.0: {}
 
   scheduler@0.27.0: {}
 
