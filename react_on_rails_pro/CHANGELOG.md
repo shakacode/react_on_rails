@@ -48,7 +48,7 @@ _Add changes in master not yet tagged._
 
 ### Fixed
 
-- **SECURITY: CVE-2025-55182 - React Server Components RCE Vulnerability**: by updating `react-on-rails-rsc` peer dependecy to `v19.0.3` which mitigates that vulnerability. Also, users should update `react` and `react-dom` package versions to `v19.0.1` to ensure complete mitigation. [PR 2175](https://github.com/shakacode/react_on_rails/pull/2175) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **SECURITY: CVE-2025-55182 - React Server Components RCE Vulnerability**: by updating `react-on-rails-rsc` peer dependency to `v19.0.3` which mitigates that vulnerability. Also, users should update `react` and `react-dom` package versions to `v19.0.1` to ensure complete mitigation. [PR 2175](https://github.com/shakacode/react_on_rails/pull/2175) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 - Fixed compatibility issue with httpx 1.6.x by explicitly requiring http-2 >= 1.1.1. [PR 2141](https://github.com/shakacode/react_on_rails/pull/2141) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
