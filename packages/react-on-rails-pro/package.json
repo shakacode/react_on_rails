@@ -80,6 +80,6 @@
     "mock-fs": "^5.5.0",
     "react": "19.0.0",
     "react-dom": "19.0.0",
-    "react-on-rails-rsc": "19.0.2"
+    "react-on-rails-rsc": "git+https://github.com/shakacode/react_on_rails_rsc.git#add-support-for-ssr-using-generated-rsc-payload-for-v19.0.1"
   }
 }
