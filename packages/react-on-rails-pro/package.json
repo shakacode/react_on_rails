@@ -78,8 +78,8 @@
   "devDependencies": {
     "@types/mock-fs": "^4.13.4",
     "mock-fs": "^5.5.0",
-    "react": "19.0.1",
-    "react-dom": "19.0.1",
+    "react": "^19.0.1",
+    "react-dom": "^19.0.1",
     "react-on-rails-rsc": "^19.0.3"
   }
 }
