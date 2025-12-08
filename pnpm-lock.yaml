@@ -206,8 +206,8 @@ importers:
         specifier: 19.0.1
         version: 19.0.1(react@19.0.1)
       react-on-rails-rsc:
-        specifier: git+https://github.com/shakacode/react_on_rails_rsc.git#add-support-for-ssr-using-generated-rsc-payload-for-v19.0.1
-        version: https://codeload.github.com/shakacode/react_on_rails_rsc/tar.gz/39cbd7cef6cdb51d286954b7c92f4fbae5f6ee12(react-dom@19.0.1(react@19.0.1))(react@19.0.1)(webpack@5.103.0(@swc/core@1.15.3))
+        specifier: ^19.0.3
+        version: 19.0.3(react-dom@19.0.1(react@19.0.1))(react@19.0.1)(webpack@5.103.0(@swc/core@1.15.3))
 
   packages/react-on-rails-pro-node-renderer:
     dependencies:
@@ -4438,9 +4438,8 @@ packages:
   react-is@18.3.1:
     resolution: {integrity: sha512-/LLMVyas0ljjAtoYiPqYiL8VWXzUUdThrmU5+n20DZv+a+ClRoevUzw5JxU+Ieh5/c87ytoTBV9G1FiKfNJdmg==}
 
-  react-on-rails-rsc@https://codeload.github.com/shakacode/react_on_rails_rsc/tar.gz/39cbd7cef6cdb51d286954b7c92f4fbae5f6ee12:
-    resolution: {tarball: https://codeload.github.com/shakacode/react_on_rails_rsc/tar.gz/39cbd7cef6cdb51d286954b7c92f4fbae5f6ee12}
-    version: 19.0.2
+  react-on-rails-rsc@19.0.3:
+    resolution: {integrity: sha512-g+89U83+WjZDbtLvYQbjld0pWdUXpKageSoeKsX8cj1SkmULMAzbxgvH6vdzOuQUSwchkbDgwFO9umlHDhiyug==}
     peerDependencies:
       react: ^19.0.1
       react-dom: ^19.0.1
@@ -10390,7 +10389,7 @@ snapshots:
 
   react-is@18.3.1: {}
 
-  react-on-rails-rsc@https://codeload.github.com/shakacode/react_on_rails_rsc/tar.gz/39cbd7cef6cdb51d286954b7c92f4fbae5f6ee12(react-dom@19.0.1(react@19.0.1))(react@19.0.1)(webpack@5.103.0(@swc/core@1.15.3)):
+  react-on-rails-rsc@19.0.3(react-dom@19.0.1(react@19.0.1))(react@19.0.1)(webpack@5.103.0(@swc/core@1.15.3)):
     dependencies:
       acorn-loose: 8.5.2
       neo-async: 2.6.2
