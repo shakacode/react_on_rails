@@ -127,7 +127,7 @@ This will:
    - Shakapacker 9.3.0 → 8.2.0
    - React 19.0.0 → 18.0.0
    - Remove ESLint and other packages incompatible with Node 20
-3. Clean `node_modules` and `yarn.lock`
+3. Clean `node_modules` and `pnpm-lock.yaml`
 4. Reinstall dependencies without `--frozen-lockfile`
 5. Clean and reinstall react_on_rails/spec/dummy dependencies
 
@@ -159,7 +159,7 @@ This will:
 
 1. Create `.tool-versions` with Ruby 3.4.3 and Node 22.12.0
 2. Restore files from git (reverting changes made by `script/convert`)
-3. Clean `node_modules` and `yarn.lock`
+3. Clean `node_modules` and `pnpm-lock.yaml`
 4. Reinstall dependencies with `--frozen-lockfile`
 5. Clean and reinstall react_on_rails/spec/dummy dependencies
 
@@ -190,8 +190,8 @@ When switching to **minimum**, these files are modified:
 - `package.json` - React versions, dev dependencies removed
 - `react_on_rails/spec/dummy/package.json` - React and Shakapacker versions
 - `packages/react-on-rails-pro/package.json` - Test scripts modified
-- `node_modules/`, `yarn.lock` - Cleaned and regenerated
-- `react_on_rails/spec/dummy/node_modules/`, `react_on_rails/spec/dummy/yarn.lock` - Cleaned and regenerated
+- `node_modules/`, `pnpm-lock.yaml` - Cleaned and regenerated
+- `react_on_rails/spec/dummy/node_modules/`, `react_on_rails/spec/dummy/pnpm-lock.yaml` - Cleaned and regenerated
 
 When switching to **latest**, these files are restored from git.
 
@@ -292,15 +292,15 @@ ruby --version
 node --version
 ```
 
-### Yarn install fails
+### PNPM install fails
 
 If you get package resolution errors:
 
 ```bash
 # Clean everything and try again
-rm -rf node_modules yarn.lock react_on_rails/spec/dummy/node_modules react_on_rails/spec/dummy/yarn.lock
-yarn install
-cd react_on_rails/spec/dummy && yarn install
+rm -rf node_modules pnpm-lock.yaml react_on_rails/spec/dummy/node_modules react_on_rails/spec/dummy/pnpm-lock.yaml
+pnpm install -r
+cd react_on_rails/spec/dummy && pnpm install
 ```
 
 ### Git complains about modified files

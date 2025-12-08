@@ -73,7 +73,7 @@ react_on_rails/ (monorepo root)
 │   │   └── spec/                 # Core Ruby specs
 │   └── react_on_rails_pro/       # Pro Ruby (Pro license)
 │       └── spec/                 # Pro Ruby specs
-├── packages/                     # NPM packages (yarn workspace)
+├── packages/                     # NPM packages (pnpm workspaces)
 │   ├── react-on-rails/           # Core JS/TS (MIT)
 │   │   └── tests/                # Core JS/TS tests
 │   ├── react-on-rails-pro/       # Pro JS/TS (Pro license)
@@ -294,7 +294,7 @@ After the initial merge, the following CI adjustments may be needed:
 **Objectives:**
 
 - Migrate core NPM package to workspace structure
-- Establish yarn workspace foundation
+- Establish pnpm workspace foundation
 - Maintain backward compatibility
 
 **Tasks:**
@@ -775,20 +775,20 @@ cd react_on_rails
 
 # Install dependencies
 bundle install  # Ruby gems
-yarn install    # NPM packages (workspace)
+pnpm install    # NPM packages (workspace)
 
 # Build all packages
-yarn build      # NPM packages
+pnpm build      # NPM packages
 rake build:gems # Ruby gems
 
 # Run tests
-yarn test       # NPM package tests
+pnpm test       # NPM package tests
 bundle exec rspec spec/ruby  # Ruby tests
 
 # Development commands
-yarn workspace react-on-rails build    # Build core package
-yarn workspace react-on-rails-pro test # Test pro package
-cd packages/react-on-rails && yarn dev  # Development server
+pnpm --filter react-on-rails build    # Build core package
+pnpm --filter react-on-rails-pro test # Test pro package
+cd packages/react-on-rails && pnpm dev  # Development server
 ```
 
 ### Release Process

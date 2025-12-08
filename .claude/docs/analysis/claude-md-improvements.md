@@ -44,10 +44,10 @@ Based on the CI breakage analysis, here are specific additions to prevent simila
 
    ```bash
    # Test the prepack script
-   yarn run prepack
+   pnpm run prepack
 
    # Test yalc publish (critical for local development)
-   yarn run yalc.publish
+   pnpm run yalc:publish
 
    # Verify build artifacts exist at expected paths
    ls -la lib/ReactOnRails.full.js
@@ -56,7 +56,7 @@ Based on the CI breakage analysis, here are specific additions to prevent simila
 
 3. **If you change directory structure:**
    - Update ALL path checks in package-scripts.yml
-   - Test with a clean install: `rm -rf node_modules && yarn install`
+   - Test with a clean install: `rm -rf node_modules && pnpm install`
    - Test yalc publish to ensure it works for users
 
 4. **Add tests for critical build paths:**
@@ -109,8 +109,8 @@ Based on the CI breakage analysis, here are specific additions to prevent simila
 5. **Add any formatting changes**: `git add .`
 6. **Continue rebase/merge**: `git rebase --continue` or `git commit`
 7. **TEST CRITICAL SCRIPTS**: If package-scripts.yml or build configs changed:
-   - Run `yarn run prepack` to verify build scripts work
-   - Run `yarn run yalc.publish` if package structure changed
+   - Run `pnpm run prepack` to verify build scripts work
+   - Run `pnpm run yalc:publish` if package structure changed
    - Run relevant test suites
 
 **❌ NEVER manually format during conflict resolution** - this causes formatting wars.

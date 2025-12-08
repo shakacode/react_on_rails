@@ -5,8 +5,9 @@
 Install [yalc](https://github.com/wclr/yalc).
 
 ```sh
+pnpm install -r
 cd react_on_rails_pro
-bundle && yarn && cd spec/dummy && bundle && yarn
+bundle && cd spec/dummy && bundle && pnpm install
 ```
 
 To use the `React 18 Apollo with GraphQL` example you need to seed the testing database inside `spec/dummy` directory.
@@ -175,14 +176,14 @@ To do this, follow the instructions in the
 
 1. Add `console.log('Hello!')` [here](https://github.com/shakacode/react_on_rails_pro/blob/more_test_and_docs/packages/node-renderer/src/ReactOnRailsProNodeRenderer.js#L6) in `packages/node-renderer/src/ReactOnRailsProNodeRenderer.js` to confirm we're getting an update to the node package.
 2. The `preinstall` script of `spec/dummy` builds the NPM package and sets up `yalc` to use it for the renderer.
-   It's run automatically when you run `yarn install`.
+   It's run automatically when you run `pnpm install`.
 3. Refresh the browser if the server is already running or start the server using `foreman start -f Procfile.dev` from `spec/dummy` and navigate to `http://localhost:3000/`. You will now see the `Hello!` message printed in the browser's console.
 
 <!-- prettier-ignore -->
 > [!NOTE]
 > `yalc` makes the NPM package available globally on the machine.
 > So, if you have the repo checked out more than once to compare behavior between branches,
-> make sure to run `yarn install` every time you switch to a new copy.
+> make sure to run `pnpm install` every time you switch to a new copy.
 
 # Development Setup for Gem and Node Package Contributors
 
@@ -226,11 +227,11 @@ For more information check the script section of the
 
 ```sh
 cd spec/dummy
-yarn install
+pnpm install -r
 ```
 
 > [!NOTE]
-> This runs npm under the hood as explained in the **Test NPM for react_on_rails_pro** section above.
+> This uses yalc under the hood as explained in the **Example: Testing NPM changes with the dummy app** section above.
 
 From now on, the example and dummy apps will use your local packages/node-renderer folder as the `react_on_rails_pro` node package.
 
@@ -238,24 +239,24 @@ From now on, the example and dummy apps will use your local packages/node-render
 
 ```sh
 cd react_on_rails_pro
-yarn install
+pnpm install -r
 ```
 
-Or run this, which builds the yarn package, then the webpack files for spec/dummy, and finally runs tests in
+Or run this, which builds the pnpm package, then the webpack files for spec/dummy, and finally runs tests in
 spec/dummy.
 
 ```sh
 # Optionally change default selenium_firefox driver
 # export DRIVER=poltergeist
 cd react_on_rails_pro
-yarn run dummy:spec
+pnpm run dummy:spec
 ```
 
 ### Run NPM JS tests
 
 ```sh
 cd react_on_rails_pro
-yarn test
+pnpm test
 ```
 
 ### Debugging NPM JS tests
@@ -263,7 +264,7 @@ yarn test
 Example of using ndb to debug a test
 
 ```bash
-ndb $(yarn bin)/jest --runInBand  packages/node-renderer/tests/**/*.test.[jt]s -t 'FriendsAndGuests bundle for commit 1a7fe417'
+ndb $(pnpm bin)/jest --runInBand  packages/node-renderer/tests/**/*.test.[jt]s -t 'FriendsAndGuests bundle for commit 1a7fe417'
 ```
 
 Hit F8 and then a debugger statement within the test will get hit.
@@ -282,7 +283,7 @@ between tests. See the file [`packages/node-renderer/tests/helper.ts`](packages/
 
 ```sh
 cd react_on_rails_pro
-yarn run check
+pnpm run check
 ```
 
 ### Starting the Dummy App
@@ -313,15 +314,17 @@ Before running Ruby tests ensure you have done the following steps in `spec/dumm
 
 ```sh
 # in the root directory
+pnpm install -r
+
+cd react_on_rails
 bundle install
-yarn install
 
 cd spec/dummy
 
 bundle install
 bundle exec rake react_on_rails:generate_packs
 
-yarn install
+pnpm install -r
 
 RAILS_ENV=test bin/shakapacker # to generate assets for test environment
 ```
@@ -330,7 +333,7 @@ Then in a separate terminal, run the following to run the Node renderer and the 
 
 ```sh
 # in spec/dummy directory
-yarn run node-renderer
+pnpm run node-renderer
 RAILS_ENV=test bin/dev&
 ```
 

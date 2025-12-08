@@ -8,7 +8,7 @@ This guide provides specific guidelines for AI coding agents (like Claude Code) 
 
 ```bash
 # Install dependencies
-bundle && yarn
+bundle && pnpm install -r
 
 # Run tests
 bundle exec rspec                    # All tests (from project root)
@@ -17,7 +17,7 @@ cd react_on_rails/spec/dummy && bundle exec rspec   # Dummy app tests only
 # Linting & Formatting
 bundle exec rubocop                  # Ruby linting
 bundle exec rubocop [file_path]     # Lint specific file
-# Note: yarn format requires local setup, format manually
+# Note: pnpm format requires local setup, format manually
 
 # Development
 cd react_on_rails/spec/dummy && foreman start       # Start dummy app with webpack
@@ -30,7 +30,7 @@ cd react_on_rails/spec/dummy && foreman start       # Start dummy app with webpa
 - [ ] No trailing whitespace
 - [ ] Line length ≤120 characters
 - [ ] Security violations properly scoped with disable comments
-- [ ] No `package-lock.json` or other non-Yarn lock files (except `Gemfile.lock`)
+- [ ] No `package-lock.json`, `yarn.lock` or other non-PNPM lock files (except `Gemfile.lock`)
 
 ## Development Patterns for AI Contributors
 
@@ -249,7 +249,7 @@ Use `gh pr create` with:
 
 - Don't assume packages are installed globally
 - Use `bundle exec` for Ruby commands
-- Verify setup with `bundle && yarn` when needed
+- Verify setup with `bundle && pnpm` when needed
 
 ### 4. RuboCop Configuration
 

@@ -479,7 +479,7 @@ When changing directory structure:
 
 1. Update ALL path references in configuration files
 2. Search codebase: `grep -r "old/path"`
-3. Test scripts: `yarn run prepack`, `yarn run yalc.publish`
+3. Test scripts: `pnpm run prepack`, `pnpm run yalc:publish`
 4. Run full test suite before committing
 
 ---

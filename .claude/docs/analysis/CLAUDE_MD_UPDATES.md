@@ -67,7 +67,7 @@ Add this new section to CLAUDE.md (both root and .conductor/london-v1):
 2. **Test yalc publish (CRITICAL):**
 
    ```bash
-   yarn run yalc.publish
+   pnpm run yalc:publish
    # Should publish successfully
    ```
 
@@ -103,7 +103,7 @@ In Sep 2024, we moved `node_package/` → `packages/react-on-rails/`. The path i
 package-scripts.yml was updated to `packages/react-on-rails/lib/ReactOnRails.full.js`.
 Later, the structure was partially reverted to `lib/` at root, but package-scripts.yml
 wasn't updated. This broke yalc publish silently for 7 weeks. Manual testing of
-`yarn run yalc.publish` would have caught this immediately.
+`yarn run yalc:publish` would have caught this immediately.
 
 ````
 
@@ -157,7 +157,7 @@ Some failures don't show up in standard CI:
 
 **Always manually test critical workflows:**
 
-- If you changed package structure → test `yarn run yalc.publish`
+- If you changed package structure → test `yarn run yalc:publish`
 - If you changed build configs → test `yarn build && ls -la lib/`
 - If you changed generators → test `rake run_rspec:example_basic`
 
@@ -199,7 +199,7 @@ Add this new section to CLAUDE.md (both versions):
    ```bash
    # If it's a build artifact path in package-scripts.yml:
    yarn run prepack
-   yarn run yalc.publish
+   yarn run yalc:publish
 
    # If it's a webpack output path:
    yarn build && ls -la <output-path>
@@ -238,7 +238,7 @@ find . -name "package.json" -type f
 
 # 3. Test package scripts
 yarn run prepack
-yarn run yalc.publish
+yarn run yalc:publish
 
 # 4. Test clean install
 rm -rf node_modules && yarn install
@@ -259,7 +259,7 @@ rake
 **How to prevent:**
 
 1. After changing directory structure, search for ALL references to old paths
-2. Always run `yarn run yalc.publish` manually to verify it works
+2. Always run `yarn run yalc:publish` manually to verify it works
 3. Check that paths in package-scripts.yml match actual file locations
 4. Use `ls -la <path>` to verify paths exist before committing
 
@@ -288,7 +288,7 @@ Update the existing "Merge Conflict Resolution Workflow" section with this addit
 7. **TEST CRITICAL SCRIPTS if build configs changed:**
    ```bash
    yarn run prepack          # Test prepack script
-   yarn run yalc.publish     # Test yalc publish if package structure changed
+   yarn run yalc:publish     # Test yalc publish if package structure changed
    rake run_rspec:gem        # Run relevant test suites
 ````
 
