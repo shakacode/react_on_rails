@@ -1,7 +1,7 @@
 Using NPM for React on Rails
 
 - Use `yalc link` to hook up the spec/dummy/client/node_modules to the top level
-- Be sure to install Yarn dependencies in spec/dummy/client
+- Be sure to install NPM dependencies in spec/dummy/client
 
 ## Initial setup
 
@@ -10,21 +10,23 @@ Read [Dev Initial Setup in Tips for Contributors](/CONTRIBUTING.md#dev-initial-s
 ## Set up yalc
 
 ```sh
-cd react_on_rails
-bundle install
+cd packages/react-on-rails
+pnpm install
+pnpm build
 yalc publish
+cd ../../react_on_rails
+bundle install
 cd spec/dummy
 bundle install
 yalc link react-on-rails
 ```
 
-## Run yarn if not done yet
+## Run PNPM if not done yet
 
 ```sh
-cd react_on_rails
-yarn run dummy:install
-cd spec/dummy
-yarn build:rescript
+pnpm install -r
+cd react_on_rails/spec/dummy
+pnpm build:rescript
 ```
 
 # Starting the Sample App
@@ -39,10 +41,4 @@ foreman start -f Procfile.dev
 
 ```sh
 foreman start -f Procfile.dev-static-assets
-```
-
-## Creating Assets for Tests
-
-```sh
-foreman start -f Procfile.spec
 ```

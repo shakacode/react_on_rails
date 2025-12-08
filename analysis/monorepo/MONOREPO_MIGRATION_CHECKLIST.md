@@ -63,11 +63,11 @@ The monorepo migration is in **Phase 2 (Git Merger) - COMPLETE**. We've successf
 
 ### Build System Validation
 
-- [ ] Test `yarn run prepack` succeeds
-- [ ] Test `yarn run yalc.publish` for each package
-- [ ] Verify `yarn build` outputs to correct directories
+- [ ] Test `pnpm run prepack` succeeds
+- [ ] Test `pnpm run yalc:publish` for each package
+- [ ] Verify `pnpm run build` outputs to correct directories
 - [ ] Check `ls -la packages/*/lib/*.js` shows all artifacts
-- [ ] Test clean install: `rm -rf node_modules && yarn install`
+- [ ] Test clean install: `rm -rf node_modules && pnpm install`
 - [ ] Validate `rake node_package` generates correct structure
 
 ### Testing Infrastructure

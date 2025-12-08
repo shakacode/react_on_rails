@@ -59,7 +59,11 @@
 All JavaScript in React On Rails is loaded from npm: [react-on-rails](https://www.npmjs.com/package/react-on-rails). To manually install this (you did not use the generator), assuming you have a standard configuration, run this command (assuming you are in the directory where you have your `node_modules`):
 
 ```bash
-yarn add react-on-rails --exact
+# Use your preferred package manager
+npm install react-on-rails --save-exact
+# or: yarn add react-on-rails --exact
+# or: pnpm add react-on-rails --save-exact
 ```
 
-That will install the latest version and update your package.json. **NOTE:** the `--exact` flag will ensure that you do not have a "~" or "^" for your react-on-rails version in your package.json.
+That will install the latest version and update your package.json.
+**NOTE:** the `--save-exact` (or `--exact` for yarn) flag will ensure that you do not have a "~" or "^" for your react-on-rails version in your package.json.

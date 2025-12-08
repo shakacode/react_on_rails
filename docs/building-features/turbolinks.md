@@ -22,6 +22,8 @@ gem "turbo-rails"
 
 # JavaScript
 yarn add @hotwired/turbo-rails
+# or: npm install @hotwired/turbo-rails
+# or: pnpm add @hotwired/turbo-rails
 ```
 
 **2. Enable Turbo in React on Rails**
@@ -104,7 +106,7 @@ React on Rails currently supports:
 - **Turbolinks 2.x** (Classic) - Auto-detected
 - See [Turbolinks on Github](https://github.com/rails/turbolinks)
 
-You may include Turbolinks either via yarn (recommended) or via the gem.
+You may include Turbolinks either via npm/yarn/pnpm (recommended) or via the gem.
 
 ### Why Turbolinks?
 
@@ -125,7 +127,7 @@ This definitely can make an app perform better, even if the JavaScript and style
 
 #### Install Checklist
 
-1. Include turbolinks via yarn as shown in the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/blob/8a6c8aa2e3b7ae5b08b0a9744fb3a63a2fe0f002/client/webpack.client.base.config.js#L22) or include the gem "turbolinks".
+1. Include turbolinks via your package manager as shown in the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/blob/8a6c8aa2e3b7ae5b08b0a9744fb3a63a2fe0f002/client/webpack.client.base.config.js#L22) or include the gem "turbolinks".
 1. Included the proper "track" tags when you include the javascript and stylesheet:
 
 **For Turbolinks 5.x:**

@@ -73,7 +73,7 @@ The monorepo merger has been successfully completed with full git history preser
 #### Validation Requirements
 
 - [ ] `yarn run prepack` succeeds
-- [ ] `yarn run yalc.publish` works for each package
+- [ ] `yarn run yalc:publish` works for each package
 - [ ] `yarn build` outputs to correct directories
 - [ ] `rake node_package` generates correct structure
 - [ ] Full test suite passes: `rake`
@@ -215,7 +215,7 @@ The monorepo merger has been successfully completed with full git history preser
 2. **Test current YALC publishing** (10 min)
 
    ```bash
-   yarn run yalc.publish
+   yarn run yalc:publish
    # Verify success and check published location
    ```
 

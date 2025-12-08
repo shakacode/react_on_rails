@@ -112,9 +112,9 @@ If **YES**, spend the 15 minutes. CI iteration is expensive (10-30 min/cycle). L
 grep -r "old/path" . --exclude-dir=node_modules --exclude-dir=.git
 
 # 2. Test build pipeline
-rm -rf node_modules && yarn install --frozen-lockfile
-yarn run build
-yarn run yalc:publish
+rm -rf node_modules && pnpm install -r --frozen-lockfile
+pnpm run build
+pnpm run yalc:publish
 
 # 3. Test relevant specs
 bundle exec rake run_rspec:gem          # If you changed gem code
@@ -123,7 +123,7 @@ bundle exec rake run_rspec:shakapacker_examples  # If you changed generators
 
 # 4. Lint everything
 bundle exec rubocop
-yarn run lint
+pnpm run lint
 ```
 
 **See full guide**: [`.claude/docs/avoiding-ci-failure-cycles.md`](.claude/docs/avoiding-ci-failure-cycles.md)
@@ -399,7 +399,7 @@ For each suspicious entry:
 7. **TEST CRITICAL SCRIPTS if build configs changed:**
    ```bash
    pnpm run prepack          # Test prepack script
-   pnpm run yalc.publish     # Test yalc publish if package structure changed
+   pnpm run yalc:publish     # Test yalc publish if package structure changed
    rake run_rspec:gem        # Run relevant test suites
    ```
 
