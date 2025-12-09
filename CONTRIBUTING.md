@@ -209,6 +209,7 @@ bin/setup
 ```
 
 This single command installs all dependencies across the monorepo:
+
 - Root pnpm and bundle dependencies
 - Builds the node package
 - Sets up `react_on_rails/spec/dummy`
@@ -221,17 +222,20 @@ This single command installs all dependencies across the monorepo:
 If you prefer to set up manually or need more control:
 
 1. Install root dependencies:
+
 ```sh
 bundle install
 pnpm install
 ```
 
 2. Build the node package:
+
 ```sh
 rake node_package
 ```
 
 3. Set up the dummy app:
+
 ```sh
 cd react_on_rails/spec/dummy
 bundle install
