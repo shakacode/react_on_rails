@@ -11,7 +11,7 @@
 #   bin/setup --help       # Show this help message
 #
 
-set -e
+set -euo pipefail
 
 # Colors for output
 RED='\033[0;31m'
@@ -169,6 +169,8 @@ install_dependencies() {
 }
 
 build_node_package() {
+  # Builds TypeScript packages and runs pnpm yalc:publish for local development.
+  # This compiles node_package/src/ to lib/ and makes packages available locally.
   print_step "Building node package..."
   if ! rake node_package; then
     print_error "Failed to build node package"
