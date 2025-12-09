@@ -54,6 +54,13 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
     dev_deps["webpack-assets-manifest"] = "^5.0.6" if dev_deps&.key?("webpack-assets-manifest")
     update_shakapacker_dependency(deps, dev_deps)
 
+    # Add npm overrides to force React 18 versions, preventing yalc-linked
+    # react-on-rails from pulling in React 19 as a transitive dependency
+    package_json["overrides"] = {
+      "react" => ExampleType::MINIMUM_REACT_VERSION,
+      "react-dom" => ExampleType::MINIMUM_REACT_VERSION
+    }
+
     File.write(package_json_path, "#{JSON.pretty_generate(package_json)}\n")
   end
 
@@ -126,7 +133,10 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
         bundle_install_in(example_type.dir)
       end
 
-      sh_in_dir(example_type.dir, "npm install")
+      # Use --legacy-peer-deps for minimum version examples to avoid peer dependency
+      # conflicts when yalc-linked react-on-rails expects newer React versions
+      npm_install_cmd = example_type.minimum_versions? ? "npm install --legacy-peer-deps" : "npm install"
+      sh_in_dir(example_type.dir, npm_install_cmd)
       # Generate the component packs after running the generator to ensure all
       # auto-bundled components have corresponding pack files created.
       # Use unbundled_sh_in_dir to ensure we're using the generated app's Gemfile
