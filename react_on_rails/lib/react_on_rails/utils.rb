@@ -98,9 +98,12 @@ module ReactOnRails
           exitstatus: #{status.exitstatus}#{stdout_msg}#{stderr_msg}
         MSG
 
-        puts wrap_message(msg)
-        puts ""
-        puts default_troubleshooting_section
+        # Use warn to ensure output is visible in CI logs (goes to stderr)
+        # and flush immediately before calling exit!
+        warn wrap_message(msg)
+        warn ""
+        warn default_troubleshooting_section
+        $stderr.flush
 
         # Rspec catches exit without! in the exit callbacks
         exit!(1)
