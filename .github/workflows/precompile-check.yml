@@ -132,7 +132,7 @@ jobs:
         run: cd react_on_rails/spec/dummy && pnpm run build:rescript
       - name: Generate file system-based packs
         run: cd react_on_rails/spec/dummy && RAILS_ENV=production bundle exec rake react_on_rails:generate_packs
-      - name: Run assets:precompile and check output
+      - name: Run assets:precompile and capture output
         run: |
           cd react_on_rails/spec/dummy
 
@@ -146,139 +146,14 @@ jobs:
           PRECOMPILE_EXIT=${PIPESTATUS[0]}
 
           echo "=========================================="
-          echo "Precompile finished. Checking output for known issues..."
-          echo ""
-
-          # Check for known failure patterns
-          FAILURES_FOUND=0
 
           # Check if rake command itself failed
           if [ "$PRECOMPILE_EXIT" -ne 0 ]; then
             echo "::error::Precompile command failed with exit code $PRECOMPILE_EXIT"
-            FAILURES_FOUND=1
+            exit "$PRECOMPILE_EXIT"
           fi
-
-          # Pattern 1: Duplicate webpack compilation (indicates rake tasks running twice)
-          # Look for webpack's "Compiled successfully" message which appears once per compilation
-          if grep -q "Compiled successfully" precompile_output.txt; then
-            COMPILE_SUCCESS_COUNT=$(grep -c "Compiled successfully" precompile_output.txt || true)
-            if [ "$COMPILE_SUCCESS_COUNT" -gt 1 ]; then
-              echo "::error::FAILURE: Detected $COMPILE_SUCCESS_COUNT webpack compilations (expected 1). Tasks may be running twice."
-              echo "  Matching lines:"
-              grep -n "Compiled successfully" precompile_output.txt | head -5
-              FAILURES_FOUND=1
-            fi
-          fi
-
-          # Pattern 2: Duplicate task execution messages (generate_packs)
-          if grep -q "react_on_rails:generate_packs" precompile_output.txt; then
-            GENERATE_PACKS_COUNT=$(grep -c "react_on_rails:generate_packs" precompile_output.txt || true)
-            if [ "$GENERATE_PACKS_COUNT" -gt 1 ]; then
-              echo "::error::FAILURE: react_on_rails:generate_packs task ran $GENERATE_PACKS_COUNT times (should only run once)."
-              echo "  Matching lines:"
-              grep -n "react_on_rails:generate_packs" precompile_output.txt
-              FAILURES_FOUND=1
-            fi
-          fi
-
-          # Pattern 2b: Duplicate locale generation
-          if grep -q "react_on_rails:locale" precompile_output.txt; then
-            LOCALE_COUNT=$(grep -c "react_on_rails:locale" precompile_output.txt || true)
-            if [ "$LOCALE_COUNT" -gt 1 ]; then
-              echo "::error::FAILURE: react_on_rails:locale task ran $LOCALE_COUNT times (should only run once)."
-              echo "  Matching lines:"
-              grep -n "react_on_rails:locale" precompile_output.txt
-              FAILURES_FOUND=1
-            fi
-          fi
-
-          # Pattern 2c: Duplicate webpack builds (check "Built at:" messages)
-          BUILT_AT_COUNT=$(grep -c "Built at:" precompile_output.txt || true)
-          if [ "$BUILT_AT_COUNT" -gt 1 ]; then
-            echo "::error::FAILURE: Detected $BUILT_AT_COUNT webpack builds (expected 1). Tasks may be running twice."
-            echo "  Matching lines:"
-            grep -n "Built at:" precompile_output.txt | head -5
-            FAILURES_FOUND=1
-          fi
-
-          # Pattern 3: Module not found errors
-          if grep -Ei "module not found|cannot find module|can't resolve" precompile_output.txt; then
-            echo "::error::FAILURE: Module resolution errors detected in precompile output."
-            echo "  Sample matching lines:"
-            grep -Ei "module not found|cannot find module|can't resolve" precompile_output.txt | head -3
-            FAILURES_FOUND=1
-          fi
-
-          # Pattern 3b: ENOENT errors (missing files/directories)
-          if grep -q "Error: ENOENT" precompile_output.txt; then
-            echo "::error::FAILURE: Missing file or directory errors detected."
-            echo "  Sample matching lines:"
-            grep -n "Error: ENOENT" precompile_output.txt | head -3
-            FAILURES_FOUND=1
-          fi
-
-          # Pattern 4: Webpack build errors (use specific webpack error markers)
-          if grep -Ei "webpack.*error|failed to compile|compilation failed|ERROR in" precompile_output.txt; then
-            echo "::error::FAILURE: Webpack compilation errors detected."
-            echo "  Sample matching lines:"
-            grep -Ei "webpack.*error|failed to compile|compilation failed|ERROR in" precompile_output.txt | head -3
-            FAILURES_FOUND=1
-          fi
-
-          # Pattern 5: Ruby/Rails errors during precompile (match error class format)
-          if grep -E "(NameError|LoadError|NoMethodError|SyntaxError):" precompile_output.txt; then
-            echo "::error::FAILURE: Ruby errors detected during precompile."
-            echo "  Sample matching lines:"
-            grep -E "(NameError|LoadError|NoMethodError|SyntaxError):" precompile_output.txt | head -3
-            FAILURES_FOUND=1
-          fi
-
-          # Pattern 6: Asset pipeline errors
-          if grep -Ei "Sprockets::FileNotFound|Asset.*was not declared" precompile_output.txt; then
-            echo "::error::FAILURE: Asset pipeline errors detected."
-            echo "  Sample matching lines:"
-            grep -Ei "Sprockets::FileNotFound|Asset.*was not declared" precompile_output.txt | head -3
-            FAILURES_FOUND=1
-          fi
-
-          # Pattern 7: Memory issues
-          if grep -Ei "javascript heap out of memory|killed|out of memory" precompile_output.txt; then
-            echo "::error::FAILURE: Memory-related errors detected."
-            echo "  Sample matching lines:"
-            grep -Ei "javascript heap out of memory|killed|out of memory" precompile_output.txt | head -3
-            FAILURES_FOUND=1
-          fi
-
-          # Pattern 8: Check for warnings that might indicate problems
-          WARNING_COUNT=$(grep -ci "warning" precompile_output.txt || true)
-          if [ "$WARNING_COUNT" -gt 10 ]; then
-            echo "::warning::High number of warnings detected: $WARNING_COUNT warnings found. Please review."
-            echo "  Sample warnings:"
-            grep -i "warning" precompile_output.txt | head -5
-          fi
-
-          # Pattern 9: Deprecation warnings (log for visibility, don't fail)
-          DEPRECATION_COUNT=$(grep -c "DEPRECATION" precompile_output.txt || true)
-          if [ "$DEPRECATION_COUNT" -gt 0 ]; then
-            echo "::warning::Found $DEPRECATION_COUNT deprecation warnings. These may indicate future breakage."
-            echo "  Deprecation messages:"
-            grep -n "DEPRECATION" precompile_output.txt | head -5
-          fi
-
-          if [ "$FAILURES_FOUND" -eq 1 ]; then
-            echo ""
-            echo "=========================================="
-            echo "PRECOMPILE CHECK FAILED"
-            echo "=========================================="
-            echo "Review the output above for details."
-            exit 1
-          fi
-
-          echo ""
-          echo "=========================================="
-          echo "PRECOMPILE CHECK PASSED"
-          echo "=========================================="
-          echo "No known failure patterns detected in precompile output."
+      - name: Validate precompile output
+        run: script/validate-precompile-output react_on_rails/spec/dummy/precompile_output.txt
       - name: Upload precompile output
         if: always()
         uses: actions/upload-artifact@v4

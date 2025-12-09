@@ -1,0 +1,181 @@
+#!/bin/bash
+#
+# Validates assets:precompile output for known failure patterns.
+#
+# Usage:
+#   script/validate-precompile-output <output_file>
+#   RAILS_ENV=production rake assets:precompile 2>&1 | script/validate-precompile-output -
+#
+# Exit codes:
+#   0 - All checks passed
+#   1 - One or more failure patterns detected
+#
+# This script checks for known issues that don't cause precompile to fail
+# but indicate bugs like duplicate task execution or missing dependencies.
+#
+# See: https://github.com/shakacode/react_on_rails/issues/2081
+
+set -e
+
+OUTPUT_FILE="${1:--}"
+
+if [ "$OUTPUT_FILE" = "-" ]; then
+  # Read from stdin to temp file
+  TEMP_FILE=$(mktemp)
+  cat > "$TEMP_FILE"
+  OUTPUT_FILE="$TEMP_FILE"
+  trap "rm -f $TEMP_FILE" EXIT
+fi
+
+if [ ! -f "$OUTPUT_FILE" ]; then
+  echo "Error: Output file '$OUTPUT_FILE' not found"
+  exit 1
+fi
+
+echo "Validating assets:precompile output..."
+echo ""
+
+FAILURES_FOUND=0
+
+# Helper function to report errors (supports GitHub Actions annotations)
+report_error() {
+  local message="$1"
+  if [ -n "$GITHUB_ACTIONS" ]; then
+    echo "::error::$message"
+  else
+    echo "ERROR: $message"
+  fi
+}
+
+# Helper function to report warnings
+report_warning() {
+  local message="$1"
+  if [ -n "$GITHUB_ACTIONS" ]; then
+    echo "::warning::$message"
+  else
+    echo "WARNING: $message"
+  fi
+}
+
+# Pattern 1: Duplicate webpack compilation (indicates rake tasks running twice)
+# Look for webpack's "Compiled successfully" message which appears once per compilation
+if grep -q "Compiled successfully" "$OUTPUT_FILE"; then
+  COMPILE_SUCCESS_COUNT=$(grep -c "Compiled successfully" "$OUTPUT_FILE" || true)
+  if [ "$COMPILE_SUCCESS_COUNT" -gt 1 ]; then
+    report_error "Detected $COMPILE_SUCCESS_COUNT webpack compilations (expected 1). Tasks may be running twice."
+    echo "  See: https://github.com/shakacode/react_on_rails/pull/2052"
+    echo "  Matching lines:"
+    grep -n "Compiled successfully" "$OUTPUT_FILE" | head -5
+    FAILURES_FOUND=1
+  fi
+fi
+
+# Pattern 2: Duplicate task execution messages (generate_packs)
+if grep -q "react_on_rails:generate_packs" "$OUTPUT_FILE"; then
+  GENERATE_PACKS_COUNT=$(grep -c "react_on_rails:generate_packs" "$OUTPUT_FILE" || true)
+  if [ "$GENERATE_PACKS_COUNT" -gt 1 ]; then
+    report_error "react_on_rails:generate_packs task ran $GENERATE_PACKS_COUNT times (should only run once)."
+    echo "  Matching lines:"
+    grep -n "react_on_rails:generate_packs" "$OUTPUT_FILE"
+    FAILURES_FOUND=1
+  fi
+fi
+
+# Pattern 2b: Duplicate locale generation
+if grep -q "react_on_rails:locale" "$OUTPUT_FILE"; then
+  LOCALE_COUNT=$(grep -c "react_on_rails:locale" "$OUTPUT_FILE" || true)
+  if [ "$LOCALE_COUNT" -gt 1 ]; then
+    report_error "react_on_rails:locale task ran $LOCALE_COUNT times (should only run once)."
+    echo "  Matching lines:"
+    grep -n "react_on_rails:locale" "$OUTPUT_FILE"
+    FAILURES_FOUND=1
+  fi
+fi
+
+# Pattern 2c: Duplicate webpack builds (check "Built at:" messages)
+BUILT_AT_COUNT=$(grep -c "Built at:" "$OUTPUT_FILE" || true)
+if [ "$BUILT_AT_COUNT" -gt 1 ]; then
+  report_error "Detected $BUILT_AT_COUNT webpack builds (expected 1). Tasks may be running twice."
+  echo "  Matching lines:"
+  grep -n "Built at:" "$OUTPUT_FILE" | head -5
+  FAILURES_FOUND=1
+fi
+
+# Pattern 3: Module not found errors
+if grep -Ei "module not found|cannot find module|can't resolve" "$OUTPUT_FILE"; then
+  report_error "Module resolution errors detected in precompile output."
+  echo "  Sample matching lines:"
+  grep -Ei "module not found|cannot find module|can't resolve" "$OUTPUT_FILE" | head -3
+  FAILURES_FOUND=1
+fi
+
+# Pattern 3b: ENOENT errors (missing files/directories)
+if grep -q "Error: ENOENT" "$OUTPUT_FILE"; then
+  report_error "Missing file or directory errors detected."
+  echo "  Sample matching lines:"
+  grep -n "Error: ENOENT" "$OUTPUT_FILE" | head -3
+  FAILURES_FOUND=1
+fi
+
+# Pattern 4: Webpack build errors (use specific webpack error markers)
+if grep -Ei "webpack.*error|failed to compile|compilation failed|ERROR in" "$OUTPUT_FILE"; then
+  report_error "Webpack compilation errors detected."
+  echo "  Sample matching lines:"
+  grep -Ei "webpack.*error|failed to compile|compilation failed|ERROR in" "$OUTPUT_FILE" | head -3
+  FAILURES_FOUND=1
+fi
+
+# Pattern 5: Ruby/Rails errors during precompile (match error class format)
+if grep -E "(NameError|LoadError|NoMethodError|SyntaxError):" "$OUTPUT_FILE"; then
+  report_error "Ruby errors detected during precompile."
+  echo "  Sample matching lines:"
+  grep -E "(NameError|LoadError|NoMethodError|SyntaxError):" "$OUTPUT_FILE" | head -3
+  FAILURES_FOUND=1
+fi
+
+# Pattern 6: Asset pipeline errors
+if grep -Ei "Sprockets::FileNotFound|Asset.*was not declared" "$OUTPUT_FILE"; then
+  report_error "Asset pipeline errors detected."
+  echo "  Sample matching lines:"
+  grep -Ei "Sprockets::FileNotFound|Asset.*was not declared" "$OUTPUT_FILE" | head -3
+  FAILURES_FOUND=1
+fi
+
+# Pattern 7: Memory issues
+if grep -Ei "javascript heap out of memory|killed|out of memory" "$OUTPUT_FILE"; then
+  report_error "Memory-related errors detected."
+  echo "  Sample matching lines:"
+  grep -Ei "javascript heap out of memory|killed|out of memory" "$OUTPUT_FILE" | head -3
+  FAILURES_FOUND=1
+fi
+
+# Pattern 8: Check for warnings that might indicate problems
+WARNING_COUNT=$(grep -ci "warning" "$OUTPUT_FILE" || true)
+if [ "$WARNING_COUNT" -gt 10 ]; then
+  report_warning "High number of warnings detected: $WARNING_COUNT warnings found. Please review."
+  echo "  Sample warnings:"
+  grep -i "warning" "$OUTPUT_FILE" | head -5
+fi
+
+# Pattern 9: Deprecation warnings (log for visibility, don't fail)
+DEPRECATION_COUNT=$(grep -c "DEPRECATION" "$OUTPUT_FILE" || true)
+if [ "$DEPRECATION_COUNT" -gt 0 ]; then
+  report_warning "Found $DEPRECATION_COUNT deprecation warnings. These may indicate future breakage."
+  echo "  Deprecation messages:"
+  grep -n "DEPRECATION" "$OUTPUT_FILE" | head -5
+fi
+
+echo ""
+if [ "$FAILURES_FOUND" -eq 1 ]; then
+  echo "=========================================="
+  echo "PRECOMPILE VALIDATION FAILED"
+  echo "=========================================="
+  echo "Review the errors above for details."
+  exit 1
+fi
+
+echo "=========================================="
+echo "PRECOMPILE VALIDATION PASSED"
+echo "=========================================="
+echo "No known failure patterns detected."
+exit 0
