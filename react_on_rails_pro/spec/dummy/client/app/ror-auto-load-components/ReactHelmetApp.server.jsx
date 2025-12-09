@@ -40,7 +40,7 @@ export default async (props, _railsContext) => {
 
   const promiseObject = {
     componentHtml,
-    title: helmet ? helmet.title.toString() : '',
+    title: helmet?.title?.toString() || '',
   };
   return promiseObject;
 };

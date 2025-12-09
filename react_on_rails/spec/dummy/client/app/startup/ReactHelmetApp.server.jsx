@@ -30,7 +30,7 @@ export default (props, _railsContext) => {
 
   const renderedHtml = {
     componentHtml,
-    title: helmet ? helmet.title.toString() : '',
+    title: helmet?.title?.toString() || '',
   };
 
   // Note that this function returns an Object for server rendering.

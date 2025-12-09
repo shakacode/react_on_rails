@@ -29,13 +29,13 @@ const loadableApp = (props, railsContext) => {
   return {
     renderedHtml: {
       componentHtml,
-      link: helmet ? helmet.link.toString() : '',
+      link: helmet?.link?.toString() || '',
       linkTags: extractor.getLinkTags(),
       styleTags: extractor.getStyleTags(),
-      meta: helmet ? helmet.meta.toString() : '',
+      meta: helmet?.meta?.toString() || '',
       scriptTags: extractor.getScriptTags(),
-      style: helmet ? helmet.style.toString() : '',
-      title: helmet ? helmet.title.toString() : '',
+      style: helmet?.style?.toString() || '',
+      title: helmet?.title?.toString() || '',
     },
   };
 };

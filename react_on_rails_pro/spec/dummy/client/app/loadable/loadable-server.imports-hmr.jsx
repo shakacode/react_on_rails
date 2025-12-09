@@ -19,10 +19,10 @@ const hmrApp = (props, railsContext) => {
   return {
     renderedHtml: {
       componentHtml,
-      link: helmet ? helmet.link.toString() : '',
-      meta: helmet ? helmet.meta.toString() : '',
-      style: helmet ? helmet.style.toString() : '',
-      title: helmet ? helmet.title.toString() : '',
+      link: helmet?.link?.toString() || '',
+      meta: helmet?.meta?.toString() || '',
+      style: helmet?.style?.toString() || '',
+      title: helmet?.title?.toString() || '',
     },
   };
 };
