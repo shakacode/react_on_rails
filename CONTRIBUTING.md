@@ -26,14 +26,15 @@ During this transition:
 
 Git hooks are installed automatically when you run the standard setup commands. They will run automatic linting on **all changed files (staged + unstaged + untracked)** - making commits fast while preventing CI failures.
 
+- After cloning the repo, run `bin/setup` from the root directory to install all dependencies.
+
 - After updating code via Git, to prepare all examples:
 
 ```sh
-cd react_on_rails/
 bundle && pnpm install && rake shakapacker_examples:gen_all && rake node_package && rake
 ```
 
-See [Dev Initial Setup](#dev-initial-setup) below for, well... initial setup,
+See [Dev Initial Setup](#dev-initial-setup) below for initial setup details,
 and [Running tests](#running-tests) for more details on running tests.
 
 # IDE/IDE SETUP
@@ -199,9 +200,45 @@ or the equivalent command for your package manager.
 
 ## Dev Initial Setup
 
-### Prereqs
+### Quick Setup (Recommended)
 
-After checking out the repo, making sure you have Ruby and Node version managers set up (such as rvm and nvm, or rbenv and nodenv, etc.), cd to `react_on_rails/spec/dummy` and run `bin/setup` to install ruby dependencies. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
+After checking out the repo and ensuring you have Ruby and Node version managers set up (such as rvm and nvm, or rbenv and nodenv, etc.), run:
+
+```sh
+bin/setup
+```
+
+This single command installs all dependencies across the monorepo:
+- Root pnpm and bundle dependencies
+- Builds the node package
+- Sets up `react_on_rails/spec/dummy`
+- Sets up `react_on_rails_pro` (if present)
+- Sets up `react_on_rails_pro/spec/dummy` (if present)
+- Sets up `react_on_rails_pro/spec/execjs-compatible-dummy` (if present)
+
+### Manual Setup (Alternative)
+
+If you prefer to set up manually or need more control:
+
+1. Install root dependencies:
+```sh
+bundle install
+pnpm install
+```
+
+2. Build the node package:
+```sh
+rake node_package
+```
+
+3. Set up the dummy app:
+```sh
+cd react_on_rails/spec/dummy
+bundle install
+pnpm install
+```
+
+You can also run `bin/console` for an interactive prompt that will allow you to experiment.
 
 ### Local Node Package
 
