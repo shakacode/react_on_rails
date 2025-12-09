@@ -50,6 +50,8 @@ _Add changes in master not yet tagged._
 
 - Fixed compatibility issue with httpx 1.6.x by explicitly requiring http-2 >= 1.1.1. [PR 2141](https://github.com/shakacode/react_on_rails/pull/2141) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
+- **Client Disconnect Handling for Streaming**: Added error handling for client disconnects during streaming. When a client disconnects mid-stream (browser closed, network drop), the system now catches `IOError`/`Errno::EPIPE`, sets a `client_disconnected` flag, stops the barrier to cancel producer tasks, and logs the disconnect for debugging. Prevents wasted CPU from producers continuing after the writer fails. [PR 2137](https://github.com/shakacode/react_on_rails/pull/2137) by [justin808](https://github.com/justin808).
+
 - **Node Renderer Worker Restart**: Fixed "descriptor closed" error that occurred when the node renderer restarts while handling an in-progress request (especially streaming requests). Workers now perform graceful shutdowns: they disconnect from the cluster to stop receiving new requests, wait for active requests to complete, then shut down cleanly. A configurable `gracefulWorkerRestartTimeout` ensures workers are forcibly killed if they don't shut down in time. [PR 1970](https://github.com/shakacode/react_on_rails/pull/1970) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 - **Body Duplication Bug On Streaming**: Fixed a bug that happens while streaming if the node renderer connection closed after streaming some chunks to the client. [PR 1995](https://github.com/shakacode/react_on_rails/pull/1995) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
