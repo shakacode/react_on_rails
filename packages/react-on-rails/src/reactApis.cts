@@ -41,6 +41,19 @@ type HydrateOrRenderType = (domNode: Element, reactElement: ReactElement) => Ren
 // These methods exist at runtime but are removed from @types/react-dom@19
 const legacyReactDOM = ReactDOM as unknown as LegacyReactDOM;
 
+// Validate legacy APIs exist at runtime when needed (React < 18)
+if (!supportsRootApi) {
+  if (typeof legacyReactDOM.hydrate !== 'function') {
+    throw new Error('React legacy hydrate API not available. Expected React 16/17.');
+  }
+  if (typeof legacyReactDOM.render !== 'function') {
+    throw new Error('React legacy render API not available. Expected React 16/17.');
+  }
+  if (typeof legacyReactDOM.unmountComponentAtNode !== 'function') {
+    throw new Error('React legacy unmountComponentAtNode API not available. Expected React 16/17.');
+  }
+}
+
 /* eslint-disable @typescript-eslint/no-non-null-assertion -- reactDomClient is always defined when supportsRootApi is true */
 export const reactHydrate: HydrateOrRenderType = supportsRootApi
   ? reactDomClient!.hydrateRoot
