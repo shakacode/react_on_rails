@@ -133,6 +133,10 @@ jobs:
         run: cd react_on_rails/spec/dummy && pnpm run build:rescript
       - name: Generate file system-based packs
         run: cd react_on_rails/spec/dummy && RAILS_ENV=production bundle exec rake react_on_rails:generate_packs
+      - name: Clean compiled assets
+        # Clobber removes both Sprockets assets (public/assets) and webpack output (public/webpack)
+        # This ensures we test a fresh build, not cached "Everything's up-to-date" output
+        run: cd react_on_rails/spec/dummy && RAILS_ENV=production bundle exec rake assets:clobber
       - name: Run assets:precompile and capture output
         # Timeout prevents hung webpack processes from running for 6 hours.
         # Typical precompile takes 2-5 minutes; 15 minutes is generous.
