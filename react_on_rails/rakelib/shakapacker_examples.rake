@@ -50,6 +50,9 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
     update_react_dependencies(deps, react_version)
     # Shakapacker 8.2.0 requires webpack-assets-manifest ^5.x (check devDependencies too)
     dev_deps["webpack-assets-manifest"] = "^5.0.6" if dev_deps&.key?("webpack-assets-manifest")
+    # Shakapacker 8.2.0 requires babel-loader to be explicitly installed as a devDependency
+    # (in 9.x this requirement was relaxed or the package structure changed)
+    dev_deps["babel-loader"] = "^9.1.3" if dev_deps
     update_shakapacker_dependency(deps, dev_deps)
 
     # Add npm overrides to force specific React version, preventing yalc-linked
