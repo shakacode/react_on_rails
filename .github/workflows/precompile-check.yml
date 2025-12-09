@@ -113,9 +113,10 @@ jobs:
       - name: yalc publish for react-on-rails
         run: cd packages/react-on-rails && yalc publish
       - name: yalc add react-on-rails
-        # Use --link to maintain the link: protocol that matches pnpm-lock.yaml
-        run: cd react_on_rails/spec/dummy && yalc add --link react-on-rails
+        run: cd react_on_rails/spec/dummy && yalc add react-on-rails
       - name: Install Node modules with pnpm for dummy app
+        # --ignore-workspace prevents pnpm from treating this as part of the parent workspace
+        # The dummy app doesn't have a pnpm-lock.yaml
         run: cd react_on_rails/spec/dummy && pnpm install --ignore-workspace
       - name: Save dummy app ruby gems to cache
         uses: actions/cache@v4

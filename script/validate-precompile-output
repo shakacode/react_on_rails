@@ -141,6 +141,10 @@ if grep -q "react_on_rails:locale" "$OUTPUT_FILE"; then
 fi
 
 # Pattern 2c: Duplicate webpack builds (alternative detection via "Built at:" timestamp)
+# Note: This check complements Pattern 1's "Compiled successfully" check.
+# - "Compiled successfully" is from webpack's stats output (may be absent if build fails)
+# - "Built at:" is webpack's timestamp header (always present even on failed builds)
+# Both are checked to catch duplicates regardless of build success/failure.
 BUILT_AT_COUNT=$(grep -c "Built at:" "$OUTPUT_FILE" || true)
 if [ "$BUILT_AT_COUNT" -gt 1 ]; then
   report_error "Detected $BUILT_AT_COUNT webpack builds (expected 1). Tasks may be running twice."
@@ -155,7 +159,8 @@ fi
 # Prevents: Missing npm packages or incorrect import paths that precompile may not fail on.
 # Important: Uses strict matching to avoid false positives from deprecation warnings
 #            or informational messages that contain similar phrases.
-# Only matches when preceded by ERROR, Error:, or webpack's "Module not found: Error:" format.
+# Matches webpack's standard format: "Module not found: Error: Can't resolve 'package' in '/path'"
+# Also matches error messages preceded by ERROR or Error: keywords.
 if grep -Ei "(^|\s)(ERROR|Error:).*module not found|(^|\s)(ERROR|Error:).*cannot find module|(^|\s)(ERROR|Error:).*can't resolve|Module not found: Error:" "$OUTPUT_FILE"; then
   report_error "Module resolution errors detected in precompile output."
   echo "  Sample matching lines:"
@@ -247,11 +252,12 @@ fi
 # Pattern 7: Memory issues
 # ==============================================================================
 # Prevents: OOM kills that can happen silently with webpack on large codebases.
-# Note: "killed" alone may have false positives; consider tightening if needed.
-if grep -Ei "javascript heap out of memory|killed|out of memory" "$OUTPUT_FILE"; then
+# Uses word boundary (\b) for "Killed" to avoid matching "killed the bug" etc.
+# "Killed" (capital K) is the typical OOM killer message format.
+if grep -Ei "javascript heap out of memory|\bKilled\b|out of memory" "$OUTPUT_FILE"; then
   report_error "Memory-related errors detected."
   echo "  Sample matching lines:"
-  grep -Ei "javascript heap out of memory|killed|out of memory" "$OUTPUT_FILE" | head -3
+  grep -Ei "javascript heap out of memory|\bKilled\b|out of memory" "$OUTPUT_FILE" | head -3
   FAILURES_FOUND=1
 fi
 
