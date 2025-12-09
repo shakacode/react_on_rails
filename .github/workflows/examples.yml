@@ -183,7 +183,7 @@ jobs:
       - name: Main CI - Latest version examples
         if: matrix.dependency-level == 'latest'
         run: cd react_on_rails && bundle exec rake run_rspec:shakapacker_examples_latest
-      - name: Main CI - Pinned version examples (React 17 and 18)
+      - name: Main CI - Pinned version examples (minimum: React 18.0.0, Shakapacker 8.2.0)
         if: matrix.dependency-level == 'minimum'
         run: cd react_on_rails && bundle exec rake run_rspec:shakapacker_examples_pinned
       - name: Store test results
