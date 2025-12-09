@@ -13,12 +13,21 @@ describe InstallGenerator, type: :generator do
     include_examples "base_generator", application_js: true
     include_examples "no_redux_generator"
 
-    it "installs SWC dependencies by default (Shakapacker 9.3.0+ default transpiler)" do
+    it "installs appropriate transpiler dependencies based on Shakapacker version" do
       assert_file "package.json" do |content|
         package_json = JSON.parse(content)
         # SWC is the default transpiler for Shakapacker 9.3.0+
-        expect(package_json["devDependencies"]).to include("@swc/core")
-        expect(package_json["devDependencies"]).to include("swc-loader")
+        # Babel is the default for older versions
+        swc_is_default = ReactOnRails::PackerUtils.shakapacker_version_requirement_met?("9.3.0")
+
+        if swc_is_default
+          expect(package_json["devDependencies"]).to include("@swc/core")
+          expect(package_json["devDependencies"]).to include("swc-loader")
+        else
+          # For older Shakapacker versions, SWC is NOT installed by default
+          # (Babel is the default, but we don't install Babel deps since Shakapacker handles it)
+          expect(package_json["devDependencies"]).not_to include("@swc/core")
+        end
       end
     end
   end

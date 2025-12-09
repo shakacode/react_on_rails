@@ -155,10 +155,15 @@ RSpec.describe GeneratorHelper, type: :generator do
           default: &default
             source_path: app/javascript
         YAML
+        # Stub to simulate Shakapacker 9.3.0+ where SWC is default
+        stub_const("ReactOnRails::PackerUtils", Class.new do
+          def self.shakapacker_version_requirement_met?(version)
+            version == "9.3.0"
+          end
+        end)
       end
 
       it "returns true for Shakapacker 9.3.0+ (SWC is default)" do
-        # The method assumes latest Shakapacker when version detection fails
         expect(using_swc?).to be true
       end
     end
@@ -166,9 +171,15 @@ RSpec.describe GeneratorHelper, type: :generator do
     context "when shakapacker.yml does not exist" do
       before do
         FileUtils.rm_f(shakapacker_yml_path)
+        # Stub to simulate Shakapacker 9.3.0+ where SWC is default
+        stub_const("ReactOnRails::PackerUtils", Class.new do
+          def self.shakapacker_version_requirement_met?(version)
+            version == "9.3.0"
+          end
+        end)
       end
 
-      it "returns true for fresh installations (SWC is recommended)" do
+      it "returns true for fresh installations with Shakapacker 9.3.0+" do
         expect(using_swc?).to be true
       end
     end
@@ -176,6 +187,12 @@ RSpec.describe GeneratorHelper, type: :generator do
     context "when shakapacker.yml has parse errors" do
       before do
         File.write(shakapacker_yml_path, "invalid: yaml: [}")
+        # Stub to simulate Shakapacker 9.3.0+ where SWC is default
+        stub_const("ReactOnRails::PackerUtils", Class.new do
+          def self.shakapacker_version_requirement_met?(version)
+            version == "9.3.0"
+          end
+        end)
       end
 
       it "returns true (assumes latest Shakapacker with SWC default)" do
