@@ -63,18 +63,3 @@ gsub_file_content(
 )
 # test:rsc script now automatically detects React version and skips on React 18
 # No override needed - the script checks React version and exits cleanly if < 19
-# Keep modern JSX transform for React 18+
-# gsub_file_content("../tsconfig.json", "react-jsx", "react")
-# gsub_file_content("../spec/dummy/babel.config.js", "runtime: 'automatic'", "runtime: 'classic'")
-# Keep modern ReScript configuration for React 18+
-# gsub_file_content("../spec/dummy/rescript.json", '"version": 4', '"version": 4, "mode": "classic"')
-# Skip React 16 file replacements since we're using React 18+
-# Dir.glob(File.expand_path("../spec/dummy/**/app-react16/**/*.*", __dir__)).each do |file|
-#   move(file, file.gsub("-react16", ""))
-# end
-
-# These replacements were incorrect - generateWebpackConfig() is the correct function from shakapacker
-# gsub_file_content("../spec/dummy/config/webpack/commonWebpackConfig.js", /generateWebpackConfig(\(\))?/,
-#                   "webpackConfig")
-#
-# gsub_file_content("../spec/dummy/config/webpack/webpack.config.js", /generateWebpackConfig(\(\))?/, "webpackConfig")
