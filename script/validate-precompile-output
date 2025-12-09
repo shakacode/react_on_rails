@@ -180,12 +180,32 @@ fi
 # Matches:
 # - "^ERROR in ./": Webpack's standard error format for file-specific errors
 # - "failed to compile": Direct compilation failure message
-# - "compilation failed": Explicit failure message
+# - "COMPILATION FAILED": Shakapacker's explicit failure message (uppercase)
 # - "Module build failed": Loader/build errors (e.g., babel, css-loader failures)
-if grep -Ei "^ERROR in [./]|failed to compile|compilation failed|Module build failed" "$OUTPUT_FILE"; then
+if grep -Ei "^ERROR in [./]|failed to compile|COMPILATION FAILED|Module build failed" "$OUTPUT_FILE"; then
   report_error "Webpack compilation errors detected."
   echo "  Sample matching lines:"
-  grep -Ei "^ERROR in [./]|failed to compile|compilation failed|Module build failed" "$OUTPUT_FILE" | head -3
+  grep -Ei "^ERROR in [./]|failed to compile|COMPILATION FAILED|Module build failed" "$OUTPUT_FILE" | head -3
+  # Show context around COMPILATION FAILED for more useful error info
+  if grep -q "COMPILATION FAILED" "$OUTPUT_FILE"; then
+    echo ""
+    echo "  Context around compilation failure:"
+    grep -A 20 "COMPILATION FAILED" "$OUTPUT_FILE" | head -25
+  fi
+  FAILURES_FOUND=1
+fi
+
+# ==============================================================================
+# Pattern 4b: Missing webpack CLI
+# ==============================================================================
+# Prevents: Confusing errors when webpack-cli is not installed.
+# Webpack 5+ requires webpack-cli as a separate dependency.
+# Symptom: "CLI for webpack must be installed" message during compilation.
+if grep -q "CLI for webpack must be installed" "$OUTPUT_FILE"; then
+  report_error "webpack-cli is not installed."
+  echo "  This is a required dependency for webpack builds."
+  echo "  To fix: pnpm add -D webpack-cli"
+  echo "  Or: npm install -D webpack-cli"
   FAILURES_FOUND=1
 fi
 
