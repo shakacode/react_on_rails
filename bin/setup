@@ -6,8 +6,9 @@
 # making it easy for new contributors to get started quickly.
 #
 # Usage:
-#   bin/setup         # Full setup of all packages
-#   bin/setup --help  # Show this help message
+#   bin/setup              # Full setup of all packages
+#   bin/setup --skip-pro   # Skip Pro package setup
+#   bin/setup --help       # Show this help message
 #
 
 set -e
@@ -23,6 +24,12 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# Track start time for elapsed time display
+START_TIME=$(date +%s)
+
+# Flags
+SKIP_PRO=false
+
 show_help() {
   echo "Usage: bin/setup [OPTIONS]"
   echo ""
@@ -30,15 +37,16 @@ show_help() {
   echo "all dependencies across the monorepo."
   echo ""
   echo "Options:"
-  echo "  --help    Show this help message"
+  echo "  --skip-pro  Skip react_on_rails_pro setup (for contributors without Pro access)"
+  echo "  --help      Show this help message"
   echo ""
   echo "This script will:"
   echo "  1. Install root pnpm and bundle dependencies"
   echo "  2. Build the node package"
   echo "  3. Set up react_on_rails/spec/dummy"
-  echo "  4. Set up react_on_rails_pro (if present)"
-  echo "  5. Set up react_on_rails_pro/spec/dummy (if present)"
-  echo "  6. Set up react_on_rails_pro/spec/execjs-compatible-dummy (if present)"
+  echo "  4. Set up react_on_rails_pro (if present and not skipped)"
+  echo "  5. Set up react_on_rails_pro/spec/dummy (if present and not skipped)"
+  echo "  6. Set up react_on_rails_pro/spec/execjs-compatible-dummy (if present and not skipped)"
 }
 
 print_step() {
@@ -98,6 +106,26 @@ check_prerequisites() {
     done
     exit 1
   fi
+
+  # Display versions found
+  echo "  Ruby:    $(ruby -v | head -1)"
+  echo "  Node:    $(node -v)"
+  echo "  pnpm:    $(pnpm -v)"
+  echo "  Bundler: $(bundle -v)"
+}
+
+verify_root_directory() {
+  if [ ! -f "$ROOT_DIR/Rakefile" ]; then
+    print_error "Rakefile not found. Are you in the correct directory?"
+    print_error "Expected location: $ROOT_DIR/Rakefile"
+    exit 1
+  fi
+
+  if [ ! -f "$ROOT_DIR/package.json" ]; then
+    print_error "package.json not found. Are you in the correct directory?"
+    print_error "Expected location: $ROOT_DIR/package.json"
+    exit 1
+  fi
 }
 
 install_dependencies() {
@@ -118,32 +146,91 @@ install_dependencies() {
     if bundle check &> /dev/null; then
       print_success "Ruby dependencies already satisfied"
     else
-      bundle install
+      if ! bundle install; then
+        print_error "Failed to install Ruby dependencies in $name"
+        exit 1
+      fi
       print_success "Ruby dependencies installed"
     fi
   fi
 
   # Install JS dependencies if package.json exists
+  # Use --frozen-lockfile to match CI behavior and ensure lockfile integrity
   if [ -f "package.json" ]; then
     echo "  Installing JavaScript dependencies..."
-    pnpm install
+    if ! pnpm install --frozen-lockfile; then
+      print_error "Failed to install JavaScript dependencies in $name"
+      exit 1
+    fi
     print_success "JavaScript dependencies installed"
   fi
 
   cd "$ROOT_DIR"
 }
 
-main() {
-  # Handle --help
-  if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
-    show_help
-    exit 0
+build_node_package() {
+  print_step "Building node package..."
+  if ! rake node_package; then
+    print_error "Failed to build node package"
+    exit 1
   fi
+  print_success "Node package built"
+}
+
+verify_build_artifacts() {
+  print_step "Verifying build artifacts..."
+
+  local artifact="packages/react-on-rails/lib/ReactOnRails.full.js"
+  if [ ! -f "$ROOT_DIR/$artifact" ]; then
+    print_error "Build failed: $artifact not found"
+    print_error "Expected location: $ROOT_DIR/$artifact"
+    exit 1
+  fi
+  print_success "Build artifacts verified"
+}
+
+show_elapsed_time() {
+  local END_TIME=$(date +%s)
+  local ELAPSED=$((END_TIME - START_TIME))
+  local MINUTES=$((ELAPSED / 60))
+  local SECONDS=$((ELAPSED % 60))
+
+  if [ $MINUTES -gt 0 ]; then
+    echo -e "Total time: ${BLUE}${MINUTES}m ${SECONDS}s${NC}"
+  else
+    echo -e "Total time: ${BLUE}${SECONDS}s${NC}"
+  fi
+}
+
+main() {
+  # Parse arguments
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      --help|-h)
+        show_help
+        exit 0
+        ;;
+      --skip-pro)
+        SKIP_PRO=true
+        shift
+        ;;
+      *)
+        print_error "Unknown option: $1"
+        echo "Run 'bin/setup --help' for usage information."
+        exit 1
+        ;;
+    esac
+  done
 
   echo -e "${GREEN}Setting up React on Rails development environment...${NC}"
   echo ""
 
   cd "$ROOT_DIR"
+
+  # Verify we're in the correct directory
+  print_step "Verifying project directory..."
+  verify_root_directory
+  print_success "Project directory verified"
 
   # Check prerequisites
   print_step "Checking prerequisites..."
@@ -154,15 +241,18 @@ main() {
   install_dependencies "$ROOT_DIR" "root directory"
 
   # Build node package
-  print_step "Building node package..."
-  rake node_package
-  print_success "Node package built"
+  build_node_package
+
+  # Verify build artifacts
+  verify_build_artifacts
 
   # react_on_rails/spec/dummy
   install_dependencies "$ROOT_DIR/react_on_rails/spec/dummy" "react_on_rails/spec/dummy"
 
-  # react_on_rails_pro (if present)
-  if [ -d "$ROOT_DIR/react_on_rails_pro" ]; then
+  # react_on_rails_pro (if present and not skipped)
+  if [ "$SKIP_PRO" = true ]; then
+    print_warning "Skipping react_on_rails_pro setup (--skip-pro flag)"
+  elif [ -d "$ROOT_DIR/react_on_rails_pro" ]; then
     install_dependencies "$ROOT_DIR/react_on_rails_pro" "react_on_rails_pro"
 
     # react_on_rails_pro/spec/dummy
@@ -176,6 +266,10 @@ main() {
   echo -e "${GREEN}========================================${NC}"
   echo -e "${GREEN}Setup complete!${NC}"
   echo -e "${GREEN}========================================${NC}"
+  show_elapsed_time
+  echo ""
+  echo "Git hooks have been automatically installed during setup."
+  echo "They will run linting on changed files before each commit."
   echo ""
   echo "You can now run:"
   echo "  rake              # Run all tests"

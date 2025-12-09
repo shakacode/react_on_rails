@@ -202,10 +202,18 @@ or the equivalent command for your package manager.
 
 ### Quick Setup (Recommended)
 
-After checking out the repo and ensuring you have Ruby and Node version managers set up (such as rvm and nvm, or rbenv and nodenv, etc.), run:
+After checking out the repo and ensuring you have Ruby and Node version managers set up (such as rvm and nvm, or rbenv and nodenv, etc.) with the correct versions active, run:
 
 ```sh
+# First, verify your versions match the project requirements
+ruby -v  # Should show 3.4.x or version in .ruby-version
+node -v  # Should show 22.x or version in .node-version
+
+# Then run the setup script
 bin/setup
+
+# Or skip Pro setup (for contributors without Pro access)
+bin/setup --skip-pro
 ```
 
 This single command installs all dependencies across the monorepo:
