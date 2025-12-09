@@ -129,6 +129,9 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
         apply_react_version(example_type.dir, example_type.react_version_string)
         # Re-run bundle install since Gemfile was updated with pinned shakapacker version
         bundle_install_in(example_type.dir)
+        # Regenerate Shakapacker binstubs after downgrading from 9.x to 8.2.x
+        # The binstub format may differ between major versions
+        unbundled_sh_in_dir(example_type.dir, "bundle exec rake shakapacker:binstubs")
       end
 
       # Use --legacy-peer-deps for pinned React version examples to avoid peer dependency
