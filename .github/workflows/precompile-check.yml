@@ -133,6 +133,9 @@ jobs:
       - name: Generate file system-based packs
         run: cd react_on_rails/spec/dummy && RAILS_ENV=production bundle exec rake react_on_rails:generate_packs
       - name: Run assets:precompile and capture output
+        # Timeout prevents hung webpack processes from running for 6 hours.
+        # Typical precompile takes 2-5 minutes; 15 minutes is generous.
+        timeout-minutes: 15
         run: |
           cd react_on_rails/spec/dummy
 

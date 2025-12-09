@@ -4,7 +4,15 @@
 #
 # Usage:
 #   script/validate-precompile-output <output_file>
+#
+#   # When piping, MUST use pipefail to catch rake failures:
+#   set -o pipefail
 #   RAILS_ENV=production rake assets:precompile 2>&1 | script/validate-precompile-output -
+#
+#   # Or use tee to capture output and check exit code separately:
+#   RAILS_ENV=production rake assets:precompile 2>&1 | tee output.txt
+#   if [ ${PIPESTATUS[0]} -ne 0 ]; then echo "Rake failed!"; exit 1; fi
+#   script/validate-precompile-output output.txt
 #
 # Exit codes:
 #   0 - All checks passed
@@ -12,6 +20,10 @@
 #
 # This script checks for known issues that don't cause precompile to fail
 # but indicate bugs like duplicate task execution or missing dependencies.
+#
+# Environment variables:
+#   MIN_EXPECTED_LINES - Minimum lines expected in output (default: 10)
+#   WARNING_THRESHOLD  - Warning count threshold before alerting (default: 20)
 #
 # See: https://github.com/shakacode/react_on_rails/issues/2081
 
@@ -24,12 +36,37 @@ if [ "$OUTPUT_FILE" = "-" ]; then
   TEMP_FILE=$(mktemp)
   cat > "$TEMP_FILE"
   OUTPUT_FILE="$TEMP_FILE"
-  trap "rm -f $TEMP_FILE" EXIT
+  trap 'rm -f "$TEMP_FILE"' EXIT
 fi
 
 if [ ! -f "$OUTPUT_FILE" ]; then
   echo "Error: Output file '$OUTPUT_FILE' not found"
   exit 1
+fi
+
+# Check for empty or suspiciously small output
+# A successful precompile produces substantial output (webpack stats, asset listing, etc.)
+# Empty or very small output usually indicates the command failed before producing anything.
+OUTPUT_SIZE=$(wc -c < "$OUTPUT_FILE" | tr -d ' ')
+OUTPUT_LINES=$(wc -l < "$OUTPUT_FILE" | tr -d ' ')
+
+if [ "$OUTPUT_SIZE" -eq 0 ]; then
+  echo "Error: Output file is empty."
+  echo "This usually means the precompile command failed before producing any output."
+  echo "Check that all dependencies are installed (bundle install, pnpm install)."
+  exit 1
+fi
+
+# Minimum expected lines for a successful precompile (webpack output alone is 50+ lines)
+MIN_EXPECTED_LINES="${MIN_EXPECTED_LINES:-10}"
+if [ "$OUTPUT_LINES" -lt "$MIN_EXPECTED_LINES" ]; then
+  echo "Warning: Output file has only $OUTPUT_LINES lines (expected at least $MIN_EXPECTED_LINES)."
+  echo "This may indicate the precompile failed early. Output contents:"
+  echo "---"
+  cat "$OUTPUT_FILE"
+  echo "---"
+  echo ""
+  echo "If this is expected, set MIN_EXPECTED_LINES=0 to disable this check."
 fi
 
 echo "Validating assets:precompile output..."
@@ -57,8 +94,14 @@ report_warning() {
   fi
 }
 
+# ==============================================================================
 # Pattern 1: Duplicate webpack compilation (indicates rake tasks running twice)
-# Look for webpack's "Compiled successfully" message which appears once per compilation
+# ==============================================================================
+# Prevents: Rails::Engine loading rake tasks twice, causing double webpack builds
+# History: PR #2052 fixed this - Engine's rake_tasks block was explicitly loading
+#          tasks from lib/tasks/, but Rails::Engine already does this automatically.
+# Symptom: "Compiled successfully" appears 2+ times in output, doubling build time.
+# See: https://github.com/shakacode/react_on_rails/pull/2052
 if grep -q "Compiled successfully" "$OUTPUT_FILE"; then
   COMPILE_SUCCESS_COUNT=$(grep -c "Compiled successfully" "$OUTPUT_FILE" || true)
   if [ "$COMPILE_SUCCESS_COUNT" -gt 1 ]; then
@@ -70,7 +113,12 @@ if grep -q "Compiled successfully" "$OUTPUT_FILE"; then
   fi
 fi
 
-# Pattern 2: Duplicate task execution messages (generate_packs)
+# ==============================================================================
+# Pattern 2: Duplicate task execution (react_on_rails rake tasks)
+# ==============================================================================
+# Prevents: Same root cause as Pattern 1 - rake tasks executing twice.
+# Symptom: react_on_rails:generate_packs or react_on_rails:locale appear multiple times.
+# These tasks generate files, so running twice wastes time and may cause issues.
 if grep -q "react_on_rails:generate_packs" "$OUTPUT_FILE"; then
   GENERATE_PACKS_COUNT=$(grep -c "react_on_rails:generate_packs" "$OUTPUT_FILE" || true)
   if [ "$GENERATE_PACKS_COUNT" -gt 1 ]; then
@@ -81,7 +129,7 @@ if grep -q "react_on_rails:generate_packs" "$OUTPUT_FILE"; then
   fi
 fi
 
-# Pattern 2b: Duplicate locale generation
+# Pattern 2b: Duplicate locale generation (same root cause as 2a)
 if grep -q "react_on_rails:locale" "$OUTPUT_FILE"; then
   LOCALE_COUNT=$(grep -c "react_on_rails:locale" "$OUTPUT_FILE" || true)
   if [ "$LOCALE_COUNT" -gt 1 ]; then
@@ -92,7 +140,7 @@ if grep -q "react_on_rails:locale" "$OUTPUT_FILE"; then
   fi
 fi
 
-# Pattern 2c: Duplicate webpack builds (check "Built at:" messages)
+# Pattern 2c: Duplicate webpack builds (alternative detection via "Built at:" timestamp)
 BUILT_AT_COUNT=$(grep -c "Built at:" "$OUTPUT_FILE" || true)
 if [ "$BUILT_AT_COUNT" -gt 1 ]; then
   report_error "Detected $BUILT_AT_COUNT webpack builds (expected 1). Tasks may be running twice."
@@ -101,15 +149,21 @@ if [ "$BUILT_AT_COUNT" -gt 1 ]; then
   FAILURES_FOUND=1
 fi
 
-# Pattern 3: Module not found errors
-if grep -Ei "module not found|cannot find module|can't resolve" "$OUTPUT_FILE"; then
+# ==============================================================================
+# Pattern 3: Module resolution errors
+# ==============================================================================
+# Prevents: Missing npm packages or incorrect import paths that precompile may not fail on.
+# Important: Uses strict matching to avoid false positives from deprecation warnings
+#            or informational messages that contain similar phrases.
+# Only matches when preceded by ERROR, Error:, or webpack's "Module not found: Error:" format.
+if grep -Ei "(^|\s)(ERROR|Error:).*module not found|(^|\s)(ERROR|Error:).*cannot find module|(^|\s)(ERROR|Error:).*can't resolve|Module not found: Error:" "$OUTPUT_FILE"; then
   report_error "Module resolution errors detected in precompile output."
   echo "  Sample matching lines:"
-  grep -Ei "module not found|cannot find module|can't resolve" "$OUTPUT_FILE" | head -3
+  grep -Ei "(^|\s)(ERROR|Error:).*module not found|(^|\s)(ERROR|Error:).*cannot find module|(^|\s)(ERROR|Error:).*can't resolve|Module not found: Error:" "$OUTPUT_FILE" | head -3
   FAILURES_FOUND=1
 fi
 
-# Pattern 3b: ENOENT errors (missing files/directories)
+# Pattern 3b: ENOENT errors (missing files/directories during build)
 if grep -q "Error: ENOENT" "$OUTPUT_FILE"; then
   report_error "Missing file or directory errors detected."
   echo "  Sample matching lines:"
@@ -117,15 +171,29 @@ if grep -q "Error: ENOENT" "$OUTPUT_FILE"; then
   FAILURES_FOUND=1
 fi
 
-# Pattern 4: Webpack build errors (use specific webpack error markers)
-if grep -Ei "webpack.*error|failed to compile|compilation failed|ERROR in" "$OUTPUT_FILE"; then
+# ==============================================================================
+# Pattern 4: Webpack compilation errors
+# ==============================================================================
+# Prevents: Silent webpack build failures that don't cause precompile to exit non-zero.
+# Important: Uses specific error markers to avoid false positives from benign text
+#            like "webpack handles errors gracefully" in documentation or comments.
+# Matches:
+# - "^ERROR in ./": Webpack's standard error format for file-specific errors
+# - "failed to compile": Direct compilation failure message
+# - "compilation failed": Explicit failure message
+# - "Module build failed": Loader/build errors (e.g., babel, css-loader failures)
+if grep -Ei "^ERROR in [./]|failed to compile|compilation failed|Module build failed" "$OUTPUT_FILE"; then
   report_error "Webpack compilation errors detected."
   echo "  Sample matching lines:"
-  grep -Ei "webpack.*error|failed to compile|compilation failed|ERROR in" "$OUTPUT_FILE" | head -3
+  grep -Ei "^ERROR in [./]|failed to compile|compilation failed|Module build failed" "$OUTPUT_FILE" | head -3
   FAILURES_FOUND=1
 fi
 
-# Pattern 5: Ruby/Rails errors during precompile (match error class format)
+# ==============================================================================
+# Pattern 5: Ruby/Rails errors during precompile
+# ==============================================================================
+# Prevents: Ruby exceptions that are caught/logged but don't fail the rake task.
+# Matches specific exception class names to avoid false positives.
 if grep -E "(NameError|LoadError|NoMethodError|SyntaxError):" "$OUTPUT_FILE"; then
   report_error "Ruby errors detected during precompile."
   echo "  Sample matching lines:"
@@ -133,7 +201,21 @@ if grep -E "(NameError|LoadError|NoMethodError|SyntaxError):" "$OUTPUT_FILE"; th
   FAILURES_FOUND=1
 fi
 
-# Pattern 6: Asset pipeline errors
+# Pattern 5b: Bundler/Gem errors (missing or version mismatch)
+# Detects errors like "Could not find gem 'shakapacker (= 9.4.0)'"
+# These indicate bundle install wasn't run or Gemfile.lock is out of sync.
+if grep -Ei "Could not find gem|Run \`bundle install\`|Bundler::GemNotFound|Gem::MissingSpecError" "$OUTPUT_FILE"; then
+  report_error "Bundler/gem dependency errors detected."
+  echo "  This usually means 'bundle install' needs to be run."
+  echo "  Sample matching lines:"
+  grep -Ei "Could not find gem|Run \`bundle install\`|Bundler::GemNotFound|Gem::MissingSpecError" "$OUTPUT_FILE" | head -3
+  FAILURES_FOUND=1
+fi
+
+# ==============================================================================
+# Pattern 6: Sprockets/Asset pipeline errors
+# ==============================================================================
+# Prevents: Missing assets that Sprockets can't find or undeclared asset dependencies.
 if grep -Ei "Sprockets::FileNotFound|Asset.*was not declared" "$OUTPUT_FILE"; then
   report_error "Asset pipeline errors detected."
   echo "  Sample matching lines:"
@@ -141,7 +223,11 @@ if grep -Ei "Sprockets::FileNotFound|Asset.*was not declared" "$OUTPUT_FILE"; th
   FAILURES_FOUND=1
 fi
 
+# ==============================================================================
 # Pattern 7: Memory issues
+# ==============================================================================
+# Prevents: OOM kills that can happen silently with webpack on large codebases.
+# Note: "killed" alone may have false positives; consider tightening if needed.
 if grep -Ei "javascript heap out of memory|killed|out of memory" "$OUTPUT_FILE"; then
   report_error "Memory-related errors detected."
   echo "  Sample matching lines:"
@@ -149,15 +235,26 @@ if grep -Ei "javascript heap out of memory|killed|out of memory" "$OUTPUT_FILE";
   FAILURES_FOUND=1
 fi
 
-# Pattern 8: Check for warnings that might indicate problems
+# ==============================================================================
+# Pattern 8: Warning count threshold (advisory, does not fail)
+# ==============================================================================
+# Purpose: Alert when warnings spike, which may indicate new issues worth investigating.
+# Threshold is configurable via WARNING_THRESHOLD env var.
+# Default of 20 chosen based on typical precompile output having ~10-15 benign warnings
+# from node deprecations and peer dependency notices.
+WARNING_THRESHOLD="${WARNING_THRESHOLD:-20}"
 WARNING_COUNT=$(grep -ci "warning" "$OUTPUT_FILE" || true)
-if [ "$WARNING_COUNT" -gt 10 ]; then
-  report_warning "High number of warnings detected: $WARNING_COUNT warnings found. Please review."
+if [ "$WARNING_COUNT" -gt "$WARNING_THRESHOLD" ]; then
+  report_warning "High number of warnings detected: $WARNING_COUNT warnings found (threshold: $WARNING_THRESHOLD). Please review."
   echo "  Sample warnings:"
   grep -i "warning" "$OUTPUT_FILE" | head -5
 fi
 
-# Pattern 9: Deprecation warnings (log for visibility, don't fail)
+# ==============================================================================
+# Pattern 9: Deprecation warnings (advisory, does not fail)
+# ==============================================================================
+# Purpose: Track deprecations that may cause future breakage after upgrades.
+# Rails deprecations are logged with "DEPRECATION" prefix.
 DEPRECATION_COUNT=$(grep -c "DEPRECATION" "$OUTPUT_FILE" || true)
 if [ "$DEPRECATION_COUNT" -gt 0 ]; then
   report_warning "Found $DEPRECATION_COUNT deprecation warnings. These may indicate future breakage."
