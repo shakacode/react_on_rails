@@ -129,15 +129,18 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
         apply_react_version(example_type.dir, example_type.react_version_string)
         # Re-run bundle install since Gemfile was updated with pinned shakapacker version
         bundle_install_in(example_type.dir)
+        # Run npm install BEFORE shakapacker:binstubs to ensure the npm shakapacker version
+        # matches the gem version. The binstubs task loads the Rails environment which
+        # validates version matching between gem and npm package.
+        # Use --legacy-peer-deps to avoid peer dependency conflicts when yalc-linked
+        # react-on-rails expects newer React versions
+        sh_in_dir(example_type.dir, "npm install --legacy-peer-deps")
         # Regenerate Shakapacker binstubs after downgrading from 9.x to 8.2.x
         # The binstub format may differ between major versions
         unbundled_sh_in_dir(example_type.dir, "bundle exec rake shakapacker:binstubs")
+      else
+        sh_in_dir(example_type.dir, "npm install")
       end
-
-      # Use --legacy-peer-deps for pinned React version examples to avoid peer dependency
-      # conflicts when yalc-linked react-on-rails expects newer React versions
-      npm_install_cmd = example_type.pinned_react_version? ? "npm install --legacy-peer-deps" : "npm install"
-      sh_in_dir(example_type.dir, npm_install_cmd)
       # Generate the component packs after running the generator to ensure all
       # auto-bundled components have corresponding pack files created.
       # Use unbundled_sh_in_dir to ensure we're using the generated app's Gemfile
