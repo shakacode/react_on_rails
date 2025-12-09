@@ -1,4 +1,5 @@
 example_type_data:
+  # Latest versions (React 19, Shakapacker 9.x)
   - name: basic
     generator_options: ''
   - name: basic-server-rendering
@@ -7,10 +8,19 @@ example_type_data:
     generator_options: --redux
   - name: redux-server-rendering
     generator_options: --redux --example-server-rendering
-  # Minimum version compatibility tests - tests React 18 and Shakapacker 8.2.0
-  - name: basic-minimum
+
+  # React 18 compatibility tests (minimum supported version with Root API)
+  - name: basic-react18
     generator_options: ''
-    minimum_versions: true
-  - name: basic-server-rendering-minimum
+    react_version: '18'
+  - name: basic-server-rendering-react18
     generator_options: --example-server-rendering
-    minimum_versions: true
+    react_version: '18'
+
+  # React 17 compatibility tests (legacy render/hydrate API)
+  - name: basic-react17
+    generator_options: ''
+    react_version: '17'
+  - name: basic-server-rendering-react17
+    generator_options: --example-server-rendering
+    react_version: '17'

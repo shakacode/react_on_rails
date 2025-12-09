@@ -56,9 +56,10 @@ export function reactRender(domNode: Element, reactElement: ReactElement): Rende
   return legacyReactDOM.render(reactElement, domNode);
 }
 
-export const unmountComponentAtNode = supportsRootApi
+export const unmountComponentAtNode: (container: Element) => boolean = supportsRootApi
   ? // not used if we use root API
-    () => false
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    (_container: Element) => false
   : (container: Element) => legacyReactDOM.unmountComponentAtNode(container);
 
 export const ensureReactUseAvailable = () => {

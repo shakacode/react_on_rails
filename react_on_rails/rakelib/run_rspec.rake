@@ -82,10 +82,10 @@ namespace :run_rspec do
     puts "Creating #{example_type.rspec_task_name} task"
     desc "Runs RSpec for #{example_type.name_pretty} only"
     task example_type.rspec_task_name_short => example_type.gen_task_name do
-      # Use unbundled mode for minimum version examples to ensure the example app's
+      # Use unbundled mode for pinned React version examples to ensure the example app's
       # Gemfile and gem versions are used, not the parent workspace's bundle
       run_tests_in(File.join(examples_dir, example_type.name),
-                   unbundled: example_type.minimum_versions?)
+                   unbundled: example_type.pinned_react_version?)
     end
   end
 
@@ -94,23 +94,47 @@ namespace :run_rspec do
     ExampleType.all[:shakapacker_examples].each { |example_type| Rake::Task[example_type.rspec_task_name].invoke }
   end
 
-  # Helper methods for filtering examples
+  # Helper methods for filtering examples by React version
   def latest_examples
-    ExampleType.all[:shakapacker_examples].reject(&:minimum_versions?)
+    ExampleType.all[:shakapacker_examples].reject(&:pinned_react_version?)
   end
 
-  def minimum_examples
-    ExampleType.all[:shakapacker_examples].select(&:minimum_versions?)
+  def react18_examples
+    ExampleType.all[:shakapacker_examples].select { |e| e.react_version == "18" }
   end
 
-  desc "Runs Rspec for latest version example apps only (React 19, Shakapacker 9.4.0)"
+  def react17_examples
+    ExampleType.all[:shakapacker_examples].select { |e| e.react_version == "17" }
+  end
+
+  def pinned_version_examples
+    ExampleType.all[:shakapacker_examples].select(&:pinned_react_version?)
+  end
+
+  desc "Runs Rspec for latest version example apps only (React 19, Shakapacker 9.x)"
   task shakapacker_examples_latest: latest_examples.map(&:gen_task_name) do
     latest_examples.each { |example_type| Rake::Task[example_type.rspec_task_name].invoke }
   end
 
+  desc "Runs Rspec for React 18 example apps only (Shakapacker 8.2.0)"
+  task shakapacker_examples_react18: react18_examples.map(&:gen_task_name) do
+    react18_examples.each { |example_type| Rake::Task[example_type.rspec_task_name].invoke }
+  end
+
+  desc "Runs Rspec for React 17 example apps only (legacy render API)"
+  task shakapacker_examples_react17: react17_examples.map(&:gen_task_name) do
+    react17_examples.each { |example_type| Rake::Task[example_type.rspec_task_name].invoke }
+  end
+
+  desc "Runs Rspec for all pinned version example apps (React 17 and 18)"
+  task shakapacker_examples_pinned: pinned_version_examples.map(&:gen_task_name) do
+    pinned_version_examples.each { |example_type| Rake::Task[example_type.rspec_task_name].invoke }
+  end
+
+  # Legacy alias for backward compatibility
   desc "Runs Rspec for minimum version example apps only (React 18, Shakapacker 8.2.0)"
-  task shakapacker_examples_minimum: minimum_examples.map(&:gen_task_name) do
-    minimum_examples.each { |example_type| Rake::Task[example_type.rspec_task_name].invoke }
+  task shakapacker_examples_minimum: react18_examples.map(&:gen_task_name) do
+    react18_examples.each { |example_type| Rake::Task[example_type.rspec_task_name].invoke }
   end
 
   Coveralls::RakeTask.new if ENV["USE_COVERALLS"] == "TRUE"

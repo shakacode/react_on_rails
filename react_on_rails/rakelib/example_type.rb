@@ -14,22 +14,42 @@ module ReactOnRails
         @all ||= { shakapacker_examples: [] }
       end
 
-      # Minimum supported versions for compatibility testing
-      MINIMUM_REACT_VERSION = "18.0.0"
+      # Supported React versions for compatibility testing
+      REACT_VERSIONS = {
+        "17" => "17.0.2",
+        "18" => "18.0.0",
+        "19" => nil # nil means use latest (default)
+      }.freeze
+
+      # Minimum Shakapacker version for compatibility testing
       MINIMUM_SHAKAPACKER_VERSION = "8.2.0"
 
-      attr_reader :packer_type, :name, :generator_options, :minimum_versions
+      attr_reader :packer_type, :name, :generator_options, :react_version
 
-      # Ruby convention: predicate method with ? suffix for boolean checks
-      def minimum_versions?
-        minimum_versions
+      # Returns true if this example uses a pinned (non-latest) React version
+      def pinned_react_version?
+        !react_version.nil?
       end
 
-      def initialize(packer_type: nil, name: nil, generator_options: nil, minimum_versions: false)
+      # Returns the actual React version string to use
+      def react_version_string
+        return nil unless react_version
+
+        REACT_VERSIONS[react_version.to_s] || react_version
+      end
+
+      # Legacy method for backward compatibility - true if React 18 (minimum supported)
+      def minimum_versions?
+        react_version == "18"
+      end
+
+      def initialize(packer_type: nil, name: nil, generator_options: nil, minimum_versions: false, react_version: nil)
         @packer_type = packer_type
         @name = name
         @generator_options = generator_options
-        @minimum_versions = minimum_versions
+        # Support both legacy minimum_versions flag and new react_version parameter
+        # minimum_versions: true is equivalent to react_version: "18"
+        @react_version = react_version || (minimum_versions ? "18" : nil)
         self.class.all[packer_type.to_sym] << self
       end
 

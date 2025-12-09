@@ -16,14 +16,12 @@ require_relative "task_helpers"
 namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
   include ReactOnRails::TaskHelpers
 
-  # Updates React-related dependencies to minimum supported versions
-  def update_react_dependencies(deps)
+  # Updates React-related dependencies to a specific version
+  def update_react_dependencies(deps, react_version)
     return unless deps
 
-    deps["react"] = ExampleType::MINIMUM_REACT_VERSION
-    deps["react-dom"] = ExampleType::MINIMUM_REACT_VERSION
-    # Shakapacker 8.2.0 requires webpack-assets-manifest ^5.x
-    deps["webpack-assets-manifest"] = "^5.0.6" if deps.key?("webpack-assets-manifest")
+    deps["react"] = react_version
+    deps["react-dom"] = react_version
   end
 
   # Updates Shakapacker to minimum supported version in either dependencies or devDependencies
@@ -35,8 +33,8 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
     end
   end
 
-  # Updates dependencies in package.json to use minimum supported versions
-  def update_package_json_versions(package_json_path)
+  # Updates dependencies in package.json to use specific React version
+  def update_package_json_for_react_version(package_json_path, react_version)
     return unless File.exist?(package_json_path)
 
     begin
@@ -49,16 +47,16 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
     deps = package_json["dependencies"]
     dev_deps = package_json["devDependencies"]
 
-    update_react_dependencies(deps)
+    update_react_dependencies(deps, react_version)
     # Shakapacker 8.2.0 requires webpack-assets-manifest ^5.x (check devDependencies too)
     dev_deps["webpack-assets-manifest"] = "^5.0.6" if dev_deps&.key?("webpack-assets-manifest")
     update_shakapacker_dependency(deps, dev_deps)
 
-    # Add npm overrides to force React 18 versions, preventing yalc-linked
+    # Add npm overrides to force specific React version, preventing yalc-linked
     # react-on-rails from pulling in React 19 as a transitive dependency
     package_json["overrides"] = {
-      "react" => ExampleType::MINIMUM_REACT_VERSION,
-      "react-dom" => ExampleType::MINIMUM_REACT_VERSION
+      "react" => react_version,
+      "react-dom" => react_version
     }
 
     File.write(package_json_path, "#{JSON.pretty_generate(package_json)}\n")
@@ -82,13 +80,13 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
     File.write(gemfile_path, gemfile_content)
   end
 
-  # Updates package.json and Gemfile to use minimum supported versions for compatibility testing
-  def apply_minimum_versions(dir)
-    update_package_json_versions(File.join(dir, "package.json"))
+  # Updates package.json and Gemfile to use specific React version for compatibility testing
+  def apply_react_version(dir, react_version)
+    update_package_json_for_react_version(File.join(dir, "package.json"), react_version)
     update_gemfile_versions(File.join(dir, "Gemfile"))
 
-    puts "  Updated package.json with minimum versions:"
-    puts "    React: #{ExampleType::MINIMUM_REACT_VERSION}"
+    puts "  Updated package.json for compatibility testing:"
+    puts "    React: #{react_version}"
     puts "    Shakapacker: #{ExampleType::MINIMUM_SHAKAPACKER_VERSION}"
   end
 
@@ -126,16 +124,16 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
       # Re-run bundle install since dev_tests generator adds rspec-rails and coveralls to Gemfile
       bundle_install_in(example_type.dir)
 
-      # Apply minimum versions for compatibility testing examples
-      if example_type.minimum_versions
-        apply_minimum_versions(example_type.dir)
+      # Apply specific React version for compatibility testing examples
+      if example_type.pinned_react_version?
+        apply_react_version(example_type.dir, example_type.react_version_string)
         # Re-run bundle install since Gemfile was updated with pinned shakapacker version
         bundle_install_in(example_type.dir)
       end
 
-      # Use --legacy-peer-deps for minimum version examples to avoid peer dependency
+      # Use --legacy-peer-deps for pinned React version examples to avoid peer dependency
       # conflicts when yalc-linked react-on-rails expects newer React versions
-      npm_install_cmd = example_type.minimum_versions? ? "npm install --legacy-peer-deps" : "npm install"
+      npm_install_cmd = example_type.pinned_react_version? ? "npm install --legacy-peer-deps" : "npm install"
       sh_in_dir(example_type.dir, npm_install_cmd)
       # Generate the component packs after running the generator to ensure all
       # auto-bundled components have corresponding pack files created.
