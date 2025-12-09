@@ -255,7 +255,7 @@ if [ "$LINT_CONFIG_CHANGED" = true ] || [ "$RUBY_CHANGED" = true ] || [ "$JS_CHA
   RUN_LINT=true
 fi
 
-if [ "$RUBY_CHANGED" = true ] || [ "$RSPEC_CHANGED" = true ]; then
+if [ "$RUBY_CHANGED" = true ] || [ "$RSPEC_CHANGED" = true ] || [ "$GENERATORS_CHANGED" = true ]; then
   RUN_RUBY_TESTS=true
 fi
 
