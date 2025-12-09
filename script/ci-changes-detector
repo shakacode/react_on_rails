@@ -59,7 +59,7 @@ RUBY_CHANGED=false
 RSPEC_CHANGED=false
 SPEC_DUMMY_CHANGED=false
 JS_CHANGED=false
-GENERATORS_CHANGED=false # needs to be duplicated to pro
+GENERATORS_CHANGED=false
 PRO_RUBY_CHANGED=false
 PRO_RSPEC_CHANGED=false
 PRO_JS_CHANGED=false
@@ -87,7 +87,7 @@ while IFS= read -r file; do
       RUBY_CHANGED=true
       ;;
 
-    # Ruby gem-specific specs (MUST be after Generators to avoid catching generator specs)
+    # Ruby gem-specific specs (MUST be after Generators since this pattern catches ALL specs including generator specs)
     react_on_rails/spec/react_on_rails/*|react_on_rails/spec/react_on_rails/**/*|.github/workflows/gem-tests.yml)
       DOCS_ONLY=false
       RSPEC_CHANGED=true
