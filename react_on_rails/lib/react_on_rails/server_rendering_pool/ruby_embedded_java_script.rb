@@ -13,7 +13,7 @@ module ReactOnRails
             size: ReactOnRails.configuration.server_renderer_pool_size,
             timeout: ReactOnRails.configuration.server_renderer_timeout
           }
-          @js_context_pool = ConnectionPool.new(options) { create_js_context }
+          @js_context_pool = ConnectionPool.new(**options) { create_js_context }
         end
 
         def reset_pool_if_server_bundle_was_modified
