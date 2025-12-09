@@ -154,8 +154,8 @@ jobs:
         run: cd react_on_rails/spec/dummy && yalc add --link react-on-rails
       - name: Install Node modules with pnpm for dummy app
         # --ignore-workspace prevents pnpm from treating this as part of the parent workspace
-        # The dummy app doesn't have a pnpm-lock.yaml and shouldn't use frozen lockfile
-        run: cd react_on_rails/spec/dummy && pnpm install --ignore-workspace
+        # minimum config changes package.json (shakapacker version), so can't use frozen lockfile
+        run: cd react_on_rails/spec/dummy && pnpm install --ignore-workspace ${{ matrix.dependency-level == 'minimum' && '--no-frozen-lockfile' || '' }}
       - name: Save dummy app ruby gems to cache
         uses: actions/cache@v4
         with:
@@ -261,8 +261,8 @@ jobs:
         run: cd react_on_rails/spec/dummy && yalc add --link react-on-rails
       - name: Install Node modules with pnpm for dummy app
         # --ignore-workspace prevents pnpm from treating this as part of the parent workspace
-        # The dummy app doesn't have a pnpm-lock.yaml and shouldn't use frozen lockfile
-        run: cd react_on_rails/spec/dummy && pnpm install --ignore-workspace
+        # minimum config changes package.json (shakapacker version), so can't use frozen lockfile
+        run: cd react_on_rails/spec/dummy && pnpm install --ignore-workspace ${{ matrix.dependency-level == 'minimum' && '--no-frozen-lockfile' || '' }}
       - name: Dummy JS tests
         run: |
           cd react_on_rails/spec/dummy
