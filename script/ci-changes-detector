@@ -75,22 +75,22 @@ while IFS= read -r file; do
       # Don't change DOCS_ONLY flag, just continue
       ;;
 
+    # Generators (MUST be before Ruby source code to avoid being caught by lib/**/*.rb)
+    react_on_rails/lib/generators/*|react_on_rails/lib/generators/**/*|react_on_rails/spec/react_on_rails/generators/*|react_on_rails/spec/react_on_rails/generators/**/*|rakelib/example_type.rb|rakelib/examples_config.yml|rakelib/shakapacker_examples.rake|.github/workflows/examples.yml)
+      DOCS_ONLY=false
+      GENERATORS_CHANGED=true
+      ;;
+
     # Ruby source code
     react_on_rails/lib/*.rb|react_on_rails/lib/**/*.rb|Gemfile|Gemfile.lock|rakelib/run_rspec.rake|rakelib/node_package.rake|rakelib/dummy_apps.rake)
       DOCS_ONLY=false
       RUBY_CHANGED=true
       ;;
 
-    # Ruby gem-specific specs
+    # Ruby gem-specific specs (MUST be after Generators to avoid catching generator specs)
     react_on_rails/spec/react_on_rails/*|react_on_rails/spec/react_on_rails/**/*|.github/workflows/gem-tests.yml)
       DOCS_ONLY=false
       RSPEC_CHANGED=true
-      ;;
-
-    # Generators
-    react_on_rails/lib/generators/*|react_on_rails/lib/generators/**/*|rakelib/example_type.rb|rakelib/examples_config.yml|rakelib/shakapacker_examples.rake|.github/workflows/examples.yml)
-      DOCS_ONLY=false
-      GENERATORS_CHANGED=true
       ;;
 
     # JavaScript/TypeScript source (including tests, scripts, and package files)
