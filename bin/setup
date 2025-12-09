@@ -1,0 +1,284 @@
+#!/usr/bin/env bash
+#
+# bin/setup - Unified development environment setup for React on Rails
+#
+# This script installs all dependencies across all directories in the monorepo,
+# making it easy for new contributors to get started quickly.
+#
+# Usage:
+#   bin/setup              # Full setup of all packages
+#   bin/setup --skip-pro   # Skip Pro package setup
+#   bin/setup --help       # Show this help message
+#
+
+set -euo pipefail
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Script directory (for running from anywhere)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Track start time for elapsed time display
+START_TIME=$(date +%s)
+
+# Flags
+SKIP_PRO=false
+
+show_help() {
+  echo "Usage: bin/setup [OPTIONS]"
+  echo ""
+  echo "Sets up the React on Rails development environment by installing"
+  echo "all dependencies across the monorepo."
+  echo ""
+  echo "Options:"
+  echo "  --skip-pro  Skip react_on_rails_pro setup (for contributors without Pro access)"
+  echo "  --help      Show this help message"
+  echo ""
+  echo "This script will:"
+  echo "  1. Install root pnpm and bundle dependencies"
+  echo "  2. Build the node package"
+  echo "  3. Set up react_on_rails/spec/dummy"
+  echo "  4. Set up react_on_rails_pro (if present and not skipped)"
+  echo "  5. Set up react_on_rails_pro/spec/dummy (if present and not skipped)"
+  echo "  6. Set up react_on_rails_pro/spec/execjs-compatible-dummy (if present and not skipped)"
+}
+
+print_step() {
+  echo -e "\n${BLUE}==>${NC} ${GREEN}$1${NC}"
+}
+
+print_warning() {
+  echo -e "${YELLOW}Warning:${NC} $1"
+}
+
+print_error() {
+  echo -e "${RED}Error:${NC} $1"
+}
+
+print_success() {
+  echo -e "${GREEN}✓${NC} $1"
+}
+
+check_prerequisites() {
+  local missing=()
+
+  if ! command -v pnpm &> /dev/null; then
+    missing+=("pnpm")
+  fi
+
+  if ! command -v bundle &> /dev/null; then
+    missing+=("bundler")
+  fi
+
+  if ! command -v node &> /dev/null; then
+    missing+=("node")
+  fi
+
+  if ! command -v ruby &> /dev/null; then
+    missing+=("ruby")
+  fi
+
+  if [ ${#missing[@]} -ne 0 ]; then
+    print_error "Missing required tools: ${missing[*]}"
+    echo ""
+    echo "Please install the following before running this script:"
+    for tool in "${missing[@]}"; do
+      case $tool in
+        pnpm)
+          echo "  - pnpm: https://pnpm.io/installation"
+          ;;
+        bundler)
+          echo "  - bundler: gem install bundler"
+          ;;
+        node)
+          echo "  - node: https://nodejs.org/ (or use nvm/nodenv)"
+          ;;
+        ruby)
+          echo "  - ruby: https://www.ruby-lang.org/ (or use rvm/rbenv)"
+          ;;
+      esac
+    done
+    exit 1
+  fi
+
+  # Display versions found
+  echo "  Ruby:    $(ruby -v | head -1)"
+  echo "  Node:    $(node -v)"
+  echo "  pnpm:    $(pnpm -v)"
+  echo "  Bundler: $(bundle -v)"
+}
+
+verify_root_directory() {
+  if [ ! -f "$ROOT_DIR/Rakefile" ]; then
+    print_error "Rakefile not found. Are you in the correct directory?"
+    print_error "Expected location: $ROOT_DIR/Rakefile"
+    exit 1
+  fi
+
+  if [ ! -f "$ROOT_DIR/package.json" ]; then
+    print_error "package.json not found. Are you in the correct directory?"
+    print_error "Expected location: $ROOT_DIR/package.json"
+    exit 1
+  fi
+}
+
+install_dependencies() {
+  local dir="$1"
+  local name="$2"
+
+  if [ ! -d "$dir" ]; then
+    print_warning "Directory not found: $dir (skipping)"
+    return 0
+  fi
+
+  print_step "Setting up $name..."
+  cd "$dir"
+
+  # Install Ruby dependencies if Gemfile exists
+  if [ -f "Gemfile" ]; then
+    echo "  Installing Ruby dependencies..."
+    if bundle check &> /dev/null; then
+      print_success "Ruby dependencies already satisfied"
+    else
+      if ! bundle install; then
+        print_error "Failed to install Ruby dependencies in $name"
+        exit 1
+      fi
+      print_success "Ruby dependencies installed"
+    fi
+  fi
+
+  # Install JS dependencies if package.json exists
+  # Use --frozen-lockfile to match CI behavior and ensure lockfile integrity
+  if [ -f "package.json" ]; then
+    echo "  Installing JavaScript dependencies..."
+    if ! pnpm install --frozen-lockfile; then
+      print_error "Failed to install JavaScript dependencies in $name"
+      exit 1
+    fi
+    print_success "JavaScript dependencies installed"
+  fi
+
+  cd "$ROOT_DIR"
+}
+
+build_node_package() {
+  # Builds TypeScript packages and runs pnpm yalc:publish for local development.
+  # This compiles node_package/src/ to lib/ and makes packages available locally.
+  print_step "Building node package..."
+  if ! rake node_package; then
+    print_error "Failed to build node package"
+    exit 1
+  fi
+  print_success "Node package built"
+}
+
+verify_build_artifacts() {
+  print_step "Verifying build artifacts..."
+
+  local artifact="packages/react-on-rails/lib/ReactOnRails.full.js"
+  if [ ! -f "$ROOT_DIR/$artifact" ]; then
+    print_error "Build failed: $artifact not found"
+    print_error "Expected location: $ROOT_DIR/$artifact"
+    exit 1
+  fi
+  print_success "Build artifacts verified"
+}
+
+show_elapsed_time() {
+  local END_TIME=$(date +%s)
+  local ELAPSED=$((END_TIME - START_TIME))
+  local MINUTES=$((ELAPSED / 60))
+  local SECONDS=$((ELAPSED % 60))
+
+  if [ $MINUTES -gt 0 ]; then
+    echo -e "Total time: ${BLUE}${MINUTES}m ${SECONDS}s${NC}"
+  else
+    echo -e "Total time: ${BLUE}${SECONDS}s${NC}"
+  fi
+}
+
+main() {
+  # Parse arguments
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      --help|-h)
+        show_help
+        exit 0
+        ;;
+      --skip-pro)
+        SKIP_PRO=true
+        shift
+        ;;
+      *)
+        print_error "Unknown option: $1"
+        echo "Run 'bin/setup --help' for usage information."
+        exit 1
+        ;;
+    esac
+  done
+
+  echo -e "${GREEN}Setting up React on Rails development environment...${NC}"
+  echo ""
+
+  cd "$ROOT_DIR"
+
+  # Verify we're in the correct directory
+  print_step "Verifying project directory..."
+  verify_root_directory
+  print_success "Project directory verified"
+
+  # Check prerequisites
+  print_step "Checking prerequisites..."
+  check_prerequisites
+  print_success "All prerequisites found"
+
+  # Root dependencies
+  install_dependencies "$ROOT_DIR" "root directory"
+
+  # Build node package
+  build_node_package
+
+  # Verify build artifacts
+  verify_build_artifacts
+
+  # react_on_rails/spec/dummy
+  install_dependencies "$ROOT_DIR/react_on_rails/spec/dummy" "react_on_rails/spec/dummy"
+
+  # react_on_rails_pro (if present and not skipped)
+  if [ "$SKIP_PRO" = true ]; then
+    print_warning "Skipping react_on_rails_pro setup (--skip-pro flag)"
+  elif [ -d "$ROOT_DIR/react_on_rails_pro" ]; then
+    install_dependencies "$ROOT_DIR/react_on_rails_pro" "react_on_rails_pro"
+
+    # react_on_rails_pro/spec/dummy
+    install_dependencies "$ROOT_DIR/react_on_rails_pro/spec/dummy" "react_on_rails_pro/spec/dummy"
+
+    # react_on_rails_pro/spec/execjs-compatible-dummy
+    install_dependencies "$ROOT_DIR/react_on_rails_pro/spec/execjs-compatible-dummy" "react_on_rails_pro/spec/execjs-compatible-dummy"
+  fi
+
+  echo ""
+  echo -e "${GREEN}========================================${NC}"
+  echo -e "${GREEN}Setup complete!${NC}"
+  echo -e "${GREEN}========================================${NC}"
+  show_elapsed_time
+  echo ""
+  echo "Git hooks have been automatically installed during setup."
+  echo "They will run linting on changed files before each commit."
+  echo ""
+  echo "You can now run:"
+  echo "  rake              # Run all tests"
+  echo "  rake lint         # Run linters"
+  echo "  rake all_but_examples  # Run tests (excluding generator examples)"
+  echo ""
+  echo "For more information, see CONTRIBUTING.md"
+}
+
+main "$@"
