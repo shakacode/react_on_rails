@@ -17,7 +17,9 @@ You can find the **package** version numbers from this repo's tags and below in 
 
 ## [Unreleased]
 
-_Add changes in master not yet tagged._
+### [v16.2.0.beta.13] - 2025-12-07
+
+Changes since the last non-beta release.
 
 ### Improved
 
@@ -538,7 +540,8 @@ Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52
 - advanced error handling
 
 [HEAD compared to 3.2.1]: https://github.com/shakacode/react_on_rails_pro/compare/3.3.1...HEAD
-[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/4.0.0-rc-15...HEAD
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.2.0.beta.13...master
+[v16.2.0.beta.13]: https://github.com/shakacode/react_on_rails/compare/16.1.1...v16.2.0.beta.13
 [4.0.0-rc.15]: https://github.com/shakacode/react_on_rails_pro/compare/4.0.0-rc.14...4.0.0-rc.15
 [4.0.0.rc.11]: https://github.com/shakacode/react_on_rails_pro/compare/4.0.0-rc.9...4.0.0-rc.11
 [4.0.0.rc.9]: https://github.com/shakacode/react_on_rails_pro/compare/4.0.0-rc.6...4.0.0-rc.9
