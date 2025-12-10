@@ -295,7 +295,7 @@ jobs:
           echo "🚀 Starting production server..."
           cd react_on_rails/spec/dummy
 
-          # Start server in background
+          # Start server in background (Core uses rails directly, not foreman)
           bin/prod &
           echo "Server started in background"
 
@@ -335,13 +335,23 @@ jobs:
         if: env.RUN_CORE && always()
         run: |
           echo "🛑 Stopping Core production server..."
-          # Find and kill the Puma process on port 3001
-          if lsof -ti:3001 > /dev/null 2>&1; then
-            kill "$(lsof -ti:3001)" || true
-            echo "✅ Server stopped"
-          else
-            echo "ℹ️ No server running on port 3001"
-          fi
+          # Kill all server-related processes (safe in isolated CI environment)
+          pkill -9 -f "ruby|node|foreman|overmind|puma" || true
+
+          # Wait for port 3001 to be free
+          echo "⏳ Waiting for port 3001 to be free..."
+          for _ in {1..10}; do
+            if ! lsof -ti:3001 > /dev/null 2>&1; then
+              echo "✅ Port 3001 is now free"
+              exit 0
+            fi
+            sleep 1
+          done
+
+          echo "❌ ERROR: Port 3001 is still in use after 10 seconds"
+          echo "Processes using port 3001:"
+          lsof -i:3001 || true
+          exit 1
 
       - name: Validate Core benchmark results
         if: env.RUN_CORE
@@ -474,13 +484,9 @@ jobs:
         if: env.RUN_PRO && always()
         run: |
           echo "🛑 Stopping Pro production server..."
-          # Find and kill the Puma process on port 3001
-          if lsof -ti:3001 > /dev/null 2>&1; then
-            kill "$(lsof -ti:3001)" || true
-            echo "✅ Server stopped"
-          else
-            echo "ℹ️ No server running on port 3001"
-          fi
+          # Kill all server-related processes (safe in isolated CI environment)
+          pkill -9 -f "ruby|node|foreman|overmind|puma" || true
+          echo "✅ Server stopped"
 
       - name: Validate Pro benchmark results
         if: env.RUN_PRO
