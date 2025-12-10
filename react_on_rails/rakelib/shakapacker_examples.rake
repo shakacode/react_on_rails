@@ -54,6 +54,9 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
     # Shakapacker 8.2.0 requires babel-loader to be explicitly installed as a devDependency
     # (in 9.x this requirement was relaxed or the package structure changed)
     dev_deps["babel-loader"] = "^9.1.3" if dev_deps
+    # @babel/plugin-transform-runtime is required by the default babel config but not
+    # automatically included as a dependency in older Shakapacker versions
+    dev_deps["@babel/plugin-transform-runtime"] = "^7.24.0" if dev_deps
     update_shakapacker_dependency(deps, dev_deps)
 
     # Add npm overrides to force specific React version, preventing yalc-linked
