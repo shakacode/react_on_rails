@@ -138,7 +138,9 @@ jobs:
       - name: Install Node modules with pnpm for Pro dummy app
         # --ignore-workspace prevents pnpm from treating this as part of the parent workspace
         # The Pro dummy app has its own dependencies and uses yalc links
-        run: cd spec/dummy && pnpm install --ignore-workspace
+        run: |
+          pwd
+          cd spec/dummy && pnpm install
 
       - name: Install Ruby Gems for Pro dummy app
         run: |
