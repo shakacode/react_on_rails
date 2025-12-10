@@ -9,7 +9,7 @@ GIT
 PATH
   remote: ..
   specs:
-    react_on_rails (16.2.0.beta.13)
+    react_on_rails (16.2.0.beta.14)
       addressable
       connection_pool
       execjs (~> 2.5)
@@ -20,7 +20,7 @@ PATH
 PATH
   remote: .
   specs:
-    react_on_rails_pro (16.2.0.beta.13)
+    react_on_rails_pro (16.2.0.beta.14)
       addressable
       async (>= 2.6)
       connection_pool
@@ -29,7 +29,7 @@ PATH
       httpx (~> 1.5)
       jwt (~> 2.7)
       rainbow
-      react_on_rails (= 16.2.0.beta.13)
+      react_on_rails (= 16.2.0.beta.14)
 
 GEM
   remote: https://rubygems.org/
@@ -402,7 +402,7 @@ GEM
       websocket (~> 1.0)
     semantic_range (3.1.0)
     sexp_processor (4.17.1)
-    shakapacker (9.3.0)
+    shakapacker (9.4.0)
       activesupport (>= 5.2)
       package_json
       rack-proxy (>= 0.6.1)
@@ -519,7 +519,7 @@ DEPENDENCIES
   sass-rails
   scss_lint
   selenium-webdriver (= 4.9.0)
-  shakapacker (= 9.3.0)
+  shakapacker (= 9.4.0)
   spring
   spring-watcher-listen
   sprockets
