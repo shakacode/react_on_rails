@@ -97,4 +97,3 @@ RSpec/NestedGroups:
 
 Style/FrozenStringLiteralComment:
   EnforcedStyle: always
-
