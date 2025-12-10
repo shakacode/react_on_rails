@@ -334,28 +334,6 @@ jobs:
 
           echo "✅ Benchmark suite completed successfully"
 
-      - name: Stop Core production server
-        if: env.RUN_CORE && always()
-        run: |
-          echo "🛑 Stopping Core production server..."
-          # Kill all server-related processes (safe in isolated CI environment)
-          pkill -9 -f "ruby|node|foreman|overmind|puma" || true
-
-          # Wait for port 3001 to be free
-          echo "⏳ Waiting for port 3001 to be free..."
-          for _ in {1..10}; do
-            if ! lsof -ti:3001 > /dev/null 2>&1; then
-              echo "✅ Port 3001 is now free"
-              exit 0
-            fi
-            sleep 1
-          done
-
-          echo "❌ ERROR: Port 3001 is still in use after 10 seconds"
-          echo "Processes using port 3001:"
-          lsof -i:3001 || true
-          exit 1
-
       - name: Validate Core benchmark results
         if: env.RUN_CORE
         run: |
@@ -383,6 +361,28 @@ jobs:
           path: bench_results/
           retention-days: 30
           if-no-files-found: warn
+
+      - name: Stop Core production server
+        if: env.RUN_CORE && always()
+        run: |
+          echo "🛑 Stopping Core production server..."
+          # Kill all server-related processes (safe in isolated CI environment)
+          pkill -9 -f "ruby|node|foreman|overmind|puma" || true
+
+          # Wait for port 3001 to be free
+          echo "⏳ Waiting for port 3001 to be free..."
+          for _ in {1..10}; do
+            if ! lsof -ti:3001 > /dev/null 2>&1; then
+              echo "✅ Port 3001 is now free"
+              exit 0
+            fi
+            sleep 1
+          done
+
+          echo "❌ ERROR: Port 3001 is still in use after 10 seconds"
+          echo "Processes using port 3001:"
+          lsof -i:3001 || true
+          exit 1
 
       # ============================================
       # STEP 6: SETUP PRO APPLICATION SERVER
@@ -483,14 +483,6 @@ jobs:
 
           echo "✅ Benchmark suite completed successfully"
 
-      - name: Stop Pro production server
-        if: env.RUN_PRO && always()
-        run: |
-          echo "🛑 Stopping Pro production server..."
-          # Kill all server-related processes (safe in isolated CI environment)
-          pkill -9 -f "ruby|node|foreman|overmind|puma" || true
-          echo "✅ Server stopped"
-
       - name: Validate Pro benchmark results
         if: env.RUN_PRO
         run: |
@@ -518,6 +510,14 @@ jobs:
           path: bench_results/
           retention-days: 30
           if-no-files-found: warn
+
+      - name: Stop Pro production server
+        if: env.RUN_PRO && always()
+        run: |
+          echo "🛑 Stopping Pro production server..."
+          # Kill all server-related processes (safe in isolated CI environment)
+          pkill -9 -f "ruby|node|foreman|overmind|puma" || true
+          echo "✅ Server stopped"
 
       # ============================================
       # STEP 8: WORKFLOW COMPLETION
