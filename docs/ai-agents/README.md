@@ -247,6 +247,8 @@ The React on Rails generator creates TypeScript-ready configuration. For existin
 
 ```bash
 yarn add typescript @types/react @types/react-dom
+# or: npm install typescript @types/react @types/react-dom
+# or: pnpm add typescript @types/react @types/react-dom
 ```
 
 **Step 2:** Ensure `tsconfig.json` has proper JSX support (the generator creates this):
@@ -287,14 +289,14 @@ export default MyComponent;
 
 ### "Cannot find module 'react-on-rails'"
 
-**Cause:** npm/yarn package not installed alongside gem
+**Cause:** npm package not installed alongside gem
 
 **Solution:**
 
 ```bash
 yarn add react-on-rails
-# or
-npm install react-on-rails
+# or: npm install react-on-rails
+# or: pnpm add react-on-rails
 ```
 
 ### Component Not Rendering (Blank Space)
@@ -347,10 +349,10 @@ rake react_on_rails:doctor
 ```bash
 # Clear cache and reinstall
 rm -rf node_modules
-yarn install
+yarn install  # or: npm install, pnpm install
 
 # Rebuild assets
-yarn build
+yarn build  # or: npm run build, pnpm build
 
 # Check Shakapacker config
 cat config/shakapacker.yml

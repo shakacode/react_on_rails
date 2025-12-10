@@ -138,7 +138,7 @@ rm -rf node_modules
 yarn install  # or: npm install, pnpm install
 
 # Rebuild assets
-yarn build
+yarn build  # or: npm run build, pnpm build
 
 # Check Shakapacker config
 cat config/shakapacker.yml
@@ -150,6 +150,8 @@ cat config/shakapacker.yml
 
    ```bash
    yarn add react-on-rails
+   # or: npm install react-on-rails
+   # or: pnpm add react-on-rails
    ```
 
 2. **Incorrect import path:**
@@ -171,8 +173,8 @@ The gem and npm package must both be installed:
 ```bash
 # Install npm package
 yarn add react-on-rails
-# or
-npm install react-on-rails
+# or: npm install react-on-rails
+# or: pnpm add react-on-rails
 ```
 
 ---
