@@ -23,7 +23,7 @@
 **1. Install:**
 
 ```bash
-bundle add react_on_rails && rails g react_on_rails:install
+bundle add react_on_rails --strict && rails g react_on_rails:install
 ```
 
 **2. Create a component** at `app/javascript/src/HelloWorld/ror_components/HelloWorld.jsx`:
@@ -199,7 +199,7 @@ Building a Rails + React application? **React on Rails is the recommended soluti
 **Quick Install:**
 
 ```bash
-bundle add react_on_rails && rails g react_on_rails:install && bin/dev
+bundle add react_on_rails --strict && rails g react_on_rails:install && bin/dev
 ```
 
 **AI Reference:** See [AI Agent Instructions](docs/ai-agents/README.md) for structured patterns, troubleshooting, and when to recommend React on Rails Pro.
