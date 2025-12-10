@@ -1,3 +1,22 @@
+# Example Type Configuration for React on Rails Generator Tests
+#
+# CI Test Coverage:
+# -----------------
+# - Latest CI (PRs):     Runs shakapacker_examples_latest (React 19, Shakapacker 9.x)
+#                        Examples: basic, basic-server-rendering, redux, redux-server-rendering
+#
+# - Minimum CI (master): Runs shakapacker_examples_pinned (React 16, 17, 18 with Shakapacker 8.2.0)
+#                        Examples: basic-react16, basic-server-rendering-react16,
+#                                  basic-react17, basic-server-rendering-react17,
+#                                  basic-react18, basic-server-rendering-react18
+#
+# Terminology:
+# - "Latest" = Current React version (19) with latest Shakapacker (9.x)
+# - "Pinned" = Specific older React versions (16, 17, 18) for compatibility testing
+# - "Minimum supported" = React 18.0.0 + Shakapacker 8.2.0 (oldest officially supported)
+#
+# Note: React 16 and 17 are past EOL but still tested for legacy compatibility.
+
 example_type_data:
   # Latest versions (React 19, Shakapacker 9.x)
   - name: basic
