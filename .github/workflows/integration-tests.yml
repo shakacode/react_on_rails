@@ -160,7 +160,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: react_on_rails/spec/dummy/vendor/bundle
-          key: dummy-app-gem-cache-${{ hashFiles('react_on_rails/spec/dummy/Gemfile.lock') }}-2-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
+          key: dummy-app-gem-cache-${{ hashFiles('react_on_rails/spec/dummy/Gemfile.lock') }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
       - name: Install Ruby Gems for dummy app
         run: |
           cd react_on_rails/spec/dummy
@@ -237,12 +237,12 @@ jobs:
         uses: actions/cache@v4
         with:
           path: vendor/bundle
-          key: package-app-gem-cache-${{ hashFiles('Gemfile.lock') }}-2-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
+          key: package-app-gem-cache-${{ hashFiles('Gemfile.lock') }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
       - name: Save dummy app ruby gems to cache
         uses: actions/cache@v4
         with:
           path: react_on_rails/spec/dummy/vendor/bundle
-          key: dummy-app-gem-cache-${{ hashFiles('react_on_rails/spec/dummy/Gemfile.lock') }}-2-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
+          key: dummy-app-gem-cache-${{ hashFiles('react_on_rails/spec/dummy/Gemfile.lock') }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
       - id: get-sha
         run: echo "sha=\"$(git rev-parse HEAD)\"" >> "$GITHUB_OUTPUT"
       - name: Save test Webpack bundles to cache (for build number checksum used by RSpec job)

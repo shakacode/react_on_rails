@@ -128,7 +128,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: react_on_rails_pro/spec/dummy/vendor/bundle
-          key: v4-pro-dummy-app-gem-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/Gemfile.lock') }}-2
+          key: v4-pro-dummy-app-gem-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/Gemfile.lock') }}
 
       - name: Install Node modules with pnpm for Pro package
         run: |

@@ -122,7 +122,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: react_on_rails/spec/dummy/vendor/bundle
-          key: dummy-app-gem-cache-${{ hashFiles('react_on_rails/spec/dummy/Gemfile.lock') }}-2-precompile
+          key: dummy-app-gem-cache-${{ hashFiles('react_on_rails/spec/dummy/Gemfile.lock') }}-precompile
       - name: Install Ruby Gems for dummy app
         run: |
           cd react_on_rails/spec/dummy
