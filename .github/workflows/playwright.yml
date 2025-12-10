@@ -76,10 +76,9 @@ jobs:
 
       - name: Install dummy app dependencies
         working-directory: react_on_rails/spec/dummy
-        # --ignore-workspace prevents pnpm from treating this as part of the parent workspace
         run: |
           bundle install
-          pnpm install --ignore-workspace
+          pnpm install
 
       - name: Install Playwright browsers
         working-directory: react_on_rails/spec/dummy
