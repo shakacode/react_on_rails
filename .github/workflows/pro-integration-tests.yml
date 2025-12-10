@@ -137,7 +137,6 @@ jobs:
 
       - name: Install Node modules with pnpm for Pro dummy app
         run: |
-          pwd
           cd spec/dummy && pnpm install
 
       - name: Install Ruby Gems for Pro dummy app
