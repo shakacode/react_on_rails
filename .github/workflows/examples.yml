@@ -185,7 +185,7 @@ jobs:
         run: cd react_on_rails && bundle exec rake run_rspec:shakapacker_examples_latest
       - name: "Main CI - Pinned version examples (minimum: React 18.0.0, Shakapacker 8.2.0)"
         if: matrix.dependency-level == 'minimum'
-        run: cd react_on_rails && bundle exec rake run_rspec:shakapacker_examples_pinned
+        run: cd react_on_rails && bundle exec rake run_rspec:shakapacker_examples_minimum
       - name: Store test results
         uses: actions/upload-artifact@v4
         with:
