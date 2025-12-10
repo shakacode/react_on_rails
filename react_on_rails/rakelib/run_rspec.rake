@@ -82,13 +82,62 @@ namespace :run_rspec do
     puts "Creating #{example_type.rspec_task_name} task"
     desc "Runs RSpec for #{example_type.name_pretty} only"
     task example_type.rspec_task_name_short => example_type.gen_task_name do
-      run_tests_in(File.join(examples_dir, example_type.name)) # have to use relative path
+      # Use unbundled mode for pinned React version examples to ensure the example app's
+      # Gemfile and gem versions are used, not the parent workspace's bundle
+      run_tests_in(File.join(examples_dir, example_type.name),
+                   unbundled: example_type.pinned_react_version?)
     end
   end
 
   desc "Runs Rspec for shakapacker example apps only"
   task shakapacker_examples: "shakapacker_examples:gen_all" do
     ExampleType.all[:shakapacker_examples].each { |example_type| Rake::Task[example_type.rspec_task_name].invoke }
+  end
+
+  # Helper methods for filtering examples by React version
+  def latest_examples
+    ExampleType.all[:shakapacker_examples].reject(&:pinned_react_version?)
+  end
+
+  def react18_examples
+    ExampleType.all[:shakapacker_examples].select { |e| e.react_version == "18" }
+  end
+
+  def react17_examples
+    ExampleType.all[:shakapacker_examples].select { |e| e.react_version == "17" }
+  end
+
+  def react16_examples
+    ExampleType.all[:shakapacker_examples].select { |e| e.react_version == "16" }
+  end
+
+  def pinned_version_examples
+    ExampleType.all[:shakapacker_examples].select(&:pinned_react_version?)
+  end
+
+  desc "Runs Rspec for latest version example apps only (React 19, Shakapacker 9.x)"
+  task shakapacker_examples_latest: latest_examples.map(&:gen_task_name) do
+    latest_examples.each { |example_type| Rake::Task[example_type.rspec_task_name].invoke }
+  end
+
+  desc "Runs Rspec for React 18 example apps only (Shakapacker 8.2.0)"
+  task shakapacker_examples_react18: react18_examples.map(&:gen_task_name) do
+    react18_examples.each { |example_type| Rake::Task[example_type.rspec_task_name].invoke }
+  end
+
+  desc "Runs Rspec for React 17 example apps only (legacy render API)"
+  task shakapacker_examples_react17: react17_examples.map(&:gen_task_name) do
+    react17_examples.each { |example_type| Rake::Task[example_type.rspec_task_name].invoke }
+  end
+
+  desc "Runs Rspec for React 16 example apps only (oldest supported legacy API)"
+  task shakapacker_examples_react16: react16_examples.map(&:gen_task_name) do
+    react16_examples.each { |example_type| Rake::Task[example_type.rspec_task_name].invoke }
+  end
+
+  desc "Runs Rspec for all pinned version example apps (React 16, 17, and 18)"
+  task shakapacker_examples_pinned: pinned_version_examples.map(&:gen_task_name) do
+    pinned_version_examples.each { |example_type| Rake::Task[example_type.rspec_task_name].invoke }
   end
 
   Coveralls::RakeTask.new if ENV["USE_COVERALLS"] == "TRUE"
@@ -139,11 +188,23 @@ end
 # If string is passed and it's not absolute, it's converted relative to root of the gem.
 # TEST_ENV_COMMAND_NAME is used to make SimpleCov.command_name unique in order to
 # prevent a name collision. Defaults to the given directory's name.
+# Options:
+#   :command_name - name for SimpleCov (default: dir basename)
+#   :rspec_args - additional rspec arguments (default: "")
+#   :env_vars - additional environment variables (default: "")
+#   :unbundled - run with unbundled_sh_in_dir for Bundler isolation (default: false)
+#                This is required for pinned version examples because they have different
+#                gem versions (e.g., Shakapacker 8.2.0) pinned in their Gemfile than the
+#                parent workspace (Shakapacker 9.x). Without bundle isolation, Bundler
+#                would inherit the parent's gem resolution and use the wrong versions.
+#                Latest version examples don't need this because they use the same versions
+#                as the parent workspace.
 def run_tests_in(dir, options = {})
   path = calc_path(dir)
 
   command_name = options.fetch(:command_name, path.basename)
   rspec_args = options.fetch(:rspec_args, "")
+  unbundled = options.fetch(:unbundled, false)
 
   # Build environment variables as an array for proper spacing
   env_tokens = []
@@ -152,5 +213,11 @@ def run_tests_in(dir, options = {})
   env_tokens << "COVERAGE=true" if ENV["USE_COVERALLS"]
 
   env_vars = env_tokens.join(" ")
-  sh_in_dir(path.realpath, "#{env_vars} bundle exec rspec #{rspec_args}")
+  command = "#{env_vars} bundle exec rspec #{rspec_args}"
+
+  if unbundled
+    unbundled_sh_in_dir(path.realpath, command)
+  else
+    sh_in_dir(path.realpath, command)
+  end
 end

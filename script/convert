@@ -1,34 +1,46 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+# This script converts the codebase to use minimum supported dependency versions.
+# It's run during CI when testing the "minimum" dependency matrix to ensure
+# backward compatibility.
+#
+# React/Shakapacker version compatibility is now tested through generator smoke tests
+# (see examples_config.yml for minimum version examples like basic-minimum).
+# This script only handles Node.js/tooling compatibility and Pro package test adjustments.
+
 def gsub_file_content(path, old_content, new_content)
   path = File.expand_path(path, __dir__)
 
   # Support both old structure (files at root) and new structure (files in react_on_rails/)
   # This allows the script to work before and after the monorepo reorganization
   unless File.exist?(path)
-    # Try the old location by removing one level of nesting
-    old_path = path.sub(%r{/react_on_rails/Gemfile}, "/Gemfile")
-    path = old_path if File.exist?(old_path)
+    # Try alternate locations:
+    # 1. For react_on_rails subdirectory paths, try removing that nesting
+    # 2. For packages/* paths, try the old node_package/ location
+    alternate_paths = [
+      path.sub(%r{/react_on_rails/}, "/"),
+      path.sub(%r{/packages/react-on-rails/}, "/node_package/"),
+      path.sub(%r{/packages/react-on-rails-pro/}, "/react_on_rails_pro/node_package/")
+    ]
+
+    alternate_paths.each do |alt_path|
+      if File.exist?(alt_path)
+        path = alt_path
+        break
+      end
+    end
+  end
+
+  unless File.exist?(path)
+    warn "Warning: File not found: #{path}"
+    return
   end
 
   content = File.binread(path)
   content.gsub!(old_content, new_content)
   File.binwrite(path, content)
 end
-
-def move(old_path, new_path)
-  old_path = File.expand_path(old_path, __dir__)
-  new_path = File.expand_path(new_path, __dir__)
-  File.rename(old_path, new_path)
-end
-
-# Keep shakapacker.yml since we're using Shakapacker 8+
-# move("../react_on_rails/spec/dummy/config/shakapacker.yml", "../react_on_rails/spec/dummy/config/webpacker.yml")
-
-# Shakapacker - use version with async script loading support (8.2.0+)
-gsub_file_content("../react_on_rails/Gemfile.development_dependencies", /gem "shakapacker", "[^"]*"/, 'gem "shakapacker", "8.2.0"')
-gsub_file_content("../react_on_rails/spec/dummy/package.json", /"shakapacker": "[^"]*",/, '"shakapacker": "8.2.0",')
 
 # The below packages don't work on the oldest supported Node version and aren't needed there anyway
 # Note: All dev dependencies remain in root package.json even after workspace migration
@@ -42,13 +54,7 @@ gsub_file_content("../package.json", %r{"@testing-library/[^"]*": "[^"]*",}, "")
 # Clean up any trailing commas before closing braces
 gsub_file_content("../package.json", /,(\s*})/, "\\1")
 
-# Switch to minimum supported React version (React 18 since we removed PropTypes)
-gsub_file_content("../package.json", /"react": "[^"]*",/, '"react": "18.0.0",')
-gsub_file_content("../package.json", /"react-dom": "[^"]*",/, '"react-dom": "18.0.0",')
-gsub_file_content("../packages/react-on-rails-pro/package.json", /"react": "[^"]*",/, '"react": "18.0.0",')
-gsub_file_content("../packages/react-on-rails-pro/package.json", /"react-dom": "[^"]*",/, '"react-dom": "18.0.0",')
-gsub_file_content("../react_on_rails/spec/dummy/package.json", /"react": "[^"]*",/, '"react": "18.0.0",')
-gsub_file_content("../react_on_rails/spec/dummy/package.json", /"react-dom": "[^"]*",/, '"react-dom": "18.0.0",')
+# Pro package: Skip RSC tests on React 18 since RSC requires React 19
 gsub_file_content(
   "../packages/react-on-rails-pro/package.json",
   /"test:non-rsc": "(?:\\"|[^"])*",/,
@@ -57,18 +63,3 @@ gsub_file_content(
 )
 # test:rsc script now automatically detects React version and skips on React 18
 # No override needed - the script checks React version and exits cleanly if < 19
-# Keep modern JSX transform for React 18+
-# gsub_file_content("../tsconfig.json", "react-jsx", "react")
-# gsub_file_content("../spec/dummy/babel.config.js", "runtime: 'automatic'", "runtime: 'classic'")
-# Keep modern ReScript configuration for React 18+
-# gsub_file_content("../spec/dummy/rescript.json", '"version": 4', '"version": 4, "mode": "classic"')
-# Skip React 16 file replacements since we're using React 18+
-# Dir.glob(File.expand_path("../spec/dummy/**/app-react16/**/*.*", __dir__)).each do |file|
-#   move(file, file.gsub("-react16", ""))
-# end
-
-# These replacements were incorrect - generateWebpackConfig() is the correct function from shakapacker
-# gsub_file_content("../spec/dummy/config/webpack/commonWebpackConfig.js", /generateWebpackConfig(\(\))?/,
-#                   "webpackConfig")
-#
-# gsub_file_content("../spec/dummy/config/webpack/webpack.config.js", /generateWebpackConfig(\(\))?/, "webpackConfig")

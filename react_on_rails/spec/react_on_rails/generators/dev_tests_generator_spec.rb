@@ -34,7 +34,8 @@ describe DevTestsGenerator, type: :generator do
       assert_file("Gemfile") do |contents|
         expect(contents).to match("gem \"rspec-rails\", group: :test")
         expect(contents).to match("gem \"coveralls\", require: false")
-        expect(contents).to match("gem \"chromedriver-helper\", group: :test")
+        # chromedriver-helper was removed as it's deprecated since 2019
+        # Modern selenium-webdriver (4.x) handles driver management automatically
       end
     end
   end
