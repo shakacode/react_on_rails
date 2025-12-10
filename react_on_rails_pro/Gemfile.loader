@@ -1,18 +1,19 @@
 # frozen_string_literal: true
 
 # Load base dependencies
-base_deps = File.read(File.expand_path("./Gemfile.development_dependencies", __dir__))
+base_deps_path = File.expand_path("./Gemfile.development_dependencies", __dir__)
+base_deps = File.read(base_deps_path)
 
 # Determine which override file to use
-override_deps = if ENV["CI"] == "true" && File.exist?(File.expand_path("./Gemfile.ci", __dir__))
+override_deps_path = if ENV["CI"] == "true" && File.exist?(File.expand_path("./Gemfile.ci", __dir__))
   # In CI environment, use CI dependencies
-  File.read(File.expand_path("./Gemfile.ci", __dir__))
+  File.expand_path("./Gemfile.ci", __dir__)
 elsif File.exist?(File.expand_path("./Gemfile.local", __dir__))
   # In non-CI environment, use local dependencies if they exist
-  File.read(File.expand_path("./Gemfile.local", __dir__))
-else
-  ""
+  File.expand_path("./Gemfile.local", __dir__)
 end
+
+override_deps = override_deps_path ? File.read(override_deps_path) : ""
 
 # Parse override gems
 override_gem_names = override_deps.scan(/^\s*gem\s+["']([^"']+)["']/).flatten
@@ -26,7 +27,9 @@ end
 base_deps.gsub!(/^\s*$\n/, '')
 
 # Evaluate the modified base dependencies
-eval(base_deps)
+# Using instance_eval with filepath preserves __dir__ in evaluated content,
+# allowing eval_gemfile calls to work correctly inside loaded files.
+instance_eval(base_deps, base_deps_path)
 
 # Evaluate override dependencies if they exist
-eval(override_deps) unless override_deps.empty?
+instance_eval(override_deps, override_deps_path) unless override_deps.empty?

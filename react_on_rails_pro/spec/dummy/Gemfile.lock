@@ -108,7 +108,6 @@ GEM
     addressable (2.8.7)
       public_suffix (>= 2.0.2, < 7.0)
     amazing_print (1.6.0)
-    ast (2.4.2)
     async (2.34.0)
       console (~> 1.29)
       fiber-annotation
@@ -272,10 +271,6 @@ GEM
     nokogiri (1.18.10-x86_64-linux-musl)
       racc (~> 1.4)
     package_json (0.2.0)
-    parallel (1.25.1)
-    parser (3.3.3.0)
-      ast (~> 2.4.1)
-      racc
     pg (1.5.6)
     pp (0.6.3)
       prettyprint
@@ -380,24 +375,6 @@ GEM
     rspec-support (3.13.1)
     rspec_junit_formatter (0.6.0)
       rspec-core (>= 2, < 4, != 2.12.0)
-    rubocop (1.36.0)
-      json (~> 2.3)
-      parallel (~> 1.10)
-      parser (>= 3.1.2.1)
-      rainbow (>= 2.2.2, < 4.0)
-      regexp_parser (>= 1.8, < 3.0)
-      rexml (>= 3.2.5, < 4.0)
-      rubocop-ast (>= 1.20.1, < 2.0)
-      ruby-progressbar (~> 1.7)
-      unicode-display_width (>= 1.4.0, < 3.0)
-    rubocop-ast (1.31.3)
-      parser (>= 3.3.1.0)
-    rubocop-performance (1.15.0)
-      rubocop (>= 1.7.0, < 2.0)
-      rubocop-ast (>= 0.4.0)
-    rubocop-rspec (2.13.2)
-      rubocop (~> 1.33)
-    ruby-progressbar (1.13.0)
     ruby_parser (3.21.0)
       racc (~> 1.5)
       sexp_processor (~> 4.16)
@@ -476,7 +453,6 @@ GEM
       concurrent-ruby (~> 1.0)
     uglifier (4.2.0)
       execjs (>= 0.3.0, < 3)
-    unicode-display_width (2.5.0)
     uri (1.0.3)
     useragent (0.16.11)
     web-console (4.2.1)
@@ -555,9 +531,6 @@ DEPENDENCIES
   rspec-rails
   rspec-retry
   rspec_junit_formatter
-  rubocop (= 1.36.0)
-  rubocop-performance (= 1.15.0)
-  rubocop-rspec (= 2.13.2)
   sass-rails
   scss_lint
   selenium-webdriver (= 4.9.0)

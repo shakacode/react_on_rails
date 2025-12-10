@@ -1,0 +1,100 @@
+# Root RuboCop configuration for React on Rails monorepo
+# This contains shared settings inherited by react_on_rails/ and react_on_rails_pro/
+require:
+  - rubocop-performance
+  - rubocop-rspec
+
+AllCops:
+  NewCops: enable
+  DisplayCopNames: true
+  SuggestExtensions: false
+  TargetRubyVersion: 3.0
+
+  Include:
+    - '**/Rakefile'
+    - '**/config.ru'
+    - '**/Gemfile'
+    - '**/*.rb'
+    - '**/*.rake'
+
+  Exclude:
+    - '**/*.js'
+    - '**/node_modules/**/*'
+    - '**/public/**/*'
+    - '**/tmp/**/*'
+    - 'coverage/**/*'
+    - 'gen-examples/**/*'
+    - 'node_modules/**/*'
+    - 'spec/fixtures/**/*'
+    - 'spec/react_on_rails/dummy-for-generators/**/*'
+    - '**/vendor/**/*'
+
+Naming/FileName:
+  Exclude:
+    - '**/Gemfile'
+    - '**/Gemfile.*'
+    - '**/Rakefile'
+
+Layout/LineLength:
+  Max: 120
+
+Style/StringLiterals:
+  EnforcedStyle: double_quotes
+
+Style/Documentation:
+  Enabled: false
+
+Style/HashEachMethods:
+  Enabled: true
+
+Style/HashTransformKeys:
+  Enabled: true
+
+Style/HashTransformValues:
+  Enabled: true
+
+Metrics/AbcSize:
+  Max: 28
+
+Metrics/ClassLength:
+  Max: 150
+
+Metrics/CyclomaticComplexity:
+  Max: 8
+
+Metrics/PerceivedComplexity:
+  Max: 10
+
+Metrics/ParameterLists:
+  Max: 5
+  CountKeywordArgs: false
+
+Metrics/MethodLength:
+  Max: 41
+
+Metrics/ModuleLength:
+  Max: 180
+
+RSpec/DescribeClass:
+  Enabled: false
+
+RSpec/ExampleLength:
+  Enabled: false
+
+RSpec/MessageSpies:
+  Enabled: false
+
+RSpec/MessageChain:
+  Enabled: false
+
+RSpec/MultipleExpectations:
+  Enabled: false
+
+RSpec/MultipleMemoizedHelpers:
+  Max: 12
+
+RSpec/NestedGroups:
+  Max: 5
+
+Style/FrozenStringLiteralComment:
+  EnforcedStyle: always

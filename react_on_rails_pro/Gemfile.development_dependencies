@@ -1,6 +1,9 @@
 # Keep in sync with https://github.com/shakacode/react_on_rails/blob/master/Gemfile.development_dependencies
 # frozen_string_literal: true
 
+# Shared dev dependencies (rubocop, etc.)
+eval_gemfile File.expand_path("../Gemfile.shared_dev_dependencies", __dir__)
+
 git_source(:github) { |repo| "https://github.com/#{repo}.git" }
 
 ruby '3.3.7'
@@ -51,9 +54,6 @@ group :development, :test do
   gem 'pry-theme' # An easy way to customize Pry colors via theme files
 
   gem "rbs", require: false
-  gem "rubocop", "1.36.0", require: false
-  gem 'rubocop-performance', "1.15.0", require: false
-  gem 'rubocop-rspec', "2.13.2", require: false
   gem "scss_lint", require: false
   gem 'fakefs', require: 'fakefs/safe'
 end
