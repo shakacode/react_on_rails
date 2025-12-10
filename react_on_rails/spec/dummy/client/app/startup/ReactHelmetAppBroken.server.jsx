@@ -28,7 +28,7 @@ export default (props) => {
 
   const renderedHtml = {
     componentHtml,
-    title: helmet ? helmet.title.toString() : '',
+    title: helmet?.title?.toString() || '',
   };
   return { renderedHtml };
 };

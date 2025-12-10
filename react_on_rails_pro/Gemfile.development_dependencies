@@ -7,7 +7,7 @@ ruby '3.3.7'
 
 gem "react_on_rails", path: "../"
 
-gem "shakapacker", "9.3.0"
+gem "shakapacker", "9.4.0"
 gem "bootsnap", require: false
 gem "rails", "~> 7.1"
 gem "puma", "~> 6"
