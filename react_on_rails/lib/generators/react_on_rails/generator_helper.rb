@@ -124,4 +124,75 @@ module GeneratorHelper
       true
     end
   end
+
+  # Check if SWC is configured as the JavaScript transpiler in shakapacker.yml
+  #
+  # @return [Boolean] true if SWC is configured or should be used by default
+  #
+  # Detection logic:
+  # 1. If shakapacker.yml exists and specifies javascript_transpiler: parse it
+  # 2. For Shakapacker 9.3.0+, SWC is the default if not specified
+  # 3. Returns true for fresh installations (SWC is recommended default)
+  #
+  # @note This method is used to determine whether to install SWC dependencies
+  #   (@swc/core, swc-loader) instead of Babel dependencies during generation.
+  #
+  # @note Caching: The result is memoized for the lifetime of the generator instance.
+  #   If shakapacker.yml changes during generator execution (unlikely), the cached
+  #   value will not update. This is acceptable since generators run quickly.
+  def using_swc?
+    return @using_swc if defined?(@using_swc)
+
+    @using_swc = detect_swc_configuration
+  end
+
+  private
+
+  def detect_swc_configuration
+    shakapacker_yml_path = File.join(destination_root, "config/shakapacker.yml")
+
+    if File.exist?(shakapacker_yml_path)
+      config = parse_shakapacker_yml(shakapacker_yml_path)
+      transpiler = config.dig("default", "javascript_transpiler")
+
+      # Explicit configuration takes precedence
+      return transpiler == "swc" if transpiler
+
+      # For Shakapacker 9.3.0+, SWC is the default
+      return shakapacker_version_9_3_or_higher?
+    end
+
+    # Fresh install: SWC is recommended default for Shakapacker 9.3.0+
+    shakapacker_version_9_3_or_higher?
+  end
+
+  def parse_shakapacker_yml(path)
+    require "yaml"
+    # Use safe_load_file for security (defense-in-depth, even though this is user's own config)
+    # permitted_classes: [Symbol] allows symbol keys which shakapacker.yml may use
+    # aliases: true allows YAML anchors (&default, *default) commonly used in Rails configs
+    YAML.safe_load_file(path, permitted_classes: [Symbol], aliases: true)
+  rescue ArgumentError
+    # Older Psych versions don't support all parameters - try without aliases
+    begin
+      YAML.safe_load_file(path, permitted_classes: [Symbol])
+    rescue ArgumentError
+      # Very old Psych - fall back to safe_load with File.read
+      YAML.safe_load(File.read(path), permitted_classes: [Symbol]) # rubocop:disable Style/YAMLFileRead
+    end
+  rescue StandardError
+    # If we can't parse the file, return empty config
+    {}
+  end
+
+  # Check if Shakapacker 9.3.0 or higher is available
+  # This version made SWC the default JavaScript transpiler
+  def shakapacker_version_9_3_or_higher?
+    return true unless defined?(ReactOnRails::PackerUtils)
+
+    ReactOnRails::PackerUtils.shakapacker_version_requirement_met?("9.3.0")
+  rescue StandardError
+    # If we can't determine version, assume latest (which uses SWC)
+    true
+  end
 end
