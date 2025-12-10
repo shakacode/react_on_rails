@@ -64,6 +64,7 @@ on:
       - '**.md'
       - 'docs/**'
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
     paths-ignore:
       - '**.md'
       - 'docs/**'
@@ -90,6 +91,12 @@ env:
 
 jobs:
   benchmark:
+    # Run on: push to master, workflow_dispatch, or PRs with 'full-ci' or 'benchmark' labels
+    if: |
+      github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.pull_request.labels.*.name, 'full-ci') ||
+      contains(github.event.pull_request.labels.*.name, 'benchmark')
     runs-on: ubuntu-latest
     env:
       SECRET_KEY_BASE: 'dummy-secret-key-for-ci-testing-not-used-in-production'
