@@ -30,7 +30,7 @@ This checks your environment, dependencies, and configuration for common problem
 2. **Name matches exactly?**
 
    ```erb
-   <%# The name must match exactly (case-sensitive) %>
+   <%# The name must match exactly (case-sensitive, check for typos) %>
    <%= react_component("MyComponent", props: {}) %>
    ```
 
@@ -57,6 +57,8 @@ This checks your environment, dependencies, and configuration for common problem
 1. **Using non-deterministic values in render:**
 
    ```jsx
+   import React, { useState, useEffect } from 'react';
+
    // BAD - different on server vs client
    const MyComponent = () => <div>{Date.now()}</div>;
 
@@ -133,7 +135,7 @@ ls -la public/packs/server-bundle.js
 ```bash
 # Clear and reinstall dependencies
 rm -rf node_modules
-yarn install  # or npm install
+yarn install  # or: npm install, pnpm install
 
 # Rebuild assets
 yarn build

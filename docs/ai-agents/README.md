@@ -120,7 +120,7 @@ bin/dev
 
 **User wants:** "Add a React component to my Rails page"
 
-> **Note:** The generator sets `config.auto_load_bundle = true` in `config/initializers/react_on_rails.rb`, so you don't need to specify it on each component call.
+> **Note:** The generator sets `config.auto_load_bundle = true` in `config/initializers/react_on_rails.rb` (v16.0+), so you don't need to specify it on each component call.
 
 **Step 1:** Create component file at `app/javascript/src/MyComponent/ror_components/MyComponent.jsx`:
 
@@ -165,7 +165,7 @@ export default MyComponent;
 }) %>
 ```
 
-**Important:** Always serialize dates as ISO8601 strings. Never pass ActiveRecord objects directly.
+**Important:** Always serialize dates as ISO8601 strings (timezone-safe and JS-parseable). Never pass ActiveRecord objects directly.
 
 ### Pattern 3: Enable Server-Side Rendering
 
@@ -249,7 +249,17 @@ The React on Rails generator creates TypeScript-ready configuration. For existin
 yarn add typescript @types/react @types/react-dom
 ```
 
-**Step 2:** Rename component files from `.jsx` to `.tsx`:
+**Step 2:** Ensure `tsconfig.json` has proper JSX support (the generator creates this):
+
+```json
+{
+  "compilerOptions": {
+    "jsx": "react-jsx"
+  }
+}
+```
+
+**Step 3:** Rename component files from `.jsx` to `.tsx`:
 
 ```tsx
 // MyComponent.tsx
@@ -294,7 +304,7 @@ npm install react-on-rails
 **Checklist:**
 
 1. Component registered? Check for `ReactOnRails.register({ ComponentName })`
-2. Name matches exactly? `react_component("ComponentName")` must match registration (case-sensitive)
+2. Name matches exactly? `react_component("ComponentName")` must match registration (case-sensitive, check for typos)
 3. Bundle loaded? Check `<%= javascript_pack_tag %>` in layout `<head>`
 4. Auto-bundling enabled? Check `config.auto_load_bundle = true` in `config/initializers/react_on_rails.rb`
 5. Component in `ror_components` directory? Auto-bundling looks for this directory name
