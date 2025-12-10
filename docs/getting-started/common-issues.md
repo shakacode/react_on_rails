@@ -41,11 +41,8 @@ This checks your environment, dependencies, and configuration for common problem
    <%= javascript_pack_tag %>
    ```
 
-4. **Using auto_load_bundle?**
-
-   ```erb
-   <%= react_component("MyComponent", props: {}, auto_load_bundle: true) %>
-   ```
+4. **Auto-bundling enabled?**
+   Check `config.auto_load_bundle = true` in `config/initializers/react_on_rails.rb`
 
 5. **Check browser console** for JavaScript errors
 

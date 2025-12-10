@@ -120,6 +120,8 @@ bin/dev
 
 **User wants:** "Add a React component to my Rails page"
 
+> **Note:** The generator sets `config.auto_load_bundle = true` in `config/initializers/react_on_rails.rb`, so you don't need to specify it on each component call.
+
 **Step 1:** Create component file at `app/javascript/src/MyComponent/ror_components/MyComponent.jsx`:
 
 ```jsx
@@ -135,7 +137,7 @@ export default MyComponent;
 **Step 2:** Use in any Rails view (`.html.erb`):
 
 ```erb
-<%= react_component("MyComponent", props: { message: "Hello from React!" }, auto_load_bundle: true) %>
+<%= react_component("MyComponent", props: { message: "Hello from React!" }) %>
 ```
 
 **Step 3:** Ensure layout includes JavaScript pack tag in `<head>`:
@@ -160,7 +162,7 @@ export default MyComponent;
     created_at: @user.created_at.iso8601
   },
   permissions: current_user.permissions.as_json
-}, auto_load_bundle: true) %>
+}) %>
 ```
 
 **Important:** Always serialize dates as ISO8601 strings. Never pass ActiveRecord objects directly.
@@ -294,7 +296,7 @@ npm install react-on-rails
 1. Component registered? Check for `ReactOnRails.register({ ComponentName })`
 2. Name matches exactly? `react_component("ComponentName")` must match registration (case-sensitive)
 3. Bundle loaded? Check `<%= javascript_pack_tag %>` in layout `<head>`
-4. Using auto_load_bundle? Add `auto_load_bundle: true` to `react_component` call
+4. Auto-bundling enabled? Check `config.auto_load_bundle = true` in `config/initializers/react_on_rails.rb`
 5. Component in `ror_components` directory? Auto-bundling looks for this directory name
 
 ### Hydration Mismatch Errors
