@@ -13,7 +13,7 @@ AllCops:
   Include:
     - '**/Rakefile'
     - '**/config.ru'
-    - 'Gemfile'
+    - '**/Gemfile'
     - '**/*.rb'
     - '**/*.rake'
 
