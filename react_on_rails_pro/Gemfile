@@ -5,4 +5,8 @@ source "https://rubygems.org"
 # Specify your gem"s dependencies in react_on_rails.gemspec
 gemspec
 
+# Shared dev dependencies must be loaded here (not in Gemfile.development_dependencies)
+# because Gemfile.loader uses eval() which breaks __dir__ resolution
+eval_gemfile File.expand_path("../Gemfile.shared_dev_dependencies", __dir__)
+
 eval_gemfile File.expand_path("./Gemfile.loader", __dir__)

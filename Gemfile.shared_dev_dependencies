@@ -1,0 +1,10 @@
+# frozen_string_literal: true
+
+# Shared development dependencies for react_on_rails and react_on_rails_pro
+# This ensures consistent versions across the monorepo
+
+group :development, :test do
+  gem "rubocop", "1.61.0", require: false
+  gem "rubocop-performance", "~>1.20.0", require: false
+  gem "rubocop-rspec", "~>2.26", require: false
+end

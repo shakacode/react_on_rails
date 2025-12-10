@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+eval_gemfile File.expand_path("../Gemfile.shared_dev_dependencies", __dir__)
+
 gem "shakapacker", "9.4.0"
 gem "bootsnap", require: false
 gem "rails", "~> 7.1"
@@ -35,9 +37,6 @@ group :development, :test do
   gem "pry-rescue"
   gem "rbs", require: false
   gem "steep", require: false
-  gem "rubocop", "1.61.0", require: false
-  gem "rubocop-performance", "~>1.20.0", require: false
-  gem "rubocop-rspec", "~>2.26", require: false
   gem "spring", "~> 4.0"
   gem "lefthook", require: false
   # Added for Ruby 3.5+ compatibility to silence warnings
