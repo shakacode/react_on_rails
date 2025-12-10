@@ -76,6 +76,31 @@ def add_summary_line(*parts)
   end
 end
 
+# Check if a route has required parameters (e.g., /rsc_payload/:component_name)
+# Required parameters are :param NOT inside parentheses
+# Optional parameters are inside parentheses like (/:optional_param)
+def route_has_required_params?(path)
+  # Remove optional parameter sections (anything in parentheses)
+  path_without_optional = path.gsub(/\([^)]*\)/, "")
+  # Check if remaining path contains :param
+  path_without_optional.include?(":")
+end
+
+# Strip optional parameters from route path for use in URLs
+# e.g., "/route(/:optional)(.:format)" -> "/route"
+def strip_optional_params(route)
+  route.gsub(/\([^)]*\)/, "")
+end
+
+# Sanitize route name for use in filenames
+# Removes characters that GitHub Actions disallows in artifacts
+def sanitize_route_name(route)
+  name = strip_optional_params(route).gsub(%r{^/}, "").tr("/", "_")
+  name = "root" if name.empty?
+  # Replace invalid characters: " : < > | * ? \r \n
+  name.gsub(/[":.<>|*?\r\n]+/, "_").squeeze("_").gsub(/^_|_$/, "")
+end
+
 # Get routes from the Rails app filtered by pages# and react_router# controllers
 def get_benchmark_routes(app_dir)
   routes_output = `cd #{app_dir} && bundle exec rails routes 2>&1`
@@ -90,6 +115,13 @@ def get_benchmark_routes(app_dir)
 
     path = match[1]
     path = "/" if path.empty? # Handle root route
+
+    # Skip routes with required parameters (e.g., /rsc_payload/:component_name)
+    if route_has_required_params?(path)
+      puts "Skipping route with required parameters: #{path}"
+      next
+    end
+
     routes << path
   end
   raise "No pages# or react_router# routes found in #{app_dir}" if routes.empty?
@@ -378,7 +410,8 @@ routes.each do |route|
   puts "Benchmarking route: #{route}"
   puts separator
 
-  target = URI.parse("http://#{BASE_URL}#{route}")
+  # Strip optional parameters from route for URL (e.g., "(/:locale)" -> "")
+  target = URI.parse("http://#{BASE_URL}#{strip_optional_params(route)}")
 
   # Warm up server for this route
   puts "Warming up server for #{route} with 10 requests..."
@@ -388,9 +421,7 @@ routes.each do |route|
   end
   puts "Warm-up complete for #{route}"
 
-  # Sanitize route name for filenames
-  route_name = route.gsub(%r{^/}, "").tr("/", "_")
-  route_name = "root" if route_name.empty?
+  route_name = sanitize_route_name(route)
 
   # Run each benchmark tool
   fortio_metrics = run_fortio_benchmark(target, route_name)
