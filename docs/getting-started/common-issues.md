@@ -7,10 +7,10 @@
 Before diving into specific issues, run the doctor command:
 
 ```bash
-rake react_on_rails:doctor
+bundle exec rake react_on_rails:doctor
 
 # For more detailed output:
-VERBOSE=true rake react_on_rails:doctor
+VERBOSE=true bundle exec rake react_on_rails:doctor
 ```
 
 This checks your environment, dependencies, and configuration for common problems.
@@ -43,6 +43,8 @@ This checks your environment, dependencies, and configuration for common problem
 
 4. **Auto-bundling enabled?**
    Check `config.auto_load_bundle = true` in `config/initializers/react_on_rails.rb`
+
+   > **Note:** The generator sets this automatically in v16.0+, so you shouldn't need to add it manually for new installations.
 
 5. **Check browser console** for JavaScript errors
 
@@ -94,10 +96,10 @@ This checks your environment, dependencies, and configuration for common problem
 
 ```bash
 # Run diagnostics
-rake react_on_rails:doctor
+bundle exec rake react_on_rails:doctor
 
-# Check server bundle exists
-ls -la public/packs/server-bundle.js
+# Check server bundle exists (location may vary based on Shakapacker config)
+ls -la public/packs/server-bundle*.js
 ```
 
 ### Common Causes

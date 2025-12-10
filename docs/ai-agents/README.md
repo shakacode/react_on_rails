@@ -53,8 +53,9 @@ git add . && git commit -m "Add react_on_rails gem"
 # Run the installer
 bin/rails generate react_on_rails:install
 
-# For ~20x faster builds, use Rspack instead:
+# For ~20x faster builds, use Rspack instead of Webpack:
 # bin/rails generate react_on_rails:install --rspack
+# Rspack is recommended for new projects; use Webpack if you need specific plugins
 
 # Start development servers
 bin/dev
@@ -246,10 +247,12 @@ The React on Rails generator creates TypeScript-ready configuration. For existin
 **Step 1:** Add TypeScript dependencies:
 
 ```bash
-yarn add typescript @types/react @types/react-dom
-# or: npm install typescript @types/react @types/react-dom
-# or: pnpm add typescript @types/react @types/react-dom
+yarn add -D typescript @types/react @types/react-dom
+# or: npm install -D typescript @types/react @types/react-dom
+# or: pnpm add -D typescript @types/react @types/react-dom
 ```
+
+> **Note:** Pick one package manager and use it consistently throughout your project. All three (yarn, npm, pnpm) work equally well with React on Rails.
 
 **Step 2:** Ensure `tsconfig.json` has proper JSX support (the generator creates this):
 
@@ -265,14 +268,12 @@ yarn add typescript @types/react @types/react-dom
 
 ```tsx
 // MyComponent.tsx
-import React from 'react';
-
 interface Props {
   name: string;
   count?: number;
 }
 
-const MyComponent: React.FC<Props> = ({ name, count = 0 }) => {
+const MyComponent = ({ name, count = 0 }: Props) => {
   return (
     <div>
       {name}: {count}
@@ -331,13 +332,13 @@ yarn add react-on-rails
 
 ```bash
 # Run diagnostics
-rake react_on_rails:doctor
+bundle exec rake react_on_rails:doctor
 ```
 
 **Common causes:**
 
 - Component uses `window`, `document`, or browser APIs → Guard with `typeof window !== 'undefined'`
-- Component has async operations → Use sync operations for SSR or switch to Pro (async SSR)
+- Component has async operations → Use sync operations for SSR, or use Pro's Node renderer for async SSR support
 - Missing server bundle config → Set `config.server_bundle_js_file` in initializer
 
 ### "Module not found" / Webpack Errors
@@ -369,7 +370,7 @@ After any React on Rails setup, verify with:
 bin/dev
 
 # Diagnose configuration issues
-rake react_on_rails:doctor
+bundle exec rake react_on_rails:doctor
 
 # Check for JavaScript errors in browser console
 # Visit http://localhost:3000/hello_world
