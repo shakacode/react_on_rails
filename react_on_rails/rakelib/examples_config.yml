@@ -2,20 +2,19 @@
 #
 # CI Test Coverage:
 # -----------------
-# - Latest CI (PRs):     Runs shakapacker_examples_latest (React 19, Shakapacker 9.x)
+# - Latest CI (all PRs): Runs shakapacker_examples_latest (React 19, Shakapacker 9.x)
 #                        Examples: basic, basic-server-rendering, redux, redux-server-rendering
 #
-# - Minimum CI (master): Runs shakapacker_examples_pinned (React 16, 17, 18 with Shakapacker 8.2.0)
+# - Pinned CI (master):  Runs shakapacker_examples_pinned (React 16, 17, 18 with Shakapacker 8.2.0)
 #                        Examples: basic-react16, basic-server-rendering-react16,
 #                                  basic-react17, basic-server-rendering-react17,
 #                                  basic-react18, basic-server-rendering-react18
 #
 # Terminology:
 # - "Latest" = Current React version (19) with latest Shakapacker (9.x)
-# - "Pinned" = Specific older React versions (16, 17, 18) for compatibility testing
-# - "Minimum supported" = React 18.0.0 + Shakapacker 8.2.0 (oldest officially supported)
+# - "Pinned" = Specific older React versions (16, 17, 18) for backward compatibility testing
 #
-# Note: React 16 and 17 are past EOL but still tested for legacy compatibility.
+# Note: We support React 16+ but test with latest patch of each major version.
 
 example_type_data:
   # Latest versions (React 19, Shakapacker 9.x)
@@ -28,7 +27,7 @@ example_type_data:
   - name: redux-server-rendering
     generator_options: --redux --example-server-rendering
 
-  # React 18 compatibility tests (minimum supported version with Root API)
+  # React 18 compatibility tests (uses Root API introduced in React 18)
   - name: basic-react18
     generator_options: ''
     react_version: '18'

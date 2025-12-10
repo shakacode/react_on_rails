@@ -44,18 +44,11 @@ module ReactOnRails
         REACT_VERSIONS[react_version.to_s] || react_version
       end
 
-      # Legacy method for backward compatibility - true if React 18 (minimum supported)
-      def minimum_versions?
-        react_version == "18"
-      end
-
-      def initialize(packer_type: nil, name: nil, generator_options: nil, minimum_versions: false, react_version: nil)
+      def initialize(packer_type: nil, name: nil, generator_options: nil, react_version: nil)
         @packer_type = packer_type
         @name = name
         @generator_options = generator_options
-        # Support both legacy minimum_versions flag and new react_version parameter
-        # minimum_versions: true is equivalent to react_version: "18"
-        @react_version = react_version || (minimum_versions ? "18" : nil)
+        @react_version = react_version
 
         # Validate react_version is a known version to catch configuration errors early
         if @react_version && !REACT_VERSIONS.key?(@react_version.to_s)

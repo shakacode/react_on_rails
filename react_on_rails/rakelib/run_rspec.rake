@@ -140,12 +140,6 @@ namespace :run_rspec do
     pinned_version_examples.each { |example_type| Rake::Task[example_type.rspec_task_name].invoke }
   end
 
-  # Legacy alias for backward compatibility
-  desc "Runs Rspec for minimum version example apps only (React 18, Shakapacker 8.2.0)"
-  task shakapacker_examples_minimum: react18_examples.map(&:gen_task_name) do
-    react18_examples.each { |example_type| Rake::Task[example_type.rspec_task_name].invoke }
-  end
-
   Coveralls::RakeTask.new if ENV["USE_COVERALLS"] == "TRUE"
 
   desc "run all tests no examples"
@@ -199,7 +193,7 @@ end
 #   :rspec_args - additional rspec arguments (default: "")
 #   :env_vars - additional environment variables (default: "")
 #   :unbundled - run with unbundled_sh_in_dir for Bundler isolation (default: false)
-#                This is required for minimum version examples because they have different
+#                This is required for pinned version examples because they have different
 #                gem versions (e.g., Shakapacker 8.2.0) pinned in their Gemfile than the
 #                parent workspace (Shakapacker 9.x). Without bundle isolation, Bundler
 #                would inherit the parent's gem resolution and use the wrong versions.
