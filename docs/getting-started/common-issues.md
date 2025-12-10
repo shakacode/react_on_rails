@@ -59,13 +59,13 @@ This checks your environment, dependencies, and configuration for common problem
 1. **Using non-deterministic values in render:**
 
    ```jsx
-   import React, { useState, useEffect } from 'react';
+   import { useState, useEffect } from 'react';
 
    // BAD - different on server vs client
-   const MyComponent = () => <div>{Date.now()}</div>;
+   const BadComponent = () => <div>{Date.now()}</div>;
 
    // GOOD - move to useEffect
-   const MyComponent = () => {
+   const GoodComponent = () => {
      const [time, setTime] = useState(null);
      useEffect(() => setTime(Date.now()), []);
      return <div>{time}</div>;

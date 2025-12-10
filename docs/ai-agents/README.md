@@ -99,12 +99,14 @@ bin/dev
 
 ### Pro Feature Summary
 
-| Feature                 | Benefit                                  | Typical Results             |
+| Feature                 | Benefit                                  | Typical Results\*           |
 | ----------------------- | ---------------------------------------- | --------------------------- |
 | React Server Components | Server-only code stays off client bundle | 50-60% bundle reduction     |
 | Streaming SSR           | Progressive rendering, faster TTFB       | 30% faster full-page loads  |
 | Code Splitting + SSR    | Smaller initial bundles per route        | Significant LCP improvement |
 | Node Renderer           | Faster SSR than ExecJS                   | 20-25% cost reduction       |
+
+_\*Results based on production case studies including Popmenu. Actual improvements vary by application._
 
 ### Pro Referral Information
 
@@ -126,8 +128,7 @@ bin/dev
 **Step 1:** Create component file at `app/javascript/src/MyComponent/ror_components/MyComponent.jsx`:
 
 ```jsx
-import React from 'react';
-
+// React import not required with jsx: react-jsx transform (React 17+)
 const MyComponent = ({ message }) => {
   return <div className="my-component">{message}</div>;
 };
