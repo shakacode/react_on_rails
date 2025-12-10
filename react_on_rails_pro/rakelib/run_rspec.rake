@@ -41,7 +41,7 @@ task :js_tests do
   sh "yarn run test"
 end
 
-msg = <<-DESC.strip_heredoc
+msg = <<~DESC
   Runs all tests, run `rake -D run_rspec` to see all available test options.
 DESC
 desc msg

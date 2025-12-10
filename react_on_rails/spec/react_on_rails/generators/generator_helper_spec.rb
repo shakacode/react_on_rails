@@ -109,4 +109,147 @@ RSpec.describe GeneratorHelper, type: :generator do
       end
     end
   end
+
+  describe "#using_swc?" do
+    let(:shakapacker_yml_path) { File.join(destination_root, "config/shakapacker.yml") }
+
+    before do
+      # Clear memoized value before each test
+      remove_instance_variable(:@using_swc) if instance_variable_defined?(:@using_swc)
+      FileUtils.mkdir_p(File.join(destination_root, "config"))
+    end
+
+    after do
+      FileUtils.rm_rf(File.join(destination_root, "config"))
+    end
+
+    context "when shakapacker.yml exists with javascript_transpiler: swc" do
+      before do
+        File.write(shakapacker_yml_path, <<~YAML)
+          default: &default
+            javascript_transpiler: swc
+        YAML
+      end
+
+      it "returns true" do
+        expect(using_swc?).to be true
+      end
+    end
+
+    context "when shakapacker.yml exists with javascript_transpiler: babel" do
+      before do
+        File.write(shakapacker_yml_path, <<~YAML)
+          default: &default
+            javascript_transpiler: babel
+        YAML
+      end
+
+      it "returns false" do
+        expect(using_swc?).to be false
+      end
+    end
+
+    context "when shakapacker.yml exists without javascript_transpiler setting" do
+      before do
+        File.write(shakapacker_yml_path, <<~YAML)
+          default: &default
+            source_path: app/javascript
+        YAML
+        # Stub to simulate Shakapacker 9.3.0+ where SWC is default
+        stub_const("ReactOnRails::PackerUtils", Class.new do
+          def self.shakapacker_version_requirement_met?(version)
+            version == "9.3.0"
+          end
+        end)
+      end
+
+      it "returns true for Shakapacker 9.3.0+ (SWC is default)" do
+        expect(using_swc?).to be true
+      end
+    end
+
+    context "when shakapacker.yml does not exist" do
+      before do
+        FileUtils.rm_f(shakapacker_yml_path)
+        # Stub to simulate Shakapacker 9.3.0+ where SWC is default
+        stub_const("ReactOnRails::PackerUtils", Class.new do
+          def self.shakapacker_version_requirement_met?(version)
+            version == "9.3.0"
+          end
+        end)
+      end
+
+      it "returns true for fresh installations with Shakapacker 9.3.0+" do
+        expect(using_swc?).to be true
+      end
+    end
+
+    context "when shakapacker.yml has parse errors" do
+      before do
+        File.write(shakapacker_yml_path, "invalid: yaml: [}")
+        # Stub to simulate Shakapacker 9.3.0+ where SWC is default
+        stub_const("ReactOnRails::PackerUtils", Class.new do
+          def self.shakapacker_version_requirement_met?(version)
+            version == "9.3.0"
+          end
+        end)
+      end
+
+      it "returns true (assumes latest Shakapacker with SWC default)" do
+        expect(using_swc?).to be true
+      end
+    end
+
+    context "with version boundary scenarios" do
+      before do
+        File.write(shakapacker_yml_path, <<~YAML)
+          default: &default
+            source_path: app/javascript
+        YAML
+      end
+
+      context "when Shakapacker version is 9.3.0+ (SWC default)" do
+        before do
+          stub_const("ReactOnRails::PackerUtils", Class.new do
+            def self.shakapacker_version_requirement_met?(version)
+              version == "9.3.0"
+            end
+          end)
+        end
+
+        it "returns true when no transpiler is specified" do
+          expect(using_swc?).to be true
+        end
+      end
+
+      context "when Shakapacker version is below 9.3.0 (Babel default)" do
+        before do
+          stub_const("ReactOnRails::PackerUtils", Class.new do
+            def self.shakapacker_version_requirement_met?(version)
+              # Only meets requirements for versions below 9.3.0
+              version != "9.3.0"
+            end
+          end)
+        end
+
+        it "returns false when no transpiler is specified" do
+          expect(using_swc?).to be false
+        end
+      end
+
+      context "when PackerUtils raises an error during version check" do
+        before do
+          stub_const("ReactOnRails::PackerUtils", Class.new do
+            def self.shakapacker_version_requirement_met?(_version)
+              raise StandardError, "Cannot determine version"
+            end
+          end)
+        end
+
+        it "defaults to true (assumes latest Shakapacker)" do
+          expect(using_swc?).to be true
+        end
+      end
+    end
+  end
 end

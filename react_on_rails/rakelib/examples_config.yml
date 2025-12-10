@@ -1,4 +1,23 @@
+# Example Type Configuration for React on Rails Generator Tests
+#
+# CI Test Coverage:
+# -----------------
+# - Latest CI (all PRs): Runs shakapacker_examples_latest (React 19, Shakapacker 9.x)
+#                        Examples: basic, basic-server-rendering, redux, redux-server-rendering
+#
+# - Pinned CI (master):  Runs shakapacker_examples_pinned (React 16, 17, 18 with Shakapacker 8.2.0)
+#                        Examples: basic-react16, basic-server-rendering-react16,
+#                                  basic-react17, basic-server-rendering-react17,
+#                                  basic-react18, basic-server-rendering-react18
+#
+# Terminology:
+# - "Latest" = Current React version (19) with latest Shakapacker (9.x)
+# - "Pinned" = Specific older React versions (16, 17, 18) for backward compatibility testing
+#
+# Note: We support React 16+ but test with latest patch of each major version.
+
 example_type_data:
+  # Latest versions (React 19, Shakapacker 9.x)
   - name: basic
     generator_options: ''
   - name: basic-server-rendering
@@ -7,3 +26,27 @@ example_type_data:
     generator_options: --redux
   - name: redux-server-rendering
     generator_options: --redux --example-server-rendering
+
+  # React 18 compatibility tests (uses Root API introduced in React 18)
+  - name: basic-react18
+    generator_options: ''
+    react_version: '18'
+  - name: basic-server-rendering-react18
+    generator_options: --example-server-rendering
+    react_version: '18'
+
+  # React 17 compatibility tests (legacy render/hydrate API)
+  - name: basic-react17
+    generator_options: ''
+    react_version: '17'
+  - name: basic-server-rendering-react17
+    generator_options: --example-server-rendering
+    react_version: '17'
+
+  # React 16 compatibility tests (oldest supported legacy API)
+  - name: basic-react16
+    generator_options: ''
+    react_version: '16'
+  - name: basic-server-rendering-react16
+    generator_options: --example-server-rendering
+    react_version: '16'

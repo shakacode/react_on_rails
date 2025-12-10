@@ -99,6 +99,13 @@ module ReactOnRails
         @types/react-dom
       ].freeze
 
+      # SWC transpiler dependencies (for Shakapacker 9.3.0+ default transpiler)
+      # SWC is ~20x faster than Babel and is the default for new Shakapacker installations
+      SWC_DEPENDENCIES = %w[
+        @swc/core
+        swc-loader
+      ].freeze
+
       private
 
       def setup_js_dependencies
@@ -118,6 +125,8 @@ module ReactOnRails
         add_css_dependencies
         # Rspack dependencies are only added when --rspack flag is used
         add_rspack_dependencies if respond_to?(:options) && options&.rspack?
+        # SWC dependencies are only added when SWC is the configured transpiler
+        add_swc_dependencies if using_swc?
         # Dev dependencies vary based on bundler choice
         add_dev_dependencies
       end
@@ -229,6 +238,26 @@ module ReactOnRails
 
           You can install them manually by running:
             npm install #{RSPACK_DEPENDENCIES.join(' ')}
+        MSG
+      end
+
+      def add_swc_dependencies
+        puts "Installing SWC transpiler dependencies (20x faster than Babel)..."
+        return if add_packages(SWC_DEPENDENCIES, dev: true)
+
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Failed to add SWC dependencies.
+
+          SWC is the default JavaScript transpiler for Shakapacker 9.3.0+.
+          You can install them manually by running:
+            npm install --save-dev #{SWC_DEPENDENCIES.join(' ')}
+        MSG
+      rescue StandardError => e
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Error adding SWC dependencies: #{e.message}
+
+          You can install them manually by running:
+            npm install --save-dev #{SWC_DEPENDENCIES.join(' ')}
         MSG
       end
 

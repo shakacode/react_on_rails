@@ -4,6 +4,14 @@ import * as ReactDOM from 'react-dom';
 import type { ReactElement } from 'react';
 import type { RenderReturnType } from './types/index.ts' with { 'resolution-mode': 'import' };
 
+// Type for legacy React DOM APIs (React 16/17) that were removed from @types/react-dom@19
+// These are only used at runtime when supportsRootApi is false
+interface LegacyReactDOM {
+  hydrate(element: ReactElement, container: Element): void;
+  render(element: ReactElement, container: Element): RenderReturnType;
+  unmountComponentAtNode(container: Element): boolean;
+}
+
 const reactMajorVersion = Number(ReactDOM.version?.split('.')[0]) || 16;
 
 // TODO: once we require React 18, we can remove this and inline everything guarded by it.
@@ -29,12 +37,27 @@ if (supportsRootApi) {
 
 type HydrateOrRenderType = (domNode: Element, reactElement: ReactElement) => RenderReturnType;
 
-/* eslint-disable @typescript-eslint/no-deprecated,@typescript-eslint/no-non-null-assertion,react/no-deprecated --
- * while we need to support React 16
- */
+// Cast ReactDOM to include legacy APIs for React 16/17 compatibility
+// These methods exist at runtime but are removed from @types/react-dom@19
+const legacyReactDOM = ReactDOM as unknown as LegacyReactDOM;
+
+// Validate legacy APIs exist at runtime when needed (React < 18)
+if (!supportsRootApi) {
+  if (typeof legacyReactDOM.hydrate !== 'function') {
+    throw new Error('React legacy hydrate API not available. Expected React 16/17.');
+  }
+  if (typeof legacyReactDOM.render !== 'function') {
+    throw new Error('React legacy render API not available. Expected React 16/17.');
+  }
+  if (typeof legacyReactDOM.unmountComponentAtNode !== 'function') {
+    throw new Error('React legacy unmountComponentAtNode API not available. Expected React 16/17.');
+  }
+}
+
+/* eslint-disable @typescript-eslint/no-non-null-assertion -- reactDomClient is always defined when supportsRootApi is true */
 export const reactHydrate: HydrateOrRenderType = supportsRootApi
   ? reactDomClient!.hydrateRoot
-  : (domNode, reactElement) => ReactDOM.hydrate(reactElement, domNode);
+  : (domNode, reactElement) => legacyReactDOM.hydrate(reactElement, domNode);
 
 export function reactRender(domNode: Element, reactElement: ReactElement): RenderReturnType {
   if (supportsRootApi) {
@@ -43,14 +66,14 @@ export function reactRender(domNode: Element, reactElement: ReactElement): Rende
     return root;
   }
 
-  // eslint-disable-next-line react/no-render-return-value
-  return ReactDOM.render(reactElement, domNode);
+  return legacyReactDOM.render(reactElement, domNode);
 }
 
-export const unmountComponentAtNode: typeof ReactDOM.unmountComponentAtNode = supportsRootApi
+export const unmountComponentAtNode: (container: Element) => boolean = supportsRootApi
   ? // not used if we use root API
-    () => false
-  : ReactDOM.unmountComponentAtNode;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    (_container: Element) => false
+  : (container: Element) => legacyReactDOM.unmountComponentAtNode(container);
 
 export const ensureReactUseAvailable = () => {
   if (!('use' in React) || typeof React.use !== 'function') {

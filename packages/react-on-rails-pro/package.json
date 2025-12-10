@@ -1,6 +1,6 @@
 {
   "name": "react-on-rails-pro",
-  "version": "16.2.0-beta.12",
+  "version": "16.2.0-beta.13",
   "description": "React on Rails Pro package with React Server Components support",
   "type": "module",
   "scripts": {
@@ -60,7 +60,7 @@
   "peerDependencies": {
     "react": ">= 16",
     "react-dom": ">= 16",
-    "react-on-rails-rsc": "19.0.2"
+    "react-on-rails-rsc": "19.0.3"
   },
   "peerDependenciesMeta": {
     "react-on-rails-rsc": {
@@ -77,6 +77,9 @@
   "homepage": "https://github.com/shakacode/react_on_rails#readme",
   "devDependencies": {
     "@types/mock-fs": "^4.13.4",
-    "mock-fs": "^5.5.0"
+    "mock-fs": "^5.5.0",
+    "react": "^19.0.1",
+    "react-dom": "^19.0.1",
+    "react-on-rails-rsc": "^19.0.3"
   }
 }

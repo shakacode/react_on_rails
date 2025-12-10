@@ -5,7 +5,9 @@ require "English"
 module ReactOnRails
   module GitUtils
     def self.uncommitted_changes?(message_handler, git_installed: true)
-      return false if ENV["COVERAGE"] == "true"
+      # Skip check in CI environments - CI often makes temporary modifications
+      # (e.g., script/convert for minimum version testing) before running generators
+      return false if ENV["CI"] == "true" || ENV["COVERAGE"] == "true"
 
       status = `git status --porcelain`
       return false if git_installed && status&.empty?

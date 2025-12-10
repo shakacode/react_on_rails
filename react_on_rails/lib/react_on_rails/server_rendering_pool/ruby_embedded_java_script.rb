@@ -9,11 +9,10 @@ module ReactOnRails
     class RubyEmbeddedJavaScript
       class << self
         def reset_pool
-          options = {
+          @js_context_pool = ConnectionPool.new(
             size: ReactOnRails.configuration.server_renderer_pool_size,
             timeout: ReactOnRails.configuration.server_renderer_timeout
-          }
-          @js_context_pool = ConnectionPool.new(options) { create_js_context }
+          ) { create_js_context }
         end
 
         def reset_pool_if_server_bundle_was_modified

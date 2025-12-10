@@ -1,0 +1,172 @@
+name: Assets Precompile Check
+
+on:
+  push:
+    branches:
+      - 'master'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'react_on_rails_pro/**'
+  workflow_dispatch:
+    inputs:
+      force_run:
+        description: 'Force run all jobs (bypass detect-changes)'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  detect-changes:
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-22.04
+    outputs:
+      docs_only: ${{ steps.detect.outputs.docs_only }}
+      run_dummy_tests: ${{ steps.detect.outputs.run_dummy_tests }}
+      has_full_ci_label: ${{ steps.check-label.outputs.result }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 50
+          persist-credentials: false
+      - name: Check for full-ci label
+        id: check-label
+        uses: ./.github/actions/check-full-ci-label
+      - name: Detect relevant changes
+        id: detect
+        run: |
+          if [ "${{ inputs.force_run }}" = "true" ] || [ "${{ steps.check-label.outputs.result }}" = "true" ]; then
+            echo "run_dummy_tests=true" >> "$GITHUB_OUTPUT"
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/master' }}"
+          script/ci-changes-detector "$BASE_REF"
+        shell: bash
+      - name: Guard docs-only master pushes
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: ./.github/actions/ensure-master-docs-safety
+        with:
+          docs-only: ${{ steps.detect.outputs.docs_only }}
+          previous-sha: ${{ github.event.before }}
+
+  precompile-check:
+    needs: detect-changes
+    # Skip only if: master push AND docs-only changes
+    # Otherwise run if: on master OR workflow_dispatch OR dummy tests needed
+    if: |
+      !(
+        github.event_name == 'push' &&
+        github.ref == 'refs/heads/master' &&
+        needs.detect-changes.outputs.docs_only == 'true'
+      ) && (
+        github.ref == 'refs/heads/master' ||
+        github.event_name == 'workflow_dispatch' ||
+        needs.detect-changes.outputs.run_dummy_tests == 'true'
+      )
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4'
+          bundler: 2.5.9
+      # libyaml-dev is needed for psych v5
+      - name: Fix dependency for libyaml-dev
+        run: sudo apt install libyaml-dev
+      - name: Setup Node
+        uses: ./.github/actions/setup-node-with-retry
+        with:
+          node-version: '22'
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+      - name: Print system information
+        run: |
+          echo "Linux release: "; cat /etc/issue
+          echo "Current user: "; whoami
+          echo "Current directory: "; pwd
+          echo "Ruby version: "; ruby -v
+          echo "Node version: "; node -v
+          echo "pnpm version: "; pnpm --version
+          echo "Bundler version: "; bundle --version
+      - name: Install Node modules with pnpm for renderer package
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm add -g yalc
+      - name: yalc publish for react-on-rails
+        run: cd packages/react-on-rails && yalc publish
+      - name: yalc add react-on-rails
+        run: cd react_on_rails/spec/dummy && yalc add react-on-rails
+      - name: Install Node modules with pnpm for dummy app
+        # --ignore-workspace prevents pnpm from treating this as part of the parent workspace
+        # The dummy app doesn't have a pnpm-lock.yaml
+        run: cd react_on_rails/spec/dummy && pnpm install --ignore-workspace
+      - name: Save dummy app ruby gems to cache
+        uses: actions/cache@v4
+        with:
+          path: react_on_rails/spec/dummy/vendor/bundle
+          key: dummy-app-gem-cache-${{ hashFiles('react_on_rails/spec/dummy/Gemfile.lock') }}-precompile
+      - name: Install Ruby Gems for dummy app
+        run: |
+          cd react_on_rails/spec/dummy
+          bundle lock --add-platform 'x86_64-linux'
+          if ! bundle check --path=vendor/bundle; then
+            bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
+          fi
+      - name: Build ReScript files
+        run: cd react_on_rails/spec/dummy && pnpm run build:rescript
+      - name: Generate file system-based packs
+        run: cd react_on_rails/spec/dummy && RAILS_ENV=production bundle exec rake react_on_rails:generate_packs
+      - name: Clean compiled assets
+        # Clobber removes both Sprockets assets (public/assets) and webpack output (public/webpack)
+        # This ensures we test a fresh build, not cached "Everything's up-to-date" output
+        run: cd react_on_rails/spec/dummy && RAILS_ENV=production bundle exec rake assets:clobber
+      - name: Run assets:precompile and capture output
+        # Timeout prevents hung webpack processes from running for 6 hours.
+        # Typical precompile takes 2-5 minutes; 15 minutes is generous.
+        timeout-minutes: 15
+        run: |
+          cd react_on_rails/spec/dummy
+
+          echo "Running RAILS_ENV=production bin/rake assets:precompile..."
+          echo "=========================================="
+
+          # Run precompile and capture both stdout and stderr
+          # Use pipefail to catch rake failures even when piped through tee
+          set -o pipefail
+          RAILS_ENV=production bin/rake assets:precompile 2>&1 | tee precompile_output.txt
+          PRECOMPILE_EXIT=${PIPESTATUS[0]}
+
+          echo "=========================================="
+
+          # Check if rake command itself failed
+          if [ "$PRECOMPILE_EXIT" -ne 0 ]; then
+            echo "::error::Precompile command failed with exit code $PRECOMPILE_EXIT"
+            exit "$PRECOMPILE_EXIT"
+          fi
+      - name: Validate precompile output
+        run: script/validate-precompile-output react_on_rails/spec/dummy/precompile_output.txt
+      - name: Upload precompile output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: precompile-output-${{ github.run_id }}
+          path: react_on_rails/spec/dummy/precompile_output.txt
+          retention-days: 7

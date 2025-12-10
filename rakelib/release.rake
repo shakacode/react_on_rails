@@ -61,6 +61,9 @@ Version argument can be:
   - Explicit version: '16.2.0'
   - Pre-release version: '16.2.0.beta.1' (rubygem format with dots, converted to 16.2.0-beta.1 for NPM)
 
+Note: Pre-release versions (containing .test., .beta., .alpha., .rc., or .pre.) automatically
+skip git branch checks, allowing releases from non-master branches.
+
 This will update and release:
   PUBLIC (npmjs.org + rubygems.org):
     - react-on-rails NPM package
@@ -123,7 +126,9 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
 
   skip_push = skip_push_value == "skip_push"
 
+  # Detect if this is a test/pre-release version (contains test, beta, alpha, rc, etc.)
   version_input = args_hash.fetch(:version, "")
+  is_prerelease = version_input.match?(/\.(test|beta|alpha|rc|pre)\./i)
 
   if version_input.strip.empty?
     raise ArgumentError,
@@ -168,7 +173,6 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
 
   # Update react_on_rails_pro gem version to match
   puts "\nUpdating react_on_rails_pro gem version to #{actual_gem_version}..."
-  pro_gem_root = File.join(monorepo_root, "react_on_rails_pro")
   pro_version_file = File.join(pro_gem_root, "lib", "react_on_rails_pro", "version.rb")
   pro_version_content = File.read(pro_version_file)
   # We use gsub instead of `gem bump` here because the git tree is already dirty
@@ -181,23 +185,19 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
 
   puts "\nUpdating package.json files to version #{actual_npm_version}..."
 
-  # Update all package.json files
+  # Update all package.json files (only publishable packages)
   package_json_files = [
-    File.join(gem_root, "package.json"),
-    File.join(gem_root, "packages", "react-on-rails", "package.json"),
-    File.join(gem_root, "packages", "react-on-rails-pro", "package.json"),
-    File.join(gem_root, "react_on_rails_pro", "package.json")
+    File.join(monorepo_root, "package.json"),
+    File.join(monorepo_root, "packages", "react-on-rails", "package.json"),
+    File.join(monorepo_root, "packages", "react-on-rails-pro", "package.json"),
+    File.join(monorepo_root, "packages", "react-on-rails-pro-node-renderer", "package.json")
   ]
 
   package_json_files.each do |file|
     content = JSON.parse(File.read(file))
     content["version"] = actual_npm_version
-
-    # For react-on-rails-pro package, also update the react-on-rails dependency to exact version
-    if content["name"] == "react-on-rails-pro"
-      content["dependencies"] ||= {}
-      content["dependencies"]["react-on-rails"] = actual_npm_version
-    end
+    # Note: workspace:* dependencies (e.g., in react-on-rails-pro) are automatically
+    # converted to exact versions by pnpm during publish. No manual conversion needed.
 
     File.write(file, "#{JSON.pretty_generate(content)}\n")
     puts "  Updated #{file}"
@@ -209,7 +209,6 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
   # Update all Gemfile.lock files
   unbundled_sh_in_dir(gem_root, "bundle install#{bundle_quiet_flag}")
   unbundled_sh_in_dir(dummy_app_dir, "bundle install#{bundle_quiet_flag}")
-  pro_dummy_app_dir = File.join(gem_root, "react_on_rails_pro", "spec", "dummy")
   unbundled_sh_in_dir(pro_dummy_app_dir, "bundle install#{bundle_quiet_flag}") if Dir.exist?(pro_dummy_app_dir)
   unbundled_sh_in_dir(pro_gem_root, "bundle install#{bundle_quiet_flag}")
 
@@ -232,10 +231,23 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
   unless is_dry_run
     # Commit all version changes (skip git hooks to save time)
     sh_in_dir(monorepo_root, "LEFTHOOK=0 git add -A")
-    sh_in_dir(monorepo_root, "LEFTHOOK=0 git commit -m 'Bump version to #{actual_gem_version}'")
 
-    # Create git tag
-    sh_in_dir(monorepo_root, "git tag v#{actual_gem_version}")
+    # Only commit if there are staged changes (version might already be set)
+    git_status = `cd #{monorepo_root} && git diff --cached --quiet; echo $?`.strip
+    if git_status == "0"
+      puts "No version changes to commit (version already set to #{actual_gem_version})"
+    else
+      sh_in_dir(monorepo_root, "LEFTHOOK=0 git commit -m 'Bump version to #{actual_gem_version}'")
+    end
+
+    # Create git tag (skip if it already exists)
+    tag_name = "v#{actual_gem_version}"
+    tag_exists = system("cd #{monorepo_root} && git rev-parse #{tag_name} >/dev/null 2>&1")
+    if tag_exists
+      puts "Git tag #{tag_name} already exists, skipping tag creation"
+    else
+      sh_in_dir(monorepo_root, "git tag #{tag_name}")
+    end
 
     # Push commits and tags (skip git hooks)
     unless skip_push
@@ -256,13 +268,19 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
       puts "TIP: Set NPM_OTP environment variable to avoid repeated prompts."
     end
 
+    # For pre-release versions, skip git branch checks (allows releasing from non-master branches)
+    if is_prerelease
+      npm_publish_args += " --no-git-checks"
+      puts "Pre-release version detected - skipping git branch checks for NPM publish"
+    end
+
     # Publish react-on-rails NPM package
     puts "\nPublishing react-on-rails@#{actual_npm_version}..."
-    sh_in_dir(File.join(gem_root, "packages", "react-on-rails"), "pnpm publish #{npm_publish_args}")
+    sh_in_dir(File.join(monorepo_root, "packages", "react-on-rails"), "pnpm publish #{npm_publish_args}")
 
     # Publish react-on-rails-pro NPM package
     puts "\nPublishing react-on-rails-pro@#{actual_npm_version}..."
-    sh_in_dir(File.join(gem_root, "packages", "react-on-rails-pro"), "pnpm publish #{npm_publish_args}")
+    sh_in_dir(File.join(monorepo_root, "packages", "react-on-rails-pro"), "pnpm publish #{npm_publish_args}")
 
     # Publish node-renderer NPM package (PUBLIC on npmjs.org)
     puts "\n#{'=' * 80}"
@@ -270,11 +288,10 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
     puts "=" * 80
 
     # Publish react-on-rails-pro-node-renderer NPM package
-    # Note: Uses plain `pnpm publish` because the node-renderer
-    # package.json is in react_on_rails_pro/ which is not defined as a workspace
     node_renderer_name = "react-on-rails-pro-node-renderer"
+    node_renderer_dir = File.join(monorepo_root, "packages", "react-on-rails-pro-node-renderer")
     puts "\nPublishing #{node_renderer_name}@#{actual_npm_version}..."
-    sh_in_dir(pro_gem_root, "pnpm publish --no-git-checks #{npm_publish_args}")
+    sh_in_dir(node_renderer_dir, "pnpm publish #{npm_publish_args}")
 
     if use_verdaccio
       puts "\nSkipping Ruby gem publication (Verdaccio is NPM-only)"
@@ -319,8 +336,8 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
     puts "  - react_on_rails_pro/lib/react_on_rails_pro/version.rb"
     puts "  - package.json (root)"
     puts "  - packages/react-on-rails/package.json"
-    puts "  - packages/react-on-rails-pro/package.json (version + dependency)"
-    puts "  - react_on_rails_pro/package.json (node-renderer)"
+    puts "  - packages/react-on-rails-pro/package.json (version only; workspace:* converted by pnpm)"
+    puts "  - packages/react-on-rails-pro-node-renderer/package.json"
     puts "  - Gemfile.lock files (root, dummy apps, pro)"
     puts "\nAuto-synced (no write needed):"
     puts "  - react_on_rails_pro/react_on_rails_pro.gemspec (uses ReactOnRails::VERSION)"
