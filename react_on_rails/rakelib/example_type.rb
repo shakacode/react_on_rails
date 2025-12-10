@@ -23,8 +23,8 @@ module ReactOnRails
         "19" => nil # nil means use latest (default)
       }.freeze
 
-      # Semantic version constants for documentation and reference
-      MINIMUM_SUPPORTED_REACT_VERSION = "16.14.0"
+      # Supported React major versions (we test with latest patch of each)
+      MINIMUM_SUPPORTED_REACT_MAJOR_VERSION = "16"
       LATEST_REACT_MAJOR_VERSION = "19"
 
       # Minimum Shakapacker version for compatibility testing
