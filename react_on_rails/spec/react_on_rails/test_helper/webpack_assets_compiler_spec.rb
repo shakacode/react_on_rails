@@ -35,7 +35,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsCompiler do
           described_class.new.compile_assets
         rescue SystemExit
           # No op
-        end.to output(/#{expected_output}/).to_stdout
+        end.to output(/#{expected_output}/).to_stderr
       end
     end
   end
