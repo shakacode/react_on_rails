@@ -59,6 +59,7 @@ jobs:
             }
 
             return { shouldRespond: false };
+          result-encoding: string
 
       - name: Post helpful comment
         if: steps.check_command.outputs.result != '' && fromJSON(steps.check_command.outputs.result).shouldRespond == true
