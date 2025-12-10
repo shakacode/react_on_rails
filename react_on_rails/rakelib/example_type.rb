@@ -24,7 +24,7 @@ module ReactOnRails
       }.freeze
 
       # Semantic version constants for documentation and reference
-      MINIMUM_SUPPORTED_REACT_VERSION = "18.0.0"
+      MINIMUM_SUPPORTED_REACT_VERSION = "16.14.0"
       LATEST_REACT_MAJOR_VERSION = "19"
 
       # Minimum Shakapacker version for compatibility testing
