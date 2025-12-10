@@ -1,7 +1,16 @@
 import { RSCPayloadChunk } from 'react-on-rails';
 
-const removeRSCChunkStack = (chunk: string) => {
-  const parsedJson = JSON.parse(chunk) as RSCPayloadChunk;
+const removeRSCChunkStackInternal = (chunk: string) => {
+  if (chunk.trim().length === 0) {
+    return chunk;
+  }
+
+  let parsedJson: RSCPayloadChunk;
+  try {
+    parsedJson = JSON.parse(chunk) as RSCPayloadChunk;
+  } catch (err) {
+    throw new Error(`Error while parsing the json: "${chunk}", ${err}`);
+  }
   const { html } = parsedJson;
   const santizedHtml = html.split('\n').map((chunkLine) => {
     if (!chunkLine.includes('"stack":')) {
@@ -24,5 +33,9 @@ const removeRSCChunkStack = (chunk: string) => {
     html: santizedHtml,
   });
 };
+
+const removeRSCChunkStack = (chunk: string) => {
+  chunk.split('\n').map(removeRSCChunkStackInternal).join('\n');
+}
 
 export default removeRSCChunkStack;

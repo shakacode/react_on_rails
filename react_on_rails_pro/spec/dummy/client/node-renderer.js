@@ -55,7 +55,7 @@ const config = {
 
   // additionalContext enables you to specify additional NodeJS modules to add to the VM context in
   // addition to our supportModules defaults.
-  additionalContext: { URL, AbortController },
+  additionalContext: { URL, AbortController, performance },
 
   // Required to use setTimeout, setInterval, & clearTimeout during server rendering
   stubTimers: false,

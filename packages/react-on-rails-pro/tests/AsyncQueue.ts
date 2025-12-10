@@ -26,9 +26,10 @@ class AsyncQueue<T> {
 
   dequeue() {
     return new Promise<T>((resolve, reject) => {
-      const bufferValueIfExist = this.buffer.shift();
+      const bufferValueIfExist = this.buffer.length > 0 ? this.buffer.join('') : undefined;
+      this.buffer.length = 0;
       if (bufferValueIfExist) {
-        resolve(bufferValueIfExist);
+        resolve(bufferValueIfExist as T);
       } else if (this.isEnded) {
         reject(new Error('Queue Ended'));
       } else {
