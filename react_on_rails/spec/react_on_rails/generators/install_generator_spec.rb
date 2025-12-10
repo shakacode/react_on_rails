@@ -16,8 +16,10 @@ describe InstallGenerator, type: :generator do
     it "installs appropriate transpiler dependencies based on Shakapacker version" do
       assert_file "package.json" do |content|
         package_json = JSON.parse(content)
-        # SWC is the default transpiler for Shakapacker 9.3.0+
-        # Babel is the default for older versions
+        # This test verifies the generator adapts to the Shakapacker version in the current environment.
+        # CI runs with both minimum (Shakapacker 8.x) and latest (Shakapacker 9.x) configurations,
+        # so this test validates correct behavior for whichever version is installed.
+        # SWC is the default transpiler for Shakapacker 9.3.0+; Babel is the default for older versions.
         swc_is_default = ReactOnRails::PackerUtils.shakapacker_version_requirement_met?("9.3.0")
 
         if swc_is_default
