@@ -15,12 +15,17 @@ module ReactOnRails
       end
 
       # Supported React versions for compatibility testing
+      # Keys are major version strings, values are specific version to pin to (nil = latest)
       REACT_VERSIONS = {
         "16" => "16.14.0",
         "17" => "17.0.2",
         "18" => "18.0.0",
         "19" => nil # nil means use latest (default)
       }.freeze
+
+      # Semantic version constants for documentation and reference
+      MINIMUM_SUPPORTED_REACT_VERSION = "18.0.0"
+      LATEST_REACT_MAJOR_VERSION = "19"
 
       # Minimum Shakapacker version for compatibility testing
       MINIMUM_SHAKAPACKER_VERSION = "8.2.0"
@@ -51,6 +56,14 @@ module ReactOnRails
         # Support both legacy minimum_versions flag and new react_version parameter
         # minimum_versions: true is equivalent to react_version: "18"
         @react_version = react_version || (minimum_versions ? "18" : nil)
+
+        # Validate react_version is a known version to catch configuration errors early
+        if @react_version && !REACT_VERSIONS.key?(@react_version.to_s)
+          valid_versions = REACT_VERSIONS.keys.join(", ")
+          raise ArgumentError, "Invalid react_version '#{@react_version}' for example '#{name}'. " \
+                               "Valid versions: #{valid_versions}"
+        end
+
         self.class.all[packer_type.to_sym] << self
       end
 
