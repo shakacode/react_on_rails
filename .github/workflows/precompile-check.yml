@@ -1,10 +1,9 @@
-name: Lint JS and Ruby
+name: Assets Precompile Check
 
 on:
   push:
     branches:
       - 'master'
-    # Always trigger on master; docs-only detection handles skipping heavy jobs
   pull_request:
     paths-ignore:
       - '**.md'
@@ -26,16 +25,12 @@ jobs:
     runs-on: ubuntu-22.04
     outputs:
       docs_only: ${{ steps.detect.outputs.docs_only }}
-      run_lint: ${{ steps.detect.outputs.run_lint }}
-      run_js_tests: ${{ steps.detect.outputs.run_js_tests }}
-      run_ruby_tests: ${{ steps.detect.outputs.run_ruby_tests }}
       run_dummy_tests: ${{ steps.detect.outputs.run_dummy_tests }}
-      run_generators: ${{ steps.detect.outputs.run_generators }}
       has_full_ci_label: ${{ steps.check-label.outputs.result }}
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 50
           persist-credentials: false
       - name: Check for full-ci label
         id: check-label
@@ -43,13 +38,8 @@ jobs:
       - name: Detect relevant changes
         id: detect
         run: |
-          # If force_run is true OR full-ci label is present, run everything
           if [ "${{ inputs.force_run }}" = "true" ] || [ "${{ steps.check-label.outputs.result }}" = "true" ]; then
-            echo "run_lint=true" >> "$GITHUB_OUTPUT"
-            echo "run_js_tests=true" >> "$GITHUB_OUTPUT"
-            echo "run_ruby_tests=true" >> "$GITHUB_OUTPUT"
             echo "run_dummy_tests=true" >> "$GITHUB_OUTPUT"
-            echo "run_generators=true" >> "$GITHUB_OUTPUT"
             echo "docs_only=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -64,11 +54,10 @@ jobs:
           docs-only: ${{ steps.detect.outputs.docs_only }}
           previous-sha: ${{ github.event.before }}
 
-  build:
+  precompile-check:
     needs: detect-changes
     # Skip only if: master push AND docs-only changes
-    # Otherwise run if: on master OR lint needed
-    # This allows docs-only commits to skip linting while ensuring full CI on master for code changes
+    # Otherwise run if: on master OR workflow_dispatch OR dummy tests needed
     if: |
       !(
         github.event_name == 'push' &&
@@ -76,33 +65,31 @@ jobs:
         needs.detect-changes.outputs.docs_only == 'true'
       ) && (
         github.ref == 'refs/heads/master' ||
-        needs.detect-changes.outputs.run_lint == 'true'
+        github.event_name == 'workflow_dispatch' ||
+        needs.detect-changes.outputs.run_dummy_tests == 'true'
       )
-    env:
-      BUNDLE_FROZEN: true
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
         with:
-          # No need for history in lint job
-          fetch-depth: 1
           persist-credentials: false
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: 3
+          ruby-version: '3.4'
           bundler: 2.5.9
+      # libyaml-dev is needed for psych v5
+      - name: Fix dependency for libyaml-dev
+        run: sudo apt install libyaml-dev
       - name: Setup Node
         uses: ./.github/actions/setup-node-with-retry
         with:
-          # Pin to 22.11.0 (LTS) to avoid V8 bug in 22.21.0
-          # https://github.com/nodejs/node/issues/56010
-          node-version: '22.11.0'
+          node-version: '22'
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
       - name: Get pnpm store directory
         shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
       - name: Setup pnpm cache
         uses: actions/cache@v4
         with:
@@ -119,41 +106,23 @@ jobs:
           echo "Node version: "; node -v
           echo "pnpm version: "; pnpm --version
           echo "Bundler version: "; bundle --version
-      - name: Save root ruby gems to cache
-        uses: actions/cache@v4
-        with:
-          path: vendor/bundle
-          key: package-app-gem-cache-${{ hashFiles('Gemfile.lock') }}-lint
       - name: Install Node modules with pnpm for renderer package
-
         run: |
           pnpm install --frozen-lockfile
           pnpm add -g yalc
       - name: yalc publish for react-on-rails
         run: cd packages/react-on-rails && yalc publish
       - name: yalc add react-on-rails
-        # Use --link to maintain the link: protocol that matches pnpm-lock.yaml
-        run: cd react_on_rails/spec/dummy && yalc add --link react-on-rails
+        run: cd react_on_rails/spec/dummy && yalc add react-on-rails
       - name: Install Node modules with pnpm for dummy app
         # --ignore-workspace prevents pnpm from treating this as part of the parent workspace
-        # The dummy app has its own dependencies and uses yalc links
+        # The dummy app doesn't have a pnpm-lock.yaml
         run: cd react_on_rails/spec/dummy && pnpm install --ignore-workspace
-
-      - name: Install Ruby Gems for package
-        run: cd react_on_rails && bundle check --path=vendor/bundle || bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
-      - name: Lint Ruby
-        run: cd react_on_rails && bundle exec rubocop
-      - name: Validate RBS type signatures
-        run: cd react_on_rails && bundle exec rake rbs:validate
-      # TODO: Re-enable Steep once RBS signatures are complete for all checked files
-      # Currently disabled because 374 type errors need to be fixed first
-      # - name: Run Steep type checker
-      #   run: bundle exec rake rbs:steep
       - name: Save dummy app ruby gems to cache
         uses: actions/cache@v4
         with:
           path: react_on_rails/spec/dummy/vendor/bundle
-          key: dummy-app-gem-cache-${{ hashFiles('react_on_rails/spec/dummy/Gemfile.lock') }}-lint
+          key: dummy-app-gem-cache-${{ hashFiles('react_on_rails/spec/dummy/Gemfile.lock') }}-precompile
       - name: Install Ruby Gems for dummy app
         run: |
           cd react_on_rails/spec/dummy
@@ -161,28 +130,43 @@ jobs:
           if ! bundle check --path=vendor/bundle; then
             bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
           fi
-      - name: generate file system-based packs
-        run: cd react_on_rails/spec/dummy && RAILS_ENV="test" bundle exec rake react_on_rails:generate_packs
-      - name: Detect dead code
+      - name: Build ReScript files
+        run: cd react_on_rails/spec/dummy && pnpm run build:rescript
+      - name: Generate file system-based packs
+        run: cd react_on_rails/spec/dummy && RAILS_ENV=production bundle exec rake react_on_rails:generate_packs
+      - name: Clean compiled assets
+        # Clobber removes both Sprockets assets (public/assets) and webpack output (public/webpack)
+        # This ensures we test a fresh build, not cached "Everything's up-to-date" output
+        run: cd react_on_rails/spec/dummy && RAILS_ENV=production bundle exec rake assets:clobber
+      - name: Run assets:precompile and capture output
+        # Timeout prevents hung webpack processes from running for 6 hours.
+        # Typical precompile takes 2-5 minutes; 15 minutes is generous.
+        timeout-minutes: 15
         run: |
-          pnpm exec knip --exclude binaries
-          pnpm exec knip --production --exclude binaries
+          cd react_on_rails/spec/dummy
 
-      - name: Lint JS
-        run: pnpm run eslint --report-unused-disable-directives
-      - name: Check formatting
-        run: pnpm start format.listDifferent
-      - name: Lint SCSS with stylelint
-        run: pnpm run lint:scss
-      - name: Type-check TypeScript
-        run: pnpm run type-check
-      - name: Pack for attw and publint
-        run: cd packages/react-on-rails && pnpm pack
-      - name: Lint package types
-        # our package is ESM-only
-        # Exclude internal exports used for react-on-rails-pro communication
-        run: pnpm run attw packages/react-on-rails/react-on-rails-*.tgz --profile esm-only --exclude-entrypoints reactApis ReactDOMServer
-      - name: Lint package publishing
-        run: pnpm run publint --strict packages/react-on-rails/react-on-rails-*.tgz
-      # We only download and run Actionlint if there is any difference in GitHub Action workflows
-      # https://github.com/rhysd/actionlint/blob/main/docs/usage.md#on-github-actions
+          echo "Running RAILS_ENV=production bin/rake assets:precompile..."
+          echo "=========================================="
+
+          # Run precompile and capture both stdout and stderr
+          # Use pipefail to catch rake failures even when piped through tee
+          set -o pipefail
+          RAILS_ENV=production bin/rake assets:precompile 2>&1 | tee precompile_output.txt
+          PRECOMPILE_EXIT=${PIPESTATUS[0]}
+
+          echo "=========================================="
+
+          # Check if rake command itself failed
+          if [ "$PRECOMPILE_EXIT" -ne 0 ]; then
+            echo "::error::Precompile command failed with exit code $PRECOMPILE_EXIT"
+            exit "$PRECOMPILE_EXIT"
+          fi
+      - name: Validate precompile output
+        run: script/validate-precompile-output react_on_rails/spec/dummy/precompile_output.txt
+      - name: Upload precompile output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: precompile-output-${{ github.run_id }}
+          path: react_on_rails/spec/dummy/precompile_output.txt
+          retention-days: 7
