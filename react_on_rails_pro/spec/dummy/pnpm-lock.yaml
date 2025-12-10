@@ -29,6 +29,9 @@ importers:
       '@babel/runtime':
         specifier: '7'
         version: 7.28.4
+      '@dr.pogodin/react-helmet':
+        specifier: ^3.0.4
+        version: 3.0.4(react@19.2.1)
       '@honeybadger-io/js':
         specifier: ^4.3.1
         version: 4.9.3
@@ -143,9 +146,6 @@ importers:
       react-error-boundary:
         specifier: ^4.1.2
         version: 4.1.2(react@19.2.1)
-      react-helmet:
-        specifier: ^6.0.0-beta.2
-        version: 6.1.0(react@19.2.1)
       react-on-rails-pro:
         specifier: link:.yalc/react-on-rails-pro
         version: link:.yalc/react-on-rails-pro
@@ -186,8 +186,8 @@ importers:
         specifier: ^2.0.0
         version: 2.2.5
       shakapacker:
-        specifier: 9.3.0
-        version: 9.3.0(@babel/core@7.28.5)(@babel/plugin-transform-runtime@7.28.5(@babel/core@7.28.5))(@babel/preset-env@7.28.5(@babel/core@7.28.5))(@babel/runtime@7.28.4)(babel-loader@8.4.1(@babel/core@7.28.5)(webpack@5.103.0))(compression-webpack-plugin@9.2.0(webpack@5.103.0))(css-loader@6.11.0(webpack@5.103.0))(mini-css-extract-plugin@2.9.4(webpack@5.103.0))(sass-loader@12.6.0(sass@1.95.1)(webpack@5.103.0))(sass@1.95.1)(terser-webpack-plugin@5.3.15(webpack@5.103.0))(webpack-assets-manifest@5.2.1(webpack@5.103.0))(webpack-cli@4.10.0)(webpack-dev-server@4.15.2)(webpack@5.103.0)
+        specifier: 9.4.0
+        version: 9.4.0(@babel/core@7.28.5)(@babel/plugin-transform-runtime@7.28.5(@babel/core@7.28.5))(@babel/preset-env@7.28.5(@babel/core@7.28.5))(@babel/runtime@7.28.4)(babel-loader@8.4.1(@babel/core@7.28.5)(webpack@5.103.0))(compression-webpack-plugin@9.2.0(webpack@5.103.0))(css-loader@6.11.0(webpack@5.103.0))(mini-css-extract-plugin@2.9.4(webpack@5.103.0))(sass-loader@12.6.0(sass@1.95.1)(webpack@5.103.0))(sass@1.95.1)(terser-webpack-plugin@5.3.15(webpack@5.103.0))(webpack-assets-manifest@5.2.1(webpack@5.103.0))(webpack-cli@4.10.0)(webpack-dev-server@4.15.2)(webpack@5.103.0)
       style-loader:
         specifier: ^3.3.1
         version: 3.3.4(webpack@5.103.0)
@@ -855,6 +855,11 @@ packages:
   '@discoveryjs/json-ext@0.5.7':
     resolution: {integrity: sha512-dBVuXR082gk3jsFp7Rd/JI4kytwGHecnCoTtXFb7DB6CNHp4rg5k1bhg0nWdLGLnOV71lmDzGQaLMy8iPLY0pw==}
     engines: {node: '>=10.0.0'}
+
+  '@dr.pogodin/react-helmet@3.0.4':
+    resolution: {integrity: sha512-TesfNpzO12qcbyqKyWGDIYTdwVxD3pJv75rE/zhKUq/k9yxeP0BpOdHQ5cc1zA3j/GyY7CuIZjAUXmsxqI1/yw==}
+    peerDependencies:
+      react: '19'
 
   '@graphql-typed-document-node/core@3.2.0':
     resolution: {integrity: sha512-mB9oAsNCm9aM3/SOv4YtBMqZbYj10R7dkq8byBqxGY/ncFwhf2oQzMV+LCRlWoDSEBJ3COiR1yeDvMtsoOsuFQ==}
@@ -3458,14 +3463,6 @@ packages:
     peerDependencies:
       react: '>=16.13.1'
 
-  react-fast-compare@3.2.2:
-    resolution: {integrity: sha512-nsO+KSNgo1SbJqJEYRE9ERzo7YtYbou/OqjSQKxV7jcKox7+usiUVZOAC+XnDOABXggQTno0Y1CpVnuWEc1boQ==}
-
-  react-helmet@6.1.0:
-    resolution: {integrity: sha512-4uMzEY9nlDlgxr61NL3XbKRy1hEkXmKNXhjbAIOVw5vcFrsdYbH2FEwcNyWvWinl103nXgzYNlns9ca+8kFiWw==}
-    peerDependencies:
-      react: '>=16.3.0'
-
   react-is@16.13.1:
     resolution: {integrity: sha512-24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ==}
 
@@ -3507,11 +3504,6 @@ packages:
     engines: {node: '>=14.0.0'}
     peerDependencies:
       react: '>=16.8'
-
-  react-side-effect@2.1.2:
-    resolution: {integrity: sha512-PVjOcvVOyIILrYoyGEpDN3vmYNLdy1CajSFNt4TDsVQC5KpTijDvWVoR+/7Rz2xT978D8/ZtFceXxzsPwZEDvw==}
-    peerDependencies:
-      react: ^16.3.0 || ^17.0.0 || ^18.0.0
 
   react@19.2.1:
     resolution: {integrity: sha512-DGrYcCWK7tvYMnWh79yrPHt+vdx9tY+1gPZa7nJQtO/p8bLTDaHp4dzwEhQB7pZ4Xe3ok4XKuEPrVuc+wlpkmw==}
@@ -3762,8 +3754,8 @@ packages:
     engines: {node: '>= 0.10'}
     hasBin: true
 
-  shakapacker@9.3.0:
-    resolution: {integrity: sha512-q3gug4dZhJRLe8LHQOwG5jx7Jik0T+ZcMxEhiTyEAuIN8cIt4eek6gCn4OQdIqhdZXAiUBCUpfIHdWt9yUO9/g==}
+  shakapacker@9.4.0:
+    resolution: {integrity: sha512-Kf5+LADw5kkaPHqXDA6NknGt6p8MK9jjWuiudM+ESHcF/POxFZ1S5p7lMsyezvuMRMm0HrltQCM/NPadGEEnVg==}
     engines: {node: '>= 20', yarn: '>=1 <5'}
     peerDependencies:
       '@babel/core': ^7.17.9
@@ -3779,7 +3771,7 @@ packages:
       babel-loader: ^8.2.4 || ^9.0.0 || ^10.0.0
       compression-webpack-plugin: ^9.0.0 || ^10.0.0 || ^11.0.0
       css-loader: ^6.8.1 || ^7.0.0
-      esbuild: ^0.14.0 || ^0.15.0 || ^0.16.0 || ^0.17.0 || ^0.18.0 || ^0.19.0 || ^0.20.0 || ^0.21.0 || ^0.22.0 || ^0.23.0 || ^0.24.0 || ^0.25.0
+      esbuild: ^0.14.0 || ^0.15.0 || ^0.16.0 || ^0.17.0 || ^0.18.0 || ^0.19.0 || ^0.20.0 || ^0.21.0 || ^0.22.0 || ^0.23.0 || ^0.24.0 || ^0.25.0 || ^0.26.0 || ^0.27.0
       esbuild-loader: ^2.0.0 || ^3.0.0 || ^4.0.0
       mini-css-extract-plugin: ^2.0.0
       rspack-manifest-plugin: ^5.0.0
@@ -5245,6 +5237,11 @@ snapshots:
       '@babel/helper-validator-identifier': 7.28.5
 
   '@discoveryjs/json-ext@0.5.7': {}
+
+  '@dr.pogodin/react-helmet@3.0.4(react@19.2.1)':
+    dependencies:
+      '@babel/runtime': 7.28.4
+      react: 19.2.1
 
   '@graphql-typed-document-node/core@3.2.0(graphql@16.12.0)':
     dependencies:
@@ -7943,16 +7940,6 @@ snapshots:
       '@babel/runtime': 7.28.4
       react: 19.2.1
 
-  react-fast-compare@3.2.2: {}
-
-  react-helmet@6.1.0(react@19.2.1):
-    dependencies:
-      object-assign: 4.1.1
-      prop-types: 15.8.1
-      react: 19.2.1
-      react-fast-compare: 3.2.2
-      react-side-effect: 2.1.2(react@19.2.1)
-
   react-is@16.13.1: {}
 
   react-on-rails-rsc@19.0.3(react-dom@19.2.1(react@19.2.1))(react@19.2.1)(webpack@5.103.0):
@@ -7989,10 +7976,6 @@ snapshots:
   react-router@6.30.2(react@19.2.1):
     dependencies:
       '@remix-run/router': 1.23.1
-      react: 19.2.1
-
-  react-side-effect@2.1.2(react@19.2.1):
-    dependencies:
       react: 19.2.1
 
   react@19.2.1: {}
@@ -8273,7 +8256,7 @@ snapshots:
       safe-buffer: 5.2.1
       to-buffer: 1.2.2
 
-  shakapacker@9.3.0(@babel/core@7.28.5)(@babel/plugin-transform-runtime@7.28.5(@babel/core@7.28.5))(@babel/preset-env@7.28.5(@babel/core@7.28.5))(@babel/runtime@7.28.4)(babel-loader@8.4.1(@babel/core@7.28.5)(webpack@5.103.0))(compression-webpack-plugin@9.2.0(webpack@5.103.0))(css-loader@6.11.0(webpack@5.103.0))(mini-css-extract-plugin@2.9.4(webpack@5.103.0))(sass-loader@12.6.0(sass@1.95.1)(webpack@5.103.0))(sass@1.95.1)(terser-webpack-plugin@5.3.15(webpack@5.103.0))(webpack-assets-manifest@5.2.1(webpack@5.103.0))(webpack-cli@4.10.0)(webpack-dev-server@4.15.2)(webpack@5.103.0):
+  shakapacker@9.4.0(@babel/core@7.28.5)(@babel/plugin-transform-runtime@7.28.5(@babel/core@7.28.5))(@babel/preset-env@7.28.5(@babel/core@7.28.5))(@babel/runtime@7.28.4)(babel-loader@8.4.1(@babel/core@7.28.5)(webpack@5.103.0))(compression-webpack-plugin@9.2.0(webpack@5.103.0))(css-loader@6.11.0(webpack@5.103.0))(mini-css-extract-plugin@2.9.4(webpack@5.103.0))(sass-loader@12.6.0(sass@1.95.1)(webpack@5.103.0))(sass@1.95.1)(terser-webpack-plugin@5.3.15(webpack@5.103.0))(webpack-assets-manifest@5.2.1(webpack@5.103.0))(webpack-cli@4.10.0)(webpack-dev-server@4.15.2)(webpack@5.103.0):
     dependencies:
       js-yaml: 4.1.1
       path-complete-extname: 1.0.0
