@@ -128,7 +128,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: react_on_rails/vendor/bundle
-          key: package-app-gem-cache-${{ hashFiles('react_on_rails/Gemfile.lock') }}-${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
+          key: package-app-gem-cache-${{ hashFiles('react_on_rails/Gemfile.lock') }}-2-${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
       - name: Install Ruby Gems for package
         run: cd react_on_rails && (bundle check --path=vendor/bundle || bundle  _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3)
       - name: Git Stuff
