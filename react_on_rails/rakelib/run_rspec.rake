@@ -107,6 +107,10 @@ namespace :run_rspec do
     ExampleType.all[:shakapacker_examples].select { |e| e.react_version == "17" }
   end
 
+  def react16_examples
+    ExampleType.all[:shakapacker_examples].select { |e| e.react_version == "16" }
+  end
+
   def pinned_version_examples
     ExampleType.all[:shakapacker_examples].select(&:pinned_react_version?)
   end
@@ -126,7 +130,12 @@ namespace :run_rspec do
     react17_examples.each { |example_type| Rake::Task[example_type.rspec_task_name].invoke }
   end
 
-  desc "Runs Rspec for all pinned version example apps (React 17 and 18)"
+  desc "Runs Rspec for React 16 example apps only (oldest supported legacy API)"
+  task shakapacker_examples_react16: react16_examples.map(&:gen_task_name) do
+    react16_examples.each { |example_type| Rake::Task[example_type.rspec_task_name].invoke }
+  end
+
+  desc "Runs Rspec for all pinned version example apps (React 16, 17, and 18)"
   task shakapacker_examples_pinned: pinned_version_examples.map(&:gen_task_name) do
     pinned_version_examples.each { |example_type| Rake::Task[example_type.rspec_task_name].invoke }
   end

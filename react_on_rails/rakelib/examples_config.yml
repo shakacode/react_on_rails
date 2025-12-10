@@ -24,3 +24,11 @@ example_type_data:
   - name: basic-server-rendering-react17
     generator_options: --example-server-rendering
     react_version: '17'
+
+  # React 16 compatibility tests (oldest supported legacy API)
+  - name: basic-react16
+    generator_options: ''
+    react_version: '16'
+  - name: basic-server-rendering-react16
+    generator_options: --example-server-rendering
+    react_version: '16'

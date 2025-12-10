@@ -16,6 +16,7 @@ module ReactOnRails
 
       # Supported React versions for compatibility testing
       REACT_VERSIONS = {
+        "16" => "16.14.0",
         "17" => "17.0.2",
         "18" => "18.0.0",
         "19" => nil # nil means use latest (default)
