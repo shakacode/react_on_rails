@@ -100,11 +100,12 @@ const createParallelRenders = (size: number) => {
   return { enqueue, expectNextChunk, expectEndOfStream };
 };
 
-const delay = (ms: number) => new Promise<void>((resolve) => {
-  setTimeout(() => {
-    resolve();
-  }, ms);
-});
+const delay = (ms: number) =>
+  new Promise<void>((resolve) => {
+    setTimeout(() => {
+      resolve();
+    }, ms);
+  });
 
 test('Renders concurrent rsc streams as single rsc stream', async () => {
   // expect.assertions(258);
