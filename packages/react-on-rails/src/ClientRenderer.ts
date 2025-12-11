@@ -78,12 +78,24 @@ function renderElement(el: Element, railsContext: RailsContext): void {
   try {
     const domNode = document.getElementById(domNodeId);
     if (domNode) {
+      // Skip if this component was already rendered by a previous call
+      // This prevents hydration errors when reactOnRailsPageLoaded() is called multiple times
+      // (e.g., for asynchronously loaded content)
+      if (renderedRoots.has(domNodeId)) {
+        if (trace) {
+          console.log(`Skipping already rendered component: ${name} (dom id: ${domNodeId})`);
+        }
+        return;
+      }
+
       const componentObj = ComponentRegistry.get(name);
       if (delegateToRenderer(componentObj, props, railsContext, domNodeId, trace)) {
         return;
       }
 
-      // Hydrate if available and was server rendered
+      // Hydrate if the DOM node has content (server-rendered HTML)
+      // Since we skip already-rendered components above, this check now correctly
+      // identifies only server-rendered content, not previously client-rendered content
       const shouldHydrate = !!domNode.innerHTML;
 
       const reactElementOrRouterResult = createReactOutput({

@@ -1,0 +1,114 @@
+<h1>Test: reactOnRailsPageLoaded() Multiple Calls (Issue #2210)</h1>
+
+<p>
+  This page tests that calling <code>ReactOnRails.reactOnRailsPageLoaded()</code> multiple times
+  does not cause hydration mismatch errors for client-side only components.
+</p>
+
+<hr/>
+
+<h2>Test Scenario</h2>
+<ol>
+  <li>Initial page load renders the first AsyncComponent</li>
+  <li>Click "Add Component" to dynamically add a second component</li>
+  <li>The page will call <code>reactOnRailsPageLoaded()</code> after adding the new component</li>
+  <li>If the fix is working, there should be NO hydration errors in the console</li>
+</ol>
+
+<hr/>
+
+<h2>Components</h2>
+
+<div id="components-container">
+  <%= react_component("AsyncComponent", props: { name: "First Component" }, prerender: false, id: "AsyncComponent-1") %>
+</div>
+
+<hr/>
+
+<button id="add-component-btn" type="button">Add Component (Triggers reactOnRailsPageLoaded)</button>
+
+<div id="dynamic-components"></div>
+
+<hr/>
+
+<h2>Console Output</h2>
+<p>Check the browser console for hydration errors. If you see errors like:</p>
+<pre>
+Warning: Prop `style` did not match. Server: "align-items: center" Client: "alignItems:center"
+</pre>
+<p>Then the fix is NOT working correctly.</p>
+
+<hr/>
+
+<h2>Results</h2>
+<div id="test-results"></div>
+
+<script>
+  (function() {
+    var componentCounter = 1;
+    var consoleErrors = [];
+
+    // Capture console errors
+    var originalError = console.error;
+    console.error = function() {
+      var message = Array.prototype.slice.call(arguments).join(' ');
+      if (message.indexOf('hydrat') !== -1 || message.indexOf('Hydrat') !== -1) {
+        consoleErrors.push(message);
+        updateResults();
+      }
+      originalError.apply(console, arguments);
+    };
+
+    function updateResults() {
+      var resultsDiv = document.getElementById('test-results');
+      if (consoleErrors.length === 0) {
+        resultsDiv.innerHTML = '<p style="color: green; font-weight: bold;">✓ No hydration errors detected!</p>';
+      } else {
+        resultsDiv.innerHTML = '<p style="color: red; font-weight: bold;">✗ Hydration errors detected:</p>' +
+          '<ul>' + consoleErrors.map(function(e) { return '<li>' + e + '</li>'; }).join('') + '</ul>';
+      }
+    }
+
+    document.getElementById('add-component-btn').addEventListener('click', function() {
+      componentCounter++;
+      var container = document.getElementById('dynamic-components');
+
+      // Create the HTML structure that react_on_rails generates for client-side components
+      var componentId = 'AsyncComponent-' + componentCounter;
+      var domId = componentId;
+      var props = JSON.stringify({ name: 'Dynamic Component #' + componentCounter });
+
+      // Create the script tag (component specification)
+      var scriptTag = document.createElement('script');
+      scriptTag.type = 'application/json';
+      scriptTag.className = 'js-react-on-rails-component';
+      scriptTag.id = 'js-react-on-rails-component-' + domId;
+      scriptTag.setAttribute('data-component-name', 'AsyncComponent');
+      scriptTag.setAttribute('data-dom-id', domId);
+      scriptTag.textContent = props;
+
+      // Create the container div
+      var containerDiv = document.createElement('div');
+      containerDiv.id = domId;
+
+      // Add to DOM
+      container.appendChild(containerDiv);
+      container.appendChild(scriptTag);
+
+      // Now call reactOnRailsPageLoaded to render ALL components including the new one
+      // This is where the bug manifests - previously rendered components should NOT be re-hydrated
+      if (typeof ReactOnRails !== 'undefined') {
+        console.log('Calling reactOnRailsPageLoaded() to render new component...');
+        ReactOnRails.reactOnRailsPageLoaded();
+        console.log('reactOnRailsPageLoaded() completed');
+      }
+
+      updateResults();
+    });
+
+    // Initial results update after page load
+    document.addEventListener('DOMContentLoaded', function() {
+      setTimeout(updateResults, 100);
+    });
+  })();
+</script>

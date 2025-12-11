@@ -202,4 +202,64 @@ describe('ClientRenderer', () => {
       expect(() => reactOnRailsComponentLoaded('test-component')).not.toThrow();
     });
   });
+
+  describe('Issue #2210: Multiple calls to renderComponent', () => {
+    it('skips already-rendered components to prevent hydration errors', () => {
+      // Setup Rails context
+      const railsContextElement = document.createElement('div');
+      railsContextElement.id = 'js-react-on-rails-context';
+      railsContextElement.textContent = JSON.stringify({
+        railsEnv: 'test',
+        inMailer: false,
+        i18nLocale: 'en',
+        i18nDefaultLocale: 'en',
+        rorVersion: '13.0.0',
+        rorPro: false,
+        href: 'http://localhost:3000',
+        location: 'http://localhost:3000',
+        scheme: 'http',
+        host: 'localhost',
+        port: 3000,
+        pathname: '/',
+        search: null,
+        httpAcceptLanguage: 'en',
+        serverSide: false,
+        componentRegistryTimeout: 0,
+      });
+      document.body.appendChild(railsContextElement);
+
+      // Register a simple component
+      const TestComponent: React.FC<{ message: string }> = ({ message }) =>
+        React.createElement('div', null, `Hello, ${message}!`);
+
+      ComponentRegistry.register({ TestComponent });
+
+      // Setup DOM element with component data
+      const componentElement = document.createElement('div');
+      componentElement.className = 'js-react-on-rails-component';
+      componentElement.setAttribute('data-component-name', 'TestComponent');
+      componentElement.setAttribute('data-dom-id', 'test-component-2210');
+      componentElement.textContent = JSON.stringify({ message: 'World' });
+      document.body.appendChild(componentElement);
+
+      // Create target DOM node
+      const targetNode = document.createElement('div');
+      targetNode.id = 'test-component-2210';
+      document.body.appendChild(targetNode);
+
+      // First call should render
+      renderComponent('test-component-2210');
+      expect(targetNode.innerHTML).toContain('Rendered:');
+
+      // Get the mock to track additional calls
+      const mockHydrateOrRender = require('../src/reactHydrateOrRender.ts').default as jest.Mock;
+      const callCountAfterFirstRender = mockHydrateOrRender.mock.calls.length;
+
+      // Second call to the same component should skip (not call render again)
+      renderComponent('test-component-2210');
+
+      // The mock should NOT have been called again for the same component
+      expect(mockHydrateOrRender.mock.calls.length).toBe(callCountAfterFirstRender);
+    });
+  });
 });
