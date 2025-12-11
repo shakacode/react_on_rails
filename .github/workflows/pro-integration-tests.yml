@@ -136,8 +136,7 @@ jobs:
           pnpm install --frozen-lockfile
 
       - name: Install Node modules with pnpm for Pro dummy app
-        run: |
-          cd spec/dummy && pnpm install
+        run: cd spec/dummy && pnpm install
 
       - name: Install Ruby Gems for Pro dummy app
         run: |
