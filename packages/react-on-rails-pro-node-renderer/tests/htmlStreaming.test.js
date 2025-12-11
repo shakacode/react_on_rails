@@ -54,7 +54,7 @@ const makeRequest = async (options = {}) => {
         try {
           return JSON.parse(chunk);
         } catch (e) {
-          return { hasErrors: true, error: `JSON parsing failed: ${e.message}`, chunk };
+          return { hasErrors: true, error: `JSON parsing failed: ${e.message}`, chunk, chunksSize: decodedChunksFromData.length };
         }
       }),
     );
