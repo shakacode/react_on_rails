@@ -49,7 +49,7 @@ const makeRequest = async (options = {}) => {
       .split('\n')
       .map((chunk) => chunk.trim())
       .filter((chunk) => chunk.length > 0);
-    
+
     if (!decodedData.endsWith('\n')) {
       buffer = decodedChunksFromData.pop() ?? '';
     } else {
