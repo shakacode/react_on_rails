@@ -192,7 +192,7 @@ module ReactOnRailsPro
         days_until_expiry = ((expires_at - Time.now) / 1.day).to_i
 
         if days_until_expiry <= 7
-          true
+          last_fetch_older_than?(1.day)
         elsif days_until_expiry <= 30
           last_fetch_older_than?(7.days)
         else
