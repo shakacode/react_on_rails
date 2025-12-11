@@ -40,7 +40,7 @@ const PromiseContainer = ({ name, onResolved }: { name: string, onResolved?: () 
     <div>
       <h1>Initial Header</h1>
       <Suspense fallback={<p>Loading Promise</p>}>
-        <PromiseWrapper name={name} promise={promise} />
+        <PromiseWrapper name={name} promise={promise} onResolved={onResolved} />
       </Suspense>
     </div>
   );
@@ -161,6 +161,7 @@ test('[bug] catches logs outside the component during reading the stream', async
   }, 2);
   await finished(readable1);
   clearInterval(intervalId);
+  expect(resolved).toBe(true);
 
   expect(content1).toContain('First Unique Name');
   expect(content1).not.toContain('From Interval');
