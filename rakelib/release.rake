@@ -15,6 +15,37 @@ end
 
 # Helper methods for release-specific tasks
 # These are defined at the top level so they have access to Rake's sh method
+
+def verify_npm_auth(registry_url = "https://registry.npmjs.org/")
+  result = `npm whoami --registry #{registry_url} 2>&1`
+  unless $CHILD_STATUS.success?
+    puts <<~MESSAGE
+      ⚠️  NPM authentication required!
+
+      You are not logged in to NPM. Running 'npm login' now...
+
+    MESSAGE
+
+    # Run npm login interactively
+    system("npm login --registry #{registry_url}")
+
+    # Verify login succeeded
+    result = `npm whoami --registry #{registry_url} 2>&1`
+    unless $CHILD_STATUS.success?
+      abort <<~ERROR
+        ❌ NPM login failed!
+
+        Please manually run 'npm login' and retry the release.
+
+        Technical details:
+          Registry: #{registry_url}
+          Error: #{result.strip}
+      ERROR
+    end
+  end
+  puts "✓ Logged in to NPM as: #{result.strip}"
+end
+
 def publish_gem_with_retry(dir, gem_name, otp: nil, max_retries: ENV.fetch("GEM_RELEASE_MAX_RETRIES", "3").to_i)
   puts "\nPublishing #{gem_name} gem to RubyGems.org..."
   if otp
@@ -135,6 +166,20 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
           "Version argument is required. Use 'patch', 'minor', 'major', or explicit version (e.g., '16.2.0')"
   end
 
+  # Pre-flight authentication checks (skip for dry runs)
+  unless is_dry_run
+    # Verify NPM authentication before making any changes
+    # Skip for Verdaccio since it uses local authentication
+    if use_verdaccio
+      puts "Skipping NPM auth check (using Verdaccio local registry)"
+    else
+      puts "\n#{'=' * 80}"
+      puts "PRE-FLIGHT CHECKS"
+      puts "=" * 80
+      verify_npm_auth
+    end
+  end
+
   # Having the examples prevents publishing
   Rake::Task["shakapacker_examples:clobber"].invoke
   # Delete any react_on_rails.gemspec except the root one
@@ -196,7 +241,7 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
   package_json_files.each do |file|
     content = JSON.parse(File.read(file))
     content["version"] = actual_npm_version
-    # Note: workspace:* dependencies (e.g., in react-on-rails-pro) are automatically
+    # NOTE: workspace:* dependencies (e.g., in react-on-rails-pro) are automatically
     # converted to exact versions by pnpm during publish. No manual conversion needed.
 
     File.write(file, "#{JSON.pretty_generate(content)}\n")
