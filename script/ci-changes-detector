@@ -267,7 +267,9 @@ if [ "$SPEC_DUMMY_CHANGED" = true ] || [ "$RUBY_CORE_CHANGED" = true ] || [ "$JS
   RUN_DUMMY_TESTS=true
 fi
 
-if [ "$GENERATORS_CHANGED" = true ]; then
+# JS changes trigger generator tests because generators do a full build
+# which catches TypeScript compilation errors (see issue #2205)
+if [ "$GENERATORS_CHANGED" = true ] || [ "$JS_CHANGED" = true ]; then
   RUN_GENERATORS=true
 fi
 
