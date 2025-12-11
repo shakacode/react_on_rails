@@ -217,6 +217,7 @@ export async function buildVM(filePath: string) {
           TextEncoder,
           URLSearchParams,
           ReadableStream,
+          performance,
           process,
           setTimeout,
           setInterval,
