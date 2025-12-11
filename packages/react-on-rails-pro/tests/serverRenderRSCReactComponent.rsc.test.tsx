@@ -11,14 +11,17 @@ import { finished } from 'stream/promises';
 import { text } from 'stream/consumers';
 import ReactOnRails, { RailsContextWithServerStreamingCapabilities } from '../src/ReactOnRailsRSC.ts';
 
-const PromiseWrapper = async ({ promise, name }: { promise: Promise<string>; name: string }) => {
+const PromiseWrapper = async ({ promise, name, onResolved }: { promise: Promise<string>; name: string, onResolved?: () => {} }) => {
   console.log(`[${name}] Before awaitng`);
   const value = await promise;
+  if (onResolved) {
+    onResolved();
+  }
   console.log(`[${name}] After awaitng`);
   return <p>Value: {value}</p>;
 };
 
-const PromiseContainer = ({ name }: { name: string }) => {
+const PromiseContainer = ({ name, onResolved }: { name: string, onResolved?: () => {} }) => {
   const promise = new Promise<string>((resolve) => {
     let i = 0;
     setTimeout(() => {
@@ -125,6 +128,7 @@ test('no logs lekage from outside the component', async () => {
 });
 
 test('[bug] catches logs outside the component during reading the stream', async () => {
+  let resolved = false;
   const readable1 = ReactOnRails.serverRenderRSCReactComponent({
     railsContext: {
       reactClientManifestFileName: 'react-client-manifest.json',
@@ -134,13 +138,16 @@ test('[bug] catches logs outside the component during reading the stream', async
     renderingReturnsPromises: true,
     throwJsErrors: true,
     domNodeId: 'dom-id',
-    props: { name: 'First Unique Name' },
+    props: { name: 'First Unique Name', onResolved: () => { resolved = true; } },
   });
 
   let content1 = '';
   let i = 0;
   readable1.on('data', (chunk: Buffer) => {
     i += 1;
+    if (i === 1) {
+      expect(resolved).toBe(false);
+    }
     // To avoid infinite loop
     if (i < 5) {
       console.log('Outside The Component');
