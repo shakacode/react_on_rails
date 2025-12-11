@@ -62,7 +62,7 @@ const makeRequest = async (options = {}) => {
         try {
           return JSON.parse(chunk);
         } catch (e) {
-          return { hasErrors: true, error: `JSON parsing failed: ${e.message}`, chunk, chunksSize: decodedChunksFromData.length };
+          return { hasErrors: true, error: `JSON parsing failed: ${e.message}` };
         }
       }),
     );
@@ -206,7 +206,6 @@ describe('html streaming', () => {
       expect(fullBody).toContain('branch2 (level 0)');
 
       // Fail to findout the chunks content on CI
-      expect(JSON.stringify(jsonChunks, undefined, 2)).toContain('nnnnnnnnnnnnnnnnnn');
       expect(jsonChunks[0].isShellReady).toBeTruthy();
       expect(jsonChunks[0].hasErrors).toBeTruthy();
       expect(jsonChunks[0].renderingError).toMatchObject({
