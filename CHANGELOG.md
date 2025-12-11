@@ -21,7 +21,7 @@ After a release, please make sure to run `bundle exec rake update_changelog`. Th
 
 ### [Unreleased]
 
-### [v16.2.0.beta.13] - 2025-12-07
+### [16.2.0.beta.19] - 2025-12-10
 
 Changes since the last non-beta release (16.1.1).
 
@@ -62,6 +62,8 @@ Changes since the last non-beta release (16.1.1).
 
 #### Improved
 
+- **SWC Compiler Detection**: Added intelligent detection and automatic installation of SWC transpiler packages (`@swc/core` and `swc-loader`) when the generator detects SWC configuration. For Shakapacker 9.3.0+ (where SWC is the default transpiler), required packages are now installed automatically. Includes graceful error handling and YAML parsing security improvements. [PR 2135](https://github.com/shakacode/react_on_rails/pull/2135) by [justin808](https://github.com/justin808).
+
 - **Enhanced bin/dev Error Messages**: Improved error messages when `bin/dev` fails by suggesting the `--verbose` flag for detailed debugging output. The verbose flag now properly cascades to child processes via the `REACT_ON_RAILS_VERBOSE` environment variable, making troubleshooting pack generation failures significantly easier. [PR 2083](https://github.com/shakacode/react_on_rails/pull/2083) by [justin808](https://github.com/justin808).
 
 - **Automatic Precompile Hook Coordination in bin/dev**: The `bin/dev` command now automatically runs Shakapacker's `precompile_hook` once before starting development processes and sets `SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true` to prevent duplicate execution in spawned webpack processes.
@@ -76,6 +78,10 @@ Changes since the last non-beta release (16.1.1).
 - **Improved Error Messages**: Error messages for version mismatches and package configuration issues now include package-manager-specific installation commands (npm, yarn, pnpm, bun). [PR #1881](https://github.com/shakacode/react_on_rails/pull/1881) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 #### Fixed
+
+- **TypeScript processPromise Return Type**: Fixed TypeScript compilation error in `serverRenderReactComponent.ts` where the type checker couldn't properly narrow the union type after the `isValidElement` check. Added explicit type assertion to `FinalHtmlResult` to resolve the issue. [PR 2204](https://github.com/shakacode/react_on_rails/pull/2204) by [justin808](https://github.com/justin808).
+
+- **connection_pool 3.0+ Compatibility**: Fixed `ArgumentError: wrong number of arguments` when using `connection_pool` gem version 3.0 or later. The gem's API changed from accepting a positional hash to requiring keyword arguments. This fix ensures compatibility with both older and newer versions of `connection_pool`. Addresses [issue 2185](https://github.com/shakacode/react_on_rails/issues/2185). [PR 2125](https://github.com/shakacode/react_on_rails/pull/2125) by [justin808](https://github.com/justin808).
 
 - **RSpec Helper Optimization with Private SSR Directories**: Fixed RSpec helper optimization bug that caused tests to run with stale server-side code when server bundles are stored in private `ssr-generated/` directories. The helper now automatically monitors server bundles and other critical files, ensuring proper rebuild detection even when assets are in separate directories from the manifest. [PR 1838](https://github.com/shakacode/react_on_rails/pull/1838) by [justin808](https://github.com/justin808).
 
@@ -1854,8 +1860,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.2.0.beta.13...master
-[v16.2.0.beta.13]: https://github.com/shakacode/react_on_rails/compare/16.1.1...v16.2.0.beta.13
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/16.2.0.beta.19...master
+[16.2.0.beta.19]: https://github.com/shakacode/react_on_rails/compare/16.1.1...16.2.0.beta.19
 [16.1.1]: https://github.com/shakacode/react_on_rails/compare/16.1.0...16.1.1
 [16.1.0]: https://github.com/shakacode/react_on_rails/compare/16.0.0...16.1.0
 [16.0.0]: https://github.com/shakacode/react_on_rails/compare/14.2.0...16.0.0

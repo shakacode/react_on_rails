@@ -351,10 +351,14 @@ task :release, %i[version dry_run] do |_t, args|
         - react_on_rails_pro #{actual_gem_version}
 
       Next steps:
-        1. Update CHANGELOG.md: bundle exec rake update_changelog
-        2. Update pro CHANGELOG.md: cd react_on_rails_pro && bundle exec rake update_changelog
-        3. Commit CHANGELOGs: git commit -a -m 'Update CHANGELOG.md files'
-        4. Push changes: git push
+        Option A - Use Claude Code:
+          Run /update-changelog in Claude Code to update and create a PR
+
+        Option B - Manual:
+          1. Update CHANGELOG.md: bundle exec rake update_changelog
+          2. Update pro CHANGELOG.md: cd react_on_rails_pro && bundle exec rake update_changelog
+          3. Commit CHANGELOGs: git commit -a -m 'Update CHANGELOG.md files'
+          4. Push changes: git push
 
     MSG
 
