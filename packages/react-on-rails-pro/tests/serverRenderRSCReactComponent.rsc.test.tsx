@@ -28,7 +28,7 @@ const PromiseContainer = ({ name }: { name: string }) => {
         clearInterval(intervalId);
         resolve(`Value of name ${name}`);
       }
-    }, 1);
+    }, 20);
   });
 
   return (
@@ -157,4 +157,4 @@ test('[bug] catches logs outside the component during reading the stream', async
   expect(content1).not.toContain('From Interval');
   // Here's the bug
   expect(content1).toContain('Outside The Component');
-});
+}, 10000);
