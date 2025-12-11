@@ -34,6 +34,7 @@ const makeRequest = async (options = {}) => {
   const jsonChunks = [];
   let firstByteTime;
   let status;
+  let buffer = '';
   const decoder = new TextDecoder();
 
   request.on('response', (headers) => {
@@ -44,10 +45,17 @@ const makeRequest = async (options = {}) => {
     // Sometimes, multiple chunks are merged into one.
     // So, the server uses \n as a delimiter between chunks.
     const decodedData = typeof data === 'string' ? data : decoder.decode(data, { stream: false });
-    const decodedChunksFromData = decodedData
+    const decodedChunksFromData = (buffer + decodedData)
       .split('\n')
       .map((chunk) => chunk.trim())
       .filter((chunk) => chunk.length > 0);
+    
+    if (!decodedData.endsWith('\n')) {
+      buffer = decodedChunksFromData.pop() ?? '';
+    } else {
+      buffer = '';
+    }
+
     chunks.push(...decodedChunksFromData);
     jsonChunks.push(
       ...decodedChunksFromData.map((chunk) => {
