@@ -21,14 +21,16 @@ const PromiseWrapper = async ({ promise, name }: { promise: Promise<string>; nam
 const PromiseContainer = ({ name }: { name: string }) => {
   const promise = new Promise<string>((resolve) => {
     let i = 0;
-    const intervalId = setInterval(() => {
-      console.log(`Interval ${i} at [${name}]`);
-      i += 1;
-      if (i === 50) {
-        clearInterval(intervalId);
-        resolve(`Value of name ${name}`);
-      }
-    }, 20);
+    setTimeout(() => {
+      const intervalId = setInterval(() => {
+        console.log(`Interval ${i} at [${name}]`);
+        i += 1;
+        if (i === 50) {
+          clearInterval(intervalId);
+          resolve(`Value of name ${name}`);
+        }
+      }, 20);
+    }, 200);
   });
 
   return (
