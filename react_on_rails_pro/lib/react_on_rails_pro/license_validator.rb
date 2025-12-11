@@ -152,11 +152,20 @@ module ReactOnRailsPro
       end
 
       def load_license_string
-        # First try environment variable
+        # Try auto-refresh if enabled and near expiry
+        maybe_refresh_license
+
+        # Priority: cache (if auto-refresh enabled) → ENV → config file
+        if ReactOnRailsPro.configuration.auto_refresh_enabled?
+          cached_token = LicenseCache.token
+          return cached_token if cached_token.present?
+        end
+
+        # Environment variable
         license = ENV.fetch("REACT_ON_RAILS_PRO_LICENSE", nil)
         return license if license.present?
 
-        # Then try config file
+        # Config file
         config_path = Rails.root.join("config", "react_on_rails_pro_license.key")
         return File.read(config_path).strip if config_path.exist?
 
@@ -164,6 +173,38 @@ module ReactOnRailsPro
                     "or create #{config_path} file. " \
                     "Get a FREE evaluation license at https://shakacode.com/react-on-rails-pro"
         handle_invalid_license(error_msg)
+      end
+
+      def maybe_refresh_license
+        return unless ReactOnRailsPro.configuration.auto_refresh_enabled?
+        return unless should_check_for_refresh?
+
+        response = LicenseFetcher.fetch
+        return if response.nil?
+
+        LicenseCache.write(response)
+      end
+
+      def should_check_for_refresh?
+        expires_at = LicenseCache.expires_at
+        return false if expires_at.nil?
+
+        days_until_expiry = ((expires_at - Time.now) / 1.day).to_i
+
+        if days_until_expiry <= 7
+          true
+        elsif days_until_expiry <= 30
+          last_fetch_older_than?(7.days)
+        else
+          false
+        end
+      end
+
+      def last_fetch_older_than?(duration)
+        fetched_at = LicenseCache.fetched_at
+        return true if fetched_at.nil?
+
+        Time.now - fetched_at > duration
       end
 
       def public_key
