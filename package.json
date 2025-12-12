@@ -30,6 +30,7 @@
     "@testing-library/react": "^16.2.0",
     "@tsconfig/node14": "^14.1.2",
     "@types/jest": "^29.5.14",
+    "@types/k6": "^1.4.0",
     "@types/node": "^20.17.16",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
