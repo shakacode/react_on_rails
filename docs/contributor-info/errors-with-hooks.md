@@ -14,7 +14,7 @@ The main reason to get this is due to multiple versions of React installed.
 cd <top level>
 npm ls react
 
-cd spec/dummy
+cd react_on_rails/spec/dummy
 npm ls react
 ```
 
@@ -40,6 +40,6 @@ Instead use [Yalc](https://github.com/whitecolor/yalc).
 cd <top level>
 yalc publish
 
-cd spec/dummy
+cd react_on_rails/spec/dummy
 yalc link react-on-rails
 ```

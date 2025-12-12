@@ -159,7 +159,7 @@ See [Rails/Shakapacker React Integration Options](https://www.shakacode.com/reac
 ## Online demo
 
 - See the [react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial) for an example of a live implementation and code.
-- A deployed version of the project `spec/dummy`, which demonstrates several uses of `react_on_rails`, will soon be available on [Control Plane through this link](https://ror-spec-dummy.reactrails.com/)
+- A deployed version of the project `react_on_rails/spec/dummy`, which demonstrates several uses of `react_on_rails`, will soon be available on [Control Plane through this link](https://ror-spec-dummy.reactrails.com/)
 
 ## ShakaCode Forum Premium Content
 

@@ -148,7 +148,7 @@ react_on_rails/
   run: yalc publish
 
 - name: yalc add react-on-rails
-  run: cd spec/dummy && yalc add react-on-rails
+  run: cd react_on_rails/spec/dummy && yalc add react-on-rails
 ```
 
 **Status**: Working in both configurations
@@ -265,10 +265,12 @@ task node_package: "node_package:build"
 **Critical**: When migrating from `node_package/` to `packages/react-on-rails/`:
 
 1. **package-scripts.yml** references:
+
    - ❌ `[ -f node_package/lib/ReactOnRails.full.js ]` → ✅ `[ -f lib/ReactOnRails.full.js ]`
    - ❌ `[ -f packages/node-renderer/dist/ReactOnRailsProNodeRenderer.js ]` (already correct in Pro)
 
 2. **package.json** "main" and "files" fields:
+
    - Master: `"main": "node_package/lib/ReactOnRails.full.js"`
    - Target: `"main": "lib/ReactOnRails.full.js"` (in packages/react-on-rails)
 
@@ -280,11 +282,13 @@ task node_package: "node_package:build"
 #### Workspace Integration Tasks
 
 1. **Yarn workspaces validation**
+
    - Verify all workspace commands work correctly
    - Test cross-workspace dependencies
    - Validate yalc publish chain
 
 2. **CI/CD Integration**
+
    - Update GitHub Actions for workspace structure
    - Verify separate package versioning works
    - Test independent package publishing
@@ -333,7 +337,7 @@ task node_package: "node_package:build"
   run: yalc publish
 
 - name: yalc add react-on-rails
-  run: cd spec/dummy && yalc add react-on-rails
+  run: cd react_on_rails/spec/dummy && yalc add react-on-rails
 ```
 
 **Current Limitation**:
@@ -371,24 +375,28 @@ task node_package: "node_package:build"
 ⚠️ **Critical Path Issues**:
 
 1. **Path References** (HIGHEST PRIORITY)
+
    - [ ] Update all hardcoded `node_package/lib/` references
    - [ ] Verify `package-scripts.yml` paths after migration
    - [ ] Test `yalc publish` with new paths
    - **Impact**: Breaking yalc publish silently (as happened in Sept 2024)
 
 2. **Workspace Integration** (HIGH)
+
    - [ ] Validate `yarn workspaces run yalc:publish`
    - [ ] Test cross-workspace dependency resolution
    - [ ] Verify package version management
    - **Impact**: Package installation failures for users
 
 3. **CI/CD Consolidation** (HIGH)
+
    - [ ] Merge CircleCI into GitHub Actions workflow
    - [ ] Test all CI jobs with workspace structure
    - [ ] Update caching strategies for workspaces
    - **Impact**: Unpredictable CI behavior, missing test coverage
 
 4. **Pro Package Migration** (MEDIUM)
+
    - [ ] Consolidate `react_on_rails_pro/` with `packages/react-on-rails-pro/`
    - [ ] Remove redundant configurations
    - [ ] Update build scripts
@@ -483,11 +491,13 @@ GitHub Actions
 ### Phase 3: Pre-Monorepo Structure Preparation
 
 1. **Validate Current State**
+
    - [ ] Run full test suite on surabaya-v1
    - [ ] Verify yalc publish works with workspace structure
    - [ ] Test clean install scenarios
 
 2. **Path Migration Checklist**
+
    - [ ] Update all `package-scripts.yml` paths
    - [ ] Update all CI workflow paths
    - [ ] Search codebase for hardcoded `node_package/` references
@@ -501,11 +511,13 @@ GitHub Actions
 ### Phase 4: Final Monorepo Restructuring
 
 1. **Consolidate Pro Package**
+
    - [ ] Merge `react_on_rails_pro/` into monorepo structure
    - [ ] Remove redundant configurations
    - [ ] Update gemspec files
 
 2. **CI/CD Consolidation**
+
    - [ ] Move CircleCI jobs to GitHub Actions
    - [ ] Update workspace cache strategies
    - [ ] Verify all test jobs pass
@@ -522,23 +534,27 @@ GitHub Actions
 ✅ **Migration will be complete when**:
 
 1. **Structure**
+
    - All JavaScript packages in `packages/` directory
    - Yarn workspaces configured and working
    - No references to `node_package/src/` in documentation
 
 2. **Build & Package**
+
    - `yarn build` compiles all packages
    - `yarn yalc:publish` publishes all packages
    - `yarn run prepack` passes pre-publication checks
    - All build artifacts in expected locations
 
 3. **Testing**
+
    - All RSpec tests pass (Ruby)
    - All Jest tests pass (JavaScript)
    - CI/CD pipeline fully operational
    - Clean install works for all package types
 
 4. **Documentation**
+
    - All developer instructions updated
    - Path references accurate
    - Release process documented

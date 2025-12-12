@@ -37,7 +37,7 @@
     "function-url-quotes": null
   },
   "ignoreFiles": [
-    "spec/dummy/app/assets/stylesheets/application.css",
+    "react_on_rails/spec/dummy/app/assets/stylesheets/application.css",
     "**/*.js",
     "**/*.jsx",
     "**/*.ts",

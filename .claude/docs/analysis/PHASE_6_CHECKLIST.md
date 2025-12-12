@@ -624,7 +624,7 @@ Most should still work, but verify paths like:
 - [ ] Test core dummy app:
 
   ```bash
-  cd spec/dummy
+  cd react_on_rails/spec/dummy
   bundle install
   yarn install
   yarn build
