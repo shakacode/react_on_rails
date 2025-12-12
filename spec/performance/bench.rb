@@ -122,6 +122,12 @@ def get_benchmark_routes(app_dir)
       next
     end
 
+    # Skip "_for_testing" routes (test-only endpoints not meant for benchmarking)
+    if path.include?("_for_testing")
+      puts "Skipping test-only route: #{path}"
+      next
+    end
+
     routes << path
   end
   raise "No pages# or react_router# routes found in #{app_dir}" if routes.empty?
