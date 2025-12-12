@@ -306,6 +306,7 @@ def run_vegeta_benchmark(target, route_name)
       *vegeta_args,
       "-duration=#{DURATION}",
       "-timeout=#{REQUEST_TIMEOUT}",
+      "-redirects=0",
       "> #{vegeta_bin}"
     ].join(" ")
     raise "Vegeta attack failed" unless system(vegeta_cmd)
@@ -380,7 +381,10 @@ def run_k6_benchmark(target, route_name)
       };
 
       export default function () {
-        const response = http.get('#{target}', { timeout: '#{REQUEST_TIMEOUT}' });
+        const response = http.get('#{target}', {
+          timeout: '#{REQUEST_TIMEOUT}',
+          redirects: 0,
+        });
         check(response, {
           'status=200': r => r.status === 200,
         });
