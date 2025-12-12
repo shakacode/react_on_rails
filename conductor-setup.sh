@@ -16,7 +16,6 @@ echo "🚀 Setting up React on Rails workspace..."
 # Check required tools
 echo "📋 Checking required tools..."
 command -v bundle >/dev/null 2>&1 || { echo "❌ Error: bundler is not installed. Please install Ruby and bundler first."; exit 1; }
-command -v yarn >/dev/null 2>&1 || { echo "❌ Error: yarn is not installed. Please install yarn first."; exit 1; }
 command -v node >/dev/null 2>&1 || { echo "❌ Error: Node.js is not installed. Please install Node.js first."; exit 1; }
 
 # Check Ruby version
@@ -54,13 +53,17 @@ fi
 echo "💎 Installing Ruby dependencies..."
 bundle install
 
+# Enable corepack for pnpm (this project uses pnpm, not yarn)
+echo "📦 Enabling corepack for pnpm..."
+corepack enable
+
 # Install JavaScript dependencies
 echo "📦 Installing JavaScript dependencies..."
-yarn install
+pnpm install
 
 # Build the TypeScript package
 echo "🔨 Building TypeScript package..."
-yarn run build
+pnpm run build
 
 # Generate the node package
 echo "📦 Generating node package..."
@@ -73,14 +76,14 @@ bundle exec lefthook install || echo "⚠️ Could not install lefthook hooks"
 # Run initial linting to ensure everything is set up correctly
 echo "✅ Running initial linting checks..."
 bundle exec rubocop --version
-yarn run type-check || echo "⚠️ Type checking had issues"
+pnpm run type-check || echo "⚠️ Type checking had issues"
 
 echo "✨ Workspace setup complete!"
 echo ""
 echo "📚 Key commands:"
 echo "  • rake - Run all tests and linting"
 echo "  • rake run_rspec - Run Ruby tests"
-echo "  • yarn run test - Run JavaScript tests"
+echo "  • pnpm run test - Run JavaScript tests"
 echo "  • bundle exec rubocop - Run Ruby linting (required before commits)"
 echo "  • rake autofix - Auto-fix formatting issues"
 echo ""
