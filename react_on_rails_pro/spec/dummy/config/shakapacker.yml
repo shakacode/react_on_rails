@@ -6,11 +6,14 @@ default: &default
   public_root_path: public
   public_output_path: packs
   nested_entries: true
-  javascript_transpiler: babel
 
-  cache_path: tmp/cache/webpacker
+  # Using SWC for faster JavaScript transpilation (20x faster than Babel)
+  javascript_transpiler: swc
+
+  cache_path: tmp/cache/shakapacker
   check_yarn_integrity: false
   webpack_compile_output: false
+  ensure_consistent_versioning: true
 
   # Additional paths webpack should look up modules
   # ['app/assets', 'engine/foo/app/assets']
