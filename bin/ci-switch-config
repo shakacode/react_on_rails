@@ -267,21 +267,21 @@ EOF
   # Clean and reinstall
   print_header "Cleaning node_modules and reinstalling"
   rm -rf node_modules
-  if [ -f yarn.lock ]; then
-    rm yarn.lock
+  if [ -f pnpm-lock.yaml ]; then
+    rm pnpm-lock.yaml
   fi
 
   print_header "Installing root dependencies (without --frozen-lockfile)"
-  yarn install --no-progress
+  pnpm install --no-frozen-lockfile
 
   print_header "Cleaning spec/dummy and reinstalling"
   cd spec/dummy
   rm -rf node_modules vendor/bundle
-  if [ -f yarn.lock ]; then
-    rm yarn.lock
+  if [ -f pnpm-lock.yaml ]; then
+    rm pnpm-lock.yaml
   fi
 
-  yarn install --no-progress
+  pnpm install --no-frozen-lockfile
   bundle install --path=vendor/bundle
 
   print_success "Dependencies installed"
@@ -408,21 +408,21 @@ EOF
   # Clean and reinstall
   print_header "Cleaning node_modules and reinstalling"
   rm -rf node_modules
-  if [ -f yarn.lock ]; then
-    rm yarn.lock
+  if [ -f pnpm-lock.yaml ]; then
+    rm pnpm-lock.yaml
   fi
 
   print_header "Installing root dependencies with --frozen-lockfile"
-  yarn install --frozen-lockfile --no-progress
+  pnpm install --frozen-lockfile
 
   print_header "Cleaning spec/dummy and reinstalling"
   cd spec/dummy
   rm -rf node_modules vendor/bundle
-  if [ -f yarn.lock ]; then
-    rm yarn.lock
+  if [ -f pnpm-lock.yaml ]; then
+    rm pnpm-lock.yaml
   fi
 
-  yarn install --frozen-lockfile --no-progress
+  pnpm install --frozen-lockfile
   bundle install --path=vendor/bundle
 
   print_success "Dependencies installed"

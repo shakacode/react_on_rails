@@ -188,13 +188,13 @@ run_command() {
   local cmd_id="$1"
   case "$cmd_id" in
     "lint-js-and-ruby")
-      bundle exec rubocop && yarn run eslint --report-unused-disable-directives && yarn start format.listDifferent
+      bundle exec rubocop && pnpm run eslint --report-unused-disable-directives && pnpm start format.listDifferent
       ;;
     "rspec-package-tests")
       bundle exec rake run_rspec:gem
       ;;
     "package-js-tests")
-      yarn test
+      pnpm test
       ;;
     "dummy-app-integration-tests")
       bundle exec rake run_rspec:all_dummy
@@ -257,7 +257,7 @@ if [ "$NUM_COMMANDS" -eq 0 ]; then
   echo "You can still run common test suites:"
   echo "  bundle exec rake run_rspec:all_dummy    # Dummy app tests"
   echo "  bundle exec rake run_rspec:gem          # Gem tests"
-  echo "  yarn test                                 # JS tests"
+  echo "  pnpm test                                 # JS tests"
   exit 1
 fi
 
@@ -289,7 +289,7 @@ echo ""
 # Ensure dependencies
 if [ ! -d "node_modules" ] || [ ! -d "vendor/bundle" ]; then
   echo -e "${YELLOW}Installing dependencies...${NC}"
-  bundle install && yarn install
+  bundle install && pnpm install
   echo ""
 fi
 
