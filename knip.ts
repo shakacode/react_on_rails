@@ -5,7 +5,7 @@ const config: KnipConfig = {
   workspaces: {
     // Root workspace - manages the monorepo and global tooling
     '.': {
-      entry: ['eslint.config.ts', 'jest.config.base.js'],
+      entry: ['eslint.config.ts', 'jest.config.base.js', 'benchmarks/k6.ts'],
       project: ['*.{js,mjs,ts}'],
       ignoreBinaries: [
         // Has to be installed globally

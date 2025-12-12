@@ -223,7 +223,7 @@ if IS_MAX_RATE && CONNECTIONS != MAX_CONNECTIONS
   raise "For RATE=max, CONNECTIONS must be equal to MAX_CONNECTIONS (got #{CONNECTIONS} and #{MAX_CONNECTIONS})"
 end
 
-# rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity, Metrics/MethodLength
+# rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
 # Benchmark a single route with Fortio
 def run_fortio_benchmark(target, route_name)
@@ -341,58 +341,23 @@ def run_k6_benchmark(target, route_name)
   begin
     puts "\n===> k6: #{route_name}"
 
-    k6_script_file = "#{OUTDIR}/#{route_name}_k6_test.js"
+    k6_script = File.expand_path("k6.ts", __dir__)
     k6_summary_json = "#{OUTDIR}/#{route_name}_k6_summary.json"
     k6_txt = "#{OUTDIR}/#{route_name}_k6.txt"
 
-    # Configure k6 scenarios
-    k6_scenarios =
-      if IS_MAX_RATE
-        <<~JS.strip
-          {
-            max_rate: {
-              executor: 'constant-vus',
-              vus: #{CONNECTIONS},
-              duration: '#{DURATION}'
-            }
-          }
-        JS
-      else
-        <<~JS.strip
-          {
-            constant_rate: {
-              executor: 'constant-arrival-rate',
-              rate: #{RATE},
-              timeUnit: '1s',
-              duration: '#{DURATION}',
-              preAllocatedVUs: #{CONNECTIONS},
-              maxVUs: #{MAX_CONNECTIONS}
-            }
-          }
-        JS
-      end
+    # Build k6 command with environment variables
+    k6_env_vars = [
+      "-e TARGET_URL=#{target}",
+      "-e RATE=#{RATE}",
+      "-e DURATION=#{DURATION}",
+      "-e CONNECTIONS=#{CONNECTIONS}",
+      "-e MAX_CONNECTIONS=#{MAX_CONNECTIONS}",
+      "-e REQUEST_TIMEOUT=#{REQUEST_TIMEOUT}"
+    ].join(" ")
 
-    k6_script = <<~JS
-      import http from 'k6/http';
-      import { check } from 'k6';
-
-      export const options = {
-        scenarios: #{k6_scenarios},
-      };
-
-      export default function () {
-        const response = http.get('#{target}', {
-          timeout: '#{REQUEST_TIMEOUT}',
-          redirects: 0,
-        });
-        check(response, {
-          'status=200': r => r.status === 200,
-        });
-      }
-    JS
-    File.write(k6_script_file, k6_script)
-    k6_command = "k6 run --summary-export=#{k6_summary_json} --summary-trend-stats 'min,avg,med,max,p(90),p(99)'"
-    raise "k6 benchmark failed" unless system("#{k6_command} #{k6_script_file} | tee #{k6_txt}")
+    k6_command = "k6 run #{k6_env_vars} --summary-export=#{k6_summary_json} " \
+                 "--summary-trend-stats 'min,avg,med,max,p(90),p(99)' #{k6_script}"
+    raise "k6 benchmark failed" unless system("#{k6_command} | tee #{k6_txt}")
 
     k6_data = parse_json_file(k6_summary_json, "k6")
     k6_rps = k6_data.dig("metrics", "iterations", "rate")&.round(2) || "missing"
@@ -400,16 +365,21 @@ def run_k6_benchmark(target, route_name)
     k6_p90 = k6_data.dig("metrics", "http_req_duration", "p(90)")&.round(2) || "missing"
     k6_p99 = k6_data.dig("metrics", "http_req_duration", "p(99)")&.round(2) || "missing"
 
-    # Status: compute successful vs failed requests
+    # Status: extract counts from checks (status_200, status_302, status_4xx, status_5xx)
     k6_reqs_total = k6_data.dig("metrics", "http_reqs", "count") || 0
     k6_checks = k6_data.dig("root_group", "checks") || {}
-    k6_status_parts = k6_checks.map do |name, check|
-      status_label = name.start_with?("status=") ? name.delete_prefix("status=") : name
-      "#{status_label}=#{check['passes']}"
+    k6_known_count = 0
+    k6_status_parts = k6_checks.filter_map do |name, check|
+      passes = check["passes"] || 0
+      k6_known_count += passes
+      next if passes.zero?
+
+      # Convert check names like "status_200" to "200", "status_4xx" to "4xx"
+      status_label = name.sub(/^status_/, "")
+      "#{status_label}=#{passes}"
     end
-    k6_reqs_known_status = k6_checks.values.sum { |check| check["passes"] || 0 }
-    k6_reqs_other = k6_reqs_total - k6_reqs_known_status
-    k6_status_parts << "other=#{k6_reqs_other}" if k6_reqs_other.positive?
+    k6_other = k6_reqs_total - k6_known_count
+    k6_status_parts << "other=#{k6_other}" if k6_other.positive?
     k6_status = k6_status_parts.empty? ? "missing" : k6_status_parts.join(",")
 
     [k6_rps, k6_p50, k6_p90, k6_p99, k6_status]
@@ -419,7 +389,7 @@ def run_k6_benchmark(target, route_name)
   end
 end
 
-# rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity, Metrics/MethodLength
+# rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
 # Initialize summary file
 File.write(SUMMARY_TXT, "")
