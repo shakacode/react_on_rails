@@ -5,4 +5,4 @@ wp-client: bin/shakapacker-dev-server
 wp-server: SERVER_BUNDLE_ONLY=true bin/shakapacker --watch
 
 # Bundle ReScript .res files
-rescript: yarn build:rescript:dev
+rescript: pnpm build:rescript:dev
