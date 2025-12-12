@@ -62,3 +62,5 @@ Find guidance for your specific scenario:
 ---
 
 **💡 Tip:** For the best reading experience with full navigation and search, visit the [documentation website](https://www.shakacode.com/react-on-rails/docs/).
+
+<!-- Investigation trigger -->
