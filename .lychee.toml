@@ -1,0 +1,48 @@
+# Lychee link checker configuration
+# https://lychee.cli.rs
+
+# Only accept 200 and 206 (match previous markdown-link-check behavior)
+accept = ["200", "206"]
+
+# Retry failed requests (handles transient 502/503/504 errors)
+max_retries = 3
+retry_wait_time = 10
+
+# Timeout for each request
+timeout = 20
+
+# Exclude patterns (migrated from markdown-link-check-config.json)
+exclude = [
+  # Localhost/development URLs
+  '^http://localhost',
+  '^https://localhost',
+  '^mailto:',
+
+  # Sites that block bots or require auth
+  '^https://www\.npmjs\.(org|com)',
+  '^https://medium\.com',
+  '^https://blog\.shakacode\.com',
+  '^https://www\.linkedin\.com',
+  '^https://reactrails\.slack\.com',
+
+  # Known dead/problematic URLs
+  '^https://your-shared-addr\.c9users\.io',
+  '^https://hichee\.com',
+  '^https://reactrails\.com',
+  '^https?://rubyonrails\.org/doctrine',
+
+  # Legacy tutorial repo (archived)
+  '^https://github\.com/shakacode/react-webpack-rails-tutorial/',
+]
+
+# Exclude planning docs (contain placeholder links)
+exclude_path = [
+  'docs/planning/',
+]
+
+# Don't check fragments/anchors (can be flaky)
+include_fragments = false
+
+# Cache results to speed up repeated runs
+cache = true
+max_cache_age = "1d"
