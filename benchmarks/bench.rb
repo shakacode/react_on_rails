@@ -93,18 +93,18 @@ def strip_optional_params(route)
 end
 
 # Sanitize route name for use in filenames
-# Removes characters that GitHub Actions disallows in artifacts
+# Removes characters that GitHub Actions disallows in artifacts and shell metacharacters
 def sanitize_route_name(route)
   name = strip_optional_params(route).gsub(%r{^/}, "").tr("/", "_")
   name = "root" if name.empty?
-  # Replace invalid characters: " : < > | * ? \r \n
-  name.gsub(/[":.<>|*?\r\n]+/, "_").squeeze("_").gsub(/^_|_$/, "")
+  # Replace invalid characters: " : < > | * ? \r \n $ ` ; & ( ) [ ] { } ! #
+  name.gsub(/[":.<>|*?\r\n$`;&#!()\[\]{}]+/, "_").squeeze("_").gsub(/^_|_$/, "")
 end
 
 # Get routes from the Rails app filtered by pages# and react_router# controllers
 def get_benchmark_routes(app_dir)
-  routes_output = `cd #{app_dir} && bundle exec rails routes 2>&1`
-  raise "Failed to get routes from #{app_dir}" unless $CHILD_STATUS.success?
+  routes_output, status = Open3.capture2e("bundle", "exec", "rails", "routes", chdir: app_dir)
+  raise "Failed to get routes from #{app_dir}" unless status.success?
 
   routes = []
   routes_output.each_line do |line|

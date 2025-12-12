@@ -334,7 +334,7 @@ jobs:
           set -e  # Exit on any error
           echo "🏃 Running Core benchmark suite..."
 
-          if ! ruby spec/performance/bench.rb; then
+          if ! ruby benchmarks/bench.rb; then
             echo "❌ ERROR: Benchmark execution failed"
             exit 1
           fi
@@ -483,7 +483,7 @@ jobs:
           set -e
           echo "🏃 Running Pro benchmark suite..."
 
-          if ! PRO=true ruby spec/performance/bench.rb; then
+          if ! PRO=true ruby benchmarks/bench.rb; then
             echo "❌ ERROR: Benchmark execution failed"
             exit 1
           fi
