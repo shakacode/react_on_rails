@@ -10,6 +10,9 @@ import { app } from '../../support/on-rails';
  * that were already rendered on the client (not server-rendered).
  *
  * The fix: Skip rendering for components that are already tracked in the renderedRoots Map.
+ *
+ * Additional edge case (CodeRabbit feedback): When a DOM node is replaced (same ID, new element),
+ * the component should still render to the new node (not be skipped).
  */
 test.describe('Issue #2210: reactOnRailsPageLoaded() Multiple Calls', () => {
   test.beforeEach(async () => {
@@ -161,5 +164,66 @@ test.describe('Issue #2210: reactOnRailsPageLoaded() Multiple Calls', () => {
     // Check the test results div for success message
     const resultsDiv = page.locator('#test-results');
     await expect(resultsDiv).toContainText('No hydration errors detected');
+  });
+
+  test('should render to replaced DOM node with same ID (CodeRabbit edge case)', async ({ page }) => {
+    const consoleLogs = [];
+
+    page.on('console', (message) => {
+      if (message.type() === 'log') {
+        consoleLogs.push(message.text());
+      }
+    });
+
+    await page.goto('/async_page_loaded_test');
+    await page.waitForLoadState('networkidle');
+
+    // Verify initial component is rendered
+    const component = page.locator('#AsyncComponent-1');
+    await expect(component).toBeVisible();
+    await expect(component.locator('[data-testid="async-component"]')).toContainText('First Component');
+
+    // Click the replace button - this removes the DOM node and creates a new one with the same ID
+    const replaceButton = page.locator('#replace-component-btn');
+    await replaceButton.click();
+
+    // Wait for the replacement to complete
+    await page.waitForTimeout(200);
+
+    // Check that the DOM replacement happened
+    const replacementLogged = consoleLogs.some((log) => log.includes('Replacing DOM node'));
+    expect(replacementLogged).toBe(true);
+
+    // The component should have been re-rendered to the new DOM node
+    // Without the fix, this would fail because the component would be skipped
+    await expect(component).toBeVisible();
+    await expect(component.locator('[data-testid="async-component"]')).toContainText('First Component');
+
+    // Check the replace results div for success message
+    const replaceResultsDiv = page.locator('#replace-results');
+    await expect(replaceResultsDiv).toContainText('Component re-rendered to new DOM node');
+  });
+
+  test('should handle multiple DOM node replacements', async ({ page }) => {
+    await page.goto('/async_page_loaded_test');
+    await page.waitForLoadState('networkidle');
+
+    const replaceButton = page.locator('#replace-component-btn');
+    const replaceResultsDiv = page.locator('#replace-results');
+
+    // Replace the component 3 times
+    await replaceButton.click();
+    await expect(replaceResultsDiv).toContainText('replace #1');
+
+    await replaceButton.click();
+    await expect(replaceResultsDiv).toContainText('replace #2');
+
+    await replaceButton.click();
+    await expect(replaceResultsDiv).toContainText('replace #3');
+
+    // Component should still be visible and working after all replacements
+    const component = page.locator('#AsyncComponent-1');
+    await expect(component).toBeVisible();
+    await expect(component.locator('[data-testid="async-component"]')).toContainText('First Component');
   });
 });

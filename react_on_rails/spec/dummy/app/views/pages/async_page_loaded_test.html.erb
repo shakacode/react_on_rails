@@ -7,12 +7,20 @@
 
 <hr/>
 
-<h2>Test Scenario</h2>
+<h2>Test Scenario 1: Adding New Components</h2>
 <ol>
   <li>Initial page load renders the first AsyncComponent</li>
   <li>Click "Add Component" to dynamically add a second component</li>
   <li>The page will call <code>reactOnRailsPageLoaded()</code> after adding the new component</li>
   <li>If the fix is working, there should be NO hydration errors in the console</li>
+</ol>
+
+<h2>Test Scenario 2: Replacing DOM Nodes (CodeRabbit Edge Case)</h2>
+<ol>
+  <li>Click "Replace Component" to remove and recreate the first component's DOM node with the same ID</li>
+  <li>The page will call <code>reactOnRailsPageLoaded()</code> after replacing the node</li>
+  <li>The component should re-render (not be skipped) because it's a new DOM element</li>
+  <li>Without the fix, the component would NOT render (old root leaked, new node ignored)</li>
 </ol>
 
 <hr/>
@@ -26,6 +34,7 @@
 <hr/>
 
 <button id="add-component-btn" type="button">Add Component (Triggers reactOnRailsPageLoaded)</button>
+<button id="replace-component-btn" type="button">Replace Component (Same ID, New DOM Node)</button>
 
 <div id="dynamic-components"></div>
 
@@ -42,10 +51,12 @@ Warning: Prop `style` did not match. Server: "align-items: center" Client: "alig
 
 <h2>Results</h2>
 <div id="test-results"></div>
+<div id="replace-results"></div>
 
 <script>
   (function() {
     var componentCounter = 1;
+    var replaceCounter = 0;
     var consoleErrors = [];
 
     // Capture console errors
@@ -66,6 +77,15 @@ Warning: Prop `style` did not match. Server: "align-items: center" Client: "alig
       } else {
         resultsDiv.innerHTML = '<p style="color: red; font-weight: bold;">✗ Hydration errors detected:</p>' +
           '<ul>' + consoleErrors.map(function(e) { return '<li>' + e + '</li>'; }).join('') + '</ul>';
+      }
+    }
+
+    function updateReplaceResults(success, message) {
+      var resultsDiv = document.getElementById('replace-results');
+      if (success) {
+        resultsDiv.innerHTML = '<p style="color: green; font-weight: bold;">✓ ' + message + '</p>';
+      } else {
+        resultsDiv.innerHTML = '<p style="color: red; font-weight: bold;">✗ ' + message + '</p>';
       }
     }
 
@@ -102,6 +122,53 @@ Warning: Prop `style` did not match. Server: "align-items: center" Client: "alig
         ReactOnRails.reactOnRailsPageLoaded();
         console.log('reactOnRailsPageLoaded() completed');
       }
+
+      updateResults();
+    });
+
+    document.getElementById('replace-component-btn').addEventListener('click', function() {
+      replaceCounter++;
+      var domId = 'AsyncComponent-1';
+      var container = document.getElementById('components-container');
+
+      // Get the old DOM node
+      var oldNode = document.getElementById(domId);
+      if (!oldNode) {
+        updateReplaceResults(false, 'Could not find component to replace');
+        return;
+      }
+
+      console.log('Replacing DOM node: ' + domId);
+
+      // Remove the old DOM node (but keep the script tag)
+      oldNode.remove();
+
+      // Create a NEW DOM node with the SAME ID
+      var newNode = document.createElement('div');
+      newNode.id = domId;
+      // Insert at the beginning of the container
+      container.insertBefore(newNode, container.firstChild);
+
+      console.log('New DOM node created with same ID: ' + domId);
+
+      // Call reactOnRailsPageLoaded - this should render to the NEW node
+      // Without the fix: would skip because domId is already in renderedRoots
+      // With the fix: detects different node instance, unmounts old, renders new
+      if (typeof ReactOnRails !== 'undefined') {
+        console.log('Calling reactOnRailsPageLoaded() after DOM replacement...');
+        ReactOnRails.reactOnRailsPageLoaded();
+        console.log('reactOnRailsPageLoaded() completed');
+      }
+
+      // Check if the new node got rendered
+      setTimeout(function() {
+        var renderedNode = document.getElementById(domId);
+        if (renderedNode && renderedNode.innerHTML.indexOf('async-component') !== -1) {
+          updateReplaceResults(true, 'Component re-rendered to new DOM node (replace #' + replaceCounter + ')');
+        } else {
+          updateReplaceResults(false, 'Component was NOT rendered to new DOM node - fix is not working!');
+        }
+      }, 100);
 
       updateResults();
     });
