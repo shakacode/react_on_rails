@@ -285,7 +285,6 @@ def run_vegeta_benchmark(target, route_name)
   begin
     puts "\n===> Vegeta: #{route_name}"
 
-    vegeta_bin = "#{OUTDIR}/#{route_name}_vegeta.bin"
     vegeta_json = "#{OUTDIR}/#{route_name}_vegeta.json"
     vegeta_txt = "#{OUTDIR}/#{route_name}_vegeta.txt"
 
@@ -297,15 +296,28 @@ def run_vegeta_benchmark(target, route_name)
         ["-rate=#{RATE}", "--workers=#{CONNECTIONS}", "--max-workers=#{MAX_CONNECTIONS}"]
       end
 
+    # Run vegeta attack and pipe to text report (displayed and saved)
+    # Then generate JSON report by re-encoding from the text output isn't possible,
+    # so we save to a temp .bin file, generate both reports, then delete it
+    vegeta_bin = "#{OUTDIR}/#{route_name}_vegeta.bin"
     vegeta_cmd = [
       "echo 'GET #{target}' |",
       "vegeta", "attack",
       *vegeta_args,
       "-duration=#{DURATION}",
-      "-timeout=#{REQUEST_TIMEOUT}"
+      "-timeout=#{REQUEST_TIMEOUT}",
+      "> #{vegeta_bin}"
     ].join(" ")
-    raise "Vegeta attack failed" unless system("#{vegeta_cmd} | tee #{vegeta_bin} | vegeta report | tee #{vegeta_txt}")
-    raise "Vegeta report generation failed" unless system("vegeta report -type=json #{vegeta_bin} > #{vegeta_json}")
+    raise "Vegeta attack failed" unless system(vegeta_cmd)
+
+    # Generate text report (display and save)
+    raise "Vegeta text report failed" unless system("vegeta report #{vegeta_bin} | tee #{vegeta_txt}")
+
+    # Generate JSON report
+    raise "Vegeta JSON report failed" unless system("vegeta report -type=json #{vegeta_bin} > #{vegeta_json}")
+
+    # Delete the large binary file to save disk space
+    FileUtils.rm_f(vegeta_bin)
 
     vegeta_data = parse_json_file(vegeta_json, "Vegeta")
     vegeta_rps = vegeta_data["throughput"]&.round(2) || "missing"
