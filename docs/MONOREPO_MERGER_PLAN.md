@@ -660,12 +660,10 @@ After the initial merge, the following CI adjustments may be needed:
 ### Critical License Rules
 
 1. **Directory Classification:**
-
    - **MIT Licensed:** `lib/react_on_rails/` (including specs), `packages/react-on-rails/` (including tests)
    - **Pro Licensed:** All directories explicitly listed in LICENSE.md under "React on Rails Pro License"
 
 2. **LICENSE.md Updates:**
-
    - Must be updated whenever pro directories are moved or renamed
    - Must accurately reflect current directory structure
    - Pro directories must be explicitly listed
