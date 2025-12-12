@@ -297,5 +297,133 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
                            /must be a positive integer/)
       end
     end
+
+    describe "license auto-refresh configuration" do
+      after do
+        ENV.delete("REACT_ON_RAILS_PRO_LICENSE_KEY")
+      end
+
+      describe ".auto_refresh_license" do
+        it "defaults to true" do
+          ReactOnRailsPro.configure {} # rubocop:disable Lint/EmptyBlock
+
+          expect(ReactOnRailsPro.configuration.auto_refresh_license).to be(true)
+        end
+
+        it "can be set to false" do
+          ReactOnRailsPro.configure do |config|
+            config.auto_refresh_license = false
+          end
+
+          expect(ReactOnRailsPro.configuration.auto_refresh_license).to be(false)
+        end
+      end
+
+      describe ".license_api_url" do
+        it "defaults to https://licenses.shakacode.com" do
+          ReactOnRailsPro.configure {} # rubocop:disable Lint/EmptyBlock
+
+          expect(ReactOnRailsPro.configuration.license_api_url)
+            .to eq(ReactOnRailsPro::Configuration::DEFAULT_LICENSE_API_URL)
+        end
+
+        it "can be customized" do
+          custom_url = "https://custom-licensing.example.com"
+          ReactOnRailsPro.configure do |config|
+            config.license_api_url = custom_url
+          end
+
+          expect(ReactOnRailsPro.configuration.license_api_url).to eq(custom_url)
+        end
+      end
+
+      describe ".license_key" do
+        it "returns configured value when set" do
+          ReactOnRailsPro.configure do |config|
+            config.license_key = "lic_configured_key"
+          end
+
+          expect(ReactOnRailsPro.configuration.license_key).to eq("lic_configured_key")
+        end
+
+        it "returns nil when not configured" do
+          ReactOnRailsPro.configure {} # rubocop:disable Lint/EmptyBlock
+
+          expect(ReactOnRailsPro.configuration.license_key).to be_nil
+        end
+
+        it "returns ENV value when ENV is set" do
+          ENV["REACT_ON_RAILS_PRO_LICENSE_KEY"] = "lic_env_key"
+          ReactOnRailsPro.configure {} # rubocop:disable Lint/EmptyBlock
+
+          expect(ReactOnRailsPro.configuration.license_key).to eq("lic_env_key")
+        end
+
+        it "prioritizes ENV over configured value" do
+          ENV["REACT_ON_RAILS_PRO_LICENSE_KEY"] = "lic_env_key"
+          ReactOnRailsPro.configure do |config|
+            config.license_key = "lic_configured_key"
+          end
+
+          expect(ReactOnRailsPro.configuration.license_key).to eq("lic_env_key")
+        end
+
+        it "ignores empty ENV value and uses configured value" do
+          ENV["REACT_ON_RAILS_PRO_LICENSE_KEY"] = ""
+          ReactOnRailsPro.configure do |config|
+            config.license_key = "lic_configured_key"
+          end
+
+          expect(ReactOnRailsPro.configuration.license_key).to eq("lic_configured_key")
+        end
+      end
+
+      describe ".auto_refresh_enabled?" do
+        it "returns true when auto_refresh_license is true and license_key is set" do
+          ReactOnRailsPro.configure do |config|
+            config.auto_refresh_license = true
+            config.license_key = "lic_test_key"
+          end
+
+          expect(ReactOnRailsPro.configuration.auto_refresh_enabled?).to be(true)
+        end
+
+        it "returns false when auto_refresh_license is false" do
+          ReactOnRailsPro.configure do |config|
+            config.auto_refresh_license = false
+            config.license_key = "lic_test_key"
+          end
+
+          expect(ReactOnRailsPro.configuration.auto_refresh_enabled?).to be(false)
+        end
+
+        it "returns false when license_key is nil" do
+          ReactOnRailsPro.configure do |config|
+            config.auto_refresh_license = true
+            config.license_key = nil
+          end
+
+          expect(ReactOnRailsPro.configuration.auto_refresh_enabled?).to be(false)
+        end
+
+        it "returns false when license_key is empty string" do
+          ReactOnRailsPro.configure do |config|
+            config.auto_refresh_license = true
+            config.license_key = ""
+          end
+
+          expect(ReactOnRailsPro.configuration.auto_refresh_enabled?).to be(false)
+        end
+
+        it "returns true when license_key is set via ENV" do
+          ENV["REACT_ON_RAILS_PRO_LICENSE_KEY"] = "lic_env_key"
+          ReactOnRailsPro.configure do |config|
+            config.auto_refresh_license = true
+          end
+
+          expect(ReactOnRailsPro.configuration.auto_refresh_enabled?).to be(true)
+        end
+      end
+    end
   end
 end
