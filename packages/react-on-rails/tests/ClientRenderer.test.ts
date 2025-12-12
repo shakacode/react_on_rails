@@ -204,8 +204,7 @@ describe('ClientRenderer', () => {
   });
 
   describe('Issue #2210: Multiple calls to renderComponent', () => {
-    it('skips already-rendered components to prevent hydration errors', () => {
-      // Setup Rails context
+    const setupRailsContext = () => {
       const railsContextElement = document.createElement('div');
       railsContextElement.id = 'js-react-on-rails-context';
       railsContextElement.textContent = JSON.stringify({
@@ -227,6 +226,10 @@ describe('ClientRenderer', () => {
         componentRegistryTimeout: 0,
       });
       document.body.appendChild(railsContextElement);
+    };
+
+    it('skips already-rendered components to prevent hydration errors', () => {
+      setupRailsContext();
 
       // Register a simple component
       const TestComponent: React.FC<{ message: string }> = ({ message }) =>
@@ -260,6 +263,50 @@ describe('ClientRenderer', () => {
 
       // The mock should NOT have been called again for the same component
       expect(mockHydrateOrRender.mock.calls.length).toBe(callCountAfterFirstRender);
+    });
+
+    it('renders when DOM node is replaced (same id, new node)', () => {
+      setupRailsContext();
+
+      // Register a simple component
+      const TestComponent: React.FC<{ message: string }> = ({ message }) =>
+        React.createElement('div', null, `Hello, ${message}!`);
+
+      ComponentRegistry.register({ TestComponent });
+
+      // Setup DOM element with component data
+      const componentElement = document.createElement('div');
+      componentElement.className = 'js-react-on-rails-component';
+      componentElement.setAttribute('data-component-name', 'TestComponent');
+      componentElement.setAttribute('data-dom-id', 'test-component-replace');
+      componentElement.textContent = JSON.stringify({ message: 'World' });
+      document.body.appendChild(componentElement);
+
+      // Create first target DOM node
+      const targetNode1 = document.createElement('div');
+      targetNode1.id = 'test-component-replace';
+      document.body.appendChild(targetNode1);
+
+      // First call should render
+      renderComponent('test-component-replace');
+      expect(targetNode1.innerHTML).toContain('Rendered:');
+
+      // Get the mock to track calls
+      const mockHydrateOrRender = require('../src/reactHydrateOrRender.ts').default as jest.Mock;
+      const callCountAfterFirstRender = mockHydrateOrRender.mock.calls.length;
+
+      // Simulate DOM node replacement (e.g., via async HTML injection)
+      targetNode1.remove();
+      const targetNode2 = document.createElement('div');
+      targetNode2.id = 'test-component-replace';
+      document.body.appendChild(targetNode2);
+
+      // Second call should render the new node (not skip)
+      renderComponent('test-component-replace');
+
+      // The mock SHOULD have been called again for the replaced node
+      expect(mockHydrateOrRender.mock.calls.length).toBe(callCountAfterFirstRender + 1);
+      expect(targetNode2.innerHTML).toContain('Rendered:');
     });
   });
 });

@@ -78,14 +78,38 @@ function renderElement(el: Element, railsContext: RailsContext): void {
   try {
     const domNode = document.getElementById(domNodeId);
     if (domNode) {
-      // Skip if this component was already rendered by a previous call
+      // Check if this component was already rendered by a previous call
       // This prevents hydration errors when reactOnRailsPageLoaded() is called multiple times
       // (e.g., for asynchronously loaded content)
-      if (renderedRoots.has(domNodeId)) {
-        if (trace) {
-          console.log(`Skipping already rendered component: ${name} (dom id: ${domNodeId})`);
+      const existing = renderedRoots.get(domNodeId);
+      if (existing) {
+        // Only skip if it's the exact same DOM node and it's still connected to the document
+        const sameNode = existing.domNode === domNode && existing.domNode.isConnected;
+        if (sameNode) {
+          if (trace) {
+            console.log(`Skipping already rendered component: ${name} (dom id: ${domNodeId})`);
+          }
+          return;
         }
-        return;
+        // DOM node was replaced (e.g., via async HTML injection) - clean up the old root
+        try {
+          if (
+            supportsRootApi &&
+            existing.root &&
+            typeof existing.root === 'object' &&
+            'unmount' in existing.root
+          ) {
+            existing.root.unmount();
+          } else {
+            unmountComponentAtNode(existing.domNode);
+          }
+        } catch (unmountError) {
+          // Ignore unmount errors for replaced nodes
+          if (trace) {
+            console.log(`Error unmounting replaced component: ${name}`, unmountError);
+          }
+        }
+        renderedRoots.delete(domNodeId);
       }
 
       const componentObj = ComponentRegistry.get(name);
