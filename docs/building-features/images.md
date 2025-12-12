@@ -31,7 +31,7 @@ const assetLoaderRules = [
 
 ```
 
-A full example can be found at [spec/dummy/client/app/startup/ImageExample.jsx](https://github.com/shakacode/react_on_rails/tree/master/react_on_rails/spec/dummy/client/app/startup/ImageExample.jsx)
+A full example can be found at [react_on_rails/spec/dummy/client/app/startup/ImageExample.jsx](https://github.com/shakacode/react_on_rails/tree/master/react_on_rails/spec/dummy/client/app/startup/ImageExample.jsx)
 
 You are free to use images either in image tags or as background images in SCSS files. You can
 use a "global" location of /client/app/assets/images or a relative path to your JS or SCSS file, as

@@ -175,7 +175,7 @@ This project maintains two distinct but integrated packages:
 
 ## Testing & Examples
 
-### Dummy App (`react_on_rails/react_on_rails/spec/dummy/`)
+### Dummy App (`react_on_rails/spec/dummy/`)
 
 - Full Rails app for integration testing
 - Examples of various React on Rails features

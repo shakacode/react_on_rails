@@ -188,7 +188,7 @@ When switching to **minimum**, these files are modified:
 - `.tool-versions` - Ruby/Node versions
 - `Gemfile.development_dependencies` - Shakapacker gem version
 - `package.json` - React versions, dev dependencies removed
-- `react_on_rails/react_on_rails/spec/dummy/package.json` - React and Shakapacker versions
+- `react_on_rails/spec/dummy/package.json` - React and Shakapacker versions
 - `packages/react-on-rails-pro/package.json` - Test scripts modified
 - `node_modules/`, `yarn.lock` - Cleaned and regenerated
 - `react_on_rails/spec/dummy/node_modules/`, `react_on_rails/spec/dummy/yarn.lock` - Cleaned and regenerated
