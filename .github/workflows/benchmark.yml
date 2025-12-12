@@ -251,23 +251,19 @@ jobs:
       - name: yalc publish for react-on-rails
         run: cd packages/react-on-rails && yalc publish
 
-      # TODO only needed while we use --ignore-workspace below
       - name: Cache core dummy app node modules
         if: env.RUN_CORE
         uses: actions/cache@v4
         with:
           path: react_on_rails/spec/dummy/node_modules
-          key: v4-pro-dummy-app-node-modules-cache-${{ hashFiles('pnpm-lock.yaml', 'react_on_rails/spec/dummy/package.json') }}
+          key: v4-core-dummy-app-node-modules-cache-${{ hashFiles('react_on_rails/spec/dummy/pnpm-lock.yaml') }}
 
       - name: Install Node modules for the dummy app
         if: env.RUN_CORE
-        # TODO simplify this both here and in integration tests
-        # --ignore-workspace prevents pnpm from treating this as part of the parent workspace
-        # The dummy app doesn't have a pnpm-lock.yaml and shouldn't use frozen lockfile
         run: |
           cd react_on_rails/spec/dummy
-          yalc add react-on-rails
-          pnpm install --ignore-workspace
+          yalc add --link react-on-rails
+          pnpm install
 
       - name: Save Core dummy app ruby gems to cache
         if: env.RUN_CORE
@@ -399,20 +395,18 @@ jobs:
         uses: actions/cache@v4
         with:
           path: react_on_rails_pro/spec/dummy/node_modules
-          key: v4-pro-dummy-app-node-modules-cache-${{ hashFiles('pnpm-lock.yaml', 'react_on_rails_pro/spec/dummy/package.json') }}
+          key: v4-pro-dummy-app-node-modules-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/pnpm-lock.yaml') }}
 
       - name: yalc publish for react-on-rails-pro
         if: env.RUN_PRO
         run: cd packages/react-on-rails-pro && yalc publish
 
-      # Same reason for --ignore-workspace as for core
-      # TODO Remove it here as well
       - name: Install Node modules with Pnpm for Pro dummy app
         if: env.RUN_PRO
         run: |
           cd react_on_rails_pro/spec/dummy
-          yalc add react-on-rails-pro
-          pnpm install --ignore-workspace
+          yalc add --link react-on-rails-pro
+          pnpm install
 
       - name: Cache Pro dummy app Ruby gems
         if: env.RUN_PRO
