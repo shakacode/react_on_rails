@@ -445,7 +445,7 @@ cd packages/react-on-rails && yarn build && yarn test
 cd packages/react-on-rails-pro && yarn build && yarn test
 
 # Test in dummy app
-cd spec/dummy && yarn install && yarn build
+cd react_on_rails/spec/dummy && yarn install && yarn build
 ```
 
 ## Rollback Strategy

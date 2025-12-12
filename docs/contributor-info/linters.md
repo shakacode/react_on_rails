@@ -70,7 +70,7 @@ Rule severity is configured with `'off'`, `'warn'` or `'error'`. In older config
 
 Rules can also take a few additional options. In this case, the rule can be set to an array, the first item of which is the severity and the rest are options.
 
-See file [.eslintrc](https://github.com/shakacode/react_on_rails/tree/master/lib/generators/react_on_rails/templates/.eslintrc) for examples of configuration
+See file [.eslintrc](https://github.com/shakacode/react_on_rails/tree/master/react_on_rails/lib/generators/react_on_rails/templates/.eslintrc) for examples of configuration
 
 ### Specify/Override rules in code
 

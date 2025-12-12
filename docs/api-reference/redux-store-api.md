@@ -90,7 +90,7 @@ Include the module `ReactOnRails::Controller` in your controller, probably in Ap
   2. In your component definition, you'll call `ReactOnRails.getStore('storeName')` to get the hydrated Redux store to attach to your components.
 - **props:** Named parameter `props`. ReactOnRails takes care of setting up the hydration of your store with props from the view.
 
-For an example, see [spec/dummy/app/controllers/pages_controller.rb](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/app/controllers/pages_controller.rb). Note: this is preferable to using the equivalent view_helper `redux_store` in that you can be assured that the store is initialized before your components.
+For an example, see [spec/dummy/app/controllers/pages_controller.rb](https://github.com/shakacode/react_on_rails/tree/master/react_on_rails/spec/dummy/app/controllers/pages_controller.rb). Note: this is preferable to using the equivalent view_helper `redux_store` in that you can be assured that the store is initialized before your components.
 
 ## View Helper
 
@@ -100,9 +100,9 @@ This method has the same API as the controller extension. **HOWEVER**, we recomm
 
 `redux_store_hydration_data`
 
-Place this view helper (no parameters) at the end of your shared layout so ReactOnRails will render the redux store hydration data. Since we're going to be setting up the stores in the controllers, we need to know where on the view to put the client-side rendering of this hydration data, which is a hidden div with a matching class that contains a data props. For an example, see [spec/dummy/app/views/layouts/application.html.erb](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/app/views/layouts/application.html.erb).
+Place this view helper (no parameters) at the end of your shared layout so ReactOnRails will render the redux store hydration data. Since we're going to be setting up the stores in the controllers, we need to know where on the view to put the client-side rendering of this hydration data, which is a hidden div with a matching class that contains a data props. For an example, see [spec/dummy/app/views/layouts/application.html.erb](https://github.com/shakacode/react_on_rails/tree/master/react_on_rails/spec/dummy/app/views/layouts/application.html.erb).
 
 ## More Details
 
-- [lib/react_on_rails/controller.rb](https://github.com/shakacode/react_on_rails/tree/master/lib/react_on_rails/controller.rb) source
-- [lib/react_on_rails/helper.rb](https://github.com/shakacode/react_on_rails/tree/master/lib/react_on_rails/helper.rb) source
+- [lib/react_on_rails/controller.rb](https://github.com/shakacode/react_on_rails/tree/master/react_on_rails/lib/react_on_rails/controller.rb) source
+- [lib/react_on_rails/helper.rb](https://github.com/shakacode/react_on_rails/tree/master/react_on_rails/lib/react_on_rails/helper.rb) source

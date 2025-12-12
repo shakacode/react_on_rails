@@ -4,7 +4,7 @@
 # Shakapacker precompile hook for React on Rails - Shared Implementation
 #
 # This is the shared implementation used by both test dummy apps:
-# - spec/dummy/bin/shakapacker-precompile-hook
+# - react_on_rails/spec/dummy/bin/shakapacker-precompile-hook
 # - react_on_rails_pro/spec/dummy/bin/shakapacker-precompile-hook
 #
 # This script runs before webpack compilation to:

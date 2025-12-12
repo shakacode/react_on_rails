@@ -32,7 +32,7 @@ packages/node-renderer/   →         Keep (Pro only)
 ```bash
 yarn build
 yalc publish                    # Single command at root
-cd spec/dummy && yalc add react-on-rails
+cd react_on_rails/spec/dummy && yalc add react-on-rails
 ```
 
 ### Target (Surabaya-v1)
@@ -40,7 +40,7 @@ cd spec/dummy && yalc add react-on-rails
 ```bash
 yarn build                      # Builds all workspaces
 yarn yalc:publish              # Runs yalc:publish in all workspaces
-cd spec/dummy && yalc add react-on-rails
+cd react_on_rails/spec/dummy && yalc add react-on-rails
 ```
 
 ## Build Scripts - Path Reference Guide

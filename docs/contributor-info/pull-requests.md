@@ -38,4 +38,4 @@ When making doc changes, we want the change to work on both the gitbook and the 
 ### Links to other docs
 
 - When making references to source code files, use a full GitHub URL, for example:
-  `[spec/dummy/config/initializers/react_on_rails.rb](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/config/initializers/react_on_rails.rb)`
+  `[spec/dummy/config/initializers/react_on_rails.rb](https://github.com/shakacode/react_on_rails/tree/master/react_on_rails/spec/dummy/config/initializers/react_on_rails.rb)`

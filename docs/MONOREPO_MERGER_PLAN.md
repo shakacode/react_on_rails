@@ -272,7 +272,7 @@ After the initial merge, the following CI adjustments may be needed:
    - Use `link-source` scripts to build and publish packages with yalc
    - Avoid `file:` paths in package.json - use `link:.yalc/package-name` instead
 5. **Multiple Dummy Apps**: Don't forget to update ALL dummy apps:
-   - `spec/dummy/` (main dummy app)
+   - `react_on_rails/spec/dummy/` (main dummy app)
    - `react_on_rails_pro/spec/dummy/` (pro dummy app)
    - `react_on_rails_pro/spec/execjs-compatible-dummy/` (ExecJS dummy app)
 6. **CircleCI Optimization**: When using yalc with preinstall hooks:
@@ -660,10 +660,12 @@ After the initial merge, the following CI adjustments may be needed:
 ### Critical License Rules
 
 1. **Directory Classification:**
+
    - **MIT Licensed:** `lib/react_on_rails/` (including specs), `packages/react-on-rails/` (including tests)
    - **Pro Licensed:** All directories explicitly listed in LICENSE.md under "React on Rails Pro License"
 
 2. **LICENSE.md Updates:**
+
    - Must be updated whenever pro directories are moved or renamed
    - Must accurately reflect current directory structure
    - Pro directories must be explicitly listed

@@ -19,14 +19,17 @@ rake release[version,dry_run,registry,skip_push]
 **Arguments:**
 
 1. **`version`** (required): Version bump type or explicit version
+
    - Bump types: `patch`, `minor`, `major`
    - Explicit: `16.2.0`
    - Pre-release: `16.2.0.beta.1` (rubygem format with dots, converted to `16.2.0-beta.1` for NPM)
 
 2. **`dry_run`** (optional): `true` to preview changes without releasing
+
    - Default: `false`
 
 3. **`registry`** (optional): Publishing registry for testing
+
    - `verdaccio`: Publish all NPM packages to local Verdaccio (skips RubyGems)
    - `npm`: Normal release to npmjs.org + rubygems.org (default)
 
@@ -96,6 +99,7 @@ For pre-release versions, the gem version format is automatically converted to N
 Before running the release command, verify:
 
 1. **NPM authentication**: Run `npm whoami` to confirm you're logged in
+
    - If not logged in, the release script will automatically run `npm login` for you
 
 2. **RubyGems authentication**: Ensure you have valid credentials for `gem push`
@@ -142,7 +146,7 @@ After a successful release, you'll see instructions to:
 2. Update the dummy app's Gemfile.lock:
 
    ```bash
-   cd spec/dummy && bundle update react_on_rails
+   cd react_on_rails/spec/dummy && bundle update react_on_rails
    ```
 
 3. Commit the CHANGELOG and Gemfile.lock:
@@ -220,6 +224,7 @@ Before releasing to production, test the release process locally:
    ```
 
 3. This will:
+
    - Publish all 3 NPM packages to local Verdaccio
    - Skip RubyGem publishing
    - Update version files (revert manually after testing)
@@ -259,10 +264,12 @@ The release script now checks NPM authentication at the start and will automatic
 If the release fails partway through (e.g., during NPM publish):
 
 1. Check what was published:
+
    - NPM: `npm view react-on-rails@X.Y.Z`
    - RubyGems: `gem list react_on_rails -r -a`
 
 2. If the git tag was created but packages weren't published:
+
    - Delete the tag: `git tag -d vX.Y.Z && git push origin :vX.Y.Z`
    - Revert the version commit: `git reset --hard HEAD~1 && git push -f`
    - Start over with `rake release[X.Y.Z]`

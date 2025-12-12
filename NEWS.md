@@ -5,7 +5,7 @@ _A history of the news. A few bullets at the top will also show on the [README.m
 - **October 14, 2020**: [RUBY ROGUES
   RR 474: React on Rails V12 – Don’t Shave That Yak! with Justin Gordon](https://devchat.tv/ruby-rogues/rr-474-react-on-rails-v12-dont-shave-that-yak-with-justin-gordon/).
 
-- **October 1, 2020**: See the [spec/dummy](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy) example repo for a simple configuration of Webpack via the rails/webpacker gem
+- **October 1, 2020**: See the [spec/dummy](https://github.com/shakacode/react_on_rails/tree/master/react_on_rails/spec/dummy) example repo for a simple configuration of Webpack via the rails/webpacker gem
   that supports SSR.
 - **August 2, 2020**: See the example repo of [React on Rails Tutorial With SSR, HMR fast refresh, and TypeScript](https://github.com/shakacode/react_on_rails_demo_ssr_hmr) for a new way to set up the creation of your SSR bundle with `rails/webpacker`.
 - July 8, 2020: Release **v12**.

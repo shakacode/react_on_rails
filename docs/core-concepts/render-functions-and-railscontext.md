@@ -80,7 +80,7 @@ reduxStore = MyReduxStore(props, railsContext);
 > [!NOTE]
 > See [Redux Store](../api-reference/redux-store-api.md#multiple-react-components-on-a-page-with-one-store) on how to set up Redux stores that allow multiple components to talk to the same store.
 
-The `railsContext` has: (see the implementation in [ReactOnRails::Helper](https://github.com/shakacode/react_on_rails/tree/master/lib/react_on_rails/helper.rb), method `rails_context` for the definitive list).
+The `railsContext` has: (see the implementation in [ReactOnRails::Helper](https://github.com/shakacode/react_on_rails/tree/master/react_on_rails/lib/react_on_rails/helper.rb), method `rails_context` for the definitive list).
 
 ```ruby
   {
@@ -188,7 +188,7 @@ Set the config value for the `rendering_extension`:
 
 Implement it like this above in the same file. Create a class method on the module called `custom_context` that takes the `view_context` for a param.
 
-See [spec/dummy/config/initializers/react_on_rails.rb](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/config/initializers/react_on_rails.rb) for a detailed example.
+See [spec/dummy/config/initializers/react_on_rails.rb](https://github.com/shakacode/react_on_rails/tree/master/react_on_rails/spec/dummy/config/initializers/react_on_rails.rb) for a detailed example.
 
 ```ruby
 module RenderingExtension
