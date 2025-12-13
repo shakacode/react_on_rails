@@ -1,6 +1,6 @@
 {
   "name": "react-on-rails-pro",
-  "version": "16.2.0-beta.19",
+  "version": "16.2.0-beta.20",
   "description": "React on Rails Pro package with React Server Components support",
   "type": "module",
   "scripts": {
