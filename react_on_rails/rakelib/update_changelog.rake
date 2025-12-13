@@ -4,11 +4,25 @@ require "English"
 require "bundler"
 require_relative "task_helpers"
 
-desc "Updates CHANGELOG.md inserting headers for the new version.
+desc "Updates CHANGELOG.md inserting headers for the new version (headers only, not content).
 
-Argument: Git tag. Defaults to the latest tag."
+Argument: Git tag. Defaults to the latest tag.
+
+TIP: For a better experience, use the /update-changelog command in Claude Code.
+     It will analyze commits, write changelog entries, and create a PR automatically."
 
 task :update_changelog, %i[tag] do |_, args|
+  puts <<~TIP
+
+    ┌─────────────────────────────────────────────────────────────────────────────┐
+    │ TIP: This task only adds version headers and links, not changelog entries. │
+    │                                                                             │
+    │ For full changelog automation, use Claude Code:                             │
+    │   Run /update-changelog to analyze commits, write entries, and create a PR │
+    └─────────────────────────────────────────────────────────────────────────────┘
+
+  TIP
+
   tag = args[:tag] || `git describe --tags --abbrev=0`.strip
   anchor = "[#{tag}]"
 
@@ -40,5 +54,6 @@ task :update_changelog, %i[tag] do |_, args|
   end
 
   File.write("CHANGELOG.md", changelog)
-  puts "Updated CHANGELOG.md with an entry for #{tag}"
+  puts "Updated CHANGELOG.md with version header for #{tag}"
+  puts "NOTE: You still need to write the changelog entries manually."
 end
