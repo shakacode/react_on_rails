@@ -5,6 +5,7 @@ You are helping to add an entry to the CHANGELOG.md file for the React on Rails 
 ## Critical Requirements
 
 1. **User-visible changes only**: Only add changelog entries for user-visible changes:
+
    - New features
    - Bug fixes
    - Breaking changes
@@ -99,16 +100,20 @@ This will:
 To determine the most recent version:
 
 1. **Check git tags** to find the latest released version:
+
    ```bash
    git tag --sort=-v:refname | head -10
    ```
+
    This shows tags like `v16.2.0.beta.20`, `v16.2.0.beta.19`, etc.
 
 2. **Check the CHANGELOG.md** for version headers (note: changelog uses versions WITHOUT the `v` prefix):
+
    - `### [16.2.0.beta.19] - 2025-12-10` (beta version)
    - `### [16.1.1] - 2025-09-24` (stable version)
 
 3. **Use this regex pattern** to find version headers in the changelog:
+
    ```regex
    ^### \[([^\]]+)\] - \d{4}-\d{2}-\d{2}
    ```
@@ -131,11 +136,13 @@ The format at the bottom should be:
 When a new version is released:
 
 1. Insert the new version header **immediately after** `### [Unreleased]`:
+
    ```markdown
    ### [Unreleased]
 
    ### [16.2.0.beta.20] - 2025-12-12
    ```
+
 2. Update the `[unreleased]:` link to compare from the new version to master
 3. Add a new version link comparing the previous version to the new version
 
@@ -144,11 +151,13 @@ When a new version is released:
 ### For Regular Changelog Updates
 
 1. **ALWAYS fetch latest changes first**:
+
    - **CRITICAL**: Run `git fetch origin master` to ensure you have the latest commits
    - The workspace may be behind origin/master, causing you to miss recently merged PRs
    - After fetching, use `origin/master` for all comparisons, NOT local `master` branch
 
 2. **Determine the correct version tag to compare against**:
+
    - First, check the tag dates: `git log --tags --simplify-by-decoration --pretty="format:%ai %d" | head -10`
    - Find the latest version tag and its date
    - **Also check the CHANGELOG.md** for the most recent version header: look for `### [VERSION] - DATE` pattern right after `### [Unreleased]`
@@ -158,6 +167,7 @@ When a new version is released:
    - **CRITICAL**: Always use `git log TAG..BRANCH` to find commits that are in the tag but not in the branch, as the tag may be ahead
 
 3. **Check commits and version boundaries**:
+
    - **IMPORTANT**: Use `origin/master` in all commands below, not local `master`
    - Run `git log --oneline LAST_TAG..origin/master` to see commits since the last release
    - Also check `git log --oneline origin/master..LAST_TAG` to see if the tag is ahead of origin/master
@@ -173,17 +183,20 @@ When a new version is released:
 5. **Read the current CHANGELOG.md** to understand the existing structure and formatting.
 
 6. **Determine where entries should go**:
+
    - If the latest version tag is NEWER than origin/master branch, move entries from "Unreleased" to that version section
    - If origin/master is ahead of the latest tag, add new entries to "Unreleased"
    - Always verify the version date in CHANGELOG.md matches the actual tag date
 
 7. **Add or move entries** to the appropriate section under appropriate category headings.
+
    - **CRITICAL**: When moving entries from "Unreleased" to a version section, merge them with existing entries under the same category heading
    - **NEVER create duplicate section headings** (e.g., don't create two "### Fixed" sections)
    - If the version section already has a category heading (e.g., "### Fixed"), add the moved entries to that existing section
    - Maintain the category order as defined above
 
 8. **Verify formatting**:
+
    - Bold description with period
    - Proper PR link (NO hash symbol)
    - Proper author link
@@ -203,10 +216,12 @@ When a new version is released:
 When releasing from beta to a stable version (e.g., v16.1.0-beta.3 → v16.1.0):
 
 1. **Remove all beta version labels** from the changelog:
+
    - Change `### [v16.1.0-beta.1]`, `### [v16.1.0-beta.2]`, etc. to a single `### [v16.1.0]` section
    - Combine all beta entries into the stable release section
 
 2. **Consolidate duplicate entries**:
+
    - If bug fixes or changes were made to features introduced in earlier betas, keep only the final state
    - Remove redundant changelog entries for fixes to beta features
    - Keep the most recent/accurate description of each change
@@ -218,14 +233,17 @@ When releasing from beta to a stable version (e.g., v16.1.0-beta.3 → v16.1.0):
 When a new beta version is released (e.g., `16.2.0.beta.20`):
 
 1. **Check the latest git tag** to confirm the new version:
+
    ```bash
    git tag --sort=-v:refname | head -5
    ```
+
    This shows the latest tags (e.g., `v16.2.0.beta.20`). Strip the `v` prefix for changelog use.
 
 2. **Find the most recent version** in the changelog by looking for the first `### [VERSION] - DATE` after `### [Unreleased]`
 
 3. **Insert the new version header immediately after `### [Unreleased]`**:
+
    ```markdown
    ### [Unreleased]
 
@@ -235,8 +253,10 @@ When a new beta version is released (e.g., `16.2.0.beta.20`):
    ```
 
 4. **Update the version diff links at the bottom of the file**:
+
    - Change the `[unreleased]:` link to compare from the new version to master
    - Add a new link for the new version comparing to the previous version:
+
    ```markdown
    [unreleased]: https://github.com/shakacode/react_on_rails/compare/16.2.0.beta.20...master
    [16.2.0.beta.20]: https://github.com/shakacode/react_on_rails/compare/16.2.0.beta.19...16.2.0.beta.20
@@ -246,10 +266,12 @@ When a new beta version is released (e.g., `16.2.0.beta.20`):
 5. **For changelog entries**, ask the user which approach to take:
 
    **Option 1: Process changes since last beta**
+
    - Only add entries for commits since the previous beta version
    - Maintains detailed history of what changed in each beta
 
    **Option 2: Collapse all prior betas into current beta**
+
    - Combine all beta changelog entries into the new beta version
    - Removes previous beta version sections
    - Cleaner changelog with less version noise
