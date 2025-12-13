@@ -83,7 +83,9 @@ function renderElement(el: Element, railsContext: RailsContext): void {
       // (e.g., for asynchronously loaded content)
       const existing = renderedRoots.get(domNodeId);
       if (existing) {
-        // Only skip if it's the exact same DOM node and it's still connected to the document
+        // Only skip if it's the exact same DOM node and it's still connected to the document.
+        // If the node was replaced (e.g., via innerHTML or Turbo), we need to unmount the old
+        // root and re-render to the new node to prevent memory leaks and ensure rendering works.
         const sameNode = existing.domNode === domNode && existing.domNode.isConnected;
         if (sameNode) {
           if (trace) {
