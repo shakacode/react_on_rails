@@ -8,6 +8,9 @@ CLAUDE_CODE_TIP = <<~TIP
   ┌─────────────────────────────────────────────────────────────────────────────┐
   │ TIP: This task only adds version headers and links, not changelog entries. │
   │ For full automation, run /update-changelog in Claude Code.                 │
+  │                                                                             │
+  │ After running this task, manually add entries under the new header:        │
+  │   #### Fixed / #### Added / #### Changed / etc.                            │
   └─────────────────────────────────────────────────────────────────────────────┘
 TIP
 
