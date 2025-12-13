@@ -21,6 +21,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+### [16.2.0.beta.20] - 2025-12-12
+
+#### Fixed
+
+- **Hydration Mismatch on Multiple `reactOnRailsPageLoaded()` Calls**: Fixed hydration errors that occurred when `reactOnRailsPageLoaded()` was invoked multiple times for asynchronously loaded content. The fix tracks rendered components and skips re-rendering already-tracked components, while intelligently handling DOM node replacements by detecting when a node with the same ID is swapped out. Addresses [issue 2210](https://github.com/shakacode/react_on_rails/issues/2210). [PR 2211](https://github.com/shakacode/react_on_rails/pull/2211) by [justin808](https://github.com/justin808).
+
 ### [16.2.0.beta.19] - 2025-12-10
 
 Changes since the last non-beta release (16.1.1).
@@ -1860,7 +1866,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/16.2.0.beta.19...master
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/16.2.0.beta.20...master
+[16.2.0.beta.20]: https://github.com/shakacode/react_on_rails/compare/16.2.0.beta.19...16.2.0.beta.20
 [16.2.0.beta.19]: https://github.com/shakacode/react_on_rails/compare/16.1.1...16.2.0.beta.19
 [16.1.1]: https://github.com/shakacode/react_on_rails/compare/16.1.0...16.1.1
 [16.1.0]: https://github.com/shakacode/react_on_rails/compare/16.0.0...16.1.0
