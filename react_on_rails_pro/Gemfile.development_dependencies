@@ -23,7 +23,6 @@ gem "pg"
 # Turbolinks makes following links in your web application faster. Read more: https://github.com/rails/turbolinks
 gem "turbolinks"
 gem "sqlite3", "~> 1.4"
-gem "uglifier"
 gem "jquery-rails"
 gem "sprockets"
 gem "sass-rails"
