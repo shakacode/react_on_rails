@@ -1,8 +1,9 @@
 # Lychee link checker configuration
 # https://lychee.cli.rs
 
-# Only accept 200 and 206 (match previous markdown-link-check behavior)
-accept = ["200", "206"]
+# Accept successful responses and permanent redirects
+# 200 = OK, 206 = Partial Content, 308 = Permanent Redirect
+accept = ["200", "206", "308"]
 
 # Retry failed requests (handles transient 502/503/504 errors)
 max_retries = 3
