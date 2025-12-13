@@ -78,7 +78,7 @@ describe(testName, () => {
       ],
     });
 
-    expect(result).toEqual(renderResult);
+    expect(result.response).toEqual(renderResult);
     expect(
       hasVMContextForBundle(path.resolve(__dirname, `./tmp/${testName}/1495063024898/1495063024898.js`)),
     ).toBeTruthy();
@@ -92,7 +92,7 @@ describe(testName, () => {
       bundleTimestamp: BUNDLE_TIMESTAMP,
     });
 
-    expect(result).toEqual({
+    expect(result.response).toEqual({
       status: 410,
       headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
       data: 'No bundle uploaded',
@@ -108,7 +108,7 @@ describe(testName, () => {
       bundleTimestamp: BUNDLE_TIMESTAMP,
     });
 
-    expect(result).toEqual(renderResult);
+    expect(result.response).toEqual(renderResult);
   });
 
   test('If lockfile exists, and is stale', async () => {
@@ -133,7 +133,7 @@ describe(testName, () => {
       ],
     });
 
-    expect(result).toEqual(renderResult);
+    expect(result.response).toEqual(renderResult);
     expect(
       hasVMContextForBundle(path.resolve(__dirname, `./tmp/${testName}/1495063024898/1495063024898.js`)),
     ).toBeTruthy();
@@ -165,7 +165,7 @@ describe(testName, () => {
       ],
     });
 
-    expect(result).toEqual(renderResult);
+    expect(result.response).toEqual(renderResult);
     expect(
       hasVMContextForBundle(path.resolve(__dirname, `./tmp/${testName}/1495063024898/1495063024898.js`)),
     ).toBeTruthy();
@@ -199,7 +199,7 @@ describe(testName, () => {
       ],
     });
 
-    expect(result).toEqual(renderResult);
+    expect(result.response).toEqual(renderResult);
     // only the primary bundle should be in the VM context
     // The secondary bundle will be processed only if the rendering request requests it
     expect(
@@ -254,7 +254,7 @@ describe(testName, () => {
       assetsToCopy: additionalAssets,
     });
 
-    expect(result).toEqual(renderResult);
+    expect(result.response).toEqual(renderResult);
 
     // Only the primary bundle should be in the VM context
     // The secondary bundle will be processed only if the rendering request requests it
@@ -310,7 +310,7 @@ describe(testName, () => {
       dependencyBundleTimestamps: [SECONDARY_BUNDLE_TIMESTAMP],
     });
 
-    expect(result).toEqual({
+    expect(result.response).toEqual({
       status: 410,
       headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
       data: 'No bundle uploaded',
@@ -328,7 +328,7 @@ describe(testName, () => {
       dependencyBundleTimestamps: [SECONDARY_BUNDLE_TIMESTAMP],
     });
 
-    expect(result).toEqual(renderResult);
+    expect(result.response).toEqual(renderResult);
   });
 
   test('rendering request can call runOnOtherBundle', async () => {
@@ -348,7 +348,7 @@ describe(testName, () => {
       dependencyBundleTimestamps: [SECONDARY_BUNDLE_TIMESTAMP],
     });
 
-    expect(result).toEqual(renderResultFromBothBundles);
+    expect(result.response).toEqual(renderResultFromBothBundles);
     // Both bundles should be in the VM context
     expect(
       hasVMContextForBundle(path.resolve(__dirname, `./tmp/${testName}/1495063024898/1495063024898.js`)),
@@ -370,7 +370,7 @@ describe(testName, () => {
       bundleTimestamp: BUNDLE_TIMESTAMP,
     });
 
-    expect(result).toEqual({
+    expect(result.response).toEqual({
       status: 200,
       headers: { 'Cache-Control': 'public, max-age=31536000' },
       data: renderingRequest,
@@ -402,7 +402,7 @@ describe(testName, () => {
       bundleTimestamp: BUNDLE_TIMESTAMP,
     });
 
-    expect(result).toEqual({
+    expect(result.response).toEqual({
       status: 200,
       headers: { 'Cache-Control': 'public, max-age=31536000' },
       data: JSON.stringify('undefined'),
@@ -420,7 +420,7 @@ describe(testName, () => {
       dependencyBundleTimestamps: [SECONDARY_BUNDLE_TIMESTAMP],
     });
 
-    expect(result).toEqual({
+    expect(result.response).toEqual({
       status: 410,
       headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
       data: 'No bundle uploaded',
