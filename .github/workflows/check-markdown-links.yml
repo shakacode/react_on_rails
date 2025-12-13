@@ -33,5 +33,5 @@ jobs:
       - name: Check markdown links
         uses: lycheeverse/lychee-action@v2
         with:
-          args: --config .lychee.toml docs/ *.md
+          args: --config .lychee.toml docs/ *.md react_on_rails_pro/docs/ react_on_rails_pro/*.md
           fail: true

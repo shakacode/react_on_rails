@@ -102,7 +102,7 @@ Changes since the last non-beta release.
   - Seamlessly use React Server Components in your Rails apps
   - Reduce client bundle sizes
   - Enable powerful new patterns for data fetching
-  - [See the full tutorial](https://www.shakacode.com/react-on-rails-pro/docs/react-server-components-tutorial)
+  - [See the full tutorial](https://www.shakacode.com/react-on-rails-pro/docs/react-server-components/tutorial)
 
 [PR 422](https://github.com/shakacode/react_on_rails_pro/pull/422) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
