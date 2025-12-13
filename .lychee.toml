@@ -21,18 +21,13 @@ exclude = [
   # Sites that block bots or require auth
   '^https://www\.npmjs\.(org|com)',
   '^https://medium\.com',
-  '^https://blog\.shakacode\.com',
   '^https://www\.linkedin\.com',
   '^https://reactrails\.slack\.com',
 
-  # Known dead/problematic URLs
+  # Known dead/problematic URLs (verified)
   '^https://your-shared-addr\.c9users\.io',
   '^https://hichee\.com',
-  '^https://reactrails\.com',
-  '^https?://rubyonrails\.org/doctrine',
-
-  # Legacy tutorial repo (archived)
-  '^https://github\.com/shakacode/react-webpack-rails-tutorial/',
+  '^https?://rubyonrails\.org/doctrine',  # DNS issues
 ]
 
 # Exclude planning docs (contain placeholder links)
