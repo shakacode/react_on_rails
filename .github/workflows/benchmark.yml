@@ -46,7 +46,7 @@ on:
       tools:
         description: 'Comma-separated list of tools to run'
         required: false
-        default: 'fortio,vegeta,k6'
+        default: 'k6'
         type: string
       app_version:
         description: 'Which app version to benchmark'
@@ -85,7 +85,7 @@ env:
   WEB_CONCURRENCY: ${{ github.event.inputs.web_concurrency || 4 }}
   RAILS_MAX_THREADS: ${{ github.event.inputs.rails_threads || 3 }}
   RAILS_MIN_THREADS: ${{ github.event.inputs.rails_threads || 3 }}
-  TOOLS: ${{ github.event.inputs.tools || 'fortio,vegeta,k6' }}
+  TOOLS: ${{ github.event.inputs.tools || 'k6' }}
 
 jobs:
   benchmark:

@@ -20,7 +20,7 @@ DURATION = env_or_default("DURATION", "30s")
 # request timeout (duration string as above)
 REQUEST_TIMEOUT = env_or_default("REQUEST_TIMEOUT", "60s")
 # Tools to run (comma-separated)
-TOOLS = env_or_default("TOOLS", "fortio,vegeta,k6").split(",")
+TOOLS = env_or_default("TOOLS", "k6").split(",")
 
 OUTDIR = "bench_results"
 SUMMARY_TXT = "#{OUTDIR}/summary.txt".freeze
