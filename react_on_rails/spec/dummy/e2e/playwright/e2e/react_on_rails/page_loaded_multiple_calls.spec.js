@@ -4,7 +4,7 @@ import { app } from '../../support/on-rails';
 /**
  * Tests for Issue #2210: Hydration mismatch when reactOnRailsPageLoaded() is called multiple times
  *
- * When a user calls ReactOnRails.reactOnRailsPageLoaded() multiple times (e.g., for asynchronously
+ * When a user calls ReactOnRails.reactOnRailsPageLoaded() multiple times (e.g., for dynamically
  * loaded content), the previously rendered client-side components should NOT be re-hydrated.
  * This was causing hydration mismatch errors because React was trying to hydrate components
  * that were already rendered on the client (not server-rendered).
@@ -13,6 +13,8 @@ import { app } from '../../support/on-rails';
  *
  * Additional edge case (CodeRabbit feedback): When a DOM node is replaced (same ID, new element),
  * the component should still render to the new node (not be skipped).
+ *
+ * Note: This tests the core package's manual rendering API, not Pro's async hydration feature.
  */
 test.describe('Issue #2210: reactOnRailsPageLoaded() Multiple Calls', () => {
   test.beforeEach(async () => {
@@ -32,15 +34,15 @@ test.describe('Issue #2210: reactOnRailsPageLoaded() Multiple Calls', () => {
       }
     });
 
-    await page.goto('/async_page_loaded_test');
+    await page.goto('/manual_render_test');
     await page.waitForLoadState('networkidle');
 
     // Verify the first component rendered
-    const firstComponent = page.locator('#AsyncComponent-1');
+    const firstComponent = page.locator('#ManualRenderComponent-1');
     await expect(firstComponent).toBeVisible();
 
     // Check for the component content
-    const componentText = firstComponent.locator('[data-testid="async-component"]');
+    const componentText = firstComponent.locator('[data-testid="manual-render-component"]');
     await expect(componentText).toContainText('First Component');
 
     // No hydration errors should occur on initial load
@@ -70,11 +72,11 @@ test.describe('Issue #2210: reactOnRailsPageLoaded() Multiple Calls', () => {
       }
     });
 
-    await page.goto('/async_page_loaded_test');
+    await page.goto('/manual_render_test');
     await page.waitForLoadState('networkidle');
 
     // Verify initial component is rendered
-    const firstComponent = page.locator('#AsyncComponent-1');
+    const firstComponent = page.locator('#ManualRenderComponent-1');
     await expect(firstComponent).toBeVisible();
 
     // Click the button to add a new component and trigger reactOnRailsPageLoaded()
@@ -82,11 +84,11 @@ test.describe('Issue #2210: reactOnRailsPageLoaded() Multiple Calls', () => {
     await addButton.click();
 
     // Wait for the new component to be rendered
-    const secondComponent = page.locator('#AsyncComponent-2');
+    const secondComponent = page.locator('#ManualRenderComponent-2');
     await expect(secondComponent).toBeVisible();
 
     // Verify the second component has content
-    await expect(secondComponent.locator('[data-testid="async-component"]')).toContainText(
+    await expect(secondComponent.locator('[data-testid="manual-render-component"]')).toContainText(
       'Dynamic Component #2',
     );
 
@@ -100,7 +102,9 @@ test.describe('Issue #2210: reactOnRailsPageLoaded() Multiple Calls', () => {
 
     // First component should still be visible and functional
     await expect(firstComponent).toBeVisible();
-    await expect(firstComponent.locator('[data-testid="async-component"]')).toContainText('First Component');
+    await expect(firstComponent.locator('[data-testid="manual-render-component"]')).toContainText(
+      'First Component',
+    );
   });
 
   test('should handle multiple dynamic component additions without hydration errors', async ({ page }) => {
@@ -119,39 +123,39 @@ test.describe('Issue #2210: reactOnRailsPageLoaded() Multiple Calls', () => {
       }
     });
 
-    await page.goto('/async_page_loaded_test');
+    await page.goto('/manual_render_test');
     await page.waitForLoadState('networkidle');
 
     const addButton = page.locator('#add-component-btn');
 
     // Add 3 components dynamically (components 2, 3, 4)
     await addButton.click();
-    await expect(page.locator('#AsyncComponent-2')).toBeVisible();
-    await expect(page.locator('#AsyncComponent-2').locator('[data-testid="async-component"]')).toContainText(
-      'Dynamic Component #2',
-    );
+    await expect(page.locator('#ManualRenderComponent-2')).toBeVisible();
+    await expect(
+      page.locator('#ManualRenderComponent-2').locator('[data-testid="manual-render-component"]'),
+    ).toContainText('Dynamic Component #2');
 
     await addButton.click();
-    await expect(page.locator('#AsyncComponent-3')).toBeVisible();
-    await expect(page.locator('#AsyncComponent-3').locator('[data-testid="async-component"]')).toContainText(
-      'Dynamic Component #3',
-    );
+    await expect(page.locator('#ManualRenderComponent-3')).toBeVisible();
+    await expect(
+      page.locator('#ManualRenderComponent-3').locator('[data-testid="manual-render-component"]'),
+    ).toContainText('Dynamic Component #3');
 
     await addButton.click();
-    await expect(page.locator('#AsyncComponent-4')).toBeVisible();
-    await expect(page.locator('#AsyncComponent-4').locator('[data-testid="async-component"]')).toContainText(
-      'Dynamic Component #4',
-    );
+    await expect(page.locator('#ManualRenderComponent-4')).toBeVisible();
+    await expect(
+      page.locator('#ManualRenderComponent-4').locator('[data-testid="manual-render-component"]'),
+    ).toContainText('Dynamic Component #4');
 
     // All 4 components should be visible (1 initial + 3 added)
-    await expect(page.locator('[data-testid="async-component"]')).toHaveCount(4);
+    await expect(page.locator('[data-testid="manual-render-component"]')).toHaveCount(4);
 
     // CRITICAL: No hydration errors should have occurred during any of the additions
     expect(consoleErrors).toHaveLength(0);
   });
 
   test('should show success message in test results div', async ({ page }) => {
-    await page.goto('/async_page_loaded_test');
+    await page.goto('/manual_render_test');
     await page.waitForLoadState('networkidle');
 
     // Click to add a component
@@ -159,7 +163,7 @@ test.describe('Issue #2210: reactOnRailsPageLoaded() Multiple Calls', () => {
     await addButton.click();
 
     // Wait for component to render
-    await expect(page.locator('#AsyncComponent-2')).toBeVisible();
+    await expect(page.locator('#ManualRenderComponent-2')).toBeVisible();
 
     // Check the test results div for success message
     const resultsDiv = page.locator('#test-results');
@@ -175,13 +179,15 @@ test.describe('Issue #2210: reactOnRailsPageLoaded() Multiple Calls', () => {
       }
     });
 
-    await page.goto('/async_page_loaded_test');
+    await page.goto('/manual_render_test');
     await page.waitForLoadState('networkidle');
 
     // Verify initial component is rendered
-    const component = page.locator('#AsyncComponent-1');
+    const component = page.locator('#ManualRenderComponent-1');
     await expect(component).toBeVisible();
-    await expect(component.locator('[data-testid="async-component"]')).toContainText('First Component');
+    await expect(component.locator('[data-testid="manual-render-component"]')).toContainText(
+      'First Component',
+    );
 
     // Click the replace button - this removes the DOM node and creates a new one with the same ID
     const replaceButton = page.locator('#replace-component-btn');
@@ -197,7 +203,9 @@ test.describe('Issue #2210: reactOnRailsPageLoaded() Multiple Calls', () => {
     // The component should have been re-rendered to the new DOM node
     // Without the fix, this would fail because the component would be skipped
     await expect(component).toBeVisible();
-    await expect(component.locator('[data-testid="async-component"]')).toContainText('First Component');
+    await expect(component.locator('[data-testid="manual-render-component"]')).toContainText(
+      'First Component',
+    );
 
     // Check the replace results div for success message
     const replaceResultsDiv = page.locator('#replace-results');
@@ -205,7 +213,7 @@ test.describe('Issue #2210: reactOnRailsPageLoaded() Multiple Calls', () => {
   });
 
   test('should handle multiple DOM node replacements', async ({ page }) => {
-    await page.goto('/async_page_loaded_test');
+    await page.goto('/manual_render_test');
     await page.waitForLoadState('networkidle');
 
     const replaceButton = page.locator('#replace-component-btn');
@@ -222,8 +230,10 @@ test.describe('Issue #2210: reactOnRailsPageLoaded() Multiple Calls', () => {
     await expect(replaceResultsDiv).toContainText('replace #3');
 
     // Component should still be visible and working after all replacements
-    const component = page.locator('#AsyncComponent-1');
+    const component = page.locator('#ManualRenderComponent-1');
     await expect(component).toBeVisible();
-    await expect(component.locator('[data-testid="async-component"]')).toContainText('First Component');
+    await expect(component.locator('[data-testid="manual-render-component"]')).toContainText(
+      'First Component',
+    );
   });
 });

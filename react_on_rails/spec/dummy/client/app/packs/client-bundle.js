@@ -7,7 +7,7 @@ import '@hotwired/turbo-rails';
 import ReactOnRails from 'react-on-rails/client';
 
 import HelloTurboStream from '../startup/HelloTurboStream';
-import AsyncComponent from '../startup/AsyncComponent';
+import ManualRenderComponent from '../startup/ManualRenderComponent';
 import SharedReduxStore from '../stores/SharedReduxStore';
 
 ReactOnRails.setOptions({
@@ -17,7 +17,7 @@ ReactOnRails.setOptions({
 
 ReactOnRails.register({
   HelloTurboStream,
-  AsyncComponent,
+  ManualRenderComponent,
 });
 
 ReactOnRails.registerStore({

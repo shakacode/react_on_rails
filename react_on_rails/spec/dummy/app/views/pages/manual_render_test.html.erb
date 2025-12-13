@@ -5,11 +5,13 @@
   does not cause hydration mismatch errors for client-side only components.
 </p>
 
+<p><em>Note: This tests the core package's manual rendering API, not Pro's async hydration feature.</em></p>
+
 <hr/>
 
 <h2>Test Scenario 1: Adding New Components</h2>
 <ol>
-  <li>Initial page load renders the first AsyncComponent</li>
+  <li>Initial page load renders the first ManualRenderComponent</li>
   <li>Click "Add Component" to dynamically add a second component</li>
   <li>The page will call <code>reactOnRailsPageLoaded()</code> after adding the new component</li>
   <li>If the fix is working, there should be NO hydration errors in the console</li>
@@ -28,7 +30,7 @@
 <h2>Components</h2>
 
 <div id="components-container">
-  <%= react_component("AsyncComponent", props: { name: "First Component" }, prerender: false, id: "AsyncComponent-1") %>
+  <%= react_component("ManualRenderComponent", props: { name: "First Component" }, prerender: false, id: "ManualRenderComponent-1") %>
 </div>
 
 <hr/>
@@ -94,7 +96,7 @@ Warning: Prop `style` did not match. Server: "align-items: center" Client: "alig
       var container = document.getElementById('dynamic-components');
 
       // Create the HTML structure that react_on_rails generates for client-side components
-      var componentId = 'AsyncComponent-' + componentCounter;
+      var componentId = 'ManualRenderComponent-' + componentCounter;
       var domId = componentId;
       var props = JSON.stringify({ name: 'Dynamic Component #' + componentCounter });
 
@@ -103,7 +105,7 @@ Warning: Prop `style` did not match. Server: "align-items: center" Client: "alig
       scriptTag.type = 'application/json';
       scriptTag.className = 'js-react-on-rails-component';
       scriptTag.id = 'js-react-on-rails-component-' + domId;
-      scriptTag.setAttribute('data-component-name', 'AsyncComponent');
+      scriptTag.setAttribute('data-component-name', 'ManualRenderComponent');
       scriptTag.setAttribute('data-dom-id', domId);
       scriptTag.textContent = props;
 
@@ -128,7 +130,7 @@ Warning: Prop `style` did not match. Server: "align-items: center" Client: "alig
 
     document.getElementById('replace-component-btn').addEventListener('click', function() {
       replaceCounter++;
-      var domId = 'AsyncComponent-1';
+      var domId = 'ManualRenderComponent-1';
       var container = document.getElementById('components-container');
 
       // Get the old DOM node
@@ -163,7 +165,7 @@ Warning: Prop `style` did not match. Server: "align-items: center" Client: "alig
       // Check if the new node got rendered
       setTimeout(function() {
         var renderedNode = document.getElementById(domId);
-        if (renderedNode && renderedNode.innerHTML.indexOf('async-component') !== -1) {
+        if (renderedNode && renderedNode.innerHTML.indexOf('manual-render-component') !== -1) {
           updateReplaceResults(true, 'Component re-rendered to new DOM node (replace #' + replaceCounter + ')');
         } else {
           updateReplaceResults(false, 'Component was NOT rendered to new DOM node - fix is not working!');

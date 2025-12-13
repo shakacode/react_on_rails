@@ -3,13 +3,15 @@ import React from 'react';
 
 /**
  * A simple component used to test the reactOnRailsPageLoaded() behavior
- * when called multiple times (e.g., for asynchronously loaded content).
+ * when called multiple times for manually/dynamically rendered content.
  *
  * This component is client-side only (prerender: false), meaning the DOM node
  * is initially empty. When reactOnRailsPageLoaded() is called again after the
  * component has already been rendered, it should NOT try to hydrate.
+ *
+ * Note: This tests the core package's manual rendering API, not Pro's async hydration.
  */
-const AsyncComponent = ({ name }) => {
+const ManualRenderComponent = ({ name }) => {
   // Use inline styles to verify that hydration issues would cause CSS property
   // format mismatches (camelCase in React vs kebab-case in server HTML)
   const containerStyle = {
@@ -23,16 +25,16 @@ const AsyncComponent = ({ name }) => {
   };
 
   return (
-    <div style={containerStyle} data-testid="async-component">
-      <h3>Async Component: {name}</h3>
-      <p>This component was loaded and rendered client-side.</p>
+    <div style={containerStyle} data-testid="manual-render-component">
+      <h3>Manual Render Component: {name}</h3>
+      <p>This component was loaded and rendered client-side via manual API call.</p>
       <p>If you see hydration errors, the fix for issue #2210 is not working.</p>
     </div>
   );
 };
 
-AsyncComponent.propTypes = {
+ManualRenderComponent.propTypes = {
   name: PropTypes.string.isRequired,
 };
 
-export default AsyncComponent;
+export default ManualRenderComponent;
