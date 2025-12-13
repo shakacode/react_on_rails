@@ -271,8 +271,8 @@ If the release fails partway through (e.g., during NPM publish):
 3. If some packages were published but not others:
    - You can manually publish the missing packages:
      ```bash
-     cd packages/react-on-rails && yarn publish --new-version X.Y.Z
-     cd ../react-on-rails-pro && yarn publish --new-version X.Y.Z
+     cd packages/react-on-rails && pnpm publish --new-version X.Y.Z
+     cd ../react-on-rails-pro && pnpm publish --new-version X.Y.Z
      gem release
      ```
 

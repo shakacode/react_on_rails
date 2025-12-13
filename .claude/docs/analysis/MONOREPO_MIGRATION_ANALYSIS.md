@@ -491,7 +491,7 @@ GitHub Actions
    - [ ] Update all `package-scripts.yml` paths
    - [ ] Update all CI workflow paths
    - [ ] Search codebase for hardcoded `node_package/` references
-   - [ ] Run `yarn run yalc.publish` manually (critical!)
+   - [ ] Run `pnpm run yalc:publish` manually (critical!)
 
 3. **Documentation Alignment**
    - [ ] Update CONTRIBUTING.md section on npm development

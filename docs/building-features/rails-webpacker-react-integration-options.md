@@ -115,7 +115,11 @@ Webpack's HMR allows the replacement of modules for React in-place without reloa
 You can see an example commit of adding this [here](https://github.com/shakacode/react_on_rails_demo_ssr_hmr/commit/7e53803fce7034f5ecff335db1f400a5743a87e7).
 
 1. Add react refresh packages:
-   `yarn add @pmmmwh/react-refresh-webpack-plugin react-refresh -D`
+   ```bash
+   yarn add -D @pmmmwh/react-refresh-webpack-plugin react-refresh
+   # or: npm install -D @pmmmwh/react-refresh-webpack-plugin react-refresh
+   # or: pnpm add -D @pmmmwh/react-refresh-webpack-plugin react-refresh
+   ```
 2. Update `babel.config.js` adding
    ```js
    plugins: [
@@ -143,7 +147,9 @@ You can see an example commit of adding this [here](https://github.com/shakacode
 1. Add the `react-hot-loader` and ` @hot-loader/react-dom` npm packages.
 
    ```bash
-   yarn add --dev react-hot-loader @hot-loader/react-dom
+   yarn add -D react-hot-loader @hot-loader/react-dom
+   # or: npm install -D react-hot-loader @hot-loader/react-dom
+   # or: pnpm add -D react-hot-loader @hot-loader/react-dom
    ```
 
 2. Update your babel config, `babel.config.js`. Add the plugin `react-hot-loader/babel`

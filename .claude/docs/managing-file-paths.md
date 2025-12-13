@@ -14,11 +14,11 @@
 
    ```bash
    # If it's a build artifact path in package-scripts.yml:
-   yarn run prepack
-   yarn run yalc.publish
+   pnpm run prepack
+   pnpm run yalc:publish
 
    # If it's a webpack output path:
-   yarn build && ls -la <output-path>
+   pnpm build && ls -la <output-path>
    ```
 
 3. **Search for ALL references to old paths if renaming:**
@@ -48,16 +48,16 @@ After any directory structure change, run this checklist:
 grep -r "old/path/name" . --exclude-dir=node_modules --exclude-dir=.git
 
 # 2. Verify build artifacts are in expected locations
-yarn build
+pnpm build
 find . -name "ReactOnRails.full.js" -type f
 find . -name "package.json" -type f
 
 # 3. Test package scripts
-yarn run prepack
-yarn run yalc.publish
+pnpm run prepack
+pnpm run yalc:publish
 
 # 4. Test clean install
-rm -rf node_modules && yarn install
+rm -rf node_modules && pnpm install -r
 
 # 5. Run full test suite
 rake
@@ -75,6 +75,6 @@ rake
 **How to prevent:**
 
 1. After changing directory structure, search for ALL references to old paths
-2. Always run `yarn run yalc.publish` manually to verify it works
+2. Always run `pnpm run yalc:publish` manually to verify it works
 3. Check that paths in package-scripts.yml match actual file locations
 4. Use `ls -la <path>` to verify paths exist before committing

@@ -1,15 +1,15 @@
 #!/bin/bash
 # Update the example rails node packages
 
-yarn run clean
-yarn run build
+pnpm run clean
+pnpm run build
 
 # Ensure the paths will work no matter where we run the script from
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 root_path=${DIR}/../..
 
 # Set up link
-(cd $root_path && yarn link)
+(cd $root_path && pnpm link)
 
 # Link the example apps to use react_on_rails node_package
 examplesDir=${root_path}/gen-examples/examples

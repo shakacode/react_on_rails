@@ -63,6 +63,8 @@ To enable the HMR functionality, you have to use `./bin/shakapacker-dev-server`
 
    ```bash
    yarn add -D @pmmmwh/react-refresh-webpack-plugin react-refresh
+   # or: npm install -D @pmmmwh/react-refresh-webpack-plugin react-refresh
+   # or: pnpm add -D @pmmmwh/react-refresh-webpack-plugin react-refresh
    ```
 
 3. HMR is for use with the `webpack-dev-server`, so we only add this for the `webpack-dev-server`.

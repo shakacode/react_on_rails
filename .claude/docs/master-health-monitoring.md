@@ -69,8 +69,8 @@ Some failures don't show up in standard CI:
 
 **Always manually test critical workflows:**
 
-- If you changed package structure → test `yarn run yalc.publish`
-- If you changed build configs → test `yarn build && ls -la lib/`
+- If you changed package structure → test `pnpm run yalc:publish`
+- If you changed build configs → test `pnpm build && ls -la lib/`
 - If you changed generators → test `rake run_rspec:example_basic`
 
 ## Understanding Workflow Reruns

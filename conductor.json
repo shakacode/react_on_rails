@@ -3,7 +3,7 @@
     "setup": "./conductor-setup.sh",
     "run": "cd react_on_rails/spec/dummy && bin/dev",
     "test": "rake run_rspec:dummy",
-    "lint": "bundle exec rubocop && yarn run lint",
+    "lint": "bundle exec rubocop && pnpm run lint",
     "archive": ""
   },
   "runScriptMode": "nonconcurrent"

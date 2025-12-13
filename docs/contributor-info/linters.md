@@ -37,13 +37,13 @@ Autofixing is a **HUGE** time saver!
 
 ```bash
 # Check formatting
-yarn start format.listDifferent
+pnpm start format.listDifferent
 
 # Fix formatting (includes all linters)
 rake autofix
 
 # Or format only
-yarn start format
+pnpm start format
 ```
 
 ### Merge Conflict Resolution

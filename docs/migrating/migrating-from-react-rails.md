@@ -4,7 +4,7 @@ In this guide, it is assumed that you have upgraded the `react-rails` project to
 
 1. Update Deps
    1. Replace `react-rails` in `Gemfile` with the latest version of `react_on_rails` and run `bundle install`.
-   2. Remove `react_ujs` from `package.json` and run `yarn install`.
+   2. Remove `react_ujs` from `package.json` and run your package manager's install command (e.g., `pnpm install`, `yarn install`, or `npm install`).
    3. Commit changes!
 
 2. Run `rails g react_on_rails:install` but do not commit the change. `react_on_rails` installs node dependencies and also creates sample React component, Rails view/controller, and updates `config/routes.rb`.
