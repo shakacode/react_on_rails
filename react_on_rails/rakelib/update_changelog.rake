@@ -22,6 +22,15 @@ def update_changelog_links(changelog, tag, anchor)
   changelog.sub!(match_data[0], "#{new_unreleased_link}\n#{new_tag_link}")
 end
 
+# Find the most recent version from the changelog (beta or stable)
+# Returns nil if no version is found
+def find_most_recent_version(changelog)
+  # Match version headers like "### [16.2.0.beta.19] - 2025-12-10" or "### [16.1.1] - 2025-09-24"
+  version_pattern = /^### \[([^\]]+)\] - \d{4}-\d{2}-\d{2}/
+  match = changelog.match(version_pattern)
+  match ? match[1] : nil
+end
+
 desc "Updates CHANGELOG.md inserting headers for the new version (headers only, not content).
 Argument: Git tag. Defaults to the latest tag.
 TIP: Use /update-changelog in Claude Code for full automation."
@@ -41,7 +50,17 @@ task :update_changelog, %i[tag] do |_, args|
   tag_date = `git show -s --format=%cs #{tag} 2>&1`.split("\n").last&.strip
   abort("Failed to find tag #{tag}") unless $CHILD_STATUS.success? && tag_date
 
-  changelog.sub!("Changes since the last non-beta release.", "\\0\n\n### #{anchor} - #{tag_date}")
+  most_recent_version = find_most_recent_version(changelog)
+
+  if most_recent_version
+    # Insert the new version header right after ### [Unreleased]
+    # This works for both beta→beta and stable→beta transitions
+    changelog.sub!("### [Unreleased]", "### [Unreleased]\n\n### #{anchor} - #{tag_date}")
+  else
+    # Fallback: insert after "Changes since the last non-beta release." if no version found
+    changelog.sub!("Changes since the last non-beta release.", "\\0\n\n### #{anchor} - #{tag_date}")
+  end
+
   update_changelog_links(changelog, tag, anchor)
 
   File.write("CHANGELOG.md", changelog)
