@@ -15,7 +15,7 @@ If you think ShakaCode can help your project, [click here](https://meetings.hubs
 ## Contributors
 
 Please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide.
-After a release, please make sure to run `bundle exec rake update_changelog`. This will add a heading for the latest version and update the links at the end of the file.
+After a release, run `/update-changelog` in Claude Code to analyze commits, write entries, and create a PR. Alternatively, run `bundle exec rake update_changelog` to add version headers only (you must write entries manually).
 
 ## Versions
 

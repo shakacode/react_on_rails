@@ -131,24 +131,25 @@ You'll need to enter OTP tokens when prompted:
 
 ### Post-Release Steps
 
-After a successful release, you'll see instructions to:
+After a successful release, update the changelog using one of these options:
 
-1. Update the CHANGELOG.md:
+**Option A - Use Claude Code (recommended):**
+
+Run the `/update-changelog` command in Claude Code. This will analyze commits, write changelog entries, and create a PR automatically.
+
+**Option B - Manual (headers only, you must write entries):**
+
+1. Update the CHANGELOG.md headers:
 
    ```bash
    bundle exec rake update_changelog
    ```
 
-2. Update the dummy app's Gemfile.lock:
+   Note: This only adds version headers and links. You must write the actual changelog entries manually.
 
+2. Commit and push:
    ```bash
-   cd spec/dummy && bundle update react_on_rails
-   ```
-
-3. Commit the CHANGELOG and Gemfile.lock:
-   ```bash
-   cd /path/to/react_on_rails
-   git commit -a -m 'Update CHANGELOG.md and spec/dummy Gemfile.lock'
+   git commit -a -m 'Update CHANGELOG.md'
    git push
    ```
 
