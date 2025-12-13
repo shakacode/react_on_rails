@@ -20,8 +20,6 @@ MAX_CONNECTIONS = env_or_default("MAX_CONNECTIONS", CONNECTIONS).to_i
 DURATION = env_or_default("DURATION", "30s")
 # request timeout (duration string as above)
 REQUEST_TIMEOUT = env_or_default("REQUEST_TIMEOUT", "60s")
-# Tools to run (comma-separated)
-TOOLS = env_or_default("TOOLS", "fortio,vegeta,k6").split(",")
 
 OUTDIR = "bench_results"
 SUMMARY_TXT = "#{OUTDIR}/summary.txt".freeze
@@ -109,7 +107,7 @@ validate_duration(REQUEST_TIMEOUT, "REQUEST_TIMEOUT")
 raise "MAX_CONNECTIONS (#{MAX_CONNECTIONS}) must be >= CONNECTIONS (#{CONNECTIONS})" if MAX_CONNECTIONS < CONNECTIONS
 
 # Check required tools are installed
-check_required_tools(TOOLS + %w[column tee])
+check_required_tools(%w[k6 column tee])
 
 puts <<~PARAMS
   Benchmark parameters:
@@ -124,7 +122,6 @@ puts <<~PARAMS
     - WEB_CONCURRENCY: #{ENV['WEB_CONCURRENCY'] || 'unset'}
     - RAILS_MAX_THREADS: #{ENV['RAILS_MAX_THREADS'] || 'unset'}
     - RAILS_MIN_THREADS: #{ENV['RAILS_MIN_THREADS'] || 'unset'}
-    - TOOLS: #{TOOLS.join(', ')}
 PARAMS
 
 # Wait for the server to be ready
@@ -142,176 +139,62 @@ end
 
 # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
-# Benchmark a single route with Fortio
-def run_fortio_benchmark(target, route_name)
-  return nil unless TOOLS.include?("fortio")
-
-  begin
-    puts "===> Fortio: #{route_name}"
-
-    fortio_json = "#{OUTDIR}/#{route_name}_fortio.json"
-    fortio_txt = "#{OUTDIR}/#{route_name}_fortio.txt"
-
-    # Configure Fortio arguments
-    # See https://github.com/fortio/fortio/wiki/FAQ#i-want-to-get-the-best-results-what-flags-should-i-pass
-    fortio_args =
-      if IS_MAX_RATE
-        ["-qps", 0, "-c", CONNECTIONS]
-      else
-        ["-qps", RATE, "-uniform", "-nocatchup", "-c", CONNECTIONS]
-      end
-
-    fortio_cmd = [
-      "fortio", "load",
-      *fortio_args,
-      "-t", DURATION,
-      "-timeout", REQUEST_TIMEOUT,
-      # Allow redirects. Could use -L instead, but it uses the slower HTTP client.
-      "-allow-initial-errors",
-      "-json", fortio_json,
-      target
-    ].join(" ")
-    raise "Fortio benchmark failed" unless system("#{fortio_cmd} | tee #{fortio_txt}")
-
-    fortio_data = parse_json_file(fortio_json, "Fortio")
-    fortio_rps = fortio_data["ActualQPS"]&.round(2) || "missing"
-
-    percentiles = fortio_data.dig("DurationHistogram", "Percentiles") || []
-    p50_data = percentiles.find { |p| p["Percentile"] == 50 }
-    p90_data = percentiles.find { |p| p["Percentile"] == 90 }
-    p99_data = percentiles.find { |p| p["Percentile"] == 99 }
-
-    raise "Fortio results missing percentile data" unless p50_data && p90_data && p99_data
-
-    fortio_p50 = (p50_data["Value"] * 1000).round(2)
-    fortio_p90 = (p90_data["Value"] * 1000).round(2)
-    fortio_p99 = (p99_data["Value"] * 1000).round(2)
-    fortio_status = fortio_data["RetCodes"]&.map { |k, v| "#{k}=#{v}" }&.join(",") || "missing"
-
-    [fortio_rps, fortio_p50, fortio_p90, fortio_p99, fortio_status]
-  rescue StandardError => e
-    puts "Error: #{e.message}"
-    failure_metrics(e)
-  end
-end
-
-# Benchmark a single route with Vegeta
-def run_vegeta_benchmark(target, route_name)
-  return nil unless TOOLS.include?("vegeta")
-
-  begin
-    puts "\n===> Vegeta: #{route_name}"
-
-    vegeta_json = "#{OUTDIR}/#{route_name}_vegeta.json"
-    vegeta_txt = "#{OUTDIR}/#{route_name}_vegeta.txt"
-
-    # Configure Vegeta arguments
-    vegeta_args =
-      if IS_MAX_RATE
-        ["-rate=0", "--workers=#{CONNECTIONS}", "--max-workers=#{CONNECTIONS}"]
-      else
-        ["-rate=#{RATE}", "--workers=#{CONNECTIONS}", "--max-workers=#{MAX_CONNECTIONS}"]
-      end
-
-    # Run vegeta attack and pipe to text report (displayed and saved)
-    # Then generate JSON report by re-encoding from the text output isn't possible,
-    # so we save to a temp .bin file, generate both reports, then delete it
-    vegeta_bin = "#{OUTDIR}/#{route_name}_vegeta.bin"
-    vegeta_cmd = [
-      "echo 'GET #{target}' |",
-      "vegeta", "attack",
-      *vegeta_args,
-      "-duration=#{DURATION}",
-      "-timeout=#{REQUEST_TIMEOUT}",
-      "-redirects=0",
-      "-max-body=0",
-      "> #{vegeta_bin}"
-    ].join(" ")
-    raise "Vegeta attack failed" unless system(vegeta_cmd)
-
-    # Generate text report (display and save)
-    raise "Vegeta text report failed" unless system("vegeta report #{vegeta_bin} | tee #{vegeta_txt}")
-
-    # Generate JSON report
-    raise "Vegeta JSON report failed" unless system("vegeta report -type=json #{vegeta_bin} > #{vegeta_json}")
-
-    # Delete the large binary file to save disk space
-    FileUtils.rm_f(vegeta_bin)
-
-    vegeta_data = parse_json_file(vegeta_json, "Vegeta")
-    vegeta_rps = vegeta_data["throughput"]&.round(2) || "missing"
-    vegeta_p50 = vegeta_data.dig("latencies", "50th")&./(1_000_000.0)&.round(2) || "missing"
-    vegeta_p90 = vegeta_data.dig("latencies", "90th")&./(1_000_000.0)&.round(2) || "missing"
-    vegeta_p99 = vegeta_data.dig("latencies", "99th")&./(1_000_000.0)&.round(2) || "missing"
-    vegeta_status = vegeta_data["status_codes"]&.map { |k, v| "#{k}=#{v}" }&.join(",") || "missing"
-
-    [vegeta_rps, vegeta_p50, vegeta_p90, vegeta_p99, vegeta_status]
-  rescue StandardError => e
-    puts "Error: #{e.message}"
-    failure_metrics(e)
-  end
-end
-
 # Benchmark a single route with k6
 def run_k6_benchmark(target, route_name)
-  return nil unless TOOLS.include?("k6")
+  puts "\n===> k6: #{route_name}"
 
-  begin
-    puts "\n===> k6: #{route_name}"
+  k6_script = File.expand_path("k6.ts", __dir__)
+  k6_summary_json = "#{OUTDIR}/#{route_name}_k6_summary.json"
+  k6_txt = "#{OUTDIR}/#{route_name}_k6.txt"
 
-    k6_script = File.expand_path("k6.ts", __dir__)
-    k6_summary_json = "#{OUTDIR}/#{route_name}_k6_summary.json"
-    k6_txt = "#{OUTDIR}/#{route_name}_k6.txt"
+  # Build k6 command with environment variables
+  k6_env_vars = [
+    "-e TARGET_URL=#{Shellwords.escape(target)}",
+    "-e RATE=#{RATE}",
+    "-e DURATION=#{DURATION}",
+    "-e CONNECTIONS=#{CONNECTIONS}",
+    "-e MAX_CONNECTIONS=#{MAX_CONNECTIONS}",
+    "-e REQUEST_TIMEOUT=#{REQUEST_TIMEOUT}"
+  ].join(" ")
 
-    # Build k6 command with environment variables
-    k6_env_vars = [
-      "-e TARGET_URL=#{target}",
-      "-e RATE=#{RATE}",
-      "-e DURATION=#{DURATION}",
-      "-e CONNECTIONS=#{CONNECTIONS}",
-      "-e MAX_CONNECTIONS=#{MAX_CONNECTIONS}",
-      "-e REQUEST_TIMEOUT=#{REQUEST_TIMEOUT}"
-    ].join(" ")
+  k6_command = "k6 run #{k6_env_vars} --summary-export=#{k6_summary_json} " \
+               "--summary-trend-stats 'min,avg,med,max,p(90),p(99)' #{k6_script}"
+  raise "k6 benchmark failed" unless system("#{k6_command} | tee #{k6_txt}")
 
-    k6_command = "k6 run #{k6_env_vars} --summary-export=#{k6_summary_json} " \
-                 "--summary-trend-stats 'min,avg,med,max,p(90),p(99)' #{k6_script}"
-    raise "k6 benchmark failed" unless system("#{k6_command} | tee #{k6_txt}")
+  k6_data = parse_json_file(k6_summary_json, "k6")
+  k6_rps = k6_data.dig("metrics", "iterations", "rate")&.round(2) || "missing"
+  k6_p50 = k6_data.dig("metrics", "http_req_duration", "med")&.round(2) || "missing"
+  k6_p90 = k6_data.dig("metrics", "http_req_duration", "p(90)")&.round(2) || "missing"
+  k6_p99 = k6_data.dig("metrics", "http_req_duration", "p(99)")&.round(2) || "missing"
 
-    k6_data = parse_json_file(k6_summary_json, "k6")
-    k6_rps = k6_data.dig("metrics", "iterations", "rate")&.round(2) || "missing"
-    k6_p50 = k6_data.dig("metrics", "http_req_duration", "med")&.round(2) || "missing"
-    k6_p90 = k6_data.dig("metrics", "http_req_duration", "p(90)")&.round(2) || "missing"
-    k6_p99 = k6_data.dig("metrics", "http_req_duration", "p(99)")&.round(2) || "missing"
+  # Status: extract counts from checks (status_200, status_3xx, status_4xx, status_5xx)
+  k6_reqs_total = k6_data.dig("metrics", "http_reqs", "count") || 0
+  k6_checks = k6_data.dig("root_group", "checks") || {}
+  k6_known_count = 0
+  k6_status_parts = k6_checks.filter_map do |name, check|
+    passes = check["passes"] || 0
+    k6_known_count += passes
+    next if passes.zero?
 
-    # Status: extract counts from checks (status_200, status_302, status_4xx, status_5xx)
-    k6_reqs_total = k6_data.dig("metrics", "http_reqs", "count") || 0
-    k6_checks = k6_data.dig("root_group", "checks") || {}
-    k6_known_count = 0
-    k6_status_parts = k6_checks.filter_map do |name, check|
-      passes = check["passes"] || 0
-      k6_known_count += passes
-      next if passes.zero?
-
-      # Convert check names like "status_200" to "200", "status_4xx" to "4xx"
-      status_label = name.sub(/^status_/, "")
-      "#{status_label}=#{passes}"
-    end
-    k6_other = k6_reqs_total - k6_known_count
-    k6_status_parts << "other=#{k6_other}" if k6_other.positive?
-    k6_status = k6_status_parts.empty? ? "missing" : k6_status_parts.join(",")
-
-    [k6_rps, k6_p50, k6_p90, k6_p99, k6_status]
-  rescue StandardError => e
-    puts "Error: #{e.message}"
-    failure_metrics(e)
+    # Convert check names like "status_200" to "200", "status_4xx" to "4xx"
+    status_label = name.sub(/^status_/, "")
+    "#{status_label}=#{passes}"
   end
+  k6_other = k6_reqs_total - k6_known_count
+  k6_status_parts << "other=#{k6_other}" if k6_other.positive?
+  k6_status = k6_status_parts.empty? ? "missing" : k6_status_parts.join(",")
+
+  [k6_rps, k6_p50, k6_p90, k6_p99, k6_status]
+rescue StandardError => e
+  puts "Error: #{e.message}"
+  failure_metrics(e)
 end
 
 # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
 # Initialize summary file
 File.write(SUMMARY_TXT, "")
-add_to_summary("Route", "Tool", "RPS", "p50(ms)", "p90(ms)", "p99(ms)", "Status")
+add_to_summary("Route", "RPS", "p50(ms)", "p90(ms)", "p99(ms)", "Status")
 
 # Run benchmarks for each route
 routes.each do |route|
@@ -332,16 +215,8 @@ routes.each do |route|
   puts "Warm-up complete for #{route}"
 
   route_name = sanitize_route_name(route)
-
-  # Run each benchmark tool
-  fortio_metrics = run_fortio_benchmark(target, route_name)
-  add_to_summary(route, "Fortio", *fortio_metrics) if fortio_metrics
-
-  vegeta_metrics = run_vegeta_benchmark(target, route_name)
-  add_to_summary(route, "Vegeta", *vegeta_metrics) if vegeta_metrics
-
-  k6_metrics = run_k6_benchmark(target, route_name)
-  add_to_summary(route, "k6", *k6_metrics) if k6_metrics
+  metrics = run_k6_benchmark(target, route_name)
+  add_to_summary(route, *metrics)
 end
 
 puts "\nSummary saved to #{SUMMARY_TXT}"

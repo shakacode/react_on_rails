@@ -229,7 +229,7 @@ FileUtils.mkdir_p(OUTDIR)
 
 # Initialize summary file
 File.write(SUMMARY_TXT, "")
-add_to_summary("Test", "Tool", "RPS", "p50(ms)", "p90(ms)", "p99(ms)", "Status")
+add_to_summary("Test", "RPS", "p50(ms)", "p90(ms)", "p99(ms)", "Status")
 
 # Run benchmarks for each test case
 TEST_CASES.each do |test_case|
@@ -239,7 +239,7 @@ TEST_CASES.each do |test_case|
   print_separator
 
   metrics = run_vegeta_benchmark(test_case, bundle_timestamp)
-  add_to_summary(test_case[:name], "Vegeta-h2c", *metrics)
+  add_to_summary(test_case[:name], *metrics)
 end
 
 # Display summary

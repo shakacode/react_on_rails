@@ -37,11 +37,6 @@ on:
         required: false
         default: 3
         type: number
-      tools:
-        description: 'Comma-separated list of tools to run'
-        required: false
-        default: 'fortio,vegeta,k6'
-        type: string
       app_version:
         description: 'Which app version to benchmark'
         required: false
@@ -65,7 +60,6 @@ on:
 env:
   RUBY_VERSION: "3.3.7"
   BUNDLER_VERSION: "2.5.4"
-  FORTIO_VERSION: "1.73.0"
   K6_VERSION: "1.4.2"
   VEGETA_VERSION: "12.13.0"
   # Determine which apps to run (default is 'pro_only' for all triggers)
@@ -81,7 +75,6 @@ env:
   WEB_CONCURRENCY: ${{ github.event.inputs.web_concurrency || 4 }}
   RAILS_MAX_THREADS: ${{ github.event.inputs.rails_threads || 3 }}
   RAILS_MIN_THREADS: ${{ github.event.inputs.rails_threads || 3 }}
-  TOOLS: ${{ github.event.inputs.tools || 'fortio,vegeta,k6' }}
 
 jobs:
   benchmark:
@@ -112,36 +105,16 @@ jobs:
           mkdir -p ~/bin
           echo "$HOME/bin" >> $GITHUB_PATH
 
-      - name: Cache Fortio binary
-        id: cache-fortio
-        if: contains(env.TOOLS, 'fortio')
-        uses: actions/cache@v4
-        with:
-          path: ~/bin/fortio
-          key: fortio-${{ runner.os }}-${{ runner.arch }}-${{ env.FORTIO_VERSION }}
-
-      - name: Install Fortio
-        if: contains(env.TOOLS, 'fortio') && steps.cache-fortio.outputs.cache-hit != 'true'
-        run: |
-          echo "📦 Installing Fortio v${FORTIO_VERSION}"
-          
-          # Download and extract fortio binary
-          wget -q https://github.com/fortio/fortio/releases/download/v${FORTIO_VERSION}/fortio-linux_amd64-${FORTIO_VERSION}.tgz
-          tar -xzf fortio-linux_amd64-${FORTIO_VERSION}.tgz
-
-          # Store in cache directory
-          mv usr/bin/fortio ~/bin/
-
       - name: Cache Vegeta binary
         id: cache-vegeta
-        if: env.RUN_PRO || contains(env.TOOLS, 'vegeta')
+        if: env.RUN_PRO
         uses: actions/cache@v4
         with:
           path: ~/bin/vegeta
           key: vegeta-${{ runner.os }}-${{ runner.arch }}-${{ env.VEGETA_VERSION }}
 
       - name: Install Vegeta
-        if: (env.RUN_PRO || contains(env.TOOLS, 'vegeta')) && steps.cache-vegeta.outputs.cache-hit != 'true'
+        if: env.RUN_PRO && steps.cache-vegeta.outputs.cache-hit != 'true'
         run: |
           echo "📦 Installing Vegeta v${VEGETA_VERSION}"
 
@@ -153,7 +126,6 @@ jobs:
           mv vegeta ~/bin/
 
       - name: Setup k6
-        if: contains(env.TOOLS, 'k6')
         uses: grafana/setup-k6-action@v1
         with:
           k6-version: ${{ env.K6_VERSION }}
