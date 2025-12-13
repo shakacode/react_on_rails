@@ -218,11 +218,11 @@ When a new version is released:
 
 ### For Beta to Non-Beta Version Release
 
-When releasing from beta to a stable version (e.g., v16.1.0-beta.3 → v16.1.0):
+When releasing from beta to a stable version (e.g., git tag `v16.1.0.beta.3` → `v16.1.0`):
 
 1. **Remove all beta version labels** from the changelog:
 
-   - Change `### [v16.1.0-beta.1]`, `### [v16.1.0-beta.2]`, etc. to a single `### [v16.1.0]` section
+   - Change `### [16.1.0.beta.1]`, `### [16.1.0.beta.2]`, etc. to a single `### [16.1.0]` section
    - Combine all beta entries into the stable release section
 
 2. **Consolidate duplicate entries**:
