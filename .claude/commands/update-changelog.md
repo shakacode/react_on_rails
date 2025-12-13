@@ -95,6 +95,11 @@ This will:
 - Add headers for the new version right after `### [Unreleased]`
 - Update version diff links at the bottom of the file
 
+**When to use which tool:**
+
+- **`/update-changelog` (Claude Code)**: Full automation - analyzes commits, writes changelog entries, and creates a PR. Use this for comprehensive changelog updates.
+- **`bundle exec rake update_changelog`**: Quick version header addition only. Use this if you just want the version header added and plan to write entries manually.
+
 ### Finding the Most Recent Version
 
 To determine the most recent version:

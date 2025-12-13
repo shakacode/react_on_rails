@@ -51,14 +51,26 @@ task :update_changelog, %i[tag] do |_, args|
   abort("Failed to find tag #{tag}") unless $CHILD_STATUS.success? && tag_date
 
   most_recent_version = find_most_recent_version(changelog)
+  header_inserted = false
 
   if most_recent_version
     # Insert the new version header right after ### [Unreleased]
     # This works for both beta→beta and stable→beta transitions
-    changelog.sub!("### [Unreleased]", "### [Unreleased]\n\n### #{anchor} - #{tag_date}")
-  else
+    if changelog.sub!("### [Unreleased]", "### [Unreleased]\n\n### #{anchor} - #{tag_date}")
+      header_inserted = true
+    end
+  end
+
+  unless header_inserted
     # Fallback: insert after "Changes since the last non-beta release." if no version found
-    changelog.sub!("Changes since the last non-beta release.", "\\0\n\n### #{anchor} - #{tag_date}")
+    # or if ### [Unreleased] was not found
+    if changelog.sub!("Changes since the last non-beta release.", "\\0\n\n### #{anchor} - #{tag_date}")
+      header_inserted = true
+    end
+  end
+
+  unless header_inserted
+    abort("Failed to insert version header: could not find '### [Unreleased]' or 'Changes since the last non-beta release.' in CHANGELOG.md")
   end
 
   update_changelog_links(changelog, tag, anchor)
