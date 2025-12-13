@@ -4,6 +4,17 @@ require "English"
 require "bundler"
 require_relative "task_helpers"
 
+CLAUDE_CODE_TIP = <<~TIP
+
+  ┌─────────────────────────────────────────────────────────────────────────────┐
+  │ TIP: This task only adds version headers and links, not changelog entries. │
+  │                                                                             │
+  │ For full changelog automation, use Claude Code:                             │
+  │   Run /update-changelog to analyze commits, write entries, and create a PR │
+  └─────────────────────────────────────────────────────────────────────────────┘
+
+TIP
+
 desc "Updates CHANGELOG.md inserting headers for the new version (headers only, not content).
 
 Argument: Git tag. Defaults to the latest tag.
@@ -12,16 +23,7 @@ TIP: For a better experience, use the /update-changelog command in Claude Code.
      It will analyze commits, write changelog entries, and create a PR automatically."
 
 task :update_changelog, %i[tag] do |_, args|
-  puts <<~TIP
-
-    ┌─────────────────────────────────────────────────────────────────────────────┐
-    │ TIP: This task only adds version headers and links, not changelog entries. │
-    │                                                                             │
-    │ For full changelog automation, use Claude Code:                             │
-    │   Run /update-changelog to analyze commits, write entries, and create a PR │
-    └─────────────────────────────────────────────────────────────────────────────┘
-
-  TIP
+  puts CLAUDE_CODE_TIP
 
   tag = args[:tag] || `git describe --tags --abbrev=0`.strip
   anchor = "[#{tag}]"
