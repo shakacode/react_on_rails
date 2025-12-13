@@ -142,7 +142,7 @@ After a successful release, you'll see instructions to:
 2. Update the dummy app's Gemfile.lock:
 
    ```bash
-   cd spec/dummy && bundle update react_on_rails
+   cd react_on_rails/spec/dummy && bundle update react_on_rails
    ```
 
 3. Commit the CHANGELOG and Gemfile.lock:

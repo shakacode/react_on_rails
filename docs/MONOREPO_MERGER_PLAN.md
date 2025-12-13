@@ -272,7 +272,7 @@ After the initial merge, the following CI adjustments may be needed:
    - Use `link-source` scripts to build and publish packages with yalc
    - Avoid `file:` paths in package.json - use `link:.yalc/package-name` instead
 5. **Multiple Dummy Apps**: Don't forget to update ALL dummy apps:
-   - `spec/dummy/` (main dummy app)
+   - `react_on_rails/spec/dummy/` (main dummy app)
    - `react_on_rails_pro/spec/dummy/` (pro dummy app)
    - `react_on_rails_pro/spec/execjs-compatible-dummy/` (ExecJS dummy app)
 6. **CircleCI Optimization**: When using yalc with preinstall hooks:

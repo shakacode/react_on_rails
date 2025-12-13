@@ -72,7 +72,7 @@ yarn run type-check
 ### Development Server (Dummy App)
 
 ```bash
-cd spec/dummy
+cd react_on_rails/spec/dummy
 
 # Start development with HMR
 foreman start                        # Uses Procfile.dev (default)
@@ -175,7 +175,7 @@ This project maintains two distinct but integrated packages:
 
 ## Testing & Examples
 
-### Dummy App (`spec/dummy/`)
+### Dummy App (`react_on_rails/spec/dummy/`)
 
 - Full Rails app for integration testing
 - Examples of various React on Rails features
@@ -297,8 +297,8 @@ subject(:method_result) { instance.method_name(arg) }
 
 - `/coverage`, `/tmp`, `/gen-examples`
 - `/node_package/lib`, `/node_modules`
-- `/spec/dummy/app/assets/webpack`
-- `/spec/dummy/log`, `/spec/dummy/node_modules`, `/spec/dummy/tmp`
+- `/react_on_rails/spec/dummy/app/assets/webpack`
+- `/react_on_rails/spec/dummy/log`, `/react_on_rails/spec/dummy/node_modules`, `/react_on_rails/spec/dummy/tmp`
 - `/spec/react_on_rails/dummy-for-generators`
 
 ## Important Constraints
@@ -341,7 +341,7 @@ subject(:method_result) { instance.method_name(arg) }
 
 ### Test Failures
 
-- Run tests from correct directory (project root vs spec/dummy)
+- Run tests from correct directory (project root vs react_on_rails/spec/dummy)
 - Check that `bundle install` and `yarn install` are current
 - Verify git hooks are installed: `bundle exec lefthook install`
 

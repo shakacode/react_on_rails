@@ -275,8 +275,8 @@ pnpm install
 pnpm run build
 ```
 
-Or run this, which builds the package, then the Webpack files for `spec/dummy`, and runs tests in
-`spec/dummy`.
+Or run this, which builds the package, then the Webpack files for `react_on_rails/spec/dummy`, and runs tests in
+`react_on_rails/spec/dummy`.
 
 ```sh
 # Optionally change default capybara driver

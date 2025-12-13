@@ -11,7 +11,7 @@
 - **[PR Testing Guide](pr-testing-guide.md)** - How to use this agent with Claude Code
 - [Testing Build Scripts](../docs/testing-build-scripts.md) - Build/package testing requirements
 - [CI Config Switching](../../SWITCHING_CI_CONFIGS.md) - Testing minimum vs latest dependencies
-- [Local Testing Issues](../../spec/dummy/TESTING_LOCALLY.md) - Environment-specific testing issues
+- [Local Testing Issues](../../react_on_rails/spec/dummy/TESTING_LOCALLY.md) - Environment-specific testing issues
 - [Master Health Monitoring](../docs/master-health-monitoring.md) - Post-merge CI monitoring
 - [CLAUDE.md](../../CLAUDE.md) - Full development guide with CI debugging
 
@@ -97,7 +97,7 @@ yarn run build                         # Build succeeds
 bundle exec rake autofix               # Formatting applied
 
 # MUST test in browser:
-cd spec/dummy
+cd react_on_rails/spec/dummy
 bin/dev                                # Start servers
 # Visit http://localhost:3000/hello_world
 # Open browser console - check for errors
@@ -166,7 +166,7 @@ bundle exec rake
 
 ```bash
 # Create debug script to inspect config:
-cd spec/dummy
+cd react_on_rails/spec/dummy
 cat > debug-webpack.js << 'EOF'
 const { generateWebpackConfig } = require('shakapacker');
 const config = generateWebpackConfig();
@@ -274,7 +274,7 @@ Changes affecting user-facing behavior require Playwright E2E verification:
 **Running Playwright tests:**
 
 ```bash
-cd spec/dummy
+cd react_on_rails/spec/dummy
 
 # Install browsers (one-time setup):
 yarn playwright install --with-deps
@@ -311,7 +311,7 @@ Changes to `lib/react_on_rails/engine.rb` or rake tasks require:
 
 ```bash
 # Test rake task loading (not duplicate execution):
-cd spec/dummy
+cd react_on_rails/spec/dummy
 bundle exec rake -T | grep react_on_rails
 # Should see each task ONCE, not duplicated
 
@@ -377,11 +377,11 @@ Cannot proceed without manual verification.
 # Switch to Ruby 3.2 for system tests:
 mise use ruby@3.2
 bundle install
-cd spec/dummy
+cd react_on_rails/spec/dummy
 bundle exec rspec spec/system/integration_spec.rb
 ```
 
-**See [../../spec/dummy/TESTING_LOCALLY.md](../../spec/dummy/TESTING_LOCALLY.md) for details**
+**See [../../react_on_rails/spec/dummy/TESTING_LOCALLY.md](../../react_on_rails/spec/dummy/TESTING_LOCALLY.md) for details**
 
 ## Success Criteria: Well-Tested PR
 

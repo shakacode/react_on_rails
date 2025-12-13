@@ -1687,7 +1687,7 @@ All 5.1.0 changes can be found in [#362](https://github.com/shakacode/react_on_r
 
 ##### Migration Steps v2 to v3
 
-- See [these changes of spec/dummy/spec/rails_helper.rb](https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/spec/rails_helper.rb#L36..38) for an example. Add this line to your `rails_helper.rb`:
+- See [these changes of spec/dummy/spec/rails_helper.rb](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails/spec/dummy/spec/rails_helper.rb#L36..38) for an example. Add this line to your `rails_helper.rb`:
 
 ```ruby
 RSpec.configure do |config|

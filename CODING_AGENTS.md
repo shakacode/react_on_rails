@@ -12,7 +12,7 @@ bundle && yarn
 
 # Run tests
 bundle exec rspec                    # All tests (from project root)
-cd spec/dummy && bundle exec rspec   # Dummy app tests only
+cd react_on_rails/spec/dummy && bundle exec rspec   # Dummy app tests only
 
 # Linting & Formatting
 bundle exec rubocop                  # Ruby linting
@@ -20,7 +20,7 @@ bundle exec rubocop [file_path]     # Lint specific file
 # Note: yarn format requires local setup, format manually
 
 # Development
-cd spec/dummy && foreman start       # Start dummy app with webpack
+cd react_on_rails/spec/dummy && foreman start       # Start dummy app with webpack
 ```
 
 ### CI Compliance Checklist
@@ -285,8 +285,8 @@ When analyzing codebases, ignore these directories to avoid confusion:
 
 - `/coverage`, `/tmp`, `/gen-examples`
 - `/packages/react-on-rails/lib`, `/node_modules`
-- `/spec/dummy/app/assets/webpack`
-- `/spec/dummy/log`, `/spec/dummy/node_modules`, `/spec/dummy/tmp`
+- `/react_on_rails/spec/dummy/app/assets/webpack`
+- `/react_on_rails/spec/dummy/log`, `/react_on_rails/spec/dummy/node_modules`, `/react_on_rails/spec/dummy/tmp`
 - `/spec/react_on_rails/dummy-for-generators`
 
 ## Communication with Human Maintainers

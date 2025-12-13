@@ -276,7 +276,7 @@ packages/react-on-rails/package.json
 
 - ✅ Webpack bundles cached and restored
 - ✅ Node modules installed successfully
-- ✅ Bundles present in `spec/dummy/public/webpack`
+- ✅ Bundles present in `react_on_rails/spec/dummy/public/webpack`
 
 ---
 
@@ -303,7 +303,7 @@ yarn nps build.prepack
 yarn run yalc:publish
 
 # Run failing integration tests
-cd spec/dummy
+cd react_on_rails/spec/dummy
 bundle exec rspec spec/system/integration_spec.rb
 
 # Run failing Pro tests
@@ -322,7 +322,7 @@ timeout 5m yarn run ci
 git checkout 5e033c716
 
 # Run same tests
-cd spec/dummy
+cd react_on_rails/spec/dummy
 bundle exec rspec spec/system/integration_spec.rb
 
 # Note differences in:
@@ -342,7 +342,7 @@ git bisect good 5e033c716
 
 # For each bisect step:
 yarn install --frozen-lockfile
-cd spec/dummy
+cd react_on_rails/spec/dummy
 bundle exec rspec spec/system/integration_spec.rb:23
 git bisect good/bad
 ```
@@ -388,7 +388,7 @@ git bisect good/bad
 ```bash
 rm -rf node_modules packages/*/lib
 yarn install --frozen-lockfile
-cd spec/dummy
+cd react_on_rails/spec/dummy
 bundle exec rspec spec/system/integration_spec.rb:23
 ```
 

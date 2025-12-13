@@ -27,7 +27,7 @@ Because you will probably want to run RSpec tests that rely on compiled Webpack 
 As mentioned above, you can configure `compile: true` in `config/shakapacker.yml` _if_ you've got configuration for
 your Webpack in the standard `Shakapacker` spot of `config/webpack/<NODE_ENV>.js`
 
-React on Rails also provides a helper method called `ReactOnRails::TestHelper.configure_rspec_to_compile_assets`. Call this method from inside of the `RSpec.configure` block in your `spec/rails_helper.rb` file, passing the config as an argument. See file [lib/react_on_rails/test_helper.rb](https://github.com/shakacode/react_on_rails/tree/master/lib/react_on_rails/test_helper.rb) for more details. You can customize this to your particular needs by replacing any of the default components used by `ReactOnRails::TestHelper.configure_rspec_to_compile_assets`.
+React on Rails also provides a helper method called `ReactOnRails::TestHelper.configure_rspec_to_compile_assets`. Call this method from inside of the `RSpec.configure` block in your `spec/rails_helper.rb` file, passing the config as an argument. See file [lib/react_on_rails/test_helper.rb](https://github.com/shakacode/react_on_rails/tree/master/react_on_rails/lib/react_on_rails/test_helper.rb) for more details. You can customize this to your particular needs by replacing any of the default components used by `ReactOnRails::TestHelper.configure_rspec_to_compile_assets`.
 
 ```ruby
 RSpec.configure do |config|

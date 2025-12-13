@@ -148,7 +148,7 @@ react_on_rails/
   run: yalc publish
 
 - name: yalc add react-on-rails
-  run: cd spec/dummy && yalc add react-on-rails
+  run: cd react_on_rails/spec/dummy && yalc add react-on-rails
 ```
 
 **Status**: Working in both configurations
@@ -333,7 +333,7 @@ task node_package: "node_package:build"
   run: yalc publish
 
 - name: yalc add react-on-rails
-  run: cd spec/dummy && yalc add react-on-rails
+  run: cd react_on_rails/spec/dummy && yalc add react-on-rails
 ```
 
 **Current Limitation**:
