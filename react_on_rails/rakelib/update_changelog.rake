@@ -25,15 +25,6 @@ def update_changelog_links(changelog, version, anchor)
   changelog.sub!(match_data[0], "#{new_unreleased_link}\n#{new_version_link}")
 end
 
-# Find the most recent version from the changelog (beta or stable)
-# Returns nil if no version is found
-def find_most_recent_version(changelog)
-  # Match version headers like "### [16.2.0.beta.19] - 2025-12-10" or "### [16.1.1] - 2025-09-24"
-  version_pattern = /^### \[([^\]]+)\] - \d{4}-\d{2}-\d{2}/
-  match = changelog.match(version_pattern)
-  match ? match[1] : nil
-end
-
 # Insert version header into changelog, returns true if successful
 def insert_version_header(changelog, anchor, tag_date)
   # Try inserting right after ### [Unreleased] first
