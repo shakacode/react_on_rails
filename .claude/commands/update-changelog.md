@@ -96,18 +96,26 @@ This will:
 
 ### Finding the Most Recent Version
 
-To determine the most recent version in the changelog (whether beta or stable):
+To determine the most recent version:
 
-1. **Search for the most recent version header** by looking for patterns like:
+1. **Check git tags** to find the latest released version:
+   ```bash
+   git tag --sort=-v:refname | head -10
+   ```
+   This shows tags like `v16.2.0.beta.20`, `v16.2.0.beta.19`, etc.
+
+2. **Check the CHANGELOG.md** for version headers (note: changelog uses versions WITHOUT the `v` prefix):
    - `### [16.2.0.beta.19] - 2025-12-10` (beta version)
    - `### [16.1.1] - 2025-09-24` (stable version)
 
-2. **Use this regex pattern** to find version headers:
+3. **Use this regex pattern** to find version headers in the changelog:
    ```regex
    ^### \[([^\]]+)\] - \d{4}-\d{2}-\d{2}
    ```
 
-3. **The first match after `### [Unreleased]`** is the most recent version.
+4. **The first match after `### [Unreleased]`** is the most recent version in the changelog.
+
+**IMPORTANT**: Git tags use `v` prefix (e.g., `v16.2.0.beta.20`) but the changelog and compare links use versions WITHOUT the `v` prefix (e.g., `16.2.0.beta.20`). Strip the `v` when adding to the changelog.
 
 ### Version Links
 
@@ -209,9 +217,15 @@ When releasing from beta to a stable version (e.g., v16.1.0-beta.3 → v16.1.0):
 
 When a new beta version is released (e.g., `16.2.0.beta.20`):
 
-1. **Find the most recent version** in the changelog by looking for the first `### [VERSION] - DATE` after `### [Unreleased]`
+1. **Check the latest git tag** to confirm the new version:
+   ```bash
+   git tag --sort=-v:refname | head -5
+   ```
+   This shows the latest tags (e.g., `v16.2.0.beta.20`). Strip the `v` prefix for changelog use.
 
-2. **Insert the new version header immediately after `### [Unreleased]`**:
+2. **Find the most recent version** in the changelog by looking for the first `### [VERSION] - DATE` after `### [Unreleased]`
+
+3. **Insert the new version header immediately after `### [Unreleased]`**:
    ```markdown
    ### [Unreleased]
 
@@ -220,7 +234,7 @@ When a new beta version is released (e.g., `16.2.0.beta.20`):
    ### [16.2.0.beta.19] - 2025-12-10
    ```
 
-3. **Update the version diff links at the bottom of the file**:
+4. **Update the version diff links at the bottom of the file**:
    - Change the `[unreleased]:` link to compare from the new version to master
    - Add a new link for the new version comparing to the previous version:
    ```markdown
@@ -229,7 +243,7 @@ When a new beta version is released (e.g., `16.2.0.beta.20`):
    [16.2.0.beta.19]: https://github.com/shakacode/react_on_rails/compare/16.1.1...16.2.0.beta.19
    ```
 
-4. **For changelog entries**, ask the user which approach to take:
+5. **For changelog entries**, ask the user which approach to take:
 
    **Option 1: Process changes since last beta**
    - Only add entries for commits since the previous beta version
