@@ -2,8 +2,8 @@
 # https://lychee.cli.rs
 
 # Accept successful responses and permanent redirects
-# 200 = OK, 206 = Partial Content, 308 = Permanent Redirect
-accept = ["200", "206", "308"]
+# 200 = OK, 308 = Permanent Redirect
+accept = ["200", "308"]
 
 # Retry failed requests (handles transient 502/503/504 errors)
 max_retries = 3
