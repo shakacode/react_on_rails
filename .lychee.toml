@@ -25,6 +25,7 @@ exclude = [
   '^https://www\.linkedin\.com',
   '^https://reactrails\.slack\.com',
   '^https://docs\.google\.com',  # Private docs require auth
+  '^https://claude\.ai',  # Returns 403 for automated requests
 
   # Known dead/problematic URLs (verified)
   '^https://your-shared-addr\.c9users\.io',
