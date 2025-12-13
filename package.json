@@ -115,7 +115,8 @@
   "pnpm": {
     "overrides": {
       "sentry-testkit>body-parser": "npm:empty-npm-package@1.0.0",
-      "sentry-testkit>express": "npm:empty-npm-package@1.0.0"
+      "sentry-testkit>express": "npm:empty-npm-package@1.0.0",
+      "jws": "3.2.3"
     }
   }
 }
