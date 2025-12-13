@@ -1,18 +1,9 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require "English"
-require "json"
-require "fileutils"
-require "net/http"
-require "uri"
-
-# Helper to get env var with default,
-# treating empty string and "0" as unset since they can come from the benchmark workflow.
-def env_or_default(key, default)
-  value = ENV[key].to_s
-  value.empty? || value == "0" ? default : value
-end
+require "open3"
+require "shellwords"
+require_relative "lib/benchmark_helpers"
 
 # Benchmark parameters
 PRO = ENV.fetch("PRO", "false") == "true"
@@ -35,45 +26,9 @@ TOOLS = env_or_default("TOOLS", "fortio,vegeta,k6").split(",")
 OUTDIR = "bench_results"
 SUMMARY_TXT = "#{OUTDIR}/summary.txt".freeze
 
-# Validate input parameters
-def validate_rate(rate)
-  return if rate == "max"
-
-  return if rate.match?(/^\d+(\.\d+)?$/) && rate.to_f.positive?
-
-  raise "RATE must be 'max' or a positive number (got: '#{rate}')"
-end
-
-def validate_positive_integer(value, name)
-  return if value.is_a?(Integer) && value.positive?
-
-  raise "#{name} must be a positive integer (got: '#{value}')"
-end
-
-def validate_duration(value, name)
-  return if value.match?(/^(\d+(\.\d+)?[smh])+$/)
-
-  raise "#{name} must be a duration like '10s', '1m', '1.5m' (got: '#{value}')"
-end
-
-def parse_json_file(file_path, tool_name)
-  JSON.parse(File.read(file_path))
-rescue Errno::ENOENT
-  raise "#{tool_name} results file not found: #{file_path}"
-rescue JSON::ParserError => e
-  raise "Failed to parse #{tool_name} JSON: #{e.message}"
-rescue StandardError => e
-  raise "Failed to read #{tool_name} results: #{e.message}"
-end
-
-def failure_metrics(error)
-  ["FAILED", "FAILED", "FAILED", "FAILED", error.message]
-end
-
-def add_summary_line(*parts)
-  File.open(SUMMARY_TXT, "a") do |f|
-    f.puts parts.join("\t")
-  end
+# Local wrapper for add_summary_line to use local constant
+def add_to_summary(*parts)
+  add_summary_line(SUMMARY_TXT, *parts)
 end
 
 # Check if a route has required parameters (e.g., /rsc_payload/:component_name)
@@ -154,10 +109,7 @@ validate_duration(REQUEST_TIMEOUT, "REQUEST_TIMEOUT")
 raise "MAX_CONNECTIONS (#{MAX_CONNECTIONS}) must be >= CONNECTIONS (#{CONNECTIONS})" if MAX_CONNECTIONS < CONNECTIONS
 
 # Check required tools are installed
-required_tools = TOOLS + %w[column tee]
-required_tools.each do |cmd|
-  raise "required tool '#{cmd}' is not installed" unless system("command -v #{cmd} >/dev/null 2>&1")
-end
+check_required_tools(TOOLS + %w[column tee])
 
 puts <<~PARAMS
   Benchmark parameters:
@@ -175,44 +127,9 @@ puts <<~PARAMS
     - TOOLS: #{TOOLS.join(', ')}
 PARAMS
 
-# Helper method to check if server is responding
-def server_responding?(uri)
-  response = Net::HTTP.get_response(uri)
-  # Accept both success (2xx) and redirect (3xx) responses as "server is responding"
-  success = response.is_a?(Net::HTTPSuccess) || response.is_a?(Net::HTTPRedirection)
-  info = "HTTP #{response.code} #{response.message}"
-  info += " -> #{response['location']}" if response.is_a?(Net::HTTPRedirection) && response["location"]
-  { success: success, info: info }
-rescue StandardError => e
-  { success: false, info: "#{e.class.name}: #{e.message}" }
-end
-
 # Wait for the server to be ready
-TIMEOUT_SEC = 60
-puts "Checking server availability at #{BASE_URL}..."
 test_uri = URI.parse("http://#{BASE_URL}#{routes.first}")
-start_time = Time.now
-attempt_count = 0
-loop do
-  attempt_count += 1
-  attempt_start = Time.now
-  result = server_responding?(test_uri)
-  attempt_duration = Time.now - attempt_start
-  elapsed = Time.now - start_time
-
-  # rubocop:disable Layout/LineLength
-  if result[:success]
-    puts "  ✅ Attempt #{attempt_count} at #{elapsed.round(2)}s: SUCCESS - #{result[:info]} (took #{attempt_duration.round(3)}s)"
-    break
-  else
-    puts "  ❌ Attempt #{attempt_count} at #{elapsed.round(2)}s: FAILED - #{result[:info]} (took #{attempt_duration.round(3)}s)"
-  end
-  # rubocop:enable Layout/LineLength
-
-  raise "Server at #{BASE_URL} not responding within #{TIMEOUT_SEC}s" if elapsed > TIMEOUT_SEC
-
-  sleep 1
-end
+wait_for_server(test_uri)
 puts "Server is ready!"
 
 FileUtils.mkdir_p(OUTDIR)
@@ -307,6 +224,7 @@ def run_vegeta_benchmark(target, route_name)
       "-duration=#{DURATION}",
       "-timeout=#{REQUEST_TIMEOUT}",
       "-redirects=0",
+      "-max-body=0",
       "> #{vegeta_bin}"
     ].join(" ")
     raise "Vegeta attack failed" unless system(vegeta_cmd)
@@ -393,7 +311,7 @@ end
 
 # Initialize summary file
 File.write(SUMMARY_TXT, "")
-add_summary_line("Route", "Tool", "RPS", "p50(ms)", "p90(ms)", "p99(ms)", "Status")
+add_to_summary("Route", "Tool", "RPS", "p50(ms)", "p90(ms)", "p99(ms)", "Status")
 
 # Run benchmarks for each route
 routes.each do |route|
@@ -417,13 +335,13 @@ routes.each do |route|
 
   # Run each benchmark tool
   fortio_metrics = run_fortio_benchmark(target, route_name)
-  add_summary_line(route, "Fortio", *fortio_metrics) if fortio_metrics
+  add_to_summary(route, "Fortio", *fortio_metrics) if fortio_metrics
 
   vegeta_metrics = run_vegeta_benchmark(target, route_name)
-  add_summary_line(route, "Vegeta", *vegeta_metrics) if vegeta_metrics
+  add_to_summary(route, "Vegeta", *vegeta_metrics) if vegeta_metrics
 
   k6_metrics = run_k6_benchmark(target, route_name)
-  add_summary_line(route, "k6", *k6_metrics) if k6_metrics
+  add_to_summary(route, "k6", *k6_metrics) if k6_metrics
 end
 
 puts "\nSummary saved to #{SUMMARY_TXT}"

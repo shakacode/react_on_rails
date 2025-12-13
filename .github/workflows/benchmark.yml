@@ -134,14 +134,14 @@ jobs:
 
       - name: Cache Vegeta binary
         id: cache-vegeta
-        if: contains(env.TOOLS, 'vegeta')
+        if: env.RUN_PRO || contains(env.TOOLS, 'vegeta')
         uses: actions/cache@v4
         with:
           path: ~/bin/vegeta
           key: vegeta-${{ runner.os }}-${{ runner.arch }}-${{ env.VEGETA_VERSION }}
 
       - name: Install Vegeta
-        if: contains(env.TOOLS, 'vegeta') && steps.cache-vegeta.outputs.cache-hit != 'true'
+        if: (env.RUN_PRO || contains(env.TOOLS, 'vegeta')) && steps.cache-vegeta.outputs.cache-hit != 'true'
         run: |
           echo "📦 Installing Vegeta v${VEGETA_VERSION}"
 
@@ -449,6 +449,20 @@ jobs:
 
           echo "✅ Benchmark suite completed successfully"
 
+      - name: Execute Pro Node Renderer benchmark suite
+        if: env.RUN_PRO
+        timeout-minutes: 30
+        run: |
+          set -e
+          echo "🏃 Running Pro Node Renderer benchmark suite..."
+
+          if ! ruby benchmarks/bench-node-renderer.rb; then
+            echo "❌ ERROR: Node Renderer benchmark execution failed"
+            exit 1
+          fi
+
+          echo "✅ Node Renderer benchmark suite completed successfully"
+
       - name: Validate Pro benchmark results
         if: env.RUN_PRO
         run: |
@@ -462,9 +476,14 @@ jobs:
 
           echo "✅ Benchmark results found"
           echo ""
-          echo "📊 Summary:"
+          echo "📊 Rails Benchmark Summary:"
           column -t -s $'\t' bench_results/summary.txt
           echo ""
+          if [ -f "bench_results/node_renderer_summary.txt" ]; then
+            echo "📊 Node Renderer Benchmark Summary:"
+            column -t -s $'\t' bench_results/node_renderer_summary.txt
+            echo ""
+          fi
           echo "Generated files:"
           ls -lh bench_results/
 
