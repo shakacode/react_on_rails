@@ -5,9 +5,9 @@
 # 200 = OK, 308 = Permanent Redirect
 accept = ["200", "308"]
 
-# Retry failed requests (handles transient 502/503/504 errors)
-max_retries = 3
-retry_wait_time = 10
+# Retry failed requests (handles transient 502/503/504/429 errors)
+max_retries = 5
+retry_wait_time = 30
 
 # Timeout for each request
 timeout = 20
@@ -21,7 +21,7 @@ exclude = [
 
   # Sites that block bots or require auth
   '^https://www\.npmjs\.(org|com)',
-  '^https://medium\.com',
+  '^https://medium\.com',  # Returns 403 for automated requests
   '^https://www\.linkedin\.com',
   '^https://reactrails\.slack\.com',
 
