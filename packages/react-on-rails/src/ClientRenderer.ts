@@ -78,12 +78,50 @@ function renderElement(el: Element, railsContext: RailsContext): void {
   try {
     const domNode = document.getElementById(domNodeId);
     if (domNode) {
+      // Check if this component was already rendered by a previous call
+      // This prevents hydration errors when reactOnRailsPageLoaded() is called multiple times
+      // (e.g., for asynchronously loaded content)
+      const existing = renderedRoots.get(domNodeId);
+      if (existing) {
+        // Only skip if it's the exact same DOM node and it's still connected to the document.
+        // If the node was replaced (e.g., via innerHTML or Turbo), we need to unmount the old
+        // root and re-render to the new node to prevent memory leaks and ensure rendering works.
+        const sameNode = existing.domNode === domNode && existing.domNode.isConnected;
+        if (sameNode) {
+          if (trace) {
+            console.log(`Skipping already rendered component: ${name} (dom id: ${domNodeId})`);
+          }
+          return;
+        }
+        // DOM node was replaced (e.g., via async HTML injection) - clean up the old root
+        try {
+          if (
+            supportsRootApi &&
+            existing.root &&
+            typeof existing.root === 'object' &&
+            'unmount' in existing.root
+          ) {
+            existing.root.unmount();
+          } else {
+            unmountComponentAtNode(existing.domNode);
+          }
+        } catch (unmountError) {
+          // Ignore unmount errors for replaced nodes
+          if (trace) {
+            console.log(`Error unmounting replaced component: ${name}`, unmountError);
+          }
+        }
+        renderedRoots.delete(domNodeId);
+      }
+
       const componentObj = ComponentRegistry.get(name);
       if (delegateToRenderer(componentObj, props, railsContext, domNodeId, trace)) {
         return;
       }
 
-      // Hydrate if available and was server rendered
+      // Hydrate if the DOM node has content (server-rendered HTML)
+      // Since we skip already-rendered components above, this check now correctly
+      // identifies only server-rendered content, not previously client-rendered content
       const shouldHydrate = !!domNode.innerHTML;
 
       const reactElementOrRouterResult = createReactOutput({
