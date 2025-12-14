@@ -31,7 +31,7 @@ For non-doc fixes:
 
 From [How to Write a Git Commit Message](http://chris.beams.io/posts/git-commit/)
 
-#### The seven rules of a great git commit message
+### The seven rules of a great git commit message
 
 > Keep in mind: This has all been said before.
 
@@ -45,7 +45,7 @@ From [How to Write a Git Commit Message](http://chris.beams.io/posts/git-commit/
 
 ## Doc Changes
 
-When making doc changes, we want the change to work on both https://www.shakacode.com/react-on-rails-pro/docs/ and when browsing the GitHub repo.
+When making doc changes, we want the change to work on both [the ShakaCode docs site](https://www.shakacode.com/react-on-rails-pro/docs/) and when browsing the GitHub repo.
 The issue is that the Shakacode site is generated only from files in [`docs`](./docs), so any references from them to non-doc files must use the full GitHub URL.
 
 ### Links to other docs:
@@ -268,13 +268,13 @@ Hit F8 and then a debugger statement within the test will get hit.
 
 ### Creating new VM tests
 
-1. copy a server bundle to `packages/react-on-rails-pro-node-renderer/tests/fixtures/projects/<project-name>/<commit>`
+1. copy a server bundle to `packages/node-renderer/tests/fixtures/projects/<project-name>/<commit>`
 2. create a directory with a hash representing the commit of the project
 
 ### Async issues with Jest
 
 Beware that Jest runs multiple test files synchronously, so you can't use the same temporary directory
-between tests. See the file [`packages/react-on-rails-pro-node-renderer/tests/helper.ts`](../packages/react-on-rails-pro-node-renderer/tests/helper.ts) for how we handle this.
+between tests. See the file [`packages/node-renderer/tests/helper.ts`](packages/node-renderer/tests/helper.ts) for how we handle this.
 
 ### Run most tests and linting
 
