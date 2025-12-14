@@ -129,4 +129,4 @@ jobs:
       - name: Run JS unit tests for react-on-rails package
         run: pnpm --filter react-on-rails test
       - name: Run JS unit tests for react-on-rails-pro package
-        run: pnpm --filter react-on-rails-pro test
+        run: ENABLE_JEST_CONSOLE=y pnpm --filter react-on-rails-pro test
