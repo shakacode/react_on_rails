@@ -145,13 +145,15 @@ test('[bug] catches logs outside the component during reading the stream', async
 
   let content1 = '';
   let i = 0;
+  let j = 0;
   readable1.on('data', (chunk: Buffer) => {
     i += 1;
     if (i === 1) {
       expect(resolved).toBe(false);
     }
     // To avoid infinite loop
-    if (i < 5) {
+    if (executedIntervals > 0 && j < 5) {
+      j += 1;
       console.log('Outside The Component');
       console.log(`Interval Count: ${executedIntervals}`);
     }
