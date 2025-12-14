@@ -20,6 +20,7 @@
  */
 /* eslint-disable import/no-unresolved -- k6 is installed globally */
 import http from 'k6/http';
+import { Options, Scenario } from 'k6/options';
 import { check } from 'k6';
 
 // Read configuration from environment variables
@@ -35,7 +36,7 @@ if (!targetUrl) {
 }
 
 // Configure scenarios based on rate mode
-const scenarios =
+const scenarios: Record<string, Scenario> =
   rate === 'max'
     ? {
         max_rate: {
@@ -55,7 +56,9 @@ const scenarios =
         },
       };
 
-export const options = {
+export const options: Options = {
+  // "Highly recommended" in https://grafana.com/docs/k6/latest/using-k6/k6-options/reference/#discard-response-bodies
+  discardResponseBodies: true,
   scenarios,
   // Disable default thresholds to avoid noise in output
   thresholds: {},
