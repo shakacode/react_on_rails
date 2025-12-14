@@ -21,13 +21,14 @@ const PromiseWrapper = async ({ promise, name, onResolved }: { promise: Promise<
   return <p>Value: {value}</p>;
 };
 
-const PromiseContainer = ({ name, onResolved }: { name: string, onResolved?: () => {} }) => {
+const PromiseContainer = ({ name, onResolved, tick }: { name: string, onResolved?: () => {}, tick?: () => {} }) => {
   const promise = new Promise<string>((resolve) => {
     let i = 0;
     setTimeout(() => {
       const intervalId = setInterval(() => {
         console.log(`Interval ${i} at [${name}]`);
         i += 1;
+        tick?.();
         if (i === 50) {
           clearInterval(intervalId);
           resolve(`Value of name ${name}`);
@@ -127,8 +128,9 @@ test('no logs lekage from outside the component', async () => {
   expect(content1).not.toContain('Outside The Component');
 });
 
-test('[bug] catches logs outside the component during reading the stream', async () => {
+test.only('[bug] catches logs outside the component during reading the stream', async () => {
   let resolved = false;
+  let executedIntervals = 0;
   const readable1 = ReactOnRails.serverRenderRSCReactComponent({
     railsContext: {
       reactClientManifestFileName: 'react-client-manifest.json',
@@ -138,7 +140,7 @@ test('[bug] catches logs outside the component during reading the stream', async
     renderingReturnsPromises: true,
     throwJsErrors: true,
     domNodeId: 'dom-id',
-    props: { name: 'First Unique Name', onResolved: () => { resolved = true; } },
+    props: { name: 'First Unique Name', onResolved: () => { resolved = true; }, tick: () => { executedIntervals += 1 } },
   });
 
   let content1 = '';
@@ -151,6 +153,7 @@ test('[bug] catches logs outside the component during reading the stream', async
     // To avoid infinite loop
     if (i < 5) {
       console.log('Outside The Component');
+      console.log(`Interval Count: ${executedIntervals}`);
     }
     content1 += chunk.toString();
   });

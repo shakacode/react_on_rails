@@ -8,6 +8,7 @@
     "build-watch": "pnpm run clean && tsc --watch",
     "clean": "rm -rf ./lib",
     "test": "pnpm run test:non-rsc && pnpm run test:rsc",
+    "jest": "jest",
     "test:non-rsc": "jest tests --testPathIgnorePatterns=\".*(RSC|stream|registerServerComponent|serverRenderReactComponent|SuspenseHydration).*\"",
     "test:rsc": "node scripts/check-react-version.cjs || NODE_CONDITIONS=react-server jest tests/*.rsc.test.*",
     "type-check": "tsc --noEmit --noErrorTruncation",
