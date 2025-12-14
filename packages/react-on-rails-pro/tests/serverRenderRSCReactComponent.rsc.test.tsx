@@ -34,7 +34,7 @@ const PromiseContainer = ({ name, onResolved, tick }: { name: string, onResolved
           resolve(`Value of name ${name}`);
         }
       }, 20);
-    }, 200);
+    }, 0);
   });
 
   return (
@@ -140,7 +140,7 @@ test('[bug] catches logs outside the component during reading the stream', async
     renderingReturnsPromises: true,
     throwJsErrors: true,
     domNodeId: 'dom-id',
-    props: { name: 'First Unique Name', onResolved: () => { resolved = true; }, tick: () => { executedIntervals += 1 } },
+    props: { name: 'Bug Investigation Name', onResolved: () => { resolved = true; }, tick: () => { executedIntervals += 1 } },
   });
 
   let content1 = '';
@@ -166,7 +166,7 @@ test('[bug] catches logs outside the component during reading the stream', async
   clearInterval(intervalId);
   expect(resolved).toBe(true);
 
-  expect(content1).toContain('First Unique Name');
+  expect(content1).toContain('Bug Investigation Name');
   expect(content1).not.toContain('From Interval');
   // Here's the bug
   expect(content1).toContain('Outside The Component');
