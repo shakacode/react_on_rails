@@ -128,7 +128,7 @@ test('no logs lekage from outside the component', async () => {
   expect(content1).not.toContain('Outside The Component');
 });
 
-test.only('[bug] catches logs outside the component during reading the stream', async () => {
+test('[bug] catches logs outside the component during reading the stream', async () => {
   let resolved = false;
   let executedIntervals = 0;
   const readable1 = ReactOnRails.serverRenderRSCReactComponent({
