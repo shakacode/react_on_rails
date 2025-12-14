@@ -20,7 +20,7 @@ const removeRSCChunkStackInternal = (chunk: string) => {
       return chunkLine;
     }
 
-    const regexMatch = /([^\{]+)\{/.exec(chunkLine)
+    const regexMatch = /([^\{]+)\{/.exec(chunkLine);
     if (!regexMatch) {
       return chunkLine;
     }
@@ -31,9 +31,9 @@ const removeRSCChunkStackInternal = (chunk: string) => {
       delete chunkJson.stack;
       delete chunkJson.start;
       delete chunkJson.end;
-      return `${regexMatch[1]}${JSON.stringify(chunkJson)}`
+      return `${regexMatch[1]}${JSON.stringify(chunkJson)}`;
     } catch {
-      return chunkLine
+      return chunkLine;
     }
   });
 

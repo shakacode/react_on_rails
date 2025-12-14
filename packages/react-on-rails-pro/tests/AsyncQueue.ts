@@ -1,14 +1,11 @@
 import * as EventEmitter from 'node:events';
 
-const debounce = <T extends unknown[]>(
-  callback: (...args: T) => void,
-  delay: number,
-) => {
+const debounce = <T extends unknown[]>(callback: (...args: T) => void, delay: number) => {
   let timeoutTimer: ReturnType<typeof setTimeout>;
- 
+
   return (...args: T) => {
     clearTimeout(timeoutTimer);
- 
+
     timeoutTimer = setTimeout(() => {
       callback(...args);
     }, delay);
@@ -16,13 +13,13 @@ const debounce = <T extends unknown[]>(
 };
 
 class AsyncQueue {
-  private eventEmitter = new EventEmitter<{ data: any, end: any }>();
+  private eventEmitter = new EventEmitter<{ data: any; end: any }>();
   private buffer: string = '';
   private isEnded = false;
 
   enqueue(value: string) {
     if (this.isEnded) {
-      throw new Error("Queue Ended");
+      throw new Error('Queue Ended');
     }
 
     this.buffer += value;
@@ -37,7 +34,7 @@ class AsyncQueue {
   dequeue() {
     return new Promise<string>((resolve, reject) => {
       if (this.isEnded) {
-        reject(new Error("Queue Ended"));
+        reject(new Error('Queue Ended'));
         return;
       }
 
@@ -45,8 +42,8 @@ class AsyncQueue {
         const teardown = () => {
           this.eventEmitter.off('data', checkBuffer);
           this.eventEmitter.off('end', checkBuffer);
-        }
-        
+        };
+
         if (this.buffer.length > 0) {
           resolve(this.buffer);
           this.buffer = '';
@@ -62,11 +59,11 @@ class AsyncQueue {
       }
       this.eventEmitter.on('data', checkBuffer);
       this.eventEmitter.on('end', checkBuffer);
-    })
+    });
   }
 
   toString() {
-    return ""
+    return '';
   }
 }
 

@@ -28,10 +28,7 @@ beforeEach(() => {
 
 afterEach(() => mock.restore());
 
-const AsyncQueueItem = async ({
-  asyncQueue,
-  children,
-}: PropsWithChildren<{ asyncQueue: AsyncQueue }>) => {
+const AsyncQueueItem = async ({ asyncQueue, children }: PropsWithChildren<{ asyncQueue: AsyncQueue }>) => {
   const value = await asyncQueue.dequeue();
 
   return (
