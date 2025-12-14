@@ -165,9 +165,10 @@ def run_vegeta_benchmark(test_case, bundle_timestamp)
   vegeta_p50 = vegeta_data.dig("latencies", "50th")&./(1_000_000.0)&.round(2) || "missing"
   vegeta_p90 = vegeta_data.dig("latencies", "90th")&./(1_000_000.0)&.round(2) || "missing"
   vegeta_p99 = vegeta_data.dig("latencies", "99th")&./(1_000_000.0)&.round(2) || "missing"
+  vegeta_max = vegeta_data.dig("latencies", "max")&./(1_000_000.0)&.round(2) || "missing"
   vegeta_status = vegeta_data["status_codes"]&.map { |k, v| "#{k}=#{v}" }&.join(",") || "missing"
 
-  [vegeta_rps, vegeta_p50, vegeta_p90, vegeta_p99, vegeta_status]
+  [vegeta_rps, vegeta_p50, vegeta_p90, vegeta_p99, vegeta_max, vegeta_status]
 rescue StandardError => e
   puts "Error: #{e.message}"
   failure_metrics(e)
@@ -229,7 +230,7 @@ FileUtils.mkdir_p(OUTDIR)
 
 # Initialize summary file
 File.write(SUMMARY_TXT, "")
-add_to_summary("Test", "RPS", "p50(ms)", "p90(ms)", "p99(ms)", "Status")
+add_to_summary("Test", "RPS", "p50(ms)", "p90(ms)", "p99(ms)", "max(ms)", "Status")
 
 # Run benchmarks for each test case
 TEST_CASES.each do |test_case|

@@ -157,15 +157,16 @@ def run_k6_benchmark(target, route_name)
     "-e REQUEST_TIMEOUT=#{REQUEST_TIMEOUT}"
   ].join(" ")
 
-  k6_command = "k6 run #{k6_env_vars} --summary-export=#{k6_summary_json} " \
-               "--summary-trend-stats 'min,avg,med,max,p(90),p(99)' #{k6_script}"
-  raise "k6 benchmark failed" unless system("#{k6_command} | tee #{k6_txt}")
+  k6_command = "k6 run #{k6_env_vars} --summary-export=#{Shellwords.escape(k6_summary_json)} " \
+               "--summary-trend-stats 'med,max,p(90),p(99)' #{k6_script}"
+  raise "k6 benchmark failed" unless system("#{k6_command} | tee #{Shellwords.escape(k6_txt)}")
 
   k6_data = parse_json_file(k6_summary_json, "k6")
   k6_rps = k6_data.dig("metrics", "iterations", "rate")&.round(2) || "missing"
   k6_p50 = k6_data.dig("metrics", "http_req_duration", "med")&.round(2) || "missing"
   k6_p90 = k6_data.dig("metrics", "http_req_duration", "p(90)")&.round(2) || "missing"
   k6_p99 = k6_data.dig("metrics", "http_req_duration", "p(99)")&.round(2) || "missing"
+  k6_max = k6_data.dig("metrics", "http_req_duration", "max")&.round(2) || "missing"
 
   # Status: extract counts from checks (status_200, status_3xx, status_4xx, status_5xx)
   k6_reqs_total = k6_data.dig("metrics", "http_reqs", "count") || 0
@@ -184,7 +185,7 @@ def run_k6_benchmark(target, route_name)
   k6_status_parts << "other=#{k6_other}" if k6_other.positive?
   k6_status = k6_status_parts.empty? ? "missing" : k6_status_parts.join(",")
 
-  [k6_rps, k6_p50, k6_p90, k6_p99, k6_status]
+  [k6_rps, k6_p50, k6_p90, k6_p99, k6_max, k6_status]
 rescue StandardError => e
   puts "Error: #{e.message}"
   failure_metrics(e)
@@ -194,7 +195,7 @@ end
 
 # Initialize summary file
 File.write(SUMMARY_TXT, "")
-add_to_summary("Route", "RPS", "p50(ms)", "p90(ms)", "p99(ms)", "Status")
+add_to_summary("Route", "RPS", "p50(ms)", "p90(ms)", "p99(ms)", "max(ms)", "Status")
 
 # Run benchmarks for each route
 routes.each do |route|

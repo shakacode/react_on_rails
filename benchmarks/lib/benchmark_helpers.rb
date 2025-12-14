@@ -47,7 +47,7 @@ end
 
 # Create failure metrics array for summary
 def failure_metrics(error)
-  ["FAILED", "FAILED", "FAILED", "FAILED", error.message]
+  ["FAILED", "FAILED", "FAILED", "FAILED", "FAILED", error.message]
 end
 
 # Append a line to the summary file
