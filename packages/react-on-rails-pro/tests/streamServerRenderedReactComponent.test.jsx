@@ -193,7 +193,7 @@ describe('streamServerRenderedReactComponent', () => {
     // One of the chunks should have a hasErrors property of true
     expect(chunks[0].hasErrors || chunks[1].hasErrors).toBe(true);
     expect(chunks[0].hasErrors && chunks[1].hasErrors).toBe(false);
-  }, 100000);
+  }, 10000);
 
   it("doesn't emit an error if there is an error in the async content and throwJsErrors is false", async () => {
     const { renderResult, chunks } = setupStreamTest({ throwAsyncError: true, throwJsErrors: false });

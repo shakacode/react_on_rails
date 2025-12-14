@@ -31,7 +31,7 @@ afterEach(() => mock.restore());
 const AsyncQueueItem = async ({
   asyncQueue,
   children,
-}: PropsWithChildren<{ asyncQueue: AsyncQueue<string> }>) => {
+}: PropsWithChildren<{ asyncQueue: AsyncQueue }>) => {
   const value = await asyncQueue.dequeue();
 
   return (
@@ -42,7 +42,7 @@ const AsyncQueueItem = async ({
   );
 };
 
-const AsyncQueueContainer = ({ asyncQueue }: { asyncQueue: AsyncQueue<string> }) => {
+const AsyncQueueContainer = ({ asyncQueue }: { asyncQueue: AsyncQueue }) => {
   return (
     <div>
       <h1>Async Queue</h1>
@@ -78,7 +78,7 @@ const renderComponent = (props: Record<string, unknown>) => {
 };
 
 const createParallelRenders = (size: number) => {
-  const asyncQueues = new Array(size).fill(null).map(() => new AsyncQueue<string>());
+  const asyncQueues = new Array(size).fill(null).map(() => new AsyncQueue());
   const streams = asyncQueues.map((asyncQueue) => {
     return renderComponent({ asyncQueue });
   });
@@ -100,21 +100,13 @@ const createParallelRenders = (size: number) => {
   return { enqueue, expectNextChunk, expectEndOfStream };
 };
 
-const delay = (ms: number) =>
-  new Promise<void>((resolve) => {
-    setTimeout(() => {
-      resolve();
-    }, ms);
-  });
-
 test('Renders concurrent rsc streams as single rsc stream', async () => {
   // expect.assertions(258);
-  const asyncQueue = new AsyncQueue<string>();
+  const asyncQueue = new AsyncQueue();
   const stream = renderComponent({ asyncQueue });
   const reader = new StreamReader(stream);
 
   const chunks: string[] = [];
-  await delay(100);
   let chunk = await reader.nextChunk();
   chunks.push(chunk);
   expect(chunk).toContain('Async Queue');
@@ -123,19 +115,16 @@ test('Renders concurrent rsc streams as single rsc stream', async () => {
 
   asyncQueue.enqueue('Random Value1');
 
-  await delay(100);
   chunk = await reader.nextChunk();
   chunks.push(chunk);
   expect(chunk).toContain('Random Value1');
 
   asyncQueue.enqueue('Random Value2');
-  await delay(100);
   chunk = await reader.nextChunk();
   chunks.push(chunk);
   expect(chunk).toContain('Random Value2');
 
   asyncQueue.enqueue('Random Value3');
-  await delay(100);
   chunk = await reader.nextChunk();
   chunks.push(chunk);
   expect(chunk).toContain('Random Value3');
@@ -145,17 +134,12 @@ test('Renders concurrent rsc streams as single rsc stream', async () => {
   const { enqueue, expectNextChunk, expectEndOfStream } = createParallelRenders(50);
 
   expect(chunks).toHaveLength(4);
-  await delay(100);
   await expectNextChunk(chunks[0]);
   enqueue('Random Value1');
-  await delay(100);
   await expectNextChunk(chunks[1]);
   enqueue('Random Value2');
-  await delay(100);
   await expectNextChunk(chunks[2]);
   enqueue('Random Value3');
-  await delay(100);
   await expectNextChunk(chunks[3]);
-  await delay(100);
   await expectEndOfStream();
 });
