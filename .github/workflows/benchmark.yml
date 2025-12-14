@@ -1,14 +1,8 @@
 name: Benchmark Workflow
 
 on:
-  # https://github.com/mxschmitt/action-tmate?tab=readme-ov-file#manually-triggered-debug
   workflow_dispatch:
     inputs:
-      debug_enabled:
-        description: 'Enable SSH access (⚠️ Security Risk - read workflow comments)'
-        required: false
-        default: false
-        type: boolean
       routes:
         description: 'Comma-separated routes to benchmark (e.g., "/,/hello"). Leave empty to auto-detect from Rails.'
         required: false
@@ -110,36 +104,7 @@ jobs:
         uses: actions/checkout@v4
 
       # ============================================
-      # STEP 2: OPTIONAL SSH ACCESS
-      # ============================================
-      # NOTE: Interactive confirmation is not possible in GitHub Actions.
-      # As a secure workaround, SSH access is gated by the workflow_dispatch
-      # input variable 'debug_enabled' which defaults to false.
-      # Users must explicitly set this to true to enable SSH.
-
-      - name: SSH Warning
-        if: ${{ github.event.inputs.debug_enabled == true || github.event.inputs.debug_enabled == 'true' }}
-        run: |
-          echo "⚠️  ⚠️  ⚠️  SSH ACCESS ENABLED  ⚠️  ⚠️  ⚠️"
-          echo ""
-          echo "SECURITY NOTICE:"
-          echo "  - SSH access exposes your GitHub Actions runner"
-          echo "  - Only proceed if you understand and accept the risks"
-          echo "  - Do NOT store secrets or sensitive data on the runner"
-          echo "  - Access is limited to the workflow initiator only"
-          echo "  - The session will remain open until manually terminated"
-          echo ""
-          echo "⚠️  ⚠️  ⚠️  ⚠️  ⚠️  ⚠️  ⚠️  ⚠️  ⚠️  ⚠️  ⚠️"
-
-      - name: Setup SSH access (if enabled)
-        if: ${{ github.event.inputs.debug_enabled == true || github.event.inputs.debug_enabled == 'true' }}
-        uses: mxschmitt/action-tmate@v3
-        with:
-          detached: true
-          limit-access-to-actor: true  # Only workflow trigger can access
-
-      # ============================================
-      # STEP 3: INSTALL BENCHMARKING TOOLS
+      # STEP 2: INSTALL BENCHMARKING TOOLS
       # ============================================
 
       - name: Add tools directory to PATH
@@ -194,7 +159,7 @@ jobs:
           k6-version: ${{ env.K6_VERSION }}
 
       # ============================================
-      # STEP 4: START APPLICATION SERVER
+      # STEP 3: START APPLICATION SERVER
       # ============================================
 
       - name: Setup Ruby
@@ -320,7 +285,7 @@ jobs:
           exit 1
 
       # ============================================
-      # STEP 5: RUN CORE BENCHMARKS
+      # STEP 4: RUN CORE BENCHMARKS
       # ============================================
 
       - name: Execute Core benchmark suite
@@ -388,7 +353,7 @@ jobs:
           exit 1
 
       # ============================================
-      # STEP 6: SETUP PRO APPLICATION SERVER
+      # STEP 5: SETUP PRO APPLICATION SERVER
       # ============================================
       - name: Cache Pro dummy app node modules
         if: env.RUN_PRO
@@ -467,7 +432,7 @@ jobs:
           exit 1
 
       # ============================================
-      # STEP 7: RUN PRO BENCHMARKS
+      # STEP 6: RUN PRO BENCHMARKS
       # ============================================
 
       - name: Execute Pro benchmark suite
@@ -521,7 +486,7 @@ jobs:
           echo "✅ Server stopped"
 
       # ============================================
-      # STEP 8: WORKFLOW COMPLETION
+      # STEP 7: WORKFLOW COMPLETION
       # ============================================
       - name: Workflow summary
         if: always()
