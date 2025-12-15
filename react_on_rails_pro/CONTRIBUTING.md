@@ -178,7 +178,9 @@ To do this, follow the instructions in the
    It's run automatically when you run `yarn install`.
 3. Refresh the browser if the server is already running or start the server using `foreman start -f Procfile.dev` from `spec/dummy` and navigate to `http://localhost:3000/`. You will now see the `Hello!` message printed in the browser's console.
 
-> [!NOTE] > `yalc` makes the NPM package available globally on the machine.
+<!-- prettier-ignore -->
+> [!NOTE]
+> `yalc` makes the NPM package available globally on the machine.
 > So, if you have the repo checked out more than once to compare behavior between branches,
 > make sure to run `yarn install` every time you switch to a new copy.
 
