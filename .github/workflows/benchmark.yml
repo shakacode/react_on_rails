@@ -46,6 +46,8 @@ on:
           - 'both'
           - 'core_only'
           - 'pro_only'
+          - 'pro_rails_only'
+          - 'pro_node_renderer_only'
   push:
     branches:
       - master
@@ -62,9 +64,11 @@ env:
   BUNDLER_VERSION: "2.5.4"
   K6_VERSION: "1.4.2"
   VEGETA_VERSION: "12.13.0"
-  # Determine which apps to run (default is 'pro_only' for all triggers)
-  RUN_CORE: ${{ (github.event.inputs.app_version || 'both') != 'pro_only' && 'true' || '' }}
+  # Determine which apps/benchmarks to run (default is 'both' for all triggers)
+  RUN_CORE: ${{ contains(fromJSON('["both", "core_only"]'), github.event.inputs.app_version || 'both') && 'true' || '' }}
   RUN_PRO: ${{ (github.event.inputs.app_version || 'both') != 'core_only' && 'true' || '' }}
+  RUN_PRO_RAILS: ${{ contains(fromJSON('["both", "pro_only", "pro_rails_only"]'), github.event.inputs.app_version || 'both') && 'true' || '' }}
+  RUN_PRO_NODE_RENDERER: ${{ contains(fromJSON('["both", "pro_only", "pro_node_renderer_only"]'), github.event.inputs.app_version || 'both') && 'true' || '' }}
   # Benchmark parameters (defaults in bench.rb unless overridden here for CI)
   ROUTES: ${{ github.event.inputs.routes }}
   RATE: ${{ github.event.inputs.rate || 'max' }}
@@ -408,7 +412,7 @@ jobs:
       # ============================================
 
       - name: Execute Pro benchmark suite
-        if: env.RUN_PRO
+        if: env.RUN_PRO_RAILS
         timeout-minutes: 120
         run: |
           set -e
@@ -422,7 +426,7 @@ jobs:
           echo "✅ Benchmark suite completed successfully"
 
       - name: Execute Pro Node Renderer benchmark suite
-        if: env.RUN_PRO
+        if: env.RUN_PRO_NODE_RENDERER
         timeout-minutes: 30
         run: |
           set -e
@@ -441,21 +445,28 @@ jobs:
           set -e
           echo "🔍 Validating benchmark results..."
 
-          if [ ! -f "bench_results/summary.txt" ]; then
-            echo "❌ ERROR: benchmark summary file not found"
-            exit 1
+          if [ "$RUN_PRO_RAILS" = "true" ]; then
+            if [ ! -f "bench_results/summary.txt" ]; then
+              echo "❌ ERROR: Rails benchmark summary file not found"
+              exit 1
+            fi
+            echo "📊 Rails Benchmark Summary:"
+            column -t -s $'\t' bench_results/summary.txt
+            echo ""
           fi
 
-          echo "✅ Benchmark results found"
-          echo ""
-          echo "📊 Rails Benchmark Summary:"
-          column -t -s $'\t' bench_results/summary.txt
-          echo ""
-          if [ -f "bench_results/node_renderer_summary.txt" ]; then
+          if [ "$RUN_PRO_NODE_RENDERER" = "true" ]; then
+            if [ ! -f "bench_results/node_renderer_summary.txt" ]; then
+              echo "❌ ERROR: Node Renderer benchmark summary file not found"
+              exit 1
+            fi
             echo "📊 Node Renderer Benchmark Summary:"
             column -t -s $'\t' bench_results/node_renderer_summary.txt
             echo ""
           fi
+
+          echo "✅ Benchmark results validated"
+          echo ""
           echo "Generated files:"
           ls -lh bench_results/
 
@@ -488,8 +499,9 @@ jobs:
           echo "Run number: ${{ github.run_number }}"
           echo "Triggered by: ${{ github.actor }}"
           echo "Branch: ${{ github.ref_name }}"
-          echo "Run Core: ${{ env.RUN_CORE }}"
-          echo "Run Pro: ${{ env.RUN_PRO }}"
+          echo "Run Core: ${{ env.RUN_CORE || 'false' }}"
+          echo "Run Pro Rails: ${{ env.RUN_PRO_RAILS || 'false' }}"
+          echo "Run Pro Node Renderer: ${{ env.RUN_PRO_NODE_RENDERER || 'false' }}"
           echo ""
           if [ "${{ job.status }}" == "success" ]; then
             echo "✅ All steps completed successfully"
