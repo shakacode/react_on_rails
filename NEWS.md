@@ -40,7 +40,7 @@ _A history of the news. A few bullets at the top will also show on the [README.m
 - 2016-03-18: [Slides on React on Rails](http://www.slideshare.net/justingordon/react-on-rails-v4032).
 - 2016-03-17: **4.0.3** Shipped! Includes using the new Heroku buildpack steps, several smaller changes detailed in the [CHANGELOG.md](./CHANGELOG.md).
 - 2016-03-17: **4.0.2** Shipped! Includes using the new Heroku buildpack steps.
-  - Better support for hot reloading of assets from Rails with new helpers and updates to the sample testing app, [spec/dummy](spec/dummy).
+  - Better support for hot reloading of assets from Rails with new helpers and updates to the sample testing app, [react_on_rails/spec/dummy](react_on_rails/spec/dummy).
   - Better support for Turbolinks 5.
   - Controller rendering of shared Redux stores and ability to render store data at bottom of HTML page.
   - See [#311](https://github.com/shakacode/react_on_rails/pull/311/files).
