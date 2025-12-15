@@ -60,10 +60,10 @@ on:
       - '**.md'
       - 'docs/**'
 env:
-  RUBY_VERSION: "3.3.7"
-  BUNDLER_VERSION: "2.5.4"
-  K6_VERSION: "1.4.2"
-  VEGETA_VERSION: "12.13.0"
+  RUBY_VERSION: '3.3.7'
+  BUNDLER_VERSION: '2.5.4'
+  K6_VERSION: '1.4.2'
+  VEGETA_VERSION: '12.13.0'
   # Determine which apps/benchmarks to run (default is 'both' for all triggers)
   RUN_CORE: ${{ contains(fromJSON('["both", "core_only"]'), github.event.inputs.app_version || 'both') && 'true' || '' }}
   RUN_PRO: ${{ (github.event.inputs.app_version || 'both') != 'core_only' && 'true' || '' }}
