@@ -17,6 +17,7 @@ react_on_rails/spec/dummy/public
 **/.yalc/**
 **/*generated*
 *.res.js
+**/vendor
 
 # Prettier doesn't understand ERB syntax in YAML files and can damage templates
 *.yml
