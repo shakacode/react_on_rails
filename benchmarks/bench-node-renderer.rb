@@ -30,17 +30,18 @@ def read_password_from_config
 end
 
 # Benchmark parameters
-BUNDLE_TIMESTAMP = env_or_default("BUNDLE_TIMESTAMP", nil)
 PASSWORD = read_password_from_config
 BASE_URL = env_or_default("BASE_URL", "localhost:3800")
 PROTOCOL_VERSION = read_protocol_version
 
 # Test cases: JavaScript expressions to evaluate
-# Format: { name: "test_name", request: "javascript_code" }
+# Format: { name: "test_name", request: "javascript_code", rsc: true/false }
+# rsc: true means the test requires an RSC bundle, false means non-RSC bundle
 TEST_CASES = [
-  { name: "simple_eval", request: "2+2" },
+  { name: "simple_eval", rsc: false, request: "2+2" },
   {
     name: "react_ssr",
+    rsc: false,
     request: "ReactOnRails.serverRenderReactComponent(" \
              '{name:"HelloWorld",props:{helloWorldData:{name:"Benchmark"}},domNodeId:"app"})'
   }
@@ -61,8 +62,8 @@ def add_to_summary(*parts)
   add_summary_line(SUMMARY_TXT, *parts)
 end
 
-# Find available bundle in the node-renderer bundles directory
-def find_bundle_timestamp
+# Find all production bundles in the node-renderer bundles directory
+def find_all_production_bundles
   bundles_dir = File.expand_path(
     "../react_on_rails_pro/spec/dummy/.node-renderer-bundles",
     __dir__
@@ -82,13 +83,76 @@ def find_bundle_timestamp
 
   raise "No production bundles found in #{bundles_dir}" if bundles.empty?
 
-  # Return the first production bundle
-  bundles.first
+  bundles
+end
+
+# Check if a bundle is an RSC bundle by evaluating ReactOnRails.isRSCBundle
+# Returns true/false/nil (nil means couldn't determine)
+# rubocop:disable Style/ReturnNilInPredicateMethodDefinition
+def rsc_bundle?(bundle_timestamp)
+  url = render_url(bundle_timestamp, "rsc_check")
+  body = render_body("ReactOnRails.isRSCBundle")
+
+  # Use curl with h2c since Net::HTTP doesn't support HTTP/2
+  result, status = Open3.capture2(
+    "curl", "-s", "--http2-prior-knowledge", "-X", "POST",
+    "-H", "Content-Type: application/x-www-form-urlencoded",
+    "-d", body,
+    url
+  )
+  return nil unless status.success?
+
+  # The response should be "true" or "false"
+  result.strip == "true"
+rescue StandardError => e
+  puts "  Warning: Could not determine RSC status for #{bundle_timestamp}: #{e.message}"
+  nil
+end
+# rubocop:enable Style/ReturnNilInPredicateMethodDefinition
+
+# Categorize bundles into RSC and non-RSC
+# Stops early once we find one of each type
+def categorize_bundles(bundles)
+  rsc_bundle = nil
+  non_rsc_bundle = nil
+
+  bundles.each do |bundle|
+    # Stop if we already have both types
+    break if rsc_bundle && non_rsc_bundle
+
+    puts "  Checking bundle #{bundle}..."
+    is_rsc = rsc_bundle?(bundle)
+    if is_rsc.nil?
+      puts "    Could not determine bundle type, skipping"
+    elsif is_rsc
+      puts "    RSC bundle"
+      rsc_bundle ||= bundle
+    else
+      puts "    Non-RSC bundle"
+      non_rsc_bundle ||= bundle
+    end
+  end
+
+  [rsc_bundle, non_rsc_bundle]
 end
 
 # URL-encode special characters for form body
 def url_encode(str)
   URI.encode_www_form_component(str)
+end
+
+# Build render URL for a bundle and render name
+def render_url(bundle_timestamp, render_name)
+  "http://#{BASE_URL}/bundles/#{bundle_timestamp}/render/#{render_name}"
+end
+
+# Build request body for a rendering request
+def render_body(rendering_request)
+  [
+    "protocolVersion=#{url_encode(PROTOCOL_VERSION)}",
+    "password=#{url_encode(PASSWORD)}",
+    "renderingRequest=#{url_encode(rendering_request)}"
+  ].join("&")
 end
 
 # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
@@ -100,15 +164,8 @@ def run_vegeta_benchmark(test_case, bundle_timestamp)
 
   puts "\n===> Vegeta h2c: #{name}"
 
-  # Create target URL
-  target_url = "http://#{BASE_URL}/bundles/#{bundle_timestamp}/render/#{name}"
-
-  # Create request body
-  body = [
-    "protocolVersion=#{url_encode(PROTOCOL_VERSION)}",
-    "password=#{url_encode(PASSWORD)}",
-    "renderingRequest=#{url_encode(request)}"
-  ].join("&")
+  target_url = render_url(bundle_timestamp, name)
+  body = render_body(request)
 
   # Create temp files for Vegeta
   targets_file = "#{OUTDIR}/#{name}_vegeta_targets.txt"
@@ -177,7 +234,6 @@ end
 # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 
 # Main execution
-bundle_timestamp = BUNDLE_TIMESTAMP || find_bundle_timestamp
 
 # Validate parameters
 validate_rate(RATE)
@@ -191,19 +247,7 @@ if RATE == "max" && CONNECTIONS != MAX_CONNECTIONS
 end
 
 # Check required tools
-check_required_tools(%w[vegeta column tee])
-
-# Print parameters
-print_params(
-  "BASE_URL" => BASE_URL,
-  "BUNDLE_TIMESTAMP" => bundle_timestamp,
-  "RATE" => RATE,
-  "DURATION" => DURATION,
-  "REQUEST_TIMEOUT" => REQUEST_TIMEOUT,
-  "CONNECTIONS" => CONNECTIONS,
-  "MAX_CONNECTIONS" => MAX_CONNECTIONS,
-  "TEST_CASES" => TEST_CASES.map { |tc| tc[:name] }.join(", ")
-)
+check_required_tools(%w[vegeta curl column tee])
 
 # Wait for node renderer to be ready
 # Note: Node renderer only speaks HTTP/2, but we can still check with a simple GET
@@ -225,22 +269,69 @@ rescue StandardError => e
   sleep 1
 end
 
+# Find and categorize bundles
+puts "\nDiscovering and categorizing bundles..."
+all_bundles = find_all_production_bundles
+puts "Found #{all_bundles.length} production bundle(s)"
+rsc_bundle, non_rsc_bundle = categorize_bundles(all_bundles)
+
+rsc_tests = TEST_CASES.select { |tc| tc[:rsc] }
+non_rsc_tests = TEST_CASES.reject { |tc| tc[:rsc] }
+
+if rsc_tests.any? && rsc_bundle.nil?
+  puts "Warning: RSC tests requested but no RSC bundle found, skipping: #{rsc_tests.map { |tc| tc[:name] }.join(', ')}"
+  rsc_tests = []
+end
+
+if non_rsc_tests.any? && non_rsc_bundle.nil?
+  skipped = non_rsc_tests.map { |tc| tc[:name] }.join(", ")
+  puts "Warning: Non-RSC tests requested but no non-RSC bundle found, skipping: #{skipped}"
+  non_rsc_tests = []
+end
+
+# Print parameters
+print_params(
+  "BASE_URL" => BASE_URL,
+  "RSC_BUNDLE" => rsc_bundle || "none",
+  "NON_RSC_BUNDLE" => non_rsc_bundle || "none",
+  "RATE" => RATE,
+  "DURATION" => DURATION,
+  "REQUEST_TIMEOUT" => REQUEST_TIMEOUT,
+  "CONNECTIONS" => CONNECTIONS,
+  "MAX_CONNECTIONS" => MAX_CONNECTIONS,
+  "RSC_TESTS" => rsc_tests.map { |tc| tc[:name] }.join(", ").then { |s| s.empty? ? "none" : s },
+  "NON_RSC_TESTS" => non_rsc_tests.map { |tc| tc[:name] }.join(", ").then { |s| s.empty? ? "none" : s }
+)
+
 # Create output directory
 FileUtils.mkdir_p(OUTDIR)
 
 # Initialize summary file
 File.write(SUMMARY_TXT, "")
-add_to_summary("Test", "RPS", "p50(ms)", "p90(ms)", "p99(ms)", "max(ms)", "Status")
+add_to_summary("Test", "Bundle", "RPS", "p50(ms)", "p90(ms)", "p99(ms)", "max(ms)", "Status")
 
-# Run benchmarks for each test case
-TEST_CASES.each do |test_case|
+# Run non-RSC benchmarks
+non_rsc_tests.each do |test_case|
   print_separator
-  puts "Benchmarking: #{test_case[:name]}"
+  puts "Benchmarking (non-RSC): #{test_case[:name]}"
+  puts "  Bundle: #{non_rsc_bundle}"
   puts "  Request: #{test_case[:request]}"
   print_separator
 
-  metrics = run_vegeta_benchmark(test_case, bundle_timestamp)
-  add_to_summary(test_case[:name], *metrics)
+  metrics = run_vegeta_benchmark(test_case, non_rsc_bundle)
+  add_to_summary(test_case[:name], "non-RSC", *metrics)
+end
+
+# Run RSC benchmarks
+rsc_tests.each do |test_case|
+  print_separator
+  puts "Benchmarking (RSC): #{test_case[:name]}"
+  puts "  Bundle: #{rsc_bundle}"
+  puts "  Request: #{test_case[:request]}"
+  print_separator
+
+  metrics = run_vegeta_benchmark(test_case, rsc_bundle)
+  add_to_summary(test_case[:name], "RSC", *metrics)
 end
 
 # Display summary
