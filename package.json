@@ -60,7 +60,7 @@
     "publint": "^0.3.4",
     "react": "^19.0.3",
     "react-dom": "^19.0.3",
-    "react-on-rails-rsc": "19.0.2",
+    "react-on-rails-rsc": "^19.0.4",
     "redux": "^4.2.1",
     "size-limit": "^12.0.0",
     "stylelint": "^16.14.0",
