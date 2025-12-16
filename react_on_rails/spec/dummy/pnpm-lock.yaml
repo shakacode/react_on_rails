@@ -13,7 +13,7 @@ importers:
         version: 7.28.4
       '@dr.pogodin/react-helmet':
         specifier: ^3.0.4
-        version: 3.0.4(react@19.0.3)
+        version: 3.0.4(react@19.0.0)
       '@hotwired/turbo-rails':
         specifier: ^8.0.4
         version: 8.0.20
@@ -45,20 +45,20 @@ importers:
         specifier: ^15.7.2
         version: 15.8.1
       react:
-        specifier: 19.0.3
-        version: 19.0.3
+        specifier: 19.0.0
+        version: 19.0.0
       react-dom:
-        specifier: 19.0.3
-        version: 19.0.3(react@19.0.3)
+        specifier: 19.0.0
+        version: 19.0.0(react@19.0.0)
       react-on-rails:
         specifier: link:.yalc/react-on-rails
         version: link:.yalc/react-on-rails
       react-redux:
         specifier: ^9.2.0
-        version: 9.2.0(@types/react@19.2.7)(react@19.0.3)(redux@5.0.1)
+        version: 9.2.0(@types/react@19.2.7)(react@19.0.0)(redux@5.0.1)
       react-router-dom:
         specifier: ^6.0.0
-        version: 6.30.2(react-dom@19.0.3(react@19.0.3))(react@19.0.3)
+        version: 6.30.2(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
       redux:
         specifier: ^5.0.1
         version: 5.0.1
@@ -89,7 +89,7 @@ importers:
         version: 0.5.17(react-refresh@0.11.0)(type-fest@0.21.3)(webpack-dev-server@4.15.2)(webpack@5.72.0)
       '@rescript/react':
         specifier: ^0.13.0
-        version: 0.13.1(react-dom@19.0.3(react@19.0.3))(react@19.0.3)
+        version: 0.13.1(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
       '@swc/core':
         specifier: ^1.7.0
         version: 1.15.3
@@ -2925,10 +2925,10 @@ packages:
     resolution: {integrity: sha512-s4VSOf6yN0rvbRZGxs8Om5CWj6seneMwK3oDb4lWDH0UPhWcxwOWw5+qk24bxq87szX1ydrwylIOp2uG1ojUpA==}
     engines: {node: '>= 0.8'}
 
-  react-dom@19.0.3:
-    resolution: {integrity: sha512-a7ezLfxibhu6fZBVLwy6WEd3Jn/4H8JYVO8K8GtBfRf1Pl+ox7KFoMCzAGlxLZUXo0t44YZShzhhoDH3yMVdxQ==}
+  react-dom@19.0.0:
+    resolution: {integrity: sha512-4GV5sHFG0e/0AD4X+ySy6UJd3jVl1iNsNHdpad0qhABJ11twS3TTBnseqsKurKcsNqCEFeGL3uLpVChpIO3QfQ==}
     peerDependencies:
-      react: ^19.0.3
+      react: ^19.0.0
 
   react-is@16.13.1:
     resolution: {integrity: sha512-24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ==}
@@ -2965,8 +2965,8 @@ packages:
     peerDependencies:
       react: '>=16.8'
 
-  react@19.0.3:
-    resolution: {integrity: sha512-owzQanTgpB8GF7pVL6mUwZZyhKzFePi9++GkFk54i9PRU0jq+z7v9Mwg7PAZJYCiYl5YwcyQGGq5/PLkesd8nw==}
+  react@19.0.0:
+    resolution: {integrity: sha512-V8AVnmPIICiWpGfm6GLzCR/W5FXLchHop40W4nXBmdlEceh16rCN8O8LNWm5bh5XUX91fh7KpA+W0TgMKmgTpQ==}
     engines: {node: '>=0.10.0'}
 
   readable-stream@2.3.8:
@@ -4503,10 +4503,10 @@ snapshots:
 
   '@discoveryjs/json-ext@0.5.7': {}
 
-  '@dr.pogodin/react-helmet@3.0.4(react@19.0.3)':
+  '@dr.pogodin/react-helmet@3.0.4(react@19.0.0)':
     dependencies:
       '@babel/runtime': 7.28.4
-      react: 19.0.3
+      react: 19.0.0
 
   '@hotwired/turbo-rails@8.0.20':
     dependencies:
@@ -4797,10 +4797,10 @@ snapshots:
 
   '@remix-run/router@1.23.1': {}
 
-  '@rescript/react@0.13.1(react-dom@19.0.3(react@19.0.3))(react@19.0.3)':
+  '@rescript/react@0.13.1(react-dom@19.0.0(react@19.0.0))(react@19.0.0)':
     dependencies:
-      react: 19.0.3
-      react-dom: 19.0.3(react@19.0.3)
+      react: 19.0.0
+      react-dom: 19.0.0(react@19.0.0)
 
   '@sinclair/typebox@0.27.8': {}
 
@@ -6966,39 +6966,39 @@ snapshots:
       iconv-lite: 0.4.24
       unpipe: 1.0.0
 
-  react-dom@19.0.3(react@19.0.3):
+  react-dom@19.0.0(react@19.0.0):
     dependencies:
-      react: 19.0.3
+      react: 19.0.0
       scheduler: 0.25.0
 
   react-is@16.13.1: {}
 
   react-is@18.3.1: {}
 
-  react-redux@9.2.0(@types/react@19.2.7)(react@19.0.3)(redux@5.0.1):
+  react-redux@9.2.0(@types/react@19.2.7)(react@19.0.0)(redux@5.0.1):
     dependencies:
       '@types/use-sync-external-store': 0.0.6
-      react: 19.0.3
-      use-sync-external-store: 1.6.0(react@19.0.3)
+      react: 19.0.0
+      use-sync-external-store: 1.6.0(react@19.0.0)
     optionalDependencies:
       '@types/react': 19.2.7
       redux: 5.0.1
 
   react-refresh@0.11.0: {}
 
-  react-router-dom@6.30.2(react-dom@19.0.3(react@19.0.3))(react@19.0.3):
+  react-router-dom@6.30.2(react-dom@19.0.0(react@19.0.0))(react@19.0.0):
     dependencies:
       '@remix-run/router': 1.23.1
-      react: 19.0.3
-      react-dom: 19.0.3(react@19.0.3)
-      react-router: 6.30.2(react@19.0.3)
+      react: 19.0.0
+      react-dom: 19.0.0(react@19.0.0)
+      react-router: 6.30.2(react@19.0.0)
 
-  react-router@6.30.2(react@19.0.3):
+  react-router@6.30.2(react@19.0.0):
     dependencies:
       '@remix-run/router': 1.23.1
-      react: 19.0.3
+      react: 19.0.0
 
-  react@19.0.3: {}
+  react@19.0.0: {}
 
   readable-stream@2.3.8:
     dependencies:
@@ -7528,9 +7528,9 @@ snapshots:
       punycode: 1.4.1
       qs: 6.14.0
 
-  use-sync-external-store@1.6.0(react@19.0.3):
+  use-sync-external-store@1.6.0(react@19.0.0):
     dependencies:
-      react: 19.0.3
+      react: 19.0.0
 
   util-deprecate@1.0.2: {}
 

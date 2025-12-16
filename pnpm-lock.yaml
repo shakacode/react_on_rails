@@ -56,7 +56,7 @@ importers:
         version: 6.9.1
       '@testing-library/react':
         specifier: ^16.2.0
-        version: 16.3.0(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.7))(@types/react@19.2.7)(react-dom@19.0.3(react@19.0.3))(react@19.0.3)
+        version: 16.3.0(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.7))(@types/react@19.2.7)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       '@tsconfig/node14':
         specifier: ^14.1.2
         version: 14.1.8
@@ -148,14 +148,14 @@ importers:
         specifier: ^0.3.4
         version: 0.3.15
       react:
-        specifier: 19.0.3
-        version: 19.0.3
+        specifier: ^19.0.0
+        version: 19.2.0
       react-dom:
-        specifier: 19.0.3
-        version: 19.0.3(react@19.0.3)
+        specifier: ^19.0.0
+        version: 19.2.0(react@19.2.0)
       react-on-rails-rsc:
         specifier: 19.0.2
-        version: 19.0.2(react-dom@19.0.3(react@19.0.3))(react@19.0.3)(webpack@5.103.0(@swc/core@1.15.3))
+        version: 19.0.2(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(webpack@5.103.0(@swc/core@1.15.3))
       redux:
         specifier: ^4.2.1
         version: 4.2.1
@@ -203,14 +203,14 @@ importers:
         specifier: ^5.5.0
         version: 5.5.0
       react:
-        specifier: 19.0.3
-        version: 19.0.3
+        specifier: ^19.0.1
+        version: 19.2.0
       react-dom:
-        specifier: 19.0.3
-        version: 19.0.3(react@19.0.3)
+        specifier: ^19.0.1
+        version: 19.2.0(react@19.2.0)
       react-on-rails-rsc:
         specifier: git+https://github.com/shakacode/react_on_rails_rsc.git#main
-        version: https://codeload.github.com/shakacode/react_on_rails_rsc/tar.gz/2bd5c460c38c1262ee4354a4aecba12479b55ce3(react-dom@19.0.3(react@19.0.3))(react@19.0.3)(webpack@5.103.0(@swc/core@1.15.3))
+        version: https://codeload.github.com/shakacode/react_on_rails_rsc/tar.gz/2bd5c460c38c1262ee4354a4aecba12479b55ce3(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(webpack@5.103.0(@swc/core@1.15.3))
 
   packages/react-on-rails-pro-node-renderer:
     dependencies:
@@ -4400,11 +4400,6 @@ packages:
   randombytes@2.1.0:
     resolution: {integrity: sha512-vYl3iOX+4CKUWuxGi9Ukhie6fsqXqS9FE2Zaic4tNFD2N2QQaXOMFbuKK4QmDHC0JO6B1Zp41J0LpT0oR68amQ==}
 
-  react-dom@19.0.3:
-    resolution: {integrity: sha512-a7ezLfxibhu6fZBVLwy6WEd3Jn/4H8JYVO8K8GtBfRf1Pl+ox7KFoMCzAGlxLZUXo0t44YZShzhhoDH3yMVdxQ==}
-    peerDependencies:
-      react: ^19.0.3
-
   react-dom@19.2.0:
     resolution: {integrity: sha512-UlbRu4cAiGaIewkPyiRGJk0imDN2T3JjieT6spoL2UeSf5od4n5LB/mQ4ejmxhCFT1tYe8IvaFulzynWovsEFQ==}
     peerDependencies:
@@ -4433,10 +4428,6 @@ packages:
       react: ^19.0.3
       react-dom: ^19.0.3
       webpack: ^5.59.0
-
-  react@19.0.3:
-    resolution: {integrity: sha512-owzQanTgpB8GF7pVL6mUwZZyhKzFePi9++GkFk54i9PRU0jq+z7v9Mwg7PAZJYCiYl5YwcyQGGq5/PLkesd8nw==}
-    engines: {node: '>=0.10.0'}
 
   react@19.2.0:
     resolution: {integrity: sha512-tmbWg6W31tQLeB5cdIBOicJDJRR2KzXsV7uSK9iNfLWQ5bIZfxuPEHp7M8wiHyHnn0DD1i7w3Zmin0FtkrwoCQ==}
@@ -4582,9 +4573,6 @@ packages:
   saxes@6.0.0:
     resolution: {integrity: sha512-xAg7SOnEhrm5zI3puOOKyy1OMcMlIJZYNJY7xLBwSze0UjhPLnWfj2GF2EpT0jmzaJKIWKHLsaSSajf35bcYnA==}
     engines: {node: '>=v12.22.7'}
-
-  scheduler@0.25.0:
-    resolution: {integrity: sha512-xFVuu11jh+xcO7JOAGJNOXld8/TcEHK/4CituBUeUb5hqxJLj9YuemAEuvm9gQ/+pgXYfbQuqAkiYu+u7YEsNA==}
 
   scheduler@0.27.0:
     resolution: {integrity: sha512-eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==}
@@ -6878,12 +6866,12 @@ snapshots:
       picocolors: 1.1.1
       redent: 3.0.0
 
-  '@testing-library/react@16.3.0(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.7))(@types/react@19.2.7)(react-dom@19.0.3(react@19.0.3))(react@19.0.3)':
+  '@testing-library/react@16.3.0(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.7))(@types/react@19.2.7)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)':
     dependencies:
       '@babel/runtime': 7.28.4
       '@testing-library/dom': 10.4.1
-      react: 19.0.3
-      react-dom: 19.0.3(react@19.0.3)
+      react: 19.2.0
+      react-dom: 19.2.0(react@19.2.0)
     optionalDependencies:
       '@types/react': 19.2.7
       '@types/react-dom': 19.2.3(@types/react@19.2.7)
@@ -10314,11 +10302,6 @@ snapshots:
     dependencies:
       safe-buffer: 5.2.1
 
-  react-dom@19.0.3(react@19.0.3):
-    dependencies:
-      react: 19.0.3
-      scheduler: 0.25.0
-
   react-dom@19.2.0(react@19.2.0):
     dependencies:
       react: 19.2.0
@@ -10330,25 +10313,23 @@ snapshots:
 
   react-is@18.3.1: {}
 
-  react-on-rails-rsc@19.0.2(react-dom@19.0.3(react@19.0.3))(react@19.0.3)(webpack@5.103.0(@swc/core@1.15.3)):
+  react-on-rails-rsc@19.0.2(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(webpack@5.103.0(@swc/core@1.15.3)):
     dependencies:
       acorn-loose: 8.5.2
       neo-async: 2.6.2
-      react: 19.0.3
-      react-dom: 19.0.3(react@19.0.3)
+      react: 19.2.0
+      react-dom: 19.2.0(react@19.2.0)
       webpack: 5.103.0(@swc/core@1.15.3)
       webpack-sources: 3.3.3
 
-  react-on-rails-rsc@https://codeload.github.com/shakacode/react_on_rails_rsc/tar.gz/2bd5c460c38c1262ee4354a4aecba12479b55ce3(react-dom@19.0.3(react@19.0.3))(react@19.0.3)(webpack@5.103.0(@swc/core@1.15.3)):
+  react-on-rails-rsc@https://codeload.github.com/shakacode/react_on_rails_rsc/tar.gz/2bd5c460c38c1262ee4354a4aecba12479b55ce3(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(webpack@5.103.0(@swc/core@1.15.3)):
     dependencies:
       acorn-loose: 8.5.2
       neo-async: 2.6.2
-      react: 19.0.3
-      react-dom: 19.0.3(react@19.0.3)
+      react: 19.2.0
+      react-dom: 19.2.0(react@19.2.0)
       webpack: 5.103.0(@swc/core@1.15.3)
       webpack-sources: 3.3.3
-
-  react@19.0.3: {}
 
   react@19.2.0: {}
 
@@ -10498,8 +10479,6 @@ snapshots:
   saxes@6.0.0:
     dependencies:
       xmlchars: 2.2.0
-
-  scheduler@0.25.0: {}
 
   scheduler@0.27.0: {}
 
