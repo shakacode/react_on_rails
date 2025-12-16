@@ -287,10 +287,10 @@ Date:   Mon Jan 1 12:00:00 2024 -0500
 
     Bump version to 16.2.0
 
-diff --git a/lib/react_on_rails/version.rb b/lib/react_on_rails/version.rb
+diff --git a/react_on_rails/lib/react_on_rails/version.rb b/react_on_rails/lib/react_on_rails/version.rb
 index 1234567..abcdefg 100644
---- a/lib/react_on_rails/version.rb
-+++ b/lib/react_on_rails/version.rb
+--- a/react_on_rails/lib/react_on_rails/version.rb
++++ b/react_on_rails/lib/react_on_rails/version.rb
 @@ -1,3 +1,3 @@
  module ReactOnRails
 -  VERSION = "16.1.1"

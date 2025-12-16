@@ -205,9 +205,9 @@ if [ "$RUN_DUMMY" = true ]; then
     echo ""
   else
     # Build dummy app if needed
-    if [ ! -d "spec/dummy/node_modules" ]; then
+    if [ ! -d "react_on_rails/spec/dummy/node_modules" ]; then
       echo -e "${YELLOW}Setting up dummy app...${NC}"
-      if ! (cd spec/dummy && pnpm install); then
+      if ! (cd react_on_rails/spec/dummy && pnpm install); then
         echo -e "${YELLOW}⚠ Dummy app setup failed, skipping dummy app tests${NC}"
         echo ""
       else

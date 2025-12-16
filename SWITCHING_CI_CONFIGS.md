@@ -298,7 +298,7 @@ If you get package resolution errors:
 
 ```bash
 # Clean everything and try again
-rm -rf node_modules yarn.lock spec/dummy/node_modules spec/dummy/yarn.lock
+rm -rf node_modules yarn.lock react_on_rails/spec/dummy/node_modules react_on_rails/spec/dummy/yarn.lock
 yarn install
 cd react_on_rails/spec/dummy && yarn install
 ```
