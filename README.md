@@ -103,7 +103,7 @@ rake react_on_rails:doctor
 
 The doctor command checks your environment, dependencies, and configuration files to identify potential issues. Use `VERBOSE=true rake react_on_rails:doctor` for detailed output.
 
-For detailed upgrade instructions, see [upgrade guide documentation](docs/guides/upgrading-react-on-rails.md).
+For detailed upgrade instructions, see [upgrade guide documentation](docs/upgrading/upgrading-react-on-rails.md).
 
 ## React on Rails Pro
 
@@ -138,19 +138,19 @@ To provide a high-performance framework for integrating Ruby on Rails with React
 
 ## ✨ Why React on Rails?
 
-| Feature                       | Benefit                                                                                                                                                                                      |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ⚡ **Rspack Support**         | [~20x faster builds](./docs/api-reference/generator-details.md#rspack-support) with Rspack bundler - dramatically reduce build times in development and CI                                   |
-| 🎯 **Smart Bundle Loading**   | [Automated bundle optimization](./docs/guides/auto-bundling-file-system-based-automated-bundle-generation.md) based on components used - no more manual `javascript_pack_tags` configuration |
-| 🌟 **Server-Side Rendering**  | Enhanced React Server Components support for better SEO and UX performance                                                                                                                   |
-| 🚀 **Advanced Loading**       | `sync`, `async`, and `defer` options for optimal performance based on your needs                                                                                                             |
-| 🔥 **Hot Module Replacement** | Instant feedback during development with tight [Shakapacker](https://github.com/shakacode/shakapacker) integration                                                                           |
-| 📦 **Easy Props Passing**     | Direct Rails → React data flow without separate API calls                                                                                                                                    |
-| 🗺️ **Router Integration**     | [React Router](https://reactrouter.com/) with SSR support                                                                                                                                    |
-| 🏪 **State Management**       | [Redux](https://redux.js.org/) integration with server-side rendering                                                                                                                        |
-| 🌍 **Internationalization**   | [I18n and localization support](https://www.shakacode.com/react-on-rails/docs/guides/i18n) for global apps                                                                                   |
-| 🎨 **Modern React**           | React 18+ with enhanced React Server Components and latest patterns                                                                                                                          |
-| 🦄 **ReScript Support**       | [ReScript integration](https://github.com/shakacode/rescript-react-on-rails-example) for type-safe development                                                                               |
+| Feature                       | Benefit                                                                                                                                                                                             |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ⚡ **Rspack Support**         | [~20x faster builds](./docs/api-reference/generator-details.md#rspack-support) with Rspack bundler - dramatically reduce build times in development and CI                                          |
+| 🎯 **Smart Bundle Loading**   | [Automated bundle optimization](./docs/core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md) based on components used - no more manual `javascript_pack_tags` configuration |
+| 🌟 **Server-Side Rendering**  | Enhanced React Server Components support for better SEO and UX performance                                                                                                                          |
+| 🚀 **Advanced Loading**       | `sync`, `async`, and `defer` options for optimal performance based on your needs                                                                                                                    |
+| 🔥 **Hot Module Replacement** | Instant feedback during development with tight [Shakapacker](https://github.com/shakacode/shakapacker) integration                                                                                  |
+| 📦 **Easy Props Passing**     | Direct Rails → React data flow without separate API calls                                                                                                                                           |
+| 🗺️ **Router Integration**     | [React Router](https://reactrouter.com/) with SSR support                                                                                                                                           |
+| 🏪 **State Management**       | [Redux](https://redux.js.org/) integration with server-side rendering                                                                                                                               |
+| 🌍 **Internationalization**   | [I18n and localization support](https://www.shakacode.com/react-on-rails/docs/guides/i18n) for global apps                                                                                          |
+| 🎨 **Modern React**           | React 18+ with enhanced React Server Components and latest patterns                                                                                                                                 |
+| 🦄 **ReScript Support**       | [ReScript integration](https://github.com/shakacode/rescript-react-on-rails-example) for type-safe development                                                                                      |
 
 > **Trusted by thousands** - See [real production sites](https://publicwww.com/websites/%22react-on-rails%22++-undeveloped.com+depth%3Aall/) using React on Rails
 

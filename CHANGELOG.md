@@ -288,7 +288,7 @@ To migrate to React on Rails Pro:
 
 **React on Rails v16 is a major release that modernizes the library with ESM support, removes legacy Webpacker compatibility, and introduces significant performance improvements. This release builds on the foundation of v14 with enhanced RSC (React Server Components) support and streamlined configuration.**
 
-See [Release Notes](docs/release-notes/16.0.0.md) for complete migration guide.
+See [Release Notes](docs/upgrading/release-notes/16.0.0.md) for complete migration guide.
 
 #### Major Enhancements
 
