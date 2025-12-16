@@ -78,8 +78,8 @@
   "devDependencies": {
     "@types/mock-fs": "^4.13.4",
     "mock-fs": "^5.5.0",
-    "react": "^19.0.1",
-    "react-dom": "^19.0.1",
+    "react": "19.0.3",
+    "react-dom": "19.0.3",
     "react-on-rails-rsc": "git+https://github.com/shakacode/react_on_rails_rsc.git#main"
   }
 }
