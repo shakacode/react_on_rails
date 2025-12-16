@@ -60,7 +60,7 @@
   "peerDependencies": {
     "react": ">= 16",
     "react-dom": ">= 16",
-    "react-on-rails-rsc": "19.0.3"
+    "react-on-rails-rsc": ">= 19.0.2 <= 19.2.3"
   },
   "peerDependenciesMeta": {
     "react-on-rails-rsc": {
@@ -78,8 +78,8 @@
   "devDependencies": {
     "@types/mock-fs": "^4.13.4",
     "mock-fs": "^5.5.0",
-    "react": "^19.0.1",
-    "react-dom": "^19.0.1",
-    "react-on-rails-rsc": "^19.0.3"
+    "react": "^19.0.3",
+    "react-dom": "^19.0.3",
+    "react-on-rails-rsc": "^19.0.4"
   }
 }
