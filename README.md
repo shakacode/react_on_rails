@@ -148,13 +148,13 @@ To provide a high-performance framework for integrating Ruby on Rails with React
 | 📦 **Easy Props Passing**     | Direct Rails → React data flow without separate API calls                                                                                                                                           |
 | 🗺️ **Router Integration**     | [React Router](https://reactrouter.com/) with SSR support                                                                                                                                           |
 | 🏪 **State Management**       | [Redux](https://redux.js.org/) integration with server-side rendering                                                                                                                               |
-| 🌍 **Internationalization**   | [I18n and localization support](https://www.shakacode.com/react-on-rails/docs/guides/i18n) for global apps                                                                                          |
+| 🌍 **Internationalization**   | [I18n and localization support](https://www.shakacode.com/react-on-rails/docs/building-features/i18n) for global apps                                                                                          |
 | 🎨 **Modern React**           | React 18+ with enhanced React Server Components and latest patterns                                                                                                                                 |
 | 🦄 **ReScript Support**       | [ReScript integration](https://github.com/shakacode/rescript-react-on-rails-example) for type-safe development                                                                                      |
 
 > **Trusted by thousands** - See [real production sites](https://publicwww.com/websites/%22react-on-rails%22++-undeveloped.com+depth%3Aall/) using React on Rails
 
-See [Rails/Shakapacker React Integration Options](https://www.shakacode.com/react-on-rails/docs/guides/rails-webpacker-react-integration-options) for comparisons to other gems.
+See [Rails/Shakapacker React Integration Options](https://www.shakacode.com/react-on-rails/docs/building-features/rails-webpacker-react-integration-options) for comparisons to other gems.
 
 ## Online demo
 
