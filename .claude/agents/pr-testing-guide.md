@@ -456,7 +456,7 @@ gh pr create  # Include testing summary from agent
 - [ ] **MANDATORY**: Build test: `pnpm run build && ls -la packages/react-on-rails/lib/`
 - [ ] **MANDATORY**: Prepack test: `pnpm nps build.prepack`
 - [ ] **MANDATORY**: yalc publish test: `pnpm run yalc:publish`
-- [ ] Workspace linking: `pnpm workspaces info`
+- [ ] Workspace linking: `pnpm list -r`
 - [ ] Full test suite: `bundle exec rake`
 
 #### If webpack configs changed:

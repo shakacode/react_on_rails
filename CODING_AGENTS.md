@@ -249,7 +249,7 @@ Use `gh pr create` with:
 
 - Don't assume packages are installed globally
 - Use `bundle exec` for Ruby commands
-- Verify setup with `bundle && pnpm` when needed
+- Verify setup with `bundle && pnpm install -r` when needed
 
 ### 4. RuboCop Configuration
 
