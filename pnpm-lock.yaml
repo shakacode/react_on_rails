@@ -56,7 +56,7 @@ importers:
         version: 6.9.1
       '@testing-library/react':
         specifier: ^16.2.0
-        version: 16.3.0(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.7))(@types/react@19.2.7)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
+        version: 16.3.0(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.7))(@types/react@19.2.7)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       '@tsconfig/node14':
         specifier: ^14.1.2
         version: 14.1.8
@@ -148,14 +148,14 @@ importers:
         specifier: ^0.3.4
         version: 0.3.15
       react:
-        specifier: ^19.0.0
-        version: 19.2.0
+        specifier: ^19.2.3
+        version: 19.2.3
       react-dom:
-        specifier: ^19.0.0
-        version: 19.2.0(react@19.2.0)
+        specifier: ^19.2.3
+        version: 19.2.3(react@19.2.3)
       react-on-rails-rsc:
         specifier: 19.0.2
-        version: 19.0.2(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(webpack@5.103.0(@swc/core@1.15.3))
+        version: 19.0.2(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(webpack@5.103.0(@swc/core@1.15.3))
       redux:
         specifier: ^4.2.1
         version: 4.2.1
@@ -203,10 +203,10 @@ importers:
         specifier: ^5.5.0
         version: 5.5.0
       react:
-        specifier: ^19.0.1
+        specifier: ^19.0.3
         version: 19.2.0
       react-dom:
-        specifier: ^19.0.1
+        specifier: ^19.0.3
         version: 19.2.0(react@19.2.0)
       react-on-rails-rsc:
         specifier: git+https://github.com/shakacode/react_on_rails_rsc.git#main
@@ -4405,6 +4405,11 @@ packages:
     peerDependencies:
       react: ^19.2.0
 
+  react-dom@19.2.3:
+    resolution: {integrity: sha512-yELu4WmLPw5Mr/lmeEpox5rw3RETacE++JgHqQzd2dg+YbJuat3jH4ingc+WPZhxaoFzdv9y33G+F7Nl5O0GBg==}
+    peerDependencies:
+      react: ^19.2.3
+
   react-is@16.13.1:
     resolution: {integrity: sha512-24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ==}
 
@@ -4431,6 +4436,10 @@ packages:
 
   react@19.2.0:
     resolution: {integrity: sha512-tmbWg6W31tQLeB5cdIBOicJDJRR2KzXsV7uSK9iNfLWQ5bIZfxuPEHp7M8wiHyHnn0DD1i7w3Zmin0FtkrwoCQ==}
+    engines: {node: '>=0.10.0'}
+
+  react@19.2.3:
+    resolution: {integrity: sha512-Ku/hhYbVjOQnXDZFv2+RibmLFGwFdeeKHFcOTlrt7xplBnya5OGn/hIRDsqDiSUcfORsDC7MPxwork8jBwsIWA==}
     engines: {node: '>=0.10.0'}
 
   readline-sync@1.4.10:
@@ -6866,12 +6875,12 @@ snapshots:
       picocolors: 1.1.1
       redent: 3.0.0
 
-  '@testing-library/react@16.3.0(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.7))(@types/react@19.2.7)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)':
+  '@testing-library/react@16.3.0(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.7))(@types/react@19.2.7)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)':
     dependencies:
       '@babel/runtime': 7.28.4
       '@testing-library/dom': 10.4.1
-      react: 19.2.0
-      react-dom: 19.2.0(react@19.2.0)
+      react: 19.2.3
+      react-dom: 19.2.3(react@19.2.3)
     optionalDependencies:
       '@types/react': 19.2.7
       '@types/react-dom': 19.2.3(@types/react@19.2.7)
@@ -10307,18 +10316,23 @@ snapshots:
       react: 19.2.0
       scheduler: 0.27.0
 
+  react-dom@19.2.3(react@19.2.3):
+    dependencies:
+      react: 19.2.3
+      scheduler: 0.27.0
+
   react-is@16.13.1: {}
 
   react-is@17.0.2: {}
 
   react-is@18.3.1: {}
 
-  react-on-rails-rsc@19.0.2(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(webpack@5.103.0(@swc/core@1.15.3)):
+  react-on-rails-rsc@19.0.2(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(webpack@5.103.0(@swc/core@1.15.3)):
     dependencies:
       acorn-loose: 8.5.2
       neo-async: 2.6.2
-      react: 19.2.0
-      react-dom: 19.2.0(react@19.2.0)
+      react: 19.2.3
+      react-dom: 19.2.3(react@19.2.3)
       webpack: 5.103.0(@swc/core@1.15.3)
       webpack-sources: 3.3.3
 
@@ -10332,6 +10346,8 @@ snapshots:
       webpack-sources: 3.3.3
 
   react@19.2.0: {}
+
+  react@19.2.3: {}
 
   readline-sync@1.4.10: {}
 
