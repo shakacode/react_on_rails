@@ -65,11 +65,11 @@ The task updates versions in all the following files:
 
 **Core package:**
 
-- `lib/react_on_rails/version.rb` (source of truth for all packages)
+- `react_on_rails/lib/react_on_rails/version.rb` (source of truth for all packages)
 - `package.json` (root workspace)
 - `packages/react-on-rails/package.json`
 - `Gemfile.lock` (root)
-- `spec/dummy/Gemfile.lock`
+- `react_on_rails/spec/dummy/Gemfile.lock`
 
 **Pro package:**
 
@@ -110,7 +110,7 @@ When you run `rake release[X.Y.Z]`, the task will:
 2. Verify NPM authentication (will run `npm login` if needed)
 3. Pull latest changes from the remote repository
 4. Clean up example directories
-5. Bump the gem version in `lib/react_on_rails/version.rb`
+5. Bump the gem version in `react_on_rails/lib/react_on_rails/version.rb`
 6. Update all package.json files with the new version
 7. Update the Pro package's dependency on react-on-rails
 8. Update the dummy app's Gemfile.lock
