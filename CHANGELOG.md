@@ -709,7 +709,7 @@ _Major bump because dropping support for Ruby 2.7 and deprecated `webpackConfigL
 
 ### [12.0.0] - 2020-07-08
 
-For upgrade instructions, see [docs/guides/upgrading-react-on-rails.md](https://www.shakacode.com/react-on-rails/docs/upgrading/upgrading-react-on-rails).
+For upgrade instructions, see the [upgrading guide](https://www.shakacode.com/react-on-rails/docs/upgrading/upgrading-react-on-rails).
 
 #### Major Improvements
 
