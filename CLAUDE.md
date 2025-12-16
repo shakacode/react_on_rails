@@ -208,7 +208,7 @@ bin/ci-switch-config latest
 
 **See `SWITCHING_CI_CONFIGS.md` for detailed usage and troubleshooting.**
 
-**See `spec/dummy/TESTING_LOCALLY.md` for local testing tips and known issues.**
+**See `react_on_rails/spec/dummy/TESTING_LOCALLY.md` for local testing tips and known issues.**
 
 #### Re-run Failed CI Jobs
 
@@ -252,7 +252,7 @@ This script:
 - 🎯 **Runs only failing examples** - not the entire test suite
 - 📋 **Parses RSpec output** - extracts spec paths automatically
 - 🔄 **Deduplicates** - removes duplicate specs
-- 📁 **Auto-detects directory** - runs from spec/dummy when needed
+- 📁 **Auto-detects directory** - runs from react_on_rails/spec/dummy when needed
 
 ## RBS Type Checking
 
@@ -476,7 +476,7 @@ This is a monorepo containing both the open-source package and the Pro package:
 
 ### Examples and Testing
 
-- **Dummy app**: `spec/dummy/` - Rails app for testing integration
+- **Dummy app**: `react_on_rails/spec/dummy/` - Rails app for testing integration
 - **Examples**: Generated via rake tasks for different webpack configurations
 - **Rake tasks**: Defined in `rakelib/` for various development operations
 
@@ -533,7 +533,7 @@ config.module.rules.forEach((rule, index) => {
 ### 2. Run Debug Scripts
 
 ```bash
-cd spec/dummy  # or react_on_rails_pro/spec/dummy
+cd react_on_rails/spec/dummy  # or react_on_rails_pro/spec/dummy
 NODE_ENV=test RAILS_ENV=test node debug-webpack-rules.js
 NODE_ENV=test RAILS_ENV=test node debug-webpack-with-config.js
 ```
@@ -585,7 +585,7 @@ Playwright E2E testing is integrated via the `cypress-on-rails` gem (v1.19+), wh
 The gem and Playwright are already configured. To install Playwright browsers:
 
 ```bash
-cd spec/dummy
+cd react_on_rails/spec/dummy
 pnpm playwright install --with-deps
 ```
 
@@ -594,7 +594,7 @@ pnpm playwright install --with-deps
 **Note:** Playwright will automatically start the Rails server on port 5017 before running tests. You don't need to manually start the server.
 
 ```bash
-cd spec/dummy
+cd react_on_rails/spec/dummy
 
 # Run all tests (Rails server auto-starts)
 pnpm test:e2e
@@ -617,7 +617,7 @@ pnpm test:e2e e2e/playwright/e2e/react_on_rails/basic_components.spec.js
 
 ### Writing Tests
 
-Tests are located in `spec/dummy/e2e/playwright/e2e/`. The gem provides helpful commands for Rails integration:
+Tests are located in `react_on_rails/spec/dummy/e2e/playwright/e2e/`. The gem provides helpful commands for Rails integration:
 
 ```javascript
 import { test, expect } from "@playwright/test";
@@ -675,7 +675,7 @@ end
 ### Test Organization
 
 ```
-spec/dummy/e2e/
+react_on_rails/spec/dummy/e2e/
 ├── playwright.config.js          # Playwright configuration
 ├── playwright/
 │   ├── support/
@@ -784,8 +784,8 @@ end
 
 ### Testing Engines
 
-- **Dummy app** (`spec/dummy/`): Full Rails app for integration testing
-- **Unit tests** (`spec/react_on_rails/`): Test gem code in isolation
+- **Dummy app** (`react_on_rails/spec/dummy/`): Full Rails app for integration testing
+- **Unit tests** (`react_on_rails/spec/react_on_rails/`): Test gem code in isolation
 - Always test both contexts: gem code alone and gem + host app integration
 
 ### Common Pitfalls
@@ -800,6 +800,6 @@ end
 Exclude these directories to prevent IDE slowdowns:
 
 - `/coverage`, `/tmp`, `/gen-examples`, `/packages/react-on-rails/lib`
-- `/node_modules`, `/spec/dummy/node_modules`, `/spec/dummy/tmp`
-- `/spec/dummy/app/assets/webpack`, `/spec/dummy/log`
-- `/spec/dummy/e2e/playwright-report`, `/spec/dummy/test-results`
+- `/node_modules`, `/react_on_rails/spec/dummy/node_modules`, `/react_on_rails/spec/dummy/tmp`
+- `/react_on_rails/spec/dummy/app/assets/webpack`, `/react_on_rails/spec/dummy/log`
+- `/react_on_rails/spec/dummy/e2e/playwright-report`, `/react_on_rails/spec/dummy/test-results`

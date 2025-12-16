@@ -12,8 +12,8 @@ gen-examples/examples/*
 packages/*/lib/*
 spec/react_on_rails/dummy-for-generators/app/javascript/bundles/HelloWorld/*
 bundle/
-spec/dummy/lib/bs/**
-spec/dummy/public
+react_on_rails/spec/dummy/lib/bs/**
+react_on_rails/spec/dummy/public
 **/.yalc/**
 **/*generated*
 *.res.js

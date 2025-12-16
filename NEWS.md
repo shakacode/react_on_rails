@@ -5,7 +5,7 @@ _A history of the news. A few bullets at the top will also show on the [README.m
 - **October 14, 2020**: [RUBY ROGUES
   RR 474: React on Rails V12 – Don’t Shave That Yak! with Justin Gordon](https://devchat.tv/ruby-rogues/rr-474-react-on-rails-v12-dont-shave-that-yak-with-justin-gordon/).
 
-- **October 1, 2020**: See the [spec/dummy](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy) example repo for a simple configuration of Webpack via the rails/webpacker gem
+- **October 1, 2020**: See the [spec/dummy](https://github.com/shakacode/react_on_rails/tree/master/react_on_rails/spec/dummy) example repo for a simple configuration of Webpack via the rails/webpacker gem
   that supports SSR.
 - **August 2, 2020**: See the example repo of [React on Rails Tutorial With SSR, HMR fast refresh, and TypeScript](https://github.com/shakacode/react_on_rails_demo_ssr_hmr) for a new way to set up the creation of your SSR bundle with `rails/webpacker`.
 - July 8, 2020: Release **v12**.
@@ -40,7 +40,7 @@ _A history of the news. A few bullets at the top will also show on the [README.m
 - 2016-03-18: [Slides on React on Rails](http://www.slideshare.net/justingordon/react-on-rails-v4032).
 - 2016-03-17: **4.0.3** Shipped! Includes using the new Heroku buildpack steps, several smaller changes detailed in the [CHANGELOG.md](./CHANGELOG.md).
 - 2016-03-17: **4.0.2** Shipped! Includes using the new Heroku buildpack steps.
-  - Better support for hot reloading of assets from Rails with new helpers and updates to the sample testing app, [spec/dummy](spec/dummy).
+  - Better support for hot reloading of assets from Rails with new helpers and updates to the sample testing app, [react_on_rails/spec/dummy](react_on_rails/spec/dummy).
   - Better support for Turbolinks 5.
   - Controller rendering of shared Redux stores and ability to render store data at bottom of HTML page.
   - See [#311](https://github.com/shakacode/react_on_rails/pull/311/files).

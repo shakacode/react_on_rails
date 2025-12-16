@@ -410,7 +410,7 @@ gem "webpacker"
       hmr: false
     ```
     Set hmr to your preference.
-  - See the example `spec/dummy/config/webpacker.yml`.
+  - See the example `react_on_rails/spec/dummy/config/webpacker.yml`.
   - Remove keys `hot_reloading_host` and `hot_reloading_enabled_by_default`. These are replaced by the `dev_server` key.
   - Rename `webpack_public_output_dir` to `public_output_path`.
 

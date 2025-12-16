@@ -89,7 +89,7 @@ Unlike Turbo Frames, Turbo Streams don't dispatch the normal `turbo:render` even
 
 - See [v16.0 Release Notes](../upgrading/release-notes/16.0.0.md#enhanced-script-loading-strategies) for full `immediate_hydration` documentation
 - See [Streaming Server Rendering](./streaming-server-rendering.md) for another Pro use case
-- Working example in codebase: `spec/dummy/app/views/pages/turbo_stream_send_hello_world.turbo_stream.erb`
+- Working example in codebase: `react_on_rails/spec/dummy/app/views/pages/turbo_stream_send_hello_world.turbo_stream.erb`
 - Contact [justin@shakacode.com](mailto:justin@shakacode.com) for React on Rails Pro licensing
 
 **Migration Note:** If you're referencing [PR #1620](https://github.com/shakacode/react_on_rails/pull/1620) discussions, note that `force_load` was renamed to `immediate_hydration` in v16.0.

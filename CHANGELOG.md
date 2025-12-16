@@ -1591,7 +1591,7 @@ All 5.1.0 changes can be found in [#362](https://github.com/shakacode/react_on_r
 
 ##### Added
 
-- [spec/dummy](spec/dummy) is a full sample app of React on Rails techniques **including** the hot reloading of assets from Rails!
+- [react_on_rails/spec/dummy](react_on_rails/spec/dummy) is a full sample app of React on Rails techniques **including** the hot reloading of assets from Rails!
 - Added helpers `env_stylesheet_link_tag` and `env_javascript_include_tag` to support hot reloading Rails. See the [README.md](./README.md) for more details and see the example application in `spec/dummy`. Also see how this is used in the [tutorial: application.html.erb](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/app%2Fviews%2Flayouts%2Fapplication.html.erb#L6)
 - Added optional parameter for ReactOnRails.getStore(name, throwIfMissing = true) so that you can check if a store is defined easily.
 - Added controller `module ReactOnRails::Controller`. Adds method `redux_store` to set up Redux stores in the view.
@@ -1693,7 +1693,7 @@ All 5.1.0 changes can be found in [#362](https://github.com/shakacode/react_on_r
 
 ##### Migration Steps v2 to v3
 
-- See [these changes of spec/dummy/spec/rails_helper.rb](https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/spec/rails_helper.rb#L36..38) for an example. Add this line to your `rails_helper.rb`:
+- See [these changes of spec/dummy/spec/rails_helper.rb](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails/spec/dummy/spec/rails_helper.rb#L36..38) for an example. Add this line to your `rails_helper.rb`:
 
 ```ruby
 RSpec.configure do |config|

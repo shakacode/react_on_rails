@@ -18,7 +18,7 @@ This guide assumes you're already using Shakapacker 9.0+. If you need to upgrade
 
 ## Migration Steps
 
-**Note**: This migration has been successfully implemented in the React on Rails standard dummy app (`spec/dummy`). The Pro dummy app (`react_on_rails_pro/spec/dummy`) continues using Babel for RSC stability.
+**Note**: This migration has been successfully implemented in the React on Rails standard dummy app (`react_on_rails/spec/dummy`). The Pro dummy app (`react_on_rails_pro/spec/dummy`) continues using Babel for RSC stability.
 
 ### 1. Install Required Dependencies
 
@@ -260,7 +260,7 @@ Test coverage includes:
 
 **For React on Rails projects without React Server Components**: ✅ **Migration to SWC is recommended**
 
-The standard React on Rails dummy app (`spec/dummy`) successfully uses SWC, demonstrating its compatibility with core React on Rails features.
+The standard React on Rails dummy app (`react_on_rails/spec/dummy`) successfully uses SWC, demonstrating its compatibility with core React on Rails features.
 
 **For projects using React Server Components**: ⚠️ **Stay with Babel for now** - The React on Rails Pro dummy app continues using Babel due to RSC's experimental status with SWC. Consider staying with Babel until SWC RSC support stabilizes, or conduct extensive testing before production deployment.
 
