@@ -77,7 +77,7 @@ setOptions(options);
  * Allow directly calling the page loaded script in case the default events that trigger React
  * rendering are not sufficient, such as when loading JavaScript asynchronously with TurboLinks:
  * More details can be found here:
- * https://www.shakacode.com/react-on-rails/docs/rails/turbolinks
+ * https://www.shakacode.com/react-on-rails/docs/building-features/turbolinks
  */
 reactOnRailsPageLoaded();
 
