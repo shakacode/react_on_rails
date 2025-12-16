@@ -2,17 +2,21 @@
 # frozen_string_literal: true
 
 # Converts benchmark summary files to JSON format for github-action-benchmark
-# Outputs two files:
-#   - benchmark_rps.json (customBiggerIsBetter)
-#   - benchmark_latency.json (customSmallerIsBetter)
+# Outputs a single file with all metrics using customSmallerIsBetter:
+#   - benchmark.json (customSmallerIsBetter)
+#     - RPS values are negated (so higher RPS = lower negative value = better)
+#     - Latencies are kept as-is (lower is better)
+#     - Failed percentage is kept as-is (lower is better)
 #
-# Usage: ruby convert_to_benchmark_json.rb [prefix]
+# Usage: ruby convert_to_benchmark_json.rb [prefix] [--append]
 #   prefix: Optional prefix for benchmark names (e.g., "Core: " or "Pro: ")
+#   --append: Append to existing benchmark.json instead of overwriting
 
 require "json"
 
 BENCH_RESULTS_DIR = "bench_results"
 PREFIX = ARGV[0] || ""
+APPEND_MODE = ARGV.include?("--append")
 
 # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
@@ -88,22 +92,21 @@ def calculate_failed_percentage(status_str)
   (failed.to_f / total * 100).round(2)
 end
 
-# Convert results to customBiggerIsBetter format (for RPS)
-def to_rps_json(results)
-  results.map do |r|
-    {
-      name: "#{r[:name]} - RPS",
-      unit: "requests/sec",
-      value: r[:rps]
-    }
-  end
-end
-
-# Convert results to customSmallerIsBetter format (for latencies and failure rate)
-def to_latency_json(results)
+# Convert all results to customSmallerIsBetter format
+# RPS is negated (higher RPS = lower negative value = better)
+# Latencies and failure rates are kept as-is (lower is better)
+def to_unified_json(results)
   output = []
 
   results.each do |r|
+    # Add negated RPS (higher RPS becomes lower negative value, which is better)
+    output << {
+      name: "#{r[:name]} - RPS",
+      unit: "requests/sec (negated)",
+      value: -r[:rps]
+    }
+
+    # Add latencies (lower is better)
     output << {
       name: "#{r[:name]} - p50 latency",
       unit: "ms",
@@ -119,6 +122,8 @@ def to_latency_json(results)
       unit: "ms",
       value: r[:p99]
     }
+
+    # Add failure percentage (lower is better)
     output << {
       name: "#{r[:name]} - failed requests",
       unit: "%",
@@ -147,12 +152,22 @@ if all_results.empty?
   exit 0
 end
 
-# Write RPS JSON (bigger is better)
-rps_json = to_rps_json(all_results)
-File.write(File.join(BENCH_RESULTS_DIR, "benchmark_rps.json"), JSON.pretty_generate(rps_json))
-puts "Wrote #{rps_json.length} RPS metrics to benchmark_rps.json"
+# Convert current results to JSON
+new_metrics = to_unified_json(all_results)
+output_path = File.join(BENCH_RESULTS_DIR, "benchmark.json")
 
-# Write latency/failure JSON (smaller is better)
-latency_json = to_latency_json(all_results)
-File.write(File.join(BENCH_RESULTS_DIR, "benchmark_latency.json"), JSON.pretty_generate(latency_json))
-puts "Wrote #{latency_json.length} latency/failure metrics to benchmark_latency.json"
+# In append mode, merge with existing metrics
+if APPEND_MODE && File.exist?(output_path)
+  existing_metrics = JSON.parse(File.read(output_path))
+  unified_json = existing_metrics + new_metrics
+  puts "Appended #{new_metrics.length} metrics to existing #{existing_metrics.length} metrics"
+else
+  unified_json = new_metrics
+  puts "Created #{unified_json.length} new metrics"
+end
+
+# Write unified JSON (all metrics using customSmallerIsBetter with negated RPS)
+File.write(output_path, JSON.pretty_generate(unified_json))
+puts "Wrote #{unified_json.length} total metrics to benchmark.json (from #{all_results.length} benchmark results)"
+puts "  - RPS values are negated (higher RPS = lower negative value = better)"
+puts "  - Latencies and failure rates use original values (lower is better)"

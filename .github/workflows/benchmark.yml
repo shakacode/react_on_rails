@@ -302,40 +302,6 @@ jobs:
         run: |
           ruby benchmarks/convert_to_benchmark_json.rb "Core: "
 
-      - name: Store Core RPS benchmark results
-        if: env.RUN_CORE
-        uses: benchmark-action/github-action-benchmark@v1
-        with:
-          name: Core Benchmark - RPS
-          tool: customBiggerIsBetter
-          output-file-path: bench_results/benchmark_rps.json
-          gh-pages-branch: benchmark-data
-          benchmark-data-dir-path: docs/benchmarks
-          alert-threshold: '150%'
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          comment-on-alert: true
-          alert-comment-cc-users: '@alexeyr-ci2'
-          fail-on-alert: true
-          summary-always: true
-          auto-push: false
-
-      - name: Store Core latency benchmark results
-        if: env.RUN_CORE
-        uses: benchmark-action/github-action-benchmark@v1
-        with:
-          name: Core Benchmark - Latency
-          tool: customSmallerIsBetter
-          output-file-path: bench_results/benchmark_latency.json
-          gh-pages-branch: benchmark-data
-          benchmark-data-dir-path: docs/benchmarks
-          alert-threshold: '150%'
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          comment-on-alert: true
-          alert-comment-cc-users: '@alexeyr-ci2'
-          fail-on-alert: true
-          summary-always: true
-          auto-push: false
-
       - name: Upload Core benchmark results
         uses: actions/upload-artifact@v4
         if: env.RUN_CORE && always()
@@ -512,41 +478,7 @@ jobs:
       - name: Convert Pro benchmark results to JSON
         if: env.RUN_PRO
         run: |
-          ruby benchmarks/convert_to_benchmark_json.rb "Pro: "
-
-      - name: Store Pro RPS benchmark results
-        if: env.RUN_PRO
-        uses: benchmark-action/github-action-benchmark@v1
-        with:
-          name: Pro Benchmark - RPS
-          tool: customBiggerIsBetter
-          output-file-path: bench_results/benchmark_rps.json
-          gh-pages-branch: benchmark-data
-          benchmark-data-dir-path: docs/benchmarks
-          alert-threshold: '150%'
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          comment-on-alert: true
-          alert-comment-cc-users: '@alexeyr-ci2'
-          fail-on-alert: true
-          summary-always: true
-          auto-push: false
-
-      - name: Store Pro latency benchmark results
-        if: env.RUN_PRO
-        uses: benchmark-action/github-action-benchmark@v1
-        with:
-          name: Pro Benchmark - Latency
-          tool: customSmallerIsBetter
-          output-file-path: bench_results/benchmark_latency.json
-          gh-pages-branch: benchmark-data
-          benchmark-data-dir-path: docs/benchmarks
-          alert-threshold: '150%'
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          comment-on-alert: true
-          alert-comment-cc-users: '@alexeyr-ci2'
-          fail-on-alert: true
-          summary-always: true
-          auto-push: false
+          ruby benchmarks/convert_to_benchmark_json.rb "Pro: " --append
 
       - name: Upload Pro benchmark results
         uses: actions/upload-artifact@v4
@@ -566,12 +498,24 @@ jobs:
           echo "✅ Server stopped"
 
       # ============================================
-      # STEP 7: PUSH BENCHMARK DATA
+      # STEP 7: STORE BENCHMARK DATA
       # ============================================
-      - name: Push benchmark data
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-        run: |
-          git push 'https://github-actions:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git' benchmark-data:benchmark-data
+      - name: Store all benchmark results
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: React on Rails Benchmarks
+          tool: customSmallerIsBetter
+          output-file-path: bench_results/benchmark.json
+          gh-pages-branch: benchmark-data
+          benchmark-data-dir-path: docs/benchmarks
+          alert-threshold: '150%'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          comment-on-alert: true
+          alert-comment-cc-users: '@alexeyr-ci2'
+          fail-on-alert: true
+          summary-always: true
+          # New changes should only be actually recorded on pushes to master
+          auto-push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
 
       # ============================================
       # STEP 8: WORKFLOW COMPLETION
