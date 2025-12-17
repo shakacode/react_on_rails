@@ -38,6 +38,9 @@ exclude = [
   '^https://(www\.)?mycfsapp\.com',     # SSL hostname mismatch
   '^https://(www\.)?scoutapp\.com',     # SSL hostname mismatch
 
+  # Badge services that block bots
+  '^https://badge\.fury\.io',  # Returns 403 for automated requests
+
   # Sites from PROJECTS.md that block bots or are unreliable
   '^https://blog\.shakacode\.com',  # May block automated requests
   '^https?://(www\.)?foxford\.ru',  # Russian site, often blocks bots
