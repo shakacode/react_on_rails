@@ -32,6 +32,12 @@ exclude = [
   '^https://hichee\.com',
   '^https?://rubyonrails\.org/doctrine',  # DNS issues
 
+  # SSL certificate issues (expired/hostname mismatch/verification failed)
+  '^https://(www\.)?blinkinc\.com',     # SSL certificate expired
+  '^https://(www\.)?localwise\.com',    # SSL verification failed
+  '^https://(www\.)?mycfsapp\.com',     # SSL hostname mismatch
+  '^https://(www\.)?scoutapp\.com',     # SSL hostname mismatch
+
   # Sites from PROJECTS.md that block bots or are unreliable
   '^https://blog\.shakacode\.com',  # May block automated requests
   '^https?://(www\.)?foxford\.ru',  # Russian site, often blocks bots
