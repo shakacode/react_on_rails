@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Check markdown links using lychee (matches CI behavior exactly)
+# Only checks git-tracked, user-facing docs to match CI workflow:
+#   - docs/**/*.md
+#   - *.md (root level only)
+#   - react_on_rails_pro/docs/**/*.md
+#   - react_on_rails_pro/*.md
+
+set -e
+
+{
+  git ls-files 'docs/*.md' 'docs/**/*.md'
+  git ls-files '*.md' | grep -v '/'
+  git ls-files 'react_on_rails_pro/docs/*.md' 'react_on_rails_pro/docs/**/*.md'
+  git ls-files 'react_on_rails_pro/*.md'
+} | sort -u | lychee --config .lychee.toml --files-from -
