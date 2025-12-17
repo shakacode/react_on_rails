@@ -48,7 +48,7 @@ export default function HelloWorld({ name }) {
 
 **🚀 React on Rails v16.0 Released!** Major modernization with ESM support, enhanced React Server Components, and streamlined configuration.
 
-- **⚡ Rspack Support**: New `--rspack` generator flag for ~20x faster builds! Use Rspack instead of Webpack for dramatically improved build performance. See [Rspack documentation](https://www.shakacode.com/react-on-rails/docs/api/generator-details#rspack-support) for details.
+- **⚡ Rspack Support**: New `--rspack` generator flag for ~20x faster builds! Use Rspack instead of Webpack for dramatically improved build performance. See [Rspack documentation](https://www.shakacode.com/react-on-rails/docs/api-reference/generator-details#rspack-support) for details.
 - **ESM-only package**: Modern module system with better tree-shaking and performance
 - **React Server Components**: Improved rendering flow and new `RSCRoute` component for seamless SSR
 - **Performance improvements**: New async loading strategies and optimized bundle generation
