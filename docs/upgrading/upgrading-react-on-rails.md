@@ -276,7 +276,7 @@ Reason for doing this: This enables your Webpack bundles to bypass the Rails ass
 - `config/initializers/react_on_rails.rb`:
   - Delete `config.generated_assets_dir`. Webpacker's config now supplies this information.
   - Replace `config.npm_build_(test|production)_command` with `config.build_(test|production)_command`.
-- `config/webpacker.yml`: start with our [example config](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/config/webpacker.yml) (feel free to modify it as needed). I recommend setting dev_server.hmr to false however since HMR is currently broken.
+- `config/webpacker.yml`: start with our [example config](https://github.com/shakacode/react-on-rails-v9-rc-generator/blob/master/config/webpacker.yml) (feel free to modify it as needed). I recommend setting dev_server.hmr to false however since HMR is currently broken.
 - `client/package.json`: bump `react_on_rails` (I recommend bumping `webpack` as well). You'll also need `js-yaml` if you're not already using `eslint` and `webpack-manifest-plugin` regardless.
 
 ###### Client Webpack config
