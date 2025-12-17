@@ -67,18 +67,24 @@ echo "✅ Node.js version: v$NODE_VERSION"
 
 # Copy any environment files from root if they exist
 if [ -f "$CONDUCTOR_ROOT_PATH/.env" ]; then
-    echo "📝 Copying .env file..."
     cp "$CONDUCTOR_ROOT_PATH/.env" .env
 fi
-
 if [ -f "$CONDUCTOR_ROOT_PATH/.env.local" ]; then
-    echo "📝 Copying .env.local file..."
     cp "$CONDUCTOR_ROOT_PATH/.env.local" .env.local
 fi
 
 # Install Ruby dependencies
 echo "💎 Installing Ruby dependencies..."
 run_cmd bundle install
+
+echo "💎 Installing Ruby dependencies for spec/dummy..."
+(cd react_on_rails/spec/dummy && bundle install)
+
+echo "💎 Installing Ruby dependencies for react_on_rails_pro..."
+(cd react_on_rails_pro && bundle install)
+
+echo "💎 Installing Ruby dependencies for react_on_rails_pro/spec/dummy..."
+(cd react_on_rails_pro/spec/dummy && bundle install)
 
 # Enable corepack for pnpm (this project uses pnpm, not yarn)
 echo "📦 Enabling corepack for pnpm..."
@@ -88,7 +94,7 @@ run_cmd corepack enable
 echo "📦 Installing JavaScript dependencies..."
 run_cmd pnpm install
 
-# Build the TypeScript package
+# Build TypeScript (required for tests)
 echo "🔨 Building TypeScript package..."
 run_cmd pnpm run build
 
