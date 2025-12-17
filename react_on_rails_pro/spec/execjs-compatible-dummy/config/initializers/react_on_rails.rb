@@ -2,7 +2,7 @@
 
 # ⚠️ TEST CONFIGURATION - Do not copy directly for production apps
 # This is the ExecJS-compatible dummy app for testing legacy webpacker compatibility.
-# See docs/api-reference/configuration.md for production configuration guidance.
+# See docs/configuration/configuration.md for production configuration guidance.
 
 ReactOnRails.configure do |config|
   ################################################################################
@@ -27,5 +27,5 @@ ReactOnRails.configure do |config|
   ################################################################################
   # Most options have sensible defaults. For advanced configuration including
   # component loading strategies, server bundle security, and more, see:
-  # https://github.com/shakacode/react_on_rails/blob/master/docs/api-reference/configuration.md
+  # https://github.com/shakacode/react_on_rails/blob/master/docs/configuration/configuration.md
 end

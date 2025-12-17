@@ -21,7 +21,8 @@ Perfect if you're new to React on Rails
 Jump straight to what you need
 
 - **[Installation Guide](./getting-started/installation-into-an-existing-rails-app.md)** - Add to existing Rails app
-- **[API Reference](./api-reference/view-helpers-api.md)** - View helpers, configuration, JavaScript API
+- **[API Reference](./api-reference/view-helpers-api.md)** - View helpers and JavaScript API
+- **[Configuration](./configuration/configuration.md)** - All configuration options
 - **[Core Concepts](./core-concepts/how-react-on-rails-works.md)** - Architecture and SSR
 
 ### 🏗️ **Migrating from Other Solutions**
@@ -47,7 +48,8 @@ Find guidance for your specific scenario:
 - **[Getting Started](./getting-started/)** - Installation, quick start, tutorial
 - **[Core Concepts](./core-concepts/)** - How React on Rails works, SSR, auto-bundling
 - **[Building Features](./building-features/)** - Redux, routing, i18n, testing
-- **[API Reference](./api-reference/)** - View helpers, configuration, JavaScript API
+- **[Configuration](./configuration/)** - All configuration options
+- **[API Reference](./api-reference/)** - View helpers and JavaScript API
 - **[Deployment](./deployment/)** - Production deployment and troubleshooting
 - **[Upgrading](./upgrading/)** - Version upgrade guides
 - **[Migrating](./migrating/)** - From other frameworks

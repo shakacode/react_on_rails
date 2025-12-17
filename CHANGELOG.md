@@ -677,7 +677,7 @@ _Major bump because dropping support for Ruby 2.7 and deprecated `webpackConfigL
 
 #### Added
 
-- Added the ability to assign a module with a `call` method to `config.build_production_command`. See [the configuration docs](https://www.shakacode.com/react-on-rails/docs/api-reference/configuration). [PR 1362: Accept custom module for config.build_production_command](https://github.com/shakacode/react_on_rails/pull/1362).
+- Added the ability to assign a module with a `call` method to `config.build_production_command`. See [the configuration docs](https://www.shakacode.com/react-on-rails/docs/configuration/configuration). [PR 1362: Accept custom module for config.build_production_command](https://github.com/shakacode/react_on_rails/pull/1362).
 
 #### Fixed
 

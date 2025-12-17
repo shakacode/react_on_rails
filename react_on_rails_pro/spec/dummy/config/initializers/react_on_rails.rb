@@ -2,7 +2,7 @@
 
 # ⚠️ TEST CONFIGURATION - Do not copy directly for production apps
 # This is the Pro dummy app configuration used for testing React on Rails Pro features.
-# See docs/api-reference/configuration.md for production configuration guidance.
+# See docs/configuration/configuration.md for production configuration guidance.
 
 # Advanced: Custom rendering extension to add values to railsContext
 module RenderingExtension
