@@ -45,6 +45,20 @@ exclude = [
   '^https://(www\.)?first\.io',     # Returns 403
   '^https://(www\.)?estately\.com', # Returns 403
   '^https://hiring\.careerbuilder\.com',  # Returns 403
+
+  # Historical releases that were documented in CHANGELOG but never tagged
+  # These versions had CHANGELOG entries created but the git tag + version bump was forgotten.
+  # The work was rolled into the next release. See issue #2232 for investigation details.
+  '^https://github\.com/shakacode/react_on_rails/compare/8\.0\.6\.\.\.8\.0\.7$',   # 8.0.7 never tagged
+  '^https://github\.com/shakacode/react_on_rails/compare/8\.0\.7\.\.\.9\.0\.0$',   # 8.0.7 never tagged
+  '^https://github\.com/shakacode/react_on_rails/compare/10\.1\.1\.\.\.10\.1\.2$', # 10.1.2 never tagged
+  '^https://github\.com/shakacode/react_on_rails/compare/10\.1\.2\.\.\.10\.1\.3$', # 10.1.2 never tagged
+
+  # Deleted GitHub user accounts (contributors whose accounts no longer exist)
+  '^https://github\.com/(alleycat-at-git|Conturbo|jblasco3|nostophilia|railsme|samphilipd|wouldntsavezion)$',
+
+  # Private repo (react_on_rails_pro) - requires authentication
+  '^https://github\.com/shakacode/react_on_rails_pro/',
 ]
 
 # Exclude paths (regex patterns)
