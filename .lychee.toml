@@ -6,8 +6,8 @@
 accept = ["200", "308"]
 
 # Retry failed requests (handles transient 502/503/504/429 errors)
-max_retries = 4
-retry_wait_time = 15
+max_retries = 5
+retry_wait_time = 30
 
 # Timeout for each request
 timeout = 20
