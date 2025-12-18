@@ -98,7 +98,7 @@ const createParallelRenders = (size: number) => {
 };
 
 test('Renders concurrent rsc streams as single rsc stream', async () => {
-  // expect.assertions(258);
+  expect.assertions(258);
   const asyncQueue = new AsyncQueue();
   const stream = renderComponent({ asyncQueue });
   const reader = new StreamReader(stream);
