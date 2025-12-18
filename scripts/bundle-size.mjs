@@ -13,6 +13,7 @@
  */
 
 import fs from 'fs';
+import { parseArgs, colors } from './utils.mjs';
 
 // Default threshold: 0.5 KB (512 bytes)
 // Intentionally strict to catch any bundle size changes early.
@@ -22,15 +23,6 @@ const DEFAULT_THRESHOLD = 512;
 // Later, we will implement performance tests that will use more accurate mechanisms and can detect smaller performance regressions
 const DEFAULT_TIME_PERCENTAGE_THRESHOLD = 0.1;
 const DEFAULT_CONFIG = '.size-limit.json';
-
-// ANSI color codes
-const colors = {
-  red: '\x1b[31m',
-  green: '\x1b[32m',
-  yellow: '\x1b[33m',
-  blue: '\x1b[34m',
-  reset: '\x1b[0m',
-};
 
 /**
  * Format bytes to human-readable string
@@ -50,29 +42,6 @@ function formatTime(ms) {
     return `${(ms / 1000).toFixed(2)} s`;
   }
   return `${ms.toFixed(0)} ms`;
-}
-
-/**
- * Parse command line arguments
- */
-function parseArgs(args) {
-  const parsed = { _: [] };
-  for (let i = 0; i < args.length; i += 1) {
-    const arg = args[i];
-    if (arg.startsWith('--')) {
-      const key = arg.slice(2);
-      const next = args[i + 1];
-      if (next && !next.startsWith('--')) {
-        parsed[key] = next;
-        i += 1;
-      } else {
-        parsed[key] = true;
-      }
-    } else {
-      parsed._.push(arg);
-    }
-  }
-  return parsed;
 }
 
 /**

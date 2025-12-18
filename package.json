@@ -34,6 +34,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@types/turbolinks": "^5.2.2",
+    "benny": "^3.7.1",
     "create-react-class": "^15.7.0",
     "eslint": "^9.24.0",
     "eslint-config-prettier": "^10.1.1",
@@ -67,6 +68,7 @@
     "stylelint-config-standard-scss": "^13.1.0",
     "swc-loader": "^0.2.6",
     "ts-jest": "^29.2.5",
+    "tsx": "^4.21.0",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.29.1"
   },
