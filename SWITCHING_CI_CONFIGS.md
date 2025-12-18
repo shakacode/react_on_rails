@@ -129,7 +129,7 @@ This will:
    - Remove ESLint and other packages incompatible with Node 20
 3. Clean `node_modules` and `yarn.lock`
 4. Reinstall dependencies without `--frozen-lockfile`
-5. Clean and reinstall spec/dummy dependencies
+5. Clean and reinstall react_on_rails/spec/dummy dependencies
 
 **After switching, run:**
 
@@ -142,7 +142,7 @@ mise current           # For mise users
 
 # Build and test
 rake node_package
-cd spec/dummy
+cd react_on_rails/spec/dummy
 bin/shakapacker-precompile-hook
 RAILS_ENV=test bin/shakapacker
 cd ../..
@@ -161,7 +161,7 @@ This will:
 2. Restore files from git (reverting changes made by `script/convert`)
 3. Clean `node_modules` and `yarn.lock`
 4. Reinstall dependencies with `--frozen-lockfile`
-5. Clean and reinstall spec/dummy dependencies
+5. Clean and reinstall react_on_rails/spec/dummy dependencies
 
 **After switching, run:**
 
@@ -174,7 +174,7 @@ mise current           # For mise users
 
 # Build and test
 rake node_package
-cd spec/dummy
+cd react_on_rails/spec/dummy
 bin/shakapacker-precompile-hook
 RAILS_ENV=test bin/shakapacker
 cd ../..
@@ -188,10 +188,10 @@ When switching to **minimum**, these files are modified:
 - `.tool-versions` - Ruby/Node versions
 - `Gemfile.development_dependencies` - Shakapacker gem version
 - `package.json` - React versions, dev dependencies removed
-- `spec/dummy/package.json` - React and Shakapacker versions
+- `react_on_rails/spec/dummy/package.json` - React and Shakapacker versions
 - `packages/react-on-rails-pro/package.json` - Test scripts modified
 - `node_modules/`, `yarn.lock` - Cleaned and regenerated
-- `spec/dummy/node_modules/`, `spec/dummy/yarn.lock` - Cleaned and regenerated
+- `react_on_rails/spec/dummy/node_modules/`, `react_on_rails/spec/dummy/yarn.lock` - Cleaned and regenerated
 
 When switching to **latest**, these files are restored from git.
 
@@ -215,7 +215,7 @@ node --version  # Should show v20.x
 
 # 5. Build and test
 rake node_package
-cd spec/dummy
+cd react_on_rails/spec/dummy
 bin/shakapacker-precompile-hook
 RAILS_ENV=test bin/shakapacker
 cd ../..
@@ -239,7 +239,7 @@ bundle exec rake run_rspec:all_dummy
 # Switch and test in minimum
 bin/ci-switch-config minimum
 rake node_package
-cd spec/dummy && bin/shakapacker-precompile-hook && RAILS_ENV=test bin/shakapacker && cd ../..
+cd react_on_rails/spec/dummy && bin/shakapacker-precompile-hook && RAILS_ENV=test bin/shakapacker && cd ../..
 bundle exec rake run_rspec:all_dummy
 
 # Switch back
@@ -298,9 +298,9 @@ If you get package resolution errors:
 
 ```bash
 # Clean everything and try again
-rm -rf node_modules yarn.lock spec/dummy/node_modules spec/dummy/yarn.lock
+rm -rf node_modules yarn.lock react_on_rails/spec/dummy/node_modules react_on_rails/spec/dummy/yarn.lock
 yarn install
-cd spec/dummy && yarn install
+cd react_on_rails/spec/dummy && yarn install
 ```
 
 ### Git complains about modified files
@@ -316,7 +316,7 @@ If `git restore` doesn't work:
 
 ```bash
 # Manually restore from git
-git restore Gemfile.development_dependencies package.json spec/dummy/package.json packages/react-on-rails-pro/package.json
+git restore Gemfile.development_dependencies package.json react_on_rails/spec/dummy/package.json packages/react-on-rails-pro/package.json
 
 # Then run latest again
 bin/ci-switch-config latest

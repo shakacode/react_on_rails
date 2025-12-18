@@ -103,7 +103,7 @@ Renderer functions are not meant to be used on the server since there's no DOM o
 [React Router](https://reactrouter.com/) is supported, including server-side rendering! See:
 
 1. [React on Rails docs for React Router](../building-features/react-router.md)
-2. Examples in [spec/dummy/app/views/react_router](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/app/views/react_router) and follow to the JavaScript code in the [spec/dummy/client/app/startup/RouterApp.server.jsx](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/client/app/startup/RouterApp.server.jsx).
+2. Examples in [spec/dummy/app/views/react_router](https://github.com/shakacode/react_on_rails/tree/master/react_on_rails/spec/dummy/app/views/react_router) and follow to the JavaScript code in the [spec/dummy/client/app/startup/RouterApp.server.jsx](https://github.com/shakacode/react_on_rails/tree/master/react_on_rails/spec/dummy/client/app/startup/RouterApp.server.jsx).
 3. [React on Rails Pro loadable-components guide](https://www.shakacode.com/react-on-rails-pro/docs/code-splitting-loadable-components) for modern code splitting with server-side rendering.
 
 ---
@@ -162,4 +162,4 @@ See the [React on Rails Pro Configuration](https://github.com/shakacode/react_on
 
 ## More details
 
-See the [lib/react_on_rails/helper.rb](https://github.com/shakacode/react_on_rails/tree/master/lib/react_on_rails/helper.rb) source.
+See the [lib/react_on_rails/helper.rb](https://github.com/shakacode/react_on_rails/tree/master/react_on_rails/lib/react_on_rails/helper.rb) source.

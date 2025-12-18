@@ -99,9 +99,8 @@ If you prefer manual registration:
    ```erb
    <%= javascript_pack_tag 'application' %>
    <%= stylesheet_pack_tag 'application' %>
+   ```
 ````
-
-```
 
 ### Enhanced SSR Errors
 
@@ -138,8 +137,7 @@ useEffect(() => { /_ DOM operations here _/ }, [])
 if (typeof window !== 'undefined') { /_ browser code _/ }
 
 • Use dynamic import for browser-only code
-
-````
+```
 
 ## Ruby Configuration
 
@@ -155,7 +153,7 @@ raise ReactOnRails::SmartError.new(
     available_components: ReactOnRails::PackerUtils.registered_components
   }
 )
-````
+```
 
 ### Error Types
 

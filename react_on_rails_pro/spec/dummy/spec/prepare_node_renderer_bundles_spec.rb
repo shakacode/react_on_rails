@@ -2,7 +2,7 @@
 
 require "rails_helper"
 
-describe ReactOnRailsPro::PrepareNodeRenderBundles do # rubocop:disable RSpec/FilePath
+describe ReactOnRailsPro::PrepareNodeRenderBundles do # rubocop:disable RSpec/FilePath,RSpec/SpecFilePathFormat
   let(:asset_filename) { "loadable-stats2.json" }
   let(:asset_filename2) { "loadable-stats3.json" }
   let(:fixture_path) { File.expand_path("./spec/fixtures/#{asset_filename}") }

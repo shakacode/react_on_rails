@@ -91,3 +91,7 @@ packages/**/node_modules/
 
 # Jest test reports
 junit.xml
+.lycheecache
+
+# Benchmark Results
+benchmark/

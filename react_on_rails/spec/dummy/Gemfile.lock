@@ -1,7 +1,7 @@
 PATH
   remote: ../..
   specs:
-    react_on_rails (16.2.0.beta.12)
+    react_on_rails (16.2.0.beta.20)
       addressable
       connection_pool
       execjs (~> 2.5)
@@ -345,7 +345,7 @@ GEM
       rubyzip (>= 1.2.2, < 3.0)
       websocket (~> 1.0)
     semantic_range (3.1.0)
-    shakapacker (9.3.0)
+    shakapacker (9.4.0)
       activesupport (>= 5.2)
       package_json
       rack-proxy (>= 0.6.1)
@@ -461,7 +461,7 @@ DEPENDENCIES
   sass-rails (~> 6.0)
   sdoc
   selenium-webdriver (= 4.9.0)
-  shakapacker (= 9.3.0)
+  shakapacker (= 9.4.0)
   spring (~> 4.0)
   sprockets (~> 4.0)
   sqlite3 (~> 1.6)

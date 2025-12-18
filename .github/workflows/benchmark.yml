@@ -1,0 +1,61 @@
+name: Benchmark Critical Operations
+
+on:
+  pull_request
+
+jobs:
+  run-benchmarks:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      CI_JOB_NUMBER: 1
+    steps:
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Checkout PR branch for config
+        uses: actions/checkout@v4
+
+      - name: Save benchmarks
+        run: |
+          mkdir -p /tmp/react-on-rails-pro
+          cp -r packages/react-on-rails-pro/benchmarks/ /tmp/react-on-rails-pro/
+
+      - name: Checkout base branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.base_ref }}
+
+      - name: Copy size-limit config to base branch
+        run: |
+          rm -rf packages/react-on-rails-pro/benchmarks/
+          cp -r /tmp/react-on-rails-pro/benchmarks/ packages/react-on-rails-pro/
+
+      - name: Install base dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run benchmark on base branch
+        run: |
+          pnpm tsx packages/react-on-rails-pro/benchmarks/streamServerRenderReactComponent.tsx
+          cp -r benchmark/ /tmp/control-benchmark
+
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+
+      - name: Install PR dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run benchmark on experiment branch
+        run: pnpm tsx packages/react-on-rails-pro/benchmarks/streamServerRenderReactComponent.tsx
+
+      - name: Check performance change
+        run: node scripts/benchmark.mjs --control /tmp/control-benchmark --experiment benchmark/

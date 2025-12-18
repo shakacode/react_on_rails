@@ -9,11 +9,10 @@ module ReactOnRails
     class RubyEmbeddedJavaScript
       class << self
         def reset_pool
-          options = {
+          @js_context_pool = ConnectionPool.new(
             size: ReactOnRails.configuration.server_renderer_pool_size,
             timeout: ReactOnRails.configuration.server_renderer_timeout
-          }
-          @js_context_pool = ConnectionPool.new(options) { create_js_context }
+          ) { create_js_context }
         end
 
         def reset_pool_if_server_bundle_was_modified
@@ -50,7 +49,6 @@ module ReactOnRails
         # Note, js_code does not have to be based on React.
         # js_code MUST RETURN json stringify Object
         # Calling code will probably call 'html_safe' on return value before rendering to the view.
-        # rubocop:disable Metrics/CyclomaticComplexity
         def exec_server_render_js(js_code, render_options, js_evaluator = nil)
           js_evaluator ||= self
           if render_options.trace
@@ -87,7 +85,6 @@ module ReactOnRails
           # We need to parse each chunk and replay the console messages.
           result.transform { |chunk| parse_result_and_replay_console_messages(chunk, render_options) }
         end
-        # rubocop:enable Metrics/CyclomaticComplexity
 
         def trace_js_code_used(msg, js_code, file_name = "tmp/server-generated.js", force: false)
           return unless ReactOnRails.configuration.trace || force

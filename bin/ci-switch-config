@@ -180,8 +180,8 @@ show_status() {
   fi
 
   SHAKAPACKER_NPM=""
-  if [ -f "$PROJECT_ROOT/spec/dummy/package.json" ]; then
-    SHAKAPACKER_NPM=$(grep '"shakapacker"' "$PROJECT_ROOT/spec/dummy/package.json" | sed -E 's/.*"([0-9.]+)".*/\1/' || echo "")
+  if [ -f "$PROJECT_ROOT/react_on_rails/spec/dummy/package.json" ]; then
+    SHAKAPACKER_NPM=$(grep '"shakapacker"' "$PROJECT_ROOT/react_on_rails/spec/dummy/package.json" | sed -E 's/.*"([0-9.]+)".*/\1/' || echo "")
     echo "  Shakapacker (npm): ${SHAKAPACKER_NPM:-not found}"
   fi
 
@@ -192,8 +192,8 @@ show_status() {
   fi
 
   REACT_DUMMY=""
-  if [ -f "$PROJECT_ROOT/spec/dummy/package.json" ]; then
-    REACT_DUMMY=$(grep '"react":' "$PROJECT_ROOT/spec/dummy/package.json" | sed -E 's/.*"([^"]+)".*/\1/' || echo "")
+  if [ -f "$PROJECT_ROOT/react_on_rails/spec/dummy/package.json" ]; then
+    REACT_DUMMY=$(grep '"react":' "$PROJECT_ROOT/react_on_rails/spec/dummy/package.json" | sed -E 's/.*"([^"]+)".*/\1/' || echo "")
     echo "  React (dummy): ${REACT_DUMMY:-not found}"
   fi
 
@@ -267,21 +267,21 @@ EOF
   # Clean and reinstall
   print_header "Cleaning node_modules and reinstalling"
   rm -rf node_modules
-  if [ -f yarn.lock ]; then
-    rm yarn.lock
+  if [ -f pnpm-lock.yaml ]; then
+    rm pnpm-lock.yaml
   fi
 
   print_header "Installing root dependencies (without --frozen-lockfile)"
-  yarn install --no-progress
+  pnpm install --no-frozen-lockfile
 
-  print_header "Cleaning spec/dummy and reinstalling"
-  cd spec/dummy
+  print_header "Cleaning react_on_rails/spec/dummy and reinstalling"
+  cd react_on_rails/spec/dummy
   rm -rf node_modules vendor/bundle
-  if [ -f yarn.lock ]; then
-    rm yarn.lock
+  if [ -f pnpm-lock.yaml ]; then
+    rm pnpm-lock.yaml
   fi
 
-  yarn install --no-progress
+  pnpm install --no-frozen-lockfile
   bundle install --path=vendor/bundle
 
   print_success "Dependencies installed"
@@ -345,7 +345,7 @@ EOF
   echo ""
   print_warning "Next steps to build and test:"
   echo "  rake node_package"
-  echo "  cd spec/dummy && bin/shakapacker-precompile-hook && RAILS_ENV=test bin/shakapacker"
+  echo "  cd react_on_rails/spec/dummy && bin/shakapacker-precompile-hook && RAILS_ENV=test bin/shakapacker"
   echo "  bundle exec rake run_rspec:all_dummy"
 }
 
@@ -399,7 +399,7 @@ EOF
   # Restore files from git
   print_header "Restoring dependency files from git"
   cd "$PROJECT_ROOT"
-  if ! git restore Gemfile.development_dependencies package.json spec/dummy/package.json packages/react-on-rails-pro/package.json 2>/dev/null; then
+  if ! git restore Gemfile.development_dependencies package.json react_on_rails/spec/dummy/package.json packages/react-on-rails-pro/package.json 2>/dev/null; then
     print_warning "Some files could not be restored (may not exist in git)"
   else
     print_success "Files restored from git"
@@ -408,21 +408,21 @@ EOF
   # Clean and reinstall
   print_header "Cleaning node_modules and reinstalling"
   rm -rf node_modules
-  if [ -f yarn.lock ]; then
-    rm yarn.lock
+  if [ -f pnpm-lock.yaml ]; then
+    rm pnpm-lock.yaml
   fi
 
   print_header "Installing root dependencies with --frozen-lockfile"
-  yarn install --frozen-lockfile --no-progress
+  pnpm install --frozen-lockfile
 
-  print_header "Cleaning spec/dummy and reinstalling"
-  cd spec/dummy
+  print_header "Cleaning react_on_rails/spec/dummy and reinstalling"
+  cd react_on_rails/spec/dummy
   rm -rf node_modules vendor/bundle
-  if [ -f yarn.lock ]; then
-    rm yarn.lock
+  if [ -f pnpm-lock.yaml ]; then
+    rm pnpm-lock.yaml
   fi
 
-  yarn install --frozen-lockfile --no-progress
+  pnpm install --frozen-lockfile
   bundle install --path=vendor/bundle
 
   print_success "Dependencies installed"
@@ -486,7 +486,7 @@ EOF
   echo ""
   print_warning "Next steps to build and test:"
   echo "  rake node_package"
-  echo "  cd spec/dummy && bin/shakapacker-precompile-hook && RAILS_ENV=test bin/shakapacker"
+  echo "  cd react_on_rails/spec/dummy && bin/shakapacker-precompile-hook && RAILS_ENV=test bin/shakapacker"
   echo "  bundle exec rake run_rspec:all_dummy"
 }
 

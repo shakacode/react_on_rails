@@ -43,4 +43,5 @@ Rails.application.routes.draw do
   get "pure_component_wrapped_in_function" => "pages#pure_component_wrapped_in_function"
   get "turbo_frame_tag_hello_world" => "pages#turbo_frame_tag_hello_world"
   post "turbo_stream_send_hello_world" => "pages#turbo_stream_send_hello_world"
+  get "manual_render_test" => "pages#manual_render_test"
 end

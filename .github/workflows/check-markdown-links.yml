@@ -6,12 +6,12 @@ on:
     paths:
       - '**.md'
       - '.github/workflows/check-markdown-links.yml'
-      - '.github/markdown-link-check-config.json'
+      - '.lychee.toml'
   pull_request:
     paths:
       - '**.md'
       - '.github/workflows/check-markdown-links.yml'
-      - '.github/markdown-link-check-config.json'
+      - '.lychee.toml'
   schedule:
     # Run weekly on Monday at 8am UTC
     - cron: '0 8 * * 1'
@@ -23,18 +23,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check markdown links (with retry on transient errors)
-        uses: Wandalen/wretry.action@v3.5.0
+      - name: Restore lychee cache
+        uses: actions/cache@v4
         with:
-          action: tcort/github-action-markdown-link-check@a800ad5f1c35bf61987946fd31c15726a1c9f2ba
-          with: |
-            use-quiet-mode: yes
-            use-verbose-mode: no
-            config-file: .github/markdown-link-check-config.json
-            folder-path: docs/
-            file-extension: .md
-            max-depth: -1
-            check-modified-files-only: no
-            base-branch: master
-          attempt_limit: 3
-          attempt_delay: 10000
+          path: .lycheecache
+          key: cache-lychee-${{ github.sha }}
+          restore-keys: cache-lychee-
+
+      - name: Check markdown links
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: --config .lychee.toml docs/ *.md react_on_rails_pro/docs/ react_on_rails_pro/*.md
+          fail: true

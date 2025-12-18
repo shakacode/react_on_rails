@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+#
+# Skip bundle size check for current branch
+#
+# Usage:
+#   bin/skip-bundle-size-check
+#
+
+set -e
+
+SKIP_FILE=".bundle-size-skip-branch"
+BRANCH=$(git branch --show-current)
+
+if [ -z "$BRANCH" ]; then
+  echo "Error: Not on a branch (detached HEAD?)"
+  exit 1
+fi
+
+# Write comment header and branch name
+cat > "$SKIP_FILE" << EOF
+# This file allows skipping the bundle size CI check for a specific branch.
+# When a branch name in this file matches the PR branch, the size check is skipped.
+#
+# Usage: Run \`bin/skip-bundle-size-check\` to set the current branch, then commit and push.
+#
+# This is useful when you have an intentional size increase that exceeds the 0.5KB threshold.
+$BRANCH
+EOF
+echo "Set '$BRANCH' as the branch to skip bundle size check"
+echo ""
+echo "Next steps:"
+echo "  git add $SKIP_FILE"
+echo "  git commit -m 'Skip bundle size check for $BRANCH'"
+echo "  git push"

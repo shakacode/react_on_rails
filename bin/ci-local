@@ -153,7 +153,7 @@ ensure_pro_dependencies() {
 
   if [ ! -d "react_on_rails_pro/node_modules" ] || [ ! -d "react_on_rails_pro/vendor/bundle" ]; then
     echo -e "${YELLOW}Installing React on Rails Pro dependencies...${NC}"
-    if ! (cd react_on_rails_pro && bundle install && yarn install); then
+    if ! (cd react_on_rails_pro && bundle install && pnpm install); then
       echo -e "${YELLOW}⚠ Pro dependencies installation failed, skipping Pro tests${NC}"
       RUN_PRO_LINT=false
       RUN_PRO_TESTS=false
@@ -167,7 +167,7 @@ ensure_pro_dependencies() {
 # Ensure dependencies are installed
 if [ ! -d "node_modules" ] || [ ! -d "vendor/bundle" ]; then
   echo -e "${YELLOW}Installing dependencies...${NC}"
-  if ! (bundle install && yarn install); then
+  if ! (bundle install && pnpm install); then
     echo -e "${RED}✗ Dependency installation failed${NC}"
     echo -e "${RED}Cannot proceed without dependencies. Please fix the errors above.${NC}"
     exit 1
@@ -179,14 +179,14 @@ fi
 # Run linting
 if [ "$RUN_LINT" = true ]; then
   run_job "RuboCop" "bundle exec rubocop"
-  run_job "ESLint" "yarn run eslint --report-unused-disable-directives"
-  run_job "Prettier Check" "yarn start format.listDifferent"
-  run_job "TypeScript Type Check" "yarn run type-check"
+  run_job "ESLint" "pnpm run eslint --report-unused-disable-directives"
+  run_job "Prettier Check" "pnpm start format.listDifferent"
+  run_job "TypeScript Type Check" "pnpm run type-check"
 fi
 
 # Run JS unit tests
 if [ "$RUN_JS" = true ]; then
-  run_job "JS Unit Tests" "yarn test"
+  run_job "JS Unit Tests" "pnpm test"
 fi
 
 # Run Ruby gem tests
@@ -205,9 +205,9 @@ if [ "$RUN_DUMMY" = true ]; then
     echo ""
   else
     # Build dummy app if needed
-    if [ ! -d "spec/dummy/node_modules" ]; then
+    if [ ! -d "react_on_rails/spec/dummy/node_modules" ]; then
       echo -e "${YELLOW}Setting up dummy app...${NC}"
-      if ! (cd spec/dummy && yarn install); then
+      if ! (cd react_on_rails/spec/dummy && pnpm install); then
         echo -e "${YELLOW}⚠ Dummy app setup failed, skipping dummy app tests${NC}"
         echo ""
       else
@@ -241,9 +241,9 @@ fi
 if [ "$RUN_PRO_LINT" = true ]; then
   if ensure_pro_dependencies; then
     run_job "React on Rails Pro RuboCop" "cd react_on_rails_pro && bundle exec rubocop"
-    run_job "React on Rails Pro ESLint" "cd react_on_rails_pro && yarn run nps eslint"
-    run_job "React on Rails Pro Format Check" "cd react_on_rails_pro && yarn run nps format.listDifferent"
-    run_job "React on Rails Pro TypeScript Check" "cd react_on_rails_pro && yarn run nps check-typescript"
+    run_job "React on Rails Pro ESLint" "cd react_on_rails_pro && pnpm run nps eslint"
+    run_job "React on Rails Pro Format Check" "cd react_on_rails_pro && pnpm run nps format.listDifferent"
+    run_job "React on Rails Pro TypeScript Check" "cd react_on_rails_pro && pnpm run nps check-typescript"
   fi
 fi
 
@@ -253,7 +253,7 @@ if [ "$RUN_PRO_TESTS" = true ]; then
     echo -e "${YELLOW}Skipping React on Rails Pro tests in --fast mode${NC}"
     echo ""
   elif ensure_pro_dependencies; then
-    run_job "React on Rails Pro JS Tests" "cd react_on_rails_pro && yarn run nps test"
+    run_job "React on Rails Pro JS Tests" "cd react_on_rails_pro && pnpm run nps test"
     run_job "React on Rails Pro RSpec" "cd react_on_rails_pro && bundle exec rspec"
   fi
 fi

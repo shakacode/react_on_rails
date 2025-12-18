@@ -20,7 +20,7 @@ FileUtils.chdir APP_ROOT do
   system("bundle check") || system!("BUNDLE_FROZEN=true bundle install")
 
   # Install JavaScript dependencies
-  system!("yarn install --frozen-lockfile")
+  system!("pnpm install --frozen-lockfile")
 
   # puts "\n== Copying sample files =="
   # unless File.exist?("config/database.yml")

@@ -9,6 +9,7 @@ import { renderToString } from './ReactDOMServer.cts';
 import { createResultObject, convertToError, validateComponent } from './serverRenderUtils.ts';
 import type {
   CreateReactOutputResult,
+  FinalHtmlResult,
   RenderParams,
   RenderResult,
   RenderState,
@@ -71,7 +72,8 @@ function processPromise(
     if (isValidElement(promiseResult)) {
       return processReactElement(promiseResult);
     }
-    return promiseResult;
+    // promiseResult is string | ServerRenderHashRenderedHtml (both are FinalHtmlResult)
+    return promiseResult as FinalHtmlResult;
   });
 }
 

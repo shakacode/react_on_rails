@@ -81,11 +81,11 @@ jobs:
       )
     strategy:
       matrix:
-        include:
+        node-version:
           # Always run: Latest Node version (fast feedback on PRs)
-          - node-version: '22'
+          - '22'
           # Master and full-ci label: Minimum supported Node version (full coverage)
-          - node-version: '20'
+          - '20'
         exclude:
           # Skip minimum dependency matrix on regular PRs (run only on master or with full-ci label)
           - node-version: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && needs.detect-changes.outputs.has_full_ci_label != 'true' && '20' || '' }}
@@ -122,9 +122,11 @@ jobs:
         run: script/convert
       - name: Install Node modules with pnpm for renderer package
         run: |
-          pnpm install ${{ matrix.node-version == '22' && '--frozen-lockfile' || '' }}
+          pnpm install ${{ matrix.node-version == '22' && '--frozen-lockfile' || '--no-frozen-lockfile' }}
           pnpm add -g yalc
       - name: Build Renderer package
         run: pnpm build
-      - name: Run JS unit tests for Renderer package
-        run: pnpm test
+      - name: Run JS unit tests for react-on-rails package
+        run: pnpm --filter react-on-rails test
+      - name: Run JS unit tests for react-on-rails-pro package
+        run: pnpm --filter react-on-rails-pro test

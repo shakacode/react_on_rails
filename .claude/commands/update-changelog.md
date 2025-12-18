@@ -91,26 +91,63 @@ bundle exec rake update_changelog
 
 This will:
 
-- Add headers for the new version
+- Add headers for the new version right after `### [Unreleased]`
 - Update version diff links at the bottom of the file
+
+**When to use which tool:**
+
+- **`/update-changelog` (Claude Code)**: Full automation - analyzes commits, writes changelog entries, and creates a PR. Use this for comprehensive changelog updates.
+- **`bundle exec rake update_changelog`**: Quick version header addition only. Use this if you just want the version header added and plan to write entries manually.
+
+### Finding the Most Recent Version
+
+To determine the most recent version:
+
+1. **Check git tags** to find the latest released version:
+
+   ```bash
+   git tag --sort=-v:refname | head -10
+   ```
+
+   This shows tags like `v16.2.0.beta.20`, `v16.2.0.beta.19`, etc.
+
+2. **Check the CHANGELOG.md** for version headers (note: changelog uses versions WITHOUT the `v` prefix):
+   - `### [16.2.0.beta.19] - 2025-12-10` (beta version)
+   - `### [16.1.1] - 2025-09-24` (stable version)
+
+3. **Use this regex pattern** to find version headers in the changelog:
+
+   ```regex
+   ^### \[([^\]]+)\] - \d{4}-\d{2}-\d{2}
+   ```
+
+4. **The first match after `### [Unreleased]`** is the most recent version in the changelog.
+
+**IMPORTANT**: Git tags use `v` prefix (e.g., `v16.2.0.beta.20`) but the changelog and compare links use versions WITHOUT the `v` prefix (e.g., `16.2.0.beta.20`). Strip the `v` when adding to the changelog.
 
 ### Version Links
 
-After adding an entry to the `## [Unreleased]` section, ensure the version diff links at the bottom of the file are correct.
+After adding an entry to the `### [Unreleased]` section, ensure the version diff links at the bottom of the file are correct.
 
 The format at the bottom should be:
 
 ```markdown
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.0.0...master
-[v16.0.0]: https://github.com/shakacode/react_on_rails/compare/v15.0.0...v16.0.0
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/16.2.0.beta.19...master
+[16.2.0.beta.19]: https://github.com/shakacode/react_on_rails/compare/16.1.1...16.2.0.beta.19
 ```
 
 When a new version is released:
 
-1. Change `[Unreleased]` heading to `## [vX.Y.Z] - Month Day, Year`
-2. Add a new `## [Unreleased]` section at the top
-3. Update the `[Unreleased]` link to compare from the new version
-4. Add a new version link for the released version
+1. Insert the new version header **immediately after** `### [Unreleased]`:
+
+   ```markdown
+   ### [Unreleased]
+
+   ### [16.2.0.beta.20] - 2025-12-12
+   ```
+
+2. Update the `[unreleased]:` link to compare from the new version to master
+3. Add a new version link comparing the previous version to the new version
 
 ## Process
 
@@ -124,6 +161,8 @@ When a new version is released:
 2. **Determine the correct version tag to compare against**:
    - First, check the tag dates: `git log --tags --simplify-by-decoration --pretty="format:%ai %d" | head -10`
    - Find the latest version tag and its date
+   - **Also check the CHANGELOG.md** for the most recent version header: look for `### [VERSION] - DATE` pattern right after `### [Unreleased]`
+   - The most recent version in the changelog may be a beta version like `16.2.0.beta.19`
    - Compare origin/master branch date to the tag date
    - If the tag is NEWER than origin/master, it means the branch needs to be updated to include the tag's commits
    - **CRITICAL**: Always use `git log TAG..BRANCH` to find commits that are in the tag but not in the branch, as the tag may be ahead
@@ -171,10 +210,10 @@ When a new version is released:
 
 ### For Beta to Non-Beta Version Release
 
-When releasing from beta to a stable version (e.g., v16.1.0-beta.3 → v16.1.0):
+When releasing from beta to a stable version (e.g., git tag `v16.1.0.beta.3` → `v16.1.0`):
 
 1. **Remove all beta version labels** from the changelog:
-   - Change `### [v16.1.0-beta.1]`, `### [v16.1.0-beta.2]`, etc. to a single `### [v16.1.0]` section
+   - Change `### [16.1.0.beta.1]`, `### [16.1.0.beta.2]`, etc. to a single `### [16.1.0]` section
    - Combine all beta entries into the stable release section
 
 2. **Consolidate duplicate entries**:
@@ -186,20 +225,52 @@ When releasing from beta to a stable version (e.g., v16.1.0-beta.3 → v16.1.0):
 
 ### For New Beta Version Release
 
-When creating a new beta version, ask the user which approach to take:
+When a new beta version is released (e.g., `16.2.0.beta.20`):
 
-**Option 1: Process changes since last beta**
+1. **Check the latest git tag** to confirm the new version:
 
-- Only add entries for commits since the previous beta version
-- Maintains detailed history of what changed in each beta
+   ```bash
+   git tag --sort=-v:refname | head -5
+   ```
 
-**Option 2: Collapse all prior betas into current beta**
+   This shows the latest tags (e.g., `v16.2.0.beta.20`). Strip the `v` prefix for changelog use.
 
-- Combine all beta changelog entries into the new beta version
-- Removes previous beta version sections
-- Cleaner changelog with less version noise
+2. **Find the most recent version** in the changelog by looking for the first `### [VERSION] - DATE` after `### [Unreleased]`
+
+3. **Insert the new version header immediately after `### [Unreleased]`**:
+
+   ```markdown
+   ### [Unreleased]
+
+   ### [16.2.0.beta.20] - 2025-12-12
+
+   ### [16.2.0.beta.19] - 2025-12-10
+   ```
+
+4. **Update the version diff links at the bottom of the file**:
+   - Change the `[unreleased]:` link to compare from the new version to master
+   - Add a new link for the new version comparing to the previous version:
+
+   ```markdown
+   [unreleased]: https://github.com/shakacode/react_on_rails/compare/16.2.0.beta.20...master
+   [16.2.0.beta.20]: https://github.com/shakacode/react_on_rails/compare/16.2.0.beta.19...16.2.0.beta.20
+   [16.2.0.beta.19]: https://github.com/shakacode/react_on_rails/compare/16.1.1...16.2.0.beta.19
+   ```
+
+5. **For changelog entries**, ask the user which approach to take:
+
+   **Option 1: Process changes since last beta**
+   - Only add entries for commits since the previous beta version
+   - Maintains detailed history of what changed in each beta
+
+   **Option 2: Collapse all prior betas into current beta**
+   - Combine all beta changelog entries into the new beta version
+   - Removes previous beta version sections
+   - Cleaner changelog with less version noise
 
 After the user chooses, proceed with that approach.
+
+**CRITICAL**: The new version header must be inserted **immediately after `### [Unreleased]`**, NOT after "Changes since the last non-beta release." or any other text. This ensures correct ordering of version headers.
 
 ## Examples
 

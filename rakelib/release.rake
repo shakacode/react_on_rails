@@ -15,6 +15,37 @@ end
 
 # Helper methods for release-specific tasks
 # These are defined at the top level so they have access to Rake's sh method
+
+def verify_npm_auth(registry_url = "https://registry.npmjs.org/")
+  result = `npm whoami --registry #{registry_url} 2>&1`
+  unless $CHILD_STATUS.success?
+    puts <<~MESSAGE
+      ⚠️  NPM authentication required!
+
+      You are not logged in to NPM. Running 'npm login' now...
+
+    MESSAGE
+
+    # Run npm login interactively
+    system("npm login --registry #{registry_url}")
+
+    # Verify login succeeded
+    result = `npm whoami --registry #{registry_url} 2>&1`
+    unless $CHILD_STATUS.success?
+      abort <<~ERROR
+        ❌ NPM login failed!
+
+        Please manually run 'npm login' and retry the release.
+
+        Technical details:
+          Registry: #{registry_url}
+          Error: #{result.strip}
+      ERROR
+    end
+  end
+  puts "✓ Logged in to NPM as: #{result.strip}"
+end
+
 def publish_gem_with_retry(dir, gem_name, otp: nil, max_retries: ENV.fetch("GEM_RELEASE_MAX_RETRIES", "3").to_i)
   puts "\nPublishing #{gem_name} gem to RubyGems.org..."
   if otp
@@ -61,6 +92,9 @@ Version argument can be:
   - Explicit version: '16.2.0'
   - Pre-release version: '16.2.0.beta.1' (rubygem format with dots, converted to 16.2.0-beta.1 for NPM)
 
+Note: Pre-release versions (containing .test., .beta., .alpha., .rc., or .pre.) automatically
+skip git branch checks, allowing releases from non-master branches.
+
 This will update and release:
   PUBLIC (npmjs.org + rubygems.org):
     - react-on-rails NPM package
@@ -71,8 +105,6 @@ This will update and release:
 
 1st argument: Version (patch/minor/major OR explicit version like 16.2.0)
 2nd argument: Dry run (true/false, default: false)
-3rd argument: Registry (verdaccio/npm, default: npm)
-4th argument: Skip push (skip_push to skip, default: push)
 
 Environment variables:
   VERBOSE=1                    # Enable verbose logging (shows all output)
@@ -87,11 +119,9 @@ Examples:
   rake release[16.2.0]                          # Set explicit version
   rake release[16.2.0.beta.1]                   # Set pre-release version (→ 16.2.0-beta.1 for NPM)
   rake release[patch,true]                      # Dry run
-  rake release[16.2.0,false,verdaccio]          # Test with Verdaccio
-  rake release[16.2.0,false,npm,skip_push]      # Release without pushing to remote
   VERBOSE=1 rake release[patch]                 # Release with verbose logging
   NPM_OTP=123456 RUBYGEMS_OTP=789012 rake release[patch]  # Skip OTP prompts")
-task :release, %i[version dry_run registry skip_push] do |_t, args|
+task :release, %i[version dry_run] do |_t, args|
   include ReactOnRails::TaskHelpers
 
   # Check if there are uncommitted changes
@@ -106,28 +136,21 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
   # Configure output verbosity
   verbose(is_verbose)
 
-  # Validate registry parameter
-  registry_value = args_hash.fetch(:registry, "")
-  unless registry_value.empty? || registry_value == "verdaccio" || registry_value == "npm"
-    raise ArgumentError,
-          "Invalid registry value '#{registry_value}'. Valid values are: 'verdaccio', 'npm', or empty string"
-  end
-
-  use_verdaccio = registry_value == "verdaccio"
-
-  # Validate skip_push parameter
-  skip_push_value = args_hash.fetch(:skip_push, "")
-  unless skip_push_value.empty? || skip_push_value == "skip_push"
-    raise ArgumentError, "Invalid skip_push value '#{skip_push_value}'. Valid values are: 'skip_push' or empty string"
-  end
-
-  skip_push = skip_push_value == "skip_push"
-
+  # Detect if this is a test/pre-release version (contains test, beta, alpha, rc, etc.)
   version_input = args_hash.fetch(:version, "")
+  is_prerelease = version_input.match?(/\.(test|beta|alpha|rc|pre)\./i)
 
   if version_input.strip.empty?
     raise ArgumentError,
           "Version argument is required. Use 'patch', 'minor', 'major', or explicit version (e.g., '16.2.0')"
+  end
+
+  # Pre-flight authentication checks (skip for dry runs)
+  unless is_dry_run
+    puts "\n#{'=' * 80}"
+    puts "PRE-FLIGHT CHECKS"
+    puts "=" * 80
+    verify_npm_auth
   end
 
   # Having the examples prevents publishing
@@ -137,8 +160,8 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
   # Delete any react_on_rails_pro.gemspec except the one in react_on_rails_pro directory
   sh_in_dir(gem_root, "find . -mindepth 3 -name 'react_on_rails_pro.gemspec' -delete")
 
-  # Pull latest changes (skip in dry-run mode or when skip_push is set)
-  sh_in_dir(monorepo_root, "git pull --rebase") unless is_dry_run || skip_push
+  # Pull latest changes (skip in dry-run mode)
+  sh_in_dir(monorepo_root, "git pull --rebase") unless is_dry_run
 
   # Determine if version_input is semver keyword or explicit version
   semver_keywords = %w[patch minor major]
@@ -168,7 +191,6 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
 
   # Update react_on_rails_pro gem version to match
   puts "\nUpdating react_on_rails_pro gem version to #{actual_gem_version}..."
-  pro_gem_root = File.join(monorepo_root, "react_on_rails_pro")
   pro_version_file = File.join(pro_gem_root, "lib", "react_on_rails_pro", "version.rb")
   pro_version_content = File.read(pro_version_file)
   # We use gsub instead of `gem bump` here because the git tree is already dirty
@@ -181,23 +203,19 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
 
   puts "\nUpdating package.json files to version #{actual_npm_version}..."
 
-  # Update all package.json files
+  # Update all package.json files (only publishable packages)
   package_json_files = [
-    File.join(gem_root, "package.json"),
-    File.join(gem_root, "packages", "react-on-rails", "package.json"),
-    File.join(gem_root, "packages", "react-on-rails-pro", "package.json"),
-    File.join(gem_root, "react_on_rails_pro", "package.json")
+    File.join(monorepo_root, "package.json"),
+    File.join(monorepo_root, "packages", "react-on-rails", "package.json"),
+    File.join(monorepo_root, "packages", "react-on-rails-pro", "package.json"),
+    File.join(monorepo_root, "packages", "react-on-rails-pro-node-renderer", "package.json")
   ]
 
   package_json_files.each do |file|
     content = JSON.parse(File.read(file))
     content["version"] = actual_npm_version
-
-    # For react-on-rails-pro package, also update the react-on-rails dependency to exact version
-    if content["name"] == "react-on-rails-pro"
-      content["dependencies"] ||= {}
-      content["dependencies"]["react-on-rails"] = actual_npm_version
-    end
+    # NOTE: workspace:* dependencies (e.g., in react-on-rails-pro) are automatically
+    # converted to exact versions by pnpm during publish. No manual conversion needed.
 
     File.write(file, "#{JSON.pretty_generate(content)}\n")
     puts "  Updated #{file}"
@@ -209,176 +227,140 @@ task :release, %i[version dry_run registry skip_push] do |_t, args|
   # Update all Gemfile.lock files
   unbundled_sh_in_dir(gem_root, "bundle install#{bundle_quiet_flag}")
   unbundled_sh_in_dir(dummy_app_dir, "bundle install#{bundle_quiet_flag}")
-  pro_dummy_app_dir = File.join(gem_root, "react_on_rails_pro", "spec", "dummy")
   unbundled_sh_in_dir(pro_dummy_app_dir, "bundle install#{bundle_quiet_flag}") if Dir.exist?(pro_dummy_app_dir)
   unbundled_sh_in_dir(pro_gem_root, "bundle install#{bundle_quiet_flag}")
 
-  # Prepare NPM registry configuration
-  npm_registry_url = use_verdaccio ? "http://localhost:4873/" : "https://registry.npmjs.org/"
-  npm_publish_args = use_verdaccio ? "--registry #{npm_registry_url}" : ""
-
-  if use_verdaccio
-    puts "\n#{'=' * 80}"
-    puts "VERDACCIO LOCAL REGISTRY MODE"
-    puts "=" * 80
-    puts "\nBefore proceeding, ensure:"
-    puts "  1. Verdaccio server is running on http://localhost:4873/"
-    puts "  2. You are authenticated with Verdaccio:"
-    puts "     npm adduser --registry http://localhost:4873/"
-    puts "\nPress ENTER to continue or Ctrl+C to cancel..."
-    $stdin.gets unless is_dry_run
-  end
+  # Prepare NPM publish args
+  npm_publish_args = ""
 
   unless is_dry_run
     # Commit all version changes (skip git hooks to save time)
     sh_in_dir(monorepo_root, "LEFTHOOK=0 git add -A")
-    sh_in_dir(monorepo_root, "LEFTHOOK=0 git commit -m 'Bump version to #{actual_gem_version}'")
 
-    # Create git tag
-    sh_in_dir(monorepo_root, "git tag v#{actual_gem_version}")
-
-    # Push commits and tags (skip git hooks)
-    unless skip_push
-      sh_in_dir(monorepo_root, "LEFTHOOK=0 git push")
-      sh_in_dir(monorepo_root, "LEFTHOOK=0 git push --tags")
+    # Only commit if there are staged changes (version might already be set)
+    git_status = `cd #{monorepo_root} && git diff --cached --quiet; echo $?`.strip
+    if git_status == "0"
+      puts "No version changes to commit (version already set to #{actual_gem_version})"
+    else
+      sh_in_dir(monorepo_root, "LEFTHOOK=0 git commit -m 'Bump version to #{actual_gem_version}'")
     end
 
+    # Create git tag (skip if it already exists)
+    tag_name = "v#{actual_gem_version}"
+    tag_exists = system("cd #{monorepo_root} && git rev-parse #{tag_name} >/dev/null 2>&1")
+    if tag_exists
+      puts "Git tag #{tag_name} already exists, skipping tag creation"
+    else
+      sh_in_dir(monorepo_root, "git tag #{tag_name}")
+    end
+
+    # Push commits and tags (skip git hooks)
+    sh_in_dir(monorepo_root, "LEFTHOOK=0 git push")
+    sh_in_dir(monorepo_root, "LEFTHOOK=0 git push --tags")
+
     puts "\n#{'=' * 80}"
-    puts "Publishing PUBLIC packages to #{use_verdaccio ? 'Verdaccio (local)' : 'npmjs.org'}..."
+    puts "Publishing PUBLIC packages to npmjs.org..."
     puts "=" * 80
 
     # Configure NPM OTP
-    if npm_otp && !use_verdaccio
+    if npm_otp
       npm_publish_args += " --otp #{npm_otp}"
       puts "Using provided NPM OTP for all NPM package publications..."
-    elsif !use_verdaccio
+    else
       puts "\nNOTE: You will be prompted for NPM OTP code for each of the 3 NPM packages."
       puts "TIP: Set NPM_OTP environment variable to avoid repeated prompts."
     end
 
+    # For pre-release versions, skip git branch checks (allows releasing from non-master branches)
+    if is_prerelease
+      npm_publish_args += " --no-git-checks"
+      puts "Pre-release version detected - skipping git branch checks for NPM publish"
+    end
+
     # Publish react-on-rails NPM package
     puts "\nPublishing react-on-rails@#{actual_npm_version}..."
-    sh_in_dir(File.join(gem_root, "packages", "react-on-rails"), "pnpm publish #{npm_publish_args}")
+    sh_in_dir(File.join(monorepo_root, "packages", "react-on-rails"), "pnpm publish #{npm_publish_args}")
 
     # Publish react-on-rails-pro NPM package
     puts "\nPublishing react-on-rails-pro@#{actual_npm_version}..."
-    sh_in_dir(File.join(gem_root, "packages", "react-on-rails-pro"), "pnpm publish #{npm_publish_args}")
+    sh_in_dir(File.join(monorepo_root, "packages", "react-on-rails-pro"), "pnpm publish #{npm_publish_args}")
 
     # Publish node-renderer NPM package (PUBLIC on npmjs.org)
     puts "\n#{'=' * 80}"
-    puts "Publishing PUBLIC node-renderer to #{use_verdaccio ? 'Verdaccio (local)' : 'npmjs.org'}..."
+    puts "Publishing PUBLIC node-renderer to npmjs.org..."
     puts "=" * 80
 
     # Publish react-on-rails-pro-node-renderer NPM package
-    # Note: Uses plain `pnpm publish` because the node-renderer
-    # package.json is in react_on_rails_pro/ which is not defined as a workspace
     node_renderer_name = "react-on-rails-pro-node-renderer"
+    node_renderer_dir = File.join(monorepo_root, "packages", "react-on-rails-pro-node-renderer")
     puts "\nPublishing #{node_renderer_name}@#{actual_npm_version}..."
-    sh_in_dir(pro_gem_root, "pnpm publish --no-git-checks #{npm_publish_args}")
+    sh_in_dir(node_renderer_dir, "pnpm publish #{npm_publish_args}")
 
-    if use_verdaccio
-      puts "\nSkipping Ruby gem publication (Verdaccio is NPM-only)"
+    puts "\n#{'=' * 80}"
+    puts "Publishing PUBLIC Ruby gems..."
+    puts "=" * 80
+
+    if rubygems_otp
+      puts "Using provided RubyGems OTP for both gem publications..."
     else
-      puts "\n#{'=' * 80}"
-      puts "Publishing PUBLIC Ruby gems..."
-      puts "=" * 80
-
-      if rubygems_otp
-        puts "Using provided RubyGems OTP for both gem publications..."
-      else
-        puts "\nNOTE: You will be prompted for RubyGems OTP code for each of the 2 gems."
-        puts "TIP: Set RUBYGEMS_OTP environment variable to avoid repeated prompts."
-      end
-
-      # Publish react_on_rails Ruby gem with retry logic
-      publish_gem_with_retry(gem_root, "react_on_rails", otp: rubygems_otp)
-
-      # Add delay before next OTP operation to ensure clean separation
-      puts "\n⏳ Waiting 5 seconds before next publication to ensure OTP separation..."
-      sleep 5
-
-      # Publish react_on_rails_pro Ruby gem to RubyGems.org with retry logic
-      publish_gem_with_retry(pro_gem_root, "react_on_rails_pro", otp: rubygems_otp)
+      puts "\nNOTE: You will be prompted for RubyGems OTP code for each of the 2 gems."
+      puts "TIP: Set RUBYGEMS_OTP environment variable to avoid repeated prompts."
     end
-  end
 
-  npm_registry_note = if use_verdaccio
-                        "Verdaccio (http://localhost:4873/)"
-                      else
-                        "npmjs.org"
-                      end
+    # Publish react_on_rails Ruby gem with retry logic
+    publish_gem_with_retry(gem_root, "react_on_rails", otp: rubygems_otp)
+
+    # Add delay before next OTP operation to ensure clean separation
+    puts "\n⏳ Waiting 5 seconds before next publication to ensure OTP separation..."
+    sleep 5
+
+    # Publish react_on_rails_pro Ruby gem to RubyGems.org with retry logic
+    publish_gem_with_retry(pro_gem_root, "react_on_rails_pro", otp: rubygems_otp)
+  end
 
   if is_dry_run
     puts "\n#{'=' * 80}"
     puts "DRY RUN COMPLETE"
     puts "=" * 80
     puts "Version would be bumped to: #{actual_gem_version} (gem) / #{actual_npm_version} (npm)"
-    puts "NPM Registry: #{npm_registry_note}"
     puts "\nFiles that would be updated:"
     puts "  - react_on_rails/lib/react_on_rails/version.rb"
     puts "  - react_on_rails_pro/lib/react_on_rails_pro/version.rb"
     puts "  - package.json (root)"
     puts "  - packages/react-on-rails/package.json"
-    puts "  - packages/react-on-rails-pro/package.json (version + dependency)"
-    puts "  - react_on_rails_pro/package.json (node-renderer)"
+    puts "  - packages/react-on-rails-pro/package.json (version only; workspace:* converted by pnpm)"
+    puts "  - packages/react-on-rails-pro-node-renderer/package.json"
     puts "  - Gemfile.lock files (root, dummy apps, pro)"
     puts "\nAuto-synced (no write needed):"
     puts "  - react_on_rails_pro/react_on_rails_pro.gemspec (uses ReactOnRails::VERSION)"
-    registry_arg = use_verdaccio ? ",false,verdaccio" : ""
-    puts "\nTo actually release, run: rake release[#{actual_gem_version}#{registry_arg}]"
+    puts "\nTo actually release, run: rake release[#{actual_gem_version}]"
   else
     msg = <<~MSG
 
       #{'=' * 80}
-      RELEASE COMPLETE! 🎉
+      RELEASE COMPLETE!
       #{'=' * 80}
 
-      Published to #{npm_registry_note}:
+      Published to npmjs.org:
         - react-on-rails@#{actual_npm_version}
         - react-on-rails-pro@#{actual_npm_version}
         - react-on-rails-pro-node-renderer@#{actual_npm_version}
+
+      Ruby Gems (RubyGems.org):
+        - react_on_rails #{actual_gem_version}
+        - react_on_rails_pro #{actual_gem_version}
+
+      Next steps:
+        Option A - Use Claude Code (recommended):
+          Run /update-changelog to analyze commits, write entries, and create a PR
+
+        Option B - Manual (headers only, you must write entries):
+          1. Update CHANGELOG.md: bundle exec rake update_changelog
+          2. Update pro CHANGELOG.md: cd react_on_rails_pro && bundle exec rake update_changelog
+          3. Commit CHANGELOGs: git commit -a -m 'Update CHANGELOG.md files'
+          4. Push changes: git push
+
     MSG
-
-    unless use_verdaccio
-      msg += "\n  Ruby Gems (RubyGems.org):\n"
-      msg += "    - react_on_rails #{actual_gem_version}\n"
-      msg += "    - react_on_rails_pro #{actual_gem_version}\n"
-    end
-
-    if skip_push
-      msg += <<~SKIP_PUSH
-
-        ⚠️  Git push was skipped. Don't forget to push manually:
-          git push
-          git push --tags
-
-      SKIP_PUSH
-    end
-
-    msg += if use_verdaccio
-             <<~VERDACCIO
-
-               Verdaccio test packages published successfully!
-
-               To test installation:
-                 npm install --registry http://localhost:4873/ react-on-rails@#{actual_npm_version}
-                 npm install --registry http://localhost:4873/ react-on-rails-pro@#{actual_npm_version}
-                 npm install --registry http://localhost:4873/ react-on-rails-pro-node-renderer@#{actual_npm_version}
-
-               Note: Ruby gems were not published (Verdaccio is NPM-only)
-
-             VERDACCIO
-           else
-             <<~PRODUCTION
-
-               Next steps:
-                 1. Update CHANGELOG.md: bundle exec rake update_changelog
-                 2. Update pro CHANGELOG.md: cd react_on_rails_pro && bundle exec rake update_changelog
-                 3. Commit CHANGELOGs: git commit -a -m 'Update CHANGELOG.md files'
-                 4. Push changes: git push
-
-             PRODUCTION
-           end
 
     puts msg
   end

@@ -26,14 +26,15 @@ During this transition:
 
 Git hooks are installed automatically when you run the standard setup commands. They will run automatic linting on **all changed files (staged + unstaged + untracked)** - making commits fast while preventing CI failures.
 
+- After cloning the repo, run `bin/setup` from the root directory to install all dependencies.
+
 - After updating code via Git, to prepare all examples:
 
 ```sh
-cd react_on_rails/
 bundle && pnpm install && rake shakapacker_examples:gen_all && rake node_package && rake
 ```
 
-See [Dev Initial Setup](#dev-initial-setup) below for, well... initial setup,
+See [Dev Initial Setup](#dev-initial-setup) below for initial setup details,
 and [Running tests](#running-tests) for more details on running tests.
 
 # IDE/IDE SETUP
@@ -199,9 +200,57 @@ or the equivalent command for your package manager.
 
 ## Dev Initial Setup
 
-### Prereqs
+### Quick Setup (Recommended)
 
-After checking out the repo, making sure you have Ruby and Node version managers set up (such as rvm and nvm, or rbenv and nodenv, etc.), cd to `react_on_rails/spec/dummy` and run `bin/setup` to install ruby dependencies. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
+After checking out the repo and ensuring you have Ruby and Node version managers set up (such as rvm and nvm, or rbenv and nodenv, etc.) with the correct versions active, run:
+
+```sh
+# First, verify your versions match the project requirements
+ruby -v  # Should show 3.4.x or version in .ruby-version
+node -v  # Should show 22.x or version in .node-version
+
+# Then run the setup script
+bin/setup
+
+# Or skip Pro setup (for contributors without Pro access)
+bin/setup --skip-pro
+```
+
+This single command installs all dependencies across the monorepo:
+
+- Root pnpm and bundle dependencies
+- Builds the node package
+- Sets up `react_on_rails/spec/dummy`
+- Sets up `react_on_rails_pro` (if present)
+- Sets up `react_on_rails_pro/spec/dummy` (if present)
+- Sets up `react_on_rails_pro/spec/execjs-compatible-dummy` (if present)
+
+### Manual Setup (Alternative)
+
+If you prefer to set up manually or need more control:
+
+1. Install root dependencies:
+
+```sh
+bundle install
+pnpm install
+```
+
+2. Build the node package:
+
+```sh
+rake node_package
+```
+
+3. Set up the dummy app:
+
+```sh
+cd react_on_rails/spec/dummy
+bundle install
+pnpm install
+```
+
+You can also run `bin/console` for an interactive prompt that will allow you to experiment.
 
 ### Local Node Package
 
@@ -226,8 +275,8 @@ pnpm install
 pnpm run build
 ```
 
-Or run this, which builds the package, then the Webpack files for `spec/dummy`, and runs tests in
-`spec/dummy`.
+Or run this, which builds the package, then the Webpack files for `react_on_rails/spec/dummy`, and runs tests in
+`react_on_rails/spec/dummy`.
 
 ```sh
 # Optionally change default capybara driver
@@ -304,6 +353,69 @@ Run only ESLint:
 ```sh
 pnpm run lint
 ```
+
+### Bundle Size Checks
+
+React on Rails monitors bundle sizes in CI to prevent unexpected size increases. The CI compares your PR's bundle sizes against the base branch and fails if any package increases by more than 0.5KB.
+
+#### Running Locally
+
+Check current bundle sizes:
+
+```sh
+pnpm run size
+```
+
+Get JSON output for programmatic use:
+
+```sh
+pnpm run size:json
+```
+
+Compare your branch against the base branch:
+
+```sh
+bin/compare-bundle-sizes
+```
+
+This script automatically:
+
+1. Stashes any uncommitted changes
+2. Checks out and builds the base branch (default: `master`)
+3. Checks out and builds your current branch
+4. Compares the size and total execution time (loading + running) and shows a detailed report
+
+Options:
+
+```sh
+bin/compare-bundle-sizes main        # Compare against 'main' instead of 'master'
+bin/compare-bundle-sizes --hierarchical  # Group results by package
+```
+
+#### Bypassing the Check
+
+If your PR intentionally increases bundle size (e.g., adding a new feature), you can skip the bundle size check:
+
+```sh
+# Run from your PR branch
+bin/skip-bundle-size-check
+git add .bundle-size-skip-branch
+git commit -m "Skip bundle size check for intentional size increase"
+git push
+```
+
+This sets your branch to skip the size check. The skip only applies to the specific branch name written to `.bundle-size-skip-branch`.
+
+**Important**: Only skip the check when the size increase is justified. Document why the increase is acceptable in your PR description.
+
+#### What Gets Measured
+
+The CI measures sizes for:
+
+- **react-on-rails**: Raw, gzip, and brotli compressed sizes
+- **react-on-rails-pro**: Raw, gzip, and brotli compressed sizes
+- **react-on-rails-pro-node-renderer**: Raw, gzip, and brotli compressed sizes
+- **Webpack bundled imports**: Client-side bundle sizes when importing via webpack
 
 ### Starting the Dummy App
 
@@ -472,6 +584,11 @@ Removes the `full-ci` label and returns to standard CI behavior:
 - Reducing CI time during rapid iteration on a PR
 
 **Note:** The `full-ci` label is preserved on merged PRs as a historical record of which PRs ran with comprehensive testing.
+
+#### Important Notes
+
+- **Force-pushes:** The `/run-skipped-ci` command adds the `full-ci` label to your PR. If you force-push after commenting, the initial workflow run will test the old commit, but subsequent pushes will automatically run full CI because the label persists.
+- **Branch operations:** Avoid deleting or force-pushing branches while workflows are running, as this may cause failures.
 
 ### Install Generator
 

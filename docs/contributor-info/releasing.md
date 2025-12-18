@@ -65,11 +65,11 @@ The task updates versions in all the following files:
 
 **Core package:**
 
-- `lib/react_on_rails/version.rb` (source of truth for all packages)
+- `react_on_rails/lib/react_on_rails/version.rb` (source of truth for all packages)
 - `package.json` (root workspace)
 - `packages/react-on-rails/package.json`
 - `Gemfile.lock` (root)
-- `spec/dummy/Gemfile.lock`
+- `react_on_rails/spec/dummy/Gemfile.lock`
 
 **Pro package:**
 
@@ -91,23 +91,35 @@ For pre-release versions, the gem version format is automatically converted to N
 - Gem: `3.0.0.beta.1`
 - NPM: `3.0.0-beta.1`
 
+### Pre-Release Checklist
+
+Before running the release command, verify:
+
+1. **NPM authentication**: Run `npm whoami` to confirm you're logged in
+   - If not logged in, the release script will automatically run `npm login` for you
+
+2. **RubyGems authentication**: Ensure you have valid credentials for `gem push`
+
+3. **No uncommitted changes**: Run `git status` to verify clean working tree
+
 ### Release Process
 
 When you run `rake release[X.Y.Z]`, the task will:
 
 1. Check for uncommitted changes (will abort if found)
-2. Pull latest changes from the remote repository
-3. Clean up example directories
-4. Bump the gem version in `lib/react_on_rails/version.rb`
-5. Update all package.json files with the new version
-6. Update the Pro package's dependency on react-on-rails
-7. Update the dummy app's Gemfile.lock
-8. Commit all version changes with message "Bump version to X.Y.Z"
-9. Create a git tag `vX.Y.Z`
-10. Push commits and tags to the remote repository
-11. Publish `react-on-rails` to NPM (requires 2FA token)
-12. Publish `react-on-rails-pro` to NPM (requires 2FA token)
-13. Publish `react_on_rails` to RubyGems (requires 2FA token)
+2. Verify NPM authentication (will run `npm login` if needed)
+3. Pull latest changes from the remote repository
+4. Clean up example directories
+5. Bump the gem version in `react_on_rails/lib/react_on_rails/version.rb`
+6. Update all package.json files with the new version
+7. Update the Pro package's dependency on react-on-rails
+8. Update the dummy app's Gemfile.lock
+9. Commit all version changes with message "Bump version to X.Y.Z"
+10. Create a git tag `vX.Y.Z`
+11. Push commits and tags to the remote repository
+12. Publish `react-on-rails` to NPM (requires 2FA token)
+13. Publish `react-on-rails-pro` to NPM (requires 2FA token)
+14. Publish `react_on_rails` to RubyGems (requires 2FA token)
 
 ### Two-Factor Authentication
 
@@ -119,24 +131,25 @@ You'll need to enter OTP tokens when prompted:
 
 ### Post-Release Steps
 
-After a successful release, you'll see instructions to:
+After a successful release, update the changelog using one of these options:
 
-1. Update the CHANGELOG.md:
+**Option A - Use Claude Code (recommended):**
+
+Run the `/update-changelog` command in Claude Code. This will analyze commits, write changelog entries, and create a PR automatically.
+
+**Option B - Manual (headers only, you must write entries):**
+
+1. Update the CHANGELOG.md headers:
 
    ```bash
    bundle exec rake update_changelog
    ```
 
-2. Update the dummy app's Gemfile.lock:
+   Note: This only adds version headers and links. You must write the actual changelog entries manually.
 
+2. Commit and push:
    ```bash
-   cd spec/dummy && bundle update react_on_rails
-   ```
-
-3. Commit the CHANGELOG and Gemfile.lock:
-   ```bash
-   cd /path/to/react_on_rails
-   git commit -a -m 'Update CHANGELOG.md and spec/dummy Gemfile.lock'
+   git commit -a -m 'Update CHANGELOG.md'
    git push
    ```
 
@@ -232,6 +245,16 @@ rake release[16.2.0,true]
 
 This shows you exactly what would be updated without making any changes.
 
+### NPM Authentication Issues
+
+If you see errors like "Access token expired" or "E404 Not Found" during NPM publish:
+
+1. Your NPM token has expired (tokens now expire after 90 days)
+2. Run `npm login` to refresh your credentials
+3. Retry the release
+
+The release script now checks NPM authentication at the start and will automatically run `npm login` if needed, so this issue will be caught and handled before any changes are made.
+
 ### If Release Fails
 
 If the release fails partway through (e.g., during NPM publish):
@@ -264,10 +287,10 @@ Date:   Mon Jan 1 12:00:00 2024 -0500
 
     Bump version to 16.2.0
 
-diff --git a/lib/react_on_rails/version.rb b/lib/react_on_rails/version.rb
+diff --git a/react_on_rails/lib/react_on_rails/version.rb b/react_on_rails/lib/react_on_rails/version.rb
 index 1234567..abcdefg 100644
---- a/lib/react_on_rails/version.rb
-+++ b/lib/react_on_rails/version.rb
+--- a/react_on_rails/lib/react_on_rails/version.rb
++++ b/react_on_rails/lib/react_on_rails/version.rb
 @@ -1,3 +1,3 @@
  module ReactOnRails
 -  VERSION = "16.1.1"

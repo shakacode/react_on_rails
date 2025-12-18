@@ -1,0 +1,183 @@
+<h1>Test: reactOnRailsPageLoaded() Multiple Calls (Issue #2210)</h1>
+
+<p>
+  This page tests that calling <code>ReactOnRails.reactOnRailsPageLoaded()</code> multiple times
+  does not cause hydration mismatch errors for client-side only components.
+</p>
+
+<p><em>Note: This tests the core package's manual rendering API, not Pro's async hydration feature.</em></p>
+
+<hr/>
+
+<h2>Test Scenario 1: Adding New Components</h2>
+<ol>
+  <li>Initial page load renders the first ManualRenderComponent</li>
+  <li>Click "Add Component" to dynamically add a second component</li>
+  <li>The page will call <code>reactOnRailsPageLoaded()</code> after adding the new component</li>
+  <li>If the fix is working, there should be NO hydration errors in the console</li>
+</ol>
+
+<h2>Test Scenario 2: Replacing DOM Nodes (CodeRabbit Edge Case)</h2>
+<ol>
+  <li>Click "Replace Component" to remove and recreate the first component's DOM node with the same ID</li>
+  <li>The page will call <code>reactOnRailsPageLoaded()</code> after replacing the node</li>
+  <li>The component should re-render (not be skipped) because it's a new DOM element</li>
+  <li>Without the fix, the component would NOT render (old root leaked, new node ignored)</li>
+</ol>
+
+<hr/>
+
+<h2>Components</h2>
+
+<div id="components-container">
+  <%= react_component("ManualRenderComponent", props: { name: "First Component" }, prerender: false, id: "ManualRenderComponent-1") %>
+</div>
+
+<hr/>
+
+<button id="add-component-btn" type="button">Add Component (Triggers reactOnRailsPageLoaded)</button>
+<button id="replace-component-btn" type="button">Replace Component (Same ID, New DOM Node)</button>
+
+<div id="dynamic-components"></div>
+
+<hr/>
+
+<h2>Console Output</h2>
+<p>Check the browser console for hydration errors. If you see errors like:</p>
+<pre>
+Warning: Prop `style` did not match. Server: "align-items: center" Client: "alignItems:center"
+</pre>
+<p>Then the fix is NOT working correctly.</p>
+
+<hr/>
+
+<h2>Results</h2>
+<div id="test-results"></div>
+<div id="replace-results"></div>
+
+<script>
+  (function() {
+    var componentCounter = 1;
+    var replaceCounter = 0;
+    var consoleErrors = [];
+
+    // Capture console errors
+    var originalError = console.error;
+    console.error = function() {
+      var message = Array.prototype.slice.call(arguments).join(' ');
+      if (message.indexOf('hydrat') !== -1 || message.indexOf('Hydrat') !== -1) {
+        consoleErrors.push(message);
+        updateResults();
+      }
+      originalError.apply(console, arguments);
+    };
+
+    function updateResults() {
+      var resultsDiv = document.getElementById('test-results');
+      if (consoleErrors.length === 0) {
+        resultsDiv.innerHTML = '<p style="color: green; font-weight: bold;">✓ No hydration errors detected!</p>';
+      } else {
+        resultsDiv.innerHTML = '<p style="color: red; font-weight: bold;">✗ Hydration errors detected:</p>' +
+          '<ul>' + consoleErrors.map(function(e) { return '<li>' + e + '</li>'; }).join('') + '</ul>';
+      }
+    }
+
+    function updateReplaceResults(success, message) {
+      var resultsDiv = document.getElementById('replace-results');
+      if (success) {
+        resultsDiv.innerHTML = '<p style="color: green; font-weight: bold;">✓ ' + message + '</p>';
+      } else {
+        resultsDiv.innerHTML = '<p style="color: red; font-weight: bold;">✗ ' + message + '</p>';
+      }
+    }
+
+    document.getElementById('add-component-btn').addEventListener('click', function() {
+      componentCounter++;
+      var container = document.getElementById('dynamic-components');
+
+      // Create the HTML structure that react_on_rails generates for client-side components
+      var componentId = 'ManualRenderComponent-' + componentCounter;
+      var domId = componentId;
+      var props = JSON.stringify({ name: 'Dynamic Component #' + componentCounter });
+
+      // Create the script tag (component specification)
+      var scriptTag = document.createElement('script');
+      scriptTag.type = 'application/json';
+      scriptTag.className = 'js-react-on-rails-component';
+      scriptTag.id = 'js-react-on-rails-component-' + domId;
+      scriptTag.setAttribute('data-component-name', 'ManualRenderComponent');
+      scriptTag.setAttribute('data-dom-id', domId);
+      scriptTag.textContent = props;
+
+      // Create the container div
+      var containerDiv = document.createElement('div');
+      containerDiv.id = domId;
+
+      // Add to DOM
+      container.appendChild(containerDiv);
+      container.appendChild(scriptTag);
+
+      // Now call reactOnRailsPageLoaded to render ALL components including the new one
+      // This is where the bug manifests - previously rendered components should NOT be re-hydrated
+      if (typeof ReactOnRails !== 'undefined') {
+        console.log('Calling reactOnRailsPageLoaded() to render new component...');
+        ReactOnRails.reactOnRailsPageLoaded();
+        console.log('reactOnRailsPageLoaded() completed');
+      }
+
+      updateResults();
+    });
+
+    document.getElementById('replace-component-btn').addEventListener('click', function() {
+      replaceCounter++;
+      var domId = 'ManualRenderComponent-1';
+      var container = document.getElementById('components-container');
+
+      // Get the old DOM node
+      var oldNode = document.getElementById(domId);
+      if (!oldNode) {
+        updateReplaceResults(false, 'Could not find component to replace');
+        return;
+      }
+
+      console.log('Replacing DOM node: ' + domId);
+
+      // Remove the old DOM node (but keep the script tag)
+      oldNode.remove();
+
+      // Create a NEW DOM node with the SAME ID
+      var newNode = document.createElement('div');
+      newNode.id = domId;
+      // Insert at the beginning of the container
+      container.insertBefore(newNode, container.firstChild);
+
+      console.log('New DOM node created with same ID: ' + domId);
+
+      // Call reactOnRailsPageLoaded - this should render to the NEW node
+      // Without the fix: would skip because domId is already in renderedRoots
+      // With the fix: detects different node instance, unmounts old, renders new
+      if (typeof ReactOnRails !== 'undefined') {
+        console.log('Calling reactOnRailsPageLoaded() after DOM replacement...');
+        ReactOnRails.reactOnRailsPageLoaded();
+        console.log('reactOnRailsPageLoaded() completed');
+      }
+
+      // Check if the new node got rendered
+      setTimeout(function() {
+        var renderedNode = document.getElementById(domId);
+        if (renderedNode && renderedNode.innerHTML.indexOf('manual-render-component') !== -1) {
+          updateReplaceResults(true, 'Component re-rendered to new DOM node (replace #' + replaceCounter + ')');
+        } else {
+          updateReplaceResults(false, 'Component was NOT rendered to new DOM node - fix is not working!');
+        }
+      }, 100);
+
+      updateResults();
+    });
+
+    // Initial results update after page load
+    document.addEventListener('DOMContentLoaded', function() {
+      setTimeout(updateResults, 100);
+    });
+  })();
+</script>

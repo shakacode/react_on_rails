@@ -61,7 +61,6 @@ class BundlerSwitcher
     puts "✅ Updated assets_bundler to '#{@target_bundler}'"
   end
 
-  # rubocop:disable Metrics/CyclomaticComplexity
   def update_dependencies
     puts "📦 Updating package.json dependencies..."
 
@@ -86,9 +85,7 @@ class BundlerSwitcher
     puts "✅ Removed #{@target_bundler == 'rspack' ? 'webpack' : 'rspack'} dependencies"
     File.write(package_json_path, JSON.pretty_generate(package_json))
   end
-  # rubocop:enable Metrics/CyclomaticComplexity
 
-  # rubocop:disable Metrics/CyclomaticComplexity
   def install_dependencies
     puts "📥 Installing #{@target_bundler} dependencies..."
 
@@ -123,7 +120,6 @@ class BundlerSwitcher
 
     puts "✅ Installed #{@target_bundler} dependencies"
   end
-  # rubocop:enable Metrics/CyclomaticComplexity
 
   def detect_package_manager
     return "yarn" if File.exist?("yarn.lock")

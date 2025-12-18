@@ -1,4 +1,4 @@
-name: Lint JS and Ruby
+name: Lint GitHub Actions
 
 on:
   push:

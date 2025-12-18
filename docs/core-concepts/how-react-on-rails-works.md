@@ -30,7 +30,7 @@ You can see all this on the source for [reactrails.com](https://reactrails.com/)
 
 Each time you change your client code, you will need to re-generate the bundles (the Webpack-created JavaScript files included in `application.js`). The included example Foreman `Procfile.dev` files will take care of this for you by starting a Webpack process with the watch flag. This will watch your JavaScript code files for changes. Alternatively, the `shakapacker` library also can ensure that your bundles are built.
 
-For example, you might create a [Procfile.dev](https://github.com/shakacode/react_on_rails/tree/master/spec/dummy/Procfile.dev).
+For example, you might create a [Procfile.dev](https://github.com/shakacode/react_on_rails/tree/master/react_on_rails/spec/dummy/Procfile.dev).
 
 On production deployments that use asset precompilation, such as Heroku deployments, `shakapacker`, by default, will automatically run Webpack to build your JavaScript bundles, running the command `bin/shakapacker` in your app.
 

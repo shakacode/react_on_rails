@@ -1,0 +1,63 @@
+# Lychee link checker configuration
+# https://lychee.cli.rs
+
+# Accept successful responses and permanent redirects
+# 200 = OK, 308 = Permanent Redirect
+accept = ["200", "308"]
+
+# Retry failed requests (handles transient 502/503/504/429 errors)
+max_retries = 4
+retry_wait_time = 15
+
+# Timeout for each request
+timeout = 20
+
+# Exclude patterns (migrated from markdown-link-check-config.json)
+exclude = [
+  # Localhost/development URLs
+  '^http://localhost',
+  '^https://localhost',
+  '^mailto:',
+
+  # Sites that block bots or require auth
+  '^https://www\.npmjs\.(org|com)',
+  '^https://medium\.com',  # Returns 403 for automated requests
+  '^https://www\.linkedin\.com',
+  '^https://reactrails\.slack\.com',
+  '^https://docs\.google\.com',  # Private docs require auth
+  '^https://claude\.ai',  # Returns 403 for automated requests
+
+  # Known dead/problematic URLs (verified)
+  '^https://your-shared-addr\.c9users\.io',
+  '^https://hichee\.com',
+  '^https?://rubyonrails\.org/doctrine',  # DNS issues
+
+  # SSL certificate issues (expired/hostname mismatch/verification failed)
+  '^https://(www\.)?blinkinc\.com',     # SSL certificate expired
+  '^https://(www\.)?localwise\.com',    # SSL verification failed
+  '^https://(www\.)?mycfsapp\.com',     # SSL hostname mismatch
+  '^https://(www\.)?scoutapp\.com',     # SSL hostname mismatch
+
+  # Sites from PROJECTS.md that block bots or are unreliable
+  '^https://blog\.shakacode\.com',  # May block automated requests
+  '^https?://(www\.)?foxford\.ru',  # Russian site, often blocks bots
+  '^https://(www\.)?airgoat\.com',  # Returns 403
+  '^https://(www\.)?first\.io',     # Returns 403
+  '^https://(www\.)?estately\.com', # Returns 403
+  '^https://hiring\.careerbuilder\.com',  # Returns 403
+]
+
+# Exclude paths (regex patterns)
+exclude_path = [
+  'docs/planning/',           # Contains placeholder links
+  '.*/node_modules/.*',       # Dependencies
+  '.*/spec/.*',               # Test fixtures
+  'SUMMARY.md',               # GitBook TOC with old doc structure links (kept for redirects)
+]
+
+# Don't check fragments/anchors (can be flaky)
+include_fragments = false
+
+# Cache results to speed up repeated runs
+cache = true
+max_cache_age = "1d"

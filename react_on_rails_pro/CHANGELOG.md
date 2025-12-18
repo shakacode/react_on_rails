@@ -17,7 +17,9 @@ You can find the **package** version numbers from this repo's tags and below in 
 
 ## [Unreleased]
 
-_Add changes in master not yet tagged._
+### [v16.2.0.beta.13] - 2025-12-07
+
+Changes since the last non-beta release.
 
 ### Improved
 
@@ -47,6 +49,12 @@ _Add changes in master not yet tagged._
 - **Node Renderer Gem Version Validation**: The node renderer now validates that the Ruby gem version (`react_on_rails_pro`) matches the node renderer package version (`@shakacode-tools/react-on-rails-pro-node-renderer`) on every render request. Environment-aware: strict enforcement in development (returns 412 Precondition Failed on mismatch), permissive in production (allows with warning). Includes version normalization to handle Ruby gem vs NPM format differences (e.g., `4.0.0.rc.1` vs `4.0.0-rc.1`). [PR #1881](https://github.com/shakacode/react_on_rails/pull/1881) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 ### Fixed
+
+- **SECURITY: CVE-2025-55182 - React Server Components RCE Vulnerability**: by updating `react-on-rails-rsc` peer dependency to `v19.0.3` which mitigates that vulnerability. Also, users should update `react` and `react-dom` package versions to `v19.0.1` to ensure complete mitigation. [PR 2175](https://github.com/shakacode/react_on_rails/pull/2175) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+- Fixed compatibility issue with httpx 1.6.x by explicitly requiring http-2 >= 1.1.1. [PR 2141](https://github.com/shakacode/react_on_rails/pull/2141) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+- **Client Disconnect Handling for Streaming**: Added error handling for client disconnects during streaming. When a client disconnects mid-stream (browser closed, network drop), the system now catches `IOError`/`Errno::EPIPE`, sets a `client_disconnected` flag, stops the barrier to cancel producer tasks, and logs the disconnect for debugging. Prevents wasted CPU from producers continuing after the writer fails. [PR 2137](https://github.com/shakacode/react_on_rails/pull/2137) by [justin808](https://github.com/justin808).
 
 - **Node Renderer Worker Restart**: Fixed "descriptor closed" error that occurred when the node renderer restarts while handling an in-progress request (especially streaming requests). Workers now perform graceful shutdowns: they disconnect from the cluster to stop receiving new requests, wait for active requests to complete, then shut down cleanly. A configurable `gracefulWorkerRestartTimeout` ensures workers are forcibly killed if they don't shut down in time. [PR 1970](https://github.com/shakacode/react_on_rails/pull/1970) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
@@ -94,7 +102,7 @@ _Add changes in master not yet tagged._
   - Seamlessly use React Server Components in your Rails apps
   - Reduce client bundle sizes
   - Enable powerful new patterns for data fetching
-  - [See the full tutorial](https://www.shakacode.com/react-on-rails-pro/docs/react-server-components-tutorial)
+  - [See the full tutorial](https://www.shakacode.com/react-on-rails-pro/docs/react-server-components/tutorial)
 
 [PR 422](https://github.com/shakacode/react_on_rails_pro/pull/422) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
@@ -534,7 +542,8 @@ Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52
 - advanced error handling
 
 [HEAD compared to 3.2.1]: https://github.com/shakacode/react_on_rails_pro/compare/3.3.1...HEAD
-[Unreleased]: https://github.com/shakacode/react_on_rails_pro/compare/4.0.0-rc-15...HEAD
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.2.0.beta.13...master
+[v16.2.0.beta.13]: https://github.com/shakacode/react_on_rails/compare/16.1.1...v16.2.0.beta.13
 [4.0.0-rc.15]: https://github.com/shakacode/react_on_rails_pro/compare/4.0.0-rc.14...4.0.0-rc.15
 [4.0.0.rc.11]: https://github.com/shakacode/react_on_rails_pro/compare/4.0.0-rc.9...4.0.0-rc.11
 [4.0.0.rc.9]: https://github.com/shakacode/react_on_rails_pro/compare/4.0.0-rc.6...4.0.0-rc.9

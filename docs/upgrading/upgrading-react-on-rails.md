@@ -21,7 +21,13 @@ rails generate react_on_rails:install
 - `shakapacker.yml` settings
 - other configuration files
 
-## Upgrading to v16
+## Upgrading to v16.1.x (from v16.0.x)
+
+This is a minor release - update your gem and npm package versions, then run `bundle install` and your package manager's install command. See the [v16.1.x Release Notes](release-notes/16.1.0.md) for new features and bug fixes.
+
+**Deprecation:** Remove `config.generated_assets_dirs` from your configuration if present. Asset paths are now automatically determined from `public_output_path` in `config/shakapacker.yml`.
+
+## Upgrading to v16 (from v14/v15)
 
 ### Breaking Changes
 
@@ -404,7 +410,7 @@ gem "webpacker"
       hmr: false
     ```
     Set hmr to your preference.
-  - See the example `spec/dummy/config/webpacker.yml`.
+  - See the example `react_on_rails/spec/dummy/config/webpacker.yml`.
   - Remove keys `hot_reloading_host` and `hot_reloading_enabled_by_default`. These are replaced by the `dev_server` key.
   - Rename `webpack_public_output_dir` to `public_output_path`.
 

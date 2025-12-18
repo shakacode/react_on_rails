@@ -2,7 +2,7 @@
 
 All notable changes to this project's source code will be documented in this file. Items under `Unreleased` is upcoming features that will be out in the next version.
 
-Migration instructions for the major updates can be found [here](https://www.shakacode.com/react-on-rails/docs/guides/upgrading-react-on-rails#upgrading-to-version-9.md). Some smaller migration information can be found here.
+Migration instructions for the major updates can be found [here](https://www.shakacode.com/react-on-rails/docs/upgrading/upgrading-react-on-rails#upgrading-to-version-9). Some smaller migration information can be found here.
 
 ## Want to Save Time Updating?
 
@@ -15,52 +15,25 @@ If you think ShakaCode can help your project, [click here](https://meetings.hubs
 ## Contributors
 
 Please follow the recommendations outlined at [keepachangelog.com](http://keepachangelog.com/). Please use the existing headings and styling as a guide.
-After a release, please make sure to run `bundle exec rake update_changelog`. This will add a heading for the latest version and update the links at the end of the file.
+After a release, run `/update-changelog` in Claude Code to analyze commits, write entries, and create a PR. Alternatively, run `bundle exec rake update_changelog` to add version headers only (you must write entries manually).
 
 ## Versions
 
 ### [Unreleased]
 
-Changes since the last non-beta release.
+#### Fixed
 
-#### Added
+- **React Server Components Security Vulnerabilities (CVE-2025-55183, CVE-2025-55184, CVE-2025-67779)**: Upgraded React to v19.0.3 and react-on-rails-rsc to v19.0.4 to fix three critical security vulnerabilities in React Server Components. CVE-2025-55183 (CVSS 5.3) involved source code exposure when server function references were stringified, potentially leaking hardcoded secrets. CVE-2025-55184 and CVE-2025-67779 (both CVSS 7.5) involved denial of service attacks via cyclic promise references that could cause infinite loops and 100% CPU consumption. The fixes implement dual-layer cycle detection with a 1,000-iteration depth limit and override `toString()` methods on server references to return safe placeholders. Addresses [issue 2223](https://github.com/shakacode/react_on_rails/issues/2223). [PR 2233](https://github.com/shakacode/react_on_rails/pull/2233) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
-- **Service Dependency Checking for bin/dev**: Added optional `.dev-services.yml` configuration to validate required external services (Redis, PostgreSQL, Elasticsearch, etc.) are running before `bin/dev` starts the development server. Provides clear error messages with start commands and install hints when services are missing. Zero impact if not configured - backwards compatible with all existing installations. [PR 2098](https://github.com/shakacode/react_on_rails/pull/2098) by [justin808](https://github.com/justin808).
-
-#### Changed
-
-- **Monorepo Structure Reorganization**: Restructured the monorepo to use two top-level product directories (`react_on_rails/` and `react_on_rails_pro/`) instead of mixing source files at the root level. This improves organization and clarity for contributors working on either the open-source or Pro versions. **Important for contributors**: If you have an existing clone of the repository, you may need to update your IDE exclusion patterns and paths. See the updated `CLAUDE.md` for current project structure. [PR 2114](https://github.com/shakacode/react_on_rails/pull/2114) by [justin808](https://github.com/justin808).
-
-- **Package Manager Migration to pnpm (Contributors Only)**: Migrated the monorepo from Yarn Classic to pnpm for improved dependency management and faster installs. **This only affects contributors** - end users can continue using any package manager (npm, yarn, pnpm) with their applications. Contributors should reinstall dependencies with `pnpm install` after pulling this change. [PR 2121](https://github.com/shakacode/react_on_rails/pull/2121) by [justin808](https://github.com/justin808).
-
-#### Improved
-
-- **Automatic Precompile Hook Coordination in bin/dev**: The `bin/dev` command now automatically runs Shakapacker's `precompile_hook` once before starting development processes and sets `SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true` to prevent duplicate execution in spawned webpack processes.
-  - Eliminates the need for manual coordination, sleep hacks, and duplicate task calls in Procfile.dev
-  - Users can configure expensive build tasks (like locale generation or ReScript compilation) once in `config/shakapacker.yml` and `bin/dev` handles coordination automatically
-  - Includes warning for Shakapacker versions below 9.4.0 (the `SHAKAPACKER_SKIP_PRECOMPILE_HOOK` environment variable is only supported in 9.4.0+)
-  - The `SHAKAPACKER_SKIP_PRECOMPILE_HOOK` environment variable is set for all spawned processes, making it available for custom scripts that need to detect when `bin/dev` is managing the precompile hook
-  - Addresses [2091](https://github.com/shakacode/react_on_rails/issues/2091) by [justin808](https://github.com/justin808)
-
-- **Idempotent Locale Generation**: The `react_on_rails:locale` rake task is now idempotent, automatically skipping generation when locale files are already up-to-date. This makes it safe to call multiple times (e.g., in Shakapacker's `precompile_hook`) without duplicate work. Added `force=true` option to override timestamp checking. [PR 2090](https://github.com/shakacode/react_on_rails/pull/2090) by [justin808](https://github.com/justin808).
-
-### [v16.2.0.beta.12] - 2025-11-20
-
-#### Added
-
-- **CSP Nonce Support for Console Replay**: Added Content Security Policy (CSP) nonce support for the `consoleReplay` script generated during server-side rendering. When Rails CSP is configured, the console replay script will automatically include the nonce attribute, allowing it to execute under restrictive CSP policies like `script-src: 'self'`. The implementation includes cross-version Rails compatibility (5.2-7.x) and defense-in-depth nonce sanitization to prevent attribute injection attacks. [PR 2059](https://github.com/shakacode/react_on_rails/pull/2059) by [justin808](https://github.com/justin808).
-
-#### Improved
-
-- **Enhanced bin/dev Error Messages**: Improved error messages when `bin/dev` fails by suggesting the `--verbose` flag for detailed debugging output. The verbose flag now properly cascades to child processes via the `REACT_ON_RAILS_VERBOSE` environment variable, making troubleshooting pack generation failures significantly easier. [PR 2083](https://github.com/shakacode/react_on_rails/pull/2083) by [justin808](https://github.com/justin808).
+### [16.2.0.beta.20] - 2025-12-12
 
 #### Fixed
 
-- **RSpec Helper Optimization with Private SSR Directories**: Fixed RSpec helper optimization bug that caused tests to run with stale server-side code when server bundles are stored in private `ssr-generated/` directories. The helper now automatically monitors server bundles and other critical files, ensuring proper rebuild detection even when assets are in separate directories from the manifest. [PR 1838](https://github.com/shakacode/react_on_rails/pull/1838) by [justin808](https://github.com/justin808).
+- **Hydration Mismatch on Multiple `reactOnRailsPageLoaded()` Calls**: Fixed hydration errors that occurred when `reactOnRailsPageLoaded()` was invoked multiple times for asynchronously loaded content. The fix tracks rendered components and skips re-rendering already-tracked components, while intelligently handling DOM node replacements by detecting when a node with the same ID is swapped out. Addresses [issue 2210](https://github.com/shakacode/react_on_rails/issues/2210). [PR 2211](https://github.com/shakacode/react_on_rails/pull/2211) by [justin808](https://github.com/justin808).
 
-- **Pack Generation in bin/dev from Bundler Context**: Fixed pack generation failing with "Could not find command 'react_on_rails:generate_packs'" when running `bin/dev` from within a Bundler context. The fix wraps the bundle exec call with `Bundler.with_unbundled_env` to prevent interception. [PR 2085](https://github.com/shakacode/react_on_rails/pull/2085) by [justin808](https://github.com/justin808).
+### [16.2.0.beta.19] - 2025-12-10
 
-### [v16.2.0.beta.11] - 2025-11-19
+Changes since the last non-beta release (16.1.1).
 
 #### Added
 
@@ -68,9 +41,11 @@ Changes since the last non-beta release.
 
 - **Rspack Support**: Added `--rspack` flag to `react_on_rails:install` generator for significantly faster builds (~20x improvement with SWC). Includes unified webpack/rspack configuration templates and `bin/switch-bundler` utility to switch between bundlers post-installation. [PR #1852](https://github.com/shakacode/react_on_rails/pull/1852) by [justin808](https://github.com/justin808).
 
-- **Attribution Comment**: Added HTML comment attribution to Rails views containing React on Rails functionality. The comment automatically displays which version is in use (open source React on Rails or React on Rails Pro) and, for Pro users, shows the license status. This helps identify React on Rails usage across your application. [PR #1857](https://github.com/shakacode/react_on_rails/pull/1857) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **Service Dependency Checking for bin/dev**: Added optional `.dev-services.yml` configuration to validate required external services (Redis, PostgreSQL, Elasticsearch, etc.) are running before `bin/dev` starts the development server. Provides clear error messages with start commands and install hints when services are missing. Zero impact if not configured - backwards compatible with all existing installations. [PR 2098](https://github.com/shakacode/react_on_rails/pull/2098) by [justin808](https://github.com/justin808).
 
-- **Improved Error Messages**: Error messages for version mismatches and package configuration issues now include package-manager-specific installation commands (npm, yarn, pnpm, bun). [PR #1881](https://github.com/shakacode/react_on_rails/pull/1881) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **CSP Nonce Support for Console Replay**: Added Content Security Policy (CSP) nonce support for the `consoleReplay` script generated during server-side rendering. When Rails CSP is configured, the console replay script will automatically include the nonce attribute, allowing it to execute under restrictive CSP policies like `script-src: 'self'`. The implementation includes cross-version Rails compatibility (5.2-7.x) and defense-in-depth nonce sanitization to prevent attribute injection attacks. [PR 2059](https://github.com/shakacode/react_on_rails/pull/2059) by [justin808](https://github.com/justin808).
+
+- **Attribution Comment**: Added HTML comment attribution to Rails views containing React on Rails functionality. The comment automatically displays which version is in use (open source React on Rails or React on Rails Pro) and, for Pro users, shows the license status. This helps identify React on Rails usage across your application. [PR #1857](https://github.com/shakacode/react_on_rails/pull/1857) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 - **Smart Error Messages with Actionable Solutions**: Added intelligent Ruby-side error handling with context-aware, actionable solutions for common issues. Features include fuzzy matching for component name typos, environment-specific debugging suggestions, color-coded error formatting, and detailed troubleshooting guides for component registration, auto-bundling, hydration mismatches, server rendering errors, and Redux store issues. See the [Improved Error Messages guide](docs/guides/improved-error-messages.md) for details. [PR 1934](https://github.com/shakacode/react_on_rails/pull/1934) by [justin808](https://github.com/justin808).
 
@@ -95,11 +70,34 @@ Changes since the last non-beta release.
 
 - **Removed Babel Dependency Installation**: The generator no longer installs `@babel/preset-react` or `@babel/preset-typescript` packages. Shakapacker handles JavaScript transpiler configuration (Babel, SWC, or esbuild) via the `javascript_transpiler` setting in `shakapacker.yml`. SWC is now the default transpiler and includes built-in support for React and TypeScript. Users who explicitly choose Babel will need to manually install and configure the required presets. This change reduces unnecessary dependencies and aligns with Shakapacker's modular transpiler approach. [PR 2051](https://github.com/shakacode/react_on_rails/pull/2051) by [justin808](https://github.com/justin808).
 
-#### Documentation
+#### Improved
 
-- **Simplified Configuration Files**: Improved configuration documentation and generator template for better clarity and usability. Reduced generator template from 67 to 42 lines (37% reduction). Added comprehensive testing configuration guide. Reorganized configuration docs into Essential vs Advanced sections. Enhanced Doctor program with diagnostics for server rendering and test compilation consistency. [PR #2011](https://github.com/shakacode/react_on_rails/pull/2011) by [justin808](https://github.com/justin808).
+- **SWC Compiler Detection**: Added intelligent detection and automatic installation of SWC transpiler packages (`@swc/core` and `swc-loader`) when the generator detects SWC configuration. For Shakapacker 9.3.0+ (where SWC is the default transpiler), required packages are now installed automatically. Includes graceful error handling and YAML parsing security improvements. [PR 2135](https://github.com/shakacode/react_on_rails/pull/2135) by [justin808](https://github.com/justin808).
+
+- **Enhanced bin/dev Error Messages**: Improved error messages when `bin/dev` fails by suggesting the `--verbose` flag for detailed debugging output. The verbose flag now properly cascades to child processes via the `REACT_ON_RAILS_VERBOSE` environment variable, making troubleshooting pack generation failures significantly easier. [PR 2083](https://github.com/shakacode/react_on_rails/pull/2083) by [justin808](https://github.com/justin808).
+
+- **Automatic Precompile Hook Coordination in bin/dev**: The `bin/dev` command now automatically runs Shakapacker's `precompile_hook` once before starting development processes and sets `SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true` to prevent duplicate execution in spawned webpack processes.
+  - Eliminates the need for manual coordination, sleep hacks, and duplicate task calls in Procfile.dev
+  - Users can configure expensive build tasks (like locale generation or ReScript compilation) once in `config/shakapacker.yml` and `bin/dev` handles coordination automatically
+  - Includes warning for Shakapacker versions below 9.4.0 (the `SHAKAPACKER_SKIP_PRECOMPILE_HOOK` environment variable is only supported in 9.4.0+)
+  - The `SHAKAPACKER_SKIP_PRECOMPILE_HOOK` environment variable is set for all spawned processes, making it available for custom scripts that need to detect when `bin/dev` is managing the precompile hook
+  - Addresses [2091](https://github.com/shakacode/react_on_rails/issues/2091) by [justin808](https://github.com/justin808)
+
+- **Idempotent Locale Generation**: The `react_on_rails:locale` rake task is now idempotent, automatically skipping generation when locale files are already up-to-date. This makes it safe to call multiple times (e.g., in Shakapacker's `precompile_hook`) without duplicate work. Added `force=true` option to override timestamp checking. [PR 2090](https://github.com/shakacode/react_on_rails/pull/2090) by [justin808](https://github.com/justin808).
+
+- **Improved Error Messages**: Error messages for version mismatches and package configuration issues now include package-manager-specific installation commands (npm, yarn, pnpm, bun). [PR #1881](https://github.com/shakacode/react_on_rails/pull/1881) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 #### Fixed
+
+- **TypeScript processPromise Return Type**: Fixed TypeScript compilation error in `serverRenderReactComponent.ts` where the type checker couldn't properly narrow the union type after the `isValidElement` check. Added explicit type assertion to `FinalHtmlResult` to resolve the issue. [PR 2204](https://github.com/shakacode/react_on_rails/pull/2204) by [justin808](https://github.com/justin808).
+
+- **connection_pool 3.0+ Compatibility**: Fixed `ArgumentError: wrong number of arguments` when using `connection_pool` gem version 3.0 or later. The gem's API changed from accepting a positional hash to requiring keyword arguments. This fix ensures compatibility with both older and newer versions of `connection_pool`. Addresses [issue 2185](https://github.com/shakacode/react_on_rails/issues/2185). [PR 2125](https://github.com/shakacode/react_on_rails/pull/2125) by [justin808](https://github.com/justin808).
+
+- **RSpec Helper Optimization with Private SSR Directories**: Fixed RSpec helper optimization bug that caused tests to run with stale server-side code when server bundles are stored in private `ssr-generated/` directories. The helper now automatically monitors server bundles and other critical files, ensuring proper rebuild detection even when assets are in separate directories from the manifest. [PR 1838](https://github.com/shakacode/react_on_rails/pull/1838) by [justin808](https://github.com/justin808).
+
+- **Pack Generation in bin/dev from Bundler Context**: Fixed pack generation failing with "Could not find command 'react_on_rails:generate_packs'" when running `bin/dev` from within a Bundler context. The fix wraps the bundle exec call with `Bundler.with_unbundled_env` to prevent interception. [PR 2085](https://github.com/shakacode/react_on_rails/pull/2085) by [justin808](https://github.com/justin808).
+
+- **bin/dev Process Manager Detection**: Fixed misleading "Process Manager Not Found" error when overmind is installed but exits with a non-zero code (e.g., when a Procfile process crashes). The error message now correctly distinguishes between a missing process manager and a process manager that ran but failed. [PR 2087](https://github.com/shakacode/react_on_rails/pull/2087) by [justin808](https://github.com/justin808).
 
 - **Doctor Command Version Mismatch Detection**: Fixed false version mismatch warnings in `rake react_on_rails:doctor` when using beta/prerelease versions. The command now correctly recognizes that gem version `16.2.0.beta.10` matches npm version `16.2.0-beta.10` using proper semver conversion instead of string normalization that stripped prerelease identifiers. [PR 2064](https://github.com/shakacode/react_on_rails/pull/2064) by [ihabadham](https://github.com/ihabadham).
 
@@ -203,6 +201,20 @@ To migrate to React on Rails Pro:
 
 - **Command Injection Protection**: Added security hardening to prevent potential command injection in package manager commands. [PR #1881](https://github.com/shakacode/react_on_rails/pull/1881) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
+#### Documentation
+
+- **Simplified Configuration Files**: Improved configuration documentation and generator template for better clarity and usability. Reduced generator template from 67 to 42 lines (37% reduction). Added comprehensive testing configuration guide. Reorganized configuration docs into Essential vs Advanced sections. Enhanced Doctor program with diagnostics for server rendering and test compilation consistency. [PR #2011](https://github.com/shakacode/react_on_rails/pull/2011) by [justin808](https://github.com/justin808).
+
+#### Developer (Contributors Only)
+
+- **Monorepo Structure Reorganization**: Restructured the monorepo to use two top-level product directories (`react_on_rails/` and `react_on_rails_pro/`) instead of mixing source files at the root level. This improves organization and clarity for contributors working on either the open-source or Pro versions. **Important for contributors**: If you have an existing clone of the repository, you may need to update your IDE exclusion patterns and paths. See the updated `CLAUDE.md` for current project structure. [PR 2114](https://github.com/shakacode/react_on_rails/pull/2114) by [justin808](https://github.com/justin808).
+
+- **Package Manager Migration to pnpm**: Migrated the monorepo from Yarn Classic to pnpm for improved dependency management and faster installs. Contributors should reinstall dependencies with `pnpm install` after pulling this change. [PR 2121](https://github.com/shakacode/react_on_rails/pull/2121) by [justin808](https://github.com/justin808).
+
+- **Bundle Size CI Monitoring**: Added automated bundle size tracking to CI using size-limit. Compares PR bundle sizes against the base branch and fails if any package increases by more than 0.5KB. Includes local comparison tool (`bin/compare-bundle-sizes`) and bypass mechanism (`bin/skip-bundle-size-check`) for intentional size increases. [PR 2149](https://github.com/shakacode/react_on_rails/pull/2149) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+- **Download Time CI Monitoring**: Added automated download time tracking to CI using size-limit. Compares PR client import download times against the base branch and fails if any import increases by more than 10%. [PR 2160](https://github.com/shakacode/react_on_rails/pull/2160) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 ### [16.1.1] - 2025-09-24
 
 #### Bug Fixes
@@ -280,7 +292,7 @@ To migrate to React on Rails Pro:
 
 **React on Rails v16 is a major release that modernizes the library with ESM support, removes legacy Webpacker compatibility, and introduces significant performance improvements. This release builds on the foundation of v14 with enhanced RSC (React Server Components) support and streamlined configuration.**
 
-See [Release Notes](docs/release-notes/16.0.0.md) for complete migration guide.
+See [Release Notes](docs/upgrading/release-notes/16.0.0.md) for complete migration guide.
 
 #### Major Enhancements
 
@@ -665,7 +677,7 @@ _Major bump because dropping support for Ruby 2.7 and deprecated `webpackConfigL
 
 #### Added
 
-- Added the ability to assign a module with a `call` method to `config.build_production_command`. See [the configuration docs](https://www.shakacode.com/react-on-rails/docs/guides/configuration). [PR 1362: Accept custom module for config.build_production_command](https://github.com/shakacode/react_on_rails/pull/1362).
+- Added the ability to assign a module with a `call` method to `config.build_production_command`. See [the configuration docs](https://www.shakacode.com/react-on-rails/docs/api-reference/configuration). [PR 1362: Accept custom module for config.build_production_command](https://github.com/shakacode/react_on_rails/pull/1362).
 
 #### Fixed
 
@@ -701,7 +713,7 @@ _Major bump because dropping support for Ruby 2.7 and deprecated `webpackConfigL
 
 ### [12.0.0] - 2020-07-08
 
-For upgrade instructions, see [docs/guides/upgrading-react-on-rails.md](https://www.shakacode.com/react-on-rails/docs/guides/upgrading-react-on-rails).
+For upgrade instructions, see the [upgrading guide](https://www.shakacode.com/react-on-rails/docs/upgrading/upgrading-react-on-rails).
 
 #### Major Improvements
 
@@ -719,7 +731,7 @@ set JavaScript property `renderFunction` on the function for which you want to r
 invoked to return the React component. In that case, you won't need to pass any unused params.
 [PR 1268](https://github.com/shakacode/react_on_rails/pull/1268) by [justin808](https://github.com/justin808)
 
-See [docs/guides/upgrading-react-on-rails](https://www.shakacode.com/react-on-rails/docs/guides/upgrading-react-on-rails#upgrading-to-v12)
+See [docs/guides/upgrading-react-on-rails](https://www.shakacode.com/react-on-rails/docs/upgrading/upgrading-react-on-rails#upgrading-to-v12)
 for details.
 
 #### Other Updates
@@ -1058,7 +1070,7 @@ Updated React on Rails to depend on [rails/webpacker](https://github.com/rails/w
 
 #### 9.0 from 8.x. Upgrade Instructions
 
-Moved to [our documentation](https://www.shakacode.com/react-on-rails/docs/guides/upgrading-react-on-rails#upgrading-to-version-9).
+Moved to [our documentation](https://www.shakacode.com/react-on-rails/docs/upgrading/upgrading-react-on-rails#upgrading-to-version-9).
 
 ### [8.0.7] - 2017-08-16
 
@@ -1510,7 +1522,7 @@ Here is the addition to the generated config file:
 ##### Added
 
 - Support for React 15.0 to react_on_rails. See [#379](https://github.com/shakacode/react_on_rails/pull/379) by [brucek](https://github.com/brucek).
-- Support for Node.js server side rendering. See [#380](https://github.com/shakacode/react_on_rails/pull/380) by [alleycat](https://github.com/alleycat-at-git) and [doc](https://www.shakacode.com/react-on-rails/docs/react-on-rails-pro/react-on-rails-pro#pro-integration-with-nodejs-for-server-rendering)
+- Support for Node.js server side rendering. See [#380](https://github.com/shakacode/react_on_rails/pull/380) by [alleycat](https://github.com/alleycat-at-git) and [doc](https://www.shakacode.com/react-on-rails/docs/pro/react-on-rails-pro#pro-integration-with-nodejs-for-server-rendering)
 
 ##### Removed
 
@@ -1583,7 +1595,7 @@ All 5.1.0 changes can be found in [#362](https://github.com/shakacode/react_on_r
 
 ##### Added
 
-- [spec/dummy](spec/dummy) is a full sample app of React on Rails techniques **including** the hot reloading of assets from Rails!
+- [react_on_rails/spec/dummy](react_on_rails/spec/dummy) is a full sample app of React on Rails techniques **including** the hot reloading of assets from Rails!
 - Added helpers `env_stylesheet_link_tag` and `env_javascript_include_tag` to support hot reloading Rails. See the [README.md](./README.md) for more details and see the example application in `spec/dummy`. Also see how this is used in the [tutorial: application.html.erb](https://github.com/shakacode/react-webpack-rails-tutorial/blob/master/app%2Fviews%2Flayouts%2Fapplication.html.erb#L6)
 - Added optional parameter for ReactOnRails.getStore(name, throwIfMissing = true) so that you can check if a store is defined easily.
 - Added controller `module ReactOnRails::Controller`. Adds method `redux_store` to set up Redux stores in the view.
@@ -1680,12 +1692,12 @@ All 5.1.0 changes can be found in [#362](https://github.com/shakacode/react_on_r
 
   You'll get a deprecation message to change this.
 
-- Renamed `ReactOnRails.configure_rspec_to_compile_assets` to `ReactOnRails::TestHelper.configure_rspec_to_compile_assets`. The code has also been optimized to check for whether or not the compiled webpack bundles are up to date or not and will not run if not necessary. If you are using non-standard directories for your generated webpack assets (`app/assets/javascripts/generated` and `app/assets/stylesheets/generated`) or have additional directories you wish the helper to check, you need to update your ReactOnRails configuration accordingly. See [documentation](https://www.shakacode.com/react-on-rails/docs/guides/rspec_configuration) for how to do this. [#253](https://github.com/shakacode/react_on_rails/pull/253).
+- Renamed `ReactOnRails.configure_rspec_to_compile_assets` to `ReactOnRails::TestHelper.configure_rspec_to_compile_assets`. The code has also been optimized to check for whether or not the compiled webpack bundles are up to date or not and will not run if not necessary. If you are using non-standard directories for your generated webpack assets (`app/assets/javascripts/generated` and `app/assets/stylesheets/generated`) or have additional directories you wish the helper to check, you need to update your ReactOnRails configuration accordingly. See [documentation](https://www.shakacode.com/react-on-rails/docs/building-features/rspec-configuration) for how to do this. [#253](https://github.com/shakacode/react_on_rails/pull/253).
 - You have to call `ReactOnRails.register` to register React components. This was deprecated in v2. [#273](https://github.com/shakacode/react_on_rails/pull/273).
 
 ##### Migration Steps v2 to v3
 
-- See [these changes of spec/dummy/spec/rails_helper.rb](https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/spec/rails_helper.rb#L36..38) for an example. Add this line to your `rails_helper.rb`:
+- See [these changes of spec/dummy/spec/rails_helper.rb](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails/spec/dummy/spec/rails_helper.rb#L36..38) for an example. Add this line to your `rails_helper.rb`:
 
 ```ruby
 RSpec.configure do |config|
@@ -1707,7 +1719,7 @@ RSpec.configure do |config|
 
 ##### Added
 
-- New JavaScript API for debugging TurboLinks issues. Be sure to see [turbolinks docs](https://www.shakacode.com/react-on-rails/docs/rails/turbolinks). `ReactOnRails.setOptions({ traceTurbolinks: true });`. Removed the file `debug_turbolinks` added in 2.1.1. See [#243](https://github.com/shakacode/react_on_rails/pull/243).
+- New JavaScript API for debugging TurboLinks issues. Be sure to see [turbolinks docs](https://www.shakacode.com/react-on-rails/docs/building-features/turbolinks). `ReactOnRails.setOptions({ traceTurbolinks: true });`. Removed the file `debug_turbolinks` added in 2.1.1. See [#243](https://github.com/shakacode/react_on_rails/pull/243).
 
 ## [2.1.1] - 2016-01-28
 
@@ -1718,15 +1730,15 @@ RSpec.configure do |config|
 ##### Added
 
 - `ReactOnRails.render` returns a virtualDomElement Reference to your React component's backing instance. See [#234](https://github.com/shakacode/react_on_rails/pull/234).
-- `debug_turbolinks` helper for debugging turbolinks issues. See [turbolinks](https://www.shakacode.com/react-on-rails/docs/rails/turbolinks).
+- `debug_turbolinks` helper for debugging turbolinks issues. See [turbolinks](https://www.shakacode.com/react-on-rails/docs/building-features/turbolinks).
 - Enhanced regression testing for non-turbolinks apps. Runs all tests for dummy app with turbolinks both disabled and enabled.
 
 ## [2.1.0] - 2016-01-26
 
 ##### Added
 
-- Added EnsureAssetsCompiled feature so that you do not accidentally run tests without properly compiling the JavaScript bundles. Add a line to your `rails_helper.rb` file to check that the latest Webpack bundles have been generated prior to running tests that may depend on your client-side code. See [docs](https://www.shakacode.com/react-on-rails/docs/guides/rspec_configuration) for more detailed instructions. [#222](https://github.com/shakacode/react_on_rails/pull/222)
-- Added [migration guide](https://www.shakacode.com/react-on-rails/docs/additional-details/migrating-from-react-rails) for migrating from React-Rails. [#219](https://github.com/shakacode/react_on_rails/pull/219)
+- Added EnsureAssetsCompiled feature so that you do not accidentally run tests without properly compiling the JavaScript bundles. Add a line to your `rails_helper.rb` file to check that the latest Webpack bundles have been generated prior to running tests that may depend on your client-side code. See [docs](https://www.shakacode.com/react-on-rails/docs/building-features/rspec-configuration) for more detailed instructions. [#222](https://github.com/shakacode/react_on_rails/pull/222)
+- Added [migration guide](https://www.shakacode.com/react-on-rails/docs/migrating/migrating-from-react-rails) for migrating from React-Rails. [#219](https://github.com/shakacode/react_on_rails/pull/219)
 - Added [React on Rails Doctrine](https://www.shakacode.com/react-on-rails/docs/misc/doctrine) to docs. Discusses the project's motivations, conventions, and principles. [#220](https://github.com/shakacode/react_on_rails/pull/220)
 - Added ability to skip `display:none` style in the generated content tag for a component. Some developers may want to disable inline styles for security reasons. See generated config [initializer file](lib/generators/react_on_rails/templates/base/base/config/initializers/react_on_rails.rb#L27) for example on setting `skip_display_none`. [#218](https://github.com/shakacode/react_on_rails/pull/218)
 
@@ -1858,8 +1870,9 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.2.0.beta.11...master
-[v16.2.0.beta.11]: https://github.com/shakacode/react_on_rails/compare/16.1.1...v16.2.0.beta.11
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/16.2.0.beta.20...master
+[16.2.0.beta.20]: https://github.com/shakacode/react_on_rails/compare/16.2.0.beta.19...16.2.0.beta.20
+[16.2.0.beta.19]: https://github.com/shakacode/react_on_rails/compare/16.1.1...16.2.0.beta.19
 [16.1.1]: https://github.com/shakacode/react_on_rails/compare/16.1.0...16.1.1
 [16.1.0]: https://github.com/shakacode/react_on_rails/compare/16.0.0...16.1.0
 [16.0.0]: https://github.com/shakacode/react_on_rails/compare/14.2.0...16.0.0

@@ -432,7 +432,7 @@ describe "React Router Sixth Page", :js do
                   "#ServerComponentRouter-react-component-0"
 
   # Skip the test that fails without JavaScript - being addressed in another PR
-  it "renders the page completely on server and displays content on client even without JavaScript", # rubocop:disable RSpec/NoExpectationExample
+  it "renders the page completely on server and displays content on client even without JavaScript",
      skip: "Being addressed in another PR" do
     # This test is overridden to skip it
   end

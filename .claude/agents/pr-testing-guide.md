@@ -401,7 +401,7 @@ git commit -m "Fix helper method"
 # Agent responds with checklist
 
 # 5. Complete testing checklist
-cd spec/dummy
+cd react_on_rails/spec/dummy
 bin/dev
 # Test in browser...
 
@@ -446,7 +446,7 @@ gh pr create  # Include testing summary from agent
 
 - [ ] Run tests locally: `yarn run test`
 - [ ] Build succeeds: `yarn run build`
-- [ ] Test in browser: `cd spec/dummy && bin/dev`
+- [ ] Test in browser: `cd react_on_rails/spec/dummy && bin/dev`
 - [ ] Check browser console for errors
 - [ ] If SSR code changed: Verify SSR output in page source
 
@@ -479,7 +479,7 @@ gh pr create  # Include testing summary from agent
 
 #### If user-facing behavior changed (React components, SSR, view helpers):
 
-- [ ] Run Playwright E2E tests: `cd spec/dummy && yarn test:e2e`
+- [ ] Run Playwright E2E tests: `cd react_on_rails/spec/dummy && yarn test:e2e`
 - [ ] Verify components render in browser
 - [ ] Check server-side rendering in view source
 - [ ] No JavaScript console errors
@@ -532,7 +532,7 @@ gh pr create  # Include testing summary from agent
 
 **Browser testing** - Dummy app visual inspection
 
-    cd spec/dummy && bin/dev
+    cd react_on_rails/spec/dummy && bin/dev
     # Visit http://localhost:3000/hello_world
     # Check console for errors
 
@@ -617,7 +617,7 @@ Verified locally:
 
 Tested in dummy app:
 ```bash
-cd spec/dummy
+cd react_on_rails/spec/dummy
 bin/dev
 # Visited http://localhost:3000/hello_world
 # ✅ Component renders
@@ -689,5 +689,5 @@ gh pr view --json statusCheckRollup
 - Testing build scripts: [../docs/testing-build-scripts.md](../docs/testing-build-scripts.md)
 - CI debugging: [CLAUDE.md](../../CLAUDE.md) "Replicating CI Failures Locally"
 - Config switching: [SWITCHING_CI_CONFIGS.md](../../SWITCHING_CI_CONFIGS.md)
-- Local testing issues: [spec/dummy/TESTING_LOCALLY.md](../../spec/dummy/TESTING_LOCALLY.md)
+- Local testing issues: [react_on_rails/spec/dummy/TESTING_LOCALLY.md](../../react_on_rails/spec/dummy/TESTING_LOCALLY.md)
 - Master health: [../docs/master-health-monitoring.md](../docs/master-health-monitoring.md)

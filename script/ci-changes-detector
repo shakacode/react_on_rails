@@ -55,12 +55,12 @@ fi
 DOCS_ONLY=true
 LINT_CONFIG_CHANGED=false
 PRO_LINT_CONFIG_CHANGED=false
-RUBY_CHANGED=false
+RUBY_CORE_CHANGED=false
 RSPEC_CHANGED=false
 SPEC_DUMMY_CHANGED=false
 JS_CHANGED=false
-GENERATORS_CHANGED=false # needs to be duplicated to pro
-PRO_RUBY_CHANGED=false
+GENERATORS_CHANGED=false
+PRO_RUBY_CORE_CHANGED=false
 PRO_RSPEC_CHANGED=false
 PRO_JS_CHANGED=false
 PRO_DUMMY_CHANGED=false
@@ -75,22 +75,22 @@ while IFS= read -r file; do
       # Don't change DOCS_ONLY flag, just continue
       ;;
 
-    # Ruby source code
-    react_on_rails/lib/*.rb|react_on_rails/lib/**/*.rb|Gemfile|Gemfile.lock|rakelib/run_rspec.rake|rakelib/node_package.rake|rakelib/dummy_apps.rake)
+    # Generators (MUST be before Ruby source code to avoid being caught by lib/**/*.rb)
+    react_on_rails/lib/generators/*|react_on_rails/lib/generators/**/*|react_on_rails/spec/react_on_rails/generators/*|react_on_rails/spec/react_on_rails/generators/**/*|rakelib/example_type.rb|rakelib/examples_config.yml|rakelib/shakapacker_examples.rake|.github/workflows/examples.yml)
       DOCS_ONLY=false
-      RUBY_CHANGED=true
+      GENERATORS_CHANGED=true
       ;;
 
-    # Ruby gem-specific specs
+    # Ruby core source code (non-generator lib files)
+    react_on_rails/lib/*.rb|react_on_rails/lib/**/*.rb|Gemfile|Gemfile.lock|rakelib/run_rspec.rake|rakelib/node_package.rake|rakelib/dummy_apps.rake)
+      DOCS_ONLY=false
+      RUBY_CORE_CHANGED=true
+      ;;
+
+    # Ruby gem-specific specs (MUST be after Generators since this pattern catches ALL specs including generator specs)
     react_on_rails/spec/react_on_rails/*|react_on_rails/spec/react_on_rails/**/*|.github/workflows/gem-tests.yml)
       DOCS_ONLY=false
       RSPEC_CHANGED=true
-      ;;
-
-    # Generators
-    react_on_rails/lib/generators/*|react_on_rails/lib/generators/**/*|rakelib/example_type.rb|rakelib/examples_config.yml|rakelib/shakapacker_examples.rake|.github/workflows/examples.yml)
-      DOCS_ONLY=false
-      GENERATORS_CHANGED=true
       ;;
 
     # JavaScript/TypeScript source (including tests, scripts, and package files)
@@ -108,7 +108,7 @@ while IFS= read -r file; do
     # React on Rails Pro source code
     react_on_rails_pro/lib/*|react_on_rails_pro/lib/**/*)
       DOCS_ONLY=false
-      PRO_RUBY_CHANGED=true
+      PRO_RUBY_CORE_CHANGED=true
       ;;
 
     # JavaScript/TypeScript Pro source (including tests, scripts, and package files)
@@ -151,11 +151,11 @@ while IFS= read -r file; do
     # Changes to CI infrastructure should trigger tests to validate the changes work
     script/*|script/**/*|bin/*|bin/**/*|.github/workflows/*|.github/actions/*|.github/actions/**/*|lefthook.yml)
       DOCS_ONLY=false
-      RUBY_CHANGED=true  # Trigger all tests for CI infrastructure changes
+      RUBY_CORE_CHANGED=true  # Trigger all tests for CI infrastructure changes
       JS_CHANGED=true
       SPEC_DUMMY_CHANGED=true
       GENERATORS_CHANGED=true
-      PRO_RUBY_CHANGED=true
+      PRO_RUBY_CORE_CHANGED=true
       PRO_JS_CHANGED=true
       PRO_DUMMY_CHANGED=true
       ;;
@@ -223,14 +223,14 @@ if [ "$DOCS_ONLY" = true ]; then
 fi
 
 echo "Changed file categories:"
-[ "$RUBY_CHANGED" = true ] && echo -e "${YELLOW}  • Ruby source code${NC}"
+[ "$RUBY_CORE_CHANGED" = true ] && echo -e "${YELLOW}  • Ruby core source code${NC}"
 [ "$JS_CHANGED" = true ] && echo -e "${YELLOW}  • JavaScript/TypeScript code${NC}"
 [ "$RSPEC_CHANGED" = true ] && echo -e "${YELLOW}  • RSpec tests${NC}"
 [ "$SPEC_DUMMY_CHANGED" = true ] && echo -e "${YELLOW}  • Dummy app${NC}"
 [ "$GENERATORS_CHANGED" = true ] && echo -e "${YELLOW}  • Generators${NC}"
 [ "$PRO_JS_CHANGED" = true ] && echo -e "${YELLOW}  • React on Rails Pro JavaScript/TypeScript${NC}"
 [ "$PRO_RSPEC_CHANGED" = true ] && echo -e "${YELLOW}  • React on Rails Pro RSpec tests${NC}"
-[ "$PRO_RUBY_CHANGED" = true ] && echo -e "${YELLOW}  • React on Rails Pro Ruby source code${NC}"
+[ "$PRO_RUBY_CORE_CHANGED" = true ] && echo -e "${YELLOW}  • React on Rails Pro Ruby core source code${NC}"
 [ "$PRO_DUMMY_CHANGED" = true ] && echo -e "${YELLOW}  • React on Rails Pro Dummy app${NC}"
 [ "$PRO_NODE_RENDERER_CHANGED" = true ] && echo -e "${YELLOW}  • React on Rails Pro Node Renderer package${NC}"
 [ "$LINT_CONFIG_CHANGED" = true ] && echo -e "${YELLOW}  • Lint/format configuration${NC}"
@@ -251,11 +251,11 @@ RUN_PRO_TESTS=false
 RUN_PRO_DUMMY_TESTS=false
 RUN_PRO_NODE_RENDERER_TESTS=false
 
-if [ "$LINT_CONFIG_CHANGED" = true ] || [ "$RUBY_CHANGED" = true ] || [ "$JS_CHANGED" = true ] || [ "$SPEC_DUMMY_CHANGED" = true ]; then
+if [ "$LINT_CONFIG_CHANGED" = true ] || [ "$RUBY_CORE_CHANGED" = true ] || [ "$JS_CHANGED" = true ] || [ "$SPEC_DUMMY_CHANGED" = true ]; then
   RUN_LINT=true
 fi
 
-if [ "$RUBY_CHANGED" = true ] || [ "$RSPEC_CHANGED" = true ]; then
+if [ "$RUBY_CORE_CHANGED" = true ] || [ "$RSPEC_CHANGED" = true ] || [ "$GENERATORS_CHANGED" = true ]; then
   RUN_RUBY_TESTS=true
 fi
 
@@ -263,27 +263,29 @@ if [ "$JS_CHANGED" = true ]; then
   RUN_JS_TESTS=true
 fi
 
-if [ "$SPEC_DUMMY_CHANGED" = true ] || [ "$RUBY_CHANGED" = true ] || [ "$JS_CHANGED" = true ]; then
+if [ "$SPEC_DUMMY_CHANGED" = true ] || [ "$RUBY_CORE_CHANGED" = true ] || [ "$JS_CHANGED" = true ]; then
   RUN_DUMMY_TESTS=true
 fi
 
-if [ "$GENERATORS_CHANGED" = true ]; then
+# JS changes trigger generator tests because generators do a full build
+# which catches TypeScript compilation errors (see issue #2205)
+if [ "$GENERATORS_CHANGED" = true ] || [ "$JS_CHANGED" = true ]; then
   RUN_GENERATORS=true
 fi
 
-if [ "$PRO_LINT_CONFIG_CHANGED" = true ] || [ "$PRO_RUBY_CHANGED" = true ] || [ "$PRO_JS_CHANGED" = true ] || [ "$PRO_DUMMY_CHANGED" = true ] || [ "$RUBY_CHANGED" = true ]; then
+if [ "$PRO_LINT_CONFIG_CHANGED" = true ] || [ "$PRO_RUBY_CORE_CHANGED" = true ] || [ "$PRO_JS_CHANGED" = true ] || [ "$PRO_DUMMY_CHANGED" = true ] || [ "$RUBY_CORE_CHANGED" = true ]; then
   RUN_PRO_LINT=true
 fi
 
-if [ "$PRO_RUBY_CHANGED" = true ] || [ "$PRO_RSPEC_CHANGED" = true ] || [ "$PRO_JS_CHANGED" = true ] || [ "$RUBY_CHANGED" = true ]; then
+if [ "$PRO_RUBY_CORE_CHANGED" = true ] || [ "$PRO_RSPEC_CHANGED" = true ] || [ "$PRO_JS_CHANGED" = true ] || [ "$RUBY_CORE_CHANGED" = true ]; then
   RUN_PRO_TESTS=true
 fi
 
-if [ "$PRO_DUMMY_CHANGED" = true ] || [ "$PRO_RUBY_CHANGED" = true ] || [ "$PRO_JS_CHANGED" = true ] || [ "$RUBY_CHANGED" = true ]; then
+if [ "$PRO_DUMMY_CHANGED" = true ] || [ "$PRO_RUBY_CORE_CHANGED" = true ] || [ "$PRO_JS_CHANGED" = true ] || [ "$RUBY_CORE_CHANGED" = true ]; then
   RUN_PRO_DUMMY_TESTS=true
 fi
 
-if [ "$PRO_NODE_RENDERER_CHANGED" = true ] || [ "$PRO_JS_CHANGED" = true ] || [ "$RUBY_CHANGED" = true ]; then
+if [ "$PRO_NODE_RENDERER_CHANGED" = true ] || [ "$PRO_JS_CHANGED" = true ] || [ "$RUBY_CORE_CHANGED" = true ]; then
   RUN_PRO_NODE_RENDERER_TESTS=true
 fi
 
