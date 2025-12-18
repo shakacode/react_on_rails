@@ -60,6 +60,13 @@ b.suite(
     const result2 = renderComponent(Container, { delay: 10 });
     await Promise.all([text(result1), text(result2)]);
   }),
+  b.add('many delayed async component', async () => {
+    const results = new Array(10).fill(0).map(() => {
+      const result = renderComponent(Container, { delay: 10 });
+      return text(result);
+    });
+    await Promise.all(results);
+  }),
   b.save({ file: 'stream' }),
 ).catch(() => {
   console.log('Error');
