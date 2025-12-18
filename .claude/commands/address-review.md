@@ -100,8 +100,10 @@ gh api repos/${REPO}/pulls/{PR_NUMBER}/comments/{COMMENT_ID}/replies -X POST -f 
 **For standalone review comments (not in a thread):**
 
 ```bash
-gh api repos/${REPO}/pulls/{PR_NUMBER}/comments -X POST -f body="<response>" -f commit_id="<COMMIT_SHA>" -f path="<FILE_PATH>" -f line=<LINE_NUMBER>
+gh api repos/${REPO}/pulls/{PR_NUMBER}/comments -X POST -f body="<response>" -f commit_id="<COMMIT_SHA>" -f path="<FILE_PATH>" -f line=<LINE_NUMBER> -f side="RIGHT"
 ```
+
+Note: `side` is required when using `line`. Use `"RIGHT"` for the PR commit side (most common) or `"LEFT"` for the base commit side.
 
 The response should briefly explain:
 
