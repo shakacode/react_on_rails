@@ -212,11 +212,13 @@ export async function buildVM(filePath: string) {
         // 1. docs/node-renderer/js-configuration.md
         // 2. packages/node-renderer/src/shared/configBuilder.ts
         extendContext(contextObject, {
+          AbortController,
           Buffer,
           TextDecoder,
           TextEncoder,
           URLSearchParams,
           ReadableStream,
+          performance,
           process,
           setTimeout,
           setInterval,

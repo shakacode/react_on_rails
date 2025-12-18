@@ -28,10 +28,7 @@ beforeEach(() => {
 
 afterEach(() => mock.restore());
 
-const AsyncQueueItem = async ({
-  asyncQueue,
-  children,
-}: PropsWithChildren<{ asyncQueue: AsyncQueue<string> }>) => {
+const AsyncQueueItem = async ({ asyncQueue, children }: PropsWithChildren<{ asyncQueue: AsyncQueue }>) => {
   const value = await asyncQueue.dequeue();
 
   return (
@@ -42,7 +39,7 @@ const AsyncQueueItem = async ({
   );
 };
 
-const AsyncQueueContainer = ({ asyncQueue }: { asyncQueue: AsyncQueue<string> }) => {
+const AsyncQueueContainer = ({ asyncQueue }: { asyncQueue: AsyncQueue }) => {
   return (
     <div>
       <h1>Async Queue</h1>
@@ -78,7 +75,7 @@ const renderComponent = (props: Record<string, unknown>) => {
 };
 
 const createParallelRenders = (size: number) => {
-  const asyncQueues = new Array(size).fill(null).map(() => new AsyncQueue<string>());
+  const asyncQueues = new Array(size).fill(null).map(() => new AsyncQueue());
   const streams = asyncQueues.map((asyncQueue) => {
     return renderComponent({ asyncQueue });
   });
@@ -102,7 +99,7 @@ const createParallelRenders = (size: number) => {
 
 test('Renders concurrent rsc streams as single rsc stream', async () => {
   expect.assertions(258);
-  const asyncQueue = new AsyncQueue<string>();
+  const asyncQueue = new AsyncQueue();
   const stream = renderComponent({ asyncQueue });
   const reader = new StreamReader(stream);
 
@@ -114,6 +111,7 @@ test('Renders concurrent rsc streams as single rsc stream', async () => {
   expect(chunk).not.toContain('Random Value');
 
   asyncQueue.enqueue('Random Value1');
+
   chunk = await reader.nextChunk();
   chunks.push(chunk);
   expect(chunk).toContain('Random Value1');

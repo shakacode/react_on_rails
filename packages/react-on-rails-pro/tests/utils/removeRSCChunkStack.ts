@@ -1,28 +1,50 @@
 import { RSCPayloadChunk } from 'react-on-rails';
 
-const removeRSCChunkStack = (chunk: string) => {
-  const parsedJson = JSON.parse(chunk) as RSCPayloadChunk;
+const removeRSCChunkStackInternal = (chunk: string) => {
+  if (chunk.trim().length === 0) {
+    return chunk;
+  }
+
+  let parsedJson: RSCPayloadChunk;
+  try {
+    parsedJson = JSON.parse(chunk) as RSCPayloadChunk;
+  } catch (err) {
+    throw new Error(`Error while parsing the json: "${chunk}", ${err}`);
+  }
   const { html } = parsedJson;
   const santizedHtml = html.split('\n').map((chunkLine) => {
-    if (!chunkLine.includes('"stack":')) {
+    if (/^[0-9a-fA-F]+\:D/.exec(chunkLine) || chunkLine.startsWith(':N')) {
+      return '';
+    }
+    if (!(chunkLine.includes('"stack":') || chunkLine.includes('"start":') || chunkLine.includes('"end":'))) {
       return chunkLine;
     }
 
-    const regexMatch = /(^\d+):\{/.exec(chunkLine);
+    const regexMatch = /([^\{]+)\{/.exec(chunkLine);
     if (!regexMatch) {
       return chunkLine;
     }
 
     const chunkJsonString = chunkLine.slice(chunkLine.indexOf('{'));
-    const chunkJson = JSON.parse(chunkJsonString) as { stack?: string };
-    delete chunkJson.stack;
-    return `${regexMatch[1]}:${JSON.stringify(chunkJson)}`;
+    try {
+      const chunkJson = JSON.parse(chunkJsonString);
+      delete chunkJson.stack;
+      delete chunkJson.start;
+      delete chunkJson.end;
+      return `${regexMatch[1]}${JSON.stringify(chunkJson)}`;
+    } catch {
+      return chunkLine;
+    }
   });
 
   return JSON.stringify({
     ...parsedJson,
     html: santizedHtml,
   });
+};
+
+const removeRSCChunkStack = (chunk: string) => {
+  chunk.split('\n').map(removeRSCChunkStackInternal).join('\n');
 };
 
 export default removeRSCChunkStack;

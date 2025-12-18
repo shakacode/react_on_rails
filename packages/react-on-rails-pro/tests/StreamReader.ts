@@ -2,7 +2,7 @@ import { PassThrough, Readable } from 'node:stream';
 import AsyncQueue from './AsyncQueue.ts';
 
 class StreamReader {
-  private asyncQueue: AsyncQueue<string>;
+  private asyncQueue: AsyncQueue;
 
   constructor(pipeableStream: Pick<Readable, 'pipe'>) {
     this.asyncQueue = new AsyncQueue();

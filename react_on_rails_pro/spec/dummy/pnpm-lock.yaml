@@ -10,7 +10,7 @@ importers:
     dependencies:
       '@apollo/client':
         specifier: ^3.6.9
-        version: 3.14.0(@types/react@18.3.27)(graphql@16.12.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+        version: 3.14.0(@types/react@18.3.27)(graphql@16.12.0)(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
       '@babel/core':
         specifier: '7'
         version: 7.28.5
@@ -31,7 +31,7 @@ importers:
         version: 7.28.4
       '@dr.pogodin/react-helmet':
         specifier: ^3.0.4
-        version: 3.0.4(react@19.2.3)
+        version: 3.0.4(react@19.2.1)
       '@honeybadger-io/js':
         specifier: ^4.3.1
         version: 4.9.3
@@ -40,10 +40,10 @@ importers:
         version: 5.16.1(@babel/core@7.28.5)
       '@loadable/component':
         specifier: ^5.16.3
-        version: 5.16.7(react@19.2.3)
+        version: 5.16.7(react@19.2.1)
       '@loadable/server':
         specifier: ^5.16.2
-        version: 5.16.7(@loadable/component@5.16.7(react@19.2.3))(react@19.2.3)
+        version: 5.16.7(@loadable/component@5.16.7(react@19.2.1))(react@19.2.1)
       '@loadable/webpack-plugin':
         specifier: ^5.15.2
         version: 5.15.2(webpack@5.103.0)
@@ -52,10 +52,10 @@ importers:
         version: 7.120.4
       '@shakacode/use-ssr-computation.macro':
         specifier: ^1.2.4
-        version: 1.2.4(react@19.2.3)
+        version: 1.2.4(react@19.2.1)
       '@shakacode/use-ssr-computation.runtime':
         specifier: ^2.0.0
-        version: 2.0.0(react@19.2.3)
+        version: 2.0.0(react@19.2.1)
       '@webpack-cli/serve':
         specifier: ^1.6.0
         version: 1.7.0(webpack-cli@4.10.0)(webpack-dev-server@4.15.2)
@@ -138,14 +138,14 @@ importers:
         specifier: ^15.7.2
         version: 15.8.1
       react:
-        specifier: ^19.0.3
-        version: 19.2.3
+        specifier: 19.2.1
+        version: 19.2.1
       react-dom:
-        specifier: ^19.0.3
-        version: 19.2.3(react@19.2.3)
+        specifier: 19.2.1
+        version: 19.2.1(react@19.2.1)
       react-error-boundary:
         specifier: ^4.1.2
-        version: 4.1.2(react@19.2.3)
+        version: 4.1.2(react@19.2.1)
       react-on-rails-pro:
         specifier: link:.yalc/react-on-rails-pro
         version: link:.yalc/react-on-rails-pro
@@ -153,20 +153,20 @@ importers:
         specifier: link:.yalc/react-on-rails-pro-node-renderer
         version: link:.yalc/react-on-rails-pro-node-renderer
       react-on-rails-rsc:
-        specifier: ^19.0.4
-        version: 19.0.4(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(webpack@5.103.0)
+        specifier: git+https://github.com/shakacode/react_on_rails_rsc#upgrade-to-react-v19.2.1
+        version: https://codeload.github.com/shakacode/react_on_rails_rsc/tar.gz/3644ec9cb93f911b27e39f5e3266aeb7d95644a7(react-dom@19.2.1(react@19.2.1))(react@19.2.1)(webpack@5.103.0)
       react-proptypes:
         specifier: ^1.0.0
         version: 1.0.0
       react-redux:
         specifier: ^9.2.0
-        version: 9.2.0(@types/react@18.3.27)(react@19.2.3)(redux@5.0.1)
+        version: 9.2.0(@types/react@18.3.27)(react@19.2.1)(redux@5.0.1)
       react-refresh:
         specifier: ^0.11.0
         version: 0.11.0
       react-router-dom:
         specifier: ^6.15.0
-        version: 6.30.2(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+        version: 6.30.2(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
       redis:
         specifier: ^5.0.1
         version: 5.10.0
@@ -3453,10 +3453,10 @@ packages:
     resolution: {integrity: sha512-s4VSOf6yN0rvbRZGxs8Om5CWj6seneMwK3oDb4lWDH0UPhWcxwOWw5+qk24bxq87szX1ydrwylIOp2uG1ojUpA==}
     engines: {node: '>= 0.8'}
 
-  react-dom@19.2.3:
-    resolution: {integrity: sha512-yELu4WmLPw5Mr/lmeEpox5rw3RETacE++JgHqQzd2dg+YbJuat3jH4ingc+WPZhxaoFzdv9y33G+F7Nl5O0GBg==}
+  react-dom@19.2.1:
+    resolution: {integrity: sha512-ibrK8llX2a4eOskq1mXKu/TGZj9qzomO+sNfO98M6d9zIPOEhlBkMkBUBLd1vgS0gQsLDBzA+8jJBVXDnfHmJg==}
     peerDependencies:
-      react: ^19.2.3
+      react: ^19.2.1
 
   react-error-boundary@4.1.2:
     resolution: {integrity: sha512-GQDxZ5Jd+Aq/qUxbCm1UtzmL/s++V7zKgE8yMktJiCQXCCFZnMZh9ng+6/Ne6PjNSXH0L9CjeOEREfRnq6Duag==}
@@ -3466,11 +3466,12 @@ packages:
   react-is@16.13.1:
     resolution: {integrity: sha512-24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ==}
 
-  react-on-rails-rsc@19.0.4:
-    resolution: {integrity: sha512-KtHYz0opcXJk+Zw5aabjNiaszzpTdFgs1YfSLIZJSzU5SpddUw7b08epkxeJq/TCpR60Q9vsjxX3Q3OWJ97tMg==}
+  react-on-rails-rsc@https://codeload.github.com/shakacode/react_on_rails_rsc/tar.gz/3644ec9cb93f911b27e39f5e3266aeb7d95644a7:
+    resolution: {tarball: https://codeload.github.com/shakacode/react_on_rails_rsc/tar.gz/3644ec9cb93f911b27e39f5e3266aeb7d95644a7}
+    version: 19.0.3
     peerDependencies:
-      react: ^19.0.3
-      react-dom: ^19.0.3
+      react: ^19.2.1
+      react-dom: ^19.2.1
       webpack: ^5.59.0
 
   react-proptypes@1.0.0:
@@ -3505,8 +3506,8 @@ packages:
     peerDependencies:
       react: '>=16.8'
 
-  react@19.2.3:
-    resolution: {integrity: sha512-Ku/hhYbVjOQnXDZFv2+RibmLFGwFdeeKHFcOTlrt7xplBnya5OGn/hIRDsqDiSUcfORsDC7MPxwork8jBwsIWA==}
+  react@19.2.1:
+    resolution: {integrity: sha512-DGrYcCWK7tvYMnWh79yrPHt+vdx9tY+1gPZa7nJQtO/p8bLTDaHp4dzwEhQB7pZ4Xe3ok4XKuEPrVuc+wlpkmw==}
     engines: {node: '>=0.10.0'}
 
   read-cache@1.0.0:
@@ -4465,7 +4466,7 @@ snapshots:
 
   '@alloc/quick-lru@5.2.0': {}
 
-  '@apollo/client@3.14.0(@types/react@18.3.27)(graphql@16.12.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)':
+  '@apollo/client@3.14.0(@types/react@18.3.27)(graphql@16.12.0)(react-dom@19.2.1(react@19.2.1))(react@19.2.1)':
     dependencies:
       '@graphql-typed-document-node/core': 3.2.0(graphql@16.12.0)
       '@wry/caches': 1.0.1
@@ -4476,14 +4477,14 @@ snapshots:
       hoist-non-react-statics: 3.3.2
       optimism: 0.18.1
       prop-types: 15.8.1
-      rehackt: 0.1.0(@types/react@18.3.27)(react@19.2.3)
+      rehackt: 0.1.0(@types/react@18.3.27)(react@19.2.1)
       symbol-observable: 4.0.0
       ts-invariant: 0.10.3
       tslib: 2.8.1
       zen-observable-ts: 1.2.5
     optionalDependencies:
-      react: 19.2.3
-      react-dom: 19.2.3(react@19.2.3)
+      react: 19.2.1
+      react-dom: 19.2.1(react@19.2.1)
     transitivePeerDependencies:
       - '@types/react'
 
@@ -5238,10 +5239,10 @@ snapshots:
 
   '@discoveryjs/json-ext@0.5.7': {}
 
-  '@dr.pogodin/react-helmet@3.0.4(react@19.2.3)':
+  '@dr.pogodin/react-helmet@3.0.4(react@19.2.1)':
     dependencies:
       '@babel/runtime': 7.28.4
-      react: 19.2.3
+      react: 19.2.1
 
   '@graphql-typed-document-node/core@3.2.0(graphql@16.12.0)':
     dependencies:
@@ -5288,18 +5289,18 @@ snapshots:
       '@babel/core': 7.28.5
       '@babel/plugin-syntax-dynamic-import': 7.8.3(@babel/core@7.28.5)
 
-  '@loadable/component@5.16.7(react@19.2.3)':
+  '@loadable/component@5.16.7(react@19.2.1)':
     dependencies:
       '@babel/runtime': 7.28.4
       hoist-non-react-statics: 3.3.2
-      react: 19.2.3
+      react: 19.2.1
       react-is: 16.13.1
 
-  '@loadable/server@5.16.7(@loadable/component@5.16.7(react@19.2.3))(react@19.2.3)':
+  '@loadable/server@5.16.7(@loadable/component@5.16.7(react@19.2.1))(react@19.2.1)':
     dependencies:
-      '@loadable/component': 5.16.7(react@19.2.3)
+      '@loadable/component': 5.16.7(react@19.2.1)
       lodash: 4.17.21
-      react: 19.2.3
+      react: 19.2.1
 
   '@loadable/webpack-plugin@5.15.2(webpack@5.103.0)':
     dependencies:
@@ -5453,16 +5454,16 @@ snapshots:
     dependencies:
       '@sentry/types': 7.120.4
 
-  '@shakacode/use-ssr-computation.macro@1.2.4(react@19.2.3)':
+  '@shakacode/use-ssr-computation.macro@1.2.4(react@19.2.1)':
     dependencies:
-      '@shakacode/use-ssr-computation.runtime': 2.0.0(react@19.2.3)
+      '@shakacode/use-ssr-computation.runtime': 2.0.0(react@19.2.1)
       babel-plugin-macros: 3.1.0
     transitivePeerDependencies:
       - react
 
-  '@shakacode/use-ssr-computation.runtime@2.0.0(react@19.2.3)':
+  '@shakacode/use-ssr-computation.runtime@2.0.0(react@19.2.1)':
     dependencies:
-      react: 19.2.3
+      react: 19.2.1
 
   '@tailwindcss/aspect-ratio@0.4.2(tailwindcss@3.4.18)':
     dependencies:
@@ -7930,24 +7931,24 @@ snapshots:
       iconv-lite: 0.4.24
       unpipe: 1.0.0
 
-  react-dom@19.2.3(react@19.2.3):
+  react-dom@19.2.1(react@19.2.1):
     dependencies:
-      react: 19.2.3
+      react: 19.2.1
       scheduler: 0.27.0
 
-  react-error-boundary@4.1.2(react@19.2.3):
+  react-error-boundary@4.1.2(react@19.2.1):
     dependencies:
       '@babel/runtime': 7.28.4
-      react: 19.2.3
+      react: 19.2.1
 
   react-is@16.13.1: {}
 
-  react-on-rails-rsc@19.0.4(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(webpack@5.103.0):
+  react-on-rails-rsc@https://codeload.github.com/shakacode/react_on_rails_rsc/tar.gz/3644ec9cb93f911b27e39f5e3266aeb7d95644a7(react-dom@19.2.1(react@19.2.1))(react@19.2.1)(webpack@5.103.0):
     dependencies:
       acorn-loose: 8.5.2
       neo-async: 2.6.2
-      react: 19.2.3
-      react-dom: 19.2.3(react@19.2.3)
+      react: 19.2.1
+      react-dom: 19.2.1(react@19.2.1)
       webpack: 5.103.0(webpack-cli@4.10.0)
       webpack-sources: 3.3.3
 
@@ -7955,30 +7956,30 @@ snapshots:
     dependencies:
       prop-types: 15.8.1
 
-  react-redux@9.2.0(@types/react@18.3.27)(react@19.2.3)(redux@5.0.1):
+  react-redux@9.2.0(@types/react@18.3.27)(react@19.2.1)(redux@5.0.1):
     dependencies:
       '@types/use-sync-external-store': 0.0.6
-      react: 19.2.3
-      use-sync-external-store: 1.6.0(react@19.2.3)
+      react: 19.2.1
+      use-sync-external-store: 1.6.0(react@19.2.1)
     optionalDependencies:
       '@types/react': 18.3.27
       redux: 5.0.1
 
   react-refresh@0.11.0: {}
 
-  react-router-dom@6.30.2(react-dom@19.2.3(react@19.2.3))(react@19.2.3):
+  react-router-dom@6.30.2(react-dom@19.2.1(react@19.2.1))(react@19.2.1):
     dependencies:
       '@remix-run/router': 1.23.1
-      react: 19.2.3
-      react-dom: 19.2.3(react@19.2.3)
-      react-router: 6.30.2(react@19.2.3)
+      react: 19.2.1
+      react-dom: 19.2.1(react@19.2.1)
+      react-router: 6.30.2(react@19.2.1)
 
-  react-router@6.30.2(react@19.2.3):
+  react-router@6.30.2(react@19.2.1):
     dependencies:
       '@remix-run/router': 1.23.1
-      react: 19.2.3
+      react: 19.2.1
 
-  react@19.2.3: {}
+  react@19.2.1: {}
 
   read-cache@1.0.0:
     dependencies:
@@ -8047,10 +8048,10 @@ snapshots:
     dependencies:
       jsesc: 3.1.0
 
-  rehackt@0.1.0(@types/react@18.3.27)(react@19.2.3):
+  rehackt@0.1.0(@types/react@18.3.27)(react@19.2.1):
     optionalDependencies:
       '@types/react': 18.3.27
-      react: 19.2.3
+      react: 19.2.1
 
   relateurl@0.2.7: {}
 
@@ -8670,9 +8671,9 @@ snapshots:
       punycode: 1.4.1
       qs: 6.14.0
 
-  use-sync-external-store@1.6.0(react@19.2.3):
+  use-sync-external-store@1.6.0(react@19.2.1):
     dependencies:
-      react: 19.2.3
+      react: 19.2.1
 
   util-deprecate@1.0.2: {}
 

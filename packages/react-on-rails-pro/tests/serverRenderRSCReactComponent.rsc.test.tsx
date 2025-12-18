@@ -140,7 +140,7 @@ test('[bug] catches logs outside the component during reading the stream', async
   readable1.on('data', (chunk: Buffer) => {
     i += 1;
     // To avoid infinite loop
-    if (i < 5) {
+    if (i < 10) {
       console.log('Outside The Component');
     }
     content1 += chunk.toString();
