@@ -41,6 +41,9 @@ exclude = [
   # Badge services that block bots
   '^https://badge\.fury\.io',  # Returns 403 for automated requests
 
+  # Planned deployments not yet live
+  '^https://ror-spec-dummy\.reactrails\.com',  # spec/dummy demo - deployment pending
+
   # Sites from PROJECTS.md that block bots or are unreliable
   '^https://blog\.shakacode\.com',  # May block automated requests
   '^https?://(www\.)?foxford\.ru',  # Russian site, often blocks bots
