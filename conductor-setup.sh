@@ -66,11 +66,13 @@ fi
 echo "✅ Node.js version: v$NODE_VERSION"
 
 # Copy any environment files from root if they exist
-if [ -f "$CONDUCTOR_ROOT_PATH/.env" ]; then
-    cp "$CONDUCTOR_ROOT_PATH/.env" .env
-fi
-if [ -f "$CONDUCTOR_ROOT_PATH/.env.local" ]; then
-    cp "$CONDUCTOR_ROOT_PATH/.env.local" .env.local
+if [ -n "$CONDUCTOR_ROOT_PATH" ]; then
+    if [ -f "$CONDUCTOR_ROOT_PATH/.env" ]; then
+        cp "$CONDUCTOR_ROOT_PATH/.env" .env
+    fi
+    if [ -f "$CONDUCTOR_ROOT_PATH/.env.local" ]; then
+        cp "$CONDUCTOR_ROOT_PATH/.env.local" .env.local
+    fi
 fi
 
 # Install Ruby dependencies
