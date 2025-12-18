@@ -1571,7 +1571,7 @@ All 5.1.0 changes can be found in [#362](https://github.com/shakacode/react_on_r
 
 ##### Breaking Changes
 
-- You must provide named attributes, including `props` for view helper `react_component`. See [this commit](https://github.com/shakacode/react-webpack-rails-tutorial/commit/a97fa90042cbe27be7fd7fa70b5622bfcf9c3673) for an example migration used for [www.reactrails.com](http://www.reactrails.com).
+- You must provide named attributes, including `props` for view helper `react_component`. See [this commit](https://github.com/shakacode/react-webpack-rails-tutorial/commit/a97fa90042cbe27be7fd7fa70b5622bfcf9c3673) for an example migration used for [reactrails.com](https://reactrails.com).
 
 ## [4.0.3] - 2016-03-17
 
