@@ -1740,7 +1740,7 @@ RSpec.configure do |config|
 - Added EnsureAssetsCompiled feature so that you do not accidentally run tests without properly compiling the JavaScript bundles. Add a line to your `rails_helper.rb` file to check that the latest Webpack bundles have been generated prior to running tests that may depend on your client-side code. See [docs](https://www.shakacode.com/react-on-rails/docs/building-features/rspec-configuration) for more detailed instructions. [#222](https://github.com/shakacode/react_on_rails/pull/222)
 - Added [migration guide](https://www.shakacode.com/react-on-rails/docs/migrating/migrating-from-react-rails) for migrating from React-Rails. [#219](https://github.com/shakacode/react_on_rails/pull/219)
 - Added [React on Rails Doctrine](https://www.shakacode.com/react-on-rails/docs/misc/doctrine) to docs. Discusses the project's motivations, conventions, and principles. [#220](https://github.com/shakacode/react_on_rails/pull/220)
-- Added ability to skip `display:none` style in the generated content tag for a component. Some developers may want to disable inline styles for security reasons. See generated config [initializer file](lib/generators/react_on_rails/templates/base/base/config/initializers/react_on_rails.rb#L27) for example on setting `skip_display_none`. [#218](https://github.com/shakacode/react_on_rails/pull/218)
+- Added ability to skip `display:none` style in the generated content tag for a component. Some developers may want to disable inline styles for security reasons. See the `skip_display_none` configuration option. [#218](https://github.com/shakacode/react_on_rails/pull/218)
 
 ##### Changed
 

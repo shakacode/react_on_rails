@@ -173,7 +173,7 @@ To do this, follow the instructions in the
 
 ### Example: Testing NPM changes with the dummy app
 
-1. Add `console.log('Hello!')` [here](https://github.com/shakacode/react_on_rails_pro/blob/more_test_and_docs/packages/node-renderer/src/ReactOnRailsProNodeRenderer.js#L6) in `packages/node-renderer/src/ReactOnRailsProNodeRenderer.js` to confirm we're getting an update to the node package.
+1. Add `console.log('Hello!')` [here](https://github.com/shakacode/react_on_rails_pro/blob/master/packages/node-renderer/src/ReactOnRailsProNodeRenderer.ts#L6) in `packages/node-renderer/src/ReactOnRailsProNodeRenderer.ts` to confirm we're getting an update to the node package.
 2. The `preinstall` script of `spec/dummy` builds the NPM package and sets up `yalc` to use it for the renderer.
    It's run automatically when you run `yarn install`.
 3. Refresh the browser if the server is already running or start the server using `foreman start -f Procfile.dev` from `spec/dummy` and navigate to `http://localhost:3000/`. You will now see the `Hello!` message printed in the browser's console.
@@ -276,7 +276,7 @@ Hit F8 and then a debugger statement within the test will get hit.
 ### Async issues with Jest
 
 Beware that Jest runs multiple test files synchronously, so you can't use the same temporary directory
-between tests. See the file [`packages/node-renderer/tests/helper.ts`](packages/node-renderer/tests/helper.ts) for how we handle this.
+between tests. See the file [`packages/node-renderer/tests/helper.ts`](https://github.com/shakacode/react_on_rails_pro/blob/master/packages/node-renderer/tests/helper.ts) for how we handle this.
 
 ### Run most tests and linting
 
