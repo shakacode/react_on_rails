@@ -1,10 +1,10 @@
-name: Bundle Size
+name: Benchmark Critical Operations
 
 on:
   pull_request
 
 jobs:
-  check-bundle-size:
+  run-benchmarks:
     runs-on: ubuntu-22.04
     permissions:
       contents: read
