@@ -51,6 +51,12 @@ exclude = [
   '^https://(www\.)?first\.io',     # Returns 403
   '^https://(www\.)?estately\.com', # Returns 403
   '^https://hiring\.careerbuilder\.com',  # Returns 403
+  '^https?://(www\.)?pivotaltracker\.com',  # Timeout in CI
+  '^https?://(www\.)?undeveloped\.com',  # Timeout in CI
+
+  # External sites that timeout during CI checks
+  '^https://devchat\.tv',  # Ruby Rogues podcast - times out in CI
+  '^https?://chlg\.co',  # URL shortener - times out in CI
 
   # Historical releases that were documented in CHANGELOG but never tagged
   # These versions had CHANGELOG entries created but the git tag + version bump was forgotten.
