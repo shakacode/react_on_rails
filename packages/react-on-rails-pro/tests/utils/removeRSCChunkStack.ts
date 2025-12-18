@@ -44,7 +44,7 @@ const removeRSCChunkStackInternal = (chunk: string) => {
 };
 
 const removeRSCChunkStack = (chunk: string) => {
-  chunk.split('\n').map(removeRSCChunkStackInternal).join('\n');
+  return chunk.split('\n').map(removeRSCChunkStackInternal).join('\n');
 };
 
 export default removeRSCChunkStack;
