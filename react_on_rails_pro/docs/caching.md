@@ -44,14 +44,14 @@ Completed 200 OK in 19ms (Views: 16.4ms | ActiveRecord: 0.0ms)
 
 ### Why?
 
-1. Server side rendering is typically done like a stateless functional component, meaning that the result should be idempotent based on props passed in.
+1. Server-side rendering is typically done like a stateless functional component, meaning that the result should be idempotent based on props passed in.
 1. It's much easier than configuring fragment caching. So long as you have some space in your Rails cache, "it should just work."
 
 ### Why not?
 
 If you're using regular caching for most components (cached_react_component_hash), and you don't want to use caching for other components, then having prerender caching still results in caching for all your rendering calls, increasing the likelihood of premature cache ejection.
 
-In the future, React on Rails will allow stateful server rendering. Thus, your server side JavaScript depend on externalities, such as AJAX calls for
+In the future, React on Rails will allow stateful server rendering. Thus, your server-side JavaScript depend on externalities, such as AJAX calls for
 GraphQL. In that case, you will set this caching to false.
 
 ### When?
