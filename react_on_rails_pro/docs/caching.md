@@ -44,7 +44,7 @@ Completed 200 OK in 19ms (Views: 16.4ms | ActiveRecord: 0.0ms)
 
 ### Why?
 
-1. Server side rendering is typically done like a stateless functional component, meaning that the result should be idempotent from based on props passed in.
+1. Server side rendering is typically done like a stateless functional component, meaning that the result should be idempotent based on props passed in.
 1. It's much easier than configuring fragment caching. So long as you have some space in your Rails cache, "it should just work."
 
 ### Why not?
@@ -124,7 +124,7 @@ location = the_rails_context[:location]
 
 If you are calling `rails_context` from your controller method, then prefix it like this: `helpers.rails_context` so long as you have react_on_rails > 11.2.2. If less than that, call `helpers.send(:rails_context, server_side: true)`
 
-If performance is particulary sensitive, consult the view helper definition for `rails_context`. For example, you can save the cost of calculating the rails_context by directly getting a value:
+If performance is particularly sensitive, consult the view helper definition for `rails_context`. For example, you can save the cost of calculating the rails_context by directly getting a value:
 
 ```ruby
 i18nLocale = I18n.locale
