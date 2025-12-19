@@ -9,6 +9,15 @@ description: Validates PR testing before merge. Use when creating PRs, investiga
 
 **Core Principle:** Be deeply suspicious of claims that tests passed unless you have concrete evidence. Assume automated tests have gaps. Manual testing is often required.
 
+## Additional Context
+
+When you need more details, use the Read tool to examine:
+
+- `.claude/docs/testing-build-scripts.md` - Build/package testing requirements
+- `.claude/docs/master-health-monitoring.md` - Post-merge CI monitoring
+- `SWITCHING_CI_CONFIGS.md` - CI config switching guide
+- `react_on_rails/spec/dummy/TESTING_LOCALLY.md` - Environment-specific testing issues
+
 ## Agent Behavior
 
 ### Default Stance: Skeptical
