@@ -14,12 +14,16 @@ timeout = 20
 
 # Exclude patterns (migrated from markdown-link-check-config.json)
 exclude = [
-  # Localhost/development URLs
+  # ============================================================================
+  # DEVELOPMENT URLS
+  # ============================================================================
   '^http://localhost',
   '^https://localhost',
   '^mailto:',
 
-  # Sites that block bots or require auth
+  # ============================================================================
+  # SITES THAT BLOCK BOTS OR REQUIRE AUTH
+  # ============================================================================
   '^https://www\.npmjs\.(org|com)',
   '^https://medium\.com',  # Returns 403 for automated requests
   '^https://www\.linkedin\.com',
@@ -27,41 +31,58 @@ exclude = [
   '^https://docs\.google\.com',  # Private docs require auth
   '^https://claude\.ai',  # Returns 403 for automated requests
 
-  # Known dead/problematic URLs (verified)
+  # ============================================================================
+  # KNOWN DEAD OR PROBLEMATIC URLS
+  # ============================================================================
   '^https://your-shared-addr\.c9users\.io',
   '^https://hichee\.com',
   '^https?://rubyonrails\.org/doctrine',  # DNS issues
 
-  # SSL certificate issues (expired/hostname mismatch/verification failed)
+  # ============================================================================
+  # SSL CERTIFICATE ISSUES
+  # ============================================================================
+  # Expired, hostname mismatch, or verification failed
   '^https://(www\.)?blinkinc\.com',     # SSL certificate expired
   '^https://(www\.)?localwise\.com',    # SSL verification failed
   '^https://(www\.)?mycfsapp\.com',     # SSL hostname mismatch
   '^https://(www\.)?scoutapp\.com',     # SSL hostname mismatch
 
-  # Badge services that block bots
+  # ============================================================================
+  # BADGE SERVICES
+  # ============================================================================
   '^https://badge\.fury\.io',  # Returns 403 for automated requests
 
-  # Sites that return 504 from GitHub Actions IPs
+  # ============================================================================
+  # SITES THAT RETURN 504 FROM CI
+  # ============================================================================
   '^https://reactrails\.com',  # Works locally but 504s from CI
 
-  # Planned deployments not yet live
+  # ============================================================================
+  # PLANNED DEPLOYMENTS NOT YET LIVE
+  # ============================================================================
   '^https://ror-spec-dummy\.reactrails\.com',  # spec/dummy demo - deployment pending
 
-  # Sites from PROJECTS.md that block bots or are unreliable
+  # ============================================================================
+  # SITES FROM PROJECTS.MD THAT BLOCK BOTS OR ARE UNRELIABLE
+  # ============================================================================
   '^https://blog\.shakacode\.com',  # May block automated requests
   '^https?://(www\.)?foxford\.ru',  # Russian site, often blocks bots
   '^https://(www\.)?airgoat\.com',  # Returns 403
   '^https://(www\.)?first\.io',     # Returns 403
   '^https://(www\.)?estately\.com', # Returns 403
   '^https://hiring\.careerbuilder\.com',  # Returns 403
+
+  # ============================================================================
+  # EXTERNAL SITES THAT TIMEOUT DURING CI CHECKS
+  # ============================================================================
   '^https?://(www\.)?pivotaltracker\.com',  # Timeout in CI
   '^https?://(www\.)?undeveloped\.com',  # Timeout in CI
-
-  # External sites that timeout during CI checks
   '^https://devchat\.tv',  # Ruby Rogues podcast - times out in CI
   '^https?://chlg\.co',  # URL shortener - times out in CI
 
-  # Historical releases that were documented in CHANGELOG but never tagged
+  # ============================================================================
+  # HISTORICAL RELEASES NEVER TAGGED
+  # ============================================================================
   # These versions had CHANGELOG entries created but the git tag + version bump was forgotten.
   # The work was rolled into the next release. See issue #2232 for investigation details.
   '^https://github\.com/shakacode/react_on_rails/compare/8\.0\.6\.\.\.8\.0\.7$',   # 8.0.7 never tagged
@@ -69,11 +90,16 @@ exclude = [
   '^https://github\.com/shakacode/react_on_rails/compare/10\.1\.1\.\.\.10\.1\.2$', # 10.1.2 never tagged
   '^https://github\.com/shakacode/react_on_rails/compare/10\.1\.2\.\.\.10\.1\.3$', # 10.1.2 never tagged
 
-  # Deleted GitHub user accounts (contributors whose accounts no longer exist)
+  # ============================================================================
+  # DELETED GITHUB USER ACCOUNTS
+  # ============================================================================
+  # Contributors whose accounts no longer exist
   '^https://github\.com/(alleycat-at-git|Conturbo|jblasco3|nostophilia|railsme|samphilipd|wouldntsavezion)$',
 
-  # Private repo (react_on_rails_pro) - requires authentication
-  '^https://github\.com/shakacode/react_on_rails_pro/',
+  # ============================================================================
+  # PRIVATE REPOSITORIES
+  # ============================================================================
+  '^https://github\.com/shakacode/react_on_rails_pro/',  # Requires authentication
 ]
 
 # Exclude paths (regex patterns)
