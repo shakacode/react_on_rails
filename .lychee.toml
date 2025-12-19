@@ -24,7 +24,7 @@ exclude = [
   # ============================================================================
   # SITES THAT BLOCK BOTS OR REQUIRE AUTH
   # ============================================================================
-  '^https://www\.npmjs\.(org|com)',
+  '^https://(www\.)?npmjs\.(org|com)',  # Returns 403 for automated requests
   '^https://medium\.com',  # Returns 403 for automated requests
   '^https://www\.linkedin\.com',
   '^https://reactrails\.slack\.com',
