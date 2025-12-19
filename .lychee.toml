@@ -6,8 +6,8 @@
 accept = ["200", "308"]
 
 # Retry failed requests (handles transient 502/503/504/429 errors)
-max_retries = 5
-retry_wait_time = 30
+max_retries = 4
+retry_wait_time = 15
 
 # Timeout for each request
 timeout = 20
@@ -40,6 +40,9 @@ exclude = [
 
   # Badge services that block bots
   '^https://badge\.fury\.io',  # Returns 403 for automated requests
+
+  # Sites that return 504 from GitHub Actions IPs
+  '^https://reactrails\.com',  # Works locally but 504s from CI
 
   # Planned deployments not yet live
   '^https://ror-spec-dummy\.reactrails\.com',  # spec/dummy demo - deployment pending
