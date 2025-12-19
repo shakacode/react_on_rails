@@ -149,7 +149,7 @@ bundle exec rake
 
 **Why this matters:**
 
-- See [../docs/testing-build-scripts.md](../docs/testing-build-scripts.md) for real examples of silent failures
+- See `.claude/docs/testing-build-scripts.md` for real examples of silent failures
 - Build scripts run during `npm install`, `yalc publish`, and package installation
 - Failures are often SILENT in CI but break users completely
 
@@ -214,7 +214,7 @@ gh run list --workflow="Integration Tests" --branch <pr-branch> --limit 10 --jso
 # Key question: Did MY commits break it, or was it already broken?
 ```
 
-**See [../docs/testing-build-scripts.md](../docs/testing-build-scripts.md) "Before You Start: Check CI Status"**
+**See `.claude/docs/testing-build-scripts.md` "Before You Start: Check CI Status"**
 
 **Reproduce failures locally:**
 
@@ -234,7 +234,7 @@ bin/ci-rerun-failures
 pbpaste | bin/ci-run-failed-specs
 ```
 
-**See [../../SWITCHING_CI_CONFIGS.md](../../SWITCHING_CI_CONFIGS.md) for full details**
+**See `SWITCHING_CI_CONFIGS.md` for full details**
 
 ### 6. Generator Changes
 
@@ -384,7 +384,7 @@ cd react_on_rails/spec/dummy
 bundle exec rspec spec/system/integration_spec.rb
 ```
 
-**See [../../react_on_rails/spec/dummy/TESTING_LOCALLY.md](../../react_on_rails/spec/dummy/TESTING_LOCALLY.md) for details**
+**See `react_on_rails/spec/dummy/TESTING_LOCALLY.md` for details**
 
 ## Success Criteria: Well-Tested PR
 
