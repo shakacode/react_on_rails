@@ -3,7 +3,7 @@
 [![License](https://img.shields.io/badge/license-Commercial-blue.svg)](./LICENSE)
 [![Build Integration Tests](https://github.com/shakacode/react_on_rails/actions/workflows/pro-integration-tests.yml/badge.svg)](https://github.com/shakacode/react_on_rails/actions/workflows/pro-integration-tests.yml)
 [![Build Lint](https://github.com/shakacode/react_on_rails/actions/workflows/pro-lint.yml/badge.svg)](https://github.com/shakacode/react_on_rails/actions/workflows/pro-lint.yml)
-[![Build Package Tests](https://github.com/shakacode/react_on_rails/actions/workflows/pro-package-tests.yml/badge.svg)](https://github.com/shakacode/react_on_rails/actions/workflows/pro-package-tests.yml)
+[![Build Package Tests](https://github.com/shakacode/react_on_rails/actions/workflows/pro-test-package-and-gem.yml/badge.svg)](https://github.com/shakacode/react_on_rails/actions/workflows/pro-test-package-and-gem.yml)
 
 **Performance enhancements and advanced features for [React on Rails](https://github.com/shakacode/react_on_rails).**
 

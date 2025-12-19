@@ -1571,7 +1571,7 @@ All 5.1.0 changes can be found in [#362](https://github.com/shakacode/react_on_r
 
 ##### Breaking Changes
 
-- You must provide named attributes, including `props` for view helper `react_component`. See [this commit](https://github.com/shakacode/react-webpack-rails-tutorial/commit/a97fa90042cbe27be7fd7fa70b5622bfcf9c3673) for an example migration used for [www.reactrails.com](http://www.reactrails.com).
+- You must provide named attributes, including `props` for view helper `react_component`. See [this commit](https://github.com/shakacode/react-webpack-rails-tutorial/commit/a97fa90042cbe27be7fd7fa70b5622bfcf9c3673) for an example migration used for [reactrails.com](https://reactrails.com).
 
 ## [4.0.3] - 2016-03-17
 
@@ -1870,9 +1870,9 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/16.2.0.beta.20...master
-[16.2.0.beta.20]: https://github.com/shakacode/react_on_rails/compare/16.2.0.beta.19...16.2.0.beta.20
-[16.2.0.beta.19]: https://github.com/shakacode/react_on_rails/compare/16.1.1...16.2.0.beta.19
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.2.0.beta.20...master
+[16.2.0.beta.20]: https://github.com/shakacode/react_on_rails/compare/v16.2.0.beta.19...v16.2.0.beta.20
+[16.2.0.beta.19]: https://github.com/shakacode/react_on_rails/compare/16.1.1...v16.2.0.beta.19
 [16.1.1]: https://github.com/shakacode/react_on_rails/compare/16.1.0...16.1.1
 [16.1.0]: https://github.com/shakacode/react_on_rails/compare/16.0.0...16.1.0
 [16.0.0]: https://github.com/shakacode/react_on_rails/compare/14.2.0...16.0.0
@@ -2014,8 +2014,8 @@ such as:
 [2.1.1]: https://github.com/shakacode/react_on_rails/compare/v2.1.0...2.1.1
 [2.1.0]: https://github.com/shakacode/react_on_rails/compare/v2.0.2...v2.1.0
 [2.0.2]: https://github.com/shakacode/react_on_rails/compare/v2.0.1...v2.0.2
-[2.0.1]: https://github.com/shakacode/react_on_rails/compare/v2.0.0...v2.0.1
-[2.0.0]: https://github.com/shakacode/react_on_rails/compare/v1.2.2...v2.0.0
+[2.0.1]: https://github.com/shakacode/react_on_rails/compare/2.0.0...v2.0.1
+[2.0.0]: https://github.com/shakacode/react_on_rails/compare/v1.2.2...2.0.0
 [1.2.2]: https://github.com/shakacode/react_on_rails/compare/v1.2.0...v1.2.2
 [1.2.0]: https://github.com/shakacode/react_on_rails/compare/v1.1.0...v1.2.0
 [1.1.1]: https://github.com/shakacode/react_on_rails/compare/v1.1.1...v1.0.0
