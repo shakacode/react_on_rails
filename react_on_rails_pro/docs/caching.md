@@ -4,25 +4,28 @@ Caching at the React on Rails level can greatly speed up your app and reduce the
 
 Consult the [Rails Guide on Caching](http://guides.rubyonrails.org/caching_with_rails.html#cache-stores) for details on:
 
-* [Cache Stores and Configuration](http://guides.rubyonrails.org/caching_with_rails.html#cache-stores)
-* [Determination of Cache Keys](http://guides.rubyonrails.org/caching_with_rails.html#cache-keys)
-* [Caching in Development](http://guides.rubyonrails.org/caching_with_rails.html#caching-in-development): **To toggle caching in development**, run `rails dev:cache`.
+- [Cache Stores and Configuration](http://guides.rubyonrails.org/caching_with_rails.html#cache-stores)
+- [Determination of Cache Keys](http://guides.rubyonrails.org/caching_with_rails.html#cache-keys)
+- [Caching in Development](http://guides.rubyonrails.org/caching_with_rails.html#caching-in-development): **To toggle caching in development**, run `rails dev:cache`.
 
 See the [bottom note on confirming and debugging cache keys](#confirming-and-debugging-cache-keys).
 
 ## Overview
+
 React on Rails Pro has caching at 2 levels:
 
-1. "Fragment caching" view helpers, `cached_react_component` and `cached_react_component_hash`.  
-2. Caching of requests for server rendering. 
+1. "Fragment caching" view helpers, `cached_react_component` and `cached_react_component_hash`.
+2. Caching of requests for server rendering.
 
 ### Tracing
+
 If tracing is turned on in your config/initializers/react_on_rails_pro.rb, you'll see timing log messages that begin with `[ReactOnRailsPro:1234]: exec_server_render_js` where 1234 is the process id and `exec_server_render_js` could be a different method being traced.
 
-* **exec_server_render_js**: Timing of server rendering, which may have the prerender_caching turned on.
-* **cached_react_component** and **cached_react_component_hash**: Timing of the cached view helper which maybe calling server rendering.
+- **exec_server_render_js**: Timing of server rendering, which may have the prerender_caching turned on.
+- **cached_react_component** and **cached_react_component_hash**: Timing of the cached view helper which may be calling server rendering.
 
 Here's a sample. Note the second request
+
 ```
 Started GET "/server_side_redux_app_cached" for ::1 at 2018-05-24 22:40:13 -1000
 [ReactOnRailsPro:63422] exec_server_render_js: ReduxApp, 230.7ms
@@ -40,16 +43,19 @@ Completed 200 OK in 19ms (Views: 16.4ms | ActiveRecord: 0.0ms)
 ## Prerender (Server Side Rendering) Caching
 
 ### Why?
-1. Server side rendering is typically done like a stateless functional component, meaning that the result should be idempotent from based on props passed in. 
+
+1. Server-side rendering is typically done like a stateless functional component, meaning that the result should be idempotent based on props passed in.
 1. It's much easier than configuring fragment caching. So long as you have some space in your Rails cache, "it should just work."
 
 ### Why not?
-If you're using regular caching for most componentas (cached_react_component_hash), and you don't want to use caching for other components, then having prerender caching still results in caching for all your rendering calls, increasing the liklihood of premature cache ejection.
 
-In the future, React on Rails will allow stateful server rendering. Thus, your server side JavaScript depend on externalities, such as AJAX calls for
+If you're using regular caching for most components (cached_react_component_hash), and you don't want to use caching for other components, then having prerender caching still results in caching for all your rendering calls, increasing the likelihood of premature cache ejection.
+
+In the future, React on Rails will allow stateful server rendering. Thus, your server-side JavaScript depend on externalities, such as AJAX calls for
 GraphQL. In that case, you will set this caching to false.
 
 ### When?
+
 The largest percentage gains will come from saving the time of server rendering. However, even when not doing server rendering, caching can be effective as the caching will prevent the calculation of the props and the conversion to a string of the prop values.
 
 ### How?
@@ -67,6 +73,7 @@ Server rendering JavaScript evaluation requests are cached by a cache key that c
 2. The JavaScript code to evaluate.
 
 ### Diagnostics
+
 if you're using `react_component_hash`, you'll get 2 extra keys returned:
 
 1. RORP_CACHE_KEY: the prerender cache key
@@ -76,7 +83,7 @@ It can be useful to log these to the rendered HTML page to debug caching issues.
 
 ## React on Rails Fragment Caching
 
-This is very similar to Rails fragment caching. 
+This is very similar to Rails fragment caching.
 
 From the [Rails docs](http://guides.rubyonrails.org/caching_with_rails.html#fragment-caching):
 
@@ -92,17 +99,20 @@ If you're already familiar with Rails fragment caching, the React on Rails imple
 The reasons "why" and "why not" are the same as for basic Rails fragment caching:
 
 ### Why Use Fragment Caching?
+
 1. Next to caching at the controller or HTTP level, this is the fastest type of caching.
 2. The additional complexity to add this with React on Rails Pro is minimal.
 3. The performance gains can be huge.
 4. The load on your Rails server can be far lessened.
 
 ### Why Not Use Fragment Caching?
+
 1. It's tricky to get all the right cache keys. You have to consider any values that can change and cause the rendering to change. See the [Rails docs for cache keys](http://guides.rubyonrails.org/caching_with_rails.html#cache-keys)
 2. Testing is a bit tricky or just not done for fragment caching.
 3. Some deployments require you to clear caches.
 
 ### Considerations for Determining Your Cache Key
+
 1. Consult the [Rails docs for cache keys](http://guides.rubyonrails.org/caching_with_rails.html#cache-keys) for help with cache key definitions.
 2. If your React code depends on any values from the [Rails Context](https://github.com/shakacode/react_on_rails/blob/master/docs/basics/generator-functions-and-railscontext.md#rails-context), such as the `locale` or the URL `location`, then be sure to include such values in your cache key. In other words, if you are using some JavaScript such as `react-router` that depends on your URL, or on a call to `toLocalString(locale)`, then be sure to include such values in your cache key. To find the values that React on Rails uses, use some code like this:
 
@@ -114,14 +124,14 @@ location = the_rails_context[:location]
 
 If you are calling `rails_context` from your controller method, then prefix it like this: `helpers.rails_context` so long as you have react_on_rails > 11.2.2. If less than that, call `helpers.send(:rails_context, server_side: true)`
 
-
-If performance is particulary sensitive, consult the view helper definition for `rails_context`. For example, you can save the cost of calculating the rails_context by directly getting a value:
+If performance is particularly sensitive, consult the view helper definition for `rails_context`. For example, you can save the cost of calculating the rails_context by directly getting a value:
 
 ```ruby
 i18nLocale = I18n.locale
 ```
- 
+
 ### How: API
+
 Here is the doc for helpers `cached_react_component` and `cached_react_component_hash`. Consult the [docs in React on Rails](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/) for the non-cached analogies `react_component` and `react_component_hash`. These docs only show the differences.
 
 ```ruby
@@ -131,10 +141,10 @@ Here is the doc for helpers `cached_react_component` and `cached_react_component
   # 1. You must pass the props as a block. This is so that the evaluation of the props is not done
   #    if the cache can be used.
   # 2. Provide the cache_key option
-  #    cache_key: String or Array (or Proc returning a String or Array) containing your cache keys. 
-  #    If prerender is set to true, the server bundle digest will be included in the cache key. 
+  #    cache_key: String or Array (or Proc returning a String or Array) containing your cache keys.
+  #    If prerender is set to true, the server bundle digest will be included in the cache key.
   #    The cache_key value is the same as used for conventional Rails fragment caching.
-  # 3. Optionally provide the `:cache_options` key with a value of a hash including as 
+  # 3. Optionally provide the `:cache_options` key with a value of a hash including as
   #    :compress, :expires_in, :race_condition_ttl as documented in the Rails Guides
   # 4. Provide boolean values for `:if` or `:unless` to conditionally use caching.
 ```
@@ -144,6 +154,7 @@ You can find the `:cache_options` documented in the [Rails docs for ActiveSuppor
 #### API Usage examples
 
 The fragment caching for `react_component`:
+
 ```ruby
 <%= cached_react_component("App", cache_key: [@user, @post], prerender: true) do
   some_slow_method_that_returns_props
@@ -151,6 +162,7 @@ end %>
 ```
 
 Suppose you only want to cache when `current_user.nil?`. Use the `:if` option (`unless:` is analogous):
+
 ```ruby
 <%= cached_react_component("App", cache_key: [@user, @post], prerender: true, if: current_user.nil?) do
   some_slow_method_that_returns_props
@@ -173,11 +185,11 @@ And a fragment caching version for the `react_component_hash`:
 
 <% printable_cache_key = ReactOnRailsPro::Utils.printable_cache_key(result[:RORP_CACHE_KEY]) %>
 <!-- <%= "CACHE_HIT: #{result[:RORP_CACHE_HIT]}, RORP_CACHE_KEY: #{printable_cache_key}" %> -->
-````
+```
+
 Note in the above example, React on Rails Pro returns both the raw cache key and whether or not there was a cache hit.
 
-
-### Your JavaScript Bundles and Cache Keys 
+### Your JavaScript Bundles and Cache Keys
 
 When doing fragment caching of server rendering with React on Rails Pro, the cache key must reflect
 your React. This is analogous to how Rails puts an MD5 hash of your views in
@@ -191,15 +203,17 @@ case you have, React on Rails handles it.
 
 # Confirming and Debugging Cache Keys
 
-Cache key composition can be confirmed in development mode with the following steps. THe goal is to confirm that some change that should  trigger new cached data actually triggers a new cache key. For example, when the server bundle changes, does that trigger a new cache key for any server rendering?
+Cache key composition can be confirmed in development mode with the following steps. The goal is to confirm that some change that should trigger new cached data actually triggers a new cache key. For example, when the server bundle changes, does that trigger a new cache key for any server rendering?
 
 1. Run `Rails.cache.clear` to clear the cache.
-1. Run `rails dev:cache` to toggle caching in development mode. 
+1. Run `rails dev:cache` to toggle caching in development mode.
 
 You will see a message like:
+
 > Development mode is now being cached.
 
 You might need to check your `config/development.rb`contains the following:
+
 ```ruby
   # Enable/disable caching. By default caching is disabled.
   if Rails.root.join("tmp/caching-dev.txt").exist?
@@ -209,7 +223,7 @@ You might need to check your `config/development.rb`contains the following:
     config.public_file_server.headers = {
       "Cache-Control" => "public, max-age=172800"
     }
-    
+
     # For Rails >= 5.1 determines whether to log fragment cache reads and writes in verbose format as follows:
     config.action_controller.enable_fragment_cache_logging
   else
@@ -225,10 +239,8 @@ You might need to check your `config/development.rb`contains the following:
 
 5. Check the cache entry again. You should have noticed that it changed.
 
-
 To avoid seeing the cache calls to the prerender_caching, you can temporarily set:
+
 ```
 config.prerender_caching = false
 ```
-
-
