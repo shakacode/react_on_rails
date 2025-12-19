@@ -11,32 +11,32 @@ It also includes many eslint defaults that the AirBnb eslint does not include.
 Running the linter:
 
 ```bash
-yarn run lint
+pnpm run lint
 ```
 
 or to autofix
 
 ```bash
-yarn run lint -- --fix
+pnpm run lint -- --fix
 ```
 
 # Updating Node Dependencies
 
 ```bash
-yarn global add npm-check-updates
+pnpm add -g npm-check-updates
 ```
 
 ```bash
 # Make sure you are in the `client` directory, then run
 cd client
 npm-check-updates -u -a
-yarn
+pnpm install
 ```
 
 Another option for upgrading:
 
 ```bash
-yarn upgrade
+pnpm update
 ```
 
 Then confirm that the hot reload server and the Rails server both work fine. You
@@ -53,7 +53,7 @@ Before you do so, consider:
 
 ```bash
 cd client
-yarn add module_name@version
+pnpm add module_name@version
 # or
-# yarn add --dev module_name@version
+# pnpm add -D module_name@version
 ```

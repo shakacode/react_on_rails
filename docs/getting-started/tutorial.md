@@ -50,8 +50,8 @@ Trying out **React on Rails** is super easy, so long as you have the basic prere
 
 - **Ruby:** We support all active Ruby versions but recommend using the latest stable Ruby version. Solutions like [rvm](https://rvm.io) or [rbenv](https://github.com/rbenv/rbenv) make it easy to have multiple Ruby versions on your machine.
 - **Rails:** This tutorial targets Rails 7.0+. React on Rails supports Rails 6 and later, but some tutorial steps may differ for Rails 6.
-- **Nodejs:** We support all [active Node versions](https://github.com/nodejs/release#release-schedule) but recommend using the latest LTS release of Nodejs for the longest support. Older inactive node versions might still work but is not guaranteed. We also recommend using [nvm](https://github.com/nvm-sh/nvm/) to ease using different node versions in different projects.
-- **yarn:** We use [yarn classic](https://classic.yarnpkg.com/) as our node package manager.
+- **Node.js:** We support all [active Node versions](https://github.com/nodejs/release#release-schedule) but recommend using the latest LTS release of Nodejs for the longest support. Older inactive node versions might still work but is not guaranteed. We also recommend using [nvm](https://github.com/nvm-sh/nvm/) to ease using different node versions in different projects.
+- **Node Package manager:** You can use [npm](https://npmjs.com/), Yarn ([Classic](https://classic.yarnpkg.com/) or [Berry](https://yarnpkg.com/)), or [pnpm](https://pnpm.io/).
 - You need to have either [Overmind](https://github.com/DarthSim/overmind) or [Foreman](https://rubygems.org/gems/foreman) as a process manager.
 
 ### Create a new Ruby on Rails App

@@ -76,10 +76,10 @@ bundle exec rake rbs:validate          # Type signatures valid
 
 **Automated (CI covers):**
 
-- ✅ Jest unit tests (`yarn run test`)
-- ✅ TypeScript compilation (`yarn run type-check`)
-- ✅ ESLint (`yarn run lint`)
-- ✅ Prettier formatting (`yarn start format.listDifferent`)
+- ✅ Jest unit tests (`pnpm run test`)
+- ✅ TypeScript compilation (`pnpm run type-check`)
+- ✅ ESLint (`pnpm run lint`)
+- ✅ Prettier formatting (`pnpm start format.listDifferent`)
 
 **Manual verification required:**
 
@@ -91,9 +91,9 @@ bundle exec rake rbs:validate          # Type signatures valid
 
 ```bash
 # MUST run locally:
-yarn run test                          # All JS tests pass
-yarn run type-check                    # TypeScript compiles
-yarn run build                         # Build succeeds
+pnpm run test                          # All JS tests pass
+pnpm run type-check                    # TypeScript compiles
+pnpm run build                         # Build succeeds
 bundle exec rake autofix               # Formatting applied
 
 # MUST test in browser:
@@ -119,25 +119,25 @@ Changes to any of these files trigger **MANDATORY manual testing checklist:**
 
 ```bash
 # Step 1: Clean install (MOST CRITICAL)
-rm -rf node_modules yarn.lock
-yarn install --frozen-lockfile
+rm -rf node_modules pnpm-lock.yaml
+pnpm install -r --frozen-lockfile
 # ❌ STOP if this fails - nothing else matters
 
 # Step 2: Test build scripts
-yarn run build
+pnpm run build
 ls -la packages/react-on-rails/lib/ReactOnRails.full.js
 # ❌ STOP if artifact missing
 
 # Step 3: Test prepack
-yarn nps build.prepack
+pnpm nps build.prepack
 # ❌ STOP if this fails
 
 # Step 4: Test yalc publish (critical for local dev)
-yarn run yalc:publish
+pnpm run yalc:publish
 # ❌ STOP if this fails
 
 # Step 5: Test package structure
-yarn workspaces info
+pnpm -r list
 # Verify workspace linking
 
 # Step 6: Run test suite
@@ -277,16 +277,16 @@ Changes affecting user-facing behavior require Playwright E2E verification:
 cd react_on_rails/spec/dummy
 
 # Install browsers (one-time setup):
-yarn playwright install --with-deps
+pnpm playwright install --with-deps
 
 # Run all E2E tests (Rails server auto-starts):
-yarn test:e2e
+pnpm test:e2e
 
 # Run in UI mode (interactive debugging):
-yarn test:e2e:ui
+pnpm test:e2e:ui
 
 # Run specific test file:
-yarn test:e2e e2e/playwright/e2e/react_on_rails/basic_components.spec.js
+pnpm test:e2e e2e/playwright/e2e/react_on_rails/basic_components.spec.js
 ```
 
 **What to verify:**

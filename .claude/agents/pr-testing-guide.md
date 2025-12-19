@@ -426,8 +426,8 @@ gh pr create  # Include testing summary from agent
 
 - [ ] RuboCop passes (`bundle exec rubocop`)
 - [ ] RSpec unit tests pass (`rake run_rspec:gem`)
-- [ ] Jest tests pass (`yarn run test`)
-- [ ] TypeScript compiles (`yarn run type-check`)
+- [ ] Jest tests pass (`pnpm run test`)
+- [ ] TypeScript compiles (`pnpm run type-check`)
 - [ ] RBS validation passes (`rake rbs:validate`)
 - [ ] Prettier formatting applied (`rake autofix`)
 
@@ -444,19 +444,19 @@ gh pr create  # Include testing summary from agent
 
 #### If JS/TS files changed:
 
-- [ ] Run tests locally: `yarn run test`
-- [ ] Build succeeds: `yarn run build`
+- [ ] Run tests locally: `pnpm run test`
+- [ ] Build succeeds: `pnpm run build`
 - [ ] Test in browser: `cd react_on_rails/spec/dummy && bin/dev`
 - [ ] Check browser console for errors
 - [ ] If SSR code changed: Verify SSR output in page source
 
 #### If build configs changed:
 
-- [ ] **MANDATORY**: Clean install test: `rm -rf node_modules && yarn install --frozen-lockfile`
-- [ ] **MANDATORY**: Build test: `yarn run build && ls -la packages/react-on-rails/lib/`
-- [ ] **MANDATORY**: Prepack test: `yarn nps build.prepack`
-- [ ] **MANDATORY**: yalc publish test: `yarn run yalc:publish`
-- [ ] Workspace linking: `yarn workspaces info`
+- [ ] **MANDATORY**: Clean install test: `rm -rf node_modules && pnpm install -r --frozen-lockfile`
+- [ ] **MANDATORY**: Build test: `pnpm run build && ls -la packages/react-on-rails/lib/`
+- [ ] **MANDATORY**: Prepack test: `pnpm nps build.prepack`
+- [ ] **MANDATORY**: yalc publish test: `pnpm run yalc:publish`
+- [ ] Workspace linking: `pnpm list -r`
 - [ ] Full test suite: `bundle exec rake`
 
 #### If webpack configs changed:
@@ -479,7 +479,7 @@ gh pr create  # Include testing summary from agent
 
 #### If user-facing behavior changed (React components, SSR, view helpers):
 
-- [ ] Run Playwright E2E tests: `cd react_on_rails/spec/dummy && yarn test:e2e`
+- [ ] Run Playwright E2E tests: `cd react_on_rails/spec/dummy && pnpm test:e2e`
 - [ ] Verify components render in browser
 - [ ] Check server-side rendering in view source
 - [ ] No JavaScript console errors
@@ -527,8 +527,8 @@ gh pr create  # Include testing summary from agent
 
 **Build scripts** - CRITICAL: Clean install test in full environment
 
-    rm -rf node_modules && yarn install --frozen-lockfile
-    yarn run yalc:publish
+    rm -rf node_modules && pnpm install -r --frozen-lockfile
+    pnpm run yalc:publish
 
 **Browser testing** - Dummy app visual inspection
 
@@ -608,11 +608,11 @@ CI Status: All checks passing (see run #1234)
 Update React to 19.0.0
 
 Verified locally:
-- [x] Clean install: `rm -rf node_modules && yarn install --frozen-lockfile` ✅
-- [x] Build: `yarn run build` ✅
+- [x] Clean install: `rm -rf node_modules && pnpm install -r --frozen-lockfile` ✅
+- [x] Build: `pnpm run build` ✅
 - [x] Artifacts: `ls -la packages/react-on-rails/lib/ReactOnRails.full.js` ✅
-- [x] yalc publish: `yarn run yalc:publish` ✅
-- [x] Tests: `yarn run test` (42 passed) ✅
+- [x] yalc publish: `pnpm run yalc:publish` ✅
+- [x] Tests: `pnpm run test` (42 passed) ✅
 - [x] Browser: Dummy app renders correctly ✅
 
 Tested in dummy app:

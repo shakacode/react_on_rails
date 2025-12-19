@@ -128,11 +128,11 @@ Group 4 (Monorepo Node Renderer):
    ```bash
    # Ensure tests pass
    bundle exec rspec
-   yarn test
+   pnpm test
 
    # Ensure linting passes
    bundle exec rubocop
-   yarn run lint
+   pnpm run lint
    ```
 
 4. **Create focused PR**
@@ -210,7 +210,7 @@ Group 4 (Monorepo Node Renderer):
 ```bash
 # Open source tests
 bundle exec rspec spec/react_on_rails/
-yarn test packages/react-on-rails/tests/buildConsoleReplay.test.js
+pnpm test packages/react-on-rails/tests/buildConsoleReplay.test.js
 
 # Pro tests
 cd react_on_rails_pro/spec/dummy

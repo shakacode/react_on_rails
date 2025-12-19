@@ -100,7 +100,7 @@ grep -r "old/path" . --exclude-dir=node_modules --exclude-dir=.git
 bundle exec rubocop
 
 # JavaScript/TypeScript
-yarn run lint
+pnpm run lint
 
 # Or both
 rake lint
@@ -111,13 +111,13 @@ rake lint
 ```bash
 # CRITICAL: Clean install test
 rm -rf node_modules
-yarn install --frozen-lockfile
+pnpm install -r --frozen-lockfile
 
 # Build all packages
-yarn run build
+pnpm run build
 
 # Test yalc publish
-yarn run yalc:publish
+pnpm run yalc:publish
 
 # Verify artifacts exist
 ls -la packages/*/lib/*.js
@@ -132,7 +132,7 @@ ls -la packages/*/lib/*.js
 bundle exec rake run_rspec:gem
 
 # JavaScript tests
-yarn run test
+pnpm run test
 ```
 
 #### D. Integration Tests (If you changed configs, workflows, or infrastructure)
@@ -180,7 +180,7 @@ bin/ci-rerun-failures --help
 
 Tested with:
 - bin/ci-rerun-failures (all checks passed)
-- yarn build && yarn run yalc:publish (verified)
+- pnpm build && pnpm run yalc:publish (verified)
 - bundle exec rake run_rspec:gem (all tests pass)"
 
 ❌ "Fix workflow paths"
@@ -331,9 +331,9 @@ grep -r "spec/dummy" . --exclude-dir=node_modules --exclude-dir=.git > dummy-ref
 
 ```bash
 # After making changes, before first push:
-rm -rf node_modules && yarn install --frozen-lockfile
-yarn run build
-yarn run yalc:publish
+rm -rf node_modules && pnpm install -r --frozen-lockfile
+pnpm run build
+pnpm run yalc:publish
 bundle exec rubocop
 bundle exec rake run_rspec:gem
 bundle exec rake run_rspec:dummy
