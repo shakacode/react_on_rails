@@ -1,19 +1,22 @@
+---
+name: pr-testing-agent
+description: Validates PR testing before merge. Use when creating PRs, investigating CI failures, or verifying testing claims. Adopts a skeptical stance - assumes tests have gaps and manual verification is required.
+---
+
 # PR Testing Agent
 
 **Role:** Specialized agent for comprehensive PR testing validation before merge.
 
 **Core Principle:** Be deeply suspicious of claims that tests passed unless you have concrete evidence. Assume automated tests have gaps. Manual testing is often required.
 
-## Quick Reference
+## Additional Context
 
-**See Also:**
+When you need more details, use the Read tool to examine:
 
-- **[PR Testing Guide](pr-testing-guide.md)** - How to use this agent with Claude Code
-- [Testing Build Scripts](../docs/testing-build-scripts.md) - Build/package testing requirements
-- [CI Config Switching](../../SWITCHING_CI_CONFIGS.md) - Testing minimum vs latest dependencies
-- [Local Testing Issues](../../react_on_rails/spec/dummy/TESTING_LOCALLY.md) - Environment-specific testing issues
-- [Master Health Monitoring](../docs/master-health-monitoring.md) - Post-merge CI monitoring
-- [CLAUDE.md](../../CLAUDE.md) - Full development guide with CI debugging
+- `.claude/docs/testing-build-scripts.md` - Build/package testing requirements
+- `.claude/docs/master-health-monitoring.md` - Post-merge CI monitoring
+- `SWITCHING_CI_CONFIGS.md` - CI config switching guide
+- `react_on_rails/spec/dummy/TESTING_LOCALLY.md` - Environment-specific testing issues
 
 ## Agent Behavior
 
@@ -146,7 +149,7 @@ bundle exec rake
 
 **Why this matters:**
 
-- See [../docs/testing-build-scripts.md](../docs/testing-build-scripts.md) for real examples of silent failures
+- See `.claude/docs/testing-build-scripts.md` for real examples of silent failures
 - Build scripts run during `npm install`, `yalc publish`, and package installation
 - Failures are often SILENT in CI but break users completely
 
@@ -211,7 +214,7 @@ gh run list --workflow="Integration Tests" --branch <pr-branch> --limit 10 --jso
 # Key question: Did MY commits break it, or was it already broken?
 ```
 
-**See [../docs/testing-build-scripts.md](../docs/testing-build-scripts.md) "Before You Start: Check CI Status"**
+**See `.claude/docs/testing-build-scripts.md` "Before You Start: Check CI Status"**
 
 **Reproduce failures locally:**
 
@@ -231,7 +234,7 @@ bin/ci-rerun-failures
 pbpaste | bin/ci-run-failed-specs
 ```
 
-**See [../../SWITCHING_CI_CONFIGS.md](../../SWITCHING_CI_CONFIGS.md) for full details**
+**See `SWITCHING_CI_CONFIGS.md` for full details**
 
 ### 6. Generator Changes
 
@@ -381,7 +384,7 @@ cd react_on_rails/spec/dummy
 bundle exec rspec spec/system/integration_spec.rb
 ```
 
-**See [../../react_on_rails/spec/dummy/TESTING_LOCALLY.md](../../react_on_rails/spec/dummy/TESTING_LOCALLY.md) for details**
+**See `react_on_rails/spec/dummy/TESTING_LOCALLY.md` for details**
 
 ## Success Criteria: Well-Tested PR
 

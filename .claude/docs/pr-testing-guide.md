@@ -1,6 +1,6 @@
 # PR Testing Guide
 
-**Companion to:** [PR Testing Agent](pr-testing-agent.md)
+**Companion to:** [PR Testing Agent](../agents/pr-testing-agent.md)
 
 This guide shows you **how to use** the PR Testing Agent with Claude Code, including workflows, checklists, templates, and real-world examples.
 
@@ -17,8 +17,8 @@ This guide shows you **how to use** the PR Testing Agent with Claude Code, inclu
 
 **Related Documentation:**
 
-- **[PR Testing Agent](pr-testing-agent.md)** - Core agent behavior and requirements
-- [Testing Build Scripts](../docs/testing-build-scripts.md) - Build/package testing requirements
+- **[PR Testing Agent](../agents/pr-testing-agent.md)** - Core agent behavior and requirements
+- [Testing Build Scripts](testing-build-scripts.md) - Build/package testing requirements
 - [CI Config Switching](../../SWITCHING_CI_CONFIGS.md) - Testing minimum vs latest dependencies
 - [CLAUDE.md](../../CLAUDE.md) - Full development guide
 
@@ -68,7 +68,7 @@ This guide shows you **how to use** the PR Testing Agent with Claude Code, inclu
 **The easiest way to use this agent with Claude Code is to explicitly reference it in your prompts:**
 
 ```
-"Use the PR Testing Agent from .claude/agents/pr-testing-agent.md to validate my testing"
+"Validate my testing using the pr-testing-agent"
 
 "I changed package.json. According to PR Testing Agent Section 3, what testing is required?"
 
@@ -334,7 +334,7 @@ pbpaste | bin/ci-run-failed-specs
 
 **The PR Testing Agent guidelines are automatically available when:**
 
-- You reference `.claude/agents/pr-testing-agent.md` in prompts
+- You ask about PR testing validation or readiness to merge
 - You mention "PR Testing Agent" or "testing checklist"
 - You ask about testing requirements for specific file types
 - CLAUDE.md is loaded (which references this documentation)
@@ -348,7 +348,6 @@ pbpaste | bin/ci-run-failed-specs
 **This agent complements but does not replace:**
 
 - Standard code review for logic, design, and maintainability
-- The `code-reviewer` agent (focuses on code quality, security)
 - CI automated checks (provides guidance when they fail)
 
 **This agent specializes in:**
@@ -686,8 +685,8 @@ gh pr view --json statusCheckRollup
 
 **Reference documentation:**
 
-- Testing build scripts: [../docs/testing-build-scripts.md](../docs/testing-build-scripts.md)
+- Testing build scripts: [testing-build-scripts.md](testing-build-scripts.md)
 - CI debugging: [CLAUDE.md](../../CLAUDE.md) "Replicating CI Failures Locally"
 - Config switching: [SWITCHING_CI_CONFIGS.md](../../SWITCHING_CI_CONFIGS.md)
 - Local testing issues: [react_on_rails/spec/dummy/TESTING_LOCALLY.md](../../react_on_rails/spec/dummy/TESTING_LOCALLY.md)
-- Master health: [../docs/master-health-monitoring.md](../docs/master-health-monitoring.md)
+- Master health: [master-health-monitoring.md](master-health-monitoring.md)
