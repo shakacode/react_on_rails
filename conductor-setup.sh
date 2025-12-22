@@ -16,42 +16,34 @@ echo "🚀 Setting up React on Rails workspace..."
 # Check required tools
 echo "📋 Checking required tools..."
 command -v bundle >/dev/null 2>&1 || { echo "❌ Error: bundler is not installed. Please install Ruby and bundler first."; exit 1; }
+command -v pnpm >/dev/null 2>&1 || { echo "❌ Error: pnpm is not installed. Please install pnpm first (npm install -g pnpm or corepack enable)."; exit 1; }
 command -v node >/dev/null 2>&1 || { echo "❌ Error: Node.js is not installed. Please install Node.js first."; exit 1; }
 
-# Check Ruby version
-RUBY_VERSION=$(ruby -v | awk '{print $2}')
-MIN_RUBY_VERSION="3.0.0"
-if [[ $(echo -e "$MIN_RUBY_VERSION\n$RUBY_VERSION" | sort -V | head -n1) != "$MIN_RUBY_VERSION" ]]; then
-    echo "❌ Error: Ruby version $RUBY_VERSION is too old. React on Rails requires Ruby >= 3.0.0"
-    echo "   Please upgrade Ruby using rbenv, rvm, or your system package manager."
-    exit 1
-fi
-echo "✅ Ruby version: $RUBY_VERSION"
-
-# Check Node version
-NODE_VERSION=$(node -v | cut -d'v' -f2)
-MIN_NODE_VERSION="20.0.0"
-if [[ $(echo -e "$MIN_NODE_VERSION\n$NODE_VERSION" | sort -V | head -n1) != "$MIN_NODE_VERSION" ]]; then
-    echo "❌ Error: Node.js version v$NODE_VERSION is too old. React on Rails requires Node.js >= 20.0.0"
-    echo "   Please upgrade Node.js using nvm, asdf, or your system package manager."
-    exit 1
-fi
-echo "✅ Node.js version: v$NODE_VERSION"
+echo "✅ Ruby version: $(ruby -v | awk '{print $2}')"
+echo "✅ Node.js version: $(node -v)"
 
 # Copy any environment files from root if they exist
-if [ -f "$CONDUCTOR_ROOT_PATH/.env" ]; then
-    echo "📝 Copying .env file..."
-    cp "$CONDUCTOR_ROOT_PATH/.env" .env
-fi
-
-if [ -f "$CONDUCTOR_ROOT_PATH/.env.local" ]; then
-    echo "📝 Copying .env.local file..."
-    cp "$CONDUCTOR_ROOT_PATH/.env.local" .env.local
+if [ -n "$CONDUCTOR_ROOT_PATH" ]; then
+    if [ -f "$CONDUCTOR_ROOT_PATH/.env" ]; then
+        cp "$CONDUCTOR_ROOT_PATH/.env" .env
+    fi
+    if [ -f "$CONDUCTOR_ROOT_PATH/.env.local" ]; then
+        cp "$CONDUCTOR_ROOT_PATH/.env.local" .env.local
+    fi
 fi
 
 # Install Ruby dependencies
-echo "💎 Installing Ruby dependencies..."
+echo "💎 Installing Ruby dependencies (root)..."
 bundle install
+
+echo "💎 Installing Ruby dependencies for spec/dummy..."
+(cd react_on_rails/spec/dummy && bundle install)
+
+echo "💎 Installing Ruby dependencies for react_on_rails_pro..."
+(cd react_on_rails_pro && bundle install)
+
+echo "💎 Installing Ruby dependencies for react_on_rails_pro/spec/dummy..."
+(cd react_on_rails_pro/spec/dummy && bundle install)
 
 # Enable corepack for pnpm (this project uses pnpm, not yarn)
 echo "📦 Enabling corepack for pnpm..."
@@ -61,7 +53,7 @@ corepack enable
 echo "📦 Installing JavaScript dependencies..."
 pnpm install
 
-# Build the TypeScript package
+# Build TypeScript (required for tests)
 echo "🔨 Building TypeScript package..."
 pnpm run build
 
@@ -81,10 +73,8 @@ pnpm run type-check || echo "⚠️ Type checking had issues"
 echo "✨ Workspace setup complete!"
 echo ""
 echo "📚 Key commands:"
-echo "  • rake - Run all tests and linting"
-echo "  • rake run_rspec - Run Ruby tests"
-echo "  • pnpm run test - Run JavaScript tests"
-echo "  • bundle exec rubocop - Run Ruby linting (required before commits)"
-echo "  • rake autofix - Auto-fix formatting issues"
-echo ""
-echo "⚠️ Remember: Always run 'bundle exec rubocop' before committing!"
+echo "  • rake run_rspec:gem      - Run gem unit tests"
+echo "  • rake run_rspec:dummy    - Run integration tests"
+echo "  • pnpm run test           - Run JavaScript tests"
+echo "  • bundle exec rubocop     - Run Ruby linting"
+echo "  • rake autofix            - Auto-fix formatting"
