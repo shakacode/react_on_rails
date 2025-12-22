@@ -275,13 +275,14 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
             config.auto_refresh_license = true
             config.license_key = "lic_test_key"
           end
+          # Cache already has token, so seed_cache_if_needed won't write
           allow(ReactOnRailsPro::LicenseCache).to receive_messages(token: valid_token, expires_at: nil)
         end
 
         it "uses cached token" do
           data = described_class.validated_license_data!
           expect(data).to be_a(Hash)
-          expect(ReactOnRailsPro::LicenseCache).to have_received(:token)
+          expect(ReactOnRailsPro::LicenseCache).to have_received(:token).at_least(:once)
         end
       end
 
@@ -307,12 +308,16 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
             config.license_key = "lic_test_key"
           end
           allow(ReactOnRailsPro::LicenseCache).to receive_messages(token: nil, expires_at: nil)
+          # Stub write since seed_cache_if_needed will try to seed the cache
+          allow(ReactOnRailsPro::LicenseCache).to receive(:write)
           ENV["REACT_ON_RAILS_PRO_LICENSE"] = valid_token
         end
 
-        it "falls back to ENV" do
+        it "falls back to ENV and seeds cache" do
           data = described_class.validated_license_data!
           expect(data).to be_a(Hash)
+          # Verify cache was seeded
+          expect(ReactOnRailsPro::LicenseCache).to have_received(:write)
         end
       end
     end
@@ -527,6 +532,68 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
           it "does not write to cache" do
             expect(ReactOnRailsPro::LicenseCache).not_to receive(:write)
             described_class.send(:maybe_refresh_license)
+          end
+        end
+      end
+    end
+
+    describe ".seed_cache_if_needed" do
+      let(:license_data) { { "exp" => (Time.now + (365 * 24 * 60 * 60)).to_i } }
+
+      context "when auto_refresh is disabled" do
+        before do
+          ReactOnRailsPro.configure { |c| c.auto_refresh_license = false }
+        end
+
+        it "does not write to cache" do
+          expect(ReactOnRailsPro::LicenseCache).not_to receive(:write)
+          described_class.send(:seed_cache_if_needed, license_data)
+        end
+      end
+
+      context "when auto_refresh is enabled" do
+        before do
+          ReactOnRailsPro.configure do |config|
+            config.auto_refresh_license = true
+            config.license_key = "lic_test_key"
+          end
+        end
+
+        context "when cache already has token" do
+          before do
+            allow(ReactOnRailsPro::LicenseCache).to receive(:token).and_return(valid_token)
+          end
+
+          it "does not write to cache" do
+            expect(ReactOnRailsPro::LicenseCache).not_to receive(:write)
+            described_class.send(:seed_cache_if_needed, license_data)
+          end
+        end
+
+        context "when cache is empty and token exists in ENV" do
+          before do
+            allow(ReactOnRailsPro::LicenseCache).to receive(:token).and_return(nil)
+            allow(ReactOnRailsPro::LicenseCache).to receive(:write)
+            ENV["REACT_ON_RAILS_PRO_LICENSE"] = valid_token
+          end
+
+          it "seeds the cache with token and expiry" do
+            described_class.send(:seed_cache_if_needed, license_data)
+            expect(ReactOnRailsPro::LicenseCache).to have_received(:write).with(
+              hash_including("token" => valid_token, "expires_at" => kind_of(String))
+            )
+          end
+        end
+
+        context "when cache is empty and no token in ENV or file" do
+          before do
+            allow(ReactOnRailsPro::LicenseCache).to receive(:token).and_return(nil)
+            ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
+          end
+
+          it "does not write to cache" do
+            expect(ReactOnRailsPro::LicenseCache).not_to receive(:write)
+            described_class.send(:seed_cache_if_needed, license_data)
           end
         end
       end
