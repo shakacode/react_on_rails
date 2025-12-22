@@ -385,7 +385,7 @@ When running tests in Docker, consider:
 
 ## Related Documentation
 
-- [Configuration Reference](../api-reference/configuration.md#build_test_command)
+- [Configuration Reference](../configuration/configuration.md#build_test_command)
 - [Shakapacker Configuration](https://github.com/shakacode/shakapacker#configuration)
 - [RSpec Configuration](../building-features/rspec-configuration.md)
 - [Minitest Configuration](../building-features/minitest-configuration.md)

@@ -39,7 +39,7 @@ See [docs/caching](./caching.md) for more details.
 
 Suppose you detect that some library used in server-rendering is leaking state between calls to server render. In that case, you can set the `config.ssr_pre_hook_js` in your `config/initializers/react_on_rails_pro.rb` to run some JavaScript to clear the globally leaked state at the beginning of each call to server render.
 
-For more details, see [Rails Configuration](https://github.com/shakacode/react_on_rails/blob/master/docs/api-reference/configuration.md).
+For more details, see [Rails Configuration](https://github.com/shakacode/react_on_rails/blob/master/docs/configuration/configuration.md).
 
 ### React On Rails Pro Node Renderer
 

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # React on Rails configuration
-# See https://github.com/shakacode/react_on_rails/blob/master/docs/api-reference/configuration.md
+# See https://github.com/shakacode/react_on_rails/blob/master/docs/configuration/configuration.md
 # for complete documentation of all configuration options.
 
 ReactOnRails.configure do |config|
@@ -62,5 +62,5 @@ ReactOnRails.configure do |config|
   # - Custom rendering extensions
   # - And more...
   #
-  # See: https://github.com/shakacode/react_on_rails/blob/master/docs/api-reference/configuration.md
+  # See: https://github.com/shakacode/react_on_rails/blob/master/docs/configuration/configuration.md
 end
