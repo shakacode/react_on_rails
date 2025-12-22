@@ -336,7 +336,7 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
         end
 
         it "returns false" do
-          result = described_class.send(:should_check_for_refresh?)
+          result = ReactOnRailsPro::LicenseRefreshChecker.should_check_for_refresh?
           expect(result).to be false
         end
       end
@@ -352,7 +352,7 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
         end
 
         it "returns false" do
-          result = described_class.send(:should_check_for_refresh?)
+          result = ReactOnRailsPro::LicenseRefreshChecker.should_check_for_refresh?
           expect(result).to be false
         end
       end
@@ -370,7 +370,7 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
           end
 
           it "returns true" do
-            result = described_class.send(:should_check_for_refresh?)
+            result = ReactOnRailsPro::LicenseRefreshChecker.should_check_for_refresh?
             expect(result).to be true
           end
         end
@@ -382,7 +382,7 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
           end
 
           it "returns false" do
-            result = described_class.send(:should_check_for_refresh?)
+            result = ReactOnRailsPro::LicenseRefreshChecker.should_check_for_refresh?
             expect(result).to be false
           end
         end
@@ -401,7 +401,7 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
           end
 
           it "returns true" do
-            result = described_class.send(:should_check_for_refresh?)
+            result = ReactOnRailsPro::LicenseRefreshChecker.should_check_for_refresh?
             expect(result).to be true
           end
         end
@@ -420,7 +420,7 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
           end
 
           it "returns true" do
-            result = described_class.send(:should_check_for_refresh?)
+            result = ReactOnRailsPro::LicenseRefreshChecker.should_check_for_refresh?
             expect(result).to be true
           end
         end
@@ -432,7 +432,7 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
           end
 
           it "returns false" do
-            result = described_class.send(:should_check_for_refresh?)
+            result = ReactOnRailsPro::LicenseRefreshChecker.should_check_for_refresh?
             expect(result).to be false
           end
         end
@@ -451,7 +451,7 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
           end
 
           it "returns true" do
-            result = described_class.send(:should_check_for_refresh?)
+            result = ReactOnRailsPro::LicenseRefreshChecker.should_check_for_refresh?
             expect(result).to be true
           end
         end
@@ -464,7 +464,7 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
         end
 
         it "returns true (triggers fetch)" do
-          result = described_class.send(:should_check_for_refresh?)
+          result = ReactOnRailsPro::LicenseRefreshChecker.should_check_for_refresh?
           expect(result).to be true
         end
       end
@@ -487,7 +487,7 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
 
         it "does not call fetcher" do
           expect(ReactOnRailsPro::LicenseFetcher).not_to receive(:fetch)
-          described_class.send(:maybe_refresh_license)
+          ReactOnRailsPro::LicenseRefreshChecker.maybe_refresh_license
         end
       end
 
@@ -498,7 +498,7 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
 
         it "does not call fetcher" do
           expect(ReactOnRailsPro::LicenseFetcher).not_to receive(:fetch)
-          described_class.send(:maybe_refresh_license)
+          ReactOnRailsPro::LicenseRefreshChecker.maybe_refresh_license
         end
       end
 
@@ -519,7 +519,7 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
           end
 
           it "writes response to cache" do
-            described_class.send(:maybe_refresh_license)
+            ReactOnRailsPro::LicenseRefreshChecker.maybe_refresh_license
             expect(ReactOnRailsPro::LicenseCache).to have_received(:write).with(fetch_response)
           end
         end
@@ -531,7 +531,7 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
 
           it "does not write to cache" do
             expect(ReactOnRailsPro::LicenseCache).not_to receive(:write)
-            described_class.send(:maybe_refresh_license)
+            ReactOnRailsPro::LicenseRefreshChecker.maybe_refresh_license
           end
         end
       end
@@ -547,7 +547,7 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
 
         it "does not write to cache" do
           expect(ReactOnRailsPro::LicenseCache).not_to receive(:write)
-          described_class.send(:seed_cache_if_needed, license_data)
+          ReactOnRailsPro::LicenseRefreshChecker.seed_cache_if_needed(license_data)
         end
       end
 
@@ -566,7 +566,7 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
 
           it "does not write to cache" do
             expect(ReactOnRailsPro::LicenseCache).not_to receive(:write)
-            described_class.send(:seed_cache_if_needed, license_data)
+            ReactOnRailsPro::LicenseRefreshChecker.seed_cache_if_needed(license_data)
           end
         end
 
@@ -578,7 +578,7 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
           end
 
           it "seeds the cache with token and expiry" do
-            described_class.send(:seed_cache_if_needed, license_data)
+            ReactOnRailsPro::LicenseRefreshChecker.seed_cache_if_needed(license_data)
             expect(ReactOnRailsPro::LicenseCache).to have_received(:write).with(
               hash_including("token" => valid_token, "expires_at" => kind_of(String))
             )
@@ -593,7 +593,7 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
 
           it "does not write to cache" do
             expect(ReactOnRailsPro::LicenseCache).not_to receive(:write)
-            described_class.send(:seed_cache_if_needed, license_data)
+            ReactOnRailsPro::LicenseRefreshChecker.seed_cache_if_needed(license_data)
           end
         end
       end

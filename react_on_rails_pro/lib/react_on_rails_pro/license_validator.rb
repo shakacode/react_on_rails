@@ -3,7 +3,6 @@
 require "jwt"
 
 module ReactOnRailsPro
-  # rubocop:disable Metrics/ClassLength
   class LicenseValidator
     # Grace period: 1 month (in seconds)
     GRACE_PERIOD_SECONDS = 30 * 24 * 60 * 60
@@ -29,7 +28,7 @@ module ReactOnRailsPro
 
           # Seed the license cache on first boot if auto-refresh is enabled
           # This populates the cache with expiry info so refresh logic works on subsequent boots
-          seed_cache_if_needed(license_data)
+          LicenseRefreshChecker.seed_cache_if_needed(license_data)
 
           @license_data
         rescue JWT::DecodeError => e
@@ -158,7 +157,7 @@ module ReactOnRailsPro
 
       def load_license_string
         # Try auto-refresh if enabled and near expiry
-        maybe_refresh_license
+        LicenseRefreshChecker.maybe_refresh_license
 
         # Priority: cache (if auto-refresh enabled) → ENV → config file
         if ReactOnRailsPro.configuration.auto_refresh_enabled?
@@ -180,67 +179,6 @@ module ReactOnRailsPro
         handle_invalid_license(error_msg)
       end
 
-      def maybe_refresh_license
-        return unless ReactOnRailsPro.configuration.auto_refresh_enabled?
-        return unless should_check_for_refresh?
-
-        response = LicenseFetcher.fetch
-        return if response.nil?
-
-        LicenseCache.write(response)
-      end
-
-      # Seeds the cache on first boot so that refresh logic works on subsequent boots.
-      # The cache stores the token's expiry, which should_check_for_refresh? needs to determine
-      # when to trigger a refresh.
-      def seed_cache_if_needed(license_data)
-        return unless ReactOnRailsPro.configuration.auto_refresh_enabled?
-        return if LicenseCache.token.present? # Cache already exists
-
-        token = load_token_from_env_or_file
-        return unless token
-
-        expires_at = Time.at(license_data["exp"])
-
-        LicenseCache.write(
-          "token" => token,
-          "expires_at" => expires_at.iso8601
-        )
-      end
-
-      # Loads token from ENV or file, skipping cache (used for seeding)
-      def load_token_from_env_or_file
-        license = ENV.fetch("REACT_ON_RAILS_PRO_LICENSE", nil)
-        return license if license.present?
-
-        config_path = Rails.root.join("config", "react_on_rails_pro_license.key")
-        return File.read(config_path).strip if config_path.exist?
-
-        nil
-      end
-
-      def should_check_for_refresh?
-        expires_at = LicenseCache.expires_at
-        return false if expires_at.nil?
-
-        days_until_expiry = ((expires_at - Time.now) / 1.day).to_i
-
-        if days_until_expiry <= 7
-          last_fetch_older_than?(1.day)
-        elsif days_until_expiry <= 30
-          last_fetch_older_than?(7.days)
-        else
-          false
-        end
-      end
-
-      def last_fetch_older_than?(duration)
-        fetched_at = LicenseCache.fetched_at
-        return true if fetched_at.nil?
-
-        Time.now - fetched_at > duration
-      end
-
       def public_key
         ReactOnRailsPro::LicensePublicKey::KEY
       end
@@ -260,5 +198,4 @@ module ReactOnRailsPro
       end
     end
   end
-  # rubocop:enable Metrics/ClassLength
 end
