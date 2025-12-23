@@ -20,12 +20,14 @@ This document explains how to configure your React on Rails Pro license.
 ## License Types
 
 ### Free License
+
 - **Duration**: 3 months
 - **Usage**: Personal, educational, and evaluation purposes only (development, testing, evaluation, CI/CD) - **NOT for production**
 - **Cost**: FREE - just register with your email
 - **Renewal**: Get a new free license or upgrade to paid
 
 ### Paid License
+
 - **Duration**: 1 year (or longer)
 - **Usage**: Production deployment
 - **Cost**: Subscription-based
@@ -74,6 +76,68 @@ echo "config/react_on_rails_pro_license.key" >> .gitignore
 
 **Never commit your license to version control.**
 
+## Automatic License Renewal (Paid Subscriptions)
+
+Paid subscribers can enable **automatic license renewal** so you never need to manually update your license token. Instead of copying a new JWT token each year, you configure a permanent **license key** and the gem handles renewal automatically.
+
+### License Key vs. License Token
+
+|                          | License Token                        | License Key                       |
+| ------------------------ | ------------------------------------ | --------------------------------- |
+| **Environment Variable** | `REACT_ON_RAILS_PRO_LICENSE`         | `REACT_ON_RAILS_PRO_LICENSE_KEY`  |
+| **Format**               | JWT (starts with `eyJ...`)           | Short key (starts with `lic_...`) |
+| **Expires**              | Yes (1 year)                         | Never                             |
+| **Auto-renewal**         | No - manual update required          | Yes - automatic                   |
+| **Network calls**        | None (offline validation)            | Only near expiration              |
+| **Best for**             | Trial users, air-gapped environments | Paid subscriptions                |
+
+### Setup
+
+**1. Get your license key** from the [React on Rails Pro dashboard](https://licenses.shakacode.com) after purchasing a paid subscription.
+
+**2. Set the environment variable:**
+
+```bash
+# Add to .env or your shell profile
+export REACT_ON_RAILS_PRO_LICENSE_KEY="lic_abc123xyz..."
+```
+
+**That's it!** The gem will automatically fetch fresh tokens as needed.
+
+### How It Works
+
+The gem checks for license renewal based on how close your current token is to expiration:
+
+| Time Until Expiration | Check Frequency                |
+| --------------------- | ------------------------------ |
+| > 30 days             | No checks (offline validation) |
+| 7-30 days             | Weekly                         |
+| ≤ 7 days              | Daily                          |
+
+When a fresh token is fetched, it's cached locally in `tmp/react_on_rails_pro_license.cache`. This cache persists across app restarts to minimize API calls.
+
+### Disabling Auto-Refresh
+
+For **air-gapped environments** or deployments where outbound network calls are not permitted:
+
+```ruby
+# config/initializers/react_on_rails_pro.rb
+ReactOnRailsPro.configure do |config|
+  config.auto_refresh_license = false
+end
+```
+
+When disabled, use the traditional `REACT_ON_RAILS_PRO_LICENSE` environment variable with your JWT token and update it manually when it expires.
+
+### Privacy
+
+When auto-refresh is enabled, the gem makes HTTPS requests containing only:
+
+- Your license key (for authentication)
+- A User-Agent header identifying the gem
+
+**No telemetry, usage data, or other information is transmitted.**
+
 ## License Validation
 
 The license is validated at multiple points:
@@ -103,6 +167,7 @@ Get your FREE evaluation license in 30 seconds - no credit card required!
 - ✅ **Development/Test**: No grace period - fails immediately (helps catch expiration early)
 
 **Important**: The grace period is designed to give production deployments time to renew, but you should:
+
 1. Monitor your logs for license expiration warnings
 2. Renew licenses before they expire
 3. Test license renewal in development/staging first
@@ -132,6 +197,7 @@ Set up CI with a license (see [CI_SETUP.md](./CI_SETUP.md) for detailed instruct
 ### Verify License is Working
 
 **Ruby Console:**
+
 ```ruby
 rails console
 > ReactOnRails::Utils.react_on_rails_pro?
@@ -141,14 +207,16 @@ rails console
 **Note:** With startup validation enabled, your Rails app won't start with an invalid license. If you can run the Rails console, your license is valid.
 
 **Check License Details:**
+
 ```ruby
 > ReactOnRailsPro::LicenseValidator.license_data
 # Shows: {"sub"=>"your@email.com", "exp"=>1234567890, "plan"=>"free", ...}
 ```
 
 **Browser JavaScript Console:**
+
 ```javascript
-window.railsContext.rorPro
+window.railsContext.rorPro;
 // Should return: true
 ```
 
@@ -157,6 +225,7 @@ window.railsContext.rorPro
 ### Error: "No license found"
 
 **Solutions:**
+
 1. Verify environment variable: `echo $REACT_ON_RAILS_PRO_LICENSE`
 2. Check config file exists: `ls config/react_on_rails_pro_license.key`
 3. **Get a FREE license**: [https://shakacode.com/react-on-rails-pro](https://shakacode.com/react-on-rails-pro)
@@ -164,10 +233,12 @@ window.railsContext.rorPro
 ### Error: "Invalid license signature"
 
 **Causes:**
+
 - License token was truncated or modified
 - Wrong license format (must be complete JWT token)
 
 **Solutions:**
+
 1. Ensure you copied the complete license (starts with `eyJ`)
 2. Check for extra spaces or newlines
 3. Get a new FREE license if corrupted
@@ -175,15 +246,18 @@ window.railsContext.rorPro
 ### Error: "License has expired"
 
 **What happens:**
+
 - **Development/Test/CI**: Application fails to start immediately
 - **Production**: 1-month grace period with ERROR logs, then fails to start
 
 **Solutions:**
+
 1. **Free License**: Get a new 3-month FREE license
 2. **Paid License**: Contact support to renew
 3. Visit: [https://shakacode.com/react-on-rails-pro](https://shakacode.com/react-on-rails-pro)
 
 **If you see grace period warnings in production:**
+
 - You have time to renew, but don't wait!
 - The warning shows how many days remain
 - Plan your license renewal before the grace period ends
@@ -211,12 +285,12 @@ The license is a JWT (JSON Web Token) signed with RSA-256, containing:
 
 ```json
 {
-  "sub": "user@example.com",        // Your email (REQUIRED)
-  "iat": 1234567890,                 // Issued at timestamp (REQUIRED)
-  "exp": 1234567890,                 // Expiration timestamp (REQUIRED)
-  "plan": "free",                    // License plan: "free" or "paid" (Optional)
-  "organization": "Your Company",    // Organization name (Optional)
-  "iss": "api"                       // Issuer identifier (Optional, standard JWT claim)
+  "sub": "user@example.com", // Your email (REQUIRED)
+  "iat": 1234567890, // Issued at timestamp (REQUIRED)
+  "exp": 1234567890, // Expiration timestamp (REQUIRED)
+  "plan": "free", // License plan: "free" or "paid" (Optional)
+  "organization": "Your Company", // Organization name (Optional)
+  "iss": "api" // Issuer identifier (Optional, standard JWT claim)
 }
 ```
 
@@ -266,7 +340,19 @@ A: Each developer should get their own FREE license. For CI, you can share one l
 A: Get a new 3-month FREE license, or upgrade to a paid license for production use.
 
 **Q: Do I need internet to validate the license?**
-A: No! License validation is completely offline using cryptographic signatures.
+A: No! License validation is completely offline using cryptographic signatures. The only time network calls are made is for automatic license renewal (if enabled), and only when your license is within 30 days of expiration.
 
 **Q: Is my email shared or sold?**
 A: Never. We only use it to send you license renewals and important updates.
+
+**Q: What's the difference between LICENSE and LICENSE_KEY?**
+A: `REACT_ON_RAILS_PRO_LICENSE` is a JWT token that expires yearly and requires manual updates. `REACT_ON_RAILS_PRO_LICENSE_KEY` is a permanent key that enables automatic renewal - set it once and forget about license management. See [Automatic License Renewal](#automatic-license-renewal-paid-subscriptions) for details.
+
+**Q: Should I use LICENSE_KEY or LICENSE?**
+A: For **paid subscriptions**, use `LICENSE_KEY` for automatic renewal. For **trial users** or **air-gapped environments**, use `LICENSE` with the JWT token.
+
+**Q: Can I use both LICENSE and LICENSE_KEY?**
+A: Yes. If both are set, the gem uses the cached/fetched token from auto-refresh when available, falling back to the LICENSE token. For simplicity, we recommend using just one method.
+
+**Q: What data does auto-refresh send to the server?**
+A: Only your license key for authentication. No telemetry, usage data, or device identifiers are transmitted.

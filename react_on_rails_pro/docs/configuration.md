@@ -1,6 +1,6 @@
 # Configuration
 
-`config/initializers/react_on_rails_pro.rb`  
+`config/initializers/react_on_rails_pro.rb`
 
 1. You don't need to create a initializer if you are satisfied with the defaults as described below.
 1. Values beginning with `renderer` pertain only to using an external rendering server. You will need to ensure these values are consistent with your configuration for the external rendering server, as given in [JS configuration](https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/js-configuration/)
@@ -32,12 +32,12 @@ ReactOnRailsPro.configure do |config|
   # Remote bundle caching saves deployment time by caching bundles.
   # See /docs/bundle-caching.md for usage and an example of a module called S3BundleCacheAdapter.
   config.remote_bundle_cache_adapter = nil
-  
+
   # ALL OPTIONS BELOW ONLY APPLY IF SERVER RENDERING
 
   # If true, then cache the evaluation of JS for prerendering using the standard Rails cache.
   # Applies to all rendering engines.
-  # Default for `prerender_caching` is false.  
+  # Default for `prerender_caching` is false.
   config.prerender_caching = true
 
   # Retry request in case of time out on the node-renderer side
@@ -77,9 +77,9 @@ ReactOnRailsPro.configure do |config|
   # config.renderer_password = ENV["RENDERER_PASSWORD"]
 
   # Set the `ssr_timeout` configuration so the Rails server will not wait more than this many seconds
-  # for a SSR request to return once issued. 
+  # for a SSR request to return once issued.
   config.ssr_timeout = 5
-  
+
   # If false, then crash if no backup rendering when the remote renderer is not available
   # Can be useful to set to false in development or testing to make sure that the remote renderer
   # works and any non-availability of the remote renderer does not just do ExecJS.
@@ -103,7 +103,7 @@ ReactOnRailsPro.configure do |config|
   config.renderer_http_pool_warn_timeout = 0.25 # seconds
 
   # Snippet of JavaScript to be run right at the beginning of the server rendering process. The code
-  # to be executed must either be self contained or reference some globally exposed module.  
+  # to be executed must either be self contained or reference some globally exposed module.
   # For example, suppose that we had to call `SomeLibrary.clearCache()`between every call to server
   # renderer to ensure no leakage of state between calls. Note, SomeLibrary needs to be globally
   # exposed in the server rendering webpack bundle. This code is visible in the tracing of the calls
@@ -161,5 +161,27 @@ ReactOnRailsPro.configure do |config|
   # - Faster page loading
   # - Selective hydration of client components
   # - Progressive rendering with Suspense boundaries
+
+  ################################################################################
+  # LICENSE AUTO-REFRESH CONFIGURATION
+  # See LICENSE_SETUP.md for detailed documentation on automatic license renewal.
+  ################################################################################
+
+  # License key for automatic license renewal. When configured, the gem fetches
+  # fresh license tokens automatically as your current token approaches expiration.
+  # Can also be set via ENV: REACT_ON_RAILS_PRO_LICENSE_KEY (takes precedence).
+  # Get your license key from the dashboard after purchasing a paid subscription.
+  # Default is nil (auto-refresh disabled unless set).
+  config.license_key = ENV["REACT_ON_RAILS_PRO_LICENSE_KEY"]
+
+  # Enable or disable automatic license refresh. Set to false for air-gapped
+  # environments or when outbound network calls are not permitted.
+  # Auto-refresh only activates if license_key is also configured.
+  # Default is true.
+  config.auto_refresh_license = true
+
+  # URL of the license API server. Only change if using a custom license server.
+  # Default is "https://licenses.shakacode.com".
+  config.license_api_url = "https://licenses.shakacode.com"
 end
 ```
