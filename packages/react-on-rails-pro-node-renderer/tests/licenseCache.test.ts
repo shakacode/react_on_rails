@@ -148,6 +148,23 @@ describe('LicenseCache', () => {
 
       expect(fs.writeFileSync).not.toHaveBeenCalled();
     });
+
+    it('logs warning on write failure', () => {
+      process.env.REACT_ON_RAILS_PRO_LICENSE_KEY = 'lic_test123';
+      jest.mocked(fs.existsSync).mockReturnValue(true);
+      jest.mocked(fs.writeFileSync).mockImplementation(() => {
+        throw new Error('Permission denied');
+      });
+
+      writeCache({
+        token: 'test-token',
+        expires_at: '2026-12-09T00:00:00Z',
+      });
+
+      expect(console.warn).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to write license cache: Permission denied'),
+      );
+    });
   });
 
   describe('getCachedToken', () => {

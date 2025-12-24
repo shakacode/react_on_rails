@@ -83,6 +83,44 @@ describe('LicenseFetcher', () => {
       expect(result).toEqual(mockResponse);
     });
 
+    it('sends User-Agent header with requests', async () => {
+      process.env.REACT_ON_RAILS_PRO_LICENSE_KEY = 'lic_test123';
+
+      fetchSpy.mockResolvedValueOnce({
+        status: 200,
+        json: () => Promise.resolve({ token: 'test', expires_at: '2026-01-01' }),
+      });
+
+      await fetchLicense();
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            'User-Agent': 'ReactOnRailsPro-NodeRenderer',
+          }),
+        }),
+      );
+    });
+
+    it('returns null on invalid JSON response', async () => {
+      jest.useFakeTimers();
+      process.env.REACT_ON_RAILS_PRO_LICENSE_KEY = 'lic_test123';
+
+      fetchSpy.mockResolvedValue({
+        status: 200,
+        json: () => Promise.reject(new SyntaxError('Unexpected token')),
+      });
+
+      const resultPromise = fetchLicense();
+      await jest.runAllTimersAsync();
+      const result = await resultPromise;
+
+      expect(result).toBeNull();
+
+      jest.useRealTimers();
+    });
+
     it('uses custom API URL when set', async () => {
       process.env.REACT_ON_RAILS_PRO_LICENSE_KEY = 'lic_test123';
       process.env.REACT_ON_RAILS_PRO_LICENSE_API_URL = 'http://localhost:3000';
