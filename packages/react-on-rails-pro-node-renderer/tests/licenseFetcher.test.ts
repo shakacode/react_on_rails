@@ -1,28 +1,21 @@
 import { isAutoRefreshEnabled, fetchLicense } from '../src/shared/licenseFetcher';
 
-// Store original fetch
-const originalFetch = global.fetch;
-
 describe('LicenseFetcher', () => {
-  let mockFetch: jest.Mock;
+  let fetchSpy: jest.SpyInstance;
 
   beforeEach(() => {
-    // Clear environment
+    jest.restoreAllMocks();
+
     delete process.env.REACT_ON_RAILS_PRO_LICENSE_KEY;
     delete process.env.REACT_ON_RAILS_PRO_AUTO_REFRESH_LICENSE;
     delete process.env.REACT_ON_RAILS_PRO_LICENSE_API_URL;
 
-    // Mock fetch
-    mockFetch = jest.fn();
-    global.fetch = mockFetch;
-
-    // Suppress console output
+    fetchSpy = jest.spyOn(global, 'fetch').mockImplementation();
     jest.spyOn(console, 'log').mockImplementation(() => {});
     jest.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
   afterEach(() => {
-    global.fetch = originalFetch;
     jest.restoreAllMocks();
   });
 
@@ -57,10 +50,9 @@ describe('LicenseFetcher', () => {
 
   describe('fetchLicense', () => {
     it('returns null when auto-refresh is disabled', async () => {
-      // No LICENSE_KEY set
       const result = await fetchLicense();
       expect(result).toBeNull();
-      expect(mockFetch).not.toHaveBeenCalled();
+      expect(fetchSpy).not.toHaveBeenCalled();
     });
 
     it('fetches license from API when enabled', async () => {
@@ -72,14 +64,14 @@ describe('LicenseFetcher', () => {
         plan: 'paid_annual',
       };
 
-      mockFetch.mockResolvedValueOnce({
+      fetchSpy.mockResolvedValueOnce({
         status: 200,
         json: () => Promise.resolve(mockResponse),
       });
 
       const result = await fetchLicense();
 
-      expect(mockFetch).toHaveBeenCalledWith(
+      expect(fetchSpy).toHaveBeenCalledWith(
         'https://licenses.shakacode.com/api/license',
         expect.objectContaining({
           method: 'GET',
@@ -95,50 +87,62 @@ describe('LicenseFetcher', () => {
       process.env.REACT_ON_RAILS_PRO_LICENSE_KEY = 'lic_test123';
       process.env.REACT_ON_RAILS_PRO_LICENSE_API_URL = 'http://localhost:3000';
 
-      mockFetch.mockResolvedValueOnce({
+      fetchSpy.mockResolvedValueOnce({
         status: 200,
         json: () => Promise.resolve({ token: 'test', expires_at: '2026-01-01' }),
       });
 
       await fetchLicense();
 
-      expect(mockFetch).toHaveBeenCalledWith('http://localhost:3000/api/license', expect.anything());
+      expect(fetchSpy).toHaveBeenCalledWith('http://localhost:3000/api/license', expect.anything());
     });
 
     it('returns null on 401 unauthorized', async () => {
       process.env.REACT_ON_RAILS_PRO_LICENSE_KEY = 'lic_invalid';
 
-      mockFetch.mockResolvedValueOnce({
+      fetchSpy.mockResolvedValueOnce({
         status: 401,
       });
 
       const result = await fetchLicense();
       expect(result).toBeNull();
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
     });
 
     it('returns null on network error after retries', async () => {
+      jest.useFakeTimers();
       process.env.REACT_ON_RAILS_PRO_LICENSE_KEY = 'lic_test123';
 
-      // async-retry will attempt initial + retries times
-      mockFetch.mockRejectedValue(new Error('Network error'));
+      fetchSpy.mockRejectedValue(new Error('Network error'));
 
-      const result = await fetchLicense();
+      const resultPromise = fetchLicense();
+      await jest.runAllTimersAsync();
+      const result = await resultPromise;
+
       expect(result).toBeNull();
-      expect(mockFetch).toHaveBeenCalled();
-    }, 15000);
+      expect(fetchSpy).toHaveBeenCalledTimes(3);
+
+      jest.useRealTimers();
+    });
 
     it('returns null on non-200 status after retries', async () => {
+      jest.useFakeTimers();
       process.env.REACT_ON_RAILS_PRO_LICENSE_KEY = 'lic_test123';
 
-      // async-retry will retry on non-200 status
-      mockFetch.mockResolvedValue({ status: 500 });
+      fetchSpy.mockResolvedValue({ status: 500 });
 
-      const result = await fetchLicense();
+      const resultPromise = fetchLicense();
+      await jest.runAllTimersAsync();
+      const result = await resultPromise;
+
       expect(result).toBeNull();
-      expect(mockFetch).toHaveBeenCalled();
-    }, 15000);
+      expect(fetchSpy).toHaveBeenCalledTimes(3);
+
+      jest.useRealTimers();
+    });
 
     it('succeeds after retry', async () => {
+      jest.useFakeTimers();
       process.env.REACT_ON_RAILS_PRO_LICENSE_KEY = 'lic_test123';
 
       const mockResponse = {
@@ -146,14 +150,19 @@ describe('LicenseFetcher', () => {
         expires_at: '2026-12-09T00:00:00Z',
       };
 
-      mockFetch.mockRejectedValueOnce(new Error('Temporary error')).mockResolvedValueOnce({
+      fetchSpy.mockRejectedValueOnce(new Error('Temporary error')).mockResolvedValueOnce({
         status: 200,
         json: () => Promise.resolve(mockResponse),
       });
 
-      const result = await fetchLicense();
+      const resultPromise = fetchLicense();
+      await jest.runAllTimersAsync();
+      const result = await resultPromise;
+
       expect(result).toEqual(mockResponse);
-      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+
+      jest.useRealTimers();
     });
   });
 });
