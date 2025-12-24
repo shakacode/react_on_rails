@@ -11,10 +11,10 @@ import { getValidatedLicenseData } from './shared/licenseValidator.js';
 
 const MILLISECONDS_IN_MINUTE = 60000;
 
-export default function masterRun(runningConfig?: Partial<Config>) {
+export default async function masterRun(runningConfig?: Partial<Config>) {
   // Validate license before starting - required in all environments
   log.info('[React on Rails Pro] Validating license...');
-  getValidatedLicenseData();
+  await getValidatedLicenseData();
   log.info('[React on Rails Pro] License validation successful');
 
   // Store config in app state. From now it can be loaded by any module using getConfig():

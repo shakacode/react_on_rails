@@ -42,7 +42,7 @@ and for "@fastify/..." dependencies in your package.json. Consider removing them
     await worker.default(config).ready();
   } else {
     const master = require('./master.js') as typeof import('./master.js');
-    master.default(config);
+    await master.default(config);
   }
   /* eslint-enable global-require,@typescript-eslint/no-require-imports */
 }
