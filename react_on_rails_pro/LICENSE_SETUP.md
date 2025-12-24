@@ -131,10 +131,12 @@ When disabled, use the traditional `REACT_ON_RAILS_PRO_LICENSE` environment vari
 
 ### Privacy
 
-When auto-refresh is enabled, the gem makes HTTPS requests containing only:
+When auto-refresh is enabled, HTTPS requests contain only:
 
 - Your license key (for authentication)
-- A User-Agent header identifying the gem
+- A User-Agent header identifying the client:
+  - Ruby gem: `ReactOnRailsPro-Gem`
+  - Node Renderer: `ReactOnRailsPro-NodeRenderer`
 
 **No telemetry, usage data, or other information is transmitted.**
 

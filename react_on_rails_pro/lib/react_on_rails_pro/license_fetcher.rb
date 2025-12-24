@@ -19,7 +19,10 @@ module ReactOnRailsPro
         response = HTTPX
                    .plugin(:retries, max_retries: MAX_RETRIES, retry_after: RETRY_DELAY_SECONDS)
                    .with(timeout: { request_timeout: REQUEST_TIMEOUT_SECONDS })
-                   .with(headers: { "Authorization" => "Bearer #{license_key}" })
+                   .with(headers: {
+                           "Authorization" => "Bearer #{license_key}",
+                           "User-Agent" => "ReactOnRailsPro-Gem"
+                         })
                    .get("#{api_url}/api/license")
 
         return nil if response.is_a?(HTTPX::ErrorResponse)
