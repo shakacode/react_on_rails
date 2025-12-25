@@ -8,7 +8,6 @@ module ReactOnRails
     def self.shakapacker_precompile_hook_configured?: () -> bool
     def self.shakapacker_precompile_hook_value: () -> String
     def self.raise_shakapacker_version_incompatible_for_autobundling: () -> void
-    def self.raise_shakapacker_version_incompatible_for_basic_pack_generation: () -> void
     def self.raise_nested_entries_disabled: () -> void
   end
 end
