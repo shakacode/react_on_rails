@@ -89,7 +89,7 @@
     "preload-webpack-plugin": "^3.0.0-alpha.1",
     "typescript": "^5.2.2",
     "webpack-cli": "^4.10.0",
-    "webpack-dev-server": "^4.7.3"
+    "webpack-dev-server": "^5.2.1"
   },
   "browser": {
     "fs": false
