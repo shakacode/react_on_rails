@@ -1,7 +1,6 @@
 module ReactOnRails
   module PackerUtils
     def self.supports_autobundling?: () -> bool
-    def self.supports_basic_pack_generation?: () -> bool
     def self.supports_async_loading?: () -> bool
     def self.nested_entries?: () -> bool
     def self.packer_public_output_path: () -> String
