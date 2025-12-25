@@ -10,8 +10,9 @@ module ReactOnRailsPro
     class << self
       def reset_connection
         @standard_connection&.close
+        @incremental_connection&.close
         @standard_connection = nil
-        reset_thread_local_incremental_connections
+        @incremental_connection = nil
       end
 
       def render_code(path, js_code, send_bundle)
@@ -58,7 +59,8 @@ module ReactOnRailsPro
             "POST",
             path,
             headers: { "content-type" => "application/x-ndjson" },
-            body: []
+            body: [],
+            stream: true
           )
 
           # Create emitter and use it to generate initial request data
@@ -134,19 +136,8 @@ module ReactOnRailsPro
       end
       # rubocop:enable Naming/MemoizedInstanceVariableName
 
-      # Thread-local connection for incremental rendering
-      # Each thread gets its own persistent connection to avoid connection pool issues
       def incremental_connection
-        Thread.current[:react_on_rails_incremental_connection] ||= create_incremental_connection
-      end
-
-      def reset_thread_local_incremental_connections
-        # Close all thread-local incremental connections
-        Thread.list.each do |thread|
-          conn = thread[:react_on_rails_incremental_connection]
-          conn&.close
-          thread[:react_on_rails_incremental_connection] = nil
-        end
+        @incremental_connection ||= create_incremental_connection
       end
 
       def perform_request(path, **post_options) # rubocop:disable Metrics/AbcSize,Metrics/CyclomaticComplexity
