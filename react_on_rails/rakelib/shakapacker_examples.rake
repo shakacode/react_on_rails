@@ -61,11 +61,6 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
 
   # Updates package.json and Gemfile to use specific React version for compatibility testing
   def apply_react_version(dir, react_version)
-    puts "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"
-    puts "shakapacker_examples.rake: #{__LINE__},  method: #{__method__}"
-    puts "react_version = #{react_version.ai}"
-    puts "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"
-
     update_package_json_for_react_version(File.join(dir, "package.json"), react_version)
 
     puts "  Updated package.json for compatibility testing:"
