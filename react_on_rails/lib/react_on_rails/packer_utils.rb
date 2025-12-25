@@ -154,15 +154,6 @@ module ReactOnRails
       raise ReactOnRails::Error, msg
     end
 
-    def self.raise_shakapacker_version_incompatible_for_basic_pack_generation
-      msg = <<~MSG
-        **ERROR** ReactOnRails: Please upgrade ::Shakapacker to version #{ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION} or \
-        above to use basic pack generation features. The currently installed version is #{ReactOnRails::PackerUtils.shakapacker_version}.
-      MSG
-
-      raise ReactOnRails::Error, msg
-    end
-
     # Check if shakapacker.yml has a precompile hook configured
     # This prevents react_on_rails from running generate_packs twice
     #
