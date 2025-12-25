@@ -177,12 +177,10 @@ module ReactOnRails
 
   describe "version constants validation" do
     it "ensures MINIMUM_SHAKAPACKER_VERSION constants are properly defined" do
-      expect(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION).to eq("6.5.1")
       expect(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_BUNDLING).to eq("7.0.0")
     end
 
     it "ensures version requirements are logically consistent" do
-      basic_version = Gem::Version.new(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION)
       auto_reg_version = Gem::Version.new(
         ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_BUNDLING
       )
