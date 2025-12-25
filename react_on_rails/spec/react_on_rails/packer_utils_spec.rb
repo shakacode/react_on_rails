@@ -91,22 +91,6 @@ module ReactOnRails
       end
     end
 
-    describe ".supports_basic_pack_generation?" do
-      it "returns true when ::Shakapacker >= 6.5.1" do
-        allow(described_class).to receive(:shakapacker_version_requirement_met?)
-          .with(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION).and_return(true)
-
-        expect(described_class.supports_basic_pack_generation?).to be(true)
-      end
-
-      it "returns false when ::Shakapacker < 6.5.1" do
-        allow(described_class).to receive(:shakapacker_version_requirement_met?)
-          .with(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION).and_return(false)
-
-        expect(described_class.supports_basic_pack_generation?).to be(false)
-      end
-    end
-
     describe ".supports_autobundling?" do
       let(:mock_config) { instance_double("::Shakapacker::Config") } # rubocop:disable RSpec/VerifiedDoubleReference
       let(:mock_packer) { instance_double("::Shakapacker", config: mock_config) } # rubocop:disable RSpec/VerifiedDoubleReference
