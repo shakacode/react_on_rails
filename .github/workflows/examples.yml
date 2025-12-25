@@ -73,12 +73,15 @@ jobs:
       - id: set-matrix
         run: |
           # Determine if we should run full matrix (master, workflow_dispatch, force_run, or full-ci label)
+          echo "needs.detect-changes.outputs.has_full_ci_label is ${{ needs.detect-changes.outputs.has_full_ci_label }}" 
+          
           if [[ "${{ github.ref }}" == "refs/heads/master" ]] || \
              [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || \
              [[ "${{ inputs.force_run }}" == "true" ]] || \
              [[ "${{ needs.detect-changes.outputs.has_full_ci_label }}" == "true" ]]; then
             # Full matrix: test both latest and minimum supported versions
             echo 'matrix={"include":[{"ruby-version":"3.4","dependency-level":"latest"},{"ruby-version":"3.2","dependency-level":"minimum"}]}' >> $GITHUB_OUTPUT
+            echo 'matrix={"include":[{"ruby-version":"3.4","dependency-level":"latest"},{"ruby-version":"3.2","dependency-level":"minimum"}]}' 
           else
             # PR matrix: test only latest versions for fast feedback
             echo 'matrix={"include":[{"ruby-version":"3.4","dependency-level":"latest"}]}' >> $GITHUB_OUTPUT
