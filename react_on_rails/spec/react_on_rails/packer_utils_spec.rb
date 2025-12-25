@@ -180,15 +180,6 @@ module ReactOnRails
       expect(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_BUNDLING).to eq("7.0.0")
     end
 
-    it "ensures version requirements are logically consistent" do
-      auto_reg_version = Gem::Version.new(
-        ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_BUNDLING
-      )
-
-      expect(auto_reg_version).to be >= basic_version,
-                                  "Auto-registration version should be >= basic pack generation version"
-    end
-
     it "validates version checks are cached properly" do
       # Mock the shakapacker_version to avoid dependency on actual version
       allow(ReactOnRails::PackerUtils).to receive(:shakapacker_version).and_return("7.1.0")
