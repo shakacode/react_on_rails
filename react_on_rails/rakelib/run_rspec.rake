@@ -79,7 +79,6 @@ namespace :run_rspec do
 
   # Dynamically define Rake tasks for each example app found in the examples directory
   ExampleType.all[:shakapacker_examples].each do |example_type|
-    puts "Creating #{example_type.rspec_task_name} task"
     desc "Runs RSpec for #{example_type.name_pretty} only"
     task example_type.rspec_task_name_short => example_type.gen_task_name do
       # Use unbundled mode for pinned React version examples to ensure the example app's
