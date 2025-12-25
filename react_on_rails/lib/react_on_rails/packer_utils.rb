@@ -36,10 +36,6 @@ module ReactOnRails
       shakapacker_version_requirement_met?("8.2.0")
     end
 
-    def self.supports_basic_pack_generation?
-      shakapacker_version_requirement_met?(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION)
-    end
-
     def self.supports_autobundling?
       min_version = ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_BUNDLING
       ::Shakapacker.config.respond_to?(:nested_entries?) && shakapacker_version_requirement_met?(min_version)
