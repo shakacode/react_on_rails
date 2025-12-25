@@ -147,8 +147,7 @@ module ReactOnRails
       msg = <<~MSG
         **ERROR** ReactOnRails: Please upgrade ::Shakapacker to version #{ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_BUNDLING} or \
         above to use the automated bundle generation feature (which requires nested_entries support). \
-        The currently installed version is #{ReactOnRails::PackerUtils.shakapacker_version}. \
-        Basic pack generation requires ::Shakapacker #{ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION} or above.
+        The currently installed version is #{ReactOnRails::PackerUtils.shakapacker_version}.
       MSG
 
       raise ReactOnRails::Error, msg
