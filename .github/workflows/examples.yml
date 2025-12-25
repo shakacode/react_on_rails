@@ -73,7 +73,6 @@ jobs:
       - id: set-matrix
         run: |
           # Determine if we should run full matrix (master, workflow_dispatch, force_run, or full-ci label)
-          
           if [[ "${{ github.ref }}" == "refs/heads/master" ]] || \
              [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || \
              [[ "${{ inputs.force_run }}" == "true" ]] || \
