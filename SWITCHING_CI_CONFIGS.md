@@ -23,7 +23,7 @@ The project runs tests against two configurations:
 
 - **Ruby**: 3.4
 - **Node**: 22
-- **Shakapacker**: 9.3.0
+- **Shakapacker**: 9.4.0
 - **React**: 19.0.0
 - **Dependencies**: Latest versions with `--frozen-lockfile`
 - **When it runs**: Always on PRs and master
@@ -124,7 +124,7 @@ This will:
 
 1. Create `.tool-versions` with Ruby 3.2.8 and Node 20.18.1
 2. Run `script/convert` to downgrade dependencies:
-   - Shakapacker 9.3.0 → 8.2.0
+   - Shakapacker 9.4.0 → 8.2.0
    - React 19.0.0 → 18.0.0
    - Remove ESLint and other packages incompatible with Node 20
 3. Clean `node_modules` and `pnpm-lock.yaml`

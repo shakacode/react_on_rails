@@ -328,11 +328,6 @@ module ReactOnRails
                           "shakapacker.yml private_output_path: '#{relative_path}'")
     end
 
-    def check_minimum_shakapacker_version
-      ReactOnRails::PackerUtils.raise_shakapacker_version_incompatible_for_basic_pack_generation unless
-        ReactOnRails::PackerUtils.supports_basic_pack_generation?
-    end
-
     def check_autobundling_requirements
       raise_missing_components_subdirectory unless components_subdirectory.present?
 
