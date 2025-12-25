@@ -9,10 +9,8 @@ module ReactOnRailsPro
   class Request # rubocop:disable Metrics/ClassLength
     class << self
       def reset_connection
-        @standard_connection&.close
-        @incremental_connection&.close
-        @standard_connection = nil
-        @incremental_connection = nil
+        @connection&.close
+        @connection = nil
       end
 
       def render_code(path, js_code, send_bundle)
@@ -55,7 +53,7 @@ module ReactOnRailsPro
           end
 
           # Build bidirectional streaming request
-          request = incremental_connection.build_request(
+          request = connection.build_request(
             "POST",
             path,
             headers: { "content-type" => "application/x-ndjson" },
@@ -67,7 +65,7 @@ module ReactOnRailsPro
           emitter = ReactOnRailsPro::AsyncPropsEmitter.new(bundle_timestamp, request)
           initial_data = build_initial_incremental_request(js_code, emitter)
 
-          response = incremental_connection.request(request, stream: true)
+          response = connection.request(request, stream: true)
           request << "#{initial_data.to_json}\n"
 
           # Execute async props block in background using barrier
@@ -132,13 +130,9 @@ module ReactOnRailsPro
 
       # rubocop:disable Naming/MemoizedInstanceVariableName
       def connection
-        @standard_connection ||= create_standard_connection
+        @connection ||= create_connection
       end
       # rubocop:enable Naming/MemoizedInstanceVariableName
-
-      def incremental_connection
-        @incremental_connection ||= create_incremental_connection
-      end
 
       def perform_request(path, **post_options) # rubocop:disable Metrics/AbcSize,Metrics/CyclomaticComplexity
         available_retries = ReactOnRailsPro.configuration.renderer_request_retry_limit
@@ -278,20 +272,11 @@ module ReactOnRailsPro
         )
       end
 
-      def create_standard_connection
-        build_connection_config.plugin(:stream)
-      end
-
-      def create_incremental_connection
-        build_connection_config.plugin(:stream_bidi)
-      end
-
-      def build_connection_config # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
+      def create_connection # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
         url = ReactOnRailsPro.configuration.renderer_url
         Rails.logger.info do
           "[ReactOnRailsPro] Setting up Node Renderer connection to #{url}"
         end
-
         HTTPX
           # For persistent connections we want retries,
           # so the requests don't just fail if the other side closes the connection
@@ -317,7 +302,6 @@ module ReactOnRailsPro
                                          "of a component.\nOriginal error:\n#{e}\n#{e.backtrace}"
                                        )
                                      end
-
                                      Rails.logger.info do
                                        "[ReactOnRailsPro] An error occurred while making " \
                                          "a request to the Node Renderer.\n" \
@@ -330,6 +314,8 @@ module ReactOnRailsPro
                                      nil
                                    end
           )
+          .plugin(:stream)
+          .plugin(:stream_bidi)
           # See https://www.rubydoc.info/gems/httpx/1.3.3/HTTPX%2FOptions:initialize for the available options
           .with(
             origin: url,
