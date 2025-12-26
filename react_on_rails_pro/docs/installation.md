@@ -119,7 +119,7 @@ import registerServerComponent from 'react-on-rails-pro/registerServerComponent/
 import { wrapServerComponentRenderer } from 'react-on-rails-pro/wrapServerComponentRenderer/client';
 ```
 
-See the [React Server Components documentation](./react-server-components/index.md) for detailed usage.
+See the [React Server Components tutorial](./react-server-components/tutorial.md) for detailed usage.
 
 # Node Renderer Installation
 
