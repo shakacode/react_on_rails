@@ -3,6 +3,7 @@
   "version": "16.2.0-beta.20",
   "protocolVersion": "2.0.0",
   "description": "React on Rails Pro Node Renderer for server-side rendering",
+  "main": "lib/ReactOnRailsProNodeRenderer.js",
   "directories": {
     "doc": "docs"
   },
