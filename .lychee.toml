@@ -61,6 +61,8 @@ exclude = [
   # PLANNED DEPLOYMENTS NOT YET LIVE
   # ============================================================================
   '^https://ror-spec-dummy\.reactrails\.com',  # spec/dummy demo - deployment pending
+  # TODO: Remove this exclusion once licenses.shakacode.com is deployed
+  '^https://licenses\.shakacode\.com',  # React on Rails Pro licensing app - deployment pending
 
   # ============================================================================
   # SITES FROM PROJECTS.MD THAT BLOCK BOTS OR ARE UNRELIABLE
