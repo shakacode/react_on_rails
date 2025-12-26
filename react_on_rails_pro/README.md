@@ -294,6 +294,8 @@ Visit [https://shakacode.com/react-on-rails-pro](https://shakacode.com/react-on-
 export REACT_ON_RAILS_PRO_LICENSE="eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
+> **Paid subscribers:** Use `REACT_ON_RAILS_PRO_LICENSE_KEY` instead for automatic license renewal. See [LICENSE_SETUP.md](./LICENSE_SETUP.md#automatic-license-renewal-paid-subscriptions) for details.
+
 **3. Install the Gem**
 
 Since React on Rails Pro is part of the public monorepo, you can install it directly from GitHub:

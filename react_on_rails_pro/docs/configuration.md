@@ -161,5 +161,27 @@ ReactOnRailsPro.configure do |config|
   # - Faster page loading
   # - Selective hydration of client components
   # - Progressive rendering with Suspense boundaries
+
+  ################################################################################
+  # LICENSE AUTO-REFRESH CONFIGURATION
+  # See LICENSE_SETUP.md for detailed documentation on automatic license renewal.
+  ################################################################################
+
+  # License key for automatic license renewal. When configured, the gem fetches
+  # fresh license tokens automatically as your current token approaches expiration.
+  # Can also be set via ENV: REACT_ON_RAILS_PRO_LICENSE_KEY (takes precedence).
+  # Get your license key from the dashboard after purchasing a paid subscription.
+  # Default is nil (auto-refresh disabled unless set).
+  config.license_key = ENV["REACT_ON_RAILS_PRO_LICENSE_KEY"]
+
+  # Enable or disable automatic license refresh. Set to false for air-gapped
+  # environments or when outbound network calls are not permitted.
+  # Auto-refresh only activates if license_key is also configured.
+  # Default is true.
+  config.auto_refresh_license = true
+
+  # URL of the license API server. Only change if using a custom license server.
+  # Default is "https://licenses.shakacode.com".
+  config.license_api_url = "https://licenses.shakacode.com"
 end
 ```

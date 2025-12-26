@@ -47,6 +47,8 @@ Set your license token as an environment variable:
 export REACT_ON_RAILS_PRO_LICENSE="your-license-token-here"
 ```
 
+> **Paid subscribers:** Use `REACT_ON_RAILS_PRO_LICENSE_KEY` instead for automatic license renewal. See [LICENSE_SETUP.md](../LICENSE_SETUP.md#automatic-license-renewal-paid-subscriptions) for details.
+
 Or configure it in your Rails initializer (not recommended for production):
 
 ```ruby

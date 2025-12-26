@@ -2,6 +2,9 @@ import * as jwt from 'jsonwebtoken';
 import * as fs from 'fs';
 import * as path from 'path';
 import { PUBLIC_KEY } from './licensePublicKey.js';
+import { isAutoRefreshEnabled } from './licenseFetcher.js';
+import { getCachedToken } from './licenseCache.js';
+import { maybeRefreshLicense, seedCacheIfNeeded } from './licenseRefreshChecker.js';
 
 interface LicenseData {
   // Subject (email for whom the license is issued)
@@ -78,12 +81,21 @@ function logLicenseInfo(license: LicenseData): void {
 }
 
 /**
- * Loads the license string from environment variable or config file.
+ * Loads the license string from cache, environment variable, or config file.
+ * Priority: cache (if auto-refresh enabled) → ENV → config file
  * @private
  */
 // eslint-disable-next-line consistent-return
 function loadLicenseString(): string {
-  // First try environment variable
+  // Check cache first if auto-refresh is enabled
+  if (isAutoRefreshEnabled()) {
+    const cachedToken = getCachedToken();
+    if (cachedToken) {
+      return cachedToken;
+    }
+  }
+
+  // Then try environment variable
   const envLicense = process.env.REACT_ON_RAILS_PRO_LICENSE;
   if (envLicense) {
     return envLicense;
@@ -108,7 +120,7 @@ function loadLicenseString(): string {
 }
 
 /**
- * Loads and decodes the license from environment or file.
+ * Loads and decodes the license from cache, environment, or file.
  * @private
  */
 function loadAndDecodeLicense(): LicenseData {
@@ -183,17 +195,21 @@ function validateLicenseData(license: LicenseData): number | undefined {
 /**
  * Validates the license and returns the license data.
  * Caches the result after first validation.
+ * Supports automatic license refresh when configured with LICENSE_KEY.
  *
- * @returns The validated license data
+ * @returns Promise resolving to the validated license data
  * @throws Exits process if license is invalid
  */
 // eslint-disable-next-line consistent-return
-export function getValidatedLicenseData(): LicenseData {
+export async function getValidatedLicenseData(): Promise<LicenseData> {
   if (cachedLicenseData !== undefined) {
     return cachedLicenseData;
   }
 
   try {
+    // Try auto-refresh if enabled and near expiry
+    await maybeRefreshLicense();
+
     // Load and decode license (but don't cache yet)
     const licenseData = loadAndDecodeLicense();
 
@@ -203,6 +219,10 @@ export function getValidatedLicenseData(): LicenseData {
     // Validation passed - now cache both data and grace days
     cachedLicenseData = licenseData;
     cachedGraceDaysRemaining = graceDays;
+
+    // Seed the license cache on first boot if auto-refresh is enabled
+    // This populates the cache with expiry info so refresh logic works on subsequent boots
+    seedCacheIfNeeded(licenseData.exp);
 
     return cachedLicenseData;
   } catch (error: unknown) {
@@ -229,11 +249,11 @@ export function getValidatedLicenseData(): LicenseData {
 /**
  * Checks if the current license is an evaluation/free license.
  *
- * @returns true if plan is not "paid"
+ * @returns Promise resolving to true if plan is not "paid"
  * @public TODO: Remove this line when this function is actually used
  */
-export function isEvaluation(): boolean {
-  const data = getValidatedLicenseData();
+export async function isEvaluation(): Promise<boolean> {
+  const data = await getValidatedLicenseData();
   const plan = data.plan ?? '';
   return plan !== 'paid' && !plan.startsWith('paid_');
 }
@@ -241,12 +261,12 @@ export function isEvaluation(): boolean {
 /**
  * Returns remaining grace period days if license is expired but in grace period.
  *
- * @returns Number of days remaining, or undefined if not in grace period
+ * @returns Promise resolving to number of days remaining, or undefined if not in grace period
  * @public TODO: Remove this line when this function is actually used
  */
-export function getGraceDaysRemaining(): number | undefined {
+export async function getGraceDaysRemaining(): Promise<number | undefined> {
   // Ensure license is validated and cached
-  getValidatedLicenseData();
+  await getValidatedLicenseData();
 
   // Return cached grace days (undefined if not in grace period)
   return cachedGraceDaysRemaining;

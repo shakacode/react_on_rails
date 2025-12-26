@@ -26,6 +26,10 @@ module ReactOnRailsPro
           @license_data = license_data
           @grace_days_remaining = grace_days
 
+          # Seed the license cache on first boot if auto-refresh is enabled
+          # This populates the cache with expiry info so refresh logic works on subsequent boots
+          LicenseRefreshChecker.seed_cache_if_needed(license_data)
+
           @license_data
         rescue JWT::DecodeError => e
           error = "Invalid license signature: #{e.message}. " \
@@ -152,11 +156,20 @@ module ReactOnRailsPro
       end
 
       def load_license_string
-        # First try environment variable
+        # Try auto-refresh if enabled and near expiry
+        LicenseRefreshChecker.maybe_refresh_license
+
+        # Priority: cache (if auto-refresh enabled) → ENV → config file
+        if ReactOnRailsPro.configuration.auto_refresh_enabled?
+          cached_token = LicenseCache.token
+          return cached_token if cached_token.present?
+        end
+
+        # Environment variable
         license = ENV.fetch("REACT_ON_RAILS_PRO_LICENSE", nil)
         return license if license.present?
 
-        # Then try config file
+        # Config file
         config_path = Rails.root.join("config", "react_on_rails_pro_license.key")
         return File.read(config_path).strip if config_path.exist?
 
