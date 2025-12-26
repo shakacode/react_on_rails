@@ -16,6 +16,11 @@ describe('LicenseFetcher', () => {
   });
 
   afterEach(() => {
+    // Clear any pending retry timers to prevent "Cannot log after tests are done" errors.
+    // This is safe to call regardless of whether fake timers are active (no-op with real timers).
+    // See: https://github.com/jestjs/jest/issues/10487
+    jest.clearAllTimers();
+    jest.useRealTimers();
     jest.restoreAllMocks();
   });
 
@@ -117,8 +122,6 @@ describe('LicenseFetcher', () => {
       const result = await resultPromise;
 
       expect(result).toBeNull();
-
-      jest.useRealTimers();
     });
 
     it('uses custom API URL when set', async () => {
@@ -159,8 +162,6 @@ describe('LicenseFetcher', () => {
 
       expect(result).toBeNull();
       expect(fetchSpy).toHaveBeenCalledTimes(3);
-
-      jest.useRealTimers();
     });
 
     it('returns null on non-200 status after retries', async () => {
@@ -175,8 +176,6 @@ describe('LicenseFetcher', () => {
 
       expect(result).toBeNull();
       expect(fetchSpy).toHaveBeenCalledTimes(3);
-
-      jest.useRealTimers();
     });
 
     it('succeeds after retry', async () => {
@@ -199,8 +198,6 @@ describe('LicenseFetcher', () => {
 
       expect(result).toEqual(mockResponse);
       expect(fetchSpy).toHaveBeenCalledTimes(2);
-
-      jest.useRealTimers();
     });
   });
 });
