@@ -43,6 +43,7 @@ const vmCreationPromises = new Map<string, Promise<VMContext>>();
 
 /**
  * Returns all bundle paths that have a VM context
+ * @internal Used in tests
  */
 export function hasVMContextForBundle(bundlePath: string) {
   return vmContexts.has(bundlePath);

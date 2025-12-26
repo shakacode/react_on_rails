@@ -81,8 +81,6 @@ const config: KnipConfig = {
         // Test helper utilities
         'tests/helper.ts',
         'tests/httpRequestUtils.ts',
-        // Exported for test utilities only
-        'src/worker/vm.ts:hasVMContextForBundle',
       ],
       ignoreDependencies: [
         // Optional dependencies used in integrations

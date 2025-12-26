@@ -35,7 +35,7 @@ module ReactOnRailsPro
           end
 
           form = form_with_code(js_code, false)
-          perform_streaming_request(path, form: form)
+          perform_request(path, form: form, stream: true)
         end
       end
 
@@ -132,13 +132,20 @@ module ReactOnRailsPro
         @connection ||= create_connection
       end
 
-      def perform_request(path, **post_options) # rubocop:disable Metrics/AbcSize,Metrics/CyclomaticComplexity
+      # Performs HTTP POST requests using the build_request pattern.
+      # This approach is required because when stream_bidi plugin is loaded,
+      # using connection.post with stream: true causes timeouts (the plugin's
+      # empty? method returns false, preventing END_STREAM from being sent).
+      #
+      # For consistency and to share error handling logic, both streaming and
+      # non-streaming requests use build_request with manually encoded bodies.
+      def perform_request(path, form: nil, json: nil, stream: false) # rubocop:disable Metrics/AbcSize,Metrics/CyclomaticComplexity
         available_retries = ReactOnRailsPro.configuration.renderer_request_retry_limit
         retry_request = true
         while retry_request
           begin
             start_time = Time.now
-            response = connection.post(path, **post_options)
+            response = execute_http_request(path, form: form, json: json, stream: stream)
             raise response.error if response.is_a?(HTTPX::ErrorResponse)
 
             request_time = Time.now - start_time
@@ -162,7 +169,7 @@ module ReactOnRailsPro
             next
           rescue HTTPX::Error => e # Connection errors or other unexpected errors
             # Such errors are handled by ReactOnRailsPro::StreamRequest instead
-            raise if e.is_a?(HTTPX::HTTPError) && post_options[:stream]
+            raise if e.is_a?(HTTPX::HTTPError) && stream
 
             raise ReactOnRailsPro::Error,
                   "Node renderer request failed: #{path}.\nOriginal error:\n#{e}\n#{e.backtrace}"
@@ -179,41 +186,38 @@ module ReactOnRailsPro
         response
       end
 
-      # Performs a streaming POST request using the build_request pattern.
-      # When stream_bidi plugin is loaded, using connection.post with stream: true causes timeouts
-      # because the plugin's empty? method returns false, preventing END_STREAM from being sent.
-      #
-      # Additionally, the form: option cannot be used with stream: true because:
-      # 1. request.close calls self << "" to signal end of stream
-      # 2. This requires @body to implement << method
-      # 3. But Form::Encoder and Multipart::Encoder don't implement <<
-      #
-      # Solution: Manually encode form data and pass as body: [encoded_string]
-      def perform_streaming_request(path, form:)
-        body, content_type = encode_form_for_stream(form)
-        request = connection.build_request(
-          "POST",
-          path,
-          headers: { "content-type" => content_type },
-          body: [body],
-          stream: true
-        )
-        request.close # Signal end of request body to send END_STREAM flag
-        response = connection.request(request, stream: true)
-        raise response.error if response.is_a?(HTTPX::ErrorResponse)
+      # Executes an HTTP POST request using build_request pattern.
+      # For streaming requests, calls request.close to send END_STREAM flag.
+      def execute_http_request(path, form: nil, json: nil, stream: false)
+        body, content_type = encode_request_body(form: form, json: json)
 
-        response
+        request_options = {
+          headers: { "content-type" => content_type },
+          body: body
+        }
+        request_options[:stream] = true if stream
+
+        request = connection.build_request("POST", path, **request_options)
+        request.close if stream # Signal end of request body to send END_STREAM flag
+
+        connection.request(request)
       end
 
-      # Encodes form data for use with stream_bidi plugin.
-      # Automatically detects if form contains files and uses appropriate encoding.
-      def encode_form_for_stream(form_data)
-        encoder = if HTTPX::Transcoder::Multipart.multipart?(form_data)
-                    HTTPX::Transcoder::Multipart.encode(form_data)
-                  else
-                    HTTPX::Transcoder::Form.encode(form_data)
-                  end
-        [encoder.to_s, encoder.content_type]
+      # Encodes request body for use with build_request.
+      # Supports both form data (with automatic multipart detection) and JSON data.
+      def encode_request_body(form: nil, json: nil)
+        if form
+          encoder = if HTTPX::Transcoder::Multipart.multipart?(form)
+                      HTTPX::Transcoder::Multipart.encode(form)
+                    else
+                      HTTPX::Transcoder::Form.encode(form)
+                    end
+          [encoder.to_s, encoder.content_type]
+        elsif json
+          [JSON.generate(json), "application/json"]
+        else
+          raise ArgumentError, "Either form: or json: must be provided"
+        end
       end
 
       def form_with_code(js_code, send_bundle)

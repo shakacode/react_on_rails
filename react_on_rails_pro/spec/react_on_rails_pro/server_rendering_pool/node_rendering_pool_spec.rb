@@ -18,8 +18,7 @@ module ReactOnRailsPro
         allow(ReactOnRailsPro::ServerRenderingPool::ProRendering)
           .to receive(:set_request_digest_on_render_options)
         allow(ReactOnRailsPro.configuration).to receive(:enable_rsc_support).and_return(false)
-        allow(described_class).to receive(:server_bundle_hash).and_return("server123")
-        allow(described_class).to receive(:rsc_bundle_hash).and_return("rsc456")
+        allow(described_class).to receive_messages(server_bundle_hash: "server123", rsc_bundle_hash: "rsc456")
       end
 
       describe ".prepare_incremental_render_path" do

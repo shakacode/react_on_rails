@@ -135,12 +135,10 @@ describe ReactOnRailsPro::Request do
       expect(first_request_info[:request].body.to_s).not_to include("bundle")
 
       # The bundle should be sent via the /upload-assets endpoint
-      upload_request_body = upload_request_info[:request].body.instance_variable_get(:@body)
-      upload_request_form = upload_request_body.instance_variable_get(:@form)
+      upload_request_body = upload_request_info[:request].body.to_s
 
-      expect(upload_request_form).to have_key("bundle_server_bundle.js")
-      expect(upload_request_form["bundle_server_bundle.js"][:body]).to be_a(FakeFS::Pathname)
-      expect(upload_request_form["bundle_server_bundle.js"][:body].to_s).to eq(server_bundle_path)
+      expect(upload_request_body).to include("bundle_server_bundle.js")
+      expect(upload_request_body).to include('console.log("mock bundle");')
 
       # Second render request should also not have a bundle
       expect(second_request_info[:request].body.to_s).to include("renderingRequest=console.log")
@@ -176,12 +174,10 @@ describe ReactOnRailsPro::Request do
       expect(first_request_info[:request].body.to_s).not_to include("bundle")
 
       # The bundle should be sent via the /upload-assets endpoint
-      upload_request_body = upload_request_info[:request].body.instance_variable_get(:@body)
-      upload_request_form = upload_request_body.instance_variable_get(:@form)
+      upload_request_body = upload_request_info[:request].body.to_s
 
-      expect(upload_request_form).to have_key("bundle_server_bundle.js")
-      expect(upload_request_form["bundle_server_bundle.js"][:body]).to be_a(FakeFS::Pathname)
-      expect(upload_request_form["bundle_server_bundle.js"][:body].to_s).to eq(server_bundle_path)
+      expect(upload_request_body).to include("bundle_server_bundle.js")
+      expect(upload_request_body).to include('console.log("mock bundle");')
 
       # Second render request should also not have a bundle
       expect(second_request_info[:request].body.to_s).to include("renderingRequest=console.log")
