@@ -4,7 +4,7 @@
 
 Building webpack bundles is often time-consuming, and the same bundles are built many times.
 For example, you might build the production bundles during CI, then for a Review app, then
-for Staging, and maybe even for Production. Or you might want to deploy a small Ruby only
+for Staging, and maybe even for Production. Or you might want to deploy a small Ruby-only
 change to production, but you will have to wait minutes for your bundles to be built again.
 
 ## Solution
@@ -97,7 +97,7 @@ The goal is that Ruby only changes that don't affect your webpack bundles don't 
 
 ### 3. Remove any call to rake task `react_on_rails_pro:pre_stage_bundle_for_node_renderer`
 
-This task is called automaticaly if you're using bundle caching.
+This task is called automatically if you're using bundle caching.
 
 ```ruby
   Rake::Task['react_on_rails_pro:pre_stage_bundle_for_node_renderer'].invoke

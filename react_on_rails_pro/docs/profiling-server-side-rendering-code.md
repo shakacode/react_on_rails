@@ -100,7 +100,7 @@ To see the renderer behavior while there are many requests coming to it, you can
    ab -n 100 -c 10 http://localhost:3000/
    ```
 
-1. Now, we you open the noder-renderer profile, you will see it very busy responding to all requests
+1. Now, when you open the node-renderer profile, you will see it very busy responding to all requests
 
    ![Busy renderer profile](https://github.com/shakacode/react_on_rails_pro/assets/7099193/2ce69bf2-45ee-4a9d-af33-37e20aed86bc)
 
