@@ -72,9 +72,58 @@ ReactOnRailsPro.configure do |config|
 end
 ```
 
-# Node Package Installation
+# Client Package Installation
 
-**Note:** You only need to install the Node Package if you are using the standalone node renderer (`NodeRenderer`). If you're using `ExecJS` (the default), skip this section.
+All React on Rails Pro users need to install the `react-on-rails-pro` npm package for client-side React integration.
+
+## Install react-on-rails-pro
+
+### Using npm:
+
+```bash
+npm install react-on-rails-pro
+```
+
+### Using yarn:
+
+```bash
+yarn add react-on-rails-pro
+```
+
+### Using pnpm:
+
+```bash
+pnpm add react-on-rails-pro
+```
+
+## Usage
+
+**Important:** Import from `react-on-rails-pro`, not `react-on-rails`. The Pro package re-exports everything from the core package plus Pro-exclusive features.
+
+```javascript
+// Correct - use react-on-rails-pro
+import ReactOnRails from 'react-on-rails-pro';
+
+// Register components
+ReactOnRails.register({ MyComponent });
+```
+
+Pro-exclusive imports:
+
+```javascript
+// React Server Components
+import { RSCRoute } from 'react-on-rails-pro/RSCRoute';
+import registerServerComponent from 'react-on-rails-pro/registerServerComponent/client';
+
+// Async component loading
+import { wrapServerComponentRenderer } from 'react-on-rails-pro/wrapServerComponentRenderer/client';
+```
+
+See the [React Server Components documentation](./react-server-components/index.md) for detailed usage.
+
+# Node Renderer Installation
+
+**Note:** You only need to install the Node Renderer if you are using the standalone node renderer (`NodeRenderer`). If you're using `ExecJS` (the default), skip this section.
 
 ## Install react-on-rails-pro-node-renderer
 

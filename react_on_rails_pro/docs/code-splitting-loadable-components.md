@@ -167,7 +167,7 @@ So, hydration will be fired only after all necessary chunks preloads. In this ex
 
 ```js
 import React from 'react';
-import ReactOnRails from 'react-on-rails';
+import ReactOnRails from 'react-on-rails-pro';
 import { hydrateRoot } from 'react-dom/client';
 import { loadableReady } from '@loadable/component';
 import App from './App';
@@ -191,7 +191,7 @@ style tags to the Rails view. In this example below, `ServerApp` is registering 
 
 ```js
 import React from 'react';
-import ReactOnRails from 'react-on-rails';
+import ReactOnRails from 'react-on-rails-pro';
 import { ChunkExtractor } from '@loadable/server';
 import App from './App';
 import path from 'path';

@@ -1,4 +1,3 @@
-
 # Using React Server Components Inside Client Components
 
 React on Rails now supports rendering React Server Components (RSC) directly inside React Client Components. This guide explains how to use this feature effectively in your applications.
@@ -33,7 +32,7 @@ Now, you can render server components directly inside client components using th
 
 ```tsx
 'use client';
-import RSCRoute from 'react-on-rails/RSCRoute';
+import RSCRoute from 'react-on-rails-pro/RSCRoute';
 
 export default function ClientComponent() {
   return (
@@ -52,13 +51,13 @@ Register your server components in your Server and RSC bundles:
 
 ```tsx
 // packs/server_bundle.tsx
-import registerServerComponent from 'react-on-rails/registerServerComponent/server.rsc';
+import registerServerComponent from 'react-on-rails-pro/registerServerComponent/server';
 import MyServerComponent from './components/MyServerComponent';
 import AnotherServerComponent from './components/AnotherServerComponent';
 
 registerServerComponent({
   MyServerComponent,
-  AnotherServerComponent
+  AnotherServerComponent,
 });
 ```
 
@@ -73,7 +72,7 @@ Create a client component that uses `RSCRoute` to render server components:
 // components/MyClientComponent.tsx
 'use client';
 import { useState } from 'react';
-import RSCRoute from 'react-on-rails/RSCRoute';
+import RSCRoute from 'react-on-rails-pro/RSCRoute';
 
 export default function MyClientComponent({ user }) {
   return (
@@ -90,31 +89,33 @@ export default function MyClientComponent({ user }) {
 Create client and server versions of your component wrapped with `wrapServerComponentRenderer`:
 
 #### Client version:
+
 ```tsx
 // components/MyClientComponent.client.tsx
 'use client';
-import ReactOnRails from 'react-on-rails';
-import wrapServerComponentRenderer from 'react-on-rails/wrapServerComponentRenderer/client';
+import ReactOnRails from 'react-on-rails-pro';
+import wrapServerComponentRenderer from 'react-on-rails-pro/wrapServerComponentRenderer/client';
 import MyClientComponent from './MyClientComponent';
 
 const WrappedComponent = wrapServerComponentRenderer(MyClientComponent);
 
 ReactOnRails.register({
-  MyClientComponent: WrappedComponent
+  MyClientComponent: WrappedComponent,
 });
 ```
 
 #### Server version:
+
 ```tsx
 // components/MyClientComponent.server.tsx
-import ReactOnRails from 'react-on-rails';
-import wrapServerComponentRenderer from 'react-on-rails/wrapServerComponentRenderer/server';
+import ReactOnRails from 'react-on-rails-pro';
+import wrapServerComponentRenderer from 'react-on-rails-pro/wrapServerComponentRenderer/server';
 import MyClientComponent from './MyClientComponent';
 
 const WrappedComponent = wrapServerComponentRenderer(MyClientComponent);
 
 ReactOnRails.register({
-  MyClientComponent: WrappedComponent
+  MyClientComponent: WrappedComponent,
 });
 ```
 
@@ -134,7 +135,7 @@ ReactOnRails.register({
 ```tsx
 'use client';
 import { useState } from 'react';
-import RSCRoute from 'react-on-rails/RSCRoute';
+import RSCRoute from 'react-on-rails-pro/RSCRoute';
 
 export default function ClientComponent() {
   const [count, setCount] = useState(0);
@@ -158,7 +159,7 @@ export default function ClientComponent() {
 ```tsx
 'use client';
 import { Routes, Route, Link } from 'react-router-dom';
-import RSCRoute from 'react-on-rails/RSCRoute';
+import RSCRoute from 'react-on-rails-pro/RSCRoute';
 import AnotherClientComponent from './AnotherClientComponent';
 
 export default function AppRouter({ user }) {
@@ -190,7 +191,7 @@ The framework supports nesting client and server components to arbitrary depth:
 ```tsx
 'use client';
 import { Routes, Route } from 'react-router-dom';
-import RSCRoute from 'react-on-rails/RSCRoute';
+import RSCRoute from 'react-on-rails-pro/RSCRoute';
 import ServerRouteLayout from './ServerRouteLayout';
 import ClientRouteLayout from './ClientRouteLayout';
 
@@ -276,7 +277,7 @@ When using server components inside client components:
 ```tsx
 'use client';
 import { Suspense } from 'react';
-import RSCRoute from 'react-on-rails/RSCRoute';
+import RSCRoute from 'react-on-rails-pro/RSCRoute';
 
 export default function ClientComponent({ user }) {
   return (
@@ -295,17 +296,17 @@ export default function ClientComponent({ user }) {
 'use client';
 import { useState } from 'react';
 import { Suspense } from 'react';
-import RSCRoute from 'react-on-rails/RSCRoute';
+import RSCRoute from 'react-on-rails-pro/RSCRoute';
 
 export default function ClientComponent({ user }) {
   const [showServerComponent, setShowServerComponent] = useState(false);
-  
+
   return (
     <div>
       <button onClick={() => setShowServerComponent(!showServerComponent)}>
         {showServerComponent ? 'Hide' : 'Show'} Server Component
       </button>
-      
+
       {showServerComponent && (
         <Suspense fallback={<div>Loading...</div>}>
           <RSCRoute componentName="ServerComponent" componentProps={{ user }} />
