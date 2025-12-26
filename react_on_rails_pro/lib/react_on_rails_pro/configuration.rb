@@ -76,7 +76,7 @@ module ReactOnRailsPro
                   :profile_server_rendering_js_code, :raise_non_shell_server_rendering_errors, :enable_rsc_support,
                   :rsc_payload_generation_url_path, :rsc_bundle_js_file, :react_client_manifest_file,
                   :react_server_client_manifest_file,
-                  :auto_refresh_license, :license_api_url
+                  :auto_refresh_license
 
     attr_reader :concurrent_component_streaming_buffer_size
 
@@ -210,6 +210,21 @@ module ReactOnRailsPro
     # Note: Environment variable REACT_ON_RAILS_PRO_LICENSE_KEY takes precedence.
     # @param value [String] The license key
     attr_writer :license_key
+
+    # Returns the license API URL for fetching renewed tokens.
+    # Checks environment variable first, then falls back to configured value.
+    # @return [String] The license API URL
+    def license_api_url
+      url = ENV.fetch("REACT_ON_RAILS_PRO_LICENSE_API_URL", nil)
+      return url if url.present?
+
+      @license_api_url || DEFAULT_LICENSE_API_URL
+    end
+
+    # Sets the license API URL.
+    # Note: Environment variable REACT_ON_RAILS_PRO_LICENSE_API_URL takes precedence.
+    # @param value [String] The license API URL
+    attr_writer :license_api_url
 
     # Checks if automatic license refresh is enabled and properly configured.
     # Auto-refresh requires both:

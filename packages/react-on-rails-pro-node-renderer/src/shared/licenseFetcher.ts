@@ -77,7 +77,7 @@ export async function fetchLicense(): Promise<LicenseResponse | null> {
   const url = `${apiUrl}/api/license`;
 
   try {
-    const data = await retry(
+    const data = await retry<LicenseResponse>(
       async (bail) => {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -110,8 +110,9 @@ export async function fetchLicense(): Promise<LicenseResponse | null> {
       {
         retries: MAX_RETRIES,
         minTimeout: RETRY_MIN_TIMEOUT_MS,
-        onRetry: (error, attempt) => {
-          console.warn(`[React on Rails Pro] License fetch attempt ${attempt} failed: ${error.message}`);
+        onRetry: (error: unknown, attempt: number) => {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          console.warn(`[React on Rails Pro] License fetch attempt ${attempt} failed: ${errorMessage}`);
         },
       },
     );
