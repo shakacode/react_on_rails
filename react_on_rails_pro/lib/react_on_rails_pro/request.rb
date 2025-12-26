@@ -35,7 +35,7 @@ module ReactOnRailsPro
           end
 
           form = form_with_code(js_code, false)
-          perform_request(path, form: form, stream: true)
+          perform_streaming_request(path, form: form)
         end
       end
 
@@ -128,11 +128,9 @@ module ReactOnRailsPro
 
       private
 
-      # rubocop:disable Naming/MemoizedInstanceVariableName
       def connection
         @connection ||= create_connection
       end
-      # rubocop:enable Naming/MemoizedInstanceVariableName
 
       def perform_request(path, **post_options) # rubocop:disable Metrics/AbcSize,Metrics/CyclomaticComplexity
         available_retries = ReactOnRailsPro.configuration.renderer_request_retry_limit
@@ -179,6 +177,43 @@ module ReactOnRailsPro
         end
 
         response
+      end
+
+      # Performs a streaming POST request using the build_request pattern.
+      # When stream_bidi plugin is loaded, using connection.post with stream: true causes timeouts
+      # because the plugin's empty? method returns false, preventing END_STREAM from being sent.
+      #
+      # Additionally, the form: option cannot be used with stream: true because:
+      # 1. request.close calls self << "" to signal end of stream
+      # 2. This requires @body to implement << method
+      # 3. But Form::Encoder and Multipart::Encoder don't implement <<
+      #
+      # Solution: Manually encode form data and pass as body: [encoded_string]
+      def perform_streaming_request(path, form:)
+        body, content_type = encode_form_for_stream(form)
+        request = connection.build_request(
+          "POST",
+          path,
+          headers: { "content-type" => content_type },
+          body: [body],
+          stream: true
+        )
+        request.close # Signal end of request body to send END_STREAM flag
+        response = connection.request(request, stream: true)
+        raise response.error if response.is_a?(HTTPX::ErrorResponse)
+
+        response
+      end
+
+      # Encodes form data for use with stream_bidi plugin.
+      # Automatically detects if form contains files and uses appropriate encoding.
+      def encode_form_for_stream(form_data)
+        encoder = if HTTPX::Transcoder::Multipart.multipart?(form_data)
+                    HTTPX::Transcoder::Multipart.encode(form_data)
+                  else
+                    HTTPX::Transcoder::Form.encode(form_data)
+                  end
+        [encoder.to_s, encoder.content_type]
       end
 
       def form_with_code(js_code, send_bundle)
