@@ -5,8 +5,6 @@
  * @module shared/licenseFetcher
  */
 
-import retry from 'async-retry';
-
 const REQUEST_TIMEOUT_MS = 5000;
 const MAX_RETRIES = 2;
 const RETRY_MIN_TIMEOUT_MS = 1000;
@@ -18,14 +16,58 @@ export interface LicenseResponse {
 }
 
 /**
- * Error thrown when authentication fails (401/403).
- * Used to signal that retries should be aborted.
+ * Error thrown to abort retry attempts immediately.
+ * Used for errors that shouldn't be retried (e.g., authentication failures).
  */
-class UnauthorizedError extends Error {
-  constructor() {
-    super('unauthorized');
-    this.name = 'UnauthorizedError';
+class AbortRetryError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AbortRetryError';
   }
+}
+
+/**
+ * Simple retry utility that retries a function with delays between attempts.
+ * Designed to clean up properly and avoid Jest timer issues.
+ */
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  options: {
+    retries: number;
+    minTimeout: number;
+    onFailedAttempt?: (error: Error, attemptNumber: number) => void;
+  },
+): Promise<T> {
+  const { retries, minTimeout, onFailedAttempt } = options;
+  let lastError: Error = new Error('withRetry: no attempts made');
+
+  for (let attempt = 1; attempt <= retries + 1; attempt += 1) {
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      return await fn();
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      // AbortRetryError means stop immediately, no more retries
+      if (error instanceof AbortRetryError) {
+        throw error;
+      }
+
+      // Call the callback for non-abort errors
+      onFailedAttempt?.(lastError, attempt);
+
+      // If we have retries left, wait before the next attempt
+      if (attempt <= retries) {
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, minTimeout);
+        });
+      }
+    }
+  }
+
+  // All retries exhausted
+  throw lastError;
 }
 
 /**
@@ -77,8 +119,8 @@ export async function fetchLicense(): Promise<LicenseResponse | null> {
   const url = `${apiUrl}/api/license`;
 
   try {
-    const data = await retry<LicenseResponse>(
-      async (bail) => {
+    const data = await withRetry<LicenseResponse>(
+      async () => {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
@@ -93,9 +135,8 @@ export async function fetchLicense(): Promise<LicenseResponse | null> {
           });
 
           if (response.status === 401 || response.status === 403) {
-            // Don't retry auth errors - bail immediately
-            bail(new UnauthorizedError());
-            throw new UnauthorizedError(); // TypeScript needs this
+            // Don't retry auth errors - abort immediately
+            throw new AbortRetryError('unauthorized');
           }
 
           if (response.status !== 200) {
@@ -110,9 +151,14 @@ export async function fetchLicense(): Promise<LicenseResponse | null> {
       {
         retries: MAX_RETRIES,
         minTimeout: RETRY_MIN_TIMEOUT_MS,
-        onRetry: (error: unknown, attempt: number) => {
-          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-          console.warn(`[React on Rails Pro] License fetch attempt ${attempt} failed: ${errorMessage}`);
+        onFailedAttempt: (error: Error, attemptNumber: number) => {
+          // AbortRetryError means we're stopping retries intentionally, don't log
+          if (error instanceof AbortRetryError) {
+            return;
+          }
+          console.warn(
+            `[React on Rails Pro] License fetch attempt ${attemptNumber} failed: ${error.message}`,
+          );
         },
       },
     );
@@ -120,7 +166,7 @@ export async function fetchLicense(): Promise<LicenseResponse | null> {
     console.log('[React on Rails Pro] License fetched successfully');
     return data;
   } catch (error) {
-    if (error instanceof UnauthorizedError) {
+    if (error instanceof AbortRetryError) {
       console.warn('[React on Rails Pro] License fetch failed: unauthorized');
     } else {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

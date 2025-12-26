@@ -4,8 +4,6 @@ describe('LicenseFetcher', () => {
   let fetchSpy: jest.SpyInstance;
 
   beforeEach(() => {
-    jest.restoreAllMocks();
-
     delete process.env.REACT_ON_RAILS_PRO_LICENSE_KEY;
     delete process.env.REACT_ON_RAILS_PRO_AUTO_REFRESH_LICENSE;
     delete process.env.REACT_ON_RAILS_PRO_LICENSE_API_URL;
@@ -16,12 +14,8 @@ describe('LicenseFetcher', () => {
   });
 
   afterEach(() => {
-    // Clear any pending retry timers to prevent "Cannot log after tests are done" errors.
-    // This is safe to call regardless of whether fake timers are active (no-op with real timers).
-    // See: https://github.com/jestjs/jest/issues/10487
     jest.clearAllTimers();
     jest.useRealTimers();
-    jest.restoreAllMocks();
   });
 
   describe('isAutoRefreshEnabled', () => {
