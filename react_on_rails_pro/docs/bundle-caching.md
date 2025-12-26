@@ -1,16 +1,19 @@
 # Bundle Caching
 
 ## Why?
+
 Building webpack bundles is often time-consuming, and the same bundles are built many times.
 For example, you might build the production bundles during CI, then for a Review app, then
 for Staging, and maybe even for Production. Or you might want to deploy a small Ruby only
 change to production, but you will have to wait minutes for your bundles to be built again.
 
 ## Solution
+
 React on Rails 2.1.0 introduces bundle caching based on a digest of all the source files, defined
 in the `config/shakapacker.yml` file, plus other files defined with `config.dependency_globs` and
 excluding any files from `config.excluded_dependency_globs`. Creating this hash key takes at most a
-few seconds for even large projects. Additionally, the cache key includes 
+few seconds for even large projects. Additionally, the cache key includes
+
 1. NODE_ENV
 2. Version of React on Rails Pro
 3. Configurable additional env values by supplying an array in method cache_keys on the `remote_bundle_cache_adapter`. See examples below.
@@ -18,6 +21,7 @@ few seconds for even large projects. Additionally, the cache key includes
 This cache key is used for saving files to some remote storage, typically S3.
 
 ## Bonus for local development with multiple directories building production builds
+
 Bundle caching can help save time if you have multiple directories for the same repository.
 
 The bundles are cached in `Rails.root.join('tmp', 'bundle_cache')`
@@ -32,6 +36,7 @@ ln -s ../../my_project/tmp/bundle_cache
 ## Configuration
 
 ### 1. React on Rails Configuration
+
 First, we need to tell React on Rails to use a custom build module. In
 `config/initializers/react_on_rails`, set this value:
 
@@ -49,7 +54,7 @@ ReactOnRails.configure do |config|
 end
 ```
 
-And define it like this:   
+And define it like this:
 
 ```ruby
 module CustomBuildCommand
@@ -61,6 +66,7 @@ end
 ```
 
 ### 2. React on Rails Pro Configuration
+
 Next, we need to configure the `config/initializers/react_on_rails_pro.rb` with some module,
 say called S3BundleCacheAdapter.
 
@@ -79,21 +85,26 @@ cached_react_component and cached_react_component_hash, add those as well to `co
 To simplify your configuration, entire directories can be added to `config.dependency_globs` & then any irrelevant files or subdirectories can be added to `config.excluded_dependency_globs`
 
 For example:
+
 ```ruby
   config.dependency_globs = [ File.join(Rails.root, "app", "views", "**", "*.jbuilder") ]
   config.excluded_dependency_globs = [ File.join(Rails.root, "app", "views", "**", "dont_hash_this.jbuilder") ]
 ```
+
 will hash all files in `app/views` that have the `jbuilder` extension except for any file named `dont_hash_this.jbuilder`.
 
 The goal is that Ruby only changes that don't affect your webpack bundles don't change the cache keys, and anything that could affect the bundles MUST change the cache keys!
 
 ### 3. Remove any call to rake task `react_on_rails_pro:pre_stage_bundle_for_node_renderer`
+
 This task is called automaticaly if you're using bundle caching.
+
 ```ruby
   Rake::Task['react_on_rails_pro:pre_stage_bundle_for_node_renderer'].invoke
 ```
 
 #### Custom ENV cache keys
+
 Check your webpack config for the webpack.DefinePlugin. That allows JS code to use
 `process.env.MY_ENV_VAR` resulting in bundles that differ depending on the ENV value set.
 
@@ -115,12 +126,14 @@ Another use of the ENV values would be a cache version, so incrementing this ENV
 would force a new cache value.
 
 ## Disabling via an ENV value
+
 Once configured for bundle caching, ReactOnRailsPro::AssetsPrecompile's caching functionality
 can be disabled by setting ENV["DISABLE_PRECOMPILE_CACHE"] equal to "true"
 
 ### Examples of `remote_bundle_cache_adapter`:
 
 #### S3BundleCacheAdapter
+
 Example of a module for custom methods for the `remote_bundle_cache_adapter`.
 
 Note, S3UploadService is your own code that fetches and uploads.
@@ -140,7 +153,7 @@ class S3BundleCacheAdapter
   def self.cache_keys
     [Rails.env, ENV['SOME_ENV_VALUE']]
   end
-  
+
   # return value is unused
   # This command should build the bundles
   def self.build
@@ -153,8 +166,8 @@ class S3BundleCacheAdapter
     result = S3UploadService.new.fetch_object(zipped_bundles_filename)
     result.get.body.read if result
   end
-  
-  # Optional: method to return an array of extra files paths, that require caching. 
+
+  # Optional: method to return an array of extra files paths, that require caching.
   # These files get placed at the `extra_files` directory at the top of the zipfile
   # and are moved to the original places after unzipping the bundles.
   def self.extra_files_to_cache
@@ -180,6 +193,7 @@ end
 ```
 
 #### LocalBundleCacheAdapter
+
 Example of a module for custom methods for the `remote_bundle_cache_adapter` that does not save files
 remotely. Only local files are used.
 
@@ -189,7 +203,7 @@ class LocalBundleCacheAdapter
     # if no additional cache keys, return an empty array
     []
   end
-  
+
   def self.build
     Rake.sh(ReactOnRails::Utils.prepend_cd_node_modules_directory('yarn start build.prod').to_s)
   end

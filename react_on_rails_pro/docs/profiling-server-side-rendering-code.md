@@ -7,53 +7,53 @@ This guide uses the RORP dummy app in profiling the server-side code.
 ## Profiling Server-Side Code Running On Node Renderer
 
 1. Run node-renderer using the `--inspect` node option.
-    
-    Open the `spec/dummy/Procfile.dev` file and update the `node-renderer` process to run the renderer using `node --inspect` command. Change the following line
-    
-    ```bash
-    node-renderer: RENDERER_LOG_LEVEL=debug yarn run node-renderer
-    ```
-    
-    To
-    
-    ```bash
-    node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node --inspect client/node-renderer.js
-    ```
+
+   Open the `spec/dummy/Procfile.dev` file and update the `node-renderer` process to run the renderer using `node --inspect` command. Change the following line
+
+   ```bash
+   node-renderer: RENDERER_LOG_LEVEL=debug yarn run node-renderer
+   ```
+
+   To
+
+   ```bash
+   node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node --inspect client/node-renderer.js
+   ```
 
 1. Run the App
-    
-    ```bash
-    bin/dev
-    ```
+
+   ```bash
+   bin/dev
+   ```
 
 1. Visit `chrome://inspect` on Chrome browser and you should see something like this:
-    
-    ![Chrome Inspect Tab](https://github.com/shakacode/react_on_rails_pro/assets/7099193/2a64660f-9381-4bbb-b385-318aa833389d)
+
+   ![Chrome Inspect Tab](https://github.com/shakacode/react_on_rails_pro/assets/7099193/2a64660f-9381-4bbb-b385-318aa833389d)
 
 1. Click the `inspect` link. This should open a developer tools window. Open the performance tab there
-    
-    ![Chrome Performance Tab](https://github.com/shakacode/react_on_rails_pro/assets/7099193/ddf572bd-182f-4911-bb8f-4bafa4ec1034)
+
+   ![Chrome Performance Tab](https://github.com/shakacode/react_on_rails_pro/assets/7099193/ddf572bd-182f-4911-bb8f-4bafa4ec1034)
 
 1. Click the `record` button
-    
-    ![Chrome Performance Tab](https://github.com/shakacode/react_on_rails_pro/assets/7099193/20848091-d446-4690-988b-09db59ddf9e0)
+
+   ![Chrome Performance Tab](https://github.com/shakacode/react_on_rails_pro/assets/7099193/20848091-d446-4690-988b-09db59ddf9e0)
 
 1. Open the web app you want to test and refresh it multiple times. We use the React on Rails Pro dummy app for this tutorial. So, we will open it in the browser by going to [http://localhost:3000](http://localhost:3000)
-    
-    ![RORP Dummy App](https://github.com/shakacode/react_on_rails_pro/assets/7099193/8dc1ef3d-62e4-492d-a5b4-c693b7f7e08c)
+
+   ![RORP Dummy App](https://github.com/shakacode/react_on_rails_pro/assets/7099193/8dc1ef3d-62e4-492d-a5b4-c693b7f7e08c)
 
 1. If you get any `Timeout Error` while visiting the page, you may need to increase the `ssr_timeout` in the Ruby on Rails initializer file. **Running node-renderer** using the `--inspect` flag makes it slower. So, you can increase the `ssr_timeout` to `10 seconds` by adding the following line to `config/initializers/react_on_rails_pro.rb` file
-    
-    ```ruby
-    config.ssr_timeout = 10
-    ```
+
+   ```ruby
+   config.ssr_timeout = 10
+   ```
 
 1. Stop performance recording
-    
-    ![Running profiler at the performance tab](https://github.com/shakacode/react_on_rails_pro/assets/7099193/bc02bbd6-3358-4edf-ba3a-36e11620a096)
+
+   ![Running profiler at the performance tab](https://github.com/shakacode/react_on_rails_pro/assets/7099193/bc02bbd6-3358-4edf-ba3a-36e11620a096)
 
 1. You should see something like this
-   
+
    ![Recorded Node JS profile](https://github.com/shakacode/react_on_rails_pro/assets/7099193/6dc098bb-9f07-49be-9a1f-2149f6712631)
 
 ## Profile Analysis
@@ -89,24 +89,25 @@ config.prerender_caching = false
 To see the renderer behavior while there are many requests coming to it, you can use the `ApacheBench (ab)` tool that lets you make many HTTP requests to a specific end points at the same time.
 
 1. The `ApacheBench (ab)` is installed on macOS by default. You can install it on Linux by running the following command
-    
-    ```bash
-    sudo apt-get install apache2-utils 
-    ```
+
+   ```bash
+   sudo apt-get install apache2-utils
+   ```
 
 1. Do all steps in `Profiling Server-Side Code Running On Node Renderer` section except the step number 6. Instead of opening the page in the browser, let the `ab` tool make many HTTP requests for you by running the following command.
-    
-    ```bash
-    ab -n 100 -c 10 http://localhost:3000/
-    ```
+
+   ```bash
+   ab -n 100 -c 10 http://localhost:3000/
+   ```
 
 1. Now, we you open the noder-renderer profile, you will see it very busy responding to all requests
-    
-    ![Busy renderer profile](https://github.com/shakacode/react_on_rails_pro/assets/7099193/2ce69bf2-45ee-4a9d-af33-37e20aed86bc)
+
+   ![Busy renderer profile](https://github.com/shakacode/react_on_rails_pro/assets/7099193/2ce69bf2-45ee-4a9d-af33-37e20aed86bc)
 
 1. Then, you can analyze the renderer behavior of each request as stated in `Profile Analysis` section.
 
 ### ExecJS
+
 React on Rails Pro supports profiling with ExecJS starting from version **4.0.0**. You will need to do more work to profile ExecJS if you are using an older version.
 
 If you are using **v4.0.0** or later, you can enable the profiler by setting the `profile_server_rendering_js_code` config by adding the following line to the ReactOnRails initializer.

@@ -3,6 +3,7 @@
 Before reading this document, please read the [Create React Server Component without SSR](./create-without-ssr.md) document.
 
 ## Make the React Server Component Page Progressively Load
+
 React Server Components support progressive loading, which means they can be built as asynchronous functions that resolve and render after the initial HTML is sent to the client. This enables a better user experience by:
 
 1. Showing initial content quickly while async data loads;
@@ -162,7 +163,6 @@ The `ToggleContainer` is marked with [`'use client'`](https://react.dev/referenc
 It's important to note that while client components (like `ToggleContainer`) cannot directly import server components, they can receive server components as props (like children in this case). This is why we can pass the server-rendered image element as a child to our client-side `ToggleContainer` component. This pattern allows for flexible composition while maintaining the boundaries between server and client code.
 
 This pattern allows us to optimize performance by keeping most of the component logic on the server while selectively adding interactivity where needed on the client.
-
 
 ## Checking The Network Requests
 

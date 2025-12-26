@@ -1,4 +1,3 @@
-
 # Using React Server Components Inside Client Components
 
 React on Rails now supports rendering React Server Components (RSC) directly inside React Client Components. This guide explains how to use this feature effectively in your applications.
@@ -58,7 +57,7 @@ import AnotherServerComponent from './components/AnotherServerComponent';
 
 registerServerComponent({
   MyServerComponent,
-  AnotherServerComponent
+  AnotherServerComponent,
 });
 ```
 
@@ -90,6 +89,7 @@ export default function MyClientComponent({ user }) {
 Create client and server versions of your component wrapped with `wrapServerComponentRenderer`:
 
 #### Client version:
+
 ```tsx
 // components/MyClientComponent.client.tsx
 'use client';
@@ -100,11 +100,12 @@ import MyClientComponent from './MyClientComponent';
 const WrappedComponent = wrapServerComponentRenderer(MyClientComponent);
 
 ReactOnRails.register({
-  MyClientComponent: WrappedComponent
+  MyClientComponent: WrappedComponent,
 });
 ```
 
 #### Server version:
+
 ```tsx
 // components/MyClientComponent.server.tsx
 import ReactOnRails from 'react-on-rails';
@@ -114,7 +115,7 @@ import MyClientComponent from './MyClientComponent';
 const WrappedComponent = wrapServerComponentRenderer(MyClientComponent);
 
 ReactOnRails.register({
-  MyClientComponent: WrappedComponent
+  MyClientComponent: WrappedComponent,
 });
 ```
 
@@ -299,13 +300,13 @@ import RSCRoute from 'react-on-rails/RSCRoute';
 
 export default function ClientComponent({ user }) {
   const [showServerComponent, setShowServerComponent] = useState(false);
-  
+
   return (
     <div>
       <button onClick={() => setShowServerComponent(!showServerComponent)}>
         {showServerComponent ? 'Hide' : 'Show'} Server Component
       </button>
-      
+
       {showServerComponent && (
         <Suspense fallback={<div>Loading...</div>}>
           <RSCRoute componentName="ServerComponent" componentProps={{ user }} />

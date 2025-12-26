@@ -112,7 +112,6 @@ end
 
 You can test your application by running `rails server` and navigating to the appropriate route.
 
-
 6. **What Happens During Streaming**
 
 When a user visits the page, they'll experience the following sequence:
@@ -152,9 +151,7 @@ For example, with our `MyStreamingComponent`, the sequence might be:
 
 <script>
   // This implementation is slightly simplified
-  document.getElementById('s0').replaceChildren(
-    document.getElementById('b0')
-  );
+  document.getElementById('s0').replaceChildren(document.getElementById('b0'));
 </script>
 ```
 
@@ -182,6 +179,7 @@ Streaming SSR is particularly valuable in specific scenarios. Here's when to con
 ### Best Practices for Streaming
 
 1. **Component Structure**
+
    ```jsx
    // Good: Independent sections that can stream separately
    <Layout>

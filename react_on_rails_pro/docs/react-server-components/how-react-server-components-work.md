@@ -30,7 +30,7 @@ export default function HomePage() {
       <Footer />
     </div>
   );
-};
+}
 ```
 
 It replaces all exports of the file with the client references.
@@ -38,26 +38,27 @@ It replaces all exports of the file with the client references.
 > [!NOTE]
 > The code shown below represents internal implementation details of how React Server Components work under the hood. You don't need to understand these details to use React Server Components effectively in your application. This section is included for those interested in the technical implementation.
 
-
 ```js
-import { registerClientReference } from "react-server-dom-webpack/server";
+import { registerClientReference } from 'react-server-dom-webpack/server';
 
 export const Header = registerClientReference(
   function () {
     throw new Error(
-      "Attempted to call Header() from the server but Header is on the client. It's not possible to invoke a client function from the server, it can only be rendered as a Component or passed to props of a Client Component."
+      "Attempted to call Header() from the server but Header is on the client. It's not possible to invoke a client function from the server, it can only be rendered as a Component or passed to props of a Client Component.",
     );
   },
-  "file:///path/to/src/HomePage.jsx",
-  "Header"
+  'file:///path/to/src/HomePage.jsx',
+  'Header',
 );
 
 export default registerClientReference(
-  function() {
-    throw new Error("Attempted to call the default export of file:///path/to/src/HomePage.jsx from the serverbut it's on the client. It's not possible to invoke a client function from the server, it can only be rendered as a Component or passed to props of aClient Component.");
+  function () {
+    throw new Error(
+      "Attempted to call the default export of file:///path/to/src/HomePage.jsx from the serverbut it's on the client. It's not possible to invoke a client function from the server, it can only be rendered as a Component or passed to props of aClient Component.",
+    );
   },
-  "file:///path/to/src/HomePage.jsx",
-  "default"
+  'file:///path/to/src/HomePage.jsx',
+  'default',
 );
 ```
 
@@ -114,10 +115,12 @@ If you want to change the file name of the `react-client-manifest.json` file, yo
 ```js
 const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
 
-config.plugins.push(new RSCWebpackPlugin({
-  isServer: false,
-  clientManifestFilename: 'client-components-webpack-manifest.json',
-}));
+config.plugins.push(
+  new RSCWebpackPlugin({
+    isServer: false,
+    clientManifestFilename: 'client-components-webpack-manifest.json',
+  }),
+);
 ```
 
 And because React on Rails Pro uploads the `react-client-manifest.json` file to the renderer while uploading the server bundle and it expects it to be named `react-client-manifest.json`, you need to tell React on Rails Pro that the name is changed to `client-components-webpack-manifest.json`.
@@ -192,6 +195,7 @@ The interesting part is how the RSC payload references the client components. Le
 ```
 
 The RSC payload references client components by including:
+
 1. The webpack module ID of the client component (e.g. "./app/javascript/components/ToggleContainer.jsx")
 2. The webpack chunk IDs that contain the component code (e.g. ["client25","js/client25.js"])
 3. The export name being referenced (e.g. "default")
@@ -224,9 +228,12 @@ In this case, ensure you pass the correct path to `registerServerComponent` func
 // client/app/packs/client-bundle.js
 import registerServerComponent from 'react-on-rails/registerServerComponent/client';
 
-registerServerComponent({
-  rscPayloadGenerationUrlPath: "flight-payload",
-}, "ReactServerComponentPage")
+registerServerComponent(
+  {
+    rscPayloadGenerationUrlPath: 'flight-payload',
+  },
+  'ReactServerComponentPage',
+);
 ```
 
 Or if you enabled the `auto_load_bundle` option to make React on Rails automatically register react components, you can pass the path to the `rsc_payload_generation_url_path` config in React on Rails Pro configuration.

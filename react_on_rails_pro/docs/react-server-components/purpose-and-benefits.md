@@ -3,6 +3,7 @@
 ## Why RSC with Streaming?
 
 ### Waterfall Loading Pattern Benefits
+
 React Server Components with streaming is beneficial for most applications, but it's especially powerful for applications with waterfall loading patterns where data dependencies chain together. For example, when you need to load a user profile before loading their posts, or fetch categories before products. Here's why:
 
 ### How RSC Fixes Waterfall Server Rendering Issues:
@@ -26,25 +27,26 @@ When a user visits the page, they'll experience the following sequence:
 React Server Components significantly reduce client-side JavaScript by:
 
 1. **Server-Only Code Elimination:**
-    - Dependencies used only in server components never ship to the client
-    - Database queries, API calls, and their libraries stay server-side
-    - Heavy data processing utilities remain on the server
-    - Server-only NPM packages don't impact client bundle
+   - Dependencies used only in server components never ship to the client
+   - Database queries, API calls, and their libraries stay server-side
+   - Heavy data processing utilities remain on the server
+   - Server-only NPM packages don't impact client bundle
 
 2. **Concrete Examples:**
-    - Routing logic can stay server-side
-    - Data fetching libraries (like React Query) are often unnecessary
-    - Large formatting libraries (e.g., date-fns, numeral) can be server-only
-    - Image processing utilities stay on server
-    - Markdown parsers run server-side only
-    - Heavy validation libraries remain server-side
+   - Routing logic can stay server-side
+   - Data fetching libraries (like React Query) are often unnecessary
+   - Large formatting libraries (e.g., date-fns, numeral) can be server-only
+   - Image processing utilities stay on server
+   - Markdown parsers run server-side only
+   - Heavy validation libraries remain server-side
 
 For example, a typical dashboard might see:
+
 ```jsx
 // Before: All code shipped to client
 import { format } from 'date-fns'; // ~30KB
-import { marked } from 'marked';    // ~35KB
-import numeral from 'numeral';      // ~25KB
+import { marked } from 'marked'; // ~35KB
+import numeral from 'numeral'; // ~25KB
 
 // After: With RSC, these imports stay server-side
 // Client bundle reduced by ~90KB
@@ -89,12 +91,14 @@ For example, in a typical page layout:
 ```
 
 With selective hydration:
+
 - Navigation could become interactive while Comments are still loading
 - If user tries to click a Sidebar button, it gets priority hydration
 - Each component hydrates independently when ready
 - No waiting for all components to load before any become interactive
 
 This approach significantly improves the user experience by:
+
 - Reducing Time to Interactive (TTI) for important components
 - Providing faster response to user interactions
 - Maintaining smooth performance even on slower devices or networks
@@ -102,10 +106,10 @@ This approach significantly improves the user experience by:
 
 For a deeper dive into selective hydration, see our [Selective Hydration in Streamed Components](./selective-hydration-in-streamed-components.md) guide.
 
-
 ### Comparison with Other Approaches:
 
 1. **Full Server Rendering:**
+
 - ❌ Delays First Byte until entire page is rendered
 - ❌ All-or-nothing approach to hydration
 - ❌ Must wait for all JavaScript before any interactivity
@@ -113,6 +117,7 @@ For a deeper dive into selective hydration, see our [Selective Hydration in Stre
 - ✅ Complete initial HTML
 
 2. **Client-side Lazy Loading:**
+
 - ❌ Empty initial HTML for lazy components
 - ❌ Must wait for hydration to load
 - ❌ Poor SEO for lazy content
@@ -121,6 +126,7 @@ For a deeper dive into selective hydration, see our [Selective Hydration in Stre
 - ✅ Reduces initial bundle size
 
 3. **RSC with Streaming:**
+
 - ✅ Immediate First Byte
 - ✅ Progressive HTML streaming
 - ✅ SEO-friendly for all content
@@ -132,6 +138,7 @@ For a deeper dive into selective hydration, see our [Selective Hydration in Stre
 ### 1. Enable RSC Support
 
 Add to your Rails initializer, it makes the magic happen 🪄:
+
 ```ruby
 # config/initializers/react_on_rails_pro.rb
 ReactOnRailsPro.configure do |config|
@@ -142,13 +149,14 @@ end
 ### 2. Update Webpack Configuration
 
 Create RSC bundle and make it use the RSC loader:
+
 ```javascript
 // config/webpack/rscWebpackConfig.mjs
 const rscConfig = serverWebpackConfig();
 
 // Configure RSC entry point
 rscConfig.entry = {
-  'rsc-bundle': rscConfig.entry['server-bundle']
+  'rsc-bundle': rscConfig.entry['server-bundle'],
 };
 
 // Add RSC loader
@@ -181,6 +189,7 @@ export default function App() {
 ```
 
 #### 2. Identify Server Component Candidates:
+
 - Data fetching components
 - Non-interactive UI
 - Static content sections
@@ -236,6 +245,7 @@ async function LazyLoadedSection() {
 ```
 
 This migration approach allows you to:
+
 - Maintain existing functionality while migrating
 - Incrementally improve performance
 - Test changes in isolation

@@ -1,7 +1,8 @@
 # Server-side rendering with code-splitting in React on Rails
+
 by ShakaCode
 
-*Last updated June 13, 2019*
+_Last updated June 13, 2019_
 
 # Deprecated
 
@@ -21,14 +22,16 @@ If the project includes server rendering, then you need to exclude the use of dy
 # Dependencies
 
 Install following libraries in client folder:
+
 ```
 yarn add react-loadable webpack-conditional-loader
 ```
 
 - [react-loadable](https://github.com/jamiebuilds/react-loadable) - take cares of loading and correctly displaying our dynamic components.
-- [webpack-conditional-loader](https://www.npmjs.com/package/webpack-conditional-loader) - allow us conditionally extract parts of our code into different bundles. 
+- [webpack-conditional-loader](https://www.npmjs.com/package/webpack-conditional-loader) - allow us conditionally extract parts of our code into different bundles.
 
 Add `webpack-conditional-loader` to the loaders, like this:
+
 ```js
 {
   test: /\.jsx?$/,
@@ -45,6 +48,7 @@ Add `webpack-conditional-loader` to the loaders, like this:
 ```
 
 Optionally. Create alias for `DynamicImports.js` file in `resolve`:
+
 ```js
 alias: {
   DynamicImports: path.resolve(__dirname, 'client', 'DynamicImports.js'),
@@ -54,6 +58,7 @@ alias: {
 # Simple example of using dynamic components
 
 Consider the component that we want to convert to a dynamic:
+
 ```
 components
   |_ Map
@@ -61,6 +66,7 @@ components
 ```
 
 Let's create `index.jsx` in `Map` directory with the following contents:
+
 ```jsx
 let Component = null;
 
@@ -84,16 +90,16 @@ import Loadable from 'react-loadable';
 
 import Loading from '../Loading';
 
-const load = opts => Loadable({
-  delay: 10000,
-  loading: () => <Loading />,
-  render(loaded, props) {
-    const LoadedComponent = loaded.default;
-    return <LoadedComponent {...props} />;
-  },
-  ...opts,
-});
-
+const load = (opts) =>
+  Loadable({
+    delay: 10000,
+    loading: () => <Loading />,
+    render(loaded, props) {
+      const LoadedComponent = loaded.default;
+      return <LoadedComponent {...props} />;
+    },
+    ...opts,
+  });
 
 /* Here we're wrapping our component in react-loadable HOC */
 const DynamicComponent = load({
@@ -101,7 +107,7 @@ const DynamicComponent = load({
     We need to specify these params: `webpackChunkName`, `modules` and `webpack`
     so react-loadable can load our chunk correctly
   */
-  loader: () => import(/* webpackChunkName: "Map" */'./Map'),
+  loader: () => import(/* webpackChunkName: "Map" */ './Map'),
   modules: ['./Map'],
   webpack: () => [require.resolveWeak('./Map')],
 });
@@ -116,12 +122,15 @@ export default Component;
 ```
 
 Now, if we want to use this component we should import it like this:
+
 ```jsx
-import Map from './components/Map'
+import Map from './components/Map';
 ```
+
 in this case, webpack will load `index.jsx` instead of `Map.jsx` if not some other special order specified.
 
 Also, `IS_SSR=true` must added when creating server side bundle, like this:
+
 ```
 NODE_ENV=production IS_SSR=true webpack --config webpack.config.ssr.prod.js
 ```
@@ -141,33 +150,34 @@ More details can be found in the documentation react-loadable.
 
 But we can get rid of annoying flickering `Loading ...` the first time the page loads. The server renderer has already rendered the necessary components. Therefore, we can transfer this information from the server renderer to the client and preload the necessary modules.
 
-Unfortunately, the way specified in the documentation `react-loadable` does not work for us. 
+Unfortunately, the way specified in the documentation `react-loadable` does not work for us.
 
 Here is another similar method.
 
 For this we use the function `registerDynamicComponentOnServer`. We will place it in the new file `DynamicImports.js`:
 
-
 ```javascript
-export const registerDynamicComponentOnServer = name => {
-  const serverSide = typeof window === 'undefined'
+export const registerDynamicComponentOnServer = (name) => {
+  const serverSide = typeof window === 'undefined';
 
   if (serverSide) {
     if (typeof global.dynamicComponents === 'undefined') {
-      global.dynamicComponents = []
+      global.dynamicComponents = [];
     }
     if (global.dynamicComponents.indexOf(name) === -1) {
-      global.dynamicComponents.push(name)
+      global.dynamicComponents.push(name);
     }
   }
-}
+};
 ```
+
 As you can see from the function body, it runs only for server-side rendering.  
 It simply adds the name of the component to the global array `dynamicComponents` which will be transferred to the client later.
 
 It must be imported into the component that needs to be made dynamic and called in the render method of this component. For example:
 
 components/Map/Map.jsx:
+
 ```javascript
 ...
 import { registerDynamicComponentOnServer } from 'DynamicImports';
@@ -182,12 +192,11 @@ class Map extends React.Component {
 }
 ```
 
-
 Then this global array must be passed to the client.
 To do this, change server entry point as follows:
 
-
 **ServerApp.js**:
+
 ```javascript
 import React from 'react';
 import ReactOnRails from 'react-on-rails';
@@ -195,26 +204,21 @@ import ReactOnRails from 'react-on-rails';
 import App from './App';
 
 const ServerApp = (props, railsContext) => {
-
-  const html = renderToString(
-    <App
-      {...props}
-      components={{ MainPage, AboutPage }}
-    />
-  );
+  const html = renderToString(<App {...props} components={{ MainPage, AboutPage }} />);
 
   return {
     html,
     dynamicComponents: JSON.stringify(global.dynamicComponents),
   };
-}
+};
 
-ReactOnRails.register({ App: ServerApp })
+ReactOnRails.register({ App: ServerApp });
 
-export default ServerApp
+export default ServerApp;
 ```
 
 And add our array to view in rails, where our react_component is displayed
+
 ```slim
 <% component = react_component("App", props: {}, prerender: true) %>
 
@@ -237,90 +241,87 @@ To do this, we will create an object with the component names as the keys, and t
 We will add it to `DynamicImports.js` and add a check for the presence of the registered component in this object in the function` registerDynamicComponentOnServer`:
 
 **DynamicImports.js**
+
 ```javascript
 const DynamicImports = {
-  Map: () => import('./components/Map')
-}
+  Map: () => import('./components/Map'),
+};
 
-export const registerDynamicComponentOnServer = name => {
-  const serverSide = typeof window === 'undefined'
+export const registerDynamicComponentOnServer = (name) => {
+  const serverSide = typeof window === 'undefined';
 
   if (serverSide) {
     if (typeof global.dynamicComponents === 'undefined') {
-      global.dynamicComponents = []
+      global.dynamicComponents = [];
     }
     if (typeof DynamicImports[name] === 'undefined') {
-      throw new Error(`Dynamic import not defined for ${name}`)
+      throw new Error(`Dynamic import not defined for ${name}`);
     }
     if (global.dynamicComponents.indexOf(name) === -1) {
-      global.dynamicComponents.push(name)
+      global.dynamicComponents.push(name);
     }
   }
-}
+};
 
-export default DynamicImports
+export default DynamicImports;
 ```
 
 Now we can load the component we need, knowing its name
 For example:
+
 ```javascript
-DynamicImports ['Map'] ()
+DynamicImports['Map']();
 ```
+
 This function will return Promise, which can be used for client rendering.
 
 Change the Client.js to add the preloading of the required components:
 
-
 **Client.js**
+
 ```javascript
 import React from 'react';
 import { hydrateRoot } from 'react-dom/client';
-import Loadable from 'react-loadable'
+import Loadable from 'react-loadable';
 
 import App from './App';
 
-import DynamicImports from 'DynamicImports'
+import DynamicImports from 'DynamicImports';
 
 const App = (props, railsContext, domNodeId) => {
-
   const dynamicComponents =
-    typeof window.dynamicComponents !== 'undefined'
-      ? JSON.parse(window.dynamicComponents)
-      : []
+    typeof window.dynamicComponents !== 'undefined' ? JSON.parse(window.dynamicComponents) : [];
 
-
-  const dynamicImports = []
-  dynamicComponents.map(name => {
-    const dynamicImportInvoked = DynamicImports[name]()
-    dynamicImports.push(dynamicImportInvoked)
-  })
+  const dynamicImports = [];
+  dynamicComponents.map((name) => {
+    const dynamicImportInvoked = DynamicImports[name]();
+    dynamicImports.push(dynamicImportInvoked);
+  });
 
   Promise.all(dynamicImports)
     .then(() => Loadable.preloadReady())
     .then(() => {
       hydrateRoot(
-        <App
-          {...props}
-          components={{ MainPage, AboutPage }}
-        />,
+        <App {...props} components={{ MainPage, AboutPage }} />,
         document.getElementById(domNodeId),
-      )
-    })
-}
+      );
+    });
+};
 
-export default App
+export default App;
 ```
 
 This code requires explanation.
 
 The array with names of rendered components called `dynamicComponents` is used in the map function.  
 In this function, the dynamic import invoked and the result (promise) is added to `dynamicImports` array.
+
 ```javascript
-  const dynamicImports = []
-  dynamicComponents.map(name => {
-    const dynamicImportInvoked = DynamicImports[name]()
-    dynamicImports.push(dynamicImportInvoked)
-  })
+const dynamicImports = [];
+dynamicComponents.map((name) => {
+  const dynamicImportInvoked = DynamicImports[name]();
+  dynamicImports.push(dynamicImportInvoked);
+});
 ```
 
 This array is used in the function `Promise.all`
@@ -334,16 +335,19 @@ Then fires `Loadable.preloadReady()`
 ```javascript
 .then(() => Loadable.preloadReady())
 ```
+
 As in the doc:
 Check for modules that are already loaded in the browser and call the matching LoadableComponent.preload methods.
 
 We need to call this method to initialize already preloaded components.
 
 In addition, note that in the creation of dynamic modules, the `modules` and` webpack` options are used, per the docs for react-loadable.
+
 ```javascript
   modules: ['./AboutPage'],
   webpack: () => [require.resolveWeak('./AboutPage')],
 ```
+
 They are needed to make .preload method work properly
 
 Thus, all dynamic modules will be loaded up to hydrate, and there will be no flicker.
