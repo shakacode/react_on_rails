@@ -23,8 +23,12 @@ React on Rails Pro packages are now **publicly distributed** via npmjs.org and R
 
 Package names have changed:
 
-- **Scoped** (old): `@shakacode-tools/react-on-rails-pro-node-renderer`
-- **Unscoped** (new): `react-on-rails-pro-node-renderer`
+| Package       | Old (Scoped)                                        | New (Unscoped)                     |
+| ------------- | --------------------------------------------------- | ---------------------------------- |
+| Client        | `react-on-rails`                                    | `react-on-rails-pro`               |
+| Node Renderer | `@shakacode-tools/react-on-rails-pro-node-renderer` | `react-on-rails-pro-node-renderer` |
+
+**Important:** Pro users should now import from `react-on-rails-pro` instead of `react-on-rails`. The Pro package includes all core features plus Pro-exclusive functionality.
 
 ### Your Current Setup (GitHub Packages)
 
@@ -98,11 +102,12 @@ rm .npmrc
 
 #### Step 3: Update package.json
 
-Change the package name from **scoped** to **unscoped**:
+**Add the client package** and update the node renderer package name:
 
 ```diff
 {
   "dependencies": {
++   "react-on-rails-pro": "^16.2.0",
 -   "@shakacode-tools/react-on-rails-pro-node-renderer": "16.1.1"
 +   "react-on-rails-pro-node-renderer": "^16.2.0"
   }
@@ -117,18 +122,36 @@ npm install
 yarn install
 ```
 
-#### Step 4: Update Require Statements
+#### Step 4: Update Import Statements
 
-Update all require/import statements to use the **unscoped** package name:
+**Client code:** Change all imports from `react-on-rails` to `react-on-rails-pro`:
 
-**In your node renderer configuration file:**
+```diff
+- import ReactOnRails from 'react-on-rails';
++ import ReactOnRails from 'react-on-rails-pro';
+```
+
+**Pro-exclusive features** (React Server Components, async loading):
+
+```diff
+- import { RSCRoute } from 'react-on-rails/RSCRoute';
++ import { RSCRoute } from 'react-on-rails-pro/RSCRoute';
+
+- import registerServerComponent from 'react-on-rails/registerServerComponent/client';
++ import registerServerComponent from 'react-on-rails-pro/registerServerComponent/client';
+
+- import { wrapServerComponentRenderer } from 'react-on-rails/wrapServerComponentRenderer/client';
++ import { wrapServerComponentRenderer } from 'react-on-rails-pro/wrapServerComponentRenderer/client';
+```
+
+**Node renderer configuration file:**
 
 ```diff
 - const { reactOnRailsProNodeRenderer } = require('@shakacode-tools/react-on-rails-pro-node-renderer');
 + const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');
 ```
 
-**If using integrations (Sentry, Honeybadger):**
+**Node renderer integrations (Sentry, Honeybadger):**
 
 ```diff
 - require('@shakacode-tools/react-on-rails-pro-node-renderer/integrations/sentry').init();
@@ -171,10 +194,12 @@ bundle list | grep react_on_rails_pro
 #### 2. Verify NPM Package Installation
 
 ```bash
-npm list react-on-rails-pro-node-renderer
-# or
-yarn list --pattern react-on-rails-pro-node-renderer
+# Verify client package
+npm list react-on-rails-pro
+# Should show: react-on-rails-pro@16.2.0 or higher
 
+# Verify node renderer (if using)
+npm list react-on-rails-pro-node-renderer
 # Should show: react-on-rails-pro-node-renderer@16.2.0 or higher
 ```
 
@@ -202,11 +227,22 @@ If the license is invalid or missing, you'll see an error with instructions.
 - Run `bundle install` again
 - Check that you have the correct version specified
 
-#### "Cannot find module 'react-on-rails-pro-node-renderer'"
+#### "Cannot find module 'react-on-rails-pro'" or "Cannot find module 'react-on-rails-pro-node-renderer'"
 
-- Verify you updated all require statements to the unscoped name
+- Verify you added `react-on-rails-pro` to your package.json dependencies
+- Verify you updated all import/require statements to use the correct package names
 - Delete `node_modules` and reinstall: `rm -rf node_modules && npm install`
-- Check that package.json has the correct unscoped package name
+
+#### "Cannot mix react-on-rails (core) with react-on-rails-pro"
+
+This error occurs when you import from both `react-on-rails` and `react-on-rails-pro`. Pro users should **only** import from `react-on-rails-pro`:
+
+```diff
+- import ReactOnRails from 'react-on-rails';
++ import ReactOnRails from 'react-on-rails-pro';
+```
+
+The Pro package re-exports everything from core, so you don't need both.
 
 #### "License validation failed"
 

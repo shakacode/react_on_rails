@@ -19,7 +19,19 @@
 
 ### Q: Will package installation or usage change?
 
-**A:** Yes. The Pro packages will become public instead of private. If you need Pro features, you will need to install the `react-on-rails-pro` NPM package in addition to `react-on-rails`, and import Pro features from `react-on-rails-pro`.
+**A:** Yes. The Pro packages are now public instead of private:
+
+- **Ruby:** Install `react_on_rails_pro` gem (it depends on `react_on_rails`)
+- **JavaScript:** Install and import from `react-on-rails-pro` instead of `react-on-rails`
+
+**Important:** Pro users should import from `react-on-rails-pro`, not `react-on-rails`. The Pro package re-exports all core features plus Pro-exclusive functionality:
+
+```javascript
+// Correct for Pro users
+import ReactOnRails from 'react-on-rails-pro';
+```
+
+See the [Installation Guide](../react_on_rails_pro/docs/installation.md) for details.
 
 ### Q: How will the monorepo structure maintain license separation?
 
