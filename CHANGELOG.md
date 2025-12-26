@@ -25,6 +25,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 - **React Server Components Security Vulnerabilities (CVE-2025-55183, CVE-2025-55184, CVE-2025-67779)**: Upgraded React to v19.0.3 and react-on-rails-rsc to v19.0.4 to fix three critical security vulnerabilities in React Server Components. CVE-2025-55183 (CVSS 5.3) involved source code exposure when server function references were stringified, potentially leaking hardcoded secrets. CVE-2025-55184 and CVE-2025-67779 (both CVSS 7.5) involved denial of service attacks via cyclic promise references that could cause infinite loops and 100% CPU consumption. The fixes implement dual-layer cycle detection with a 1,000-iteration depth limit and override `toString()` methods on server references to return safe placeholders. Addresses [issue 2223](https://github.com/shakacode/react_on_rails/issues/2223). [PR 2233](https://github.com/shakacode/react_on_rails/pull/2233) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
+#### Developer (Contributors Only)
+
+- **Benchmarking in CI**: A benchmark workflow will now run on all pushes to master, as well as PRs with `benchmark` or `full-ci` labels. [PR 1868](https://github.com/shakacode/react_on_rails/pull/1868) by [alexeyr-ci2](https://github.com/alexeyr-ci2)
+
 ### [16.2.0.beta.20] - 2025-12-12
 
 #### Fixed

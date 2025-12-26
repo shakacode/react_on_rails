@@ -1,0 +1,6 @@
+# Procfile for production mode (precompiled assets)
+
+rails: RAILS_ENV=production NODE_ENV=production bin/rails s -p 3001
+
+# Start Node server for server rendering.
+node-renderer: NODE_ENV=production RENDERER_LOG_LEVEL=error RENDERER_PORT=3800 node client/node-renderer.js
