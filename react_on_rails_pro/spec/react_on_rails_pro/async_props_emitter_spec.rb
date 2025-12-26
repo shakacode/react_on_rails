@@ -12,11 +12,11 @@ RSpec.describe ReactOnRailsPro::AsyncPropsEmitter do
 
   describe "#call" do
     it "writes NDJSON update chunk with correct structure" do
-      allow(request_stream).to receive(:write)
+      allow(request_stream).to receive(:<<)
 
       emitter.call("books", ["Book 1", "Book 2"])
 
-      expect(request_stream).to have_received(:write) do |output|
+      expect(request_stream).to have_received(:<<) do |output|
         expect(output).to end_with("\n")
         parsed = JSON.parse(output.chomp)
         expect(parsed["bundleTimestamp"]).to eq(bundle_timestamp)
@@ -28,7 +28,7 @@ RSpec.describe ReactOnRailsPro::AsyncPropsEmitter do
     it "logs error and continues without raising when write fails" do
       mock_logger = instance_double(Logger)
       allow(Rails).to receive(:logger).and_return(mock_logger)
-      allow(request_stream).to receive(:write).and_raise(StandardError.new("Connection lost"))
+      allow(request_stream).to receive(:<<).and_raise(StandardError.new("Connection lost"))
       allow(mock_logger).to receive(:error)
 
       expect { emitter.call("books", []) }.not_to raise_error

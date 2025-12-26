@@ -242,10 +242,10 @@ describe ReactOnRailsPro::Request do
 
       allow(mock_connection).to receive_messages(build_request: mock_request, request: mock_response)
       allow(mock_request).to receive(:close)
-      allow(mock_request).to receive(:write)
+      allow(mock_request).to receive(:<<)
       allow(mock_response).to receive(:is_a?).with(HTTPX::ErrorResponse).and_return(false)
       allow(mock_response).to receive(:each).and_yield("chunk\n")
-      allow(described_class).to receive(:incremental_connection).and_return(mock_connection)
+      allow(described_class).to receive(:connection).and_return(mock_connection)
 
       # Stub AsyncPropsEmitter to return a mock with end_stream_chunk
       allow(ReactOnRailsPro::AsyncPropsEmitter).to receive(:new) do |_bundle_timestamp, _request|
@@ -270,12 +270,13 @@ describe ReactOnRailsPro::Request do
         "POST",
         "/render-incremental",
         headers: { "content-type" => "application/x-ndjson" },
-        body: []
+        body: [],
+        stream: true
       )
-      expect(mock_request).to have_received(:write).at_least(:once)
+      expect(mock_request).to have_received(:<<).at_least(:once)
     end
 
-    it "spawns barrier.async task and passes emitter to async_props_block" do
+    it "passes AsyncPropsEmitter to async_props_block" do
       emitter_received = nil
       test_async_props_block = proc { |emitter| emitter_received = emitter }
 
@@ -292,6 +293,39 @@ describe ReactOnRailsPro::Request do
       stream.each_chunk(&:itself)
 
       expect(emitter_received).to be_a(ReactOnRailsPro::AsyncPropsEmitter)
+    end
+
+    it "executes async_props_block concurrently with response streaming via barrier.async" do
+      execution_order = []
+
+      test_async_props_block = proc do |_emitter|
+        execution_order << :async_block_start
+        # Simulate async work - this runs in a separate fiber
+        sleep 0.01
+        execution_order << :async_block_end
+      end
+
+      # Track when chunks are yielded during streaming
+      allow(mock_response).to receive(:each) do |&block|
+        execution_order << :chunk_yielded
+        block.call("chunk\n")
+      end
+
+      # Allow real emitter to be created for this test
+      allow(ReactOnRailsPro::AsyncPropsEmitter).to receive(:new).and_call_original
+
+      stream = described_class.render_code_with_incremental_updates(
+        "/render-incremental",
+        js_code,
+        async_props_block: test_async_props_block,
+        is_rsc_payload: false
+      )
+
+      stream.each_chunk(&:itself)
+
+      # Verify concurrent execution: chunk should be yielded while async block is running
+      # If synchronous, order would be [:async_block_start, :async_block_end, :chunk_yielded]
+      expect(execution_order).to eq(%i[async_block_start chunk_yielded async_block_end])
     end
 
     it "uses rsc_bundle_hash when is_rsc_payload is true" do
