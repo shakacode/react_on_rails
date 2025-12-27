@@ -5,6 +5,42 @@ require "httpx"
 require_relative "stream_request"
 require_relative "async_props_emitter"
 
+HTTPX::Plugins.load_plugin(:stream_bidi)
+
+#
+# Patch for httpx stream_bidi plugin retry bug
+#
+# Problem: When a streaming request fails and is retried, the @headers_sent
+# flag is not reset. This causes the :body callback to fire prematurely on
+# retry, leading to re-entrant handle() calls that crash with:
+#   HTTP2::Error::InternalError
+#
+# This patch resets @headers_sent and @closed when transitioning back to :idle
+#
+# Can be removed once fixed upstream in httpx gem
+# Related: https://gitlab.com/os85/httpx
+#
+if defined?(HTTPX::Plugins::StreamBidi)
+  module HTTPX
+    module Plugins
+      module StreamBidi
+        module RequestMethodsRetryFix
+          def transition(nextstate)
+            if nextstate == :idle
+              @headers_sent = false
+              @closed = false
+            end
+
+            super
+          end
+        end
+
+        RequestMethods.prepend(RequestMethodsRetryFix)
+      end
+    end
+  end
+end
+
 module ReactOnRailsPro
   class Request # rubocop:disable Metrics/ClassLength
     class << self
