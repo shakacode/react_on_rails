@@ -28,7 +28,6 @@ if defined?(HTTPX::Plugins::StreamBidi)
           def transition(nextstate)
             if nextstate == :idle
               @headers_sent = false
-              @closed = false
             end
 
             super
