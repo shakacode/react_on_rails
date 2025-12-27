@@ -3,13 +3,47 @@
 require "uri"
 require "httpx"
 require_relative "stream_request"
+require_relative "async_props_emitter"
+
+HTTPX::Plugins.load_plugin(:stream_bidi)
+
+#
+# Patch for httpx stream_bidi plugin retry bug
+#
+# Problem: When a streaming request fails and is retried, the @headers_sent
+# flag is not reset. This causes the :body callback to fire prematurely on
+# retry, leading to re-entrant handle() calls that crash with:
+#   HTTP2::Error::InternalError
+#
+# This patch resets @headers_sent and @closed when transitioning back to :idle
+#
+# Can be removed once fixed upstream in httpx gem
+# Related: https://gitlab.com/os85/httpx
+#
+if defined?(HTTPX::Plugins::StreamBidi)
+  module HTTPX
+    module Plugins
+      module StreamBidi
+        module RequestMethodsRetryFix
+          def transition(nextstate)
+            @headers_sent = false if nextstate == :idle
+
+            super
+          end
+        end
+
+        RequestMethods.prepend(RequestMethodsRetryFix)
+      end
+    end
+  end
+end
 
 module ReactOnRailsPro
   class Request # rubocop:disable Metrics/ClassLength
     class << self
       def reset_connection
         @connection&.close
-        @connection = create_connection
+        @connection = nil
       end
 
       def render_code(path, js_code, send_bundle)
@@ -27,9 +61,54 @@ module ReactOnRailsPro
                 "rendering any RSC payload."
         end
 
-        ReactOnRailsPro::StreamRequest.create do |send_bundle|
-          form = form_with_code(js_code, send_bundle)
+        ReactOnRailsPro::StreamRequest.create do |send_bundle, _barrier|
+          if send_bundle
+            Rails.logger.info { "[ReactOnRailsPro] Sending bundle to the node renderer" }
+            upload_assets
+          end
+
+          form = form_with_code(js_code, false)
           perform_request(path, form: form, stream: true)
+        end
+      end
+
+      def render_code_with_incremental_updates(path, js_code, async_props_block:, is_rsc_payload:)
+        Rails.logger.info { "[ReactOnRailsPro] Perform incremental rendering request #{path}" }
+
+        # Determine bundle timestamp based on RSC support
+        pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
+        bundle_timestamp = is_rsc_payload ? pool.rsc_bundle_hash : pool.server_bundle_hash
+
+        ReactOnRailsPro::StreamRequest.create do |send_bundle, barrier|
+          if send_bundle
+            Rails.logger.info { "[ReactOnRailsPro] Sending bundle to the node renderer" }
+            upload_assets
+          end
+
+          # Build bidirectional streaming request
+          request = connection.build_request(
+            "POST",
+            path,
+            headers: { "content-type" => "application/x-ndjson" },
+            body: [],
+            stream: true
+          )
+
+          # Create emitter and use it to generate initial request data
+          emitter = ReactOnRailsPro::AsyncPropsEmitter.new(bundle_timestamp, request)
+          initial_data = build_initial_incremental_request(js_code, emitter)
+
+          response = connection.request(request, stream: true)
+          request << "#{initial_data.to_json}\n"
+
+          # Execute async props block in background using barrier
+          barrier.async do
+            async_props_block.call(emitter)
+          ensure
+            request.close
+          end
+
+          response
         end
       end
 
@@ -86,13 +165,20 @@ module ReactOnRailsPro
         @connection ||= create_connection
       end
 
-      def perform_request(path, **post_options) # rubocop:disable Metrics/AbcSize,Metrics/CyclomaticComplexity
+      # Performs HTTP POST requests using the build_request pattern.
+      # This approach is required because when stream_bidi plugin is loaded,
+      # using connection.post with stream: true causes timeouts (the plugin's
+      # empty? method returns false, preventing END_STREAM from being sent).
+      #
+      # For consistency and to share error handling logic, both streaming and
+      # non-streaming requests use build_request with manually encoded bodies.
+      def perform_request(path, form: nil, json: nil, stream: false) # rubocop:disable Metrics/AbcSize,Metrics/CyclomaticComplexity
         available_retries = ReactOnRailsPro.configuration.renderer_request_retry_limit
         retry_request = true
         while retry_request
           begin
             start_time = Time.now
-            response = connection.post(path, **post_options)
+            response = execute_http_request(path, form: form, json: json, stream: stream)
             raise response.error if response.is_a?(HTTPX::ErrorResponse)
 
             request_time = Time.now - start_time
@@ -116,7 +202,7 @@ module ReactOnRailsPro
             next
           rescue HTTPX::Error => e # Connection errors or other unexpected errors
             # Such errors are handled by ReactOnRailsPro::StreamRequest instead
-            raise if e.is_a?(HTTPX::HTTPError) && post_options[:stream]
+            raise if e.is_a?(HTTPX::HTTPError) && stream
 
             raise ReactOnRailsPro::Error,
                   "Node renderer request failed: #{path}.\nOriginal error:\n#{e}\n#{e.backtrace}"
@@ -131,6 +217,40 @@ module ReactOnRailsPro
         end
 
         response
+      end
+
+      # Executes an HTTP POST request using build_request pattern.
+      # For streaming requests, calls request.close to send END_STREAM flag.
+      def execute_http_request(path, form: nil, json: nil, stream: false)
+        body, content_type = encode_request_body(form: form, json: json)
+
+        request_options = {
+          headers: { "content-type" => content_type },
+          body: body
+        }
+        request_options[:stream] = true if stream
+
+        request = connection.build_request("POST", path, **request_options)
+        request.close if stream # Signal end of request body to send END_STREAM flag
+
+        connection.request(request)
+      end
+
+      # Encodes request body for use with build_request.
+      # Supports both form data (with automatic multipart detection) and JSON data.
+      def encode_request_body(form: nil, json: nil)
+        if form
+          encoder = if HTTPX::Transcoder::Multipart.multipart?(form)
+                      HTTPX::Transcoder::Multipart.encode(form)
+                    else
+                      HTTPX::Transcoder::Form.encode(form)
+                    end
+          [encoder.to_s, encoder.content_type]
+        elsif json
+          [JSON.generate(json), "application/json"]
+        else
+          raise ArgumentError, "Either form: or json: must be provided"
+        end
       end
 
       def form_with_code(js_code, send_bundle)
@@ -217,12 +337,18 @@ module ReactOnRailsPro
         ReactOnRailsPro::Utils.common_form_data
       end
 
+      def build_initial_incremental_request(js_code, emitter)
+        common_form_data.merge(
+          renderingRequest: js_code,
+          onRequestClosedUpdateChunk: emitter.end_stream_chunk
+        )
+      end
+
       def create_connection # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
         url = ReactOnRailsPro.configuration.renderer_url
         Rails.logger.info do
           "[ReactOnRailsPro] Setting up Node Renderer connection to #{url}"
         end
-
         HTTPX
           # For persistent connections we want retries,
           # so the requests don't just fail if the other side closes the connection
@@ -248,7 +374,6 @@ module ReactOnRailsPro
                                          "of a component.\nOriginal error:\n#{e}\n#{e.backtrace}"
                                        )
                                      end
-
                                      Rails.logger.info do
                                        "[ReactOnRailsPro] An error occurred while making " \
                                          "a request to the Node Renderer.\n" \
@@ -262,6 +387,7 @@ module ReactOnRailsPro
                                    end
           )
           .plugin(:stream)
+          .plugin(:stream_bidi)
           # See https://www.rubydoc.info/gems/httpx/1.3.3/HTTPX%2FOptions:initialize for the available options
           .with(
             origin: url,

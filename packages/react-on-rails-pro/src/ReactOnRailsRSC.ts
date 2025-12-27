@@ -25,6 +25,7 @@ import {
 import { convertToError } from 'react-on-rails/serverRenderUtils';
 import handleError from './handleErrorRSC.ts';
 import ReactOnRails from './ReactOnRails.full.ts';
+import AsyncPropsManager from './AsyncPropsManager.ts';
 
 import {
   streamServerRenderedComponent,
@@ -103,6 +104,26 @@ ReactOnRails.serverRenderRSCReactComponent = (options: RSCRenderParams) => {
     console.history = [];
   }
 };
+
+function addAsyncPropsCapabilityToComponentProps<
+  AsyncPropsType extends Record<string, unknown>,
+  PropsType extends Record<string, unknown>,
+>(props: PropsType) {
+  const asyncPropManager = new AsyncPropsManager();
+  const propsAfterAddingAsyncProps = {
+    ...props,
+    getReactOnRailsAsyncProp: <PropName extends keyof AsyncPropsType>(propName: PropName) => {
+      return asyncPropManager.getProp(propName as string) as Promise<AsyncPropsType[PropName]>;
+    },
+  };
+
+  return {
+    asyncPropManager,
+    props: propsAfterAddingAsyncProps,
+  };
+}
+
+ReactOnRails.addAsyncPropsCapabilityToComponentProps = addAsyncPropsCapabilityToComponentProps;
 
 ReactOnRails.isRSCBundle = true;
 
