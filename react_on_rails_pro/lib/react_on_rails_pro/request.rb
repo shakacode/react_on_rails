@@ -26,9 +26,7 @@ if defined?(HTTPX::Plugins::StreamBidi)
       module StreamBidi
         module RequestMethodsRetryFix
           def transition(nextstate)
-            if nextstate == :idle
-              @headers_sent = false
-            end
+            @headers_sent = false if nextstate == :idle
 
             super
           end
