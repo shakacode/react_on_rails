@@ -52,6 +52,8 @@ Changes since the last non-beta release.
 
 - **Thread-Safe Connection Management**: Fixed race conditions in `ReactOnRailsPro::Request` connection management. The lazy initialization (`@connection ||= create_connection`) was not atomic, allowing multiple threads to create duplicate connections at startup. Now uses a mutex with double-checked locking pattern for thread-safe initialization while maintaining lock-free reads for optimal performance. [PR 2259](https://github.com/shakacode/react_on_rails/pull/2259) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
+- **HTTPX Streaming Compatibility**: Fixed streaming request timeouts when using HTTPX with both `:stream` and `:stream_bidi` plugins. Refactored `perform_request` to use the `build_request` pattern with explicit `request.close` to send the HTTP/2 `END_STREAM` flag. Also includes a temporary workaround for an [HTTPX stream_bidi plugin retry bug](https://github.com/HoneyryderChuck/httpx/issues/124) that caused crashes on request retries. [PR 2251](https://github.com/shakacode/react_on_rails/pull/2251) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 - **SECURITY: CVE-2025-55182 - React Server Components RCE Vulnerability**: by updating `react-on-rails-rsc` peer dependency to `v19.0.3` which mitigates that vulnerability. Also, users should update `react` and `react-dom` package versions to `v19.0.1` to ensure complete mitigation. [PR 2175](https://github.com/shakacode/react_on_rails/pull/2175) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 - Fixed compatibility issue with httpx 1.6.x by explicitly requiring http-2 >= 1.1.1. [PR 2141](https://github.com/shakacode/react_on_rails/pull/2141) by [AbanoubGhadban](https://github.com/AbanoubGhadban).

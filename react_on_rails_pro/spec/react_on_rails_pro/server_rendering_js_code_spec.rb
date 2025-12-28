@@ -61,10 +61,12 @@ RSpec.describe ReactOnRailsPro::ServerRenderingJsCode do
       end
 
       before do
-        allow(ReactOnRailsPro.configuration).to receive(:enable_rsc_support).and_return(false)
-        allow(ReactOnRailsPro.configuration).to receive(:throw_js_errors).and_return(false)
-        allow(ReactOnRailsPro.configuration).to receive(:rendering_returns_promises).and_return(false)
-        allow(ReactOnRailsPro.configuration).to receive(:ssr_pre_hook_js).and_return(nil)
+        allow(ReactOnRailsPro.configuration).to receive_messages(
+          enable_rsc_support: false,
+          throw_js_errors: false,
+          rendering_returns_promises: false,
+          ssr_pre_hook_js: nil
+        )
       end
 
       it "includes async props setup JavaScript in the generated code" do
@@ -95,10 +97,12 @@ RSpec.describe ReactOnRailsPro::ServerRenderingJsCode do
       end
 
       before do
-        allow(ReactOnRailsPro.configuration).to receive(:enable_rsc_support).and_return(false)
-        allow(ReactOnRailsPro.configuration).to receive(:throw_js_errors).and_return(false)
-        allow(ReactOnRailsPro.configuration).to receive(:rendering_returns_promises).and_return(false)
-        allow(ReactOnRailsPro.configuration).to receive(:ssr_pre_hook_js).and_return(nil)
+        allow(ReactOnRailsPro.configuration).to receive_messages(
+          enable_rsc_support: false,
+          throw_js_errors: false,
+          rendering_returns_promises: false,
+          ssr_pre_hook_js: nil
+        )
       end
 
       it "does NOT include async props setup JavaScript in the generated code" do

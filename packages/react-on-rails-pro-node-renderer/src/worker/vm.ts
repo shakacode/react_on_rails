@@ -43,6 +43,7 @@ const vmCreationPromises = new Map<string, Promise<VMContext>>();
 
 /**
  * Returns all bundle paths that have a VM context
+ * @internal Used in tests
  */
 export function hasVMContextForBundle(bundlePath: string) {
   return vmContexts.has(bundlePath);
@@ -365,7 +366,7 @@ export async function buildExecutionContext(
         const objectResult = await result;
         result = JSON.stringify(objectResult);
       }
-      if (log.level === 'debug') {
+      if (log.level === 'debug' && result) {
         log.debug(`result from JS:
   ${smartTrim(result)}`);
         const debugOutputPathResult = path.join(serverBundleCachePath, 'result.json');

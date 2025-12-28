@@ -493,7 +493,7 @@ export interface ReactOnRailsInternal extends ReactOnRails {
   isRSCBundle: boolean;
   /**
    * Adds the getAsyncProp function to the component props object
-   * @returns An object containitng: the AsyncPropsManager and the component props after adding the getAsyncProp to it
+   * @returns An object containing: the AsyncPropsManager and the component props after adding the getAsyncProp to it
    */
   addAsyncPropsCapabilityToComponentProps: <
     AsyncPropsType extends Record<string, unknown>,
