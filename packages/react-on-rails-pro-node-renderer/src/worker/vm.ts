@@ -301,6 +301,20 @@ export type ExecutionContext = {
   getVMContext: (bundleFilePath: string) => VMContext | undefined;
 };
 
+/**
+ * Builds an ExecutionContext that manages VM execution for a set of bundles.
+ *
+ * The ExecutionContext includes a `sharedExecutionContext` Map that enables safe data sharing
+ * between the initial render request and subsequent update chunks (for incremental rendering).
+ *
+ * CRITICAL SECURITY DESIGN:
+ * - sharedExecutionContext is created ONCE per ExecutionContext (per HTTP request)
+ * - It is NOT a global variable - each request gets its own isolated Map
+ * - This prevents data leakage between concurrent rendering requests from different users
+ * - The Map is passed to the VM context only during code execution, then immediately removed
+ *
+ * @see handleIncrementalRenderRequest.ts for how update chunks access the same context
+ */
 export async function buildExecutionContext(
   bundlePaths: string[],
   buildVmsIfNeeded: boolean,
@@ -313,6 +327,10 @@ export async function buildExecutionContext(
       mapBundleFilePathToVMContext.set(bundleFilePath, vmContext);
     }),
   );
+
+  // This Map persists for the lifetime of this ExecutionContext (one HTTP request).
+  // It allows data to be shared between the initial render and subsequent update chunks.
+  // Example: asyncPropsManager is stored here during initial render and accessed by update chunks.
   const sharedExecutionContext = new Map();
 
   const runInVM = async (renderingRequest: string, bundleFilePath: string, vmCluster?: typeof cluster) => {
@@ -338,6 +356,11 @@ export async function buildExecutionContext(
         await writeFileAsync(debugOutputPathCode, renderingRequest);
       }
 
+      // Execute the rendering request in the VM context.
+      // We temporarily inject sharedExecutionContext into the VM's global scope
+      // so that code can store/retrieve data (e.g., asyncPropsManager).
+      // IMPORTANT: We clean up immediately after execution to prevent the VM context
+      // (which may be reused by other requests) from retaining references to this request's data.
       let result = sharedConsoleHistory.trackConsoleHistoryInRenderRequest(() => {
         context.renderingRequest = renderingRequest;
         context.sharedExecutionContext = sharedExecutionContext;
@@ -349,6 +372,10 @@ export async function buildExecutionContext(
         try {
           return vm.runInContext(renderingRequest, context) as RenderCodeResult;
         } finally {
+          // Clean up references immediately after execution.
+          // Note: sharedExecutionContext itself is NOT cleared here - it persists
+          // for the lifetime of this ExecutionContext so that update chunks can access it.
+          // We only remove the VM context's reference to prevent cross-request data access.
           context.renderingRequest = undefined;
           context.sharedExecutionContext = undefined;
           context.runOnOtherBundle = undefined;

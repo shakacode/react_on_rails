@@ -47,6 +47,32 @@ module ReactOnRailsPro
         end
       end
 
+      # Performs an incremental render request with bidirectional HTTP/2 streaming.
+      #
+      # ARCHITECTURE: This method orchestrates the async props flow:
+      #
+      # ┌─────────────────────────────────────────────────────────────────────────┐
+      # │  Rails Thread (main)              │  Rails Thread (barrier.async)       │
+      # ├───────────────────────────────────┼─────────────────────────────────────┤
+      # │  1. Send initial NDJSON line      │                                     │
+      # │     {renderingRequest, ...}       │                                     │
+      # │                                   │                                     │
+      # │  2. Return response stream        │  3. Execute async_props_block       │
+      # │     (caller processes HTML)       │     emit.call("users", User.all)    │
+      # │                                   │     └── Sends NDJSON: {updateChunk} │
+      # │                                   │     emit.call("posts", Post.all)    │
+      # │                                   │     └── Sends NDJSON: {updateChunk} │
+      # │                                   │                                     │
+      # │  ... streaming HTML chunks ...    │  4. Block completes                 │
+      # │                                   │     request.close (sends END_STREAM)│
+      # └───────────────────────────────────┴─────────────────────────────────────┘
+      #
+      # WHY barrier.async?
+      # - We need to return the response stream immediately so Rails can start sending HTML
+      # - The async_props_block runs concurrently, sending props as they become available
+      # - When the block finishes, we close the request (END_STREAM flag)
+      # - Node's handleRequestClosed then calls asyncPropsManager.endStream()
+      #
       def render_code_with_incremental_updates(path, js_code, async_props_block:, is_rsc_payload:)
         Rails.logger.info { "[ReactOnRailsPro] Perform incremental rendering request #{path}" }
 
@@ -60,7 +86,8 @@ module ReactOnRailsPro
             upload_assets
           end
 
-          # Build bidirectional streaming request
+          # Build bidirectional streaming request using HTTPX's stream_bidi plugin.
+          # This creates an HTTP/2 stream where we can send data while receiving.
           request = connection.build_request(
             "POST",
             path,
@@ -69,17 +96,23 @@ module ReactOnRailsPro
             stream: true
           )
 
-          # Create emitter and use it to generate initial request data
+          # Create emitter - it will write NDJSON lines to the request stream
           emitter = ReactOnRailsPro::AsyncPropsEmitter.new(bundle_timestamp, request)
           initial_data = build_initial_incremental_request(js_code, emitter)
 
+          # Start the request - response begins streaming immediately
           response = connection.request(request, stream: true)
+
+          # Send the initial render request as first NDJSON line
           request << "#{initial_data.to_json}\n"
 
-          # Execute async props block in background using barrier
+          # Execute async props block in a separate fiber via barrier.
+          # This runs concurrently with the response streaming back to the client.
           barrier.async do
             async_props_block.call(emitter)
           ensure
+            # When the block completes (or raises), close the request.
+            # This sends HTTP/2 END_STREAM flag, triggering Node's handleRequestClosed.
             request.close
           end
 

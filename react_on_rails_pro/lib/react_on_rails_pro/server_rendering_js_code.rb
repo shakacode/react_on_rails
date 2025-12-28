@@ -46,7 +46,23 @@ module ReactOnRailsPro
         JS
       end
 
-      # Generates JavaScript code for async props setup when incremental rendering is enabled
+      # Generates JavaScript code for async props setup when incremental rendering is enabled.
+      #
+      # This code runs DURING the initial render request, BEFORE the component renders.
+      # It sets up the infrastructure that allows:
+      # 1. Component to call `getReactOnRailsAsyncProp("propName")` → returns a Promise
+      # 2. Update chunks to call `asyncPropsManager.setProp("propName", value)` → resolves the Promise
+      #
+      # WHY isRSCBundle CHECK?
+      # - Async props only work with React Server Components (RSC)
+      # - RSC bundle has `addAsyncPropsCapabilityToComponentProps` method
+      # - Server bundle (non-RSC) doesn't support this pattern
+      #
+      # WHY sharedExecutionContext?
+      # - The asyncPropManager needs to be accessible by update chunks that arrive later
+      # - Update chunks run in the same ExecutionContext, so they can retrieve it
+      # - sharedExecutionContext is NOT global - it's scoped to this HTTP request
+      #
       # @param render_options [Object] Options that control the rendering behavior
       # @return [String] JavaScript code that sets up AsyncPropsManager or empty string
       def async_props_setup_js(render_options)
