@@ -2,6 +2,12 @@ import { StringDecoder } from 'string_decoder';
 import type { ResponseResult } from '../shared/utils';
 import * as errorReporter from '../shared/errorReporter';
 
+// Maximum size for a single NDJSON line (10MB - matches Fastify fieldSizeLimit)
+export const MAX_NDJSON_LINE_SIZE = 10 * 1024 * 1024;
+
+// Maximum total request size (100MB - matches Fastify bodyLimit)
+export const MAX_NDJSON_REQUEST_SIZE = 100 * 1024 * 1024;
+
 /**
  * Result interface for render request callbacks
  */
@@ -35,11 +41,31 @@ export async function handleIncrementalRenderStream(
   let hasReceivedFirstObject = false;
   const decoder = new StringDecoder('utf8');
   let buffer = '';
+  let totalBytesReceived = 0;
 
   try {
     for await (const chunk of request.raw) {
-      const str = decoder.write(chunk);
+      const chunkBuffer = chunk instanceof Buffer ? chunk : Buffer.from(chunk);
+      totalBytesReceived += chunkBuffer.length;
+
+      // Check total request size limit
+      if (totalBytesReceived > MAX_NDJSON_REQUEST_SIZE) {
+        throw new Error(
+          `NDJSON request exceeds maximum size of ${MAX_NDJSON_REQUEST_SIZE} bytes (${Math.round(MAX_NDJSON_REQUEST_SIZE / 1024 / 1024)}MB). ` +
+            `Received ${totalBytesReceived} bytes.`,
+        );
+      }
+
+      const str = decoder.write(chunkBuffer);
       buffer += str;
+
+      // Check single line size limit (protects against missing newlines)
+      if (buffer.length > MAX_NDJSON_LINE_SIZE) {
+        throw new Error(
+          `NDJSON line exceeds maximum size of ${MAX_NDJSON_LINE_SIZE} bytes (${Math.round(MAX_NDJSON_LINE_SIZE / 1024 / 1024)}MB). ` +
+            `Current buffer: ${buffer.length} bytes. Ensure each JSON object is followed by a newline.`,
+        );
+      }
 
       // Process all complete JSON objects in the buffer
       let boundary = buffer.indexOf('\n');

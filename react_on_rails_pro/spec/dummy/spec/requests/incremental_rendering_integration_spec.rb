@@ -18,13 +18,13 @@ describe "Incremental Rendering Integration", :integration do
   # Fixture bundle paths (real files on disk)
   let(:fixture_bundle_path) do
     File.expand_path(
-      "../../../../packages/node-renderer/tests/fixtures/bundle-incremental.js",
+      "../../../../../packages/react-on-rails-pro-node-renderer/tests/fixtures/bundle-incremental.js",
       __dir__
     )
   end
   let(:fixture_rsc_bundle_path) do
     File.expand_path(
-      "../../../../packages/node-renderer/tests/fixtures/secondary-bundle-incremental.js",
+      "../../../../../packages/react-on-rails-pro-node-renderer/tests/fixtures/secondary-bundle-incremental.js",
       __dir__
     )
   end

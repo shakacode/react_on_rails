@@ -315,7 +315,7 @@ export default function run(config: Partial<Config>) {
           }
         },
 
-        onUpdateReceived: (obj: unknown) => {
+        onUpdateReceived: async (obj: unknown) => {
           if (!incrementalSink) {
             log.error({ msg: 'Unexpected update chunk received after rendering was aborted', obj });
             return;
@@ -323,7 +323,7 @@ export default function run(config: Partial<Config>) {
 
           try {
             log.info(`Received a new update chunk ${JSON.stringify(obj)}`);
-            incrementalSink.add(obj);
+            await incrementalSink.add(obj);
           } catch (err) {
             // Log error but don't stop processing
             log.error({ err, msg: 'Error processing update chunk' });

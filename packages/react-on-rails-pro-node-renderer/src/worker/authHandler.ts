@@ -7,7 +7,6 @@
 // TODO: Replace with fastify-basic-auth per https://github.com/shakacode/react_on_rails_pro/issues/110
 
 import { timingSafeEqual } from 'crypto';
-import type { FastifyRequest } from './types.js';
 import { getConfig } from '../shared/configBuilder.js';
 
 export interface AuthBody {
