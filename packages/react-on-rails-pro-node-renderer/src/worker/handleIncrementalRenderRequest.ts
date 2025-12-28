@@ -61,10 +61,32 @@ export type IncrementalRenderResult = {
 };
 
 /**
- * Starts handling an incremental render request. This function:
- * - Calls handleRenderRequest internally to handle all validation and VM execution
- * - Returns the result from handleRenderRequest directly
- * - Provides a sink for future incremental updates (to be implemented in next commit)
+ * Handles the initial request for incremental rendering and returns a "sink" for updates.
+ *
+ * ARCHITECTURE: Incremental rendering uses a "sink" pattern for update chunks:
+ *
+ * 1. Initial Request Flow:
+ *    Rails → NDJSON line 1 → handleIncrementalRenderRequest → VM executes renderingRequest
+ *    └── Creates AsyncPropsManager, stores in sharedExecutionContext
+ *    └── React component suspends on asyncPropsManager.getProp("propName")
+ *    └── Returns streaming response (initial shell HTML)
+ *
+ * 2. Update Chunk Flow (for each async prop):
+ *    Rails → NDJSON line N → sink.add(chunk) → VM executes updateChunk
+ *    └── updateChunk calls asyncPropsManager.setProp("propName", value)
+ *    └── React promise resolves, component resumes rendering
+ *    └── More HTML chunks stream back
+ *
+ * 3. Stream End Flow:
+ *    Rails closes HTTP request → sink.handleRequestClosed()
+ *    └── Executes onRequestClosedUpdateChunk (calls asyncPropsManager.endStream())
+ *    └── Any unresolved props reject with error
+ *
+ * The sink uses the SAME ExecutionContext created during initial request,
+ * so update chunks can access sharedExecutionContext.get("asyncPropsManager").
+ *
+ * @returns response - The initial render result (streaming HTML)
+ * @returns sink - Object with add() and handleRequestClosed() for processing updates
  */
 export async function handleIncrementalRenderRequest(
   initial: IncrementalRenderInitialRequest,
