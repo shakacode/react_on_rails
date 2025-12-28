@@ -272,7 +272,7 @@ describe ReactOnRailsPro::Request do
       expect(described_class.send(:connection)).to eq(new_connection)
     end
 
-    it "handles close errors gracefully during reset" do
+    it "propagates close errors during reset" do
       old_connection = instance_double(HTTPX::Session)
       new_connection = instance_double(HTTPX::Session)
 
@@ -281,8 +281,10 @@ describe ReactOnRailsPro::Request do
       allow(described_class).to receive(:create_connection).and_return(new_connection)
       allow(old_connection).to receive(:close).and_raise(StandardError, "Close failed")
 
-      # Should not raise, should still set new connection
-      expect { described_class.reset_connection }.not_to raise_error
+      # Should raise the close error
+      expect { described_class.reset_connection }.to raise_error(StandardError, "Close failed")
+
+      # But new connection should still be set (close happens after assignment)
       expect(described_class.send(:connection)).to eq(new_connection)
     end
   end

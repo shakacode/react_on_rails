@@ -16,7 +16,7 @@ module ReactOnRailsPro
           new_conn = create_connection
           old_conn = @connection
           @connection = new_conn
-          old_conn&.close rescue nil # rubocop:disable Style/RescueModifier
+          old_conn&.close
         end
       end
 
