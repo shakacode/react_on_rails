@@ -23,7 +23,7 @@
     "@fastify/multipart": "^8.3.1 || ^9.0.3",
     "fastify": "^4.29.0 || ^5.2.1",
     "fs-extra": "^11.2.0",
-    "jsonwebtoken": "^9.0.2",
+    "jsonwebtoken": "^9.0.3",
     "lockfile": "^1.0.4",
     "pino": "^9.0.0"
   },
