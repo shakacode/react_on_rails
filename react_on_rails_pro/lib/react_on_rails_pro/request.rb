@@ -353,7 +353,6 @@ module ReactOnRailsPro
                                      nil
                                    end
           )
-          .plugin(:stream)
           .plugin(:stream_bidi)
           # See https://www.rubydoc.info/gems/httpx/1.3.3/HTTPX%2FOptions:initialize for the available options
           .with(
