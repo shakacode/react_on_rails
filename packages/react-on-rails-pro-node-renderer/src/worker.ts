@@ -28,6 +28,7 @@ import {
   type IncrementalRenderSink,
 } from './worker/handleIncrementalRenderRequest.js';
 import { handleIncrementalRenderStream } from './worker/handleIncrementalRenderStream.js';
+import { BODY_SIZE_LIMIT, FIELD_SIZE_LIMIT } from './shared/constants.js';
 import {
   errorResponseResult,
   formatExceptionMessage,
@@ -132,7 +133,7 @@ export default function run(config: Partial<Config>) {
 
   const app = fastify({
     http2: useHttp2 as true,
-    bodyLimit: 104857600, // 100 MB
+    bodyLimit: BODY_SIZE_LIMIT,
     logger:
       logHttpLevel !== 'silent' ? { name: 'RORP HTTP', level: logHttpLevel, ...sharedLoggerOptions } : false,
     ...fastifyServerOptions,
@@ -147,16 +148,13 @@ export default function run(config: Partial<Config>) {
     done();
   });
 
-  // 10 MB limit for code including props
-  const fieldSizeLimit = 1024 * 1024 * 10;
-
   // Supports application/x-www-form-urlencoded
   void app.register(fastifyFormbody);
   // Supports multipart/form-data
   void app.register(fastifyMultipart, {
     attachFieldsToBody: 'keyValues',
     limits: {
-      fieldSize: fieldSizeLimit,
+      fieldSize: FIELD_SIZE_LIMIT,
       // For bundles and assets
       fileSize: Infinity,
     },
