@@ -7,9 +7,17 @@ require_relative "stream_request"
 module ReactOnRailsPro
   class Request # rubocop:disable Metrics/ClassLength
     class << self
+      # Mutex for thread-safe connection management.
+      # Using a constant eliminates the race condition that would exist with @mutex ||= Mutex.new
+      CONNECTION_MUTEX = Mutex.new
+
       def reset_connection
-        @connection&.close
-        @connection = create_connection
+        CONNECTION_MUTEX.synchronize do
+          new_conn = create_connection
+          old_conn = @connection
+          @connection = new_conn
+          old_conn&.close
+        end
       end
 
       def render_code(path, js_code, send_bundle)
@@ -83,7 +91,14 @@ module ReactOnRailsPro
       private
 
       def connection
-        @connection ||= create_connection
+        # Fast path: return existing connection without locking (lock-free for 99.99% of calls)
+        conn = @connection
+        return conn if conn
+
+        # Slow path: initialize with lock (only happens once per process)
+        CONNECTION_MUTEX.synchronize do
+          @connection ||= create_connection
+        end
       end
 
       def perform_request(path, **post_options) # rubocop:disable Metrics/AbcSize,Metrics/CyclomaticComplexity
