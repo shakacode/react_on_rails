@@ -35,7 +35,7 @@ export type IncrementalRenderInitialRequest = {
 
 export type FirstIncrementalRenderRequestChunk = {
   renderingRequest: string;
-  onRequestClosedUpdateChunk?: string;
+  onRequestClosedUpdateChunk?: UpdateChunk;
 };
 
 function assertFirstIncrementalRenderRequestChunk(
@@ -45,13 +45,14 @@ function assertFirstIncrementalRenderRequestChunk(
     typeof chunk !== 'object' ||
     chunk === null ||
     !('renderingRequest' in chunk) ||
-    typeof chunk.renderingRequest !== 'string' ||
-    // onRequestClosedUpdateChunk is an optional field
-    ('onRequestClosedUpdateChunk' in chunk &&
-      chunk.onRequestClosedUpdateChunk &&
-      typeof chunk.onRequestClosedUpdateChunk !== 'object')
+    typeof chunk.renderingRequest !== 'string'
   ) {
     throw new Error('Invalid first incremental render request chunk received, missing properties');
+  }
+
+  // Validate onRequestClosedUpdateChunk if present (optional field)
+  if ('onRequestClosedUpdateChunk' in chunk && chunk.onRequestClosedUpdateChunk) {
+    assertIsUpdateChunk(chunk.onRequestClosedUpdateChunk);
   }
 }
 
@@ -131,21 +132,16 @@ export async function handleIncrementalRenderRequest(
             return;
           }
 
-          try {
-            assertIsUpdateChunk(onRequestClosedUpdateChunk);
-            const bundlePath = getRequestBundleFilePath(onRequestClosedUpdateChunk.bundleTimestamp);
-            executionContext
-              .runInVM(onRequestClosedUpdateChunk.updateChunk, bundlePath)
-              .catch((err: unknown) => {
-                log.error({
-                  msg: 'Error running onRequestClosedUpdateChunk',
-                  err,
-                  onRequestClosedUpdateChunk,
-                });
+          const bundlePath = getRequestBundleFilePath(onRequestClosedUpdateChunk.bundleTimestamp);
+          executionContext
+            .runInVM(onRequestClosedUpdateChunk.updateChunk, bundlePath)
+            .catch((err: unknown) => {
+              log.error({
+                msg: 'Error running onRequestClosedUpdateChunk',
+                err,
+                onRequestClosedUpdateChunk,
               });
-          } catch (err) {
-            log.error({ msg: 'Invalid onRequestClosedUpdateChunk', err, onRequestClosedUpdateChunk });
-          }
+            });
         },
       },
     };

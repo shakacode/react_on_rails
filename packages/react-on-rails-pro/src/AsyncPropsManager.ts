@@ -84,6 +84,7 @@ class AsyncPropsManager {
     }
 
     promiseController.resolve(propValue);
+    promiseController.resolved = true;
   }
 
   endStream() {
