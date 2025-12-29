@@ -111,8 +111,9 @@ export class VMContextNotFoundError extends Error {
 
 async function buildVM(filePath: string): Promise<VMContext> {
   // Return existing promise if VM is already being created
-  if (vmCreationPromises.has(filePath)) {
-    return vmCreationPromises.get(filePath) as Promise<VMContext>;
+  const existingVmCreationPromise = vmCreationPromises.get(filePath);
+  if (existingVmCreationPromise) {
+    return existingVmCreationPromise;
   }
 
   // Check if VM for this bundle already exists
@@ -120,7 +121,7 @@ async function buildVM(filePath: string): Promise<VMContext> {
   if (vmContext) {
     // Update last used time when accessing existing VM
     vmContext.lastUsed = Date.now();
-    return Promise.resolve(vmContext);
+    return vmContext;
   }
 
   // Create a new promise for this VM creation
