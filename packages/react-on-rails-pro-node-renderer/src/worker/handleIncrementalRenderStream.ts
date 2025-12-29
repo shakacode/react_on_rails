@@ -1,7 +1,6 @@
 import { StringDecoder } from 'string_decoder';
 import type { ResponseResult } from '../shared/utils';
 import * as errorReporter from '../shared/errorReporter';
-import log from '../shared/log';
 
 // Maximum size for a single NDJSON line (10MB - matches Fastify fieldSizeLimit)
 export const MAX_NDJSON_LINE_SIZE = 10 * 1024 * 1024;
@@ -88,7 +87,6 @@ export async function handleIncrementalRenderStream(
             } else {
               // Error in subsequent chunks - log and report but continue processing
               const reportedMessage = `JSON parsing error in update chunk: ${err instanceof Error ? err.message : String(err)}`;
-              log.error({ msg: reportedMessage });
               errorReporter.message(reportedMessage);
               // Skip this malformed chunk and continue with next ones
               // eslint-disable-next-line no-continue
@@ -121,7 +119,6 @@ export async function handleIncrementalRenderStream(
             } catch (err) {
               // Error in update chunk processing - log and report but continue processing
               const errorMessage = `Error processing update chunk: ${err instanceof Error ? err.message : String(err)}`;
-              log.error({ msg: errorMessage, err });
               errorReporter.message(errorMessage);
               // Continue processing other chunks
             }
