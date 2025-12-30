@@ -1,0 +1,222 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 550" font-family="system-ui, -apple-system, sans-serif">
+  <defs>
+    <linearGradient id="bgGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0c0a09"/>
+      <stop offset="100%" style="stop-color:#1c1917"/>
+    </linearGradient>
+    <linearGradient id="fetchGrad1" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#f43f5e"/>
+      <stop offset="100%" style="stop-color:#e11d48"/>
+    </linearGradient>
+    <linearGradient id="fetchGrad2" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#f97316"/>
+      <stop offset="100%" style="stop-color:#ea580c"/>
+    </linearGradient>
+    <linearGradient id="fetchGrad3" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#eab308"/>
+      <stop offset="100%" style="stop-color:#ca8a04"/>
+    </linearGradient>
+    <linearGradient id="parallelGrad1" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#22c55e"/>
+      <stop offset="100%" style="stop-color:#16a34a"/>
+    </linearGradient>
+    <linearGradient id="parallelGrad2" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#14b8a6"/>
+      <stop offset="100%" style="stop-color:#0d9488"/>
+    </linearGradient>
+    <linearGradient id="parallelGrad3" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#06b6d4"/>
+      <stop offset="100%" style="stop-color:#0891b2"/>
+    </linearGradient>
+    <filter id="glow2" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="550" fill="url(#bgGrad2)"/>
+
+  <!-- Decorative circles -->
+  <circle cx="100" cy="100" r="200" fill="none" stroke="#292524" stroke-width="1" opacity="0.5"/>
+  <circle cx="800" cy="450" r="150" fill="none" stroke="#292524" stroke-width="1" opacity="0.5"/>
+
+  <!-- Title -->
+  <text x="450" y="45" text-anchor="middle" font-size="28" font-weight="bold" fill="white">Waterfall vs Parallel Fetching</text>
+  <text x="450" y="75" text-anchor="middle" font-size="14" fill="#a8a29e">Why async props dramatically improve performance</text>
+
+  <!-- Waterfall Section -->
+  <g transform="translate(50, 110)">
+    <rect x="0" y="0" width="380" height="200" rx="16" fill="#1c1917" stroke="#44403c" stroke-width="1"/>
+
+    <!-- Header -->
+    <rect x="0" y="0" width="380" height="45" rx="16" fill="#292524"/>
+    <rect x="0" y="30" width="380" height="15" fill="#292524"/>
+    <text x="30" y="30" font-size="16" font-weight="600" fill="#fca5a5">❌ Waterfall Pattern</text>
+    <text x="250" y="30" font-size="12" fill="#78716c">Traditional SSR</text>
+
+    <!-- Gantt chart -->
+    <g transform="translate(20, 60)">
+      <!-- Time axis -->
+      <line x1="0" y1="120" x2="340" y2="120" stroke="#44403c" stroke-width="1"/>
+      <text x="0" y="140" font-size="10" fill="#78716c">0ms</text>
+      <text x="85" y="140" font-size="10" fill="#78716c">300ms</text>
+      <text x="170" y="140" font-size="10" fill="#78716c">600ms</text>
+      <text x="255" y="140" font-size="10" fill="#78716c">900ms</text>
+      <text x="330" y="140" font-size="10" fill="#78716c">1200ms</text>
+
+      <!-- Fetch 1: Users (0-400ms) -->
+      <g>
+        <text x="0" y="20" font-size="11" fill="#fca5a5">Users</text>
+        <rect x="60" y="5" width="0" height="25" rx="4" fill="url(#fetchGrad1)" filter="url(#glow2)">
+          <animate attributeName="width" values="0;113" dur="1.2s" fill="freeze"/>
+        </rect>
+        <text x="116" y="22" text-anchor="middle" font-size="9" fill="white" opacity="0">
+          400ms
+          <animate attributeName="opacity" values="0;1" dur="0.2s" begin="1.2s" fill="freeze"/>
+        </text>
+      </g>
+
+      <!-- Fetch 2: Posts (400-700ms) - waits for Users -->
+      <g>
+        <text x="0" y="55" font-size="11" fill="#fb923c">Posts</text>
+        <rect x="173" y="40" width="0" height="25" rx="4" fill="url(#fetchGrad2)" filter="url(#glow2)">
+          <animate attributeName="width" values="0;85" dur="0.9s" begin="1.2s" fill="freeze"/>
+        </rect>
+        <text x="215" y="57" text-anchor="middle" font-size="9" fill="white" opacity="0">
+          300ms
+          <animate attributeName="opacity" values="0;1" dur="0.2s" begin="2.1s" fill="freeze"/>
+        </text>
+        <!-- Waiting indicator -->
+        <line x1="60" y1="52" x2="173" y2="52" stroke="#44403c" stroke-width="1" stroke-dasharray="4,4" opacity="0">
+          <animate attributeName="opacity" values="0;1" dur="0.3s" begin="1.2s" fill="freeze"/>
+        </line>
+      </g>
+
+      <!-- Fetch 3: Comments (700-1200ms) - waits for Posts -->
+      <g>
+        <text x="0" y="90" font-size="11" fill="#facc15">Comments</text>
+        <rect x="258" y="75" width="0" height="25" rx="4" fill="url(#fetchGrad3)" filter="url(#glow2)">
+          <animate attributeName="width" values="0;142" dur="1.5s" begin="2.1s" fill="freeze"/>
+        </rect>
+        <text x="329" y="92" text-anchor="middle" font-size="9" fill="white" opacity="0">
+          500ms
+          <animate attributeName="opacity" values="0;1" dur="0.2s" begin="3.6s" fill="freeze"/>
+        </text>
+        <!-- Waiting indicator -->
+        <line x1="60" y1="87" x2="258" y2="87" stroke="#44403c" stroke-width="1" stroke-dasharray="4,4" opacity="0">
+          <animate attributeName="opacity" values="0;1" dur="0.3s" begin="2.1s" fill="freeze"/>
+        </line>
+      </g>
+    </g>
+  </g>
+
+  <!-- Total time indicator for Waterfall -->
+  <g transform="translate(50, 320)" opacity="0">
+    <animate attributeName="opacity" values="0;1" dur="0.3s" begin="3.6s" fill="freeze"/>
+    <rect x="0" y="0" width="380" height="50" rx="12" fill="#7f1d1d" stroke="#dc2626"/>
+    <text x="190" y="22" text-anchor="middle" font-size="14" font-weight="600" fill="#fca5a5">Total Time: 1200ms</text>
+    <text x="190" y="40" text-anchor="middle" font-size="11" fill="#f87171">Each fetch waits for the previous one</text>
+  </g>
+
+  <!-- Parallel Section -->
+  <g transform="translate(470, 110)">
+    <rect x="0" y="0" width="380" height="200" rx="16" fill="#1c1917" stroke="#44403c" stroke-width="1"/>
+
+    <!-- Header -->
+    <rect x="0" y="0" width="380" height="45" rx="16" fill="#292524"/>
+    <rect x="0" y="30" width="380" height="15" fill="#292524"/>
+    <text x="30" y="30" font-size="16" font-weight="600" fill="#86efac">✓ Parallel Pattern</text>
+    <text x="270" y="30" font-size="12" fill="#78716c">Async Props</text>
+
+    <!-- Gantt chart -->
+    <g transform="translate(20, 60)">
+      <!-- Time axis -->
+      <line x1="0" y1="120" x2="340" y2="120" stroke="#44403c" stroke-width="1"/>
+      <text x="0" y="140" font-size="10" fill="#78716c">0ms</text>
+      <text x="85" y="140" font-size="10" fill="#78716c">300ms</text>
+      <text x="170" y="140" font-size="10" fill="#78716c">600ms</text>
+      <text x="255" y="140" font-size="10" fill="#78716c">900ms</text>
+      <text x="330" y="140" font-size="10" fill="#78716c">1200ms</text>
+
+      <!-- All fetches start simultaneously -->
+      <!-- Fetch 1: Users (0-400ms) -->
+      <g>
+        <text x="0" y="20" font-size="11" fill="#86efac">Users</text>
+        <rect x="60" y="5" width="0" height="25" rx="4" fill="url(#parallelGrad1)" filter="url(#glow2)">
+          <animate attributeName="width" values="0;113" dur="1.2s" fill="freeze"/>
+        </rect>
+        <text x="116" y="22" text-anchor="middle" font-size="9" fill="white" opacity="0">
+          400ms
+          <animate attributeName="opacity" values="0;1" dur="0.2s" begin="1.2s" fill="freeze"/>
+        </text>
+      </g>
+
+      <!-- Fetch 2: Posts (0-300ms) - starts immediately! -->
+      <g>
+        <text x="0" y="55" font-size="11" fill="#5eead4">Posts</text>
+        <rect x="60" y="40" width="0" height="25" rx="4" fill="url(#parallelGrad2)" filter="url(#glow2)">
+          <animate attributeName="width" values="0;85" dur="0.9s" fill="freeze"/>
+        </rect>
+        <text x="102" y="57" text-anchor="middle" font-size="9" fill="white" opacity="0">
+          300ms
+          <animate attributeName="opacity" values="0;1" dur="0.2s" begin="0.9s" fill="freeze"/>
+        </text>
+      </g>
+
+      <!-- Fetch 3: Comments (0-500ms) - starts immediately! -->
+      <g>
+        <text x="0" y="90" font-size="11" fill="#67e8f9">Comments</text>
+        <rect x="60" y="75" width="0" height="25" rx="4" fill="url(#parallelGrad3)" filter="url(#glow2)">
+          <animate attributeName="width" values="0;142" dur="1.5s" fill="freeze"/>
+        </rect>
+        <text x="131" y="92" text-anchor="middle" font-size="9" fill="white" opacity="0">
+          500ms
+          <animate attributeName="opacity" values="0;1" dur="0.2s" begin="1.5s" fill="freeze"/>
+        </text>
+      </g>
+
+      <!-- Parallel start indicator -->
+      <line x1="60" y1="5" x2="60" y2="100" stroke="#22c55e" stroke-width="2" opacity="0.5">
+        <animate attributeName="opacity" values="0;0.5;0.5;0" dur="0.5s" fill="freeze"/>
+      </line>
+    </g>
+  </g>
+
+  <!-- Total time indicator for Parallel -->
+  <g transform="translate(470, 320)" opacity="0">
+    <animate attributeName="opacity" values="0;1" dur="0.3s" begin="1.5s" fill="freeze"/>
+    <rect x="0" y="0" width="380" height="50" rx="12" fill="#14532d" stroke="#22c55e"/>
+    <text x="190" y="22" text-anchor="middle" font-size="14" font-weight="600" fill="#86efac">Total Time: 500ms</text>
+    <text x="190" y="40" text-anchor="middle" font-size="11" fill="#4ade80">All fetches run simultaneously</text>
+  </g>
+
+  <!-- Comparison Arrow -->
+  <g transform="translate(350, 395)" opacity="0">
+    <animate attributeName="opacity" values="0;1" dur="0.5s" begin="4s" fill="freeze"/>
+    <path d="M 50 0 L 100 30 L 50 60 L 50 40 L 0 40 L 0 20 L 50 20 Z" fill="#fbbf24"/>
+    <text x="150" y="40" font-size="18" font-weight="bold" fill="#fbbf24">2.4x Faster!</text>
+  </g>
+
+  <!-- Code comparison -->
+  <g transform="translate(50, 400)">
+    <rect x="0" y="0" width="380" height="120" rx="12" fill="#292524" stroke="#44403c"/>
+    <text x="20" y="25" font-size="11" font-weight="600" fill="#f87171">// Traditional - Sequential</text>
+    <text x="20" y="45" font-size="10" fill="#a8a29e" font-family="monospace">const users = await fetchUsers();</text>
+    <text x="20" y="62" font-size="10" fill="#a8a29e" font-family="monospace">const posts = await fetchPosts(users);</text>
+    <text x="20" y="79" font-size="10" fill="#a8a29e" font-family="monospace">const comments = await fetchComments(posts);</text>
+    <text x="20" y="105" font-size="10" fill="#78716c">// Each await blocks the next fetch</text>
+  </g>
+
+  <g transform="translate(470, 400)">
+    <rect x="0" y="0" width="380" height="120" rx="12" fill="#292524" stroke="#44403c"/>
+    <text x="20" y="25" font-size="11" font-weight="600" fill="#4ade80">// Async Props - Parallel</text>
+    <text x="20" y="45" font-size="10" fill="#a8a29e" font-family="monospace">users: async_prop { fetchUsers() },</text>
+    <text x="20" y="62" font-size="10" fill="#a8a29e" font-family="monospace">posts: async_prop { fetchPosts() },</text>
+    <text x="20" y="79" font-size="10" fill="#a8a29e" font-family="monospace">comments: async_prop { fetchComments() }</text>
+    <text x="20" y="105" font-size="10" fill="#78716c">// All fetches start immediately!</text>
+  </g>
+</svg>

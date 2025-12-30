@@ -1,0 +1,229 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 550" font-family="system-ui, -apple-system, sans-serif">
+  <defs>
+    <linearGradient id="errorBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e"/>
+      <stop offset="100%" style="stop-color:#16213e"/>
+    </linearGradient>
+    <linearGradient id="errorGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#ef4444"/>
+      <stop offset="100%" style="stop-color:#dc2626"/>
+    </linearGradient>
+    <linearGradient id="successGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#22c55e"/>
+      <stop offset="100%" style="stop-color:#16a34a"/>
+    </linearGradient>
+    <linearGradient id="warningGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#f59e0b"/>
+      <stop offset="100%" style="stop-color:#d97706"/>
+    </linearGradient>
+
+    <filter id="errorGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="glow"/>
+      <feMerge>
+        <feMergeNode in="glow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Error shake animation -->
+    <animateTransform id="shake" attributeName="transform" type="translate" values="0,0;-5,0;5,0;-5,0;5,0;0,0" dur="0.4s"/>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="550" fill="url(#errorBg)"/>
+
+  <!-- Title -->
+  <text x="450" y="45" text-anchor="middle" font-size="26" font-weight="bold" fill="white">Graceful Error Handling</text>
+  <text x="450" y="75" text-anchor="middle" font-size="14" fill="#94a3b8">When async props fail, other parts still load independently</text>
+
+  <!-- Scenario: One async prop fails -->
+  <g transform="translate(50, 110)">
+    <!-- Browser frame -->
+    <rect x="0" y="0" width="500" height="380" rx="12" fill="#0f172a" stroke="#334155" stroke-width="2"/>
+    <rect x="0" y="0" width="500" height="36" rx="12" fill="#1e293b"/>
+    <rect x="0" y="24" width="500" height="12" fill="#1e293b"/>
+    <circle cx="18" cy="18" r="5" fill="#f87171"/>
+    <circle cx="36" cy="18" r="5" fill="#fbbf24"/>
+    <circle cx="54" cy="18" r="5" fill="#4ade80"/>
+    <rect x="70" y="8" width="350" height="20" rx="4" fill="#0f172a"/>
+    <text x="85" y="22" font-size="10" fill="#64748b">myapp.com/dashboard</text>
+
+    <!-- Page content -->
+    <g transform="translate(15, 50)">
+      <!-- Header - loads successfully -->
+      <rect x="0" y="0" width="470" height="35" rx="6" fill="#3b82f6" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="0.2s" fill="freeze"/>
+      </rect>
+      <text x="235" y="23" text-anchor="middle" font-size="12" fill="white" font-weight="500" opacity="0">
+        Dashboard Header ✓
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="0.2s" fill="freeze"/>
+      </text>
+
+      <!-- Users - loads successfully -->
+      <g transform="translate(0, 50)">
+        <!-- Skeleton -->
+        <rect x="0" y="0" width="225" height="120" rx="8" fill="#1e293b" stroke="#334155" opacity="1">
+          <animate attributeName="opacity" values="1;0" dur="0.1s" begin="1.5s" fill="freeze"/>
+        </rect>
+        <!-- Success content -->
+        <rect x="0" y="0" width="225" height="120" rx="8" fill="url(#successGrad)" opacity="0">
+          <animate attributeName="opacity" values="0;1" dur="0.2s" begin="1.5s" fill="freeze"/>
+        </rect>
+        <text x="112" y="35" text-anchor="middle" font-size="12" fill="white" font-weight="500" opacity="0">
+          Users
+          <animate attributeName="opacity" values="0;1" dur="0.2s" begin="1.5s" fill="freeze"/>
+        </text>
+        <text x="112" y="60" text-anchor="middle" font-size="24" opacity="0">
+          ✓
+          <animate attributeName="opacity" values="0;1" dur="0.2s" begin="1.5s" fill="freeze"/>
+        </text>
+        <text x="112" y="85" text-anchor="middle" font-size="10" fill="rgba(255,255,255,0.8)" opacity="0">
+          Successfully loaded
+          <animate attributeName="opacity" values="0;1" dur="0.2s" begin="1.5s" fill="freeze"/>
+        </text>
+        <text x="112" y="105" text-anchor="middle" font-size="10" fill="rgba(255,255,255,0.6)" opacity="0">
+          3 users displayed
+          <animate attributeName="opacity" values="0;1" dur="0.2s" begin="1.5s" fill="freeze"/>
+        </text>
+      </g>
+
+      <!-- Posts - FAILS! -->
+      <g transform="translate(245, 50)">
+        <!-- Skeleton -->
+        <rect x="0" y="0" width="225" height="120" rx="8" fill="#1e293b" stroke="#334155" opacity="1">
+          <animate attributeName="opacity" values="1;0" dur="0.1s" begin="2.5s" fill="freeze"/>
+        </rect>
+        <!-- Error state -->
+        <g opacity="0">
+          <animate attributeName="opacity" values="0;1" dur="0.2s" begin="2.5s" fill="freeze"/>
+          <rect x="0" y="0" width="225" height="120" rx="8" fill="#7f1d1d" stroke="#ef4444" stroke-width="2" filter="url(#errorGlow)">
+            <animateTransform attributeName="transform" type="translate" values="0,0;-3,0;3,0;-3,0;3,0;0,0" dur="0.3s" begin="2.5s"/>
+          </rect>
+          <text x="112" y="35" text-anchor="middle" font-size="12" fill="#fca5a5" font-weight="500">Posts</text>
+          <text x="112" y="60" text-anchor="middle" font-size="24">❌</text>
+          <text x="112" y="85" text-anchor="middle" font-size="10" fill="#fca5a5">Failed to load</text>
+          <rect x="45" y="95" width="135" height="20" rx="4" fill="#991b1b" stroke="#ef4444"/>
+          <text x="112" y="109" text-anchor="middle" font-size="9" fill="#fca5a5">↻ Retry</text>
+        </g>
+      </g>
+
+      <!-- Comments - still loads successfully! -->
+      <g transform="translate(0, 185)">
+        <!-- Skeleton -->
+        <rect x="0" y="0" width="470" height="80" rx="8" fill="#1e293b" stroke="#334155" opacity="1">
+          <animate attributeName="opacity" values="1;0" dur="0.1s" begin="3.5s" fill="freeze"/>
+        </rect>
+        <!-- Success content -->
+        <rect x="0" y="0" width="470" height="80" rx="8" fill="url(#successGrad)" opacity="0">
+          <animate attributeName="opacity" values="0;1" dur="0.2s" begin="3.5s" fill="freeze"/>
+        </rect>
+        <text x="235" y="30" text-anchor="middle" font-size="12" fill="white" font-weight="500" opacity="0">
+          Comments ✓
+          <animate attributeName="opacity" values="0;1" dur="0.2s" begin="3.5s" fill="freeze"/>
+        </text>
+        <text x="235" y="55" text-anchor="middle" font-size="10" fill="rgba(255,255,255,0.8)" opacity="0">
+          12 comments loaded - unaffected by Posts error
+          <animate attributeName="opacity" values="0;1" dur="0.2s" begin="3.5s" fill="freeze"/>
+        </text>
+      </g>
+
+      <!-- Key insight -->
+      <g transform="translate(0, 280)" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.3s" begin="4s" fill="freeze"/>
+        <rect x="0" y="0" width="470" height="40" rx="8" fill="#1e3a5f" stroke="#3b82f6"/>
+        <text x="235" y="25" text-anchor="middle" font-size="11" fill="#60a5fa">
+          💡 Each Suspense boundary fails independently - other content still loads!
+        </text>
+      </g>
+    </g>
+  </g>
+
+  <!-- Right side: Explanation -->
+  <g transform="translate(580, 110)">
+    <text x="0" y="0" font-size="16" font-weight="600" fill="white">Error Isolation</text>
+
+    <!-- Error boundary concept -->
+    <g transform="translate(0, 25)">
+      <rect x="0" y="0" width="290" height="130" rx="10" fill="#1e293b" stroke="#334155"/>
+
+      <text x="15" y="25" font-size="12" font-weight="500" fill="#94a3b8">React Error Boundaries</text>
+
+      <g transform="translate(15, 40)">
+        <rect x="0" y="0" width="260" height="75" rx="6" fill="#0f172a" stroke="#475569"/>
+        <text x="130" y="20" text-anchor="middle" font-size="10" fill="#64748b" font-family="monospace">&lt;ErrorBoundary&gt;</text>
+        <text x="130" y="38" text-anchor="middle" font-size="10" fill="#64748b" font-family="monospace">  &lt;Suspense fallback={...}&gt;</text>
+        <text x="130" y="56" text-anchor="middle" font-size="10" fill="#64748b" font-family="monospace">    &lt;AsyncComponent /&gt;</text>
+        <text x="130" y="74" text-anchor="middle" font-size="10" fill="#64748b" font-family="monospace">  &lt;/Suspense&gt;</text>
+      </g>
+    </g>
+
+    <!-- What happens -->
+    <g transform="translate(0, 175)">
+      <text x="0" y="0" font-size="14" font-weight="500" fill="white">What Happens</text>
+
+      <g transform="translate(0, 20)">
+        <!-- Step 1 -->
+        <g opacity="0">
+          <animate attributeName="opacity" values="0;1" dur="0.2s" begin="0.5s" fill="freeze"/>
+          <circle cx="15" cy="12" r="12" fill="#3b82f6"/>
+          <text x="15" y="16" text-anchor="middle" font-size="10" fill="white">1</text>
+          <text x="35" y="16" font-size="11" fill="#94a3b8">Shell renders immediately</text>
+        </g>
+
+        <!-- Step 2 -->
+        <g transform="translate(0, 35)" opacity="0">
+          <animate attributeName="opacity" values="0;1" dur="0.2s" begin="1.5s" fill="freeze"/>
+          <circle cx="15" cy="12" r="12" fill="#22c55e"/>
+          <text x="15" y="16" text-anchor="middle" font-size="10" fill="white">2</text>
+          <text x="35" y="16" font-size="11" fill="#94a3b8">Users loads successfully</text>
+        </g>
+
+        <!-- Step 3 -->
+        <g transform="translate(0, 70)" opacity="0">
+          <animate attributeName="opacity" values="0;1" dur="0.2s" begin="2.5s" fill="freeze"/>
+          <circle cx="15" cy="12" r="12" fill="#ef4444"/>
+          <text x="15" y="16" text-anchor="middle" font-size="10" fill="white">3</text>
+          <text x="35" y="16" font-size="11" fill="#fca5a5">Posts fails - shows error UI</text>
+        </g>
+
+        <!-- Step 4 -->
+        <g transform="translate(0, 105)" opacity="0">
+          <animate attributeName="opacity" values="0;1" dur="0.2s" begin="3.5s" fill="freeze"/>
+          <circle cx="15" cy="12" r="12" fill="#22c55e"/>
+          <text x="15" y="16" text-anchor="middle" font-size="10" fill="white">4</text>
+          <text x="35" y="16" font-size="11" fill="#94a3b8">Comments still loads!</text>
+        </g>
+      </g>
+    </g>
+
+    <!-- Best practices -->
+    <g transform="translate(0, 340)">
+      <text x="0" y="0" font-size="14" font-weight="500" fill="white">Best Practices</text>
+
+      <g transform="translate(0, 20)">
+        <rect x="0" y="0" width="290" height="130" rx="8" fill="#14532d" stroke="#22c55e"/>
+
+        <g transform="translate(15, 20)">
+          <text x="0" y="0" font-size="10" fill="#86efac">✓ Wrap each async section in Error Boundary</text>
+          <text x="0" y="25" font-size="10" fill="#86efac">✓ Provide meaningful fallback UI</text>
+          <text x="0" y="50" font-size="10" fill="#86efac">✓ Include retry mechanism</text>
+          <text x="0" y="75" font-size="10" fill="#86efac">✓ Log errors to monitoring service</text>
+          <text x="0" y="100" font-size="10" fill="#86efac">✓ Don't let one failure break entire page</text>
+        </g>
+      </g>
+    </g>
+  </g>
+
+  <!-- Comparison: With vs Without Error Boundaries -->
+  <g transform="translate(50, 505)">
+    <rect x="0" y="0" width="800" height="35" rx="8" fill="#1e293b"/>
+
+    <g transform="translate(20, 22)">
+      <rect x="0" y="-10" width="16" height="16" rx="4" fill="#ef4444"/>
+      <text x="25" y="3" font-size="11" fill="#fca5a5">Without Error Boundaries: Entire page crashes</text>
+
+      <rect x="350" y="-10" width="16" height="16" rx="4" fill="#22c55e"/>
+      <text x="375" y="3" font-size="11" fill="#86efac">With Error Boundaries: Only affected section shows error</text>
+    </g>
+  </g>
+</svg>

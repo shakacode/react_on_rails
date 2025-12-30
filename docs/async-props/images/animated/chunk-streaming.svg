@@ -1,0 +1,292 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600" font-family="system-ui, -apple-system, sans-serif">
+  <defs>
+    <linearGradient id="darkBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a0a0a"/>
+      <stop offset="100%" style="stop-color:#171717"/>
+    </linearGradient>
+    <linearGradient id="chunkGrad1" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#3b82f6"/>
+      <stop offset="100%" style="stop-color:#2563eb"/>
+    </linearGradient>
+    <linearGradient id="chunkGrad2" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#22c55e"/>
+      <stop offset="100%" style="stop-color:#16a34a"/>
+    </linearGradient>
+    <linearGradient id="chunkGrad3" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#a855f7"/>
+      <stop offset="100%" style="stop-color:#9333ea"/>
+    </linearGradient>
+    <linearGradient id="pipeGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#374151"/>
+      <stop offset="50%" style="stop-color:#1f2937"/>
+      <stop offset="100%" style="stop-color:#374151"/>
+    </linearGradient>
+    <filter id="neonGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="600" fill="url(#darkBg)"/>
+
+  <!-- Grid pattern -->
+  <g stroke="#262626" stroke-width="1" opacity="0.5">
+    <line x1="0" y1="100" x2="900" y2="100"/>
+    <line x1="0" y1="200" x2="900" y2="200"/>
+    <line x1="0" y1="300" x2="900" y2="300"/>
+    <line x1="0" y1="400" x2="900" y2="400"/>
+    <line x1="0" y1="500" x2="900" y2="500"/>
+  </g>
+
+  <!-- Title -->
+  <text x="450" y="45" text-anchor="middle" font-size="26" font-weight="bold" fill="white">Streaming Chunks Anatomy</text>
+  <text x="450" y="75" text-anchor="middle" font-size="14" fill="#737373">How HTML streams from server to browser in real-time</text>
+
+  <!-- Server -->
+  <g transform="translate(30, 120)">
+    <rect x="0" y="0" width="200" height="400" rx="12" fill="#1c1c1c" stroke="#404040" stroke-width="2"/>
+    <rect x="0" y="0" width="200" height="40" rx="12" fill="#262626"/>
+    <rect x="0" y="28" width="200" height="12" fill="#262626"/>
+    <text x="100" y="28" text-anchor="middle" font-size="14" font-weight="600" fill="#e5e5e5">Node Renderer</text>
+
+    <!-- React component tree -->
+    <g transform="translate(15, 55)">
+      <text x="0" y="15" font-size="11" fill="#a3a3a3">Rendering:</text>
+
+      <rect x="0" y="25" width="170" height="30" rx="4" fill="#3b82f6" opacity="0.2" stroke="#3b82f6">
+        <animate attributeName="opacity" values="0.2;0.5;0.2" dur="2s" repeatCount="indefinite"/>
+      </rect>
+      <text x="10" y="45" font-size="10" fill="#60a5fa">&lt;App&gt;</text>
+
+      <rect x="15" y="65" width="155" height="25" rx="4" fill="#22c55e" opacity="0.2" stroke="#22c55e">
+        <animate attributeName="opacity" values="0.2;0.5;0.2" dur="2s" begin="0.3s" repeatCount="indefinite"/>
+      </rect>
+      <text x="25" y="82" font-size="10" fill="#86efac">&lt;Header /&gt;</text>
+
+      <rect x="15" y="100" width="155" height="50" rx="4" fill="#a855f7" opacity="0.2" stroke="#a855f7">
+        <animate attributeName="opacity" values="0.2;0.5;0.2" dur="2s" begin="0.6s" repeatCount="indefinite"/>
+      </rect>
+      <text x="25" y="117" font-size="10" fill="#c4b5fd">&lt;Suspense&gt;</text>
+      <text x="35" y="135" font-size="9" fill="#a78bfa">&lt;UsersList /&gt;</text>
+
+      <rect x="15" y="160" width="155" height="50" rx="4" fill="#f97316" opacity="0.2" stroke="#f97316">
+        <animate attributeName="opacity" values="0.2;0.5;0.2" dur="2s" begin="0.9s" repeatCount="indefinite"/>
+      </rect>
+      <text x="25" y="177" font-size="10" fill="#fdba74">&lt;Suspense&gt;</text>
+      <text x="35" y="195" font-size="9" fill="#fb923c">&lt;PostsList /&gt;</text>
+    </g>
+
+    <!-- renderToPipeableStream -->
+    <g transform="translate(15, 290)">
+      <rect x="0" y="0" width="170" height="45" rx="6" fill="#262626" stroke="#404040"/>
+      <text x="85" y="18" text-anchor="middle" font-size="10" fill="#a3a3a3">renderToPipeableStream()</text>
+      <text x="85" y="35" text-anchor="middle" font-size="9" fill="#737373">React 18 Streaming API</text>
+    </g>
+
+    <!-- Output pipe -->
+    <rect x="175" y="305" width="30" height="20" rx="4" fill="url(#pipeGrad)"/>
+  </g>
+
+  <!-- Streaming Pipe (animated) -->
+  <g transform="translate(230, 200)">
+    <!-- Pipe structure -->
+    <rect x="0" y="110" width="350" height="30" rx="15" fill="url(#pipeGrad)" stroke="#525252"/>
+
+    <!-- Flow lines inside pipe -->
+    <line x1="15" y1="125" x2="335" y2="125" stroke="#404040" stroke-width="1" stroke-dasharray="10,5">
+      <animate attributeName="stroke-dashoffset" values="0;-30" dur="0.5s" repeatCount="indefinite"/>
+    </line>
+
+    <!-- Chunk 1: Shell -->
+    <g>
+      <rect x="-60" y="107" width="70" height="36" rx="8" fill="url(#chunkGrad1)" filter="url(#neonGlow)">
+        <animate attributeName="x" values="-60;360" dur="2s" begin="0s;6s" repeatCount="indefinite"/>
+      </rect>
+      <text x="-25" y="130" text-anchor="middle" font-size="10" fill="white" font-weight="500">
+        Shell
+        <animate attributeName="x" values="-25;395" dur="2s" begin="0s;6s" repeatCount="indefinite"/>
+      </text>
+    </g>
+
+    <!-- Chunk 2: Users data -->
+    <g>
+      <rect x="-60" y="107" width="70" height="36" rx="8" fill="url(#chunkGrad2)" filter="url(#neonGlow)">
+        <animate attributeName="x" values="-60;360" dur="2s" begin="2s;8s" repeatCount="indefinite"/>
+      </rect>
+      <text x="-25" y="130" text-anchor="middle" font-size="10" fill="white" font-weight="500">
+        Users
+        <animate attributeName="x" values="-25;395" dur="2s" begin="2s;8s" repeatCount="indefinite"/>
+      </text>
+    </g>
+
+    <!-- Chunk 3: Posts data -->
+    <g>
+      <rect x="-60" y="107" width="70" height="36" rx="8" fill="url(#chunkGrad3)" filter="url(#neonGlow)">
+        <animate attributeName="x" values="-60;360" dur="2s" begin="4s;10s" repeatCount="indefinite"/>
+      </rect>
+      <text x="-25" y="130" text-anchor="middle" font-size="10" fill="white" font-weight="500">
+        Posts
+        <animate attributeName="x" values="-25;395" dur="2s" begin="4s;10s" repeatCount="indefinite"/>
+      </text>
+    </g>
+
+    <!-- Labels -->
+    <text x="175" y="95" text-anchor="middle" font-size="12" fill="#a3a3a3">HTTP Response Stream</text>
+    <text x="175" y="165" text-anchor="middle" font-size="10" fill="#737373">Transfer-Encoding: chunked</text>
+  </g>
+
+  <!-- Browser -->
+  <g transform="translate(610, 120)">
+    <rect x="0" y="0" width="260" height="400" rx="12" fill="#1c1c1c" stroke="#404040" stroke-width="2"/>
+    <rect x="0" y="0" width="260" height="40" rx="12" fill="#262626"/>
+    <rect x="0" y="28" width="260" height="12" fill="#262626"/>
+
+    <!-- Traffic lights -->
+    <circle cx="20" cy="20" r="6" fill="#ef4444"/>
+    <circle cx="40" cy="20" r="6" fill="#fbbf24"/>
+    <circle cx="60" cy="20" r="6" fill="#22c55e"/>
+
+    <text x="150" y="25" text-anchor="middle" font-size="12" fill="#e5e5e5">Browser</text>
+
+    <!-- Page content building up -->
+    <g transform="translate(15, 55)">
+      <!-- Shell appears first -->
+      <g opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.3s" begin="1.5s" fill="freeze"/>
+        <rect x="0" y="0" width="230" height="35" rx="6" fill="#3b82f6"/>
+        <text x="115" y="22" text-anchor="middle" font-size="11" fill="white">Header</text>
+      </g>
+
+      <!-- Users skeleton then content -->
+      <g>
+        <!-- Skeleton -->
+        <rect x="0" y="45" width="110" height="80" rx="6" fill="#262626" stroke="#404040" opacity="1">
+          <animate attributeName="opacity" values="1;0" dur="0.2s" begin="3.5s" fill="freeze"/>
+        </rect>
+        <text x="55" y="90" text-anchor="middle" font-size="9" fill="#525252" opacity="1">
+          Loading...
+          <animate attributeName="opacity" values="1;0" dur="0.2s" begin="3.5s" fill="freeze"/>
+        </text>
+
+        <!-- Actual content -->
+        <rect x="0" y="45" width="110" height="80" rx="6" fill="#22c55e" opacity="0">
+          <animate attributeName="opacity" values="0;1" dur="0.3s" begin="3.5s" fill="freeze"/>
+        </rect>
+        <text x="55" y="75" text-anchor="middle" font-size="10" fill="white" font-weight="500" opacity="0">
+          Users
+          <animate attributeName="opacity" values="0;1" dur="0.3s" begin="3.5s" fill="freeze"/>
+        </text>
+        <text x="55" y="95" text-anchor="middle" font-size="9" fill="rgba(255,255,255,0.7)" opacity="0">
+          3 loaded
+          <animate attributeName="opacity" values="0;1" dur="0.3s" begin="3.5s" fill="freeze"/>
+        </text>
+      </g>
+
+      <!-- Posts skeleton then content -->
+      <g>
+        <!-- Skeleton -->
+        <rect x="120" y="45" width="110" height="80" rx="6" fill="#262626" stroke="#404040" opacity="1">
+          <animate attributeName="opacity" values="1;0" dur="0.2s" begin="5.5s" fill="freeze"/>
+        </rect>
+        <text x="175" y="90" text-anchor="middle" font-size="9" fill="#525252" opacity="1">
+          Loading...
+          <animate attributeName="opacity" values="1;0" dur="0.2s" begin="5.5s" fill="freeze"/>
+        </text>
+
+        <!-- Actual content -->
+        <rect x="120" y="45" width="110" height="80" rx="6" fill="#a855f7" opacity="0">
+          <animate attributeName="opacity" values="0;1" dur="0.3s" begin="5.5s" fill="freeze"/>
+        </rect>
+        <text x="175" y="75" text-anchor="middle" font-size="10" fill="white" font-weight="500" opacity="0">
+          Posts
+          <animate attributeName="opacity" values="0;1" dur="0.3s" begin="5.5s" fill="freeze"/>
+        </text>
+        <text x="175" y="95" text-anchor="middle" font-size="9" fill="rgba(255,255,255,0.7)" opacity="0">
+          5 loaded
+          <animate attributeName="opacity" values="0;1" dur="0.3s" begin="5.5s" fill="freeze"/>
+        </text>
+      </g>
+    </g>
+
+    <!-- Network panel -->
+    <g transform="translate(15, 220)">
+      <rect x="0" y="0" width="230" height="165" rx="6" fill="#0a0a0a" stroke="#262626"/>
+      <text x="10" y="20" font-size="10" font-weight="500" fill="#a3a3a3">Network Timeline</text>
+
+      <!-- Chunk arrivals visualization -->
+      <g transform="translate(10, 35)">
+        <!-- Timeline -->
+        <line x1="0" y1="0" x2="210" y2="0" stroke="#404040" stroke-width="1"/>
+        <text x="0" y="15" font-size="8" fill="#525252">0ms</text>
+        <text x="70" y="15" font-size="8" fill="#525252">500ms</text>
+        <text x="140" y="15" font-size="8" fill="#525252">1000ms</text>
+        <text x="200" y="15" font-size="8" fill="#525252">1500ms</text>
+
+        <!-- Chunk 1 bar -->
+        <g transform="translate(0, 25)">
+          <text x="0" y="12" font-size="9" fill="#60a5fa">Shell</text>
+          <rect x="45" y="2" width="0" height="14" rx="3" fill="#3b82f6">
+            <animate attributeName="width" values="0;30" dur="0.3s" begin="1.5s" fill="freeze"/>
+          </rect>
+        </g>
+
+        <!-- Chunk 2 bar -->
+        <g transform="translate(0, 50)">
+          <text x="0" y="12" font-size="9" fill="#86efac">Users</text>
+          <rect x="45" y="2" width="0" height="14" rx="3" fill="#22c55e">
+            <animate attributeName="width" values="0;60" dur="0.3s" begin="3.5s" fill="freeze"/>
+          </rect>
+        </g>
+
+        <!-- Chunk 3 bar -->
+        <g transform="translate(0, 75)">
+          <text x="0" y="12" font-size="9" fill="#c4b5fd">Posts</text>
+          <rect x="45" y="2" width="0" height="14" rx="3" fill="#a855f7">
+            <animate attributeName="width" values="0;80" dur="0.3s" begin="5.5s" fill="freeze"/>
+          </rect>
+        </g>
+
+        <!-- TTFB indicator -->
+        <g transform="translate(0, 100)" opacity="0">
+          <animate attributeName="opacity" values="0;1" dur="0.2s" begin="1.5s" fill="freeze"/>
+          <line x1="75" y1="0" x2="75" y2="-85" stroke="#22c55e" stroke-width="1" stroke-dasharray="3,3"/>
+          <rect x="60" y="5" width="60" height="18" rx="4" fill="#14532d"/>
+          <text x="90" y="17" text-anchor="middle" font-size="8" fill="#86efac">TTFB: 50ms</text>
+        </g>
+      </g>
+    </g>
+  </g>
+
+  <!-- Chunk anatomy detail -->
+  <g transform="translate(50, 540)">
+    <text x="0" y="0" font-size="12" font-weight="600" fill="white">Chunk Contents:</text>
+
+    <g transform="translate(120, -15)">
+      <rect x="0" y="0" width="180" height="35" rx="6" fill="url(#chunkGrad1)"/>
+      <text x="90" y="15" text-anchor="middle" font-size="9" fill="white" font-weight="500">Shell Chunk</text>
+      <text x="90" y="28" text-anchor="middle" font-size="8" fill="rgba(255,255,255,0.7)">&lt;html&gt;&lt;head&gt;...&lt;/head&gt;&lt;body&gt;...</text>
+    </g>
+
+    <g transform="translate(320, -15)">
+      <rect x="0" y="0" width="180" height="35" rx="6" fill="url(#chunkGrad2)"/>
+      <text x="90" y="15" text-anchor="middle" font-size="9" fill="white" font-weight="500">Data Chunk</text>
+      <text x="90" y="28" text-anchor="middle" font-size="8" fill="rgba(255,255,255,0.7)">&lt;script&gt;$RC(0, users)&lt;/script&gt;</text>
+    </g>
+
+    <g transform="translate(520, -15)">
+      <rect x="0" y="0" width="180" height="35" rx="6" fill="url(#chunkGrad3)"/>
+      <text x="90" y="15" text-anchor="middle" font-size="9" fill="white" font-weight="500">Replacement Chunk</text>
+      <text x="90" y="28" text-anchor="middle" font-size="8" fill="rgba(255,255,255,0.7)">&lt;div&gt;Actual content&lt;/div&gt;</text>
+    </g>
+
+    <g transform="translate(720, -15)">
+      <rect x="0" y="0" width="130" height="35" rx="6" fill="#262626" stroke="#404040"/>
+      <text x="65" y="15" text-anchor="middle" font-size="9" fill="#a3a3a3">End Chunk</text>
+      <text x="65" y="28" text-anchor="middle" font-size="8" fill="#737373">&lt;/body&gt;&lt;/html&gt;</text>
+    </g>
+  </g>
+</svg>

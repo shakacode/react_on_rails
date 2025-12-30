@@ -1,0 +1,408 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 700" font-family="system-ui, -apple-system, sans-serif">
+  <defs>
+    <linearGradient id="cosmicBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#030712"/>
+      <stop offset="30%" style="stop-color:#0f172a"/>
+      <stop offset="70%" style="stop-color:#1e1b4b"/>
+      <stop offset="100%" style="stop-color:#030712"/>
+    </linearGradient>
+
+    <linearGradient id="userGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ec4899"/>
+      <stop offset="100%" style="stop-color:#db2777"/>
+    </linearGradient>
+    <linearGradient id="railsGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ef4444"/>
+      <stop offset="100%" style="stop-color:#dc2626"/>
+    </linearGradient>
+    <linearGradient id="nodeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#22c55e"/>
+      <stop offset="100%" style="stop-color:#16a34a"/>
+    </linearGradient>
+    <linearGradient id="reactGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#38bdf8"/>
+      <stop offset="100%" style="stop-color:#0ea5e9"/>
+    </linearGradient>
+    <linearGradient id="dbGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f59e0b"/>
+      <stop offset="100%" style="stop-color:#d97706"/>
+    </linearGradient>
+
+    <filter id="cosmicGlow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="10" result="glow"/>
+      <feMerge>
+        <feMergeNode in="glow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Connection line gradient -->
+    <linearGradient id="lineGrad1" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#ec4899"/>
+      <stop offset="100%" style="stop-color:#ef4444"/>
+    </linearGradient>
+    <linearGradient id="lineGrad2" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#ef4444"/>
+      <stop offset="100%" style="stop-color:#22c55e"/>
+    </linearGradient>
+    <linearGradient id="lineGrad3" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#22c55e"/>
+      <stop offset="100%" style="stop-color:#ec4899"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1000" height="700" fill="url(#cosmicBg)"/>
+
+  <!-- Decorative nebula effects -->
+  <ellipse cx="200" cy="350" rx="150" ry="200" fill="#6366f1" opacity="0.05"/>
+  <ellipse cx="800" cy="400" rx="180" ry="150" fill="#ec4899" opacity="0.05"/>
+  <ellipse cx="500" cy="200" rx="200" ry="100" fill="#22c55e" opacity="0.03"/>
+
+  <!-- Title -->
+  <text x="500" y="45" text-anchor="middle" font-size="30" font-weight="bold" fill="white">Full Request Lifecycle</text>
+  <text x="500" y="75" text-anchor="middle" font-size="14" fill="#94a3b8">From user click to fully rendered page with streaming SSR</text>
+
+  <!-- Main flow container -->
+  <g transform="translate(50, 110)">
+
+    <!-- Step 1: User -->
+    <g transform="translate(0, 200)">
+      <circle cx="50" cy="50" r="45" fill="url(#userGrad)" filter="url(#cosmicGlow)" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.3s" begin="0.2s" fill="freeze"/>
+      </circle>
+      <text x="50" y="55" text-anchor="middle" font-size="30" opacity="0">
+        👤
+        <animate attributeName="opacity" values="0;1" dur="0.3s" begin="0.2s" fill="freeze"/>
+      </text>
+      <text x="50" y="115" text-anchor="middle" font-size="12" font-weight="500" fill="#f9a8d4" opacity="0">
+        User
+        <animate attributeName="opacity" values="0;1" dur="0.3s" begin="0.2s" fill="freeze"/>
+      </text>
+      <text x="50" y="132" text-anchor="middle" font-size="10" fill="#94a3b8" opacity="0">
+        Clicks link
+        <animate attributeName="opacity" values="0;1" dur="0.3s" begin="0.2s" fill="freeze"/>
+      </text>
+    </g>
+
+    <!-- Arrow 1: User to Rails -->
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.2s" begin="0.8s" fill="freeze"/>
+      <path d="M 100 250 Q 140 250 180 250" stroke="url(#lineGrad1)" stroke-width="3" fill="none" stroke-dasharray="10,5">
+        <animate attributeName="stroke-dashoffset" values="30;0" dur="0.5s" begin="0.8s" fill="freeze"/>
+      </path>
+      <polygon points="180,250 170,243 170,257" fill="#ef4444"/>
+      <text x="140" y="235" text-anchor="middle" font-size="9" fill="#94a3b8">HTTP</text>
+      <text x="140" y="270" text-anchor="middle" font-size="9" fill="#94a3b8">Request</text>
+    </g>
+
+    <!-- Step 2: Rails Server -->
+    <g transform="translate(190, 180)">
+      <rect x="0" y="0" width="130" height="140" rx="12" fill="#1e293b" stroke="#ef4444" stroke-width="2" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.3s" begin="1s" fill="freeze"/>
+      </rect>
+      <rect x="0" y="0" width="130" height="35" rx="12" fill="url(#railsGrad)" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.3s" begin="1s" fill="freeze"/>
+      </rect>
+      <rect x="0" y="23" width="130" height="12" fill="url(#railsGrad)" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.3s" begin="1s" fill="freeze"/>
+      </rect>
+      <text x="65" y="24" text-anchor="middle" font-size="12" font-weight="600" fill="white" opacity="0">
+        Rails
+        <animate attributeName="opacity" values="0;1" dur="0.3s" begin="1s" fill="freeze"/>
+      </text>
+
+      <!-- Rails internals -->
+      <text x="10" y="55" font-size="9" fill="#94a3b8" opacity="0">
+        Controller
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="1.3s" fill="freeze"/>
+      </text>
+      <rect x="10" y="62" width="110" height="20" rx="4" fill="#7f1d1d" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="1.3s" fill="freeze"/>
+      </rect>
+      <text x="65" y="76" text-anchor="middle" font-size="8" fill="#fca5a5" opacity="0">
+        react_component()
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="1.3s" fill="freeze"/>
+      </text>
+
+      <text x="10" y="100" font-size="9" fill="#94a3b8" opacity="0">
+        Async Props
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="1.5s" fill="freeze"/>
+      </text>
+      <rect x="10" y="107" width="110" height="20" rx="4" fill="#7f1d1d" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="1.5s" fill="freeze"/>
+        <animate attributeName="fill" values="#7f1d1d;#14532d" dur="0.3s" begin="4s" fill="freeze"/>
+      </rect>
+      <text x="65" y="121" text-anchor="middle" font-size="8" fill="#fca5a5" opacity="0">
+        async_prop { ... }
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="1.5s" fill="freeze"/>
+      </text>
+    </g>
+
+    <!-- Arrow 2: Rails to Node (bidirectional NDJSON) -->
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.2s" begin="1.8s" fill="freeze"/>
+      <!-- Request line -->
+      <path d="M 325 230 Q 365 220 405 230" stroke="url(#lineGrad2)" stroke-width="2" fill="none" stroke-dasharray="8,4">
+        <animate attributeName="stroke-dashoffset" values="24;0" dur="0.5s" repeatCount="indefinite"/>
+      </path>
+      <!-- Response line -->
+      <path d="M 405 270 Q 365 280 325 270" stroke="#22c55e" stroke-width="2" fill="none" stroke-dasharray="8,4">
+        <animate attributeName="stroke-dashoffset" values="0;24" dur="0.5s" repeatCount="indefinite"/>
+      </path>
+      <text x="365" y="255" text-anchor="middle" font-size="9" fill="#94a3b8">NDJSON</text>
+      <text x="365" y="268" text-anchor="middle" font-size="9" fill="#94a3b8">Stream</text>
+    </g>
+
+    <!-- Step 3: Node Renderer -->
+    <g transform="translate(410, 180)">
+      <rect x="0" y="0" width="130" height="140" rx="12" fill="#1e293b" stroke="#22c55e" stroke-width="2" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.3s" begin="2s" fill="freeze"/>
+      </rect>
+      <rect x="0" y="0" width="130" height="35" rx="12" fill="url(#nodeGrad)" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.3s" begin="2s" fill="freeze"/>
+      </rect>
+      <rect x="0" y="23" width="130" height="12" fill="url(#nodeGrad)" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.3s" begin="2s" fill="freeze"/>
+      </rect>
+      <text x="65" y="24" text-anchor="middle" font-size="12" font-weight="600" fill="white" opacity="0">
+        Node.js
+        <animate attributeName="opacity" values="0;1" dur="0.3s" begin="2s" fill="freeze"/>
+      </text>
+
+      <!-- Node internals -->
+      <text x="10" y="55" font-size="9" fill="#94a3b8" opacity="0">
+        React 18
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="2.3s" fill="freeze"/>
+      </text>
+      <rect x="10" y="62" width="110" height="20" rx="4" fill="#14532d" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="2.3s" fill="freeze"/>
+      </rect>
+      <text x="65" y="76" text-anchor="middle" font-size="8" fill="#86efac" opacity="0">
+        renderToPipeableStream
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="2.3s" fill="freeze"/>
+      </text>
+
+      <text x="10" y="100" font-size="9" fill="#94a3b8" opacity="0">
+        Suspense
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="2.5s" fill="freeze"/>
+      </text>
+      <rect x="10" y="107" width="110" height="20" rx="4" fill="#14532d" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="2.5s" fill="freeze"/>
+      </rect>
+      <text x="65" y="121" text-anchor="middle" font-size="8" fill="#86efac" opacity="0">
+        Progressive render
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="2.5s" fill="freeze"/>
+      </text>
+    </g>
+
+    <!-- Arrow 3: Node to Browser -->
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.2s" begin="2.8s" fill="freeze"/>
+      <path d="M 545 250 Q 585 250 625 250" stroke="url(#lineGrad3)" stroke-width="3" fill="none" stroke-dasharray="10,5">
+        <animate attributeName="stroke-dashoffset" values="30;0" dur="0.5s" repeatCount="indefinite"/>
+      </path>
+      <polygon points="625,250 615,243 615,257" fill="#ec4899"/>
+      <text x="585" y="235" text-anchor="middle" font-size="9" fill="#94a3b8">HTML</text>
+      <text x="585" y="270" text-anchor="middle" font-size="9" fill="#94a3b8">Stream</text>
+    </g>
+
+    <!-- Step 4: Browser -->
+    <g transform="translate(635, 160)">
+      <rect x="0" y="0" width="250" height="180" rx="12" fill="#0f172a" stroke="#ec4899" stroke-width="2" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.3s" begin="3s" fill="freeze"/>
+      </rect>
+      <rect x="0" y="0" width="250" height="30" rx="12" fill="#1e293b" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.3s" begin="3s" fill="freeze"/>
+      </rect>
+      <rect x="0" y="18" width="250" height="12" fill="#1e293b" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.3s" begin="3s" fill="freeze"/>
+      </rect>
+      <circle cx="15" cy="15" r="5" fill="#f87171" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.3s" begin="3s" fill="freeze"/>
+      </circle>
+      <circle cx="32" cy="15" r="5" fill="#fbbf24" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.3s" begin="3s" fill="freeze"/>
+      </circle>
+      <circle cx="49" cy="15" r="5" fill="#4ade80" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.3s" begin="3s" fill="freeze"/>
+      </circle>
+      <text x="125" y="18" text-anchor="middle" font-size="10" fill="white" opacity="0">
+        Browser
+        <animate attributeName="opacity" values="0;1" dur="0.3s" begin="3s" fill="freeze"/>
+      </text>
+
+      <!-- Progressive content -->
+      <!-- Shell -->
+      <rect x="10" y="40" width="230" height="25" rx="4" fill="#3b82f6" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="3.5s" fill="freeze"/>
+      </rect>
+
+      <!-- Content areas with progressive fill -->
+      <rect x="10" y="75" width="108" height="60" rx="4" fill="#1e293b" stroke="#334155" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.1s" begin="3.5s" fill="freeze"/>
+      </rect>
+      <rect x="10" y="75" width="108" height="60" rx="4" fill="#22c55e" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="4.5s" fill="freeze"/>
+      </rect>
+
+      <rect x="132" y="75" width="108" height="60" rx="4" fill="#1e293b" stroke="#334155" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.1s" begin="3.5s" fill="freeze"/>
+      </rect>
+      <rect x="132" y="75" width="108" height="60" rx="4" fill="#a855f7" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="5s" fill="freeze"/>
+      </rect>
+
+      <rect x="10" y="145" width="230" height="25" rx="4" fill="#1e293b" stroke="#334155" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.1s" begin="3.5s" fill="freeze"/>
+      </rect>
+      <rect x="10" y="145" width="230" height="25" rx="4" fill="#f97316" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="5.5s" fill="freeze"/>
+      </rect>
+    </g>
+
+    <!-- Database (connected to Rails) -->
+    <g transform="translate(220, 380)">
+      <ellipse cx="35" cy="20" rx="35" ry="15" fill="url(#dbGrad)" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="1.5s" fill="freeze"/>
+      </ellipse>
+      <rect x="0" y="20" width="70" height="35" fill="#d97706" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="1.5s" fill="freeze"/>
+      </rect>
+      <ellipse cx="35" cy="55" rx="35" ry="15" fill="#b45309" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="1.5s" fill="freeze"/>
+      </ellipse>
+      <text x="35" y="42" text-anchor="middle" font-size="10" fill="white" opacity="0">
+        DB
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="1.5s" fill="freeze"/>
+      </text>
+
+      <!-- Connection to Rails -->
+      <path d="M 35 0 L 35 -60" stroke="#f59e0b" stroke-width="2" stroke-dasharray="5,3" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="1.8s" fill="freeze"/>
+        <animate attributeName="stroke-dashoffset" values="0;16" dur="0.5s" repeatCount="indefinite"/>
+      </path>
+
+      <!-- Query result packet -->
+      <rect x="5" y="-35" width="60" height="20" rx="6" fill="#fbbf24" opacity="0">
+        <animate attributeName="opacity" values="0;1;1;0" dur="1s" begin="4s" fill="freeze"/>
+        <animate attributeName="y" values="-35;-80" dur="1s" begin="4s" fill="freeze"/>
+      </rect>
+      <text x="35" y="-22" text-anchor="middle" font-size="8" fill="#1e293b" opacity="0">
+        data
+        <animate attributeName="opacity" values="0;1;1;0" dur="1s" begin="4s" fill="freeze"/>
+        <animate attributeName="y" values="-22;-67" dur="1s" begin="4s" fill="freeze"/>
+      </text>
+    </g>
+  </g>
+
+  <!-- Timeline at bottom -->
+  <g transform="translate(50, 560)">
+    <text x="0" y="0" font-size="14" font-weight="600" fill="white">Timeline</text>
+
+    <!-- Timeline bar -->
+    <rect x="0" y="20" width="900" height="12" rx="6" fill="#1e293b"/>
+    <rect x="0" y="20" width="0" height="12" rx="6" fill="linear-gradient(90deg, #ec4899, #ef4444, #22c55e, #38bdf8)">
+      <animate attributeName="width" values="0;900" dur="6s" fill="freeze"/>
+    </rect>
+
+    <!-- Milestones -->
+    <g transform="translate(0, 50)">
+      <circle cx="0" cy="0" r="8" fill="#ec4899" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.1s" begin="0.2s" fill="freeze"/>
+      </circle>
+      <text x="0" y="25" text-anchor="middle" font-size="9" fill="#f9a8d4" opacity="0">
+        Click
+        <animate attributeName="opacity" values="0;1" dur="0.1s" begin="0.2s" fill="freeze"/>
+      </text>
+      <text x="0" y="40" text-anchor="middle" font-size="8" fill="#64748b" opacity="0">
+        0ms
+        <animate attributeName="opacity" values="0;1" dur="0.1s" begin="0.2s" fill="freeze"/>
+      </text>
+    </g>
+
+    <g transform="translate(150, 50)">
+      <circle cx="0" cy="0" r="8" fill="#ef4444" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.1s" begin="1s" fill="freeze"/>
+      </circle>
+      <text x="0" y="25" text-anchor="middle" font-size="9" fill="#fca5a5" opacity="0">
+        Rails
+        <animate attributeName="opacity" values="0;1" dur="0.1s" begin="1s" fill="freeze"/>
+      </text>
+      <text x="0" y="40" text-anchor="middle" font-size="8" fill="#64748b" opacity="0">
+        10ms
+        <animate attributeName="opacity" values="0;1" dur="0.1s" begin="1s" fill="freeze"/>
+      </text>
+    </g>
+
+    <g transform="translate(300, 50)">
+      <circle cx="0" cy="0" r="8" fill="#22c55e" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.1s" begin="2s" fill="freeze"/>
+      </circle>
+      <text x="0" y="25" text-anchor="middle" font-size="9" fill="#86efac" opacity="0">
+        Node
+        <animate attributeName="opacity" values="0;1" dur="0.1s" begin="2s" fill="freeze"/>
+      </text>
+      <text x="0" y="40" text-anchor="middle" font-size="8" fill="#64748b" opacity="0">
+        20ms
+        <animate attributeName="opacity" values="0;1" dur="0.1s" begin="2s" fill="freeze"/>
+      </text>
+    </g>
+
+    <g transform="translate(450, 50)">
+      <circle cx="0" cy="0" r="8" fill="#3b82f6" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.1s" begin="3.5s" fill="freeze"/>
+      </circle>
+      <text x="0" y="25" text-anchor="middle" font-size="9" fill="#93c5fd" opacity="0">
+        Shell
+        <animate attributeName="opacity" values="0;1" dur="0.1s" begin="3.5s" fill="freeze"/>
+      </text>
+      <text x="0" y="40" text-anchor="middle" font-size="8" fill="#64748b" opacity="0">
+        50ms
+        <animate attributeName="opacity" values="0;1" dur="0.1s" begin="3.5s" fill="freeze"/>
+      </text>
+    </g>
+
+    <g transform="translate(600, 50)">
+      <circle cx="0" cy="0" r="8" fill="#22c55e" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.1s" begin="4.5s" fill="freeze"/>
+      </circle>
+      <text x="0" y="25" text-anchor="middle" font-size="9" fill="#86efac" opacity="0">
+        Users
+        <animate attributeName="opacity" values="0;1" dur="0.1s" begin="4.5s" fill="freeze"/>
+      </text>
+      <text x="0" y="40" text-anchor="middle" font-size="8" fill="#64748b" opacity="0">
+        500ms
+        <animate attributeName="opacity" values="0;1" dur="0.1s" begin="4.5s" fill="freeze"/>
+      </text>
+    </g>
+
+    <g transform="translate(750, 50)">
+      <circle cx="0" cy="0" r="8" fill="#a855f7" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.1s" begin="5s" fill="freeze"/>
+      </circle>
+      <text x="0" y="25" text-anchor="middle" font-size="9" fill="#c4b5fd" opacity="0">
+        Posts
+        <animate attributeName="opacity" values="0;1" dur="0.1s" begin="5s" fill="freeze"/>
+      </text>
+      <text x="0" y="40" text-anchor="middle" font-size="8" fill="#64748b" opacity="0">
+        800ms
+        <animate attributeName="opacity" values="0;1" dur="0.1s" begin="5s" fill="freeze"/>
+      </text>
+    </g>
+
+    <g transform="translate(900, 50)">
+      <circle cx="0" cy="0" r="8" fill="#fbbf24" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.1s" begin="5.5s" fill="freeze"/>
+      </circle>
+      <text x="0" y="25" text-anchor="middle" font-size="9" fill="#fcd34d" opacity="0">
+        Complete
+        <animate attributeName="opacity" values="0;1" dur="0.1s" begin="5.5s" fill="freeze"/>
+      </text>
+      <text x="0" y="40" text-anchor="middle" font-size="8" fill="#64748b" opacity="0">
+        1000ms
+        <animate attributeName="opacity" values="0;1" dur="0.1s" begin="5.5s" fill="freeze"/>
+      </text>
+    </g>
+  </g>
+</svg>
