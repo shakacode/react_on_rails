@@ -1,0 +1,201 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" font-family="system-ui, -apple-system, sans-serif">
+  <defs>
+    <pattern id="skeleton" patternUnits="userSpaceOnUse" width="8" height="8">
+      <rect width="8" height="8" fill="#f3f4f6"/>
+      <rect x="0" y="0" width="4" height="4" fill="#e5e7eb"/>
+      <rect x="4" y="4" width="4" height="4" fill="#e5e7eb"/>
+    </pattern>
+    <linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#3b82f6"/>
+      <stop offset="100%" style="stop-color:#1d4ed8"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="600" fill="#f8fafc"/>
+
+  <!-- Title -->
+  <text x="400" y="35" text-anchor="middle" font-size="20" font-weight="bold" fill="#1e293b">Progressive Loading Sequence</text>
+  <text x="400" y="55" text-anchor="middle" font-size="12" fill="#64748b">How Async Props streams content to the browser</text>
+
+  <!-- Stage 1: Shell -->
+  <g transform="translate(40, 90)">
+    <text x="100" y="0" text-anchor="middle" font-size="14" font-weight="600" fill="#3b82f6">Stage 1: Shell (50ms)</text>
+
+    <!-- Browser window -->
+    <rect x="0" y="15" width="200" height="150" rx="8" fill="white" stroke="#e2e8f0" stroke-width="2"/>
+    <rect x="0" y="15" width="200" height="24" rx="8" fill="#f1f5f9"/>
+    <rect x="0" y="31" width="200" height="8" fill="#f1f5f9"/>
+    <circle cx="14" cy="27" r="5" fill="#fca5a5"/>
+    <circle cx="28" cy="27" r="5" fill="#fcd34d"/>
+    <circle cx="42" cy="27" r="5" fill="#86efac"/>
+
+    <!-- Header -->
+    <rect x="10" y="45" width="180" height="20" rx="4" fill="url(#headerGrad)"/>
+    <text x="100" y="59" text-anchor="middle" font-size="9" fill="white" font-weight="500">My App</text>
+
+    <!-- Skeleton loaders -->
+    <rect x="10" y="75" width="85" height="75" rx="4" fill="url(#skeleton)" stroke="#d1d5db"/>
+    <text x="52" y="115" text-anchor="middle" font-size="8" fill="#9ca3af">Loading...</text>
+
+    <rect x="105" y="75" width="85" height="75" rx="4" fill="url(#skeleton)" stroke="#d1d5db"/>
+    <text x="147" y="115" text-anchor="middle" font-size="8" fill="#9ca3af">Loading...</text>
+
+    <!-- Status badge -->
+    <rect x="60" y="155" width="80" height="18" rx="9" fill="#dbeafe"/>
+    <text x="100" y="167" text-anchor="middle" font-size="9" fill="#1d4ed8" font-weight="500">✓ Interactive</text>
+  </g>
+
+  <!-- Arrow 1 -->
+  <g transform="translate(250, 150)">
+    <path d="M 0 0 L 40 0" stroke="#94a3b8" stroke-width="2" fill="none"/>
+    <polygon points="40,0 32,-5 32,5" fill="#94a3b8"/>
+    <text x="20" y="20" text-anchor="middle" font-size="9" fill="#64748b">Users</text>
+    <text x="20" y="32" text-anchor="middle" font-size="9" fill="#64748b">data</text>
+  </g>
+
+  <!-- Stage 2: Users Loaded -->
+  <g transform="translate(300, 90)">
+    <text x="100" y="0" text-anchor="middle" font-size="14" font-weight="600" fill="#10b981">Stage 2: Users (500ms)</text>
+
+    <!-- Browser window -->
+    <rect x="0" y="15" width="200" height="150" rx="8" fill="white" stroke="#10b981" stroke-width="2"/>
+    <rect x="0" y="15" width="200" height="24" rx="8" fill="#f1f5f9"/>
+    <rect x="0" y="31" width="200" height="8" fill="#f1f5f9"/>
+    <circle cx="14" cy="27" r="5" fill="#fca5a5"/>
+    <circle cx="28" cy="27" r="5" fill="#fcd34d"/>
+    <circle cx="42" cy="27" r="5" fill="#86efac"/>
+
+    <!-- Header -->
+    <rect x="10" y="45" width="180" height="20" rx="4" fill="url(#headerGrad)"/>
+    <text x="100" y="59" text-anchor="middle" font-size="9" fill="white" font-weight="500">My App</text>
+
+    <!-- Users panel (loaded) -->
+    <rect x="10" y="75" width="85" height="75" rx="4" fill="#10b981"/>
+    <text x="52" y="95" text-anchor="middle" font-size="8" fill="white" font-weight="500">Users</text>
+    <rect x="15" y="100" width="75" height="10" rx="2" fill="white" opacity="0.3"/>
+    <rect x="15" y="114" width="75" height="10" rx="2" fill="white" opacity="0.3"/>
+    <rect x="15" y="128" width="75" height="10" rx="2" fill="white" opacity="0.3"/>
+
+    <!-- Posts panel (still loading) -->
+    <rect x="105" y="75" width="85" height="75" rx="4" fill="url(#skeleton)" stroke="#d1d5db"/>
+    <text x="147" y="115" text-anchor="middle" font-size="8" fill="#9ca3af">Loading...</text>
+
+    <!-- Status badge -->
+    <rect x="45" y="155" width="110" height="18" rx="9" fill="#d1fae5"/>
+    <text x="100" y="167" text-anchor="middle" font-size="9" fill="#059669" font-weight="500">✓ Users visible</text>
+  </g>
+
+  <!-- Arrow 2 -->
+  <g transform="translate(510, 150)">
+    <path d="M 0 0 L 40 0" stroke="#94a3b8" stroke-width="2" fill="none"/>
+    <polygon points="40,0 32,-5 32,5" fill="#94a3b8"/>
+    <text x="20" y="20" text-anchor="middle" font-size="9" fill="#64748b">Posts</text>
+    <text x="20" y="32" text-anchor="middle" font-size="9" fill="#64748b">data</text>
+  </g>
+
+  <!-- Stage 3: Complete -->
+  <g transform="translate(560, 90)">
+    <text x="100" y="0" text-anchor="middle" font-size="14" font-weight="600" fill="#8b5cf6">Stage 3: Complete (900ms)</text>
+
+    <!-- Browser window -->
+    <rect x="0" y="15" width="200" height="150" rx="8" fill="white" stroke="#8b5cf6" stroke-width="2"/>
+    <rect x="0" y="15" width="200" height="24" rx="8" fill="#f1f5f9"/>
+    <rect x="0" y="31" width="200" height="8" fill="#f1f5f9"/>
+    <circle cx="14" cy="27" r="5" fill="#fca5a5"/>
+    <circle cx="28" cy="27" r="5" fill="#fcd34d"/>
+    <circle cx="42" cy="27" r="5" fill="#86efac"/>
+
+    <!-- Header -->
+    <rect x="10" y="45" width="180" height="20" rx="4" fill="url(#headerGrad)"/>
+    <text x="100" y="59" text-anchor="middle" font-size="9" fill="white" font-weight="500">My App</text>
+
+    <!-- Users panel (loaded) -->
+    <rect x="10" y="75" width="85" height="75" rx="4" fill="#10b981"/>
+    <text x="52" y="95" text-anchor="middle" font-size="8" fill="white" font-weight="500">Users</text>
+    <rect x="15" y="100" width="75" height="10" rx="2" fill="white" opacity="0.3"/>
+    <rect x="15" y="114" width="75" height="10" rx="2" fill="white" opacity="0.3"/>
+    <rect x="15" y="128" width="75" height="10" rx="2" fill="white" opacity="0.3"/>
+
+    <!-- Posts panel (loaded) -->
+    <rect x="105" y="75" width="85" height="75" rx="4" fill="#8b5cf6"/>
+    <text x="147" y="95" text-anchor="middle" font-size="8" fill="white" font-weight="500">Posts</text>
+    <rect x="110" y="100" width="75" height="10" rx="2" fill="white" opacity="0.3"/>
+    <rect x="110" y="114" width="75" height="10" rx="2" fill="white" opacity="0.3"/>
+    <rect x="110" y="128" width="75" height="10" rx="2" fill="white" opacity="0.3"/>
+
+    <!-- Status badge -->
+    <rect x="50" y="155" width="100" height="18" rx="9" fill="#ede9fe"/>
+    <text x="100" y="167" text-anchor="middle" font-size="9" fill="#7c3aed" font-weight="500">✓ Fully loaded</text>
+  </g>
+
+  <!-- Timeline bar -->
+  <g transform="translate(40, 320)">
+    <text x="0" y="0" font-size="12" font-weight="600" fill="#1e293b">Timeline</text>
+
+    <rect x="0" y="15" width="720" height="30" rx="4" fill="#f1f5f9"/>
+
+    <!-- TTFB marker -->
+    <rect x="0" y="15" width="40" height="30" rx="4" fill="#3b82f6"/>
+    <text x="20" y="34" text-anchor="middle" font-size="8" fill="white" font-weight="500">Shell</text>
+
+    <!-- Users stream marker -->
+    <rect x="200" y="15" width="30" height="30" rx="0" fill="#10b981"/>
+    <text x="215" y="34" text-anchor="middle" font-size="8" fill="white" font-weight="500">📤</text>
+
+    <!-- Posts stream marker -->
+    <rect x="360" y="15" width="30" height="30" rx="0" fill="#8b5cf6"/>
+    <text x="375" y="34" text-anchor="middle" font-size="8" fill="white" font-weight="500">📤</text>
+
+    <!-- Time labels -->
+    <text x="0" y="60" font-size="9" fill="#64748b">0ms</text>
+    <text x="200" y="60" font-size="9" fill="#64748b">500ms</text>
+    <text x="360" y="60" font-size="9" fill="#64748b">900ms</text>
+    <text x="720" y="60" font-size="9" fill="#64748b" text-anchor="end">complete</text>
+  </g>
+
+  <!-- What happens at each stage -->
+  <g transform="translate(40, 400)">
+    <text x="0" y="0" font-size="12" font-weight="600" fill="#1e293b">What Happens at Each Stage</text>
+
+    <!-- Stage 1 description -->
+    <g transform="translate(0, 20)">
+      <rect x="0" y="0" width="230" height="80" rx="6" fill="#dbeafe" stroke="#93c5fd"/>
+      <circle cx="20" cy="20" r="12" fill="#3b82f6"/>
+      <text x="20" y="24" text-anchor="middle" font-size="11" fill="white" font-weight="bold">1</text>
+      <text x="40" y="24" font-size="11" font-weight="600" fill="#1d4ed8">Shell Render</text>
+      <text x="15" y="45" font-size="9" fill="#3b82f6">• HTML structure sent to browser</text>
+      <text x="15" y="58" font-size="9" fill="#3b82f6">• Skeleton loaders visible</text>
+      <text x="15" y="71" font-size="9" fill="#3b82f6">• Page is already interactive!</text>
+    </g>
+
+    <!-- Stage 2 description -->
+    <g transform="translate(245, 20)">
+      <rect x="0" y="0" width="230" height="80" rx="6" fill="#d1fae5" stroke="#86efac"/>
+      <circle cx="20" cy="20" r="12" fill="#10b981"/>
+      <text x="20" y="24" text-anchor="middle" font-size="11" fill="white" font-weight="bold">2</text>
+      <text x="40" y="24" font-size="11" font-weight="600" fill="#059669">First Data Arrives</text>
+      <text x="15" y="45" font-size="9" fill="#10b981">• Users data streamed in</text>
+      <text x="15" y="58" font-size="9" fill="#10b981">• React hydrates Users section</text>
+      <text x="15" y="71" font-size="9" fill="#10b981">• Posts still loading</text>
+    </g>
+
+    <!-- Stage 3 description -->
+    <g transform="translate(490, 20)">
+      <rect x="0" y="0" width="230" height="80" rx="6" fill="#ede9fe" stroke="#c4b5fd"/>
+      <circle cx="20" cy="20" r="12" fill="#8b5cf6"/>
+      <text x="20" y="24" text-anchor="middle" font-size="11" fill="white" font-weight="bold">3</text>
+      <text x="40" y="24" font-size="11" font-weight="600" fill="#7c3aed">Fully Loaded</text>
+      <text x="15" y="45" font-size="9" fill="#8b5cf6">• Posts data streamed in</text>
+      <text x="15" y="58" font-size="9" fill="#8b5cf6">• All Suspense boundaries resolved</text>
+      <text x="15" y="71" font-size="9" fill="#8b5cf6">• Page fully interactive</text>
+    </g>
+  </g>
+
+  <!-- Key insight -->
+  <g transform="translate(40, 520)">
+    <rect x="0" y="0" width="720" height="60" rx="8" fill="#fef3c7" stroke="#fcd34d"/>
+    <text x="20" y="25" font-size="12" font-weight="600" fill="#92400e">💡 Key Insight</text>
+    <text x="20" y="45" font-size="11" fill="#78350f">Users can interact with the page immediately (50ms), even while data is still loading in the background.</text>
+  </g>
+</svg>

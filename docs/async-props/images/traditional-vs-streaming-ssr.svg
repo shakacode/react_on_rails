@@ -1,0 +1,171 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 500" font-family="system-ui, -apple-system, sans-serif">
+  <defs>
+    <linearGradient id="shellGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1d4ed8;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="contentGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#10b981;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#059669;stop-opacity:1" />
+    </linearGradient>
+    <pattern id="loadingPattern" patternUnits="userSpaceOnUse" width="8" height="8">
+      <rect width="8" height="8" fill="#e5e7eb"/>
+      <rect x="0" y="0" width="4" height="4" fill="#d1d5db"/>
+      <rect x="4" y="4" width="4" height="4" fill="#d1d5db"/>
+    </pattern>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="500" fill="#f8fafc"/>
+
+  <!-- Title -->
+  <text x="450" y="35" text-anchor="middle" font-size="20" font-weight="bold" fill="#1e293b">Traditional SSR vs Streaming SSR with Async Props</text>
+
+  <!-- TRADITIONAL SSR Section -->
+  <text x="225" y="70" text-anchor="middle" font-size="16" font-weight="600" fill="#dc2626">Traditional SSR</text>
+  <text x="225" y="90" text-anchor="middle" font-size="12" fill="#64748b">User waits for ALL data before seeing anything</text>
+
+  <!-- Traditional SSR - Browser frames -->
+  <g transform="translate(30, 110)">
+    <!-- Frame 1: Blank -->
+    <rect x="0" y="0" width="120" height="90" rx="4" fill="white" stroke="#e2e8f0" stroke-width="2"/>
+    <rect x="0" y="0" width="120" height="16" rx="4" fill="#f1f5f9"/>
+    <circle cx="10" cy="8" r="3" fill="#fca5a5"/>
+    <circle cx="20" cy="8" r="3" fill="#fcd34d"/>
+    <circle cx="30" cy="8" r="3" fill="#86efac"/>
+    <rect x="8" y="24" width="104" height="58" fill="white"/>
+    <text x="60" y="58" text-anchor="middle" font-size="10" fill="#94a3b8">Blank</text>
+    <text x="60" y="100" text-anchor="middle" font-size="9" fill="#64748b">0ms</text>
+  </g>
+
+  <!-- Arrow -->
+  <path d="M 160 155 L 180 155" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+  <g transform="translate(190, 110)">
+    <!-- Frame 2: Still Blank -->
+    <rect x="0" y="0" width="120" height="90" rx="4" fill="white" stroke="#e2e8f0" stroke-width="2"/>
+    <rect x="0" y="0" width="120" height="16" rx="4" fill="#f1f5f9"/>
+    <circle cx="10" cy="8" r="3" fill="#fca5a5"/>
+    <circle cx="20" cy="8" r="3" fill="#fcd34d"/>
+    <circle cx="30" cy="8" r="3" fill="#86efac"/>
+    <rect x="8" y="24" width="104" height="58" fill="white"/>
+    <text x="60" y="50" text-anchor="middle" font-size="9" fill="#94a3b8">Fetching data...</text>
+    <text x="60" y="65" text-anchor="middle" font-size="9" fill="#94a3b8">Still waiting...</text>
+    <text x="60" y="100" text-anchor="middle" font-size="9" fill="#64748b">1000ms</text>
+  </g>
+
+  <!-- Arrow -->
+  <path d="M 320 155 L 340 155" stroke="#94a3b8" stroke-width="2"/>
+
+  <g transform="translate(350, 110)">
+    <!-- Frame 3: Complete -->
+    <rect x="0" y="0" width="120" height="90" rx="4" fill="white" stroke="#e2e8f0" stroke-width="2"/>
+    <rect x="0" y="0" width="120" height="16" rx="4" fill="#f1f5f9"/>
+    <circle cx="10" cy="8" r="3" fill="#fca5a5"/>
+    <circle cx="20" cy="8" r="3" fill="#fcd34d"/>
+    <circle cx="30" cy="8" r="3" fill="#86efac"/>
+    <rect x="8" y="22" width="104" height="10" rx="2" fill="#3b82f6"/>
+    <rect x="8" y="36" width="45" height="38" rx="2" fill="#10b981"/>
+    <rect x="58" y="36" width="54" height="38" rx="2" fill="#8b5cf6"/>
+    <text x="60" y="100" text-anchor="middle" font-size="9" fill="#64748b">1800ms</text>
+  </g>
+
+  <!-- TTFB indicator for Traditional -->
+  <g transform="translate(30, 215)">
+    <text x="0" y="0" font-size="11" fill="#dc2626" font-weight="500">TTFB: 1800ms</text>
+    <rect x="0" y="8" width="390" height="6" rx="3" fill="#fecaca"/>
+    <rect x="0" y="8" width="390" height="6" rx="3" fill="#dc2626"/>
+  </g>
+
+  <!-- STREAMING SSR Section -->
+  <text x="225" y="270" text-anchor="middle" font-size="16" font-weight="600" fill="#059669">Streaming SSR with Async Props</text>
+  <text x="225" y="290" text-anchor="middle" font-size="12" fill="#64748b">User sees shell immediately, content streams in</text>
+
+  <!-- Streaming SSR - Browser frames -->
+  <g transform="translate(30, 305)">
+    <!-- Frame 1: Shell -->
+    <rect x="0" y="0" width="120" height="90" rx="4" fill="white" stroke="#10b981" stroke-width="2"/>
+    <rect x="0" y="0" width="120" height="16" rx="4" fill="#f1f5f9"/>
+    <circle cx="10" cy="8" r="3" fill="#fca5a5"/>
+    <circle cx="20" cy="8" r="3" fill="#fcd34d"/>
+    <circle cx="30" cy="8" r="3" fill="#86efac"/>
+    <rect x="8" y="22" width="104" height="10" rx="2" fill="#3b82f6"/>
+    <rect x="8" y="36" width="45" height="38" rx="2" fill="url(#loadingPattern)" stroke="#d1d5db"/>
+    <rect x="58" y="36" width="54" height="38" rx="2" fill="url(#loadingPattern)" stroke="#d1d5db"/>
+    <text x="60" y="100" text-anchor="middle" font-size="9" fill="#059669" font-weight="600">50ms ✓</text>
+  </g>
+
+  <!-- Arrow -->
+  <path d="M 160 350 L 180 350" stroke="#10b981" stroke-width="2"/>
+
+  <g transform="translate(190, 305)">
+    <!-- Frame 2: Users loaded -->
+    <rect x="0" y="0" width="120" height="90" rx="4" fill="white" stroke="#10b981" stroke-width="2"/>
+    <rect x="0" y="0" width="120" height="16" rx="4" fill="#f1f5f9"/>
+    <circle cx="10" cy="8" r="3" fill="#fca5a5"/>
+    <circle cx="20" cy="8" r="3" fill="#fcd34d"/>
+    <circle cx="30" cy="8" r="3" fill="#86efac"/>
+    <rect x="8" y="22" width="104" height="10" rx="2" fill="#3b82f6"/>
+    <rect x="8" y="36" width="45" height="38" rx="2" fill="#10b981"/>
+    <rect x="58" y="36" width="54" height="38" rx="2" fill="url(#loadingPattern)" stroke="#d1d5db"/>
+    <text x="30" y="52" text-anchor="middle" font-size="7" fill="white">Users</text>
+    <text x="60" y="100" text-anchor="middle" font-size="9" fill="#64748b">500ms</text>
+  </g>
+
+  <!-- Arrow -->
+  <path d="M 320 350 L 340 350" stroke="#10b981" stroke-width="2"/>
+
+  <g transform="translate(350, 305)">
+    <!-- Frame 3: Complete -->
+    <rect x="0" y="0" width="120" height="90" rx="4" fill="white" stroke="#10b981" stroke-width="2"/>
+    <rect x="0" y="0" width="120" height="16" rx="4" fill="#f1f5f9"/>
+    <circle cx="10" cy="8" r="3" fill="#fca5a5"/>
+    <circle cx="20" cy="8" r="3" fill="#fcd34d"/>
+    <circle cx="30" cy="8" r="3" fill="#86efac"/>
+    <rect x="8" y="22" width="104" height="10" rx="2" fill="#3b82f6"/>
+    <rect x="8" y="36" width="45" height="38" rx="2" fill="#10b981"/>
+    <rect x="58" y="36" width="54" height="38" rx="2" fill="#8b5cf6"/>
+    <text x="30" y="52" text-anchor="middle" font-size="7" fill="white">Users</text>
+    <text x="85" y="52" text-anchor="middle" font-size="7" fill="white">Posts</text>
+    <text x="60" y="100" text-anchor="middle" font-size="9" fill="#64748b">900ms</text>
+  </g>
+
+  <!-- TTFB indicator for Streaming -->
+  <g transform="translate(30, 410)">
+    <text x="0" y="0" font-size="11" fill="#059669" font-weight="500">TTFB: 50ms</text>
+    <rect x="0" y="8" width="390" height="6" rx="3" fill="#d1fae5"/>
+    <rect x="0" y="8" width="11" height="6" rx="3" fill="#059669"/>
+  </g>
+
+  <!-- Right side: Comparison Box -->
+  <g transform="translate(500, 100)">
+    <rect x="0" y="0" width="370" height="320" rx="8" fill="white" stroke="#e2e8f0" stroke-width="2"/>
+    <text x="185" y="30" text-anchor="middle" font-size="14" font-weight="600" fill="#1e293b">Key Differences</text>
+
+    <!-- Traditional -->
+    <rect x="20" y="50" width="330" height="80" rx="6" fill="#fef2f2"/>
+    <text x="35" y="75" font-size="12" font-weight="600" fill="#dc2626">Traditional SSR</text>
+    <text x="35" y="95" font-size="11" fill="#64748b">• Wait for ALL data before rendering</text>
+    <text x="35" y="112" font-size="11" fill="#64748b">• Single large response</text>
+    <text x="35" y="129" font-size="11" fill="#dc2626">• TTFB = Total data fetch time</text>
+
+    <!-- Streaming -->
+    <rect x="20" y="145" width="330" height="95" rx="6" fill="#f0fdf4"/>
+    <text x="35" y="170" font-size="12" font-weight="600" fill="#059669">Streaming SSR with Async Props</text>
+    <text x="35" y="190" font-size="11" fill="#64748b">• Shell renders immediately</text>
+    <text x="35" y="207" font-size="11" fill="#64748b">• Content streams as data arrives</text>
+    <text x="35" y="224" font-size="11" fill="#059669">• TTFB = Shell render time only</text>
+
+    <!-- Improvement callout -->
+    <rect x="20" y="255" width="330" height="50" rx="6" fill="#dbeafe"/>
+    <text x="185" y="280" text-anchor="middle" font-size="13" font-weight="600" fill="#1d4ed8">36x faster Time to First Byte</text>
+    <text x="185" y="298" text-anchor="middle" font-size="11" fill="#3b82f6">1800ms → 50ms</text>
+  </g>
+
+  <!-- Arrow marker definition -->
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#94a3b8"/>
+    </marker>
+  </defs>
+</svg>
