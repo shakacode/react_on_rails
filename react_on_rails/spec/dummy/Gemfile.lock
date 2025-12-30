@@ -449,7 +449,7 @@ DEPENDENCIES
   pry-rails
   pry-rescue
   puma (~> 6.0)
-  rails (~> 7.1)
+  rails (~> 7.1.0)
   rbs
   react_on_rails!
   rspec-rails
