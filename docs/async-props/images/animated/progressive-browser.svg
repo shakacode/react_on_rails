@@ -1,0 +1,217 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 400" font-family="system-ui, -apple-system, sans-serif">
+  <defs>
+    <linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#3b82f6"/>
+      <stop offset="100%" style="stop-color:#1d4ed8"/>
+    </linearGradient>
+
+    <!-- Skeleton shimmer animation -->
+    <linearGradient id="shimmer" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#e5e7eb">
+        <animate attributeName="offset" values="-1;2" dur="1.5s" repeatCount="indefinite"/>
+      </stop>
+      <stop offset="50%" style="stop-color:#f3f4f6">
+        <animate attributeName="offset" values="-0.5;2.5" dur="1.5s" repeatCount="indefinite"/>
+      </stop>
+      <stop offset="100%" style="stop-color:#e5e7eb">
+        <animate attributeName="offset" values="0;3" dur="1.5s" repeatCount="indefinite"/>
+      </stop>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="500" height="400" fill="#f8fafc"/>
+
+  <!-- Title -->
+  <text x="250" y="30" text-anchor="middle" font-size="18" font-weight="bold" fill="#1e293b">Progressive Loading</text>
+
+  <!-- Browser Window -->
+  <g transform="translate(50, 50)">
+    <!-- Browser chrome -->
+    <rect x="0" y="0" width="400" height="300" rx="12" fill="white" stroke="#e2e8f0" stroke-width="2"/>
+    <rect x="0" y="0" width="400" height="36" rx="12" fill="#f1f5f9"/>
+    <rect x="0" y="24" width="400" height="12" fill="#f1f5f9"/>
+
+    <!-- Traffic lights -->
+    <circle cx="18" cy="18" r="6" fill="#fca5a5"/>
+    <circle cx="38" cy="18" r="6" fill="#fcd34d"/>
+    <circle cx="58" cy="18" r="6" fill="#86efac"/>
+
+    <!-- URL bar -->
+    <rect x="80" y="8" width="240" height="20" rx="4" fill="white" stroke="#e2e8f0"/>
+    <text x="95" y="22" font-size="10" fill="#64748b">myapp.com/dashboard</text>
+
+    <!-- Page content area -->
+    <rect x="10" y="46" width="380" height="244" rx="4" fill="#fafafa"/>
+
+    <!-- Header (always visible from start) -->
+    <rect x="20" y="56" width="360" height="30" rx="4" fill="url(#headerGrad)">
+      <animate attributeName="opacity" values="0;1" dur="0.3s" begin="0.2s" fill="freeze"/>
+    </rect>
+    <text x="200" y="76" text-anchor="middle" font-size="12" fill="white" font-weight="500" opacity="0">
+      My Dashboard
+      <animate attributeName="opacity" values="0;1" dur="0.3s" begin="0.2s" fill="freeze"/>
+    </text>
+
+    <!-- Users Section -->
+    <g>
+      <!-- Skeleton (visible initially, fades out) -->
+      <rect x="20" y="96" width="170" height="90" rx="6" fill="url(#shimmer)" stroke="#e5e7eb" opacity="1">
+        <animate attributeName="opacity" values="1;0" dur="0.3s" begin="1.5s" fill="freeze"/>
+      </rect>
+      <rect x="30" y="106" width="100" height="12" rx="2" fill="#d1d5db" opacity="1">
+        <animate attributeName="opacity" values="1;0" dur="0.3s" begin="1.5s" fill="freeze"/>
+      </rect>
+      <rect x="30" y="126" width="150" height="8" rx="2" fill="#e5e7eb" opacity="1">
+        <animate attributeName="opacity" values="1;0" dur="0.3s" begin="1.5s" fill="freeze"/>
+      </rect>
+      <rect x="30" y="142" width="130" height="8" rx="2" fill="#e5e7eb" opacity="1">
+        <animate attributeName="opacity" values="1;0" dur="0.3s" begin="1.5s" fill="freeze"/>
+      </rect>
+      <rect x="30" y="158" width="140" height="8" rx="2" fill="#e5e7eb" opacity="1">
+        <animate attributeName="opacity" values="1;0" dur="0.3s" begin="1.5s" fill="freeze"/>
+      </rect>
+
+      <!-- Actual content (fades in) -->
+      <rect x="20" y="96" width="170" height="90" rx="6" fill="#10b981" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.3s" begin="1.5s" fill="freeze"/>
+      </rect>
+      <text x="105" y="116" text-anchor="middle" font-size="11" fill="white" font-weight="600" opacity="0">
+        Users
+        <animate attributeName="opacity" values="0;1" dur="0.3s" begin="1.5s" fill="freeze"/>
+      </text>
+      <rect x="30" y="126" width="150" height="12" rx="2" fill="white" opacity="0">
+        <animate attributeName="opacity" values="0;0.4" dur="0.3s" begin="1.5s" fill="freeze"/>
+      </rect>
+      <rect x="30" y="144" width="150" height="12" rx="2" fill="white" opacity="0">
+        <animate attributeName="opacity" values="0;0.4" dur="0.3s" begin="1.5s" fill="freeze"/>
+      </rect>
+      <rect x="30" y="162" width="150" height="12" rx="2" fill="white" opacity="0">
+        <animate attributeName="opacity" values="0;0.4" dur="0.3s" begin="1.5s" fill="freeze"/>
+      </rect>
+    </g>
+
+    <!-- Posts Section -->
+    <g>
+      <!-- Skeleton (visible initially, fades out later) -->
+      <rect x="210" y="96" width="170" height="90" rx="6" fill="url(#shimmer)" stroke="#e5e7eb" opacity="1">
+        <animate attributeName="opacity" values="1;0" dur="0.3s" begin="2.8s" fill="freeze"/>
+      </rect>
+      <rect x="220" y="106" width="100" height="12" rx="2" fill="#d1d5db" opacity="1">
+        <animate attributeName="opacity" values="1;0" dur="0.3s" begin="2.8s" fill="freeze"/>
+      </rect>
+      <rect x="220" y="126" width="150" height="8" rx="2" fill="#e5e7eb" opacity="1">
+        <animate attributeName="opacity" values="1;0" dur="0.3s" begin="2.8s" fill="freeze"/>
+      </rect>
+      <rect x="220" y="142" width="130" height="8" rx="2" fill="#e5e7eb" opacity="1">
+        <animate attributeName="opacity" values="1;0" dur="0.3s" begin="2.8s" fill="freeze"/>
+      </rect>
+      <rect x="220" y="158" width="140" height="8" rx="2" fill="#e5e7eb" opacity="1">
+        <animate attributeName="opacity" values="1;0" dur="0.3s" begin="2.8s" fill="freeze"/>
+      </rect>
+
+      <!-- Actual content (fades in) -->
+      <rect x="210" y="96" width="170" height="90" rx="6" fill="#8b5cf6" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.3s" begin="2.8s" fill="freeze"/>
+      </rect>
+      <text x="295" y="116" text-anchor="middle" font-size="11" fill="white" font-weight="600" opacity="0">
+        Posts
+        <animate attributeName="opacity" values="0;1" dur="0.3s" begin="2.8s" fill="freeze"/>
+      </text>
+      <rect x="220" y="126" width="150" height="12" rx="2" fill="white" opacity="0">
+        <animate attributeName="opacity" values="0;0.4" dur="0.3s" begin="2.8s" fill="freeze"/>
+      </rect>
+      <rect x="220" y="144" width="150" height="12" rx="2" fill="white" opacity="0">
+        <animate attributeName="opacity" values="0;0.4" dur="0.3s" begin="2.8s" fill="freeze"/>
+      </rect>
+      <rect x="220" y="162" width="150" height="12" rx="2" fill="white" opacity="0">
+        <animate attributeName="opacity" values="0;0.4" dur="0.3s" begin="2.8s" fill="freeze"/>
+      </rect>
+    </g>
+
+    <!-- Stats Section -->
+    <g>
+      <!-- Skeleton -->
+      <rect x="20" y="196" width="360" height="84" rx="6" fill="url(#shimmer)" stroke="#e5e7eb" opacity="1">
+        <animate attributeName="opacity" values="1;0" dur="0.3s" begin="3.5s" fill="freeze"/>
+      </rect>
+
+      <!-- Actual content -->
+      <rect x="20" y="196" width="360" height="84" rx="6" fill="#f59e0b" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.3s" begin="3.5s" fill="freeze"/>
+      </rect>
+      <text x="200" y="220" text-anchor="middle" font-size="11" fill="white" font-weight="600" opacity="0">
+        Statistics
+        <animate attributeName="opacity" values="0;1" dur="0.3s" begin="3.5s" fill="freeze"/>
+      </text>
+
+      <!-- Chart bars -->
+      <rect x="40" y="230" width="30" height="40" rx="2" fill="white" opacity="0">
+        <animate attributeName="opacity" values="0;0.5" dur="0.3s" begin="3.5s" fill="freeze"/>
+        <animate attributeName="height" values="0;40" dur="0.5s" begin="3.5s" fill="freeze"/>
+        <animate attributeName="y" values="270;230" dur="0.5s" begin="3.5s" fill="freeze"/>
+      </rect>
+      <rect x="90" y="245" width="30" height="25" rx="2" fill="white" opacity="0">
+        <animate attributeName="opacity" values="0;0.5" dur="0.3s" begin="3.6s" fill="freeze"/>
+        <animate attributeName="height" values="0;25" dur="0.5s" begin="3.6s" fill="freeze"/>
+        <animate attributeName="y" values="270;245" dur="0.5s" begin="3.6s" fill="freeze"/>
+      </rect>
+      <rect x="140" y="235" width="30" height="35" rx="2" fill="white" opacity="0">
+        <animate attributeName="opacity" values="0;0.5" dur="0.3s" begin="3.7s" fill="freeze"/>
+        <animate attributeName="height" values="0;35" dur="0.5s" begin="3.7s" fill="freeze"/>
+        <animate attributeName="y" values="270;235" dur="0.5s" begin="3.7s" fill="freeze"/>
+      </rect>
+      <rect x="190" y="250" width="30" height="20" rx="2" fill="white" opacity="0">
+        <animate attributeName="opacity" values="0;0.5" dur="0.3s" begin="3.8s" fill="freeze"/>
+        <animate attributeName="height" values="0;20" dur="0.5s" begin="3.8s" fill="freeze"/>
+        <animate attributeName="y" values="270;250" dur="0.5s" begin="3.8s" fill="freeze"/>
+      </rect>
+      <rect x="240" y="225" width="30" height="45" rx="2" fill="white" opacity="0">
+        <animate attributeName="opacity" values="0;0.5" dur="0.3s" begin="3.9s" fill="freeze"/>
+        <animate attributeName="height" values="0;45" dur="0.5s" begin="3.9s" fill="freeze"/>
+        <animate attributeName="y" values="270;225" dur="0.5s" begin="3.9s" fill="freeze"/>
+      </rect>
+      <rect x="290" y="240" width="30" height="30" rx="2" fill="white" opacity="0">
+        <animate attributeName="opacity" values="0;0.5" dur="0.3s" begin="4s" fill="freeze"/>
+        <animate attributeName="height" values="0;30" dur="0.5s" begin="4s" fill="freeze"/>
+        <animate attributeName="y" values="270;240" dur="0.5s" begin="4s" fill="freeze"/>
+      </rect>
+      <rect x="340" y="255" width="30" height="15" rx="2" fill="white" opacity="0">
+        <animate attributeName="opacity" values="0;0.5" dur="0.3s" begin="4.1s" fill="freeze"/>
+        <animate attributeName="height" values="0;15" dur="0.5s" begin="4.1s" fill="freeze"/>
+        <animate attributeName="y" values="270;255" dur="0.5s" begin="4.1s" fill="freeze"/>
+      </rect>
+    </g>
+  </g>
+
+  <!-- Status indicators -->
+  <g transform="translate(50, 365)">
+    <!-- Shell loaded -->
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.2s" begin="0.2s" fill="freeze"/>
+      <rect x="0" y="0" width="90" height="24" rx="12" fill="#dbeafe"/>
+      <text x="45" y="16" text-anchor="middle" font-size="10" fill="#1d4ed8" font-weight="500">Shell: 50ms</text>
+    </g>
+
+    <!-- Users loaded -->
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.2s" begin="1.5s" fill="freeze"/>
+      <rect x="100" y="0" width="100" height="24" rx="12" fill="#d1fae5"/>
+      <text x="150" y="16" text-anchor="middle" font-size="10" fill="#059669" font-weight="500">Users: 500ms</text>
+    </g>
+
+    <!-- Posts loaded -->
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.2s" begin="2.8s" fill="freeze"/>
+      <rect x="210" y="0" width="100" height="24" rx="12" fill="#ede9fe"/>
+      <text x="260" y="16" text-anchor="middle" font-size="10" fill="#7c3aed" font-weight="500">Posts: 800ms</text>
+    </g>
+
+    <!-- Complete -->
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.2s" begin="4.2s" fill="freeze"/>
+      <rect x="320" y="0" width="80" height="24" rx="12" fill="#fef3c7"/>
+      <text x="360" y="16" text-anchor="middle" font-size="10" fill="#92400e" font-weight="500">✓ Done</text>
+    </g>
+  </g>
+</svg>

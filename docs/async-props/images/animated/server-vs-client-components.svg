@@ -1,0 +1,230 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 950 600" font-family="system-ui, -apple-system, sans-serif">
+  <defs>
+    <linearGradient id="spaceBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0c0a1d"/>
+      <stop offset="50%" style="stop-color:#1a1333"/>
+      <stop offset="100%" style="stop-color:#0c0a1d"/>
+    </linearGradient>
+    <linearGradient id="serverGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366f1"/>
+      <stop offset="100%" style="stop-color:#4f46e5"/>
+    </linearGradient>
+    <linearGradient id="clientGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#06b6d4"/>
+      <stop offset="100%" style="stop-color:#0891b2"/>
+    </linearGradient>
+    <linearGradient id="sharedGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8b5cf6"/>
+      <stop offset="100%" style="stop-color:#7c3aed"/>
+    </linearGradient>
+
+    <filter id="starGlow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="2" result="glow"/>
+      <feMerge>
+        <feMergeNode in="glow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Star symbol -->
+    <symbol id="star" viewBox="0 0 10 10">
+      <circle cx="5" cy="5" r="1" fill="white"/>
+    </symbol>
+  </defs>
+
+  <!-- Background -->
+  <rect width="950" height="600" fill="url(#spaceBg)"/>
+
+  <!-- Decorative stars -->
+  <g opacity="0.6">
+    <use href="#star" x="50" y="80" width="6" height="6"><animate attributeName="opacity" values="0.3;1;0.3" dur="2s" repeatCount="indefinite"/></use>
+    <use href="#star" x="150" y="120" width="4" height="4"><animate attributeName="opacity" values="0.3;1;0.3" dur="2.5s" repeatCount="indefinite"/></use>
+    <use href="#star" x="800" y="100" width="5" height="5"><animate attributeName="opacity" values="0.3;1;0.3" dur="1.8s" repeatCount="indefinite"/></use>
+    <use href="#star" x="880" y="200" width="4" height="4"><animate attributeName="opacity" values="0.3;1;0.3" dur="2.2s" repeatCount="indefinite"/></use>
+    <use href="#star" x="100" y="500" width="5" height="5"><animate attributeName="opacity" values="0.3;1;0.3" dur="2.1s" repeatCount="indefinite"/></use>
+    <use href="#star" x="850" y="480" width="4" height="4"><animate attributeName="opacity" values="0.3;1;0.3" dur="1.9s" repeatCount="indefinite"/></use>
+  </g>
+
+  <!-- Title -->
+  <text x="475" y="50" text-anchor="middle" font-size="28" font-weight="bold" fill="white">Component Rendering Locations</text>
+  <text x="475" y="80" text-anchor="middle" font-size="14" fill="#a1a1aa">Understanding where your components execute</text>
+
+  <!-- Server Side -->
+  <g transform="translate(50, 120)">
+    <!-- Server box -->
+    <rect x="0" y="0" width="400" height="340" rx="16" fill="#1e1b4b" stroke="#4f46e5" stroke-width="2"/>
+
+    <!-- Server header -->
+    <rect x="0" y="0" width="400" height="50" rx="16" fill="url(#serverGrad)"/>
+    <rect x="0" y="34" width="400" height="16" fill="url(#serverGrad)"/>
+    <text x="40" y="32" font-size="20">🖥️</text>
+    <text x="70" y="34" font-size="16" font-weight="600" fill="white">Server (Node.js)</text>
+
+    <!-- Server components -->
+    <g transform="translate(20, 70)">
+      <text x="0" y="0" font-size="12" font-weight="500" fill="#a5b4fc">Server Components</text>
+
+      <!-- Data fetching -->
+      <g transform="translate(0, 20)" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.3s" begin="0.5s" fill="freeze"/>
+        <rect x="0" y="0" width="360" height="50" rx="8" fill="#312e81" stroke="#6366f1"/>
+        <text x="15" y="20" font-size="11" fill="#c7d2fe" font-family="monospace">async function getData() {</text>
+        <text x="15" y="38" font-size="11" fill="#c7d2fe" font-family="monospace">  return await db.query(...)</text>
+        <text x="350" y="30" font-size="14">💾</text>
+      </g>
+
+      <!-- Heavy computation -->
+      <g transform="translate(0, 80)" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.3s" begin="0.8s" fill="freeze"/>
+        <rect x="0" y="0" width="360" height="50" rx="8" fill="#312e81" stroke="#6366f1"/>
+        <text x="15" y="20" font-size="11" fill="#c7d2fe" font-family="monospace">function heavyComputation() {</text>
+        <text x="15" y="38" font-size="11" fill="#c7d2fe" font-family="monospace">  return processData(bigData)</text>
+        <text x="350" y="30" font-size="14">⚡</text>
+      </g>
+
+      <!-- Secrets/API keys -->
+      <g transform="translate(0, 140)" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.3s" begin="1.1s" fill="freeze"/>
+        <rect x="0" y="0" width="360" height="50" rx="8" fill="#312e81" stroke="#6366f1"/>
+        <text x="15" y="20" font-size="11" fill="#c7d2fe" font-family="monospace">const secret = process.env.API_KEY</text>
+        <text x="15" y="38" font-size="11" fill="#c7d2fe" font-family="monospace">// Never sent to browser!</text>
+        <text x="350" y="30" font-size="14">🔐</text>
+      </g>
+
+      <!-- Benefits -->
+      <g transform="translate(0, 205)">
+        <text x="0" y="0" font-size="11" font-weight="500" fill="#6366f1">Benefits:</text>
+        <text x="0" y="20" font-size="10" fill="#a5b4fc">✓ Direct database access</text>
+        <text x="0" y="38" font-size="10" fill="#a5b4fc">✓ Keep secrets secure</text>
+        <text x="0" y="56" font-size="10" fill="#a5b4fc">✓ Reduce bundle size</text>
+        <text x="180" y="20" font-size="10" fill="#a5b4fc">✓ Faster data fetching</text>
+        <text x="180" y="38" font-size="10" fill="#a5b4fc">✓ SEO friendly</text>
+        <text x="180" y="56" font-size="10" fill="#a5b4fc">✓ Zero client JS</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- Client Side -->
+  <g transform="translate(500, 120)">
+    <!-- Client box -->
+    <rect x="0" y="0" width="400" height="340" rx="16" fill="#164e63" stroke="#06b6d4" stroke-width="2"/>
+
+    <!-- Client header -->
+    <rect x="0" y="0" width="400" height="50" rx="16" fill="url(#clientGrad)"/>
+    <rect x="0" y="34" width="400" height="16" fill="url(#clientGrad)"/>
+    <text x="40" y="32" font-size="20">🌐</text>
+    <text x="70" y="34" font-size="16" font-weight="600" fill="white">Client (Browser)</text>
+
+    <!-- Client components -->
+    <g transform="translate(20, 70)">
+      <text x="0" y="0" font-size="12" font-weight="500" fill="#67e8f9">Client Components</text>
+
+      <!-- Interactivity -->
+      <g transform="translate(0, 20)" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.3s" begin="1.5s" fill="freeze"/>
+        <rect x="0" y="0" width="360" height="50" rx="8" fill="#0e4c5f" stroke="#06b6d4"/>
+        <text x="15" y="20" font-size="11" fill="#a5f3fc" font-family="monospace">'use client'</text>
+        <text x="15" y="38" font-size="11" fill="#a5f3fc" font-family="monospace">onClick={() =&gt; setState(...)}</text>
+        <text x="350" y="30" font-size="14">👆</text>
+      </g>
+
+      <!-- Browser APIs -->
+      <g transform="translate(0, 80)" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.3s" begin="1.8s" fill="freeze"/>
+        <rect x="0" y="0" width="360" height="50" rx="8" fill="#0e4c5f" stroke="#06b6d4"/>
+        <text x="15" y="20" font-size="11" fill="#a5f3fc" font-family="monospace">useEffect(() =&gt; {</text>
+        <text x="15" y="38" font-size="11" fill="#a5f3fc" font-family="monospace">  window.localStorage.set(...)</text>
+        <text x="350" y="30" font-size="14">🪟</text>
+      </g>
+
+      <!-- Real-time updates -->
+      <g transform="translate(0, 140)" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.3s" begin="2.1s" fill="freeze"/>
+        <rect x="0" y="0" width="360" height="50" rx="8" fill="#0e4c5f" stroke="#06b6d4"/>
+        <text x="15" y="20" font-size="11" fill="#a5f3fc" font-family="monospace">const [count, setCount] = useState(0)</text>
+        <text x="15" y="38" font-size="11" fill="#a5f3fc" font-family="monospace">// Re-renders on state change</text>
+        <text x="350" y="30" font-size="14">🔄</text>
+      </g>
+
+      <!-- Benefits -->
+      <g transform="translate(0, 205)">
+        <text x="0" y="0" font-size="11" font-weight="500" fill="#06b6d4">Benefits:</text>
+        <text x="0" y="20" font-size="10" fill="#67e8f9">✓ User interactions</text>
+        <text x="0" y="38" font-size="10" fill="#67e8f9">✓ Browser APIs</text>
+        <text x="0" y="56" font-size="10" fill="#67e8f9">✓ Real-time updates</text>
+        <text x="180" y="20" font-size="10" fill="#67e8f9">✓ Animations</text>
+        <text x="180" y="38" font-size="10" fill="#67e8f9">✓ Form handling</text>
+        <text x="180" y="56" font-size="10" fill="#67e8f9">✓ Third-party widgets</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- Data flow arrow -->
+  <g transform="translate(450, 250)">
+    <path d="M 0 40 L 50 40" stroke="#8b5cf6" stroke-width="3" stroke-dasharray="8,4">
+      <animate attributeName="stroke-dashoffset" values="0;-24" dur="0.8s" repeatCount="indefinite"/>
+    </path>
+    <polygon points="50,40 40,30 40,50" fill="#8b5cf6"/>
+    <text x="25" y="70" text-anchor="middle" font-size="10" fill="#a78bfa">HTML</text>
+    <text x="25" y="85" text-anchor="middle" font-size="10" fill="#a78bfa">Stream</text>
+  </g>
+
+  <!-- Combined example at bottom -->
+  <g transform="translate(50, 480)">
+    <rect x="0" y="0" width="850" height="100" rx="12" fill="#1e1b4b" stroke="#8b5cf6"/>
+
+    <text x="425" y="25" text-anchor="middle" font-size="14" font-weight="600" fill="white">Combined Pattern (Best of Both Worlds)</text>
+
+    <g transform="translate(20, 40)">
+      <!-- Server component -->
+      <rect x="0" y="0" width="250" height="45" rx="6" fill="url(#serverGrad)" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="3s" fill="freeze"/>
+      </rect>
+      <text x="125" y="18" text-anchor="middle" font-size="10" fill="white" font-weight="500" opacity="0">
+        &lt;ProductList products={data} /&gt;
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="3s" fill="freeze"/>
+      </text>
+      <text x="125" y="35" text-anchor="middle" font-size="9" fill="rgba(255,255,255,0.7)" opacity="0">
+        🖥️ Server: Fetches &amp; renders list
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="3s" fill="freeze"/>
+      </text>
+
+      <!-- Arrow -->
+      <text x="270" y="25" font-size="20" fill="#8b5cf6" opacity="0">
+        →
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="3.3s" fill="freeze"/>
+      </text>
+
+      <!-- Client component inside -->
+      <rect x="300" y="0" width="250" height="45" rx="6" fill="url(#clientGrad)" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="3.5s" fill="freeze"/>
+      </rect>
+      <text x="425" y="18" text-anchor="middle" font-size="10" fill="white" font-weight="500" opacity="0">
+        &lt;AddToCartButton /&gt;
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="3.5s" fill="freeze"/>
+      </text>
+      <text x="425" y="35" text-anchor="middle" font-size="9" fill="rgba(255,255,255,0.7)" opacity="0">
+        🌐 Client: Handles click events
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="3.5s" fill="freeze"/>
+      </text>
+
+      <!-- Result -->
+      <text x="580" y="25" font-size="20" fill="#22c55e" opacity="0">
+        =
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="3.8s" fill="freeze"/>
+      </text>
+
+      <rect x="620" y="0" width="200" height="45" rx="6" fill="#14532d" stroke="#22c55e" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="4s" fill="freeze"/>
+      </rect>
+      <text x="720" y="18" text-anchor="middle" font-size="10" fill="#86efac" font-weight="500" opacity="0">
+        Fast + Interactive
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="4s" fill="freeze"/>
+      </text>
+      <text x="720" y="35" text-anchor="middle" font-size="9" fill="rgba(134,239,172,0.8)" opacity="0">
+        ✓ SEO + ✓ UX
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="4s" fill="freeze"/>
+      </text>
+    </g>
+  </g>
+</svg>

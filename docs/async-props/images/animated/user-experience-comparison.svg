@@ -1,0 +1,289 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 950 650" font-family="system-ui, -apple-system, sans-serif">
+  <defs>
+    <linearGradient id="uxBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#020617"/>
+      <stop offset="50%" style="stop-color:#0f172a"/>
+      <stop offset="100%" style="stop-color:#020617"/>
+    </linearGradient>
+
+    <!-- User satisfaction gradient -->
+    <linearGradient id="frustrationGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#ef4444"/>
+      <stop offset="100%" style="stop-color:#dc2626"/>
+    </linearGradient>
+    <linearGradient id="happyGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#22c55e"/>
+      <stop offset="100%" style="stop-color:#16a34a"/>
+    </linearGradient>
+
+    <!-- Bounce animation for emoji -->
+    <animate id="bounce" attributeName="transform" type="scale" values="1;1.1;1" dur="0.3s"/>
+
+    <!-- Pulse effect -->
+    <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="glow"/>
+      <feMerge>
+        <feMergeNode in="glow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="950" height="650" fill="url(#uxBg)"/>
+
+  <!-- Decorative elements -->
+  <circle cx="100" cy="600" r="200" fill="#1e3a5f" opacity="0.1"/>
+  <circle cx="850" cy="100" r="150" fill="#3b1c5f" opacity="0.1"/>
+
+  <!-- Title -->
+  <text x="475" y="50" text-anchor="middle" font-size="28" font-weight="bold" fill="white">User Experience Comparison</text>
+  <text x="475" y="80" text-anchor="middle" font-size="14" fill="#94a3b8">Same page load, dramatically different experience</text>
+
+  <!-- Traditional SSR Side -->
+  <g transform="translate(30, 110)">
+    <!-- Header -->
+    <rect x="0" y="0" width="420" height="45" rx="10" fill="#1e293b" stroke="#334155"/>
+    <circle cx="25" cy="22" r="15" fill="#ef4444" opacity="0.2"/>
+    <text x="25" y="27" text-anchor="middle" font-size="18">😔</text>
+    <text x="55" y="28" font-size="16" font-weight="600" fill="#f87171">Traditional SSR</text>
+    <text x="320" y="28" font-size="12" fill="#64748b">TTFB: 3000ms</text>
+
+    <!-- Browser mockup -->
+    <g transform="translate(0, 60)">
+      <rect x="0" y="0" width="420" height="280" rx="12" fill="#0f172a" stroke="#1e293b" stroke-width="2"/>
+      <rect x="0" y="0" width="420" height="32" rx="12" fill="#1e293b"/>
+      <rect x="0" y="20" width="420" height="12" fill="#1e293b"/>
+      <circle cx="18" cy="16" r="5" fill="#f87171"/>
+      <circle cx="36" cy="16" r="5" fill="#fbbf24"/>
+      <circle cx="54" cy="16" r="5" fill="#4ade80"/>
+
+      <!-- Page content - blank for a long time -->
+      <rect x="15" y="45" width="390" height="220" rx="8" fill="#020617"/>
+
+      <!-- Spinner (visible for 3 seconds) -->
+      <g transform="translate(210, 155)" opacity="1">
+        <animate attributeName="opacity" values="1;0" dur="0.2s" begin="3s" fill="freeze"/>
+        <circle cx="0" cy="0" r="25" fill="none" stroke="#334155" stroke-width="3"/>
+        <circle cx="0" cy="0" r="25" fill="none" stroke="#ef4444" stroke-width="3" stroke-dasharray="39 118" stroke-linecap="round">
+          <animateTransform attributeName="transform" type="rotate" values="0;360" dur="1s" repeatCount="3"/>
+        </circle>
+        <text x="0" y="50" text-anchor="middle" font-size="11" fill="#64748b">Loading...</text>
+      </g>
+
+      <!-- Content appears all at once after 3s -->
+      <g opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="3s" fill="freeze"/>
+        <!-- Header -->
+        <rect x="25" y="55" width="370" height="30" rx="6" fill="#3b82f6"/>
+        <!-- User card -->
+        <rect x="25" y="95" width="175" height="80" rx="6" fill="#22c55e"/>
+        <!-- Posts card -->
+        <rect x="210" y="95" width="185" height="80" rx="6" fill="#a855f7"/>
+        <!-- Comments -->
+        <rect x="25" y="185" width="370" height="70" rx="6" fill="#f97316"/>
+      </g>
+    </g>
+
+    <!-- User reaction timeline -->
+    <g transform="translate(0, 360)">
+      <text x="0" y="0" font-size="12" font-weight="500" fill="#94a3b8">User Reaction Timeline</text>
+
+      <!-- Timeline bar -->
+      <rect x="0" y="15" width="420" height="8" rx="4" fill="#1e293b"/>
+      <rect x="0" y="15" width="0" height="8" rx="4" fill="url(#frustrationGrad)">
+        <animate attributeName="width" values="0;420" dur="4s" fill="freeze"/>
+      </rect>
+
+      <!-- Reaction markers -->
+      <g transform="translate(30, 40)">
+        <text x="0" y="0" font-size="20">😐</text>
+        <text x="0" y="20" font-size="9" fill="#64748b">0s: Waiting</text>
+      </g>
+
+      <g transform="translate(120, 40)" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="1s" fill="freeze"/>
+        <text x="0" y="0" font-size="20">🤔</text>
+        <text x="0" y="20" font-size="9" fill="#64748b">1s: Confused</text>
+      </g>
+
+      <g transform="translate(220, 40)" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="2s" fill="freeze"/>
+        <text x="0" y="0" font-size="20">😤</text>
+        <text x="0" y="20" font-size="9" fill="#64748b">2s: Frustrated</text>
+      </g>
+
+      <g transform="translate(320, 40)" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="3s" fill="freeze"/>
+        <text x="0" y="0" font-size="20">😮‍💨</text>
+        <text x="0" y="20" font-size="9" fill="#64748b">3s: Finally!</text>
+      </g>
+    </g>
+
+    <!-- Metrics -->
+    <g transform="translate(0, 450)">
+      <rect x="0" y="0" width="420" height="80" rx="10" fill="#1e293b" stroke="#dc2626"/>
+
+      <g transform="translate(20, 20)">
+        <text x="0" y="0" font-size="11" fill="#94a3b8">Perceived Speed</text>
+        <rect x="0" y="10" width="150" height="12" rx="6" fill="#0f172a"/>
+        <rect x="0" y="10" width="30" height="12" rx="6" fill="#ef4444"/>
+        <text x="160" y="20" font-size="11" fill="#f87171">Slow</text>
+      </g>
+
+      <g transform="translate(220, 20)">
+        <text x="0" y="0" font-size="11" fill="#94a3b8">User Engagement</text>
+        <rect x="0" y="10" width="150" height="12" rx="6" fill="#0f172a"/>
+        <rect x="0" y="10" width="45" height="12" rx="6" fill="#ef4444"/>
+        <text x="160" y="20" font-size="11" fill="#f87171">Low</text>
+      </g>
+
+      <text x="210" y="65" text-anchor="middle" font-size="10" fill="#64748b">Users may leave before content loads</text>
+    </g>
+  </g>
+
+  <!-- Streaming SSR Side -->
+  <g transform="translate(500, 110)">
+    <!-- Header -->
+    <rect x="0" y="0" width="420" height="45" rx="10" fill="#1e293b" stroke="#334155"/>
+    <circle cx="25" cy="22" r="15" fill="#22c55e" opacity="0.2"/>
+    <text x="25" y="27" text-anchor="middle" font-size="18">😊</text>
+    <text x="55" y="28" font-size="16" font-weight="600" fill="#4ade80">Streaming SSR</text>
+    <text x="340" y="28" font-size="12" fill="#64748b">TTFB: 50ms</text>
+
+    <!-- Browser mockup -->
+    <g transform="translate(0, 60)">
+      <rect x="0" y="0" width="420" height="280" rx="12" fill="#0f172a" stroke="#22c55e" stroke-width="2"/>
+      <rect x="0" y="0" width="420" height="32" rx="12" fill="#1e293b"/>
+      <rect x="0" y="20" width="420" height="12" fill="#1e293b"/>
+      <circle cx="18" cy="16" r="5" fill="#f87171"/>
+      <circle cx="36" cy="16" r="5" fill="#fbbf24"/>
+      <circle cx="54" cy="16" r="5" fill="#4ade80"/>
+
+      <!-- Page content area -->
+      <rect x="15" y="45" width="390" height="220" rx="8" fill="#020617"/>
+
+      <!-- Header appears immediately -->
+      <rect x="25" y="55" width="370" height="30" rx="6" fill="#3b82f6" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="0.1s" fill="freeze"/>
+      </rect>
+
+      <!-- Skeletons then content -->
+      <!-- Users skeleton -->
+      <rect x="25" y="95" width="175" height="80" rx="6" fill="#1e293b" stroke="#334155" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.1s" begin="0.1s" fill="freeze"/>
+        <animate attributeName="opacity" values="1;0" dur="0.1s" begin="1s" fill="freeze"/>
+      </rect>
+      <!-- Users content -->
+      <rect x="25" y="95" width="175" height="80" rx="6" fill="#22c55e" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="1s" fill="freeze"/>
+      </rect>
+
+      <!-- Posts skeleton -->
+      <rect x="210" y="95" width="185" height="80" rx="6" fill="#1e293b" stroke="#334155" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.1s" begin="0.1s" fill="freeze"/>
+        <animate attributeName="opacity" values="1;0" dur="0.1s" begin="1.8s" fill="freeze"/>
+      </rect>
+      <!-- Posts content -->
+      <rect x="210" y="95" width="185" height="80" rx="6" fill="#a855f7" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="1.8s" fill="freeze"/>
+      </rect>
+
+      <!-- Comments skeleton -->
+      <rect x="25" y="185" width="370" height="70" rx="6" fill="#1e293b" stroke="#334155" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.1s" begin="0.1s" fill="freeze"/>
+        <animate attributeName="opacity" values="1;0" dur="0.1s" begin="2.5s" fill="freeze"/>
+      </rect>
+      <!-- Comments content -->
+      <rect x="25" y="185" width="370" height="70" rx="6" fill="#f97316" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="2.5s" fill="freeze"/>
+      </rect>
+    </g>
+
+    <!-- User reaction timeline -->
+    <g transform="translate(0, 360)">
+      <text x="0" y="0" font-size="12" font-weight="500" fill="#94a3b8">User Reaction Timeline</text>
+
+      <!-- Timeline bar -->
+      <rect x="0" y="15" width="420" height="8" rx="4" fill="#1e293b"/>
+      <rect x="0" y="15" width="0" height="8" rx="4" fill="url(#happyGrad)">
+        <animate attributeName="width" values="0;420" dur="4s" fill="freeze"/>
+      </rect>
+
+      <!-- Reaction markers -->
+      <g transform="translate(10, 40)">
+        <text x="0" y="0" font-size="20">😃</text>
+        <text x="0" y="20" font-size="9" fill="#64748b">50ms: Content!</text>
+      </g>
+
+      <g transform="translate(100, 40)" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="1s" fill="freeze"/>
+        <text x="0" y="0" font-size="20">😊</text>
+        <text x="0" y="20" font-size="9" fill="#64748b">1s: More data</text>
+      </g>
+
+      <g transform="translate(200, 40)" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="2s" fill="freeze"/>
+        <text x="0" y="0" font-size="20">😄</text>
+        <text x="0" y="20" font-size="9" fill="#64748b">2s: Almost there</text>
+      </g>
+
+      <g transform="translate(310, 40)" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="2.5s" fill="freeze"/>
+        <text x="0" y="0" font-size="20">🎉</text>
+        <text x="0" y="20" font-size="9" fill="#64748b">2.5s: Complete!</text>
+      </g>
+    </g>
+
+    <!-- Metrics -->
+    <g transform="translate(0, 450)">
+      <rect x="0" y="0" width="420" height="80" rx="10" fill="#1e293b" stroke="#22c55e"/>
+
+      <g transform="translate(20, 20)">
+        <text x="0" y="0" font-size="11" fill="#94a3b8">Perceived Speed</text>
+        <rect x="0" y="10" width="150" height="12" rx="6" fill="#0f172a"/>
+        <rect x="0" y="10" width="140" height="12" rx="6" fill="#22c55e"/>
+        <text x="160" y="20" font-size="11" fill="#4ade80">Fast</text>
+      </g>
+
+      <g transform="translate(220, 20)">
+        <text x="0" y="0" font-size="11" fill="#94a3b8">User Engagement</text>
+        <rect x="0" y="10" width="150" height="12" rx="6" fill="#0f172a"/>
+        <rect x="0" y="10" width="135" height="12" rx="6" fill="#22c55e"/>
+        <text x="160" y="20" font-size="11" fill="#4ade80">High</text>
+      </g>
+
+      <text x="210" y="65" text-anchor="middle" font-size="10" fill="#64748b">Users engaged from the first moment</text>
+    </g>
+  </g>
+
+  <!-- Comparison summary -->
+  <g transform="translate(50, 560)">
+    <rect x="0" y="0" width="850" height="70" rx="12" fill="#1e293b" stroke="#475569"/>
+
+    <!-- Key metrics comparison -->
+    <g transform="translate(30, 20)">
+      <text x="0" y="0" font-size="12" font-weight="600" fill="white">Key Metrics</text>
+
+      <g transform="translate(0, 20)">
+        <text x="0" y="0" font-size="11" fill="#94a3b8">Time to First Content:</text>
+        <text x="150" y="0" font-size="11" fill="#f87171">Traditional: 3000ms</text>
+        <text x="300" y="0" font-size="11" fill="#4ade80">Streaming: 50ms</text>
+        <text x="450" y="0" font-size="12" font-weight="bold" fill="#fbbf24">60x faster</text>
+      </g>
+
+      <g transform="translate(0, 40)">
+        <text x="0" y="0" font-size="11" fill="#94a3b8">Bounce Rate Impact:</text>
+        <text x="150" y="0" font-size="11" fill="#f87171">High risk</text>
+        <text x="300" y="0" font-size="11" fill="#4ade80">Minimal</text>
+        <text x="450" y="0" font-size="12" fill="#94a3b8">Every 100ms delay = 1% conversion loss</text>
+      </g>
+    </g>
+
+    <!-- Winner badge -->
+    <g transform="translate(700, 15)">
+      <rect x="0" y="0" width="120" height="40" rx="20" fill="#22c55e" filter="url(#softGlow)"/>
+      <text x="60" y="26" text-anchor="middle" font-size="14" font-weight="bold" fill="white">Winner! 🏆</text>
+    </g>
+  </g>
+</svg>

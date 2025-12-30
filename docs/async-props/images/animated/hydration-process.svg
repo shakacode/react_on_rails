@@ -1,0 +1,257 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 520" font-family="system-ui, -apple-system, sans-serif">
+  <defs>
+    <linearGradient id="hydrateBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e1b4b"/>
+      <stop offset="100%" style="stop-color:#312e81"/>
+    </linearGradient>
+    <linearGradient id="staticGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#6b7280"/>
+      <stop offset="100%" style="stop-color:#4b5563"/>
+    </linearGradient>
+    <linearGradient id="hydratedGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#8b5cf6"/>
+      <stop offset="100%" style="stop-color:#7c3aed"/>
+    </linearGradient>
+    <linearGradient id="interactiveGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#06b6d4"/>
+      <stop offset="100%" style="stop-color:#0891b2"/>
+    </linearGradient>
+    <filter id="glowPurple" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="6" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Water droplet animation -->
+    <symbol id="droplet" viewBox="0 0 20 24">
+      <path d="M10 0 C10 0 0 12 0 16 C0 20.4 4.5 24 10 24 C15.5 24 20 20.4 20 16 C20 12 10 0 10 0Z" fill="#8b5cf6"/>
+    </symbol>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="520" fill="url(#hydrateBg)"/>
+
+  <!-- Decorative elements -->
+  <circle cx="850" cy="50" r="100" fill="#4c1d95" opacity="0.3"/>
+  <circle cx="50" cy="470" r="80" fill="#4c1d95" opacity="0.3"/>
+
+  <!-- Title -->
+  <text x="450" y="45" text-anchor="middle" font-size="26" font-weight="bold" fill="white">Progressive Hydration</text>
+  <text x="450" y="75" text-anchor="middle" font-size="14" fill="#a5b4fc">How React brings server-rendered HTML to life</text>
+
+  <!-- Browser Window -->
+  <g transform="translate(50, 100)">
+    <!-- Window frame -->
+    <rect x="0" y="0" width="500" height="380" rx="12" fill="#1e1b4b" stroke="#4c1d95" stroke-width="2"/>
+    <rect x="0" y="0" width="500" height="36" rx="12" fill="#312e81"/>
+    <rect x="0" y="24" width="500" height="12" fill="#312e81"/>
+
+    <!-- Traffic lights -->
+    <circle cx="20" cy="18" r="6" fill="#f87171"/>
+    <circle cx="40" cy="18" r="6" fill="#fbbf24"/>
+    <circle cx="60" cy="18" r="6" fill="#4ade80"/>
+
+    <!-- URL bar -->
+    <rect x="80" y="8" width="340" height="20" rx="4" fill="#1e1b4b"/>
+    <text x="95" y="22" font-size="10" fill="#a5b4fc">myapp.com/dashboard</text>
+
+    <!-- Page content area -->
+    <rect x="10" y="46" width="480" height="324" rx="8" fill="#0f0a2a"/>
+
+    <!-- Header - Static HTML then hydrates -->
+    <g>
+      <rect x="20" y="56" width="460" height="40" rx="6" fill="url(#staticGrad)">
+        <animate attributeName="fill" from="url(#staticGrad)" to="#8b5cf6" dur="0.3s" begin="1s" fill="freeze"/>
+      </rect>
+      <text x="250" y="82" text-anchor="middle" font-size="14" fill="white" font-weight="500">Dashboard Header</text>
+      <!-- Hydration wave effect -->
+      <rect x="20" y="56" width="0" height="40" rx="6" fill="#8b5cf6" opacity="0.6">
+        <animate attributeName="width" values="0;460" dur="0.5s" begin="1s" fill="freeze"/>
+        <animate attributeName="opacity" values="0.6;0" dur="0.5s" begin="1s" fill="freeze"/>
+      </rect>
+    </g>
+
+    <!-- Nav buttons - hydrate with interactivity -->
+    <g transform="translate(20, 106)">
+      <!-- Button 1 -->
+      <rect x="0" y="0" width="80" height="30" rx="6" fill="url(#staticGrad)">
+        <animate attributeName="fill" from="url(#staticGrad)" to="#06b6d4" dur="0.3s" begin="1.5s" fill="freeze"/>
+      </rect>
+      <text x="40" y="20" text-anchor="middle" font-size="11" fill="white">Home</text>
+      <!-- Click ripple appears after hydration -->
+      <circle cx="40" cy="15" r="0" fill="white" opacity="0">
+        <animate attributeName="r" values="0;50;0" dur="0.6s" begin="3.5s" fill="freeze"/>
+        <animate attributeName="opacity" values="0;0.3;0" dur="0.6s" begin="3.5s" fill="freeze"/>
+      </circle>
+
+      <!-- Button 2 -->
+      <rect x="90" y="0" width="80" height="30" rx="6" fill="url(#staticGrad)">
+        <animate attributeName="fill" from="url(#staticGrad)" to="#06b6d4" dur="0.3s" begin="1.7s" fill="freeze"/>
+      </rect>
+      <text x="130" y="20" text-anchor="middle" font-size="11" fill="white">Profile</text>
+
+      <!-- Button 3 -->
+      <rect x="180" y="0" width="80" height="30" rx="6" fill="url(#staticGrad)">
+        <animate attributeName="fill" from="url(#staticGrad)" to="#06b6d4" dur="0.3s" begin="1.9s" fill="freeze"/>
+      </rect>
+      <text x="220" y="20" text-anchor="middle" font-size="11" fill="white">Settings</text>
+    </g>
+
+    <!-- Users Card - Suspense boundary -->
+    <g transform="translate(20, 150)">
+      <rect x="0" y="0" width="220" height="130" rx="8" fill="url(#staticGrad)" stroke="#6b7280">
+        <animate attributeName="fill" from="url(#staticGrad)" to="#8b5cf6" dur="0.3s" begin="2.5s" fill="freeze"/>
+        <animate attributeName="stroke" from="#6b7280" to="#a78bfa" dur="0.3s" begin="2.5s" fill="freeze"/>
+      </rect>
+      <text x="110" y="25" text-anchor="middle" font-size="12" fill="white" font-weight="500">Users</text>
+
+      <!-- User list items -->
+      <rect x="10" y="40" width="200" height="25" rx="4" fill="#374151">
+        <animate attributeName="fill" from="#374151" to="#7c3aed" dur="0.2s" begin="2.6s" fill="freeze"/>
+      </rect>
+      <rect x="10" y="70" width="200" height="25" rx="4" fill="#374151">
+        <animate attributeName="fill" from="#374151" to="#7c3aed" dur="0.2s" begin="2.7s" fill="freeze"/>
+      </rect>
+      <rect x="10" y="100" width="200" height="25" rx="4" fill="#374151">
+        <animate attributeName="fill" from="#374151" to="#7c3aed" dur="0.2s" begin="2.8s" fill="freeze"/>
+      </rect>
+
+      <!-- Hydration wave -->
+      <rect x="0" y="0" width="0" height="130" rx="8" fill="#a78bfa" opacity="0.4">
+        <animate attributeName="width" values="0;220" dur="0.4s" begin="2.5s" fill="freeze"/>
+        <animate attributeName="opacity" values="0.4;0" dur="0.4s" begin="2.5s" fill="freeze"/>
+      </rect>
+    </g>
+
+    <!-- Posts Card - Suspense boundary (loads later) -->
+    <g transform="translate(260, 150)">
+      <rect x="0" y="0" width="220" height="130" rx="8" fill="url(#staticGrad)" stroke="#6b7280">
+        <animate attributeName="fill" from="url(#staticGrad)" to="#8b5cf6" dur="0.3s" begin="3.5s" fill="freeze"/>
+        <animate attributeName="stroke" from="#6b7280" to="#a78bfa" dur="0.3s" begin="3.5s" fill="freeze"/>
+      </rect>
+      <text x="110" y="25" text-anchor="middle" font-size="12" fill="white" font-weight="500">Posts</text>
+
+      <!-- Post items -->
+      <rect x="10" y="40" width="200" height="25" rx="4" fill="#374151">
+        <animate attributeName="fill" from="#374151" to="#7c3aed" dur="0.2s" begin="3.6s" fill="freeze"/>
+      </rect>
+      <rect x="10" y="70" width="200" height="25" rx="4" fill="#374151">
+        <animate attributeName="fill" from="#374151" to="#7c3aed" dur="0.2s" begin="3.7s" fill="freeze"/>
+      </rect>
+      <rect x="10" y="100" width="200" height="25" rx="4" fill="#374151">
+        <animate attributeName="fill" from="#374151" to="#7c3aed" dur="0.2s" begin="3.8s" fill="freeze"/>
+      </rect>
+
+      <!-- Hydration wave -->
+      <rect x="0" y="0" width="0" height="130" rx="8" fill="#a78bfa" opacity="0.4">
+        <animate attributeName="width" values="0;220" dur="0.4s" begin="3.5s" fill="freeze"/>
+        <animate attributeName="opacity" values="0.4;0" dur="0.4s" begin="3.5s" fill="freeze"/>
+      </rect>
+    </g>
+
+    <!-- Footer -->
+    <g transform="translate(20, 300)">
+      <rect x="0" y="0" width="460" height="60" rx="8" fill="url(#staticGrad)">
+        <animate attributeName="fill" from="url(#staticGrad)" to="#8b5cf6" dur="0.3s" begin="4s" fill="freeze"/>
+      </rect>
+      <text x="230" y="35" text-anchor="middle" font-size="11" fill="white">Footer with interactive elements</text>
+
+      <!-- Hydration wave -->
+      <rect x="0" y="0" width="0" height="60" rx="8" fill="#a78bfa" opacity="0.4">
+        <animate attributeName="width" values="0;460" dur="0.4s" begin="4s" fill="freeze"/>
+        <animate attributeName="opacity" values="0.4;0" dur="0.4s" begin="4s" fill="freeze"/>
+      </rect>
+    </g>
+  </g>
+
+  <!-- Right side: Process explanation -->
+  <g transform="translate(580, 110)">
+    <text x="0" y="0" font-size="16" font-weight="600" fill="white">Hydration Process</text>
+
+    <!-- Step 1 -->
+    <g transform="translate(0, 30)" opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.3s" begin="0.3s" fill="freeze"/>
+      <rect x="0" y="0" width="270" height="70" rx="10" fill="#1e1b4b" stroke="#6b7280"/>
+      <circle cx="25" cy="35" r="15" fill="url(#staticGrad)"/>
+      <text x="25" y="40" text-anchor="middle" font-size="12" fill="white" font-weight="bold">1</text>
+      <text x="50" y="25" font-size="12" font-weight="500" fill="white">Static HTML Received</text>
+      <text x="50" y="45" font-size="10" fill="#a5b4fc">Server sends pre-rendered HTML</text>
+      <text x="50" y="60" font-size="10" fill="#a5b4fc">Visible but not interactive</text>
+    </g>
+
+    <!-- Step 2 -->
+    <g transform="translate(0, 115)" opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.3s" begin="1s" fill="freeze"/>
+      <rect x="0" y="0" width="270" height="70" rx="10" fill="#1e1b4b" stroke="#8b5cf6">
+        <animate attributeName="stroke" from="#6b7280" to="#8b5cf6" dur="0.3s" begin="1s" fill="freeze"/>
+      </rect>
+      <circle cx="25" cy="35" r="15" fill="url(#hydratedGrad)"/>
+      <text x="25" y="40" text-anchor="middle" font-size="12" fill="white" font-weight="bold">2</text>
+      <text x="50" y="25" font-size="12" font-weight="500" fill="white">React Hydrates</text>
+      <text x="50" y="45" font-size="10" fill="#a5b4fc">React attaches event handlers</text>
+      <text x="50" y="60" font-size="10" fill="#a5b4fc">Components become reactive</text>
+    </g>
+
+    <!-- Step 3 -->
+    <g transform="translate(0, 200)" opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.3s" begin="2.5s" fill="freeze"/>
+      <rect x="0" y="0" width="270" height="70" rx="10" fill="#1e1b4b" stroke="#8b5cf6">
+        <animate attributeName="stroke" from="#6b7280" to="#06b6d4" dur="0.3s" begin="2.5s" fill="freeze"/>
+      </rect>
+      <circle cx="25" cy="35" r="15" fill="url(#interactiveGrad)"/>
+      <text x="25" y="40" text-anchor="middle" font-size="12" fill="white" font-weight="bold">3</text>
+      <text x="50" y="25" font-size="12" font-weight="500" fill="white">Suspense Resolves</text>
+      <text x="50" y="45" font-size="10" fill="#a5b4fc">Async data arrives</text>
+      <text x="50" y="60" font-size="10" fill="#a5b4fc">Content hydrates progressively</text>
+    </g>
+
+    <!-- Step 4 -->
+    <g transform="translate(0, 285)" opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.3s" begin="4s" fill="freeze"/>
+      <rect x="0" y="0" width="270" height="70" rx="10" fill="#1e1b4b" stroke="#22c55e"/>
+      <circle cx="25" cy="35" r="15" fill="#22c55e"/>
+      <text x="25" y="40" text-anchor="middle" font-size="12" fill="white" font-weight="bold">✓</text>
+      <text x="50" y="25" font-size="12" font-weight="500" fill="white">Fully Interactive</text>
+      <text x="50" y="45" font-size="10" fill="#a5b4fc">All components hydrated</text>
+      <text x="50" y="60" font-size="10" fill="#a5b4fc">App is ready for user input</text>
+    </g>
+  </g>
+
+  <!-- Floating water droplets animation -->
+  <g>
+    <use href="#droplet" x="570" y="200" width="15" height="18" opacity="0">
+      <animate attributeName="opacity" values="0;1;0" dur="1s" begin="1s" fill="freeze"/>
+      <animate attributeName="y" values="200;250" dur="1s" begin="1s" fill="freeze"/>
+    </use>
+    <use href="#droplet" x="600" y="180" width="12" height="14" opacity="0">
+      <animate attributeName="opacity" values="0;1;0" dur="0.8s" begin="1.2s" fill="freeze"/>
+      <animate attributeName="y" values="180;230" dur="0.8s" begin="1.2s" fill="freeze"/>
+    </use>
+    <use href="#droplet" x="630" y="190" width="10" height="12" opacity="0">
+      <animate attributeName="opacity" values="0;1;0" dur="0.9s" begin="1.4s" fill="freeze"/>
+      <animate attributeName="y" values="190;240" dur="0.9s" begin="1.4s" fill="freeze"/>
+    </use>
+  </g>
+
+  <!-- Legend -->
+  <g transform="translate(50, 490)">
+    <rect x="0" y="0" width="800" height="25" rx="6" fill="#1e1b4b"/>
+
+    <rect x="20" y="6" width="14" height="14" rx="3" fill="url(#staticGrad)"/>
+    <text x="42" y="17" font-size="11" fill="#a5b4fc">Static HTML</text>
+
+    <rect x="150" y="6" width="14" height="14" rx="3" fill="#8b5cf6"/>
+    <text x="172" y="17" font-size="11" fill="#a5b4fc">Hydrating</text>
+
+    <rect x="270" y="6" width="14" height="14" rx="3" fill="#06b6d4"/>
+    <text x="292" y="17" font-size="11" fill="#a5b4fc">Interactive</text>
+
+    <rect x="400" y="6" width="14" height="14" rx="3" fill="#22c55e"/>
+    <text x="422" y="17" font-size="11" fill="#a5b4fc">Fully Loaded</text>
+
+    <rect x="540" y="2" width="20" height="20" rx="4" fill="none" stroke="#a78bfa" stroke-width="2" opacity="0.5"/>
+    <text x="568" y="17" font-size="11" fill="#a5b4fc">Hydration Wave</text>
+  </g>
+</svg>

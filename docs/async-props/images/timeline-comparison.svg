@@ -1,0 +1,141 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 420" font-family="system-ui, -apple-system, sans-serif">
+  <!-- Background -->
+  <rect width="900" height="420" fill="#f8fafc"/>
+
+  <!-- Title -->
+  <text x="450" y="30" text-anchor="middle" font-size="18" font-weight="bold" fill="#1e293b">Data Fetching Timeline Comparison</text>
+
+  <!-- Time axis labels -->
+  <g transform="translate(180, 55)">
+    <text x="0" y="0" font-size="10" fill="#64748b">0ms</text>
+    <text x="120" y="0" font-size="10" fill="#64748b">400ms</text>
+    <text x="240" y="0" font-size="10" fill="#64748b">800ms</text>
+    <text x="360" y="0" font-size="10" fill="#64748b">1200ms</text>
+    <text x="480" y="0" font-size="10" fill="#64748b">1600ms</text>
+    <text x="580" y="0" font-size="10" fill="#64748b">2000ms</text>
+  </g>
+
+  <!-- Grid lines -->
+  <g stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4,4">
+    <line x1="180" y1="65" x2="180" y2="380"/>
+    <line x1="300" y1="65" x2="300" y2="380"/>
+    <line x1="420" y1="65" x2="420" y2="380"/>
+    <line x1="540" y1="65" x2="540" y2="380"/>
+    <line x1="660" y1="65" x2="660" y2="380"/>
+    <line x1="760" y1="65" x2="760" y2="380"/>
+  </g>
+
+  <!-- TRADITIONAL SSR Section -->
+  <rect x="15" y="70" width="150" height="130" rx="6" fill="#fef2f2" stroke="#fecaca"/>
+  <text x="90" y="90" text-anchor="middle" font-size="13" font-weight="600" fill="#dc2626">Traditional SSR</text>
+
+  <!-- Traditional: Fetch Users -->
+  <g transform="translate(180, 105)">
+    <rect x="0" y="0" width="240" height="24" rx="4" fill="#f87171"/>
+    <text x="120" y="16" text-anchor="middle" font-size="10" fill="white" font-weight="500">Fetch Users (800ms)</text>
+  </g>
+  <text x="165" y="122" text-anchor="end" font-size="10" fill="#64748b">Users</text>
+
+  <!-- Traditional: Fetch Posts (sequential) -->
+  <g transform="translate(420, 135)">
+    <rect x="0" y="0" width="180" height="24" rx="4" fill="#fb923c"/>
+    <text x="90" y="16" text-anchor="middle" font-size="10" fill="white" font-weight="500">Fetch Posts (600ms)</text>
+  </g>
+  <text x="165" y="152" text-anchor="end" font-size="10" fill="#64748b">Posts</text>
+
+  <!-- Traditional: Render -->
+  <g transform="translate(600, 165)">
+    <rect x="0" y="0" width="60" height="24" rx="4" fill="#a78bfa"/>
+    <text x="30" y="16" text-anchor="middle" font-size="10" fill="white" font-weight="500">Render</text>
+  </g>
+  <text x="165" y="182" text-anchor="end" font-size="10" fill="#64748b">Render</text>
+
+  <!-- Traditional: TTFB marker -->
+  <line x1="660" y1="100" x2="660" y2="195" stroke="#dc2626" stroke-width="2" stroke-dasharray="4,2"/>
+  <g transform="translate(665, 145)">
+    <rect x="0" y="0" width="80" height="20" rx="3" fill="#dc2626"/>
+    <text x="40" y="14" text-anchor="middle" font-size="9" fill="white" font-weight="600">TTFB: 1660ms</text>
+  </g>
+
+  <!-- Waterfall indicator -->
+  <path d="M 420 117 L 420 135" stroke="#94a3b8" stroke-width="1" stroke-dasharray="2,2"/>
+  <path d="M 600 147 L 600 165" stroke="#94a3b8" stroke-width="1" stroke-dasharray="2,2"/>
+
+  <!-- STREAMING SSR Section -->
+  <rect x="15" y="220" width="150" height="150" rx="6" fill="#f0fdf4" stroke="#bbf7d0"/>
+  <text x="90" y="240" text-anchor="middle" font-size="13" font-weight="600" fill="#059669">Async Props</text>
+  <text x="90" y="255" text-anchor="middle" font-size="11" fill="#059669">(Streaming)</text>
+
+  <!-- Streaming: Render Shell -->
+  <g transform="translate(180, 270)">
+    <rect x="0" y="0" width="20" height="24" rx="4" fill="#3b82f6"/>
+    <text x="10" y="16" text-anchor="middle" font-size="8" fill="white">▶</text>
+  </g>
+  <text x="165" y="287" text-anchor="end" font-size="10" fill="#64748b">Shell</text>
+
+  <!-- Streaming: TTFB marker (early!) -->
+  <line x1="200" y1="265" x2="200" y2="360" stroke="#059669" stroke-width="2" stroke-dasharray="4,2"/>
+  <g transform="translate(205, 265)">
+    <rect x="0" y="0" width="70" height="20" rx="3" fill="#059669"/>
+    <text x="35" y="14" text-anchor="middle" font-size="9" fill="white" font-weight="600">TTFB: 50ms</text>
+  </g>
+
+  <!-- Streaming: Fetch Users (parallel) -->
+  <g transform="translate(180, 300)">
+    <rect x="0" y="0" width="240" height="24" rx="4" fill="#4ade80"/>
+    <text x="120" y="16" text-anchor="middle" font-size="10" fill="white" font-weight="500">Fetch Users (800ms)</text>
+  </g>
+  <text x="165" y="317" text-anchor="end" font-size="10" fill="#64748b">Users</text>
+
+  <!-- Streaming: Stream Users HTML -->
+  <g transform="translate(420, 300)">
+    <rect x="0" y="0" width="30" height="24" rx="4" fill="#22c55e"/>
+    <text x="15" y="16" text-anchor="middle" font-size="8" fill="white">📤</text>
+  </g>
+
+  <!-- Streaming: Fetch Posts (parallel!) -->
+  <g transform="translate(180, 330)">
+    <rect x="0" y="0" width="180" height="24" rx="4" fill="#60a5fa"/>
+    <text x="90" y="16" text-anchor="middle" font-size="10" fill="white" font-weight="500">Fetch Posts (600ms)</text>
+  </g>
+  <text x="165" y="347" text-anchor="end" font-size="10" fill="#64748b">Posts</text>
+
+  <!-- Streaming: Stream Posts HTML -->
+  <g transform="translate(360, 330)">
+    <rect x="0" y="0" width="30" height="24" rx="4" fill="#3b82f6"/>
+    <text x="15" y="16" text-anchor="middle" font-size="8" fill="white">📤</text>
+  </g>
+
+  <!-- Parallel fetch indicator -->
+  <rect x="175" y="298" width="8" height="58" rx="2" fill="#059669" opacity="0.3"/>
+
+  <!-- Legend -->
+  <g transform="translate(500, 380)">
+    <rect x="0" y="0" width="380" height="30" rx="4" fill="white" stroke="#e2e8f0"/>
+    <rect x="15" y="10" width="12" height="12" rx="2" fill="#3b82f6"/>
+    <text x="32" y="19" font-size="9" fill="#64748b">Shell/Stream</text>
+    <rect x="105" y="10" width="12" height="12" rx="2" fill="#4ade80"/>
+    <text x="122" y="19" font-size="9" fill="#64748b">Data Fetch</text>
+    <rect x="195" y="10" width="12" height="12" rx="2" fill="#22c55e"/>
+    <text x="212" y="19" font-size="9" fill="#64748b">Stream Chunk</text>
+    <line x1="295" y1="16" x2="315" y2="16" stroke="#dc2626" stroke-width="2" stroke-dasharray="4,2"/>
+    <text x="320" y="19" font-size="9" fill="#64748b">TTFB</text>
+  </g>
+
+  <!-- Key insight callout -->
+  <g transform="translate(760, 280)">
+    <rect x="0" y="0" width="120" height="80" rx="6" fill="#dbeafe" stroke="#93c5fd"/>
+    <text x="60" y="22" text-anchor="middle" font-size="10" font-weight="600" fill="#1d4ed8">Key Insight</text>
+    <text x="60" y="40" text-anchor="middle" font-size="9" fill="#3b82f6">Data fetches run</text>
+    <text x="60" y="52" text-anchor="middle" font-size="9" fill="#3b82f6">in PARALLEL</text>
+    <text x="60" y="70" text-anchor="middle" font-size="9" fill="#1d4ed8" font-weight="500">800ms total</text>
+  </g>
+
+  <!-- Traditional total time -->
+  <g transform="translate(760, 120)">
+    <rect x="0" y="0" width="120" height="60" rx="6" fill="#fee2e2" stroke="#fecaca"/>
+    <text x="60" y="22" text-anchor="middle" font-size="10" font-weight="600" fill="#dc2626">Sequential</text>
+    <text x="60" y="40" text-anchor="middle" font-size="9" fill="#ef4444">800 + 600 + 200</text>
+    <text x="60" y="55" text-anchor="middle" font-size="10" fill="#dc2626" font-weight="500">= 1600ms total</text>
+  </g>
+</svg>
