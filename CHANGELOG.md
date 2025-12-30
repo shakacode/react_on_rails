@@ -1873,7 +1873,7 @@ such as:
 - Fix several generator-related issues.
 
 [unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.2.0.rc.0...master
-[16.2.0.rc.0]: https://github.com/shakacode/react_on_rails/compare/v16.1.1...v16.2.0.rc.0
+[16.2.0.rc.0]: https://github.com/shakacode/react_on_rails/compare/16.1.1...v16.2.0.rc.0
 [16.1.1]: https://github.com/shakacode/react_on_rails/compare/16.1.0...16.1.1
 [16.1.0]: https://github.com/shakacode/react_on_rails/compare/16.0.0...16.1.0
 [16.0.0]: https://github.com/shakacode/react_on_rails/compare/14.2.0...16.0.0
