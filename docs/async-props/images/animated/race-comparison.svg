@@ -1,0 +1,193 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 450" font-family="system-ui, -apple-system, sans-serif">
+  <defs>
+    <linearGradient id="redBar" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#ef4444"/>
+      <stop offset="100%" style="stop-color:#dc2626"/>
+    </linearGradient>
+    <linearGradient id="greenBar" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#22c55e"/>
+      <stop offset="100%" style="stop-color:#16a34a"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="700" height="450" fill="#f8fafc"/>
+
+  <!-- Title -->
+  <text x="350" y="35" text-anchor="middle" font-size="20" font-weight="bold" fill="#1e293b">Traditional SSR vs Async Props</text>
+  <text x="350" y="55" text-anchor="middle" font-size="12" fill="#64748b">Watch the race to first content!</text>
+
+  <!-- Traditional SSR Section -->
+  <g transform="translate(30, 80)">
+    <rect x="0" y="0" width="300" height="160" rx="8" fill="#fef2f2" stroke="#fecaca"/>
+    <text x="150" y="25" text-anchor="middle" font-size="14" font-weight="600" fill="#dc2626">Traditional SSR</text>
+
+    <!-- Browser mockup -->
+    <rect x="20" y="40" width="260" height="100" rx="6" fill="white" stroke="#e2e8f0"/>
+    <rect x="20" y="40" width="260" height="20" rx="6" fill="#f1f5f9"/>
+    <rect x="20" y="54" width="260" height="6" fill="#f1f5f9"/>
+    <circle cx="32" cy="50" r="4" fill="#fca5a5"/>
+    <circle cx="44" cy="50" r="4" fill="#fcd34d"/>
+    <circle cx="56" cy="50" r="4" fill="#86efac"/>
+
+    <!-- Blank screen with spinner -->
+    <text x="150" y="100" text-anchor="middle" font-size="10" fill="#94a3b8" opacity="1">
+      Loading...
+      <animate attributeName="opacity" values="1;0" dur="0.3s" begin="4s" fill="freeze"/>
+    </text>
+
+    <!-- Spinner animation -->
+    <g transform="translate(150, 110)" opacity="1">
+      <animate attributeName="opacity" values="1;0" dur="0.3s" begin="4s" fill="freeze"/>
+      <circle cx="0" cy="0" r="10" fill="none" stroke="#d1d5db" stroke-width="2"/>
+      <path d="M 0 -10 A 10 10 0 0 1 10 0" fill="none" stroke="#dc2626" stroke-width="2" stroke-linecap="round">
+        <animateTransform attributeName="transform" type="rotate" values="0;360" dur="1s" repeatCount="4"/>
+      </path>
+    </g>
+
+    <!-- Content appears all at once (after 4 seconds) -->
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.3s" begin="4s" fill="freeze"/>
+      <rect x="30" y="70" width="240" height="15" rx="3" fill="#3b82f6"/>
+      <rect x="30" y="90" width="110" height="40" rx="3" fill="#10b981"/>
+      <rect x="150" y="90" width="120" height="40" rx="3" fill="#8b5cf6"/>
+    </g>
+  </g>
+
+  <!-- Async Props Section -->
+  <g transform="translate(370, 80)">
+    <rect x="0" y="0" width="300" height="160" rx="8" fill="#f0fdf4" stroke="#bbf7d0"/>
+    <text x="150" y="25" text-anchor="middle" font-size="14" font-weight="600" fill="#059669">Async Props</text>
+
+    <!-- Browser mockup -->
+    <rect x="20" y="40" width="260" height="100" rx="6" fill="white" stroke="#10b981" stroke-width="2"/>
+    <rect x="20" y="40" width="260" height="20" rx="6" fill="#f1f5f9"/>
+    <rect x="20" y="54" width="260" height="6" fill="#f1f5f9"/>
+    <circle cx="32" cy="50" r="4" fill="#fca5a5"/>
+    <circle cx="44" cy="50" r="4" fill="#fcd34d"/>
+    <circle cx="56" cy="50" r="4" fill="#86efac"/>
+
+    <!-- Shell appears immediately -->
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.2s" begin="0.3s" fill="freeze"/>
+      <rect x="30" y="70" width="240" height="15" rx="3" fill="#3b82f6"/>
+    </g>
+
+    <!-- Skeleton loaders -->
+    <rect x="30" y="90" width="110" height="40" rx="3" fill="#e5e7eb" stroke="#d1d5db" opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.2s" begin="0.3s" fill="freeze"/>
+      <animate attributeName="opacity" values="1;0" dur="0.2s" begin="1.5s" fill="freeze"/>
+    </rect>
+    <rect x="150" y="90" width="120" height="40" rx="3" fill="#e5e7eb" stroke="#d1d5db" opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.2s" begin="0.3s" fill="freeze"/>
+      <animate attributeName="opacity" values="1;0" dur="0.2s" begin="2.5s" fill="freeze"/>
+    </rect>
+
+    <!-- Users content appears -->
+    <rect x="30" y="90" width="110" height="40" rx="3" fill="#10b981" opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.2s" begin="1.5s" fill="freeze"/>
+    </rect>
+
+    <!-- Posts content appears -->
+    <rect x="150" y="90" width="120" height="40" rx="3" fill="#8b5cf6" opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.2s" begin="2.5s" fill="freeze"/>
+    </rect>
+
+    <!-- "Interactive" badge -->
+    <rect x="90" y="135" width="80" height="18" rx="9" fill="#d1fae5" opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.2s" begin="0.3s" fill="freeze"/>
+    </rect>
+    <text x="130" y="147" text-anchor="middle" font-size="8" fill="#059669" font-weight="500" opacity="0">
+      ✓ Interactive!
+      <animate attributeName="opacity" values="0;1" dur="0.2s" begin="0.3s" fill="freeze"/>
+    </text>
+  </g>
+
+  <!-- Racing Timeline -->
+  <g transform="translate(30, 270)">
+    <text x="0" y="0" font-size="14" font-weight="600" fill="#1e293b">Timeline Race</text>
+
+    <!-- Track labels -->
+    <text x="0" y="35" font-size="11" fill="#dc2626" font-weight="500">Traditional</text>
+    <text x="0" y="75" font-size="11" fill="#059669" font-weight="500">Async Props</text>
+
+    <!-- Track backgrounds -->
+    <rect x="90" y="20" width="550" height="25" rx="4" fill="#fee2e2"/>
+    <rect x="90" y="60" width="550" height="25" rx="4" fill="#d1fae5"/>
+
+    <!-- Traditional progress bar (slow, all at once) -->
+    <rect x="90" y="20" width="0" height="25" rx="4" fill="url(#redBar)">
+      <animate attributeName="width" values="0;550" dur="4s" fill="freeze"/>
+    </rect>
+
+    <!-- Async Props TTFB marker (immediate) -->
+    <rect x="90" y="60" width="0" height="25" rx="4" fill="url(#greenBar)">
+      <animate attributeName="width" values="0;40" dur="0.3s" fill="freeze"/>
+    </rect>
+
+    <!-- Finish flags -->
+    <!-- Traditional finish -->
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.2s" begin="4s" fill="freeze"/>
+      <text x="645" y="38" font-size="16">🏁</text>
+      <text x="645" y="55" font-size="9" fill="#dc2626" font-weight="500">4000ms</text>
+    </g>
+
+    <!-- Async TTFB marker -->
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.2s" begin="0.3s" fill="freeze"/>
+      <line x1="130" y1="55" x2="130" y2="90" stroke="#059669" stroke-width="2"/>
+      <text x="130" y="102" text-anchor="middle" font-size="9" fill="#059669" font-weight="500">TTFB 50ms!</text>
+    </g>
+  </g>
+
+  <!-- Stats comparison -->
+  <g transform="translate(30, 330)">
+    <text x="0" y="0" font-size="14" font-weight="600" fill="#1e293b">Performance Comparison</text>
+
+    <!-- Traditional stats -->
+    <g transform="translate(0, 20)">
+      <rect x="0" y="0" width="200" height="80" rx="8" fill="#fef2f2" stroke="#fecaca"/>
+      <text x="100" y="25" text-anchor="middle" font-size="11" font-weight="600" fill="#dc2626">Traditional SSR</text>
+
+      <text x="20" y="48" font-size="10" fill="#64748b">Time to First Byte:</text>
+      <text x="180" y="48" text-anchor="end" font-size="10" fill="#dc2626" font-weight="600" opacity="0">
+        4000ms
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="4s" fill="freeze"/>
+      </text>
+
+      <text x="20" y="68" font-size="10" fill="#64748b">Time to Interactive:</text>
+      <text x="180" y="68" text-anchor="end" font-size="10" fill="#dc2626" font-weight="600" opacity="0">
+        4000ms
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="4s" fill="freeze"/>
+      </text>
+    </g>
+
+    <!-- Async Props stats -->
+    <g transform="translate(220, 20)">
+      <rect x="0" y="0" width="200" height="80" rx="8" fill="#f0fdf4" stroke="#bbf7d0"/>
+      <text x="100" y="25" text-anchor="middle" font-size="11" font-weight="600" fill="#059669">Async Props</text>
+
+      <text x="20" y="48" font-size="10" fill="#64748b">Time to First Byte:</text>
+      <text x="180" y="48" text-anchor="end" font-size="10" fill="#059669" font-weight="600" opacity="0">
+        50ms
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="0.3s" fill="freeze"/>
+      </text>
+
+      <text x="20" y="68" font-size="10" fill="#64748b">Time to Interactive:</text>
+      <text x="180" y="68" text-anchor="end" font-size="10" fill="#059669" font-weight="600" opacity="0">
+        50ms
+        <animate attributeName="opacity" values="0;1" dur="0.2s" begin="0.3s" fill="freeze"/>
+      </text>
+    </g>
+
+    <!-- Winner badge -->
+    <g transform="translate(440, 20)" opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.5s" begin="4.5s" fill="freeze"/>
+      <rect x="0" y="0" width="200" height="80" rx="8" fill="#fef3c7" stroke="#fcd34d"/>
+      <text x="100" y="30" text-anchor="middle" font-size="16">🏆</text>
+      <text x="100" y="50" text-anchor="middle" font-size="12" font-weight="600" fill="#92400e">80x Faster TTFB!</text>
+      <text x="100" y="68" text-anchor="middle" font-size="10" fill="#a16207">4000ms → 50ms</text>
+    </g>
+  </g>
+</svg>
