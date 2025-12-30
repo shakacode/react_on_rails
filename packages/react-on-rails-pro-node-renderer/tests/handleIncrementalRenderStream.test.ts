@@ -1,7 +1,5 @@
-import {
-  handleIncrementalRenderStream,
-  MAX_NDJSON_LINE_SIZE,
-} from '../src/worker/handleIncrementalRenderStream';
+import { handleIncrementalRenderStream } from '../src/worker/handleIncrementalRenderStream';
+import { FIELD_SIZE_LIMIT } from '../src/shared/constants';
 import type { ResponseResult } from '../src/shared/utils';
 
 /**
@@ -84,7 +82,7 @@ describe('handleIncrementalRenderStream', () => {
 
     it('rejects single line exceeding line size limit (10MB)', async () => {
       // Create a single chunk > 10MB without any newlines
-      const oversizedLine = Buffer.alloc(MAX_NDJSON_LINE_SIZE + 1024, 'x');
+      const oversizedLine = Buffer.alloc(FIELD_SIZE_LIMIT + 1024, 'x');
       const chunks = [oversizedLine];
 
       const mockRequest = createMockStream(chunks);
