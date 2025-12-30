@@ -246,7 +246,9 @@ task :release, %i[version dry_run] do |_t, args|
     end
 
     # Create git tag (skip if it already exists)
-    tag_name = "v#{actual_gem_version}"
+    # Note: Tags use version without 'v' prefix (e.g., '16.2.0' not 'v16.2.0')
+    # to match the historical convention used from version 2.0.0 through 16.1.2
+    tag_name = actual_gem_version
     tag_exists = system("cd #{monorepo_root} && git rev-parse #{tag_name} >/dev/null 2>&1")
     if tag_exists
       puts "Git tag #{tag_name} already exists, skipping tag creation"

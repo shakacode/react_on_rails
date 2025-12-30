@@ -46,7 +46,7 @@ TIP: Use /update-changelog in Claude Code for full automation."
 task :update_changelog, %i[tag] do |_, args|
   puts CLAUDE_CODE_TIP
 
-  # Git tags use 'v' prefix (e.g., v16.2.0), but CHANGELOG uses versions without it
+  # Git tags may have 'v' prefix (historical tags) - strip it for CHANGELOG
   git_tag = args[:tag] || `git describe --tags --abbrev=0`.strip
   changelog_version = git_tag.delete_prefix("v")
   anchor = "[#{changelog_version}]"

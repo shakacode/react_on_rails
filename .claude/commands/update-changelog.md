@@ -109,7 +109,9 @@ To determine the most recent version:
    git tag --sort=-v:refname | head -10
    ```
 
-   This shows tags like `v16.2.0.beta.20`, `v16.2.0.beta.19`, etc.
+   This shows tags like `16.2.1`, `16.2.0`, `16.1.1`, etc.
+   Note: Some historical tags (v16.2.0.beta.0 through v16.2.0.rc.0) have a `v` prefix due to a
+   temporary convention change, but the standard convention is no `v` prefix.
 
 2. **Check the CHANGELOG.md** for version headers (note: changelog uses versions WITHOUT the `v` prefix):
    - `### [16.2.0.beta.19] - 2025-12-10` (beta version)
@@ -123,7 +125,7 @@ To determine the most recent version:
 
 4. **The first match after `### [Unreleased]`** is the most recent version in the changelog.
 
-**IMPORTANT**: Git tags use `v` prefix (e.g., `v16.2.0.beta.20`) but the changelog and compare links use versions WITHOUT the `v` prefix (e.g., `16.2.0.beta.20`). Strip the `v` when adding to the changelog.
+**IMPORTANT**: Git tags do NOT use a `v` prefix (e.g., `16.2.1`, `16.1.1`). The changelog and compare links also use versions without the `v` prefix. Note: Some historical tags from v16.2.0.beta.0 through v16.2.0.rc.0 have a `v` prefix - strip it when adding to the changelog.
 
 ### Version Links
 
@@ -210,7 +212,10 @@ When a new version is released:
 
 ### For Beta to Non-Beta Version Release
 
-When releasing from beta to a stable version (e.g., git tag `v16.1.0.beta.3` → `v16.1.0`):
+When releasing from beta to a stable version (e.g., git tag `16.3.0.beta.3` → `16.3.0`):
+
+> **Note**: Historical tags v16.2.0.beta.0 through v16.2.0.rc.0 have a `v` prefix due to a temporary
+> convention change. Future releases use no `v` prefix.
 
 1. **Remove all beta version labels** from the changelog:
    - Change `### [16.1.0.beta.1]`, `### [16.1.0.beta.2]`, etc. to a single `### [16.1.0]` section
@@ -233,7 +238,8 @@ When a new beta version is released (e.g., `16.2.0.beta.20`):
    git tag --sort=-v:refname | head -5
    ```
 
-   This shows the latest tags (e.g., `v16.2.0.beta.20`). Strip the `v` prefix for changelog use.
+   This shows the latest tags (e.g., `16.2.0.beta.21`, `16.2.0.beta.20`).
+   Note: Historical tags v16.2.0.beta.0 through v16.2.0.rc.0 have a `v` prefix - strip it for changelog use.
 
 2. **Find the most recent version** in the changelog by looking for the first `### [VERSION] - DATE` after `### [Unreleased]`
 
