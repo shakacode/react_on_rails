@@ -42,10 +42,10 @@ const config = {
   // be set if you wish to have automatic worker restarting, say to clear memory leaks.
 
   // time in minutes between restarting all workers
-  allWorkersRestartInterval: (env.CI ? 2 : env.RENDERER_ALL_WORKERS_RESTART_INTERVAL) || 10,
+  allWorkersRestartInterval: (env.CI ? 2 : env.RENDERER_ALL_WORKERS_RESTART_INTERVAL) || 0.2,
 
   // time in minutes between each worker restarting when restarting all workers
-  delayBetweenIndividualWorkerRestarts: env.CI ? 0.01 : 1,
+  delayBetweenIndividualWorkerRestarts: env.CI ? 0.01 : 0.01,
 
   // If set to true, `supportModules` enables the server-bundle code to call a default set of NodeJS modules
   // that get added to the VM context: { Buffer, process, setTimeout, setInterval, clearTimeout, clearInterval }.

@@ -50,6 +50,9 @@ export default function App({ basePath = '/server_router', ...props }: { basePat
           <li>
             <Link to={`${basePath}/deterministic-rsc-error`}>Deterministic RSC Error</Link>
           </li>
+          <li>
+            <Link to={`${basePath}/async-props-component`}>Async Props Component</Link>
+          </li>
         </ul>
       </nav>
       <Suspense fallback={<div>Loading Page...</div>}>
@@ -89,6 +92,14 @@ export default function App({ basePath = '/server_router', ...props }: { basePat
           <Route
             path={`${basePath}/deterministic-rsc-error`}
             element={<RSCRoute componentName="DeterministicRSCErrorComponent" componentProps={{}} />}
+          />
+          <Route
+            path={`${basePath}/async-props-component`}
+            element={<RSCRoute componentName="AsyncPropsComponent" componentProps={props} />}
+          />
+          <Route
+            path={`${basePath}/async-props-component-for-testing`}
+            element={<RSCRoute componentName="AsyncPropsComponentForTesting" componentProps={props} />}
           />
         </Routes>
       </Suspense>

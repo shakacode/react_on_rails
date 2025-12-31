@@ -40,5 +40,11 @@ export function createProMethodCapability() {
     reactOnRailsStoreLoaded(storeName: string): Promise<void> {
       return hydrateStore(storeName);
     },
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    addAsyncPropsCapabilityToComponentProps(...args: any[]): any {
+      void args;
+      throw new Error('addAsyncPropsCapabilityToComponentProps is supported in the RSC bundle only.');
+    },
   };
 }

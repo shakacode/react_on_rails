@@ -149,6 +149,12 @@ type RenderFunctionResult = RenderFunctionSyncResult | RenderFunctionAsyncResult
 
 type StreamableComponentResult = ReactElement | Promise<ReactElement | string>;
 
+type AsyncPropsManager = {
+  getProp: (propName: string) => Promise<unknown>;
+  setProp: (propName: string, propValue: unknown) => void;
+  endStream: () => void;
+};
+
 /**
  * Render-functions are used to create dynamic React components or server-rendered HTML with side effects.
  * They receive two arguments: props and railsContext.
@@ -220,11 +226,18 @@ export interface RegisteredComponent {
 
 export type ItemRegistrationCallback<T> = (component: T) => void;
 
+export type GenerateRSCPayloadFunction = (
+  componentName: string,
+  props: unknown,
+  railsContext: RailsContextWithServerComponentMetadata,
+) => Promise<NodeJS.ReadableStream>;
+
 interface Params {
   props?: Record<string, unknown>;
   railsContext?: RailsContext;
   domNodeId?: string;
   trace?: boolean;
+  generateRSCPayload?: GenerateRSCPayloadFunction;
 }
 
 export interface RenderParams extends Params {
@@ -366,6 +379,15 @@ export type RSCPayloadStreamInfo = {
 
 export type RSCPayloadCallback = (streamInfo: RSCPayloadStreamInfo) => void;
 
+export type WithAsyncProps<
+  AsyncPropsType extends Record<string, unknown>,
+  PropsType extends Record<string, unknown>,
+> = PropsType & {
+  getReactOnRailsAsyncProp: <PropName extends keyof AsyncPropsType>(
+    propName: PropName,
+  ) => Promise<AsyncPropsType[PropName]>;
+};
+
 /** Contains the parts of the `ReactOnRails` API intended for internal use only. */
 export interface ReactOnRailsInternal extends ReactOnRails {
   /**
@@ -480,6 +502,19 @@ export interface ReactOnRailsInternal extends ReactOnRails {
    * Indicates if the RSC bundle is being used.
    */
   isRSCBundle: boolean;
+  /**
+   * Adds the getAsyncProp function to the component props object
+   * @returns An object containing: the AsyncPropsManager and the component props after adding the getAsyncProp to it
+   */
+  addAsyncPropsCapabilityToComponentProps: <
+    AsyncPropsType extends Record<string, unknown>,
+    PropsType extends Record<string, unknown>,
+  >(
+    props: PropsType,
+  ) => {
+    asyncPropManager: AsyncPropsManager;
+    props: WithAsyncProps<AsyncPropsType, PropsType>;
+  };
 }
 
 export type RenderStateHtml = FinalHtmlResult | Promise<FinalHtmlResult | ServerRenderResult>;

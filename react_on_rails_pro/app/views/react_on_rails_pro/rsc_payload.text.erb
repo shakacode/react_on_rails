@@ -1,1 +1,19 @@
+<%# TODO Remove after adding support for requesting async props from node renderer side %>
+
+<% if @rsc_payload_component_name.start_with? "AsyncPropsComponent" %>
+<%= rsc_payload_react_component_with_async_props("AsyncPropsComponent", props: { name: "John Doe", age: 30, description: "Software Engineer" }) do |emit|
+  if @rsc_payload_component_name == "AsyncPropsComponentForTesting"
+    read_async_props_from_redis(emit)
+    next
+  end
+
+  # Simulate fetching async props
+  sleep 1
+  emit.call("books", ["The Pragmatic Programmer", "Clean Code", "Design Patterns"])
+
+  sleep 1
+  emit.call("researches", ["Machine Learning Study", "React Performance Optimization", "Database Indexing Strategies"])
+end %>
+<% else %>
 <%= rsc_payload_react_component(@rsc_payload_component_name, props: @rsc_payload_component_props) %>
+<% end %>
