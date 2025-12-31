@@ -120,23 +120,22 @@ const asyncPropsAtRouterPageTest = redisReceiverPageController.extend<PageFixtur
   ],
 });
 
-const redisReceiverPageWithAsyncClientComponentTest =
-  redisReceiverPageController.extend<PageFixture>({
-    pagePath: [
-      async ({ page, nonBlockingNavigateWithRequestId, sendRedisValue }, use) => {
-        const pagePath = '/redis_receiver_for_testing?async_toggle_container=true';
-        await nonBlockingNavigateWithRequestId(pagePath);
+const redisReceiverPageWithAsyncClientComponentTest = redisReceiverPageController.extend<PageFixture>({
+  pagePath: [
+    async ({ page, nonBlockingNavigateWithRequestId, sendRedisValue }, use) => {
+      const pagePath = '/redis_receiver_for_testing?async_toggle_container=true';
+      await nonBlockingNavigateWithRequestId(pagePath);
 
-        await expect(page.getByText('Loading ToggleContainer')).toBeVisible();
-        await expect(page.locator('.toggle-button')).not.toBeVisible();
+      await expect(page.getByText('Loading ToggleContainer')).toBeVisible();
+      await expect(page.locator('.toggle-button')).not.toBeVisible();
 
-        await sendRedisValue('ToggleContainer', 'anything');
-        await expect(page.locator('.toggle-button')).toBeVisible();
-        await use(pagePath);
-      },
-      { auto: true },
-    ],
-  });
+      await sendRedisValue('ToggleContainer', 'anything');
+      await expect(page.locator('.toggle-button')).toBeVisible();
+      await use(pagePath);
+    },
+    { auto: true },
+  ],
+});
 
 const redisReceiverInsideRouterPageTest = redisReceiverPageController.extend<PageFixture>({
   pagePath: [
