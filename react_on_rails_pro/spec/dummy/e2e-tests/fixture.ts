@@ -11,13 +11,14 @@ type RedisRequestIdFixture = {
   nonBlockingNavigateWithRequestId: (path: string) => Promise<Response | null>;
 };
 
-type RedisReceiverPageFixture = {
+type PageFixture = {
   pagePath: string;
 };
 
 export type RedisReceiverControllerFixture = {
   sendRedisValue: (key: string, value: unknown) => Promise<void>;
   sendRedisItemValue: (itemIndex: number, value: unknown) => Promise<void>;
+  endRedisStream: () => Promise<void>;
   matchPageSnapshot: (snapshotPath: string) => Promise<void>;
   waitForConsoleMessage: (msg: string) => Promise<void>;
   getNetworkRequests: (requestUrlPattern: RegExp) => Promise<Request[]>;
@@ -66,6 +67,11 @@ const redisReceiverPageController = redisControlledTest.extend<RedisReceiverCont
       await sendRedisValue(`Item${itemIndex}`, value);
     });
   },
+  endRedisStream: async ({ redisClient, redisRequestId }, use) => {
+    await use(async () => {
+      await redisClient.xAdd(`stream:${redisRequestId}`, '*', { end: 'true' });
+    });
+  },
   matchPageSnapshot: async ({ page }, use) => {
     await use(async (snapshotPath) => {
       await expect(page.locator('.redis-receiver-container:visible')).toBeVisible();
@@ -92,7 +98,7 @@ const redisReceiverPageController = redisControlledTest.extend<RedisReceiverCont
   },
 });
 
-const redisReceiverPageTest = redisReceiverPageController.extend<RedisReceiverPageFixture>({
+const redisReceiverPageTest = redisReceiverPageController.extend<PageFixture>({
   pagePath: [
     async ({ nonBlockingNavigateWithRequestId }, use) => {
       const pagePath = '/redis_receiver_for_testing';
@@ -103,8 +109,19 @@ const redisReceiverPageTest = redisReceiverPageController.extend<RedisReceiverPa
   ],
 });
 
+const asyncPropsAtRouterPageTest = redisReceiverPageController.extend<PageFixture>({
+  pagePath: [
+    async ({ nonBlockingNavigateWithRequestId }, use) => {
+      const pagePath = '/server_router/async-props-component-for-testing';
+      await nonBlockingNavigateWithRequestId(pagePath);
+      await use(pagePath);
+    },
+    { auto: true },
+  ],
+});
+
 const redisReceiverPageWithAsyncClientComponentTest =
-  redisReceiverPageController.extend<RedisReceiverPageFixture>({
+  redisReceiverPageController.extend<PageFixture>({
     pagePath: [
       async ({ page, nonBlockingNavigateWithRequestId, sendRedisValue }, use) => {
         const pagePath = '/redis_receiver_for_testing?async_toggle_container=true';
@@ -121,7 +138,7 @@ const redisReceiverPageWithAsyncClientComponentTest =
     ],
   });
 
-const redisReceiverInsideRouterPageTest = redisReceiverPageController.extend<RedisReceiverPageFixture>({
+const redisReceiverInsideRouterPageTest = redisReceiverPageController.extend<PageFixture>({
   pagePath: [
     async ({ nonBlockingNavigateWithRequestId }, use) => {
       const pagePath = '/server_router/redis-receiver-for-testing';
@@ -132,7 +149,7 @@ const redisReceiverInsideRouterPageTest = redisReceiverPageController.extend<Red
   ],
 });
 
-const redisReceiverPageAfterNavigationTest = redisReceiverPageController.extend<RedisReceiverPageFixture>({
+const redisReceiverPageAfterNavigationTest = redisReceiverPageController.extend<PageFixture>({
   pagePath: [
     async ({ nonBlockingNavigateWithRequestId, page }, use) => {
       await nonBlockingNavigateWithRequestId('/server_router/simple-server-component');
@@ -145,6 +162,7 @@ const redisReceiverPageAfterNavigationTest = redisReceiverPageController.extend<
 });
 
 export {
+  asyncPropsAtRouterPageTest,
   redisReceiverPageController,
   redisReceiverPageTest,
   redisReceiverInsideRouterPageTest,

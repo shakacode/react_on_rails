@@ -90,6 +90,10 @@ export default function App({ basePath = '/server_router', ...props }: { basePat
             path={`${basePath}/async-props-component`}
             element={<RSCRoute componentName="AsyncPropsComponent" componentProps={props} />}
           />
+          <Route
+            path={`${basePath}/async-props-component-for-testing`}
+            element={<RSCRoute componentName="AsyncPropsComponentForTesting" componentProps={props} />}
+          />
         </Routes>
       </Suspense>
     </ErrorBoundary>
