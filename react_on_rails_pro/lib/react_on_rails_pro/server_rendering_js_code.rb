@@ -36,14 +36,44 @@ module ReactOnRailsPro
           renderingRequest,
           rscBundleHash: '#{ReactOnRailsPro::Utils.rsc_bundle_hash}',
         }
-        if (typeof generateRSCPayload !== 'function') {
-          globalThis.generateRSCPayload = function generateRSCPayload(componentName, props, railsContext) {
-            const { renderingRequest, rscBundleHash } = railsContext.serverSideRSCPayloadParameters;
-            const propsString = JSON.stringify(props);
-            const newRenderingRequest = renderingRequest.replace(/\\(\\s*\\)\\s*$/, `('${componentName}', ${propsString})`);
-            return runOnOtherBundle(rscBundleHash, newRenderingRequest);
-          }
+        const runOnOtherBundle = globalThis.runOnOtherBundle;
+        const generateRSCPayload = function generateRSCPayload(componentName, props, railsContext) {
+          const { renderingRequest, rscBundleHash } = railsContext.serverSideRSCPayloadParameters;
+          const propsString = JSON.stringify(props);
+          const newRenderingRequest = renderingRequest.replace(/\\(\\s*\\)\\s*$/, `('${componentName}', ${propsString})`);
+          return runOnOtherBundle(rscBundleHash, newRenderingRequest);
         }
+        JS
+      end
+
+      # Generates JavaScript code for async props setup when incremental rendering is enabled.
+      #
+      # This code runs DURING the initial render request, BEFORE the component renders.
+      # It sets up the infrastructure that allows:
+      # 1. Component to call `getReactOnRailsAsyncProp("propName")` → returns a Promise
+      # 2. Update chunks to call `asyncPropsManager.setProp("propName", value)` → resolves the Promise
+      #
+      # WHY isRSCBundle CHECK?
+      # - Async props only work with React Server Components (RSC)
+      # - RSC bundle has `addAsyncPropsCapabilityToComponentProps` method
+      # - Server bundle (non-RSC) doesn't support this pattern
+      #
+      # WHY sharedExecutionContext?
+      # - The asyncPropManager needs to be accessible by update chunks that arrive later
+      # - Update chunks run in the same ExecutionContext, so they can retrieve it
+      # - sharedExecutionContext is NOT global - it's scoped to this HTTP request
+      #
+      # @param render_options [Object] Options that control the rendering behavior
+      # @return [String] JavaScript code that sets up AsyncPropsManager or empty string
+      def async_props_setup_js(render_options)
+        return "" unless render_options.internal_option(:async_props_block)
+
+        <<-JS
+          if (ReactOnRails.isRSCBundle) {
+            var { props: propsWithAsyncProps, asyncPropManager } = ReactOnRails.addAsyncPropsCapabilityToComponentProps(usedProps);
+            usedProps = propsWithAsyncProps;
+            sharedExecutionContext.set("asyncPropsManager", asyncPropManager);
+          }
         JS
       end
 
@@ -85,6 +115,7 @@ module ReactOnRailsPro
           #{ssr_pre_hook_js}
           #{redux_stores}
           var usedProps = typeof props === 'undefined' ? #{props_string} : props;
+          #{async_props_setup_js(render_options)}
           return ReactOnRails[#{render_function_name}]({
             name: componentName,
             domNodeId: '#{render_options.dom_id}',
@@ -93,6 +124,7 @@ module ReactOnRailsPro
             railsContext: railsContext,
             throwJsErrors: #{ReactOnRailsPro.configuration.throw_js_errors},
             renderingReturnsPromises: #{ReactOnRailsPro.configuration.rendering_returns_promises},
+            generateRSCPayload: typeof generateRSCPayload !== 'undefined' ? generateRSCPayload : undefined,
           });
         })()
         JS
