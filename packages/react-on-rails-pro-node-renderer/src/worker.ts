@@ -14,11 +14,22 @@ import log, { sharedLoggerOptions } from './shared/log.js';
 import packageJson from './shared/packageJson.js';
 import { buildConfig, Config, getConfig } from './shared/configBuilder.js';
 import fileExistsAsync from './shared/fileExistsAsync.js';
-import type { FastifyInstance, FastifyReply, FastifyRequest } from './worker/types.js';
-import checkProtocolVersion from './worker/checkProtocolVersionHandler.js';
-import authenticate from './worker/authHandler.js';
-import { handleRenderRequest, type ProvidedNewBundle } from './worker/handleRenderRequest.js';
+import type { FastifyInstance, FastifyReply } from './worker/types.js';
+import { performRequestPrechecks } from './worker/requestPrechecks.js';
+import { type AuthBody, authenticate } from './worker/authHandler.js';
+import {
+  handleRenderRequest,
+  type ProvidedNewBundle,
+  handleNewBundlesProvided,
+} from './worker/handleRenderRequest.js';
 import handleGracefulShutdown from './worker/handleGracefulShutdown.js';
+import {
+  handleIncrementalRenderRequest,
+  type IncrementalRenderInitialRequest,
+  type IncrementalRenderSink,
+} from './worker/handleIncrementalRenderRequest.js';
+import { handleIncrementalRenderStream } from './worker/handleIncrementalRenderStream.js';
+import { BODY_SIZE_LIMIT, FIELD_SIZE_LIMIT } from './shared/constants.js';
 import {
   errorResponseResult,
   formatExceptionMessage,
@@ -129,7 +140,7 @@ export default function run(config: Partial<Config>) {
 
   const app = fastify({
     http2: useHttp2 as true,
-    bodyLimit: 104857600, // 100 MB
+    bodyLimit: BODY_SIZE_LIMIT,
     logger:
       logHttpLevel !== 'silent' ? { name: 'RORP HTTP', level: logHttpLevel, ...sharedLoggerOptions } : false,
     ...fastifyServerOptions,
@@ -161,16 +172,13 @@ export default function run(config: Partial<Config>) {
     }
   });
 
-  // 10 MB limit for code including props
-  const fieldSizeLimit = 1024 * 1024 * 10;
-
   // Supports application/x-www-form-urlencoded
   void app.register(fastifyFormbody);
   // Supports multipart/form-data
   void app.register(fastifyMultipart, {
     attachFieldsToBody: 'keyValues',
     limits: {
-      fieldSize: fieldSizeLimit,
+      fieldSize: FIELD_SIZE_LIMIT,
       // For bundles and assets
       fileSize: Infinity,
     },
@@ -203,41 +211,11 @@ export default function run(config: Partial<Config>) {
     },
   });
 
-  const isProtocolVersionMatch = async (req: FastifyRequest, res: FastifyReply) => {
-    // Check protocol version
-    const protocolVersionCheckingResult = checkProtocolVersion(req);
-
-    if (typeof protocolVersionCheckingResult === 'object') {
-      await setResponse(protocolVersionCheckingResult, res);
-      return false;
-    }
-
-    return true;
-  };
-
-  const isAuthenticated = async (req: FastifyRequest, res: FastifyReply) => {
-    // Authenticate Ruby client
-    const authResult = authenticate(req);
-
-    if (typeof authResult === 'object') {
-      await setResponse(authResult, res);
-      return false;
-    }
-
-    return true;
-  };
-
-  const requestPrechecks = async (req: FastifyRequest, res: FastifyReply) => {
-    if (!(await isProtocolVersionMatch(req, res))) {
-      return false;
-    }
-
-    if (!(await isAuthenticated(req, res))) {
-      return false;
-    }
-
-    return true;
-  };
+  // Ensure NDJSON bodies are not buffered and are available as a stream immediately
+  app.addContentTypeParser('application/x-ndjson', (req, payload, done) => {
+    // Pass through the raw stream; the route will consume req.raw
+    done(null, payload);
+  });
 
   // See https://github.com/shakacode/react_on_rails_pro/issues/119 for why
   // the digest is part of the request URL. Yes, it's not used here, but the
@@ -252,7 +230,9 @@ export default function run(config: Partial<Config>) {
     // Can't infer from the route like Express can
     Params: { bundleTimestamp: string; renderRequestDigest: string };
   }>('/bundles/:bundleTimestamp/render/:renderRequestDigest', async (req, res) => {
-    if (!(await requestPrechecks(req, res))) {
+    const precheckResult = performRequestPrechecks(req.body);
+    if (precheckResult) {
+      await setResponse(precheckResult, res);
       return;
     }
 
@@ -294,7 +274,7 @@ export default function run(config: Partial<Config>) {
             providedNewBundles,
             assetsToCopy,
           });
-          await setResponse(result, res);
+          await setResponse(result.response, res);
         } catch (err) {
           const exceptionMessage = formatExceptionMessage(
             renderingRequest,
@@ -312,17 +292,129 @@ export default function run(config: Partial<Config>) {
     }
   });
 
+  // Streaming NDJSON incremental render endpoint
+  app.post<{
+    Params: { bundleTimestamp: string; renderRequestDigest: string };
+  }>('/bundles/:bundleTimestamp/incremental-render/:renderRequestDigest', async (req, res) => {
+    const { bundleTimestamp } = req.params;
+
+    // Stream parser state
+    let incrementalSink: IncrementalRenderSink | undefined;
+
+    try {
+      // Handle the incremental render stream
+      await handleIncrementalRenderStream({
+        request: req,
+        onRenderRequestReceived: async (obj: unknown) => {
+          // Build a temporary FastifyRequest shape for protocol/auth check
+          const tempReqBody = typeof obj === 'object' && obj !== null ? (obj as Record<string, unknown>) : {};
+
+          // Perform request prechecks
+          const precheckResult = performRequestPrechecks(tempReqBody);
+          if (precheckResult) {
+            return {
+              response: precheckResult,
+              shouldContinue: false,
+            };
+          }
+
+          // Extract data for incremental render request
+          const dependencyBundleTimestamps = extractBodyArrayField(
+            tempReqBody as WithBodyArrayField<Record<string, unknown>, 'dependencyBundleTimestamps'>,
+            'dependencyBundleTimestamps',
+          );
+
+          const initial: IncrementalRenderInitialRequest = {
+            firstRequestChunk: obj,
+            bundleTimestamp,
+            dependencyBundleTimestamps,
+          };
+
+          try {
+            const { response, sink } = await handleIncrementalRenderRequest(initial);
+            incrementalSink = sink;
+
+            return {
+              response,
+              shouldContinue: !!incrementalSink,
+            };
+          } catch (err) {
+            const errorResponse = errorResponseResult(
+              formatExceptionMessage(
+                'IncrementalRender',
+                err,
+                'Error while handling incremental render request',
+              ),
+            );
+            return {
+              response: errorResponse,
+              shouldContinue: false,
+            };
+          }
+        },
+
+        onUpdateReceived: async (obj: unknown) => {
+          if (!incrementalSink) {
+            log.error({ msg: 'Unexpected update chunk received after rendering was aborted', obj });
+            return;
+          }
+
+          try {
+            log.info(`Received a new update chunk ${JSON.stringify(obj)}`);
+            await incrementalSink.add(obj);
+          } catch (err) {
+            // Log error but don't stop processing
+            log.error({ err, msg: 'Error processing update chunk' });
+          }
+        },
+
+        onResponseStart: async (response: ResponseResult) => {
+          await setResponse(response, res);
+        },
+
+        onRequestEnded: () => {
+          if (!incrementalSink) {
+            return;
+          }
+
+          incrementalSink.handleRequestClosed();
+        },
+      });
+    } catch (err) {
+      // If an error occurred during stream processing, send error response
+      const errorResponse = errorResponseResult(
+        formatExceptionMessage('IncrementalRender', err, 'Error while processing incremental render stream'),
+      );
+      await setResponse(errorResponse, res);
+    }
+  });
+
   // There can be additional files that might be required at the runtime.
   // Since the remote renderer doesn't contain any assets, they must be uploaded manually.
   app.post<{
     Body: WithBodyArrayField<Record<string, Asset>, 'targetBundles'>;
   }>('/upload-assets', async (req, res) => {
-    if (!(await requestPrechecks(req, res))) {
+    const precheckResult = performRequestPrechecks(req.body);
+    if (precheckResult) {
+      await setResponse(precheckResult, res);
       return;
     }
     let lockAcquired = false;
     let lockfileName: string | undefined;
-    const assets: Asset[] = Object.values(req.body).filter(isAsset);
+    const assets: Asset[] = [];
+
+    // Extract bundles that start with 'bundle_' prefix
+    const bundles: Array<{ timestamp: string; bundle: Asset }> = [];
+    Object.entries(req.body).forEach(([key, value]) => {
+      if (isAsset(value)) {
+        if (key.startsWith('bundle_')) {
+          const timestamp = key.replace('bundle_', '');
+          bundles.push({ timestamp, bundle: value });
+        } else {
+          assets.push(value);
+        }
+      }
+    });
 
     // Handle targetBundles as either a string or an array
     const targetBundles = extractBodyArrayField(req.body, 'targetBundles');
@@ -334,7 +426,9 @@ export default function run(config: Partial<Config>) {
     }
 
     const assetsDescription = JSON.stringify(assets.map((asset) => asset.filename));
-    const taskDescription = `Uploading files ${assetsDescription} to bundle directories: ${targetBundles.join(', ')}`;
+    const bundlesDescription =
+      bundles.length > 0 ? ` and bundles ${JSON.stringify(bundles.map((b) => b.bundle.filename))}` : '';
+    const taskDescription = `Uploading files ${assetsDescription}${bundlesDescription} to bundle directories: ${targetBundles.join(', ')}`;
 
     try {
       const { lockfileName: name, wasLockAcquired, errorMessage } = await lock('transferring-assets');
@@ -373,6 +467,23 @@ export default function run(config: Partial<Config>) {
 
           await Promise.all(assetCopyPromises);
 
+          // Handle bundles using the existing logic from handleRenderRequest
+          if (bundles.length > 0) {
+            const providedNewBundles = bundles.map(({ timestamp, bundle }) => ({
+              timestamp,
+              bundle,
+            }));
+
+            // Use the existing bundle handling logic
+            // Note: handleNewBundlesProvided will handle deleting the uploaded bundle files
+            // Pass null for assetsToCopy since we handle assets separately in this endpoint
+            const bundleResult = await handleNewBundlesProvided('upload-assets', providedNewBundles, null);
+            if (bundleResult) {
+              await setResponse(bundleResult, res);
+              return;
+            }
+          }
+
           await setResponse(
             {
               status: 200,
@@ -381,7 +492,7 @@ export default function run(config: Partial<Config>) {
             res,
           );
         } catch (err) {
-          const msg = 'ERROR when trying to copy assets';
+          const msg = 'ERROR when trying to copy assets and bundles';
           const message = `${msg}. ${err}. Task: ${taskDescription}`;
           log.error({
             msg,
@@ -413,7 +524,9 @@ export default function run(config: Partial<Config>) {
     Querystring: { filename: string };
     Body: WithBodyArrayField<Record<string, unknown>, 'targetBundles'>;
   }>('/asset-exists', async (req, res) => {
-    if (!(await isAuthenticated(req, res))) {
+    const authResult = authenticate(req.body as AuthBody);
+    if (authResult) {
+      await setResponse(authResult, res);
       return;
     }
 
