@@ -8,7 +8,7 @@ import {
   resetForTest,
   BUNDLE_TIMESTAMP,
 } from './helper';
-import { buildVM, hasVMContextForBundle, resetVM, runInVM, getVMContext } from '../src/worker/vm';
+import { buildExecutionContext, hasVMContextForBundle, resetVM } from '../src/worker/vm';
 import { getConfig } from '../src/shared/configBuilder';
 import { isErrorRenderResult } from '../src/shared/utils';
 
@@ -32,7 +32,10 @@ describe('buildVM and runInVM', () => {
       config.supportModules = false;
 
       await createUploadedBundleForTest();
-      await buildVM(uploadedBundlePathForTest());
+      const { runInVM } = await buildExecutionContext(
+        [uploadedBundlePathForTest()],
+        /* buildVmsIfNeeded */ true,
+      );
 
       let result = await runInVM('typeof Buffer === "undefined"', uploadedBundlePathForTest());
       expect(result).toBeTruthy();
@@ -46,7 +49,10 @@ describe('buildVM and runInVM', () => {
       config.supportModules = true;
 
       await createUploadedBundleForTest();
-      await buildVM(uploadedBundlePathForTest());
+      const { runInVM } = await buildExecutionContext(
+        [uploadedBundlePathForTest()],
+        /* buildVmsIfNeeded */ true,
+      );
 
       let result = await runInVM('typeof Buffer !== "undefined"', uploadedBundlePathForTest());
       expect(result).toBeTruthy();
@@ -59,7 +65,10 @@ describe('buildVM and runInVM', () => {
   describe('additionalContext', () => {
     test('not available if additionalContext not set', async () => {
       await createUploadedBundleForTest();
-      await buildVM(uploadedBundlePathForTest());
+      const { runInVM } = await buildExecutionContext(
+        [uploadedBundlePathForTest()],
+        /* buildVmsIfNeeded */ true,
+      );
 
       const result = await runInVM('typeof testString === "undefined"', uploadedBundlePathForTest());
       expect(result).toBeTruthy();
@@ -70,7 +79,10 @@ describe('buildVM and runInVM', () => {
       config.additionalContext = { testString: 'a string' };
 
       await createUploadedBundleForTest();
-      await buildVM(uploadedBundlePathForTest());
+      const { runInVM } = await buildExecutionContext(
+        [uploadedBundlePathForTest()],
+        /* buildVmsIfNeeded */ true,
+      );
 
       const result = await runInVM('typeof testString !== "undefined"', uploadedBundlePathForTest());
       expect(result).toBeTruthy();
@@ -81,7 +93,10 @@ describe('buildVM and runInVM', () => {
     expect.assertions(14);
 
     await createUploadedBundleForTest();
-    await buildVM(uploadedBundlePathForTest());
+    const { runInVM } = await buildExecutionContext(
+      [uploadedBundlePathForTest()],
+      /* buildVmsIfNeeded */ true,
+    );
 
     let result = await runInVM('ReactOnRails', uploadedBundlePathForTest());
     expect(result).toEqual(JSON.stringify({ dummy: { html: 'Dummy Object' } }));
@@ -129,7 +144,10 @@ describe('buildVM and runInVM', () => {
   test('VM security and captured exceptions', async () => {
     expect.assertions(1);
     await createUploadedBundleForTest();
-    await buildVM(uploadedBundlePathForTest());
+    const { runInVM } = await buildExecutionContext(
+      [uploadedBundlePathForTest()],
+      /* buildVmsIfNeeded */ true,
+    );
     // Adopted form https://github.com/patriksimek/vm2/blob/master/test/tests.js:
     const result = await runInVM('process.exit()', uploadedBundlePathForTest());
     expect(
@@ -140,7 +158,10 @@ describe('buildVM and runInVM', () => {
   test('Captured exceptions for a long message', async () => {
     expect.assertions(4);
     await createUploadedBundleForTest();
-    await buildVM(uploadedBundlePathForTest());
+    const { runInVM } = await buildExecutionContext(
+      [uploadedBundlePathForTest()],
+      /* buildVmsIfNeeded */ true,
+    );
     // Adopted form https://github.com/patriksimek/vm2/blob/master/test/tests.js:
     const code = `process.exit()${'\n// 1234567890123456789012345678901234567890'.repeat(
       50,
@@ -156,7 +177,10 @@ describe('buildVM and runInVM', () => {
   test('resetVM', async () => {
     expect.assertions(2);
     await createUploadedBundleForTest();
-    await buildVM(uploadedBundlePathForTest());
+    const { runInVM } = await buildExecutionContext(
+      [uploadedBundlePathForTest()],
+      /* buildVmsIfNeeded */ true,
+    );
 
     const result = await runInVM('ReactOnRails', uploadedBundlePathForTest());
     expect(result).toEqual(JSON.stringify({ dummy: { html: 'Dummy Object' } }));
@@ -169,7 +193,10 @@ describe('buildVM and runInVM', () => {
   test('VM console history', async () => {
     expect.assertions(1);
     await createUploadedBundleForTest();
-    await buildVM(uploadedBundlePathForTest());
+    const { runInVM } = await buildExecutionContext(
+      [uploadedBundlePathForTest()],
+      /* buildVmsIfNeeded */ true,
+    );
 
     const vmResult = await runInVM(
       'console.log("Console message inside of VM") || console.history;',
@@ -206,7 +233,7 @@ describe('buildVM and runInVM', () => {
       __dirname,
       './fixtures/projects/friendsandguests/1a7fe417/server-bundle.js',
     );
-    await buildVM(serverBundlePath);
+    const { runInVM } = await buildExecutionContext([serverBundlePath], /* buildVmsIfNeeded */ true);
 
     // WelcomePage component:
     const welcomePageComponentRenderingRequest = readRenderingRequest(
@@ -280,7 +307,7 @@ describe('buildVM and runInVM', () => {
       __dirname,
       './fixtures/projects/react-webpack-rails-tutorial/ec974491/server-bundle.js',
     );
-    await buildVM(serverBundlePath);
+    const { runInVM } = await buildExecutionContext([serverBundlePath], /* buildVmsIfNeeded */ true);
 
     // NavigationBar component:
     const navigationBarComponentRenderingRequest = readRenderingRequest(
@@ -325,7 +352,7 @@ describe('buildVM and runInVM', () => {
       __dirname,
       './fixtures/projects/bionicworkshop/fa6ccf6b/server-bundle.js',
     );
-    await buildVM(serverBundlePath);
+    const { runInVM } = await buildExecutionContext([serverBundlePath], /* buildVmsIfNeeded */ true);
 
     // SignIn page with flash component:
     const signInPageWithFlashRenderingRequest = readRenderingRequest(
@@ -383,7 +410,7 @@ describe('buildVM and runInVM', () => {
       __dirname,
       './fixtures/projects/spec-dummy/9fa89f7/server-bundle-web-target.js',
     );
-    await buildVM(serverBundlePath);
+    const { runInVM } = await buildExecutionContext([serverBundlePath], /* buildVmsIfNeeded */ true);
 
     // WelcomePage component:
     const reduxAppComponentRenderingRequest = readRenderingRequest(
@@ -421,11 +448,11 @@ describe('buildVM and runInVM', () => {
       config.stubTimers = false;
       config.replayServerAsyncOperationLogs = replayServerAsyncOperationLogs;
 
-      await buildVM(serverBundlePath);
+      return buildExecutionContext([serverBundlePath], /* buildVmsIfNeeded */ true);
     };
 
     test('console logs in sync and async server operations', async () => {
-      await prepareVM(true);
+      const { runInVM } = await prepareVM(true);
       const consoleLogsInAsyncServerRequestResult = (await runInVM(
         consoleLogsInAsyncServerRequest,
         serverBundlePath,
@@ -446,7 +473,7 @@ describe('buildVM and runInVM', () => {
     });
 
     test('console logs are not leaked to other requests', async () => {
-      await prepareVM(true);
+      const { runInVM } = await prepareVM(true);
       const otherRequestId = '9f3b7e12-5a8d-4c6f-b1e3-2d7f8a6c9e0b';
       const otherconsoleLogsInAsyncServerRequest = consoleLogsInAsyncServerRequest.replace(
         requestId,
@@ -478,7 +505,7 @@ describe('buildVM and runInVM', () => {
     });
 
     test('if replayServerAsyncOperationLogs is false, only sync console logs are replayed', async () => {
-      await prepareVM(false);
+      const { runInVM } = await prepareVM(false);
       const consoleLogsInAsyncServerRequestResult = await runInVM(
         consoleLogsInAsyncServerRequest,
         serverBundlePath,
@@ -499,7 +526,7 @@ describe('buildVM and runInVM', () => {
     });
 
     test('console logs are not leaked to other requests when replayServerAsyncOperationLogs is false', async () => {
-      await prepareVM(false);
+      const { runInVM } = await prepareVM(false);
       const otherRequestId = '9f3b7e12-5a8d-4c6f-b1e3-2d7f8a6c9e0b';
       const otherconsoleLogsInAsyncServerRequest = consoleLogsInAsyncServerRequest.replace(
         requestId,
@@ -535,7 +562,7 @@ describe('buildVM and runInVM', () => {
 
     test('calling multiple buildVM in parallel creates the same VM context', async () => {
       const buildAndGetVmContext = async () => {
-        await prepareVM(true);
+        const { getVMContext } = await prepareVM(true);
         return getVMContext(serverBundlePath);
       };
 
@@ -575,7 +602,7 @@ describe('buildVM and runInVM', () => {
 
     test('running runInVM before buildVM', async () => {
       resetVM();
-      void prepareVM(true);
+      const { runInVM } = await prepareVM(true);
       // If the bundle is parsed, ReactOnRails object will be globally available and has the serverRenderReactComponent method
       const ReactOnRails = await runInVM(
         'typeof ReactOnRails !== "undefined" && ReactOnRails && typeof ReactOnRails.serverRenderReactComponent',
@@ -586,17 +613,22 @@ describe('buildVM and runInVM', () => {
 
     test("running multiple buildVM in parallel doesn't cause runInVM to return partial results", async () => {
       resetVM();
-      void Promise.all([prepareVM(true), prepareVM(true), prepareVM(true), prepareVM(true)]);
+      const [{ runInVM: runInVM1 }, { runInVM: runInVM2 }, { runInVM: runInVM3 }] = await Promise.all([
+        prepareVM(true),
+        prepareVM(true),
+        prepareVM(true),
+        prepareVM(true),
+      ]);
       // If the bundle is parsed, ReactOnRails object will be globally available and has the serverRenderReactComponent method
-      const runCodeInVM = () =>
+      const runCodeInVM = (runInVM: typeof runInVM1) =>
         runInVM(
           'typeof ReactOnRails !== "undefined" && ReactOnRails && typeof ReactOnRails.serverRenderReactComponent',
           serverBundlePath,
         );
       const [runCodeInVM1, runCodeInVM2, runCodeInVM3] = await Promise.all([
-        runCodeInVM(),
-        runCodeInVM(),
-        runCodeInVM(),
+        runCodeInVM(runInVM1),
+        runCodeInVM(runInVM2),
+        runCodeInVM(runInVM3),
       ]);
       expect(runCodeInVM1).toBe('function');
       expect(runCodeInVM2).toBe('function');
@@ -629,9 +661,9 @@ describe('buildVM and runInVM', () => {
       const bundle3 = path.resolve(__dirname, './fixtures/projects/bionicworkshop/fa6ccf6b/server-bundle.js');
 
       // Build VMs up to and beyond the pool limit
-      await buildVM(bundle1);
-      await buildVM(bundle2);
-      await buildVM(bundle3);
+      await buildExecutionContext([bundle1], /* buildVmsIfNeeded */ true);
+      await buildExecutionContext([bundle2], /* buildVmsIfNeeded */ true);
+      await buildExecutionContext([bundle3], /* buildVmsIfNeeded */ true);
 
       // Only the two most recently used bundles should have contexts
       expect(hasVMContextForBundle(bundle1)).toBeFalsy();
@@ -648,10 +680,10 @@ describe('buildVM and runInVM', () => {
         __dirname,
         './fixtures/projects/spec-dummy/e5e10d1/server-bundle-node-target.js',
       );
-      await buildVM(bundle1);
-      await buildVM(bundle2);
-      await buildVM(bundle2);
-      await buildVM(bundle2);
+      await buildExecutionContext([bundle1], /* buildVmsIfNeeded */ true);
+      await buildExecutionContext([bundle2], /* buildVmsIfNeeded */ true);
+      await buildExecutionContext([bundle2], /* buildVmsIfNeeded */ true);
+      await buildExecutionContext([bundle2], /* buildVmsIfNeeded */ true);
 
       expect(hasVMContextForBundle(bundle1)).toBeTruthy();
       expect(hasVMContextForBundle(bundle2)).toBeTruthy();
@@ -669,8 +701,8 @@ describe('buildVM and runInVM', () => {
       const bundle3 = path.resolve(__dirname, './fixtures/projects/bionicworkshop/fa6ccf6b/server-bundle.js');
 
       // Create initial VMs
-      await buildVM(bundle1);
-      await buildVM(bundle2);
+      await buildExecutionContext([bundle1], /* buildVmsIfNeeded */ true);
+      await buildExecutionContext([bundle2], /* buildVmsIfNeeded */ true);
 
       // Wait a bit to ensure timestamp difference
       await new Promise((resolve) => {
@@ -678,10 +710,10 @@ describe('buildVM and runInVM', () => {
       });
 
       // Access bundle1 again to update its timestamp
-      await buildVM(bundle1);
+      await buildExecutionContext([bundle1], /* buildVmsIfNeeded */ true);
 
       // Add a new VM - should remove bundle2 as it's the oldest
-      await buildVM(bundle3);
+      await buildExecutionContext([bundle3], /* buildVmsIfNeeded */ true);
 
       // Bundle1 should still exist as it was accessed more recently
       expect(hasVMContextForBundle(bundle1)).toBeTruthy();
@@ -701,8 +733,8 @@ describe('buildVM and runInVM', () => {
       const bundle3 = path.resolve(__dirname, './fixtures/projects/bionicworkshop/fa6ccf6b/server-bundle.js');
 
       // Create initial VMs
-      await buildVM(bundle1);
-      await buildVM(bundle2);
+      const { runInVM } = await buildExecutionContext([bundle1], /* buildVmsIfNeeded */ true);
+      await buildExecutionContext([bundle2], /* buildVmsIfNeeded */ true);
 
       // Wait a bit to ensure timestamp difference
       await new Promise((resolve) => {
@@ -713,7 +745,7 @@ describe('buildVM and runInVM', () => {
       await runInVM('1 + 1', bundle1);
 
       // Add a new VM - should remove bundle2 as it's the oldest
-      await buildVM(bundle3);
+      await buildExecutionContext([bundle3], /* buildVmsIfNeeded */ true);
 
       // Bundle1 should still exist as it was used more recently
       expect(hasVMContextForBundle(bundle1)).toBeTruthy();
@@ -728,16 +760,16 @@ describe('buildVM and runInVM', () => {
       );
 
       // Build VM first time
-      await buildVM(bundle);
+      const { runInVM } = await buildExecutionContext([bundle], /* buildVmsIfNeeded */ true);
 
       // Set a variable in the VM context
       await runInVM('global.testVar = "test value"', bundle);
 
       // Build VM second time - should reuse existing context
-      await buildVM(bundle);
+      const { runInVM: runInVM2 } = await buildExecutionContext([bundle], /* buildVmsIfNeeded */ true);
 
       // Variable should still exist if context was reused
-      const result = await runInVM('global.testVar', bundle);
+      const result = await runInVM2('global.testVar', bundle);
       expect(result).toBe('test value');
     });
   });

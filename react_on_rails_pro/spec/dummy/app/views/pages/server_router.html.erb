@@ -1,11 +1,35 @@
-<%= stream_react_component("ServerComponentRouter", 
+<%
+  options = {
     props: @app_props_server_render.merge(
       artificialDelay: params[:artificial_delay] || 0,
       postsCount: params[:posts_count] || 2,
       requestId: params[:request_id],
+      name: "John Doe",
+      age: 30,
+      description: "Software Engineer",
     ),
     trace: true, 
-    id: "ServerComponentRouter-react-component-0") %>
+    id: "ServerComponentRouter-react-component-0"
+  }
+%>
+
+<% if request.path.include?("/async-props-component") %>
+  <%= stream_react_component_with_async_props("ServerComponentRouter", **options) do |emitter|
+        if request.path.end_with?("/async-props-component-for-testing")
+          read_async_props_from_redis(emitter)
+          next
+        end
+
+        # Simulate fetching async props
+        sleep 1
+        emitter.call("books", ["The Pragmatic Programmer", "Clean Code", "Design Patterns"])
+
+        sleep 1
+        emitter.call("researches", ["Machine Learning Study", "React Performance Optimization", "Database Indexing Strategies"])
+      end %>
+<% else %>
+  <%= stream_react_component("ServerComponentRouter", **options) %>
+<% end %>
 <hr/>
 
 <h1>React Rails Server Streaming Server Rendered RSC Components</h1>
