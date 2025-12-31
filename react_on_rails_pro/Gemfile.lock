@@ -26,7 +26,7 @@ PATH
       connection_pool
       execjs (~> 2.9)
       http-2 (>= 1.1.1)
-      httpx (~> 1.5)
+      httpx (>= 1.7.0)
       jwt (~> 2.7)
       rainbow
       react_on_rails (= 16.2.1)
@@ -188,7 +188,7 @@ GEM
       railties
     hashdiff (1.1.0)
     http-2 (1.1.1)
-    httpx (1.6.3)
+    httpx (1.7.0)
       http-2 (>= 1.0.0)
     i18n (1.14.8)
       concurrent-ruby (~> 1.0)

@@ -29,7 +29,7 @@ import * as errorReporter from '../shared/errorReporter.js';
 const readFileAsync = promisify(fs.readFile);
 const writeFileAsync = promisify(fs.writeFile);
 
-interface VMContext {
+export interface VMContext {
   context: Context;
   sharedConsoleHistory: SharedConsoleHistory;
   lastUsed: number; // Track when this VM was last used
@@ -39,10 +39,11 @@ interface VMContext {
 const vmContexts = new Map<string, VMContext>();
 
 // Track VM creation promises to handle concurrent buildVM requests
-const vmCreationPromises = new Map<string, Promise<boolean>>();
+const vmCreationPromises = new Map<string, Promise<VMContext>>();
 
 /**
  * Returns all bundle paths that have a VM context
+ * @internal Used in tests
  */
 export function hasVMContextForBundle(bundlePath: string) {
   return vmContexts.has(bundlePath);
@@ -101,87 +102,18 @@ function manageVMPoolSize() {
   }
 }
 
-/**
- *
- * @param renderingRequest JS Code to execute for SSR
- * @param filePath
- * @param vmCluster
- */
-export async function runInVM(
-  renderingRequest: string,
-  filePath: string,
-  vmCluster?: typeof cluster,
-): Promise<RenderResult> {
-  const { serverBundleCachePath } = getConfig();
-
-  try {
-    // Wait for VM creation if it's in progress
-    if (vmCreationPromises.has(filePath)) {
-      await vmCreationPromises.get(filePath);
-    }
-
-    // Get the correct VM context based on the provided bundle path
-    const vmContext = getVMContext(filePath);
-
-    if (!vmContext) {
-      throw new Error(`No VM context found for bundle ${filePath}`);
-    }
-
-    // Update last used timestamp
-    vmContext.lastUsed = Date.now();
-
-    const { context, sharedConsoleHistory } = vmContext;
-
-    if (log.level === 'debug') {
-      // worker is nullable in the primary process
-      const workerId = vmCluster?.worker?.id;
-      log.debug(`worker ${workerId ? `${workerId} ` : ''}received render request for bundle ${filePath} with code
-${smartTrim(renderingRequest)}`);
-      const debugOutputPathCode = path.join(serverBundleCachePath, 'code.js');
-      log.debug(`Full code executed written to: ${debugOutputPathCode}`);
-      await writeFileAsync(debugOutputPathCode, renderingRequest);
-    }
-
-    let result = sharedConsoleHistory.trackConsoleHistoryInRenderRequest(() => {
-      context.renderingRequest = renderingRequest;
-      try {
-        return vm.runInContext(renderingRequest, context) as RenderCodeResult;
-      } finally {
-        context.renderingRequest = undefined;
-      }
-    });
-
-    if (isReadableStream(result)) {
-      const newStreamAfterHandlingError = handleStreamError(result, (error) => {
-        const msg = formatExceptionMessage(renderingRequest, error, 'Error in a rendering stream');
-        errorReporter.message(msg);
-      });
-      return newStreamAfterHandlingError;
-    }
-    if (typeof result !== 'string') {
-      const objectResult = await result;
-      result = JSON.stringify(objectResult);
-    }
-    if (log.level === 'debug') {
-      log.debug(`result from JS:
-${smartTrim(result)}`);
-      const debugOutputPathResult = path.join(serverBundleCachePath, 'result.json');
-      log.debug(`Wrote result to file: ${debugOutputPathResult}`);
-      await writeFileAsync(debugOutputPathResult, result);
-    }
-
-    return result;
-  } catch (exception) {
-    const exceptionMessage = formatExceptionMessage(renderingRequest, exception);
-    log.debug('Caught exception in rendering request: %s', exceptionMessage);
-    return Promise.resolve({ exceptionMessage });
+export class VMContextNotFoundError extends Error {
+  constructor(bundleFilePath: string) {
+    super(`VMContext not found for bundle: ${bundleFilePath}`);
+    this.name = 'VMContextNotFoundError';
   }
 }
 
-export async function buildVM(filePath: string) {
+async function buildVM(filePath: string): Promise<VMContext> {
   // Return existing promise if VM is already being created
-  if (vmCreationPromises.has(filePath)) {
-    return vmCreationPromises.get(filePath);
+  const existingVmCreationPromise = vmCreationPromises.get(filePath);
+  if (existingVmCreationPromise) {
+    return existingVmCreationPromise;
   }
 
   // Check if VM for this bundle already exists
@@ -189,7 +121,7 @@ export async function buildVM(filePath: string) {
   if (vmContext) {
     // Update last used time when accessing existing VM
     vmContext.lastUsed = Date.now();
-    return Promise.resolve(true);
+    return vmContext;
   }
 
   // Create a new promise for this VM creation
@@ -200,12 +132,7 @@ export async function buildVM(filePath: string) {
         additionalContext !== null && additionalContext.constructor === Object;
       const sharedConsoleHistory = new SharedConsoleHistory();
 
-      const runOnOtherBundle = async (bundleTimestamp: string | number, renderingRequest: string) => {
-        const bundlePath = getRequestBundleFilePath(bundleTimestamp);
-        return runInVM(renderingRequest, bundlePath, cluster);
-      };
-
-      const contextObject = { sharedConsoleHistory, runOnOtherBundle };
+      const contextObject = { sharedConsoleHistory };
 
       if (supportModules) {
         // IMPORTANT: When adding anything to this object, update:
@@ -305,11 +232,12 @@ export async function buildVM(filePath: string) {
       }
 
       // Only now, after VM is fully initialized, store the context
-      vmContexts.set(filePath, {
+      const newVmContext: VMContext = {
         context,
         sharedConsoleHistory,
         lastUsed: Date.now(),
-      });
+      };
+      vmContexts.set(filePath, newVmContext);
 
       // Manage pool size after adding new VM
       manageVMPoolSize();
@@ -330,7 +258,7 @@ export async function buildVM(filePath: string) {
         );
       }
 
-      return true;
+      return newVmContext;
     } catch (error) {
       log.error({ error }, 'Caught Error when creating context in buildVM');
       errorReporter.error(error as Error);
@@ -345,6 +273,147 @@ export async function buildVM(filePath: string) {
   vmCreationPromises.set(filePath, vmCreationPromise);
 
   return vmCreationPromise;
+}
+
+async function getOrBuildVMContext(bundleFilePath: string, buildVmsIfNeeded: boolean): Promise<VMContext> {
+  const vmContext = getVMContext(bundleFilePath);
+  if (vmContext) {
+    return vmContext;
+  }
+
+  const vmCreationPromise = vmCreationPromises.get(bundleFilePath);
+  if (vmCreationPromise) {
+    return vmCreationPromise;
+  }
+
+  if (buildVmsIfNeeded) {
+    return buildVM(bundleFilePath);
+  }
+
+  throw new VMContextNotFoundError(bundleFilePath);
+}
+
+export type ExecutionContext = {
+  runInVM: (
+    renderingRequest: string,
+    bundleFilePath: string,
+    vmCluster?: typeof cluster,
+  ) => Promise<RenderResult>;
+  getVMContext: (bundleFilePath: string) => VMContext | undefined;
+};
+
+/**
+ * Builds an ExecutionContext that manages VM execution for a set of bundles.
+ *
+ * The ExecutionContext includes a `sharedExecutionContext` Map that enables safe data sharing
+ * between the initial render request and subsequent update chunks (for incremental rendering).
+ *
+ * CRITICAL SECURITY DESIGN:
+ * - sharedExecutionContext is created ONCE per ExecutionContext (per HTTP request)
+ * - It is NOT a global variable - each request gets its own isolated Map
+ * - This prevents data leakage between concurrent rendering requests from different users
+ * - The Map is passed to the VM context only during code execution, then immediately removed
+ *
+ * @see handleIncrementalRenderRequest.ts for how update chunks access the same context
+ */
+export async function buildExecutionContext(
+  bundlePaths: string[],
+  buildVmsIfNeeded: boolean,
+): Promise<ExecutionContext> {
+  const mapBundleFilePathToVMContext = new Map<string, VMContext>();
+  await Promise.all(
+    bundlePaths.map(async (bundleFilePath) => {
+      const vmContext = await getOrBuildVMContext(bundleFilePath, buildVmsIfNeeded);
+      vmContext.lastUsed = Date.now();
+      mapBundleFilePathToVMContext.set(bundleFilePath, vmContext);
+    }),
+  );
+
+  // This Map persists for the lifetime of this ExecutionContext (one HTTP request).
+  // It allows data to be shared between the initial render and subsequent update chunks.
+  // Example: asyncPropsManager is stored here during initial render and accessed by update chunks.
+  const sharedExecutionContext = new Map();
+
+  const runInVM = async (renderingRequest: string, bundleFilePath: string, vmCluster?: typeof cluster) => {
+    try {
+      const { serverBundleCachePath } = getConfig();
+      const vmContext = mapBundleFilePathToVMContext.get(bundleFilePath);
+      if (!vmContext) {
+        throw new VMContextNotFoundError(bundleFilePath);
+      }
+
+      // Update last used timestamp
+      vmContext.lastUsed = Date.now();
+
+      const { context, sharedConsoleHistory } = vmContext;
+
+      if (log.level === 'debug') {
+        // worker is nullable in the primary process
+        const workerId = vmCluster?.worker?.id;
+        log.debug(`worker ${workerId ? `${workerId} ` : ''}received render request for bundle ${bundleFilePath} with code
+  ${smartTrim(renderingRequest)}`);
+        const debugOutputPathCode = path.join(serverBundleCachePath, 'code.js');
+        log.debug(`Full code executed written to: ${debugOutputPathCode}`);
+        await writeFileAsync(debugOutputPathCode, renderingRequest);
+      }
+
+      // Execute the rendering request in the VM context.
+      // We temporarily inject sharedExecutionContext into the VM's global scope
+      // so that code can store/retrieve data (e.g., asyncPropsManager).
+      // IMPORTANT: We clean up immediately after execution to prevent the VM context
+      // (which may be reused by other requests) from retaining references to this request's data.
+      let result = sharedConsoleHistory.trackConsoleHistoryInRenderRequest(() => {
+        context.renderingRequest = renderingRequest;
+        context.sharedExecutionContext = sharedExecutionContext;
+        context.runOnOtherBundle = (bundleTimestamp: string | number, newRenderingRequest: string) => {
+          const otherBundleFilePath = getRequestBundleFilePath(bundleTimestamp);
+          return runInVM(newRenderingRequest, otherBundleFilePath, vmCluster);
+        };
+
+        try {
+          return vm.runInContext(renderingRequest, context) as RenderCodeResult;
+        } finally {
+          // Clean up references immediately after execution.
+          // Note: sharedExecutionContext itself is NOT cleared here - it persists
+          // for the lifetime of this ExecutionContext so that update chunks can access it.
+          // We only remove the VM context's reference to prevent cross-request data access.
+          context.renderingRequest = undefined;
+          context.sharedExecutionContext = undefined;
+          context.runOnOtherBundle = undefined;
+        }
+      });
+
+      if (isReadableStream(result)) {
+        const newStreamAfterHandlingError = handleStreamError(result, (error) => {
+          const msg = formatExceptionMessage(renderingRequest, error, 'Error in a rendering stream');
+          errorReporter.message(msg);
+        });
+        return newStreamAfterHandlingError;
+      }
+      if (typeof result !== 'string') {
+        const objectResult = await result;
+        result = JSON.stringify(objectResult);
+      }
+      if (log.level === 'debug' && result) {
+        log.debug(`result from JS:
+  ${smartTrim(result)}`);
+        const debugOutputPathResult = path.join(serverBundleCachePath, 'result.json');
+        log.debug(`Wrote result to file: ${debugOutputPathResult}`);
+        await writeFileAsync(debugOutputPathResult, result);
+      }
+
+      return result;
+    } catch (exception) {
+      const exceptionMessage = formatExceptionMessage(renderingRequest, exception);
+      log.debug('Caught exception in rendering request: %s', exceptionMessage);
+      return Promise.resolve({ exceptionMessage });
+    }
+  };
+
+  return {
+    getVMContext: (bundleFilePath: string) => mapBundleFilePathToVMContext.get(bundleFilePath),
+    runInVM,
+  };
 }
 
 /** @internal Used in tests */
