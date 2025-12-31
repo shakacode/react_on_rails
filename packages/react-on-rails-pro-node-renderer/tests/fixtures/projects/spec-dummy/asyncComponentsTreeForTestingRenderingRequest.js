@@ -8,17 +8,23 @@
     rscBundleHash: '88888-test',
   }
 
-  if (typeof generateRSCPayload !== 'function') {
-    globalThis.generateRSCPayload = function generateRSCPayload(componentName, props, railsContext) {
-      const { renderingRequest, rscBundleHash } = railsContext.serverSideRSCPayloadParameters;
-      const propsString = JSON.stringify(props);
-      const newRenderingRequest = renderingRequest.replace(/\(\s*\)\s*$/, `('${componentName}', ${propsString})`);
-      return runOnOtherBundle(rscBundleHash, newRenderingRequest);
-    }
+  const runOnOtherBundle = globalThis.runOnOtherBundle;
+  const generateRSCPayload = function generateRSCPayload(componentName, props, railsContext) {
+    const { renderingRequest, rscBundleHash } = railsContext.serverSideRSCPayloadParameters;
+    const propsString = JSON.stringify(props);
+    const newRenderingRequest = renderingRequest.replace(/\(\s*\)\s*$/, `('${componentName}', ${propsString})`);
+    return runOnOtherBundle(rscBundleHash, newRenderingRequest);
   }
 
   ReactOnRails.clearHydratedStores();
   var usedProps = typeof props === 'undefined' ? {"helloWorldData":{"name":"Mr. Server Side Rendering","\u003cscript\u003ewindow.alert('xss1');\u003c/script\u003e":"\u003cscript\u003ewindow.alert(\"xss2\");\u003c/script\u003e"}} : props;
+  
+  if (ReactOnRails.isRSCBundle) {
+    var { props: propsWithAsyncProps, asyncPropManager } = ReactOnRails.addAsyncPropsCapabilityToComponentProps(usedProps);
+    usedProps = propsWithAsyncProps;
+    sharedExecutionContext.set("asyncPropsManager", asyncPropManager);
+  }
+
   return ReactOnRails[ReactOnRails.isRSCBundle ? 'serverRenderRSCReactComponent' : 'streamServerRenderedReactComponent']({
     name: componentName,
     domNodeId: 'AsyncComponentsTreeForTesting-react-component-0',
@@ -27,5 +33,6 @@
     railsContext: railsContext,
     throwJsErrors: false,
     renderingReturnsPromises: true,
+    generateRSCPayload: typeof generateRSCPayload !== 'undefined' ? generateRSCPayload : undefined,
   });
 })()

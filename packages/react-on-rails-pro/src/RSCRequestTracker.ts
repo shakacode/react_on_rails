@@ -17,25 +17,9 @@ import {
   RSCPayloadStreamInfo,
   RSCPayloadCallback,
   RailsContextWithServerComponentMetadata,
+  GenerateRSCPayloadFunction,
 } from 'react-on-rails/types';
 import { extractErrorMessage } from './utils.ts';
-
-/**
- * Global function provided by React on Rails Pro for generating RSC payloads.
- *
- * This function is injected into the global scope during server-side rendering
- * by the RORP rendering request. It handles the actual generation of React Server
- * Component payloads on the server side.
- *
- * @see https://github.com/shakacode/react_on_rails_pro/blob/master/lib/react_on_rails_pro/server_rendering_js_code.rb
- */
-declare global {
-  function generateRSCPayload(
-    componentName: string,
-    props: unknown,
-    railsContext: RailsContextWithServerComponentMetadata,
-  ): Promise<NodeJS.ReadableStream>;
-}
 
 /**
  * RSC Request Tracker - manages RSC payload generation and tracking for a single request.
@@ -52,8 +36,14 @@ class RSCRequestTracker {
 
   private railsContext: RailsContextWithServerComponentMetadata;
 
-  constructor(railsContext: RailsContextWithServerComponentMetadata) {
+  private generateRSCPayload?: GenerateRSCPayloadFunction;
+
+  constructor(
+    railsContext: RailsContextWithServerComponentMetadata,
+    generateRSCPayload?: GenerateRSCPayloadFunction,
+  ) {
     this.railsContext = railsContext;
+    this.generateRSCPayload = generateRSCPayload;
   }
 
   /**
@@ -120,17 +110,17 @@ class RSCRequestTracker {
    * @throws Error if generateRSCPayload is not available or fails
    */
   async getRSCPayloadStream(componentName: string, props: unknown): Promise<NodeJS.ReadableStream> {
-    // Validate that the global generateRSCPayload function is available
-    if (typeof generateRSCPayload !== 'function') {
+    // Validate that the generateRSCPayload function is available
+    if (!this.generateRSCPayload) {
       throw new Error(
-        'generateRSCPayload is not defined. Please ensure that you are using at least version 4.0.0 of ' +
-          'React on Rails Pro and the Node renderer, and that ReactOnRailsPro.configuration.enable_rsc_support ' +
-          'is set to true.',
+        'generateRSCPayload function is not available. This could mean: ' +
+          '(1) ReactOnRailsPro.configuration.enable_rsc_support is not enabled, or ' +
+          '(2) You are using an incompatible version of React on Rails Pro (requires 4.0.0+).',
       );
     }
 
     try {
-      const stream = await generateRSCPayload(componentName, props, this.railsContext);
+      const stream = await this.generateRSCPayload(componentName, props, this.railsContext);
 
       // Tee stream to allow for multiple consumers:
       //   1. stream1 - Used by React's runtime to perform server-side rendering
