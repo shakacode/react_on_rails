@@ -32,6 +32,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 - **`bin/dev` browser auto-open now waits for route readiness**: `--open-browser` and `--open-browser-once` now poll the target app route and open the browser only after receiving a success or redirect response, reducing premature opens during boot. [PR 2885](https://github.com/shakacode/react_on_rails/pull/2885) by [justin808](https://github.com/justin808).
 
+#### Pro
+
+##### Fixed
+
+- **HTTPX Streaming Compatibility**: Fixed streaming request timeouts when using HTTPX with both `:stream` and `:stream_bidi` plugins. Refactored `perform_request` to use the `build_request` pattern with explicit `request.close` to send the HTTP/2 `END_STREAM` flag. Also includes a temporary workaround for an [HTTPX stream_bidi plugin retry bug](https://github.com/HoneyryderChuck/httpx/issues/124) that caused crashes on request retries. [PR 2251](https://github.com/shakacode/react_on_rails/pull/2251) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 ### [16.5.1] - 2026-03-27
 
 #### Fixed

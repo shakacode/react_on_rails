@@ -22,6 +22,7 @@ type ReactOnRailsCoreSpecificFunctions = Pick<
   | 'reactOnRailsStoreLoaded'
   | 'streamServerRenderedReactComponent'
   | 'serverRenderRSCReactComponent'
+  | 'addAsyncPropsCapabilityToComponentProps'
 >;
 
 export default function createReactOnRails(
@@ -75,6 +76,10 @@ export default function createReactOnRails(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     serverRenderRSCReactComponent(): any {
       throw new Error('serverRenderRSCReactComponent requires react-on-rails-pro package');
+    },
+
+    addAsyncPropsCapabilityToComponentProps() {
+      throw new Error('addAsyncPropsCapabilityToComponentProps requires react-on-rails-pro package');
     },
   };
 

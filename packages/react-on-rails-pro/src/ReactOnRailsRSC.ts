@@ -25,6 +25,7 @@ import {
 import { convertToError } from 'react-on-rails/serverRenderUtils';
 import handleError from './handleErrorRSC.ts';
 import ReactOnRails from './ReactOnRails.full.ts';
+import AsyncPropsManager from './AsyncPropsManager.ts';
 
 import {
   streamServerRenderedComponent,
@@ -103,6 +104,62 @@ ReactOnRails.serverRenderRSCReactComponent = (options: RSCRenderParams) => {
     console.history = [];
   }
 };
+
+/**
+ * Adds async props capability to component props.
+ *
+ * DESIGN DECISION: Function in props vs. Hook
+ *
+ * We use `getReactOnRailsAsyncProp` function in props instead of a `useAsyncProps` hook because:
+ *
+ * 1. REACT SERVER COMPONENTS: RSCs cannot use hooks - they're async functions, not components
+ *    with a render lifecycle. Hooks require the React hooks runtime which isn't available in RSC.
+ *
+ * 2. SIMPLER ARCHITECTURE: No need for React Context or Provider wrappers.
+ *    The function is just a closure over the AsyncPropsManager.
+ *
+ * 3. TYPE SAFETY: TypeScript can infer the prop types from the generic parameters,
+ *    giving autocomplete for available async props.
+ *
+ * USAGE:
+ * ```tsx
+ * // Types define what async props are available
+ * type AsyncProps = { users: User[]; posts: Post[] };
+ * type SyncProps = { title: string };
+ *
+ * // Component receives getReactOnRailsAsyncProp with proper types
+ * function Dashboard({ title, getReactOnRailsAsyncProp }: WithAsyncProps<AsyncProps, SyncProps>) {
+ *   const users = await getReactOnRailsAsyncProp('users');  // Promise<User[]>
+ *   const posts = await getReactOnRailsAsyncProp('posts');  // Promise<Post[]>
+ *   // ...
+ * }
+ * ```
+ *
+ * @returns asyncPropManager - Stored in sharedExecutionContext for update chunks
+ * @returns props - Original props plus getReactOnRailsAsyncProp function
+ */
+function addAsyncPropsCapabilityToComponentProps<
+  AsyncPropsType extends Record<string, unknown>,
+  PropsType extends Record<string, unknown>,
+>(props: PropsType) {
+  const asyncPropManager = new AsyncPropsManager();
+  const propsAfterAddingAsyncProps = {
+    ...props,
+    // This function is a closure over asyncPropManager, allowing the component
+    // to retrieve async props without needing access to the manager directly.
+    getReactOnRailsAsyncProp: <PropName extends keyof AsyncPropsType>(propName: PropName) => {
+      return asyncPropManager.getProp(propName as string) as Promise<AsyncPropsType[PropName]>;
+    },
+  };
+
+  // Return both the manager (for storing in sharedExecutionContext) and the enhanced props
+  return {
+    asyncPropManager,
+    props: propsAfterAddingAsyncProps,
+  };
+}
+
+ReactOnRails.addAsyncPropsCapabilityToComponentProps = addAsyncPropsCapabilityToComponentProps;
 
 ReactOnRails.isRSCBundle = true;
 
