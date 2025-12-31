@@ -183,19 +183,19 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
 
     unless request_id
       sleep 1
-      raise "You must pass the request_id param to the page, this page is inteded to be used for testing only" 
+      raise "You must pass the request_id param to the page, this page is inteded to be used for testing only"
     end
 
     ended = false
-    last_received_id = '0-0'
+    last_received_id = "0-0"
     stream_id = "stream:#{request_id}"
-    while !ended
+    until ended
       received_messages = redis.xread(stream_id, last_received_id, block: 0)[stream_id]
       # receive_messages are like [[msg1_id, [**msg_entries]], [msg2_id, [**msg_entries]]]
       last_received_id = received_messages.last.first
-      received_messages.each do |_, message_entries|
+      received_messages.each_value do |message_entries|
         message_entries.each do |message_key, message_value|
-          if message_key == 'end'
+          if message_key == "end"
             ended = true
             next
           end
