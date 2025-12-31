@@ -13,13 +13,13 @@ asyncPropsAtRouterPageTest(
     await expect(page.getByText('Engineering in software')).not.toBeVisible();
     await expect(page.getByText('The Need for Software Engineering')).not.toBeVisible();
 
-    sendRedisValue('books', ['Clean Code', 'Design Patterns']);
+    await sendRedisValue('books', ['Clean Code', 'Design Patterns']);
     await expect(page.getByText('Clean Code')).toBeVisible();
     await expect(page.getByText('Design Patterns')).toBeVisible();
     await expect(page.getByText('Engineering in software')).not.toBeVisible();
     await expect(page.getByText('The Need for Software Engineering')).not.toBeVisible();
 
-    sendRedisValue('researches', ['Engineering in software', 'The Need for Software Engineering']);
+    await sendRedisValue('researches', ['Engineering in software', 'The Need for Software Engineering']);
     await expect(page.getByText('Clean Code')).toBeVisible();
     await expect(page.getByText('Design Patterns')).toBeVisible();
     await expect(page.getByText('Engineering in software')).toBeVisible();
