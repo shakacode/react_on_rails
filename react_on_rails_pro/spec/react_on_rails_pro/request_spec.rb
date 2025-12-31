@@ -2,6 +2,9 @@
 
 require_relative "spec_helper"
 require "fakefs/safe"
+require "httpx"
+
+HTTPX::Plugins.load_plugin(:stream)
 
 describe ReactOnRailsPro::Request do
   let(:logger_mock) { instance_double(ActiveSupport::Logger).as_null_object }
@@ -109,6 +112,13 @@ describe ReactOnRailsPro::Request do
                                                    count: 1) do |yielder|
         yielder.call("Bundle not found\n")
       end
+
+      # Mock the /upload-assets endpoint that gets called when send_bundle is true
+      upload_assets_url = "#{renderer_url}/upload-assets"
+      upload_request_info = mock_streaming_response(upload_assets_url, 200, count: 1) do |yielder|
+        yielder.call("Assets uploaded\n")
+      end
+
       second_request_info = mock_streaming_response(render_full_url, 200) do |yielder|
         yielder.call("Hello, world!\n")
       end
@@ -124,21 +134,31 @@ describe ReactOnRailsPro::Request do
       expect(first_request_info[:request].body.to_s).to include("renderingRequest=console.log")
       expect(first_request_info[:request].body.to_s).not_to include("bundle")
 
-      # Second request should have a bundle
-      # It's a multipart/form-data request, so we can access the form directly
-      second_request_body = second_request_info[:request].body.instance_variable_get(:@body)
-      second_request_form = second_request_body.instance_variable_get(:@form)
+      # The bundle should be sent via the /upload-assets endpoint
+      upload_request_body = upload_request_info[:request].body.to_s
 
-      expect(second_request_form).to have_key("bundle_server_bundle.js")
-      expect(second_request_form["bundle_server_bundle.js"][:body]).to be_a(FakeFS::Pathname)
-      expect(second_request_form["bundle_server_bundle.js"][:body].to_s).to eq(server_bundle_path)
+      expect(upload_request_body).to include("bundle_server_bundle.js")
+      expect(upload_request_body).to include('console.log("mock bundle");')
+
+      # Second render request should also not have a bundle
+      expect(second_request_info[:request].body.to_s).to include("renderingRequest=console.log")
+      expect(second_request_info[:request].body.to_s).not_to include("bundle")
     end
 
     it "raises duplicate bundle upload error when server asks for bundle twice" do
-      first_request_info = mock_streaming_response(render_full_url, ReactOnRailsPro::STATUS_SEND_BUNDLE) do |yielder|
+      first_request_info = mock_streaming_response(render_full_url, ReactOnRailsPro::STATUS_SEND_BUNDLE,
+                                                   count: 1) do |yielder|
         yielder.call("Bundle not found\n")
       end
-      second_request_info = mock_streaming_response(render_full_url, ReactOnRailsPro::STATUS_SEND_BUNDLE) do |yielder|
+
+      # Mock the /upload-assets endpoint that gets called when send_bundle is true
+      upload_assets_url = "#{renderer_url}/upload-assets"
+      upload_request_info = mock_streaming_response(upload_assets_url, 200, count: 1) do |yielder|
+        yielder.call("Assets uploaded\n")
+      end
+
+      second_request_info = mock_streaming_response(render_full_url, ReactOnRailsPro::STATUS_SEND_BUNDLE,
+                                                    count: 1) do |yielder|
         yielder.call("Bundle still not found\n")
       end
 
@@ -153,13 +173,15 @@ describe ReactOnRailsPro::Request do
       expect(first_request_info[:request].body.to_s).to include("renderingRequest=console.log")
       expect(first_request_info[:request].body.to_s).not_to include("bundle")
 
-      # Second request should have a bundle
-      second_request_body = second_request_info[:request].body.instance_variable_get(:@body)
-      second_request_form = second_request_body.instance_variable_get(:@form)
+      # The bundle should be sent via the /upload-assets endpoint
+      upload_request_body = upload_request_info[:request].body.to_s
 
-      expect(second_request_form).to have_key("bundle_server_bundle.js")
-      expect(second_request_form["bundle_server_bundle.js"][:body]).to be_a(FakeFS::Pathname)
-      expect(second_request_form["bundle_server_bundle.js"][:body].to_s).to eq(server_bundle_path)
+      expect(upload_request_body).to include("bundle_server_bundle.js")
+      expect(upload_request_body).to include('console.log("mock bundle");')
+
+      # Second render request should also not have a bundle
+      expect(second_request_info[:request].body.to_s).to include("renderingRequest=console.log")
+      expect(second_request_info[:request].body.to_s).not_to include("bundle")
     end
 
     it "raises incompatible error when server returns incompatible error" do
@@ -288,4 +310,136 @@ describe ReactOnRailsPro::Request do
       expect(described_class.send(:connection)).to eq(new_connection)
     end
   end
+
+  # Unverified doubles are required for HTTPX bidirectional streaming because:
+  # 1. HTTPX::StreamResponse doesn't define status in its interface (causes verified double failures)
+  # 2. The :stream_bidi plugin adds methods (#write, #close, #build_request) not in standard interfaces
+  # 3. Using double(ClassName) documents the class while allowing interface flexibility
+  # rubocop:disable RSpec/VerifiedDoubles, RSpec/MultipleMemoizedHelpers
+  describe "render_code_with_incremental_updates" do
+    let(:js_code) { "console.log('incremental rendering');" }
+    let(:async_props_block) { proc { |_emitter| } }
+    let(:mock_request) { double(HTTPX::Request) }
+    let(:mock_response) { double(HTTPX::StreamResponse, status: 200) }
+    let(:mock_connection) { double(HTTPX::Session) }
+
+    before do
+      allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool).to receive_messages(
+        server_bundle_hash: "server_bundle.js",
+        rsc_bundle_hash: "rsc_bundle.js"
+      )
+
+      allow(mock_connection).to receive_messages(build_request: mock_request, request: mock_response)
+      allow(mock_request).to receive(:close)
+      allow(mock_request).to receive(:<<)
+      allow(mock_response).to receive(:is_a?).with(HTTPX::ErrorResponse).and_return(false)
+      allow(mock_response).to receive(:each).and_yield("chunk\n")
+      allow(described_class).to receive(:connection).and_return(mock_connection)
+
+      # Stub AsyncPropsEmitter to return a mock with end_stream_chunk
+      allow(ReactOnRailsPro::AsyncPropsEmitter).to receive(:new) do |_bundle_timestamp, _request|
+        double(
+          ReactOnRailsPro::AsyncPropsEmitter,
+          end_stream_chunk: { bundleTimestamp: "mocked", updateChunk: "mocked_js" }
+        )
+      end
+    end
+
+    it "creates NDJSON request with correct initial data" do
+      stream = described_class.render_code_with_incremental_updates(
+        "/render-incremental",
+        js_code,
+        async_props_block: async_props_block,
+        is_rsc_payload: false
+      )
+
+      stream.each_chunk(&:itself)
+
+      expect(mock_connection).to have_received(:build_request).with(
+        "POST",
+        "/render-incremental",
+        headers: { "content-type" => "application/x-ndjson" },
+        body: [],
+        stream: true
+      )
+      expect(mock_request).to have_received(:<<).at_least(:once)
+    end
+
+    it "passes AsyncPropsEmitter to async_props_block" do
+      emitter_received = nil
+      test_async_props_block = proc { |emitter| emitter_received = emitter }
+
+      # Allow real emitter to be created for this test
+      allow(ReactOnRailsPro::AsyncPropsEmitter).to receive(:new).and_call_original
+
+      stream = described_class.render_code_with_incremental_updates(
+        "/render-incremental",
+        js_code,
+        async_props_block: test_async_props_block,
+        is_rsc_payload: false
+      )
+
+      stream.each_chunk(&:itself)
+
+      expect(emitter_received).to be_a(ReactOnRailsPro::AsyncPropsEmitter)
+    end
+
+    it "executes async_props_block concurrently with response streaming via barrier.async" do
+      execution_order = []
+
+      test_async_props_block = proc do |_emitter|
+        execution_order << :async_block_start
+        # Simulate async work - this runs in a separate fiber
+        sleep 0.01
+        execution_order << :async_block_end
+      end
+
+      # Track when chunks are yielded during streaming
+      allow(mock_response).to receive(:each) do |&block|
+        execution_order << :chunk_yielded
+        block.call("chunk\n")
+      end
+
+      # Allow real emitter to be created for this test
+      allow(ReactOnRailsPro::AsyncPropsEmitter).to receive(:new).and_call_original
+
+      stream = described_class.render_code_with_incremental_updates(
+        "/render-incremental",
+        js_code,
+        async_props_block: test_async_props_block,
+        is_rsc_payload: false
+      )
+
+      stream.each_chunk(&:itself)
+
+      # Verify concurrent execution: chunk should be yielded while async block is running
+      # If synchronous, order would be [:async_block_start, :async_block_end, :chunk_yielded]
+      expect(execution_order).to eq(%i[async_block_start chunk_yielded async_block_end])
+    end
+
+    it "uses rsc_bundle_hash when is_rsc_payload is true" do
+      allow(ReactOnRailsPro.configuration).to receive(:enable_rsc_support).and_return(true)
+
+      emitter_captured = nil
+      allow(ReactOnRailsPro::AsyncPropsEmitter).to receive(:new) do |bundle_timestamp, request_stream|
+        emitter_captured = { bundle_timestamp: bundle_timestamp, request_stream: request_stream }
+        double(
+          ReactOnRailsPro::AsyncPropsEmitter,
+          end_stream_chunk: { bundleTimestamp: bundle_timestamp, updateChunk: "mocked_js" }
+        )
+      end
+
+      stream = described_class.render_code_with_incremental_updates(
+        "/render-incremental",
+        js_code,
+        async_props_block: async_props_block,
+        is_rsc_payload: true
+      )
+
+      stream.each_chunk(&:itself)
+
+      expect(emitter_captured[:bundle_timestamp]).to eq("rsc_bundle.js")
+    end
+  end
+  # rubocop:enable RSpec/VerifiedDoubles, RSpec/MultipleMemoizedHelpers
 end

@@ -27,6 +27,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 Changes since the last non-beta release.
 
+#### Pro
+
+##### Fixed
+
+- **HTTPX Streaming Compatibility**: Fixed streaming request timeouts when using HTTPX with both `:stream` and `:stream_bidi` plugins. Refactored `perform_request` to use the `build_request` pattern with explicit `request.close` to send the HTTP/2 `END_STREAM` flag. Also includes a temporary workaround for an [HTTPX stream_bidi plugin retry bug](https://github.com/HoneyryderChuck/httpx/issues/124) that caused crashes on request retries. [PR 2251](https://github.com/shakacode/react_on_rails/pull/2251) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 ### [16.4.0.rc.5] - 2026-02-26
 
 #### Fixed
