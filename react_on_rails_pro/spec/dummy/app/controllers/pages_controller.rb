@@ -173,8 +173,40 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
   # See files in spec/dummy/app/views/pages
 
   helper_method :calc_slow_app_props_server_render
+  helper_method :read_async_props_from_redis
 
   private
+
+  def read_async_props_from_redis(emitter)
+    redis = ::Redis.new
+    request_id = params[:request_id]
+
+    unless request_id
+      sleep 1
+      raise "You must pass the request_id param to the page, this page is inteded to be used for testing only"
+    end
+
+    ended = false
+    last_received_id = "0-0"
+    stream_id = "stream:#{request_id}"
+    until ended
+      received_messages = redis.xread(stream_id, last_received_id, block: 0)[stream_id]
+      # receive_messages are like [[msg1_id, [**msg_entries]], [msg2_id, [**msg_entries]]]
+      last_received_id = received_messages.last.first
+      received_messages.each_value do |message_entries|
+        message_entries.each do |message_key, message_value|
+          if message_key == "end"
+            ended = true
+            next
+          end
+
+          sleep 0.1
+          # Key starts with :
+          emitter.call(message_key[1..], JSON.parse(message_value))
+        end
+      end
+    end
+  end
 
   def calc_slow_app_props_server_render
     msg = <<-MSG.strip_heredoc
