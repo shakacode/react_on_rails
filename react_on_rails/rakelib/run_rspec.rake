@@ -79,7 +79,6 @@ namespace :run_rspec do
 
   # Dynamically define Rake tasks for each example app found in the examples directory
   ExampleType.all[:shakapacker_examples].each do |example_type|
-    puts "Creating #{example_type.rspec_task_name} task"
     desc "Runs RSpec for #{example_type.name_pretty} only"
     task example_type.rspec_task_name_short => example_type.gen_task_name do
       # Use unbundled mode for pinned React version examples to ensure the example app's
@@ -115,12 +114,12 @@ namespace :run_rspec do
     ExampleType.all[:shakapacker_examples].select(&:pinned_react_version?)
   end
 
-  desc "Runs Rspec for latest version example apps only (React 19, Shakapacker 9.x)"
+  desc "Runs Rspec for latest version example apps only (React 19)"
   task shakapacker_examples_latest: latest_examples.map(&:gen_task_name) do
     latest_examples.each { |example_type| Rake::Task[example_type.rspec_task_name].invoke }
   end
 
-  desc "Runs Rspec for React 18 example apps only (Shakapacker 8.2.0)"
+  desc "Runs Rspec for React 18 example apps only"
   task shakapacker_examples_react18: react18_examples.map(&:gen_task_name) do
     react18_examples.each { |example_type| Rake::Task[example_type.rspec_task_name].invoke }
   end
