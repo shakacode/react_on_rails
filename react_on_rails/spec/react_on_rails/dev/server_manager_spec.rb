@@ -440,4 +440,160 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       end
     end
   end
+
+  # These tests verify argument parsing works correctly, following Rails' CLI testing pattern
+  # See: https://github.com/rails/rails/blob/main/railties/test/commands/server_test.rb
+  describe ".run_from_command_line argument parsing" do
+    before do
+      mock_system_calls
+      allow(ReactOnRails::PackerUtils).to receive(:shakapacker_precompile_hook_value).and_return(nil)
+      allow(ReactOnRails::Dev::ServiceChecker).to receive(:check_services).and_return(true)
+    end
+
+    context "with --route flag" do
+      # This test would have caught the bug fixed in PR #2273
+      # The generator creates bin/dev with: argv_with_defaults.push("--route", DEFAULT_ROUTE)
+      # which passes ["--route", "hello_world"] to run_from_command_line
+      it "correctly parses --route with value as separate argument (generator default)" do
+        expect(described_class).to receive(:start).with(
+          :development,
+          "Procfile.dev",
+          hash_including(route: "hello_world", verbose: false)
+        )
+
+        described_class.run_from_command_line(["--route", "hello_world"])
+      end
+
+      it "correctly parses --route=value syntax" do
+        expect(described_class).to receive(:start).with(
+          :development,
+          "Procfile.dev",
+          hash_including(route: "hello_world")
+        )
+
+        described_class.run_from_command_line(["--route=hello_world"])
+      end
+
+      it "correctly parses command before --route flag" do
+        expect(described_class).to receive(:start).with(
+          :static,
+          "Procfile.dev-static-assets",
+          hash_including(route: "myroute")
+        )
+
+        described_class.run_from_command_line(["static", "--route", "myroute"])
+      end
+
+      it "correctly parses command after --route flag" do
+        expect(described_class).to receive(:start).with(
+          :static,
+          "Procfile.dev-static-assets",
+          hash_including(route: "myroute")
+        )
+
+        described_class.run_from_command_line(["--route", "myroute", "static"])
+      end
+
+      it "does not treat route value as a command" do
+        # This is the core bug test - "hello_world" should NOT be treated as a command
+        expect(described_class).not_to receive(:start).with(:unknown, anything, anything)
+
+        # Should start development mode (default), not fail with "Unknown argument: hello_world"
+        expect(described_class).to receive(:start).with(
+          :development,
+          "Procfile.dev",
+          hash_including(route: "hello_world")
+        )
+
+        described_class.run_from_command_line(["--route", "hello_world"])
+      end
+    end
+
+    context "with --rails-env flag" do
+      it "correctly parses --rails-env with value as separate argument" do
+        env = { "NODE_ENV" => "production", "RAILS_ENV" => "staging" }
+        argv = ["bundle", "exec", "rails", "assets:precompile"]
+        status_double = instance_double(Process::Status, success?: true)
+        expect(Open3).to receive(:capture3).with(env, *argv).and_return(["output", "", status_double])
+
+        described_class.run_from_command_line(["prod", "--rails-env", "staging"])
+      end
+
+      it "does not treat rails-env value as a command" do
+        env = { "NODE_ENV" => "production", "RAILS_ENV" => "production" }
+        argv = ["bundle", "exec", "rails", "assets:precompile"]
+        status_double = instance_double(Process::Status, success?: true)
+        expect(Open3).to receive(:capture3).with(env, *argv).and_return(["output", "", status_double])
+
+        # "production" after --rails-env should not be treated as a command
+        described_class.run_from_command_line(["--rails-env", "production", "prod"])
+      end
+    end
+
+    context "with --verbose flag" do
+      it "correctly parses --verbose flag" do
+        expect(described_class).to receive(:start).with(
+          :development,
+          "Procfile.dev",
+          hash_including(verbose: true)
+        )
+
+        described_class.run_from_command_line(["--verbose"])
+      end
+
+      it "correctly parses -v short flag" do
+        expect(described_class).to receive(:start).with(
+          :development,
+          "Procfile.dev",
+          hash_including(verbose: true)
+        )
+
+        described_class.run_from_command_line(["-v"])
+      end
+    end
+
+    context "with multiple flags" do
+      it "correctly parses command with multiple flags" do
+        expect(described_class).to receive(:start).with(
+          :static,
+          "Procfile.dev-static-assets",
+          hash_including(route: "dashboard", verbose: true)
+        )
+
+        described_class.run_from_command_line(["static", "--route", "dashboard", "--verbose"])
+      end
+
+      it "correctly parses flags in any order" do
+        expect(described_class).to receive(:start).with(
+          :static,
+          "Procfile.dev-static-assets",
+          hash_including(route: "dashboard", verbose: true)
+        )
+
+        described_class.run_from_command_line(["--verbose", "--route", "dashboard", "static"])
+      end
+    end
+
+    context "with no arguments (default mode)" do
+      it "starts development mode with no route" do
+        expect(described_class).to receive(:start).with(
+          :development,
+          "Procfile.dev",
+          hash_including(route: nil, verbose: false)
+        )
+
+        described_class.run_from_command_line([])
+      end
+    end
+
+    context "with unknown command" do
+      it "rejects and shows error message" do
+        expect_any_instance_of(Kernel).to receive(:puts).with("Unknown argument: invalid_command")
+        expect_any_instance_of(Kernel).to receive(:puts).with("Run 'dev help' for usage information")
+        expect_any_instance_of(Kernel).to receive(:exit).with(1)
+
+        described_class.run_from_command_line(["invalid_command"])
+      end
+    end
+  end
 end
