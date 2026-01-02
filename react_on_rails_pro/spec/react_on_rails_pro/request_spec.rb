@@ -195,4 +195,97 @@ describe ReactOnRailsPro::Request do
       end
     end
   end
+
+  describe "thread-safe connection management" do
+    let(:mock_connection) { instance_double(HTTPX::Session) }
+
+    before do
+      # Reset connection state before each test
+      described_class.instance_variable_set(:@connection, nil)
+    end
+
+    after do
+      # Clean up connection state after each test
+      described_class.instance_variable_set(:@connection, nil)
+    end
+
+    it "creates only one connection when accessed concurrently" do
+      connections_created = 0
+      counter_mutex = Mutex.new
+
+      # Stub create_connection to track calls and simulate slow creation
+      allow(described_class).to receive(:create_connection) do
+        counter_mutex.synchronize { connections_created += 1 }
+        sleep(0.01) # Simulate connection setup time to increase race window
+        mock_connection
+      end
+
+      # Simulate multiple threads racing to initialize connection
+      threads = Array.new(10) do
+        Thread.new { described_class.send(:connection) }
+      end
+      threads.each(&:join)
+
+      # Should only create ONE connection despite concurrent calls
+      expect(connections_created).to eq(1)
+    end
+
+    it "safely handles reset during concurrent access" do
+      allow(described_class).to receive(:create_connection).and_return(mock_connection)
+      allow(mock_connection).to receive(:close)
+
+      errors = []
+      errors_mutex = Mutex.new
+
+      # Background threads accessing connection
+      threads = Array.new(5) do
+        Thread.new do
+          50.times do
+            described_class.send(:connection)
+          rescue StandardError => e
+            errors_mutex.synchronize { errors << e }
+          end
+        end
+      end
+
+      # Reset connection while other threads are accessing it
+      sleep(0.005)
+      described_class.reset_connection
+
+      threads.each(&:join)
+
+      expect(errors).to be_empty
+    end
+
+    it "properly closes old connection on reset" do
+      old_connection = instance_double(HTTPX::Session)
+      new_connection = instance_double(HTTPX::Session)
+
+      # Set up initial connection
+      described_class.instance_variable_set(:@connection, old_connection)
+
+      allow(described_class).to receive(:create_connection).and_return(new_connection)
+      expect(old_connection).to receive(:close)
+
+      described_class.reset_connection
+
+      expect(described_class.send(:connection)).to eq(new_connection)
+    end
+
+    it "propagates close errors during reset" do
+      old_connection = instance_double(HTTPX::Session)
+      new_connection = instance_double(HTTPX::Session)
+
+      described_class.instance_variable_set(:@connection, old_connection)
+
+      allow(described_class).to receive(:create_connection).and_return(new_connection)
+      allow(old_connection).to receive(:close).and_raise(StandardError, "Close failed")
+
+      # Should raise the close error
+      expect { described_class.reset_connection }.to raise_error(StandardError, "Close failed")
+
+      # But new connection should still be set (close happens after assignment)
+      expect(described_class.send(:connection)).to eq(new_connection)
+    end
+  end
 end

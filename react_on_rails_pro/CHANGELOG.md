@@ -17,7 +17,9 @@ You can find the **package** version numbers from this repo's tags and below in 
 
 ## [Unreleased]
 
-### [v16.2.0.beta.13] - 2025-12-07
+Changes since the last non-beta release.
+
+### [v16.2.0.rc.0] - 2025-12-29
 
 Changes since the last non-beta release.
 
@@ -32,7 +34,6 @@ Changes since the last non-beta release.
 - Added `cached_stream_react_component` helper method, similar to `cached_react_component` but for streamed components.
 - **License Validation System**: Implemented comprehensive JWT-based license validation with offline verification using RSA-256 signatures. License validation occurs at startup in both Ruby and Node.js environments. Supports required fields (`sub`, `iat`, `exp`) and optional fields (`plan`, `organization`, `iss`). FREE evaluation licenses are available for 3 months at [shakacode.com/react-on-rails-pro](https://shakacode.com/react-on-rails-pro). [PR #1857](https://github.com/shakacode/react_on_rails/pull/1857) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 - **Pro-Specific Configurations Moved from Open-Source**: The following React Server Components (RSC) configurations are now exclusively in the Pro gem and should be configured in `ReactOnRailsPro.configure`:
-
   - `rsc_bundle_js_file` - Path to the RSC bundle file
   - `react_server_client_manifest_file` - Path to the React server client manifest
   - `react_client_manifest_file` - Path to the React client manifest
@@ -40,7 +41,6 @@ Changes since the last non-beta release.
   These configurations were previously available in the open-source `ReactOnRails.configure` block but have been moved to Pro where they belong since RSC is a Pro-only feature.
 
 - **Streaming View Helpers Now Pro-Exclusive**: The following view helpers are now defined exclusively in the Pro gem:
-
   - `stream_react_component` - Progressive SSR using React 18+ streaming
   - `rsc_payload_react_component` - RSC payload rendering
 
@@ -49,6 +49,10 @@ Changes since the last non-beta release.
 - **Node Renderer Gem Version Validation**: The node renderer now validates that the Ruby gem version (`react_on_rails_pro`) matches the node renderer package version (`@shakacode-tools/react-on-rails-pro-node-renderer`) on every render request. Environment-aware: strict enforcement in development (returns 412 Precondition Failed on mismatch), permissive in production (allows with warning). Includes version normalization to handle Ruby gem vs NPM format differences (e.g., `4.0.0.rc.1` vs `4.0.0-rc.1`). [PR #1881](https://github.com/shakacode/react_on_rails/pull/1881) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 ### Fixed
+
+- **Thread-Safe Connection Management**: Fixed race conditions in `ReactOnRailsPro::Request` connection management. The lazy initialization (`@connection ||= create_connection`) was not atomic, allowing multiple threads to create duplicate connections at startup. Now uses a mutex with double-checked locking pattern for thread-safe initialization while maintaining lock-free reads for optimal performance. [PR 2259](https://github.com/shakacode/react_on_rails/pull/2259) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+- **Legacy Module Resolver Compatibility**: Added `main` field to `react-on-rails-pro` and `react-on-rails-pro-node-renderer` package.json files for compatibility with legacy module resolvers like `eslint-import-resolver-node` that don't support Node.js conditional exports. [PR 2256](https://github.com/shakacode/react_on_rails/pull/2256) by [ihabadham](https://github.com/ihabadham).
 
 - **SECURITY: CVE-2025-55182 - React Server Components RCE Vulnerability**: by updating `react-on-rails-rsc` peer dependency to `v19.0.3` which mitigates that vulnerability. Also, users should update `react` and `react-dom` package versions to `v19.0.1` to ensure complete mitigation. [PR 2175](https://github.com/shakacode/react_on_rails/pull/2175) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
@@ -115,7 +119,6 @@ Changes since the last non-beta release.
 ### Changed
 
 - [PR 511](https://github.com/shakacode/react_on_rails_pro/pull/511) by [Romex91](https://github.com/Romex91)
-
   - Set `bodyLimit` to 100 MB by default to fix error 413.
   - Add `fastifyServerOptions` to the config
 
@@ -262,7 +265,6 @@ React 18 is now supported! Check the [React on Rails CHANGELOG.md](https://githu
 ### Added
 
 - [PR 220](https://github.com/shakacode/react_on_rails_pro/pull/220) by [justin808](https://github.com/justin808).
-
   - **Add `ssr_timeout` configuration** so the Rails server will not wait more than this many seconds for a SSR request to return once issued.
   - Change default for `renderer_use_fallback_exec_js` to `false`.
   - Change default log level to info.
@@ -542,8 +544,8 @@ Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52
 - advanced error handling
 
 [HEAD compared to 3.2.1]: https://github.com/shakacode/react_on_rails_pro/compare/3.3.1...HEAD
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.2.0.beta.13...master
-[v16.2.0.beta.13]: https://github.com/shakacode/react_on_rails/compare/16.1.1...v16.2.0.beta.13
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.2.0.rc.0...master
+[v16.2.0.rc.0]: https://github.com/shakacode/react_on_rails/compare/16.1.1...v16.2.0.rc.0
 [4.0.0-rc.15]: https://github.com/shakacode/react_on_rails_pro/compare/4.0.0-rc.14...4.0.0-rc.15
 [4.0.0.rc.11]: https://github.com/shakacode/react_on_rails_pro/compare/4.0.0-rc.9...4.0.0-rc.11
 [4.0.0.rc.9]: https://github.com/shakacode/react_on_rails_pro/compare/4.0.0-rc.6...4.0.0-rc.9

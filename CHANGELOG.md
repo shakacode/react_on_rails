@@ -21,17 +21,9 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
-#### Fixed
+Changes since the last non-beta release.
 
-- **React Server Components Security Vulnerabilities (CVE-2025-55183, CVE-2025-55184, CVE-2025-67779)**: Upgraded React to v19.0.3 and react-on-rails-rsc to v19.0.4 to fix three critical security vulnerabilities in React Server Components. CVE-2025-55183 (CVSS 5.3) involved source code exposure when server function references were stringified, potentially leaking hardcoded secrets. CVE-2025-55184 and CVE-2025-67779 (both CVSS 7.5) involved denial of service attacks via cyclic promise references that could cause infinite loops and 100% CPU consumption. The fixes implement dual-layer cycle detection with a 1,000-iteration depth limit and override `toString()` methods on server references to return safe placeholders. Addresses [issue 2223](https://github.com/shakacode/react_on_rails/issues/2223). [PR 2233](https://github.com/shakacode/react_on_rails/pull/2233) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-
-### [16.2.0.beta.20] - 2025-12-12
-
-#### Fixed
-
-- **Hydration Mismatch on Multiple `reactOnRailsPageLoaded()` Calls**: Fixed hydration errors that occurred when `reactOnRailsPageLoaded()` was invoked multiple times for asynchronously loaded content. The fix tracks rendered components and skips re-rendering already-tracked components, while intelligently handling DOM node replacements by detecting when a node with the same ID is swapped out. Addresses [issue 2210](https://github.com/shakacode/react_on_rails/issues/2210). [PR 2211](https://github.com/shakacode/react_on_rails/pull/2211) by [justin808](https://github.com/justin808).
-
-### [16.2.0.beta.19] - 2025-12-10
+### [16.2.0.rc.0] - 2025-12-29
 
 Changes since the last non-beta release (16.1.1).
 
@@ -88,6 +80,12 @@ Changes since the last non-beta release (16.1.1).
 - **Improved Error Messages**: Error messages for version mismatches and package configuration issues now include package-manager-specific installation commands (npm, yarn, pnpm, bun). [PR #1881](https://github.com/shakacode/react_on_rails/pull/1881) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 #### Fixed
+
+- **Thread-Safe Connection Management (Pro)**: Fixed race conditions in `ReactOnRailsPro::Request` connection management using double-checked locking pattern. Prevents duplicate connections at startup and ensures exception-safe connection resets. [PR 2259](https://github.com/shakacode/react_on_rails/pull/2259) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+- **Legacy Module Resolver Compatibility (Pro)**: Added `main` field to `react-on-rails-pro` and `react-on-rails-pro-node-renderer` package.json files for compatibility with legacy module resolvers like `eslint-import-resolver-node` that don't support Node.js conditional exports. [PR 2256](https://github.com/shakacode/react_on_rails/pull/2256) by [ihabadham](https://github.com/ihabadham).
+
+- **Hydration Mismatch on Multiple `reactOnRailsPageLoaded()` Calls**: Fixed hydration errors that occurred when `reactOnRailsPageLoaded()` was invoked multiple times for asynchronously loaded content. The fix tracks rendered components and skips re-rendering already-tracked components, while intelligently handling DOM node replacements by detecting when a node with the same ID is swapped out. Addresses [issue 2210](https://github.com/shakacode/react_on_rails/issues/2210). [PR 2211](https://github.com/shakacode/react_on_rails/pull/2211) by [justin808](https://github.com/justin808).
 
 - **TypeScript processPromise Return Type**: Fixed TypeScript compilation error in `serverRenderReactComponent.ts` where the type checker couldn't properly narrow the union type after the `isValidElement` check. Added explicit type assertion to `FinalHtmlResult` to resolve the issue. [PR 2204](https://github.com/shakacode/react_on_rails/pull/2204) by [justin808](https://github.com/justin808).
 
@@ -198,6 +196,10 @@ To migrate to React on Rails Pro:
 - **Node Renderer Version Validation** (Pro users only): Remote node renderer now validates gem version at request time. Version mismatches in development return 412 Precondition Failed (production allows with warning). **Migration**: Ensure react_on_rails_pro gem and @shakacode-tools/react-on-rails-pro-node-renderer package versions match. [PR #1881](https://github.com/shakacode/react_on_rails/pull/1881) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 #### Security
+
+- **React Server Components Security Vulnerabilities (CVE-2025-55183, CVE-2025-55184, CVE-2025-67779)**: Upgraded React to v19.0.3 and react-on-rails-rsc to v19.0.4 to fix three critical security vulnerabilities in React Server Components. CVE-2025-55183 (CVSS 5.3) involved source code exposure when server function references were stringified, potentially leaking hardcoded secrets. CVE-2025-55184 and CVE-2025-67779 (both CVSS 7.5) involved denial of service attacks via cyclic promise references that could cause infinite loops and 100% CPU consumption. The fixes implement dual-layer cycle detection with a 1,000-iteration depth limit and override `toString()` methods on server references to return safe placeholders. Addresses [issue 2223](https://github.com/shakacode/react_on_rails/issues/2223). [PR 2233](https://github.com/shakacode/react_on_rails/pull/2233) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+- **Development Dependencies Security**: Addressed 58 Dependabot vulnerabilities in dev/test dependencies including critical issues in webpack (DOM clobbering XSS), nokogiri (libxml2 CVEs), activestorage, rack (5 DoS vulnerabilities), and jws (HMAC signature bypass). These changes only affect development environments—production gem code is unchanged. [PR 2261](https://github.com/shakacode/react_on_rails/pull/2261) by [ihabadham](https://github.com/ihabadham).
 
 - **Command Injection Protection**: Added security hardening to prevent potential command injection in package manager commands. [PR #1881](https://github.com/shakacode/react_on_rails/pull/1881) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
@@ -1870,9 +1872,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.2.0.beta.20...master
-[16.2.0.beta.20]: https://github.com/shakacode/react_on_rails/compare/v16.2.0.beta.19...v16.2.0.beta.20
-[16.2.0.beta.19]: https://github.com/shakacode/react_on_rails/compare/16.1.1...v16.2.0.beta.19
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.2.0.rc.0...master
+[16.2.0.rc.0]: https://github.com/shakacode/react_on_rails/compare/16.1.1...v16.2.0.rc.0
 [16.1.1]: https://github.com/shakacode/react_on_rails/compare/16.1.0...16.1.1
 [16.1.0]: https://github.com/shakacode/react_on_rails/compare/16.0.0...16.1.0
 [16.0.0]: https://github.com/shakacode/react_on_rails/compare/14.2.0...16.0.0

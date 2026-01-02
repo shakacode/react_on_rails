@@ -8,6 +8,7 @@
   "private": true,
   "dependencies": {
     "@babel/runtime": "^7.22.0",
+    "@dr.pogodin/react-helmet": "^3.0.4",
     "@hotwired/turbo-rails": "^8.0.4",
     "core-js": "3",
     "create-react-class": "^15.6.3",
@@ -18,7 +19,6 @@
     "node-libs-browser": "^2.2.1",
     "null-loader": "^4.0.0",
     "prop-types": "^15.7.2",
-    "@dr.pogodin/react-helmet": "^3.0.4",
     "react": "^19.0.3",
     "react-dom": "^19.0.3",
     "react-on-rails": "link:.yalc/react-on-rails",
@@ -58,10 +58,10 @@
     "swc-loader": "^0.2.6",
     "terser-webpack-plugin": "5.3.1",
     "url-loader": "^4.0.0",
-    "webpack": "5.72.0",
+    "webpack": "^5.94.0",
     "webpack-assets-manifest": "5",
     "webpack-cli": "4",
-    "webpack-dev-server": "^4.9.0",
+    "webpack-dev-server": "^5.2.1",
     "webpack-merge": "5"
   },
   "browser": {
