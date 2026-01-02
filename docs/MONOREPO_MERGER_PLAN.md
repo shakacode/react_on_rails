@@ -763,24 +763,42 @@ The `.github/dependabot.yml` file configures automated security updates. It must
 **Current Configuration (Pre-Phase 6):**
 
 ```yaml
-# Bundler entries
-- directory: '/react_on_rails' # Open source gem
-- directory: '/react_on_rails_pro' # Pro gem
-
 # NPM entries
-- directory: '/' # Root pnpm workspace
-- directory: '/spec/react_on_rails/dummy-for-generators' # Yarn-based generator dummy
+- directories:
+    - '/' # Root pnpm workspace
+    - '/react_on_rails/spec/dummy' # Open source dummy app
+    - '/react_on_rails_pro/spec/dummy' # Pro dummy app
+
+# Bundler entries
+- directories:
+    - '/react_on_rails' # Open source gem
+    - '/react_on_rails/spec/dummy' # Open source dummy app
+    - '/react_on_rails_pro' # Pro gem
+    - '/react_on_rails_pro/spec/dummy' # Pro dummy app
+    - '/react_on_rails_pro/spec/execjs-compatible-dummy' # ExecJS dummy app
+
+# GitHub Actions
+- directory: '/'
 ```
 
 **Final Configuration (Post-Phase 6):**
 
 ```yaml
-# Bundler entries
-- directory: '/' # Root now contains both gemspecs
+# NPM entries (final dummy app locations may be different or they may become part of the workspace and be removed here)
+- directories:
+    - '/' # Root pnpm workspace
+    - '/lib/react_on_rails/spec/dummy' # Open source dummy app
+    - '/lib/react_on_rails_pro/spec/dummy' # Pro dummy app
 
-# NPM entries (unchanged)
+# Bundler entries (or other final dummy app locations)
+- directories:
+    - '/' # Root now contains both gemspecs
+    - '/lib/react_on_rails/spec/dummy' # Open source dummy app
+    - '/lib/react_on_rails_pro/spec/dummy' # Pro dummy app
+    - '/lib/react_on_rails_pro/spec/execjs-compatible-dummy' # ExecJS dummy app
+
+# GitHub Actions (unchanged)
 - directory: '/'
-- directory: '/spec/react_on_rails/dummy-for-generators'
 ```
 
 **When to Update dependabot.yml:**
