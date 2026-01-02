@@ -8,6 +8,18 @@ jest.mock('../src/shared/licensePublicKey', () => ({
   PUBLIC_KEY: '',
 }));
 
+// Mock auto-refresh modules to prevent side effects
+jest.mock('../src/shared/licenseFetcher', () => ({
+  isAutoRefreshEnabled: jest.fn().mockReturnValue(false),
+}));
+jest.mock('../src/shared/licenseCache', () => ({
+  getCachedToken: jest.fn().mockReturnValue(null),
+}));
+jest.mock('../src/shared/licenseRefreshChecker', () => ({
+  maybeRefreshLicense: jest.fn().mockResolvedValue(undefined),
+  seedCacheIfNeeded: jest.fn(),
+}));
+
 interface LicenseData {
   sub?: string;
   exp: number;
@@ -17,9 +29,9 @@ interface LicenseData {
 }
 
 interface LicenseValidatorModule {
-  getValidatedLicenseData: () => LicenseData;
-  isEvaluation: () => boolean;
-  getGraceDaysRemaining: () => number | undefined;
+  getValidatedLicenseData: () => Promise<LicenseData>;
+  isEvaluation: () => Promise<boolean>;
+  getGraceDaysRemaining: () => Promise<number | undefined>;
   reset: () => void;
 }
 
@@ -68,6 +80,18 @@ describe('LicenseValidator', () => {
       PUBLIC_KEY: testPublicKey,
     }));
 
+    // Re-mock auto-refresh modules after resetModules
+    jest.doMock('../src/shared/licenseFetcher', () => ({
+      isAutoRefreshEnabled: jest.fn().mockReturnValue(false),
+    }));
+    jest.doMock('../src/shared/licenseCache', () => ({
+      getCachedToken: jest.fn().mockReturnValue(null),
+    }));
+    jest.doMock('../src/shared/licenseRefreshChecker', () => ({
+      maybeRefreshLicense: jest.fn().mockResolvedValue(undefined),
+      seedCacheIfNeeded: jest.fn(),
+    }));
+
     // Clear environment variable
     delete process.env.REACT_ON_RAILS_PRO_LICENSE;
 
@@ -82,7 +106,7 @@ describe('LicenseValidator', () => {
   });
 
   describe('getValidatedLicenseData', () => {
-    it('returns valid license data for valid license in ENV', () => {
+    it('returns valid license data for valid license in ENV', async () => {
       const validPayload = {
         sub: 'test@example.com',
         iat: Math.floor(Date.now() / 1000),
@@ -93,13 +117,13 @@ describe('LicenseValidator', () => {
       process.env.REACT_ON_RAILS_PRO_LICENSE = validToken;
 
       const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
-      const data = module.getValidatedLicenseData();
+      const data = await module.getValidatedLicenseData();
       expect(data).toBeDefined();
       expect(data.sub).toBe('test@example.com');
       expect(data.exp).toBe(validPayload.exp);
     });
 
-    it('calls process.exit for expired license in non-production', () => {
+    it('calls process.exit for expired license in non-production', async () => {
       const expiredPayload = {
         sub: 'test@example.com',
         iat: Math.floor(Date.now() / 1000) - 7200,
@@ -112,7 +136,7 @@ describe('LicenseValidator', () => {
       const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
 
       // Call getValidatedLicenseData which should trigger process.exit
-      module.getValidatedLicenseData();
+      await module.getValidatedLicenseData();
 
       // Verify process.exit was called with code 1
       expect(mockProcessExit).toHaveBeenCalledWith(1);
@@ -120,7 +144,7 @@ describe('LicenseValidator', () => {
       expect(mockConsoleError).toHaveBeenCalledWith(expect.stringContaining('FREE evaluation license'));
     });
 
-    it('calls process.exit for license missing exp field', () => {
+    it('calls process.exit for license missing exp field', async () => {
       const payloadWithoutExp = {
         sub: 'test@example.com',
         iat: Math.floor(Date.now() / 1000),
@@ -132,7 +156,7 @@ describe('LicenseValidator', () => {
 
       const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
 
-      module.getValidatedLicenseData();
+      await module.getValidatedLicenseData();
 
       expect(mockProcessExit).toHaveBeenCalledWith(1);
       expect(mockConsoleError).toHaveBeenCalledWith(
@@ -141,7 +165,7 @@ describe('LicenseValidator', () => {
       expect(mockConsoleError).toHaveBeenCalledWith(expect.stringContaining('FREE evaluation license'));
     });
 
-    it('calls process.exit for invalid signature', () => {
+    it('calls process.exit for invalid signature', async () => {
       // Generate a different key pair for invalid signature
       const wrongKeyPair = crypto.generateKeyPairSync('rsa', {
         modulusLength: 2048,
@@ -167,14 +191,14 @@ describe('LicenseValidator', () => {
 
       const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
 
-      module.getValidatedLicenseData();
+      await module.getValidatedLicenseData();
 
       expect(mockProcessExit).toHaveBeenCalledWith(1);
       expect(mockConsoleError).toHaveBeenCalledWith(expect.stringContaining('Invalid license signature'));
       expect(mockConsoleError).toHaveBeenCalledWith(expect.stringContaining('FREE evaluation license'));
     });
 
-    it('calls process.exit for missing license', () => {
+    it('calls process.exit for missing license', async () => {
       delete process.env.REACT_ON_RAILS_PRO_LICENSE;
 
       // Mock fs.existsSync to return false (no config file)
@@ -182,14 +206,14 @@ describe('LicenseValidator', () => {
 
       const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
 
-      module.getValidatedLicenseData();
+      await module.getValidatedLicenseData();
 
       expect(mockProcessExit).toHaveBeenCalledWith(1);
       expect(mockConsoleError).toHaveBeenCalledWith(expect.stringContaining('No license found'));
       expect(mockConsoleError).toHaveBeenCalledWith(expect.stringContaining('FREE evaluation license'));
     });
 
-    it('caches validation result', () => {
+    it('caches validation result', async () => {
       const validPayload = {
         sub: 'test@example.com',
         iat: Math.floor(Date.now() / 1000),
@@ -202,20 +226,20 @@ describe('LicenseValidator', () => {
       const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
 
       // First call
-      const data1 = module.getValidatedLicenseData();
+      const data1 = await module.getValidatedLicenseData();
       expect(data1.sub).toBe('test@example.com');
 
       // Change ENV (shouldn't affect cached result)
       delete process.env.REACT_ON_RAILS_PRO_LICENSE;
 
       // Second call should use cache
-      const data2 = module.getValidatedLicenseData();
+      const data2 = await module.getValidatedLicenseData();
       expect(data2.sub).toBe('test@example.com');
     });
   });
 
   describe('isEvaluation', () => {
-    it('returns true for free license', () => {
+    it('returns true for free license', async () => {
       const freePayload = {
         sub: 'test@example.com',
         iat: Math.floor(Date.now() / 1000),
@@ -227,10 +251,10 @@ describe('LicenseValidator', () => {
       process.env.REACT_ON_RAILS_PRO_LICENSE = validToken;
 
       const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
-      expect(module.isEvaluation()).toBe(true);
+      expect(await module.isEvaluation()).toBe(true);
     });
 
-    it('returns false for paid license', () => {
+    it('returns false for paid license', async () => {
       const paidPayload = {
         sub: 'test@example.com',
         iat: Math.floor(Date.now() / 1000),
@@ -242,12 +266,12 @@ describe('LicenseValidator', () => {
       process.env.REACT_ON_RAILS_PRO_LICENSE = validToken;
 
       const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
-      expect(module.isEvaluation()).toBe(false);
+      expect(await module.isEvaluation()).toBe(false);
     });
   });
 
   describe('reset', () => {
-    it('clears cached validation data', () => {
+    it('clears cached validation data', async () => {
       const validPayload = {
         sub: 'test@example.com',
         iat: Math.floor(Date.now() / 1000),
@@ -260,14 +284,14 @@ describe('LicenseValidator', () => {
       const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
 
       // Validate once to cache
-      module.getValidatedLicenseData();
+      await module.getValidatedLicenseData();
 
       // Reset and change license
       module.reset();
       delete process.env.REACT_ON_RAILS_PRO_LICENSE;
 
       // Should fail now since license is missing and cache was cleared
-      module.getValidatedLicenseData();
+      await module.getValidatedLicenseData();
       expect(mockProcessExit).toHaveBeenCalledWith(1);
     });
   });
