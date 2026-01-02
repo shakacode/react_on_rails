@@ -476,6 +476,9 @@ After the initial merge, the following CI adjustments may be needed:
 - [ ] Remove empty `react_on_rails_pro/` directory
 - [ ] Update all require paths in Ruby code
 - [ ] Update gemspec file paths and dependencies
+- [ ] **Update `.github/dependabot.yml`** to reflect final directory structure:
+  - Remove `/react_on_rails_pro` bundler entry (directory no longer exists)
+  - Update bundler directory from `/react_on_rails` to `/` (root now has both gemspecs)
 
 **License Compliance:**
 
@@ -740,6 +743,70 @@ license-compliance:
     - name: Run License Compliance Check
       run: ruby script/check-license-compliance.rb
 ```
+
+## Configuration Files
+
+When directories are moved or renamed during the merger, the following configuration files must be updated to reflect the new structure:
+
+| File                     | What to Update                                  |
+| ------------------------ | ----------------------------------------------- |
+| `.github/dependabot.yml` | `directory:` entries for bundler/npm ecosystems |
+| `.rubocop.yml`           | Exclusion patterns                              |
+| `eslint.config.ts`       | Ignore patterns                                 |
+| `.prettierignore`        | Ignored directories                             |
+| `knip.ts`                | Ignore patterns                                 |
+
+### Dependabot Configuration
+
+The `.github/dependabot.yml` file configures automated security updates. It must be kept in sync with the repository structure.
+
+**Current Configuration (Pre-Phase 6):**
+
+```yaml
+# NPM entries
+- directories:
+    - '/' # Root pnpm workspace
+    - '/react_on_rails/spec/dummy' # Open source dummy app
+    - '/react_on_rails_pro/spec/dummy' # Pro dummy app
+
+# Bundler entries
+- directories:
+    - '/react_on_rails' # Open source gem
+    - '/react_on_rails/spec/dummy' # Open source dummy app
+    - '/react_on_rails_pro' # Pro gem
+    - '/react_on_rails_pro/spec/dummy' # Pro dummy app
+    - '/react_on_rails_pro/spec/execjs-compatible-dummy' # ExecJS dummy app
+
+# GitHub Actions
+- directory: '/'
+```
+
+**Final Configuration (Post-Phase 6):**
+
+```yaml
+# NPM entries (final dummy app locations may be different or they may become part of the workspace and be removed here)
+- directories:
+    - '/' # Root pnpm workspace
+    - '/lib/react_on_rails/spec/dummy' # Open source dummy app
+    - '/lib/react_on_rails_pro/spec/dummy' # Pro dummy app
+
+# Bundler entries (or other final dummy app locations)
+- directories:
+    - '/' # Root now contains both gemspecs
+    - '/lib/react_on_rails/spec/dummy' # Open source dummy app
+    - '/lib/react_on_rails_pro/spec/dummy' # Pro dummy app
+    - '/lib/react_on_rails_pro/spec/execjs-compatible-dummy' # ExecJS dummy app
+
+# GitHub Actions (unchanged)
+- directory: '/'
+```
+
+**When to Update dependabot.yml:**
+
+- When Gemfile locations change
+- When package.json files are added/moved/removed
+- When new workspaces are added
+- When directories containing lock files are restructured
 
 ## Risk Management
 
