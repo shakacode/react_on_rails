@@ -254,8 +254,8 @@ jobs:
           echo "🚀 Starting production server..."
           cd react_on_rails/spec/dummy
 
-          # Start server in background (Core uses rails directly, not foreman)
-          bin/prod &
+          # Start server in background with high priority for consistent performance
+          sudo nice -n -20 bin/prod &
           echo "Server started in background"
 
           # Wait for server to be ready (max 30 seconds)
@@ -283,7 +283,8 @@ jobs:
           set -e  # Exit on any error
           echo "🏃 Running Core benchmark suite..."
 
-          if ! ruby benchmarks/bench.rb; then
+          # Run with elevated priority (server has -20, this has -10)
+          if ! sudo nice -n -10 ruby benchmarks/bench.rb; then
             echo "❌ ERROR: Benchmark execution failed"
             exit 1
           fi
@@ -407,8 +408,8 @@ jobs:
           echo "🚀 Starting Pro production server..."
           cd react_on_rails_pro/spec/dummy
 
-          # Start server in background
-          bin/prod &
+          # Start server in background with high priority for consistent performance
+          sudo nice -n -20 bin/prod &
           echo "Server started in background"
 
           # Wait for server to be ready (max 30 seconds)
@@ -436,7 +437,8 @@ jobs:
           set -e
           echo "🏃 Running Pro benchmark suite..."
 
-          if ! PRO=true ruby benchmarks/bench.rb; then
+          # Run with elevated priority (server has -20, this has -10)
+          if ! sudo nice -n -10 PRO=true ruby benchmarks/bench.rb; then
             echo "❌ ERROR: Benchmark execution failed"
             exit 1
           fi
@@ -450,7 +452,8 @@ jobs:
           set -e
           echo "🏃 Running Pro Node Renderer benchmark suite..."
 
-          if ! ruby benchmarks/bench-node-renderer.rb; then
+          # Run with elevated priority (server has -20, this has -10)
+          if ! sudo nice -n -10 ruby benchmarks/bench-node-renderer.rb; then
             echo "❌ ERROR: Node Renderer benchmark execution failed"
             exit 1
           fi
