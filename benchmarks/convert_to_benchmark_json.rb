@@ -4,7 +4,7 @@
 # Converts benchmark summary files to JSON format for github-action-benchmark
 # Outputs a single file with all metrics using customSmallerIsBetter:
 #   - benchmark.json (customSmallerIsBetter)
-#     - RPS values are negated (so higher RPS = lower negative value = better)
+#     - RPS values are converted to ms/request (1000/RPS) so lower is better
 #     - Latencies are kept as-is (lower is better)
 #     - Failed percentage is kept as-is (lower is better)
 #
@@ -18,7 +18,16 @@ BENCH_RESULTS_DIR = "bench_results"
 PREFIX = ARGV[0] || ""
 APPEND_MODE = ARGV.include?("--append")
 
-# rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+# Try to parse a string as a float, return nil if not a valid number
+def parse_float(str)
+  return nil if str.nil? || str.empty? || str == "MISSING" || str == "FAILED"
+
+  Float(str)
+rescue ArgumentError, TypeError
+  nil
+end
+
+# rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
 
 # Parse a summary file and return array of hashes with metrics
 # Expected format (tab-separated):
@@ -43,14 +52,13 @@ def parse_summary_file(file_path, prefix: "")
     bundle_suffix = row["Bundle"] ? " (#{row['Bundle']})" : ""
     full_name = "#{prefix}#{name}#{bundle_suffix}"
 
-    # Skip if we got FAILED values
-    next if row["RPS"] == "FAILED"
+    # Parse numeric values, skip row if RPS can't be parsed (FAILED, MISSING, etc.)
+    rps = parse_float(row["RPS"])
+    next if rps.nil?
 
-    # Parse numeric values
-    rps = row["RPS"]&.to_f
-    p50 = row["p50(ms)"]&.to_f
-    p90 = row["p90(ms)"]&.to_f
-    p99 = row["p99(ms)"]&.to_f
+    p50 = parse_float(row["p50(ms)"])
+    p90 = parse_float(row["p90(ms)"])
+    p99 = parse_float(row["p99(ms)"])
 
     # Calculate failed percentage from Status column
     failed_pct = calculate_failed_percentage(row["Status"])
@@ -68,12 +76,12 @@ def parse_summary_file(file_path, prefix: "")
   results
 end
 
-# rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+# rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
 
 # Calculate failed request percentage from status string
 # Status format: "200=7508,302=100,5xx=10" etc.
 def calculate_failed_percentage(status_str)
-  return 0.0 if status_str.nil? || status_str == "MISSING"
+  return 0.0 if status_str.nil? || status_str == "MISSING" || status_str == "FAILED"
 
   total = 0
   failed = 0
@@ -92,43 +100,34 @@ def calculate_failed_percentage(status_str)
   (failed.to_f / total * 100).round(2)
 end
 
+# Add a metric to the output array if the value is not nil
+def add_metric(output, name:, unit:, value:)
+  return if value.nil?
+
+  output << { name: name, unit: unit, value: value }
+end
+
 # Convert all results to customSmallerIsBetter format
-# RPS is negated (higher RPS = lower negative value = better)
+# RPS is converted to ms/request (1000/RPS) so lower values mean higher throughput
 # Latencies and failure rates are kept as-is (lower is better)
 def to_unified_json(results)
   output = []
 
   results.each do |r|
-    # Add negated RPS (higher RPS becomes lower negative value, which is better)
-    output << {
-      name: "#{r[:name]} - RPS",
-      unit: "requests/sec (negated)",
-      value: -r[:rps]
-    }
+    base_name = r[:name]
+    throughput_value = r[:rps].positive? ? (1000.0 / r[:rps]).round(4) : nil
 
-    # Add latencies (lower is better)
-    output << {
-      name: "#{r[:name]} - p50 latency",
-      unit: "ms",
-      value: r[:p50]
-    }
-    output << {
-      name: "#{r[:name]} - p90 latency",
-      unit: "ms",
-      value: r[:p90]
-    }
-    output << {
-      name: "#{r[:name]} - p99 latency",
-      unit: "ms",
-      value: r[:p99]
-    }
+    # Convert RPS to ms/request (1000/RPS) - lower is better
+    # This preserves correct alert threshold behavior (regression = higher value)
+    add_metric(output, name: "#{base_name} - throughput", unit: "ms/request", value: throughput_value)
+
+    # Add latencies (lower is better) - only if we have valid values
+    add_metric(output, name: "#{base_name} - p50 latency", unit: "ms", value: r[:p50])
+    add_metric(output, name: "#{base_name} - p90 latency", unit: "ms", value: r[:p90])
+    add_metric(output, name: "#{base_name} - p99 latency", unit: "ms", value: r[:p99])
 
     # Add failure percentage (lower is better)
-    output << {
-      name: "#{r[:name]} - failed requests",
-      unit: "%",
-      value: r[:failed_pct]
-    }
+    add_metric(output, name: "#{base_name} - failed requests", unit: "%", value: r[:failed_pct])
   end
 
   output
@@ -148,8 +147,8 @@ if File.exist?(node_renderer_summary)
 end
 
 if all_results.empty?
-  puts "No benchmark results found to convert"
-  exit 0
+  warn "ERROR: All benchmarks failed - no valid results to convert"
+  exit 1
 end
 
 # Convert current results to JSON
@@ -166,8 +165,8 @@ else
   puts "Created #{unified_json.length} new metrics"
 end
 
-# Write unified JSON (all metrics using customSmallerIsBetter with negated RPS)
+# Write unified JSON (all metrics using customSmallerIsBetter)
 File.write(output_path, JSON.pretty_generate(unified_json))
 puts "Wrote #{unified_json.length} total metrics to benchmark.json (from #{all_results.length} benchmark results)"
-puts "  - RPS values are negated (higher RPS = lower negative value = better)"
-puts "  - Latencies and failure rates use original values (lower is better)"
+puts "  - Throughput: ms/request (1000/RPS) - lower is better"
+puts "  - Latencies and failure rates: original values - lower is better"
