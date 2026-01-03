@@ -578,4 +578,167 @@ describe InstallGenerator, type: :generator do
       end
     end
   end
+
+  # Pro/RSC prerequisite validation tests
+
+  context "when using --pro flag without Pro gem installed" do
+    let(:install_generator) { described_class.new([], { pro: true }) }
+
+    specify "missing_pro_gem? returns true and error mentions --pro flag" do
+      allow(Gem).to receive(:loaded_specs).and_return({})
+      allow(install_generator).to receive(:gem_in_lockfile?).with("react_on_rails_pro").and_return(false)
+
+      expect(install_generator.send(:missing_pro_gem?)).to be true
+      error_text = GeneratorMessages.messages.join("\n")
+      expect(error_text).to include("--pro")
+      expect(error_text).to include("react_on_rails_pro")
+      expect(error_text).to include("Try Pro free!")
+    end
+  end
+
+  context "when using --rsc flag without Pro gem installed" do
+    let(:install_generator) { described_class.new([], { rsc: true }) }
+
+    specify "missing_pro_gem? returns true and error mentions --rsc flag" do
+      allow(Gem).to receive(:loaded_specs).and_return({})
+      allow(install_generator).to receive(:gem_in_lockfile?).with("react_on_rails_pro").and_return(false)
+
+      expect(install_generator.send(:missing_pro_gem?)).to be true
+      error_text = GeneratorMessages.messages.join("\n")
+      expect(error_text).to include("--rsc")
+    end
+  end
+
+  context "when using --pro flag with Pro gem in Gem.loaded_specs" do
+    let(:install_generator) { described_class.new([], { pro: true }) }
+
+    specify "missing_pro_gem? returns false" do
+      allow(Gem).to receive(:loaded_specs).and_return({ "react_on_rails_pro" => double })
+
+      expect(install_generator.send(:missing_pro_gem?)).to be false
+    end
+  end
+
+  context "when using --pro flag with Pro gem in Gemfile.lock" do
+    let(:install_generator) { described_class.new([], { pro: true }) }
+
+    specify "missing_pro_gem? returns false" do
+      allow(Gem).to receive(:loaded_specs).and_return({})
+      allow(install_generator).to receive(:gem_in_lockfile?).with("react_on_rails_pro").and_return(true)
+
+      expect(install_generator.send(:missing_pro_gem?)).to be false
+    end
+  end
+
+  context "when not using --pro or --rsc flags" do
+    let(:install_generator) { described_class.new }
+
+    specify "missing_pro_gem? returns false without checking gem" do
+      expect(install_generator.send(:missing_pro_gem?)).to be false
+    end
+  end
+
+  # React version detection tests
+
+  context "when package.json has standard React version" do
+    let(:install_generator) { described_class.new }
+
+    specify "detect_react_version extracts version" do
+      allow(install_generator).to receive(:package_json).and_return({ "dependencies" => { "react" => "19.0.3" } })
+
+      expect(install_generator.send(:detect_react_version)).to eq("19.0.3")
+    end
+  end
+
+  context "when package.json has React version with caret prefix" do
+    let(:install_generator) { described_class.new }
+
+    specify "detect_react_version extracts version without prefix" do
+      allow(install_generator).to receive(:package_json).and_return({ "dependencies" => { "react" => "^19.0.3" } })
+
+      expect(install_generator.send(:detect_react_version)).to eq("19.0.3")
+    end
+  end
+
+  context "when package.json has React as workspace protocol" do
+    let(:install_generator) { described_class.new }
+
+    specify "detect_react_version returns nil" do
+      allow(install_generator).to receive(:package_json).and_return({ "dependencies" => { "react" => "workspace:*" } })
+
+      expect(install_generator.send(:detect_react_version)).to be_nil
+    end
+  end
+
+  context "when package.json is not available" do
+    let(:install_generator) { described_class.new }
+
+    specify "detect_react_version returns nil" do
+      allow(install_generator).to receive(:package_json).and_return(nil)
+
+      expect(install_generator.send(:detect_react_version)).to be_nil
+    end
+  end
+
+  # RSC React version warning tests
+
+  context "when using --rsc with React 19.0.3" do
+    let(:install_generator) { described_class.new([], { rsc: true }) }
+
+    specify "warn_about_react_version_for_rsc does not add warning" do
+      allow(install_generator).to receive(:detect_react_version).and_return("19.0.3")
+
+      install_generator.send(:warn_about_react_version_for_rsc)
+      expect(GeneratorMessages.messages.join("\n")).not_to include("⚠️")
+    end
+  end
+
+  context "when using --rsc with React 19.1.0" do
+    let(:install_generator) { described_class.new([], { rsc: true }) }
+
+    specify "warn_about_react_version_for_rsc adds version incompatibility warning" do
+      allow(install_generator).to receive(:detect_react_version).and_return("19.1.0")
+
+      install_generator.send(:warn_about_react_version_for_rsc)
+      warning_text = GeneratorMessages.messages.join("\n")
+      expect(warning_text).to include("RSC requires React 19.0.x")
+      expect(warning_text).to include("detected: 19.1.0")
+    end
+  end
+
+  context "when using --rsc with React 18.2.0" do
+    let(:install_generator) { described_class.new([], { rsc: true }) }
+
+    specify "warn_about_react_version_for_rsc adds version incompatibility warning" do
+      allow(install_generator).to receive(:detect_react_version).and_return("18.2.0")
+
+      install_generator.send(:warn_about_react_version_for_rsc)
+      warning_text = GeneratorMessages.messages.join("\n")
+      expect(warning_text).to include("RSC requires React 19.0.x")
+    end
+  end
+
+  context "when using --rsc with React 19.0.0" do
+    let(:install_generator) { described_class.new([], { rsc: true }) }
+
+    specify "warn_about_react_version_for_rsc adds CVE security warning" do
+      allow(install_generator).to receive(:detect_react_version).and_return("19.0.0")
+
+      install_generator.send(:warn_about_react_version_for_rsc)
+      warning_text = GeneratorMessages.messages.join("\n")
+      expect(warning_text).to include("security vulnerabilities")
+      expect(warning_text).to include("CVE")
+    end
+  end
+
+  context "when not using --rsc flag" do
+    let(:install_generator) { described_class.new }
+
+    specify "warn_about_react_version_for_rsc does not run" do
+      allow(install_generator).to receive(:detect_react_version).and_return("18.2.0")
+
+      install_generator.send(:warn_about_react_version_for_rsc)
+      expect(GeneratorMessages.messages.join("\n")).not_to include("RSC")
+    end
+  end
 end
