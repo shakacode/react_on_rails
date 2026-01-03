@@ -129,6 +129,7 @@ module ReactOnRails
         end
         setup_react_dependencies
         warn_about_react_version_for_rsc
+        setup_pro if use_pro?
       end
 
       def setup_react_dependencies
@@ -510,9 +511,92 @@ module ReactOnRails
         puts Rainbow("✅ Created tsconfig.json").green
       end
 
-      # Removed: Shakapacker auto-installation logic (now explicit dependency)
+      # Pro setup methods
 
-      # Removed: Shakapacker 8+ is now required as explicit dependency
+      def setup_pro
+        puts Rainbow("\n#{'=' * 80}").cyan
+        puts Rainbow("🚀 REACT ON RAILS PRO SETUP").cyan.bold
+        puts Rainbow("=" * 80).cyan
+
+        create_pro_initializer
+        create_node_renderer
+        add_pro_to_procfile
+        # NOTE: Pro npm dependencies are added in add_js_dependencies (js_dependency_manager.rb)
+        # to ensure single npm install run with all dependencies
+
+        puts Rainbow("=" * 80).cyan
+        puts Rainbow("✅ React on Rails Pro setup complete!").green
+        puts Rainbow("=" * 80).cyan
+      end
+
+      def create_pro_initializer
+        initializer_path = "config/initializers/react_on_rails_pro.rb"
+
+        if File.exist?(File.join(destination_root, initializer_path))
+          puts Rainbow("ℹ️  #{initializer_path} already exists, skipping").yellow
+          return
+        end
+
+        puts Rainbow("📝 Creating React on Rails Pro initializer...").yellow
+
+        pro_template_path = "templates/pro/base/config/initializers/react_on_rails_pro.rb.tt"
+        template(pro_template_path, initializer_path)
+
+        puts Rainbow("✅ Created #{initializer_path}").green
+      end
+
+      def create_node_renderer
+        node_renderer_path = "client/node-renderer.js"
+
+        if File.exist?(File.join(destination_root, node_renderer_path))
+          puts Rainbow("ℹ️  #{node_renderer_path} already exists, skipping").yellow
+          return
+        end
+
+        puts Rainbow("📝 Creating Node Renderer bootstrap...").yellow
+
+        # Ensure client directory exists
+        FileUtils.mkdir_p("client")
+
+        template_path = "templates/pro/base/client/node-renderer.js"
+        copy_file(template_path, node_renderer_path)
+
+        puts Rainbow("✅ Created #{node_renderer_path}").green
+      end
+
+      def add_pro_to_procfile
+        procfile_path = File.join(destination_root, "Procfile.dev")
+
+        # Check if Procfile.dev exists
+        unless File.exist?(procfile_path)
+          GeneratorMessages.add_warning(<<~MSG.strip)
+            ⚠️  Procfile.dev not found. Skipping Node Renderer process addition.
+
+            You'll need to add the Node Renderer to your process manager manually:
+              node-renderer: RENDERER_LOG_LEVEL=info RENDERER_PORT=3800 node client/node-renderer.js
+          MSG
+          return
+        end
+
+        # Check if node-renderer is already in Procfile.dev (idempotency)
+        if File.read(procfile_path).include?("node-renderer:")
+          puts Rainbow("ℹ️  Node Renderer already in Procfile.dev, skipping").yellow
+          return
+        end
+
+        puts Rainbow("📝 Adding Node Renderer to Procfile.dev...").yellow
+
+        node_renderer_line = <<~PROCFILE
+
+          # React on Rails Pro - Node Renderer for SSR
+          node-renderer: RENDERER_LOG_LEVEL=info RENDERER_PORT=3800 node client/node-renderer.js
+        PROCFILE
+
+        append_to_file("Procfile.dev", node_renderer_line)
+
+        puts Rainbow("✅ Added Node Renderer to Procfile.dev").green
+      end
+
       # rubocop:enable Metrics/ClassLength
     end
   end

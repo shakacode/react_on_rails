@@ -106,6 +106,13 @@ module ReactOnRails
         swc-loader
       ].freeze
 
+      # React on Rails Pro dependencies (only installed when --pro or --rsc flag is used)
+      # These packages are published publicly on npmjs.org but require a license for production use
+      PRO_DEPENDENCIES = %w[
+        react-on-rails-pro
+        react-on-rails-pro-node-renderer
+      ].freeze
+
       private
 
       def setup_js_dependencies
@@ -127,6 +134,8 @@ module ReactOnRails
         add_rspack_dependencies if respond_to?(:options) && options&.rspack?
         # SWC dependencies are only added when SWC is the configured transpiler
         add_swc_dependencies if using_swc?
+        # Pro dependencies are only added when --pro or --rsc flag is used
+        add_pro_dependencies if respond_to?(:use_pro?) && use_pro?
         # Dev dependencies vary based on bundler choice
         add_dev_dependencies
       end
@@ -277,6 +286,25 @@ module ReactOnRails
 
           You can install them manually by running:
             npm install --save-dev #{TYPESCRIPT_DEPENDENCIES.join(' ')}
+        MSG
+      end
+
+      def add_pro_dependencies
+        puts "Installing React on Rails Pro dependencies..."
+        return if add_packages(PRO_DEPENDENCIES)
+
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Failed to add React on Rails Pro dependencies.
+
+          You can install them manually by running:
+            npm install #{PRO_DEPENDENCIES.join(' ')}
+        MSG
+      rescue StandardError => e
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Error adding React on Rails Pro dependencies: #{e.message}
+
+          You can install them manually by running:
+            npm install #{PRO_DEPENDENCIES.join(' ')}
         MSG
       end
 
