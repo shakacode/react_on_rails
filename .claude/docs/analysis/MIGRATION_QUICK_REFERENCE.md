@@ -114,7 +114,7 @@ react_on_rails_pro/packages/    →   packages/react-on-rails-pro/lib/
 ```
 Path Migration Testing
 - [ ] Verify all paths in package-scripts.yml
-- [ ] Test yarn run yalc.publish manually
+- [ ] Test yarn run yalc:publish manually
 - [ ] Check package.json main/exports/files fields
 - [ ] Search for hardcoded node_package/ references
 
@@ -158,7 +158,7 @@ Documentation Testing
 ```bash
 yarn run prepack  # Test prepack script
 ls -la lib/ReactOnRails.full.js  # Verify path exists
-yarn run yalc.publish  # Manual test
+yarn run yalc:publish  # Manual test
 ```
 
 ### Issue: Workspace packages not building

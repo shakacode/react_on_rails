@@ -2,7 +2,7 @@
 
 # ⚠️ TEST CONFIGURATION - Do not copy directly for production apps
 # This is the Pro dummy app configuration used for testing React on Rails Pro features.
-# See docs/api-reference/configuration.md for production configuration guidance.
+# See docs/configuration/configuration.md for production configuration guidance.
 
 # Advanced: Custom rendering extension to add values to railsContext
 module RenderingExtension
@@ -55,6 +55,6 @@ ReactOnRails.configure do |config|
 
   # NOTE: build_test_command and webpack_generated_files are commented out
   # because we've set test.compile to true in shakapacker.yml
-  # config.build_test_command = "yarn run build:test"
+  # config.build_test_command = "pnpm run build:test"
   # config.webpack_generated_files = %w[server-bundle.js manifest.json]
 end

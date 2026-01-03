@@ -63,7 +63,7 @@ React on Rails is configured in `config/initializers/react_on_rails.rb`:
 - Logging options
 - Auto-bundling settings
 
-For complete configuration options, see the [Configuration Reference](../api-reference/configuration.md).
+For complete configuration options, see the [Configuration Reference](../configuration/configuration.md).
 
 For all view helper options (props, HTML options, tracing, etc.), see the [View Helpers API](../api-reference/view-helpers-api.md).
 
@@ -241,7 +241,7 @@ Now that you understand the core concepts, here are recommended paths forward:
 
 - **[View Helpers API](../api-reference/view-helpers-api.md)** - Complete `react_component` options
 - **[JavaScript API](../api-reference/javascript-api.md)** - ReactOnRails JavaScript methods
-- **[Configuration](../api-reference/configuration.md)** - All configuration options
+- **[Configuration](../configuration/configuration.md)** - All configuration options
 
 ---
 

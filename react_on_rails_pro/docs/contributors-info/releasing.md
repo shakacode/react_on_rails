@@ -33,6 +33,7 @@ rake release[17.0.0,false,verdaccio]
 ```
 
 This unified script releases all 5 packages together:
+
 - react-on-rails (NPM)
 - react-on-rails-pro (NPM)
 - react-on-rails-pro-node-renderer (NPM)

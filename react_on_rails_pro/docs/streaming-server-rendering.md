@@ -112,12 +112,12 @@ end
 
 You can test your application by running `rails server` and navigating to the appropriate route.
 
-
 6. **What Happens During Streaming**
 
 When a user visits the page, they'll experience the following sequence:
 
 1. The initial HTML shell is sent immediately, including:
+
    - The page layout
    - Any static content (like the `<h1>` and footer)
    - Placeholder content for the React component (typically a loading state)
@@ -152,9 +152,7 @@ For example, with our `MyStreamingComponent`, the sequence might be:
 
 <script>
   // This implementation is slightly simplified
-  document.getElementById('s0').replaceChildren(
-    document.getElementById('b0')
-  );
+  document.getElementById('s0').replaceChildren(document.getElementById('b0'));
 </script>
 ```
 
@@ -165,11 +163,13 @@ Streaming SSR is particularly valuable in specific scenarios. Here's when to con
 ### Ideal Use Cases
 
 1. **Data-Heavy Pages**
+
    - Pages that fetch data from multiple sources
    - Dashboard-style layouts where different sections can load independently
    - Content that requires heavy processing or computation
 
 2. **Progressive Enhancement**
+
    - When you want users to see and interact with parts of the page while others load
    - For improving perceived performance on slower connections
    - When different parts of your page have different priority levels
@@ -182,6 +182,7 @@ Streaming SSR is particularly valuable in specific scenarios. Here's when to con
 ### Best Practices for Streaming
 
 1. **Component Structure**
+
    ```jsx
    // Good: Independent sections that can stream separately
    <Layout>

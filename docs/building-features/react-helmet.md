@@ -3,7 +3,13 @@
 ## Installation and general usage
 
 See [nfl/react-helmet](https://github.com/nfl/react-helmet) for details on how to use this package.
-Run `yarn add react-helmet` to add this package to your application.
+Add this package to your application:
+
+```bash
+yarn add react-helmet
+# or: npm install react-helmet
+# or: pnpm add react-helmet
+```
 
 ## Example
 

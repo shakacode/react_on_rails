@@ -40,11 +40,11 @@ end
 > After enabling RSC support, you must add the `'use client';` directive at the top of your JavaScript entry points (packs) that are not yet migrated to support Server Components.
 >
 > This directive tells React that these files should be treated as client components. You don't need to add this directive to all JavaScript files - only the entry points. Any file imported by a file marked with `'use client';` will automatically be treated as a client component as well. Without this directive, React will assume these files contain Server Components, which will cause errors if the components use client-side features like:
+>
 > - `useState` or other state hooks
 > - `useEffect` or other effect hooks
 > - Event handlers (onClick, onChange, etc.)
 > - Browser APIs
-
 
 For example:
 
@@ -55,7 +55,6 @@ For example:
 // ... existing code ...
 ```
 
-
 3. Create a new Webpack configuration to generate React Server Components bundles (RSC bundles) (usually named `rsc-bundle.js`).
 
 RSC bundle is a clone of the server bundle `server-bundle.js` but we just add the RSC loader `react-on-rails-rsc/WebpackLoader` to the used loaders.
@@ -63,6 +62,7 @@ RSC bundle is a clone of the server bundle `server-bundle.js` but we just add th
 You can check the [How React Server Components work](how-react-server-components-work.md) for more information about the RSC loader (It's better to read it after reading this article).
 
 Create a new file `config/webpack/rscWebpackConfig.js`:
+
 ```js
 // use the same config as serverWebpackConfig.js but add the RSC loader
 const serverWebpackConfig = require('./serverWebpackConfig');
@@ -95,7 +95,7 @@ const configureRsc = () => {
   const rules = rscConfig.module.rules;
   rules.forEach((rule) => {
     if (Array.isArray(rule.use)) {
-      // Ensure this loader runs before the JS loader (Babel loader in this case) to properly exclude client components from the RSC bundle.  
+      // Ensure this loader runs before the JS loader (Babel loader in this case) to properly exclude client components from the RSC bundle.
       // If your project uses a different JS loader, insert it before that loader instead.
       const babelLoader = extractLoader(rule, 'babel-loader');
       if (babelLoader) {
@@ -240,13 +240,13 @@ async function ReactServerComponent() {
     uptime: Math.floor(os.uptime() / 3600), // Convert to hours
     totalMemory: Math.floor(os.totalmem() / (1024 * 1024 * 1024)), // Convert to GB
     freeMemory: Math.floor(os.freemem() / (1024 * 1024 * 1024)), // Convert to GB
-    cpus: os.cpus().length
+    cpus: os.cpus().length,
   };
 
   return (
     <div className="server-component-demo">
       <h2>React Server Component Demo</h2>
-      
+
       <section>
         <h3>Date Calculations (using moment.js)</h3>
         <p>Date Range: {formattedDateRange}</p>
@@ -277,16 +277,17 @@ async function ReactServerComponent() {
       </section>
 
       <div className="note">
-        <p><strong>Note:</strong> The heavy libraries (moment.js, lodash) and Node.js 
-        modules (os) used in this component stay on the server and are not shipped 
-        to the client, reducing the client bundle size significantly.</p>
+        <p>
+          <strong>Note:</strong> The heavy libraries (moment.js, lodash) and Node.js modules (os) used in this
+          component stay on the server and are not shipped to the client, reducing the client bundle size
+          significantly.
+        </p>
       </div>
     </div>
   );
 }
 
 export default ReactServerComponent;
-
 ```
 
 ## Create a React Server Component Page
@@ -318,7 +319,7 @@ If you didn't enable `auto_load_bundle`, you need to register the React Server C
 
 ```js
 // client/app/packs/server-bundle.js
-import registerServerComponent from 'react-on-rails/registerServerComponent/server';
+import registerServerComponent from 'react-on-rails-pro/registerServerComponent/server';
 import ReactServerComponentPage from './components/ReactServerComponentPage';
 
 registerServerComponent({
@@ -328,22 +329,22 @@ registerServerComponent({
 
 ```js
 // client/app/packs/client-bundle.js
-import registerServerComponent from 'react-on-rails/registerServerComponent/client';
+import registerServerComponent from 'react-on-rails-pro/registerServerComponent/client';
 
-registerServerComponent(
-  { rscPayloadGenerationUrlPath: 'rsc_payload/' },
-  'ReactServerComponentPage',
-);
+registerServerComponent({ rscPayloadGenerationUrlPath: 'rsc_payload/' }, 'ReactServerComponentPage');
 ```
 
 As you can see, server components are not registered using the `ReactOnRails.register` function. Instead, we use the `registerServerComponent` function to register the server component. Also, `registerServerComponent` has different options for the client bundle and the server bundle.
+
 - For the server bundle, the component itself is passed to the `registerServerComponent` function, so the component is bundled into the server bundle.
 - For the client bundle, we pass the component name as an argument to the `registerServerComponent` function, so the component is not bundled into the client bundle.
 
 As you can see at [How React Server Components work](how-react-server-components-work.md):
+
 - Server components are rendered on the client using the rsc payload not the component itself.
 
 And as you can see at [React Server Components Rendering Flow](./rendering-flow.md):
+
 - In the future, the server bundle will use the RSC payload to render the server component on the server side as well.
 
 The `rscPayloadGenerationUrlPath` option will be explained in detail later in this document. For now, just know that it specifies the base URL path for React Server Component requests.
@@ -360,7 +361,6 @@ end
 ```
 
 This will add the `/rsc_payload` path to the routes. This is the base URL path that will receive requests from the client to render the React Server Components. `rsc_payload_route` is explained in the [How React Server Components work](how-react-server-components-work.md) document.
-
 
 ## Add Route to the React Server Component Page
 
@@ -380,7 +380,7 @@ This route will be used to render the React Server Component Page.
 Create a new file `app/views/pages/react_server_component_without_ssr.html.erb`:
 
 ```erb
-<%= react_component("ReactServerComponentPage", 
+<%= react_component("ReactServerComponentPage",
     prerender: false,
     trace: true,
     id: "ReactServerComponentPage-react-component-0") %>
@@ -417,6 +417,7 @@ Also, by looking at the console, we can see the log
 ```
 [SERVER] Hello from ReactServerComponent
 ```
+
 The `[SERVER]` prefix indicates that the component was executed on the server side. The absence of any client-side logs confirms that no client-side rendering or hydration occurred. This demonstrates a key characteristic of React Server Components - they run exclusively on the server without requiring any JavaScript execution in the browser, leading to improved performance and reduced client-side bundle sizes.
 
 ## How the React Server Component Page is Rendered on Browser?
@@ -432,6 +433,7 @@ If we click on the fetch request, we can see the response.
 The response contains two main parts:
 
 1. The React Server Component (RSC) payload - This is a special format designed by React for serializing server components and transmitting them to the client. The RSC payload includes:
+
    - The component's rendered output
    - Any data props that were passed to the client components
    - References to client components that need to be hydrated
@@ -445,4 +447,3 @@ The RSC payload format and how React processes it is explained in detail in the 
 ## Next Steps
 
 Now that you understand the basics of React Server Components, you can proceed to the next article: [Add Streaming and Interactivity to RSC Page](./add-streaming-and-interactivity.md) to learn how to enhance your RSC page with streaming capabilities and client-side interactivity.
-

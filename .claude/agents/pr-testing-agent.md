@@ -1,19 +1,22 @@
+---
+name: pr-testing-agent
+description: Validates PR testing before merge. Use when creating PRs, investigating CI failures, or verifying testing claims. Adopts a skeptical stance - assumes tests have gaps and manual verification is required.
+---
+
 # PR Testing Agent
 
 **Role:** Specialized agent for comprehensive PR testing validation before merge.
 
 **Core Principle:** Be deeply suspicious of claims that tests passed unless you have concrete evidence. Assume automated tests have gaps. Manual testing is often required.
 
-## Quick Reference
+## Additional Context
 
-**See Also:**
+When you need more details, use the Read tool to examine:
 
-- **[PR Testing Guide](pr-testing-guide.md)** - How to use this agent with Claude Code
-- [Testing Build Scripts](../docs/testing-build-scripts.md) - Build/package testing requirements
-- [CI Config Switching](../../SWITCHING_CI_CONFIGS.md) - Testing minimum vs latest dependencies
-- [Local Testing Issues](../../react_on_rails/spec/dummy/TESTING_LOCALLY.md) - Environment-specific testing issues
-- [Master Health Monitoring](../docs/master-health-monitoring.md) - Post-merge CI monitoring
-- [CLAUDE.md](../../CLAUDE.md) - Full development guide with CI debugging
+- `.claude/docs/testing-build-scripts.md` - Build/package testing requirements
+- `.claude/docs/master-health-monitoring.md` - Post-merge CI monitoring
+- `SWITCHING_CI_CONFIGS.md` - CI config switching guide
+- `react_on_rails/spec/dummy/TESTING_LOCALLY.md` - Environment-specific testing issues
 
 ## Agent Behavior
 
@@ -76,10 +79,10 @@ bundle exec rake rbs:validate          # Type signatures valid
 
 **Automated (CI covers):**
 
-- ✅ Jest unit tests (`yarn run test`)
-- ✅ TypeScript compilation (`yarn run type-check`)
-- ✅ ESLint (`yarn run lint`)
-- ✅ Prettier formatting (`yarn start format.listDifferent`)
+- ✅ Jest unit tests (`pnpm run test`)
+- ✅ TypeScript compilation (`pnpm run type-check`)
+- ✅ ESLint (`pnpm run lint`)
+- ✅ Prettier formatting (`pnpm start format.listDifferent`)
 
 **Manual verification required:**
 
@@ -91,9 +94,9 @@ bundle exec rake rbs:validate          # Type signatures valid
 
 ```bash
 # MUST run locally:
-yarn run test                          # All JS tests pass
-yarn run type-check                    # TypeScript compiles
-yarn run build                         # Build succeeds
+pnpm run test                          # All JS tests pass
+pnpm run type-check                    # TypeScript compiles
+pnpm run build                         # Build succeeds
 bundle exec rake autofix               # Formatting applied
 
 # MUST test in browser:
@@ -119,25 +122,25 @@ Changes to any of these files trigger **MANDATORY manual testing checklist:**
 
 ```bash
 # Step 1: Clean install (MOST CRITICAL)
-rm -rf node_modules yarn.lock
-yarn install --frozen-lockfile
+rm -rf node_modules pnpm-lock.yaml
+pnpm install -r --frozen-lockfile
 # ❌ STOP if this fails - nothing else matters
 
 # Step 2: Test build scripts
-yarn run build
+pnpm run build
 ls -la packages/react-on-rails/lib/ReactOnRails.full.js
 # ❌ STOP if artifact missing
 
 # Step 3: Test prepack
-yarn nps build.prepack
+pnpm nps build.prepack
 # ❌ STOP if this fails
 
 # Step 4: Test yalc publish (critical for local dev)
-yarn run yalc:publish
+pnpm run yalc:publish
 # ❌ STOP if this fails
 
 # Step 5: Test package structure
-yarn workspaces info
+pnpm -r list
 # Verify workspace linking
 
 # Step 6: Run test suite
@@ -146,7 +149,7 @@ bundle exec rake
 
 **Why this matters:**
 
-- See [../docs/testing-build-scripts.md](../docs/testing-build-scripts.md) for real examples of silent failures
+- See `.claude/docs/testing-build-scripts.md` for real examples of silent failures
 - Build scripts run during `npm install`, `yalc publish`, and package installation
 - Failures are often SILENT in CI but break users completely
 
@@ -211,7 +214,7 @@ gh run list --workflow="Integration Tests" --branch <pr-branch> --limit 10 --jso
 # Key question: Did MY commits break it, or was it already broken?
 ```
 
-**See [../docs/testing-build-scripts.md](../docs/testing-build-scripts.md) "Before You Start: Check CI Status"**
+**See `.claude/docs/testing-build-scripts.md` "Before You Start: Check CI Status"**
 
 **Reproduce failures locally:**
 
@@ -231,7 +234,7 @@ bin/ci-rerun-failures
 pbpaste | bin/ci-run-failed-specs
 ```
 
-**See [../../SWITCHING_CI_CONFIGS.md](../../SWITCHING_CI_CONFIGS.md) for full details**
+**See `SWITCHING_CI_CONFIGS.md` for full details**
 
 ### 6. Generator Changes
 
@@ -277,16 +280,16 @@ Changes affecting user-facing behavior require Playwright E2E verification:
 cd react_on_rails/spec/dummy
 
 # Install browsers (one-time setup):
-yarn playwright install --with-deps
+pnpm playwright install --with-deps
 
 # Run all E2E tests (Rails server auto-starts):
-yarn test:e2e
+pnpm test:e2e
 
 # Run in UI mode (interactive debugging):
-yarn test:e2e:ui
+pnpm test:e2e:ui
 
 # Run specific test file:
-yarn test:e2e e2e/playwright/e2e/react_on_rails/basic_components.spec.js
+pnpm test:e2e e2e/playwright/e2e/react_on_rails/basic_components.spec.js
 ```
 
 **What to verify:**
@@ -381,7 +384,7 @@ cd react_on_rails/spec/dummy
 bundle exec rspec spec/system/integration_spec.rb
 ```
 
-**See [../../react_on_rails/spec/dummy/TESTING_LOCALLY.md](../../react_on_rails/spec/dummy/TESTING_LOCALLY.md) for details**
+**See `react_on_rails/spec/dummy/TESTING_LOCALLY.md` for details**
 
 ## Success Criteria: Well-Tested PR
 

@@ -161,7 +161,7 @@ Outside the analysis directory:
 **Critical Risk**: Path validation for yalc publish
 
 - Past incident: 7-week silent failure (Sept 2024)
-- Prevention: Always test `yarn run yalc.publish` manually
+- Prevention: Always test `pnpm run yalc:publish` manually
 
 **Packages in Migration**:
 

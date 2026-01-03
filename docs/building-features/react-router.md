@@ -22,8 +22,8 @@ First, add React Router v6 to your project:
 
 ```bash
 npm install react-router-dom@^6.0.0
-# or
-yarn add react-router-dom@^6.0.0
+# or: yarn add react-router-dom@^6.0.0
+# or: pnpm add react-router-dom@^6.0.0
 ```
 
 **Why React Router v6?** React Router v7 has merged with Remix and uses a different architecture that may not be fully compatible with React on Rails' server-side rendering approach. We recommend v6 for stable integration. If you need v7 features, please test thoroughly and share your findings with the community.

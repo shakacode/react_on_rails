@@ -63,4 +63,4 @@ Let’s make your apps faster—together.
 [2]: https://geekyants.com/en-gb/blog/boosting-performance-with-nextjs-and-react-server-components-a-geekyantscom-case-study
 [3]: https://www.compilenrun.com/docs/framework/nextjs/nextjs-ecosystem/nextjs-case-studies/#case-study-3-hulus-streaming-platform
 [4]: https://medium.com/styled-components/v3-1-0-such-perf-wow-many-streams-c45c434dbd03
-[5]: https://questlab.pro/blog-posts/web-development/wd-pl-2024-articleId912i1h212818
+[5]: https://web.archive.org/web/20250908030148/https://questlab.pro/blog-posts/web-development/wd-pl-2024-articleId912i1h212818

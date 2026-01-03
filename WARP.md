@@ -12,10 +12,10 @@ React on Rails is a Ruby gem and NPM package that seamlessly integrates React co
 
 ```bash
 # Initial setup for gem development
-bundle && yarn
+bundle && pnpm install -r
 
 # Full setup including examples
-bundle && yarn && rake shakapacker_examples:gen_all && rake node_package && rake
+bundle && pnpm install -r && rake shakapacker_examples:gen_all && rake node_package && rake
 
 # Install git hooks (automatic on setup)
 bundle exec lefthook install
@@ -32,7 +32,7 @@ bundle exec rspec                    # All Ruby tests from project root
 rake run_rspec:gem                   # Top-level gem tests only
 rake run_rspec:dummy                 # Dummy app tests with turbolinks
 rake run_rspec:dummy_no_turbolinks   # Dummy app tests without turbolinks
-yarn run test                        # JavaScript tests (Jest)
+pnpm run test                        # JavaScript tests (Jest)
 
 # Run single example test
 rake run_rspec:shakapacker_examples_basic
@@ -51,22 +51,22 @@ rake autofix  # Runs eslint --fix, prettier --write, and rubocop -A
 # Manual linting
 bundle exec rubocop                  # Ruby - MUST pass before commit
 rake lint                            # All linters (ESLint + RuboCop)
-yarn run lint                        # ESLint only
+pnpm run lint                        # ESLint only
 rake lint:rubocop                    # RuboCop only
 
 # Check formatting without fixing
-yarn start format.listDifferent
+pnpm start format.listDifferent
 ```
 
 ### Building
 
 ```bash
 # Build NPM package (TypeScript → JavaScript)
-yarn run build                       # One-time build
-yarn run build-watch                 # Watch mode for development
+pnpm run build                       # One-time build
+pnpm run build-watch                 # Watch mode for development
 
 # Type checking
-yarn run type-check
+pnpm run type-check
 ```
 
 ### Development Server (Dummy App)
@@ -87,7 +87,7 @@ bin/dev prod                         # Production-like environment
 
 ```bash
 # In react_on_rails directory
-yarn run build
+pnpm run build
 yalc publish
 
 # In test app directory
@@ -98,7 +98,7 @@ cd /path/to/react_on_rails
 yalc push                            # Push updates to all linked apps
 
 cd /path/to/test_app
-yarn                                 # Update dependencies
+pnpm install -r                      # Update dependencies
 ```
 
 ## Critical Pre-Commit Requirements
@@ -201,7 +201,7 @@ This project maintains two distinct but integrated packages:
 ### Making Code Changes
 
 1. Make changes to Ruby or TypeScript code
-2. For NPM changes: `yarn run build` or `yarn run build-watch`
+2. For NPM changes: `pnpm run build` or `pnpm run build-watch`
 3. For Yalc testing: `yalc push`
 4. Run relevant tests
 5. **Run `rake autofix`** to fix all linting
@@ -212,7 +212,7 @@ This project maintains two distinct but integrated packages:
 1. Create failing test that reproduces issue
 2. Implement minimal fix
 3. Ensure all tests pass
-4. Run linting: `bundle exec rubocop` and `yarn run lint`
+4. Run linting: `bundle exec rubocop` and `pnpm run lint`
 5. Update documentation if needed
 
 ### Adding Features
@@ -242,7 +242,7 @@ yalc publish
 yalc push
 
 cd /path/to/test-app
-yarn install
+pnpm install -r
 bin/dev
 ```
 
@@ -305,7 +305,7 @@ subject(:method_result) { instance.method_name(arg) }
 
 ### Package Manager
 
-- **ONLY use Yarn Classic (1.x)** - never use npm
+- **ONLY use PNPM** - never use npm
 - Package manager enforced via `packageManager` field in package.json
 
 ### Dependencies
@@ -342,7 +342,7 @@ subject(:method_result) { instance.method_name(arg) }
 ### Test Failures
 
 - Run tests from correct directory (project root vs react_on_rails/spec/dummy)
-- Check that `bundle install` and `yarn install` are current
+- Check that `bundle install` and `pnpm install -r` are current
 - Verify git hooks are installed: `bundle exec lefthook install`
 
 ### Linting Failures

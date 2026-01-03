@@ -19,7 +19,7 @@ namespace :lint do
 
   desc "Run eslint as shell"
   task :eslint do
-    sh_in_dir(gem_root, "yarn run eslint")
+    sh_in_dir(gem_root, "pnpm run eslint")
   end
 
   desc "Run all eslint, rubocop linters. Skip ruby-lint and scss"

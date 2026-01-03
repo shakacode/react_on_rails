@@ -2,12 +2,12 @@
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+
 **Table of Contents**
 
 - [Webpack Configuration](#webpack-configuration)
 - [Loadable Components](#loadable-components)
 - [Caching](#caching)
-- [Run yarn if not done yet](#run-yarn-if-not-done-yet)
 - [Starting the Sample App](#starting-the-sample-app)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
@@ -15,29 +15,36 @@
 ## Installation
 
 ```sh
+pnpm install -r
 cd react_on_rails_pro
-bundle && yarn && cd spec/dummy && bundle && yarn
+bundle
+cd spec/dummy
+bundle && pnpm install
 ```
 
 To use the `React 18 Apollo with GraphQL` example you need to seed the testing database inside `spec/dummy` directory.
+
 ```sh
 rake db:seed
 ```
 
 ## Running
+
 Run one of these Procfiles:
 
 1. [Procfile.dev](./Procfile.dev): Development setup with HMR and with loadable-components.
 2. [Procfile.static](./Procfile.static): Development setup using `webpack --watch`. No HMR, but loadable-components is used.
 
 ## Webpack Configuration
-This example builds on the standard Shakapacker configuration, as demonstrated
-by repo (shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh](https://github.com/shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh) 
 
-* [config/shakapacker.yml](./config/shakapacker.yml)
-* [config/webpack directory](./config/webpack)
+This example builds on the standard Shakapacker configuration, as demonstrated
+by repo [shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh](https://github.com/shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh)
+
+- [config/shakapacker.yml](./config/shakapacker.yml)
+- [config/webpack directory](./config/webpack)
 
 ## Loadable Components
+
 See more details in [docs/code-splitting-loadable-components](../../docs/code-splitting-loadable-components.md).
 
 Note that the webpack configuration substitutes files with the extension `imports-loadable.js` with `imports-hmr.js`. See the use of `NormalModuleReplacementPlugin` in [`config/webpack/commonWebpackConfig.js`](./config/webpack/commonWebpackConfig.js).
@@ -58,11 +65,13 @@ Please check [CONTRIBUTING.md](../../CONTRIBUTING.md), it has the other necessar
 ## Starting the Sample App
 
 ### Using HMR and no loadable-components
+
 ```sh
 overmind start -f Procfile.dev
 ```
-   
+
 ### Using loadable-components and no HMR
+
 ```sh
 overmind start -f Procfile.static
 ```

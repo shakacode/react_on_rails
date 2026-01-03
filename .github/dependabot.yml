@@ -1,0 +1,75 @@
+# Dependabot configuration
+# - Only security updates (version updates disabled via open-pull-requests-limit: 0)
+# - Dependencies grouped within each ecosystem/directory
+# - 3-day minimum release age for new versions (so they can't be unpublished in NPM)
+# - Labels: "dependencies" (default), language-specific (javascript/ruby/github-actions), "full-ci"
+#
+# Note: Root pnpm workspace (/) covers packages/react-on-rails, etc.
+# Dummy apps have separate lock files and are listed explicitly.
+
+version: 2
+
+updates:
+  # NPM/PNPM packages - root workspace and dummy apps
+  - package-ecosystem: "npm"
+    directories:
+      - "/"
+      - "/react_on_rails/spec/dummy"
+      - "/react_on_rails_pro/spec/dummy"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "javascript"
+      - "full-ci"
+    # Disable version update PRs - only security updates will be created
+    open-pull-requests-limit: 0
+    cooldown:
+      default-days: 3
+    groups:
+      npm-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+
+  # Ruby gems - Open source and Pro gems (including dummy apps)
+  # Root directory is not included because it reuses the Gemfile from react_on_rails
+  - package-ecosystem: "bundler"
+    directories:
+      - "/react_on_rails"
+      - "/react_on_rails/spec/dummy"
+      - "/react_on_rails_pro"
+      - "/react_on_rails_pro/spec/dummy"
+      - "/react_on_rails_pro/spec/execjs-compatible-dummy"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "ruby"
+      - "full-ci"
+    open-pull-requests-limit: 0
+    cooldown:
+      default-days: 3
+    groups:
+      bundler-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "github-actions"
+      - "full-ci"
+    open-pull-requests-limit: 0
+    cooldown:
+      default-days: 3
+    groups:
+      actions-security:
+        applies-to: security-updates
+        patterns:
+          - "*"

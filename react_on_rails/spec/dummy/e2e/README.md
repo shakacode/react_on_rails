@@ -6,13 +6,13 @@ This directory contains end-to-end tests using Playwright integrated with Rails 
 
 ```bash
 # Install Playwright browsers (first time only)
-yarn playwright install --with-deps
+pnpm playwright install --with-deps
 
 # Run all tests
-yarn test:e2e
+pnpm test:e2e
 
 # Run in UI mode for debugging
-yarn test:e2e:ui
+pnpm test:e2e:ui
 ```
 
 ## Features
@@ -153,33 +153,33 @@ await app('my_command', { some: 'options' });
 
 ```bash
 # All tests
-yarn test:e2e
+pnpm test:e2e
 
 # Specific file
-yarn test:e2e e2e/playwright/e2e/react_on_rails/basic_components.spec.js
+pnpm test:e2e e2e/playwright/e2e/react_on_rails/basic_components.spec.js
 
 # UI mode (interactive)
-yarn test:e2e:ui
+pnpm test:e2e:ui
 
 # Headed mode (visible browser)
-yarn test:e2e:headed
+pnpm test:e2e:headed
 
 # Debug mode
-yarn test:e2e:debug
+pnpm test:e2e:debug
 
 # Specific browser
-yarn test:e2e --project=chromium
-yarn test:e2e --project=firefox
-yarn test:e2e --project=webkit
+pnpm test:e2e --project=chromium
+pnpm test:e2e --project=firefox
+pnpm test:e2e --project=webkit
 
 # View last run report
-yarn test:e2e:report
+pnpm test:e2e:report
 ```
 
 ## Debugging
 
-1. **UI Mode**: `yarn test:e2e:ui` - Best for interactive debugging
-2. **Headed Mode**: `yarn test:e2e:headed` - See browser actions
+1. **UI Mode**: `pnpm test:e2e:ui` - Best for interactive debugging
+2. **Headed Mode**: `pnpm test:e2e:headed` - See browser actions
 3. **Pause Execution**: Add `await page.pause()` in your test
 4. **Console Logging**: Check browser console in headed mode
 5. **Screenshots**: Automatically taken on failure

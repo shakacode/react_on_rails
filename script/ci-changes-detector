@@ -94,7 +94,7 @@ while IFS= read -r file; do
       ;;
 
     # JavaScript/TypeScript source (including tests, scripts, and package files)
-    package.json|yarn.lock|packages/react-on-rails/src/*|packages/react-on-rails/src/**/*|packages/react-on-rails/tests/*|packages/react-on-rails/tests/**/*|packages/react-on-rails/scripts/*|packages/react-on-rails/scripts/**/*|packages/react-on-rails/package.json|packages/react-on-rails/tsconfig.json|.github/workflows/package-js-tests.yml)
+    package.json|pnpm-lock.yaml|packages/react-on-rails/src/*|packages/react-on-rails/src/**/*|packages/react-on-rails/tests/*|packages/react-on-rails/tests/**/*|packages/react-on-rails/scripts/*|packages/react-on-rails/scripts/**/*|packages/react-on-rails/package.json|packages/react-on-rails/tsconfig.json|.github/workflows/package-js-tests.yml)
       DOCS_ONLY=false
       JS_CHANGED=true
       ;;

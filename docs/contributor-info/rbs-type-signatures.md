@@ -57,7 +57,7 @@ sig/
 │   └── ...                         # And more
 ```
 
-For more details, see [sig/README.md](../../sig/README.md).
+For more details, see [sig/README.md](../../react_on_rails/sig/README.md).
 
 ## Contributing
 
