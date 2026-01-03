@@ -162,11 +162,11 @@ def run_k6_benchmark(target, route_name)
   raise "k6 benchmark failed" unless system("#{k6_command} | tee #{Shellwords.escape(k6_txt)}")
 
   k6_data = parse_json_file(k6_summary_json, "k6")
-  k6_rps = k6_data.dig("metrics", "iterations", "rate")&.round(2) || "missing"
-  k6_p50 = k6_data.dig("metrics", "http_req_duration", "med")&.round(2) || "missing"
-  k6_p90 = k6_data.dig("metrics", "http_req_duration", "p(90)")&.round(2) || "missing"
-  k6_p99 = k6_data.dig("metrics", "http_req_duration", "p(99)")&.round(2) || "missing"
-  k6_max = k6_data.dig("metrics", "http_req_duration", "max")&.round(2) || "missing"
+  k6_rps = k6_data.dig("metrics", "iterations", "rate")&.round(2) || "MISSING"
+  k6_p50 = k6_data.dig("metrics", "http_req_duration", "med")&.round(2) || "MISSING"
+  k6_p90 = k6_data.dig("metrics", "http_req_duration", "p(90)")&.round(2) || "MISSING"
+  k6_p99 = k6_data.dig("metrics", "http_req_duration", "p(99)")&.round(2) || "MISSING"
+  k6_max = k6_data.dig("metrics", "http_req_duration", "max")&.round(2) || "MISSING"
 
   # Status: extract counts from checks (status_200, status_3xx, status_4xx, status_5xx)
   k6_reqs_total = k6_data.dig("metrics", "http_reqs", "count") || 0
@@ -183,7 +183,7 @@ def run_k6_benchmark(target, route_name)
   end
   k6_other = k6_reqs_total - k6_known_count
   k6_status_parts << "other=#{k6_other}" if k6_other.positive?
-  k6_status = k6_status_parts.empty? ? "missing" : k6_status_parts.join(",")
+  k6_status = k6_status_parts.empty? ? "MISSING" : k6_status_parts.join(",")
 
   [k6_rps, k6_p50, k6_p90, k6_p99, k6_max, k6_status]
 rescue StandardError => e

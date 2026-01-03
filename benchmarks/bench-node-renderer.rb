@@ -218,12 +218,12 @@ def run_vegeta_benchmark(test_case, bundle_timestamp)
 
   # Parse results
   vegeta_data = parse_json_file(vegeta_json, "Vegeta")
-  vegeta_rps = vegeta_data["throughput"]&.round(2) || "missing"
-  vegeta_p50 = vegeta_data.dig("latencies", "50th")&./(1_000_000.0)&.round(2) || "missing"
-  vegeta_p90 = vegeta_data.dig("latencies", "90th")&./(1_000_000.0)&.round(2) || "missing"
-  vegeta_p99 = vegeta_data.dig("latencies", "99th")&./(1_000_000.0)&.round(2) || "missing"
-  vegeta_max = vegeta_data.dig("latencies", "max")&./(1_000_000.0)&.round(2) || "missing"
-  vegeta_status = vegeta_data["status_codes"]&.map { |k, v| "#{k}=#{v}" }&.join(",") || "missing"
+  vegeta_rps = vegeta_data["throughput"]&.round(2) || "MISSING"
+  vegeta_p50 = vegeta_data.dig("latencies", "50th")&./(1_000_000.0)&.round(2) || "MISSING"
+  vegeta_p90 = vegeta_data.dig("latencies", "90th")&./(1_000_000.0)&.round(2) || "MISSING"
+  vegeta_p99 = vegeta_data.dig("latencies", "99th")&./(1_000_000.0)&.round(2) || "MISSING"
+  vegeta_max = vegeta_data.dig("latencies", "max")&./(1_000_000.0)&.round(2) || "MISSING"
+  vegeta_status = vegeta_data["status_codes"]&.map { |k, v| "#{k}=#{v}" }&.join(",") || "MISSING"
 
   [vegeta_rps, vegeta_p50, vegeta_p90, vegeta_p99, vegeta_max, vegeta_status]
 rescue StandardError => e

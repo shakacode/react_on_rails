@@ -73,7 +73,7 @@ end
 # Calculate failed request percentage from status string
 # Status format: "200=7508,302=100,5xx=10" etc.
 def calculate_failed_percentage(status_str)
-  return 0.0 if status_str.nil? || status_str == "missing"
+  return 0.0 if status_str.nil? || status_str == "MISSING"
 
   total = 0
   failed = 0
