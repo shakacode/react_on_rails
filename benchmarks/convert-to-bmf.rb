@@ -1,14 +1,22 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-# Converts benchmark summary files to JSON format for github-action-benchmark
-# Outputs a single file with all metrics using customSmallerIsBetter:
-#   - benchmark.json (customSmallerIsBetter)
-#     - RPS values are converted to ms/request (1000/RPS) so lower is better
-#     - Latencies are kept as-is (lower is better)
-#     - Failed percentage is kept as-is (lower is better)
+# Converts benchmark summary files to Bencher Metric Format (BMF) JSON
+# See: https://bencher.dev/docs/reference/bencher-metric-format/
 #
-# Usage: ruby convert_to_benchmark_json.rb [prefix] [--append]
+# Output format (BMF):
+#   {
+#     "benchmark_name": {
+#       "measure_name": { "value": 123.45 }
+#     }
+#   }
+#
+# Measures (snake_case for easy CLI usage with --threshold-measure):
+#   - rps: Requests per second (higher is better - use Lower Boundary threshold)
+#   - p50_latency_ms, p90_latency_ms, p99_latency_ms: Latencies (lower is better - Upper Boundary)
+#   - failed_pct: Failed request percentage (lower is better - use Upper Boundary)
+#
+# Usage: ruby convert-to-bmf.rb [prefix] [--append]
 #   prefix: Optional prefix for benchmark names (e.g., "Core: " or "Pro: ")
 #   --append: Append to existing benchmark.json instead of overwriting
 
@@ -100,34 +108,44 @@ def calculate_failed_percentage(status_str)
   (failed.to_f / total * 100).round(2)
 end
 
-# Add a metric to the output array if the value is not nil
-def add_metric(output, name:, unit:, value:)
+# Add a measure to the benchmark entry if the value is not nil
+# BMF format: { "measure_name": { "value": 123.45 } }
+def add_measure(benchmark_entry, measure_name:, value:)
   return if value.nil?
 
-  output << { name: name, unit: unit, value: value }
+  benchmark_entry[measure_name] = { "value" => value }
 end
 
-# Convert all results to customSmallerIsBetter format
-# RPS is converted to ms/request (1000/RPS) so lower values mean higher throughput
-# Latencies and failure rates are kept as-is (lower is better)
-def to_unified_json(results)
-  output = []
+# Convert all results to Bencher Metric Format (BMF)
+# See: https://bencher.dev/docs/reference/bencher-metric-format/
+#
+# Output structure:
+#   {
+#     "benchmark_name": {
+#       "rps": { "value": 5000.0 },
+#       "p50_latency_ms": { "value": 45.2 },
+#       ...
+#     }
+#   }
+def to_bmf_json(results)
+  output = {}
 
   results.each do |r|
-    base_name = r[:name]
-    throughput_value = r[:rps].positive? ? (1000.0 / r[:rps]).round(4) : nil
+    benchmark_name = r[:name]
+    benchmark_entry = {}
 
-    # Convert RPS to ms/request (1000/RPS) - lower is better
-    # This preserves correct alert threshold behavior (regression = higher value)
-    add_metric(output, name: "#{base_name} - throughput", unit: "ms/request", value: throughput_value)
+    # RPS (higher is better) - use Lower Boundary threshold in Bencher
+    add_measure(benchmark_entry, measure_name: "rps", value: r[:rps])
 
-    # Add latencies (lower is better) - only if we have valid values
-    add_metric(output, name: "#{base_name} - p50 latency", unit: "ms", value: r[:p50])
-    add_metric(output, name: "#{base_name} - p90 latency", unit: "ms", value: r[:p90])
-    add_metric(output, name: "#{base_name} - p99 latency", unit: "ms", value: r[:p99])
+    # Latencies in ms (lower is better) - use Upper Boundary threshold in Bencher
+    add_measure(benchmark_entry, measure_name: "p50_latency_ms", value: r[:p50])
+    add_measure(benchmark_entry, measure_name: "p90_latency_ms", value: r[:p90])
+    add_measure(benchmark_entry, measure_name: "p99_latency_ms", value: r[:p99])
 
-    # Add failure percentage (lower is better)
-    add_metric(output, name: "#{base_name} - failed requests", unit: "%", value: r[:failed_pct])
+    # Failure percentage (lower is better) - use Upper Boundary threshold in Bencher
+    add_measure(benchmark_entry, measure_name: "failed_pct", value: r[:failed_pct])
+
+    output[benchmark_name] = benchmark_entry unless benchmark_entry.empty?
   end
 
   output
@@ -151,22 +169,25 @@ if all_results.empty?
   exit 1
 end
 
-# Convert current results to JSON
-new_metrics = to_unified_json(all_results)
+# Convert current results to BMF JSON
+new_benchmarks = to_bmf_json(all_results)
 output_path = File.join(BENCH_RESULTS_DIR, "benchmark.json")
 
-# In append mode, merge with existing metrics
+# In append mode, merge with existing benchmarks
 if APPEND_MODE && File.exist?(output_path)
-  existing_metrics = JSON.parse(File.read(output_path))
-  unified_json = existing_metrics + new_metrics
-  puts "Appended #{new_metrics.length} metrics to existing #{existing_metrics.length} metrics"
+  existing_benchmarks = JSON.parse(File.read(output_path))
+  bmf_json = existing_benchmarks.merge(new_benchmarks)
+  puts "Appended #{new_benchmarks.length} benchmarks to existing #{existing_benchmarks.length} benchmarks"
 else
-  unified_json = new_metrics
-  puts "Created #{unified_json.length} new metrics"
+  bmf_json = new_benchmarks
+  puts "Created #{bmf_json.length} new benchmarks"
 end
 
-# Write unified JSON (all metrics using customSmallerIsBetter)
-File.write(output_path, JSON.pretty_generate(unified_json))
-puts "Wrote #{unified_json.length} total metrics to benchmark.json (from #{all_results.length} benchmark results)"
-puts "  - Throughput: ms/request (1000/RPS) - lower is better"
-puts "  - Latencies and failure rates: original values - lower is better"
+# Write BMF JSON
+# See: https://bencher.dev/docs/reference/bencher-metric-format/
+File.write(output_path, JSON.pretty_generate(bmf_json))
+puts "Wrote #{bmf_json.length} total benchmarks to benchmark.json (from #{all_results.length} parsed results)"
+puts "Bencher threshold configuration (--threshold-measure):"
+puts "  - rps: Higher is better (use --threshold-lower-boundary)"
+puts "  - p50/p90/p99_latency_ms: Lower is better (use --threshold-upper-boundary)"
+puts "  - failed_pct: Lower is better (use --threshold-upper-boundary)"
