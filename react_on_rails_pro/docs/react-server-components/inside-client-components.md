@@ -249,13 +249,11 @@ If you're using the `auto_load_bundle: true` option in your React on Rails confi
 When using server components inside client components:
 
 1. **During Initial SSR**:
-
    - The server component is rendered on the server
    - Its payload is embedded directly in the HTML response
    - No additional HTTP requests are needed for hydration
 
 2. **During Client Navigation**:
-
    - When a user navigates to a new route client-side
    - The client makes an HTTP request to fetch the server component payload
    - The route is rendered with the fetched server component

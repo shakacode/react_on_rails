@@ -32,7 +32,6 @@ In a React Server Components project, there are three distinct types of bundles:
 When a request is made to a page using React Server Components, the following optimized sequence occurs:
 
 1. Initial Request Processing:
-
    - The `stream_react_component` helper is called in the view
    - Makes a request to the node renderer
    - Server bundle's rendering function calls `generateRSCPayload` with the component name and props
@@ -41,7 +40,6 @@ When a request is made to a page using React Server Components, the following op
    - The payload is returned to the server bundle
 
 2. Server-Side Rendering with RSC Payload:
-
    - The server bundle uses the RSC payload to generate HTML for server components using `RSCServerRoot`
    - `RSCServerRoot` splits the RSC payload stream into two parts:
      - One stream for rendering server components as HTML
