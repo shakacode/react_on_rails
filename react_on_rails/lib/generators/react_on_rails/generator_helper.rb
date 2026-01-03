@@ -96,6 +96,75 @@ module GeneratorHelper
     options.typescript? ? "tsx" : "jsx"
   end
 
+  # Check if a gem is present in Gemfile.lock
+  #
+  # @param gem_name [String] Name of the gem to check
+  # @return [Boolean] true if the gem is in Gemfile.lock
+  def gem_in_lockfile?(gem_name)
+    gemfile = ENV["BUNDLE_GEMFILE"] || "Gemfile"
+    lockfile = File.join(File.dirname(gemfile), "Gemfile.lock")
+
+    File.file?(lockfile) &&
+      File.foreach(lockfile).any? { |line| line.match?(/^\s{4}#{Regexp.escape(gem_name)}\s\(/) }
+  rescue StandardError
+    false
+  end
+
+  # Check if React on Rails Pro gem is installed
+  #
+  # Detection priority:
+  # 1. Gem.loaded_specs - gem is loaded in current Ruby process (most reliable)
+  # 2. Gemfile.lock - gem is resolved and installed
+  #
+  # @return [Boolean] true if react_on_rails_pro gem is installed
+  def pro_gem_installed?
+    return @pro_gem_installed if defined?(@pro_gem_installed)
+
+    @pro_gem_installed = Gem.loaded_specs.key?("react_on_rails_pro") || gem_in_lockfile?("react_on_rails_pro")
+  end
+
+  # Check if Pro features should be enabled
+  # Returns true if --pro flag is set OR --rsc flag is set (RSC implies Pro)
+  #
+  # @return [Boolean] true if Pro setup should be included
+  def use_pro?
+    options[:pro] || options[:rsc]
+  end
+
+  # Check if RSC (React Server Components) should be enabled
+  # Returns true only if --rsc flag is explicitly set
+  #
+  # @return [Boolean] true if RSC setup should be included
+  def use_rsc?
+    options[:rsc]
+  end
+
+  # Detect the installed React version from package.json
+  # Uses VERSION_PARTS_REGEX pattern from VersionChecker for consistency
+  #
+  # @return [String, nil] React version string (e.g., "19.0.3") or nil if not found/parseable
+  def detect_react_version
+    pj = package_json
+    return nil unless pj
+
+    dependencies = pj.fetch("dependencies", {})
+    react_version = dependencies["react"]
+    return nil unless react_version
+
+    # Skip non-version strings (workspace:*, file:, link:, http://, etc.)
+    return nil if react_version.include?("/") || react_version.start_with?("workspace:")
+
+    # Extract version using the same regex pattern as VersionChecker
+    # Handles: "19.0.3", "^19.0.3", "~19.0.3", "19.0.3-beta.1", etc.
+    match = react_version.match(/(\d+)\.(\d+)\.(\d+)(?:[-.]([0-9A-Za-z.-]+))?/)
+    return nil unless match
+
+    # Return the matched version (without pre-release suffix for comparison)
+    "#{match[1]}.#{match[2]}.#{match[3]}"
+  rescue StandardError
+    nil
+  end
+
   # Check if Shakapacker 9.0 or higher is available
   # Returns true if Shakapacker >= 9.0, false otherwise
   #
