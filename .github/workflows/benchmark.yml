@@ -76,7 +76,8 @@ env:
   REQUEST_TIMEOUT: ${{ github.event.inputs.request_timeout }}
   CONNECTIONS: ${{ github.event.inputs.connections }}
   MAX_CONNECTIONS: ${{ github.event.inputs.connections }}
-  WEB_CONCURRENCY: ${{ github.event.inputs.web_concurrency || 4 }}
+  # WEB_CONCURRENCY default is set dynamically to NPROC-1 in "Configure CPU pinning" step
+  WEB_CONCURRENCY: ${{ github.event.inputs.web_concurrency }}
   RAILS_MAX_THREADS: ${{ github.event.inputs.rails_threads || 3 }}
   RAILS_MIN_THREADS: ${{ github.event.inputs.rails_threads || 3 }}
 
@@ -196,6 +197,35 @@ jobs:
           echo "Pnpm version: "; pnpm --version
           echo "Bundler version: "; bundle --version
 
+      - name: Configure CPU pinning and process priority
+        run: |
+          # CPU pinning: server gets CPUs 1-(nproc-1), benchmark script gets CPU 0
+          # This avoids contention and improves consistency on GitHub Actions runners
+          NPROC=$(nproc)
+          echo "Available CPUs: $NPROC"
+
+          # Server: high priority (-20), pinned to CPUs 1+
+          # Benchmark: elevated priority (-10), pinned to CPU 0
+          # sudo requires explicit PATH (secure_path in sudoers overrides -E)
+          SUDO_PREFIX="sudo env PATH=$PATH"
+          SERVER_CMD="$SUDO_PREFIX nice -n -20 taskset -c 1-$((NPROC-1)) bin/prod"
+          BENCH_CMD="$SUDO_PREFIX nice -n -10 taskset -c 0 ruby"
+
+          echo "SERVER_CMD=$SERVER_CMD" >> $GITHUB_ENV
+          echo "BENCH_CMD=$BENCH_CMD" >> $GITHUB_ENV
+
+          # Set Puma workers to match available server CPUs (only if not explicitly set)
+          if [ -z "$WEB_CONCURRENCY" ]; then
+            WEB_CONCURRENCY=$((NPROC-1))
+            echo "WEB_CONCURRENCY=$WEB_CONCURRENCY" >> $GITHUB_ENV
+            echo "WEB_CONCURRENCY (auto): $WEB_CONCURRENCY"
+          else
+            echo "WEB_CONCURRENCY (from input): $WEB_CONCURRENCY"
+          fi
+
+          echo "SERVER_CMD: $SERVER_CMD"
+          echo "BENCH_CMD: $BENCH_CMD"
+
       - name: Install Node modules with Pnpm for all packages
         run: |
           pnpm install --recursive --frozen-lockfile
@@ -254,8 +284,7 @@ jobs:
           echo "🚀 Starting production server..."
           cd react_on_rails/spec/dummy
 
-          # Start server in background with high priority for consistent performance
-          sudo nice -n -20 bin/prod &
+          $SERVER_CMD &
           echo "Server started in background"
 
           # Wait for server to be ready (max 30 seconds)
@@ -283,8 +312,7 @@ jobs:
           set -e  # Exit on any error
           echo "🏃 Running Core benchmark suite..."
 
-          # Run with elevated priority (server has -20, this has -10)
-          if ! sudo nice -n -10 ruby benchmarks/bench.rb; then
+          if ! $BENCH_CMD benchmarks/bench.rb; then
             echo "❌ ERROR: Benchmark execution failed"
             exit 1
           fi
@@ -312,8 +340,9 @@ jobs:
 
       - name: Convert Core benchmark results to JSON
         if: env.RUN_CORE
+        # sudo needed because benchmark files are owned by root (created with sudo nice)
         run: |
-          ruby benchmarks/convert-to-bmf.rb "Core: "
+          sudo ruby benchmarks/convert-to-bmf.rb "Core: "
 
       - name: Upload Core benchmark results
         uses: actions/upload-artifact@v4
@@ -408,8 +437,7 @@ jobs:
           echo "🚀 Starting Pro production server..."
           cd react_on_rails_pro/spec/dummy
 
-          # Start server in background with high priority for consistent performance
-          sudo nice -n -20 bin/prod &
+          $SERVER_CMD &
           echo "Server started in background"
 
           # Wait for server to be ready (max 30 seconds)
@@ -437,8 +465,7 @@ jobs:
           set -e
           echo "🏃 Running Pro benchmark suite..."
 
-          # Run with elevated priority (server has -20, this has -10)
-          if ! sudo nice -n -10 PRO=true ruby benchmarks/bench.rb; then
+          if ! PRO=true $BENCH_CMD benchmarks/bench.rb; then
             echo "❌ ERROR: Benchmark execution failed"
             exit 1
           fi
@@ -452,8 +479,7 @@ jobs:
           set -e
           echo "🏃 Running Pro Node Renderer benchmark suite..."
 
-          # Run with elevated priority (server has -20, this has -10)
-          if ! sudo nice -n -10 ruby benchmarks/bench-node-renderer.rb; then
+          if ! $BENCH_CMD benchmarks/bench-node-renderer.rb; then
             echo "❌ ERROR: Node Renderer benchmark execution failed"
             exit 1
           fi
@@ -493,8 +519,9 @@ jobs:
 
       - name: Convert Pro benchmark results to JSON
         if: env.RUN_PRO
+        # sudo needed because benchmark files are owned by root (created with sudo nice)
         run: |
-          ruby benchmarks/convert-to-bmf.rb "Pro: " --append
+          sudo ruby benchmarks/convert-to-bmf.rb "Pro: " --append
 
       - name: Upload Pro benchmark results
         uses: actions/upload-artifact@v4
