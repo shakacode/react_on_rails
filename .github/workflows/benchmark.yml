@@ -312,7 +312,8 @@ jobs:
           if-no-files-found: warn
 
       - name: Stop Core production server
-        if: env.RUN_CORE && always()
+        # RUN_PRO because we only need to stop it to run the Pro server
+        if: env.RUN_CORE && env.RUN_PRO && always()
         run: |
           echo "🛑 Stopping Core production server..."
           # Kill all server-related processes (safe in isolated CI environment)
@@ -488,14 +489,6 @@ jobs:
           path: bench_results/
           retention-days: 30
           if-no-files-found: warn
-
-      - name: Stop Pro production server
-        if: env.RUN_PRO && always()
-        run: |
-          echo "🛑 Stopping Pro production server..."
-          # Kill all server-related processes (safe in isolated CI environment)
-          pkill -9 -f "ruby|node|foreman|overmind|puma" || true
-          echo "✅ Server stopped"
 
       # ============================================
       # STEP 7: STORE BENCHMARK DATA
