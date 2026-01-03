@@ -43,6 +43,18 @@ module ReactOnRails
                    default: false,
                    desc: "Skip warnings. Default: false"
 
+      # --pro
+      class_option :pro,
+                   type: :boolean,
+                   default: false,
+                   desc: "Install React on Rails Pro with Node Renderer. Default: false"
+
+      # --rsc
+      class_option :rsc,
+                   type: :boolean,
+                   default: false,
+                   desc: "Install React Server Components support (includes Pro). Default: false"
+
       # Removed: --skip-shakapacker-install (Shakapacker is now a required dependency)
 
       # Main generator entry point
@@ -95,7 +107,10 @@ module ReactOnRails
       private
 
       def print_generator_messages
-        GeneratorMessages.messages.each { |message| puts message }
+        GeneratorMessages.messages.each do |message|
+          puts message
+          puts "" # Blank line after each message for readability
+        end
       end
 
       def invoke_generators
@@ -113,6 +128,7 @@ module ReactOnRails
           invoke "react_on_rails:react_no_redux", [], { typescript: options.typescript? }
         end
         setup_react_dependencies
+        warn_about_react_version_for_rsc
       end
 
       def setup_react_dependencies
@@ -123,7 +139,72 @@ module ReactOnRails
       # js(.coffee) are not checked by this method, but instead produce warning messages
       # and allow the build to continue
       def installation_prerequisites_met?
-        !(missing_node? || missing_package_manager? || ReactOnRails::GitUtils.uncommitted_changes?(GeneratorMessages))
+        !(missing_node? || missing_package_manager? || missing_pro_gem? ||
+          ReactOnRails::GitUtils.uncommitted_changes?(GeneratorMessages))
+      end
+
+      # Check if Pro gem is required but not installed
+      # Returns true (prerequisite NOT met) if --pro or --rsc flag is used but gem is missing
+      def missing_pro_gem?
+        return false unless use_pro?
+        return false if pro_gem_installed?
+
+        error = <<~MSG.strip
+          🚫 React on Rails Pro gem is required for #{use_rsc? ? '--rsc' : '--pro'} flag.
+
+          The Pro gem must be installed before running this generator.
+
+          Installation steps:
+          1. Add to your Gemfile:
+               gem 'react_on_rails_pro', '~> 16.2'
+
+          2. Run: bundle install
+
+          3. Re-run this generator with your original flags.
+
+          Try Pro free! Email justin@shakacode.com for an evaluation license.
+          More info: https://www.shakacode.com/react-on-rails-pro/
+        MSG
+        # TODO: Update URL to licenses.shakacode.com when the self-service licensing app is deployed
+        GeneratorMessages.add_error(error)
+        true
+      end
+
+      # Warn if React version is not compatible with RSC
+      # RSC requires React 19.0.x specifically (not 19.1.x or later)
+      def warn_about_react_version_for_rsc
+        return unless use_rsc?
+
+        react_version = detect_react_version
+        return if react_version.nil? # React not installed yet, will be installed by generator
+
+        # Check if React version is 19.0.x
+        major, minor, patch = react_version.split(".").map(&:to_i)
+
+        if major != 19 || minor != 0
+          GeneratorMessages.add_warning(<<~MSG.strip)
+            ⚠️  RSC requires React 19.0.x (detected: #{react_version})
+
+            React Server Components in React on Rails Pro currently only supports
+            React 19.0.x. React 19.1.x and later are not yet supported.
+
+            To upgrade React:
+              npm install react@19.0.3 react-dom@19.0.3
+
+            Or with your package manager:
+              pnpm add react@19.0.3 react-dom@19.0.3
+              yarn add react@19.0.3 react-dom@19.0.3
+          MSG
+        elsif patch < 3
+          GeneratorMessages.add_warning(<<~MSG.strip)
+            ⚠️  React #{react_version} has known security vulnerabilities.
+
+            Please upgrade to at least React 19.0.3:
+              npm install react@19.0.3 react-dom@19.0.3
+
+            See: CVE-2025-55182, CVE-2025-67779
+          MSG
+        end
       end
 
       def missing_node?
@@ -219,10 +300,7 @@ module ReactOnRails
       end
 
       def shakapacker_in_lockfile?(gem_name)
-        # Always check the target app's Gemfile.lock, not inherited BUNDLE_GEMFILE
-        # See: https://github.com/shakacode/react_on_rails/issues/2287
-        File.file?("Gemfile.lock") &&
-          File.foreach("Gemfile.lock").any? { |l| l.match?(/^\s{4}#{Regexp.escape(gem_name)}\s\(/) }
+        gem_in_lockfile?(gem_name)
       end
 
       def shakapacker_in_bundler_specs?(gem_name)
