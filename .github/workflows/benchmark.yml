@@ -83,12 +83,21 @@ env:
 jobs:
   benchmark:
     # Run on: push to master, workflow_dispatch, or PRs with 'full-ci' or 'benchmark' labels
+    # See https://bencher.dev/docs/how-to/github-actions/#pull-requests for the extra pull_request condition
     if: |
       github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch' ||
-      contains(github.event.pull_request.labels.*.name, 'full-ci') ||
-      contains(github.event.pull_request.labels.*.name, 'benchmark')
+      (
+        github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository &&
+        (contains(github.event.pull_request.labels.*.name, 'full-ci') ||
+         contains(github.event.pull_request.labels.*.name, 'benchmark'))
+      )
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+      checks: write
     env:
       SECRET_KEY_BASE: 'dummy-secret-key-for-ci-testing-not-used-in-production'
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
@@ -103,6 +112,9 @@ jobs:
       # ============================================
       # STEP 2: INSTALL BENCHMARKING TOOLS
       # ============================================
+
+      - name: Install Bencher CLI
+        uses: bencherdev/bencher@main
 
       - name: Add tools directory to PATH
         run: |
@@ -300,7 +312,7 @@ jobs:
       - name: Convert Core benchmark results to JSON
         if: env.RUN_CORE
         run: |
-          ruby benchmarks/convert_to_benchmark_json.rb "Core: "
+          ruby benchmarks/convert-to-bmf.rb "Core: "
 
       - name: Upload Core benchmark results
         uses: actions/upload-artifact@v4
@@ -479,7 +491,7 @@ jobs:
       - name: Convert Pro benchmark results to JSON
         if: env.RUN_PRO
         run: |
-          ruby benchmarks/convert_to_benchmark_json.rb "Pro: " --append
+          ruby benchmarks/convert-to-bmf.rb "Pro: " --append
 
       - name: Upload Pro benchmark results
         uses: actions/upload-artifact@v4
@@ -493,22 +505,75 @@ jobs:
       # ============================================
       # STEP 7: STORE BENCHMARK DATA
       # ============================================
-      - name: Store all benchmark results
-        uses: benchmark-action/github-action-benchmark@v1
-        with:
-          name: React on Rails Benchmarks
-          tool: customSmallerIsBetter
-          output-file-path: bench_results/benchmark.json
-          gh-pages-branch: benchmark-data
-          benchmark-data-dir-path: docs/benchmarks
-          alert-threshold: '150%'
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          comment-on-alert: true
-          alert-comment-cc-users: '@alexeyr-ci2'
-          fail-on-alert: true
-          summary-always: true
-          # New changes should only be actually recorded on pushes to master
-          auto-push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+      # See: https://bencher.dev/docs/how-to/track-benchmarks/ and
+      #      https://bencher.dev/docs/how-to/github-actions/
+      #
+      # Threshold configuration (30% regression threshold):
+      #   - rps: Lower Boundary (higher is better)
+      #   - p50/p90/p99_latency_ms: Upper Boundary (lower is better)
+      #   - failed_pct: Upper Boundary (lower is better)
+
+      - name: Track benchmarks with Bencher
+        run: |
+          # Threshold for detecting regressions (30% = 0.30)
+          THRESHOLD=0.30
+
+          # Set branch and start-point based on event type
+          if [ "${{ github.event_name }}" = "push" ]; then
+            BRANCH="master"
+            START_POINT="master"
+            START_POINT_HASH="${{ github.event.before }}"
+            EXTRA_ARGS=""
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+            BRANCH="$GITHUB_HEAD_REF"
+            START_POINT="$GITHUB_BASE_REF"
+            START_POINT_HASH="${{ github.event.pull_request.base.sha }}"
+            EXTRA_ARGS="--start-point-reset --ci-number ${{ github.event.pull_request.number }}"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # Find where branch diverged from master
+            git fetch origin master --depth=100
+            BRANCH="${{ github.ref_name }}"
+            START_POINT="master"
+            START_POINT_HASH=$(git merge-base HEAD origin/master)
+            EXTRA_ARGS=""
+          else
+            echo "❌ ERROR: Unexpected event type: ${{ github.event_name }}"
+            exit 1
+          fi
+
+          bencher run \
+            --project react-on-rails-t8a9ncxo \
+            --token '${{ secrets.BENCHER_API_TOKEN }}' \
+            --branch "$BRANCH" \
+            --start-point "$START_POINT" \
+            --start-point-hash "$START_POINT_HASH" \
+            --start-point-clone-thresholds \
+            --testbed github-actions \
+            --adapter json \
+            --file bench_results/benchmark.json \
+            --github-actions '${{ secrets.GITHUB_TOKEN }}' \
+            --err \
+            --threshold-measure rps \
+            --threshold-test percentage \
+            --threshold-lower-boundary $THRESHOLD \
+            --threshold-upper-boundary _ \
+            --threshold-measure p50_latency_ms \
+            --threshold-test percentage \
+            --threshold-lower-boundary _ \
+            --threshold-upper-boundary $THRESHOLD \
+            --threshold-measure p90_latency_ms \
+            --threshold-test percentage \
+            --threshold-lower-boundary _ \
+            --threshold-upper-boundary $THRESHOLD \
+            --threshold-measure p99_latency_ms \
+            --threshold-test percentage \
+            --threshold-lower-boundary _ \
+            --threshold-upper-boundary $THRESHOLD \
+            --threshold-measure failed_pct \
+            --threshold-test percentage \
+            --threshold-lower-boundary _ \
+            --threshold-upper-boundary $THRESHOLD \
+            $EXTRA_ARGS
 
       # ============================================
       # STEP 8: WORKFLOW COMPLETION
