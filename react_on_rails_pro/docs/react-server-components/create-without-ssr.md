@@ -433,7 +433,6 @@ If we click on the fetch request, we can see the response.
 The response contains two main parts:
 
 1. The React Server Component (RSC) payload - This is a special format designed by React for serializing server components and transmitting them to the client. The RSC payload includes:
-
    - The component's rendered output
    - Any data props that were passed to the client components
    - References to client components that need to be hydrated

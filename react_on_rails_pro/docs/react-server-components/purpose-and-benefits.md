@@ -11,7 +11,6 @@ React Server Components with streaming is beneficial for most applications, but 
 When a user visits the page, they'll experience the following sequence:
 
 1. The initial HTML shell is sent immediately, including:
-
    - The page layout
    - Any static content (like the `<h1>` and footer)
    - Placeholder content for the React component (typically a loading state)
@@ -28,7 +27,6 @@ When a user visits the page, they'll experience the following sequence:
 React Server Components significantly reduce client-side JavaScript by:
 
 1. **Server-Only Code Elimination:**
-
    - Dependencies used only in server components never ship to the client
    - Database queries, API calls, and their libraries stay server-side
    - Heavy data processing utilities remain on the server
@@ -59,13 +57,11 @@ import numeral from 'numeral'; // ~25KB
 React's selective hydration is a powerful feature that significantly improves page interactivity by:
 
 1. **Independent Component Hydration**
-
    - Each client component hydrates independently as soon as its code loads
    - No waiting for the entire page's JavaScript to load and execute
    - Components become interactive progressively rather than all at once
 
 2. **Interaction-Based Prioritization**
-
    - React automatically prioritizes hydrating components that users try to interact with
    - If a user clicks a button before hydration, that component gets priority
    - Other components continue hydrating in the background
