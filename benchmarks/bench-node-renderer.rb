@@ -7,6 +7,7 @@
 require "English"
 require "open3"
 require "socket"
+require_relative "lib/benchmark_config"
 require_relative "lib/benchmark_helpers"
 require_relative "lib/bmf_helpers"
 
@@ -48,16 +49,8 @@ TEST_CASES = [
   }
 ].freeze
 
-# Benchmark configuration
-RATE = env_or_default("RATE", "max")
-CONNECTIONS = env_or_default("CONNECTIONS", 10).to_i
-MAX_CONNECTIONS = env_or_default("MAX_CONNECTIONS", CONNECTIONS).to_i
-DURATION = env_or_default("DURATION", "30s")
-REQUEST_TIMEOUT = env_or_default("REQUEST_TIMEOUT", "60s")
-
-OUTDIR = "bench_results"
+# Script-specific configuration (common params from benchmark_config.rb)
 SUMMARY_TXT = "#{OUTDIR}/node_renderer_summary.txt".freeze
-BENCHMARK_JSON = "#{OUTDIR}/benchmark.json".freeze
 BMF_PREFIX = "Pro: NodeRenderer: "
 
 # Local wrapper for add_summary_line to use local constant
@@ -238,16 +231,7 @@ end
 
 # Main execution
 
-# Validate parameters
-validate_rate(RATE)
-validate_positive_integer(CONNECTIONS, "CONNECTIONS")
-validate_positive_integer(MAX_CONNECTIONS, "MAX_CONNECTIONS")
-validate_duration(DURATION, "DURATION")
-validate_duration(REQUEST_TIMEOUT, "REQUEST_TIMEOUT")
-
-if RATE == "max" && CONNECTIONS != MAX_CONNECTIONS
-  raise "For RATE=max, CONNECTIONS must equal MAX_CONNECTIONS (got #{CONNECTIONS} and #{MAX_CONNECTIONS})"
-end
+validate_benchmark_config!
 
 # Check required tools
 check_required_tools(%w[vegeta curl column tee])

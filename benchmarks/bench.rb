@@ -3,28 +3,16 @@
 
 require "open3"
 require "shellwords"
+require_relative "lib/benchmark_config"
 require_relative "lib/benchmark_helpers"
 require_relative "lib/bmf_helpers"
 
-# Benchmark parameters
+# Script-specific parameters
 PRO = ENV.fetch("PRO", "false") == "true"
 APP_DIR = PRO ? "react_on_rails_pro/spec/dummy" : "react_on_rails/spec/dummy"
 ROUTES = env_or_default("ROUTES", nil)
 BASE_URL = env_or_default("BASE_URL", "localhost:3001")
-# requests per second; if "max" will get maximum number of queries instead of a fixed rate
-RATE = env_or_default("RATE", "50")
-# concurrent connections/virtual users
-CONNECTIONS = env_or_default("CONNECTIONS", 10).to_i
-# maximum connections/virtual users
-MAX_CONNECTIONS = env_or_default("MAX_CONNECTIONS", CONNECTIONS).to_i
-# benchmark duration (duration string like "30s", "1m", "90s")
-DURATION = env_or_default("DURATION", "30s")
-# request timeout (duration string as above)
-REQUEST_TIMEOUT = env_or_default("REQUEST_TIMEOUT", "60s")
-
-OUTDIR = "bench_results"
 SUMMARY_TXT = "#{OUTDIR}/summary.txt".freeze
-BENCHMARK_JSON = "#{OUTDIR}/benchmark.json".freeze
 BMF_PREFIX = PRO ? "Pro: " : "Core: "
 
 # Local wrapper for add_summary_line to use local constant
@@ -101,13 +89,7 @@ routes =
 
 raise "No routes to benchmark" if routes.empty?
 
-validate_rate(RATE)
-validate_positive_integer(CONNECTIONS, "CONNECTIONS")
-validate_positive_integer(MAX_CONNECTIONS, "MAX_CONNECTIONS")
-validate_duration(DURATION, "DURATION")
-validate_duration(REQUEST_TIMEOUT, "REQUEST_TIMEOUT")
-
-raise "MAX_CONNECTIONS (#{MAX_CONNECTIONS}) must be >= CONNECTIONS (#{CONNECTIONS})" if MAX_CONNECTIONS < CONNECTIONS
+validate_benchmark_config!
 
 # Check required tools are installed
 check_required_tools(%w[k6 column tee])
@@ -136,12 +118,6 @@ FileUtils.mkdir_p(OUTDIR)
 
 # Initialize BMF collector for Bencher output
 bmf_collector = BmfCollector.new(prefix: BMF_PREFIX)
-
-# Validate RATE=max constraint
-IS_MAX_RATE = RATE == "max"
-if IS_MAX_RATE && CONNECTIONS != MAX_CONNECTIONS
-  raise "For RATE=max, CONNECTIONS must be equal to MAX_CONNECTIONS (got #{CONNECTIONS} and #{MAX_CONNECTIONS})"
-end
 
 # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
