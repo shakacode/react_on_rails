@@ -298,21 +298,22 @@ module ReactOnRails
 
         puts Rainbow("🔧 Configuring Shakapacker for Rspack...").yellow
 
-        # Parse YAML config properly to avoid fragile regex manipulation
-        # Support both old and new Psych versions
-        config = begin
-          YAML.load_file(shakapacker_config_path, aliases: true)
-        rescue ArgumentError
-          # Older Psych versions don't support the aliases parameter
-          YAML.load_file(shakapacker_config_path)
-        end
-        # Update default section
-        config["default"] ||= {}
-        config["default"]["assets_bundler"] = "rspack"
-        config["default"]["webpack_loader"] = "swc"
+        # Use regex replacement to preserve file structure (comments, anchors, aliases)
+        # This replaces ALL occurrences of assets_bundler, not just in default section
+        # Using gsub_file (Thor method) for consistency with Rails generator patterns
+        gsub_file(
+          shakapacker_config_path,
+          /^(\s*assets_bundler:\s*)["']?webpack["']?(\s*(?:#.*)?)$/,
+          '\1rspack\2'
+        )
 
-        # Write back as YAML
-        File.write(shakapacker_config_path, YAML.dump(config))
+        # Update webpack_loader to swc (rspack works best with SWC)
+        gsub_file(
+          shakapacker_config_path,
+          /^(\s*webpack_loader:\s*)["']?babel["']?(\s*(?:#.*)?)$/,
+          '\1swc\2'
+        )
+
         puts Rainbow("✅ Updated shakapacker.yml for Rspack").green
       end
     end
