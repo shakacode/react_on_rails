@@ -56,10 +56,11 @@ class BmfCollector
       # RPS (higher is better) - use Lower Boundary threshold in Bencher
       add_measure(benchmark_entry, "rps", r[:rps])
 
-      # Latencies in ms (lower is better) - use Upper Boundary threshold in Bencher
-      add_measure(benchmark_entry, "p50_latency_ms", r[:p50])
-      add_measure(benchmark_entry, "p90_latency_ms", r[:p90])
-      add_measure(benchmark_entry, "p99_latency_ms", r[:p99])
+      # Latencies (lower is better) - use Upper Boundary threshold in Bencher
+      # Units (ms) configured in Bencher measure settings
+      add_measure(benchmark_entry, "p50_latency", r[:p50])
+      add_measure(benchmark_entry, "p90_latency", r[:p90])
+      add_measure(benchmark_entry, "p99_latency", r[:p99])
 
       # Failure percentage (lower is better) - use Upper Boundary threshold in Bencher
       add_measure(benchmark_entry, "failed_pct", r[:failed_pct])
