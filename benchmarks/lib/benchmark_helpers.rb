@@ -6,33 +6,7 @@ require "net/http"
 require "uri"
 
 # Shared utilities for benchmark scripts
-
-# Helper to get env var with default,
-# treating empty string and "0" as unset since they can come from the benchmark workflow.
-def env_or_default(key, default)
-  value = ENV[key].to_s
-  value.empty? || value == "0" ? default : value
-end
-
-# Validation helpers
-def validate_rate(rate)
-  return if rate == "max"
-  return if rate.match?(/^\d+(\.\d+)?$/) && rate.to_f.positive?
-
-  raise "RATE must be 'max' or a positive number (got: '#{rate}')"
-end
-
-def validate_positive_integer(value, name)
-  return if value.is_a?(Integer) && value.positive?
-
-  raise "#{name} must be a positive integer (got: '#{value}')"
-end
-
-def validate_duration(value, name)
-  return if value.match?(/^(\d+(\.\d+)?[smh])+$/)
-
-  raise "#{name} must be a duration like '10s', '1m', '1.5m' (got: '#{value}')"
-end
+# Note: env_or_default and validation helpers are in benchmark_config.rb
 
 # JSON parsing with error handling
 def parse_json_file(file_path, tool_name)
