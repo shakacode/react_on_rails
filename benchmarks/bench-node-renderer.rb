@@ -8,6 +8,7 @@ require "English"
 require "open3"
 require "socket"
 require_relative "lib/benchmark_helpers"
+require_relative "lib/bmf_helpers"
 
 # Read configuration from source files
 def read_protocol_version
@@ -56,6 +57,8 @@ REQUEST_TIMEOUT = env_or_default("REQUEST_TIMEOUT", "60s")
 
 OUTDIR = "bench_results"
 SUMMARY_TXT = "#{OUTDIR}/node_renderer_summary.txt".freeze
+BENCHMARK_JSON = "#{OUTDIR}/benchmark.json".freeze
+BMF_PREFIX = "Pro: NodeRenderer: "
 
 # Local wrapper for add_summary_line to use local constant
 def add_to_summary(*parts)
@@ -306,6 +309,9 @@ print_params(
 # Create output directory
 FileUtils.mkdir_p(OUTDIR)
 
+# Initialize BMF collector for Bencher output
+bmf_collector = BmfCollector.new(prefix: BMF_PREFIX)
+
 # Initialize summary file
 File.write(SUMMARY_TXT, "")
 add_to_summary("Test", "Bundle", "RPS", "p50(ms)", "p90(ms)", "p99(ms)", "max(ms)", "Status")
@@ -318,8 +324,12 @@ non_rsc_tests.each do |test_case|
   puts "  Request: #{test_case[:request]}"
   print_separator
 
-  metrics = run_vegeta_benchmark(test_case, non_rsc_bundle)
-  add_to_summary(test_case[:name], "non-RSC", *metrics)
+  rps, p50, p90, p99, max_latency, status = run_vegeta_benchmark(test_case, non_rsc_bundle)
+  add_to_summary(test_case[:name], "non-RSC", rps, p50, p90, p99, max_latency, status)
+
+  # Add to BMF collector for Bencher output
+  bmf_collector.add(name: test_case[:name], rps: rps, p50: p50, p90: p90, p99: p99, status: status,
+                    suffix: " (non-RSC)")
 end
 
 # Run RSC benchmarks
@@ -330,9 +340,16 @@ rsc_tests.each do |test_case|
   puts "  Request: #{test_case[:request]}"
   print_separator
 
-  metrics = run_vegeta_benchmark(test_case, rsc_bundle)
-  add_to_summary(test_case[:name], "RSC", *metrics)
+  rps, p50, p90, p99, max_latency, status = run_vegeta_benchmark(test_case, rsc_bundle)
+  add_to_summary(test_case[:name], "RSC", rps, p50, p90, p99, max_latency, status)
+
+  # Add to BMF collector for Bencher output
+  bmf_collector.add(name: test_case[:name], rps: rps, p50: p50, p90: p90, p99: p99, status: status,
+                    suffix: " (RSC)")
 end
 
 # Display summary
 display_summary(SUMMARY_TXT)
+
+# Write BMF JSON for Bencher (append to existing Pro results)
+bmf_collector.write_bmf_json(BENCHMARK_JSON, append: true)
