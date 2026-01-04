@@ -188,6 +188,12 @@ module ReactOnRails
       config_data&.[](:precompile_hook) || config_data&.[]("precompile_hook")
     end
 
+    # Regex pattern to detect pack generation in hook scripts
+    # Matches both:
+    # - The rake task: react_on_rails:generate_packs
+    # - The Ruby method: generate_packs_if_stale (used by generator template)
+    GENERATE_PACKS_PATTERN = /(react_on_rails:generate_packs|generate_packs_if_stale)/
+
     def self.hook_contains_generate_packs?(hook_value)
       # The hook value can be either:
       # 1. A direct command containing the rake task
@@ -195,7 +201,7 @@ module ReactOnRails
       return false if hook_value.blank?
 
       # Check if it's a direct command first
-      return true if hook_value.to_s.match?(/\breact_on_rails:generate_packs\b/)
+      return true if hook_value.to_s.match?(GENERATE_PACKS_PATTERN)
 
       # Check if it's a script file path
       script_path = resolve_hook_script_path(hook_value)
@@ -203,7 +209,7 @@ module ReactOnRails
 
       # Read and check script contents
       script_contents = File.read(script_path)
-      script_contents.match?(/\breact_on_rails:generate_packs\b/)
+      script_contents.match?(GENERATE_PACKS_PATTERN)
     rescue StandardError
       # If we can't read the script, assume it doesn't contain generate_packs
       false
