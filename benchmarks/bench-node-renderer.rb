@@ -240,12 +240,12 @@ check_required_tools(%w[vegeta curl column tee])
 # Note: Node renderer only speaks HTTP/2, but we can still check with a simple GET
 # that will fail - we just check it doesn't refuse connection
 puts "\nWaiting for node renderer at #{BASE_URL}..."
+base_uri = URI.parse("http://#{BASE_URL}")
 start_time = Time.now
 timeout_sec = 60
 loop do
   # Try a simple TCP connection to check if server is up
-
-  Socket.tcp(BASE_URL.split(":").first, BASE_URL.split(":").last.to_i, connect_timeout: 5, &:close)
+  Socket.tcp(base_uri.host, base_uri.port, connect_timeout: 5, &:close)
   puts "  Node renderer is accepting connections"
   break
 rescue StandardError => e
