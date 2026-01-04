@@ -92,8 +92,10 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      issues: write
-      pull-requests: write
+      ## Disabled until https://github.com/bencherdev/bencher/issues/644 is fixed,
+      ## for now post only a check:
+      # issues: write
+      # pull-requests: write
       checks: write
     env:
       SECRET_KEY_BASE: 'dummy-secret-key-for-ci-testing-not-used-in-production'
