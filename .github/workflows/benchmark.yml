@@ -206,10 +206,8 @@ jobs:
 
           # Server: high priority (-20), pinned to CPUs 1+
           # Benchmark: elevated priority (-10), pinned to CPU 0
-          # sudo requires explicit PATH (secure_path in sudoers overrides -E)
-          SUDO_PREFIX="sudo env PATH=$PATH"
-          SERVER_CMD="$SUDO_PREFIX nice -n -20 taskset -c 1-$((NPROC-1)) bin/prod"
-          BENCH_CMD="$SUDO_PREFIX nice -n -10 taskset -c 0 ruby"
+          SERVER_CMD="nice -n -20 taskset -c 1-$((NPROC-1)) bin/prod"
+          BENCH_CMD="nice -n -10 taskset -c 0 ruby"
 
           echo "SERVER_CMD=$SERVER_CMD" >> $GITHUB_ENV
           echo "BENCH_CMD=$BENCH_CMD" >> $GITHUB_ENV
