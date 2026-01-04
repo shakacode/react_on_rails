@@ -81,9 +81,14 @@ class BmfCollector
 
     # In append mode, merge with existing benchmarks
     if append && File.exist?(output_path)
-      existing_benchmarks = JSON.parse(File.read(output_path))
-      bmf_json = existing_benchmarks.merge(new_benchmarks)
-      puts "Appended #{new_benchmarks.length} benchmarks to existing #{existing_benchmarks.length} benchmarks"
+      begin
+        existing_benchmarks = JSON.parse(File.read(output_path))
+        bmf_json = existing_benchmarks.merge(new_benchmarks)
+        puts "Appended #{new_benchmarks.length} benchmarks to existing #{existing_benchmarks.length} benchmarks"
+      rescue JSON::ParserError => e
+        warn "WARNING: Existing #{output_path} contains invalid JSON (#{e.message}), overwriting"
+        bmf_json = new_benchmarks
+      end
     else
       bmf_json = new_benchmarks
       puts "Created #{bmf_json.length} new benchmarks"
