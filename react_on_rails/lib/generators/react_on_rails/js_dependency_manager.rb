@@ -127,17 +127,19 @@ module ReactOnRails
       end
 
       def add_js_dependencies
-        add_react_on_rails_package
+        using_pro = respond_to?(:use_pro?) && use_pro?
+        # Pro package includes react-on-rails, so skip base package when using Pro
+        add_react_on_rails_package unless using_pro
         add_react_dependencies
         add_css_dependencies
-        # Rspack dependencies are only added when --rspack flag is used
-        add_rspack_dependencies if respond_to?(:options) && options&.rspack?
-        # SWC dependencies are only added when SWC is the configured transpiler
+        add_rspack_dependencies if using_rspack?
         add_swc_dependencies if using_swc?
-        # Pro dependencies are only added when --pro or --rsc flag is used
-        add_pro_dependencies if respond_to?(:use_pro?) && use_pro?
-        # Dev dependencies vary based on bundler choice
+        add_pro_dependencies if using_pro
         add_dev_dependencies
+      end
+
+      def using_rspack?
+        respond_to?(:options) && options&.rspack?
       end
 
       def add_react_on_rails_package
@@ -291,6 +293,11 @@ module ReactOnRails
 
       def add_pro_dependencies
         puts "Installing React on Rails Pro dependencies..."
+
+        # When upgrading from base React on Rails to Pro, remove the base package first
+        # Pro package includes all base functionality, so having both causes validation errors
+        remove_base_package_if_present
+
         return if add_packages(PRO_DEPENDENCIES)
 
         GeneratorMessages.add_warning(<<~MSG.strip)
@@ -305,6 +312,25 @@ module ReactOnRails
 
           You can install them manually by running:
             npm install #{PRO_DEPENDENCIES.join(' ')}
+        MSG
+      end
+
+      def remove_base_package_if_present
+        pj = package_json
+        return unless pj
+
+        dependencies = pj.fetch("dependencies", {})
+        return unless dependencies.key?("react-on-rails")
+
+        puts "Removing base 'react-on-rails' package (Pro package includes all base functionality)..."
+        pj.manager.remove(["react-on-rails"])
+        puts "✅ Removed 'react-on-rails' package"
+      rescue StandardError => e
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Could not remove base 'react-on-rails' package: #{e.message}
+
+          Please remove it manually:
+            npm uninstall react-on-rails
         MSG
       end
 
