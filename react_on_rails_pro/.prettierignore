@@ -3,7 +3,7 @@ node_modules
 **/tmp
 **/public
 **/package.json
-vendor/bundle
+**/vendor
 **/.node-renderer-bundles
 spec/dummy/.yalc/
 

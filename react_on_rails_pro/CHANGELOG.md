@@ -34,6 +34,7 @@ Changes since the last non-beta release.
 - Added `cached_stream_react_component` helper method, similar to `cached_react_component` but for streamed components.
 - **License Validation System**: Implemented comprehensive JWT-based license validation with offline verification using RSA-256 signatures. License validation occurs at startup in both Ruby and Node.js environments. Supports required fields (`sub`, `iat`, `exp`) and optional fields (`plan`, `organization`, `iss`). FREE evaluation licenses are available for 3 months at [shakacode.com/react-on-rails-pro](https://shakacode.com/react-on-rails-pro). [PR #1857](https://github.com/shakacode/react_on_rails/pull/1857) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 - **Pro-Specific Configurations Moved from Open-Source**: The following React Server Components (RSC) configurations are now exclusively in the Pro gem and should be configured in `ReactOnRailsPro.configure`:
+
   - `rsc_bundle_js_file` - Path to the RSC bundle file
   - `react_server_client_manifest_file` - Path to the React server client manifest
   - `react_client_manifest_file` - Path to the React client manifest
@@ -41,6 +42,7 @@ Changes since the last non-beta release.
   These configurations were previously available in the open-source `ReactOnRails.configure` block but have been moved to Pro where they belong since RSC is a Pro-only feature.
 
 - **Streaming View Helpers Now Pro-Exclusive**: The following view helpers are now defined exclusively in the Pro gem:
+
   - `stream_react_component` - Progressive SSR using React 18+ streaming
   - `rsc_payload_react_component` - RSC payload rendering
 
@@ -119,6 +121,7 @@ Changes since the last non-beta release.
 ### Changed
 
 - [PR 511](https://github.com/shakacode/react_on_rails_pro/pull/511) by [Romex91](https://github.com/Romex91)
+
   - Set `bodyLimit` to 100 MB by default to fix error 413.
   - Add `fastifyServerOptions` to the config
 
@@ -265,6 +268,7 @@ React 18 is now supported! Check the [React on Rails CHANGELOG.md](https://githu
 ### Added
 
 - [PR 220](https://github.com/shakacode/react_on_rails_pro/pull/220) by [justin808](https://github.com/justin808).
+
   - **Add `ssr_timeout` configuration** so the Rails server will not wait more than this many seconds for a SSR request to return once issued.
   - Change default for `renderer_use_fallback_exec_js` to `false`.
   - Change default log level to info.
