@@ -51,7 +51,7 @@ TEST_CASES = [
 
 # Script-specific configuration (common params from benchmark_config.rb)
 SUMMARY_TXT = "#{OUTDIR}/node_renderer_summary.txt".freeze
-BMF_PREFIX = "Pro: NodeRenderer: "
+BMF_PREFIX = "Pro Node Renderer: "
 
 # Local wrapper for add_summary_line to use local constant
 def add_to_summary(*parts)
@@ -312,8 +312,7 @@ non_rsc_tests.each do |test_case|
   add_to_summary(test_case[:name], "non-RSC", rps, p50, p90, p99, max_latency, status)
 
   # Add to BMF collector for Bencher output
-  bmf_collector.add(name: test_case[:name], rps: rps, p50: p50, p90: p90, p99: p99, status: status,
-                    suffix: " (non-RSC)")
+  bmf_collector.add(name: "#{test_case[:name]} (non-RSC)", rps: rps, p50: p50, p90: p90, p99: p99, status: status)
 end
 
 # Run RSC benchmarks
@@ -328,8 +327,7 @@ rsc_tests.each do |test_case|
   add_to_summary(test_case[:name], "RSC", rps, p50, p90, p99, max_latency, status)
 
   # Add to BMF collector for Bencher output
-  bmf_collector.add(name: test_case[:name], rps: rps, p50: p50, p90: p90, p99: p99, status: status,
-                    suffix: " (RSC)")
+  bmf_collector.add(name: "#{test_case[:name]} (RSC)", rps: rps, p50: p50, p90: p90, p99: p99, status: status)
 end
 
 # Display summary

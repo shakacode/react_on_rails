@@ -13,7 +13,7 @@ APP_DIR = PRO ? "react_on_rails_pro/spec/dummy" : "react_on_rails/spec/dummy"
 ROUTES = env_or_default("ROUTES", nil)
 BASE_URL = env_or_default("BASE_URL", "localhost:3001")
 SUMMARY_TXT = "#{OUTDIR}/summary.txt".freeze
-BMF_PREFIX = PRO ? "Pro: " : "Core: "
+BMF_SUFFIX = PRO ? ": Pro" : ": Core"
 
 # Local wrapper for add_summary_line to use local constant
 def add_to_summary(*parts)
@@ -116,8 +116,8 @@ puts "Server is ready!"
 
 FileUtils.mkdir_p(OUTDIR)
 
-# Initialize BMF collector for Bencher output
-bmf_collector = BmfCollector.new(prefix: BMF_PREFIX)
+# Initialize BMF collector for Bencher output (suffix used for Core/Pro distinction)
+bmf_collector = BmfCollector.new(suffix: BMF_SUFFIX)
 
 # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 

@@ -19,8 +19,9 @@ require "json"
 
 # Collect benchmark results for BMF JSON output
 class BmfCollector
-  def initialize(prefix: "")
+  def initialize(prefix: "", suffix: "")
     @prefix = prefix
+    @suffix = suffix
     @results = []
   end
 
@@ -31,13 +32,12 @@ class BmfCollector
   # @param p90 [Numeric, nil] 90th percentile latency in ms
   # @param p99 [Numeric, nil] 99th percentile latency in ms
   # @param status [String, nil] Status string like "200=100,5xx=2"
-  # @param suffix [String] Optional suffix for benchmark name (e.g., " (non-RSC)")
-  def add(name:, rps:, p50:, p90:, p99:, status:, suffix: "")
+  def add(name:, rps:, p50:, p90:, p99:, status:)
     # Skip if RPS is not a valid number (FAILED, MISSING, etc.)
     return unless rps.is_a?(Numeric)
 
     @results << {
-      name: "#{@prefix}#{name}#{suffix}",
+      name: "#{@prefix}#{name}#{@suffix}",
       rps: rps,
       p50: p50,
       p90: p90,
