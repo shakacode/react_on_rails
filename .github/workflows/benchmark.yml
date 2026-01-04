@@ -338,12 +338,6 @@ jobs:
           echo "Generated files:"
           ls -lh bench_results/
 
-      - name: Convert Core benchmark results to JSON
-        if: env.RUN_CORE
-        # sudo needed because benchmark files are owned by root (created with sudo nice)
-        run: |
-          sudo ruby benchmarks/convert-to-bmf.rb "Core: "
-
       - name: Upload Core benchmark results
         uses: actions/upload-artifact@v4
         if: env.RUN_CORE && always()
@@ -516,12 +510,6 @@ jobs:
           echo ""
           echo "Generated files:"
           ls -lh bench_results/
-
-      - name: Convert Pro benchmark results to JSON
-        if: env.RUN_PRO
-        # sudo needed because benchmark files are owned by root (created with sudo nice)
-        run: |
-          sudo ruby benchmarks/convert-to-bmf.rb "Pro: " --append
 
       - name: Upload Pro benchmark results
         uses: actions/upload-artifact@v4

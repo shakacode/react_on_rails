@@ -4,6 +4,7 @@
 require "open3"
 require "shellwords"
 require_relative "lib/benchmark_helpers"
+require_relative "lib/bmf_helpers"
 
 # Benchmark parameters
 PRO = ENV.fetch("PRO", "false") == "true"
@@ -23,6 +24,8 @@ REQUEST_TIMEOUT = env_or_default("REQUEST_TIMEOUT", "60s")
 
 OUTDIR = "bench_results"
 SUMMARY_TXT = "#{OUTDIR}/summary.txt".freeze
+BENCHMARK_JSON = "#{OUTDIR}/benchmark.json".freeze
+BMF_PREFIX = PRO ? "Pro: " : "Core: "
 
 # Local wrapper for add_summary_line to use local constant
 def add_to_summary(*parts)
@@ -131,6 +134,9 @@ puts "Server is ready!"
 
 FileUtils.mkdir_p(OUTDIR)
 
+# Initialize BMF collector for Bencher output
+bmf_collector = BmfCollector.new(prefix: BMF_PREFIX)
+
 # Validate RATE=max constraint
 IS_MAX_RATE = RATE == "max"
 if IS_MAX_RATE && CONNECTIONS != MAX_CONNECTIONS
@@ -216,9 +222,15 @@ routes.each do |route|
   puts "Warm-up complete for #{route}"
 
   route_name = sanitize_route_name(route)
-  metrics = run_k6_benchmark(target, route_name)
-  add_to_summary(route, *metrics)
+  rps, p50, p90, p99, max_latency, status = run_k6_benchmark(target, route_name)
+  add_to_summary(route, rps, p50, p90, p99, max_latency, status)
+
+  # Add to BMF collector for Bencher output
+  bmf_collector.add(name: route, rps: rps, p50: p50, p90: p90, p99: p99, status: status)
 end
 
 puts "\nSummary saved to #{SUMMARY_TXT}"
 system("column", "-t", "-s", "\t", SUMMARY_TXT)
+
+# Write BMF JSON for Bencher (append if Pro to combine with Core results)
+bmf_collector.write_bmf_json(BENCHMARK_JSON, append: PRO)
