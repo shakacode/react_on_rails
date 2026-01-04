@@ -573,15 +573,15 @@ jobs:
             --threshold-test percentage \
             --threshold-lower-boundary $THRESHOLD \
             --threshold-upper-boundary _ \
-            --threshold-measure p50_latency_ms \
+            --threshold-measure p50_latency \
             --threshold-test percentage \
             --threshold-lower-boundary _ \
             --threshold-upper-boundary $THRESHOLD \
-            --threshold-measure p90_latency_ms \
+            --threshold-measure p90_latency \
             --threshold-test percentage \
             --threshold-lower-boundary _ \
             --threshold-upper-boundary $THRESHOLD \
-            --threshold-measure p99_latency_ms \
+            --threshold-measure p99_latency \
             --threshold-test percentage \
             --threshold-lower-boundary _ \
             --threshold-upper-boundary $THRESHOLD \
