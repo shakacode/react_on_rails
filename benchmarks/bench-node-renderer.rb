@@ -51,7 +51,7 @@ TEST_CASES = [
 
 # Script-specific configuration (common params from benchmark_config.rb)
 SUMMARY_TXT = "#{OUTDIR}/node_renderer_summary.txt".freeze
-BMF_PREFIX = "Pro: NodeRenderer: "
+BMF_PREFIX = "Pro Node Renderer: "
 
 # Local wrapper for add_summary_line to use local constant
 def add_to_summary(*parts)
