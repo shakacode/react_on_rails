@@ -2,6 +2,7 @@
 
 require_relative "spec_helper"
 
+# rubocop:disable Metrics/ModuleLength
 module ReactOnRails
   describe PackerUtils do
     describe ".shakapacker_version_requirement_met?" do
@@ -139,9 +140,70 @@ module ReactOnRails
           expect(described_class.shakapacker_precompile_hook_configured?).to be true
         end
 
+        it "returns true when hook command contains generate_packs_if_stale method" do
+          hook_value = "ruby -e 'ReactOnRails::PacksGenerator.instance.generate_packs_if_stale'"
+          allow(mock_config).to receive(:send).with(:data)
+                                              .and_return({ precompile_hook: hook_value })
+          expect(described_class.shakapacker_precompile_hook_configured?).to be true
+        end
+
         it "returns false when hook command doesn't contain generate_packs" do
           allow(mock_config).to receive(:send).with(:data)
                                               .and_return({ precompile_hook: "bin/some-other-command" })
+          expect(described_class.shakapacker_precompile_hook_configured?).to be false
+        end
+      end
+
+      context "when precompile_hook points to a script file" do
+        let(:hook_path) { "bin/shakapacker-precompile-hook" }
+        let(:script_full_path) { instance_double(Pathname) }
+        let(:rails_root) { instance_double(Pathname) }
+
+        before do
+          allow(mock_config).to receive(:send).with(:data)
+                                              .and_return({ precompile_hook: hook_path })
+          allow(Rails).to receive(:root).and_return(rails_root)
+          allow(Rails).to receive(:respond_to?).with(:root).and_return(true)
+          allow(rails_root).to receive(:join).with(hook_path).and_return(script_full_path)
+        end
+
+        it "returns true when script contains generate_packs_if_stale" do
+          allow(script_full_path).to receive(:file?).and_return(true)
+          allow(File).to receive(:exist?).with(script_full_path).and_return(true)
+          allow(File).to receive(:read).with(script_full_path).and_return(<<~RUBY)
+            #!/usr/bin/env ruby
+            require_relative "../config/environment"
+            ReactOnRails::PacksGenerator.instance.generate_packs_if_stale
+          RUBY
+
+          expect(described_class.shakapacker_precompile_hook_configured?).to be true
+        end
+
+        it "returns true when script contains react_on_rails:generate_packs rake task" do
+          allow(script_full_path).to receive(:file?).and_return(true)
+          allow(File).to receive(:exist?).with(script_full_path).and_return(true)
+          allow(File).to receive(:read).with(script_full_path).and_return(<<~BASH)
+            #!/bin/bash
+            bundle exec rake react_on_rails:generate_packs
+          BASH
+
+          expect(described_class.shakapacker_precompile_hook_configured?).to be true
+        end
+
+        it "returns false when script doesn't contain generate_packs" do
+          allow(script_full_path).to receive(:file?).and_return(true)
+          allow(File).to receive(:exist?).with(script_full_path).and_return(true)
+          allow(File).to receive(:read).with(script_full_path).and_return(<<~BASH)
+            #!/bin/bash
+            echo "Some other precompile hook"
+          BASH
+
+          expect(described_class.shakapacker_precompile_hook_configured?).to be false
+        end
+
+        it "returns false when script file doesn't exist" do
+          allow(script_full_path).to receive(:file?).and_return(false)
+
           expect(described_class.shakapacker_precompile_hook_configured?).to be false
         end
       end
@@ -195,3 +257,4 @@ module ReactOnRails
     end
   end
 end
+# rubocop:enable Metrics/ModuleLength

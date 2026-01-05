@@ -192,7 +192,7 @@ module ReactOnRails
     # Matches both:
     # - The rake task: react_on_rails:generate_packs
     # - The Ruby method: generate_packs_if_stale (used by generator template)
-    GENERATE_PACKS_PATTERN = /(react_on_rails:generate_packs|generate_packs_if_stale)/
+    GENERATE_PACKS_PATTERN = /\b(react_on_rails:generate_packs|generate_packs_if_stale)\b/
 
     def self.hook_contains_generate_packs?(hook_value)
       # The hook value can be either:
