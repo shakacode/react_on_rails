@@ -2,7 +2,7 @@
 
 const { devServer, inliningCss, config } = require('shakapacker');
 
-const generateWebpackConfigs = require('./generateWebpackConfigs');
+const serverClientOrBoth = require('./ServerClientOrBoth');
 
 const developmentEnvOnly = (clientWebpackConfig, _serverWebpackConfig) => {
   // React Refresh (Fast Refresh) setup - only when dev server is running (HMR mode)
@@ -24,4 +24,4 @@ const developmentEnvOnly = (clientWebpackConfig, _serverWebpackConfig) => {
   }
 };
 
-module.exports = generateWebpackConfigs(developmentEnvOnly);
+module.exports = serverClientOrBoth(developmentEnvOnly);
