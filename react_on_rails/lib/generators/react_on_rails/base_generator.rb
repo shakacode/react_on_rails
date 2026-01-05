@@ -79,7 +79,7 @@ module ReactOnRails
                         config/webpack/development.js
                         config/webpack/production.js
                         config/webpack/serverWebpackConfig.js
-                        config/webpack/generateWebpackConfigs.js]
+                        config/webpack/ServerClientOrBoth.js]
         config = {
           message: "// The source code including full typescript support is available at:"
         }
