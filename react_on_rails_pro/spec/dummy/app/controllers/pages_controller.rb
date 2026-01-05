@@ -8,6 +8,9 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
   enable_async_react_rendering only: [:async_components_demo]
 
   XSS_PAYLOAD = { "<script>window.alert('xss1');</script>" => '<script>window.alert("xss2");</script>' }.freeze
+  # Constants for random data generation (extracted to avoid Performance/CollectionLiteralInLoop)
+  COLORS = %w[red green blue yellow purple].freeze
+  SIZES = %w[small medium large xlarge].freeze
   PROPS_NAME = "Mr. Server Side Rendering"
   APP_PROPS_SERVER_RENDER = {
     helloWorldData: {
@@ -168,6 +171,22 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
 
   # See files in spec/dummy/app/views/pages
 
+  # Large props stress test for reproducing JSON parsing race condition
+  # https://github.com/shakacode/react_on_rails/issues/2283
+  def large_props_stress_test
+    # Get registration delay from params (default 100ms)
+    @registration_delay = (params[:delay] || 100).to_i
+
+    # Generate large props (~200KB each) to trigger the race condition
+    @large_props_first = generate_large_props(1)
+    @large_props_second = generate_large_props(2)
+    @large_props_array = (0..2).map { |i| generate_large_props(i + 10) }
+
+    # Calculate total props size for display
+    all_props = [@large_props_first, @large_props_second] + @large_props_array
+    @total_props_size = all_props.sum { |p| p.to_json.length }
+  end
+
   helper_method :calc_slow_app_props_server_render
 
   private
@@ -201,6 +220,58 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
       helloWorldData: {
         name: "Mrs. Client Side Hello Again"
       }.merge(XSS_PAYLOAD)
+    }
+  end
+
+  # Generate large props data (~200KB when serialized to JSON)
+  def generate_large_props(component_id)
+    items = build_large_items_array
+    build_props_hash(component_id, items)
+  end
+
+  def build_large_items_array
+    # Create a large nested structure to reach ~200KB
+    (0..500).map do |i|
+      {
+        id: i,
+        uuid: SecureRandom.uuid,
+        name: "Item #{i} with a reasonably long name to increase size",
+        description: "This is a detailed description for item #{i}. " * 10,
+        metadata: build_item_metadata(i)
+      }
+    end
+  end
+
+  def build_item_metadata(index)
+    {
+      created_at: Time.now.iso8601,
+      updated_at: Time.now.iso8601,
+      tags: %w[tag1 tag2 tag3 tag4 tag5],
+      attributes: {
+        color: COLORS.sample,
+        size: SIZES.sample,
+        weight: rand(1.0..100.0).round(2),
+        dimensions: { width: rand(10..100), height: rand(10..100), depth: rand(10..100) }
+      },
+      # Add some special characters that could potentially cause issues
+      special_chars: "Special: <script>alert('xss')</script> & \"quotes\" 'apostrophe' \u2028\u2029",
+      nested_array: (0..10).map { |j| { nested_id: j, value: "nested_value_#{index}_#{j}" * 5 } }
+    }
+  end
+
+  def build_props_hash(component_id, items)
+    {
+      componentId: component_id,
+      loadTime: Time.now.iso8601,
+      registrationDelay: @registration_delay,
+      largeData: {
+        items: items,
+        summary: {
+          totalItems: items.length,
+          generatedAt: Time.now.iso8601,
+          propsVersion: "1.0.0"
+        }
+      }
     }
   end
 end

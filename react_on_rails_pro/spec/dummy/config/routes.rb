@@ -77,6 +77,10 @@ Rails.application.routes.draw do
   get "pure_component_wrapped_in_function" => "pages#pure_component_wrapped_in_function"
   get "posts_page" => "pages#posts_page"
 
+  # Large props stress test for reproducing JSON parsing race condition
+  # https://github.com/shakacode/react_on_rails/issues/2283
+  get "large_props_stress_test" => "pages#large_props_stress_test"
+
   # API Routes
   namespace :api do
     resources :posts do
