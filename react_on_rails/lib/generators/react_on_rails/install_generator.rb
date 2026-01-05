@@ -130,6 +130,7 @@ module ReactOnRails
         setup_react_dependencies
         warn_about_react_version_for_rsc
         setup_pro if use_pro?
+        setup_rsc if use_rsc?
       end
 
       def setup_react_dependencies
@@ -595,6 +596,72 @@ module ReactOnRails
         append_to_file("Procfile.dev", node_renderer_line)
 
         puts Rainbow("✅ Added Node Renderer to Procfile.dev").green
+      end
+
+      # RSC setup methods
+
+      def setup_rsc
+        puts Rainbow("\n#{'=' * 80}").magenta
+        puts Rainbow("🚀 REACT SERVER COMPONENTS SETUP").magenta.bold
+        puts Rainbow("=" * 80).magenta
+
+        create_rsc_webpack_config
+        add_rsc_to_procfile
+        # NOTE: RSC npm dependencies are added in add_js_dependencies (js_dependency_manager.rb)
+        # to ensure single npm install run with all dependencies
+
+        puts Rainbow("=" * 80).magenta
+        puts Rainbow("✅ React Server Components setup complete!").green
+        puts Rainbow("=" * 80).magenta
+      end
+
+      def create_rsc_webpack_config
+        webpack_config_path = "config/webpack/rscWebpackConfig.js"
+
+        if File.exist?(File.join(destination_root, webpack_config_path))
+          puts Rainbow("ℹ️  #{webpack_config_path} already exists, skipping").yellow
+          return
+        end
+
+        puts Rainbow("📝 Creating RSC webpack config...").yellow
+
+        rsc_template_path = "templates/rsc/base/config/webpack/rscWebpackConfig.js.tt"
+        template(rsc_template_path, webpack_config_path)
+
+        puts Rainbow("✅ Created #{webpack_config_path}").green
+      end
+
+      def add_rsc_to_procfile
+        procfile_path = File.join(destination_root, "Procfile.dev")
+
+        # Check if Procfile.dev exists
+        unless File.exist?(procfile_path)
+          GeneratorMessages.add_warning(<<~MSG.strip)
+            ⚠️  Procfile.dev not found. Skipping RSC bundle watcher addition.
+
+            You'll need to add the RSC bundle watcher to your process manager manually:
+              rails-rsc-assets: RSC_BUNDLE_ONLY=yes bin/shakapacker --watch
+          MSG
+          return
+        end
+
+        # Check if RSC watcher is already in Procfile.dev (idempotency)
+        if File.read(procfile_path).include?("RSC_BUNDLE_ONLY")
+          puts Rainbow("ℹ️  RSC bundle watcher already in Procfile.dev, skipping").yellow
+          return
+        end
+
+        puts Rainbow("📝 Adding RSC bundle watcher to Procfile.dev...").yellow
+
+        rsc_watcher_line = <<~PROCFILE
+
+          # React on Rails Pro - RSC bundle watcher
+          rails-rsc-assets: RSC_BUNDLE_ONLY=yes bin/shakapacker --watch
+        PROCFILE
+
+        append_to_file("Procfile.dev", rsc_watcher_line)
+
+        puts Rainbow("✅ Added RSC bundle watcher to Procfile.dev").green
       end
 
       # rubocop:enable Metrics/ClassLength
