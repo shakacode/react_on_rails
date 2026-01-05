@@ -418,6 +418,225 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  context "with --pro" do
+    before(:all) { run_generator_test_with_args(%w[--pro], package_json: true) }
+
+    include_examples "base_generator", application_js: true
+    include_examples "no_redux_generator"
+
+    it "creates Pro initializer with NodeRenderer configuration" do
+      assert_file "config/initializers/react_on_rails_pro.rb" do |content|
+        expect(content).to include("ReactOnRailsPro.configure")
+        expect(content).to include('config.server_renderer = "NodeRenderer"')
+        expect(content).to include("config.renderer_url")
+        expect(content).to include("config.renderer_password")
+        expect(content).to include("config.ssr_timeout")
+      end
+    end
+
+    it "creates node-renderer.js bootstrap file" do
+      assert_file "client/node-renderer.js" do |content|
+        expect(content).to include("reactOnRailsProNodeRenderer")
+        expect(content).to include("require('react-on-rails-pro-node-renderer')")
+        expect(content).to include("serverBundleCachePath")
+        expect(content).to include("port:")
+        expect(content).to include("password:")
+        expect(content).to include("workersCount:")
+      end
+    end
+
+    it "adds node-renderer process to Procfile.dev" do
+      assert_file "Procfile.dev" do |content|
+        expect(content).to include("node-renderer:")
+        expect(content).to include("RENDERER_PORT=3800")
+        expect(content).to include("node client/node-renderer.js")
+      end
+    end
+
+    it "installs Pro npm dependencies" do
+      assert_file "package.json" do |content|
+        package_json = JSON.parse(content)
+        deps = package_json["dependencies"] || {}
+        expect(deps).to include("react-on-rails-pro")
+        expect(deps).to include("react-on-rails-pro-node-renderer")
+      end
+    end
+
+    # TODO: When --rsc tests are added, evaluate if this negative test is redundant.
+    #       If the positive RSC tests adequately cover the template conditional, remove this.
+    it "Pro initializer does not include RSC configuration" do
+      assert_file "config/initializers/react_on_rails_pro.rb" do |content|
+        expect(content).not_to include("enable_rsc_support")
+        expect(content).not_to include("rsc_bundle_js_file")
+      end
+    end
+  end
+
+  context "with --pro --redux" do
+    before(:all) { run_generator_test_with_args(%w[--pro --redux], package_json: true) }
+
+    include_examples "base_generator_common", application_js: true
+    include_examples "react_with_redux_generator"
+
+    it "creates Pro initializer" do
+      assert_file "config/initializers/react_on_rails_pro.rb" do |content|
+        expect(content).to include("ReactOnRailsPro.configure")
+      end
+    end
+
+    it "creates node-renderer.js" do
+      assert_file "client/node-renderer.js" do |content|
+        expect(content).to include("reactOnRailsProNodeRenderer")
+      end
+    end
+
+    it "adds node-renderer to Procfile.dev" do
+      assert_file "Procfile.dev" do |content|
+        expect(content).to include("node-renderer:")
+      end
+    end
+
+    it "installs both Pro and Redux dependencies" do
+      assert_file "package.json" do |content|
+        package_json = JSON.parse(content)
+        deps = package_json["dependencies"] || {}
+        expect(deps).to include("react-on-rails-pro")
+        expect(deps).to include("redux")
+      end
+    end
+  end
+
+  context "with --pro --typescript" do
+    before(:all) { run_generator_test_with_args(%w[--pro --typescript], package_json: true) }
+
+    include_examples "base_generator_common", application_js: true
+    include_examples "no_redux_generator"
+
+    it "creates Pro initializer" do
+      assert_file "config/initializers/react_on_rails_pro.rb" do |content|
+        expect(content).to include("ReactOnRailsPro.configure")
+      end
+    end
+
+    it "creates node-renderer.js" do
+      assert_file "client/node-renderer.js"
+    end
+
+    it "creates TypeScript component files with .tsx extension" do
+      assert_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.tsx"
+      assert_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.server.tsx"
+    end
+
+    it "creates tsconfig.json file" do
+      assert_file "tsconfig.json" do |content|
+        config = JSON.parse(content)
+        expect(config["compilerOptions"]["jsx"]).to eq("react-jsx")
+      end
+    end
+
+    it "installs both Pro and TypeScript dependencies" do
+      assert_file "package.json" do |content|
+        package_json = JSON.parse(content)
+        deps = package_json["dependencies"] || {}
+        dev_deps = package_json["devDependencies"] || {}
+        expect(deps).to include("react-on-rails-pro")
+        expect(dev_deps).to include("typescript")
+        expect(dev_deps).to include("@types/react")
+      end
+    end
+  end
+
+  context "with --pro --rspack" do
+    before(:all) { run_generator_test_with_args(%w[--pro --rspack], package_json: true) }
+
+    include_examples "base_generator", application_js: true
+    include_examples "no_redux_generator"
+
+    it "creates Pro initializer" do
+      assert_file "config/initializers/react_on_rails_pro.rb" do |content|
+        expect(content).to include("ReactOnRailsPro.configure")
+      end
+    end
+
+    it "creates node-renderer.js" do
+      assert_file "client/node-renderer.js"
+    end
+
+    it "installs both Pro and Rspack dependencies" do
+      assert_file "package.json" do |content|
+        package_json = JSON.parse(content)
+        deps = package_json["dependencies"] || {}
+        expect(deps).to include("react-on-rails-pro")
+        expect(deps).to include("@rspack/core")
+      end
+    end
+  end
+
+  context "when Pro initializer already exists" do
+    before(:all) do
+      run_generator_test_with_args(%w[--pro], package_json: true) do
+        simulate_existing_file("config/initializers/react_on_rails_pro.rb", "# existing Pro config\n")
+      end
+    end
+
+    it "does not overwrite existing Pro initializer" do
+      assert_file "config/initializers/react_on_rails_pro.rb" do |content|
+        expect(content).to include("# existing Pro config")
+        expect(content).not_to include("ReactOnRailsPro.configure")
+      end
+    end
+  end
+
+  context "when node-renderer.js already exists" do
+    before(:all) do
+      run_generator_test_with_args(%w[--pro], package_json: true) do
+        simulate_existing_dir("client")
+        simulate_existing_file("client/node-renderer.js", "// existing node-renderer\n")
+      end
+    end
+
+    it "does not overwrite existing node-renderer.js" do
+      assert_file "client/node-renderer.js" do |content|
+        expect(content).to include("// existing node-renderer")
+        expect(content).not_to include("reactOnRailsProNodeRenderer")
+      end
+    end
+  end
+
+  context "when Procfile.dev already contains node-renderer" do
+    let(:install_generator) { described_class.new([], { pro: true }) }
+
+    before do
+      allow(install_generator).to receive(:destination_root).and_return("/fake/path")
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with("/fake/path/Procfile.dev").and_return(true)
+      allow(File).to receive(:read).with("/fake/path/Procfile.dev")
+                                   .and_return("rails: bundle exec rails s\nnode-renderer: existing config\n")
+    end
+
+    specify "add_pro_to_procfile does not append duplicate entry" do
+      expect(install_generator).not_to receive(:append_to_file)
+      install_generator.send(:add_pro_to_procfile)
+    end
+  end
+
+  context "when Procfile.dev exists without node-renderer" do
+    let(:install_generator) { described_class.new([], { pro: true }) }
+
+    before do
+      allow(install_generator).to receive(:destination_root).and_return("/fake/path")
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with("/fake/path/Procfile.dev").and_return(true)
+      allow(File).to receive(:read).with("/fake/path/Procfile.dev")
+                                   .and_return("rails: bundle exec rails s\nwp-client: bin/shakapacker\n")
+    end
+
+    specify "add_pro_to_procfile appends node-renderer entry" do
+      expect(install_generator).to receive(:append_to_file).with("Procfile.dev", include("node-renderer:"))
+      install_generator.send(:add_pro_to_procfile)
+    end
+  end
+
   context "with helpful message" do
     let(:expected) do
       GeneratorMessages.format_info(GeneratorMessages.helpful_message_after_installation)
