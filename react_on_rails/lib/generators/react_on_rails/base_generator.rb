@@ -27,6 +27,18 @@ module ReactOnRails
                    default: false,
                    desc: "Use Rspack instead of Webpack as the bundler"
 
+      # --pro
+      class_option :pro,
+                   type: :boolean,
+                   default: false,
+                   desc: "Setup React on Rails Pro with Node Renderer"
+
+      # --rsc
+      class_option :rsc,
+                   type: :boolean,
+                   default: false,
+                   desc: "Setup React Server Components (requires Pro)"
+
       def add_hello_world_route
         route "get 'hello_world', to: 'hello_world#index'"
       end
