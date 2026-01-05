@@ -113,6 +113,12 @@ module ReactOnRails
         react-on-rails-pro-node-renderer
       ].freeze
 
+      # React Server Components dependencies (only installed when --rsc flag is used)
+      # Requires React 19.0.x - see https://react.dev/reference/rsc/server-components
+      RSC_DEPENDENCIES = %w[
+        react-on-rails-rsc
+      ].freeze
+
       private
 
       def setup_js_dependencies
@@ -128,6 +134,7 @@ module ReactOnRails
 
       def add_js_dependencies
         using_pro = respond_to?(:use_pro?) && use_pro?
+        using_rsc = respond_to?(:use_rsc?) && use_rsc?
         # Pro package includes react-on-rails, so skip base package when using Pro
         add_react_on_rails_package unless using_pro
         add_react_dependencies
@@ -135,6 +142,7 @@ module ReactOnRails
         add_rspack_dependencies if using_rspack?
         add_swc_dependencies if using_swc?
         add_pro_dependencies if using_pro
+        add_rsc_dependencies if using_rsc
         add_dev_dependencies
       end
 
@@ -312,6 +320,25 @@ module ReactOnRails
 
           You can install them manually by running:
             npm install #{PRO_DEPENDENCIES.join(' ')}
+        MSG
+      end
+
+      def add_rsc_dependencies
+        puts "Installing React Server Components dependencies..."
+        return if add_packages(RSC_DEPENDENCIES)
+
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Failed to add React Server Components dependencies.
+
+          You can install them manually by running:
+            npm install #{RSC_DEPENDENCIES.join(' ')}
+        MSG
+      rescue StandardError => e
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Error adding React Server Components dependencies: #{e.message}
+
+          You can install them manually by running:
+            npm install #{RSC_DEPENDENCIES.join(' ')}
         MSG
       end
 
