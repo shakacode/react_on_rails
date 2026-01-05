@@ -2,21 +2,7 @@
 // This creates the RSC bundle based on the server webpack config
 // See: https://www.shakacode.com/react-on-rails-pro/docs/react-server-components/
 
-const serverWebpackConfig = require('./serverWebpackConfig');
-
-/**
- * Extracts a specific loader from a webpack rule by name
- * @param {Object} rule - Webpack rule object
- * @param {string} loaderName - Name of the loader to find
- * @returns {Object|null} The loader object if found, null otherwise
- */
-function extractLoader(rule, loaderName) {
-  if (!Array.isArray(rule.use)) return null;
-  return rule.use.find((item) => {
-    const testValue = typeof item === 'string' ? item : item.loader;
-    return testValue && testValue.includes(loaderName);
-  });
-}
+const { default: serverWebpackConfig, extractLoader } = require('./serverWebpackConfig');
 
 const configureRsc = () => {
   const rscConfig = serverWebpackConfig();
