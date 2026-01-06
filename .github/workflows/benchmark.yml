@@ -530,6 +530,8 @@ jobs:
       #   - failed_pct: Upper Boundary (lower is better)
 
       - name: Track benchmarks with Bencher
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Threshold for detecting regressions (30% = 0.30)
           THRESHOLD=0.30
@@ -544,7 +546,7 @@ jobs:
             BRANCH="$GITHUB_HEAD_REF"
             START_POINT="$GITHUB_BASE_REF"
             START_POINT_HASH="${{ github.event.pull_request.base.sha }}"
-            EXTRA_ARGS="--start-point-reset --ci-number ${{ github.event.pull_request.number }}"
+            EXTRA_ARGS="--start-point-reset"
           elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             # Find where branch diverged from master
             git fetch origin master --depth=100
@@ -557,6 +559,9 @@ jobs:
             exit 1
           fi
 
+          # Run bencher and capture HTML output (stdout) while letting stderr go to logs
+          # Use set +e to capture exit code without failing immediately
+          set +e
           bencher run \
             --project react-on-rails-t8a9ncxo \
             --token '${{ secrets.BENCHER_API_TOKEN }}' \
@@ -567,8 +572,9 @@ jobs:
             --testbed github-actions \
             --adapter json \
             --file bench_results/benchmark.json \
-            --github-actions '${{ secrets.GITHUB_TOKEN }}' \
             --err \
+            --quiet \
+            --format html \
             --threshold-measure rps \
             --threshold-test percentage \
             --threshold-lower-boundary $THRESHOLD \
@@ -589,7 +595,21 @@ jobs:
             --threshold-test percentage \
             --threshold-lower-boundary _ \
             --threshold-upper-boundary $THRESHOLD \
-            $EXTRA_ARGS
+            $EXTRA_ARGS > bench_results/bencher_report.html
+          BENCHER_EXIT_CODE=$?
+          set -e
+
+          # Post report to job summary if there's HTML output
+          # Can't currently post it as a comment; the file is too large.
+          if [ -s bench_results/bencher_report.html ]; then
+            echo "📊 Adding Bencher report to job summary..."
+            cat bench_results/bencher_report.html >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "✅ No alerts - no Bencher report to post"
+          fi
+
+          # Exit with bencher's exit code to fail workflow if there was an alert
+          exit $BENCHER_EXIT_CODE
 
       # ============================================
       # STEP 8: WORKFLOW COMPLETION
