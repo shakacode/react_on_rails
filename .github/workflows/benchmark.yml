@@ -599,11 +599,45 @@ jobs:
           BENCHER_EXIT_CODE=$?
           set -e
 
-          # Post report to job summary if there's HTML output
-          # Can't currently post it as a comment; the file is too large.
+          # Post report to job summary and PR comment(s) if there's HTML output
           if [ -s bench_results/bencher_report.html ]; then
             echo "📊 Adding Bencher report to job summary..."
             cat bench_results/bencher_report.html >> "$GITHUB_STEP_SUMMARY"
+
+            if [ "${{ github.event_name }}" = "pull_request" ]; then
+              echo "📝 Splitting HTML report for PR comments..."
+              ruby benchmarks/split_html_report.rb bench_results/bencher_report.html bench_results/bencher_chunk
+
+              # Delete old Bencher report comments (identified by marker)
+              echo "🗑️ Deleting old Bencher report comments..."
+              gh api "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
+                --paginate --jq '.[] | select(.body | contains("<!-- BENCHER_REPORT -->")) | .id' | \
+              while read -r comment_id; do
+                echo "Deleting comment $comment_id"
+                gh api -X DELETE "repos/${{ github.repository }}/issues/comments/$comment_id"
+              done
+
+              # Post each chunk as a separate comment
+              COMMENT_FAILED=false
+              for chunk_file in bench_results/bencher_chunk*.html; do
+                if [ -f "$chunk_file" ]; then
+                  echo "Posting $chunk_file ($(wc -c < "$chunk_file") bytes)..."
+                  if ! gh pr comment ${{ github.event.pull_request.number }} --body-file "$chunk_file"; then
+                    echo "⚠️ Failed to post $chunk_file"
+                    COMMENT_FAILED=true
+                  fi
+                fi
+              done
+
+              # If any chunk failed to post, add a fallback comment
+              if [ "$COMMENT_FAILED" = "true" ]; then
+                echo "⚠️ Some chunks failed to post, adding fallback comment..."
+                FALLBACK_BODY="<!-- BENCHER_REPORT -->"
+                FALLBACK_BODY="${FALLBACK_BODY}"$'\n'"⚠️ **Bencher report chunks were too large to post as PR comments.**"
+                FALLBACK_BODY="${FALLBACK_BODY}"$'\n'$'\n'"View the full report in the [job summary](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})."
+                gh pr comment ${{ github.event.pull_request.number }} --body "$FALLBACK_BODY" || true
+              fi
+            fi
           else
             echo "✅ No alerts - no Bencher report to post"
           fi
