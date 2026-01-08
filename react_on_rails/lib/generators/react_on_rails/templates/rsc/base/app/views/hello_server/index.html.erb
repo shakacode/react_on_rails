@@ -1,0 +1,27 @@
+<h1>HelloServer - React Server Component</h1>
+
+<p>
+  This page demonstrates React Server Components (RSC) with React on Rails Pro.
+  Compare this to <a href="/hello_world">HelloWorld</a> which runs in the browser.
+  HelloServer runs only on the server - no JavaScript is sent to the browser for this component.
+</p>
+
+<%#
+  stream_react_component renders the RSC with streaming support.
+
+  Key points:
+  - prerender: true enables server-side rendering
+  - Props are passed from the controller (@hello_server_props)
+  - The component streams as it renders (no loading spinner needed)
+  - Only the HTML is sent to browser, no JS bundle for this component
+%>
+<%= stream_react_component('HelloServer', props: @hello_server_props, prerender: true) %>
+
+<hr>
+
+<p>
+  <strong>Learn more:</strong>
+  <a href="https://www.shakacode.com/react-on-rails-pro/docs/react-server-components/">
+    React Server Components Documentation
+  </a>
+</p>
