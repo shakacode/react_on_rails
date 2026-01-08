@@ -121,12 +121,21 @@ module ReactOnRails
           create_typescript_config
         end
         invoke "react_on_rails:base", [],
-               { typescript: options.typescript?, redux: options.redux?, rspack: options.rspack? }
+               { typescript: options.typescript?, redux: options.redux?, rspack: options.rspack?,
+                 pro: options.pro?, rsc: options.rsc? }
+
+        # Component generator logic:
+        # - --rsc without --redux: Skip HelloWorld, HelloServer will be generated in setup_rsc
+        # - --rsc with --redux: Generate HelloWorldApp (user explicitly wants Redux) + HelloServer
+        # - Without --rsc: Normal behavior (HelloWorld or HelloWorldApp based on --redux)
         if options.redux?
           invoke "react_on_rails:react_with_redux", [], { typescript: options.typescript? }
-        else
+        elsif !use_rsc?
+          # Only generate HelloWorld if RSC is not enabled
+          # For RSC, HelloServer replaces HelloWorld as the example component
           invoke "react_on_rails:react_no_redux", [], { typescript: options.typescript? }
         end
+
         setup_react_dependencies
         warn_about_react_version_for_rsc
         setup_pro if use_pro?
@@ -607,6 +616,10 @@ module ReactOnRails
 
         create_rsc_webpack_config
         add_rsc_to_procfile
+        create_hello_server_component
+        create_hello_server_controller
+        create_hello_server_view
+        add_rsc_routes
         # NOTE: RSC npm dependencies are added in add_js_dependencies (js_dependency_manager.rb)
         # to ensure single npm install run with all dependencies
 
@@ -662,6 +675,88 @@ module ReactOnRails
         append_to_file("Procfile.dev", rsc_watcher_line)
 
         puts Rainbow("✅ Added RSC bundle watcher to Procfile.dev").green
+      end
+
+      def create_hello_server_component
+        hello_server_dir = "app/javascript/src/HelloServer"
+        ror_components_dir = "#{hello_server_dir}/ror_components"
+        components_dir = "#{hello_server_dir}/components"
+        ext = component_extension(options)
+
+        # Check if HelloServer already exists (check both jsx and tsx)
+        if File.exist?(File.join(destination_root, "#{ror_components_dir}/HelloServer.jsx")) ||
+           File.exist?(File.join(destination_root, "#{ror_components_dir}/HelloServer.tsx"))
+          puts Rainbow("ℹ️  HelloServer component already exists, skipping").yellow
+          return
+        end
+
+        puts Rainbow("📝 Creating HelloServer component...").yellow
+
+        # Create directories
+        empty_directory(ror_components_dir)
+        empty_directory(components_dir)
+
+        # Copy component files (uses jsx or tsx based on --typescript flag)
+        copy_file("templates/rsc/base/app/javascript/src/HelloServer/ror_components/HelloServer.#{ext}",
+                  "#{ror_components_dir}/HelloServer.#{ext}")
+        copy_file("templates/rsc/base/app/javascript/src/HelloServer/components/HelloServer.#{ext}",
+                  "#{components_dir}/HelloServer.#{ext}")
+
+        puts Rainbow("✅ Created HelloServer component").green
+      end
+
+      def create_hello_server_controller
+        controller_path = "app/controllers/hello_server_controller.rb"
+
+        if File.exist?(File.join(destination_root, controller_path))
+          puts Rainbow("ℹ️  HelloServerController already exists, skipping").yellow
+          return
+        end
+
+        puts Rainbow("📝 Creating HelloServerController...").yellow
+
+        copy_file("templates/rsc/base/app/controllers/hello_server_controller.rb", controller_path)
+
+        puts Rainbow("✅ Created #{controller_path}").green
+      end
+
+      def create_hello_server_view
+        view_path = "app/views/hello_server/index.html.erb"
+
+        if File.exist?(File.join(destination_root, view_path))
+          puts Rainbow("ℹ️  HelloServer view already exists, skipping").yellow
+          return
+        end
+
+        puts Rainbow("📝 Creating HelloServer view...").yellow
+
+        # Create views directory if needed
+        empty_directory("app/views/hello_server")
+
+        copy_file("templates/rsc/base/app/views/hello_server/index.html.erb", view_path)
+
+        puts Rainbow("✅ Created #{view_path}").green
+      end
+
+      def add_rsc_routes
+        routes_file = File.join(destination_root, "config/routes.rb")
+        routes_content = File.read(routes_file)
+
+        # Check if RSC routes already exist
+        if routes_content.include?("rsc_payload_route")
+          puts Rainbow("ℹ️  RSC routes already exist, skipping").yellow
+          return
+        end
+
+        puts Rainbow("📝 Adding RSC routes...").yellow
+
+        # Add rsc_payload_route (required for RSC payload requests)
+        route "rsc_payload_route"
+
+        # Add HelloServer route (RSC counterpart to hello_world)
+        route "get 'hello_server', to: 'hello_server#index'"
+
+        puts Rainbow("✅ Added RSC routes to config/routes.rb").green
       end
 
       # rubocop:enable Metrics/ClassLength
