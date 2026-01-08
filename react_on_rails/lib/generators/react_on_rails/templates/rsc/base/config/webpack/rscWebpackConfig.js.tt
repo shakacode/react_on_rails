@@ -5,7 +5,8 @@
 const { default: serverWebpackConfig, extractLoader } = require('./serverWebpackConfig');
 
 const configureRsc = () => {
-  const rscConfig = serverWebpackConfig();
+  // Pass true to skip RSCWebpackPlugin - RSC bundle doesn't need it
+  const rscConfig = serverWebpackConfig(true);
 
   // Update the entry name to be `rsc-bundle` instead of `server-bundle`
   const rscEntry = {

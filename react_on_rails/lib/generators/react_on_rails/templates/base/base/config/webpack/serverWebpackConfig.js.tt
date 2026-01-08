@@ -20,7 +20,12 @@ function extractLoader(rule, loaderName) {
 }
 
 <% end -%>
+<% if use_rsc? -%>
+// rscBundle parameter: when true, skips RSCWebpackPlugin (RSC bundle doesn't need it)
+const configureServer = (rscBundle = false) => {
+<% else -%>
 const configureServer = () => {
+<% end -%>
   // We need to use "merge" because the clientConfigObject, EVEN after running
   // toWebpackConfig() is a mutable GLOBAL. Thus any changes, like modifying the
   // entry value will result in changing the client config!
@@ -57,7 +62,10 @@ const configureServer = () => {
   };
 <% if use_rsc? -%>
   // Add RSC plugin for server bundle (handles client component references)
-  serverWebpackConfig.plugins.push(new RSCWebpackPlugin({ isServer: true }));
+  // Skip for RSC bundle - it doesn't need RSCWebpackPlugin
+  if (!rscBundle) {
+    serverWebpackConfig.plugins.push(new RSCWebpackPlugin({ isServer: true }));
+  }
 <% end -%>
   serverWebpackConfig.plugins.unshift(new bundler.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));
 
