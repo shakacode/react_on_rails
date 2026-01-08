@@ -637,6 +637,241 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  context "with --rsc" do
+    before(:all) { run_generator_test_with_args(%w[--rsc], package_json: true) }
+
+    it "copies common files" do
+      %w[config/initializers/react_on_rails.rb
+         Procfile.dev
+         Procfile.dev-static-assets
+         Procfile.dev-prod-assets].each { |file| assert_file(file) }
+    end
+
+    it "creates Pro initializer with RSC configuration" do
+      assert_file "config/initializers/react_on_rails_pro.rb" do |content|
+        expect(content).to include("ReactOnRailsPro.configure")
+        expect(content).to include("enable_rsc_support = true")
+        expect(content).to include('rsc_bundle_js_file = "rsc-bundle.js"')
+        expect(content).to include('rsc_payload_generation_url_path = "rsc_payload/"')
+      end
+    end
+
+    it "creates node-renderer.js" do
+      assert_file "client/node-renderer.js" do |content|
+        expect(content).to include("reactOnRailsProNodeRenderer")
+        expect(content).to include("require('react-on-rails-pro-node-renderer')")
+      end
+    end
+
+    it "adds RSC bundle watcher to Procfile.dev" do
+      assert_file "Procfile.dev" do |content|
+        expect(content).to include("RSC_BUNDLE_ONLY=yes")
+        expect(content).to include("rails-rsc-assets:")
+      end
+    end
+
+    it "installs RSC npm dependencies" do
+      assert_file "package.json" do |content|
+        package_json = JSON.parse(content)
+        deps = package_json["dependencies"] || {}
+        expect(deps).to include("react-on-rails-pro")
+        expect(deps).to include("react-on-rails-pro-node-renderer")
+        expect(deps).to include("react-on-rails-rsc")
+      end
+    end
+
+    it "creates rscWebpackConfig.js" do
+      assert_file "config/webpack/rscWebpackConfig.js" do |content|
+        expect(content).to include("const { default: serverWebpackConfig")
+        expect(content).to include("serverWebpackConfig(true)")
+        expect(content).to include("rsc-bundle")
+        expect(content).to include("react-server")
+      end
+    end
+
+    it "serverWebpackConfig includes RSCWebpackPlugin import" do
+      assert_file "config/webpack/serverWebpackConfig.js" do |content|
+        expect(content).to include("RSCWebpackPlugin")
+        expect(content).to include("react-on-rails-rsc/WebpackPlugin")
+      end
+    end
+
+    it "serverWebpackConfig has rscBundle parameter" do
+      assert_file "config/webpack/serverWebpackConfig.js" do |content|
+        expect(content).to match(/configureServer\s*=\s*\(rscBundle\s*=\s*false\)/)
+        expect(content).to include("if (!rscBundle)")
+      end
+    end
+
+    it "creates HelloServer component instead of HelloWorld" do
+      assert_no_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.jsx"
+      assert_no_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.server.jsx"
+      assert_file "app/javascript/src/HelloServer/ror_components/HelloServer.jsx"
+      assert_file "app/javascript/src/HelloServer/components/HelloServer.jsx"
+    end
+
+    it "creates HelloServer controller and view" do
+      assert_file "app/controllers/hello_server_controller.rb" do |content|
+        expect(content).to include("class HelloServerController")
+        expect(content).to include("ReactOnRailsPro::RSCPayloadRenderer")
+      end
+
+      assert_file "app/views/hello_server/index.html.erb" do |content|
+        expect(content).to include("HelloServer")
+        expect(content).to include("stream_react_component")
+      end
+    end
+
+    it "adds HelloServer route" do
+      assert_file "config/routes.rb" do |content|
+        expect(content).to include("hello_server")
+        expect(content).to include("rsc_payload")
+      end
+    end
+  end
+
+  context "with --rsc --redux" do
+    before(:all) { run_generator_test_with_args(%w[--rsc --redux], package_json: true) }
+
+    include_examples "react_with_redux_generator"
+
+    it "copies common files" do
+      %w[config/initializers/react_on_rails.rb
+         Procfile.dev
+         Procfile.dev-static-assets
+         Procfile.dev-prod-assets].each { |file| assert_file(file) }
+    end
+
+    it "creates Pro initializer with RSC configuration" do
+      assert_file "config/initializers/react_on_rails_pro.rb" do |content|
+        expect(content).to include("enable_rsc_support = true")
+      end
+    end
+
+    it "creates both HelloWorldApp and HelloServer" do
+      assert_file "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.jsx"
+      assert_file "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.server.jsx"
+      assert_file "app/javascript/src/HelloServer/ror_components/HelloServer.jsx"
+      assert_file "app/javascript/src/HelloServer/components/HelloServer.jsx"
+    end
+
+    it "installs both RSC and Redux dependencies" do
+      assert_file "package.json" do |content|
+        package_json = JSON.parse(content)
+        deps = package_json["dependencies"] || {}
+        expect(deps).to include("react-on-rails-rsc")
+        expect(deps).to include("redux")
+      end
+    end
+  end
+
+  context "with --rsc --typescript" do
+    before(:all) { run_generator_test_with_args(%w[--rsc --typescript], package_json: true) }
+
+    it "copies common files" do
+      %w[config/initializers/react_on_rails.rb
+         Procfile.dev
+         Procfile.dev-static-assets
+         Procfile.dev-prod-assets].each { |file| assert_file(file) }
+    end
+
+    it "creates Pro initializer with RSC configuration" do
+      assert_file "config/initializers/react_on_rails_pro.rb" do |content|
+        expect(content).to include("enable_rsc_support = true")
+      end
+    end
+
+    it "creates TypeScript HelloServer component" do
+      assert_no_file "app/javascript/src/HelloServer/ror_components/HelloServer.jsx"
+      assert_no_file "app/javascript/src/HelloServer/components/HelloServer.jsx"
+      assert_file "app/javascript/src/HelloServer/ror_components/HelloServer.tsx"
+      assert_file "app/javascript/src/HelloServer/components/HelloServer.tsx"
+    end
+
+    it "creates tsconfig.json file" do
+      assert_file "tsconfig.json" do |content|
+        config = JSON.parse(content)
+        expect(config["compilerOptions"]["jsx"]).to eq("react-jsx")
+      end
+    end
+
+    it "installs both RSC and TypeScript dependencies" do
+      assert_file "package.json" do |content|
+        package_json = JSON.parse(content)
+        deps = package_json["dependencies"] || {}
+        dev_deps = package_json["devDependencies"] || {}
+        expect(deps).to include("react-on-rails-rsc")
+        expect(dev_deps).to include("typescript")
+        expect(dev_deps).to include("@types/react")
+      end
+    end
+  end
+
+  context "with --rsc --rspack" do
+    before(:all) { run_generator_test_with_args(%w[--rsc --rspack], package_json: true) }
+
+    it "copies common files" do
+      %w[config/initializers/react_on_rails.rb
+         Procfile.dev
+         Procfile.dev-static-assets
+         Procfile.dev-prod-assets].each { |file| assert_file(file) }
+    end
+
+    it "creates Pro initializer with RSC configuration" do
+      assert_file "config/initializers/react_on_rails_pro.rb" do |content|
+        expect(content).to include("enable_rsc_support = true")
+      end
+    end
+
+    it "creates rscWebpackConfig.js (works with Rspack)" do
+      assert_file "config/webpack/rscWebpackConfig.js" do |content|
+        expect(content).to include("serverWebpackConfig(true)")
+      end
+    end
+
+    it "installs both RSC and Rspack dependencies" do
+      assert_file "package.json" do |content|
+        package_json = JSON.parse(content)
+        deps = package_json["dependencies"] || {}
+        expect(deps).to include("react-on-rails-rsc")
+        expect(deps).to include("@rspack/core")
+      end
+    end
+  end
+
+  context "when rscWebpackConfig.js already exists" do
+    before(:all) do
+      run_generator_test_with_args(%w[--rsc], package_json: true) do
+        simulate_existing_dir("config/webpack")
+        simulate_existing_file("config/webpack/rscWebpackConfig.js", "// existing RSC config\n")
+      end
+    end
+
+    it "does not overwrite existing rscWebpackConfig.js" do
+      assert_file "config/webpack/rscWebpackConfig.js" do |content|
+        expect(content).to include("// existing RSC config")
+        expect(content).not_to include("serverWebpackConfig(true)")
+      end
+    end
+  end
+
+  context "when Procfile.dev already contains RSC watcher" do
+    let(:install_generator) { described_class.new([], { rsc: true }) }
+
+    before do
+      allow(install_generator).to receive(:destination_root).and_return("/fake/path")
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with("/fake/path/Procfile.dev").and_return(true)
+      procfile_content = "rails: bundle exec rails s\nrails-rsc-assets: RSC_BUNDLE_ONLY=yes bin/shakapacker\n"
+      allow(File).to receive(:read).with("/fake/path/Procfile.dev").and_return(procfile_content)
+    end
+
+    specify "add_rsc_to_procfile does not append duplicate entry" do
+      expect(install_generator).not_to receive(:append_to_file)
+      install_generator.send(:add_rsc_to_procfile)
+    end
+  end
+
   context "with helpful message" do
     let(:expected) do
       GeneratorMessages.format_info(GeneratorMessages.helpful_message_after_installation)
