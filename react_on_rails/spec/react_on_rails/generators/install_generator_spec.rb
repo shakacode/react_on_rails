@@ -713,7 +713,7 @@ describe InstallGenerator, type: :generator do
     it "creates HelloServer controller and view" do
       assert_file "app/controllers/hello_server_controller.rb" do |content|
         expect(content).to include("class HelloServerController")
-        expect(content).to include("ReactOnRailsPro::RSCPayloadRenderer")
+        expect(content).to include("ReactOnRailsPro::Stream")
       end
 
       assert_file "app/views/hello_server/index.html.erb" do |content|
