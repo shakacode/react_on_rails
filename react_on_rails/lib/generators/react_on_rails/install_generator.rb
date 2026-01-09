@@ -259,11 +259,24 @@ module ReactOnRails
         puts Rainbow("=" * 80).cyan
       end
 
+      # DRY helper method for Bundler context switching with API compatibility
+      # Supports both new (with_unbundled_env) and legacy (with_clean_env) Bundler APIs
+      def with_unbundled_context(&block)
+        if Bundler.respond_to?(:with_unbundled_env)
+          Bundler.with_unbundled_env(&block)
+        elsif Bundler.respond_to?(:with_clean_env)
+          Bundler.with_clean_env(&block)
+        else
+          # Fallback if neither method is available (very old Bundler versions)
+          yield
+        end
+      end
+
       def ensure_shakapacker_in_gemfile
         return if shakapacker_in_gemfile?
 
         puts Rainbow("📝 Adding Shakapacker to Gemfile...").yellow
-        success = Bundler.with_unbundled_env { system("bundle add shakapacker --strict") }
+        success = with_unbundled_context { system("bundle add shakapacker --strict") }
         return if success
 
         handle_shakapacker_gemfile_error
@@ -274,14 +287,14 @@ module ReactOnRails
 
         # First run bundle install to make shakapacker available
         puts Rainbow("📦 Running bundle install...").yellow
-        bundle_success = Bundler.with_unbundled_env { system("bundle install") }
+        bundle_success = with_unbundled_context { system("bundle install") }
         unless bundle_success
           handle_shakapacker_install_error
           return
         end
 
         # Then run the shakapacker installer
-        success = Bundler.with_unbundled_env { system("bundle exec rails shakapacker:install") }
+        success = with_unbundled_context { system("bundle exec rails shakapacker:install") }
         return if success
 
         handle_shakapacker_install_error
