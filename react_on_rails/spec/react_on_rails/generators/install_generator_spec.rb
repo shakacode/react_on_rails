@@ -703,9 +703,16 @@ describe InstallGenerator, type: :generator do
       end
     end
 
-    it "creates HelloServer component instead of HelloWorld" do
+    it "creates HelloServer instead of HelloWorld (controller, route, and components)" do
+      # HelloWorld should NOT exist - HelloServer replaces it entirely
       assert_no_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.jsx"
       assert_no_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.server.jsx"
+      assert_no_file "app/controllers/hello_world_controller.rb"
+      assert_file "config/routes.rb" do |content|
+        expect(content).not_to include("hello_world")
+      end
+
+      # HelloServer should exist
       assert_file "app/javascript/src/HelloServer/ror_components/HelloServer.jsx"
       assert_file "app/javascript/src/HelloServer/components/HelloServer.jsx"
     end
