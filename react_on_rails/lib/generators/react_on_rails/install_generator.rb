@@ -263,7 +263,7 @@ module ReactOnRails
         return if shakapacker_in_gemfile?
 
         puts Rainbow("📝 Adding Shakapacker to Gemfile...").yellow
-        success = system("bundle add shakapacker --strict")
+        success = Bundler.with_unbundled_env { system("bundle add shakapacker --strict") }
         return if success
 
         handle_shakapacker_gemfile_error
@@ -274,14 +274,14 @@ module ReactOnRails
 
         # First run bundle install to make shakapacker available
         puts Rainbow("📦 Running bundle install...").yellow
-        bundle_success = system("bundle install")
+        bundle_success = Bundler.with_unbundled_env { system("bundle install") }
         unless bundle_success
           handle_shakapacker_install_error
           return
         end
 
         # Then run the shakapacker installer
-        success = system("bundle exec rails shakapacker:install")
+        success = Bundler.with_unbundled_env { system("bundle exec rails shakapacker:install") }
         return if success
 
         handle_shakapacker_install_error
