@@ -259,24 +259,13 @@ module ReactOnRails
         puts Rainbow("=" * 80).cyan
       end
 
-      # DRY helper method for Bundler context switching with API compatibility
-      # Supports both new (with_unbundled_env) and legacy (with_clean_env) Bundler APIs
-      def with_unbundled_context(&block)
-        if Bundler.respond_to?(:with_unbundled_env)
-          Bundler.with_unbundled_env(&block)
-        elsif Bundler.respond_to?(:with_clean_env)
-          Bundler.with_clean_env(&block)
-        else
-          # Fallback if neither method is available (very old Bundler versions)
-          yield
-        end
-      end
-
       def ensure_shakapacker_in_gemfile
         return if shakapacker_in_gemfile?
 
         puts Rainbow("📝 Adding Shakapacker to Gemfile...").yellow
-        success = with_unbundled_context { system("bundle add shakapacker --strict") }
+        # Use with_unbundled_env to prevent inheriting BUNDLE_GEMFILE from parent process
+        # See: https://github.com/shakacode/react_on_rails/issues/2287
+        success = Bundler.with_unbundled_env { system("bundle add shakapacker --strict") }
         return if success
 
         handle_shakapacker_gemfile_error
@@ -286,15 +275,16 @@ module ReactOnRails
         puts Rainbow("⚙️  Installing Shakapacker (required for webpack integration)...").yellow
 
         # First run bundle install to make shakapacker available
+        # Use with_unbundled_env to prevent inheriting BUNDLE_GEMFILE from parent process
         puts Rainbow("📦 Running bundle install...").yellow
-        bundle_success = with_unbundled_context { system("bundle install") }
+        bundle_success = Bundler.with_unbundled_env { system("bundle install") }
         unless bundle_success
           handle_shakapacker_install_error
           return
         end
 
         # Then run the shakapacker installer
-        success = with_unbundled_context { system("bundle exec rails shakapacker:install") }
+        success = Bundler.with_unbundled_env { system("bundle exec rails shakapacker:install") }
         return if success
 
         handle_shakapacker_install_error
