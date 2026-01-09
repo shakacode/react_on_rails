@@ -17,6 +17,12 @@ module ReactOnRails
                    default: false,
                    desc: "Setup prerender true for server rendered examples"
 
+      # --rsc
+      class_option :rsc,
+                   type: :boolean,
+                   default: false,
+                   desc: "Include React Server Components test (hello_server_spec.rb)"
+
       def copy_rspec_files
         %w[.eslintrc
            spec/spec_helper.rb
@@ -26,7 +32,9 @@ module ReactOnRails
       end
 
       def copy_tests
-        %w[spec/system/hello_world_spec.rb].each { |file| copy_file(file) }
+        files = %w[spec/system/hello_world_spec.rb]
+        files << "spec/system/hello_server_spec.rb" if options.rsc
+        files.each { |file| copy_file(file) }
       end
 
       def add_test_related_gems_to_gemfile
