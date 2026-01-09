@@ -20,6 +20,6 @@ class HelloServerController < ApplicationController
       name: "React on Rails Pro"
     }
 
-    stream_view_containing_react_components
+    stream_view_containing_react_components(template: "hello_server/index")
   end
 end
