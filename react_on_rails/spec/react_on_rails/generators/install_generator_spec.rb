@@ -541,5 +541,51 @@ describe InstallGenerator, type: :generator do
         ENV.delete("BUNDLE_GEMFILE")
       end
     end
+
+    it "checks local Gemfile regardless of BUNDLE_GEMFILE env var" do
+      # Even if BUNDLE_GEMFILE points elsewhere, detection should check local Gemfile
+      original_gemfile = ENV.fetch("BUNDLE_GEMFILE", nil)
+      ENV["BUNDLE_GEMFILE"] = "/some/other/project/Gemfile"
+
+      # The method should check "Gemfile" not ENV["BUNDLE_GEMFILE"]
+      # We verify this by checking it does NOT try to access the env var path
+      allow(File).to receive(:file?).with("Gemfile").and_return(false)
+      allow(File).to receive(:file?).with("/some/other/project/Gemfile").and_return(true)
+
+      result = install_generator.send(:shakapacker_in_gemfile_text?, "shakapacker")
+
+      # If it checked ENV["BUNDLE_GEMFILE"], it would find the file and continue
+      # Since we return false for "Gemfile", the result should be false
+      expect(result).to be false
+
+      # Restore
+      if original_gemfile
+        ENV["BUNDLE_GEMFILE"] = original_gemfile
+      else
+        ENV.delete("BUNDLE_GEMFILE")
+      end
+    end
+
+    it "checks local Gemfile.lock regardless of BUNDLE_GEMFILE env var" do
+      original_gemfile = ENV.fetch("BUNDLE_GEMFILE", nil)
+      ENV["BUNDLE_GEMFILE"] = "/some/other/project/Gemfile"
+
+      # The method should check "Gemfile.lock" not derived from ENV["BUNDLE_GEMFILE"]
+      allow(File).to receive(:file?).with("Gemfile.lock").and_return(false)
+      allow(File).to receive(:file?).with("/some/other/project/Gemfile.lock").and_return(true)
+
+      result = install_generator.send(:shakapacker_in_lockfile?, "shakapacker")
+
+      # If it derived path from ENV["BUNDLE_GEMFILE"], it would find the file
+      # Since we return false for "Gemfile.lock", the result should be false
+      expect(result).to be false
+
+      # Restore
+      if original_gemfile
+        ENV["BUNDLE_GEMFILE"] = original_gemfile
+      else
+        ENV.delete("BUNDLE_GEMFILE")
+      end
+    end
   end
 end

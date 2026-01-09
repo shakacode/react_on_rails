@@ -218,10 +218,10 @@ module ReactOnRails
       end
 
       def shakapacker_in_lockfile?(gem_name)
-        gemfile = ENV["BUNDLE_GEMFILE"] || "Gemfile"
-        lockfile = File.join(File.dirname(gemfile), "Gemfile.lock")
-
-        File.file?(lockfile) && File.foreach(lockfile).any? { |l| l.match?(/^\s{4}#{Regexp.escape(gem_name)}\s\(/) }
+        # Always check the target app's Gemfile.lock, not inherited BUNDLE_GEMFILE
+        # See: https://github.com/shakacode/react_on_rails/issues/2287
+        File.file?("Gemfile.lock") &&
+          File.foreach("Gemfile.lock").any? { |l| l.match?(/^\s{4}#{Regexp.escape(gem_name)}\s\(/) }
       end
 
       def shakapacker_in_bundler_specs?(gem_name)
@@ -232,10 +232,10 @@ module ReactOnRails
       end
 
       def shakapacker_in_gemfile_text?(gem_name)
-        gemfile = ENV["BUNDLE_GEMFILE"] || "Gemfile"
-
-        File.file?(gemfile) &&
-          File.foreach(gemfile).any? { |l| l.match?(/^\s*gem\s+['"]#{Regexp.escape(gem_name)}['"]/) }
+        # Always check the target app's Gemfile, not inherited BUNDLE_GEMFILE
+        # See: https://github.com/shakacode/react_on_rails/issues/2287
+        File.file?("Gemfile") &&
+          File.foreach("Gemfile").any? { |l| l.match?(/^\s*gem\s+['"]#{Regexp.escape(gem_name)}['"]/) }
       end
 
       def cli_exists?(command)
