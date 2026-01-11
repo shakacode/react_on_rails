@@ -277,8 +277,13 @@ async function forAllElementsAsync(
  *
  * This is used to prevent a race condition during HTML streaming where
  * the props script element exists in the DOM but its content is incomplete.
- * If an element has a nextSibling (the immediate hydration script), it means
- * the closing </script> tag was parsed and the content is complete.
+ *
+ * Why checking for ANY nextSibling works:
+ * - During HTML streaming, the browser parses incrementally
+ * - A script element's content is everything between <script> and </script>
+ * - The browser cannot parse ANY content after a script until </script> is found
+ * - Therefore, if nextSibling exists (even whitespace or comments), the closing
+ *   tag was parsed and the content is guaranteed to be complete
  *
  * Elements without a nextSibling will be hydrated later when their
  * immediate hydration script executes and calls reactOnRailsComponentLoaded().
