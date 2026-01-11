@@ -111,7 +111,9 @@ test.describe('JSON Parse Race Condition Fix', () => {
 
     // With the fix, hydration should succeed even with race condition
     expect(result.hydrated).toBe(true);
-    expect(result.errors.filter((e) => JSON_ERROR_PATTERNS.some((pattern) => pattern.test(e)))).toHaveLength(0);
+    expect(result.errors.filter((e) => JSON_ERROR_PATTERNS.some((pattern) => pattern.test(e)))).toHaveLength(
+      0,
+    );
 
     // Verify component IS interactive (React hydrated successfully)
     const isInteractive = await verifyComponentIsInteractive(page);
@@ -128,7 +130,9 @@ test.describe('JSON Parse Race Condition Fix', () => {
 
     // Expect successful hydration
     expect(result.hydrated).toBe(true);
-    expect(result.errors.filter((e) => JSON_ERROR_PATTERNS.some((pattern) => pattern.test(e)))).toHaveLength(0);
+    expect(result.errors.filter((e) => JSON_ERROR_PATTERNS.some((pattern) => pattern.test(e)))).toHaveLength(
+      0,
+    );
 
     // Verify component IS interactive (React hydrated successfully)
     const isInteractive = await verifyComponentIsInteractive(page);
