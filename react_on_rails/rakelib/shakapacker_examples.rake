@@ -115,7 +115,9 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
       sh_in_dir(example_type.dir, "touch .gitignore")
       sh_in_dir(example_type.dir,
                 "echo \"gem 'react_on_rails', path: '#{relative_gem_root}'\" >> #{example_type.gemfile}")
-      sh_in_dir(example_type.dir, "echo \"gem 'shakapacker', '>= 8.2.0'\" >> #{example_type.gemfile}")
+      # Pin to 9.4.0 to ensure gem and npm package versions match
+      # (shakapacker 9.5.0 gem was released but npm package version detection has issues)
+      sh_in_dir(example_type.dir, "echo \"gem 'shakapacker', '9.4.0'\" >> #{example_type.gemfile}")
       bundle_install_in(example_type.dir)
       sh_in_dir(example_type.dir, "rake shakapacker:install")
       # Skip validation when running generators on example apps during development.
