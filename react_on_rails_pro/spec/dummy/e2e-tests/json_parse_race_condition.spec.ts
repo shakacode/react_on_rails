@@ -6,7 +6,7 @@
  *
  * Issue: https://github.com/shakacode/react_on_rails/issues/2283
  *
- * The StreamingRaceSimulator middleware (activated by ?simulate_race=true)
+ * The StreamingRaceSimulator middleware (activated by ?simulate_streaming_props_delay=true)
  * splits the props script tag in the middle of its JSON content with a delay,
  * simulating the race condition that occurs on slow networks.
  */
@@ -103,7 +103,7 @@ async function verifyComponentIsInteractive(page: Page): Promise<boolean> {
 test.describe('JSON Parse Race Condition Fix', () => {
   test('should hydrate successfully even with simulated race condition', async ({ page }) => {
     // Start navigation and wait for hydration result
-    const navigationPromise = page.goto('/server_side_hello_world_hooks?simulate_race=true');
+    const navigationPromise = page.goto('/server_side_hello_world_hooks?simulate_streaming_props_delay=true');
     const resultPromise = waitForHydrationOrError(page);
 
     await navigationPromise;

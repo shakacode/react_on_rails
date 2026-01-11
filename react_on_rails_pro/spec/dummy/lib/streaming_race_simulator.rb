@@ -26,8 +26,8 @@
 #   5. After props are processed, remaining chunks pass through immediately
 #
 # USAGE:
-#   Add `?simulate_race=true` to any URL to trigger the race condition simulation.
-#   Example: http://localhost:3000/large_props_stress_test?simulate_race=true
+#   Add `?simulate_streaming_props_delay=true` to any URL to trigger the simulation.
+#   Example: http://localhost:3000/server_side_hello_world_hooks?simulate_streaming_props_delay=true
 #
 # NOTE:
 #   This middleware is for development/testing only. It should NEVER be used in
@@ -39,8 +39,8 @@ class StreamingRaceSimulator
   end
 
   def call(env)
-    # Only activate when ?simulate_race=true is in the query string
-    return @app.call(env) unless env["QUERY_STRING"]&.include?("simulate_race=true")
+    # Only activate when ?simulate_streaming_props_delay=true is in the query string
+    return @app.call(env) unless env["QUERY_STRING"]&.include?("simulate_streaming_props_delay=true")
 
     status, headers, response = @app.call(env)
 
@@ -56,8 +56,9 @@ end
 # Wraps the response body to intercept and delay the props script tag
 class DelayedPropsBody
   # Regex to match the React on Rails props script tag
-  # Example: <script type="application/json" class="js-react-on-rails-component" data-dom-id="...">{"props":...}</script>
-  PROPS_SCRIPT_PATTERN = /<script[^>]*class="[^"]*js-react-on-rails-component[^"]*"[^>]*>.*?<\/script>/m
+  # Example: <script type="application/json" class="js-react-on-rails-component"
+  #          data-dom-id="...">{"props":...}</script>
+  PROPS_SCRIPT_PATTERN = %r{<script[^>]*class="[^"]*js-react-on-rails-component[^"]*"[^>]*>.*?</script>}m
 
   # Delay in seconds between sending the two halves of the props script
   # This creates the race condition window where JS can read incomplete props
@@ -67,7 +68,7 @@ class DelayedPropsBody
     @source = source
   end
 
-  def each
+  def each(&block)
     buffer = +""
     props_processed = false
 
@@ -82,34 +83,11 @@ class DelayedPropsBody
       buffer << chunk
 
       # Try to find the complete props script tag in the buffer
-      if (match = buffer.match(PROPS_SCRIPT_PATTERN))
-        # Extract parts: before props, props script, after props
-        before = buffer[0...match.begin(0)]
-        props_script = match[0]
-        after = buffer[match.end(0)..]
+      next unless (match = buffer.match(PROPS_SCRIPT_PATTERN))
 
-        # Find the JSON content boundaries (between opening tag and closing tag)
-        # Opening tag ends at first '>' after '<script'
-        opening_tag_end = props_script.index(">") + 1
-        # Closing tag starts at '</script>'
-        closing_tag_start = props_script.rindex("</script>")
-
-        # Split in the middle of the JSON content (not in the tags)
-        json_content_length = closing_tag_start - opening_tag_end
-        split_point = opening_tag_end + (json_content_length / 2)
-
-        # Send first half (contains opening tag + truncated JSON)
-        yield before + props_script[0...split_point]
-
-        # DELAY - This is where the race condition happens!
-        # JS bundle can load and execute during this window, reading incomplete props
-        sleep RACE_CONDITION_DELAY
-
-        # Send second half (rest of JSON + closing tag) + any content after
-        yield props_script[split_point..] + after
-
-        props_processed = true
-      end
+      # Process the matched props script with delay
+      yield_props_with_delay(buffer, match, &block)
+      props_processed = true
     end
 
     # If props script was never found, yield whatever we buffered
@@ -120,5 +98,43 @@ class DelayedPropsBody
 
   def close
     @source.close if @source.respond_to?(:close)
+  end
+
+  private
+
+  def yield_props_with_delay(buffer, match)
+    before, props_script, after = extract_parts(buffer, match)
+    first_half, second_half = split_props_script(props_script)
+
+    # Send first half (contains opening tag + truncated JSON)
+    yield before + first_half
+
+    # DELAY - This is where the race condition happens!
+    # JS bundle can load and execute during this window, reading incomplete props
+    sleep RACE_CONDITION_DELAY
+
+    # Send second half (rest of JSON + closing tag) + any content after
+    yield second_half + after
+  end
+
+  def extract_parts(buffer, match)
+    before = buffer[0...match.begin(0)]
+    props_script = match[0]
+    after = buffer[match.end(0)..]
+    [before, props_script, after]
+  end
+
+  def split_props_script(props_script)
+    # Find the JSON content boundaries (between opening tag and closing tag)
+    # Opening tag ends at first '>' after '<script'
+    opening_tag_end = props_script.index(">") + 1
+    # Closing tag starts at '</script>'
+    closing_tag_start = props_script.rindex("</script>")
+
+    # Split in the middle of the JSON content (not in the tags)
+    json_content_length = closing_tag_start - opening_tag_end
+    split_point = opening_tag_end + (json_content_length / 2)
+
+    [props_script[0...split_point], props_script[split_point..]]
   end
 end
