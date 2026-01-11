@@ -87,7 +87,7 @@
     "pino-pretty": "^13.0.0",
     "preload-webpack-plugin": "^3.0.0-alpha.1",
     "typescript": "^5.2.2",
-    "webpack-cli": "^6.0.1",
+    "webpack-cli": "^4.10.0",
     "webpack-dev-server": "^5.2.1"
   },
   "browser": {

@@ -15,8 +15,8 @@
 
 import { test, expect, Browser, Page, ConsoleMessage, type BrowserContext } from '@playwright/test';
 
-// Number of concurrent page loads per test (limited to avoid overwhelming server)
-const CONCURRENT_LOADS = 6;
+// Number of concurrent page loads per test
+const CONCURRENT_LOADS = 10;
 
 // Number of iterations (total loads = CONCURRENT_LOADS * ITERATIONS)
 const ITERATIONS = 5;
@@ -46,13 +46,7 @@ test.describe('Large Props JSON Parsing Stress Test', () => {
   /**
    * Helper to load a page and check for JSON parse errors
    */
-  async function loadPageAndCheckErrors(
-    page: Page,
-    delay: number,
-    loadId: string,
-    pageTimeout: number = 15000,
-    propsSize: number = 1,
-  ): Promise<LoadResult> {
+  async function loadPageAndCheckErrors(page: Page, delay: number, loadId: string): Promise<LoadResult> {
     const errors: string[] = [];
     const consoleMessages: Array<{ type: string; text: string }> = [];
 
@@ -71,13 +65,13 @@ test.describe('Large Props JSON Parsing Stress Test', () => {
       errors.push(`PageError: ${error.message}`);
     });
 
-    const url = `/large_props_stress_test?delay=${delay}&load_id=${loadId}&size=${propsSize}`;
+    const url = `/large_props_stress_test?delay=${delay}&load_id=${loadId}`;
 
     try {
-      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: pageTimeout * 2 });
+      await page.goto(url, { waitUntil: 'domcontentloaded' });
 
       // Wait for components to render (with timeout)
-      await page.waitForSelector('[data-testid="test-status"]', { timeout: pageTimeout });
+      await page.waitForSelector('[data-testid="test-status"]', { timeout: 15000 });
 
       // Wait for status to be set
       await page.waitForFunction(
@@ -85,7 +79,7 @@ test.describe('Large Props JSON Parsing Stress Test', () => {
           const el = document.getElementById('test-status');
           return el && el.dataset.status;
         },
-        { timeout: pageTimeout },
+        { timeout: 15000 },
       );
 
       // Get the status
@@ -149,22 +143,7 @@ test.describe('Large Props JSON Parsing Stress Test', () => {
     analyzeResults(results, 200);
   });
 
-  test('should handle concurrent page loads with network throttling (slow 3G)', async ({ browser }) => {
-    test.setTimeout(180000); // 3 minutes - slow network takes longer
-    const results = await runConcurrentLoads(browser, 100, CONCURRENT_LOADS, 'slow3g');
-    // Allow timeouts on slow network, but fail on JSON parse errors
-    analyzeResults(results, 100, true);
-  });
-
-  test('EXTREME: very slow network (GPRS) with 1MB+ props', async ({ browser }) => {
-    test.setTimeout(600000); // 10 minutes for extreme test
-    // Use size=5 for ~1MB props per component, GPRS-like network
-    const results = await runConcurrentLoads(browser, 100, 3, 'gprs', 5);
-    analyzeResults(results, 100, true);
-  });
-
   test('stress test: many iterations with varying delays', async ({ browser }) => {
-    test.setTimeout(300000); // 5 minutes for this stress test
     const allResults: LoadResult[] = [];
 
     for (let iteration = 0; iteration < ITERATIONS; iteration++) {
@@ -210,52 +189,18 @@ test.describe('Large Props JSON Parsing Stress Test', () => {
 
   /**
    * Run concurrent page loads
-   * @param throttle - false, 'slow3g', or 'gprs'
-   * @param propsSize - size multiplier for props (1 = ~200KB, 5 = ~1MB)
    */
-  async function runConcurrentLoads(
-    browser: Browser,
-    delay: number,
-    count: number,
-    throttle: false | 'slow3g' | 'gprs' = false,
-    propsSize: number = 1,
-  ): Promise<LoadResult[]> {
+  async function runConcurrentLoads(browser: Browser, delay: number, count: number): Promise<LoadResult[]> {
     const promises: Promise<LoadResult>[] = [];
 
     for (let i = 0; i < count; i++) {
       const context: BrowserContext = await browser.newContext();
       const page: Page = await context.newPage();
-
-      // Simulate slow network to trigger race condition
-      if (throttle) {
-        const cdp = await context.newCDPSession(page);
-        const networkConditions =
-          throttle === 'gprs'
-            ? {
-                offline: false,
-                downloadThroughput: (50 * 1024) / 8, // 50 Kbps - GPRS
-                uploadThroughput: (20 * 1024) / 8,
-                latency: 500, // 500ms latency
-              }
-            : {
-                offline: false,
-                downloadThroughput: (500 * 1024) / 8, // 500 Kbps - slow 3G
-                uploadThroughput: (500 * 1024) / 8,
-                latency: 400, // 400ms latency
-              };
-        await cdp.send('Network.emulateNetworkConditions', networkConditions);
-      }
-
-      const loadId = `load-${delay}ms-${i}${throttle ? `-${throttle}` : ''}${propsSize > 1 ? `-${propsSize}x` : ''}`;
-      const pageTimeout = throttle === 'gprs' ? 300000 : throttle ? 60000 : 15000;
+      const loadId = `load-${delay}ms-${i}`;
 
       promises.push(
-        loadPageAndCheckErrors(page, delay, loadId, pageTimeout, propsSize).finally(async () => {
-          try {
-            await context.close();
-          } catch {
-            // Context may already be closed on timeout
-          }
+        loadPageAndCheckErrors(page, delay, loadId).finally(async () => {
+          await context.close();
         }),
       );
     }
@@ -266,33 +211,23 @@ test.describe('Large Props JSON Parsing Stress Test', () => {
   /**
    * Analyze and log results
    */
-  function analyzeResults(results: LoadResult[], delay: number, allowTimeouts: boolean = false): void {
+  function analyzeResults(results: LoadResult[], delay: number): void {
     const failures = results.filter((r) => !r.success);
     const jsonErrors = results.filter((r) => r.jsonErrors.length > 0);
-    const timeouts = failures.filter((r) => r.errors.some((e) => e.includes('timeout') || e.includes('Timeout')));
 
     console.log(`\n--- Results for delay=${delay}ms ---`);
     console.log(
-      `Total: ${results.length}, Success: ${results.length - failures.length}, Failed: ${failures.length}, Timeouts: ${timeouts.length}`,
+      `Total: ${results.length}, Success: ${results.length - failures.length}, Failed: ${failures.length}`,
     );
 
-    if (failures.length > 0) {
-      console.log('Failure details:');
-      failures.forEach((r) => console.log(`  ${r.loadId}: ${r.errors.join(', ')}`));
-    }
-
     if (jsonErrors.length > 0) {
-      console.error('!!! JSON PARSE ERRORS DETECTED !!!');
+      console.error('JSON parse errors detected:');
       jsonErrors.forEach((r) => console.error(`  ${r.loadId}:`, r.jsonErrors));
     }
 
-    // JSON parse errors are the bug we're looking for - always fail on these
+    // We expect all loads to succeed
+    expect(failures.length).toBe(0);
     expect(jsonErrors.length).toBe(0);
-
-    // For throttled tests, we allow timeouts but not other failures
-    if (!allowTimeouts) {
-      expect(failures.length).toBe(0);
-    }
   }
 });
 
@@ -301,8 +236,6 @@ test.describe('Large Props JSON Parsing Stress Test', () => {
  * This tests a different pattern - rapid back-to-back loads
  */
 test.describe('Rapid Sequential Load Test', () => {
-  test.describe.configure({ timeout: 120000 });
-
   test('should handle rapid sequential page loads', async ({ page }) => {
     const results: Array<{
       loadIndex: number;

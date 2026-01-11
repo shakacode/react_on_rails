@@ -8,10 +8,6 @@ import HelloString from '../non_react/HelloString';
 
 import SharedReduxStore from '../stores/SharedReduxStore';
 
-// Large props stress test components (issue #2283)
-import LargePropsComponent from '../components/LargePropsComponent';
-import DelayedLargePropsComponent from '../components/DelayedLargePropsComponent';
-
 // This section is used exclusively for testing purposes. It allows us to create a new React component and register it within the RSC (React Server Components) bundle.
 if (process.env.NODE_ENV === 'test') {
   globalThis.React = require('react');
@@ -19,8 +15,6 @@ if (process.env.NODE_ENV === 'test') {
 
 ReactOnRails.register({
   HelloString,
-  LargePropsComponent,
-  DelayedLargePropsComponent,
 });
 
 ReactOnRails.registerStore({
