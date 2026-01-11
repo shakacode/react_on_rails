@@ -272,8 +272,35 @@ async function forAllElementsAsync(
   await Promise.all(Array.from(els).map(callback));
 }
 
+/**
+ * Filters elements to only include those with a nextSibling.
+ *
+ * This is used to prevent a race condition during HTML streaming where
+ * the props script element exists in the DOM but its content is incomplete.
+ *
+ * Why checking for ANY nextSibling works:
+ * - During HTML streaming, the browser parses incrementally
+ * - A script element's content is everything between <script> and </script>
+ * - The browser cannot parse ANY content after a script until </script> is found
+ * - Therefore, if nextSibling exists (even whitespace or comments), the closing
+ *   tag was parsed and the content is guaranteed to be complete
+ *
+ * Elements without a nextSibling will be hydrated later when their
+ * immediate hydration script executes and calls reactOnRailsComponentLoaded().
+ *
+ * See: https://github.com/shakacode/react_on_rails/issues/2283
+ */
+async function forAllCompleteElementsAsync(
+  selector: string,
+  callback: (el: Element) => Promise<void>,
+): Promise<void> {
+  const els = document.querySelectorAll(selector);
+  const completeEls = Array.from(els).filter((el) => el.nextSibling !== null);
+  await Promise.all(completeEls.map(callback));
+}
+
 export const renderOrHydrateImmediateHydratedComponents = () =>
-  forAllElementsAsync(
+  forAllCompleteElementsAsync(
     '.js-react-on-rails-component[data-immediate-hydration="true"]',
     renderOrHydrateComponent,
   );
@@ -311,7 +338,10 @@ export async function hydrateStore(storeNameOrElement: string | Element) {
 }
 
 export const hydrateImmediateHydratedStores = () =>
-  forAllElementsAsync(`[${REACT_ON_RAILS_STORE_ATTRIBUTE}][data-immediate-hydration="true"]`, hydrateStore);
+  forAllCompleteElementsAsync(
+    `[${REACT_ON_RAILS_STORE_ATTRIBUTE}][data-immediate-hydration="true"]`,
+    hydrateStore,
+  );
 
 export const hydrateAllStores = () =>
   forAllElementsAsync(`[${REACT_ON_RAILS_STORE_ATTRIBUTE}]`, hydrateStore);
