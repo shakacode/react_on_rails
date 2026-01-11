@@ -19,8 +19,13 @@ import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 
 const DelayedLargePropsComponent = ({ largeData, componentId, loadTime, registrationDelay }) => {
-  const [renderTime] = useState(() => new Date().toISOString());
+  const [renderTime, setRenderTime] = useState(null);
   const [propsValid, setPropsValid] = useState(false);
+
+  // Set render time only on client to avoid hydration mismatch
+  useEffect(() => {
+    setRenderTime(new Date().toISOString());
+  }, []);
 
   useEffect(() => {
     // Validate that props were correctly parsed
@@ -69,7 +74,7 @@ const DelayedLargePropsComponent = ({ largeData, componentId, loadTime, registra
       <p>Props size: {(propsSize / 1024).toFixed(2)} KB</p>
       <p>Items count: {itemCount}</p>
       <p>Load time (from server): {loadTime}</p>
-      <p>Render time (client): {renderTime}</p>
+      <p>Render time (client): {renderTime || 'Loading...'}</p>
       <p data-testid="delayed-status" style={{ color: propsValid ? 'green' : 'red', fontWeight: 'bold' }}>
         Status: {propsValid ? 'Rendered Successfully' : 'INVALID PROPS'}
       </p>

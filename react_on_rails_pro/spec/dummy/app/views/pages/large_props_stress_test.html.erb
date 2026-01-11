@@ -9,7 +9,7 @@
   Used to reproduce: https://github.com/shakacode/react_on_rails/issues/2283
 %>
 
-<%= javascript_pack_tag 'large-props-bundle' %>
+<%= append_javascript_pack_tag 'large-props-bundle' %>
 
 <script>
   // Configure the delay for component registration (simulates async bundle loading)
@@ -59,8 +59,9 @@
 <h2>Immediate Registration Component (LargePropsComponent)</h2>
 <%= react_component("LargePropsComponent",
     props: @large_props_first,
-    prerender: false,
+    prerender: true,
     trace: true,
+    auto_load_bundle: false,
     id: "LargePropsComponent-1") %>
 
 <hr/>
@@ -69,8 +70,9 @@
 <p><em>This component's bundle is registered after a <%= @registration_delay %>ms delay to simulate async loading.</em></p>
 <%= react_component("DelayedLargePropsComponent",
     props: @large_props_second,
-    prerender: false,
+    prerender: true,
     trace: true,
+    auto_load_bundle: false,
     id: "DelayedLargePropsComponent-1") %>
 
 <hr/>
@@ -81,8 +83,9 @@
 <% 3.times do |i| %>
   <%= react_component("LargePropsComponent",
       props: @large_props_array[i],
-      prerender: false,
+      prerender: true,
       trace: true,
+      auto_load_bundle: false,
       id: "LargePropsComponent-multi-#{i}") %>
 <% end %>
 

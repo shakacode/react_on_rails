@@ -176,11 +176,13 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
   def large_props_stress_test
     # Get registration delay from params (default 100ms)
     @registration_delay = (params[:delay] || 100).to_i
+    # Get props size multiplier from params (default 1 = ~200KB, 5 = ~1MB)
+    @size_multiplier = (params[:size] || 1).to_i.clamp(1, 10)
 
-    # Generate large props (~200KB each) to trigger the race condition
-    @large_props_first = generate_large_props(1)
-    @large_props_second = generate_large_props(2)
-    @large_props_array = (0..2).map { |i| generate_large_props(i + 10) }
+    # Generate large props to trigger the race condition
+    @large_props_first = generate_large_props(1, @size_multiplier)
+    @large_props_second = generate_large_props(2, @size_multiplier)
+    @large_props_array = (0..2).map { |i| generate_large_props(i + 10, @size_multiplier) }
 
     # Calculate total props size for display
     all_props = [@large_props_first, @large_props_second] + @large_props_array
@@ -223,15 +225,16 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     }
   end
 
-  # Generate large props data (~200KB when serialized to JSON)
-  def generate_large_props(component_id)
-    items = build_large_items_array
+  # Generate large props data (~200KB * multiplier when serialized to JSON)
+  def generate_large_props(component_id, size_multiplier = 1)
+    items = build_large_items_array(size_multiplier)
     build_props_hash(component_id, items)
   end
 
-  def build_large_items_array
-    # Create a large nested structure to reach ~200KB
-    (0..500).map do |i|
+  def build_large_items_array(size_multiplier = 1)
+    # Create a large nested structure (~200KB * multiplier)
+    item_count = 500 * size_multiplier
+    (0...item_count).map do |i|
       {
         id: i,
         uuid: SecureRandom.uuid,

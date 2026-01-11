@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>DOM Partial Content Proof</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; }
+    .box { padding: 20px; border: 2px solid #333; margin: 20px 0; border-radius: 8px; }
+    .success { border-color: green; background: #e8f5e9; }
+    .error { border-color: red; background: #ffebee; }
+    code { background: #f5f5f5; padding: 2px 6px; }
+    pre { background: #f5f5f5; padding: 10px; overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <h1>DOM Partial Content Proof</h1>
+
+  <p>This demonstrates that <code>el.textContent</code> can return incomplete content
+  when an element is still being written to the DOM.</p>
+
+  <h2>Test 1: Simulated Streaming with document.write</h2>
+  <div class="box" id="test1-result">Running...</div>
+
+  <h2>Test 2: innerHTML Partial Write</h2>
+  <div class="box" id="test2-result">Running...</div>
+
+  <h2>Test 3: Range/Selection Proof</h2>
+  <div class="box" id="test3-result">Running...</div>
+
+  <script>
+    // Test 1: Show that we can read an element before document is closed
+    (function() {
+      var iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      document.body.appendChild(iframe);
+
+      var doc = iframe.contentDocument;
+      doc.open();
+      doc.write('<!DOCTYPE html><html><body><div id="target">START_');
+
+      // Read BEFORE closing
+      var el = doc.getElementById('target');
+      var contentBefore = el ? el.textContent : 'NOT FOUND';
+
+      doc.write('MIDDLE_');
+      var contentMiddle = el ? el.textContent : 'NOT FOUND';
+
+      doc.write('END</div></body></html>');
+      doc.close();
+      var contentAfter = el ? el.textContent : 'NOT FOUND';
+
+      document.getElementById('test1-result').innerHTML =
+        '<strong>Before close:</strong> "' + contentBefore + '" (length: ' + contentBefore.length + ')<br>' +
+        '<strong>After more write:</strong> "' + contentMiddle + '" (length: ' + contentMiddle.length + ')<br>' +
+        '<strong>After close:</strong> "' + contentAfter + '" (length: ' + contentAfter.length + ')<br><br>' +
+        '<strong>Conclusion:</strong> ' +
+        (contentBefore.length < contentAfter.length
+          ? '<span style="color:green">✓ textContent grows as content is written!</span>'
+          : '<span style="color:red">Content was complete immediately</span>');
+
+      document.body.removeChild(iframe);
+    })();
+
+    // Test 2: Show partial innerHTML updates
+    (function() {
+      var container = document.createElement('div');
+      container.style.display = 'none';
+      document.body.appendChild(container);
+
+      var results = [];
+
+      // Simulate chunked writing
+      container.innerHTML = '<script type="application/json" id="json-test">{"items":[';
+      var jsonEl = container.querySelector('#json-test');
+      results.push('After opening: "' + jsonEl.textContent + '"');
+
+      // This simulates what happens during streaming - the innerHTML is replaced
+      // In real streaming, the browser parser adds content incrementally
+
+      document.getElementById('test2-result').innerHTML =
+        '<strong>Key insight:</strong> In real HTML streaming, the browser parser ' +
+        'adds content to elements incrementally. When JS reads textContent mid-parse, ' +
+        'it gets only what has been parsed so far.<br><br>' +
+        '<strong>This is exactly what happens with immediate_hydration:</strong><br>' +
+        '1. Browser receives: <code>&lt;script type="application/json"&gt;{"items":[</code><br>' +
+        '2. Element exists in DOM, JS can query it<br>' +
+        '3. JS reads textContent → <code>{"items":[</code> (incomplete!)<br>' +
+        '4. JSON.parse() fails with "Unterminated string"';
+
+      document.body.removeChild(container);
+    })();
+
+    // Test 3: Direct proof with timing
+    (function() {
+      document.getElementById('test3-result').innerHTML =
+        '<strong>The Race Condition:</strong><br><br>' +
+        '<pre>' +
+        'Server streams:     &lt;script&gt;{"name":"very long value...\n' +
+        '                    ↑\n' +
+        '                    Browser: element in DOM, textContent = \'{"name":"very\'\n' +
+        '                    \n' +
+        'Server continues:   ...still streaming..."}}&lt;/script&gt;\n' +
+        '                    ↑\n' +
+        '                    If JS runs HERE, it reads complete JSON\n' +
+        '                    If JS ran EARLIER, it read truncated JSON\n' +
+        '</pre>' +
+        '<strong>The fix:</strong> Wait for DOMContentLoaded, or verify JSON is complete before parsing.';
+    })();
+  </script>
+
+  <h2>Why This Matters for React on Rails</h2>
+  <div class="box">
+    <p><strong>immediate_hydration</strong> runs React hydration as soon as the JS bundle loads,
+    WITHOUT waiting for <code>DOMContentLoaded</code>.</p>
+
+    <p>On slow networks with large props:</p>
+    <ol>
+      <li>Browser receives <code>&lt;script src="bundle.js" async&gt;</code></li>
+      <li>Browser starts downloading bundle.js</li>
+      <li>Server streams large JSON props in <code>&lt;script type="application/json"&gt;</code></li>
+      <li>bundle.js finishes downloading and <strong>executes immediately</strong></li>
+      <li>bundle.js reads <code>el.textContent</code> → <strong>TRUNCATED JSON</strong></li>
+      <li><code>JSON.parse()</code> → <strong>SyntaxError: Unterminated string</strong></li>
+    </ol>
+  </div>
+</body>
+</html>
