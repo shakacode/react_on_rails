@@ -23,6 +23,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 Changes since the last non-beta release.
 
+#### Fixed
+
+- **JSON Parse Race Condition in Immediate Hydration (Pro)**: Fixed a race condition where `immediate_hydration` could attempt to parse incomplete JSON props during HTML streaming on slow networks. When the JS bundle executes before the props `<script>` tag content is fully received, `el.textContent` returns truncated JSON, causing `SyntaxError: Unterminated string in JSON`. The fix uses a `nextSibling` check to verify the props script's closing tag has been parsed before attempting hydration; incomplete elements are deferred to the fallback `reactOnRailsComponentLoaded()` path. [PR 2290](https://github.com/shakacode/react_on_rails/pull/2290) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 ### [16.2.0.rc.0] - 2025-12-29
 
 Changes since the last non-beta release (16.1.1).
