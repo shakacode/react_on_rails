@@ -1,14 +1,14 @@
 /**
  * JSON Parse Race Condition Test
  *
- * Tests for the race condition bug in immediate_hydration where JS reads
- * incomplete JSON props from the DOM during HTML streaming.
+ * Tests that the race condition fix for immediate_hydration works correctly.
+ * The fix prevents JS from reading incomplete JSON props during HTML streaming.
  *
  * Issue: https://github.com/shakacode/react_on_rails/issues/2283
  *
  * The StreamingRaceSimulator middleware (activated by ?simulate_race=true)
  * splits the props script tag in the middle of its JSON content with a delay,
- * reliably reproducing the race condition.
+ * simulating the race condition that occurs on slow networks.
  */
 
 import { test, expect, Page } from '@playwright/test';
@@ -100,33 +100,8 @@ async function verifyComponentIsInteractive(page: Page): Promise<boolean> {
   return updatedText === 'Hello, TestUser123!' && updatedText !== initialText;
 }
 
-/**
- * Tests that the component is NOT interactive (not hydrated):
- * - Typing in the input should NOT update the h3 text
- */
-async function verifyComponentIsNotInteractive(page: Page): Promise<boolean> {
-  // Target the HelloWorldHooks component specifically
-  const component = page.locator('#HelloWorld-react-component-0');
-  const input = component.locator('input[type="text"]');
-  const heading = component.locator('h3');
-
-  // Get initial text
-  const initialText = await heading.textContent();
-
-  // Try to type (this may or may not work depending on SSR state)
-  await input.pressSequentially('XYZ', { delay: 50 });
-
-  // Small wait to ensure any potential updates would have happened
-  await page.waitForTimeout(100);
-
-  // Check if heading stayed the same
-  const afterText = await heading.textContent();
-
-  return afterText === initialText;
-}
-
-test.describe('JSON Parse Race Condition', () => {
-  test('should fail with JSON parse error when race condition is simulated', async ({ page }) => {
+test.describe('JSON Parse Race Condition Fix', () => {
+  test('should hydrate successfully even with simulated race condition', async ({ page }) => {
     // Start navigation and wait for hydration result
     const navigationPromise = page.goto('/server_side_hello_world_hooks?simulate_race=true');
     const resultPromise = waitForHydrationOrError(page);
@@ -134,13 +109,13 @@ test.describe('JSON Parse Race Condition', () => {
     await navigationPromise;
     const result = await resultPromise;
 
-    // Expect JSON parse error (hydration failed)
-    expect(result.hydrated).toBe(false);
-    expect(result.errors.some((e) => JSON_ERROR_PATTERNS.some((pattern) => pattern.test(e)))).toBe(true);
+    // With the fix, hydration should succeed even with race condition
+    expect(result.hydrated).toBe(true);
+    expect(result.errors.filter((e) => JSON_ERROR_PATTERNS.some((pattern) => pattern.test(e)))).toHaveLength(0);
 
-    // Verify component is NOT interactive (React didn't hydrate)
-    const isNotInteractive = await verifyComponentIsNotInteractive(page);
-    expect(isNotInteractive).toBe(true);
+    // Verify component IS interactive (React hydrated successfully)
+    const isInteractive = await verifyComponentIsInteractive(page);
+    expect(isInteractive).toBe(true);
   });
 
   test('should hydrate successfully without race condition simulation', async ({ page }) => {
