@@ -98,7 +98,6 @@ class DelayedPropsBody
         json_content_length = closing_tag_start - opening_tag_end
         split_point = opening_tag_end + (json_content_length / 2)
 
-        puts "Before props part #{props_script[0...split_point]}"
         # Send first half (contains opening tag + truncated JSON)
         yield before + props_script[0...split_point]
 
@@ -106,7 +105,6 @@ class DelayedPropsBody
         # JS bundle can load and execute during this window, reading incomplete props
         sleep RACE_CONDITION_DELAY
 
-        puts "After props part #{props_script[split_point..]}"
         # Send second half (rest of JSON + closing tag) + any content after
         yield props_script[split_point..] + after
 
