@@ -31,19 +31,26 @@ interface HydrationResult {
 async function waitForHydrationOrError(page: Page): Promise<HydrationResult> {
   const errors: string[] = [];
   let hydrated = false;
+  let resolved = false;
 
   return new Promise((resolve) => {
+    // Declare handlers first so cleanup can reference them
+    let onConsole: (msg: { type: () => string; text: () => string }) => void;
+    let onPageError: (error: Error) => void;
+
     const cleanup = () => {
       page.off('console', onConsole);
       page.off('pageerror', onPageError);
     };
 
-    const onConsole = (msg: { type: () => string; text: () => string }) => {
+    onConsole = (msg) => {
+      if (resolved) return;
       const text = msg.text();
 
       // Check for hydration success
       if (HYDRATION_SUCCESS_PATTERN.test(text)) {
         hydrated = true;
+        resolved = true;
         cleanup();
         resolve({ hydrated: true, errors });
       }
@@ -53,15 +60,18 @@ async function waitForHydrationOrError(page: Page): Promise<HydrationResult> {
         errors.push(text);
         // Check if it's a JSON parse error
         if (JSON_ERROR_PATTERNS.some((pattern) => pattern.test(text))) {
+          resolved = true;
           cleanup();
           resolve({ hydrated: false, errors });
         }
       }
     };
 
-    const onPageError = (error: Error) => {
+    onPageError = (error) => {
+      if (resolved) return;
       errors.push(error.message);
       if (JSON_ERROR_PATTERNS.some((pattern) => pattern.test(error.message))) {
+        resolved = true;
         cleanup();
         resolve({ hydrated: false, errors });
       }
@@ -72,6 +82,8 @@ async function waitForHydrationOrError(page: Page): Promise<HydrationResult> {
 
     // Timeout fallback (10 seconds)
     setTimeout(() => {
+      if (resolved) return;
+      resolved = true;
       cleanup();
       resolve({ hydrated, errors });
     }, 10000);
