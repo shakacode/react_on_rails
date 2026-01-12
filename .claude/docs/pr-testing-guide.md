@@ -565,7 +565,7 @@ Tested locally:
 
 Requires manual verification:
 - Full webpack build in production mode
-- Test in actual app with Shakapacker 9.4.0
+- Test in actual app with Shakapacker latest version
 ```
 
 ## Real-World Testing Scenarios
