@@ -23,9 +23,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 Changes since the last non-beta release.
 
+### [16.2.0.rc.1] - 2026-01-11
+
 #### Fixed
 
 - **JSON Parse Race Condition in Immediate Hydration (Pro)**: Fixed a race condition where `immediate_hydration` could attempt to parse incomplete JSON props during HTML streaming on slow networks. When the JS bundle executes before the props `<script>` tag content is fully received, `el.textContent` returns truncated JSON, causing `SyntaxError: Unterminated string in JSON`. The fix uses a `nextSibling` check to verify the props script's closing tag has been parsed before attempting hydration; incomplete elements are deferred to the fallback `reactOnRailsComponentLoaded()` path. [PR 2290](https://github.com/shakacode/react_on_rails/pull/2290) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **webpack-cli Compatibility**: Fixed compatibility issue with webpack-dev-server v5 by upgrading webpack-cli from v4 to v6.0.1 and removing the deprecated `@webpack-cli/serve` package. Also removed deprecated `https: false` configuration from shakapacker.yml. [PR 2291](https://github.com/shakacode/react_on_rails/pull/2291) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 ### [16.2.0.rc.0] - 2025-12-29
 
@@ -1876,7 +1879,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.2.0.rc.0...master
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.2.0.rc.1...master
+[16.2.0.rc.1]: https://github.com/shakacode/react_on_rails/compare/v16.2.0.rc.0...v16.2.0.rc.1
 [16.2.0.rc.0]: https://github.com/shakacode/react_on_rails/compare/16.1.1...v16.2.0.rc.0
 [16.1.1]: https://github.com/shakacode/react_on_rails/compare/16.1.0...16.1.1
 [16.1.0]: https://github.com/shakacode/react_on_rails/compare/16.0.0...16.1.0
