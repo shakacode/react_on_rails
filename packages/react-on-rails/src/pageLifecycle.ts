@@ -14,17 +14,26 @@ const pageUnloadedCallbacks = new Set<PageLifecycleCallback>();
 
 let currentPageState: PageState = 'initial';
 
+function runInNextPollPhase(callback: PageLifecycleCallback) {
+  console.log('Running the callback at the next poll phase0');
+  setTimeout(() => {
+    console.log('The real callback is running now....');
+    void callback();
+  }, 10);
+}
+
 function runPageLoadedCallbacks(): void {
+  console.log('Running page loaded callbacks', new Error().stack);
   currentPageState = 'load';
   pageLoadedCallbacks.forEach((callback) => {
-    void callback();
+    runInNextPollPhase(callback);
   });
 }
 
 function runPageUnloadedCallbacks(): void {
   currentPageState = 'unload';
   pageUnloadedCallbacks.forEach((callback) => {
-    void callback();
+    runInNextPollPhase(callback);
   });
 }
 
@@ -35,6 +44,7 @@ function setupPageNavigationListeners(): void {
   const hasNavigationLibrary = (turbolinksInstalled() && turbolinksSupported()) || turboInstalled();
   if (!hasNavigationLibrary) {
     debugTurbolinks('NO NAVIGATION LIBRARY: running page loaded callbacks immediately');
+    console.log('Run Page Loaded Callbacks');
     runPageLoadedCallbacks();
     return;
   }
@@ -68,6 +78,7 @@ function initializePageEventListeners(): void {
   isPageLifecycleInitialized = true;
 
   if (document.readyState !== 'loading') {
+    console.log(`Page state: ${document.readyState}`);
     setupPageNavigationListeners();
   } else {
     document.addEventListener('DOMContentLoaded', setupPageNavigationListeners);
@@ -76,7 +87,8 @@ function initializePageEventListeners(): void {
 
 export function onPageLoaded(callback: PageLifecycleCallback): void {
   if (currentPageState === 'load') {
-    void callback();
+    console.log('Pag is already at the load state');
+    runInNextPollPhase(callback);
   }
   pageLoadedCallbacks.add(callback);
   initializePageEventListeners();
@@ -84,7 +96,7 @@ export function onPageLoaded(callback: PageLifecycleCallback): void {
 
 export function onPageUnloaded(callback: PageLifecycleCallback): void {
   if (currentPageState === 'unload') {
-    void callback();
+    runInNextPollPhase(callback);
   }
   pageUnloadedCallbacks.add(callback);
   initializePageEventListeners();

@@ -7,6 +7,7 @@ import { debugTurbolinks } from './turbolinksUtils.ts';
 export function reactOnRailsPageLoaded() {
   debugTurbolinks('reactOnRailsPageLoaded');
   // Core package: Render all components after page is fully loaded
+  console.log('React on Rails: Page loaded - rendering all components', new Error().stack);
   renderAllComponents();
 }
 
