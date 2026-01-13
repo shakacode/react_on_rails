@@ -37,22 +37,11 @@ export async function handleIncrementalRenderStream(
   const decoder = new StringDecoder('utf8');
   let buffer = '';
   let totalBytesReceived = 0;
-  let chunkCount = 0;
-  let ndjsonLineCount = 0;
-
-  console.log('[NDJSON] Starting to process incremental render stream');
 
   try {
     for await (const chunk of request.raw) {
-      chunkCount += 1;
       const chunkBuffer = chunk instanceof Buffer ? chunk : Buffer.from(chunk);
       totalBytesReceived += chunkBuffer.length;
-      const timestamp = new Date().toISOString();
-      const chunkPreview = chunkBuffer.toString('utf8').slice(0, 200);
-      console.log(
-        `[NDJSON] HTTP/2 CHUNK #${chunkCount} received at ${timestamp}, size=${chunkBuffer.length}, total=${totalBytesReceived}`,
-      );
-      console.log(`[NDJSON] CHUNK #${chunkCount} preview: ${chunkPreview.slice(0, 150)}...`);
 
       // Check total request size limit
       if (totalBytesReceived > BODY_SIZE_LIMIT) {
@@ -75,23 +64,15 @@ export async function handleIncrementalRenderStream(
 
       // Process all complete JSON objects in the buffer
       let boundary = buffer.indexOf('\n');
-      const linesInThisChunk = (buffer.match(/\n/g) || []).length;
-      console.log(`[NDJSON] Buffer has ${linesInThisChunk} newline(s), bufferLength=${buffer.length}`);
-
       while (boundary !== -1) {
         const rawObject = buffer.slice(0, boundary).trim();
         buffer = buffer.slice(boundary + 1);
         boundary = buffer.indexOf('\n');
 
         if (rawObject) {
-          ndjsonLineCount += 1;
-          console.log(`[NDJSON] Parsing NDJSON line #${ndjsonLineCount}, length=${rawObject.length}`);
-          console.log(`[NDJSON] Line #${ndjsonLineCount} preview: ${rawObject.slice(0, 150)}...`);
-
           let parsed: unknown;
           try {
             parsed = JSON.parse(rawObject);
-            console.log(`[NDJSON] Line #${ndjsonLineCount} parsed successfully`);
           } catch (err) {
             const errorMessage = `Invalid JSON chunk: ${err instanceof Error ? err.message : String(err)}`;
 
@@ -144,17 +125,9 @@ export async function handleIncrementalRenderStream(
     const error = err instanceof Error ? err : new Error(String(err));
     // Update the error message in place to retain the original stack trace, rather than creating a new error object
     error.message = `Error while handling the request stream: ${error.message}`;
-    console.log(`[NDJSON] ERROR in stream processing: ${error.message}`);
     throw error;
   }
 
   // Stream ended normally
-  console.log(`[NDJSON] ========================================`);
-  console.log(`[NDJSON] STREAM ENDED - Summary:`);
-  console.log(`[NDJSON]   Total HTTP/2 chunks: ${chunkCount}`);
-  console.log(`[NDJSON]   Total NDJSON lines: ${ndjsonLineCount}`);
-  console.log(`[NDJSON]   Total bytes received: ${totalBytesReceived}`);
-  console.log(`[NDJSON] Calling onRequestEnded...`);
-  console.log(`[NDJSON] ========================================`);
   void onRequestEnded();
 }
