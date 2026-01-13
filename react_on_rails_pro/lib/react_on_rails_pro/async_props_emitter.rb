@@ -31,10 +31,19 @@ module ReactOnRailsPro
     # On the Node side, this triggers asyncPropsManager.setProp(propName, value).
     def call(prop_name, prop_value)
       update_chunk = generate_update_chunk(prop_name, prop_value)
-      @request_stream << "#{update_chunk.to_json}\n"
+      chunk_json = "#{update_chunk.to_json}\n"
+      Rails.logger.info do
+        "[ReactOnRailsPro::AsyncProps] Sending prop '#{prop_name}' (#{chunk_json.bytesize} bytes)..."
+      end
+      @request_stream << chunk_json
+      Rails.logger.info do
+        "[ReactOnRailsPro::AsyncProps] Sent prop '#{prop_name}' successfully"
+      end
     rescue StandardError => e
       Rails.logger.error do
-        "[ReactOnRailsPro] Failed to send async prop '#{prop_name}': #{e.message}"
+        backtrace = e.backtrace&.first(5)&.join("\n")
+        "[ReactOnRailsPro::AsyncProps] FAILED to send prop '#{prop_name}': " \
+          "#{e.class} - #{e.message}\n#{backtrace}"
       end
       # Continue - don't abort entire render because one prop failed
     end
@@ -60,7 +69,7 @@ module ReactOnRailsPro
     def generate_set_prop_js(prop_name, value)
       <<~JS.strip
         (function(){
-          var asyncPropsManager = sharedExecutionContext.get("asyncPropsManager");
+          var asyncPropsManager = ReactOnRails.getOrCreateAsyncPropsManager(sharedExecutionContext);
           asyncPropsManager.setProp(#{prop_name.to_json}, #{value.to_json});
         })()
       JS
@@ -69,7 +78,7 @@ module ReactOnRailsPro
     def generate_end_stream_js
       <<~JS.strip
         (function(){
-          var asyncPropsManager = sharedExecutionContext.get("asyncPropsManager");
+          var asyncPropsManager = ReactOnRails.getOrCreateAsyncPropsManager(sharedExecutionContext);
           asyncPropsManager.endStream();
         })()
       JS
