@@ -1,5 +1,6 @@
 import type { ResponseResult } from '../shared/utils';
 import { handleRenderRequest } from './handleRenderRequest';
+import log from '../shared/log';
 import { getRequestBundleFilePath } from '../shared/utils';
 
 export type IncrementalRenderSink = {
@@ -112,48 +113,34 @@ export async function handleIncrementalRenderRequest(
     }
 
     // Return the result with a sink that uses the execution context
-    console.log('[Sink] Creating incremental render sink for processing update chunks');
-
     return {
       response,
       sink: {
         add: async (chunk: unknown) => {
-          const timestamp = new Date().toISOString();
-          console.log(`[Sink] add() called at ${timestamp}`);
-
           try {
             assertIsUpdateChunk(chunk);
             const bundlePath = getRequestBundleFilePath(chunk.bundleTimestamp);
-            console.log(`[Sink] Executing updateChunk in VM... bundlePath=${bundlePath}`);
-            console.log(`[Sink] updateChunk code preview: ${chunk.updateChunk.slice(0, 150)}...`);
             await executionContext.runInVM(chunk.updateChunk, bundlePath).catch((err: unknown) => {
-              console.log('[Sink] ERROR in runInVM for updateChunk:', err);
+              log.error({ msg: 'Error running incremental render chunk', err, chunk });
             });
-            console.log('[Sink] updateChunk executed successfully');
           } catch (err) {
-            console.log('[Sink] Invalid incremental render chunk:', err);
+            log.error({ msg: 'Invalid incremental render chunk', err, chunk });
           }
         },
         handleRequestClosed: () => {
-          const timestamp = new Date().toISOString();
-          console.log(`[Sink] handleRequestClosed() called at ${timestamp}`);
-
           if (!onRequestClosedUpdateChunk) {
-            console.log('[Sink] No onRequestClosedUpdateChunk provided - skipping endStream');
             return;
           }
 
           const bundlePath = getRequestBundleFilePath(onRequestClosedUpdateChunk.bundleTimestamp);
-          console.log(
-            `[Sink] Executing onRequestClosedUpdateChunk (endStream) in VM... bundlePath=${bundlePath}`,
-          );
           executionContext
             .runInVM(onRequestClosedUpdateChunk.updateChunk, bundlePath)
-            .then(() => {
-              console.log('[Sink] onRequestClosedUpdateChunk (endStream) executed successfully');
-            })
             .catch((err: unknown) => {
-              console.log('[Sink] ERROR running onRequestClosedUpdateChunk:', err);
+              log.error({
+                msg: 'Error running onRequestClosedUpdateChunk',
+                err,
+                onRequestClosedUpdateChunk,
+              });
             });
         },
       },

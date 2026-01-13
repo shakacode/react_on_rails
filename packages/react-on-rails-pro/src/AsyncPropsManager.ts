@@ -69,66 +69,35 @@ class AsyncPropsManager {
    * concurrent rendering - new promises would cause re-renders.
    */
   getProp(propName: string) {
-    const timestamp = new Date().toISOString();
-    console.log(
-      `[AsyncPropsManager] getProp('${propName}') called at ${timestamp}, isClosed=${this.isClosed}`,
-    );
-
     const promiseController = this.getOrCreatePromiseController(propName);
     if (!promiseController) {
-      console.log(`[AsyncPropsManager] getProp('${propName}') - stream is closed, rejecting`);
       return Promise.reject(AsyncPropsManager.getNoPropFoundError(propName));
     }
 
-    console.log(
-      `[AsyncPropsManager] getProp('${propName}') - returning promise, resolved=${promiseController.resolved}`,
-    );
     return promiseController.promise;
   }
 
   setProp(propName: string, propValue: unknown) {
-    const timestamp = new Date().toISOString();
-    console.log(
-      `[AsyncPropsManager] setProp('${propName}') called at ${timestamp}, isClosed=${this.isClosed}`,
-    );
-
     const promiseController = this.getOrCreatePromiseController(propName);
     if (!promiseController) {
-      console.log(`[AsyncPropsManager] setProp('${propName}') - ERROR: stream is already closed!`);
       throw new Error(`Can't set the async prop "${propName}" because the stream is already closed`);
     }
 
-    console.log(`[AsyncPropsManager] setProp('${propName}') - resolving promise with value`);
     promiseController.resolve(propValue);
     promiseController.resolved = true;
-    console.log(`[AsyncPropsManager] setProp('${propName}') - promise resolved successfully`);
   }
 
   endStream() {
-    const timestamp = new Date().toISOString();
-    console.log(`[AsyncPropsManager] endStream() called at ${timestamp}, isClosed=${this.isClosed}`);
-
     if (this.isClosed) {
-      console.log(`[AsyncPropsManager] endStream() - already closed, returning early`);
       return;
     }
 
     this.isClosed = true;
-    const unresolvedProps: string[] = [];
     this.propNameToPromiseController.forEach((promiseController, propName) => {
       if (!promiseController.resolved) {
-        unresolvedProps.push(propName);
         promiseController.reject(AsyncPropsManager.getNoPropFoundError(propName));
       }
     });
-
-    if (unresolvedProps.length > 0) {
-      console.log(
-        `[AsyncPropsManager] endStream() - REJECTING unresolved props: ${unresolvedProps.join(', ')}`,
-      );
-    } else {
-      console.log(`[AsyncPropsManager] endStream() - all props were resolved, nothing to reject`);
-    }
   }
 
   private getOrCreatePromiseController(propName: string) {
@@ -183,15 +152,12 @@ const ASYNC_PROPS_MANAGER_KEY = 'asyncPropsManager';
 export function getOrCreateAsyncPropsManager(
   sharedExecutionContext: Map<string, unknown>,
 ): AsyncPropsManager {
-  const timestamp = new Date().toISOString();
   let manager = sharedExecutionContext.get(ASYNC_PROPS_MANAGER_KEY) as AsyncPropsManager | undefined;
 
   if (manager) {
-    console.log(`[getOrCreateAsyncPropsManager] Found existing manager at ${timestamp}`);
     return manager;
   }
 
-  console.log(`[getOrCreateAsyncPropsManager] Creating new manager at ${timestamp}`);
   manager = new AsyncPropsManager();
   sharedExecutionContext.set(ASYNC_PROPS_MANAGER_KEY, manager);
   return manager;
