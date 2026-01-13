@@ -52,6 +52,7 @@ export type BaseClientObjectType = Omit<
   | 'streamServerRenderedReactComponent'
   | 'serverRenderRSCReactComponent'
   | 'addAsyncPropsCapabilityToComponentProps'
+  | 'getOrCreateAsyncPropsManager'
 >;
 
 // Cache to track created objects and their registries
