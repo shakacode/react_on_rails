@@ -31,14 +31,7 @@ module ReactOnRailsPro
     # On the Node side, this triggers asyncPropsManager.setProp(propName, value).
     def call(prop_name, prop_value)
       update_chunk = generate_update_chunk(prop_name, prop_value)
-      chunk_json = "#{update_chunk.to_json}\n"
-      Rails.logger.info do
-        "[ReactOnRailsPro::AsyncProps] Sending prop '#{prop_name}' (#{chunk_json.bytesize} bytes)..."
-      end
-      @request_stream << chunk_json
-      Rails.logger.info do
-        "[ReactOnRailsPro::AsyncProps] Sent prop '#{prop_name}' successfully"
-      end
+      @request_stream << "#{update_chunk.to_json}\n"
     rescue StandardError => e
       Rails.logger.error do
         backtrace = e.backtrace&.first(5)&.join("\n")
