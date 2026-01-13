@@ -53,12 +53,8 @@ module ReactOnRailsPro
         end
 
         def eval_streaming_js(js_code, render_options)
+          is_rsc_payload = ReactOnRailsPro.configuration.enable_rsc_support && render_options.rsc_payload_streaming?
           async_props_block = render_options.internal_option(:async_props_block)
-          # Use RSC bundle when:
-          # 1. RSC support is enabled AND rsc_payload_streaming is true, OR
-          # 2. async_props_block is present (async props requires RSC bundle for getOrCreateAsyncPropsManager)
-          is_rsc_payload = ReactOnRailsPro.configuration.enable_rsc_support &&
-                           (render_options.rsc_payload_streaming? || async_props_block)
 
           if async_props_block
             # Use incremental rendering when async props block is provided
