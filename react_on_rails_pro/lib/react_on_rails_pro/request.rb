@@ -97,7 +97,7 @@ module ReactOnRailsPro
           )
 
           # Create emitter - it will write NDJSON lines to the request stream
-          emitter = ReactOnRailsPro::AsyncPropsEmitter.new(bundle_timestamp, request)
+          emitter = ReactOnRailsPro::AsyncPropsEmitter.new(pool.rsc_bundle_hash, request)
           initial_data = build_initial_incremental_request(js_code, emitter)
 
           # Start the request - response begins streaming immediately
