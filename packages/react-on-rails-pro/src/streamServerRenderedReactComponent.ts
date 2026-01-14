@@ -43,7 +43,7 @@ const streamRenderReactComponent = (
   };
 
   const { readableStream, pipeToTransform, writeChunk, emitError, endStream } =
-    transformRenderStreamChunksToResultObject(renderState);
+    transformRenderStreamChunksToResultObject(renderState, 'React Component');
 
   const reportError = (error: Error) => {
     renderState.hasErrors = true;

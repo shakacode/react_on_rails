@@ -85,8 +85,66 @@ const setResponse = async (result: ResponseResult, res: FastifyReply) => {
   }
   setHeaders(headers, res);
   res.status(status);
+
   if (stream) {
-    await res.send(stream);
+    console.log(`[setResponse DEBUG] Stream provided, setting up handlers`);
+    console.log(`  stream.readable=${stream.readable}`);
+    console.log(`  stream.readableEnded=${stream.readableEnded}`);
+    console.log(`  stream.readableFlowing=${stream.readableFlowing}`);
+
+    // For HTTP/2 streaming responses, we need to use the raw response object
+    // to properly handle streaming without premature END_STREAM.
+    // reply.send(stream) can close the response before all data is sent
+    // when the stream is initially empty (common in bidirectional streaming).
+
+    // Remove content-length header - HTTP/2 streaming doesn't use it
+    res.removeHeader('content-length');
+
+    // Get the raw HTTP/2 stream
+    const rawResponse = res.raw;
+
+    // Send headers manually
+    if (!rawResponse.headersSent) {
+      console.log(`[setResponse DEBUG] Sending headers via writeHead`);
+      rawResponse.writeHead(status, {
+        'content-type': 'application/octet-stream',
+        'cache-control': headers['Cache-Control'] || 'no-cache',
+      });
+    }
+
+    // Pipe the stream to the raw response, but don't auto-end
+    // This keeps the HTTP/2 stream open until the Node.js stream ends
+    return new Promise<void>((resolve, reject) => {
+      console.log(`[setResponse DEBUG] Setting up stream event handlers`);
+
+      stream.on('data', (chunk) => {
+        console.log(`[setResponse DEBUG] stream 'data' event: ${chunk.toString().substring(0, 100)}`);
+        rawResponse.write(chunk);
+      });
+
+      stream.on('end', () => {
+        console.log(`[setResponse DEBUG] stream 'end' event - calling rawResponse.end()`);
+        rawResponse.end();
+        resolve();
+      });
+
+      stream.on('error', (err) => {
+        console.log(`[setResponse DEBUG] stream 'error' event: ${err}`);
+        rawResponse.end();
+        reject(err);
+      });
+
+      // Also listen for close event
+      stream.on('close', () => {
+        console.log(`[setResponse DEBUG] stream 'close' event`);
+      });
+
+      // Check stream state after setting up handlers
+      console.log(`[setResponse DEBUG] After handler setup:`);
+      console.log(`  stream.readable=${stream.readable}`);
+      console.log(`  stream.readableEnded=${stream.readableEnded}`);
+      console.log(`  stream.readableFlowing=${stream.readableFlowing}`);
+    });
   } else {
     res.send(data);
   }
@@ -557,3 +615,35 @@ export default function run(config: Partial<Config>) {
 
   return app;
 }
+
+  // Investigation Summary
+
+  // Root Cause: This is a server-side race condition in the Node renderer, NOT in httpx.
+
+  // The Problem Flow:
+  // 1. Ruby sends all NDJSON lines + END_STREAM in one burst
+  // 2. Node parses first line → creates PassThrough stream → calls setResponse with void (fire-and-forget)
+  // 3. Processing immediately continues to next lines → addStreamValue writes data to stream
+  // 4. BUT setResponse hasn't finished setting up stream.on('data', ...) handlers yet
+  // 5. Data is buffered in PassThrough but never captured by HTTP response handlers
+  // 6. handleRequestClosed triggers endStream() → stream.end()
+  // 7. Stream ends with empty response body
+
+  // Why sleep fixes it:
+  // - Fiber yields, response.each() starts before close() is called
+  // - Data sent incrementally, server has time to process between chunks
+
+  // The fix belongs in handleIncrementalRenderStream.ts line 99:
+  // // Current (broken):
+  // void onResponseStart(response);
+
+  // // Should be:
+  // await onResponseStart(response);
+
+  // This ensures stream handlers are fully set up before processing more NDJSON lines.
+
+  // httpx is working correctly - it sends what it's asked to send. The issue is the Node server's fire-and-forget async pattern creating a race condition.
+
+  // Would you like me to fix the Node server code instead?
+
+
