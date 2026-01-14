@@ -52,10 +52,8 @@ const streamRenderRSCComponent = (
     isShellReady: true,
   };
 
-  const { pipeToTransform, readableStream, emitError } = transformRenderStreamChunksToResultObject(
-    renderState,
-    'RSC',
-  );
+  const { pipeToTransform, readableStream, emitError } =
+    transformRenderStreamChunksToResultObject(renderState);
 
   const reportError = (error: Error) => {
     console.error('Error in RSC stream', error);
