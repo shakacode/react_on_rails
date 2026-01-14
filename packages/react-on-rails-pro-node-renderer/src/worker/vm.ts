@@ -132,7 +132,7 @@ async function buildVM(filePath: string): Promise<VMContext> {
         additionalContext !== null && additionalContext.constructor === Object;
       const sharedConsoleHistory = new SharedConsoleHistory();
 
-      const contextObject = { sharedConsoleHistory };
+      const contextObject = { sharedConsoleHistory, nodeConsole: console };
 
       if (supportModules) {
         // IMPORTANT: When adding anything to this object, update:
@@ -177,10 +177,15 @@ async function buildVM(filePath: string): Promise<VMContext> {
       ['error', 'log', 'info', 'warn'].forEach(function (level) {
         console[level] = function () {
           var argArray = Array.prototype.slice.call(arguments);
+          var nodeArgArray = Array.prototype.slice.call(arguments);
           if (argArray.length > 0) {
             argArray[0] = '[SERVER] ' + argArray[0];
           }
-          sharedConsoleHistory.addToConsoleHistory({level: level, arguments: argArray});
+          if (nodeArgArray.length > 0) {
+            nodeArgArray[0] = '[SSR LOG] ' + nodeArgArray[0];
+          }
+          // sharedConsoleHistory.addToConsoleHistory({level: level, arguments: argArray});
+          nodeConsole[level].apply(nodeConsole, nodeArgArray);
         };
       });`,
         context,

@@ -105,7 +105,10 @@ const bufferStream = (stream: Readable) => {
   };
 };
 
-export const transformRenderStreamChunksToResultObject = (renderState: StreamRenderState) => {
+export const transformRenderStreamChunksToResultObject = (
+  renderState: StreamRenderState,
+  streamType: string,
+) => {
   const consoleHistory = console.history;
   let previouslyReplayedConsoleMessages = 0;
 
@@ -122,6 +125,9 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
       previouslyReplayedConsoleMessages = consoleHistory?.length || 0;
       const jsonChunk = JSON.stringify(createResultObject(htmlChunk, consoleReplayScript, renderState));
       this.push(`${jsonChunk}\n`);
+      setTimeout(() => {
+        console.log(`SSR Chunk (${streamType}): ${htmlChunk}`);
+      }, 0);
 
       // Reset the render state to ensure that the error is not carried over to the next chunk
       // eslint-disable-next-line no-param-reassign
@@ -248,11 +254,14 @@ export const streamServerRenderedComponent = <T, P extends RenderParams>(
 
     return renderStrategy(reactRenderingResult, optionsWithStreamingCapabilities, streamingTrackers);
   } catch (e) {
-    const { readableStream, pipeToTransform, emitError } = transformRenderStreamChunksToResultObject({
-      hasErrors: true,
-      isShellReady: false,
-      result: null,
-    });
+    const { readableStream, pipeToTransform, emitError } = transformRenderStreamChunksToResultObject(
+      {
+        hasErrors: true,
+        isShellReady: false,
+        result: null,
+      },
+      'SSR',
+    );
     if (throwJsErrors) {
       emitError(e);
     }

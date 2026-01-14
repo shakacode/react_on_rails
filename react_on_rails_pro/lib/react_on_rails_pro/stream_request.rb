@@ -128,6 +128,7 @@ module ReactOnRailsPro
         end
 
         processed_chunk = chunk.strip
+        puts "SSR Chunk (Ruby Side): #{processed_chunk}"
         yield processed_chunk unless processed_chunk.empty?
       end
     end
@@ -162,7 +163,9 @@ module ReactOnRailsPro
 
       line = "".b
 
+      puts "[Ruby Side] Starting to iterate response..."
       response.each do |chunk|
+        puts "[Ruby Side] Got response chunk: #{chunk.strip[0..200]}..."
         response.instance_variable_set(:@react_on_rails_received_first_chunk, true)
         line << chunk
 
@@ -172,6 +175,7 @@ module ReactOnRailsPro
           line = line.byteslice(idx + 1..-1)
         end
       end
+      puts "[Ruby Side] Finished iterating response."
     ensure
       yield line unless line.empty?
     end
