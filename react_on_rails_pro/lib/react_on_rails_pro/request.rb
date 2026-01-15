@@ -78,7 +78,6 @@ module ReactOnRailsPro
 
         # Determine bundle timestamp based on RSC support
         pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
-        bundle_timestamp = is_rsc_payload ? pool.rsc_bundle_hash : pool.server_bundle_hash
 
         ReactOnRailsPro::StreamRequest.create do |send_bundle, barrier|
           if send_bundle
