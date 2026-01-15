@@ -583,7 +583,7 @@ module ReactOnRails
             ⚠️  Procfile.dev not found. Skipping Node Renderer process addition.
 
             You'll need to add the Node Renderer to your process manager manually:
-              node-renderer: RENDERER_LOG_LEVEL=info RENDERER_PORT=3800 node client/node-renderer.js
+              node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node client/node-renderer.js
           MSG
           return
         end
@@ -599,7 +599,7 @@ module ReactOnRails
         node_renderer_line = <<~PROCFILE
 
           # React on Rails Pro - Node Renderer for SSR
-          node-renderer: RENDERER_LOG_LEVEL=info RENDERER_PORT=3800 node client/node-renderer.js
+          node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node client/node-renderer.js
         PROCFILE
 
         append_to_file("Procfile.dev", node_renderer_line)
@@ -653,7 +653,7 @@ module ReactOnRails
             ⚠️  Procfile.dev not found. Skipping RSC bundle watcher addition.
 
             You'll need to add the RSC bundle watcher to your process manager manually:
-              rails-rsc-assets: RSC_BUNDLE_ONLY=yes bin/shakapacker --watch
+              rsc-bundle: RSC_BUNDLE_ONLY=yes bin/shakapacker --watch
           MSG
           return
         end
@@ -669,7 +669,7 @@ module ReactOnRails
         rsc_watcher_line = <<~PROCFILE
 
           # React on Rails Pro - RSC bundle watcher
-          rails-rsc-assets: RSC_BUNDLE_ONLY=yes bin/shakapacker --watch
+          rsc-bundle: RSC_BUNDLE_ONLY=yes bin/shakapacker --watch
         PROCFILE
 
         append_to_file("Procfile.dev", rsc_watcher_line)

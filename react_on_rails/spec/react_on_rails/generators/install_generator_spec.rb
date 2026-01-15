@@ -628,7 +628,7 @@ describe InstallGenerator, type: :generator do
       allow(File).to receive(:exist?).and_call_original
       allow(File).to receive(:exist?).with("/fake/path/Procfile.dev").and_return(true)
       allow(File).to receive(:read).with("/fake/path/Procfile.dev")
-                                   .and_return("rails: bundle exec rails s\nwp-client: bin/shakapacker\n")
+                                   .and_return("rails: bundle exec rails s\ndev-server: bin/shakapacker\n")
     end
 
     specify "add_pro_to_procfile appends node-renderer entry" do
@@ -666,7 +666,7 @@ describe InstallGenerator, type: :generator do
     it "adds RSC bundle watcher to Procfile.dev" do
       assert_file "Procfile.dev" do |content|
         expect(content).to include("RSC_BUNDLE_ONLY=yes")
-        expect(content).to include("rails-rsc-assets:")
+        expect(content).to include("rsc-bundle:")
       end
     end
 
@@ -869,7 +869,7 @@ describe InstallGenerator, type: :generator do
       allow(install_generator).to receive(:destination_root).and_return("/fake/path")
       allow(File).to receive(:exist?).and_call_original
       allow(File).to receive(:exist?).with("/fake/path/Procfile.dev").and_return(true)
-      procfile_content = "rails: bundle exec rails s\nrails-rsc-assets: RSC_BUNDLE_ONLY=yes bin/shakapacker\n"
+      procfile_content = "rails: bundle exec rails s\nrsc-bundle: RSC_BUNDLE_ONLY=yes bin/shakapacker\n"
       allow(File).to receive(:read).with("/fake/path/Procfile.dev").and_return(procfile_content)
     end
 
