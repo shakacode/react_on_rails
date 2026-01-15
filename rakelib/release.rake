@@ -63,7 +63,7 @@ def publish_gem_with_retry(dir, gem_name, otp: nil, max_retries: ENV.fetch("GEM_
       otp_flag = otp ? "--otp #{otp}" : ""
       sh %(cd #{dir} && gem release #{otp_flag})
       success = true
-    rescue Gem::CommandException, IOError => e
+    rescue RuntimeError, IOError => e
       retry_count += 1
       if retry_count < max_retries
         puts "\n⚠️  #{gem_name} release failed (attempt #{retry_count}/#{max_retries})"
