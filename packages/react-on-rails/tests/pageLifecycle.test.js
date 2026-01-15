@@ -254,7 +254,7 @@ describe('pageLifecycle', () => {
     });
   });
 
-  describe('deferred script race condition (PR #1773 regression test)', () => {
+  describe('deferred script race condition (PR #2295 regression test)', () => {
     // This test documents the race condition that occurs when using `readyState !== 'loading'`
     // instead of `readyState === 'complete'`.
     //

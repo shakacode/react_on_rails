@@ -1,5 +1,5 @@
 /**
- * Deferred Script Race Condition Tests (PR #1773 Regression Test)
+ * Deferred Script Race Condition Tests (PR #2295 Regression Test)
  *
  * These tests validate that React on Rails correctly handles deferred script loading.
  *
