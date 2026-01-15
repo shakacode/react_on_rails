@@ -548,11 +548,17 @@ jobs:
             START_POINT_HASH="${{ github.event.pull_request.base.sha }}"
             EXTRA_ARGS="--start-point-reset"
           elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            # Find where branch diverged from master
-            git fetch origin master --depth=100
+            # Get merge-base from GitHub API (avoids needing deep fetch)
+            # See: https://stackoverflow.com/a/74710919
             BRANCH="${{ github.ref_name }}"
             START_POINT="master"
-            START_POINT_HASH=$(git merge-base HEAD origin/master)
+            START_POINT_HASH=$(gh api "repos/${{ github.repository }}/compare/master...$BRANCH" --jq '.merge_base_commit.sha' || true)
+
+            if [ -n "$START_POINT_HASH" ]; then
+              echo "Found merge-base via API: $START_POINT_HASH"
+            else
+              echo "⚠️ Could not find merge-base with master via GitHub API, continuing without it"
+            fi
             EXTRA_ARGS=""
           else
             echo "❌ ERROR: Unexpected event type: ${{ github.event_name }}"
