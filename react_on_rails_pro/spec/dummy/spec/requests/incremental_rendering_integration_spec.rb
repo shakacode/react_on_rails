@@ -67,13 +67,13 @@ describe "Incremental Rendering Integration", :integration do
         {
           bundleTimestamp: bundle_timestamp,
           # Add newline to the value so the fixture bundle writes it with newline
-          updateChunk: "ReactOnRails.addStreamValue(#{value.to_json} + '\\n')"
+          updateChunk: "ReactOnRails.addStreamValueToFirstBundle(#{value.to_json} + '\\n')"
         }
       end
 
     allow_any_instance_of(ReactOnRailsPro::AsyncPropsEmitter).to receive(:end_stream_chunk).and_call_original
     allow_any_instance_of(ReactOnRailsPro::AsyncPropsEmitter).to receive(:generate_end_stream_js).and_return(
-      "ReactOnRails.endStream()"
+      "ReactOnRails.endFirstBundleStream()"
     )
     # rubocop:enable RSpec/AnyInstance
 
