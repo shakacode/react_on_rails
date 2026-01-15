@@ -6,22 +6,22 @@ pre-commit:
   parallel: true
   commands:
     autofix:
-      glob: "**/*.{rb,rake,ru}"
+      glob: "{*.{rb,rake,ru},**/*.{rb,rake,ru}}"
       run: bin/lefthook/ruby-autofix all-changed
       stage_fixed: true
 
     rubocop:
-      glob: "**/*.{rb,rake,ru}"
+      glob: "{*.{rb,rake,ru},**/*.{rb,rake,ru}}"
       run: bin/lefthook/ruby-lint all-changed
       stage_fixed: true
 
     eslint:
-      glob: "**/*.{js,jsx,ts,tsx}"
+      glob: "{*.{js,jsx,ts,tsx},**/*.{js,jsx,ts,tsx}}"
       run: bin/lefthook/eslint-lint all-changed
       stage_fixed: true
 
     prettier:
-      glob: "**/*.{js,jsx,ts,tsx,json,md,yml,yaml}"
+      glob: "{*.{js,jsx,ts,tsx,json,md,yml,yaml},**/*.{js,jsx,ts,tsx,json,md,yml,yaml}}"
       run: bin/lefthook/prettier-format all-changed
       stage_fixed: true
 
