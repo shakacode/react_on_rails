@@ -88,9 +88,9 @@ describe('pageLifecycle', () => {
 
     onPageLoaded(callback);
 
-    // Should not call callback immediately since readyState is 'loading'
+    // Should not call callback immediately since readyState is 'interactive' (deferred scripts may not have run)
     expect(callback).not.toHaveBeenCalled();
-    // Verify that a DOMContentLoaded listener was added when readyState is 'loading'
+    // Verify that a DOMContentLoaded listener was added when readyState is 'interactive'
     expect(addEventListenerSpy).toHaveBeenCalledWith('DOMContentLoaded', expect.any(Function));
   });
 
