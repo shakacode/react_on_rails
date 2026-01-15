@@ -148,13 +148,17 @@ module ReactOnRails
           puts help_troubleshooting
         end
 
+        # Flags that take a value as the next argument (not using = syntax)
+        FLAGS_WITH_VALUES = %w[--route --rails-env].freeze
+
         # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
         def run_from_command_line(args = ARGV)
           require "optparse"
 
           # Get the command early to check for help/kill before running hooks
           # We need to do this before OptionParser processes flags like -h/--help
-          command = args.find { |arg| !arg.start_with?("--") && !arg.start_with?("-") }
+          # Skip arguments that are values for flags (e.g., "hello_world" after "--route")
+          command = extract_command_from_args(args)
 
           # Check if help flags are present in args (before OptionParser processes them)
           help_requested = args.any? { |arg| HELP_FLAGS.include?(arg) }
@@ -214,6 +218,32 @@ module ReactOnRails
         # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
 
         private
+
+        # Extract the command from args, skipping flag values
+        # For example, in ["--route", "hello_world"], "hello_world" is a flag value, not a command
+        # But in ["static", "--route", "hello_world"], "static" is the command
+        def extract_command_from_args(args)
+          skip_next = false
+          args.each do |arg|
+            if skip_next
+              skip_next = false
+              next
+            end
+
+            # Check if this flag takes a value as the next argument
+            if FLAGS_WITH_VALUES.include?(arg)
+              skip_next = true
+              next
+            end
+
+            # Skip any flag (starts with - or --)
+            next if arg.start_with?("-")
+
+            # Found a non-flag, non-value argument - this is the command
+            return arg
+          end
+          nil
+        end
 
         def run_precompile_hook_if_present
           require "open3"
