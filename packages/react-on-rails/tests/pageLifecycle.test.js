@@ -81,17 +81,17 @@ describe('pageLifecycle', () => {
     expect(addEventListenerSpy).not.toHaveBeenCalledWith('DOMContentLoaded', expect.any(Function));
   });
 
-  it('should initialize page event listeners immediately when document.readyState is "interactive"', () => {
+  it('should wait for DOMContentLoaded when when document.readyState is "interactive"', () => {
     setReadyState('interactive');
     const callback = jest.fn();
     const { onPageLoaded } = importPageLifecycle();
 
     onPageLoaded(callback);
 
-    // Since no navigation library is mocked, callbacks should run immediately
-    expect(callback).toHaveBeenCalledTimes(1);
-    // Should not add DOMContentLoaded listener since readyState is not 'loading'
-    expect(addEventListenerSpy).not.toHaveBeenCalledWith('DOMContentLoaded', expect.any(Function));
+    // Should not call callback immediately since readyState is 'loading'
+    expect(callback).not.toHaveBeenCalled();
+    // Verify that a DOMContentLoaded listener was added when readyState is 'loading'
+    expect(addEventListenerSpy).toHaveBeenCalledWith('DOMContentLoaded', expect.any(Function));
   });
 
   it('should wait for DOMContentLoaded when document.readyState is "loading"', () => {
