@@ -718,6 +718,48 @@ Playwright E2E tests run automatically in CI via GitHub Actions (`.github/workfl
 - Uploads HTML reports as artifacts (available for 30 days)
 - Auto-starts Rails server before running tests
 
+### Ensuring E2E Tests Pass Before Merging
+
+**CRITICAL: When adding new E2E tests, ensure they pass on CI before merging.**
+
+1. **Run tests locally first:**
+   ```bash
+   cd react_on_rails/spec/dummy
+   pnpm test:e2e
+   ```
+
+2. **Verify CI runs the tests:**
+   After pushing your PR, check that the Playwright workflow runs:
+   ```bash
+   # Check CI status for your PR
+   gh pr view --json statusCheckRollup --jq '.statusCheckRollup[] | select(.name | contains("Playwright")) | {name, conclusion, status}'
+   ```
+
+3. **If Playwright CI is not running:**
+   - Verify the workflow file exists: `.github/workflows/playwright.yml`
+   - Check if the workflow is enabled in the repository settings
+   - Ensure your changes are in the correct directory (`react_on_rails/spec/dummy/e2e/`)
+
+4. **Review CI results before merging:**
+   ```bash
+   # Wait for all checks to complete
+   gh pr checks --watch
+
+   # Or check specific Playwright run
+   gh run list --workflow="Playwright Tests" --branch your-branch-name --limit 3
+   ```
+
+5. **Download test artifacts if tests fail:**
+   ```bash
+   # List artifacts from a failed run
+   gh run view <run-id> --json jobs
+
+   # Download playwright report
+   gh run download <run-id> -n playwright-report
+   ```
+
+**DO NOT merge PRs with failing Playwright tests.** If tests are flaky, investigate and fix the flakiness before merging.
+
 ## Rails Engine Development Nuances
 
 React on Rails is a **Rails Engine**, which has important implications for development:
