@@ -35,7 +35,7 @@ module ReactOnRailsPro
     rescue StandardError => e
       Rails.logger.error do
         backtrace = e.backtrace&.first(5)&.join("\n")
-        "[ReactOnRailsPro::AsyncProps] FAILED to send prop '#{prop_name}': " \
+        "[ReactOnRailsPro::AsyncProps] Failed to send async prop '#{prop_name}': " \
           "#{e.class} - #{e.message}\n#{backtrace}"
       end
       # Continue - don't abort entire render because one prop failed
