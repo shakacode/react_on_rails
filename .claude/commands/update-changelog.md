@@ -56,23 +56,26 @@ For breaking changes, use this format:
 
 ### Category Organization
 
-Entries should be organized under these section headings. The project uses both standard and custom headings:
+Entries should be organized under these section headings **in the following order** (most critical first):
 
-**Standard headings** (from keepachangelog.com) - use these for most changes:
+**Preferred section order:**
 
-- `#### Added` - New features
-- `#### Changed` - Changes to existing functionality
-- `#### Deprecated` - Deprecation notices
-- `#### Removed` - Removed features
-- `#### Fixed` - Bug fixes
-- `#### Security` - Security-related changes
-- `#### Improved` - Improvements to existing features
+1. `#### Breaking Changes` - Breaking changes with migration guides (FIRST - most critical for upgrading users)
+2. `#### Added` - New features
+3. `#### Changed` - Changes to existing functionality
+4. `#### Improved` - Improvements to existing features
+5. `#### Fixed` - Bug fixes
+6. `#### Deprecated` - Deprecation notices
+7. `#### Removed` - Removed features
+8. `#### Security` - Security-related changes
 
-**Custom headings** (project-specific) - use sparingly when standard headings don't fit:
+**Rationale:** Breaking changes come first because they are the most critical information for anyone upgrading. Users need to know immediately if their code will break before seeing what new features are available.
 
-- `#### Breaking Changes` - Breaking changes with migration guides
+**Additional custom headings** (use sparingly when standard headings don't fit):
+
+- `#### Documentation` - Documentation improvements
+- `#### Developer (Contributors Only)` - Internal tooling changes
 - `#### API Improvements` - API changes and improvements
-- `#### Developer Experience` - Developer workflow improvements
 - `#### Generator Improvements` - Generator-specific changes
 - `#### Performance` - Performance improvements
 - `#### Pro License Features` - React on Rails Pro features
