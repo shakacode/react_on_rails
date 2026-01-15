@@ -23,16 +23,13 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 Changes since the last non-beta release.
 
-### [16.2.0.rc.1] - 2026-01-11
+### [16.2.0] - 2026-01-14
 
 #### Fixed
 
+- **Component Registration**: Fixed "component not registered" error on core `react-on-rails` package that could occur when components were referenced before registration completed. [PR 2295](https://github.com/shakacode/react_on_rails/pull/2295) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 - **JSON Parse Race Condition in Immediate Hydration (Pro)**: Fixed a race condition where `immediate_hydration` could attempt to parse incomplete JSON props during HTML streaming on slow networks. When the JS bundle executes before the props `<script>` tag content is fully received, `el.textContent` returns truncated JSON, causing `SyntaxError: Unterminated string in JSON`. The fix uses a `nextSibling` check to verify the props script's closing tag has been parsed before attempting hydration; incomplete elements are deferred to the fallback `reactOnRailsComponentLoaded()` path. [PR 2290](https://github.com/shakacode/react_on_rails/pull/2290) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 - **webpack-cli Compatibility**: Fixed compatibility issue with webpack-dev-server v5 by upgrading webpack-cli from v4 to v6.0.1 and removing the deprecated `@webpack-cli/serve` package. Also removed deprecated `https: false` configuration from shakapacker.yml. [PR 2291](https://github.com/shakacode/react_on_rails/pull/2291) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-
-### [16.2.0.rc.0] - 2025-12-29
-
-Changes since the last non-beta release (16.1.1).
 
 #### Added
 
@@ -55,6 +52,7 @@ Changes since the last non-beta release (16.1.1).
 #### Changed
 
 - **Shakapacker 9.0.0 Upgrade**: Upgraded Shakapacker from 8.2.0 to 9.0.0 with Babel transpiler configuration for compatibility. Key changes include:
+
   - Configured `javascript_transpiler: babel` in shakapacker.yml (Shakapacker 9.0 defaults to SWC which has PropTypes handling issues)
   - Added precompile hook support via `bin/shakapacker-precompile-hook` for ReScript builds and pack generation
   - Configured CSS Modules to use default exports (`namedExport: false`) for backward compatibility with existing `import styles from` syntax
@@ -76,6 +74,7 @@ Changes since the last non-beta release (16.1.1).
 - **Enhanced bin/dev Error Messages**: Improved error messages when `bin/dev` fails by suggesting the `--verbose` flag for detailed debugging output. The verbose flag now properly cascades to child processes via the `REACT_ON_RAILS_VERBOSE` environment variable, making troubleshooting pack generation failures significantly easier. [PR 2083](https://github.com/shakacode/react_on_rails/pull/2083) by [justin808](https://github.com/justin808).
 
 - **Automatic Precompile Hook Coordination in bin/dev**: The `bin/dev` command now automatically runs Shakapacker's `precompile_hook` once before starting development processes and sets `SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true` to prevent duplicate execution in spawned webpack processes.
+
   - Eliminates the need for manual coordination, sleep hacks, and duplicate task calls in Procfile.dev
   - Users can configure expensive build tasks (like locale generation or ReScript compilation) once in `config/shakapacker.yml` and `bin/dev` handles coordination automatically
   - Includes warning for Shakapacker versions below 9.4.0 (the `SHAKAPACKER_SKIP_PRECOMPILE_HOOK` environment variable is only supported in 9.4.0+)
@@ -115,6 +114,7 @@ Changes since the last non-beta release (16.1.1).
 - **`config.immediate_hydration` configuration removed**: The `config.immediate_hydration` setting in `config/initializers/react_on_rails.rb` has been removed. Immediate hydration is now automatically enabled for React on Rails Pro users and automatically disabled for non-Pro users.
 
   **Migration steps:**
+
   - Remove any `config.immediate_hydration = true` or `config.immediate_hydration = false` lines from your `config/initializers/react_on_rails.rb` file
   - Pro users: No action needed - immediate hydration is now enabled automatically for optimal performance
   - Non-Pro users: No action needed - standard hydration behavior continues to work as before
@@ -168,6 +168,7 @@ To migrate to React on Rails Pro:
 **Note:** If you're not using any of the Pro-only methods listed above, no changes are required.
 
 - **Pro-Specific Configurations Moved to Pro Gem**: The following React Server Components (RSC) configurations have been moved from `ReactOnRails.configure` to `ReactOnRailsPro.configure`:
+
   - `rsc_bundle_js_file` - Path to the RSC bundle file
   - `react_server_client_manifest_file` - Path to the React server client manifest
   - `react_client_manifest_file` - Path to the React client manifest
@@ -193,6 +194,7 @@ To migrate to React on Rails Pro:
   See the [React on Rails Pro Configuration docs](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/docs/configuration.md) for more details.
 
 - **Streaming View Helpers Moved to Pro Gem**: The following view helpers have been removed from the open-source gem and are now only available in React on Rails Pro:
+
   - `stream_react_component` - Progressive SSR using React 18+ streaming
   - `rsc_payload_react_component` - RSC payload rendering
 
@@ -235,10 +237,12 @@ To migrate to React on Rails Pro:
 #### New Features
 
 - **Server Bundle Security**: Added new configuration options for enhanced server bundle security and organization:
+
   - `server_bundle_output_path`: Configurable directory (relative to the Rails root) for server bundle output (default: "ssr-generated"). If set to `nil`, the server bundle will be loaded from the same public directory as client bundles. [PR 1798](https://github.com/shakacode/react_on_rails/pull/1798) by [justin808](https://github.com/justin808)
   - `enforce_private_server_bundles`: When enabled, ensures server bundles are only loaded from private directories outside the public folder (default: false for backward compatibility) [PR 1798](https://github.com/shakacode/react_on_rails/pull/1798) by [justin808](https://github.com/justin808)
 
 - **Improved Bundle Path Resolution**: Bundle path resolution for server bundles now works as follows:
+
   - If `server_bundle_output_path` is set, the server bundle is loaded from that directory.
   - If `server_bundle_output_path` is not set, the server bundle falls back to the client bundle directory (typically the public output path).
   - If `enforce_private_server_bundles` is enabled:
@@ -350,6 +354,7 @@ See [Release Notes](docs/upgrading/release-notes/16.0.0.md) for complete migrati
 
 - **`defer_generated_component_packs` deprecated** → use `generated_component_packs_loading_strategy`
 - Migration:
+
   - `defer_generated_component_packs: true` → `generated_component_packs_loading_strategy: :defer`
   - `defer_generated_component_packs: false` → `generated_component_packs_loading_strategy: :sync`
   - Recommended: `generated_component_packs_loading_strategy: :async` for best performance
@@ -758,6 +763,7 @@ for details.
 - Removal of config.symlink_non_digested_assets_regex as it's no longer needed with rails/webpacker.
   If any business needs this, we can move the code to a separate gem.
 - Added configuration option `same_bundle_for_client_and_server` with default `false` because
+
   1. Production applications would typically have a server bundle that differs from the client bundle
   2. This change only affects trying to use HMR with react_on_rails with rails/webpacker.
 
@@ -1475,11 +1481,13 @@ No changes.
 - Added automatic compilation of assets at precompile is now done by ReactOnRails. Thus, you don't need to provide your own `assets.rake` file that does the precompilation.
   [#398](https://github.com/shakacode/react_on_rails/pull/398) by [robwise](https://github.com/robwise), [jbhatab](https://github.com/jbhatab), and [justin808](https://github.com/justin808).
 - **Migration to v6**
+
   - Do not run the generator again if you've already run it.
 
   - See [shakacode/react-webpack-rails-tutorial/pull/287](https://github.com/shakacode/react-webpack-rails-tutorial/pull/287) for an example of upgrading from v5.
 
   - To configure the asset compilation you can either
+
     1. Specify a `config/react_on_rails` setting for `build_production_command` to be nil to turn this feature off.
     2. Specify the script command you want to run to build your production assets, and remove your `assets.rake` file.
 
@@ -1879,9 +1887,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.2.0.rc.1...master
-[16.2.0.rc.1]: https://github.com/shakacode/react_on_rails/compare/v16.2.0.rc.0...v16.2.0.rc.1
-[16.2.0.rc.0]: https://github.com/shakacode/react_on_rails/compare/16.1.1...v16.2.0.rc.0
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.2.0...master
+[16.2.0]: https://github.com/shakacode/react_on_rails/compare/16.1.1...v16.2.0
 [16.1.1]: https://github.com/shakacode/react_on_rails/compare/16.1.0...16.1.1
 [16.1.0]: https://github.com/shakacode/react_on_rails/compare/16.0.0...16.1.0
 [16.0.0]: https://github.com/shakacode/react_on_rails/compare/14.2.0...16.0.0
