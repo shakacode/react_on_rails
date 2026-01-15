@@ -818,7 +818,7 @@ Conductor runs commands in a non-interactive shell that doesn't source `.zshrc`.
 
 ### Solution
 
-Use the `bin/mise-exec` wrapper to ensure commands run with correct tool versions:
+Use the `bin/conductor-exec` wrapper to ensure commands run with correct tool versions:
 
 ```bash
 # Instead of:
@@ -828,10 +828,10 @@ pnpm install
 git commit -m "message"
 
 # Use:
-bin/mise-exec ruby --version
-bin/mise-exec bundle exec rubocop
-bin/mise-exec pnpm install
-bin/mise-exec git commit -m "message"  # Pre-commit hooks work correctly
+bin/conductor-exec ruby --version
+bin/conductor-exec bundle exec rubocop
+bin/conductor-exec pnpm install
+bin/conductor-exec git commit -m "message"  # Pre-commit hooks work correctly
 ```
 
 ### Reference
