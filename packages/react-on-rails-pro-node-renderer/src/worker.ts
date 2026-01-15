@@ -86,8 +86,22 @@ const setResponse = async (result: ResponseResult, res: FastifyReply) => {
   setHeaders(headers, res);
   res.status(status);
   if (stream) {
-    await res.send(stream);
+    await new Promise<void>((resolve) => {
+      setTimeout(() => {
+        resolve();
+      }, 1000);
+    });
+    res.raw.writeHead(status, headers);
+    // For HTTP/2 streaming, we must use writeHead() to send HEADERS frame
+    // before writing data. Using res.status()/res.header() only sets internal
+    // Fastify state but doesn't send the HTTP/2 HEADERS frame.
+    for await (const chunk of stream) {
+      res.raw.write(chunk);
+    }
+    res.raw.end();
   } else {
+    setHeaders(headers, res);
+    res.status(status);
     res.send(data);
   }
 };
