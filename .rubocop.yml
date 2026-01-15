@@ -19,7 +19,7 @@ AllCops:
 
   Exclude:
     - '**/*.js'
-    - 'bin/mise-exec' # Shell script, not Ruby
+    - 'bin/conductor-exec' # Shell script, not Ruby
     - '**/node_modules/**/*'
     - '**/public/**/*'
     - '**/tmp/**/*'

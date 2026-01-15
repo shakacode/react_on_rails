@@ -1,9 +1,9 @@
 {
   "scripts": {
     "setup": "./conductor-setup.sh",
-    "run": "bin/mise-exec bash -c 'cd react_on_rails/spec/dummy && bin/dev'",
-    "test": "bin/mise-exec rake run_rspec:dummy",
-    "lint": "bin/mise-exec bundle exec rubocop && bin/mise-exec pnpm run lint",
+    "run": "bin/conductor-exec bash -c 'cd react_on_rails/spec/dummy && bin/dev'",
+    "test": "bin/conductor-exec rake run_rspec:dummy",
+    "lint": "bin/conductor-exec bundle exec rubocop && bin/conductor-exec pnpm run lint",
     "archive": ""
   },
   "runScriptMode": "nonconcurrent"

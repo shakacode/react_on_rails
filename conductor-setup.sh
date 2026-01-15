@@ -33,8 +33,8 @@ fi
 
 # Helper function to run commands with the detected version manager
 run_cmd() {
-    if [[ "$VERSION_MANAGER" == "mise" ]] && [[ -x "bin/mise-exec" ]]; then
-        bin/mise-exec "$@"
+    if [[ "$VERSION_MANAGER" == "mise" ]] && [[ -x "bin/conductor-exec" ]]; then
+        bin/conductor-exec "$@"
     else
         "$@"
     fi
@@ -115,6 +115,6 @@ echo "  • bundle exec rubocop - Run Ruby linting (required before commits)"
 echo "  • rake autofix - Auto-fix formatting issues"
 echo ""
 if [[ "$VERSION_MANAGER" == "mise" ]]; then
-    echo "💡 Tip: Use 'bin/mise-exec <command>' if tool versions aren't detected correctly."
+    echo "💡 Tip: Use 'bin/conductor-exec <command>' if tool versions aren't detected correctly."
 fi
 echo "⚠️ Remember: Always run 'bundle exec rubocop' before committing!"
