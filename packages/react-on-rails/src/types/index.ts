@@ -492,18 +492,32 @@ export interface ReactOnRailsInternal extends ReactOnRails {
    */
   isRSCBundle: boolean;
   /**
-   * Adds the getAsyncProp function to the component props object
-   * @returns An object containing: the AsyncPropsManager and the component props after adding the getAsyncProp to it
+   * Adds the getAsyncProp function to the component props object.
+   * Uses getOrCreateAsyncPropsManager internally to handle race conditions
+   * between initial render and update chunks.
+   *
+   * @param props - The component props to enhance
+   * @param sharedExecutionContext - Map scoped to the current HTTP request
+   * @returns An object containing the component props with getReactOnRailsAsyncProp added
    */
   addAsyncPropsCapabilityToComponentProps: <
     AsyncPropsType extends Record<string, unknown>,
     PropsType extends Record<string, unknown>,
   >(
     props: PropsType,
+    sharedExecutionContext: Map<string, unknown>,
   ) => {
-    asyncPropManager: AsyncPropsManager;
     props: WithAsyncProps<AsyncPropsType, PropsType>;
   };
+  /**
+   * Gets or creates an AsyncPropsManager from the shared execution context.
+   * Implements lazy initialization to handle race conditions between
+   * the initial render request and update chunks.
+   *
+   * @param sharedExecutionContext - Map scoped to the current HTTP request
+   * @returns The AsyncPropsManager instance (existing or newly created)
+   */
+  getOrCreateAsyncPropsManager: (sharedExecutionContext: Map<string, unknown>) => AsyncPropsManager;
 }
 
 export type RenderStateHtml = FinalHtmlResult | Promise<FinalHtmlResult>;

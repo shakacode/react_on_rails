@@ -33,10 +33,9 @@ RSpec.describe ReactOnRailsPro::ServerRenderingJsCode do
         result = described_class.async_props_setup_js(render_options)
 
         expect(result).to include("ReactOnRails.isRSCBundle")
-        expect(result).to include("ReactOnRails.addAsyncPropsCapabilityToComponentProps(usedProps)")
+        expected_js = "ReactOnRails.addAsyncPropsCapabilityToComponentProps(usedProps, sharedExecutionContext)"
+        expect(result).to include(expected_js)
         expect(result).to include("propsWithAsyncProps")
-        expect(result).to include("asyncPropManager")
-        expect(result).to include('sharedExecutionContext.set("asyncPropsManager", asyncPropManager)')
         expect(result).to include("usedProps = propsWithAsyncProps")
       end
     end
@@ -80,8 +79,8 @@ RSpec.describe ReactOnRailsPro::ServerRenderingJsCode do
 
         expect(result).to include("var usedProps = typeof props === 'undefined' ?")
         expect(result).to include("ReactOnRails.isRSCBundle")
-        expect(result).to include("ReactOnRails.addAsyncPropsCapabilityToComponentProps(usedProps)")
-        expect(result).to include('sharedExecutionContext.set("asyncPropsManager", asyncPropManager)')
+        expected_js = "ReactOnRails.addAsyncPropsCapabilityToComponentProps(usedProps, sharedExecutionContext)"
+        expect(result).to include(expected_js)
       end
     end
 

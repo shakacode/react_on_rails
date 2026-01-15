@@ -37,6 +37,7 @@ export async function handleIncrementalRenderStream(
   const decoder = new StringDecoder('utf8');
   let buffer = '';
   let totalBytesReceived = 0;
+  let onResponseStartPromise: Promise<void> | null = null;
 
   try {
     for await (const chunk of request.raw) {
@@ -96,7 +97,7 @@ export async function handleIncrementalRenderStream(
               const result = await onRenderRequestReceived(parsed);
               const { response, shouldContinue: continueFlag } = result;
 
-              void onResponseStart(response);
+              onResponseStartPromise = Promise.resolve(onResponseStart(response));
 
               if (!continueFlag) {
                 return;
@@ -129,5 +130,6 @@ export async function handleIncrementalRenderStream(
   }
 
   // Stream ended normally
-  void onRequestEnded();
+  await onRequestEnded();
+  await onResponseStartPromise;
 }
