@@ -22,7 +22,7 @@
 import { test, expect } from '@playwright/test';
 import { app } from '../../support/on-rails';
 
-test.describe('Deferred Script Loading (PR #1773 regression test)', () => {
+test.describe('Deferred Script Loading (PR #2295 regression test)', () => {
   test.beforeEach(async () => {
     await app('clean');
   });
