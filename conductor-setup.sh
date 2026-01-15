@@ -12,8 +12,8 @@ echo "📋 Detecting version manager..."
 if command -v mise &> /dev/null; then
     VERSION_MANAGER="mise"
     echo "✅ Found mise"
-    # Trust mise config and install tools
-    mise trust --all 2>/dev/null || true
+    # Trust mise config for current directory only and install tools
+    mise trust 2>/dev/null || true
     mise install
 elif [[ -f ~/.asdf/asdf.sh ]]; then
     VERSION_MANAGER="asdf"
