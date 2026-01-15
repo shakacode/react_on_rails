@@ -169,18 +169,17 @@ Add your React on Rails Pro license token as an environment variable:
 export REACT_ON_RAILS_PRO_LICENSE="your-license-token-here"
 ```
 
-**Or** configure it in your Rails initializer:
+Or create a config file at `config/react_on_rails_pro_license.key`:
 
-```ruby
-# config/initializers/react_on_rails_pro.rb
-ReactOnRailsPro.configure do |config|
-  config.license_token = ENV["REACT_ON_RAILS_PRO_LICENSE"]
-end
+```bash
+echo "your-license-token-here" > config/react_on_rails_pro_license.key
 ```
 
-⚠️ **Security Warning**: Never commit your license token to version control. Always use environment variables or secure secret management systems (Rails credentials, Heroku config vars, AWS Secrets Manager, etc.).
+⚠️ **Security Warning**: Never commit your license token to version control. Add `config/react_on_rails_pro_license.key` to your `.gitignore`. For production, use environment variables or secure secret management systems (Rails credentials, Heroku config vars, AWS Secrets Manager, etc.).
 
 **Where to get your license token:** Contact [justin@shakacode.com](mailto:justin@shakacode.com) if you don't have your license token.
+
+For complete license setup instructions, see [LICENSE_SETUP.md](../LICENSE_SETUP.md).
 
 ### Verify Migration
 
