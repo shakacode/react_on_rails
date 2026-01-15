@@ -159,6 +159,80 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  context "when Shakapacker was just installed by the generator" do
+    # This tests the fix for https://github.com/shakacode/react_on_rails/issues/2278
+    # When Shakapacker is installed by the RoR generator, the marker file exists
+    # and the generator skips copying shakapacker.yml. We must still configure precompile_hook.
+    before(:all) do
+      run_generator_test_with_args(%w[], package_json: true) do
+        # Simulate Shakapacker being just installed by creating the marker file
+        # and a shakapacker.yml with the default Shakapacker format (precompile_hook commented out)
+        simulate_existing_file(".shakapacker_just_installed", "")
+        simulate_existing_file("config/shakapacker.yml", <<~YAML)
+          # Note: You must restart bin/shakapacker-dev-server for changes to take effect
+          default: &default
+            source_path: app/javascript
+            source_entry_path: packs
+            public_root_path: public
+            public_output_path: packs
+            cache_path: tmp/shakapacker
+            webpack_compile_output: true
+            shakapacker_precompile: true
+            additional_paths: []
+            cache_manifest: false
+            assets_bundler: "webpack"
+            # Example: precompile_hook: 'bin/shakapacker-precompile-hook'
+            # precompile_hook: ~
+
+          development:
+            <<: *default
+
+          test:
+            <<: *default
+            compile: true
+
+          production:
+            <<: *default
+        YAML
+        simulate_existing_file("bin/shakapacker", "")
+        simulate_existing_file("bin/shakapacker-dev-server", "")
+        simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
+          const { generateWebpackConfig } = require('shakapacker')
+          const webpackConfig = generateWebpackConfig()
+          module.exports = webpackConfig
+        JS
+      end
+    end
+
+    it "configures precompile_hook in shakapacker.yml" do
+      assert_file "config/shakapacker.yml" do |content|
+        # The commented placeholder should be replaced with the actual value
+        expect(content).to include("precompile_hook: 'bin/shakapacker-precompile-hook'")
+        # The example comment should be preserved
+        expect(content).to include("# Example: precompile_hook:")
+        # The old commented-out line should be gone
+        expect(content).not_to match(/^\s*#\s*precompile_hook:\s*~/)
+      end
+    end
+
+    it "preserves other shakapacker.yml settings and comments" do
+      assert_file "config/shakapacker.yml" do |content|
+        # Comments should be preserved
+        expect(content).to include("# Note: You must restart bin/shakapacker-dev-server")
+        # YAML anchors should be preserved
+        expect(content).to include("default: &default")
+        expect(content).to include("<<: *default")
+        # Other settings should be preserved
+        expect(content).to include("source_path: app/javascript")
+        expect(content).to include("assets_bundler: \"webpack\"")
+      end
+    end
+
+    it "removes the marker file" do
+      expect(File.exist?(File.join(destination_root, ".shakapacker_just_installed"))).to be false
+    end
+  end
+
   context "with --rspack" do
     before(:all) { run_generator_test_with_args(%w[--rspack], package_json: true) }
 

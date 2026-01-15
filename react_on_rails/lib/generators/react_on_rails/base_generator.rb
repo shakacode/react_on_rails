@@ -95,16 +95,20 @@ module ReactOnRails
         if File.exist?(".shakapacker_just_installed")
           puts "Skipping Shakapacker config copy (already installed by Shakapacker installer)"
           File.delete(".shakapacker_just_installed") # Clean up marker
-          configure_rspack_in_shakapacker if options.rspack?
-          return
+        else
+          puts "Adding Shakapacker #{ReactOnRails::PackerUtils.shakapacker_version} config"
+          base_path = "base/base/"
+          config = "config/shakapacker.yml"
+          # Use template to enable version-aware configuration
+          template("#{base_path}#{config}.tt", config)
         end
 
-        puts "Adding Shakapacker #{ReactOnRails::PackerUtils.shakapacker_version} config"
-        base_path = "base/base/"
-        config = "config/shakapacker.yml"
-        # Use template to enable version-aware configuration
-        template("#{base_path}#{config}.tt", config)
+        # Configure bundler-specific settings
         configure_rspack_in_shakapacker if options.rspack?
+
+        # Always ensure precompile_hook is configured (Shakapacker 9.0+ only)
+        # This handles all scenarios: fresh install, pre-installed Shakapacker, or user declined overwrite
+        configure_precompile_hook_in_shakapacker
       end
 
       def add_base_gems_to_gemfile
@@ -298,22 +302,34 @@ module ReactOnRails
 
         puts Rainbow("🔧 Configuring Shakapacker for Rspack...").yellow
 
-        # Parse YAML config properly to avoid fragile regex manipulation
-        # Support both old and new Psych versions
-        config = begin
-          YAML.load_file(shakapacker_config_path, aliases: true)
-        rescue ArgumentError
-          # Older Psych versions don't support the aliases parameter
-          YAML.load_file(shakapacker_config_path)
-        end
-        # Update default section
-        config["default"] ||= {}
-        config["default"]["assets_bundler"] = "rspack"
-        config["default"]["webpack_loader"] = "swc"
+        # Use gsub_file to preserve comments and file structure
+        # Replace assets_bundler: "webpack" with assets_bundler: "rspack"
+        gsub_file shakapacker_config_path,
+                  /^(\s*)assets_bundler:\s*["']?webpack["']?\s*$/,
+                  "\\1assets_bundler: \"rspack\""
 
-        # Write back as YAML
-        File.write(shakapacker_config_path, YAML.dump(config))
         puts Rainbow("✅ Updated shakapacker.yml for Rspack").green
+      end
+
+      def configure_precompile_hook_in_shakapacker
+        # precompile_hook is only supported in Shakapacker 9.0+
+        return unless ReactOnRails::PackerUtils.shakapacker_version_requirement_met?("9.0.0")
+
+        shakapacker_config_path = "config/shakapacker.yml"
+        return unless File.exist?(shakapacker_config_path)
+
+        content = File.read(shakapacker_config_path)
+
+        # Already has an active (non-commented) precompile_hook configured? Don't overwrite.
+        return if content.match?(/^\s+precompile_hook:\s*['"][^'"]+['"]/)
+
+        # Replace the commented placeholder with the actual value
+        # Shakapacker 9.x default config has: # precompile_hook: ~
+        gsub_file shakapacker_config_path,
+                  /^(\s*)#\s*precompile_hook:\s*~\s*$/,
+                  "\\1precompile_hook: 'bin/shakapacker-precompile-hook'"
+
+        puts Rainbow("✅ Configured precompile_hook in shakapacker.yml").green
       end
     end
   end
