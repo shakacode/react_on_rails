@@ -126,9 +126,36 @@ Examples:
 task :release, %i[version dry_run] do |_t, args|
   include ReactOnRails::TaskHelpers
 
+  args_hash = args.to_hash
+
+  # Validate version argument early
+  version_input = args_hash.fetch(:version, "")
+  if version_input.strip.empty?
+    raise ArgumentError,
+          "Version argument is required. Use 'patch', 'minor', 'major', or explicit version (e.g., '16.2.0')"
+  end
+
+  # Detect if this is a test/pre-release version (contains test, beta, alpha, rc, etc.)
+  is_prerelease = version_input.match?(/\.(test|beta|alpha|rc|pre)\./i)
+
+  # Check if on master branch (required for non-prerelease versions)
+  current_branch = `git rev-parse --abbrev-ref HEAD`.strip
+  unless is_prerelease || current_branch == "master"
+    abort <<~ERROR
+      ❌ Release must be run from the master branch!
+
+      Current branch: #{current_branch}
+
+      To release a stable version, please switch to master:
+        git checkout master && git pull --rebase
+
+      For pre-release versions (beta, alpha, rc, etc.), you can release from any branch:
+        rake release[#{version_input.sub(/(\d+\.\d+\.\d+)/, '\\1.beta.1')}]
+    ERROR
+  end
+
   # Check if there are uncommitted changes
   ReactOnRails::GitUtils.uncommitted_changes?(RaisingMessageHandler.new)
-  args_hash = args.to_hash
 
   is_dry_run = ReactOnRails::Utils.object_to_boolean(args_hash[:dry_run])
   is_verbose = ENV["VERBOSE"] == "1"
@@ -137,15 +164,6 @@ task :release, %i[version dry_run] do |_t, args|
 
   # Configure output verbosity
   verbose(is_verbose)
-
-  # Detect if this is a test/pre-release version (contains test, beta, alpha, rc, etc.)
-  version_input = args_hash.fetch(:version, "")
-  is_prerelease = version_input.match?(/\.(test|beta|alpha|rc|pre)\./i)
-
-  if version_input.strip.empty?
-    raise ArgumentError,
-          "Version argument is required. Use 'patch', 'minor', 'major', or explicit version (e.g., '16.2.0')"
-  end
 
   # Pre-flight authentication checks (skip for dry runs)
   unless is_dry_run
