@@ -129,8 +129,7 @@ describe "Incremental Rendering Integration", :integration do
           emitter.call("prop1", "value1")
           emitter.call("prop2", "value2")
           emitter.call("prop3", "value3")
-        },
-        is_rsc_payload: false
+        }
       )
 
       # Collect all chunks from the stream
@@ -178,8 +177,7 @@ describe "Incremental Rendering Integration", :integration do
             chunk_received.wait
 
             # If we reach here, all chunks were received while async_block was running
-          },
-          is_rsc_payload: false
+          }
         )
 
         # Collect chunks and signal after each one

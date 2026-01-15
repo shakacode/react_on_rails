@@ -73,7 +73,7 @@ module ReactOnRailsPro
       # - When the block finishes, we close the request (END_STREAM flag)
       # - Node's handleRequestClosed then calls asyncPropsManager.endStream()
       #
-      def render_code_with_incremental_updates(path, js_code, async_props_block:, is_rsc_payload:)
+      def render_code_with_incremental_updates(path, js_code, async_props_block:)
         Rails.logger.info { "[ReactOnRailsPro] Perform incremental rendering request #{path}" }
 
         # Determine bundle timestamp based on RSC support
