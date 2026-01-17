@@ -44,6 +44,7 @@ import {
 import * as errorReporter from './shared/errorReporter.js';
 import { lock, unlock } from './shared/locks.js';
 import { startSsrRequestOptions, trace } from './shared/tracing.js';
+import { PassThrough } from 'stream';
 
 // Uncomment the below for testing timeouts:
 // import { delay } from './shared/utils.js';
@@ -85,8 +86,29 @@ const setResponse = async (result: ResponseResult, res: FastifyReply) => {
   }
   setHeaders(headers, res);
   res.status(status);
+
+  const anotherStream = new PassThrough();
+  stream?.pipe(anotherStream);
+  anotherStream.on('error', (err) => {
+    log.error({ msg: 'Error in response stream', err });
+  });
+  anotherStream.on('close', () => {
+    log.debug('Response stream closed');
+  });
+  anotherStream.on('end', () => {
+    log.debug('Response stream ended');
+  });
+  anotherStream.on('data', (chunk) => {
+    log.debug(`Response stream data chunk received: ${chunk.toString()}`);
+  });
   if (stream) {
-    await res.send(stream);
+    log.debug('Sending streaming response');
+    try {
+      await res.send(stream);
+      log.debug('Finished sending streaming response');
+    } finally {
+      log.debug('Cleaning up after streaming response');
+    }
   } else {
     res.send(data);
   }
@@ -260,6 +282,9 @@ export default function run(config: Partial<Config>) {
 
     // Stream parser state
     let incrementalSink: IncrementalRenderSink | undefined;
+    // Track whether we've already started sending a response (streaming or otherwise)
+    // If true, we can't send an error response on failure - headers are already sent
+    let responseStarted = false;
 
     try {
       // Handle the incremental render stream
@@ -329,6 +354,7 @@ export default function run(config: Partial<Config>) {
         },
 
         onResponseStart: async (response: ResponseResult) => {
+          responseStarted = true;
           await setResponse(response, res);
         },
 
@@ -342,10 +368,33 @@ export default function run(config: Partial<Config>) {
       });
     } catch (err) {
       // If an error occurred during stream processing, send error response
-      const errorResponse = errorResponseResult(
-        formatExceptionMessage('IncrementalRender', err, 'Error while processing incremental render stream'),
+      const errorMessage = formatExceptionMessage(
+        'IncrementalRender',
+        err,
+        'Error while processing incremental render stream',
       );
-      await setResponse(errorResponse, res);
+
+      if (responseStarted) {
+        // Response was already started (streaming), we can't send an error response.
+        // This happens when the stream times out or errors after we've already started
+        // sending the streaming response. Just log the error.
+        log.error({
+          msg: 'Error occurred after response started, cannot send error response',
+          error: errorMessage,
+        });
+
+        // CRITICAL: We must call handleRequestClosed() to end the React stream.
+        // The React stream is waiting for async props (e.g., asyncPropsManager.getProp("researches")).
+        // If we don't call endStream(), the stream will hang forever waiting for props that will never arrive.
+        // This causes onResponse to never fire, leaving activeRequestsCount stuck and preventing worker shutdown.
+        if (incrementalSink) {
+          incrementalSink.handleRequestClosed();
+        }
+      } else {
+        // Response hasn't started yet, we can send an error response
+        const errorResponse = errorResponseResult(errorMessage);
+        await setResponse(errorResponse, res);
+      }
     }
   });
 
