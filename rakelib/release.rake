@@ -16,6 +16,14 @@ end
 # Helper methods for release-specific tasks
 # These are defined at the top level so they have access to Rake's sh method
 
+def prompt_for_otp(service_name)
+  print "\n🔑 Enter OTP code for #{service_name}: "
+  $stdout.flush
+  otp = $stdin.gets&.strip
+  abort "\n❌ No OTP provided. Aborting." if otp.nil? || otp.empty?
+  otp
+end
+
 def verify_npm_auth(registry_url = "https://registry.npmjs.org/")
   result = `npm whoami --registry #{registry_url} 2>&1`
   unless $CHILD_STATUS.success?
@@ -48,7 +56,9 @@ end
 
 def publish_gem_with_retry(dir, gem_name, otp: nil, max_retries: ENV.fetch("GEM_RELEASE_MAX_RETRIES", "3").to_i)
   puts "\nPublishing #{gem_name} gem to RubyGems.org..."
-  if otp
+  current_otp = otp
+
+  if current_otp
     puts "Using provided OTP code..."
   else
     puts "Carefully add your OTP for Rubygems when prompted."
@@ -60,24 +70,62 @@ def publish_gem_with_retry(dir, gem_name, otp: nil, max_retries: ENV.fetch("GEM_
 
   while retry_count < max_retries && !success
     begin
-      otp_flag = otp ? "--otp #{otp}" : ""
+      otp_flag = current_otp ? "--otp #{current_otp}" : ""
       sh %(cd #{dir} && gem release #{otp_flag})
       success = true
-    rescue Gem::CommandException, IOError => e
+    # Rake's sh method raises RuntimeError (not Gem exceptions) when commands fail
+    rescue RuntimeError, IOError => e
       retry_count += 1
       if retry_count < max_retries
         puts "\n⚠️  #{gem_name} release failed (attempt #{retry_count}/#{max_retries})"
+        puts "Error: #{e.class}: #{e.message}"
         puts "Common causes:"
         puts "  - OTP code expired or already used"
         puts "  - Network timeout"
-        puts "\nGenerating a FRESH OTP code and retrying in 5 seconds..."
-        sleep 5
+        puts "\nPlease enter a FRESH OTP code to retry..."
+        current_otp = prompt_for_otp("RubyGems")
       else
         puts "\n❌ Failed to publish #{gem_name} after #{max_retries} attempts"
         raise e
       end
     end
   end
+
+  # Return the last successful OTP so it can potentially be reused
+  current_otp
+end
+
+def publish_npm_with_retry(dir, package_name, base_args: "", otp: nil, max_retries: 3)
+  puts "\nPublishing #{package_name}..."
+  current_otp = otp
+
+  retry_count = 0
+  success = false
+
+  while retry_count < max_retries && !success
+    begin
+      otp_arg = current_otp ? " --otp #{current_otp}" : ""
+      sh %(cd #{dir} && pnpm publish#{base_args}#{otp_arg})
+      success = true
+    rescue RuntimeError => e
+      retry_count += 1
+      if retry_count < max_retries
+        puts "\n⚠️  #{package_name} publish failed (attempt #{retry_count}/#{max_retries})"
+        puts "Error: #{e.message}"
+        puts "Common causes:"
+        puts "  - OTP code expired or incorrect"
+        puts "  - Network timeout"
+        puts "\nPlease enter a FRESH OTP code to retry..."
+        current_otp = prompt_for_otp("NPM")
+      else
+        puts "\n❌ Failed to publish #{package_name} after #{max_retries} attempts"
+        raise e
+      end
+    end
+  end
+
+  # Return the last successful OTP so it can be reused for subsequent packages
+  current_otp
 end
 
 # rubocop:disable Metrics/BlockLength
@@ -124,9 +172,36 @@ Examples:
 task :release, %i[version dry_run] do |_t, args|
   include ReactOnRails::TaskHelpers
 
+  args_hash = args.to_hash
+
+  # Validate version argument early
+  version_input = args_hash.fetch(:version, "")
+  if version_input.strip.empty?
+    raise ArgumentError,
+          "Version argument is required. Use 'patch', 'minor', 'major', or explicit version (e.g., '16.2.0')"
+  end
+
+  # Detect if this is a test/pre-release version (contains test, beta, alpha, rc, etc.)
+  is_prerelease = version_input.match?(/\.(test|beta|alpha|rc|pre)\./i)
+
+  # Check if on master branch (required for non-prerelease versions)
+  current_branch = `git rev-parse --abbrev-ref HEAD`.strip
+  unless is_prerelease || current_branch == "master"
+    abort <<~ERROR
+      ❌ Release must be run from the master branch!
+
+      Current branch: #{current_branch}
+
+      To release a stable version, please switch to master:
+        git checkout master && git pull --rebase
+
+      For pre-release versions (beta, alpha, rc, etc.), you can release from any branch:
+        rake release[#{version_input.sub(/(\d+\.\d+\.\d+)/, '\\1.beta.1')}]
+    ERROR
+  end
+
   # Check if there are uncommitted changes
   ReactOnRails::GitUtils.uncommitted_changes?(RaisingMessageHandler.new)
-  args_hash = args.to_hash
 
   is_dry_run = ReactOnRails::Utils.object_to_boolean(args_hash[:dry_run])
   is_verbose = ENV["VERBOSE"] == "1"
@@ -135,15 +210,6 @@ task :release, %i[version dry_run] do |_t, args|
 
   # Configure output verbosity
   verbose(is_verbose)
-
-  # Detect if this is a test/pre-release version (contains test, beta, alpha, rc, etc.)
-  version_input = args_hash.fetch(:version, "")
-  is_prerelease = version_input.match?(/\.(test|beta|alpha|rc|pre)\./i)
-
-  if version_input.strip.empty?
-    raise ArgumentError,
-          "Version argument is required. Use 'patch', 'minor', 'major', or explicit version (e.g., '16.2.0')"
-  end
 
   # Pre-flight authentication checks (skip for dry runs)
   unless is_dry_run
@@ -230,9 +296,6 @@ task :release, %i[version dry_run] do |_t, args|
   unbundled_sh_in_dir(pro_dummy_app_dir, "bundle install#{bundle_quiet_flag}") if Dir.exist?(pro_dummy_app_dir)
   unbundled_sh_in_dir(pro_gem_root, "bundle install#{bundle_quiet_flag}")
 
-  # Prepare NPM publish args
-  npm_publish_args = ""
-
   unless is_dry_run
     # Commit all version changes (skip git hooks to save time)
     sh_in_dir(monorepo_root, "LEFTHOOK=0 git add -A")
@@ -262,60 +325,74 @@ task :release, %i[version dry_run] do |_t, args|
     puts "Publishing PUBLIC packages to npmjs.org..."
     puts "=" * 80
 
-    # Configure NPM OTP
-    if npm_otp
-      npm_publish_args += " --otp #{npm_otp}"
-      puts "Using provided NPM OTP for all NPM package publications..."
+    # Configure NPM base args (without OTP - that's handled by retry function)
+    npm_base_args = ""
+    current_npm_otp = npm_otp
+
+    if current_npm_otp
+      puts "Using provided NPM OTP for NPM package publications..."
     else
-      puts "\nNOTE: You will be prompted for NPM OTP code for each of the 3 NPM packages."
-      puts "TIP: Set NPM_OTP environment variable to avoid repeated prompts."
+      puts "\nNOTE: You will be prompted for NPM OTP code if needed."
+      puts "TIP: Set NPM_OTP environment variable to provide OTP upfront."
     end
 
     # For pre-release versions, skip git branch checks (allows releasing from non-master branches)
     if is_prerelease
-      npm_publish_args += " --no-git-checks"
+      npm_base_args += " --no-git-checks"
       puts "Pre-release version detected - skipping git branch checks for NPM publish"
     end
 
-    # Publish react-on-rails NPM package
-    puts "\nPublishing react-on-rails@#{actual_npm_version}..."
-    sh_in_dir(File.join(monorepo_root, "packages", "react-on-rails"), "pnpm publish #{npm_publish_args}")
+    # Publish react-on-rails NPM package (with retry)
+    current_npm_otp = publish_npm_with_retry(
+      File.join(monorepo_root, "packages", "react-on-rails"),
+      "react-on-rails@#{actual_npm_version}",
+      base_args: npm_base_args,
+      otp: current_npm_otp
+    )
 
-    # Publish react-on-rails-pro NPM package
-    puts "\nPublishing react-on-rails-pro@#{actual_npm_version}..."
-    sh_in_dir(File.join(monorepo_root, "packages", "react-on-rails-pro"), "pnpm publish #{npm_publish_args}")
+    # Publish react-on-rails-pro NPM package (with retry, reusing OTP if successful)
+    current_npm_otp = publish_npm_with_retry(
+      File.join(monorepo_root, "packages", "react-on-rails-pro"),
+      "react-on-rails-pro@#{actual_npm_version}",
+      base_args: npm_base_args,
+      otp: current_npm_otp
+    )
 
     # Publish node-renderer NPM package (PUBLIC on npmjs.org)
     puts "\n#{'=' * 80}"
     puts "Publishing PUBLIC node-renderer to npmjs.org..."
     puts "=" * 80
 
-    # Publish react-on-rails-pro-node-renderer NPM package
-    node_renderer_name = "react-on-rails-pro-node-renderer"
-    node_renderer_dir = File.join(monorepo_root, "packages", "react-on-rails-pro-node-renderer")
-    puts "\nPublishing #{node_renderer_name}@#{actual_npm_version}..."
-    sh_in_dir(node_renderer_dir, "pnpm publish #{npm_publish_args}")
+    # Publish react-on-rails-pro-node-renderer NPM package (with retry)
+    publish_npm_with_retry(
+      File.join(monorepo_root, "packages", "react-on-rails-pro-node-renderer"),
+      "react-on-rails-pro-node-renderer@#{actual_npm_version}",
+      base_args: npm_base_args,
+      otp: current_npm_otp
+    )
 
     puts "\n#{'=' * 80}"
     puts "Publishing PUBLIC Ruby gems..."
     puts "=" * 80
 
-    if rubygems_otp
-      puts "Using provided RubyGems OTP for both gem publications..."
+    current_rubygems_otp = rubygems_otp
+
+    if current_rubygems_otp
+      puts "Using provided RubyGems OTP for gem publications..."
     else
-      puts "\nNOTE: You will be prompted for RubyGems OTP code for each of the 2 gems."
-      puts "TIP: Set RUBYGEMS_OTP environment variable to avoid repeated prompts."
+      puts "\nNOTE: You will be prompted for RubyGems OTP code if needed."
+      puts "TIP: Set RUBYGEMS_OTP environment variable to provide OTP upfront."
     end
 
     # Publish react_on_rails Ruby gem with retry logic
-    publish_gem_with_retry(gem_root, "react_on_rails", otp: rubygems_otp)
+    current_rubygems_otp = publish_gem_with_retry(gem_root, "react_on_rails", otp: current_rubygems_otp)
 
     # Add delay before next OTP operation to ensure clean separation
     puts "\n⏳ Waiting 5 seconds before next publication to ensure OTP separation..."
     sleep 5
 
-    # Publish react_on_rails_pro Ruby gem to RubyGems.org with retry logic
-    publish_gem_with_retry(pro_gem_root, "react_on_rails_pro", otp: rubygems_otp)
+    # Publish react_on_rails_pro Ruby gem to RubyGems.org with retry logic (reusing OTP if still valid)
+    publish_gem_with_retry(pro_gem_root, "react_on_rails_pro", otp: current_rubygems_otp)
   end
 
   if is_dry_run
