@@ -168,6 +168,24 @@ module ReactOnRailsPro
             #   - close_write() just closes the queue, preserving data for the reader
             # See: https://github.com/socketry/protocol-http/blob/main/lib/protocol/http/body/writable.rb
             request_body.close_write
+
+            # CRITICAL: Wait for all data to be transmitted before this fiber completes.
+            #
+            # The async-http client spawns a separate Output task that reads from
+            # request_body and transmits over HTTP/2. When we call close_write(),
+            # we've signaled no more writes, but data may still be in the queue
+            # waiting to be read and transmitted.
+            #
+            # If this fiber completes (and barrier.wait returns) before the Output
+            # task finishes transmitting, the Sync block can exit and tear down
+            # the async context, causing the last chunks to be lost.
+            #
+            # By waiting until request_body.empty? is true, we ensure:
+            # 1. All data has been read from the queue by the Output task
+            # 2. The HTTP/2 frames are being/have been transmitted
+            #
+            # Note: empty? returns true only when the queue is BOTH closed AND empty.
+            Async::Task.current.yield until request_body.empty?
           end
 
           # Start the request - the write fiber above runs concurrently.

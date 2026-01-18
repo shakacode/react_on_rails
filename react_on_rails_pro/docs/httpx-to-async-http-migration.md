@@ -120,6 +120,47 @@ request_body.close
 request_body.close_write
 ```
 
+### Problem 6: Last async prop still not sent (race condition)
+
+**Cause:** Even with `close_write()`, the last async prop might not be transmitted. The async-http client spawns a separate `Output` fiber that reads from `request_body` and transmits over HTTP/2. When we call `close_write()`:
+
+1. The queue is closed (no more writes)
+2. But data may still be in the queue waiting to be read by the Output fiber
+3. Our barrier fiber completes (after `close_write`)
+4. `barrier.wait` returns because our fiber is done
+5. The `Sync` block can exit before the Output fiber finishes transmitting
+6. The async context is torn down, causing the last chunks to be lost
+
+**Solution:** Wait for `request_body.empty?` to be true before the barrier fiber completes. This ensures all data has been read from the queue by the Output fiber:
+
+```ruby
+# Before (race condition - last data lost)
+barrier.async do
+  request_body.write(initial_data)
+  async_props_block.call(emitter)
+ensure
+  request_body.close_write
+  # Fiber completes, but data may still be in queue!
+end
+
+# After (fixed)
+barrier.async do
+  request_body.write(initial_data)
+  async_props_block.call(emitter)
+ensure
+  request_body.close_write
+
+  # Wait for all data to be consumed by the HTTP/2 sender
+  # empty? returns true only when queue is BOTH closed AND empty
+  Async::Task.current.yield until request_body.empty?
+end
+```
+
+**Why this works:** `empty?` returns `true` only when the queue is both closed AND has no elements. By yielding until empty, we ensure:
+1. The Output fiber has read all data from the queue
+2. The HTTP/2 frames are being/have been transmitted
+3. Only then does our fiber complete and `barrier.wait` can return
+
 ## Key Differences: HTTPX vs async-http
 
 | Aspect | HTTPX | async-http |
@@ -130,6 +171,7 @@ request_body.close_write
 | Protocol selection | `fallback_protocol: "h2"` | `protocol: Async::HTTP::Protocol::HTTP2` |
 | Async context | Not required | Must be inside `Sync` block |
 | Request body close | Automatic | Use `close_write()` to preserve data |
+| Bidirectional completion | Automatic | Wait for `body.empty?` before fiber exits |
 
 ## Fiber Scheduling for Bidirectional Streaming
 
