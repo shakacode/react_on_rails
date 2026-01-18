@@ -109,9 +109,9 @@ module ReactOnRailsPro
           # Look at the spec of `status` in `spec/react_on_rails_pro/stream_spec.rb` for more details
           process_response_chunks(stream_response, error_body, &block)
           break
-        rescue HTTPX::HTTPError => e
+        rescue ReactOnRailsPro::Request::HTTPError => e
           send_bundle = handle_http_error(e, error_body, send_bundle)
-        rescue HTTPX::ReadTimeoutError => e
+        rescue Async::TimeoutError => e
           raise ReactOnRailsPro::Error, "Time out error while server side render streaming a component.\n" \
                                         "Original error:\n#{e}\n#{e.backtrace}"
         end
@@ -122,7 +122,8 @@ module ReactOnRailsPro
 
     def process_response_chunks(stream_response, error_body)
       loop_response_lines(stream_response) do |chunk|
-        if stream_response.is_a?(HTTPX::ErrorResponse) || stream_response.status >= 400
+        # Check for error status - async-http responses have status directly accessible
+        if stream_response.status >= 400
           error_body << chunk
           next
         end
@@ -133,8 +134,8 @@ module ReactOnRailsPro
     end
 
     def handle_http_error(error, error_body, send_bundle)
-      response = error.response
-      case response.status
+      status = error.status
+      case status
       when ReactOnRailsPro::STATUS_SEND_BUNDLE
         # To prevent infinite loop
         ReactOnRailsPro::Error.raise_duplicate_bundle_upload_error if send_bundle
@@ -143,7 +144,7 @@ module ReactOnRailsPro
       when ReactOnRailsPro::STATUS_INCOMPATIBLE
         raise ReactOnRailsPro::Error, error_body
       else
-        raise ReactOnRailsPro::Error, "Unexpected response code from renderer: #{response.status}:\n#{error_body}"
+        raise ReactOnRailsPro::Error, "Unexpected response code from renderer: #{status}:\n#{error_body}"
       end
     end
 
@@ -161,10 +162,18 @@ module ReactOnRailsPro
       return enum_for(__method__, response) unless block_given?
 
       line = "".b
+      received_first_chunk = false
 
-      response.each do |chunk|
+      # async-http uses response.body.each instead of response.each
+      # Each chunk may be a String or an IO-like object, so we ensure string conversion
+      response.body.each do |chunk|
+        received_first_chunk = true
+        # Store flag on response for retry logic (similar to HTTPX behavior)
         response.instance_variable_set(:@react_on_rails_received_first_chunk, true)
-        line << chunk
+
+        # Ensure chunk is converted to string (async-http HTTP/2 may yield Input objects)
+        chunk_str = chunk.is_a?(String) ? chunk : chunk.to_s
+        line << chunk_str
 
         while (idx = line.index("\n"))
           yield line.byteslice(0..idx - 1)

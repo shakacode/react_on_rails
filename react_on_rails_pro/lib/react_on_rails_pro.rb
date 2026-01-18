@@ -2,8 +2,10 @@
 
 require "rails"
 
-# Apply HTTPX bug fix for stream_bidi plugin
-require "react_on_rails_pro/httpx_stream_bidi_patch"
+# async-http is used for HTTP/2 streaming communication with the Node renderer
+# It replaces HTTPX and provides native bidirectional streaming support
+require "async"
+require "async/http"
 
 require "react_on_rails_pro/request"
 require "react_on_rails_pro/version"

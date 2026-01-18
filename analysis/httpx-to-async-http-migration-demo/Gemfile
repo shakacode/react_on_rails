@@ -1,0 +1,16 @@
+# frozen_string_literal: true
+
+source "https://rubygems.org"
+
+# Current implementation
+gem "httpx", ">= 1.7.0"
+gem "http-2", ">= 1.1.1"
+
+# Potential migration target
+gem "async-http", "~> 0.75"
+gem "async", ">= 2.6"
+gem "async-http-faraday", "~> 0.19"
+
+# Testing
+gem "webmock"
+gem "rspec"

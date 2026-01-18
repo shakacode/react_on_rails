@@ -31,7 +31,8 @@ module ReactOnRailsPro
     # On the Node side, this triggers asyncPropsManager.setProp(propName, value).
     def call(prop_name, prop_value)
       update_chunk = generate_update_chunk(prop_name, prop_value)
-      @request_stream << "#{update_chunk.to_json}\n"
+      # Use .write() for async-http Body::Writable compatibility
+      @request_stream.write("#{update_chunk.to_json}\n")
     rescue StandardError => e
       Rails.logger.error do
         backtrace = e.backtrace&.first(5)&.join("\n")

@@ -78,23 +78,9 @@ module ReactOnRailsPro
         def eval_js(js_code, render_options, send_bundle: false)
           path = prepare_render_path(js_code, render_options)
 
-          response = ReactOnRailsPro::Request.render_code(path, js_code, send_bundle)
-
-          case response.status
-          when 200
-            response.body
-          when ReactOnRailsPro::STATUS_SEND_BUNDLE
-            # To prevent infinite loop
-            ReactOnRailsPro::Error.raise_duplicate_bundle_upload_error if send_bundle
-
-            eval_js(js_code, render_options, send_bundle: true)
-          when 400
-            raise ReactOnRailsPro::Error,
-                  "Renderer unhandled error at the VM level: #{response.status}:\n#{response.body}"
-          else
-            raise ReactOnRailsPro::Error,
-                  "Unexpected response code from renderer: #{response.status}:\n#{response.body}"
-          end
+          # render_code returns the body content directly (handles status checking,
+          # STATUS_SEND_BUNDLE retry, and reads the response within the async context)
+          ReactOnRailsPro::Request.render_code(path, js_code, send_bundle)
         rescue StandardError => e
           raise e unless ReactOnRailsPro.configuration.renderer_use_fallback_exec_js
 
