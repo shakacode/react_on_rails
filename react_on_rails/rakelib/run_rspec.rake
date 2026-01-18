@@ -82,10 +82,11 @@ namespace :run_rspec do
     puts "Creating #{example_type.rspec_task_name} task"
     desc "Runs RSpec for #{example_type.name_pretty} only"
     task example_type.rspec_task_name_short => example_type.gen_task_name do
-      # Use unbundled mode for pinned React version examples to ensure the example app's
-      # Gemfile and gem versions are used, not the parent workspace's bundle
+      # REVERT ME: Temporary fix from PR #2288 - always use unbundled mode
+      # to ensure the example app's Gemfile and gem versions are used,
+      # not the parent workspace's bundle (which may have different shakapacker version)
       run_tests_in(File.join(examples_dir, example_type.name),
-                   unbundled: example_type.pinned_react_version?)
+                   unbundled: true)
     end
   end
 
