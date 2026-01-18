@@ -23,9 +23,15 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 Changes since the last non-beta release.
 
+### [16.2.1] - 2026-01-18
+
+#### Fixed
+
+- **bin/dev Route Argument Parsing**: Fixed `bin/dev` command failing with "Unknown argument: hello_world" when run without arguments. The `--route` argument format was changed from two separate arguments to a single combined argument (`--route=value`). [PR 2309](https://github.com/shakacode/react_on_rails/pull/2309) by [K4sku](https://github.com/K4sku).
+
 #### Developer (Contributors Only)
 
-- **Benchmarking in CI**: A benchmark workflow will now run on all pushes to master, as well as PRs with `benchmark` or `full-ci` labels. [PR 1868](https://github.com/shakacode/react_on_rails/pull/1868) by [alexeyr-ci2](https://github.com/alexeyr-ci2)
+- **Benchmarking in CI**: A benchmark workflow will now run on all pushes to master, as well as PRs with `benchmark` or `full-ci` labels. [PR 1868](https://github.com/shakacode/react_on_rails/pull/1868) by [alexeyr-ci2](https://github.com/alexeyr-ci2).
 
 ### [16.2.0] - 2026-01-14
 
@@ -1877,7 +1883,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.2.0...master
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.2.1...master
+[16.2.1]: https://github.com/shakacode/react_on_rails/compare/v16.2.0...v16.2.1
 [16.2.0]: https://github.com/shakacode/react_on_rails/compare/16.1.1...v16.2.0
 [16.1.1]: https://github.com/shakacode/react_on_rails/compare/16.1.0...16.1.1
 [16.1.0]: https://github.com/shakacode/react_on_rails/compare/16.0.0...16.1.0
