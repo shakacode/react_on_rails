@@ -20,7 +20,12 @@
 # See http://rubydoc.info/gems/rspec-core/RSpec/Core/Configuration
 require "pry-byebug"
 require "webmock"
-require "httpx/adapters/webmock"
+# Only load HTTPX webmock adapter if HTTPX is available (migration to async-http)
+begin
+  require "httpx/adapters/webmock"
+rescue LoadError
+  # HTTPX not available, skip webmock adapter
+end
 require "webmock/rspec"
 
 RSpec.configure do |config|
@@ -51,7 +56,10 @@ RSpec.configure do |config|
   end
 
   config.before do
-    ReactOnRailsPro::Request.reset_connection
+    # Reset connection state by clearing the instance variables directly
+    # This avoids issues with mocked clients leaking between examples
+    ReactOnRailsPro::Request.instance_variable_set(:@client, nil)
+    ReactOnRailsPro::Request.instance_variable_set(:@endpoint, nil)
     WebMock.allow_net_connect!
   end
 

@@ -3,6 +3,9 @@
 require "async"
 require "async/queue"
 require "async/barrier"
+require "async/http"
+require "protocol/http"
+require "protocol/http/body/readable"
 require "rails_helper"
 require "support/script_tag_utils"
 
@@ -332,34 +335,62 @@ describe ReactOnRailsProHelper do
       HTML
     end
 
-    # mock_chunks can be an Async::Queue or an Array
-    def mock_request_and_response(mock_chunks = chunks, count: 1)
-      # Reset connection instance variables to ensure clean state for tests
-      ReactOnRailsPro::Request.instance_variable_set(:@connection, nil)
-      original_httpx_plugin = HTTPX.method(:plugin)
-      allow(HTTPX).to receive(:plugin) do |*args|
-        original_httpx_plugin.call(:mock_stream).plugin(*args)
+    # Creates a mock HTTP response body that yields chunks
+    def create_mock_response_body(mock_chunks)
+      mock_body = instance_double(Protocol::HTTP::Body::Readable)
+      allow(mock_body).to receive(:each) do |&block|
+        yield_chunks_to_block(mock_chunks, block)
       end
-      clear_stream_mocks
+      allow(mock_body).to receive(:close)
+      mock_body
+    end
 
-      chunks_read.clear
-      mock_streaming_response(%r{http://localhost:3800/bundles/[a-f0-9]{32}-test/render/[a-f0-9]{32}}, 200,
-                              count: count) do |yielder|
-        if mock_chunks.is_a?(Async::Queue)
-          loop do
-            chunk = mock_chunks.dequeue
-            break if chunk.nil?
+    # Yields chunks from either an Async::Queue or Array to the given block
+    def yield_chunks_to_block(mock_chunks, block)
+      if mock_chunks.is_a?(Async::Queue)
+        loop do
+          chunk = mock_chunks.dequeue
+          break if chunk.nil?
 
-            chunks_read << chunk
-            yielder.call("#{chunk.to_json}\n")
-          end
-        else
-          mock_chunks.each do |chunk|
-            chunks_read << chunk
-            yielder.call("#{chunk.to_json}\n")
-          end
+          chunks_read << chunk
+          block.call("#{chunk.to_json}\n")
+        end
+      else
+        mock_chunks.each do |chunk|
+          chunks_read << chunk
+          block.call("#{chunk.to_json}\n")
         end
       end
+    end
+
+    # mock_chunks can be an Async::Queue or an Array
+    # count parameter controls how many times the mock can be called (for retry scenarios)
+    def mock_request_and_response(mock_chunks = chunks, count: 1) # rubocop:disable Lint/UnusedMethodArgument
+      # Reset connection instance variables to ensure clean state for tests
+      ReactOnRailsPro::Request.instance_variable_set(:@client, nil)
+      ReactOnRailsPro::Request.instance_variable_set(:@endpoint, nil)
+      chunks_read.clear
+
+      # Stub create_connection to return a mock client each time it's called
+      allow(ReactOnRailsPro::Request).to receive(:create_connection) do
+        create_mock_client_and_endpoint(mock_chunks)
+      end
+    end
+
+    # Creates a mock async-http client and endpoint pair
+    def create_mock_client_and_endpoint(mock_chunks)
+      mock_client = instance_double(Async::HTTP::Client)
+      mock_endpoint = instance_double(Async::HTTP::Endpoint)
+
+      allow(mock_client).to receive(:close)
+      allow(mock_client).to receive(:post) do |_path, _headers, _body|
+        mock_body = create_mock_response_body(mock_chunks)
+        response = instance_double(Protocol::HTTP::Response, status: 200, body: mock_body)
+        allow(response).to receive(:read).and_return("")
+        response
+      end
+
+      [mock_client, mock_endpoint]
     end
 
     describe "#stream_react_component" do # rubocop:disable RSpec/MultipleMemoizedHelpers
@@ -850,18 +881,33 @@ describe ReactOnRailsProHelper do
       allow(mocked_response).to receive(:stream).and_return(mocked_stream)
       allow(self).to receive(:response).and_return(mocked_response)
 
-      ReactOnRailsPro::Request.instance_variable_set(:@connection, nil)
-      original_httpx_plugin = HTTPX.method(:plugin)
-      allow(HTTPX).to receive(:plugin) do |*args|
-        original_httpx_plugin.call(:mock_stream).plugin(*args)
-      end
-      clear_stream_mocks
+      # Reset connection instance variables to ensure clean state for tests
+      ReactOnRailsPro::Request.instance_variable_set(:@client, nil)
+      ReactOnRailsPro::Request.instance_variable_set(:@endpoint, nil)
 
-      mock_streaming_response(%r{http://localhost:3800/bundles/[a-f0-9]{32}-test/render/[a-f0-9]{32}}, 200,
-                              count: 1) do |yielder|
-        chunks.each do |chunk|
-          yielder.call("#{chunk.to_json}\n")
+      # Stub create_connection to return a mock client each time it's called
+      allow(ReactOnRailsPro::Request).to receive(:create_connection) do
+        mock_client = instance_double(Async::HTTP::Client)
+        mock_endpoint = instance_double(Async::HTTP::Endpoint)
+
+        allow(mock_client).to receive(:close)
+
+        # Mock the client's post method to return streaming responses
+        allow(mock_client).to receive(:post) do |_path, _headers, _body|
+          mock_body = instance_double(Protocol::HTTP::Body::Readable)
+          allow(mock_body).to receive(:each) do |&block|
+            chunks.each do |chunk|
+              block.call("#{chunk.to_json}\n")
+            end
+          end
+          allow(mock_body).to receive(:close)
+
+          response = instance_double(Protocol::HTTP::Response, status: 200, body: mock_body)
+          allow(response).to receive(:read).and_return("")
+          response
         end
+
+        [mock_client, mock_endpoint]
       end
     end
 
