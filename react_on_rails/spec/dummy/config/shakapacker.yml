@@ -20,6 +20,9 @@ default: &default
   cache_manifest: false
   nested_entries: true
 
+  # Extract and emit a css file
+  extract_css: true
+
   # Hook to run before webpack compilation (e.g., for generating dynamic entry points)
   # SECURITY: Only reference trusted scripts within your project. Ensure the hook path
   # points to a file within the project root that you control.

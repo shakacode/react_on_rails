@@ -590,6 +590,75 @@ Removes the `full-ci` label and returns to standard CI behavior:
 - **Force-pushes:** The `/run-skipped-ci` command adds the `full-ci` label to your PR. If you force-push after commenting, the initial workflow run will test the old commit, but subsequent pushes will automatically run full CI because the label persists.
 - **Branch operations:** Avoid deleting or force-pushing branches while workflows are running, as this may cause failures.
 
+### Benchmarking
+
+React on Rails includes a performance benchmark workflow that measures RPS (requests per second) and latency for both Core and Pro versions.
+
+#### When Benchmarks Run
+
+- **Automatically on master**: Benchmarks run on every push to master
+- **On PRs with labels**: Add the `benchmark` or `full-ci` label to your PR to run benchmarks
+- **Manual trigger**: Use `gh workflow run` to run benchmarks with custom parameters (see [https://github.com/cli/cli#installation](https://github.com/cli/cli#installation) if you don't have `gh`):
+
+  ```bash
+  # Run with default parameters
+  gh workflow run benchmark.yml
+
+  # Run with custom parameters
+  gh workflow run benchmark.yml \
+    -f rate=100 \
+    -f duration=60s \
+    -f connections=20 \
+    -f app_version=core_only
+  ```
+
+#### Regression Detection
+
+When benchmarks run, the [github-action-benchmark](https://github.com/benchmark-action/github-action-benchmark) action compares results against historical data. If performance regresses by more than 50%, the workflow will:
+
+1. **Fail the CI check** with `fail-on-alert: true`
+2. **Post a comment on the PR** explaining the regression
+3. **Tag reviewers** for attention
+
+This helps catch performance regressions before they reach production.
+
+#### Running Benchmarks Locally
+
+**Prerequisites:** Install [k6](https://k6.io/docs/get-started/installation/) and [Vegeta](https://github.com/tsenart/vegeta#install).
+
+You can also run the server in a separate terminal instead of backgrounding it.
+
+**Core benchmarks:**
+
+```bash
+cd react_on_rails/spec/dummy
+bin/prod-assets  # Build production assets
+bin/prod &       # Start production server on port 3001
+SERVER_PID=$!
+cd ../..
+ruby benchmarks/bench.rb
+kill $SERVER_PID
+```
+
+**Pro benchmarks:**
+
+```bash
+cd react_on_rails_pro/spec/dummy
+bin/prod-assets
+bin/prod &       # Starts Rails server and node renderer
+SERVER_PID=$!
+cd ../..
+PRO=true ruby benchmarks/bench.rb         # Rails benchmarks
+ruby benchmarks/bench-node-renderer.rb    # Node renderer benchmarks
+kill $SERVER_PID
+```
+
+**Configuration:** Both scripts support environment variables for customization (rate, duration, connections, etc.). See the script headers in [`benchmarks/bench.rb`](benchmarks/bench.rb) and [`benchmarks/bench-node-renderer.rb`](benchmarks/bench-node-renderer.rb) for available options. For debugging, you may want lower `DURATION` and/or specific `ROUTES`:
+
+```bash
+DURATION=5s ROUTES=/ ruby benchmarks/bench.rb
+```
+
 ### Install Generator
 
 In your Rails app add this gem with a path to your fork.

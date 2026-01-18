@@ -23,6 +23,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 Changes since the last non-beta release.
 
+#### Developer (Contributors Only)
+
+- **Benchmarking in CI**: A benchmark workflow will now run on all pushes to master, as well as PRs with `benchmark` or `full-ci` labels. [PR 1868](https://github.com/shakacode/react_on_rails/pull/1868) by [alexeyr-ci2](https://github.com/alexeyr-ci2)
+
 ### [16.2.0] - 2026-01-14
 
 #### Breaking Changes

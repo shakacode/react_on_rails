@@ -157,6 +157,8 @@ Pre-commit hooks automatically run:
   - All linters: `rake lint` (runs ESLint and RuboCop)
   - ESLint only: `pnpm run lint` or `rake lint:eslint`
   - RuboCop only: `rake lint:rubocop`
+  - GitHub Action files (workflows, reusable actions, etc.): `actionlint`
+  - YAML files: `yamllint` (or validate the syntax with Ruby if it isn't installed). Do _not_ try to run RuboCop on `.yml` files.
 - **Code Formatting**:
   - Format code with Prettier: `rake autofix`
   - Check formatting without fixing: `pnpm run format.listDifferent`

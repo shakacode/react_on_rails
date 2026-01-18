@@ -5,7 +5,7 @@ const config: KnipConfig = {
   workspaces: {
     // Root workspace - manages the monorepo and global tooling
     '.': {
-      entry: ['eslint.config.ts', 'jest.config.base.js'],
+      entry: ['eslint.config.ts', 'jest.config.base.js', 'benchmarks/k6.ts'],
       project: ['*.{js,mjs,ts}'],
       ignoreBinaries: [
         // Has to be installed globally
@@ -13,6 +13,8 @@ const config: KnipConfig = {
         // Pro package binaries used in Pro workflows
         'playwright',
         'e2e-test',
+        // Local binaries
+        'bin/.*',
       ],
       ignore: ['react_on_rails_pro/**', 'react_on_rails/vendor/**'],
       ignoreDependencies: [
