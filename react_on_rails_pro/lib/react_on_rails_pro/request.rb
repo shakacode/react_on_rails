@@ -18,12 +18,13 @@ module ReactOnRailsPro
   class Request # rubocop:disable Metrics/ClassLength
     # Custom error class for async-http errors (replacing HTTPX error types)
     class HTTPError < StandardError
-      attr_reader :response, :status
+      attr_reader :response, :status, :body
 
-      def initialize(message, response: nil, status: nil)
+      def initialize(message, response: nil, status: nil, body: nil)
         super(message)
         @response = response
         @status = status || response&.status
+        @body = body || ""
       end
     end
 
@@ -289,15 +290,26 @@ module ReactOnRailsPro
             response = execute_http_request(path, form: form, json: json)
 
             # Check for error status - must consume body to close HTTP/2 stream
-            # Exclude special status codes that are handled by callers:
+            # For streaming requests, raise HTTPError for all 4xx status codes so StreamRequest can handle them
+            # For non-streaming requests, exclude special status codes handled separately:
             # - STATUS_SEND_BUNDLE (410): Triggers bundle upload and retry
             # - STATUS_INCOMPATIBLE: Handled separately below
             status = response.status
-            if status >= 400 &&
-               status != ReactOnRailsPro::STATUS_SEND_BUNDLE &&
-               status != ReactOnRailsPro::STATUS_INCOMPATIBLE
+            should_raise_error = if stream
+                                   status >= 400
+                                 else
+                                   status >= 400 &&
+                                     status != ReactOnRailsPro::STATUS_SEND_BUNDLE &&
+                                     status != ReactOnRailsPro::STATUS_INCOMPATIBLE
+                                 end
+            if should_raise_error
               body_content = response.read # Consume body to properly close the HTTP/2 stream
-              error = HTTPError.new("HTTP error #{status}: #{body_content}", response: response, status: status)
+              error = HTTPError.new(
+                "HTTP error #{status}: #{body_content}",
+                response: response,
+                status: status,
+                body: body_content
+              )
               raise error
             end
 

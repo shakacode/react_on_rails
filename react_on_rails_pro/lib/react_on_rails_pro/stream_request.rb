@@ -135,6 +135,15 @@ module ReactOnRailsPro
 
     def handle_http_error(error, error_body, send_bundle)
       status = error.status
+      # Use body from error if error_body is empty (for cases where body was read before streaming)
+      actual_body = if error_body.present?
+                      error_body
+                    elsif error.respond_to?(:body)
+                      error.body
+                    else
+                      ""
+                    end
+
       case status
       when ReactOnRailsPro::STATUS_SEND_BUNDLE
         # To prevent infinite loop
@@ -142,9 +151,9 @@ module ReactOnRailsPro
 
         true
       when ReactOnRailsPro::STATUS_INCOMPATIBLE
-        raise ReactOnRailsPro::Error, error_body
+        raise ReactOnRailsPro::Error, actual_body
       else
-        raise ReactOnRailsPro::Error, "Unexpected response code from renderer: #{status}:\n#{error_body}"
+        raise ReactOnRailsPro::Error, "Unexpected response code from renderer: #{status}:\n#{actual_body}"
       end
     end
 
