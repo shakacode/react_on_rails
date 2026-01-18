@@ -87,20 +87,20 @@ const setResponse = async (result: ResponseResult, res: FastifyReply) => {
   setHeaders(headers, res);
   res.status(status);
 
-  const anotherStream = new PassThrough();
-  stream?.pipe(anotherStream);
-  anotherStream.on('error', (err) => {
-    log.error({ msg: 'Error in response stream', err });
-  });
-  anotherStream.on('close', () => {
-    log.debug('Response stream closed');
-  });
-  anotherStream.on('end', () => {
-    log.debug('Response stream ended');
-  });
-  anotherStream.on('data', (chunk) => {
-    log.debug(`Response stream data chunk received: ${chunk.toString()}`);
-  });
+  // const anotherStream = new PassThrough();
+  // stream?.pipe(anotherStream);
+  // anotherStream.on('error', (err) => {
+  //   log.error({ msg: 'Error in response stream', err });
+  // });
+  // anotherStream.on('close', () => {
+  //   log.debug('Response stream closed');
+  // });
+  // anotherStream.on('end', () => {
+  //   log.debug('Response stream ended');
+  // });
+  // anotherStream.on('data', (chunk) => {
+  //   log.debug(`Response stream data chunk received: ${chunk.toString()}`);
+  // });
   if (stream) {
     log.debug('Sending streaming response');
     try {
@@ -386,10 +386,32 @@ export default function run(config: Partial<Config>) {
         // CRITICAL: We must call handleRequestClosed() to end the React stream.
         // The React stream is waiting for async props (e.g., asyncPropsManager.getProp("researches")).
         // If we don't call endStream(), the stream will hang forever waiting for props that will never arrive.
-        // This causes onResponse to never fire, leaving activeRequestsCount stuck and preventing worker shutdown.
         if (incrementalSink) {
           incrementalSink.handleRequestClosed();
         }
+
+        // CRITICAL: Forcefully destroy the HTTP/2 response stream.
+        //
+        // Background:
+        // When the client (Ruby side) stops reading (e.g., during graceful shutdown),
+        // the HTTP/2 stream experiences backpressure - data sits in the buffer and can't
+        // be flushed. This causes:
+        // - `finish` event to never fire (data not handed off to OS)
+        // - `close` event to never fire (stream not destroyed)
+        // - `await res.send(stream)` to hang forever (uses eos(reply.raw) internally)
+        // - Fastify's onResponse hook to never fire
+        // - activeRequestsCount to never decrement
+        //
+        // By calling destroy(), we:
+        // - Forcefully close the HTTP/2 stream
+        // - Emit the 'close' event on reply.raw
+        // - Allow our event listeners in handleGracefulShutdown.ts to decrement activeRequestsCount
+        // - Unblock the route handler so it can complete
+        //
+        // See: https://github.com/nodejs/node/issues/35409
+        // See: https://nodejs.org/en/learn/modules/backpressuring-in-streams
+        log.debug('Destroying HTTP/2 response stream to unblock backpressure');
+        res.raw.destroy();
       } else {
         // Response hasn't started yet, we can send an error response
         const errorResponse = errorResponseResult(errorMessage);
