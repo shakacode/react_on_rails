@@ -306,21 +306,37 @@ module ReactOnRails
         # Pro package includes all base functionality, so having both causes validation errors
         remove_base_package_if_present
 
-        return if add_packages(PRO_DEPENDENCIES)
+        # Pin to exact version matching the gem (converts Ruby format to npm format)
+        # Falls back to latest if version can't be determined
+        pro_packages = pro_packages_with_version
+        return if pro_packages.all? { |pkg| add_package(pkg) }
 
         GeneratorMessages.add_warning(<<~MSG.strip)
           ⚠️  Failed to add React on Rails Pro dependencies.
 
           You can install them manually by running:
-            npm install #{PRO_DEPENDENCIES.join(' ')}
+            npm install #{pro_packages.join(' ')}
         MSG
       rescue StandardError => e
         GeneratorMessages.add_warning(<<~MSG.strip)
           ⚠️  Error adding React on Rails Pro dependencies: #{e.message}
 
           You can install them manually by running:
-            npm install #{PRO_DEPENDENCIES.join(' ')}
+            npm install #{pro_packages_with_version.join(' ')}
         MSG
+      end
+
+      # Returns Pro package names with version suffix matching the gem version.
+      # Uses VersionSyntaxConverter to handle Ruby->npm format conversion.
+      # Falls back to unversioned package names if version can't be determined.
+      def pro_packages_with_version
+        return PRO_DEPENDENCIES unless defined?(ReactOnRailsPro::VERSION)
+
+        npm_version = ReactOnRails::VersionSyntaxConverter.new.rubygem_to_npm(ReactOnRailsPro::VERSION)
+        PRO_DEPENDENCIES.map { |pkg| "#{pkg}@#{npm_version}" }
+      rescue StandardError
+        puts "WARNING: Could not determine Pro package version. Installing latest."
+        PRO_DEPENDENCIES
       end
 
       def add_rsc_dependencies
