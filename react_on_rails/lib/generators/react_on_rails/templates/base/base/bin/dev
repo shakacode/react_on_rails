@@ -29,6 +29,6 @@ DEFAULT_ROUTE = "hello_world"
 # Main execution
 # Add the default route to ARGV if no --route option is provided
 argv_with_defaults = ARGV.dup
-argv_with_defaults.push("--route", DEFAULT_ROUTE) unless argv_with_defaults.any? { |arg| arg.start_with?("--route") }
+argv_with_defaults.push("--route=#{DEFAULT_ROUTE}") unless argv_with_defaults.any? { |arg| arg.start_with?("--route") }
 
 ReactOnRails::Dev::ServerManager.run_from_command_line(argv_with_defaults)
