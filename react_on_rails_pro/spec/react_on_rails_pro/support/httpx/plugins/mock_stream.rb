@@ -1,5 +1,9 @@
 # frozen_string_literal: true
 
+# Only load this plugin if HTTPX is available.
+# During migration to async-http, tests that don't need HTTPX should still work.
+return unless defined?(HTTPX) && HTTPX::Plugins.respond_to?(:register_plugin)
+
 module HTTPX
   module Plugins
     module MockStream
