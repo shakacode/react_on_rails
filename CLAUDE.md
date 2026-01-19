@@ -714,11 +714,42 @@ react_on_rails/spec/dummy/e2e/
 
 ### CI Integration
 
-Playwright E2E tests run automatically in CI via GitHub Actions (`.github/workflows/playwright.yml`). The workflow:
-- Runs on all PRs and pushes to master
+Playwright E2E tests run via GitHub Actions (`.github/workflows/playwright.yml`). The workflow:
+- **Only runs on pushes to master and manual dispatch (workflow_dispatch)**
+- Does NOT automatically run on PRs
 - Uses GitHub Actions annotations for test failures
 - Uploads HTML reports as artifacts (available for 30 days)
 - Auto-starts Rails server before running tests
+
+### Ensuring E2E Tests Pass Before Merging
+
+**CRITICAL: Playwright E2E tests do NOT run automatically on PRs. You must run them locally or trigger manually.**
+
+1. **Run tests locally BEFORE pushing your PR:**
+   ```bash
+   cd react_on_rails/spec/dummy
+   pnpm test:e2e
+   ```
+
+2. **If you need to verify on CI, manually trigger the workflow:**
+   ```bash
+   # Trigger workflow on your branch
+   gh workflow run "Playwright E2E Tests" --ref your-branch-name
+
+   # Monitor the run
+   gh run watch
+   ```
+
+3. **Download test artifacts if tests fail:**
+   ```bash
+   # List artifacts from a failed run
+   gh run view <run-id> --json jobs
+
+   # Download playwright report
+   gh run download <run-id> -n playwright-report
+   ```
+
+**DO NOT merge PRs without running Playwright tests.** The CI does not automatically run these tests on PRs - you must verify locally or trigger manually.
 
 ## Rails Engine Development Nuances
 
