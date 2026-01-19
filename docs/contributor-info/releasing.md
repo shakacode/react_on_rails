@@ -115,7 +115,7 @@ When you run `rake release[X.Y.Z]`, the task will:
 7. Update the Pro package's dependency on react-on-rails
 8. Update the dummy app's Gemfile.lock
 9. Commit all version changes with message "Bump version to X.Y.Z"
-10. Create a git tag `vX.Y.Z`
+10. Create a git tag `X.Y.Z` (no `v` prefix, matching historical convention)
 11. Push commits and tags to the remote repository
 12. Publish `react-on-rails` to NPM (requires 2FA token)
 13. Publish `react-on-rails-pro` to NPM (requires 2FA token)
@@ -264,7 +264,7 @@ If the release fails partway through (e.g., during NPM publish):
    - RubyGems: `gem list react_on_rails -r -a`
 
 2. If the git tag was created but packages weren't published:
-   - Delete the tag: `git tag -d vX.Y.Z && git push origin :vX.Y.Z`
+   - Delete the tag: `git tag -d X.Y.Z && git push origin :X.Y.Z`
    - Revert the version commit: `git reset --hard HEAD~1 && git push -f`
    - Start over with `rake release[X.Y.Z]`
 
