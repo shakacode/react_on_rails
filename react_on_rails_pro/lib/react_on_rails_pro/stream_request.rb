@@ -96,11 +96,18 @@ module ReactOnRailsPro
       return enum_for(:each_chunk) unless block
 
       Sync do
-        barrier = Async::Barrier.new
-
         send_bundle = false
         error_body = +""
+        barrier = nil
+
         loop do
+          # Create a new barrier for each attempt.
+          # This is critical for bidirectional streaming (incremental rendering) where:
+          # 1. The barrier has async fibers writing to the request body
+          # 2. On 410 (bundle not found), we need to stop those fibers
+          # 3. The retry needs fresh resources (new barrier, new request body, new fibers)
+          barrier = Async::Barrier.new
+
           stream_response = @request_executor.call(send_bundle, barrier)
 
           # Chunks can be merged during streaming, so we separate them by newlines
@@ -110,13 +117,17 @@ module ReactOnRailsPro
           process_response_chunks(stream_response, error_body, &block)
           break
         rescue ReactOnRailsPro::Request::HTTPError => e
+          # Stop any running fibers from the failed request before retrying.
+          # This prevents fibers from trying to write to closed bodies on 410 retry.
+          barrier&.stop
           send_bundle = handle_http_error(e, error_body, send_bundle)
         rescue Async::TimeoutError => e
+          barrier&.stop
           raise ReactOnRailsPro::Error, "Time out error while server side render streaming a component.\n" \
                                         "Original error:\n#{e}\n#{e.backtrace}"
         end
 
-        barrier.wait
+        barrier&.wait
       end
     end
 
@@ -131,6 +142,16 @@ module ReactOnRailsPro
         processed_chunk = chunk.strip
         yield processed_chunk unless processed_chunk.empty?
       end
+
+      # After processing all chunks, raise HTTPError if the response was an error.
+      # This triggers the retry logic in each_chunk for 410 (STATUS_SEND_BUNDLE).
+      return unless stream_response.status >= 400
+
+      raise ReactOnRailsPro::Request::HTTPError.new(
+        "HTTP error from renderer",
+        status: stream_response.status,
+        body: error_body
+      )
     end
 
     def handle_http_error(error, error_body, send_bundle)
@@ -185,9 +206,9 @@ module ReactOnRailsPro
         line << chunk_str
 
         while (idx = line.index("\n"))
-          yield line.byteslice(0..idx - 1)
+          yield line.byteslice(0..(idx - 1))
 
-          line = line.byteslice(idx + 1..-1)
+          line = line.byteslice((idx + 1)..-1)
         end
       end
     ensure

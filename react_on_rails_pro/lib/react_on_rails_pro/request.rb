@@ -131,7 +131,7 @@ module ReactOnRailsPro
         # Determine bundle timestamp based on RSC support
         pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
 
-        ReactOnRailsPro::StreamRequest.create do |send_bundle, barrier|
+        ReactOnRailsPro::StreamRequest.create do |send_bundle, barrier| # rubocop:disable Metrics/BlockLength
           if send_bundle
             Rails.logger.info { "[ReactOnRailsPro] Sending bundle to the node renderer" }
             upload_assets
@@ -162,31 +162,29 @@ module ReactOnRailsPro
 
             # Execute async props block to send additional props
             async_props_block.call(emitter)
+          rescue Protocol::HTTP::Body::Writable::Closed
+            # Body was closed (likely due to error response like 410).
+            # This is expected when the server rejects the request before we finish writing.
+            Rails.logger.debug { "[ReactOnRailsPro] Request body closed during async props emission" }
           ensure
             # Signal that no more data will be written.
-            # CRITICAL: Use close_write() NOT close()!
-            #   - close() calls @queue.clear which DISCARDS pending data
-            #   - close_write() just closes the queue, preserving data for the reader
-            # See: https://github.com/socketry/protocol-http/blob/main/lib/protocol/http/body/writable.rb
-            request_body.close_write
+            # Use close_write() to preserve any pending data for transmission.
+            # If the body is already closed (error case), this is a no-op.
+            request_body.close_write rescue nil # rubocop:disable Style/RescueModifier
 
-            # CRITICAL: Wait for all data to be transmitted before this fiber completes.
+            # Wait for all data to be transmitted, but with a safety check.
+            # If the HTTP/2 stream was closed due to an error (e.g., 410), the queue
+            # might never drain because the data can't be transmitted. In that case,
+            # we break out after a reasonable number of yields to avoid hanging.
             #
-            # The async-http client spawns a separate Output task that reads from
-            # request_body and transmits over HTTP/2. When we call close_write(),
-            # we've signaled no more writes, but data may still be in the queue
-            # waiting to be read and transmitted.
-            #
-            # If this fiber completes (and barrier.wait returns) before the Output
-            # task finishes transmitting, the Sync block can exit and tear down
-            # the async context, causing the last chunks to be lost.
-            #
-            # By waiting until request_body.empty? is true, we ensure:
-            # 1. All data has been read from the queue by the Output task
-            # 2. The HTTP/2 frames are being/have been transmitted
-            #
-            # Note: empty? returns true only when the queue is BOTH closed AND empty.
-            Async::Task.current.yield until request_body.empty?
+            # Normal case: empty? returns true quickly after data is transmitted.
+            # Error case: We yield a few times to give a chance for cleanup, then exit.
+            max_yields = 100
+            yield_count = 0
+            until request_body.empty? || yield_count >= max_yields
+              Async::Task.current.yield
+              yield_count += 1
+            end
           end
 
           # Start the request - the write fiber above runs concurrently.
@@ -425,27 +423,47 @@ module ReactOnRailsPro
 
         form.each do |key, value|
           if value.is_a?(Hash) && value[:body]
-            # File upload
-            body_content = value[:body]
-            body_content = body_content.read if body_content.respond_to?(:read)
-            filename = value[:filename] || "file"
-            content_type = value[:content_type] || "application/octet-stream"
-
-            parts << "--#{boundary}\r\n"
-            parts << "Content-Disposition: form-data; name=\"#{key}\"; filename=\"#{filename}\"\r\n"
-            parts << "Content-Type: #{content_type}\r\n\r\n"
-            parts << body_content.to_s
+            encode_multipart_file(parts, boundary, key, value)
+          elsif value.is_a?(Array)
+            encode_multipart_array(parts, boundary, key, value)
           else
-            # Regular field
-            parts << "--#{boundary}\r\n"
-            parts << "Content-Disposition: form-data; name=\"#{key}\"\r\n\r\n"
-            parts << value.to_s
+            encode_multipart_field(parts, boundary, key, value)
           end
-          parts << "\r\n"
         end
 
         parts << "--#{boundary}--\r\n"
         [parts.join, "multipart/form-data; boundary=#{boundary}"]
+      end
+
+      def encode_multipart_file(parts, boundary, key, value)
+        body_content = value[:body]
+        body_content = body_content.read if body_content.respond_to?(:read)
+        filename = value[:filename] || "file"
+        content_type = value[:content_type] || "application/octet-stream"
+
+        parts << "--#{boundary}\r\n"
+        parts << "Content-Disposition: form-data; name=\"#{key}\"; filename=\"#{filename}\"\r\n"
+        parts << "Content-Type: #{content_type}\r\n\r\n"
+        parts << body_content.to_s
+        parts << "\r\n"
+      end
+
+      # Encode array field as multiple fields with [] suffix.
+      # This is how multipart parsers expect arrays (e.g., fastify's @fastify/multipart)
+      def encode_multipart_array(parts, boundary, key, value)
+        value.each do |item|
+          parts << "--#{boundary}\r\n"
+          parts << "Content-Disposition: form-data; name=\"#{key}[]\"\r\n\r\n"
+          parts << item.to_s
+          parts << "\r\n"
+        end
+      end
+
+      def encode_multipart_field(parts, boundary, key, value)
+        parts << "--#{boundary}\r\n"
+        parts << "Content-Disposition: form-data; name=\"#{key}\"\r\n\r\n"
+        parts << value.to_s
+        parts << "\r\n"
       end
 
       def form_with_code(js_code, send_bundle)
