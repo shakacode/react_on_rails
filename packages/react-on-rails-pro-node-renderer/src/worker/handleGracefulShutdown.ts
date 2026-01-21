@@ -18,10 +18,8 @@ declare module 'fastify' {
 
 const handleGracefulShutdown = (app: FastifyInstance) => {
   const { worker } = cluster;
-  if (!worker) {
-    log.error('handleGracefulShutdown is called on master, expected to call it on worker only');
-    return;
-  }
+  // Support both cluster mode (worker is defined) and single-process mode (worker is undefined)
+  const workerId = worker?.id ?? 'single';
 
   let activeRequestsCount = 0;
   let isShuttingDown = false;
@@ -33,54 +31,76 @@ const handleGracefulShutdown = (app: FastifyInstance) => {
   const decrementRequestCount = (req: { [REQUEST_COUNTED_DOWN]?: boolean }, source: string) => {
     // Prevent double-decrementing if multiple completion mechanisms fire
     if (req[REQUEST_COUNTED_DOWN]) {
-      log.debug('Worker #%d request already counted down (source: %s), skipping', worker.id, source);
+      log.debug('Worker #%s request already counted down (source: %s), skipping', workerId, source);
       return;
     }
     req[REQUEST_COUNTED_DOWN] = true;
 
+    // Safety check: never decrement below 0
+    if (activeRequestsCount <= 0) {
+      log.warn(
+        'Worker #%s attempted to decrement activeRequestsCount below 0 (source: %s), current: %d',
+        workerId,
+        source,
+        activeRequestsCount,
+      );
+      return;
+    }
+
     activeRequestsCount -= 1;
     log.debug(
-      'Worker #%d request completed (source: %s), active requests: %d, isShuttingDown: %s',
-      worker.id,
+      'Worker #%s request completed (source: %s), active requests: %d, isShuttingDown: %s',
+      workerId,
       source,
       activeRequestsCount,
       isShuttingDown,
     );
 
     if (isShuttingDown && activeRequestsCount === 0) {
-      log.debug('Worker #%d all requests completed, killing worker', worker.id);
-      worker.destroy();
+      log.debug('Worker #%s all requests completed, shutting down', workerId);
+      if (worker) {
+        worker.destroy();
+      } else {
+        // Single-process mode: close the app
+        void app.close();
+      }
     }
   };
 
-  process.on('message', (msg) => {
-    if (msg === SHUTDOWN_WORKER_MESSAGE) {
-      log.debug('Worker #%d received graceful shutdown message', worker.id);
-      isShuttingDown = true;
-      if (activeRequestsCount === 0) {
-        log.debug('Worker #%d has no active requests, killing the worker', worker.id);
-        worker.destroy();
-      } else {
-        log.debug(
-          'Worker #%d has "%d" active requests, disconnecting the worker',
-          worker.id,
-          activeRequestsCount,
-        );
-        worker.disconnect();
+  // Only register shutdown message handler in cluster mode
+  if (worker) {
+    process.on('message', (msg) => {
+      if (msg === SHUTDOWN_WORKER_MESSAGE) {
+        log.debug('Worker #%s received graceful shutdown message', workerId);
+        isShuttingDown = true;
+        if (activeRequestsCount === 0) {
+          log.debug('Worker #%s has no active requests, killing the worker', workerId);
+          worker.destroy();
+        } else {
+          log.debug(
+            'Worker #%s has "%d" active requests, closing server and waiting for requests to complete',
+            workerId,
+            activeRequestsCount,
+          );
+          // Close the server to stop accepting new connections, but DON'T disconnect yet.
+          // The worker will be destroyed when all active requests complete (see decrementRequestCount).
+          // Note: app.close() returns a promise, but we don't need to await it here.
+          // The server will stop accepting new connections immediately, and existing connections
+          // will be allowed to complete.
+          void app.close();
+        }
       }
-    }
-  });
-
-  // ============================================================
-  // DEBUG: Log ALL Fastify lifecycle hooks to see what fires
-  // ============================================================
+    });
+  }
 
   // 1. onRequest - fires when request is received (before parsing)
+  // This hook MUST be active to track active requests for graceful shutdown
   app.addHook('onRequest', (req, reply, done) => {
     log.debug('>>> HOOK: onRequest fired for %s %s', req.method, req.url);
     activeRequestsCount += 1;
 
-    // Set up stream event listeners for debugging
+    // Set up stream event listeners for completion tracking
+    // These act as fallbacks in case onResponse doesn't fire (e.g., abrupt disconnections)
     const http2Stream = (req.raw as { stream?: NodeJS.EventEmitter }).stream;
 
     reply.raw.on('close', () => {
@@ -170,14 +190,14 @@ const handleGracefulShutdown = (app: FastifyInstance) => {
   // 8. onError - fires when an error occurs
   app.addHook('onError', (req, _reply, error, done) => {
     log.debug('>>> HOOK: onError fired for %s %s, error: %s', req.method, req.url, error?.message);
-    decrementRequestCount(req, 'onResponse');
+    decrementRequestCount(req, 'onError');
     done();
   });
 
   // 9. onTimeout - fires when a request times out
   app.addHook('onTimeout', (req, _reply, done) => {
     log.debug('>>> HOOK: onTimeout fired for %s %s', req.method, req.url);
-    decrementRequestCount(req, 'onResponse');
+    decrementRequestCount(req, 'onTimeout');
     done();
   });
 

@@ -1,6 +1,6 @@
 # Procfile for development with hot reloading of JavaScript and CSS
 
-# rails: rails s -p 3000
+rails: rails s -p 3000
 
 # Run the hot reload server for client development
 webpack-dev-server: HMR=true bin/shakapacker-dev-server
