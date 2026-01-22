@@ -138,8 +138,17 @@ export const isReadableStream = (stream: unknown): stream is Readable =>
   typeof (stream as Readable).read === 'function';
 
 export const handleStreamError = (stream: Readable, onError: (error: Error) => void) => {
-  stream.on('error', onError);
   const newStreamAfterHandlingError = new PassThrough();
+
+  stream.on('error', (error) => {
+    onError(error);
+    // CRITICAL: When the source stream errors, we must destroy the PassThrough.
+    // Node.js pipe() does NOT automatically close the destination on source error.
+    // Without this, the HTTP response stays open waiting for PassThrough to end,
+    // causing 30+ second delays during graceful shutdown.
+    newStreamAfterHandlingError.destroy(error);
+  });
+
   stream.pipe(newStreamAfterHandlingError);
   return newStreamAfterHandlingError;
 };

@@ -9,7 +9,9 @@ import log from '../shared/log';
  */
 export class StreamChunkTimeoutError extends Error {
   constructor(timeoutMs: number) {
-    super(`Timed out waiting for next chunk after ${timeoutMs}ms. The client may have disconnected or stopped sending data.`);
+    super(
+      `Timed out waiting for next chunk after ${timeoutMs}ms. The client may have disconnected or stopped sending data.`,
+    );
     this.name = 'StreamChunkTimeoutError';
   }
 }
@@ -94,7 +96,10 @@ export async function handleIncrementalRenderStream(
 
   try {
     log.debug('Starting to handle incremental render stream');
-    for await (const chunk of withChunkTimeout(request.raw as AsyncIterable<Buffer>, STREAM_CHUNK_TIMEOUT_MS)) {
+    for await (const chunk of withChunkTimeout(
+      request.raw as AsyncIterable<Buffer>,
+      STREAM_CHUNK_TIMEOUT_MS,
+    )) {
       log.debug(`Received chunk of size ${chunk.length}`);
       const chunkBuffer = chunk instanceof Buffer ? chunk : Buffer.from(chunk);
       totalBytesReceived += chunkBuffer.length;
