@@ -44,7 +44,6 @@ import {
 import * as errorReporter from './shared/errorReporter.js';
 import { lock, unlock } from './shared/locks.js';
 import { startSsrRequestOptions, trace } from './shared/tracing.js';
-import { PassThrough } from 'stream';
 
 // Uncomment the below for testing timeouts:
 // import { delay } from './shared/utils.js';
@@ -87,28 +86,8 @@ const setResponse = async (result: ResponseResult, res: FastifyReply) => {
   setHeaders(headers, res);
   res.status(status);
 
-  const anotherStream = new PassThrough();
-  stream?.pipe(anotherStream);
-  anotherStream.on('error', (err) => {
-    log.error({ msg: 'Error in response stream', err });
-  });
-  anotherStream.on('close', () => {
-    log.debug('Response stream closed');
-  });
-  anotherStream.on('end', () => {
-    log.debug('Response stream ended');
-  });
-  anotherStream.on('data', (chunk) => {
-    log.debug(`Response stream data chunk received: ${chunk.toString()}`);
-  });
   if (stream) {
-    log.debug('Sending streaming response');
-    try {
-      await res.send(stream);
-      log.debug('Finished sending streaming response');
-    } finally {
-      log.debug('Cleaning up after streaming response');
-    }
+    await res.send(stream);
   } else {
     res.send(data);
   }
