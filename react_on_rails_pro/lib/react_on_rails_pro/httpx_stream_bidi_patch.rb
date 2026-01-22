@@ -29,9 +29,7 @@ if defined?(HTTPX::Plugins::StreamBidi)
 
             return super unless @options.stream
 
-            if nextstate == :idle
-              callbacks(:body).clear
-            end
+            callbacks(:body).clear if nextstate == :idle
 
             super
           end
