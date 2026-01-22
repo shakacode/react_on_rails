@@ -27,6 +27,12 @@ if defined?(HTTPX::Plugins::StreamBidi)
           def transition(nextstate)
             @headers_sent = false if nextstate == :idle
 
+            return super unless @options.stream
+
+            if nextstate == :idle
+              callbacks(:body).clear
+            end
+
             super
           end
         end
