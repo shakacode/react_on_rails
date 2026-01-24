@@ -25,7 +25,7 @@ module ReactOnRails
 
       def run_generator
         if prerequisites_met?
-          check_react_version_for_rsc
+          warn_about_react_version_for_rsc(force: true)
           setup_rsc
           add_rsc_npm_dependencies
           print_success_message

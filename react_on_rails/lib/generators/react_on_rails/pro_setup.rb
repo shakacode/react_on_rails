@@ -45,22 +45,14 @@ module ReactOnRails
         puts Rainbow("=" * 80).cyan
       end
 
-      # Check if Pro gem is required but not installed.
-      # Returns true (prerequisite NOT met) if --pro or --rsc flag is used but gem is missing.
-      # Used by install_generator where Pro is optional (controlled by flags).
+      # Check if Pro gem is missing.
       #
-      # @return [Boolean] true if Pro gem is missing but required
-      def missing_pro_gem?
-        return false unless use_pro?
-
-        pro_gem_missing?
-      end
-
-      # Check if Pro gem is installed, without flag guards.
-      # Used by standalone ProGenerator where Pro is always required.
-      #
+      # @param force [Boolean] When true, always performs the check.
+      #   When false (default), only checks if Pro is required (use_pro? returns true).
+      #   Use force: true in standalone generators where Pro is always required.
       # @return [Boolean] true if Pro gem is missing
-      def pro_gem_missing?
+      def missing_pro_gem?(force: false)
+        return false unless force || use_pro?
         return false if pro_gem_installed?
 
         GeneratorMessages.add_error(<<~MSG.strip)
