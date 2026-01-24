@@ -176,7 +176,7 @@ module ReactOnRails
   end
 
   describe "version constants validation" do
-    it "ensures MINIMUM_SHAKAPACKER_VERSION constants are properly defined" do
+    it "ensures autobundling minimum version constant is properly defined" do
       expect(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_BUNDLING).to eq("7.0.0")
     end
 
