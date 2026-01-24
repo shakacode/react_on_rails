@@ -137,9 +137,13 @@ module ReactOnRails
         end
 
         setup_react_dependencies
-        warn_about_react_version_for_rsc
-        setup_pro if use_pro?
-        setup_rsc if use_rsc?
+
+        # Invoke standalone Pro/RSC generators when flags are used
+        # Pass invoked_by_install: true so they skip message printing (we handle it)
+        invoke "react_on_rails:pro", [], { invoked_by_install: true } if use_pro?
+        return unless use_rsc?
+
+        invoke "react_on_rails:rsc", [], { typescript: options.typescript?, invoked_by_install: true }
       end
 
       def setup_react_dependencies
