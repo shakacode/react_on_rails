@@ -23,6 +23,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 Changes since the last non-beta release.
 
+#### Changed
+
+- **Simplified Shakapacker version handling**: Removed obsolete minimum version checks (6.5.1) and example generation pinning (8.2.0). The gemspec dependency `shakapacker >= 6.0` is now the only minimum version requirement, with autobundling requiring >= 7.0.0. [PR 2247](https://github.com/shakacode/react_on_rails/pull/2247) by [justin808](https://github.com/justin808).
+
 ### [16.2.1] - 2026-01-18
 
 #### Fixed
