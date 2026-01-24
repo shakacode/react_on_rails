@@ -47,29 +47,33 @@ module ReactOnRails
 
       # Check if Pro gem is required but not installed.
       # Returns true (prerequisite NOT met) if --pro or --rsc flag is used but gem is missing.
+      # Used by install_generator where Pro is optional (controlled by flags).
       #
       # @return [Boolean] true if Pro gem is missing but required
       def missing_pro_gem?
         return false unless use_pro?
+
+        pro_gem_missing?
+      end
+
+      # Check if Pro gem is installed, without flag guards.
+      # Used by standalone ProGenerator where Pro is always required.
+      #
+      # @return [Boolean] true if Pro gem is missing
+      def pro_gem_missing?
         return false if pro_gem_installed?
 
-        error = <<~MSG.strip
-          🚫 React on Rails Pro gem is required for #{use_rsc? ? '--rsc' : '--pro'} flag.
+        GeneratorMessages.add_error(<<~MSG.strip)
+          🚫 React on Rails Pro gem is not installed.
 
-          The Pro gem must be installed before running this generator.
+          Add to your Gemfile:
+            gem 'react_on_rails_pro', '~> 16.2'
 
-          Installation steps:
-          1. Add to your Gemfile:
-               gem 'react_on_rails_pro', '~> 16.2'
-
-          2. Run: bundle install
-
-          3. Re-run this generator with your original flags.
+          Then run: bundle install
 
           Try Pro free! Email justin@shakacode.com for an evaluation license.
           More info: https://www.shakacode.com/react-on-rails-pro/
         MSG
-        GeneratorMessages.add_error(error)
         true
       end
 
