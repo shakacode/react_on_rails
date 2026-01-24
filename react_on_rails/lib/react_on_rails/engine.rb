@@ -69,8 +69,11 @@ module ReactOnRails
 
     # Check if we're running a Rails generator
     # @return [Boolean] true if running a generator
+    #
+    # Uses the same pattern as detecting Rails::Server or Rails::Console context.
+    # Rails only loads the Generators module when running generator commands.
     def self.running_generator?
-      !ARGV.empty? && ARGV.first&.in?(%w[generate g])
+      defined?(Rails::Generators)
     end
 
     # Check if package.json doesn't exist yet
