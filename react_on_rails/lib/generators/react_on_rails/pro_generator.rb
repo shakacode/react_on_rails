@@ -15,13 +15,20 @@ module ReactOnRails
 
       source_root File.expand_path(__dir__)
 
+      # Hidden option for when invoked from install_generator
+      # Skips message printing (parent handles it)
+      class_option :invoked_by_install,
+                   type: :boolean,
+                   default: false,
+                   hide: true
+
       desc "Add React on Rails Pro to an existing React on Rails application"
 
       def run_generator
         if prerequisites_met?
           setup_pro
           add_pro_npm_dependencies
-          print_success_message
+          print_success_message unless options[:invoked_by_install]
         else
           GeneratorMessages.add_error(<<~MSG.strip)
             🚫 React on Rails Pro generator prerequisites not met!
@@ -30,7 +37,7 @@ module ReactOnRails
           MSG
         end
       ensure
-        print_generator_messages
+        print_generator_messages unless options[:invoked_by_install]
       end
 
       private
@@ -67,8 +74,6 @@ module ReactOnRails
 
       def print_success_message
         GeneratorMessages.add_info(<<~MSG)
-          ✅ React on Rails Pro setup complete!
-
           Next steps:
           1. Set your license: export REACT_ON_RAILS_PRO_LICENSE=your_token
           2. Start the app: bin/dev (or foreman start -f Procfile.dev)

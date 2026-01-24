@@ -21,6 +21,13 @@ module ReactOnRails
                    desc: "Generate TypeScript files",
                    aliases: "-T"
 
+      # Hidden option for when invoked from install_generator
+      # Skips message printing (parent handles it)
+      class_option :invoked_by_install,
+                   type: :boolean,
+                   default: false,
+                   hide: true
+
       desc "Add React Server Components to an existing React on Rails Pro application"
 
       def run_generator
@@ -28,7 +35,7 @@ module ReactOnRails
           warn_about_react_version_for_rsc(force: true)
           setup_rsc
           add_rsc_npm_dependencies
-          print_success_message
+          print_success_message unless options[:invoked_by_install]
         else
           GeneratorMessages.add_error(<<~MSG.strip)
             🚫 React on Rails RSC generator prerequisites not met!
@@ -37,7 +44,7 @@ module ReactOnRails
           MSG
         end
       ensure
-        print_generator_messages
+        print_generator_messages unless options[:invoked_by_install]
       end
 
       private
@@ -77,8 +84,6 @@ module ReactOnRails
 
       def print_success_message
         GeneratorMessages.add_info(<<~MSG)
-          ✅ React Server Components setup complete!
-
           Next steps:
           1. Start the app: bin/dev (or foreman start -f Procfile.dev)
           2. Visit http://localhost:3000/hello_server to see RSC in action
