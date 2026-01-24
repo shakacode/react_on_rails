@@ -85,7 +85,10 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
       sh_in_dir(example_type.dir, "touch .gitignore")
       sh_in_dir(example_type.dir,
                 "echo \"gem 'react_on_rails', path: '#{relative_gem_root}'\" >> #{example_type.gemfile}")
-      # Shakapacker is automatically included as a dependency via react_on_rails.gemspec (>= 6.0)
+      # Pin Shakapacker to 9.4.0 to ensure gem and npm package versions match.
+      # Shakapacker 9.5.0 gem was released but has version detection issues with the npm package.
+      # The gemspec allows >= 6.0, but we pin here for CI stability.
+      sh_in_dir(example_type.dir, "echo \"gem 'shakapacker', '9.4.0'\" >> #{example_type.gemfile}")
       bundle_install_in(example_type.dir)
       sh_in_dir(example_type.dir, "rake shakapacker:install")
       # Skip validation when running generators on example apps during development.
@@ -104,7 +107,7 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
       # Apply specific React version for compatibility testing examples
       if example_type.pinned_react_version?
         apply_react_version(example_type.dir, example_type.react_version_string)
-        # Re-run bundle install since Gemfile was updated with pinned shakapacker version
+        # Re-run bundle install to ensure dependencies are resolved correctly
         bundle_install_in(example_type.dir)
         # Run npm install BEFORE shakapacker:binstubs to ensure the npm shakapacker version
         # matches the gem version. The binstubs task loads the Rails environment which
