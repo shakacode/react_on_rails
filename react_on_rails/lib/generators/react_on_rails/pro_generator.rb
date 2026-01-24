@@ -13,7 +13,7 @@ module ReactOnRails
       include JsDependencyManager
       include ProSetup
 
-      source_root File.expand_path("templates", __dir__)
+      source_root File.expand_path(__dir__)
 
       desc "Add React on Rails Pro to an existing React on Rails application"
 
