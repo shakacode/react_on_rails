@@ -36,7 +36,7 @@ module ReactOnRails
       private
 
       def prerequisites_met?
-        !(missing_base_installation? || pro_gem_missing?)
+        !(missing_base_installation? || missing_pro_gem?(force: true))
       end
 
       def missing_base_installation?

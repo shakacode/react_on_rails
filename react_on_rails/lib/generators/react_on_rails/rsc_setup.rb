@@ -50,18 +50,14 @@ module ReactOnRails
 
       # Warn if React version is not compatible with RSC.
       # RSC requires React 19.0.x specifically (not 19.1.x or later).
-      # Used by install_generator where RSC is optional (controlled by --rsc flag).
       #
+      # @param force [Boolean] When true, always performs the check.
+      #   When false (default), only checks if RSC is enabled (use_rsc? returns true).
+      #   Use force: true in standalone generators where RSC is always the purpose.
       # @note This should be called before setup_rsc to warn users early
-      def warn_about_react_version_for_rsc
-        return unless use_rsc?
+      def warn_about_react_version_for_rsc(force: false)
+        return unless force || use_rsc?
 
-        check_react_version_for_rsc
-      end
-
-      # Check React version compatibility for RSC, without flag guards.
-      # Used by standalone RscGenerator where RSC is always the purpose.
-      def check_react_version_for_rsc
         react_version = detect_react_version
         return if react_version.nil? # React not installed yet, will be installed by generator
 
