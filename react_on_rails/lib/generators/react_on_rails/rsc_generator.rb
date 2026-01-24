@@ -13,7 +13,7 @@ module ReactOnRails
       include JsDependencyManager
       include RscSetup
 
-      source_root File.expand_path("templates", __dir__)
+      source_root File.expand_path(__dir__)
 
       class_option :typescript,
                    type: :boolean,
