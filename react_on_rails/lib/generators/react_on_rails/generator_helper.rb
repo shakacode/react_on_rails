@@ -92,6 +92,13 @@ module GeneratorHelper
     "#{message} \n#{source}"
   end
 
+  def print_generator_messages
+    GeneratorMessages.messages.each do |message|
+      puts message
+      puts "" # Blank line after each message for readability
+    end
+  end
+
   def component_extension(options)
     options.typescript? ? "tsx" : "jsx"
   end
