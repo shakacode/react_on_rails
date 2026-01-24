@@ -6,13 +6,20 @@ require "bundler"
 require_relative "generator_helper"
 require_relative "generator_messages"
 require_relative "js_dependency_manager"
+require_relative "pro_setup"
+require_relative "rsc_setup"
 
 module ReactOnRails
   module Generators
+    # TODO: Extract more modules to reduce class length below 150 lines.
+    #       Candidates: ShakapackerSetup (~100 lines), TypeScriptSetup (~60 lines),
+    #       ValidationHelpers (~80 lines for Node/package manager checks).
     # rubocop:disable Metrics/ClassLength
     class InstallGenerator < Rails::Generators::Base
       include GeneratorHelper
       include JsDependencyManager
+      include ProSetup
+      include RscSetup
 
       # fetch USAGE file for details generator description
       source_root(File.expand_path(__dir__))
@@ -152,70 +159,6 @@ module ReactOnRails
       def installation_prerequisites_met?
         !(missing_node? || missing_package_manager? || missing_pro_gem? ||
           ReactOnRails::GitUtils.uncommitted_changes?(GeneratorMessages))
-      end
-
-      # Check if Pro gem is required but not installed
-      # Returns true (prerequisite NOT met) if --pro or --rsc flag is used but gem is missing
-      def missing_pro_gem?
-        return false unless use_pro?
-        return false if pro_gem_installed?
-
-        error = <<~MSG.strip
-          🚫 React on Rails Pro gem is required for #{use_rsc? ? '--rsc' : '--pro'} flag.
-
-          The Pro gem must be installed before running this generator.
-
-          Installation steps:
-          1. Add to your Gemfile:
-               gem 'react_on_rails_pro', '~> 16.2'
-
-          2. Run: bundle install
-
-          3. Re-run this generator with your original flags.
-
-          Try Pro free! Email justin@shakacode.com for an evaluation license.
-          More info: https://www.shakacode.com/react-on-rails-pro/
-        MSG
-        # TODO: Update URL to licenses.shakacode.com when the self-service licensing app is deployed
-        GeneratorMessages.add_error(error)
-        true
-      end
-
-      # Warn if React version is not compatible with RSC
-      # RSC requires React 19.0.x specifically (not 19.1.x or later)
-      def warn_about_react_version_for_rsc
-        return unless use_rsc?
-
-        react_version = detect_react_version
-        return if react_version.nil? # React not installed yet, will be installed by generator
-
-        # Check if React version is 19.0.x
-        major, minor, patch = react_version.split(".").map(&:to_i)
-
-        if major != 19 || minor != 0
-          GeneratorMessages.add_warning(<<~MSG.strip)
-            ⚠️  RSC requires React 19.0.x (detected: #{react_version})
-
-            React Server Components in React on Rails Pro currently only supports
-            React 19.0.x. React 19.1.x and later are not yet supported.
-
-            To upgrade React:
-              npm install react@19.0.3 react-dom@19.0.3
-
-            Or with your package manager:
-              pnpm add react@19.0.3 react-dom@19.0.3
-              yarn add react@19.0.3 react-dom@19.0.3
-          MSG
-        elsif patch < 3
-          GeneratorMessages.add_warning(<<~MSG.strip)
-            ⚠️  React #{react_version} has known security vulnerabilities.
-
-            Please upgrade to at least React 19.0.3:
-              npm install react@19.0.3 react-dom@19.0.3
-
-            See: CVE-2025-55182, CVE-2025-67779
-          MSG
-        end
       end
 
       def missing_node?
@@ -520,246 +463,7 @@ module ReactOnRails
         File.write("tsconfig.json", JSON.pretty_generate(tsconfig_content))
         puts Rainbow("✅ Created tsconfig.json").green
       end
-
-      # Pro setup methods
-
-      def setup_pro
-        puts Rainbow("\n#{'=' * 80}").cyan
-        puts Rainbow("🚀 REACT ON RAILS PRO SETUP").cyan.bold
-        puts Rainbow("=" * 80).cyan
-
-        create_pro_initializer
-        create_node_renderer
-        add_pro_to_procfile
-        # NOTE: Pro npm dependencies are added in add_js_dependencies (js_dependency_manager.rb)
-        # to ensure single npm install run with all dependencies
-
-        puts Rainbow("=" * 80).cyan
-        puts Rainbow("✅ React on Rails Pro setup complete!").green
-        puts Rainbow("=" * 80).cyan
-      end
-
-      def create_pro_initializer
-        initializer_path = "config/initializers/react_on_rails_pro.rb"
-
-        if File.exist?(File.join(destination_root, initializer_path))
-          puts Rainbow("ℹ️  #{initializer_path} already exists, skipping").yellow
-          return
-        end
-
-        puts Rainbow("📝 Creating React on Rails Pro initializer...").yellow
-
-        pro_template_path = "templates/pro/base/config/initializers/react_on_rails_pro.rb.tt"
-        template(pro_template_path, initializer_path)
-
-        puts Rainbow("✅ Created #{initializer_path}").green
-      end
-
-      def create_node_renderer
-        node_renderer_path = "client/node-renderer.js"
-
-        if File.exist?(File.join(destination_root, node_renderer_path))
-          puts Rainbow("ℹ️  #{node_renderer_path} already exists, skipping").yellow
-          return
-        end
-
-        puts Rainbow("📝 Creating Node Renderer bootstrap...").yellow
-
-        # Ensure client directory exists
-        FileUtils.mkdir_p("client")
-
-        template_path = "templates/pro/base/client/node-renderer.js"
-        copy_file(template_path, node_renderer_path)
-
-        puts Rainbow("✅ Created #{node_renderer_path}").green
-      end
-
-      def add_pro_to_procfile
-        procfile_path = File.join(destination_root, "Procfile.dev")
-
-        # Check if Procfile.dev exists
-        unless File.exist?(procfile_path)
-          GeneratorMessages.add_warning(<<~MSG.strip)
-            ⚠️  Procfile.dev not found. Skipping Node Renderer process addition.
-
-            You'll need to add the Node Renderer to your process manager manually:
-              node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node client/node-renderer.js
-          MSG
-          return
-        end
-
-        # Check if node-renderer is already in Procfile.dev (idempotency)
-        if File.read(procfile_path).include?("node-renderer:")
-          puts Rainbow("ℹ️  Node Renderer already in Procfile.dev, skipping").yellow
-          return
-        end
-
-        puts Rainbow("📝 Adding Node Renderer to Procfile.dev...").yellow
-
-        node_renderer_line = <<~PROCFILE
-
-          # React on Rails Pro - Node Renderer for SSR
-          node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node client/node-renderer.js
-        PROCFILE
-
-        append_to_file("Procfile.dev", node_renderer_line)
-
-        puts Rainbow("✅ Added Node Renderer to Procfile.dev").green
-      end
-
-      # RSC setup methods
-
-      def setup_rsc
-        puts Rainbow("\n#{'=' * 80}").magenta
-        puts Rainbow("🚀 REACT SERVER COMPONENTS SETUP").magenta.bold
-        puts Rainbow("=" * 80).magenta
-
-        create_rsc_webpack_config
-        add_rsc_to_procfile
-        create_hello_server_component
-        create_hello_server_controller
-        create_hello_server_view
-        add_rsc_routes
-        # NOTE: RSC npm dependencies are added in add_js_dependencies (js_dependency_manager.rb)
-        # to ensure single npm install run with all dependencies
-
-        puts Rainbow("=" * 80).magenta
-        puts Rainbow("✅ React Server Components setup complete!").green
-        puts Rainbow("=" * 80).magenta
-      end
-
-      def create_rsc_webpack_config
-        webpack_config_path = "config/webpack/rscWebpackConfig.js"
-
-        if File.exist?(File.join(destination_root, webpack_config_path))
-          puts Rainbow("ℹ️  #{webpack_config_path} already exists, skipping").yellow
-          return
-        end
-
-        puts Rainbow("📝 Creating RSC webpack config...").yellow
-
-        rsc_template_path = "templates/rsc/base/config/webpack/rscWebpackConfig.js.tt"
-        template(rsc_template_path, webpack_config_path)
-
-        puts Rainbow("✅ Created #{webpack_config_path}").green
-      end
-
-      def add_rsc_to_procfile
-        procfile_path = File.join(destination_root, "Procfile.dev")
-
-        # Check if Procfile.dev exists
-        unless File.exist?(procfile_path)
-          GeneratorMessages.add_warning(<<~MSG.strip)
-            ⚠️  Procfile.dev not found. Skipping RSC bundle watcher addition.
-
-            You'll need to add the RSC bundle watcher to your process manager manually:
-              rsc-bundle: RSC_BUNDLE_ONLY=yes bin/shakapacker --watch
-          MSG
-          return
-        end
-
-        # Check if RSC watcher is already in Procfile.dev (idempotency)
-        if File.read(procfile_path).include?("RSC_BUNDLE_ONLY")
-          puts Rainbow("ℹ️  RSC bundle watcher already in Procfile.dev, skipping").yellow
-          return
-        end
-
-        puts Rainbow("📝 Adding RSC bundle watcher to Procfile.dev...").yellow
-
-        rsc_watcher_line = <<~PROCFILE
-
-          # React on Rails Pro - RSC bundle watcher
-          rsc-bundle: RSC_BUNDLE_ONLY=yes bin/shakapacker --watch
-        PROCFILE
-
-        append_to_file("Procfile.dev", rsc_watcher_line)
-
-        puts Rainbow("✅ Added RSC bundle watcher to Procfile.dev").green
-      end
-
-      def create_hello_server_component
-        hello_server_dir = "app/javascript/src/HelloServer"
-        ror_components_dir = "#{hello_server_dir}/ror_components"
-        components_dir = "#{hello_server_dir}/components"
-        ext = component_extension(options)
-
-        # Check if HelloServer already exists (check both jsx and tsx)
-        if File.exist?(File.join(destination_root, "#{ror_components_dir}/HelloServer.jsx")) ||
-           File.exist?(File.join(destination_root, "#{ror_components_dir}/HelloServer.tsx"))
-          puts Rainbow("ℹ️  HelloServer component already exists, skipping").yellow
-          return
-        end
-
-        puts Rainbow("📝 Creating HelloServer component...").yellow
-
-        # Create directories
-        empty_directory(ror_components_dir)
-        empty_directory(components_dir)
-
-        # Copy component files (uses jsx or tsx based on --typescript flag)
-        copy_file("templates/rsc/base/app/javascript/src/HelloServer/ror_components/HelloServer.#{ext}",
-                  "#{ror_components_dir}/HelloServer.#{ext}")
-        copy_file("templates/rsc/base/app/javascript/src/HelloServer/components/HelloServer.#{ext}",
-                  "#{components_dir}/HelloServer.#{ext}")
-
-        puts Rainbow("✅ Created HelloServer component").green
-      end
-
-      def create_hello_server_controller
-        controller_path = "app/controllers/hello_server_controller.rb"
-
-        if File.exist?(File.join(destination_root, controller_path))
-          puts Rainbow("ℹ️  HelloServerController already exists, skipping").yellow
-          return
-        end
-
-        puts Rainbow("📝 Creating HelloServerController...").yellow
-
-        copy_file("templates/rsc/base/app/controllers/hello_server_controller.rb", controller_path)
-
-        puts Rainbow("✅ Created #{controller_path}").green
-      end
-
-      def create_hello_server_view
-        view_path = "app/views/hello_server/index.html.erb"
-
-        if File.exist?(File.join(destination_root, view_path))
-          puts Rainbow("ℹ️  HelloServer view already exists, skipping").yellow
-          return
-        end
-
-        puts Rainbow("📝 Creating HelloServer view...").yellow
-
-        # Create views directory if needed
-        empty_directory("app/views/hello_server")
-
-        copy_file("templates/rsc/base/app/views/hello_server/index.html.erb", view_path)
-
-        puts Rainbow("✅ Created #{view_path}").green
-      end
-
-      def add_rsc_routes
-        routes_file = File.join(destination_root, "config/routes.rb")
-        routes_content = File.read(routes_file)
-
-        # Check if RSC routes already exist
-        if routes_content.include?("rsc_payload_route")
-          puts Rainbow("ℹ️  RSC routes already exist, skipping").yellow
-          return
-        end
-
-        puts Rainbow("📝 Adding RSC routes...").yellow
-
-        # Add rsc_payload_route (required for RSC payload requests)
-        route "rsc_payload_route"
-
-        # Add HelloServer route (RSC counterpart to hello_world)
-        route "get 'hello_server', to: 'hello_server#index'"
-
-        puts Rainbow("✅ Added RSC routes to config/routes.rb").green
-      end
-
-      # rubocop:enable Metrics/ClassLength
     end
+    # rubocop:enable Metrics/ClassLength
   end
 end
