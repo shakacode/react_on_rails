@@ -113,13 +113,6 @@ module ReactOnRails
 
       private
 
-      def print_generator_messages
-        GeneratorMessages.messages.each do |message|
-          puts message
-          puts "" # Blank line after each message for readability
-        end
-      end
-
       def invoke_generators
         ensure_shakapacker_installed
         if options.typescript?
