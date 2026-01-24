@@ -171,7 +171,7 @@ _Requires creating a free account._
 ## Prerequisites
 
 - Ruby on Rails >= 5
-- Shakapacker >= 6.0 (CI tested: 8.2.0 - 9.4.0; autobundling requires >= 7.0)
+- Shakapacker >= 6.0 (CI tested: 8.2.0 - 9.5.0; autobundling requires >= 7.0)
 - Ruby >= 3.2 (CI tested: 3.2 - 3.4)
 - Node.js >= 20 (CI tested: 20 - 22)
 - A JavaScript package manager (npm, yarn, pnpm, or bun)

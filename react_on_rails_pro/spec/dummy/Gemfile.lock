@@ -286,7 +286,7 @@ GEM
     pp (0.6.3)
       prettyprint
     prettyprint (0.2.0)
-    prism (1.6.0)
+    prism (1.8.0)
     prism-rails (1.5.0)
       railties
     protocol (2.0.0)
@@ -356,7 +356,7 @@ GEM
       ffi (~> 1.0)
     rbs (3.9.5)
       logger
-    rdoc (7.0.3)
+    rdoc (7.1.0)
       erb
       psych (>= 4.0.0)
       tsort
@@ -446,7 +446,7 @@ GEM
       websocket (~> 1.0)
     semantic_range (3.1.0)
     sexp_processor (4.17.1)
-    shakapacker (9.4.0)
+    shakapacker (9.5.0)
       activesupport (>= 5.2)
       package_json
       rack-proxy (>= 0.6.1)
@@ -481,7 +481,7 @@ GEM
     term-ansicolor (1.10.2)
       mize
       tins (~> 1.0)
-    thor (1.4.0)
+    thor (1.5.0)
     tilt (2.4.0)
     timeout (0.6.0)
     tins (1.33.0)
@@ -579,7 +579,7 @@ DEPENDENCIES
   sass-rails
   scss_lint
   selenium-webdriver (= 4.9.0)
-  shakapacker (= 9.4.0)
+  shakapacker (= 9.5.0)
   spring
   spring-watcher-listen
   sprockets
@@ -588,9 +588,6 @@ DEPENDENCIES
   web-console
   webdrivers (= 5.3.0)
   webmock
-
-RUBY VERSION
-   ruby 3.3.7p123
 
 BUNDLED WITH
    2.5.4
