@@ -88,9 +88,9 @@ describe('pageLifecycle', () => {
 
     onPageLoaded(callback);
 
-    // Should not call callback immediately since readyState is 'loading'
+    // Should not call callback immediately since readyState is 'interactive' (deferred scripts may not have run)
     expect(callback).not.toHaveBeenCalled();
-    // Verify that a DOMContentLoaded listener was added when readyState is 'loading'
+    // Verify that a DOMContentLoaded listener was added when readyState is 'interactive'
     expect(addEventListenerSpy).toHaveBeenCalledWith('DOMContentLoaded', expect.any(Function));
   });
 
@@ -251,6 +251,123 @@ describe('pageLifecycle', () => {
       // Both callbacks should be called
       expect(callback1).not.toHaveBeenCalled();
       expect(callback2).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('deferred script race condition (PR #2295 regression test)', () => {
+    // This test documents the race condition that occurs when using `readyState !== 'loading'`
+    // instead of `readyState === 'complete'`.
+    //
+    // Timeline of events when a page loads with deferred scripts:
+    // 1. Browser starts parsing HTML
+    // 2. Browser encounters <script defer src="component-bundle.js">
+    // 3. Browser continues parsing HTML (defer scripts download in parallel)
+    // 4. Browser finishes parsing HTML → readyState becomes 'interactive'
+    // 5. Browser executes deferred scripts in order (component-bundle.js runs ReactOnRails.register())
+    // 6. Browser fires 'DOMContentLoaded' event
+    // 7. Browser loads remaining resources (images, etc.) → readyState becomes 'complete'
+    //
+    // The problem with `readyState !== 'loading'`:
+    // - If React on Rails initializes at step 4 (readyState = 'interactive')
+    // - It tries to hydrate components BEFORE step 5 completes
+    // - ComponentRegistry.get() throws "Could not find component registered with name"
+    //
+    // The fix: Use `readyState === 'complete'` to ensure we wait for DOMContentLoaded
+    // (which fires AFTER deferred scripts execute)
+
+    it('should NOT call callbacks immediately when readyState is "interactive" because deferred scripts may not have executed', () => {
+      // Simulate the state right after HTML parsing completes but before deferred scripts run
+      setReadyState('interactive');
+
+      const { onPageLoaded } = importPageLifecycle();
+
+      // This callback represents the hydration logic that needs registered components
+      const hydrateComponentCallback = jest.fn();
+      onPageLoaded(hydrateComponentCallback);
+
+      // CRITICAL: With the correct implementation (readyState === 'complete'),
+      // the callback should NOT be called immediately when readyState is 'interactive'.
+      // This gives deferred scripts time to execute and register components.
+      expect(hydrateComponentCallback).not.toHaveBeenCalled();
+
+      // Instead, a DOMContentLoaded listener should be added
+      // DOMContentLoaded fires AFTER deferred scripts execute (between steps 5 and 6)
+      expect(addEventListenerSpy).toHaveBeenCalledWith('DOMContentLoaded', expect.any(Function));
+    });
+
+    it('should demonstrate the component registration timing issue with deferred scripts', () => {
+      // This test simulates the exact scenario that causes "Could not find component" errors
+      setReadyState('interactive');
+
+      // Simulate a component that would be registered by a deferred script
+      // At readyState='interactive', the deferred script hasn't run yet
+      let componentRegistered = false;
+      const simulatedComponentRegistry = {
+        get: (name) => {
+          if (!componentRegistered) {
+            throw new Error(
+              `Could not find component registered with name ${name}. ` +
+                'Registered component names include [  ]. Maybe you forgot to register the component?',
+            );
+          }
+          return { name, component: () => null };
+        },
+      };
+
+      const { onPageLoaded } = importPageLifecycle();
+
+      // This callback simulates what happens during hydration
+      const attemptHydration = jest.fn(() => {
+        // Try to get the component - this would fail if called before deferred scripts run
+        return simulatedComponentRegistry.get('MyDeferredComponent');
+      });
+
+      onPageLoaded(attemptHydration);
+
+      // With correct implementation: callback not called yet, so no error
+      expect(attemptHydration).not.toHaveBeenCalled();
+
+      // Simulate deferred script executing (this happens before DOMContentLoaded)
+      componentRegistered = true;
+
+      // Simulate DOMContentLoaded firing (triggers the stored callback)
+      const domContentLoadedHandler = addEventListenerSpy.mock.calls.find(
+        (call) => call[0] === 'DOMContentLoaded',
+      )?.[1];
+
+      expect(domContentLoadedHandler).toBeDefined();
+
+      // Now when DOMContentLoaded fires, the component is registered
+      // and hydration succeeds
+      domContentLoadedHandler();
+      expect(attemptHydration).toHaveBeenCalled();
+      // No error thrown because componentRegistered is now true
+    });
+
+    it('should handle the case where readyState transitions from interactive to complete', () => {
+      // Start in 'interactive' state (HTML parsed, deferred scripts may be running)
+      setReadyState('interactive');
+
+      const { onPageLoaded } = importPageLifecycle();
+      const callback = jest.fn();
+
+      onPageLoaded(callback);
+
+      // Callback should not be called immediately at 'interactive'
+      expect(callback).not.toHaveBeenCalled();
+      expect(addEventListenerSpy).toHaveBeenCalledWith('DOMContentLoaded', expect.any(Function));
+
+      // Get the DOMContentLoaded handler
+      const domContentLoadedHandler = addEventListenerSpy.mock.calls.find(
+        (call) => call[0] === 'DOMContentLoaded',
+      )?.[1];
+
+      // Simulate state transition: deferred scripts complete, then DOMContentLoaded fires
+      setReadyState('complete');
+      domContentLoadedHandler();
+
+      // Now callback should have been called
+      expect(callback).toHaveBeenCalledTimes(1);
     });
   });
 });

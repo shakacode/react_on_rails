@@ -76,6 +76,7 @@ function initializePageEventListeners(): void {
   // ReactOnRails.register({ Component });
   // ReactOnRailsPro is resellient against that type of race conditions, but it won't wait for that state anyway
   // As it immediately hydrates the components at the page as soon as its html and bundle is loaded on the browser
+  // See pageLifecycle.test.js for unit tests validating this logic
   if (document.readyState === 'complete') {
     setupPageNavigationListeners();
   } else {
