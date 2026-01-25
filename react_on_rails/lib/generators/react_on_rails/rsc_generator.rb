@@ -22,7 +22,7 @@ module ReactOnRails
                    aliases: "-T"
 
       # Hidden option for when invoked from install_generator
-      # Skips message printing (parent handles it)
+      # Skips prerequisite checks and message printing (parent handles both)
       class_option :invoked_by_install,
                    type: :boolean,
                    default: false,
@@ -31,7 +31,8 @@ module ReactOnRails
       desc "Add React Server Components to an existing React on Rails Pro application"
 
       def run_generator
-        if prerequisites_met?
+        # When invoked by install_generator, skip prerequisites (parent already validated)
+        if options[:invoked_by_install] || prerequisites_met?
           warn_about_react_version_for_rsc(force: true)
           setup_rsc
           add_rsc_npm_dependencies
