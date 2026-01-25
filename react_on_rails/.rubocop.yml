@@ -59,6 +59,8 @@ RSpec/BeforeAfterAll:
   Exclude:
     - 'spec/react_on_rails/generators/dev_tests_generator_spec.rb'
     - 'spec/react_on_rails/generators/install_generator_spec.rb'
+    - 'spec/react_on_rails/generators/pro_generator_spec.rb'
+    - 'spec/react_on_rails/generators/rsc_generator_spec.rb'
     - 'spec/react_on_rails/binstubs/dev_spec.rb'
     - 'spec/react_on_rails/binstubs/dev_static_spec.rb'
     - 'spec/react_on_rails/dev/**/*_spec.rb'  # Dev module tests require global setup
