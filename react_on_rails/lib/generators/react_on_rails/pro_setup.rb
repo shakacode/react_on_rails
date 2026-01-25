@@ -55,8 +55,18 @@ module ReactOnRails
         return false unless force || use_pro?
         return false if pro_gem_installed?
 
+        # Detect context: install_generator defines :pro/:rsc options, standalone generators don't
+        context_line = if options.key?(:pro) || options.key?(:rsc)
+                         flag = options[:rsc] ? "--rsc" : "--pro"
+                         "You specified #{flag}, which requires the react_on_rails_pro gem."
+                       else
+                         "This generator requires the react_on_rails_pro gem."
+                       end
+
         GeneratorMessages.add_error(<<~MSG.strip)
           🚫 React on Rails Pro gem is not installed.
+
+          #{context_line}
 
           Add to your Gemfile:
             gem 'react_on_rails_pro', '~> 16.2'
