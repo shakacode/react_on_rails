@@ -36,10 +36,6 @@ module ReactOnRails
       shakapacker_version_requirement_met?("8.2.0")
     end
 
-    def self.supports_basic_pack_generation?
-      shakapacker_version_requirement_met?(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION)
-    end
-
     def self.supports_autobundling?
       min_version = ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_BUNDLING
       ::Shakapacker.config.respond_to?(:nested_entries?) && shakapacker_version_requirement_met?(min_version)
@@ -149,19 +145,10 @@ module ReactOnRails
 
     def self.raise_shakapacker_version_incompatible_for_autobundling
       msg = <<~MSG
-        **ERROR** ReactOnRails: Please upgrade ::Shakapacker to version #{ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_BUNDLING} or \
-        above to use the automated bundle generation feature (which requires nested_entries support). \
-        The currently installed version is #{ReactOnRails::PackerUtils.shakapacker_version}. \
-        Basic pack generation requires ::Shakapacker #{ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION} or above.
-      MSG
+        **ERROR** ReactOnRails: Automated bundle generation requires Shakapacker >= #{ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_BUNDLING} (for nested_entries support).
+        Installed version: #{ReactOnRails::PackerUtils.shakapacker_version}
 
-      raise ReactOnRails::Error, msg
-    end
-
-    def self.raise_shakapacker_version_incompatible_for_basic_pack_generation
-      msg = <<~MSG
-        **ERROR** ReactOnRails: Please upgrade ::Shakapacker to version #{ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION} or \
-        above to use basic pack generation features. The currently installed version is #{ReactOnRails::PackerUtils.shakapacker_version}.
+        To fix: Upgrade Shakapacker, or set `auto_load_bundle: false` in your ReactOnRails configuration.
       MSG
 
       raise ReactOnRails::Error, msg

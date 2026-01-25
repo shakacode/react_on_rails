@@ -194,7 +194,7 @@ Pre-commit hooks automatically run:
 #### Switch Between CI Configurations
 
 The project tests against two configurations:
-- **Latest**: Ruby 3.4, Node 22, Shakapacker 9.3.0, React 19 (runs on all PRs)
+- **Latest**: Ruby 3.4, Node 22, Shakapacker 9.5.0, React 19 (runs on all PRs)
 - **Minimum**: Ruby 3.2, Node 20, Shakapacker 8.2.0, React 18 (runs only on master)
 
 ```bash

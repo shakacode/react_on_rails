@@ -24,15 +24,6 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
     deps["react-dom"] = react_version
   end
 
-  # Updates Shakapacker to minimum supported version in either dependencies or devDependencies
-  def update_shakapacker_dependency(deps, dev_deps)
-    if dev_deps&.key?("shakapacker")
-      dev_deps["shakapacker"] = ExampleType::MINIMUM_SHAKAPACKER_VERSION
-    elsif deps&.key?("shakapacker")
-      deps["shakapacker"] = ExampleType::MINIMUM_SHAKAPACKER_VERSION
-    end
-  end
-
   # Updates dependencies in package.json to use specific React version
   def update_package_json_for_react_version(package_json_path, react_version)
     return unless File.exist?(package_json_path)
@@ -57,7 +48,6 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
     # @babel/plugin-transform-runtime is required by the default babel config but not
     # automatically included as a dependency in older Shakapacker versions
     dev_deps["@babel/plugin-transform-runtime"] = "^7.24.0" if dev_deps
-    update_shakapacker_dependency(deps, dev_deps)
 
     # Add npm overrides to force specific React version, preventing yalc-linked
     # react-on-rails from pulling in React 19 as a transitive dependency
@@ -69,32 +59,12 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
     File.write(package_json_path, "#{JSON.pretty_generate(package_json)}\n")
   end
 
-  # Updates Gemfile to pin shakapacker to minimum version
-  # (must match the npm package version exactly)
-  def update_gemfile_versions(gemfile_path)
-    return unless File.exist?(gemfile_path)
-
-    gemfile_content = File.read(gemfile_path)
-    # Replace any shakapacker gem line with exact version pin
-    # Handle both single-line: gem 'shakapacker', '>= 8.2.0'
-    # And multi-line declarations:
-    #   gem 'shakapacker',
-    #       '>= 8.2.0'
-    gemfile_content = gemfile_content.gsub(
-      /gem ['"]shakapacker['"][^\n]*(?:\n\s+[^g\n][^\n]*)*$/m,
-      "gem 'shakapacker', '#{ExampleType::MINIMUM_SHAKAPACKER_VERSION}'"
-    )
-    File.write(gemfile_path, gemfile_content)
-  end
-
   # Updates package.json and Gemfile to use specific React version for compatibility testing
   def apply_react_version(dir, react_version)
     update_package_json_for_react_version(File.join(dir, "package.json"), react_version)
-    update_gemfile_versions(File.join(dir, "Gemfile"))
 
     puts "  Updated package.json for compatibility testing:"
     puts "    React: #{react_version}"
-    puts "    Shakapacker: #{ExampleType::MINIMUM_SHAKAPACKER_VERSION}"
   end
 
   # Define tasks for each example type
@@ -115,9 +85,7 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
       sh_in_dir(example_type.dir, "touch .gitignore")
       sh_in_dir(example_type.dir,
                 "echo \"gem 'react_on_rails', path: '#{relative_gem_root}'\" >> #{example_type.gemfile}")
-      # Pin to 9.4.0 to ensure gem and npm package versions match
-      # (shakapacker 9.5.0 gem was released but npm package version detection has issues)
-      sh_in_dir(example_type.dir, "echo \"gem 'shakapacker', '9.4.0'\" >> #{example_type.gemfile}")
+      # Shakapacker is automatically included as a dependency via react_on_rails.gemspec (>= 6.0)
       bundle_install_in(example_type.dir)
       sh_in_dir(example_type.dir, "rake shakapacker:install")
       # Skip validation when running generators on example apps during development.
@@ -136,7 +104,7 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
       # Apply specific React version for compatibility testing examples
       if example_type.pinned_react_version?
         apply_react_version(example_type.dir, example_type.react_version_string)
-        # Re-run bundle install since Gemfile was updated with pinned shakapacker version
+        # Re-run bundle install to ensure dependencies are resolved correctly
         bundle_install_in(example_type.dir)
         # Run npm install BEFORE shakapacker:binstubs to ensure the npm shakapacker version
         # matches the gem version. The binstubs task loads the Rails environment which

@@ -62,7 +62,7 @@
     "sass": "^1.43.4",
     "sass-loader": "^12.3.0",
     "sass-resources-loader": "^2.0.0",
-    "shakapacker": "9.4.0",
+    "shakapacker": "9.5.0",
     "style-loader": "^3.3.1",
     "tailwindcss": "^3.2.7",
     "terser-webpack-plugin": "5",

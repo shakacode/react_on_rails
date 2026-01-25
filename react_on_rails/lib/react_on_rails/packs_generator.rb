@@ -8,8 +8,8 @@ module ReactOnRails
   class PacksGenerator
     CONTAINS_CLIENT_OR_SERVER_REGEX = /\.(server|client)($|\.)/
     COMPONENT_EXTENSIONS = /\.(jsx?|tsx?)$/
-    MINIMUM_SHAKAPACKER_VERSION = "6.5.1"
     # Auto-registration requires nested_entries support which was added in 7.0.0
+    # Note: The gemspec requires Shakapacker >= 6.0 for basic functionality
     MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_BUNDLING = "7.0.0"
 
     def self.instance

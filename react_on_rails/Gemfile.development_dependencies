@@ -2,7 +2,7 @@
 
 eval_gemfile File.expand_path("../Gemfile.shared_dev_dependencies", __dir__)
 
-gem "shakapacker", "9.4.0"
+gem "shakapacker", "9.5.0"
 gem "bootsnap", require: false
 gem "rails", "~> 7.1.0"
 

@@ -53,7 +53,7 @@ export default function HelloWorld({ name }) {
 - **React Server Components**: Improved rendering flow and new `RSCRoute` component for seamless SSR
 - **Performance improvements**: New async loading strategies and optimized bundle generation
 - **Webpacker removal**: Streamlined for Shakapacker-only support (>= 6.0)
-- [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/) supports the latest features of React 18, including [React Server Components](https://react.dev/reference/rsc/server-components) and [streaming](https://react.dev/reference/react-dom/server/renderToPipeableStream). Contact [Justin Gordon](mailto:justin@shakacode.com) for more information.
+- [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/) supports the latest features of React 19, including [React Server Components](https://react.dev/reference/rsc/server-components) and [streaming](https://react.dev/reference/react-dom/server/renderToPipeableStream). Contact [Justin Gordon](mailto:justin@shakacode.com) for more information.
 - ShakaCode now maintains the official successor to `rails/webpacker`, [`shakapacker`](https://github.com/shakacode/shakapacker).
 
 ---
@@ -171,7 +171,7 @@ _Requires creating a free account._
 ## Prerequisites
 
 - Ruby on Rails >= 5
-- Shakapacker >= 6.0 (Webpacker is no longer supported as of v16)
+- Shakapacker >= 6.0 (CI tested: 8.2.0 - 9.5.0; autobundling requires >= 7.0)
 - Ruby >= 3.2 (CI tested: 3.2 - 3.4)
 - Node.js >= 20 (CI tested: 20 - 22)
 - A JavaScript package manager (npm, yarn, pnpm, or bun)

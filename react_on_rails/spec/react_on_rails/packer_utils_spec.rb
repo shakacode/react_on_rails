@@ -91,22 +91,6 @@ module ReactOnRails
       end
     end
 
-    describe ".supports_basic_pack_generation?" do
-      it "returns true when ::Shakapacker >= 6.5.1" do
-        allow(described_class).to receive(:shakapacker_version_requirement_met?)
-          .with(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION).and_return(true)
-
-        expect(described_class.supports_basic_pack_generation?).to be(true)
-      end
-
-      it "returns false when ::Shakapacker < 6.5.1" do
-        allow(described_class).to receive(:shakapacker_version_requirement_met?)
-          .with(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION).and_return(false)
-
-        expect(described_class.supports_basic_pack_generation?).to be(false)
-      end
-    end
-
     describe ".supports_autobundling?" do
       let(:mock_config) { instance_double("::Shakapacker::Config") } # rubocop:disable RSpec/VerifiedDoubleReference
       let(:mock_packer) { instance_double("::Shakapacker", config: mock_config) } # rubocop:disable RSpec/VerifiedDoubleReference
@@ -192,19 +176,8 @@ module ReactOnRails
   end
 
   describe "version constants validation" do
-    it "ensures MINIMUM_SHAKAPACKER_VERSION constants are properly defined" do
-      expect(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION).to eq("6.5.1")
+    it "ensures autobundling minimum version constant is properly defined" do
       expect(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_BUNDLING).to eq("7.0.0")
-    end
-
-    it "ensures version requirements are logically consistent" do
-      basic_version = Gem::Version.new(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION)
-      auto_reg_version = Gem::Version.new(
-        ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_BUNDLING
-      )
-
-      expect(auto_reg_version).to be >= basic_version,
-                                  "Auto-registration version should be >= basic pack generation version"
     end
 
     it "validates version checks are cached properly" do
