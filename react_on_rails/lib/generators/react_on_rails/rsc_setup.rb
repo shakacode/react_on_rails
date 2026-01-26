@@ -38,6 +38,7 @@ module ReactOnRails
       def setup_rsc
         print_rsc_setup_banner
 
+        add_rsc_config_to_pro_initializer
         create_rsc_webpack_config
         add_rsc_to_procfile
         create_hello_server_component
@@ -90,6 +91,43 @@ module ReactOnRails
       end
 
       private
+
+      def add_rsc_config_to_pro_initializer
+        initializer_path = "config/initializers/react_on_rails_pro.rb"
+        full_path = File.join(destination_root, initializer_path)
+
+        unless File.exist?(full_path)
+          GeneratorMessages.add_warning(<<~MSG.strip)
+            ⚠️  Pro initializer not found at #{initializer_path}. Skipping RSC config.
+
+            RSC requires React on Rails Pro. Run the Pro generator first:
+              rails g react_on_rails:pro
+          MSG
+          return
+        end
+
+        content = File.read(full_path)
+
+        if content.include?("enable_rsc_support")
+          puts Rainbow("ℹ️  RSC config already in Pro initializer, skipping").yellow
+          return
+        end
+
+        puts Rainbow("📝 Adding RSC config to Pro initializer...").yellow
+
+        rsc_config = <<-CONFIG
+
+  # React Server Components configuration
+  config.enable_rsc_support = true
+  config.rsc_bundle_js_file = "rsc-bundle.js"
+  config.rsc_payload_generation_url_path = "rsc_payload/"
+        CONFIG
+
+        # Insert before the final 'end'
+        gsub_file(initializer_path, /^end\s*\z/, "#{rsc_config}end")
+
+        puts Rainbow("✅ Added RSC config to #{initializer_path}").green
+      end
 
       def print_rsc_setup_banner
         puts Rainbow("\n#{'=' * 80}").magenta

@@ -72,6 +72,13 @@ describe ProGenerator, type: :generator do
       end
     end
 
+    it "Pro initializer does not include RSC config (RSC generator adds it)" do
+      assert_file "config/initializers/react_on_rails_pro.rb" do |content|
+        expect(content).not_to include("enable_rsc_support")
+        expect(content).not_to include("rsc_bundle_js_file")
+      end
+    end
+
     it "creates node-renderer.js" do
       assert_file "client/node-renderer.js" do |content|
         expect(content).to include("reactOnRailsProNodeRenderer")

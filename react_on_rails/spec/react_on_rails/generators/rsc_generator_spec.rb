@@ -34,13 +34,25 @@ describe RscGenerator, type: :generator do
     before(:all) do
       prepare_destination
       simulate_existing_rails_files(package_json: true)
-      # Simulate Pro installed (creates the initializer file)
-      simulate_existing_file("config/initializers/react_on_rails_pro.rb", "ReactOnRailsPro.configure {}")
+      # Simulate Pro initializer (must have multi-line block for gsub_file to work)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
       # Simulate Procfile.dev exists for appending
       simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
 
       Dir.chdir(destination_root) do
         run_generator(["--force"])
+      end
+    end
+
+    it "adds RSC config to Pro initializer" do
+      assert_file "config/initializers/react_on_rails_pro.rb" do |content|
+        expect(content).to include("enable_rsc_support = true")
+        expect(content).to include('rsc_bundle_js_file = "rsc-bundle.js"')
+        expect(content).to include('rsc_payload_generation_url_path = "rsc_payload/"')
       end
     end
 
@@ -88,7 +100,11 @@ describe RscGenerator, type: :generator do
     before(:all) do
       prepare_destination
       simulate_existing_rails_files(package_json: true)
-      simulate_existing_file("config/initializers/react_on_rails_pro.rb", "ReactOnRailsPro.configure {}")
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
       simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
 
       Dir.chdir(destination_root) do
