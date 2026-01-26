@@ -15,14 +15,16 @@ module ReactOnRails
 
       source_root File.expand_path(__dir__)
 
+      def self.usage_path
+        File.expand_path("pro/USAGE", __dir__)
+      end
+
       # Hidden option for when invoked from install_generator
       # Skips prerequisite checks and message printing (parent handles both)
       class_option :invoked_by_install,
                    type: :boolean,
                    default: false,
                    hide: true
-
-      desc "Add React on Rails Pro to an existing React on Rails application"
 
       def run_generator
         # When invoked by install_generator, skip prerequisites (parent already validated)
