@@ -15,6 +15,10 @@ module ReactOnRails
 
       source_root File.expand_path(__dir__)
 
+      def self.usage_path
+        File.expand_path("rsc/USAGE", __dir__)
+      end
+
       class_option :typescript,
                    type: :boolean,
                    default: false,
@@ -27,8 +31,6 @@ module ReactOnRails
                    type: :boolean,
                    default: false,
                    hide: true
-
-      desc "Add React Server Components to an existing React on Rails Pro application"
 
       def run_generator
         # When invoked by install_generator, skip prerequisites (parent already validated)

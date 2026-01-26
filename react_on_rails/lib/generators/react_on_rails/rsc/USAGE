@@ -1,0 +1,16 @@
+Description:
+    Add React Server Components to an existing React on Rails Pro application.
+
+Example:
+    rails generate react_on_rails:rsc
+    rails generate react_on_rails:rsc --typescript
+
+    This will add:
+    - RSC webpack configuration (config/webpack/rscWebpackConfig.js)
+    - HelloServer example component
+    - HelloServerController and view
+    - RSC routes (rsc_payload_route, hello_server)
+    - RSC bundle watcher to Procfile.dev
+
+Prerequisites:
+    - React on Rails Pro must be installed (rails g react_on_rails:pro)
