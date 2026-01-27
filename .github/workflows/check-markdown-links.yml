@@ -13,8 +13,9 @@ on:
       - '.github/workflows/check-markdown-links.yml'
       - '.lychee.toml'
   schedule:
-    # Run weekly on Monday at 8am UTC
-    - cron: '0 8 * * 1'
+    # Run daily at 3am UTC to catch stale cached links
+    # See: https://lychee.cli.rs/github_action_recipes/caching/
+    - cron: '0 3 * * *'
   workflow_dispatch:
 
 jobs:
