@@ -87,7 +87,8 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
                 "echo \"gem 'react_on_rails', path: '#{relative_gem_root}'\" >> #{example_type.gemfile}")
       # Shakapacker is automatically included as a dependency via react_on_rails.gemspec (>= 6.0)
       bundle_install_in(example_type.dir)
-      sh_in_dir(example_type.dir, "rake shakapacker:install")
+      # REVERT ME: Temporary fix from PR #2288 - use unbundled context to avoid version mismatch
+      unbundled_sh_in_dir(example_type.dir, "bundle exec rake shakapacker:install")
       # Skip validation when running generators on example apps during development.
       # The generator validates that certain config options exist in the initializer,
       # but during example generation, we're often testing against the current gem
@@ -97,7 +98,8 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
       generator_commands = example_type.generator_shell_commands.map do |cmd|
         "REACT_ON_RAILS_SKIP_VALIDATION=true #{cmd}"
       end
-      sh_in_dir(example_type.dir, generator_commands)
+      # REVERT ME: Temporary fix from PR #2288 - use unbundled context to avoid version mismatch
+      unbundled_sh_in_dir(example_type.dir, generator_commands)
       # Re-run bundle install since dev_tests generator adds rspec-rails and coveralls to Gemfile
       bundle_install_in(example_type.dir)
 

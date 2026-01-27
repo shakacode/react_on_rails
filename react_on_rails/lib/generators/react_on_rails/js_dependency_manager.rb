@@ -106,6 +106,19 @@ module ReactOnRails
         swc-loader
       ].freeze
 
+      # React on Rails Pro dependencies (only installed when --pro or --rsc flag is used)
+      # These packages are published publicly on npmjs.org but require a license for production use
+      PRO_DEPENDENCIES = %w[
+        react-on-rails-pro
+        react-on-rails-pro-node-renderer
+      ].freeze
+
+      # React Server Components dependencies (only installed when --rsc flag is used)
+      # Requires React 19.0.x - see https://react.dev/reference/rsc/server-components
+      RSC_DEPENDENCIES = %w[
+        react-on-rails-rsc
+      ].freeze
+
       private
 
       def setup_js_dependencies
@@ -120,15 +133,21 @@ module ReactOnRails
       end
 
       def add_js_dependencies
-        add_react_on_rails_package
+        using_pro = respond_to?(:use_pro?) && use_pro?
+        using_rsc = respond_to?(:use_rsc?) && use_rsc?
+        # Pro package includes react-on-rails, so skip base package when using Pro
+        add_react_on_rails_package unless using_pro
         add_react_dependencies
         add_css_dependencies
-        # Rspack dependencies are only added when --rspack flag is used
-        add_rspack_dependencies if respond_to?(:options) && options&.rspack?
-        # SWC dependencies are only added when SWC is the configured transpiler
+        add_rspack_dependencies if using_rspack?
         add_swc_dependencies if using_swc?
-        # Dev dependencies vary based on bundler choice
+        add_pro_dependencies if using_pro
+        add_rsc_dependencies if using_rsc
         add_dev_dependencies
+      end
+
+      def using_rspack?
+        respond_to?(:options) && options&.rspack?
       end
 
       def add_react_on_rails_package
@@ -277,6 +296,84 @@ module ReactOnRails
 
           You can install them manually by running:
             npm install --save-dev #{TYPESCRIPT_DEPENDENCIES.join(' ')}
+        MSG
+      end
+
+      def add_pro_dependencies
+        puts "Installing React on Rails Pro dependencies..."
+
+        # When upgrading from base React on Rails to Pro, remove the base package first
+        # Pro package includes all base functionality, so having both causes validation errors
+        remove_base_package_if_present
+
+        # Pin to exact version matching the gem (converts Ruby format to npm format)
+        # Falls back to latest if version can't be determined
+        pro_packages = pro_packages_with_version
+        return if pro_packages.all? { |pkg| add_package(pkg) }
+
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Failed to add React on Rails Pro dependencies.
+
+          You can install them manually by running:
+            npm install #{pro_packages.join(' ')}
+        MSG
+      rescue StandardError => e
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Error adding React on Rails Pro dependencies: #{e.message}
+
+          You can install them manually by running:
+            npm install #{pro_packages_with_version.join(' ')}
+        MSG
+      end
+
+      # Returns Pro package names with version suffix matching the gem version.
+      # Uses VersionSyntaxConverter to handle Ruby->npm format conversion.
+      # Falls back to unversioned package names if version can't be determined.
+      def pro_packages_with_version
+        return PRO_DEPENDENCIES unless defined?(ReactOnRailsPro::VERSION)
+
+        npm_version = ReactOnRails::VersionSyntaxConverter.new.rubygem_to_npm(ReactOnRailsPro::VERSION)
+        PRO_DEPENDENCIES.map { |pkg| "#{pkg}@#{npm_version}" }
+      rescue StandardError
+        puts "WARNING: Could not determine Pro package version. Installing latest."
+        PRO_DEPENDENCIES
+      end
+
+      def add_rsc_dependencies
+        puts "Installing React Server Components dependencies..."
+        return if add_packages(RSC_DEPENDENCIES)
+
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Failed to add React Server Components dependencies.
+
+          You can install them manually by running:
+            npm install #{RSC_DEPENDENCIES.join(' ')}
+        MSG
+      rescue StandardError => e
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Error adding React Server Components dependencies: #{e.message}
+
+          You can install them manually by running:
+            npm install #{RSC_DEPENDENCIES.join(' ')}
+        MSG
+      end
+
+      def remove_base_package_if_present
+        pj = package_json
+        return unless pj
+
+        dependencies = pj.fetch("dependencies", {})
+        return unless dependencies.key?("react-on-rails")
+
+        puts "Removing base 'react-on-rails' package (Pro package includes all base functionality)..."
+        pj.manager.remove(["react-on-rails"])
+        puts "✅ Removed 'react-on-rails' package"
+      rescue StandardError => e
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Could not remove base 'react-on-rails' package: #{e.message}
+
+          Please remove it manually:
+            npm uninstall react-on-rails
         MSG
       end
 

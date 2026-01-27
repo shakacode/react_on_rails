@@ -13,6 +13,68 @@ For the below docs, find the desired `<version>` in the CHANGELOG. Note that for
 - Gems use all periods: `16.2.0.beta.1`
 - NPM packages use dashes: `16.2.0-beta.1`
 
+# Generator Installation (Recommended)
+
+The easiest way to set up React on Rails Pro is using the generator. This automates most of the manual steps described below.
+
+## Fresh Installation
+
+For new React on Rails apps, use the `--pro` flag:
+
+```bash
+# Add the Pro gem to your Gemfile first
+bundle add react_on_rails_pro
+
+# Run the generator with --pro
+rails generate react_on_rails:install --pro
+```
+
+This creates the Pro initializer, node-renderer.js, installs npm packages, and adds the Node Renderer to Procfile.dev.
+
+## Upgrading an Existing App
+
+For existing React on Rails apps, use the standalone Pro generator:
+
+```bash
+# Add the Pro gem to your Gemfile
+bundle add react_on_rails_pro
+
+# Run the Pro generator
+rails generate react_on_rails:pro
+```
+
+The standalone generator only adds Pro-specific files without re-processing your existing React on Rails setup.
+
+## After Running the Generator
+
+You still need to configure your license. Set the environment variable:
+
+```bash
+export REACT_ON_RAILS_PRO_LICENSE="your-license-token-here"
+```
+
+See [License Configuration](#license-configuration) below for other options.
+
+## Adding React Server Components
+
+To add RSC support, use `--rsc` (fresh install) or the RSC generator (existing app):
+
+```bash
+# Fresh install with RSC
+rails generate react_on_rails:install --rsc
+
+# Or add RSC to existing Pro app
+rails generate react_on_rails:rsc
+```
+
+See [React Server Components](./react-server-components/tutorial.md) for more information.
+
+---
+
+# Manual Installation
+
+The sections below describe manual installation steps. Use these if you need fine-grained control or want to understand what the generator creates.
+
 # Ruby Gem Installation
 
 ## Prerequisites

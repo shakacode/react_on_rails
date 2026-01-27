@@ -1,6 +1,9 @@
 <%= add_documentation_reference(config[:message], "// https://github.com/shakacode/react_on_rails_demo_ssr_hmr/blob/master/config/webpack/clientWebpackConfig.js") %>
 
 const commonWebpackConfig = require('./commonWebpackConfig');
+<% if use_rsc? -%>
+const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+<% end -%>
 
 const configureClient = () => {
   const clientConfig = commonWebpackConfig();
@@ -11,6 +14,11 @@ const configureClient = () => {
   // client config is going to try to load chunks.
   delete clientConfig.entry['server-bundle'];
 
+<% if use_rsc? -%>
+  // Add React Server Components plugin for client bundle
+  clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+
+<% end -%>
   return clientConfig;
 };
 
