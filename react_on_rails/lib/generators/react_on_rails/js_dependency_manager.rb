@@ -205,20 +205,29 @@ module ReactOnRails
 
       def add_react_dependencies
         puts "Installing React dependencies..."
-        return if add_packages(REACT_DEPENDENCIES)
+
+        # RSC requires React 19.0.x specifically (not 19.1.x or later)
+        # Pin to ~19.0.3 to allow patch updates while staying within 19.0.x
+        react_deps = if respond_to?(:use_rsc?) && use_rsc?
+                       %w[react@~19.0.3 react-dom@~19.0.3 prop-types]
+                     else
+                       REACT_DEPENDENCIES
+                     end
+
+        return if add_packages(react_deps)
 
         GeneratorMessages.add_warning(<<~MSG.strip)
           ⚠️  Failed to add React dependencies.
 
           You can install them manually by running:
-            npm install #{REACT_DEPENDENCIES.join(' ')}
+            npm install #{react_deps.join(' ')}
         MSG
       rescue StandardError => e
         GeneratorMessages.add_warning(<<~MSG.strip)
           ⚠️  Error adding React dependencies: #{e.message}
 
           You can install them manually by running:
-            npm install #{REACT_DEPENDENCIES.join(' ')}
+            npm install #{react_deps.join(' ')}
         MSG
       end
 
