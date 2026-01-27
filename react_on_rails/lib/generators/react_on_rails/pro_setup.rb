@@ -39,6 +39,7 @@ module ReactOnRails
         create_pro_initializer
         create_node_renderer
         add_pro_to_procfile
+        update_webpack_config_for_pro
 
         puts Rainbow("=" * 80).cyan
         puts Rainbow("✅ React on Rails Pro setup complete!").green
@@ -145,6 +146,49 @@ module ReactOnRails
         append_to_file("Procfile.dev", node_renderer_line)
 
         puts Rainbow("✅ Added Node Renderer to Procfile.dev").green
+      end
+
+      # Update serverWebpackConfig.js to enable Pro settings.
+      # This is needed for standalone Pro upgrades where the base install
+      # created webpack configs without Pro settings enabled.
+      #
+      # Uncomments:
+      # - libraryTarget: 'commonjs2' (required for Node Renderer)
+      # - serverWebpackConfig.target = 'node' (required for Node.js modules)
+      def update_webpack_config_for_pro
+        webpack_config_path = File.join(destination_root, "config/webpack/serverWebpackConfig.js")
+
+        unless File.exist?(webpack_config_path)
+          puts Rainbow("ℹ️  serverWebpackConfig.js not found, skipping webpack update").yellow
+          return
+        end
+
+        content = File.read(webpack_config_path)
+
+        # Check if Pro settings are already enabled (not commented)
+        if content.include?("libraryTarget: 'commonjs2',") &&
+           !content.include?("// libraryTarget: 'commonjs2',")
+          puts Rainbow("ℹ️  Webpack config already has Pro settings enabled, skipping").yellow
+          return
+        end
+
+        puts Rainbow("📝 Updating serverWebpackConfig.js for Pro...").yellow
+
+        webpack_config = "config/webpack/serverWebpackConfig.js"
+
+        # Uncomment libraryTarget: 'commonjs2'
+        library_target_pattern = %r{// If using the React on Rails Pro.*\n\s*// libraryTarget: 'commonjs2',}
+        library_target_replacement = "// Required for React on Rails Pro Node Renderer\n    " \
+                                     "libraryTarget: 'commonjs2',"
+        gsub_file(webpack_config, library_target_pattern, library_target_replacement)
+
+        # Uncomment serverWebpackConfig.target = 'node'
+        target_node_pattern = %r{// If using the React on Rails Pro.*\n\s*// serverWebpackConfig\.target = 'node'}
+        target_node_replacement = "// React on Rails Pro uses Node renderer, so target must be 'node'\n  " \
+                                  "serverWebpackConfig.target = 'node'"
+        gsub_file(webpack_config, target_node_pattern, target_node_replacement)
+
+        puts Rainbow("✅ Updated serverWebpackConfig.js for Pro").green
       end
     end
   end
