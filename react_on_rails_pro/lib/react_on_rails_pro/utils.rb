@@ -206,14 +206,15 @@ module ReactOnRailsPro
     def self.pro_attribution_comment
       base = "Powered by React on Rails Pro (c) ShakaCode"
 
-      # Check if in grace period
-      grace_days = ReactOnRailsPro::LicenseValidator.grace_days_remaining
-      comment = if grace_days
-                  "#{base} | Licensed (Expired - Grace Period: #{grace_days} day(s) remaining)"
-                elsif ReactOnRailsPro::LicenseValidator.evaluation?
-                  "#{base} | Evaluation License"
-                else
+      comment = case ReactOnRailsPro::LicenseValidator.license_status
+                when :valid
                   "#{base} | Licensed"
+                when :expired
+                  "#{base} | LICENSE EXPIRED"
+                when :invalid
+                  "#{base} | INVALID LICENSE"
+                when :missing
+                  "#{base} | UNLICENSED"
                 end
 
       "<!-- #{comment} -->"
