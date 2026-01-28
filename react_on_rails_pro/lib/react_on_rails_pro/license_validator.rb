@@ -4,153 +4,74 @@ require "jwt"
 
 module ReactOnRailsPro
   class LicenseValidator
-    # Grace period: 1 month (in seconds)
-    GRACE_PERIOD_SECONDS = 30 * 24 * 60 * 60
+    # License status values
+    # :valid   - License is present and not expired
+    # :expired - License is present but past expiration date
+    # :invalid - License is present but corrupted/invalid signature
+    # :missing - No license found
+    VALID_STATUSES = %i[valid expired invalid missing].freeze
 
     class << self
-      # Validates the license and returns the license data
-      # Caches the result after first validation
-      # @return [Hash] The license data
-      # @raise [ReactOnRailsPro::Error] if license is invalid
-      def validated_license_data!
+      # Returns the current license status (never raises)
+      # @return [Symbol] One of :valid, :expired, :invalid, :missing
+      def license_status
+        return @license_status if defined?(@license_status)
+
+        @license_status = determine_license_status
+      end
+
+      # Returns true if license is valid
+      # @return [Boolean]
+      def licensed?
+        license_status == :valid
+      end
+
+      # Returns license data if available (never raises)
+      # @return [Hash, nil] License data or nil if not available/valid
+      def license_data
         return @license_data if defined?(@license_data)
 
-        begin
-          # Load and decode license (but don't cache yet)
-          license_data = load_and_decode_license
-
-          # Validate the license (raises if invalid, returns grace_days)
-          grace_days = validate_license_data(license_data)
-
-          # Validation passed - now cache both data and grace days
-          @license_data = license_data
-          @grace_days_remaining = grace_days
-
-          @license_data
-        rescue JWT::DecodeError => e
-          error = "Invalid license signature: #{e.message}. " \
-                  "Your license file may be corrupted. " \
-                  "Get a FREE evaluation license at https://shakacode.com/react-on-rails-pro"
-          handle_invalid_license(error)
-        rescue StandardError => e
-          error = "License validation error: #{e.message}. " \
-                  "Get a FREE evaluation license at https://shakacode.com/react-on-rails-pro"
-          handle_invalid_license(error)
-        end
+        # Trigger status determination which also caches license_data
+        license_status
+        @license_data
       end
 
+      # Resets all cached state (primarily for testing)
       def reset!
         remove_instance_variable(:@license_data) if defined?(@license_data)
-        remove_instance_variable(:@grace_days_remaining) if defined?(@grace_days_remaining)
-      end
-
-      # Checks if the current license is an evaluation/free license
-      # @return [Boolean] true if plan is not "paid"
-      def evaluation?
-        data = validated_license_data!
-        plan = data["plan"].to_s
-        plan != "paid" && !plan.start_with?("paid_")
-      end
-
-      # Returns remaining grace period days if license is expired but in grace period
-      # @return [Integer, nil] Number of days remaining, or nil if not in grace period
-      def grace_days_remaining
-        # Ensure license is validated and cached
-        validated_license_data!
-
-        # Return cached grace days (nil if not in grace period)
-        @grace_days_remaining
+        remove_instance_variable(:@license_status) if defined?(@license_status)
       end
 
       private
 
-      # Validates the license data and raises if invalid
-      # Logs info/errors and handles grace period logic
-      # @param license [Hash] The decoded license data
-      # @return [Integer, nil] Grace days remaining if in grace period, nil otherwise
-      # @raise [ReactOnRailsPro::Error] if license is invalid
-      def validate_license_data(license)
-        # Check that exp field exists
-        unless license["exp"]
-          error = "License is missing required expiration field. " \
-                  "Your license may be from an older version. " \
-                  "Get a FREE evaluation license at https://shakacode.com/react-on-rails-pro"
-          handle_invalid_license(error)
-        end
-
-        # Check expiry with grace period for production
-        current_time = Time.now.to_i
-        exp_time = license["exp"]
-        grace_days = nil
-
-        if current_time > exp_time
-          days_expired = ((current_time - exp_time) / (24 * 60 * 60)).to_i
-
-          error = "License has expired #{days_expired} day(s) ago. " \
-                  "Get a FREE evaluation license (3 months) at https://shakacode.com/react-on-rails-pro " \
-                  "or upgrade to a paid license for production use."
-
-          # In production, allow a grace period of 1 month with error logging
-          if production? && within_grace_period?(exp_time)
-            # Calculate grace days once here
-            grace_days = calculate_grace_days_remaining(exp_time)
-            Rails.logger.error(
-              "[React on Rails Pro] WARNING: #{error} " \
-              "Grace period: #{grace_days} day(s) remaining. " \
-              "Application will fail to start after grace period expires."
-            )
-          else
-            handle_invalid_license(error)
-          end
-        end
-
-        # Log license type if present (for analytics)
-        log_license_info(license)
-
-        # Return grace days (nil if not in grace period)
-        grace_days
-      end
-
-      def production?
-        Rails.env.production?
-      end
-
-      def within_grace_period?(exp_time)
-        Time.now.to_i <= exp_time + GRACE_PERIOD_SECONDS
-      end
-
-      # Calculates remaining grace period days
-      # @param exp_time [Integer] Expiration timestamp
-      # @return [Integer] Days remaining (0 or more)
-      def calculate_grace_days_remaining(exp_time)
-        grace_end = exp_time + GRACE_PERIOD_SECONDS
-        seconds_remaining = grace_end - Time.now.to_i
-        return 0 if seconds_remaining <= 0
-
-        (seconds_remaining / (24 * 60 * 60)).to_i
-      end
-
-      def load_and_decode_license
+      # Determines the license status by loading, decoding, and validating
+      # @return [Symbol] The license status
+      def determine_license_status
+        # Step 1: Load license string
         license_string = load_license_string
+        unless license_string
+          log_license_warning("No license found. Running in unlicensed mode.")
+          return :missing
+        end
 
-        JWT.decode(
-          # The JWT token containing the license data
-          license_string,
-          # RSA public key used to verify the JWT signature
-          public_key,
-          # verify_signature: NEVER set to false! When false, signature verification is skipped,
-          # allowing anyone to forge licenses. Must always be true for security.
-          true,
-          # NOTE: Never remove the 'algorithm' parameter from JWT.decode to prevent algorithm bypassing vulnerabilities.
-          # Ensure to hardcode the expected algorithm.
-          # See: https://auth0.com/blog/critical-vulnerabilities-in-json-web-token-libraries/
-          algorithm: "RS256",
-          # Disable automatic expiration verification so we can handle it manually with custom logic
-          verify_expiration: false
-          # JWT.decode returns an array [data, header]; we use `.first` to get the data (payload).
-        ).first
+        # Step 2: Decode and verify JWT
+        decoded_data = decode_license(license_string)
+        return :invalid unless decoded_data
+
+        # Step 3: Check expiration
+        status = check_expiration(decoded_data)
+
+        # Cache the license data if we got this far
+        @license_data = decoded_data
+
+        # Log license info for analytics
+        log_license_info(decoded_data)
+
+        status
       end
 
+      # Loads license string from env var or file
+      # @return [String, nil] License string or nil if not found
       def load_license_string
         # First try environment variable
         license = ENV.fetch("REACT_ON_RAILS_PRO_LICENSE", nil)
@@ -160,20 +81,53 @@ module ReactOnRailsPro
         config_path = Rails.root.join("config", "react_on_rails_pro_license.key")
         return File.read(config_path).strip if config_path.exist?
 
-        error_msg = "No license found. Please set REACT_ON_RAILS_PRO_LICENSE environment variable " \
-                    "or create #{config_path} file. " \
-                    "Get a FREE evaluation license at https://shakacode.com/react-on-rails-pro"
-        handle_invalid_license(error_msg)
+        nil
+      end
+
+      # Decodes and verifies the JWT license
+      # @return [Hash, nil] Decoded license data or nil if invalid
+      def decode_license(license_string)
+        JWT.decode(
+          license_string,
+          public_key,
+          true, # verify signature - NEVER set to false!
+          algorithm: "RS256",
+          verify_expiration: false # we handle expiration manually
+        ).first
+      rescue JWT::DecodeError => e
+        log_license_warning("Invalid license signature: #{e.message}. Running in unlicensed mode.")
+        nil
+      rescue StandardError => e
+        log_license_warning("License validation error: #{e.message}. Running in unlicensed mode.")
+        nil
+      end
+
+      # Checks if the license is expired
+      # @return [Symbol] :valid or :expired
+      def check_expiration(license)
+        unless license["exp"]
+          log_license_warning("License is missing expiration field. Running in unlicensed mode.")
+          return :invalid
+        end
+
+        current_time = Time.now.to_i
+        exp_time = license["exp"]
+
+        if current_time > exp_time
+          days_expired = ((current_time - exp_time) / (24 * 60 * 60)).to_i
+          log_license_warning("License expired #{days_expired} day(s) ago. Running in unlicensed mode.")
+          return :expired
+        end
+
+        :valid
       end
 
       def public_key
         ReactOnRailsPro::LicensePublicKey::KEY
       end
 
-      def handle_invalid_license(message)
-        full_message = "[React on Rails Pro] #{message}"
-        Rails.logger.error(full_message)
-        raise ReactOnRailsPro::Error, full_message
+      def log_license_warning(message)
+        Rails.logger.warn("[React on Rails Pro] #{message}")
       end
 
       def log_license_info(license)
