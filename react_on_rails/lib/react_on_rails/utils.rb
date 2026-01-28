@@ -252,18 +252,14 @@ module ReactOnRails
     end
 
     # Checks if React on Rails Pro is installed and licensed.
-    # This method validates the license and will raise an exception if invalid.
+    # Checks if React on Rails Pro gem is installed
+    # Note: This only checks gem presence, not license validity
     #
-    # @return [Boolean] true if Pro is available with valid license
-    # @raise [ReactOnRailsPro::Error] if license is invalid
+    # @return [Boolean] true if Pro gem is available
     def self.react_on_rails_pro?
       return @react_on_rails_pro if defined?(@react_on_rails_pro)
 
-      @react_on_rails_pro = begin
-        return false unless gem_available?("react_on_rails_pro")
-
-        ReactOnRailsPro::Utils.validated_license_data!.present?
-      end
+      @react_on_rails_pro = gem_available?("react_on_rails_pro")
     end
 
     # Return an empty string if React on Rails Pro is not installed

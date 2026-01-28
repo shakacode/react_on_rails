@@ -51,12 +51,16 @@ module ReactOnRailsPro
       ReactOnRailsPro.configuration.enable_rsc_support
     end
 
-    # Validates the license and raises an exception if invalid.
-    #
-    # @return [Boolean] true if license is valid
-    # @raise [ReactOnRailsPro::Error] if license is invalid
-    def self.validated_license_data!
-      LicenseValidator.validated_license_data!
+    # Returns the current license status
+    # @return [Symbol] One of :valid, :expired, :invalid, :missing
+    def self.license_status
+      LicenseValidator.license_status
+    end
+
+    # Returns true if license is valid
+    # @return [Boolean]
+    def self.licensed?
+      LicenseValidator.licensed?
     end
 
     def self.copy_assets
