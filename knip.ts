@@ -73,6 +73,8 @@ const config: KnipConfig = {
         'src/integrations/*.ts!',
         // Export disableHttp2 for test utilities
         'src/worker.ts!',
+        // License validator exports public API for license checking
+        'src/shared/licenseValidator.ts!',
       ],
       project: ['src/**/*.[jt]s{x,}!', 'tests/**/*.[jt]s{x,}', '!lib/**'],
       ignore: [
