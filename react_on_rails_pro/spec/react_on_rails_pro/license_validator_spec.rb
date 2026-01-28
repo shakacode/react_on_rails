@@ -16,7 +16,8 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
     {
       sub: "test@example.com",
       iat: Time.now.to_i,
-      exp: Time.now.to_i + 3600 # Valid for 1 hour
+      exp: Time.now.to_i + 3600, # Valid for 1 hour
+      plan: "paid"
     }
   end
 
@@ -28,19 +29,14 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
     }
   end
 
-  let(:mock_logger) { instance_double(Logger, error: nil, info: nil) }
+  let(:mock_logger) { instance_double(Logger, warn: nil, info: nil) }
   let(:mock_root) { instance_double(Pathname, join: config_file_path) }
   let(:config_file_path) { instance_double(Pathname, exist?: false) }
 
   before do
     described_class.reset!
-    # Stub the public key constant to use our test key
     stub_const("ReactOnRailsPro::LicensePublicKey::KEY", test_public_key)
-    # Clear ENV variable
     ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
-
-    # Stub Rails.logger to avoid nil errors in unit tests
-    # Stub Rails.root for config file path tests
     allow(Rails).to receive_messages(logger: mock_logger, root: mock_root)
   end
 
@@ -49,23 +45,21 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
     ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
   end
 
-  describe ".validated_license_data!" do
+  describe ".license_status" do
     context "with valid license in ENV" do
       before do
         valid_token = JWT.encode(valid_payload, test_private_key, "RS256")
         ENV["REACT_ON_RAILS_PRO_LICENSE"] = valid_token
       end
 
-      it "returns license data hash" do
-        data = described_class.validated_license_data!
-        expect(data).to be_a(Hash)
-        expect(data["exp"]).to be_a(Integer)
+      it "returns :valid" do
+        expect(described_class.license_status).to eq(:valid)
       end
 
       it "caches the result" do
-        expect(described_class).to receive(:load_and_decode_license).once.and_call_original
-        described_class.validated_license_data!
-        described_class.validated_license_data! # Second call should use cache
+        described_class.license_status
+        expect(described_class).not_to receive(:determine_license_status)
+        described_class.license_status
       end
     end
 
@@ -75,85 +69,13 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
         ENV["REACT_ON_RAILS_PRO_LICENSE"] = expired_token
       end
 
-      context "when in development/test environment" do
-        before do
-          allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new("development"))
-        end
-
-        it "raises error immediately" do
-          expect do
-            described_class.validated_license_data!
-          end.to raise_error(ReactOnRailsPro::Error, /License has expired/)
-        end
-
-        it "includes FREE license information in error message" do
-          expect do
-            described_class.validated_license_data!
-          end.to raise_error(ReactOnRailsPro::Error, /FREE evaluation license/)
-        end
+      it "returns :expired" do
+        expect(described_class.license_status).to eq(:expired)
       end
 
-      context "when in production environment" do
-        before do
-          allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new("production"))
-        end
-
-        context "with grace period (expired < 1 month ago)" do
-          let(:expired_within_grace) do
-            {
-              sub: "test@example.com",
-              iat: Time.now.to_i - (15 * 24 * 60 * 60), # Issued 15 days ago
-              exp: Time.now.to_i - (10 * 24 * 60 * 60)  # Expired 10 days ago (within 1 month grace)
-            }
-          end
-
-          before do
-            token = JWT.encode(expired_within_grace, test_private_key, "RS256")
-            ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
-          end
-
-          it "does not raise error" do
-            expect { described_class.validated_license_data! }.not_to raise_error
-          end
-
-          it "logs warning with grace period remaining" do
-            expect(mock_logger).to receive(:error)
-              .with(/WARNING:.*License has expired.*Grace period:.*day\(s\) remaining/)
-            described_class.validated_license_data!
-          end
-
-          it "returns license data" do
-            data = described_class.validated_license_data!
-            expect(data).to be_a(Hash)
-          end
-        end
-
-        context "when outside grace period (expired > 1 month ago)" do
-          let(:expired_outside_grace) do
-            {
-              sub: "test@example.com",
-              iat: Time.now.to_i - (60 * 24 * 60 * 60), # Issued 60 days ago
-              exp: Time.now.to_i - (35 * 24 * 60 * 60)  # Expired 35 days ago (outside 1 month grace)
-            }
-          end
-
-          before do
-            token = JWT.encode(expired_outside_grace, test_private_key, "RS256")
-            ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
-          end
-
-          it "raises error" do
-            expect do
-              described_class.validated_license_data!
-            end.to raise_error(ReactOnRailsPro::Error, /License has expired/)
-          end
-
-          it "includes FREE license information in error message" do
-            expect do
-              described_class.validated_license_data!
-            end.to raise_error(ReactOnRailsPro::Error, /FREE evaluation license/)
-          end
-        end
+      it "logs a warning" do
+        expect(mock_logger).to receive(:warn).with(/License expired.*day\(s\) ago/)
+        described_class.license_status
       end
     end
 
@@ -162,7 +84,6 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
         {
           sub: "test@example.com",
           iat: Time.now.to_i
-          # exp field is missing
         }
       end
 
@@ -171,15 +92,13 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
         ENV["REACT_ON_RAILS_PRO_LICENSE"] = token_without_exp
       end
 
-      it "raises error" do
-        expect { described_class.validated_license_data! }
-          .to raise_error(ReactOnRailsPro::Error, /License is missing required expiration field/)
+      it "returns :invalid" do
+        expect(described_class.license_status).to eq(:invalid)
       end
 
-      it "includes FREE license information in error message" do
-        expect do
-          described_class.validated_license_data!
-        end.to raise_error(ReactOnRailsPro::Error, /FREE evaluation license/)
+      it "logs a warning about missing expiration" do
+        expect(mock_logger).to receive(:warn).with(/missing expiration field/)
+        described_class.license_status
       end
     end
 
@@ -190,32 +109,28 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
         ENV["REACT_ON_RAILS_PRO_LICENSE"] = invalid_token
       end
 
-      it "raises error" do
-        expect do
-          described_class.validated_license_data!
-        end.to raise_error(ReactOnRailsPro::Error, /Invalid license signature/)
+      it "returns :invalid" do
+        expect(described_class.license_status).to eq(:invalid)
       end
 
-      it "includes FREE license information in error message" do
-        expect do
-          described_class.validated_license_data!
-        end.to raise_error(ReactOnRailsPro::Error, /FREE evaluation license/)
+      it "logs a warning about invalid signature" do
+        expect(mock_logger).to receive(:warn).with(/Invalid license signature/)
+        described_class.license_status
       end
     end
 
     context "with missing license" do
       before do
         ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
-        # config_file_path is already set to exist?: false in the let block
       end
 
-      it "raises error" do
-        expect { described_class.validated_license_data! }.to raise_error(ReactOnRailsPro::Error, /No license found/)
+      it "returns :missing" do
+        expect(described_class.license_status).to eq(:missing)
       end
 
-      it "includes FREE license information in error message" do
-        expect { described_class.validated_license_data! }
-          .to raise_error(ReactOnRailsPro::Error, /FREE evaluation license/)
+      it "logs a warning about missing license" do
+        expect(mock_logger).to receive(:warn).with(/No license found/)
+        described_class.license_status
       end
     end
 
@@ -231,25 +146,92 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
         allow(File).to receive(:read).with(file_config_path).and_return(valid_token)
       end
 
-      it "returns license data" do
-        data = described_class.validated_license_data!
-        expect(data).to be_a(Hash)
+      it "returns :valid" do
+        expect(described_class.license_status).to eq(:valid)
       end
     end
   end
 
-  # Removed .license_data and .validation_error as they're no longer part of the public API
-  # Use validated_license_data! instead
+  describe ".licensed?" do
+    context "with valid license" do
+      before do
+        valid_token = JWT.encode(valid_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = valid_token
+      end
+
+      it "returns true" do
+        expect(described_class.licensed?).to be true
+      end
+    end
+
+    context "with expired license" do
+      before do
+        expired_token = JWT.encode(expired_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = expired_token
+      end
+
+      it "returns false" do
+        expect(described_class.licensed?).to be false
+      end
+    end
+
+    context "with missing license" do
+      it "returns false" do
+        expect(described_class.licensed?).to be false
+      end
+    end
+  end
+
+  describe ".license_data" do
+    context "with valid license" do
+      before do
+        valid_token = JWT.encode(valid_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = valid_token
+      end
+
+      it "returns license data hash" do
+        data = described_class.license_data
+        expect(data).to be_a(Hash)
+        expect(data["exp"]).to be_a(Integer)
+        expect(data["plan"]).to eq("paid")
+      end
+    end
+
+    context "with missing license" do
+      it "returns nil" do
+        expect(described_class.license_data).to be_nil
+      end
+    end
+
+    context "with invalid license" do
+      before do
+        wrong_key = OpenSSL::PKey::RSA.new(2048)
+        invalid_token = JWT.encode(valid_payload, wrong_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = invalid_token
+      end
+
+      it "returns nil" do
+        expect(described_class.license_data).to be_nil
+      end
+    end
+  end
 
   describe ".reset!" do
     before do
       valid_token = JWT.encode(valid_payload, test_private_key, "RS256")
       ENV["REACT_ON_RAILS_PRO_LICENSE"] = valid_token
-      described_class.validated_license_data! # Cache the result
+      described_class.license_status # Cache the result
     end
 
-    it "clears the cached validation result" do
-      expect(described_class.instance_variable_get(:@license_data)).not_to be_nil
+    it "clears the cached license status" do
+      expect(described_class.instance_variable_defined?(:@license_status)).to be true
+      described_class.reset!
+      expect(described_class.instance_variable_defined?(:@license_status)).to be false
+    end
+
+    it "clears the cached license data" do
+      described_class.license_data # Ensure data is cached
+      expect(described_class.instance_variable_defined?(:@license_data)).to be true
       described_class.reset!
       expect(described_class.instance_variable_defined?(:@license_data)).to be false
     end
