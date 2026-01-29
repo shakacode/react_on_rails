@@ -13,25 +13,8 @@ module ReactOnRailsPro
         @license_status = determine_license_status
       end
 
-      # Returns true if license is valid
-      # @return [Boolean]
-      def licensed?
-        license_status == :valid
-      end
-
-      # Returns license data if available (never raises)
-      # @return [Hash, nil] License data or nil if decoding failed
-      def license_data
-        return @license_data if defined?(@license_data)
-
-        # Trigger status determination which also caches license_data
-        license_status
-        @license_data
-      end
-
       # Resets all cached state (primarily for testing)
       def reset!
-        remove_instance_variable(:@license_data) if defined?(@license_data)
         remove_instance_variable(:@license_status) if defined?(@license_status)
       end
 
@@ -44,27 +27,15 @@ module ReactOnRailsPro
         license_string = load_license_string
         unless license_string
           log_license_warning("No license found. Running in unlicensed mode.")
-          @license_data = nil
           return :missing
         end
 
         # Step 2: Decode and verify JWT
         decoded_data = decode_license(license_string)
-        unless decoded_data
-          @license_data = nil
-          return :invalid
-        end
+        return :invalid unless decoded_data
 
         # Step 3: Check expiration
-        status = check_expiration(decoded_data)
-
-        # Cache the license data if we got this far
-        @license_data = decoded_data
-
-        # Log license info for analytics
-        log_license_info(decoded_data)
-
-        status
+        check_expiration(decoded_data)
       end
 
       # Loads license string from env var or file
@@ -131,14 +102,6 @@ module ReactOnRailsPro
 
       def log_license_warning(message)
         Rails.logger.warn("[React on Rails Pro] #{message}")
-      end
-
-      def log_license_info(license)
-        plan = license["plan"]
-        iss = license["iss"]
-
-        Rails.logger.info("[React on Rails Pro] License plan: #{plan}") if plan
-        Rails.logger.info("[React on Rails Pro] Issued by: #{iss}") if iss
       end
     end
   end

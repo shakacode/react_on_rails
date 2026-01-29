@@ -8,27 +8,34 @@ jest.mock('../src/shared/licensePublicKey', () => ({
   PUBLIC_KEY: '',
 }));
 
+const mockLogWarn = jest.fn();
+jest.mock('../src/shared/log', () => ({
+  __esModule: true,
+  default: {
+    warn: mockLogWarn,
+    info: jest.fn(),
+    error: jest.fn(),
+    debug: jest.fn(),
+  },
+}));
+
 import type { LicenseStatus } from '../src/shared/licenseValidator';
 
 interface LicenseValidatorModule {
   getLicenseStatus: () => LicenseStatus;
-  isLicensed: () => boolean;
-  getLicenseData: () => Record<string, unknown> | undefined;
   reset: () => void;
 }
 
 describe('LicenseValidator', () => {
   let testPrivateKey: string;
   let testPublicKey: string;
-  let mockConsoleWarn: jest.SpyInstance;
 
   beforeEach(() => {
     // Clear the module cache to get a fresh instance
     jest.resetModules();
 
-    // Mock console methods to suppress logs during tests
-    mockConsoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => {});
-    jest.spyOn(console, 'log').mockImplementation(() => {});
+    // Clear log mock
+    mockLogWarn.mockClear();
 
     // Reset fs mocks to default (no file exists)
     jest.mocked(fs.existsSync).mockReturnValue(false);
@@ -110,7 +117,7 @@ describe('LicenseValidator', () => {
       const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
       module.getLicenseStatus();
 
-      expect(mockConsoleWarn).toHaveBeenCalledWith(expect.stringContaining('License expired'));
+      expect(mockLogWarn).toHaveBeenCalledWith(expect.stringContaining('License expired'));
     });
 
     it('returns invalid for license missing exp field', () => {
@@ -173,89 +180,6 @@ describe('LicenseValidator', () => {
       delete process.env.REACT_ON_RAILS_PRO_LICENSE;
 
       expect(module.getLicenseStatus()).toBe('valid');
-    });
-  });
-
-  describe('isLicensed', () => {
-    it('returns true for valid license', () => {
-      const validPayload = {
-        sub: 'test@example.com',
-        iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(Date.now() / 1000) + 3600,
-      };
-
-      const validToken = jwt.sign(validPayload, testPrivateKey, { algorithm: 'RS256' });
-      process.env.REACT_ON_RAILS_PRO_LICENSE = validToken;
-
-      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
-      expect(module.isLicensed()).toBe(true);
-    });
-
-    it('returns false for missing license', () => {
-      delete process.env.REACT_ON_RAILS_PRO_LICENSE;
-
-      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
-      expect(module.isLicensed()).toBe(false);
-    });
-
-    it('returns false for expired license', () => {
-      const expiredPayload = {
-        sub: 'test@example.com',
-        iat: Math.floor(Date.now() / 1000) - 7200,
-        exp: Math.floor(Date.now() / 1000) - 3600,
-      };
-
-      const expiredToken = jwt.sign(expiredPayload, testPrivateKey, { algorithm: 'RS256' });
-      process.env.REACT_ON_RAILS_PRO_LICENSE = expiredToken;
-
-      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
-      expect(module.isLicensed()).toBe(false);
-    });
-  });
-
-  describe('getLicenseData', () => {
-    it('returns license data for valid license', () => {
-      const validPayload = {
-        sub: 'test@example.com',
-        iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(Date.now() / 1000) + 3600,
-        plan: 'paid',
-      };
-
-      const validToken = jwt.sign(validPayload, testPrivateKey, { algorithm: 'RS256' });
-      process.env.REACT_ON_RAILS_PRO_LICENSE = validToken;
-
-      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
-      const data = module.getLicenseData();
-      expect(data).toBeDefined();
-      expect(data!.sub).toBe('test@example.com');
-      expect(data!.plan).toBe('paid');
-    });
-
-    it('returns undefined for missing license', () => {
-      delete process.env.REACT_ON_RAILS_PRO_LICENSE;
-
-      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
-      expect(module.getLicenseData()).toBeUndefined();
-    });
-
-    it('returns undefined for invalid license', () => {
-      const wrongKeyPair = crypto.generateKeyPairSync('rsa', {
-        modulusLength: 2048,
-        publicKeyEncoding: { type: 'spki', format: 'pem' },
-        privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
-      });
-
-      const validPayload = {
-        sub: 'test@example.com',
-        exp: Math.floor(Date.now() / 1000) + 3600,
-      };
-
-      const invalidToken = jwt.sign(validPayload, wrongKeyPair.privateKey, { algorithm: 'RS256' });
-      process.env.REACT_ON_RAILS_PRO_LICENSE = invalidToken;
-
-      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
-      expect(module.getLicenseData()).toBeUndefined();
     });
   });
 

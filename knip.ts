@@ -73,7 +73,7 @@ const config: KnipConfig = {
         'src/integrations/*.ts!',
         // Export disableHttp2 for test utilities
         'src/worker.ts!',
-        // License validator exports public API for license checking
+        // License validator: reset() is used in tests, getLicenseStatus/LicenseStatus imported by master.ts
         'src/shared/licenseValidator.ts!',
       ],
       project: ['src/**/*.[jt]s{x,}!', 'tests/**/*.[jt]s{x,}', '!lib/**'],

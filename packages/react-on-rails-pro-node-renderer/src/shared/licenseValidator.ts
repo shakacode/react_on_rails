@@ -2,6 +2,7 @@ import * as jwt from 'jsonwebtoken';
 import * as fs from 'fs';
 import * as path from 'path';
 import { PUBLIC_KEY } from './licensePublicKey.js';
+import log from './log.js';
 
 interface LicenseData {
   // Subject (email for whom the license is issued)
@@ -29,29 +30,13 @@ export type LicenseStatus = 'valid' | 'expired' | 'invalid' | 'missing';
 
 // Module-level state for caching
 let cachedLicenseStatus: LicenseStatus | undefined;
-let cachedLicenseData: LicenseData | undefined;
 
 /**
  * Logs a license warning message.
  * @private
  */
 function logLicenseWarning(message: string): void {
-  console.warn(`[React on Rails Pro] ${message}`);
-}
-
-/**
- * Logs license information for analytics.
- * @private
- */
-function logLicenseInfo(license: LicenseData): void {
-  const { plan, iss } = license;
-
-  if (plan) {
-    console.log(`[React on Rails Pro] License plan: ${plan}`);
-  }
-  if (iss) {
-    console.log(`[React on Rails Pro] Issued by: ${iss}`);
-  }
+  log.warn(`[React on Rails Pro] ${message}`);
 }
 
 /**
@@ -135,27 +120,17 @@ function determineLicenseStatus(): LicenseStatus {
   const licenseString = loadLicenseString();
   if (!licenseString) {
     logLicenseWarning('No license found. Running in unlicensed mode.');
-    cachedLicenseData = undefined;
     return 'missing';
   }
 
   // Step 2: Decode and verify JWT
   const decodedData = decodeLicense(licenseString);
   if (!decodedData) {
-    cachedLicenseData = undefined;
     return 'invalid';
   }
 
   // Step 3: Check expiration
-  const status = checkExpiration(decodedData);
-
-  // Cache the license data if we got this far
-  cachedLicenseData = decodedData;
-
-  // Log license info for analytics
-  logLicenseInfo(decodedData);
-
-  return status;
+  return checkExpiration(decodedData);
 }
 
 /**
@@ -172,27 +147,8 @@ export function getLicenseStatus(): LicenseStatus {
 }
 
 /**
- * Returns true if license is valid.
- * @returns true if status is 'valid'
- */
-export function isLicensed(): boolean {
-  return getLicenseStatus() === 'valid';
-}
-
-/**
- * Returns license data if available (never throws).
- * @returns License data or undefined if decoding failed
- */
-export function getLicenseData(): LicenseData | undefined {
-  // Trigger status determination which also caches license_data
-  getLicenseStatus();
-  return cachedLicenseData;
-}
-
-/**
  * Resets all cached validation state (primarily for testing).
  */
 export function reset(): void {
   cachedLicenseStatus = undefined;
-  cachedLicenseData = undefined;
 }

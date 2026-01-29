@@ -57,12 +57,6 @@ module ReactOnRailsPro
       LicenseValidator.license_status
     end
 
-    # Returns true if license is valid
-    # @return [Boolean]
-    def self.licensed?
-      LicenseValidator.licensed?
-    end
-
     def self.copy_assets
       return if ReactOnRailsPro.configuration.assets_to_copy.blank?
 

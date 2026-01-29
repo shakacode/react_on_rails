@@ -173,70 +173,6 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
     end
   end
 
-  describe ".licensed?" do
-    context "with valid license" do
-      before do
-        valid_token = JWT.encode(valid_payload, test_private_key, "RS256")
-        ENV["REACT_ON_RAILS_PRO_LICENSE"] = valid_token
-      end
-
-      it "returns true" do
-        expect(described_class.licensed?).to be true
-      end
-    end
-
-    context "with expired license" do
-      before do
-        expired_token = JWT.encode(expired_payload, test_private_key, "RS256")
-        ENV["REACT_ON_RAILS_PRO_LICENSE"] = expired_token
-      end
-
-      it "returns false" do
-        expect(described_class.licensed?).to be false
-      end
-    end
-
-    context "with missing license" do
-      it "returns false" do
-        expect(described_class.licensed?).to be false
-      end
-    end
-  end
-
-  describe ".license_data" do
-    context "with valid license" do
-      before do
-        valid_token = JWT.encode(valid_payload, test_private_key, "RS256")
-        ENV["REACT_ON_RAILS_PRO_LICENSE"] = valid_token
-      end
-
-      it "returns license data hash" do
-        data = described_class.license_data
-        expect(data).to be_a(Hash)
-        expect(data["exp"]).to be_a(Integer)
-        expect(data["plan"]).to eq("paid")
-      end
-    end
-
-    context "with missing license" do
-      it "returns nil" do
-        expect(described_class.license_data).to be_nil
-      end
-    end
-
-    context "with invalid license" do
-      before do
-        wrong_key = OpenSSL::PKey::RSA.new(2048)
-        invalid_token = JWT.encode(valid_payload, wrong_key, "RS256")
-        ENV["REACT_ON_RAILS_PRO_LICENSE"] = invalid_token
-      end
-
-      it "returns nil" do
-        expect(described_class.license_data).to be_nil
-      end
-    end
-  end
-
   describe ".reset!" do
     before do
       valid_token = JWT.encode(valid_payload, test_private_key, "RS256")
@@ -248,13 +184,6 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
       expect(described_class.instance_variable_defined?(:@license_status)).to be true
       described_class.reset!
       expect(described_class.instance_variable_defined?(:@license_status)).to be false
-    end
-
-    it "clears the cached license data" do
-      described_class.license_data # Ensure data is cached
-      expect(described_class.instance_variable_defined?(:@license_data)).to be true
-      described_class.reset!
-      expect(described_class.instance_variable_defined?(:@license_data)).to be false
     end
   end
 end
