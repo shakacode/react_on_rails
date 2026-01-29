@@ -181,8 +181,5 @@ A: No. React on Rails Pro works without a license for development, testing, and 
 **Q: Do I need a license for CI?**
 A: No. CI/CD environments work without a license. Only production deployments require a paid license.
 
-**Q: Can multiple developers share one license?**
-A: For production, you can share a paid license across your team via environment variables.
-
 **Q: Do I need internet to validate the license?**
 A: No! License validation is completely offline using cryptographic signatures.

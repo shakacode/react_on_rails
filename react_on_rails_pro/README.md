@@ -446,10 +446,6 @@ A: No! React on Rails Pro works without a license for evaluation, development, t
 
 A: Pricing is customized based on your needs. Contact [justin@shakacode.com](mailto:justin@shakacode.com) for a quote.
 
-**Q: Can multiple developers share one license?**
-
-A: Yes! All developers in an organization can share the same license. You can use a shared license via environment variable or configuration file. [See team setup →](./LICENSE_SETUP.md#team-setup)
-
 ### Technical Questions
 
 **Q: What's the difference between Pro and open-source React on Rails?**
