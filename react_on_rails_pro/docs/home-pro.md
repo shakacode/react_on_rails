@@ -1,6 +1,6 @@
 # React on Rails Pro
 
-Node rendering and caching performance enhancements for [React on Rails](https://github.com/shakacode/react_on_rails). Now supports React 18 with updates to React on Rails! Check the [React on Rails CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for details and the updates to the [loadable-components instructions](https://github.com/shakacode/react_on_rails_pro/blob/master/docs/code-splitting-loadable-components.md).
+Node rendering and caching performance enhancements for [React on Rails](https://github.com/shakacode/react_on_rails). Now supports React 18 with updates to React on Rails! Check the [React on Rails CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for details and the updates to the [loadable-components instructions](./code-splitting-loadable-components.md).
 
 ## Getting Started
 
@@ -39,7 +39,7 @@ See [docs/caching](./caching.md) for more details.
 
 Suppose you detect that some library used in server-rendering is leaking state between calls to server render. In that case, you can set the `config.ssr_pre_hook_js` in your `config/initializers/react_on_rails_pro.rb` to run some JavaScript to clear the globally leaked state at the beginning of each call to server render.
 
-For more details, see [Rails Configuration](https://github.com/shakacode/react_on_rails/blob/master/docs/configuration/configuration.md).
+For more details, see [Rails Configuration](../../docs/configuration/configuration.md).
 
 ### React On Rails Pro Node Renderer
 

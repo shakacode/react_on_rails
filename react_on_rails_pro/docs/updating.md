@@ -179,7 +179,7 @@ echo "your-license-token-here" > config/react_on_rails_pro_license.key
 
 **Where to get your license token:** Contact [justin@shakacode.com](mailto:justin@shakacode.com) if you don't have your license token.
 
-For complete license setup instructions, see [LICENSE_SETUP.md](../LICENSE_SETUP.md).
+For complete license setup instructions, see [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/LICENSE_SETUP.md).
 
 ### Verify Migration
 
