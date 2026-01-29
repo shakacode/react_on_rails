@@ -18,12 +18,17 @@ module ReactOnRailsPro
         when :valid
           Rails.logger.info "[React on Rails Pro] License validated successfully."
         when :missing
-          Rails.logger.warn "[React on Rails Pro] Running in unlicensed mode. " \
+          Rails.logger.warn "[React on Rails Pro] No license found. " \
+                            "Using React on Rails Pro in production without a valid license violates the license terms. " \
                             "Get a license at https://www.shakacode.com/react-on-rails-pro/"
         when :expired
-          Rails.logger.warn "[React on Rails Pro] License has expired. Running in unlicensed mode."
+          Rails.logger.warn "[React on Rails Pro] License has expired. " \
+                            "Using React on Rails Pro in production without a valid license violates the license terms. " \
+                            "Renew your license at https://www.shakacode.com/react-on-rails-pro/"
         when :invalid
-          Rails.logger.warn "[React on Rails Pro] Invalid license. Running in unlicensed mode."
+          Rails.logger.warn "[React on Rails Pro] Invalid license. " \
+                            "Using React on Rails Pro in production without a valid license violates the license terms. " \
+                            "Get a license at https://www.shakacode.com/react-on-rails-pro/"
         end
       end
     end

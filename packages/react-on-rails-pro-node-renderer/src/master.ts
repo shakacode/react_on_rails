@@ -18,12 +18,22 @@ export default function masterRun(runningConfig?: Partial<Config>) {
     log.info('[React on Rails Pro] License validated successfully.');
   } else if (status === 'missing') {
     log.warn(
-      '[React on Rails Pro] Running in unlicensed mode. Get a license at https://www.shakacode.com/react-on-rails-pro/',
+      '[React on Rails Pro] No license found. ' +
+        'Using React on Rails Pro in production without a valid license violates the license terms. ' +
+        'Get a license at https://www.shakacode.com/react-on-rails-pro/',
     );
   } else if (status === 'expired') {
-    log.warn('[React on Rails Pro] License has expired. Running in unlicensed mode.');
+    log.warn(
+      '[React on Rails Pro] License has expired. ' +
+        'Using React on Rails Pro in production without a valid license violates the license terms. ' +
+        'Renew your license at https://www.shakacode.com/react-on-rails-pro/',
+    );
   } else {
-    log.warn('[React on Rails Pro] Invalid license. Running in unlicensed mode.');
+    log.warn(
+      '[React on Rails Pro] Invalid license. ' +
+        'Using React on Rails Pro in production without a valid license violates the license terms. ' +
+        'Get a license at https://www.shakacode.com/react-on-rails-pro/',
+    );
   }
 
   // Store config in app state. From now it can be loaded by any module using getConfig():
