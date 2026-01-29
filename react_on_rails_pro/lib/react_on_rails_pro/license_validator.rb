@@ -4,13 +4,6 @@ require "jwt"
 
 module ReactOnRailsPro
   class LicenseValidator
-    # License status values
-    # :valid   - License is present and not expired
-    # :expired - License is present but past expiration date
-    # :invalid - License is present but corrupted/invalid signature
-    # :missing - No license found
-    VALID_STATUSES = %i[valid expired invalid missing].freeze
-
     class << self
       # Returns the current license status (never raises)
       # @return [Symbol] One of :valid, :expired, :invalid, :missing
@@ -51,12 +44,16 @@ module ReactOnRailsPro
         license_string = load_license_string
         unless license_string
           log_license_warning("No license found. Running in unlicensed mode.")
+          @license_data = nil
           return :missing
         end
 
         # Step 2: Decode and verify JWT
         decoded_data = decode_license(license_string)
-        return :invalid unless decoded_data
+        unless decoded_data
+          @license_data = nil
+          return :invalid
+        end
 
         # Step 3: Check expiration
         status = check_expiration(decoded_data)

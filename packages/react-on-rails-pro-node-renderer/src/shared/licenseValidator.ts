@@ -8,8 +8,8 @@ interface LicenseData {
   sub?: string;
   // Issued at timestamp
   iat?: number;
-  // Required: expiration timestamp
-  exp: number;
+  // Expiration timestamp (should be present but may be missing in malformed tokens)
+  exp?: number;
   // Optional: license plan (e.g., "free", "paid")
   plan?: string;
   // Issuer (who issued the license)
@@ -135,12 +135,14 @@ function determineLicenseStatus(): LicenseStatus {
   const licenseString = loadLicenseString();
   if (!licenseString) {
     logLicenseWarning('No license found. Running in unlicensed mode.');
+    cachedLicenseData = undefined;
     return 'missing';
   }
 
   // Step 2: Decode and verify JWT
   const decodedData = decodeLicense(licenseString);
   if (!decodedData) {
+    cachedLicenseData = undefined;
     return 'invalid';
   }
 

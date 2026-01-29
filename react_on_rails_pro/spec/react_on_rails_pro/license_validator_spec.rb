@@ -150,6 +150,27 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
         expect(described_class.license_status).to eq(:valid)
       end
     end
+
+    context "when license file exists but cannot be read" do
+      let(:file_config_path) { instance_double(Pathname, exist?: true) }
+
+      before do
+        ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
+        allow(mock_root).to receive(:join)
+          .with("config", "react_on_rails_pro_license.key")
+          .and_return(file_config_path)
+        allow(File).to receive(:read).with(file_config_path).and_raise(Errno::EACCES, "Permission denied")
+      end
+
+      it "returns :missing" do
+        expect(described_class.license_status).to eq(:missing)
+      end
+
+      it "logs a warning about the file read error" do
+        expect(mock_logger).to receive(:warn).with(/Failed to read license file/)
+        described_class.license_status
+      end
+    end
   end
 
   describe ".licensed?" do
