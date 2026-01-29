@@ -25,8 +25,6 @@ Changes since the last non-beta release.
 
 #### Changed
 
-- **License-Optional Attribution Model**: React on Rails Pro now works without a license for evaluation, development, testing, and CI/CD. A paid license is only required for production deployments. Old free licenses are now treated as invalid — only paid licenses (or licenses without a `plan` field for backwards compatibility) are accepted. Documentation updated across README, LICENSE_SETUP, and CI_SETUP guides. [PR 2324](https://github.com/shakacode/react_on_rails/pull/2324) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-
 - **Simplified Shakapacker version handling**: Removed obsolete minimum version checks (6.5.1) and example generation pinning (8.2.0). The gemspec dependency `shakapacker >= 6.0` is now the only minimum version requirement, with autobundling requiring >= 7.0.0. [PR 2247](https://github.com/shakacode/react_on_rails/pull/2247) by [justin808](https://github.com/justin808).
 
 ### [16.2.1] - 2026-01-18
