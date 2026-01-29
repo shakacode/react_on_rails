@@ -163,8 +163,7 @@ The license is a JWT (JSON Web Token) signed with RSA-256, containing:
 
 Need help?
 
-1. **Documentation**: Check [CI_SETUP.md](./CI_SETUP.md) for CI configuration
-2. **Email**: support@shakacode.com
+1. **Email**: support@shakacode.com
 3. **Sales**: [justin@shakacode.com](mailto:justin@shakacode.com) for pricing
 
 ## Security Best Practices
