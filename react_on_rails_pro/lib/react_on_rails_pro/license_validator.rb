@@ -34,7 +34,11 @@ module ReactOnRailsPro
         decoded_data = decode_license(license_string)
         return :invalid unless decoded_data
 
-        # Step 3: Check expiration
+        # Step 3: Check plan validity
+        plan_status = check_plan(decoded_data)
+        return plan_status unless plan_status == :valid
+
+        # Step 4: Check expiration
         check_expiration(decoded_data)
       end
 
@@ -74,6 +78,19 @@ module ReactOnRailsPro
       rescue StandardError => e
         log_license_warning("License validation error: #{e.message}. Running in unlicensed mode.")
         nil
+      end
+
+      # Checks if the license plan is valid for production use
+      # Licenses without a plan field are considered valid (backwards compatibility with old paid licenses)
+      # Only "paid" plan is valid; all other plans (e.g., "free") are invalid
+      # @return [Symbol] :valid or :invalid
+      def check_plan(decoded_data)
+        plan = decoded_data["plan"]
+        return :valid unless plan # No plan field = valid (backwards compat with old paid licenses)
+        return :valid if plan == "paid"
+
+        log_license_warning("License plan '#{plan}' is not valid for production use. Running in unlicensed mode.")
+        :invalid
       end
 
       # Checks if the license is expired

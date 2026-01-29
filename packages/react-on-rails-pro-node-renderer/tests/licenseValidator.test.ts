@@ -183,6 +183,87 @@ describe('LicenseValidator', () => {
     });
   });
 
+  describe('getLicenseStatus with plan field', () => {
+    it("returns valid for plan 'paid'", () => {
+      const payload = {
+        sub: 'test@example.com',
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        plan: 'paid',
+      };
+
+      const token = jwt.sign(payload, testPrivateKey, { algorithm: 'RS256' });
+      process.env.REACT_ON_RAILS_PRO_LICENSE = token;
+
+      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
+      expect(module.getLicenseStatus()).toBe('valid');
+    });
+
+    it("returns invalid for plan 'free'", () => {
+      const payload = {
+        sub: 'test@example.com',
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        plan: 'free',
+      };
+
+      const token = jwt.sign(payload, testPrivateKey, { algorithm: 'RS256' });
+      process.env.REACT_ON_RAILS_PRO_LICENSE = token;
+
+      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
+      expect(module.getLicenseStatus()).toBe('invalid');
+    });
+
+    it("returns invalid for plan 'unknown'", () => {
+      const payload = {
+        sub: 'test@example.com',
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        plan: 'unknown',
+      };
+
+      const token = jwt.sign(payload, testPrivateKey, { algorithm: 'RS256' });
+      process.env.REACT_ON_RAILS_PRO_LICENSE = token;
+
+      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
+      expect(module.getLicenseStatus()).toBe('invalid');
+    });
+
+    it('returns valid when plan field is absent (backwards compatibility)', () => {
+      const payload = {
+        sub: 'test@example.com',
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        // No plan field
+      };
+
+      const token = jwt.sign(payload, testPrivateKey, { algorithm: 'RS256' });
+      process.env.REACT_ON_RAILS_PRO_LICENSE = token;
+
+      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
+      expect(module.getLicenseStatus()).toBe('valid');
+    });
+
+    it("logs a warning for invalid plan 'free'", () => {
+      const payload = {
+        sub: 'test@example.com',
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        plan: 'free',
+      };
+
+      const token = jwt.sign(payload, testPrivateKey, { algorithm: 'RS256' });
+      process.env.REACT_ON_RAILS_PRO_LICENSE = token;
+
+      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
+      module.getLicenseStatus();
+
+      expect(mockLogWarn).toHaveBeenCalledWith(
+        expect.stringContaining("License plan 'free' is not valid for production use"),
+      );
+    });
+  });
+
   describe('reset', () => {
     it('clears cached state so status is re-evaluated', () => {
       const validPayload = {

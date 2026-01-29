@@ -19,6 +19,10 @@ You can find the **package** version numbers from this repo's tags and below in 
 
 Changes since the last non-beta release.
 
+### Changed
+
+- **License-Optional Attribution Model**: React on Rails Pro now works without a license for evaluation, development, testing, and CI/CD. A paid license is only required for production deployments. Added `plan` field validation to both Ruby and Node.js license validators — only `"paid"` plan (or no plan field for backwards compatibility) is accepted. Old free licenses are now treated as invalid. Documentation overhauled across README, LICENSE_SETUP, and CI_SETUP guides. [PR 2324](https://github.com/shakacode/react_on_rails/pull/2324) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 ### Added
 
 - **Node Renderer Master/Worker Exports**: Added public `master` and `worker` exports to `react-on-rails-pro-node-renderer` package, allowing users to import from `react-on-rails-pro-node-renderer/master` and `react-on-rails-pro-node-renderer/worker`. [PR 2326](https://github.com/shakacode/react_on_rails/pull/2326) by [justin808](https://github.com/justin808).

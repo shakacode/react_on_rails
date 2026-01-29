@@ -173,6 +173,97 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
     end
   end
 
+  describe ".license_status with plan field" do
+    context "when plan is 'paid'" do
+      let(:paid_payload) do
+        {
+          sub: "test@example.com",
+          iat: Time.now.to_i,
+          exp: Time.now.to_i + 3600,
+          plan: "paid"
+        }
+      end
+
+      before do
+        token = JWT.encode(paid_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns :valid" do
+        expect(described_class.license_status).to eq(:valid)
+      end
+    end
+
+    context "when plan is 'free'" do
+      let(:free_payload) do
+        {
+          sub: "test@example.com",
+          iat: Time.now.to_i,
+          exp: Time.now.to_i + 3600,
+          plan: "free"
+        }
+      end
+
+      before do
+        token = JWT.encode(free_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns :invalid" do
+        expect(described_class.license_status).to eq(:invalid)
+      end
+
+      it "logs a warning about invalid plan" do
+        expect(mock_logger).to receive(:warn).with(/License plan 'free' is not valid for production use/)
+        described_class.license_status
+      end
+    end
+
+    context "when plan is 'unknown'" do
+      let(:unknown_plan_payload) do
+        {
+          sub: "test@example.com",
+          iat: Time.now.to_i,
+          exp: Time.now.to_i + 3600,
+          plan: "unknown"
+        }
+      end
+
+      before do
+        token = JWT.encode(unknown_plan_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns :invalid" do
+        expect(described_class.license_status).to eq(:invalid)
+      end
+
+      it "logs a warning about invalid plan" do
+        expect(mock_logger).to receive(:warn).with(/License plan 'unknown' is not valid for production use/)
+        described_class.license_status
+      end
+    end
+
+    context "when plan field is absent" do
+      let(:no_plan_payload) do
+        {
+          sub: "test@example.com",
+          iat: Time.now.to_i,
+          exp: Time.now.to_i + 3600
+        }
+      end
+
+      before do
+        token = JWT.encode(no_plan_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns :valid (backwards compatibility)" do
+        expect(described_class.license_status).to eq(:valid)
+      end
+    end
+  end
+
   describe ".reset!" do
     before do
       valid_token = JWT.encode(valid_payload, test_private_key, "RS256")

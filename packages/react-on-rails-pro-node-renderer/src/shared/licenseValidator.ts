@@ -11,7 +11,7 @@ interface LicenseData {
   iat?: number;
   // Expiration timestamp (should be present but may be missing in malformed tokens)
   exp?: number;
-  // Optional: license plan (e.g., "free", "paid")
+  // Optional: license plan (e.g., "paid"). Only "paid" is valid for production use.
   plan?: string;
   // Issuer (who issued the license)
   iss?: string;
@@ -88,6 +88,26 @@ function decodeLicense(licenseString: string): LicenseData | undefined {
 }
 
 /**
+ * Checks if the license plan is valid for production use.
+ * Licenses without a plan field are considered valid (backwards compatibility with old paid licenses).
+ * Only "paid" plan is valid; all other plans (e.g., "free") are invalid.
+ * @returns 'valid' or 'invalid'
+ * @private
+ */
+function checkPlan(decodedData: LicenseData): LicenseStatus {
+  const { plan } = decodedData;
+  if (!plan) {
+    return 'valid'; // No plan field = valid (backwards compat with old paid licenses)
+  }
+  if (plan === 'paid') {
+    return 'valid';
+  }
+
+  logLicenseWarning(`License plan '${plan}' is not valid for production use. Running in unlicensed mode.`);
+  return 'invalid';
+}
+
+/**
  * Checks if the license is expired.
  * @returns 'valid', 'expired', or 'invalid' (if exp field missing)
  * @private
@@ -129,7 +149,13 @@ function determineLicenseStatus(): LicenseStatus {
     return 'invalid';
   }
 
-  // Step 3: Check expiration
+  // Step 3: Check plan validity
+  const planStatus = checkPlan(decodedData);
+  if (planStatus !== 'valid') {
+    return planStatus;
+  }
+
+  // Step 4: Check expiration
   return checkExpiration(decodedData);
 }
 
