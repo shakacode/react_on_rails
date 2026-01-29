@@ -104,7 +104,7 @@ function decodeLicense(licenseString: string): LicenseData | undefined {
 
 /**
  * Checks if the license is expired.
- * @returns 'valid' or 'expired'
+ * @returns 'valid', 'expired', or 'invalid' (if exp field missing)
  * @private
  */
 function checkExpiration(license: LicenseData): LicenseStatus {
@@ -179,7 +179,7 @@ export function isLicensed(): boolean {
 
 /**
  * Returns license data if available (never throws).
- * @returns License data or undefined if not available/valid
+ * @returns License data or undefined if decoding failed
  */
 export function getLicenseData(): LicenseData | undefined {
   // Trigger status determination which also caches license_data

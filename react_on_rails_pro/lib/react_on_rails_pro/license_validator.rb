@@ -27,7 +27,7 @@ module ReactOnRailsPro
       end
 
       # Returns license data if available (never raises)
-      # @return [Hash, nil] License data or nil if not available/valid
+      # @return [Hash, nil] License data or nil if decoding failed
       def license_data
         return @license_data if defined?(@license_data)
 
@@ -79,7 +79,13 @@ module ReactOnRailsPro
 
         # Then try config file
         config_path = Rails.root.join("config", "react_on_rails_pro_license.key")
-        return File.read(config_path).strip if config_path.exist?
+        if config_path.exist?
+          begin
+            return File.read(config_path).strip
+          rescue StandardError => e
+            log_license_warning("Failed to read license file: #{e.message}. Running in unlicensed mode.")
+          end
+        end
 
         nil
       end
@@ -103,7 +109,7 @@ module ReactOnRailsPro
       end
 
       # Checks if the license is expired
-      # @return [Symbol] :valid or :expired
+      # @return [Symbol] :valid, :expired, or :invalid (if exp field missing)
       def check_expiration(license)
         unless license["exp"]
           log_license_warning("License is missing expiration field. Running in unlicensed mode.")
