@@ -3,9 +3,12 @@
 require "jwt"
 
 module ReactOnRailsPro
+  # Validates React on Rails Pro licenses.
+  # This class only determines license status - it does NOT log.
+  # All logging is handled by Engine.log_license_status for environment-aware messaging.
   class LicenseValidator
     class << self
-      # Returns the current license status (never raises)
+      # Returns the current license status (never raises, never logs)
       # Thread-safe: uses Mutex to prevent race conditions during initialization
       # @return [Symbol] One of :valid, :expired, :invalid, :missing
       def license_status
@@ -22,9 +25,12 @@ module ReactOnRailsPro
 
       # Resets all cached state (primarily for testing)
       def reset!
-        @mutex&.synchronize do
-          remove_instance_variable(:@license_status) if defined?(@license_status)
+        if defined?(@mutex) && @mutex
+          @mutex.synchronize do
+            remove_instance_variable(:@license_status) if defined?(@license_status)
+          end
         end
+        remove_instance_variable(:@mutex) if defined?(@mutex)
       end
 
       private
@@ -34,10 +40,7 @@ module ReactOnRailsPro
       def determine_license_status
         # Step 1: Load license string
         license_string = load_license_string
-        unless license_string
-          log_license_warning("No license found. Running in unlicensed mode.")
-          return :missing
-        end
+        return :missing unless license_string
 
         # Step 2: Decode and verify JWT
         decoded_data = decode_license(license_string)
@@ -60,15 +63,13 @@ module ReactOnRailsPro
 
         # Then try config file
         config_path = Rails.root.join("config", "react_on_rails_pro_license.key")
-        if config_path.exist?
-          begin
-            return File.read(config_path).strip
-          rescue StandardError => e
-            log_license_warning("Failed to read license file: #{e.message}. Running in unlicensed mode.")
-          end
-        end
+        return unless config_path.exist?
 
-        nil
+        begin
+          File.read(config_path).strip
+        rescue StandardError
+          nil
+        end
       end
 
       # Decodes and verifies the JWT license
@@ -81,11 +82,7 @@ module ReactOnRailsPro
           algorithm: "RS256",
           verify_expiration: false # we handle expiration manually
         ).first
-      rescue JWT::DecodeError => e
-        log_license_warning("Invalid license signature: #{e.message}. Running in unlicensed mode.")
-        nil
-      rescue StandardError => e
-        log_license_warning("License validation error: #{e.message}. Running in unlicensed mode.")
+      rescue JWT::DecodeError, StandardError
         nil
       end
 
@@ -98,36 +95,24 @@ module ReactOnRailsPro
         return :valid unless plan # No plan field = valid (backwards compat with old paid licenses)
         return :valid if plan == "paid"
 
-        log_license_warning("License plan '#{plan}' is not valid for production use. Running in unlicensed mode.")
         :invalid
       end
 
       # Checks if the license is expired
       # @return [Symbol] :valid, :expired, or :invalid (if exp field missing)
       def check_expiration(license)
-        unless license["exp"]
-          log_license_warning("License is missing expiration field. Running in unlicensed mode.")
-          return :invalid
-        end
+        return :invalid unless license["exp"]
 
         current_time = Time.now.to_i
         exp_time = license["exp"]
 
-        if current_time > exp_time
-          days_expired = ((current_time - exp_time) / (24 * 60 * 60)).to_i
-          log_license_warning("License expired #{days_expired} day(s) ago. Running in unlicensed mode.")
-          return :expired
-        end
+        return :expired if current_time > exp_time
 
         :valid
       end
 
       def public_key
         ReactOnRailsPro::LicensePublicKey::KEY
-      end
-
-      def log_license_warning(message)
-        Rails.logger.warn("[React on Rails Pro] #{message}")
       end
     end
   end

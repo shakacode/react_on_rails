@@ -36,10 +36,9 @@ module ReactOnRailsPro
       private
 
       def log_license_issue(issue, action)
-        is_production = Rails.env.production?
         prefix = "[React on Rails Pro] #{issue}."
 
-        if is_production
+        if Rails.env.production?
           warning = "Using React on Rails Pro in production without a valid license " \
                     "violates the license terms."
           Rails.logger.warn "#{prefix} #{warning} #{action}"

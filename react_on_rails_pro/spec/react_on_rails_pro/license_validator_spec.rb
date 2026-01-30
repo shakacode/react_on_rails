@@ -29,7 +29,6 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
     }
   end
 
-  let(:mock_logger) { instance_double(Logger, warn: nil, info: nil) }
   let(:mock_root) { instance_double(Pathname, join: config_file_path) }
   let(:config_file_path) { instance_double(Pathname, exist?: false) }
 
@@ -37,7 +36,7 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
     described_class.reset!
     stub_const("ReactOnRailsPro::LicensePublicKey::KEY", test_public_key)
     ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
-    allow(Rails).to receive_messages(logger: mock_logger, root: mock_root)
+    allow(Rails).to receive(:root).and_return(mock_root)
   end
 
   after do
@@ -72,11 +71,6 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
       it "returns :expired" do
         expect(described_class.license_status).to eq(:expired)
       end
-
-      it "logs a warning" do
-        expect(mock_logger).to receive(:warn).with(/License expired.*day\(s\) ago/)
-        described_class.license_status
-      end
     end
 
     context "with license missing exp field" do
@@ -95,11 +89,6 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
       it "returns :invalid" do
         expect(described_class.license_status).to eq(:invalid)
       end
-
-      it "logs a warning about missing expiration" do
-        expect(mock_logger).to receive(:warn).with(/missing expiration field/)
-        described_class.license_status
-      end
     end
 
     context "with invalid signature" do
@@ -112,11 +101,6 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
       it "returns :invalid" do
         expect(described_class.license_status).to eq(:invalid)
       end
-
-      it "logs a warning about invalid signature" do
-        expect(mock_logger).to receive(:warn).with(/Invalid license signature/)
-        described_class.license_status
-      end
     end
 
     context "with missing license" do
@@ -126,11 +110,6 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
 
       it "returns :missing" do
         expect(described_class.license_status).to eq(:missing)
-      end
-
-      it "logs a warning about missing license" do
-        expect(mock_logger).to receive(:warn).with(/No license found/)
-        described_class.license_status
       end
     end
 
@@ -164,11 +143,6 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
 
       it "returns :missing" do
         expect(described_class.license_status).to eq(:missing)
-      end
-
-      it "logs a warning about the file read error" do
-        expect(mock_logger).to receive(:warn).with(/Failed to read license file/)
-        described_class.license_status
       end
     end
   end
@@ -212,11 +186,6 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
       it "returns :invalid" do
         expect(described_class.license_status).to eq(:invalid)
       end
-
-      it "logs a warning about invalid plan" do
-        expect(mock_logger).to receive(:warn).with(/License plan 'free' is not valid for production use/)
-        described_class.license_status
-      end
     end
 
     context "when plan is 'unknown'" do
@@ -236,11 +205,6 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
 
       it "returns :invalid" do
         expect(described_class.license_status).to eq(:invalid)
-      end
-
-      it "logs a warning about invalid plan" do
-        expect(mock_logger).to receive(:warn).with(/License plan 'unknown' is not valid for production use/)
-        described_class.license_status
       end
     end
 
@@ -275,6 +239,12 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
       expect(described_class.instance_variable_defined?(:@license_status)).to be true
       described_class.reset!
       expect(described_class.instance_variable_defined?(:@license_status)).to be false
+    end
+
+    it "clears the mutex for test isolation" do
+      expect(described_class.instance_variable_defined?(:@mutex)).to be true
+      described_class.reset!
+      expect(described_class.instance_variable_defined?(:@mutex)).to be false
     end
   end
 

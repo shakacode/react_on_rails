@@ -87,14 +87,12 @@ RSpec.describe ReactOnRailsPro::Engine do
 
       context "with missing license" do
         it "logs info with no license required message" do
-          # LicenseValidator logs a warning, but Engine should log info in dev
-          allow(mock_logger).to receive(:warn) # allow validator's warning
           expect(mock_logger).to receive(:info).with(/No license found.*No license required/)
+          expect(mock_logger).not_to receive(:warn)
           described_class.log_license_status
         end
 
         it "does not include violation language in info message" do
-          allow(mock_logger).to receive(:warn) # allow validator's warning
           expect(mock_logger).to receive(:info) do |message|
             expect(message).not_to include("violates")
           end
@@ -110,9 +108,8 @@ RSpec.describe ReactOnRailsPro::Engine do
         end
 
         it "logs info with no license required message" do
-          # LicenseValidator logs a warning about expiration, but Engine should log info in dev
-          allow(mock_logger).to receive(:warn) # allow validator's warning
           expect(mock_logger).to receive(:info).with(/License has expired.*No license required/)
+          expect(mock_logger).not_to receive(:warn)
           described_class.log_license_status
         end
       end
@@ -125,9 +122,8 @@ RSpec.describe ReactOnRailsPro::Engine do
 
       context "with missing license" do
         it "logs info with no license required message" do
-          # LicenseValidator logs a warning, but Engine should log info in test
-          allow(mock_logger).to receive(:warn) # allow validator's warning
           expect(mock_logger).to receive(:info).with(/No license found.*No license required/)
+          expect(mock_logger).not_to receive(:warn)
           described_class.log_license_status
         end
       end
