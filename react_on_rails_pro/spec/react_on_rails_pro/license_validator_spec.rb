@@ -277,4 +277,21 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
       expect(described_class.instance_variable_defined?(:@license_status)).to be false
     end
   end
+
+  describe "thread safety" do
+    it "handles concurrent access without errors" do
+      valid_token = JWT.encode(valid_payload, test_private_key, "RS256")
+      ENV["REACT_ON_RAILS_PRO_LICENSE"] = valid_token
+
+      threads = Array.new(10) do
+        Thread.new do
+          described_class.reset!
+          described_class.license_status
+        end
+      end
+
+      results = threads.map(&:value)
+      expect(results).to all(eq(:valid))
+    end
+  end
 end

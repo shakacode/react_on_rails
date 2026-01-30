@@ -154,6 +154,28 @@ describe('LicenseValidator', () => {
       expect(module.getLicenseStatus()).toBe('invalid');
     });
 
+    it('logs warning for invalid signature and includes error message', () => {
+      const wrongKeyPair = crypto.generateKeyPairSync('rsa', {
+        modulusLength: 2048,
+        publicKeyEncoding: { type: 'spki', format: 'pem' },
+        privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+      });
+
+      const validPayload = {
+        sub: 'test@example.com',
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + 3600,
+      };
+
+      const invalidToken = jwt.sign(validPayload, wrongKeyPair.privateKey, { algorithm: 'RS256' });
+      process.env.REACT_ON_RAILS_PRO_LICENSE = invalidToken;
+
+      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
+      module.getLicenseStatus();
+
+      expect(mockLogWarn).toHaveBeenCalledWith(expect.stringContaining('Invalid license signature'));
+    });
+
     it('returns missing when no license is found', () => {
       delete process.env.REACT_ON_RAILS_PRO_LICENSE;
       jest.mocked(fs.existsSync).mockReturnValue(false);

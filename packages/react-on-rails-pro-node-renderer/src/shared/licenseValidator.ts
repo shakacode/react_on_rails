@@ -80,9 +80,8 @@ function decodeLicense(licenseString: string): LicenseData | undefined {
 
     return decoded;
   } catch (error) {
-    if (error instanceof Error) {
-      logLicenseWarning(`Invalid license signature: ${error.message}. Running in unlicensed mode.`);
-    }
+    const message = error instanceof Error ? error.message : String(error);
+    logLicenseWarning(`Invalid license signature: ${message}. Running in unlicensed mode.`);
     return undefined;
   }
 }

@@ -6,16 +6,25 @@ module ReactOnRailsPro
   class LicenseValidator
     class << self
       # Returns the current license status (never raises)
+      # Thread-safe: uses Mutex to prevent race conditions during initialization
       # @return [Symbol] One of :valid, :expired, :invalid, :missing
       def license_status
         return @license_status if defined?(@license_status)
 
-        @license_status = determine_license_status
+        @mutex ||= Mutex.new
+        @mutex.synchronize do
+          # Double-check pattern: another thread may have set it while we waited
+          return @license_status if defined?(@license_status)
+
+          @license_status = determine_license_status
+        end
       end
 
       # Resets all cached state (primarily for testing)
       def reset!
-        remove_instance_variable(:@license_status) if defined?(@license_status)
+        @mutex&.synchronize do
+          remove_instance_variable(:@license_status) if defined?(@license_status)
+        end
       end
 
       private
