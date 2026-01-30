@@ -14,7 +14,7 @@ module ReactOnRailsPro
     # Check license status on Rails startup and log appropriately
     # App continues running regardless of license status
     initializer "react_on_rails_pro.check_license" do
-      config.after_initialize { log_license_status }
+      config.after_initialize { ReactOnRailsPro::Engine.log_license_status }
     end
 
     class << self
