@@ -104,6 +104,21 @@ describe('LicenseValidator', () => {
       expect(module.getLicenseStatus()).toBe('invalid');
     });
 
+    it('returns invalid for non-numeric exp field', () => {
+      const payloadWithStringExp = {
+        sub: 'test@example.com',
+        iat: Math.floor(Date.now() / 1000),
+        exp: 'not-a-number',
+        plan: 'paid',
+      };
+
+      const token = jwt.sign(payloadWithStringExp, testPrivateKey, { algorithm: 'RS256' });
+      process.env.REACT_ON_RAILS_PRO_LICENSE = token;
+
+      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
+      expect(module.getLicenseStatus()).toBe('invalid');
+    });
+
     it('returns invalid for invalid signature', () => {
       const wrongKeyPair = crypto.generateKeyPairSync('rsa', {
         modulusLength: 2048,

@@ -97,7 +97,7 @@ function checkPlan(decodedData: LicenseData): LicenseStatus {
 
 /**
  * Checks if the license is expired.
- * @returns 'valid', 'expired', or 'invalid' (if exp field missing)
+ * @returns 'valid', 'expired', or 'invalid' (if exp field missing or non-numeric)
  * @private
  */
 function checkExpiration(license: LicenseData): LicenseStatus {
@@ -105,9 +105,13 @@ function checkExpiration(license: LicenseData): LicenseStatus {
     return 'invalid';
   }
 
-  const currentTime = Math.floor(Date.now() / 1000);
-  const expTime = license.exp;
+  // Safely convert exp to number, handling non-numeric values
+  const expTime = typeof license.exp === 'number' ? license.exp : Number(license.exp);
+  if (Number.isNaN(expTime)) {
+    return 'invalid';
+  }
 
+  const currentTime = Math.floor(Date.now() / 1000);
   if (currentTime >= expTime) {
     return 'expired';
   }

@@ -101,16 +101,24 @@ module ReactOnRailsPro
       end
 
       # Checks if the license is expired
-      # @return [Symbol] :valid, :expired, or :invalid (if exp field missing)
+      # @return [Symbol] :valid, :expired, or :invalid (if exp field missing or non-numeric)
       def check_expiration(license)
         return :invalid unless license["exp"]
 
-        current_time = Time.now.to_i
-        exp_time = license["exp"]
+        # Safely convert exp to Integer, handling non-numeric values
+        exp_time = if license["exp"].is_a?(Numeric)
+                     license["exp"].to_i
+                   else
+                     Integer(license["exp"])
+                   end
 
+        current_time = Time.now.to_i
         return :expired if current_time >= exp_time
 
         :valid
+      rescue ArgumentError, TypeError
+        # Non-numeric or unconvertible exp value
+        :invalid
       end
 
       def public_key

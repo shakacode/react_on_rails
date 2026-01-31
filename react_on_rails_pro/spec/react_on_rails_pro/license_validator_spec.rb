@@ -33,6 +33,7 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
   let(:config_file_path) { instance_double(Pathname, exist?: false) }
 
   before do
+    @original_license = ENV.fetch("REACT_ON_RAILS_PRO_LICENSE", nil)
     described_class.reset!
     stub_const("ReactOnRailsPro::LicensePublicKey::KEY", test_public_key)
     ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
@@ -41,7 +42,11 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
 
   after do
     described_class.reset!
-    ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
+    if @original_license
+      ENV["REACT_ON_RAILS_PRO_LICENSE"] = @original_license
+    else
+      ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
+    end
   end
 
   describe ".license_status" do
@@ -84,6 +89,26 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
       before do
         token_without_exp = JWT.encode(payload_without_exp, test_private_key, "RS256")
         ENV["REACT_ON_RAILS_PRO_LICENSE"] = token_without_exp
+      end
+
+      it "returns :invalid" do
+        expect(described_class.license_status).to eq(:invalid)
+      end
+    end
+
+    context "with non-numeric exp field" do
+      let(:payload_with_string_exp) do
+        {
+          sub: "test@example.com",
+          iat: Time.now.to_i,
+          exp: "not-a-number",
+          plan: "paid"
+        }
+      end
+
+      before do
+        token = JWT.encode(payload_with_string_exp, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
       end
 
       it "returns :invalid" do
