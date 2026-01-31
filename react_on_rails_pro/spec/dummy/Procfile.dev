@@ -11,4 +11,4 @@ rails-server-assets: HMR=true SERVER_BUNDLE_ONLY=yes bin/shakapacker --watch
 rails-rsc-assets: HMR=true RSC_BUNDLE_ONLY=yes bin/shakapacker --watch
 
 # Start Node server for server rendering.
-node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node --inspect client/node-renderer.js
+# node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node --inspect client/node-renderer.js
