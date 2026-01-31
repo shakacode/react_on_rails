@@ -330,4 +330,96 @@ describe InstallGenerator, type: :generator do
       expect(install_generator.send(:missing_node?)).to be true
     end
   end
+
+  # Regression test for https://github.com/shakacode/react_on_rails/issues/2287
+  # Bundler subprocess commands must run in unbundled environment to prevent
+  # BUNDLE_GEMFILE inheritance from parent process
+  describe "bundler environment isolation" do
+    let(:install_generator) { described_class.new }
+
+    it "clears BUNDLE_GEMFILE when running bundle add" do
+      allow(install_generator).to receive(:shakapacker_in_gemfile?).and_return(false)
+      allow(install_generator).to receive(:system).with("bundle add shakapacker --strict").and_return(true)
+
+      expect(Bundler).to receive(:with_unbundled_env).and_yield
+
+      install_generator.send(:ensure_shakapacker_in_gemfile)
+    end
+
+    it "clears BUNDLE_GEMFILE when running bundle install" do
+      # Mock the system calls to prevent actual execution
+      allow(install_generator).to receive(:system).and_return(true)
+
+      # Expect with_unbundled_env to be called for both bundle install and shakapacker:install
+      expect(Bundler).to receive(:with_unbundled_env).twice.and_yield
+
+      install_generator.send(:install_shakapacker)
+    end
+
+    it "Bundler.with_unbundled_env clears BUNDLE_GEMFILE in block" do
+      # Set a fake BUNDLE_GEMFILE to simulate parent process context
+      original_gemfile = ENV.fetch("BUNDLE_GEMFILE", nil)
+      ENV["BUNDLE_GEMFILE"] = "/fake/parent/Gemfile"
+
+      bundler_env_in_block = nil
+      Bundler.with_unbundled_env do
+        bundler_env_in_block = ENV.fetch("BUNDLE_GEMFILE", nil)
+      end
+
+      expect(bundler_env_in_block).to be_nil
+
+      # Restore original value
+      if original_gemfile
+        ENV["BUNDLE_GEMFILE"] = original_gemfile
+      else
+        ENV.delete("BUNDLE_GEMFILE")
+      end
+    end
+
+    it "checks local Gemfile regardless of BUNDLE_GEMFILE env var" do
+      # Even if BUNDLE_GEMFILE points elsewhere, detection should check local Gemfile
+      original_gemfile = ENV.fetch("BUNDLE_GEMFILE", nil)
+      ENV["BUNDLE_GEMFILE"] = "/some/other/project/Gemfile"
+
+      # The method should check "Gemfile" not ENV["BUNDLE_GEMFILE"]
+      # We verify this by checking it does NOT try to access the env var path
+      allow(File).to receive(:file?).with("Gemfile").and_return(false)
+      allow(File).to receive(:file?).with("/some/other/project/Gemfile").and_return(true)
+
+      result = install_generator.send(:shakapacker_in_gemfile_text?, "shakapacker")
+
+      # If it checked ENV["BUNDLE_GEMFILE"], it would find the file and continue
+      # Since we return false for "Gemfile", the result should be false
+      expect(result).to be false
+
+      # Restore
+      if original_gemfile
+        ENV["BUNDLE_GEMFILE"] = original_gemfile
+      else
+        ENV.delete("BUNDLE_GEMFILE")
+      end
+    end
+
+    it "checks local Gemfile.lock regardless of BUNDLE_GEMFILE env var" do
+      original_gemfile = ENV.fetch("BUNDLE_GEMFILE", nil)
+      ENV["BUNDLE_GEMFILE"] = "/some/other/project/Gemfile"
+
+      # The method should check "Gemfile.lock" not derived from ENV["BUNDLE_GEMFILE"]
+      allow(File).to receive(:file?).with("Gemfile.lock").and_return(false)
+      allow(File).to receive(:file?).with("/some/other/project/Gemfile.lock").and_return(true)
+
+      result = install_generator.send(:shakapacker_in_lockfile?, "shakapacker")
+
+      # If it derived path from ENV["BUNDLE_GEMFILE"], it would find the file
+      # Since we return false for "Gemfile.lock", the result should be false
+      expect(result).to be false
+
+      # Restore
+      if original_gemfile
+        ENV["BUNDLE_GEMFILE"] = original_gemfile
+      else
+        ENV.delete("BUNDLE_GEMFILE")
+      end
+    end
+  end
 end
