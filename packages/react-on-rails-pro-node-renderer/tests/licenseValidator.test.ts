@@ -8,17 +8,6 @@ jest.mock('../src/shared/licensePublicKey', () => ({
   PUBLIC_KEY: '',
 }));
 
-const mockLogWarn = jest.fn();
-jest.mock('../src/shared/log', () => ({
-  __esModule: true,
-  default: {
-    warn: mockLogWarn,
-    info: jest.fn(),
-    error: jest.fn(),
-    debug: jest.fn(),
-  },
-}));
-
 import type { LicenseStatus } from '../src/shared/licenseValidator';
 
 interface LicenseValidatorModule {
@@ -33,9 +22,6 @@ describe('LicenseValidator', () => {
   beforeEach(() => {
     // Clear the module cache to get a fresh instance
     jest.resetModules();
-
-    // Clear log mock
-    mockLogWarn.mockClear();
 
     // Reset fs mocks to default (no file exists)
     jest.mocked(fs.existsSync).mockReturnValue(false);
@@ -104,22 +90,6 @@ describe('LicenseValidator', () => {
       expect(module.getLicenseStatus()).toBe('expired');
     });
 
-    it('logs a warning for expired license', () => {
-      const expiredPayload = {
-        sub: 'test@example.com',
-        iat: Math.floor(Date.now() / 1000) - 7200,
-        exp: Math.floor(Date.now() / 1000) - 3600,
-      };
-
-      const expiredToken = jwt.sign(expiredPayload, testPrivateKey, { algorithm: 'RS256' });
-      process.env.REACT_ON_RAILS_PRO_LICENSE = expiredToken;
-
-      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
-      module.getLicenseStatus();
-
-      expect(mockLogWarn).toHaveBeenCalledWith(expect.stringContaining('License expired'));
-    });
-
     it('returns invalid for license missing exp field', () => {
       const payloadWithoutExp = {
         sub: 'test@example.com',
@@ -152,28 +122,6 @@ describe('LicenseValidator', () => {
 
       const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
       expect(module.getLicenseStatus()).toBe('invalid');
-    });
-
-    it('logs warning for invalid signature and includes error message', () => {
-      const wrongKeyPair = crypto.generateKeyPairSync('rsa', {
-        modulusLength: 2048,
-        publicKeyEncoding: { type: 'spki', format: 'pem' },
-        privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
-      });
-
-      const validPayload = {
-        sub: 'test@example.com',
-        iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(Date.now() / 1000) + 3600,
-      };
-
-      const invalidToken = jwt.sign(validPayload, wrongKeyPair.privateKey, { algorithm: 'RS256' });
-      process.env.REACT_ON_RAILS_PRO_LICENSE = invalidToken;
-
-      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
-      module.getLicenseStatus();
-
-      expect(mockLogWarn).toHaveBeenCalledWith(expect.stringContaining('Invalid license signature'));
     });
 
     it('returns missing when no license is found', () => {
@@ -264,25 +212,6 @@ describe('LicenseValidator', () => {
 
       const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
       expect(module.getLicenseStatus()).toBe('valid');
-    });
-
-    it("logs a warning for invalid plan 'free'", () => {
-      const payload = {
-        sub: 'test@example.com',
-        iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(Date.now() / 1000) + 3600,
-        plan: 'free',
-      };
-
-      const token = jwt.sign(payload, testPrivateKey, { algorithm: 'RS256' });
-      process.env.REACT_ON_RAILS_PRO_LICENSE = token;
-
-      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
-      module.getLicenseStatus();
-
-      expect(mockLogWarn).toHaveBeenCalledWith(
-        expect.stringContaining("License plan 'free' is not valid for production use"),
-      );
     });
   });
 

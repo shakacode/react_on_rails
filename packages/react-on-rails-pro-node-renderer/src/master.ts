@@ -17,21 +17,18 @@ export default function masterRun(runningConfig?: Partial<Config>) {
   if (status === 'valid') {
     log.info('[React on Rails Pro] License validated successfully.');
   } else if (status === 'missing') {
-    log.warn(
+    log.info(
       '[React on Rails Pro] No license found. ' +
-        'Using React on Rails Pro in production without a valid license violates the license terms. ' +
         'Get a license at https://www.shakacode.com/react-on-rails-pro/',
     );
   } else if (status === 'expired') {
-    log.warn(
+    log.info(
       '[React on Rails Pro] License has expired. ' +
-        'Using React on Rails Pro in production without a valid license violates the license terms. ' +
         'Renew your license at https://www.shakacode.com/react-on-rails-pro/',
     );
   } else {
-    log.warn(
+    log.info(
       '[React on Rails Pro] Invalid license. ' +
-        'Using React on Rails Pro in production without a valid license violates the license terms. ' +
         'Get a license at https://www.shakacode.com/react-on-rails-pro/',
     );
   }

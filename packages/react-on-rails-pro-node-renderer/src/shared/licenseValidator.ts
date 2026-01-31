@@ -2,7 +2,6 @@ import * as jwt from 'jsonwebtoken';
 import * as fs from 'fs';
 import * as path from 'path';
 import { PUBLIC_KEY } from './licensePublicKey.js';
-import log from './log.js';
 
 interface LicenseData {
   // Subject (email for whom the license is issued)
@@ -32,14 +31,6 @@ export type LicenseStatus = 'valid' | 'expired' | 'invalid' | 'missing';
 let cachedLicenseStatus: LicenseStatus | undefined;
 
 /**
- * Logs a license warning message.
- * @private
- */
-function logLicenseWarning(message: string): void {
-  log.warn(`[React on Rails Pro] ${message}`);
-}
-
-/**
  * Loads the license string from environment variable or config file.
  * @returns License string or undefined if not found
  * @private
@@ -57,8 +48,8 @@ function loadLicenseString(): string | undefined {
     if (fs.existsSync(configPath)) {
       return fs.readFileSync(configPath, 'utf8').trim();
     }
-  } catch (error) {
-    logLicenseWarning(`Error reading license file: ${(error as Error).message}`);
+  } catch {
+    // File read error - return undefined to indicate missing license
   }
 
   return undefined;
@@ -79,9 +70,8 @@ function decodeLicense(licenseString: string): LicenseData | undefined {
     }) as LicenseData;
 
     return decoded;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    logLicenseWarning(`Invalid license signature: ${message}. Running in unlicensed mode.`);
+  } catch {
+    // Invalid JWT - return undefined to indicate invalid license
     return undefined;
   }
 }
@@ -102,7 +92,6 @@ function checkPlan(decodedData: LicenseData): LicenseStatus {
     return 'valid';
   }
 
-  logLicenseWarning(`License plan '${plan}' is not valid for production use. Running in unlicensed mode.`);
   return 'invalid';
 }
 
@@ -113,7 +102,6 @@ function checkPlan(decodedData: LicenseData): LicenseStatus {
  */
 function checkExpiration(license: LicenseData): LicenseStatus {
   if (!license.exp) {
-    logLicenseWarning('License is missing expiration field. Running in unlicensed mode.');
     return 'invalid';
   }
 
@@ -121,8 +109,6 @@ function checkExpiration(license: LicenseData): LicenseStatus {
   const expTime = license.exp;
 
   if (currentTime > expTime) {
-    const daysExpired = Math.floor((currentTime - expTime) / (24 * 60 * 60));
-    logLicenseWarning(`License expired ${daysExpired} day(s) ago. Running in unlicensed mode.`);
     return 'expired';
   }
 
@@ -138,7 +124,6 @@ function determineLicenseStatus(): LicenseStatus {
   // Step 1: Load license string
   const licenseString = loadLicenseString();
   if (!licenseString) {
-    logLicenseWarning('No license found. Running in unlicensed mode.');
     return 'missing';
   }
 

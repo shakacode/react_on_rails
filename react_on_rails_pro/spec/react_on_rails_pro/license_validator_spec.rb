@@ -240,12 +240,6 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
       described_class.reset!
       expect(described_class.instance_variable_defined?(:@license_status)).to be false
     end
-
-    it "clears the mutex for test isolation" do
-      expect(described_class.instance_variable_defined?(:@mutex)).to be true
-      described_class.reset!
-      expect(described_class.instance_variable_defined?(:@mutex)).to be false
-    end
   end
 
   describe "thread safety" do

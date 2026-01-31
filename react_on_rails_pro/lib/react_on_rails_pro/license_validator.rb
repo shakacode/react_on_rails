@@ -7,6 +7,11 @@ module ReactOnRailsPro
   # This class only determines license status - it does NOT log.
   # All logging is handled by Engine.log_license_status for environment-aware messaging.
   class LicenseValidator
+    # Mutex for thread-safe license status initialization.
+    # Using a constant eliminates the race condition that would exist with @mutex ||= Mutex.new
+    # See: https://bugs.ruby-lang.org/issues/20875
+    LICENSE_MUTEX = Mutex.new
+
     class << self
       # Returns the current license status (never raises, never logs)
       # Thread-safe: uses Mutex to prevent race conditions during initialization
@@ -14,8 +19,7 @@ module ReactOnRailsPro
       def license_status
         return @license_status if defined?(@license_status)
 
-        @mutex ||= Mutex.new
-        @mutex.synchronize do
+        LICENSE_MUTEX.synchronize do
           # Double-check pattern: another thread may have set it while we waited
           return @license_status if defined?(@license_status)
 
@@ -25,12 +29,9 @@ module ReactOnRailsPro
 
       # Resets all cached state (primarily for testing)
       def reset!
-        if defined?(@mutex) && @mutex
-          @mutex.synchronize do
-            remove_instance_variable(:@license_status) if defined?(@license_status)
-          end
+        LICENSE_MUTEX.synchronize do
+          remove_instance_variable(:@license_status) if defined?(@license_status)
         end
-        remove_instance_variable(:@mutex) if defined?(@mutex)
       end
 
       private
@@ -79,10 +80,11 @@ module ReactOnRailsPro
           license_string,
           public_key,
           true, # verify signature - NEVER set to false!
+          # Enforce RS256 algorithm only to prevent "alg=none" and downgrade attacks
           algorithm: "RS256",
           verify_expiration: false # we handle expiration manually
         ).first
-      rescue JWT::DecodeError, StandardError
+      rescue StandardError
         nil
       end
 
