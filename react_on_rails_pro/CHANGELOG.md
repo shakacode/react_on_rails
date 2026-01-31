@@ -6,8 +6,8 @@ All notable changes to this project will be documented in this file. Items under
 
 Gem and package versions are the same except for beta releases where the gem uses a `.beta` and the package uses a `-beta` (same for `rc`).
 
-1. **Gem**: `16.2.1`
-2. **Package**: `16.2.1`
+1. **Gem**: `X.X.X.beta.X`
+2. **Package**: `X.X.X-beta.X`
 
 You can find the **package** version numbers from this repo's tags and below in this file.
 
