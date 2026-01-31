@@ -382,8 +382,7 @@ describe ReactOnRailsPro::Request do
       stream = described_class.render_code_with_incremental_updates(
         "/render-incremental",
         js_code,
-        async_props_block: async_props_block,
-        is_rsc_payload: false
+        async_props_block: async_props_block
       )
 
       stream.each_chunk(&:itself)
@@ -408,8 +407,7 @@ describe ReactOnRailsPro::Request do
       stream = described_class.render_code_with_incremental_updates(
         "/render-incremental",
         js_code,
-        async_props_block: test_async_props_block,
-        is_rsc_payload: false
+        async_props_block: test_async_props_block
       )
 
       stream.each_chunk(&:itself)
@@ -439,8 +437,7 @@ describe ReactOnRailsPro::Request do
       stream = described_class.render_code_with_incremental_updates(
         "/render-incremental",
         js_code,
-        async_props_block: test_async_props_block,
-        is_rsc_payload: false
+        async_props_block: test_async_props_block
       )
 
       stream.each_chunk(&:itself)
@@ -450,7 +447,7 @@ describe ReactOnRailsPro::Request do
       expect(execution_order).to eq(%i[async_block_start chunk_yielded async_block_end])
     end
 
-    it "uses rsc_bundle_hash when is_rsc_payload is true" do
+    it "uses rsc_bundle_hash for the AsyncPropsEmitter" do
       allow(ReactOnRailsPro.configuration).to receive(:enable_rsc_support).and_return(true)
 
       emitter_captured = nil
@@ -465,8 +462,7 @@ describe ReactOnRailsPro::Request do
       stream = described_class.render_code_with_incremental_updates(
         "/render-incremental",
         js_code,
-        async_props_block: async_props_block,
-        is_rsc_payload: true
+        async_props_block: async_props_block
       )
 
       stream.each_chunk(&:itself)

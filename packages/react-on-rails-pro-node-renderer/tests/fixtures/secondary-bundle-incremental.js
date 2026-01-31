@@ -22,9 +22,26 @@ global.ReactOnRails = {
     stream.write(value);
   },
 
+  // Add value to stream
+  addStreamValueToFirstBundle: function (value) {
+    if (!sharedExecutionContext.has('stream')) {
+      // Create the stream first if it doesn't exist
+      ReactOnRails.getStreamValues();
+    }
+    const { stream } = sharedExecutionContext.get('stream');
+    stream.write(value);
+  },
+
   endStream: function () {
     if (sharedExecutionContext.has('secondaryStream')) {
       const { stream } = sharedExecutionContext.get('secondaryStream');
+      stream.end();
+    }
+  },
+
+  endFirstBundleStream: function () {
+    if (sharedExecutionContext.has('stream')) {
+      const { stream } = sharedExecutionContext.get('stream');
       stream.end();
     }
   },

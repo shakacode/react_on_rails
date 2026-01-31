@@ -65,7 +65,7 @@ module ReactOnRailsPro
             expect(described_class).to have_received(:prepare_incremental_render_path)
               .with(js_code, render_options)
             expect(ReactOnRailsPro::Request).to have_received(:render_code_with_incremental_updates)
-              .with(expected_path, js_code, async_props_block: async_props_block, is_rsc_payload: false)
+              .with(expected_path, js_code, async_props_block: async_props_block)
           end
         end
 

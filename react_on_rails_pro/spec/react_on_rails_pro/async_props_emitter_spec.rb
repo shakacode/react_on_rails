@@ -20,7 +20,8 @@ RSpec.describe ReactOnRailsPro::AsyncPropsEmitter do
         expect(output).to end_with("\n")
         parsed = JSON.parse(output.chomp)
         expect(parsed["bundleTimestamp"]).to eq(bundle_timestamp)
-        expect(parsed["updateChunk"]).to include('sharedExecutionContext.get("asyncPropsManager")')
+        expected_js = "asyncPropsManager = ReactOnRails.getOrCreateAsyncPropsManager(sharedExecutionContext)"
+        expect(parsed["updateChunk"]).to include(expected_js)
         expect(parsed["updateChunk"]).to include('asyncPropsManager.setProp("books", ["Book 1","Book 2"])')
       end
     end
