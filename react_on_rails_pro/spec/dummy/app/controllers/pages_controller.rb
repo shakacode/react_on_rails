@@ -197,7 +197,7 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
       received_messages = redis.xread(stream_id, last_received_id, block: 0)[stream_id]
       # receive_messages are like [[msg1_id, [**msg_entries]], [msg2_id, [**msg_entries]]]
       last_received_id = received_messages.last.first
-      received_messages.each_value do |message_entries|
+      received_messages.each do |_message_id, message_entries| # rubocop:disable Style/HashEachMethods
         message_entries.each do |message_key, message_value|
           if message_key == "end"
             ended = true
