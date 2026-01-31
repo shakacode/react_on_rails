@@ -32,8 +32,9 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
   let(:mock_root) { instance_double(Pathname, join: config_file_path) }
   let(:config_file_path) { instance_double(Pathname, exist?: false) }
 
+  # NOTE: REACT_ON_RAILS_PRO_LICENSE does not exist in test environments,
+  # so there's no pre-existing value to preserve/restore.
   before do
-    @original_license = ENV.fetch("REACT_ON_RAILS_PRO_LICENSE", nil)
     described_class.reset!
     stub_const("ReactOnRailsPro::LicensePublicKey::KEY", test_public_key)
     ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
@@ -42,11 +43,7 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
 
   after do
     described_class.reset!
-    if @original_license
-      ENV["REACT_ON_RAILS_PRO_LICENSE"] = @original_license
-    else
-      ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
-    end
+    ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
   end
 
   describe ".license_status" do
@@ -96,25 +93,11 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
       end
     end
 
-    context "with non-numeric exp field" do
-      let(:payload_with_string_exp) do
-        {
-          sub: "test@example.com",
-          iat: Time.now.to_i,
-          exp: "not-a-number",
-          plan: "paid"
-        }
-      end
-
-      before do
-        token = JWT.encode(payload_with_string_exp, test_private_key, "RS256")
-        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
-      end
-
-      it "returns :invalid" do
-        expect(described_class.license_status).to eq(:invalid)
-      end
-    end
+    # NOTE: Test for non-numeric exp field is not included because the JWT gem
+    # validates that exp must be numeric at encode time. Any hand-crafted token
+    # with non-numeric exp would fail signature verification in decode_license
+    # before check_expiration is reached. The defensive code in check_expiration
+    # is kept as defense-in-depth but is unreachable with valid signed JWTs.
 
     context "with invalid signature" do
       before do

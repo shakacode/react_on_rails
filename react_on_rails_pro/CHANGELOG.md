@@ -548,7 +548,7 @@ Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52
 - advanced error handling
 
 [Unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.2.0...master
-[16.2.0]: https://github.com/shakacode/react_on_rails/compare/v16.1.1...v16.2.0
+[16.2.0]: https://github.com/shakacode/react_on_rails/compare/v16.2.0.beta.0...v16.2.0
 [4.0.0-rc.15]: https://github.com/shakacode/react_on_rails_pro/compare/4.0.0-rc.14...4.0.0-rc.15
 [4.0.0.rc.11]: https://github.com/shakacode/react_on_rails_pro/compare/4.0.0-rc.9...4.0.0-rc.11
 [4.0.0.rc.9]: https://github.com/shakacode/react_on_rails_pro/compare/4.0.0-rc.6...4.0.0-rc.9
