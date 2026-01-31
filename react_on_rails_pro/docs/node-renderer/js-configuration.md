@@ -89,3 +89,66 @@ And add this line to your `scripts` section of `package.json`
 ```
 
 `yarn start` will run the renderer.
+
+## Custom Fastify Configuration
+
+For advanced use cases, you can customize the Fastify server instance by importing the `master` and `worker` modules directly. This is useful for:
+
+- Adding custom routes (e.g., `/health` for container health checks)
+- Registering Fastify plugins
+- Adding custom hooks for logging or monitoring
+
+### Adding a Health Check Endpoint
+
+When running the node-renderer in Docker or Kubernetes, you may need a `/health` endpoint for container health checks:
+
+```js
+import masterRun from 'react-on-rails-pro-node-renderer/master';
+import run, { configureFastify } from 'react-on-rails-pro-node-renderer/worker';
+import cluster from 'cluster';
+
+const config = {
+  // Your configuration options here
+};
+
+// Add custom routes before starting the server
+configureFastify((app) => {
+  app.get('/health', (req, res) => {
+    res.send({ status: 'ok' });
+  });
+});
+
+// Start the appropriate process
+if (cluster.isPrimary) {
+  masterRun(config);
+} else {
+  run(config);
+}
+```
+
+### Registering Fastify Plugins
+
+You can also register Fastify plugins:
+
+```js
+import run, { configureFastify } from 'react-on-rails-pro-node-renderer/worker';
+
+configureFastify((app) => {
+  // Register a plugin
+  app.register(require('@fastify/cors'), {
+    origin: true,
+  });
+
+  // Add hooks
+  app.addHook('onRequest', async (request, reply) => {
+    // Custom logging or monitoring
+    console.log(`Request: ${request.method} ${request.url}`);
+  });
+});
+```
+
+> **Note:** The `configureFastify` function must be called before starting the worker. The configuration functions are called after the server is created but before it starts listening.
+
+### API Stability
+
+The `./master` and `./worker` exports provide direct access to the node-renderer internals. While we strive to maintain backwards compatibility, these are considered advanced APIs. If you only need basic configuration, prefer using the standard `reactOnRailsProNodeRenderer` function with the configuration options documented above.
