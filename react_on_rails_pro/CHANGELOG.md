@@ -6,8 +6,8 @@ All notable changes to this project will be documented in this file. Items under
 
 Gem and package versions are the same except for beta releases where the gem uses a `.beta` and the package uses a `-beta` (same for `rc`).
 
-1. **Gem**: `3.0.0.rc.1`
-2. **Package**: `3.0.0-rc.1`
+1. **Gem**: `16.2.1`
+2. **Package**: `16.2.1`
 
 You can find the **package** version numbers from this repo's tags and below in this file.
 
@@ -19,9 +19,17 @@ You can find the **package** version numbers from this repo's tags and below in 
 
 Changes since the last non-beta release.
 
-### [v16.2.0.rc.0] - 2025-12-29
+### Added
 
-Changes since the last non-beta release.
+- **Node Renderer Master/Worker Exports**: Added public `master` and `worker` exports to `react-on-rails-pro-node-renderer` package, allowing users to import from `react-on-rails-pro-node-renderer/master` and `react-on-rails-pro-node-renderer/worker`. [PR 2326](https://github.com/shakacode/react_on_rails/pull/2326) by [justin808](https://github.com/justin808).
+
+## [16.2.1] - 2026-01-18
+
+### Developer (Contributors Only)
+
+- **Benchmarking in CI**: Added performance testing infrastructure. [PR 1868](https://github.com/shakacode/react_on_rails/pull/1868) by [alexeyr-ci2](https://github.com/alexeyr-ci2).
+
+## [16.2.0] - 2026-01-14
 
 ### Improved
 
@@ -47,7 +55,6 @@ Changes since the last non-beta release.
   These helpers were previously in the open-source gem but have been moved to Pro as they are Pro-only features.
 
 - **Node Renderer Gem Version Validation**: The node renderer now validates that the Ruby gem version (`react_on_rails_pro`) matches the node renderer package version (`@shakacode-tools/react-on-rails-pro-node-renderer`) on every render request. Environment-aware: strict enforcement in development (returns 412 Precondition Failed on mismatch), permissive in production (allows with warning). Includes version normalization to handle Ruby gem vs NPM format differences (e.g., `4.0.0.rc.1` vs `4.0.0-rc.1`). [PR #1881](https://github.com/shakacode/react_on_rails/pull/1881) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-- **Node Renderer Master/Worker Exports**: Added public `master` and `worker` exports to `react-on-rails-pro-node-renderer` package, allowing users to import from `react-on-rails-pro-node-renderer/master` and `react-on-rails-pro-node-renderer/worker`. [PR 2326](https://github.com/shakacode/react_on_rails/pull/2326) by [justin808](https://github.com/justin808).
 
 ### Fixed
 
@@ -64,8 +71,6 @@ Changes since the last non-beta release.
 - **Node Renderer Worker Restart**: Fixed "descriptor closed" error that occurred when the node renderer restarts while handling an in-progress request (especially streaming requests). Workers now perform graceful shutdowns: they disconnect from the cluster to stop receiving new requests, wait for active requests to complete, then shut down cleanly. A configurable `gracefulWorkerRestartTimeout` ensures workers are forcibly killed if they don't shut down in time. [PR 1970](https://github.com/shakacode/react_on_rails/pull/1970) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 - **Body Duplication Bug On Streaming**: Fixed a bug that happens while streaming if the node renderer connection closed after streaming some chunks to the client. [PR 1995](https://github.com/shakacode/react_on_rails/pull/1995) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-
-### Changed
 
 ### Deprecated
 
@@ -544,9 +549,9 @@ Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52
 - support for javascript evaluation caching
 - advanced error handling
 
-[HEAD compared to 3.2.1]: https://github.com/shakacode/react_on_rails_pro/compare/3.3.1...HEAD
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.2.0.rc.0...master
-[v16.2.0.rc.0]: https://github.com/shakacode/react_on_rails/compare/16.1.1...v16.2.0.rc.0
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.2.1...master
+[16.2.1]: https://github.com/shakacode/react_on_rails/compare/v16.2.0...v16.2.1
+[16.2.0]: https://github.com/shakacode/react_on_rails/compare/v16.1.1...v16.2.0
 [4.0.0-rc.15]: https://github.com/shakacode/react_on_rails_pro/compare/4.0.0-rc.14...4.0.0-rc.15
 [4.0.0.rc.11]: https://github.com/shakacode/react_on_rails_pro/compare/4.0.0-rc.9...4.0.0-rc.11
 [4.0.0.rc.9]: https://github.com/shakacode/react_on_rails_pro/compare/4.0.0-rc.6...4.0.0-rc.9
