@@ -279,7 +279,7 @@ This is intentional. By the time the client start parsing the model data, the re
 
 Text rows are terminated by newline:
 
-```
+```rsc
 <hex id>:<tag><JSON>\n
 ```
 
