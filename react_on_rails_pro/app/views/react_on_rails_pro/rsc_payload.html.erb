@@ -8,10 +8,10 @@
   end
 
   # Simulate fetching async props
-  sleep 3
+  sleep 1
   emit.call("books", ["The Pragmatic Programmer", "Clean Code", "Design Patterns"])
 
-  sleep 3
+  sleep 1
   emit.call("researches", ["Machine Learning Study", "React Performance Optimization", "Database Indexing Strategies"])
 end %>
 <% else %>

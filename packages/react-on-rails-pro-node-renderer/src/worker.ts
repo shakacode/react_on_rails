@@ -374,7 +374,9 @@ export default function run(config: Partial<Config>) {
         // Without this, the response stream stays open waiting for the client (httpx) to timeout,
         // which can take 30+ seconds. This delays worker shutdown during graceful termination.
         // Destroying the raw response immediately closes the connection and triggers onResponse.
-        res.raw.destroy();
+        if (!res.raw.destroyed) {
+          res.raw.destroy();
+        }
       } else {
         // Response hasn't started yet, we can send an error response
         const errorResponse = errorResponseResult(errorMessage);

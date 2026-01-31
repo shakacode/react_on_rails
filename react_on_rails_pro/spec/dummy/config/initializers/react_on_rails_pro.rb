@@ -31,7 +31,7 @@ ReactOnRailsPro.configure do |config|
   # If true, then cache the evaluation of JS for prerendering using the standard Rails cache.
   # Applies to all rendering engines.
   # Default for `prerender_caching` is false.
-  config.prerender_caching = false
+  config.prerender_caching = true
 
   # Retry request in case of time out on the node-renderer side
   # 0 - no retry
