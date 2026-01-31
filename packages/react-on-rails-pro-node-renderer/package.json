@@ -12,6 +12,14 @@
       "types": "./lib/ReactOnRailsProNodeRenderer.d.ts",
       "default": "./lib/ReactOnRailsProNodeRenderer.js"
     },
+    "./master": {
+      "types": "./lib/master.d.ts",
+      "default": "./lib/master.js"
+    },
+    "./worker": {
+      "types": "./lib/worker.d.ts",
+      "default": "./lib/worker.js"
+    },
     "./integrations/*": {
       "types": "./lib/integrations/*.d.ts",
       "default": "./lib/integrations/*.js"
