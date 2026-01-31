@@ -111,14 +111,15 @@ const config = {
   // Your configuration options here
 };
 
-// Register custom routes (callbacks execute after app.listen() is called)
+// Register a custom health check route
 configureFastify((app) => {
   app.get('/health', (request, reply) => {
     reply.send({ status: 'ok' });
   });
 });
 
-// Start the appropriate process based on cluster role
+// The node-renderer uses Node.js cluster module to fork worker processes.
+// The primary process manages workers; workers handle HTTP requests.
 if (cluster.isPrimary) {
   masterRun(config);
 } else {
@@ -141,16 +142,20 @@ configureFastify((app) => {
   });
 });
 
-// Add request logging with error handling
+// Add request logging
 configureFastify((app) => {
   app.addHook('onRequest', (request, reply, done) => {
-    console.log(`Request: ${request.method} ${request.url}`);
-    done();
+    try {
+      console.log(`Request: ${request.method} ${request.url}`);
+      done();
+    } catch (err) {
+      done(err);
+    }
   });
 });
 ```
 
-> **Note:** The `configureFastify` function must be called before calling `run()`. Multiple callbacks can be registered and will execute in order after the Fastify app is created.
+> **Note:** The `configureFastify` function must be called before calling `run()`. Multiple callbacks can be registered and will execute in order. You can use `app.ready()` in your callback to ensure all plugins are loaded before performing operations that depend on them.
 
 ### API Stability
 
