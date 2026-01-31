@@ -111,14 +111,14 @@ const config = {
   // Your configuration options here
 };
 
-// Add custom routes before starting the server
+// Register custom routes (callbacks execute after app.listen() is called)
 configureFastify((app) => {
-  app.get('/health', (req, res) => {
-    res.send({ status: 'ok' });
+  app.get('/health', (request, reply) => {
+    reply.send({ status: 'ok' });
   });
 });
 
-// Start the appropriate process
+// Start the appropriate process based on cluster role
 if (cluster.isPrimary) {
   masterRun(config);
 } else {
@@ -128,9 +128,10 @@ if (cluster.isPrimary) {
 
 ### Registering Fastify Plugins
 
-You can also register Fastify plugins:
+You can also register Fastify plugins. This example assumes you're using the same cluster setup pattern shown above:
 
 ```js
+// In the worker branch of your cluster setup (see example above)
 import run, { configureFastify } from 'react-on-rails-pro-node-renderer/worker';
 
 configureFastify((app) => {
@@ -138,16 +139,18 @@ configureFastify((app) => {
   app.register(require('@fastify/cors'), {
     origin: true,
   });
+});
 
-  // Add hooks
-  app.addHook('onRequest', async (request, reply) => {
-    // Custom logging or monitoring
+// Add request logging with error handling
+configureFastify((app) => {
+  app.addHook('onRequest', (request, reply, done) => {
     console.log(`Request: ${request.method} ${request.url}`);
+    done();
   });
 });
 ```
 
-> **Note:** The `configureFastify` function must be called before starting the worker. The configuration functions are called after the server is created but before it starts listening.
+> **Note:** The `configureFastify` function must be called before calling `run()`. Multiple callbacks can be registered and will execute in order after the Fastify app is created.
 
 ### API Stability
 
