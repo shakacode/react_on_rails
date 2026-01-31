@@ -263,5 +263,11 @@ export function createCoreCapability(registries: Registries) {
       void args;
       throw new Error('addAsyncPropsCapabilityToComponentProps requires the react-on-rails-pro package.');
     },
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    getOrCreateAsyncPropsManager(...args: any[]): any {
+      void args;
+      throw new Error('getOrCreateAsyncPropsManager requires the react-on-rails-pro package.');
+    },
   };
 }

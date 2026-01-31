@@ -67,13 +67,13 @@ describe "Incremental Rendering Integration", :integration do
         {
           bundleTimestamp: bundle_timestamp,
           # Add newline to the value so the fixture bundle writes it with newline
-          updateChunk: "ReactOnRails.addStreamValue(#{value.to_json} + '\\n')"
+          updateChunk: "ReactOnRails.addStreamValueToFirstBundle(#{value.to_json} + '\\n')"
         }
       end
 
     allow_any_instance_of(ReactOnRailsPro::AsyncPropsEmitter).to receive(:end_stream_chunk).and_call_original
     allow_any_instance_of(ReactOnRailsPro::AsyncPropsEmitter).to receive(:generate_end_stream_js).and_return(
-      "ReactOnRails.endStream()"
+      "ReactOnRails.endFirstBundleStream()"
     )
     # rubocop:enable RSpec/AnyInstance
 
@@ -129,8 +129,7 @@ describe "Incremental Rendering Integration", :integration do
           emitter.call("prop1", "value1")
           emitter.call("prop2", "value2")
           emitter.call("prop3", "value3")
-        },
-        is_rsc_payload: false
+        }
       )
 
       # Collect all chunks from the stream
@@ -178,8 +177,7 @@ describe "Incremental Rendering Integration", :integration do
             chunk_received.wait
 
             # If we reach here, all chunks were received while async_block was running
-          },
-          is_rsc_payload: false
+          }
         )
 
         # Collect chunks and signal after each one

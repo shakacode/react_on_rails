@@ -26,7 +26,7 @@ import {
 } from 'react-on-rails/types';
 import { convertToError } from 'react-on-rails/serverRenderUtils';
 import handleError from '../handleErrorRSC.ts';
-import AsyncPropsManager from '../AsyncPropsManager.ts';
+import { getOrCreateAsyncPropsManager } from '../AsyncPropsManager.ts';
 
 import {
   streamServerRenderedComponent,
@@ -117,8 +117,8 @@ export function createProRSCCapability() {
     addAsyncPropsCapabilityToComponentProps<
       AsyncPropsType extends Record<string, unknown>,
       PropsType extends Record<string, unknown>,
-    >(props: PropsType) {
-      const asyncPropManager = new AsyncPropsManager();
+    >(props: PropsType, sharedExecutionContext: Map<string, unknown>) {
+      const asyncPropManager = getOrCreateAsyncPropsManager(sharedExecutionContext);
       const propsAfterAddingAsyncProps = {
         ...props,
         getReactOnRailsAsyncProp: <PropName extends keyof AsyncPropsType>(propName: PropName) => {
@@ -126,7 +126,11 @@ export function createProRSCCapability() {
         },
       };
 
-      return { asyncPropManager, props: propsAfterAddingAsyncProps };
+      return { props: propsAfterAddingAsyncProps };
+    },
+
+    getOrCreateAsyncPropsManager(sharedExecutionContext: Map<string, unknown>) {
+      return getOrCreateAsyncPropsManager(sharedExecutionContext);
     },
   };
 }

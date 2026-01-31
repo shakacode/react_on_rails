@@ -61,6 +61,12 @@ module ReactOnRailsPro
       # - RSC bundle has `addAsyncPropsCapabilityToComponentProps` method
       # - Server bundle (non-RSC) doesn't support this pattern
       #
+      # RACE CONDITION HANDLING:
+      # - Uses getOrCreateAsyncPropsManager internally for lazy initialization
+      # - If initial render runs first: creates manager, stores in sharedExecutionContext
+      # - If update chunk arrives first: creates manager via getOrCreateAsyncPropsManager
+      # - Both share the same manager via sharedExecutionContext
+      #
       # WHY sharedExecutionContext?
       # - The asyncPropManager needs to be accessible by update chunks that arrive later
       # - Update chunks run in the same ExecutionContext, so they can retrieve it
@@ -73,9 +79,8 @@ module ReactOnRailsPro
 
         <<-JS
           if (ReactOnRails.isRSCBundle) {
-            var { props: propsWithAsyncProps, asyncPropManager } = ReactOnRails.addAsyncPropsCapabilityToComponentProps(usedProps);
+            var { props: propsWithAsyncProps } = ReactOnRails.addAsyncPropsCapabilityToComponentProps(usedProps, sharedExecutionContext);
             usedProps = propsWithAsyncProps;
-            sharedExecutionContext.set("asyncPropsManager", asyncPropManager);
           }
         JS
       end

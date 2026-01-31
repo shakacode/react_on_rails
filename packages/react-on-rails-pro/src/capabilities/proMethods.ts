@@ -46,5 +46,11 @@ export function createProMethodCapability() {
       void args;
       throw new Error('addAsyncPropsCapabilityToComponentProps is supported in the RSC bundle only.');
     },
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    getOrCreateAsyncPropsManager(...args: any[]): any {
+      void args;
+      throw new Error('getOrCreateAsyncPropsManager is supported in the RSC bundle only.');
+    },
   };
 }
