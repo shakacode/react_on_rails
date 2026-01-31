@@ -23,12 +23,6 @@ Changes since the last non-beta release.
 
 - **Node Renderer Master/Worker Exports**: Added public `master` and `worker` exports to `react-on-rails-pro-node-renderer` package, allowing users to import from `react-on-rails-pro-node-renderer/master` and `react-on-rails-pro-node-renderer/worker`. [PR 2326](https://github.com/shakacode/react_on_rails/pull/2326) by [justin808](https://github.com/justin808).
 
-## [16.2.1] - 2026-01-18
-
-### Developer (Contributors Only)
-
-- **Benchmarking in CI**: Added performance testing infrastructure. [PR 1868](https://github.com/shakacode/react_on_rails/pull/1868) by [alexeyr-ci2](https://github.com/alexeyr-ci2).
-
 ## [16.2.0] - 2026-01-14
 
 ### Improved
@@ -549,8 +543,7 @@ Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52
 - support for javascript evaluation caching
 - advanced error handling
 
-[Unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.2.1...master
-[16.2.1]: https://github.com/shakacode/react_on_rails/compare/v16.2.0...v16.2.1
+[Unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.2.0...master
 [16.2.0]: https://github.com/shakacode/react_on_rails/compare/v16.1.1...v16.2.0
 [4.0.0-rc.15]: https://github.com/shakacode/react_on_rails_pro/compare/4.0.0-rc.14...4.0.0-rc.15
 [4.0.0.rc.11]: https://github.com/shakacode/react_on_rails_pro/compare/4.0.0-rc.9...4.0.0-rc.11
