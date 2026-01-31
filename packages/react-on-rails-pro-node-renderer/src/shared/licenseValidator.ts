@@ -108,7 +108,7 @@ function checkExpiration(license: LicenseData): LicenseStatus {
   const currentTime = Math.floor(Date.now() / 1000);
   const expTime = license.exp;
 
-  if (currentTime > expTime) {
+  if (currentTime >= expTime) {
     return 'expired';
   }
 

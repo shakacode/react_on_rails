@@ -108,7 +108,7 @@ module ReactOnRailsPro
         current_time = Time.now.to_i
         exp_time = license["exp"]
 
-        return :expired if current_time > exp_time
+        return :expired if current_time >= exp_time
 
         :valid
       end
