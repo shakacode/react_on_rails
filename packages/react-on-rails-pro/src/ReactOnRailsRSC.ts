@@ -25,7 +25,7 @@ import {
 import { convertToError } from 'react-on-rails/serverRenderUtils';
 import handleError from './handleErrorRSC.ts';
 import ReactOnRails from './ReactOnRails.full.ts';
-import AsyncPropsManager from './AsyncPropsManager.ts';
+import { getOrCreateAsyncPropsManager } from './AsyncPropsManager.ts';
 
 import {
   streamServerRenderedComponent,
@@ -135,14 +135,15 @@ ReactOnRails.serverRenderRSCReactComponent = (options: RSCRenderParams) => {
  * }
  * ```
  *
- * @returns asyncPropManager - Stored in sharedExecutionContext for update chunks
+ * @param props - The component props to enhance
+ * @param sharedExecutionContext - Map scoped to the current HTTP request for sharing state
  * @returns props - Original props plus getReactOnRailsAsyncProp function
  */
 function addAsyncPropsCapabilityToComponentProps<
   AsyncPropsType extends Record<string, unknown>,
   PropsType extends Record<string, unknown>,
->(props: PropsType) {
-  const asyncPropManager = new AsyncPropsManager();
+>(props: PropsType, sharedExecutionContext: Map<string, unknown>) {
+  const asyncPropManager = getOrCreateAsyncPropsManager(sharedExecutionContext);
   const propsAfterAddingAsyncProps = {
     ...props,
     // This function is a closure over asyncPropManager, allowing the component
@@ -152,14 +153,13 @@ function addAsyncPropsCapabilityToComponentProps<
     },
   };
 
-  // Return both the manager (for storing in sharedExecutionContext) and the enhanced props
   return {
-    asyncPropManager,
     props: propsAfterAddingAsyncProps,
   };
 }
 
 ReactOnRails.addAsyncPropsCapabilityToComponentProps = addAsyncPropsCapabilityToComponentProps;
+ReactOnRails.getOrCreateAsyncPropsManager = getOrCreateAsyncPropsManager;
 
 ReactOnRails.isRSCBundle = true;
 

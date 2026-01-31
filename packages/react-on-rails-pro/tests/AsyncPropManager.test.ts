@@ -1,4 +1,4 @@
-import AsyncPropsManager from '../src/AsyncPropsManager.ts';
+import AsyncPropsManager, { getOrCreateAsyncPropsManager } from '../src/AsyncPropsManager.ts';
 
 describe('Access AsyncPropManager prop before setting it', () => {
   let manager: AsyncPropsManager;
@@ -138,5 +138,137 @@ describe('Accessing AsyncPropManager prop in complex scenarios', () => {
     expect(() => manager.setProp('wrongProp', 'Nothing')).toThrow(
       /Can't set the async prop "wrongProp" because the stream is already closed/,
     );
+  });
+});
+
+/**
+ * Tests for getOrCreateAsyncPropsManager - the lazy initialization factory function.
+ *
+ * These tests verify the race condition fix where update chunks might execute
+ * before or during the initial render. The key invariant is that all callers
+ * must get the SAME AsyncPropsManager instance from the shared execution context.
+ */
+describe('getOrCreateAsyncPropsManager lazy initialization', () => {
+  let sharedExecutionContext: Map<string, unknown>;
+
+  beforeEach(() => {
+    sharedExecutionContext = new Map();
+  });
+
+  it('returns the same instance on repeated calls', () => {
+    const manager1 = getOrCreateAsyncPropsManager(sharedExecutionContext);
+    const manager2 = getOrCreateAsyncPropsManager(sharedExecutionContext);
+
+    expect(manager1).toBe(manager2);
+  });
+
+  it('creates a new manager on first call', () => {
+    expect(sharedExecutionContext.size).toBe(0);
+
+    const manager = getOrCreateAsyncPropsManager(sharedExecutionContext);
+
+    expect(manager).toBeInstanceOf(AsyncPropsManager);
+    expect(sharedExecutionContext.size).toBe(1);
+  });
+
+  it('handles update chunks arriving BEFORE initial render (setProp then getProp)', async () => {
+    // Simulate update chunk executing first (e.g., due to race condition)
+    const managerFromUpdateChunk = getOrCreateAsyncPropsManager(sharedExecutionContext);
+    managerFromUpdateChunk.setProp('users', ['Alice', 'Bob']);
+
+    // Simulate initial render executing second
+    const managerFromInitialRender = getOrCreateAsyncPropsManager(sharedExecutionContext);
+
+    // Verify they're the same instance
+    expect(managerFromUpdateChunk).toBe(managerFromInitialRender);
+
+    // Verify prop was already set and accessible
+    const result = await managerFromInitialRender.getProp('users');
+    expect(result).toEqual(['Alice', 'Bob']);
+  });
+
+  it('handles update chunks arriving DURING initial render (interleaved operations)', async () => {
+    // Initial render starts - creates manager and requests a prop
+    const managerFromRender = getOrCreateAsyncPropsManager(sharedExecutionContext);
+    const usersPromise = managerFromRender.getProp('users');
+    const postsPromise = managerFromRender.getProp('posts');
+
+    // Update chunk arrives - gets same manager and sets first prop
+    const managerFromChunk1 = getOrCreateAsyncPropsManager(sharedExecutionContext);
+    expect(managerFromChunk1).toBe(managerFromRender);
+    managerFromChunk1.setProp('users', ['User1', 'User2']);
+
+    // First prop resolves
+    await expect(usersPromise).resolves.toEqual(['User1', 'User2']);
+
+    // Another update chunk arrives - gets same manager and sets second prop
+    const managerFromChunk2 = getOrCreateAsyncPropsManager(sharedExecutionContext);
+    expect(managerFromChunk2).toBe(managerFromRender);
+    managerFromChunk2.setProp('posts', ['Post1', 'Post2']);
+
+    // Second prop resolves
+    await expect(postsPromise).resolves.toEqual(['Post1', 'Post2']);
+  });
+
+  it('handles update chunks arriving AFTER initial render (getProp then setProp)', async () => {
+    // Initial render executes first - creates manager and requests props
+    const managerFromInitialRender = getOrCreateAsyncPropsManager(sharedExecutionContext);
+    const dataPromise = managerFromInitialRender.getProp('data');
+
+    // Update chunk executes second - gets same manager and sets prop
+    const managerFromUpdateChunk = getOrCreateAsyncPropsManager(sharedExecutionContext);
+    expect(managerFromUpdateChunk).toBe(managerFromInitialRender);
+    managerFromUpdateChunk.setProp('data', { value: 42 });
+
+    // Verify prop resolves correctly
+    await expect(dataPromise).resolves.toEqual({ value: 42 });
+  });
+
+  it('isolates managers between different execution contexts', () => {
+    const context1 = new Map<string, unknown>();
+    const context2 = new Map<string, unknown>();
+
+    const manager1 = getOrCreateAsyncPropsManager(context1);
+    const manager2 = getOrCreateAsyncPropsManager(context2);
+
+    // Different contexts should have different managers
+    expect(manager1).not.toBe(manager2);
+  });
+
+  it('supports concurrent timing scenario - multiple props set before any getProp', async () => {
+    // All update chunks arrive before initial render starts reading
+    const manager = getOrCreateAsyncPropsManager(sharedExecutionContext);
+    manager.setProp('prop1', 'value1');
+    manager.setProp('prop2', 'value2');
+    manager.setProp('prop3', 'value3');
+
+    // Initial render starts and reads all props
+    const sameManager = getOrCreateAsyncPropsManager(sharedExecutionContext);
+    expect(sameManager).toBe(manager);
+
+    // All props should be immediately available
+    await expect(sameManager.getProp('prop1')).resolves.toBe('value1');
+    await expect(sameManager.getProp('prop2')).resolves.toBe('value2');
+    await expect(sameManager.getProp('prop3')).resolves.toBe('value3');
+  });
+
+  it('supports concurrent timing scenario - endStream called from update chunk context', async () => {
+    // Initial render requests props
+    const renderManager = getOrCreateAsyncPropsManager(sharedExecutionContext);
+    const prop1Promise = renderManager.getProp('prop1');
+    const prop2Promise = renderManager.getProp('prop2'); // This one won't be set
+
+    // Update chunk sets one prop
+    const chunkManager = getOrCreateAsyncPropsManager(sharedExecutionContext);
+    chunkManager.setProp('prop1', 'received');
+
+    // Another context calls endStream (simulating request close)
+    const closeManager = getOrCreateAsyncPropsManager(sharedExecutionContext);
+    expect(closeManager).toBe(renderManager);
+    closeManager.endStream();
+
+    // First prop should resolve, second should reject
+    await expect(prop1Promise).resolves.toBe('received');
+    await expect(prop2Promise).rejects.toThrow(/The async prop "prop2" is not received/);
   });
 });
