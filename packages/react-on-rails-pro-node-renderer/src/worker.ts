@@ -92,6 +92,7 @@ const setResponse = async (result: ResponseResult, res: FastifyReply) => {
   }
   setHeaders(headers, res);
   res.status(status);
+
   if (stream) {
     await res.send(stream);
   } else {
@@ -300,6 +301,9 @@ export default function run(config: Partial<Config>) {
 
     // Stream parser state
     let incrementalSink: IncrementalRenderSink | undefined;
+    // Track whether we've already started sending a response (streaming or otherwise)
+    // If true, we can't send an error response on failure - headers are already sent
+    let responseStarted = false;
 
     try {
       // Handle the incremental render stream
@@ -369,6 +373,7 @@ export default function run(config: Partial<Config>) {
         },
 
         onResponseStart: async (response: ResponseResult) => {
+          responseStarted = true;
           await setResponse(response, res);
         },
 
@@ -382,10 +387,41 @@ export default function run(config: Partial<Config>) {
       });
     } catch (err) {
       // If an error occurred during stream processing, send error response
-      const errorResponse = errorResponseResult(
-        formatExceptionMessage('IncrementalRender', err, 'Error while processing incremental render stream'),
+      const errorMessage = formatExceptionMessage(
+        'IncrementalRender',
+        err,
+        'Error while processing incremental render stream',
       );
-      await setResponse(errorResponse, res);
+
+      if (responseStarted) {
+        // Response was already started (streaming), we can't send an error response.
+        // This happens when the stream times out or errors after we've already started
+        // sending the streaming response. Just log the error.
+        log.error({
+          msg: 'Error occurred after response started, cannot send error response',
+          error: errorMessage,
+        });
+
+        // CRITICAL: We must call handleRequestClosed() to end the React stream.
+        // The React stream is waiting for async props (e.g., asyncPropsManager.getProp("researches")).
+        // If we don't call endStream(), the stream will hang forever waiting for props that will never arrive.
+        // This causes onResponse to never fire, leaving activeRequestsCount stuck and preventing worker shutdown.
+        if (incrementalSink) {
+          incrementalSink.handleRequestClosed();
+        }
+
+        // CRITICAL: Destroy the response connection to immediately close it.
+        // Without this, the response stream stays open waiting for the client (httpx) to timeout,
+        // which can take 30+ seconds. This delays worker shutdown during graceful termination.
+        // Destroying the raw response immediately closes the connection and triggers onResponse.
+        if (!res.raw.destroyed) {
+          res.raw.destroy();
+        }
+      } else {
+        // Response hasn't started yet, we can send an error response
+        const errorResponse = errorResponseResult(errorMessage);
+        await setResponse(errorResponse, res);
+      }
     }
   });
 
