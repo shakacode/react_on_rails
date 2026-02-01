@@ -21,7 +21,9 @@ export default function masterRun(runningConfig?: Partial<Config>) {
   if (status === 'valid') {
     log.info('[React on Rails Pro] License validated successfully.');
   } else if (status === 'missing') {
-    logLicenseIssue('[React on Rails Pro] No license found. Get a license at https://www.shakacode.com/react-on-rails-pro/');
+    logLicenseIssue(
+      '[React on Rails Pro] No license found. Get a license at https://www.shakacode.com/react-on-rails-pro/',
+    );
   } else if (status === 'expired') {
     logLicenseIssue(
       '[React on Rails Pro] License has expired. Renew your license at https://www.shakacode.com/react-on-rails-pro/',
