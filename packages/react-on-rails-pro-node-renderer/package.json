@@ -87,9 +87,7 @@
     "test": "jest tests",
     "type-check": "tsc --noEmit --noErrorTruncation  --project src/tsconfig.json",
     "prepare": "[ -f lib/ReactOnRailsProNodeRenderer.js ] || (rm -rf ./lib && tsc --project src/tsconfig.json)",
-    "prepublishOnly": "pnpm run build",
-    "yalc:publish": "yalc publish",
-    "yalc": "yalc"
+    "prepublishOnly": "pnpm run build"
   },
   "repository": {
     "type": "git",
@@ -125,11 +123,6 @@
     "testEnvironment": "node",
     "transform": {
       "^.+\\.[jt]sx?$": "babel-jest"
-    }
-  },
-  "husky": {
-    "hooks": {
-      "pre-commit": "yalc check"
     }
   },
   "packageManager": "pnpm@9.14.2"

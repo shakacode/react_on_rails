@@ -11,9 +11,7 @@
     "test": "jest tests",
     "type-check": "tsc --noEmit --noErrorTruncation",
     "prepare": "[ -f lib/ReactOnRails.full.js ] || (rm -rf ./lib && tsc)",
-    "prepublishOnly": "pnpm run build",
-    "yalc:publish": "yalc publish",
-    "yalc": "yalc"
+    "prepublishOnly": "pnpm run build"
   },
   "repository": {
     "type": "git",

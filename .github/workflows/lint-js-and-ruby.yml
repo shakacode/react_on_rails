@@ -124,18 +124,8 @@ jobs:
         with:
           path: vendor/bundle
           key: package-app-gem-cache-${{ hashFiles('Gemfile.lock') }}-lint
-      - name: Install Node modules with pnpm for renderer package
-
-        run: |
-          pnpm install --frozen-lockfile
-          pnpm add -g yalc
-      - name: yalc publish for react-on-rails
-        run: cd packages/react-on-rails && yalc publish
-      - name: yalc add react-on-rails
-        # Use --link to maintain the link: protocol that matches pnpm-lock.yaml
-        run: cd react_on_rails/spec/dummy && yalc add --link react-on-rails
-      - name: Install Node modules with pnpm for dummy app
-        run: cd react_on_rails/spec/dummy && pnpm install
+      - name: Install Node modules with pnpm
+        run: pnpm install --frozen-lockfile
 
       - name: Install Ruby Gems for package
         run: cd react_on_rails && bundle check --path=vendor/bundle || bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3

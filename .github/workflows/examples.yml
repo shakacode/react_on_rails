@@ -147,14 +147,8 @@ jobs:
           key: package-app-gem-cache-${{ hashFiles('react_on_rails/Gemfile.lock') }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
       - id: get-sha
         run: echo "sha=\"$(git rev-parse HEAD)\"" >> "$GITHUB_OUTPUT"
-      - name: Install Node modules with pnpm for renderer package
-        run: |
-          pnpm install ${{ matrix.dependency-level == 'latest' && '--frozen-lockfile' || '--no-frozen-lockfile' }}
-          pnpm add -g yalc
-      - name: yalc publish for react-on-rails
-        # Use pnpm workspace script to publish all workspace packages to yalc
-        # Runs the "yalc:publish" script defined in each workspace's package.json
-        run: pnpm yalc:publish
+      - name: Install Node modules with pnpm
+        run: pnpm install ${{ matrix.dependency-level == 'latest' && '--frozen-lockfile' || '--no-frozen-lockfile' }}
 
       - name: Install Ruby Gems for package
         run: |
