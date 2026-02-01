@@ -120,10 +120,8 @@ jobs:
       - name: run conversion script
         if: matrix.node-version == '20'
         run: script/convert
-      - name: Install Node modules with pnpm for renderer package
-        run: |
-          pnpm install ${{ matrix.node-version == '22' && '--frozen-lockfile' || '--no-frozen-lockfile' }}
-          pnpm add -g yalc
+      - name: Install Node modules with pnpm
+        run: pnpm install ${{ matrix.node-version == '22' && '--frozen-lockfile' || '--no-frozen-lockfile' }}
       - name: Build Renderer package
         run: pnpm build
       - name: Run JS unit tests for react-on-rails package

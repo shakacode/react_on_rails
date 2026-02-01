@@ -130,13 +130,9 @@ jobs:
           path: react_on_rails_pro/spec/dummy/vendor/bundle
           key: v4-pro-dummy-app-gem-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/Gemfile.lock') }}
 
-      - name: Install Node modules with pnpm for Pro package
-        run: |
-          pnpm add -g yalc
-          pnpm install --frozen-lockfile
-
-      - name: Install Node modules with pnpm for Pro dummy app
-        run: cd spec/dummy && pnpm install
+      - name: Install Node modules with pnpm
+        working-directory: .
+        run: pnpm install --frozen-lockfile
 
       - name: Install Ruby Gems for Pro dummy app
         run: |
@@ -258,13 +254,9 @@ jobs:
           bundle lock --add-platform 'x86_64-linux'
           bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
 
-      - name: Install Node modules with pnpm for Pro package
-        run: |
-          pnpm add -g yalc
-          pnpm install --frozen-lockfile
-
-      - name: Install Node modules with pnpm for Pro dummy app
-        run: cd spec/dummy && pnpm install
+      - name: Install Node modules with pnpm
+        working-directory: .
+        run: pnpm install --frozen-lockfile
 
       - name: Ensure minimum required Chrome version
         run: |
@@ -458,13 +450,9 @@ jobs:
           bundle lock --add-platform 'x86_64-linux'
           bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
 
-      - name: Install Node modules with pnpm for Pro package
-        run: |
-          pnpm add -g yalc
-          pnpm install --frozen-lockfile
-
-      - name: Install Node modules with pnpm for Pro dummy app
-        run: cd spec/dummy && pnpm install
+      - name: Install Node modules with pnpm
+        working-directory: .
+        run: pnpm install --frozen-lockfile
 
       - name: Ensure minimum required Chrome version
         run: |

@@ -143,18 +143,9 @@ jobs:
       - name: Run conversion script for older Node compatibility
         if: matrix.dependency-level == 'minimum'
         run: script/convert
-      - name: Install Node modules with pnpm for renderer package
-        run: |
-          pnpm install ${{ matrix.dependency-level == 'latest' && '--frozen-lockfile' || '--no-frozen-lockfile' }}
-          pnpm add -g yalc
-      - name: yalc publish for react-on-rails
-        run: cd packages/react-on-rails && yalc publish
-      - name: yalc add react-on-rails
-        # Use --link to maintain the link: protocol that matches pnpm-lock.yaml
-        run: cd react_on_rails/spec/dummy && yalc add --link react-on-rails
-      - name: Install Node modules with pnpm for dummy app
+      - name: Install Node modules with pnpm
         # minimum config changes package.json (shakapacker version), so can't use frozen lockfile
-        run: cd react_on_rails/spec/dummy && pnpm install ${{ matrix.dependency-level == 'minimum' && '--no-frozen-lockfile' || '--frozen-lockfile' }}
+        run: pnpm install ${{ matrix.dependency-level == 'latest' && '--frozen-lockfile' || '--no-frozen-lockfile' }}
       - name: Save dummy app ruby gems to cache
         uses: actions/cache@v4
         with:
@@ -250,17 +241,8 @@ jobs:
           path: react_on_rails/spec/dummy/public/webpack
           key: dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
       - name: Install Node modules with pnpm
-        run: |
-          pnpm install ${{ matrix.dependency-level == 'latest' && '--frozen-lockfile' || '--no-frozen-lockfile' }}
-          pnpm add -g yalc
-      - name: yalc publish for react-on-rails
-        run: cd packages/react-on-rails && yalc publish
-      - name: yalc add react-on-rails
-        # Use --link to maintain the link: protocol that matches pnpm-lock.yaml
-        run: cd react_on_rails/spec/dummy && yalc add --link react-on-rails
-      - name: Install Node modules with pnpm for dummy app
         # minimum config changes package.json (shakapacker version), so can't use frozen lockfile
-        run: cd react_on_rails/spec/dummy && pnpm install ${{ matrix.dependency-level == 'minimum' && '--no-frozen-lockfile' || '--frozen-lockfile' }}
+        run: pnpm install ${{ matrix.dependency-level == 'latest' && '--frozen-lockfile' || '--no-frozen-lockfile' }}
       - name: Dummy JS tests
         run: |
           cd react_on_rails/spec/dummy
