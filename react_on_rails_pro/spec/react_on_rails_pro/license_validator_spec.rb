@@ -159,6 +159,8 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
   end
 
   describe ".license_status with plan field" do
+    # Dynamically generate tests for all valid plan types from VALID_PLANS constant.
+    # This ensures tests stay in sync when new plan types are added.
     described_class::VALID_PLANS.each do |plan_type|
       context "when plan is '#{plan_type}'" do
         let(:plan_payload) do
