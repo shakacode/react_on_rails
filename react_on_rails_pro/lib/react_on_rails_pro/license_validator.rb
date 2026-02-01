@@ -7,6 +7,10 @@ module ReactOnRailsPro
   # This class only determines license status - it does NOT log.
   # All logging is handled by Engine.log_license_status for environment-aware messaging.
   class LicenseValidator
+    # Valid license plan types.
+    # Must match VALID_PLANS in packages/react-on-rails-pro-node-renderer/src/shared/licenseValidator.ts
+    VALID_PLANS = %w[paid startup nonprofit education oss partner].freeze
+
     # Mutex for thread-safe license status initialization.
     # Using a constant eliminates the race condition that would exist with @mutex ||= Mutex.new
     # See: https://bugs.ruby-lang.org/issues/20875
@@ -160,12 +164,12 @@ module ReactOnRailsPro
 
       # Checks if the license plan is valid for production use
       # Licenses without a plan field are considered valid (backwards compatibility with old paid licenses)
-      # Only "paid" plan is valid; all other plans (e.g., "free") are invalid
+      # Valid plans: paid, startup, nonprofit, education, oss, partner
       # @return [Symbol] :valid or :invalid
       def check_plan(decoded_data)
         plan = decoded_data["plan"]
         return :valid unless plan # No plan field = valid (backwards compat with old paid licenses)
-        return :valid if plan == "paid"
+        return :valid if VALID_PLANS.include?(plan)
 
         :invalid
       end

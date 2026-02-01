@@ -159,24 +159,26 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
   end
 
   describe ".license_status with plan field" do
-    context "when plan is 'paid'" do
-      let(:paid_payload) do
-        {
-          sub: "test@example.com",
-          iat: Time.now.to_i,
-          exp: Time.now.to_i + 3600,
-          plan: "paid",
-          org: "Acme Corp"
-        }
-      end
+    ReactOnRailsPro::LicenseValidator::VALID_PLANS.each do |plan_type|
+      context "when plan is '#{plan_type}'" do
+        let(:plan_payload) do
+          {
+            sub: "test@example.com",
+            iat: Time.now.to_i,
+            exp: Time.now.to_i + 3600,
+            plan: plan_type,
+            org: "Acme Corp"
+          }
+        end
 
-      before do
-        token = JWT.encode(paid_payload, test_private_key, "RS256")
-        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
-      end
+        before do
+          token = JWT.encode(plan_payload, test_private_key, "RS256")
+          ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+        end
 
-      it "returns :valid" do
-        expect(described_class.license_status).to eq(:valid)
+        it "returns :valid" do
+          expect(described_class.license_status).to eq(:valid)
+        end
       end
     end
 

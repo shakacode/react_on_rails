@@ -3,6 +3,13 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { PUBLIC_KEY } from './licensePublicKey.js';
 
+/**
+ * Valid license plan types.
+ * Must match VALID_PLANS in react_on_rails_pro/lib/react_on_rails_pro/license_validator.rb
+ */
+const VALID_PLANS = ['paid', 'startup', 'nonprofit', 'education', 'oss', 'partner'] as const;
+type ValidPlan = (typeof VALID_PLANS)[number];
+
 interface LicenseData {
   // Subject (email for whom the license is issued)
   sub?: string;
@@ -10,7 +17,7 @@ interface LicenseData {
   iat?: number;
   // Expiration timestamp (should be present but may be missing in malformed tokens)
   exp?: number;
-  // Optional: license plan (e.g., "paid"). Only "paid" is valid for production use.
+  // Optional: license plan. See VALID_PLANS for accepted values.
   plan?: string;
   // Organization name (required for all licenses)
   org?: string;
@@ -85,7 +92,7 @@ function decodeLicense(licenseString: string): LicenseData | undefined {
 /**
  * Checks if the license plan is valid for production use.
  * Licenses without a plan field are considered valid (backwards compatibility with old paid licenses).
- * Only "paid" plan is valid; all other plans (e.g., "free") are invalid.
+ * Valid plans: paid, startup, nonprofit, education, oss, partner
  * @returns 'valid' or 'invalid'
  * @private
  */
@@ -94,7 +101,7 @@ function checkPlan(decodedData: LicenseData): LicenseStatus {
   if (!plan) {
     return 'valid'; // No plan field = valid (backwards compat with old paid licenses)
   }
-  if (plan === 'paid') {
+  if (VALID_PLANS.includes(plan as ValidPlan)) {
     return 'valid';
   }
 
