@@ -106,16 +106,8 @@ jobs:
           echo "Node version: "; node -v
           echo "pnpm version: "; pnpm --version
           echo "Bundler version: "; bundle --version
-      - name: Install Node modules with pnpm for renderer package
-        run: |
-          pnpm install --frozen-lockfile
-          pnpm add -g yalc
-      - name: yalc publish for react-on-rails
-        run: cd packages/react-on-rails && yalc publish
-      - name: yalc add react-on-rails
-        run: cd react_on_rails/spec/dummy && yalc add --link react-on-rails
-      - name: Install Node modules with pnpm for dummy app
-        run: cd react_on_rails/spec/dummy && pnpm install
+      - name: Install Node modules with pnpm
+        run: pnpm install --frozen-lockfile
       - name: Save dummy app ruby gems to cache
         uses: actions/cache@v4
         with:

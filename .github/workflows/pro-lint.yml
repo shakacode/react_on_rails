@@ -142,22 +142,15 @@ jobs:
           bundle config set --local disable_checksum_validation true
           bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
 
-      - name: Install Node modules with pnpm for Pro package
-        run: |
-          pnpm add -g yalc
-          pnpm install --frozen-lockfile
+      - name: Install Node modules with pnpm
+        working-directory: .
+        run: pnpm install --frozen-lockfile
 
       - name: Install Ruby Gems for Pro dummy app
         run: |
           cd spec/dummy
           bundle lock --add-platform 'x86_64-linux'
           bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
-
-      - name: Install Node modules with pnpm for Pro dummy app
-        run: cd spec/dummy && pnpm install
-
-      - name: Install Node modules with pnpm for ExecJS dummy app
-        run: cd spec/execjs-compatible-dummy && pnpm install
 
       - name: Generate file-system based entrypoints
         run: cd spec/dummy && bundle exec rake react_on_rails:generate_packs

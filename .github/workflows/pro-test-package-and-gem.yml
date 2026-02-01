@@ -130,13 +130,9 @@ jobs:
           path: react_on_rails_pro/spec/dummy/vendor/bundle
           key: v4-pro-dummy-app-gem-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/Gemfile.lock') }}
 
-      - name: Install Node modules with pnpm for Pro package
-        run: |
-          pnpm add -g yalc
-          pnpm install --frozen-lockfile
-
-      - name: Install Node modules with pnpm for Pro dummy app
-        run: cd spec/dummy && pnpm install
+      - name: Install Node modules with pnpm
+        working-directory: .
+        run: pnpm install --frozen-lockfile
 
       - name: Install Ruby Gems for Pro dummy app
         run: |
@@ -242,11 +238,9 @@ jobs:
             react_on_rails_pro/spec/dummy/ssr-generated
           key: v4-pro-dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}
 
-      - name: Install Node modules with pnpm for Pro package
+      - name: Install Node modules with pnpm
         working-directory: .
-        run: |
-          pnpm add -g yalc
-          pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Run JS unit tests for Pro package
         run: pnpm --filter react-on-rails-pro-node-renderer run ci

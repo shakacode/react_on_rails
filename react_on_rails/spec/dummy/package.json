@@ -21,7 +21,7 @@
     "prop-types": "^15.7.2",
     "react": "^19.0.3",
     "react-dom": "^19.0.3",
-    "react-on-rails": "link:.yalc/react-on-rails",
+    "react-on-rails": "workspace:*",
     "react-redux": "^9.2.0",
     "react-router-dom": "^6.0.0",
     "redux": "^5.0.1",
@@ -68,8 +68,6 @@
     "fs": false
   },
   "scripts": {
-    "preinstall": "pnpm run link-source && yalc add --link react-on-rails",
-    "link-source": "cd ../../.. && pnpm run build && cd packages/react-on-rails && yalc publish",
     "lint": "cd ../../.. && pnpm run lint",
     "format": "cd ../../.. && pnpm run nps format",
     "test:js": "jest ./tests",
