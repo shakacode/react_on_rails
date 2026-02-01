@@ -66,7 +66,7 @@ const commonWebpackConfig = () => {
     }
   });
 
-  return merge({}, baseWebpackConfig, commonOptions);
+  return baseWebpackConfig;
 };
 
 module.exports = commonWebpackConfig;
@@ -252,7 +252,7 @@ default: &default
 Some packages may not ship compiled files. Use `patch-package` to fix:
 
 ```bash
-npm install --save-dev patch-package postinstall-postinstall
+pnpm add --save-dev patch-package postinstall-postinstall
 ```
 
 Add to package.json:
