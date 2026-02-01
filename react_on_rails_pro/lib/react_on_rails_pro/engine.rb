@@ -23,7 +23,8 @@ module ReactOnRailsPro
 
         case status
         when :valid
-          Rails.logger.info "[React on Rails Pro] License validated successfully."
+          org = ReactOnRailsPro::LicenseValidator.license_organization
+          Rails.logger.info "[React on Rails Pro] License validated successfully (#{org})."
         when :missing
           log_license_issue("No license found", "Get a license at #{LICENSE_URL}")
         when :expired

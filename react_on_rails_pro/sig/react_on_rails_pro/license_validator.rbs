@@ -10,6 +10,9 @@ module ReactOnRailsPro
     # Returns the license expiration time if available
     def self.license_expiration: () -> Time?
 
+    # Returns the organization name from the license if available
+    def self.license_organization: () -> String?
+
     # Resets all cached state (primarily for testing)
     def self.reset!: () -> void
 
@@ -17,9 +20,11 @@ module ReactOnRailsPro
 
     def self.determine_license_status: () -> license_status
     def self.determine_license_expiration: () -> Time?
+    def self.determine_license_organization: () -> String?
     def self.load_license_string: () -> String?
     def self.decode_license: (String license_string) -> Hash[String, untyped]?
     def self.check_plan: (Hash[String, untyped] decoded_data) -> license_status
+    def self.check_organization: (Hash[String, untyped] decoded_data) -> license_status
     def self.check_expiration: (Hash[String, untyped] license) -> license_status
     def self.public_key: () -> untyped
   end

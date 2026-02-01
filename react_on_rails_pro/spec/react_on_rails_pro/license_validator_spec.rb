@@ -17,7 +17,8 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
       sub: "test@example.com",
       iat: Time.now.to_i,
       exp: Time.now.to_i + 3600, # Valid for 1 hour
-      plan: "paid"
+      plan: "paid",
+      org: "Acme Corp"
     }
   end
 
@@ -25,7 +26,8 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
     {
       sub: "test@example.com",
       iat: Time.now.to_i - 7200,
-      exp: Time.now.to_i - 3600 # Expired 1 hour ago
+      exp: Time.now.to_i - 3600, # Expired 1 hour ago
+      org: "Acme Corp"
     }
   end
 
@@ -79,7 +81,8 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
       let(:payload_without_exp) do
         {
           sub: "test@example.com",
-          iat: Time.now.to_i
+          iat: Time.now.to_i,
+          org: "Acme Corp"
         }
       end
 
@@ -156,23 +159,26 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
   end
 
   describe ".license_status with plan field" do
-    context "when plan is 'paid'" do
-      let(:paid_payload) do
-        {
-          sub: "test@example.com",
-          iat: Time.now.to_i,
-          exp: Time.now.to_i + 3600,
-          plan: "paid"
-        }
-      end
+    ReactOnRailsPro::LicenseValidator::VALID_PLANS.each do |plan_type|
+      context "when plan is '#{plan_type}'" do
+        let(:plan_payload) do
+          {
+            sub: "test@example.com",
+            iat: Time.now.to_i,
+            exp: Time.now.to_i + 3600,
+            plan: plan_type,
+            org: "Acme Corp"
+          }
+        end
 
-      before do
-        token = JWT.encode(paid_payload, test_private_key, "RS256")
-        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
-      end
+        before do
+          token = JWT.encode(plan_payload, test_private_key, "RS256")
+          ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+        end
 
-      it "returns :valid" do
-        expect(described_class.license_status).to eq(:valid)
+        it "returns :valid" do
+          expect(described_class.license_status).to eq(:valid)
+        end
       end
     end
 
@@ -182,7 +188,8 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
           sub: "test@example.com",
           iat: Time.now.to_i,
           exp: Time.now.to_i + 3600,
-          plan: "free"
+          plan: "free",
+          org: "Acme Corp"
         }
       end
 
@@ -202,7 +209,8 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
           sub: "test@example.com",
           iat: Time.now.to_i,
           exp: Time.now.to_i + 3600,
-          plan: "unknown"
+          plan: "unknown",
+          org: "Acme Corp"
         }
       end
 
@@ -221,7 +229,8 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
         {
           sub: "test@example.com",
           iat: Time.now.to_i,
-          exp: Time.now.to_i + 3600
+          exp: Time.now.to_i + 3600,
+          org: "Acme Corp"
         }
       end
 
@@ -232,6 +241,91 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
 
       it "returns :valid (backwards compatibility)" do
         expect(described_class.license_status).to eq(:valid)
+      end
+    end
+  end
+
+  describe ".license_status with org field" do
+    context "when org is present" do
+      let(:payload_with_org) do
+        {
+          sub: "test@example.com",
+          iat: Time.now.to_i,
+          exp: Time.now.to_i + 3600,
+          plan: "paid",
+          org: "Acme Corp"
+        }
+      end
+
+      before do
+        token = JWT.encode(payload_with_org, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns :valid" do
+        expect(described_class.license_status).to eq(:valid)
+      end
+    end
+
+    context "when org field is absent" do
+      let(:payload_without_org) do
+        {
+          sub: "test@example.com",
+          iat: Time.now.to_i,
+          exp: Time.now.to_i + 3600,
+          plan: "paid"
+        }
+      end
+
+      before do
+        token = JWT.encode(payload_without_org, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns :invalid" do
+        expect(described_class.license_status).to eq(:invalid)
+      end
+    end
+
+    context "when org is empty string" do
+      let(:payload_empty_org) do
+        {
+          sub: "test@example.com",
+          iat: Time.now.to_i,
+          exp: Time.now.to_i + 3600,
+          plan: "paid",
+          org: ""
+        }
+      end
+
+      before do
+        token = JWT.encode(payload_empty_org, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns :invalid" do
+        expect(described_class.license_status).to eq(:invalid)
+      end
+    end
+
+    context "when org is whitespace only" do
+      let(:payload_whitespace_org) do
+        {
+          sub: "test@example.com",
+          iat: Time.now.to_i,
+          exp: Time.now.to_i + 3600,
+          plan: "paid",
+          org: "   "
+        }
+      end
+
+      before do
+        token = JWT.encode(payload_whitespace_org, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns :invalid" do
+        expect(described_class.license_status).to eq(:invalid)
       end
     end
   end
@@ -316,12 +410,89 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
     end
   end
 
+  describe ".license_organization" do
+    context "with valid license" do
+      before do
+        token = JWT.encode(valid_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns the organization name" do
+        expect(described_class.license_organization).to eq("Acme Corp")
+      end
+
+      it "caches the result" do
+        described_class.license_organization
+        expect(described_class).not_to receive(:determine_license_organization)
+        described_class.license_organization
+      end
+    end
+
+    context "with organization containing leading/trailing whitespace" do
+      let(:payload_with_whitespace_org) do
+        valid_payload.merge(org: "  Acme Corp  ")
+      end
+
+      before do
+        token = JWT.encode(payload_with_whitespace_org, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns trimmed organization name" do
+        expect(described_class.license_organization).to eq("Acme Corp")
+      end
+    end
+
+    context "with missing license" do
+      before do
+        ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
+      end
+
+      it "returns nil" do
+        expect(described_class.license_organization).to be_nil
+      end
+    end
+
+    context "with invalid license signature" do
+      before do
+        wrong_key = OpenSSL::PKey::RSA.new(2048)
+        token = JWT.encode(valid_payload, wrong_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns nil" do
+        expect(described_class.license_organization).to be_nil
+      end
+    end
+
+    context "with license missing org field" do
+      let(:payload_without_org) do
+        {
+          sub: "test@example.com",
+          iat: Time.now.to_i,
+          exp: Time.now.to_i + 3600,
+          plan: "paid"
+        }
+      end
+
+      before do
+        token = JWT.encode(payload_without_org, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns nil" do
+        expect(described_class.license_organization).to be_nil
+      end
+    end
+  end
+
   describe ".reset!" do
     before do
       valid_token = JWT.encode(valid_payload, test_private_key, "RS256")
       ENV["REACT_ON_RAILS_PRO_LICENSE"] = valid_token
       described_class.license_status # Cache the result
       described_class.license_expiration # Cache the expiration
+      described_class.license_organization # Cache the organization
     end
 
     it "clears the cached license status" do
@@ -334,6 +505,12 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
       expect(described_class.instance_variable_defined?(:@license_expiration)).to be true
       described_class.reset!
       expect(described_class.instance_variable_defined?(:@license_expiration)).to be false
+    end
+
+    it "clears the cached license organization" do
+      expect(described_class.instance_variable_defined?(:@license_organization)).to be true
+      described_class.reset!
+      expect(described_class.instance_variable_defined?(:@license_organization)).to be false
     end
   end
 

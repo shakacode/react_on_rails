@@ -15,7 +15,8 @@ RSpec.describe ReactOnRailsPro::Engine do
       sub: "test@example.com",
       iat: Time.now.to_i,
       exp: Time.now.to_i + 3600,
-      plan: "paid"
+      plan: "paid",
+      org: "Acme Corp"
     }
   end
 

@@ -3,6 +3,13 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { PUBLIC_KEY } from './licensePublicKey.js';
 
+/**
+ * Valid license plan types.
+ * Must match VALID_PLANS in react_on_rails_pro/lib/react_on_rails_pro/license_validator.rb
+ */
+const VALID_PLANS = ['paid', 'startup', 'nonprofit', 'education', 'oss', 'partner'] as const;
+type ValidPlan = (typeof VALID_PLANS)[number];
+
 interface LicenseData {
   // Subject (email for whom the license is issued)
   sub?: string;
@@ -10,8 +17,10 @@ interface LicenseData {
   iat?: number;
   // Expiration timestamp (should be present but may be missing in malformed tokens)
   exp?: number;
-  // Optional: license plan (e.g., "paid"). Only "paid" is valid for production use.
+  // Optional: license plan. See VALID_PLANS for accepted values.
   plan?: string;
+  // Organization name (required for all licenses)
+  org?: string;
   // Issuer (who issued the license)
   iss?: string;
   // Allow additional fields
@@ -29,6 +38,7 @@ export type LicenseStatus = 'valid' | 'expired' | 'invalid' | 'missing';
 
 // Module-level state for caching
 let cachedLicenseStatus: LicenseStatus | undefined;
+let cachedLicenseOrganization: string | undefined;
 
 /**
  * Loads the license string from environment variable or config file.
@@ -82,7 +92,7 @@ function decodeLicense(licenseString: string): LicenseData | undefined {
 /**
  * Checks if the license plan is valid for production use.
  * Licenses without a plan field are considered valid (backwards compatibility with old paid licenses).
- * Only "paid" plan is valid; all other plans (e.g., "free") are invalid.
+ * Valid plans: paid, startup, nonprofit, education, oss, partner
  * @returns 'valid' or 'invalid'
  * @private
  */
@@ -91,11 +101,26 @@ function checkPlan(decodedData: LicenseData): LicenseStatus {
   if (!plan) {
     return 'valid'; // No plan field = valid (backwards compat with old paid licenses)
   }
-  if (plan === 'paid') {
+  if (VALID_PLANS.includes(plan as ValidPlan)) {
     return 'valid';
   }
 
   return 'invalid';
+}
+
+/**
+ * Checks if the license has a valid organization name.
+ * Organization name is required for all licenses.
+ * @returns 'valid' or 'invalid'
+ * @private
+ */
+function checkOrganization(decodedData: LicenseData): LicenseStatus {
+  const { org } = decodedData;
+  if (typeof org !== 'string' || org.trim() === '') {
+    return 'invalid';
+  }
+
+  return 'valid';
 }
 
 /**
@@ -146,7 +171,13 @@ function determineLicenseStatus(): LicenseStatus {
     return planStatus;
   }
 
-  // Step 4: Check expiration
+  // Step 4: Check organization is present
+  const orgStatus = checkOrganization(decodedData);
+  if (orgStatus !== 'valid') {
+    return orgStatus;
+  }
+
+  // Step 5: Check expiration
   return checkExpiration(decodedData);
 }
 
@@ -171,8 +202,46 @@ export function getLicenseStatus(): LicenseStatus {
 }
 
 /**
+ * Determines the organization name from the decoded JWT.
+ * @returns The organization name or undefined if not available
+ * @private
+ */
+function determineLicenseOrganization(): string | undefined {
+  const licenseString = loadLicenseString();
+  if (!licenseString) {
+    return undefined;
+  }
+
+  const decodedData = decodeLicense(licenseString);
+  if (!decodedData) {
+    return undefined;
+  }
+
+  const { org } = decodedData;
+  if (typeof org !== 'string' || org.trim() === '') {
+    return undefined;
+  }
+
+  return org.trim();
+}
+
+/**
+ * Returns the organization name from the license if available.
+ * @returns The organization name or undefined if not available
+ */
+export function getLicenseOrganization(): string | undefined {
+  if (cachedLicenseOrganization !== undefined) {
+    return cachedLicenseOrganization;
+  }
+
+  cachedLicenseOrganization = determineLicenseOrganization();
+  return cachedLicenseOrganization;
+}
+
+/**
  * Resets all cached validation state (primarily for testing).
  */
 export function reset(): void {
   cachedLicenseStatus = undefined;
+  cachedLicenseOrganization = undefined;
 }
