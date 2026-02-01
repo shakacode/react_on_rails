@@ -111,7 +111,7 @@ RSpec.describe ReactOnRailsPro::Engine do
         end
 
         it "does not include plan type for paid licenses" do
-          expect(mock_logger).to receive(:info).with("[React on Rails Pro] License validated successfully.")
+          expect(mock_logger).to receive(:info).with("[React on Rails Pro] License validated successfully (Acme Corp).")
           described_class.log_license_status
         end
 
@@ -127,7 +127,8 @@ RSpec.describe ReactOnRailsPro::Engine do
             sub: "test@example.com",
             iat: Time.now.to_i,
             exp: Time.now.to_i + 3600,
-            plan: "startup"
+            plan: "startup",
+            org: "Startup Inc"
           }
         end
 
@@ -138,7 +139,7 @@ RSpec.describe ReactOnRailsPro::Engine do
 
         it "logs success with plan type" do
           expect(mock_logger).to receive(:info)
-            .with(/License validated successfully \(startup license\)/)
+            .with(/License validated successfully \(Startup Inc - startup license\)/)
           described_class.log_license_status
         end
       end
@@ -149,7 +150,8 @@ RSpec.describe ReactOnRailsPro::Engine do
             sub: "test@example.com",
             iat: Time.now.to_i,
             exp: Time.now.to_i + 3600,
-            plan: "nonprofit"
+            plan: "nonprofit",
+            org: "Charity Org"
           }
         end
 
@@ -160,7 +162,7 @@ RSpec.describe ReactOnRailsPro::Engine do
 
         it "logs success with plan type" do
           expect(mock_logger).to receive(:info)
-            .with(/License validated successfully \(nonprofit license\)/)
+            .with(/License validated successfully \(Charity Org - nonprofit license\)/)
           described_class.log_license_status
         end
       end
@@ -171,7 +173,8 @@ RSpec.describe ReactOnRailsPro::Engine do
             sub: "test@example.com",
             iat: Time.now.to_i,
             exp: Time.now.to_i + 3600,
-            plan: "oss"
+            plan: "oss",
+            org: "Open Source Project"
           }
         end
 
@@ -182,7 +185,7 @@ RSpec.describe ReactOnRailsPro::Engine do
 
         it "logs success with plan type" do
           expect(mock_logger).to receive(:info)
-            .with(/License validated successfully \(oss license\)/)
+            .with(/License validated successfully \(Open Source Project - oss license\)/)
           described_class.log_license_status
         end
       end
@@ -251,7 +254,8 @@ RSpec.describe ReactOnRailsPro::Engine do
             sub: "test@example.com",
             iat: Time.now.to_i,
             exp: Time.now.to_i + 3600,
-            plan: "startup"
+            plan: "startup",
+            org: "Startup Inc"
           }
         end
 
@@ -262,7 +266,7 @@ RSpec.describe ReactOnRailsPro::Engine do
 
         it "logs success with plan type" do
           expect(mock_logger).to receive(:info)
-            .with(/License validated successfully \(startup license\)/)
+            .with(/License validated successfully \(Startup Inc - startup license\)/)
           described_class.log_license_status
         end
       end
