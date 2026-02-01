@@ -23,8 +23,7 @@ module ReactOnRailsPro
 
         case status
         when :valid
-          org = ReactOnRailsPro::LicenseValidator.license_organization
-          Rails.logger.info "[React on Rails Pro] License validated successfully (#{org})."
+          log_valid_license
         when :missing
           log_license_issue("No license found", "Get a license at #{LICENSE_URL}")
         when :expired
@@ -37,6 +36,37 @@ module ReactOnRailsPro
       end
 
       private
+
+      def log_valid_license
+        org = ReactOnRailsPro::LicenseValidator.license_organization
+        plan = ReactOnRailsPro::LicenseValidator.license_plan
+        attribution_required = ReactOnRailsPro::LicenseValidator.attribution_required?
+
+        # Build license details string
+        details = [org, plan_display_name(plan)].compact.join(" - ")
+
+        message = "[React on Rails Pro] License validated successfully"
+        message += " (#{details})" if details.present?
+        message += "."
+
+        message += " Attribution required for this license type." if attribution_required
+
+        Rails.logger.info message
+      end
+
+      def plan_display_name(plan)
+        return nil unless plan
+
+        case plan
+        when "paid" then nil # Don't show "paid" - it's the default
+        when "partner" then "partner license"
+        when "startup" then "startup license"
+        when "oss" then "open source license"
+        when "nonprofit" then "nonprofit license"
+        when "education" then "education license"
+        else plan
+        end
+      end
 
       def log_license_issue(issue, action)
         prefix = "[React on Rails Pro] #{issue}."

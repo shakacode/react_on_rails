@@ -486,6 +486,257 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
     end
   end
 
+  describe ".license_plan" do
+    context "with valid license" do
+      before do
+        token = JWT.encode(valid_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns the plan type" do
+        expect(described_class.license_plan).to eq("paid")
+      end
+
+      it "caches the result" do
+        described_class.license_plan
+        expect(described_class).not_to receive(:determine_license_plan)
+        described_class.license_plan
+      end
+    end
+
+    context "with startup plan" do
+      let(:startup_payload) do
+        valid_payload.merge(plan: "startup")
+      end
+
+      before do
+        token = JWT.encode(startup_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns 'startup'" do
+        expect(described_class.license_plan).to eq("startup")
+      end
+    end
+
+    context "with missing license" do
+      before do
+        ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
+      end
+
+      it "returns nil" do
+        expect(described_class.license_plan).to be_nil
+      end
+    end
+
+    context "with license missing plan field" do
+      let(:no_plan_payload) do
+        {
+          sub: "test@example.com",
+          iat: Time.now.to_i,
+          exp: Time.now.to_i + 3600,
+          org: "Acme Corp"
+        }
+      end
+
+      before do
+        token = JWT.encode(no_plan_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns nil" do
+        expect(described_class.license_plan).to be_nil
+      end
+    end
+  end
+
+  describe ".attribution_required?" do
+    context "with paid plan (no attribution required)" do
+      before do
+        token = JWT.encode(valid_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns false" do
+        expect(described_class.attribution_required?).to be false
+      end
+
+      it "caches the result" do
+        described_class.attribution_required?
+        expect(described_class).not_to receive(:determine_attribution_required)
+        described_class.attribution_required?
+      end
+    end
+
+    context "with partner plan (no attribution required)" do
+      let(:partner_payload) do
+        valid_payload.merge(plan: "partner")
+      end
+
+      before do
+        token = JWT.encode(partner_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns false" do
+        expect(described_class.attribution_required?).to be false
+      end
+    end
+
+    context "with startup plan (attribution required)" do
+      let(:startup_payload) do
+        valid_payload.merge(plan: "startup")
+      end
+
+      before do
+        token = JWT.encode(startup_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns true" do
+        expect(described_class.attribution_required?).to be true
+      end
+    end
+
+    context "with oss plan (attribution required)" do
+      let(:oss_payload) do
+        valid_payload.merge(plan: "oss")
+      end
+
+      before do
+        token = JWT.encode(oss_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns true" do
+        expect(described_class.attribution_required?).to be true
+      end
+    end
+
+    context "with nonprofit plan (attribution optional, default no)" do
+      let(:nonprofit_payload) do
+        valid_payload.merge(plan: "nonprofit")
+      end
+
+      before do
+        token = JWT.encode(nonprofit_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns false by default" do
+        expect(described_class.attribution_required?).to be false
+      end
+    end
+
+    context "with education plan (attribution optional, default no)" do
+      let(:education_payload) do
+        valid_payload.merge(plan: "education")
+      end
+
+      before do
+        token = JWT.encode(education_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns false by default" do
+        expect(described_class.attribution_required?).to be false
+      end
+    end
+
+    context "with explicit attribution=true override" do
+      let(:nonprofit_with_attribution) do
+        valid_payload.merge(plan: "nonprofit", attribution: true)
+      end
+
+      before do
+        token = JWT.encode(nonprofit_with_attribution, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns true when explicitly set" do
+        expect(described_class.attribution_required?).to be true
+      end
+    end
+
+    context "with explicit attribution=false override" do
+      let(:startup_without_attribution) do
+        valid_payload.merge(plan: "startup", attribution: false)
+      end
+
+      before do
+        token = JWT.encode(startup_without_attribution, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns false when explicitly disabled" do
+        expect(described_class.attribution_required?).to be false
+      end
+    end
+
+    context "with missing license" do
+      before do
+        ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
+      end
+
+      it "returns false" do
+        expect(described_class.attribution_required?).to be false
+      end
+    end
+  end
+
+  describe ".license_info" do
+    context "with valid paid license" do
+      before do
+        token = JWT.encode(valid_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns a hash with all license information" do
+        info = described_class.license_info
+
+        expect(info[:org]).to eq("Acme Corp")
+        expect(info[:plan]).to eq("paid")
+        expect(info[:status]).to eq(:valid)
+        expect(info[:attribution_required]).to be false
+        expect(info[:expiration]).to be_a(Time)
+      end
+    end
+
+    context "with startup license" do
+      let(:startup_payload) do
+        valid_payload.merge(plan: "startup")
+      end
+
+      before do
+        token = JWT.encode(startup_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns attribution_required as true" do
+        info = described_class.license_info
+
+        expect(info[:plan]).to eq("startup")
+        expect(info[:attribution_required]).to be true
+      end
+    end
+
+    context "with missing license" do
+      before do
+        ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
+      end
+
+      it "returns appropriate defaults" do
+        info = described_class.license_info
+
+        expect(info[:org]).to be_nil
+        expect(info[:plan]).to be_nil
+        expect(info[:status]).to eq(:missing)
+        expect(info[:attribution_required]).to be false
+        expect(info[:expiration]).to be_nil
+      end
+    end
+  end
+
   describe ".reset!" do
     before do
       valid_token = JWT.encode(valid_payload, test_private_key, "RS256")
@@ -493,6 +744,8 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
       described_class.license_status # Cache the result
       described_class.license_expiration # Cache the expiration
       described_class.license_organization # Cache the organization
+      described_class.license_plan # Cache the plan
+      described_class.attribution_required? # Cache attribution_required
     end
 
     it "clears the cached license status" do
@@ -511,6 +764,18 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
       expect(described_class.instance_variable_defined?(:@license_organization)).to be true
       described_class.reset!
       expect(described_class.instance_variable_defined?(:@license_organization)).to be false
+    end
+
+    it "clears the cached license plan" do
+      expect(described_class.instance_variable_defined?(:@license_plan)).to be true
+      described_class.reset!
+      expect(described_class.instance_variable_defined?(:@license_plan)).to be false
+    end
+
+    it "clears the cached attribution_required" do
+      expect(described_class.instance_variable_defined?(:@attribution_required)).to be true
+      described_class.reset!
+      expect(described_class.instance_variable_defined?(:@attribution_required)).to be false
     end
   end
 
