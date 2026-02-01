@@ -6,10 +6,26 @@ module ReactOnRailsPro
   # Validates React on Rails Pro licenses.
   # This class only determines license status - it does NOT log.
   # All logging is handled by Engine.log_license_status for environment-aware messaging.
+  # rubocop:disable Metrics/ClassLength
   class LicenseValidator
     # Valid license plan types.
     # Must match VALID_PLANS in packages/react-on-rails-pro-node-renderer/src/shared/licenseValidator.ts
     VALID_PLANS = %w[paid startup nonprofit education oss partner].freeze
+
+    # Plans that require attribution by default (complimentary licenses)
+    #
+    # Attribution defaults by plan:
+    #   Plan       | Attribution Required?
+    #   -----------|----------------------
+    #   paid       | No
+    #   partner    | No
+    #   startup    | Yes
+    #   oss        | Yes
+    #   nonprofit  | No (default)
+    #   education  | No (default)
+    #
+    # These defaults can be overridden by explicit "attribution" field in the license JWT.
+    ATTRIBUTION_REQUIRED_PLANS = %w[startup oss].freeze
 
     # Mutex for thread-safe license status initialization.
     # Using a constant eliminates the race condition that would exist with @mutex ||= Mutex.new
@@ -55,12 +71,54 @@ module ReactOnRailsPro
         end
       end
 
+      # Returns the license plan type if available
+      # @return [String, nil] The plan type or nil if not available
+      def license_plan
+        return @license_plan if defined?(@license_plan)
+
+        LICENSE_MUTEX.synchronize do
+          return @license_plan if defined?(@license_plan)
+
+          @license_plan = determine_license_plan
+        end
+      end
+
+      # Returns whether attribution is required for this license
+      # Checks explicit attribution field first, then infers from plan type:
+      # - paid, partner: No attribution required
+      # - startup, oss: Attribution required
+      # - nonprofit, education: Attribution optional (default: no)
+      # @return [Boolean] True if attribution is required
+      def attribution_required?
+        return @attribution_required if defined?(@attribution_required)
+
+        LICENSE_MUTEX.synchronize do
+          return @attribution_required if defined?(@attribution_required)
+
+          @attribution_required = determine_attribution_required
+        end
+      end
+
+      # Returns license information for use in helpers and components
+      # @return [Hash] License info including org, plan, status, and attribution_required
+      def license_info
+        {
+          org: license_organization,
+          plan: license_plan,
+          status: license_status,
+          attribution_required: attribution_required?,
+          expiration: license_expiration
+        }
+      end
+
       # Resets all cached state (primarily for testing)
       def reset!
         LICENSE_MUTEX.synchronize do
           remove_instance_variable(:@license_status) if defined?(@license_status)
           remove_instance_variable(:@license_expiration) if defined?(@license_expiration)
           remove_instance_variable(:@license_organization) if defined?(@license_organization)
+          remove_instance_variable(:@license_plan) if defined?(@license_plan)
+          remove_instance_variable(:@attribution_required) if defined?(@attribution_required)
         end
       end
 
@@ -124,6 +182,42 @@ module ReactOnRailsPro
         return nil unless org.is_a?(String) && !org.strip.empty?
 
         org.strip
+      end
+
+      # Determines the license plan from the decoded JWT
+      # @return [String, nil] The plan type or nil if not available
+      def determine_license_plan
+        license_string = load_license_string
+        return nil unless license_string
+
+        decoded_data = decode_license(license_string)
+        return nil unless decoded_data
+
+        plan = decoded_data["plan"]
+        return nil unless plan.is_a?(String) && !plan.strip.empty?
+
+        plan.strip
+      end
+
+      # Determines if attribution is required based on license data
+      # Checks explicit attribution field first, then infers from plan type
+      # @return [Boolean] True if attribution is required
+      def determine_attribution_required
+        license_string = load_license_string
+        return false unless license_string
+
+        decoded_data = decode_license(license_string)
+        return false unless decoded_data
+
+        # Check explicit attribution field first
+        attribution = decoded_data["attribution"]
+        return attribution if [true, false].include?(attribution)
+
+        # Infer from plan type
+        plan = decoded_data["plan"]
+        return false unless plan.is_a?(String)
+
+        ATTRIBUTION_REQUIRED_PLANS.include?(plan.strip)
       end
 
       # Loads license string from env var or file
@@ -210,4 +304,5 @@ module ReactOnRailsPro
       end
     end
   end
+  # rubocop:enable Metrics/ClassLength
 end

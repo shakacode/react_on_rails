@@ -3,6 +3,21 @@ module ReactOnRailsPro
     # License status values
     type license_status = :valid | :expired | :invalid | :missing
 
+    # License info hash type
+    type license_info_hash = {
+      org: String?,
+      plan: String?,
+      status: license_status,
+      attribution_required: bool,
+      expiration: Time?
+    }
+
+    # Valid license plan types
+    VALID_PLANS: Array[String]
+
+    # Plans that require attribution by default
+    ATTRIBUTION_REQUIRED_PLANS: Array[String]
+
     # Returns the current license status (never raises, never logs)
     # Thread-safe: uses Mutex to prevent race conditions during initialization
     def self.license_status: () -> license_status
@@ -13,6 +28,15 @@ module ReactOnRailsPro
     # Returns the organization name from the license if available
     def self.license_organization: () -> String?
 
+    # Returns the license plan type if available
+    def self.license_plan: () -> String?
+
+    # Returns whether attribution is required for this license
+    def self.attribution_required?: () -> bool
+
+    # Returns license information for use in helpers and components
+    def self.license_info: () -> license_info_hash
+
     # Resets all cached state (primarily for testing)
     def self.reset!: () -> void
 
@@ -21,6 +45,8 @@ module ReactOnRailsPro
     def self.determine_license_status: () -> license_status
     def self.determine_license_expiration: () -> Time?
     def self.determine_license_organization: () -> String?
+    def self.determine_license_plan: () -> String?
+    def self.determine_attribution_required: () -> bool
     def self.load_license_string: () -> String?
     def self.decode_license: (String license_string) -> Hash[String, untyped]?
     def self.check_plan: (Hash[String, untyped] decoded_data) -> license_status

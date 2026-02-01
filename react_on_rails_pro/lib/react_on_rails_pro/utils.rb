@@ -201,12 +201,18 @@ module ReactOnRailsPro
 
     # Generates the Pro-specific HTML attribution comment based on license status
     # Called by React on Rails helper to generate license-specific attribution
+    # Includes organization name when available (plan is only shown in server logs for privacy)
     def self.pro_attribution_comment
       base = "Powered by React on Rails Pro (c) ShakaCode"
+      org = ReactOnRailsPro::LicenseValidator.license_organization
 
       comment = case ReactOnRailsPro::LicenseValidator.license_status
                 when :valid
-                  "#{base} | Licensed"
+                  if org.present?
+                    "#{base} | Licensed to #{org}"
+                  else
+                    "#{base} | Licensed"
+                  end
                 when :expired
                   "#{base} | LICENSE EXPIRED"
                 when :invalid
@@ -216,6 +222,13 @@ module ReactOnRailsPro
                 end
 
       "<!-- #{comment} -->"
+    end
+
+    # Returns license information for use in helpers and components
+    # Delegates to LicenseValidator.license_info
+    # @return [Hash] License info including org, plan, status, and attribution_required
+    def self.license_info
+      ReactOnRailsPro::LicenseValidator.license_info
     end
   end
 end
