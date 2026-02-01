@@ -10,6 +10,12 @@ module ReactOnRailsPro
   class LicenseValidator
     # Valid license plan types.
     # Must match VALID_PLANS in packages/react-on-rails-pro-node-renderer/src/shared/licenseValidator.ts
+    # - paid: Standard commercial license
+    # - startup: Complimentary for qualifying startups
+    # - nonprofit: Complimentary for non-profits
+    # - education: For educational institutions
+    # - oss: For open source projects
+    # - partner: Strategic partners
     VALID_PLANS = %w[paid startup nonprofit education oss partner].freeze
 
     # Plans that require attribution by default (complimentary licenses)
@@ -72,7 +78,7 @@ module ReactOnRailsPro
       end
 
       # Returns the license plan type if available
-      # @return [String, nil] The plan type or nil if not available
+      # @return [String, nil] The plan type (e.g., "paid", "startup") or nil if not available
       def license_plan
         return @license_plan if defined?(@license_plan)
 
@@ -184,8 +190,9 @@ module ReactOnRailsPro
         org.strip
       end
 
-      # Determines the license plan from the decoded JWT
-      # @return [String, nil] The plan type or nil if not available
+      # Determines the license plan type from the decoded JWT
+      # Returns nil for invalid/unknown plans - validation is handled by check_plan in license_status
+      # @return [String, nil] The plan type or nil if not available/invalid
       def determine_license_plan
         license_string = load_license_string
         return nil unless license_string
@@ -194,9 +201,9 @@ module ReactOnRailsPro
         return nil unless decoded_data
 
         plan = decoded_data["plan"]
-        return nil unless plan.is_a?(String) && !plan.strip.empty?
+        return nil unless plan && VALID_PLANS.include?(plan)
 
-        plan.strip
+        plan
       end
 
       # Determines if attribution is required based on license data
@@ -258,7 +265,7 @@ module ReactOnRailsPro
 
       # Checks if the license plan is valid for production use
       # Licenses without a plan field are considered valid (backwards compatibility with old paid licenses)
-      # Valid plans: paid, startup, nonprofit, education, oss, partner
+      # Plans in VALID_PLANS are valid; all other plans (e.g., "free") are invalid
       # @return [Symbol] :valid or :invalid
       def check_plan(decoded_data)
         plan = decoded_data["plan"]
