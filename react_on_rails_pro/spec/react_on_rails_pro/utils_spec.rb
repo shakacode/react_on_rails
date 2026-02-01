@@ -439,18 +439,32 @@ module ReactOnRailsPro
     describe ".pro_attribution_comment" do
       context "when license status is :valid" do
         before do
-          allow(ReactOnRailsPro::LicenseValidator).to receive(:license_status).and_return(:valid)
+          allow(ReactOnRailsPro::LicenseValidator).to receive_messages(license_status: :valid,
+                                                                       license_organization: nil, license_plan: nil)
         end
 
         it "returns the licensed attribution comment" do
           result = described_class.pro_attribution_comment
           expect(result).to eq("<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed -->")
         end
+
+        context "with organization name" do
+          before do
+            allow(ReactOnRailsPro::LicenseValidator).to receive_messages(license_organization: "Acme Corp",
+                                                                         license_plan: "paid")
+          end
+
+          it "includes organization name but not plan in the comment" do
+            result = described_class.pro_attribution_comment
+            expect(result).to eq("<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed to Acme Corp -->")
+          end
+        end
       end
 
       context "when license status is :expired" do
         before do
-          allow(ReactOnRailsPro::LicenseValidator).to receive(:license_status).and_return(:expired)
+          allow(ReactOnRailsPro::LicenseValidator).to receive_messages(license_status: :expired,
+                                                                       license_organization: nil, license_plan: nil)
         end
 
         it "returns the expired license attribution comment" do
@@ -461,7 +475,8 @@ module ReactOnRailsPro
 
       context "when license status is :invalid" do
         before do
-          allow(ReactOnRailsPro::LicenseValidator).to receive(:license_status).and_return(:invalid)
+          allow(ReactOnRailsPro::LicenseValidator).to receive_messages(license_status: :invalid,
+                                                                       license_organization: nil, license_plan: nil)
         end
 
         it "returns the invalid license attribution comment" do
@@ -472,7 +487,8 @@ module ReactOnRailsPro
 
       context "when license status is :missing" do
         before do
-          allow(ReactOnRailsPro::LicenseValidator).to receive(:license_status).and_return(:missing)
+          allow(ReactOnRailsPro::LicenseValidator).to receive_messages(license_status: :missing,
+                                                                       license_organization: nil, license_plan: nil)
         end
 
         it "returns the unlicensed attribution comment" do

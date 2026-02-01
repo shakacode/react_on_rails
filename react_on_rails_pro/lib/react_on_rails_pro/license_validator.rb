@@ -13,8 +13,18 @@ module ReactOnRailsPro
     VALID_PLANS = %w[paid startup nonprofit education oss partner].freeze
 
     # Plans that require attribution by default (complimentary licenses)
-    # - startup: Complimentary for qualifying startups
-    # - oss: For open source projects
+    #
+    # Attribution defaults by plan:
+    #   Plan       | Attribution Required?
+    #   -----------|----------------------
+    #   paid       | No
+    #   partner    | No
+    #   startup    | Yes
+    #   oss        | Yes
+    #   nonprofit  | No (default)
+    #   education  | No (default)
+    #
+    # These defaults can be overridden by explicit "attribution" field in the license JWT.
     ATTRIBUTION_REQUIRED_PLANS = %w[startup oss].freeze
 
     # Mutex for thread-safe license status initialization.
