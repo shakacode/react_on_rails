@@ -9,6 +9,12 @@ module ReactOnRailsPro
   class LicenseValidator
     # Valid license plan types.
     # Must match VALID_PLANS in packages/react-on-rails-pro-node-renderer/src/shared/licenseValidator.ts
+    # - paid: Standard commercial license
+    # - startup: Complimentary for qualifying startups
+    # - nonprofit: Complimentary for non-profits
+    # - education: For educational institutions
+    # - oss: For open source projects
+    # - partner: Strategic partners
     VALID_PLANS = %w[paid startup nonprofit education oss partner].freeze
 
     # Mutex for thread-safe license status initialization.
@@ -55,12 +61,25 @@ module ReactOnRailsPro
         end
       end
 
+      # Returns the license plan type if available
+      # @return [String, nil] The plan type (e.g., "paid", "startup") or nil if not available
+      def license_plan
+        return @license_plan if defined?(@license_plan)
+
+        LICENSE_MUTEX.synchronize do
+          return @license_plan if defined?(@license_plan)
+
+          @license_plan = determine_license_plan
+        end
+      end
+
       # Resets all cached state (primarily for testing)
       def reset!
         LICENSE_MUTEX.synchronize do
           remove_instance_variable(:@license_status) if defined?(@license_status)
           remove_instance_variable(:@license_expiration) if defined?(@license_expiration)
           remove_instance_variable(:@license_organization) if defined?(@license_organization)
+          remove_instance_variable(:@license_plan) if defined?(@license_plan)
         end
       end
 
@@ -92,21 +111,17 @@ module ReactOnRailsPro
       # Determines the license expiration time from the decoded JWT
       # @return [Time, nil] The expiration time or nil if not available
       def determine_license_expiration
-        license_string = load_license_string
-        return nil unless license_string
+        with_decoded_license do |decoded_data|
+          exp = decoded_data["exp"]
+          return nil unless exp
 
-        decoded_data = decode_license(license_string)
-        return nil unless decoded_data
-
-        exp = decoded_data["exp"]
-        return nil unless exp
-
-        exp_time = if exp.is_a?(Numeric)
-                     exp.to_i
-                   else
-                     Integer(exp)
-                   end
-        Time.at(exp_time)
+          exp_time = if exp.is_a?(Numeric)
+                       exp.to_i
+                     else
+                       Integer(exp)
+                     end
+          Time.at(exp_time)
+        end
       rescue ArgumentError, TypeError
         nil
       end
@@ -124,6 +139,31 @@ module ReactOnRailsPro
         return nil unless org.is_a?(String) && !org.strip.empty?
 
         org.strip
+      end
+
+      # Determines the license plan type from the decoded JWT
+      # Returns nil for invalid/unknown plans - validation is handled by check_plan in license_status
+      # @return [String, nil] The plan type or nil if not available/invalid
+      def determine_license_plan
+        with_decoded_license do |decoded_data|
+          plan = decoded_data["plan"]
+          return nil unless plan && VALID_PLANS.include?(plan)
+
+          plan
+        end
+      end
+
+      # Helper to load and decode license, yielding decoded data if successful
+      # @yield [Hash] The decoded license data
+      # @return [Object, nil] The block's return value or nil if license unavailable
+      def with_decoded_license
+        license_string = load_license_string
+        return nil unless license_string
+
+        decoded_data = decode_license(license_string)
+        return nil unless decoded_data
+
+        yield decoded_data
       end
 
       # Loads license string from env var or file
@@ -164,7 +204,8 @@ module ReactOnRailsPro
 
       # Checks if the license plan is valid for production use
       # Licenses without a plan field are considered valid (backwards compatibility with old paid licenses)
-      # Valid plans: paid, startup, nonprofit, education, oss, partner
+      # Plans in VALID_PLANS are valid; all other plans (e.g., "free") are invalid
+      # Note: Unknown plan types result in :invalid status, and license_plan returns nil
       # @return [Symbol] :valid or :invalid
       def check_plan(decoded_data)
         plan = decoded_data["plan"]

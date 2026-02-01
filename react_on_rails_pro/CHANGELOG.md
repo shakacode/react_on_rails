@@ -25,6 +25,7 @@ Changes since the last non-beta release.
 
 ### Added
 
+- **Multiple License Plan Types**: License validation now supports multiple plan types beyond "paid": `startup`, `nonprofit`, `education`, `oss`, and `partner`. Non-paid plan types are displayed in the license validation success message (e.g., "License validated successfully (startup license)."). Includes thread-safe caching for plan type retrieval via `LicenseValidator.license_plan`. [PR 2334](https://github.com/shakacode/react_on_rails/pull/2334) by [justin808](https://github.com/justin808).
 - **Node Renderer Master/Worker Exports**: Added public `master` and `worker` exports to `react-on-rails-pro-node-renderer` package, allowing users to import from `react-on-rails-pro-node-renderer/master` and `react-on-rails-pro-node-renderer/worker`. [PR 2326](https://github.com/shakacode/react_on_rails/pull/2326) by [justin808](https://github.com/justin808).
 
 ## [16.2.0] - 2026-01-14

@@ -159,7 +159,9 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
   end
 
   describe ".license_status with plan field" do
-    ReactOnRailsPro::LicenseValidator::VALID_PLANS.each do |plan_type|
+    # Dynamically generate tests for all valid plan types from VALID_PLANS constant.
+    # This ensures tests stay in sync when new plan types are added.
+    described_class::VALID_PLANS.each do |plan_type|
       context "when plan is '#{plan_type}'" do
         let(:plan_payload) do
           {
@@ -486,6 +488,109 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
     end
   end
 
+  describe ".license_plan" do
+    context "with valid license and 'paid' plan" do
+      before do
+        token = JWT.encode(valid_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns 'paid'" do
+        expect(described_class.license_plan).to eq("paid")
+      end
+
+      it "caches the result" do
+        described_class.license_plan
+        expect(described_class).not_to receive(:determine_license_plan)
+        described_class.license_plan
+      end
+    end
+
+    context "with valid license and 'startup' plan" do
+      let(:startup_payload) do
+        {
+          sub: "test@example.com",
+          iat: Time.now.to_i,
+          exp: Time.now.to_i + 3600,
+          plan: "startup",
+          org: "Startup Inc"
+        }
+      end
+
+      before do
+        token = JWT.encode(startup_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns 'startup'" do
+        expect(described_class.license_plan).to eq("startup")
+      end
+    end
+
+    context "with missing license" do
+      before do
+        ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
+      end
+
+      it "returns nil" do
+        expect(described_class.license_plan).to be_nil
+      end
+    end
+
+    context "with invalid license signature" do
+      before do
+        wrong_key = OpenSSL::PKey::RSA.new(2048)
+        token = JWT.encode(valid_payload, wrong_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns nil" do
+        expect(described_class.license_plan).to be_nil
+      end
+    end
+
+    context "with license missing plan field" do
+      let(:payload_without_plan) do
+        {
+          sub: "test@example.com",
+          iat: Time.now.to_i,
+          exp: Time.now.to_i + 3600,
+          org: "Acme Corp"
+        }
+      end
+
+      before do
+        token = JWT.encode(payload_without_plan, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns nil" do
+        expect(described_class.license_plan).to be_nil
+      end
+    end
+
+    context "with invalid plan type" do
+      let(:invalid_plan_payload) do
+        {
+          sub: "test@example.com",
+          iat: Time.now.to_i,
+          exp: Time.now.to_i + 3600,
+          plan: "free",
+          org: "Acme Corp"
+        }
+      end
+
+      before do
+        token = JWT.encode(invalid_plan_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns nil" do
+        expect(described_class.license_plan).to be_nil
+      end
+    end
+  end
+
   describe ".reset!" do
     before do
       valid_token = JWT.encode(valid_payload, test_private_key, "RS256")
@@ -493,6 +598,7 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
       described_class.license_status # Cache the result
       described_class.license_expiration # Cache the expiration
       described_class.license_organization # Cache the organization
+      described_class.license_plan # Cache the plan
     end
 
     it "clears the cached license status" do
@@ -511,6 +617,12 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
       expect(described_class.instance_variable_defined?(:@license_organization)).to be true
       described_class.reset!
       expect(described_class.instance_variable_defined?(:@license_organization)).to be false
+    end
+
+    it "clears the cached license plan" do
+      expect(described_class.instance_variable_defined?(:@license_plan)).to be true
+      described_class.reset!
+      expect(described_class.instance_variable_defined?(:@license_plan)).to be false
     end
   end
 
