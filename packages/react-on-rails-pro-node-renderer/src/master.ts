@@ -13,17 +13,21 @@ const MILLISECONDS_IN_MINUTE = 60000;
 
 export default function masterRun(runningConfig?: Partial<Config>) {
   // Check license status on startup and log appropriately
+  // Use warn in production, info in non-production (matches Ruby behavior)
   const status = getLicenseStatus();
+  const isProduction = process.env.NODE_ENV === 'production';
+  const logLicenseIssue = isProduction ? log.warn.bind(log) : log.info.bind(log);
+
   if (status === 'valid') {
     log.info('[React on Rails Pro] License validated successfully.');
   } else if (status === 'missing') {
-    log.warn('[React on Rails Pro] No license found. Get a license at https://www.shakacode.com/react-on-rails-pro/');
+    logLicenseIssue('[React on Rails Pro] No license found. Get a license at https://www.shakacode.com/react-on-rails-pro/');
   } else if (status === 'expired') {
-    log.warn(
+    logLicenseIssue(
       '[React on Rails Pro] License has expired. Renew your license at https://www.shakacode.com/react-on-rails-pro/',
     );
   } else {
-    log.warn(
+    logLicenseIssue(
       '[React on Rails Pro] Invalid license. Get a license at https://www.shakacode.com/react-on-rails-pro/',
     );
   }

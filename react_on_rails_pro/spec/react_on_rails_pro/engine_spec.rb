@@ -32,58 +32,104 @@ RSpec.describe ReactOnRailsPro::Engine do
   end
 
   describe ".log_license_status" do
-    context "with missing license" do
-      it "logs a warning" do
-        expect(mock_logger).to receive(:warn).with(/No license found/)
-        described_class.log_license_status
+    context "when in production environment" do
+      before do
+        allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new("production"))
       end
 
-      it "includes the license URL" do
-        expect(mock_logger).to receive(:warn).with(%r{shakacode\.com/react-on-rails-pro})
-        described_class.log_license_status
+      context "with missing license" do
+        it "logs a warning" do
+          expect(mock_logger).to receive(:warn).with(/No license found/)
+          described_class.log_license_status
+        end
+
+        it "includes the license URL" do
+          expect(mock_logger).to receive(:warn).with(%r{shakacode\.com/react-on-rails-pro})
+          described_class.log_license_status
+        end
+      end
+
+      context "with expired license" do
+        before do
+          expired_payload = valid_payload.merge(exp: Time.now.to_i - 3600)
+          token = JWT.encode(expired_payload, test_private_key, "RS256")
+          ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+        end
+
+        it "logs a warning" do
+          expect(mock_logger).to receive(:warn).with(/License has expired/)
+          described_class.log_license_status
+        end
+      end
+
+      context "with invalid license" do
+        before do
+          wrong_key = OpenSSL::PKey::RSA.new(2048)
+          token = JWT.encode(valid_payload, wrong_key, "RS256")
+          ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+        end
+
+        it "logs a warning" do
+          expect(mock_logger).to receive(:warn).with(/Invalid license/)
+          described_class.log_license_status
+        end
+      end
+
+      context "with valid license" do
+        before do
+          token = JWT.encode(valid_payload, test_private_key, "RS256")
+          ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+        end
+
+        it "logs success info" do
+          expect(mock_logger).to receive(:info).with(/License validated successfully/)
+          described_class.log_license_status
+        end
+
+        it "does not log a warning" do
+          expect(mock_logger).not_to receive(:warn)
+          described_class.log_license_status
+        end
       end
     end
 
-    context "with expired license" do
+    context "when in non-production environment" do
       before do
-        expired_payload = valid_payload.merge(exp: Time.now.to_i - 3600)
-        token = JWT.encode(expired_payload, test_private_key, "RS256")
-        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+        allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new("development"))
       end
 
-      it "logs a warning" do
-        expect(mock_logger).to receive(:warn).with(/License has expired/)
-        described_class.log_license_status
-      end
-    end
-
-    context "with invalid license" do
-      before do
-        wrong_key = OpenSSL::PKey::RSA.new(2048)
-        token = JWT.encode(valid_payload, wrong_key, "RS256")
-        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      context "with missing license" do
+        it "logs info instead of warning" do
+          expect(mock_logger).to receive(:info).with(/No license found/)
+          expect(mock_logger).not_to receive(:warn)
+          described_class.log_license_status
+        end
       end
 
-      it "logs a warning" do
-        expect(mock_logger).to receive(:warn).with(/Invalid license/)
-        described_class.log_license_status
-      end
-    end
+      context "with expired license" do
+        before do
+          expired_payload = valid_payload.merge(exp: Time.now.to_i - 3600)
+          token = JWT.encode(expired_payload, test_private_key, "RS256")
+          ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+        end
 
-    context "with valid license" do
-      before do
-        token = JWT.encode(valid_payload, test_private_key, "RS256")
-        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
-      end
-
-      it "logs success info" do
-        expect(mock_logger).to receive(:info).with(/License validated successfully/)
-        described_class.log_license_status
+        it "logs info instead of warning" do
+          expect(mock_logger).to receive(:info).with(/License has expired/)
+          expect(mock_logger).not_to receive(:warn)
+          described_class.log_license_status
+        end
       end
 
-      it "does not log a warning" do
-        expect(mock_logger).not_to receive(:warn)
-        described_class.log_license_status
+      context "with valid license" do
+        before do
+          token = JWT.encode(valid_payload, test_private_key, "RS256")
+          ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+        end
+
+        it "logs success info" do
+          expect(mock_logger).to receive(:info).with(/License validated successfully/)
+          described_class.log_license_status
+        end
       end
     end
   end

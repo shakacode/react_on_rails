@@ -25,11 +25,22 @@ module ReactOnRailsPro
         when :valid
           Rails.logger.info "[React on Rails Pro] License validated successfully."
         when :missing
-          Rails.logger.warn "[React on Rails Pro] No license found. Get a license at #{LICENSE_URL}"
+          log_license_issue("No license found", "Get a license at #{LICENSE_URL}")
         when :expired
-          Rails.logger.warn "[React on Rails Pro] License has expired. Renew your license at #{LICENSE_URL}"
+          log_license_issue("License has expired", "Renew your license at #{LICENSE_URL}")
         when :invalid
-          Rails.logger.warn "[React on Rails Pro] Invalid license. Get a license at #{LICENSE_URL}"
+          log_license_issue("Invalid license", "Get a license at #{LICENSE_URL}")
+        end
+      end
+
+      private
+
+      def log_license_issue(issue, action)
+        message = "[React on Rails Pro] #{issue}. #{action}"
+        if Rails.env.production?
+          Rails.logger.warn message
+        else
+          Rails.logger.info message
         end
       end
     end
