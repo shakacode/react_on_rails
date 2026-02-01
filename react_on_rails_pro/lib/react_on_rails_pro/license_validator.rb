@@ -271,6 +271,7 @@ module ReactOnRailsPro
       # Checks if the license plan is valid for production use
       # Licenses without a plan field are considered valid (backwards compatibility with old paid licenses)
       # Plans in VALID_PLANS are valid; all other plans (e.g., "free") are invalid
+      # Note: Unknown plan types result in :invalid status, and license_plan returns nil
       # @return [Symbol] :valid or :invalid
       def check_plan(decoded_data)
         plan = decoded_data["plan"]
