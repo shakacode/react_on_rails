@@ -15,11 +15,13 @@
     <title>Dummy</title>
   <% end %>
   <%= yield :head %>
+  <%= render "layouts/critical_styles" %>
   <style>
       html {
           font-size: 16px !important;
       }
   </style>
+  <%= preload_pack_asset('client-bundle.css', as: 'style') %>
   <%= stylesheet_pack_tag('client-bundle',
                           media: 'all',
                           'data-turbo-track': 'reload') %>
