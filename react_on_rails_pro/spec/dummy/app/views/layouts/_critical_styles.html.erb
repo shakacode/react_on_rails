@@ -1,0 +1,40 @@
+<%#
+  Critical CSS for preventing Flash of Unstyled Content (FOUC)
+
+  These styles are inlined to ensure the layout structure renders correctly
+  before the main Tailwind CSS bundle loads. Keep this minimal - only include
+  styles that cause visible layout shift if missing.
+
+  To update: If you change the layout structure in application.html.erb,
+  ensure the corresponding Tailwind utilities are defined here.
+%>
+<style>
+  /* Layout structure */
+  .flex { display: flex; }
+  .flex-row { flex-direction: row; }
+  .flex-col { flex-direction: column; }
+  .flex-1 { flex: 1 1 0%; }
+
+  /* Screen sizing */
+  .h-screen { height: 100vh; }
+  .w-screen { width: 100vw; }
+  .min-w-\[400px\] { min-width: 400px; }
+  .max-w-\[400px\] { max-width: 400px; }
+
+  /* Overflow */
+  .overflow-y-auto { overflow-y: auto; }
+  .overflow-x-hidden { overflow-x: hidden; }
+
+  /* Spacing */
+  .p-5 { padding: 1.25rem; }
+  .px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
+
+  /* Background colors */
+  .bg-white { background-color: #fff; }
+  .bg-slate-100 { background-color: #f1f5f9; }
+
+  /* Borders */
+  .border-solid { border-style: solid; }
+  .border-r-2 { border-right-width: 2px; }
+  .border-slate-700 { border-color: #334155; }
+</style>
