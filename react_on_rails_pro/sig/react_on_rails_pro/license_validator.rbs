@@ -1,0 +1,26 @@
+module ReactOnRailsPro
+  class LicenseValidator
+    # License status values
+    type license_status = :valid | :expired | :invalid | :missing
+
+    # Returns the current license status (never raises, never logs)
+    # Thread-safe: uses Mutex to prevent race conditions during initialization
+    def self.license_status: () -> license_status
+
+    # Returns the license expiration time if available
+    def self.license_expiration: () -> Time?
+
+    # Resets all cached state (primarily for testing)
+    def self.reset!: () -> void
+
+    private
+
+    def self.determine_license_status: () -> license_status
+    def self.determine_license_expiration: () -> Time?
+    def self.load_license_string: () -> String?
+    def self.decode_license: (String license_string) -> Hash[String, untyped]?
+    def self.check_plan: (Hash[String, untyped] decoded_data) -> license_status
+    def self.check_expiration: (Hash[String, untyped] license) -> license_status
+    def self.public_key: () -> untyped
+  end
+end

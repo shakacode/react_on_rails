@@ -51,12 +51,10 @@ module ReactOnRailsPro
       ReactOnRailsPro.configuration.enable_rsc_support
     end
 
-    # Validates the license and raises an exception if invalid.
-    #
-    # @return [Boolean] true if license is valid
-    # @raise [ReactOnRailsPro::Error] if license is invalid
-    def self.validated_license_data!
-      LicenseValidator.validated_license_data!
+    # Returns the current license status
+    # @return [Symbol] One of :valid, :expired, :invalid, :missing
+    def self.license_status
+      LicenseValidator.license_status
     end
 
     def self.copy_assets
@@ -206,14 +204,15 @@ module ReactOnRailsPro
     def self.pro_attribution_comment
       base = "Powered by React on Rails Pro (c) ShakaCode"
 
-      # Check if in grace period
-      grace_days = ReactOnRailsPro::LicenseValidator.grace_days_remaining
-      comment = if grace_days
-                  "#{base} | Licensed (Expired - Grace Period: #{grace_days} day(s) remaining)"
-                elsif ReactOnRailsPro::LicenseValidator.evaluation?
-                  "#{base} | Evaluation License"
-                else
+      comment = case ReactOnRailsPro::LicenseValidator.license_status
+                when :valid
                   "#{base} | Licensed"
+                when :expired
+                  "#{base} | LICENSE EXPIRED"
+                when :invalid
+                  "#{base} | INVALID LICENSE"
+                when :missing
+                  "#{base} | UNLICENSED"
                 end
 
       "<!-- #{comment} -->"

@@ -19,6 +19,10 @@ You can find the **package** version numbers from this repo's tags and below in 
 
 Changes since the last non-beta release.
 
+### Changed
+
+- **License-Optional Attribution Model**: React on Rails Pro now works without a license for evaluation, development, testing, and CI/CD. A paid license is only required for production deployments. Added `plan` field validation to both Ruby and Node.js license validators — only `"paid"` plan (or no plan field for backwards compatibility) is accepted. Old free licenses are now treated as invalid. Documentation overhauled across README and LICENSE_SETUP guides; removed CI_SETUP.md (CI needs no license configuration). [PR 2324](https://github.com/shakacode/react_on_rails/pull/2324) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 ### Added
 
 - **Node Renderer Master/Worker Exports**: Added public `master` and `worker` exports to `react-on-rails-pro-node-renderer` package, allowing users to import from `react-on-rails-pro-node-renderer/master` and `react-on-rails-pro-node-renderer/worker`. [PR 2326](https://github.com/shakacode/react_on_rails/pull/2326) by [justin808](https://github.com/justin808).
@@ -544,7 +548,7 @@ Above changes in [PR 52](https://github.com/shakacode/react_on_rails_pro/pull/52
 - advanced error handling
 
 [Unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.2.0...master
-[16.2.0]: https://github.com/shakacode/react_on_rails/compare/v16.1.1...v16.2.0
+[16.2.0]: https://github.com/shakacode/react_on_rails/compare/v16.2.0.beta.0...v16.2.0
 [4.0.0-rc.15]: https://github.com/shakacode/react_on_rails_pro/compare/4.0.0-rc.14...4.0.0-rc.15
 [4.0.0.rc.11]: https://github.com/shakacode/react_on_rails_pro/compare/4.0.0-rc.9...4.0.0-rc.11
 [4.0.0.rc.9]: https://github.com/shakacode/react_on_rails_pro/compare/4.0.0-rc.6...4.0.0-rc.9

@@ -35,6 +35,6 @@ ReactOnRails.configure do |config|
 end
 ```
 
-Note, full details of the React on Rails configuration are [available here](https://shakacode.com/react-on-rails/docs/api-reference/configuration/).
+Note, full details of the React on Rails configuration are [available here](https://www.shakacode.com/react-on-rails/docs/configuration/configuration/).
 
 See the doc file [render-functions-and-railscontext.md](../core-concepts/render-functions-and-railscontext.md#rails-context) for how your client-side code uses the device information
