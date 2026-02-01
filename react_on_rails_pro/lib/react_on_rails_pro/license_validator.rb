@@ -60,7 +60,7 @@ module ReactOnRailsPro
       def load_license_string
         # First try environment variable
         license = ENV.fetch("REACT_ON_RAILS_PRO_LICENSE", nil)
-        return license if license.present?
+        return license if license && !license.strip.empty?
 
         # Then try config file
         config_path = Rails.root.join("config", "react_on_rails_pro_license.key")

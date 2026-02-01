@@ -101,7 +101,7 @@ function checkPlan(decodedData: LicenseData): LicenseStatus {
  * @private
  */
 function checkExpiration(license: LicenseData): LicenseStatus {
-  if (!license.exp) {
+  if (license.exp == null) {
     return 'invalid';
   }
 
