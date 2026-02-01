@@ -236,11 +236,92 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
     end
   end
 
+  describe ".license_expiration" do
+    context "with valid license" do
+      let(:exp_time) { Time.now.to_i + 3600 }
+
+      before do
+        payload = valid_payload.merge(exp: exp_time)
+        token = JWT.encode(payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns the expiration time" do
+        result = described_class.license_expiration
+        expect(result).to be_a(Time)
+        expect(result.to_i).to eq(exp_time)
+      end
+
+      it "caches the result" do
+        described_class.license_expiration
+        expect(described_class).not_to receive(:determine_license_expiration)
+        described_class.license_expiration
+      end
+    end
+
+    context "with expired license" do
+      let(:exp_time) { Time.now.to_i - 3600 }
+
+      before do
+        payload = expired_payload.merge(exp: exp_time)
+        token = JWT.encode(payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns the expiration time even when expired" do
+        result = described_class.license_expiration
+        expect(result).to be_a(Time)
+        expect(result.to_i).to eq(exp_time)
+      end
+    end
+
+    context "with missing license" do
+      before do
+        ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
+      end
+
+      it "returns nil" do
+        expect(described_class.license_expiration).to be_nil
+      end
+    end
+
+    context "with invalid license signature" do
+      before do
+        wrong_key = OpenSSL::PKey::RSA.new(2048)
+        token = JWT.encode(valid_payload, wrong_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns nil" do
+        expect(described_class.license_expiration).to be_nil
+      end
+    end
+
+    context "with license missing exp field" do
+      let(:payload_without_exp) do
+        {
+          sub: "test@example.com",
+          iat: Time.now.to_i
+        }
+      end
+
+      before do
+        token = JWT.encode(payload_without_exp, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns nil" do
+        expect(described_class.license_expiration).to be_nil
+      end
+    end
+  end
+
   describe ".reset!" do
     before do
       valid_token = JWT.encode(valid_payload, test_private_key, "RS256")
       ENV["REACT_ON_RAILS_PRO_LICENSE"] = valid_token
       described_class.license_status # Cache the result
+      described_class.license_expiration # Cache the expiration
     end
 
     it "clears the cached license status" do
@@ -248,16 +329,25 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
       described_class.reset!
       expect(described_class.instance_variable_defined?(:@license_status)).to be false
     end
+
+    it "clears the cached license expiration" do
+      expect(described_class.instance_variable_defined?(:@license_expiration)).to be true
+      described_class.reset!
+      expect(described_class.instance_variable_defined?(:@license_expiration)).to be false
+    end
   end
 
   describe "thread safety" do
-    it "handles concurrent access without errors" do
+    it "handles concurrent first-time access without errors" do
       valid_token = JWT.encode(valid_payload, test_private_key, "RS256")
       ENV["REACT_ON_RAILS_PRO_LICENSE"] = valid_token
 
-      threads = Array.new(10) do
+      # Reset ONCE before spawning threads to test concurrent initialization
+      described_class.reset!
+
+      # Use more threads for better race condition detection
+      threads = Array.new(100) do
         Thread.new do
-          described_class.reset!
           described_class.license_status
         end
       end

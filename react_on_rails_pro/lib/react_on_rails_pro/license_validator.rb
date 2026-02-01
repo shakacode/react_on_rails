@@ -27,10 +27,23 @@ module ReactOnRailsPro
         end
       end
 
+      # Returns the license expiration time if available
+      # @return [Time, nil] The expiration time or nil if not available
+      def license_expiration
+        return @license_expiration if defined?(@license_expiration)
+
+        LICENSE_MUTEX.synchronize do
+          return @license_expiration if defined?(@license_expiration)
+
+          @license_expiration = determine_license_expiration
+        end
+      end
+
       # Resets all cached state (primarily for testing)
       def reset!
         LICENSE_MUTEX.synchronize do
           remove_instance_variable(:@license_status) if defined?(@license_status)
+          remove_instance_variable(:@license_expiration) if defined?(@license_expiration)
         end
       end
 
@@ -55,6 +68,28 @@ module ReactOnRailsPro
         check_expiration(decoded_data)
       end
 
+      # Determines the license expiration time from the decoded JWT
+      # @return [Time, nil] The expiration time or nil if not available
+      def determine_license_expiration
+        license_string = load_license_string
+        return nil unless license_string
+
+        decoded_data = decode_license(license_string)
+        return nil unless decoded_data
+
+        exp = decoded_data["exp"]
+        return nil unless exp
+
+        exp_time = if exp.is_a?(Numeric)
+                     exp.to_i
+                   else
+                     Integer(exp)
+                   end
+        Time.at(exp_time)
+      rescue ArgumentError, TypeError
+        nil
+      end
+
       # Loads license string from env var or file
       # @return [String, nil] License string or nil if not found
       def load_license_string
@@ -67,7 +102,10 @@ module ReactOnRailsPro
         return unless config_path.exist?
 
         begin
-          File.read(config_path).strip
+          content = File.read(config_path).strip
+          return nil if content.empty?
+
+          content
         rescue StandardError
           nil
         end

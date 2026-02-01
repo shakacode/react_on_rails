@@ -16,6 +16,39 @@ React on Rails Pro works **without a license** for evaluation, development, test
 | Staging (non-prod) | No                |
 | Production         | **Yes** (paid)    |
 
+## Upgrading from Previous Versions
+
+If you're upgrading from an earlier version of React on Rails Pro, note these changes:
+
+### Breaking Changes
+
+- **`ReactOnRailsPro::Utils.licensed?` has been removed** — Use `ReactOnRailsPro::LicenseValidator.license_status == :valid` instead
+- **`ReactOnRailsPro::LicenseValidator.license_data` has been removed** — Only `license_status` and `license_expiration` are available
+- **The app will no longer crash on invalid/missing licenses** — License issues are now logged as warnings in production and info in non-production environments
+
+### Migration Steps
+
+1. **Remove any custom error handling for license exceptions** — The license validator no longer raises exceptions
+2. **Update license status checks:**
+
+   ```ruby
+   # Old (removed)
+   ReactOnRailsPro::Utils.licensed?
+
+   # New
+   ReactOnRailsPro::LicenseValidator.license_status == :valid
+   ```
+
+3. **Remove any code that accessed `license_data`** — This method is no longer available
+
+### Behavior Changes
+
+- **Missing license**: Previously raised an error in production. Now logs a warning and continues running.
+- **Expired license**: Previously raised an error. Now logs a warning and continues running.
+- **Invalid license**: Previously raised an error. Now logs a warning and continues running.
+
+This change allows your application to start even with license issues, giving you time to resolve them without downtime.
+
 ## Installation
 
 ### Method 1: Environment Variable (Recommended)
@@ -83,6 +116,7 @@ CI/CD environments work without a license. If your CI pipeline deploys to produc
 ### Verify License is Working
 
 **Ruby Console:**
+
 ```ruby
 rails console
 > ReactOnRails::Utils.react_on_rails_pro?
@@ -90,8 +124,9 @@ rails console
 ```
 
 **Browser JavaScript Console:**
+
 ```javascript
-window.railsContext.rorPro
+window.railsContext.rorPro;
 // Should return: true
 ```
 
@@ -104,10 +139,12 @@ This is expected behavior in development, test, and CI environments. The applica
 ### Error: "Invalid license signature"
 
 **Causes:**
+
 - License token was truncated or modified
 - Wrong license format (must be complete JWT token)
 
 **Solutions:**
+
 1. Ensure you copied the complete license (starts with `eyJ`)
 2. Check for extra spaces or newlines
 3. Contact [support@shakacode.com](mailto:support@shakacode.com) for a replacement
@@ -115,6 +152,7 @@ This is expected behavior in development, test, and CI environments. The applica
 ### Error: "License has expired"
 
 **Solutions:**
+
 1. Contact [support@shakacode.com](mailto:support@shakacode.com) to renew your paid license
 2. Update the `REACT_ON_RAILS_PRO_LICENSE` environment variable with the new token
 
@@ -138,12 +176,12 @@ The license is a JWT (JSON Web Token) signed with RSA-256, containing:
 
 ```json
 {
-  "sub": "user@example.com",        // Your email (REQUIRED)
-  "iat": 1234567890,                 // Issued at timestamp (REQUIRED)
-  "exp": 1234567890,                 // Expiration timestamp (REQUIRED)
-  "plan": "paid",                    // License plan (Optional — only "paid" is valid for production)
-  "organization": "Your Company",    // Organization name (Optional)
-  "iss": "api"                       // Issuer identifier (Optional, standard JWT claim)
+  "sub": "user@example.com", // Your email (REQUIRED)
+  "iat": 1234567890, // Issued at timestamp (REQUIRED)
+  "exp": 1234567890, // Expiration timestamp (REQUIRED)
+  "plan": "paid", // License plan (Optional — only "paid" is valid for production)
+  "organization": "Your Company", // Organization name (Optional)
+  "iss": "api" // Issuer identifier (Optional, standard JWT claim)
 }
 ```
 
@@ -164,7 +202,7 @@ The license is a JWT (JSON Web Token) signed with RSA-256, containing:
 Need help?
 
 1. **Email**: support@shakacode.com
-3. **Sales**: [justin@shakacode.com](mailto:justin@shakacode.com) for pricing
+2. **Sales**: [justin@shakacode.com](mailto:justin@shakacode.com) for pricing
 
 ## Security Best Practices
 

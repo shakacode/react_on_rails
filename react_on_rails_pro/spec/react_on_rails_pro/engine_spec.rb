@@ -47,17 +47,35 @@ RSpec.describe ReactOnRailsPro::Engine do
           expect(mock_logger).to receive(:warn).with(%r{shakacode\.com/react-on-rails-pro})
           described_class.log_license_status
         end
+
+        it "includes the production license violation warning" do
+          expect(mock_logger).to receive(:warn).with(/violates the license terms/)
+          described_class.log_license_status
+        end
       end
 
       context "with expired license" do
+        let(:expired_time) { Time.now.to_i - 3600 }
+
         before do
-          expired_payload = valid_payload.merge(exp: Time.now.to_i - 3600)
+          expired_payload = valid_payload.merge(exp: expired_time)
           token = JWT.encode(expired_payload, test_private_key, "RS256")
           ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
         end
 
         it "logs a warning" do
           expect(mock_logger).to receive(:warn).with(/License has expired/)
+          described_class.log_license_status
+        end
+
+        it "includes the expiration date" do
+          expected_date = Time.at(expired_time).strftime("%Y-%m-%d")
+          expect(mock_logger).to receive(:warn).with(/expired on #{expected_date}/)
+          described_class.log_license_status
+        end
+
+        it "includes the production license violation warning" do
+          expect(mock_logger).to receive(:warn).with(/violates the license terms/)
           described_class.log_license_status
         end
       end
@@ -71,6 +89,11 @@ RSpec.describe ReactOnRailsPro::Engine do
 
         it "logs a warning" do
           expect(mock_logger).to receive(:warn).with(/Invalid license/)
+          described_class.log_license_status
+        end
+
+        it "includes the production license violation warning" do
+          expect(mock_logger).to receive(:warn).with(/violates the license terms/)
           described_class.log_license_status
         end
       end
@@ -104,11 +127,18 @@ RSpec.describe ReactOnRailsPro::Engine do
           expect(mock_logger).not_to receive(:warn)
           described_class.log_license_status
         end
+
+        it "includes the development/test message" do
+          expect(mock_logger).to receive(:info).with(%r{No license required for development/test environments})
+          described_class.log_license_status
+        end
       end
 
       context "with expired license" do
+        let(:expired_time) { Time.now.to_i - 3600 }
+
         before do
-          expired_payload = valid_payload.merge(exp: Time.now.to_i - 3600)
+          expired_payload = valid_payload.merge(exp: expired_time)
           token = JWT.encode(expired_payload, test_private_key, "RS256")
           ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
         end
@@ -116,6 +146,17 @@ RSpec.describe ReactOnRailsPro::Engine do
         it "logs info instead of warning" do
           expect(mock_logger).to receive(:info).with(/License has expired/)
           expect(mock_logger).not_to receive(:warn)
+          described_class.log_license_status
+        end
+
+        it "includes the expiration date" do
+          expected_date = Time.at(expired_time).strftime("%Y-%m-%d")
+          expect(mock_logger).to receive(:info).with(/expired on #{expected_date}/)
+          described_class.log_license_status
+        end
+
+        it "includes the development/test message" do
+          expect(mock_logger).to receive(:info).with(%r{No license required for development/test environments})
           described_class.log_license_status
         end
       end

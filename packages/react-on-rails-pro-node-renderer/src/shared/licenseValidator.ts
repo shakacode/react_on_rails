@@ -152,6 +152,13 @@ function determineLicenseStatus(): LicenseStatus {
 
 /**
  * Returns the current license status (never throws or exits).
+ *
+ * Note: While Node.js is single-threaded for JavaScript execution, multiple
+ * concurrent calls during event loop processing could see undefined and start
+ * redundant determinations. This is acceptable as the result is deterministic
+ * and will be the same. Unlike Ruby's Mutex-based approach, we don't need
+ * synchronization here because the worst case is redundant (but correct) work.
+ *
  * @returns One of 'valid', 'expired', 'invalid', 'missing'
  */
 export function getLicenseStatus(): LicenseStatus {

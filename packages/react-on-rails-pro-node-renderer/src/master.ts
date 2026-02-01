@@ -14,8 +14,10 @@ const MILLISECONDS_IN_MINUTE = 60000;
 export default function masterRun(runningConfig?: Partial<Config>) {
   // Check license status on startup and log appropriately
   // Use warn in production, info in non-production (matches Ruby behavior)
+  // Check both NODE_ENV and RAILS_ENV for production detection to stay consistent
+  // with Ruby's Rails.env.production? check
   const status = getLicenseStatus();
-  const isProduction = process.env.NODE_ENV === 'production';
+  const isProduction = process.env.NODE_ENV === 'production' || process.env.RAILS_ENV === 'production';
   const logLicenseIssue = isProduction ? log.warn.bind(log) : log.info.bind(log);
 
   if (status === 'valid') {
