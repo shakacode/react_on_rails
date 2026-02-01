@@ -12,6 +12,8 @@ interface LicenseData {
   exp?: number;
   // Optional: license plan (e.g., "paid"). Only "paid" is valid for production use.
   plan?: string;
+  // Organization name (required for all licenses)
+  org?: string;
   // Issuer (who issued the license)
   iss?: string;
   // Allow additional fields
@@ -29,6 +31,7 @@ export type LicenseStatus = 'valid' | 'expired' | 'invalid' | 'missing';
 
 // Module-level state for caching
 let cachedLicenseStatus: LicenseStatus | undefined;
+let cachedLicenseOrganization: string | undefined;
 
 /**
  * Loads the license string from environment variable or config file.
@@ -99,6 +102,21 @@ function checkPlan(decodedData: LicenseData): LicenseStatus {
 }
 
 /**
+ * Checks if the license has a valid organization name.
+ * Organization name is required for all licenses.
+ * @returns 'valid' or 'invalid'
+ * @private
+ */
+function checkOrganization(decodedData: LicenseData): LicenseStatus {
+  const { org } = decodedData;
+  if (typeof org !== 'string' || org.trim() === '') {
+    return 'invalid';
+  }
+
+  return 'valid';
+}
+
+/**
  * Checks if the license is expired.
  * @returns 'valid', 'expired', or 'invalid' (if exp field missing or non-numeric)
  * @private
@@ -146,7 +164,13 @@ function determineLicenseStatus(): LicenseStatus {
     return planStatus;
   }
 
-  // Step 4: Check expiration
+  // Step 4: Check organization is present
+  const orgStatus = checkOrganization(decodedData);
+  if (orgStatus !== 'valid') {
+    return orgStatus;
+  }
+
+  // Step 5: Check expiration
   return checkExpiration(decodedData);
 }
 
@@ -171,8 +195,46 @@ export function getLicenseStatus(): LicenseStatus {
 }
 
 /**
+ * Determines the organization name from the decoded JWT.
+ * @returns The organization name or undefined if not available
+ * @private
+ */
+function determineLicenseOrganization(): string | undefined {
+  const licenseString = loadLicenseString();
+  if (!licenseString) {
+    return undefined;
+  }
+
+  const decodedData = decodeLicense(licenseString);
+  if (!decodedData) {
+    return undefined;
+  }
+
+  const { org } = decodedData;
+  if (typeof org !== 'string' || org.trim() === '') {
+    return undefined;
+  }
+
+  return org.trim();
+}
+
+/**
+ * Returns the organization name from the license if available.
+ * @returns The organization name or undefined if not available
+ */
+export function getLicenseOrganization(): string | undefined {
+  if (cachedLicenseOrganization !== undefined) {
+    return cachedLicenseOrganization;
+  }
+
+  cachedLicenseOrganization = determineLicenseOrganization();
+  return cachedLicenseOrganization;
+}
+
+/**
  * Resets all cached validation state (primarily for testing).
  */
 export function reset(): void {
   cachedLicenseStatus = undefined;
+  cachedLicenseOrganization = undefined;
 }

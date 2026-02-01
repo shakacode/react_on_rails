@@ -39,11 +39,24 @@ module ReactOnRailsPro
         end
       end
 
+      # Returns the organization name from the license if available
+      # @return [String, nil] The organization name or nil if not available
+      def license_organization
+        return @license_organization if defined?(@license_organization)
+
+        LICENSE_MUTEX.synchronize do
+          return @license_organization if defined?(@license_organization)
+
+          @license_organization = determine_license_organization
+        end
+      end
+
       # Resets all cached state (primarily for testing)
       def reset!
         LICENSE_MUTEX.synchronize do
           remove_instance_variable(:@license_status) if defined?(@license_status)
           remove_instance_variable(:@license_expiration) if defined?(@license_expiration)
+          remove_instance_variable(:@license_organization) if defined?(@license_organization)
         end
       end
 
@@ -64,7 +77,11 @@ module ReactOnRailsPro
         plan_status = check_plan(decoded_data)
         return plan_status unless plan_status == :valid
 
-        # Step 4: Check expiration
+        # Step 4: Check organization is present
+        org_status = check_organization(decoded_data)
+        return org_status unless org_status == :valid
+
+        # Step 5: Check expiration
         check_expiration(decoded_data)
       end
 
@@ -88,6 +105,21 @@ module ReactOnRailsPro
         Time.at(exp_time)
       rescue ArgumentError, TypeError
         nil
+      end
+
+      # Determines the organization name from the decoded JWT
+      # @return [String, nil] The organization name or nil if not available
+      def determine_license_organization
+        license_string = load_license_string
+        return nil unless license_string
+
+        decoded_data = decode_license(license_string)
+        return nil unless decoded_data
+
+        org = decoded_data["org"]
+        return nil unless org.is_a?(String) && !org.strip.empty?
+
+        org.strip
       end
 
       # Loads license string from env var or file
@@ -136,6 +168,16 @@ module ReactOnRailsPro
         return :valid if plan == "paid"
 
         :invalid
+      end
+
+      # Checks if the license has a valid organization name
+      # Organization name is required for all licenses
+      # @return [Symbol] :valid or :invalid
+      def check_organization(decoded_data)
+        org = decoded_data["org"]
+        return :invalid unless org.is_a?(String) && !org.strip.empty?
+
+        :valid
       end
 
       # Checks if the license is expired
