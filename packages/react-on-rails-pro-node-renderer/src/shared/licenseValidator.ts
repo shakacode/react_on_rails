@@ -37,7 +37,7 @@ let cachedLicenseStatus: LicenseStatus | undefined;
  */
 function loadLicenseString(): string | undefined {
   // First try environment variable
-  const envLicense = process.env.REACT_ON_RAILS_PRO_LICENSE;
+  const envLicense = process.env.REACT_ON_RAILS_PRO_LICENSE?.trim();
   if (envLicense) {
     return envLicense;
   }
@@ -46,7 +46,10 @@ function loadLicenseString(): string | undefined {
   try {
     const configPath = path.join(process.cwd(), 'config', 'react_on_rails_pro_license.key');
     if (fs.existsSync(configPath)) {
-      return fs.readFileSync(configPath, 'utf8').trim();
+      const content = fs.readFileSync(configPath, 'utf8').trim();
+      if (content) {
+        return content;
+      }
     }
   } catch {
     // File read error - return undefined to indicate missing license
