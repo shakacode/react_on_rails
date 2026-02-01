@@ -24,7 +24,11 @@ module ReactOnRailsPro
         case status
         when :valid
           org = ReactOnRailsPro::LicenseValidator.license_organization
-          Rails.logger.info "[React on Rails Pro] License validated successfully (#{org})."
+          plan = ReactOnRailsPro::LicenseValidator.license_plan
+          # Show plan type for non-paid licenses (startup, nonprofit, etc.)
+          # Paid licenses show simpler message for backwards compatibility
+          plan_info = plan && plan != "paid" ? " - #{plan} license" : ""
+          Rails.logger.info "[React on Rails Pro] License validated successfully (#{org}#{plan_info})."
         when :missing
           log_license_issue("No license found", "Get a license at #{LICENSE_URL}")
         when :expired

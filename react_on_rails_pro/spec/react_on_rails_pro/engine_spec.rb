@@ -110,8 +110,79 @@ RSpec.describe ReactOnRailsPro::Engine do
           described_class.log_license_status
         end
 
+        it "does not include plan type for paid licenses" do
+          expect(mock_logger).to receive(:info).with("[React on Rails Pro] License validated successfully.")
+          described_class.log_license_status
+        end
+
         it "does not log a warning" do
           expect(mock_logger).not_to receive(:warn)
+          described_class.log_license_status
+        end
+      end
+
+      context "with valid startup license" do
+        let(:startup_payload) do
+          {
+            sub: "test@example.com",
+            iat: Time.now.to_i,
+            exp: Time.now.to_i + 3600,
+            plan: "startup"
+          }
+        end
+
+        before do
+          token = JWT.encode(startup_payload, test_private_key, "RS256")
+          ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+        end
+
+        it "logs success with plan type" do
+          expect(mock_logger).to receive(:info)
+            .with(/License validated successfully \(startup license\)/)
+          described_class.log_license_status
+        end
+      end
+
+      context "with valid nonprofit license" do
+        let(:nonprofit_payload) do
+          {
+            sub: "test@example.com",
+            iat: Time.now.to_i,
+            exp: Time.now.to_i + 3600,
+            plan: "nonprofit"
+          }
+        end
+
+        before do
+          token = JWT.encode(nonprofit_payload, test_private_key, "RS256")
+          ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+        end
+
+        it "logs success with plan type" do
+          expect(mock_logger).to receive(:info)
+            .with(/License validated successfully \(nonprofit license\)/)
+          described_class.log_license_status
+        end
+      end
+
+      context "with valid oss license" do
+        let(:oss_payload) do
+          {
+            sub: "test@example.com",
+            iat: Time.now.to_i,
+            exp: Time.now.to_i + 3600,
+            plan: "oss"
+          }
+        end
+
+        before do
+          token = JWT.encode(oss_payload, test_private_key, "RS256")
+          ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+        end
+
+        it "logs success with plan type" do
+          expect(mock_logger).to receive(:info)
+            .with(/License validated successfully \(oss license\)/)
           described_class.log_license_status
         end
       end
@@ -170,6 +241,28 @@ RSpec.describe ReactOnRailsPro::Engine do
 
         it "logs success info" do
           expect(mock_logger).to receive(:info).with(/License validated successfully/)
+          described_class.log_license_status
+        end
+      end
+
+      context "with valid startup license" do
+        let(:startup_payload) do
+          {
+            sub: "test@example.com",
+            iat: Time.now.to_i,
+            exp: Time.now.to_i + 3600,
+            plan: "startup"
+          }
+        end
+
+        before do
+          token = JWT.encode(startup_payload, test_private_key, "RS256")
+          ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+        end
+
+        it "logs success with plan type" do
+          expect(mock_logger).to receive(:info)
+            .with(/License validated successfully \(startup license\)/)
           described_class.log_license_status
         end
       end
