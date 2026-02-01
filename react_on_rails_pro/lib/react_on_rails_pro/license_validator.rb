@@ -156,21 +156,17 @@ module ReactOnRailsPro
       # Determines the license expiration time from the decoded JWT
       # @return [Time, nil] The expiration time or nil if not available
       def determine_license_expiration
-        license_string = load_license_string
-        return nil unless license_string
+        with_decoded_license do |decoded_data|
+          exp = decoded_data["exp"]
+          return nil unless exp
 
-        decoded_data = decode_license(license_string)
-        return nil unless decoded_data
-
-        exp = decoded_data["exp"]
-        return nil unless exp
-
-        exp_time = if exp.is_a?(Numeric)
-                     exp.to_i
-                   else
-                     Integer(exp)
-                   end
-        Time.at(exp_time)
+          exp_time = if exp.is_a?(Numeric)
+                       exp.to_i
+                     else
+                       Integer(exp)
+                     end
+          Time.at(exp_time)
+        end
       rescue ArgumentError, TypeError
         nil
       end
@@ -194,16 +190,25 @@ module ReactOnRailsPro
       # Returns nil for invalid/unknown plans - validation is handled by check_plan in license_status
       # @return [String, nil] The plan type or nil if not available/invalid
       def determine_license_plan
+        with_decoded_license do |decoded_data|
+          plan = decoded_data["plan"]
+          return nil unless plan && VALID_PLANS.include?(plan)
+
+          plan
+        end
+      end
+
+      # Helper to load and decode license, yielding decoded data if successful
+      # @yield [Hash] The decoded license data
+      # @return [Object, nil] The block's return value or nil if license unavailable
+      def with_decoded_license
         license_string = load_license_string
         return nil unless license_string
 
         decoded_data = decode_license(license_string)
         return nil unless decoded_data
 
-        plan = decoded_data["plan"]
-        return nil unless plan && VALID_PLANS.include?(plan)
-
-        plan
+        yield decoded_data
       end
 
       # Determines if attribution is required based on license data
