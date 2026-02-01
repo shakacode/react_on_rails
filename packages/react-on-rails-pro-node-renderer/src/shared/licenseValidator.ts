@@ -8,7 +8,7 @@ import { PUBLIC_KEY } from './licensePublicKey.js';
  * Must match VALID_PLANS in react_on_rails_pro/lib/react_on_rails_pro/license_validator.rb
  */
 const VALID_PLANS = ['paid', 'startup', 'nonprofit', 'education', 'oss', 'partner'] as const;
-type ValidPlan = (typeof VALID_PLANS)[number];
+export type ValidPlan = (typeof VALID_PLANS)[number];
 
 interface LicenseData {
   // Subject (email for whom the license is issued)
@@ -39,6 +39,7 @@ export type LicenseStatus = 'valid' | 'expired' | 'invalid' | 'missing';
 // Module-level state for caching
 let cachedLicenseStatus: LicenseStatus | undefined;
 let cachedLicenseOrganization: string | undefined;
+let cachedLicensePlan: ValidPlan | undefined;
 
 /**
  * Loads the license string from environment variable or config file.
@@ -239,9 +240,48 @@ export function getLicenseOrganization(): string | undefined {
 }
 
 /**
+ * Determines the license plan type from the decoded JWT.
+ * Returns undefined for invalid/unknown plans - validation is handled by checkPlan in getLicenseStatus.
+ * @returns The plan type or undefined if not available/invalid
+ * @private
+ */
+function determineLicensePlan(): ValidPlan | undefined {
+  const licenseString = loadLicenseString();
+  if (!licenseString) {
+    return undefined;
+  }
+
+  const decodedData = decodeLicense(licenseString);
+  if (!decodedData) {
+    return undefined;
+  }
+
+  const { plan } = decodedData;
+  if (!plan || !VALID_PLANS.includes(plan as ValidPlan)) {
+    return undefined;
+  }
+
+  return plan as ValidPlan;
+}
+
+/**
+ * Returns the license plan type if available.
+ * @returns The plan type (e.g., "paid", "startup") or undefined if not available
+ */
+export function getLicensePlan(): ValidPlan | undefined {
+  if (cachedLicensePlan !== undefined) {
+    return cachedLicensePlan;
+  }
+
+  cachedLicensePlan = determineLicensePlan();
+  return cachedLicensePlan;
+}
+
+/**
  * Resets all cached validation state (primarily for testing).
  */
 export function reset(): void {
   cachedLicenseStatus = undefined;
   cachedLicenseOrganization = undefined;
+  cachedLicensePlan = undefined;
 }

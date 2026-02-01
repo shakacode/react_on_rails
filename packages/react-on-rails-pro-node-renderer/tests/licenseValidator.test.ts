@@ -8,11 +8,12 @@ jest.mock('../src/shared/licensePublicKey', () => ({
   PUBLIC_KEY: '',
 }));
 
-import type { LicenseStatus } from '../src/shared/licenseValidator';
+import type { LicenseStatus, ValidPlan } from '../src/shared/licenseValidator';
 
 interface LicenseValidatorModule {
   getLicenseStatus: () => LicenseStatus;
   getLicenseOrganization: () => string | undefined;
+  getLicensePlan: () => ValidPlan | undefined;
   reset: () => void;
 }
 
@@ -377,6 +378,111 @@ describe('LicenseValidator', () => {
     });
   });
 
+  describe('getLicensePlan', () => {
+    it.each(['paid', 'startup', 'nonprofit', 'education', 'oss', 'partner'] as const)(
+      "returns '%s' for valid plan type",
+      (planType) => {
+        const payload = {
+          sub: 'test@example.com',
+          iat: Math.floor(Date.now() / 1000),
+          exp: Math.floor(Date.now() / 1000) + 3600,
+          plan: planType,
+          org: 'Acme Corp',
+        };
+
+        const token = jwt.sign(payload, testPrivateKey, { algorithm: 'RS256' });
+        process.env.REACT_ON_RAILS_PRO_LICENSE = token;
+
+        const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
+        expect(module.getLicensePlan()).toBe(planType);
+      },
+    );
+
+    it('returns undefined when plan field is absent', () => {
+      const payload = {
+        sub: 'test@example.com',
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        org: 'Acme Corp',
+        // No plan field
+      };
+
+      const token = jwt.sign(payload, testPrivateKey, { algorithm: 'RS256' });
+      process.env.REACT_ON_RAILS_PRO_LICENSE = token;
+
+      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
+      expect(module.getLicensePlan()).toBeUndefined();
+    });
+
+    it('returns undefined for invalid plan type', () => {
+      const payload = {
+        sub: 'test@example.com',
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        plan: 'free',
+        org: 'Acme Corp',
+      };
+
+      const token = jwt.sign(payload, testPrivateKey, { algorithm: 'RS256' });
+      process.env.REACT_ON_RAILS_PRO_LICENSE = token;
+
+      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
+      expect(module.getLicensePlan()).toBeUndefined();
+    });
+
+    it('returns undefined when license is missing', () => {
+      delete process.env.REACT_ON_RAILS_PRO_LICENSE;
+      jest.mocked(fs.existsSync).mockReturnValue(false);
+
+      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
+      expect(module.getLicensePlan()).toBeUndefined();
+    });
+
+    it('returns undefined when license has invalid signature', () => {
+      const wrongKeyPair = crypto.generateKeyPairSync('rsa', {
+        modulusLength: 2048,
+        publicKeyEncoding: { type: 'spki', format: 'pem' },
+        privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+      });
+
+      const payload = {
+        sub: 'test@example.com',
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        plan: 'paid',
+        org: 'Acme Corp',
+      };
+
+      const invalidToken = jwt.sign(payload, wrongKeyPair.privateKey, { algorithm: 'RS256' });
+      process.env.REACT_ON_RAILS_PRO_LICENSE = invalidToken;
+
+      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
+      expect(module.getLicensePlan()).toBeUndefined();
+    });
+
+    it('caches the result', () => {
+      const payload = {
+        sub: 'test@example.com',
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        plan: 'startup',
+        org: 'Acme Corp',
+      };
+
+      const token = jwt.sign(payload, testPrivateKey, { algorithm: 'RS256' });
+      process.env.REACT_ON_RAILS_PRO_LICENSE = token;
+
+      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
+
+      expect(module.getLicensePlan()).toBe('startup');
+
+      // Change ENV (shouldn't affect cached result)
+      delete process.env.REACT_ON_RAILS_PRO_LICENSE;
+
+      expect(module.getLicensePlan()).toBe('startup');
+    });
+  });
+
   describe('reset', () => {
     it('clears cached state so status is re-evaluated', () => {
       const validPayload = {
@@ -424,6 +530,31 @@ describe('LicenseValidator', () => {
 
       // Should return undefined now since cache was cleared
       expect(module.getLicenseOrganization()).toBeUndefined();
+    });
+
+    it('clears cached plan so it is re-evaluated', () => {
+      const validPayload = {
+        sub: 'test@example.com',
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        plan: 'startup',
+        org: 'Acme Corp',
+      };
+
+      const validToken = jwt.sign(validPayload, testPrivateKey, { algorithm: 'RS256' });
+      process.env.REACT_ON_RAILS_PRO_LICENSE = validToken;
+
+      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
+
+      // Get plan once to cache
+      expect(module.getLicensePlan()).toBe('startup');
+
+      // Reset and remove license
+      module.reset();
+      delete process.env.REACT_ON_RAILS_PRO_LICENSE;
+
+      // Should return undefined now since cache was cleared
+      expect(module.getLicensePlan()).toBeUndefined();
     });
   });
 });
