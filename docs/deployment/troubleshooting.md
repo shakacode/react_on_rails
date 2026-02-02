@@ -11,6 +11,7 @@ Having issues with React on Rails? This guide covers the most common problems an
 | **Installation**     | Generator fails or components don't appear  | [Installation Issues](#-installation-issues)                 |
 | **Compilation**      | Webpack errors, build failures              | [Build Issues](#-build-issues)                               |
 | **Runtime**          | Components not rendering, JavaScript errors | [Runtime Issues](#-runtime-issues)                           |
+| **CSS Modules**      | Styles undefined, SSR CSS crashes           | [CSS Modules Issues](#-css-modules-issues)                   |
 | **Styling (FOUC)**   | Unstyled content flash with SSR             | [Flash of Unstyled Content](#flash-of-unstyled-content-fouc) |
 | **Server Rendering** | SSR not working, hydration mismatches       | [SSR Issues](#-server-side-rendering-issues)                 |
 | **Performance**      | Slow builds, large bundles, memory issues   | [Performance Issues](#-performance-issues)                   |
@@ -190,6 +191,81 @@ useEffect(() => {
   <%= yield :body_content %>
 </body>
 </html>
+```
+
+## 🎨 CSS Modules Issues
+
+### "CSS modules returning undefined" (Shakapacker 9+)
+
+**Symptoms:**
+
+- `import css from './Component.module.scss'` returns `undefined`
+- SSR crashes: `Cannot read properties of undefined (reading 'className')`
+- Build warning: `export 'default' (imported as 'css') was not found`
+
+**Root Cause:** Shakapacker 9 changed the default CSS Modules configuration from default exports to named exports (`namedExport: true`).
+
+**Solution:** Configure CSS loader to use default exports:
+
+```javascript
+// config/webpack/commonWebpackConfig.js
+const { generateWebpackConfig } = require('shakapacker');
+
+const commonWebpackConfig = () => {
+  const baseWebpackConfig = generateWebpackConfig();
+
+  baseWebpackConfig.module.rules.forEach((rule) => {
+    if (rule.use && Array.isArray(rule.use)) {
+      const cssLoader = rule.use.find((loader) => {
+        const loaderName = typeof loader === 'string' ? loader : loader?.loader;
+        return loaderName?.includes('css-loader');
+      });
+
+      if (cssLoader?.options?.modules) {
+        cssLoader.options.modules.namedExport = false;
+        cssLoader.options.modules.exportLocalsConvention = 'camelCase';
+      }
+    }
+  });
+
+  return baseWebpackConfig;
+};
+```
+
+**See:** [Rspack Migration Guide](../migrating/migrating-from-webpack-to-rspack.md) for complete configuration details.
+
+### "CSS modules work in dev but fail in SSR"
+
+**Cause:** Server-side config overwrites CSS modules settings instead of merging them.
+
+**Solution:** Preserve existing CSS modules configuration:
+
+```javascript
+// ❌ Wrong
+cssLoader.options.modules = { exportOnlyLocals: true };
+
+// ✅ Correct
+cssLoader.options.modules = {
+  ...cssLoader.options.modules,
+  exportOnlyLocals: true,
+};
+```
+
+### "Intermittent CSS failures with Rspack"
+
+**Cause:** CSS extraction not properly filtered from server bundle. Rspack uses different loader paths than Webpack.
+
+**Solution:** Filter both Webpack and Rspack CSS extract loaders:
+
+```javascript
+rule.use = rule.use.filter((item) => {
+  const testValue = typeof item === 'string' ? item : item?.loader;
+  return !(
+    testValue?.match(/mini-css-extract-plugin/) ||
+    testValue?.includes('cssExtractLoader') || // Rspack path
+    testValue === 'style-loader'
+  );
+});
 ```
 
 ## 🖥️ Server-Side Rendering Issues
