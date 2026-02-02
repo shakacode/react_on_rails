@@ -4,6 +4,7 @@ require "English"
 require "open3"
 require "rainbow"
 require_relative "../packer_utils"
+require_relative "database_checker"
 require_relative "service_checker"
 
 module ReactOnRails
@@ -441,6 +442,9 @@ module ReactOnRails
 
           print_procfile_info(procfile, route: route)
 
+          # Check database setup before starting
+          exit 1 unless DatabaseChecker.check_database
+
           # Check required services before starting
           exit 1 unless ServiceChecker.check_services
 
@@ -566,6 +570,9 @@ module ReactOnRails
         def run_static_development(procfile, verbose: false, route: nil)
           print_procfile_info(procfile, route: route)
 
+          # Check database setup before starting
+          exit 1 unless DatabaseChecker.check_database
+
           # Check required services before starting
           exit 1 unless ServiceChecker.check_services
 
@@ -594,6 +601,9 @@ module ReactOnRails
 
         def run_development(procfile, verbose: false, route: nil)
           print_procfile_info(procfile, route: route)
+
+          # Check database setup before starting
+          exit 1 unless DatabaseChecker.check_database
 
           # Check required services before starting
           exit 1 unless ServiceChecker.check_services
