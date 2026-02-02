@@ -209,6 +209,8 @@ useEffect(() => {
 
 ```javascript
 // config/webpack/commonWebpackConfig.js
+const { generateWebpackConfig } = require('shakapacker');
+
 const commonWebpackConfig = () => {
   const baseWebpackConfig = generateWebpackConfig();
 
@@ -226,7 +228,7 @@ const commonWebpackConfig = () => {
     }
   });
 
-  return merge({}, baseWebpackConfig, commonOptions);
+  return baseWebpackConfig;
 };
 ```
 
