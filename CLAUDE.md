@@ -18,6 +18,25 @@ Examples:
 
 Top-level documentation (like README.md, CONTRIBUTING.md) should remain at the root.
 
+### Documentation Files (`docs/`)
+
+The `docs/` directory is published to the [ShakaCode website](https://www.shakacode.com/react-on-rails/docs/). **Never place new docs at the `docs/` root** — they must go in the appropriate subdirectory:
+
+| Content type | Directory |
+|---|---|
+| User getting-started guides | `docs/getting-started/` |
+| Core architecture/concepts | `docs/core-concepts/` |
+| Feature implementation guides | `docs/building-features/` |
+| API/config reference | `docs/api-reference/` |
+| Deployment & troubleshooting | `docs/deployment/` |
+| Migration guides | `docs/migrating/` |
+| General user guides | `docs/guides/` |
+| Upgrade notes & release notes | `docs/upgrading/` |
+| Internal/contributor docs (NOT published) | `docs/contributor-info/` |
+| Miscellaneous | `docs/misc/` |
+
+Files placed at the `docs/` root appear as uncategorized items at the top of the website sidebar, which looks broken.
+
 ## ⚠️ CRITICAL REQUIREMENTS
 
 **BEFORE EVERY COMMIT/PUSH:**

@@ -119,7 +119,7 @@ script/ci-changes-detector origin/master
 - Push Pro changes without testing locally first
 - Modify both Pro and main gem without running full tests
 
-For comprehensive CI documentation, see [`../docs/CI_OPTIMIZATION.md`](../docs/CI_OPTIMIZATION.md) in the repository root.
+For comprehensive CI documentation, see [`../docs/contributor-info/ci-optimization.md`](../docs/contributor-info/ci-optimization.md) in the repository root.
 
 # IDE/Editor Setup
 
