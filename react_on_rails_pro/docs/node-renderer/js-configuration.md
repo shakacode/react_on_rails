@@ -134,10 +134,11 @@ You can also register Fastify plugins. This example assumes you're using the sam
 ```js
 // In the worker branch of your cluster setup (see example above)
 import run, { configureFastify } from 'react-on-rails-pro-node-renderer/worker';
+import cors from '@fastify/cors';
 
 configureFastify((app) => {
   // Register a plugin
-  app.register(require('@fastify/cors'), {
+  app.register(cors, {
     origin: true,
   });
 });
