@@ -89,3 +89,75 @@ And add this line to your `scripts` section of `package.json`
 ```
 
 `yarn start` will run the renderer.
+
+## Custom Fastify Configuration
+
+For advanced use cases, you can customize the Fastify server instance by importing the `master` and `worker` modules directly. This is useful for:
+
+- Adding custom routes (e.g., `/health` for container health checks)
+- Registering Fastify plugins
+- Adding custom hooks for logging or monitoring
+
+### Adding a Health Check Endpoint
+
+When running the node-renderer in Docker or Kubernetes, you may need a `/health` endpoint for container health checks:
+
+```js
+import masterRun from 'react-on-rails-pro-node-renderer/master';
+import run, { configureFastify } from 'react-on-rails-pro-node-renderer/worker';
+import cluster from 'cluster';
+
+const config = {
+  // Your configuration options here
+};
+
+// Register a custom health check route
+configureFastify((app) => {
+  app.get('/health', (request, reply) => {
+    reply.send({ status: 'ok' });
+  });
+});
+
+// The node-renderer uses Node.js cluster module to fork worker processes.
+// The primary process manages workers; workers handle HTTP requests.
+if (cluster.isPrimary) {
+  masterRun(config);
+} else {
+  run(config);
+}
+```
+
+### Registering Fastify Plugins
+
+You can also register Fastify plugins. This example assumes you're using the same cluster setup pattern shown above:
+
+```js
+// In the worker branch of your cluster setup (see example above)
+import run, { configureFastify } from 'react-on-rails-pro-node-renderer/worker';
+import cors from '@fastify/cors';
+
+configureFastify((app) => {
+  // Register a plugin
+  app.register(cors, {
+    origin: true,
+  });
+});
+
+// Add request logging
+configureFastify((app) => {
+  app.addHook('onRequest', (request, reply, done) => {
+    try {
+      console.log(`Request: ${request.method} ${request.url}`);
+      done();
+    } catch (err) {
+      done(err);
+    }
+  });
+});
+```
+
+> **Note:** The `configureFastify` function must be called before calling `run()`. Multiple callbacks can be registered and will execute in order. You can use `app.ready()` in your callback to ensure all plugins are loaded before performing operations that depend on them.
+
+### API Stability
+
+The `./master` and `./worker` exports provide direct access to the node-renderer internals. While we strive to maintain backwards compatibility, these are considered advanced APIs. If you only need basic configuration, prefer using the standard `reactOnRailsProNodeRenderer` function with the configuration options documented above.
