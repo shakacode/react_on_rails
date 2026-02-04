@@ -1,7 +1,7 @@
 module ReactOnRails
   module Dev
     class DatabaseChecker
-      type check_result = { status: Symbol, error: String? }
+      type check_result = { status: Symbol, error?: String }
 
       def self.check_database: (?skip: bool) -> bool
 
