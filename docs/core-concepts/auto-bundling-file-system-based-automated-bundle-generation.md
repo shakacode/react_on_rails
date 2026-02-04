@@ -79,6 +79,10 @@ app/javascript/src/
 
 **Note:** Without configuring `component_extensions`, files like `Component.bs.js` would still be discovered (since they end with `.js`), but the component name would be extracted incorrectly as `Component.bs` instead of `Component`.
 
+**When do you need this?** Use `component_extensions` when your transpiled components use multi-part extensions (like `.bs.js`) that would otherwise result in incorrect component names.
+
+**Automatic ordering:** Extensions are automatically sorted by length internally, so overlapping extensions like `[".js", ".bs.js"]` will work correctly - the longer extension is always matched first.
+
 ### Location of generated files
 
 Generated files will go to the following two directories:

@@ -848,6 +848,34 @@ module ReactOnRails
         end
       end
 
+      context "with extensions configured without leading dot" do
+        before do
+          ReactOnRails.configuration.component_extensions = ["bs.js", "res.js"]
+        end
+
+        it "matches files with those extensions" do
+          expect(regex).to match("Component.bs.js")
+          expect(regex).to match("Component.res.js")
+        end
+      end
+
+      context "with extension case sensitivity" do
+        before do
+          ReactOnRails.configuration.component_extensions = [".BS.js"]
+        end
+
+        it "matches the exact case" do
+          expect(regex).to match("Component.BS.js")
+        end
+
+        it "does not match different case" do
+          # .bs.js would still match via the default .js extension
+          # but the specific .BS.js pattern won't match .bs.js
+          # This test verifies the case-sensitive pattern is in the regex
+          expect(regex.source).to include("BS\\.js")
+        end
+      end
+
       context "with malicious regex metacharacters in extensions (security test)" do
         # Tests for regex injection vulnerability prevention
         # Malicious extensions containing regex metacharacters should be escaped
@@ -983,6 +1011,76 @@ module ReactOnRails
         # Without configuration, the standard File.extname behavior applies
         # which strips only .js, leaving MyComponent.bs
         it { is_expected.to eq "MyComponent.bs" }
+      end
+
+      context "with overlapping extensions configured (longer extension should match first)" do
+        let(:file_path) { "/path/to/Component.bs.js" }
+        let(:old_component_extensions) { ReactOnRails.configuration.component_extensions }
+
+        before do
+          # NOTE: Order shouldn't matter as they are sorted by length internally
+          ReactOnRails.configuration.component_extensions = [".js", ".bs.js"]
+        end
+
+        after do
+          ReactOnRails.configuration.component_extensions = old_component_extensions
+        end
+
+        it "correctly extracts Component (not Component.bs)" do
+          expect(component_name).to eq "Component"
+        end
+      end
+
+      context "with extension configured without leading dot" do
+        let(:file_path) { "/path/to/MyComponent.bs.js" }
+        let(:old_component_extensions) { ReactOnRails.configuration.component_extensions }
+
+        before do
+          # Extension without leading dot - should work the same as with dot
+          ReactOnRails.configuration.component_extensions = ["bs.js"]
+        end
+
+        after do
+          ReactOnRails.configuration.component_extensions = old_component_extensions
+        end
+
+        it { is_expected.to eq "MyComponent" }
+      end
+
+      context "with case-sensitive extension" do
+        let(:file_path) { "/path/to/Component.BS.js" }
+        let(:old_component_extensions) { ReactOnRails.configuration.component_extensions }
+
+        before do
+          ReactOnRails.configuration.component_extensions = [".BS.js"]
+        end
+
+        after do
+          ReactOnRails.configuration.component_extensions = old_component_extensions
+        end
+
+        it "matches the exact case" do
+          expect(component_name).to eq "Component"
+        end
+      end
+
+      context "with mismatched case extension (no match expected)" do
+        let(:file_path) { "/path/to/Component.bs.js" }
+        let(:old_component_extensions) { ReactOnRails.configuration.component_extensions }
+
+        before do
+          # Configured with uppercase, file has lowercase
+          ReactOnRails.configuration.component_extensions = [".BS.JS"]
+        end
+
+        after do
+          ReactOnRails.configuration.component_extensions = old_component_extensions
+        end
+
+        it "falls back to standard extension stripping (case mismatch)" do
+          # Since .BS.JS doesn't match .bs.js, standard File.extname behavior applies
+          expect(component_name).to eq "Component.bs"
+        end
       end
     end
 

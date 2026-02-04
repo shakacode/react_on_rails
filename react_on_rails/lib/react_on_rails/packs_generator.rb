@@ -364,7 +364,9 @@ module ReactOnRails
 
       # Try to strip custom extensions first (e.g., ".bs.js", ".res.js")
       # These must be checked before standard extensions since they contain dots
-      custom_component_extensions.each do |ext|
+      # Sort by length (descending) to match longest extensions first, handling
+      # overlapping patterns like [".js", ".bs.js"] correctly (ensures .bs.js matches before .js)
+      custom_component_extensions.sort_by { |ext| -ext.length }.each do |ext|
         normalized_ext = ext.start_with?(".") ? ext : ".#{ext}"
         if basename.end_with?(normalized_ext)
           basename = basename[0...-normalized_ext.length]
@@ -400,6 +402,7 @@ module ReactOnRails
         Regexp.escape(ext.sub(/^\./, ""))
       end
       # Combine default and custom extensions
+      # When custom_patterns is empty, regex falls back to default extensions only
       all_patterns = DEFAULT_COMPONENT_EXTENSIONS + custom_patterns
       /\.(#{all_patterns.join('|')})$/
     end

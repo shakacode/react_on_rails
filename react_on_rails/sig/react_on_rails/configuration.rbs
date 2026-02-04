@@ -32,7 +32,8 @@ module ReactOnRails
     attr_accessor generated_component_packs_loading_strategy: Symbol?
     attr_accessor immediate_hydration: bool
     attr_accessor component_registry_timeout: Integer
-    attr_accessor component_extensions: Array[String]
+    attr_reader component_extensions: Array[String]
+    def component_extensions=: (Array[String] value) -> Array[String]
     attr_accessor server_bundle_output_path: String?
     attr_accessor enforce_private_server_bundles: bool
 
