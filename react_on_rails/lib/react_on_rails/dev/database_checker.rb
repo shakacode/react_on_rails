@@ -16,12 +16,23 @@ module ReactOnRails
     # 1. Database exists and is accessible
     # 2. Migrations are up to date (optional warning)
     #
+    # Can be disabled via:
+    # - Environment variable: SKIP_DATABASE_CHECK=true
+    # - CLI flag: bin/dev --skip-database-check
+    # - Configuration: ReactOnRails.configure { |c| c.check_database_on_dev_start = false }
+    #
+    # Note: This check spawns a Rails runner process which adds ~1-2 seconds to startup.
+    # Disable it if this overhead is unacceptable for your workflow.
+    #
     class DatabaseChecker
       class << self
         # Check if the database is set up and accessible
         #
-        # @return [Boolean] true if database is ready, false otherwise
-        def check_database
+        # @param skip [Boolean] if true, skip the check entirely
+        # @return [Boolean] true if database is ready (or check was skipped), false otherwise
+        def check_database(skip: false)
+          return true if should_skip_check?(skip)
+
           print_checking_message
           result = run_database_check
 
@@ -45,6 +56,23 @@ module ReactOnRails
         end
 
         private
+
+        def should_skip_check?(skip_flag)
+          # 1. CLI flag takes highest priority
+          return true if skip_flag
+
+          # 2. Environment variable
+          return true if ENV["SKIP_DATABASE_CHECK"] == "true"
+
+          # 3. ReactOnRails configuration (if available)
+          if defined?(ReactOnRails) && ReactOnRails.respond_to?(:configuration)
+            config = ReactOnRails.configuration
+            return true if config.respond_to?(:check_database_on_dev_start) &&
+                           config.check_database_on_dev_start == false
+          end
+
+          false
+        end
 
         def run_database_check
           check_script = <<~RUBY

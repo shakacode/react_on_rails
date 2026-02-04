@@ -3,10 +3,11 @@ module ReactOnRails
     class DatabaseChecker
       type check_result = { status: Symbol, error: String? }
 
-      def self.check_database: () -> bool
+      def self.check_database: (?skip: bool) -> bool
 
       private
 
+      def self.should_skip_check?: (bool) -> bool
       def self.run_database_check: () -> check_result
       def self.parse_check_result: (String, String, Process::Status) -> check_result
       def self.check_pending_migrations: () -> void
