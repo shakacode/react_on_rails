@@ -1,6 +1,6 @@
 {
   "name": "react-on-rails-workspace",
-  "version": "16.2.1",
+  "version": "16.3.0-rc.0",
   "description": "react-on-rails monorepo workspace manager",
   "private": true,
   "type": "module",
