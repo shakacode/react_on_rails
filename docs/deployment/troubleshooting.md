@@ -277,11 +277,6 @@ There are two common causes of FOUC in React on Rails applications:
 - **Escape special characters** - Tailwind's arbitrary value syntax like `min-w-[400px]` needs escaping: `.min-w-\[400px\]`
 - **Maintain in sync** - Update critical CSS when you change layout classes
 
-**Real-world example:** See the React on Rails Pro `spec/dummy` app implementation:
-
-- [`_critical_styles.html.erb`](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/spec/dummy/app/views/layouts/_critical_styles.html.erb)
-- [`application.html.erb`](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/spec/dummy/app/views/layouts/application.html.erb)
-
 ## 🎨 CSS Modules Issues
 
 ### "CSS modules returning undefined" (Shakapacker 9+)
