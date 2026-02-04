@@ -156,7 +156,7 @@ Renders React Server Component (RSC) payloads in NDJSON format for client-side c
 - Server-side data fetching
 - Selective client-side hydration
 
-See the [React on Rails Pro Configuration](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/docs/configuration.md) for RSC setup.
+See the [React on Rails Pro Configuration](../../react_on_rails_pro/docs/configuration.md) for RSC setup.
 
 ---
 
