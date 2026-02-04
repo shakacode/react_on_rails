@@ -534,7 +534,7 @@ The CI system intelligently skips unnecessary work:
 | JS code only               | Skips Ruby-only tests | ~30%       |
 | Workflow changes           | Runs lint only        | ~75%       |
 
-For more details, see [`docs/CI_OPTIMIZATION.md`](./docs/CI_OPTIMIZATION.md).
+For more details, see [`docs/contributor-info/ci-optimization.md`](./docs/contributor-info/ci-optimization.md).
 
 ### CI Control Commands
 
