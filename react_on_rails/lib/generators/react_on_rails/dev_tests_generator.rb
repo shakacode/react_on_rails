@@ -47,11 +47,18 @@ module ReactOnRails
         File.open(hello_world_index, "w+") { |f| f.puts new_hello_world_contents }
       end
 
-      def add_yarn_relative_install_script_in_package_json
+      def add_react_on_rails_as_file_dependency
+        # Add react-on-rails as a file dependency pointing to the local package
+        # This allows testing with the local npm package without needing yalc
         package_json = File.join(destination_root, "package.json")
         contents = JSON.parse(File.read(package_json))
-        contents["scripts"] ||= {}
-        contents["scripts"]["postinstall"] = "yalc link react-on-rails"
+        contents["dependencies"] ||= {}
+
+        # Calculate relative path from the generated example to the npm package
+        # Generated examples are in gen-examples/examples/<name>/
+        # The npm package is in packages/react-on-rails/
+        contents["dependencies"]["react-on-rails"] = "file:../../../packages/react-on-rails"
+
         File.open(package_json, "w+") { |f| f.puts JSON.pretty_generate(contents) }
       end
     end
