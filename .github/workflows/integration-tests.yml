@@ -161,7 +161,10 @@ jobs:
       - name: generate file system-based packs
         run: cd react_on_rails/spec/dummy && RAILS_ENV="test" bundle exec rake react_on_rails:generate_packs
       - name: Build test bundles for dummy app
-        run: cd react_on_rails/spec/dummy && rm -rf public/webpack/test && pnpm run build:rescript && RAILS_ENV="test" NODE_ENV="test" bin/shakapacker
+        run: |
+          rm -rf react_on_rails/spec/dummy/public/webpack/test
+          pnpm --filter "react_on_rails" run build:rescript
+          cd react_on_rails/spec/dummy && RAILS_ENV="test" NODE_ENV="test" bin/shakapacker
       - id: get-sha
         run: echo "sha=\"$(git rev-parse HEAD)\"" >> "$GITHUB_OUTPUT"
       - name: Save test Webpack bundles to cache (for build number checksum used by RSpec job)
