@@ -21,6 +21,17 @@ rails generate react_on_rails:install
 - `shakapacker.yml` settings
 - other configuration files
 
+## Upgrading to v16.2.x (from v16.1.x)
+
+This release focuses on clear separation between open-source and Pro features. See the [v16.2.x Release Notes](release-notes/16.2.0.md) for full details.
+
+**Key actions required:**
+
+1. **Remove `config.immediate_hydration`** from your initializer - this config option has been removed (automatic for Pro users)
+2. **Use exact versions** in `package.json` - semver wildcards (`^`, `~`, `*`) now cause boot failures
+3. **Pro users:** If importing Pro methods from `react-on-rails`, switch to `react-on-rails-pro`
+4. **RSC users:** Move RSC configurations from `ReactOnRails.configure` to `ReactOnRailsPro.configure`
+
 ## Upgrading to v16.1.x (from v16.0.x)
 
 This is a minor release - update your gem and npm package versions, then run `bundle install` and your package manager's install command. See the [v16.1.x Release Notes](release-notes/16.1.0.md) for new features and bug fixes.
