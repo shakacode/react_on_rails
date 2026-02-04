@@ -17,6 +17,44 @@
 # 2. Modify this script for project-specific command-line behavior
 # 3. Extend ReactOnRails::Dev classes in your Rails app for advanced customization
 # 4. Use classes directly: ReactOnRails::Dev::ServerManager.start(:development, "Custom.procfile")
+#
+# EXTENSIBLE PRECOMPILE PATTERN (Alternative to precompile_hook)
+# ===============================================================
+# If your project has custom build requirements (e.g., ReScript, TypeScript
+# compilation, custom locale generation), you can handle precompile tasks
+# directly in this script instead of using the precompile_hook mechanism.
+#
+# Benefits of this approach:
+# - Single place to manage all precompile tasks
+# - Direct Ruby API calls (faster, no shell spawning overhead)
+# - Better version manager compatibility (mise, asdf, rbenv)
+# - Clean Procfiles without embedded precompile logic
+#
+# To use this pattern:
+# 1. Uncomment and customize the run_precompile_tasks method below
+# 2. Set shakapacker_precompile: false in config/shakapacker.yml
+# 3. Remove precompile_hook from shakapacker.yml if present
+#
+# See documentation: https://www.shakacode.com/react-on-rails/docs/building-features/extensible-precompile-pattern
+#
+# def run_precompile_tasks
+#   require_relative "../config/environment"
+#
+#   puts "📦 Running precompile tasks..."
+#
+#   # Example: Build ReScript files
+#   # print "   ReScript build... "
+#   # system("yarn res:build") or exit(1)
+#   # puts "✅"
+#
+#   # Example: Generate locales using direct Ruby API (faster than rake task)
+#   # This avoids shell spawning and version manager PATH issues
+#   print "   Locale generation... "
+#   ReactOnRails::Locales.compile if ReactOnRails.configuration.i18n_dir.present?
+#   puts "✅"
+#
+#   puts ""
+# end
 
 require "bundler/setup"
 require "react_on_rails/dev"
@@ -30,5 +68,11 @@ DEFAULT_ROUTE = "hello_world"
 # Add the default route to ARGV if no --route option is provided
 argv_with_defaults = ARGV.dup
 argv_with_defaults.push("--route=#{DEFAULT_ROUTE}") unless argv_with_defaults.any? { |arg| arg.start_with?("--route") }
+
+# Uncomment to run custom precompile tasks before starting the server
+# Only run for server start commands (not kill/help)
+# unless ARGV.include?("kill") || ARGV.include?("-h") || ARGV.include?("--help") || ARGV.include?("help")
+#   run_precompile_tasks
+# end
 
 ReactOnRails::Dev::ServerManager.run_from_command_line(argv_with_defaults)

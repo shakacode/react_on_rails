@@ -58,6 +58,18 @@ default: &default
 
 See the [i18n documentation](./i18n.md#internationalization) for more details on configuring the precompile hook.
 
+### Alternative: Extensible Precompile Pattern
+
+For projects with custom build requirements (ReScript, TypeScript compilation, multiple precompile tasks), consider handling precompile tasks directly in `bin/dev` instead of using the precompile_hook mechanism.
+
+This approach provides:
+
+- Single place to manage all precompile tasks
+- Direct Ruby API calls (faster, better version manager compatibility)
+- Clean Procfiles without embedded precompile logic
+
+See the [Extensible Precompile Pattern](./extensible-precompile-pattern.md) guide for full details.
+
 ### Service Dependency Checking
 
 `bin/dev` can automatically verify that required external services (like Redis, PostgreSQL, Elasticsearch) are running before starting your development server. This prevents cryptic error messages and provides clear instructions on how to start missing services.
