@@ -1,0 +1,22 @@
+module ReactOnRails
+  module Dev
+    class DatabaseChecker
+      type check_result = { status: Symbol, error: String? }
+
+      def self.check_database: () -> bool
+
+      private
+
+      def self.run_database_check: () -> check_result
+      def self.parse_check_result: (String, String, Process::Status) -> check_result
+      def self.check_pending_migrations: () -> void
+      def self.print_checking_message: () -> void
+      def self.print_database_ok: () -> void
+      def self.print_pending_migrations_warning: () -> void
+      def self.print_no_database: (String?) -> void
+      def self.print_connection_error: (String?) -> void
+      def self.print_rails_error: (String?) -> void
+      def self.truncate_error: (String) -> String
+    end
+  end
+end

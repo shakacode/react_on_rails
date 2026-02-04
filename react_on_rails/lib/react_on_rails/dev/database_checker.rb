@@ -64,6 +64,8 @@ module ReactOnRails
             end
           RUBY
 
+          # SECURITY: Using array form of Open3.capture3 is safe from command injection.
+          # The check_script is hardcoded above and never includes user input.
           stdout, stderr, status = Open3.capture3("bin/rails", "runner", check_script)
           parse_check_result(stdout, stderr, status)
         rescue Errno::ENOENT
@@ -96,8 +98,11 @@ module ReactOnRails
           return unless status.success? && stdout.include?(" down ")
 
           print_pending_migrations_warning
-        rescue StandardError
-          nil # Ignore errors - this is just a helpful warning
+        rescue StandardError => e
+          # Ignore errors - this is just a helpful warning.
+          # Common case: schema_migrations table doesn't exist yet on brand new databases.
+          warn "[ReactOnRails] Migration check failed: #{e.message}" if ENV["DEBUG"]
+          nil
         end
 
         def print_checking_message
@@ -154,7 +159,9 @@ module ReactOnRails
         end
 
         def truncate_error(error)
-          error.length > 200 ? "#{error[0, 200]}..." : error
+          return error if error.length <= 500
+
+          "#{error[0, 500]}...\n           (Set DEBUG=1 for full error)"
         end
       end
     end
