@@ -151,7 +151,8 @@ module ReactOnRails
     # Instead, you should use the standard react_component view helper.
     #
     # store_name: name of the store, corresponding to your call to ReactOnRails.registerStores in your
-    #             JavaScript code.
+    #             JavaScript code. When using auto-bundling, this should match the filename of your
+    #             store file (e.g., "commentsStore" for commentsStore.js).
     # props: Ruby Hash or JSON string which contains the properties to pass to the redux store.
     # Options
     #    defer: false -- pass as true if you wish to render this below your component.
@@ -159,6 +160,10 @@ module ReactOnRails
     #                        get immediate hydration, non-Pro users don't. Can be explicitly overridden.
     #    auto_load_bundle: nil -- If true, automatically loads the generated pack for this store.
     #                      Defaults to ReactOnRails.configuration.auto_load_bundle if not specified.
+    #                      Requires config.stores_subdirectory to be set (e.g., "ror_stores").
+    #                      Store files should be placed in directories matching this name, e.g.:
+    #                        app/javascript/bundles/ror_stores/commentsStore.js
+    #                      The store file must export default a store generator function.
     def redux_store(store_name, props: {}, defer: false, immediate_hydration: nil, auto_load_bundle: nil)
       immediate_hydration = ReactOnRails::Utils.normalize_immediate_hydration(immediate_hydration, store_name, "Store")
 

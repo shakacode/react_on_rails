@@ -48,6 +48,9 @@ module ReactOnRails
     private
 
     def generate_packs(verbose: false)
+      # Check for name conflicts between components and stores
+      check_for_component_store_name_conflicts
+
       common_component_to_path.each_value { |component_path| create_pack(component_path, verbose: verbose) }
       client_component_to_path.each_value { |component_path| create_pack(component_path, verbose: verbose) }
 
@@ -55,6 +58,22 @@ module ReactOnRails
       store_to_path.each_value { |store_path| create_store_pack(store_path, verbose: verbose) }
 
       create_server_pack(verbose: verbose) if ReactOnRails.configuration.server_bundle_js_file.present?
+    end
+
+    def check_for_component_store_name_conflicts
+      component_names = common_component_to_path.keys + client_component_to_path.keys
+      store_names = store_to_path.keys
+      conflicts = component_names & store_names
+
+      return if conflicts.empty?
+
+      msg = <<~MSG
+        **ERROR** ReactOnRails: The following names are used for both components and stores: #{conflicts.join(', ')}.
+        This would cause pack file conflicts in the generated directory.
+        Please rename your components or stores to have unique names.
+      MSG
+
+      raise ReactOnRails::Error, msg
     end
 
     def create_pack(file_path, verbose: false)
