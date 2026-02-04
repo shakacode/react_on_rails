@@ -47,6 +47,38 @@ config.auto_load_bundle = true
 > Example (dummy app): `auto_load_bundle` is set to `true` in the same initializer.
 > [Dummy initializer](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails/spec/dummy/config/initializers/react_on_rails.rb)
 
+### Configure Additional Component Extensions (ReScript, etc.)
+
+By default, React on Rails auto-registration recognizes components with standard JavaScript/TypeScript extensions: `.js`, `.jsx`, `.ts`, `.tsx`. If you're using transpiled languages like ReScript that output files with different extensions, you can configure additional extensions using `component_extensions`.
+
+For example, to support ReScript components (which compile to `.bs.js` or `.res.js` files):
+
+```rb
+config.component_extensions = [".bs.js", ".res.js"]
+```
+
+This allows you to place ReScript-compiled components directly in your `ror_components` directories without needing JavaScript wrapper files:
+
+```text
+app/javascript/src/
+└── Comments/
+    └── ror_components/
+        └── CommentsShow.bs.js    # ReScript compiled component - auto-registered as "CommentsShow"
+```
+
+**How it works:**
+
+- The component name is extracted by stripping the configured extension (e.g., `CommentsShow.bs.js` becomes `CommentsShow`)
+- The component is auto-registered and can be used in views: `<%= react_component("CommentsShow", props) %>`
+- Server-side rendering works the same as with standard JavaScript components
+
+**Supported extension formats:**
+
+- With leading dot: `.bs.js`, `.res.js`
+- Without leading dot: `bs.js`, `res.js` (the dot will be added automatically)
+
+**Note:** Without configuring `component_extensions`, files like `Component.bs.js` would still be discovered (since they end with `.js`), but the component name would be extracted incorrectly as `Component.bs` instead of `Component`.
+
 ### Location of generated files
 
 Generated files will go to the following two directories:

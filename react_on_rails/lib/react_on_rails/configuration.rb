@@ -58,6 +58,10 @@ module ReactOnRails
       same_bundle_for_client_and_server: false,
       i18n_output_format: nil,
       components_subdirectory: nil,
+      # Additional component file extensions for auto-registration beyond the default
+      # .js, .jsx, .ts, .tsx. Useful for transpiled languages like ReScript (.bs.js, .res.js).
+      # Example: [".bs.js", ".res.js"]
+      component_extensions: [],
       make_generated_server_bundle_the_entrypoint: false,
       defer_generated_component_packs: false,
       # Maximum time in milliseconds to wait for client-side component registration after page load.
@@ -82,7 +86,7 @@ module ReactOnRails
                   :same_bundle_for_client_and_server, :rendering_props_extension,
                   :make_generated_server_bundle_the_entrypoint,
                   :generated_component_packs_loading_strategy,
-                  :component_registry_timeout,
+                  :component_registry_timeout, :component_extensions,
                   :server_bundle_output_path, :enforce_private_server_bundles
 
     # Class instance variable and mutex to track if deprecation warning has been shown
@@ -143,7 +147,7 @@ module ReactOnRails
                    same_bundle_for_client_and_server: nil,
                    i18n_dir: nil, i18n_yml_dir: nil, i18n_output_format: nil, i18n_yml_safe_load_options: nil,
                    random_dom_id: nil, server_render_method: nil, rendering_props_extension: nil,
-                   components_subdirectory: nil, auto_load_bundle: nil,
+                   components_subdirectory: nil, auto_load_bundle: nil, component_extensions: nil,
                    component_registry_timeout: nil, server_bundle_output_path: nil, enforce_private_server_bundles: nil)
       self.node_modules_location = node_modules_location.present? ? node_modules_location : Rails.root
       self.generated_assets_dirs = generated_assets_dirs
@@ -182,6 +186,7 @@ module ReactOnRails
       self.server_render_method = server_render_method
       self.components_subdirectory = components_subdirectory
       self.auto_load_bundle = auto_load_bundle
+      self.component_extensions = component_extensions || []
       self.make_generated_server_bundle_the_entrypoint = make_generated_server_bundle_the_entrypoint
       self.defer_generated_component_packs = defer_generated_component_packs
       self.generated_component_packs_loading_strategy = generated_component_packs_loading_strategy

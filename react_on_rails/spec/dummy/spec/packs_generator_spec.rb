@@ -754,6 +754,101 @@ module ReactOnRails
       end
     end
 
+    context "when component_extensions is configured for ReScript" do
+      let(:component_name) { "ComponentWithReScript" }
+      let(:rescript_component_pack) { "#{generated_directory}/ReScriptComponent.js" }
+      let(:res_component_pack) { "#{generated_directory}/ResComponent.js" }
+
+      before do
+        @saved_component_extensions = ReactOnRails.configuration.component_extensions
+        ReactOnRails.configuration.component_extensions = [".bs.js", ".res.js"]
+        stub_packer_source_path(component_name: component_name,
+                                packer_source_path: packer_source_path)
+        described_class.instance.generate_packs_if_stale
+      end
+
+      after do
+        ReactOnRails.configuration.component_extensions = @saved_component_extensions
+      end
+
+      it "creates pack for ReScriptComponent.bs.js" do
+        expect(File.exist?(rescript_component_pack)).to be(true)
+      end
+
+      it "creates pack for ResComponent.res.js" do
+        expect(File.exist?(res_component_pack)).to be(true)
+      end
+
+      it "generated pack imports from correct path with full extension" do
+        pack_content = File.read(rescript_component_pack)
+        expect(pack_content).to include("ReScriptComponent.bs.js")
+        expect(pack_content).to include("ReactOnRails.register({ReScriptComponent})")
+      end
+
+      it "extracts correct component name (without .bs suffix)" do
+        pack_content = File.read(rescript_component_pack)
+        # Should NOT have 'ReScriptComponent.bs' as a variable name
+        expect(pack_content).not_to match(/import ReScriptComponent\.bs from/)
+        expect(pack_content).to include("import ReScriptComponent from")
+      end
+
+      it "generated server bundle includes ReScript components" do
+        generated_server_bundle_content = File.read(generated_server_bundle_file_path)
+        expect(generated_server_bundle_content).to include("ReScriptComponent")
+        expect(generated_server_bundle_content).to include("ResComponent")
+      end
+    end
+
+    describe "#component_extensions_regex" do
+      let(:regex) { described_class.instance.send(:component_extensions_regex) }
+      let(:old_component_extensions) { ReactOnRails.configuration.component_extensions }
+
+      after do
+        ReactOnRails.configuration.component_extensions = old_component_extensions
+      end
+
+      context "with default configuration (no custom extensions)" do
+        before do
+          ReactOnRails.configuration.component_extensions = []
+        end
+
+        it "matches standard JS extensions" do
+          expect(regex).to match("Component.js")
+          expect(regex).to match("Component.jsx")
+          expect(regex).to match("Component.ts")
+          expect(regex).to match("Component.tsx")
+        end
+
+        it "does not match non-JS extensions" do
+          expect(regex).not_to match("Component.css")
+          expect(regex).not_to match("Component.module.css")
+          # Component.bs.js DOES match because it ends with .js
+          # The difference is in how component_name extracts the name
+        end
+      end
+
+      context "with ReScript extensions configured" do
+        before do
+          ReactOnRails.configuration.component_extensions = [".bs.js", ".res.js"]
+        end
+
+        it "matches standard JS extensions" do
+          expect(regex).to match("Component.js")
+          expect(regex).to match("Component.jsx")
+        end
+
+        it "matches configured ReScript extensions" do
+          expect(regex).to match("Component.bs.js")
+          expect(regex).to match("Component.res.js")
+        end
+
+        it "does not match unregistered extensions" do
+          expect(regex).not_to match("Component.css")
+          expect(regex).not_to match("Component.module.css")
+        end
+      end
+    end
+
     describe "#component_name" do
       subject(:component_name) { described_class.instance.send(:component_name, file_path) }
 
@@ -789,6 +884,53 @@ module ReactOnRails
         let(:file_path) { "/path/to/MyComponent.tsx" }
 
         it { is_expected.to eq "MyComponent" }
+      end
+
+      context "with ReScript .bs.js file (custom extension configured)" do
+        let(:file_path) { "/path/to/MyComponent.bs.js" }
+        let(:old_component_extensions) { ReactOnRails.configuration.component_extensions }
+
+        before do
+          ReactOnRails.configuration.component_extensions = [".bs.js", ".res.js"]
+        end
+
+        after do
+          ReactOnRails.configuration.component_extensions = old_component_extensions
+        end
+
+        it { is_expected.to eq "MyComponent" }
+      end
+
+      context "with ReScript .res.js file (custom extension configured)" do
+        let(:file_path) { "/path/to/MyComponent.res.js" }
+        let(:old_component_extensions) { ReactOnRails.configuration.component_extensions }
+
+        before do
+          ReactOnRails.configuration.component_extensions = [".bs.js", ".res.js"]
+        end
+
+        after do
+          ReactOnRails.configuration.component_extensions = old_component_extensions
+        end
+
+        it { is_expected.to eq "MyComponent" }
+      end
+
+      context "with ReScript .bs.js file (custom extension NOT configured)" do
+        let(:file_path) { "/path/to/MyComponent.bs.js" }
+
+        before do
+          @saved_extensions_for_unconfigured_test = ReactOnRails.configuration.component_extensions
+          ReactOnRails.configuration.component_extensions = []
+        end
+
+        after do
+          ReactOnRails.configuration.component_extensions = @saved_extensions_for_unconfigured_test
+        end
+
+        # Without configuration, the standard File.extname behavior applies
+        # which strips only .js, leaving MyComponent.bs
+        it { is_expected.to eq "MyComponent.bs" }
       end
     end
 

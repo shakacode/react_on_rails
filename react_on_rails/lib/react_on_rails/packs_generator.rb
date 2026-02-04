@@ -7,7 +7,8 @@ module ReactOnRails
   # rubocop:disable Metrics/ClassLength
   class PacksGenerator
     CONTAINS_CLIENT_OR_SERVER_REGEX = /\.(server|client)($|\.)/
-    COMPONENT_EXTENSIONS = /\.(jsx?|tsx?)$/
+    # Default extensions for component files (standard JS/TS)
+    DEFAULT_COMPONENT_EXTENSIONS = %w[js jsx ts tsx].freeze
     # Auto-registration requires nested_entries support which was added in 7.0.0
     # Note: The gemspec requires Shakapacker >= 6.0 for basic functionality
     MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_BUNDLING = "7.0.0"
@@ -359,8 +360,20 @@ module ReactOnRails
     end
 
     def component_name(file_path)
-      basename = File.basename(file_path, File.extname(file_path))
+      basename = File.basename(file_path)
 
+      # Try to strip custom extensions first (e.g., ".bs.js", ".res.js")
+      # These must be checked before standard extensions since they contain dots
+      custom_component_extensions.each do |ext|
+        normalized_ext = ext.start_with?(".") ? ext : ".#{ext}"
+        if basename.end_with?(normalized_ext)
+          basename = basename[0...-normalized_ext.length]
+          return basename.sub(CONTAINS_CLIENT_OR_SERVER_REGEX, "")
+        end
+      end
+
+      # Fall back to standard extension stripping
+      basename = File.basename(file_path, File.extname(file_path))
       basename.sub(CONTAINS_CLIENT_OR_SERVER_REGEX, "")
     end
 
@@ -369,7 +382,27 @@ module ReactOnRails
     end
 
     def filter_component_files(paths)
-      paths.grep(COMPONENT_EXTENSIONS)
+      paths.grep(component_extensions_regex)
+    end
+
+    # Builds a regex that matches all configured component file extensions.
+    # Default extensions: .js, .jsx, .ts, .tsx
+    # Custom extensions (e.g., .bs.js, .res.js) are added from configuration.
+    def component_extensions_regex
+      custom_extensions = ReactOnRails.configuration.component_extensions || []
+      # Escape dots and create alternation pattern for custom extensions
+      # e.g., ".bs.js" becomes "\.bs\.js"
+      custom_patterns = custom_extensions.map do |ext|
+        ext.sub(/^\./, "").gsub(".", "\\.")
+      end
+      # Combine default and custom extensions
+      all_patterns = DEFAULT_COMPONENT_EXTENSIONS + custom_patterns
+      /\.(#{all_patterns.join('|')})$/
+    end
+
+    # Returns the configured custom extensions (e.g., [".bs.js", ".res.js"])
+    def custom_component_extensions
+      ReactOnRails.configuration.component_extensions || []
     end
 
     def common_component_to_path
