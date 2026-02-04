@@ -52,9 +52,9 @@ Turbo Frames work with React components without any special configuration:
 <%# Clicking a link that responds with another turbo_frame_tag will update just that frame %>
 ```
 
-### Turbo with Auto-Registration
+### Turbo with Auto-Bundling
 
-When using React on Rails' [auto-registration feature](../core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md) (`auto_load_bundle: true`) with Turbo, there's a specific ordering requirement to address:
+When using React on Rails' [auto-bundling feature](../core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md) (`auto_load_bundle: true`) with Turbo, there's a specific ordering requirement to address:
 
 **The Challenge:**
 
@@ -86,7 +86,8 @@ Use `content_for` to render your body content first, capturing auto-appends befo
   <%= csrf_meta_tags %>
   <%= csp_meta_tag %>
 
-  <%# Turbo/Stimulus can be explicitly appended if needed %>
+  <%# Optional: Explicitly load non-React packs (Stimulus, shared stores, etc.) %>
+  <%# React component bundles are auto-appended by react_component calls above %>
   <%= append_stylesheet_pack_tag('stimulus-bundle') %>
   <%= append_javascript_pack_tag('stimulus-bundle') %>
   <%= append_javascript_pack_tag('stores-registration') %>
@@ -114,7 +115,7 @@ Use `content_for` to render your body content first, capturing auto-appends befo
 
 **Additional Resources:**
 
-- [Shakapacker Preventing FOUC guide](https://github.com/shakacode/shakapacker/blob/master/docs/preventing_fouc.md#the-content_for-body_content-pattern)
+- [Shakapacker Preventing FOUC guide](https://github.com/shakacode/shakapacker/blob/main/docs/preventing_fouc.md#the-content_for-body_content-pattern)
 - [Turbo Handbook - Working with Script Elements](https://turbo.hotwired.dev/handbook/building#working-with-script-elements)
 
 ### Turbo Streams (Requires React on Rails Pro)
