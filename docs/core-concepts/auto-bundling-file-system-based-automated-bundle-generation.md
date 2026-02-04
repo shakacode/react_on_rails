@@ -592,7 +592,8 @@ config.auto_load_bundle = false
 
 **Additional Resources**:
 
-- **Complete FOUC prevention guide**: [Shakapacker Preventing FOUC documentation](https://github.com/shakacode/shakapacker/blob/master/docs/preventing_fouc.md)
+- **Complete FOUC prevention guide**: [Shakapacker Preventing FOUC documentation](https://github.com/shakacode/shakapacker/blob/main/docs/preventing_fouc.md)
+- **Turbo/Hotwire integration**: [Using auto-bundling with Turbo](../building-features/turbolinks.md#turbo-with-auto-bundling) - same pattern required for Turbo compatibility
 - **Working example**: [react-webpack-rails-tutorial PR #686](https://github.com/shakacode/react-webpack-rails-tutorial/pull/686)
 - **Related issue**: [Shakapacker #720](https://github.com/shakacode/shakapacker/issues/720)
 
