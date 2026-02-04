@@ -66,22 +66,9 @@ app/javascript/src/
         └── CommentsShow.bs.js    # ReScript compiled component - auto-registered as "CommentsShow"
 ```
 
-**How it works:**
+The component name is extracted by stripping the configured extension (e.g., `CommentsShow.bs.js` becomes `CommentsShow`), then auto-registered for use in views with `<%= react_component("CommentsShow", props) %>`.
 
-- The component name is extracted by stripping the configured extension (e.g., `CommentsShow.bs.js` becomes `CommentsShow`)
-- The component is auto-registered and can be used in views: `<%= react_component("CommentsShow", props) %>`
-- Server-side rendering works the same as with standard JavaScript components
-
-**Supported extension formats:**
-
-- With leading dot: `.bs.js`, `.res.js`
-- Without leading dot: `bs.js`, `res.js` (the dot will be added automatically)
-
-**Note:** Without configuring `component_extensions`, files like `Component.bs.js` would still be discovered (since they end with `.js`), but the component name would be extracted incorrectly as `Component.bs` instead of `Component`.
-
-**When do you need this?** Use `component_extensions` when your transpiled components use multi-part extensions (like `.bs.js`) that would otherwise result in incorrect component names.
-
-**Automatic ordering:** Extensions are automatically sorted by length internally, so overlapping extensions like `[".js", ".bs.js"]` will work correctly - the longer extension is always matched first.
+> **Note:** Without this configuration, files like `Component.bs.js` would still be discovered (they end with `.js`), but the component name would be extracted incorrectly as `Component.bs` instead of `Component`.
 
 ### Location of generated files
 
