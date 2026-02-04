@@ -247,9 +247,7 @@ jobs:
         # minimum config changes package.json (shakapacker version), so can't use frozen lockfile
         run: pnpm install ${{ matrix.dependency-level == 'latest' && '--frozen-lockfile' || '--no-frozen-lockfile' }}
       - name: Dummy JS tests
-        run: |
-          cd react_on_rails/spec/dummy
-          pnpm run test:js
+        run: pnpm --filter "react_on_rails" run test:js
       - name: Install Ruby Gems for package
         run: |
           cd react_on_rails
