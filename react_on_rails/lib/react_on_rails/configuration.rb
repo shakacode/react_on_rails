@@ -58,6 +58,7 @@ module ReactOnRails
       same_bundle_for_client_and_server: false,
       i18n_output_format: nil,
       components_subdirectory: nil,
+      stores_subdirectory: nil,
       make_generated_server_bundle_the_entrypoint: false,
       defer_generated_component_packs: false,
       # Maximum time in milliseconds to wait for client-side component registration after page load.
@@ -79,6 +80,7 @@ module ReactOnRails
                   :trace, :development_mode, :logging_on_server, :server_renderer_pool_size,
                   :server_renderer_timeout, :skip_display_none, :raise_on_prerender_error,
                   :generated_assets_dirs, :generated_assets_dir, :components_subdirectory,
+                  :stores_subdirectory,
                   :webpack_generated_files, :rendering_extension, :build_test_command,
                   :build_production_command, :i18n_dir, :i18n_yml_dir, :i18n_output_format,
                   :i18n_yml_safe_load_options, :defer_generated_component_packs,
@@ -148,7 +150,7 @@ module ReactOnRails
                    same_bundle_for_client_and_server: nil,
                    i18n_dir: nil, i18n_yml_dir: nil, i18n_output_format: nil, i18n_yml_safe_load_options: nil,
                    random_dom_id: nil, server_render_method: nil, rendering_props_extension: nil,
-                   components_subdirectory: nil, auto_load_bundle: nil,
+                   components_subdirectory: nil, stores_subdirectory: nil, auto_load_bundle: nil,
                    component_registry_timeout: nil, server_bundle_output_path: nil, enforce_private_server_bundles: nil,
                    check_database_on_dev_start: nil)
       self.node_modules_location = node_modules_location.present? ? node_modules_location : Rails.root
@@ -187,6 +189,7 @@ module ReactOnRails
 
       self.server_render_method = server_render_method
       self.components_subdirectory = components_subdirectory
+      self.stores_subdirectory = stores_subdirectory
       self.auto_load_bundle = auto_load_bundle
       self.make_generated_server_bundle_the_entrypoint = make_generated_server_bundle_the_entrypoint
       self.defer_generated_component_packs = defer_generated_component_packs

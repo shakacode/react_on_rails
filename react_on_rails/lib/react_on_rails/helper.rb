@@ -157,8 +157,14 @@ module ReactOnRails
     #    defer: false -- pass as true if you wish to render this below your component.
     #    immediate_hydration: nil -- React on Rails Pro (licensed) feature. When nil (default), Pro users
     #                        get immediate hydration, non-Pro users don't. Can be explicitly overridden.
-    def redux_store(store_name, props: {}, defer: false, immediate_hydration: nil)
+    #    auto_load_bundle: nil -- If true, automatically loads the generated pack for this store.
+    #                      Defaults to ReactOnRails.configuration.auto_load_bundle if not specified.
+    def redux_store(store_name, props: {}, defer: false, immediate_hydration: nil, auto_load_bundle: nil)
       immediate_hydration = ReactOnRails::Utils.normalize_immediate_hydration(immediate_hydration, store_name, "Store")
+
+      # Auto-load store pack if configured
+      should_auto_load = auto_load_bundle.nil? ? ReactOnRails.configuration.auto_load_bundle : auto_load_bundle
+      load_pack_for_generated_store(store_name) if should_auto_load
 
       redux_store_data = { store_name: store_name,
                            props: props,
@@ -348,6 +354,20 @@ module ReactOnRails
       append_stylesheet_pack_tag("generated/#{react_component_name}")
     end
 
+    def load_pack_for_generated_store(store_name)
+      return unless ReactOnRails.configuration.stores_subdirectory.present?
+
+      ReactOnRails::PackerUtils.raise_nested_entries_disabled unless ReactOnRails::PackerUtils.nested_entries?
+      if Rails.env.development?
+        is_store_pack_present = File.exist?(generated_stores_pack_path(store_name))
+        raise_missing_autoloaded_store_bundle(store_name) unless is_store_pack_present
+      end
+
+      options = { defer: ReactOnRails.configuration.generated_component_packs_loading_strategy == :defer }
+      options[:async] = true if ReactOnRails.configuration.generated_component_packs_loading_strategy == :async
+      append_javascript_pack_tag("generated/#{store_name}", **options)
+    end
+
     # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
 
     def registered_stores
@@ -374,6 +394,10 @@ module ReactOnRails
 
     def generated_components_pack_path(component_name)
       "#{ReactOnRails::PackerUtils.packer_source_entry_path}/generated/#{component_name}.js"
+    end
+
+    def generated_stores_pack_path(store_name)
+      "#{ReactOnRails::PackerUtils.packer_source_entry_path}/generated/#{store_name}.js"
     end
 
     def build_react_component_result_for_server_rendered_string(
@@ -679,6 +703,14 @@ module ReactOnRails
         error_type: :missing_auto_loaded_bundle,
         component_name: react_component_name,
         expected_path: generated_components_pack_path(react_component_name)
+      )
+    end
+
+    def raise_missing_autoloaded_store_bundle(store_name)
+      raise ReactOnRails::SmartError.new(
+        error_type: :missing_auto_loaded_store_bundle,
+        component_name: store_name,
+        expected_path: generated_stores_pack_path(store_name)
       )
     end
   end

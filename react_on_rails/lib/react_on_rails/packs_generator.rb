@@ -51,6 +51,9 @@ module ReactOnRails
       common_component_to_path.each_value { |component_path| create_pack(component_path, verbose: verbose) }
       client_component_to_path.each_value { |component_path| create_pack(component_path, verbose: verbose) }
 
+      # Generate store packs if stores_subdirectory is configured
+      store_to_path.each_value { |store_path| create_store_pack(store_path, verbose: verbose) }
+
       create_server_pack(verbose: verbose) if ReactOnRails.configuration.server_bundle_js_file.present?
     end
 
@@ -128,6 +131,27 @@ module ReactOnRails
       FILE_CONTENT
     end
 
+    def create_store_pack(file_path, verbose: false)
+      output_path = generated_store_pack_path(file_path)
+      content = store_pack_file_contents(file_path)
+
+      File.write(output_path, content)
+
+      puts(Rainbow("Generated Store Pack: #{output_path}").yellow) if verbose
+    end
+
+    def store_pack_file_contents(file_path)
+      registered_store_name = store_name(file_path)
+      relative_store_path = relative_store_path_from_generated_pack(file_path)
+
+      <<~FILE_CONTENT.strip
+        import ReactOnRails from '#{react_on_rails_npm_package}/client';
+        import #{registered_store_name} from '#{relative_store_path}';
+
+        ReactOnRails.registerStore({#{registered_store_name}});
+      FILE_CONTENT
+    end
+
     def create_server_pack(verbose: false)
       File.write(generated_server_bundle_file_path, generated_server_pack_file_content)
 
@@ -135,11 +159,13 @@ module ReactOnRails
       puts(Rainbow("Generated Server Bundle: #{generated_server_bundle_file_path}").orange) if verbose
     end
 
-    def build_server_pack_content(component_on_server_imports, server_components, client_components)
+    def build_server_pack_content(component_on_server_imports, server_components, client_components,
+                                  store_imports: [], store_names: [])
+      all_imports = component_on_server_imports + store_imports
       content = <<~FILE_CONTENT
         import ReactOnRails from '#{react_on_rails_npm_package}';
 
-        #{component_on_server_imports.join("\n")}\n
+        #{all_imports.join("\n")}\n
       FILE_CONTENT
 
       if server_components.any?
@@ -149,7 +175,11 @@ module ReactOnRails
         FILE_CONTENT
       end
 
-      content + "ReactOnRails.register({#{client_components.join(",\n")}});"
+      content += "ReactOnRails.register({#{client_components.join(",\n")}});"
+
+      content += "\nReactOnRails.registerStore({#{store_names.join(",\n")}});" if store_names.any?
+
+      content
     end
 
     def generated_server_pack_file_content
@@ -169,7 +199,15 @@ module ReactOnRails
       end
       client_components = component_for_server_registration_to_path.keys - server_components
 
-      build_server_pack_content(component_on_server_imports, server_components, client_components)
+      # Include stores in server bundle
+      stores = store_to_path
+      store_imports = stores.map do |name, store_path|
+        "import #{name} from '#{relative_path(generated_server_bundle_file_path, store_path)}';"
+      end
+      store_names = stores.keys
+
+      build_server_pack_content(component_on_server_imports, server_components, client_components,
+                                store_imports: store_imports, store_names: store_names)
     end
 
     def add_generated_pack_to_server_bundle
@@ -219,6 +257,9 @@ module ReactOnRails
       expected_pack_files = Set.new
       common_component_to_path.each_value { |path| expected_pack_files << generated_pack_path(path) }
       client_component_to_path.each_value { |path| expected_pack_files << generated_pack_path(path) }
+
+      # Include store packs in expected files
+      store_to_path.each_value { |path| expected_pack_files << generated_store_pack_path(path) }
 
       if ReactOnRails.configuration.server_bundle_js_file.present?
         expected_server_bundle = generated_server_bundle_file_path
@@ -409,6 +450,42 @@ module ReactOnRails
       "#{source_path}/**/#{ReactOnRails.configuration.components_subdirectory}"
     end
 
+    def stores_search_path
+      return nil unless ReactOnRails.configuration.stores_subdirectory.present?
+
+      source_path = ReactOnRails::PackerUtils.packer_source_path
+
+      "#{source_path}/**/#{ReactOnRails.configuration.stores_subdirectory}"
+    end
+
+    def store_to_path
+      return {} unless stores_search_path
+
+      store_paths = Dir.glob("#{stores_search_path}/*")
+      filtered_paths = filter_component_files(store_paths)
+      store_name_to_path(filtered_paths)
+    end
+
+    def store_name_to_path(paths)
+      paths.to_h { |path| [store_name(path), path] }
+    end
+
+    def store_name(file_path)
+      File.basename(file_path, File.extname(file_path))
+    end
+
+    def generated_store_pack_path(file_path)
+      "#{generated_packs_directory_path}/#{store_name(file_path)}.js"
+    end
+
+    def relative_store_path_from_generated_pack(store_path)
+      store_file_pathname = Pathname.new(store_path)
+      store_generated_pack_path = generated_store_pack_path(store_path)
+      generated_pack_pathname = Pathname.new(store_generated_pack_path)
+
+      relative_path(generated_pack_pathname, store_file_pathname)
+    end
+
     def raise_client_component_overrides_common(component_name)
       msg = <<~MSG
         **ERROR** ReactOnRails: client specific definition for Component '#{component_name}' overrides the \
@@ -440,12 +517,26 @@ module ReactOnRails
 
     def stale_or_missing_packs?
       component_files = common_component_to_path.values + client_component_to_path.values
-      most_recent_mtime = Utils.find_most_recent_mtime(component_files).to_i
+      store_files = store_to_path.values
+      all_source_files = component_files + store_files
 
-      component_files.each_with_object([]).any? do |file|
+      return false if all_source_files.empty?
+
+      most_recent_mtime = Utils.find_most_recent_mtime(all_source_files).to_i
+
+      # Check component packs
+      component_files.each do |file|
         path = generated_pack_path(file)
-        !File.exist?(path) || File.mtime(path).to_i < most_recent_mtime
+        return true if !File.exist?(path) || File.mtime(path).to_i < most_recent_mtime
       end
+
+      # Check store packs
+      store_files.each do |file|
+        path = generated_store_pack_path(file)
+        return true if !File.exist?(path) || File.mtime(path).to_i < most_recent_mtime
+      end
+
+      false
     end
   end
   # rubocop:enable Metrics/ClassLength
