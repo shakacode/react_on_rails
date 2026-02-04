@@ -110,9 +110,47 @@ RSpec.describe ReactOnRailsPro::Engine do
           described_class.log_license_status
         end
 
+        it "does not include plan type for paid licenses" do
+          expect(mock_logger).to receive(:info).with("[React on Rails Pro] License validated successfully (Acme Corp).")
+          described_class.log_license_status
+        end
+
         it "does not log a warning" do
           expect(mock_logger).not_to receive(:warn)
           described_class.log_license_status
+        end
+      end
+
+      # Dynamically generate tests for plan types that display their name in log messages.
+      # Each plan has a display name that differs from the raw plan value.
+      {
+        "startup" => { org: "Startup Inc", display: "startup license" },
+        "nonprofit" => { org: "Charity Org", display: "nonprofit license" },
+        "oss" => { org: "Open Source Project", display: "open source license" },
+        "education" => { org: "University", display: "education license" },
+        "partner" => { org: "Partner Corp", display: "partner license" }
+      }.each do |plan_type, config|
+        context "with valid #{plan_type} license" do
+          let(:plan_payload) do
+            {
+              sub: "test@example.com",
+              iat: Time.now.to_i,
+              exp: Time.now.to_i + 3600,
+              plan: plan_type,
+              org: config[:org]
+            }
+          end
+
+          before do
+            token = JWT.encode(plan_payload, test_private_key, "RS256")
+            ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+          end
+
+          it "logs success with plan type" do
+            pattern = /License validated successfully \(#{Regexp.escape(config[:org])} - #{config[:display]}\)/
+            expect(mock_logger).to receive(:info).with(pattern)
+            described_class.log_license_status
+          end
         end
       end
     end
@@ -170,6 +208,30 @@ RSpec.describe ReactOnRailsPro::Engine do
 
         it "logs success info" do
           expect(mock_logger).to receive(:info).with(/License validated successfully/)
+          described_class.log_license_status
+        end
+      end
+
+      # Test one representative plan type in non-production to verify behavior is consistent
+      context "with valid startup license" do
+        let(:startup_payload) do
+          {
+            sub: "test@example.com",
+            iat: Time.now.to_i,
+            exp: Time.now.to_i + 3600,
+            plan: "startup",
+            org: "Startup Inc"
+          }
+        end
+
+        before do
+          token = JWT.encode(startup_payload, test_private_key, "RS256")
+          ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+        end
+
+        it "logs success with plan type" do
+          expect(mock_logger).to receive(:info)
+            .with(/License validated successfully \(Startup Inc - startup license\)/)
           described_class.log_license_status
         end
       end

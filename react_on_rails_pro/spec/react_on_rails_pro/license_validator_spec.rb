@@ -159,7 +159,9 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
   end
 
   describe ".license_status with plan field" do
-    ReactOnRailsPro::LicenseValidator::VALID_PLANS.each do |plan_type|
+    # Dynamically generate tests for all valid plan types from VALID_PLANS constant.
+    # This ensures tests stay in sync when new plan types are added.
+    described_class::VALID_PLANS.each do |plan_type|
       context "when plan is '#{plan_type}'" do
         let(:plan_payload) do
           {
@@ -487,13 +489,13 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
   end
 
   describe ".license_plan" do
-    context "with valid license" do
+    context "with valid license and 'paid' plan" do
       before do
         token = JWT.encode(valid_payload, test_private_key, "RS256")
         ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
       end
 
-      it "returns the plan type" do
+      it "returns 'paid'" do
         expect(described_class.license_plan).to eq("paid")
       end
 
@@ -504,9 +506,15 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
       end
     end
 
-    context "with startup plan" do
+    context "with valid license and 'startup' plan" do
       let(:startup_payload) do
-        valid_payload.merge(plan: "startup")
+        {
+          sub: "test@example.com",
+          iat: Time.now.to_i,
+          exp: Time.now.to_i + 3600,
+          plan: "startup",
+          org: "Startup Inc"
+        }
       end
 
       before do
@@ -529,8 +537,20 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
       end
     end
 
+    context "with invalid license signature" do
+      before do
+        wrong_key = OpenSSL::PKey::RSA.new(2048)
+        token = JWT.encode(valid_payload, wrong_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns nil" do
+        expect(described_class.license_plan).to be_nil
+      end
+    end
+
     context "with license missing plan field" do
-      let(:no_plan_payload) do
+      let(:payload_without_plan) do
         {
           sub: "test@example.com",
           iat: Time.now.to_i,
@@ -540,7 +560,28 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
       end
 
       before do
-        token = JWT.encode(no_plan_payload, test_private_key, "RS256")
+        token = JWT.encode(payload_without_plan, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns nil" do
+        expect(described_class.license_plan).to be_nil
+      end
+    end
+
+    context "with invalid plan type" do
+      let(:invalid_plan_payload) do
+        {
+          sub: "test@example.com",
+          iat: Time.now.to_i,
+          exp: Time.now.to_i + 3600,
+          plan: "free",
+          org: "Acme Corp"
+        }
+      end
+
+      before do
+        token = JWT.encode(invalid_plan_payload, test_private_key, "RS256")
         ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
       end
 
