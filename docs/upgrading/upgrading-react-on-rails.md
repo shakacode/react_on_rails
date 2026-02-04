@@ -27,7 +27,7 @@ This release focuses on clear separation between open-source and Pro features. S
 
 **Key actions required:**
 
-1. **Remove `config.immediate_hydration`** from your initializer - it's now deprecated and has no effect (automatic for Pro users)
+1. **Remove `config.immediate_hydration`** from your initializer - this config option has been removed (automatic for Pro users)
 2. **Use exact versions** in `package.json` - semver wildcards (`^`, `~`, `*`) now cause boot failures
 3. **Pro users:** If importing Pro methods from `react-on-rails`, switch to `react-on-rails-pro`
 4. **RSC users:** Move RSC configurations from `ReactOnRails.configure` to `ReactOnRailsPro.configure`
