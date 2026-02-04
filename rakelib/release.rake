@@ -70,8 +70,11 @@ def publish_gem_with_retry(dir, gem_name, otp: nil, max_retries: ENV.fetch("GEM_
 
   while retry_count < max_retries && !success
     begin
-      otp_flag = current_otp ? "--otp #{current_otp}" : ""
-      sh %(cd #{dir} && gem release #{otp_flag})
+      # Use GEM_HOST_OTP_CODE environment variable instead of --otp flag
+      # because `gem release` (gem-release gem) doesn't support --otp,
+      # but the underlying `gem push` reads OTP from this env var
+      env_prefix = current_otp ? "GEM_HOST_OTP_CODE=#{current_otp} " : ""
+      sh %(cd #{dir} && #{env_prefix}gem release)
       success = true
     # Rake's sh method raises RuntimeError (not Gem exceptions) when commands fail
     rescue RuntimeError, IOError => e
