@@ -390,10 +390,14 @@ module ReactOnRails
     # Custom extensions (e.g., .bs.js, .res.js) are added from configuration.
     def component_extensions_regex
       custom_extensions = ReactOnRails.configuration.component_extensions || []
-      # Escape dots and create alternation pattern for custom extensions
-      # e.g., ".bs.js" becomes "\.bs\.js"
-      custom_patterns = custom_extensions.map do |ext|
-        ext.sub(/^\./, "").gsub(".", "\\.")
+      # Validate and escape custom extensions properly to prevent regex injection
+      # Filter out invalid entries and escape ALL regex metacharacters, not just dots
+      # e.g., ".bs.js" becomes "\.bs\.js", malicious ".js|.css" becomes "\.js\|\.css"
+      custom_patterns = custom_extensions.filter_map do |ext|
+        next unless ext.is_a?(String) && !ext.empty?
+
+        # Remove leading dot if present and escape ALL regex metacharacters
+        Regexp.escape(ext.sub(/^\./, ""))
       end
       # Combine default and custom extensions
       all_patterns = DEFAULT_COMPONENT_EXTENSIONS + custom_patterns

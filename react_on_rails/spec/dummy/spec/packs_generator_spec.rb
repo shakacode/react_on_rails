@@ -847,6 +847,58 @@ module ReactOnRails
           expect(regex).not_to match("Component.module.css")
         end
       end
+
+      context "with malicious regex metacharacters in extensions (security test)" do
+        # Tests for regex injection vulnerability prevention
+        # Malicious extensions containing regex metacharacters should be escaped
+        # to prevent unintended file matching
+
+        it "escapes pipe character to prevent matching multiple extensions" do
+          # ".js|.css" should NOT match both .js AND .css files
+          # It should only match files literally ending in ".js|.css"
+          ReactOnRails.configuration.component_extensions = [".js|.css"]
+          # Should NOT match plain .css files (pipe should be escaped)
+          expect(regex).not_to match("styles.css")
+          # The pattern ".js|.css" should be escaped to "js\|\.css", not allowing alternation
+          # Verify the regex contains the escaped version
+          expect(regex.source).to include("js\\|")
+        end
+
+        it "escapes asterisk to prevent glob-like matching" do
+          # ".js*" should NOT match .j, .js, .jss, etc. through regex repetition
+          ReactOnRails.configuration.component_extensions = [".js*"]
+          # Should NOT match files with extra s characters (asterisk should be escaped)
+          expect(regex).not_to match("Component.jsss")
+          # Should NOT match just .j (asterisk meaning "zero or more" should be escaped)
+          expect(regex).not_to match("Component.j")
+          # Verify the regex contains the escaped asterisk
+          expect(regex.source).to include("js\\*")
+        end
+
+        it "escapes dollar sign to prevent end-of-line anchor issues" do
+          ReactOnRails.configuration.component_extensions = [".$"]
+          # Should NOT match any file ending with any character
+          expect(regex).not_to match("Component.x")
+          # Verify the regex contains the escaped dollar sign
+          expect(regex.source).to include("\\$")
+        end
+
+        it "escapes parentheses to prevent group capturing" do
+          ReactOnRails.configuration.component_extensions = [".(js)"]
+          # Verify the regex contains escaped parentheses (no regex syntax errors)
+          expect(regex.source).to include("\\(js\\)")
+          # The literal pattern ".(js)" is properly escaped and doesn't create a capture group
+          # If parentheses weren't escaped, the regex would treat (js) as a capture group
+        end
+
+        it "escapes square brackets to prevent character class matching" do
+          ReactOnRails.configuration.component_extensions = [".[jt]sx"]
+          # Verify the regex contains escaped square brackets
+          expect(regex.source).to include("\\[jt\\]sx")
+          # Should NOT create a character class [jt] that matches both j and t
+          # Note: Default .jsx and .tsx still match, but the malicious pattern doesn't expand
+        end
+      end
     end
 
     describe "#component_name" do

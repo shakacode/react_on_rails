@@ -86,8 +86,9 @@ module ReactOnRails
                   :same_bundle_for_client_and_server, :rendering_props_extension,
                   :make_generated_server_bundle_the_entrypoint,
                   :generated_component_packs_loading_strategy,
-                  :component_registry_timeout, :component_extensions,
+                  :component_registry_timeout,
                   :server_bundle_output_path, :enforce_private_server_bundles
+    attr_reader :component_extensions
 
     # Class instance variable and mutex to track if deprecation warning has been shown
     # Using mutex to ensure thread-safety in multi-threaded environments
@@ -132,6 +133,22 @@ module ReactOnRails
         See CHANGELOG.md for migration instructions.
       WARNING
       nil
+    end
+
+    # Custom setter for component_extensions with validation to prevent invalid inputs.
+    # Validates that the value is an array containing only non-empty strings.
+    # Empty strings and non-string values are rejected with an ArgumentError.
+    def component_extensions=(value)
+      raise ArgumentError, "component_extensions must be an Array, got #{value.class}" unless value.is_a?(Array)
+
+      invalid_entries = value.reject { |ext| ext.is_a?(String) && !ext.empty? }
+      unless invalid_entries.empty?
+        raise ArgumentError,
+              "component_extensions must contain only non-empty strings, " \
+              "got invalid entries: #{invalid_entries.inspect}"
+      end
+
+      @component_extensions = value
     end
 
     # rubocop:disable Metrics/AbcSize

@@ -506,6 +506,74 @@ module ReactOnRails
       end
     end
 
+    describe "component_extensions validation" do
+      it "accepts valid array of non-empty strings" do
+        expect do
+          ReactOnRails.configure do |config|
+            config.component_extensions = [".bs.js", ".res.js"]
+          end
+        end.not_to raise_error
+        expect(ReactOnRails.configuration.component_extensions).to eq([".bs.js", ".res.js"])
+      end
+
+      it "accepts empty array" do
+        expect do
+          ReactOnRails.configure do |config|
+            config.component_extensions = []
+          end
+        end.not_to raise_error
+        expect(ReactOnRails.configuration.component_extensions).to eq([])
+      end
+
+      it "raises ArgumentError when value is not an array" do
+        expect do
+          ReactOnRails.configure do |config|
+            config.component_extensions = ".bs.js"
+          end
+        end.to raise_error(ArgumentError, /must be an Array/)
+      end
+
+      it "raises ArgumentError when value is nil" do
+        expect do
+          ReactOnRails.configure do |config|
+            config.component_extensions = nil
+          end
+        end.to raise_error(ArgumentError, /must be an Array/)
+      end
+
+      it "raises ArgumentError when array contains non-string values" do
+        expect do
+          ReactOnRails.configure do |config|
+            config.component_extensions = [".bs.js", 123]
+          end
+        end.to raise_error(ArgumentError, /must contain only non-empty strings/)
+      end
+
+      it "raises ArgumentError when array contains empty strings" do
+        expect do
+          ReactOnRails.configure do |config|
+            config.component_extensions = [".bs.js", ""]
+          end
+        end.to raise_error(ArgumentError, /must contain only non-empty strings/)
+      end
+
+      it "raises ArgumentError when array contains nil values" do
+        expect do
+          ReactOnRails.configure do |config|
+            config.component_extensions = [".bs.js", nil]
+          end
+        end.to raise_error(ArgumentError, /must contain only non-empty strings/)
+      end
+
+      it "raises ArgumentError when array contains symbols" do
+        expect do
+          ReactOnRails.configure do |config|
+            config.component_extensions = [".bs.js", :res_js]
+          end
+        end.to raise_error(ArgumentError, /must contain only non-empty strings/)
+      end
+    end
+
     describe "enforce_private_server_bundles validation" do
       context "when enforce_private_server_bundles is true" do
         before do
