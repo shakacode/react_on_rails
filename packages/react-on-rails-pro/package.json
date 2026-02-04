@@ -1,6 +1,6 @@
 {
   "name": "react-on-rails-pro",
-  "version": "16.3.0-rc.0",
+  "version": "16.3.0-rc.1",
   "description": "React on Rails Pro package with React Server Components support",
   "main": "lib/ReactOnRails.full.js",
   "type": "module",
