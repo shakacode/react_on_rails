@@ -87,7 +87,8 @@ Use `content_for` to render your body content first, capturing auto-appends befo
   <%= csp_meta_tag %>
 
   <%# Optional: Explicitly load non-React packs (Stimulus, shared stores, etc.) %>
-  <%# React component bundles are auto-appended by react_component calls above %>
+  <%# React component bundles are already auto-appended by react_component calls above %>
+  <%# Do NOT manually append component bundles here - they're already included %>
   <%= append_stylesheet_pack_tag('stimulus-bundle') %>
   <%= append_javascript_pack_tag('stimulus-bundle') %>
   <%= append_javascript_pack_tag('stores-registration') %>
@@ -112,6 +113,12 @@ Use `content_for` to render your body content first, capturing auto-appends befo
 5. Component bundles load in the correct order
 
 **Note:** While defining body content before `<!DOCTYPE html>` may look unusual, Rails processes `content_for` blocks during template evaluation, not document output order. The final HTML is correctly structured.
+
+**Common Pitfalls:**
+
+- ❌ Don't place `javascript_pack_tag` before `content_for` blocks that call `react_component`
+- ❌ Don't manually append component bundles if using `auto_load_bundle: true`
+- ✅ Do let `react_component` handle bundle appending automatically
 
 **Additional Resources:**
 
