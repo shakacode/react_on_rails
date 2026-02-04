@@ -52,6 +52,71 @@ Turbo Frames work with React components without any special configuration:
 <%# Clicking a link that responds with another turbo_frame_tag will update just that frame %>
 ```
 
+### Turbo with Auto-Registration
+
+When using React on Rails' [auto-registration feature](../core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md) (`auto_load_bundle: true`) with Turbo, there's a specific ordering requirement to address:
+
+**The Challenge:**
+
+1. **Turbo's requirement**: Turbo must be loaded in the `<head>` to avoid script re-evaluation warnings during page navigation
+2. **Auto-registration's behavior**: `react_component` with `auto_load_bundle: true` calls `append_javascript_pack_tag` during body rendering
+3. **Shakapacker's requirement**: All `append_javascript_pack_tag` calls must occur before the final `javascript_pack_tag`
+
+This creates a conflict: the `<head>` (with `javascript_pack_tag`) renders before the `<body>` (where `react_component` triggers auto-appends).
+
+**The Solution: `content_for :body_content` Pattern**
+
+Use `content_for` to render your body content first, capturing auto-appends before the head renders:
+
+```erb
+<%# Step 1: Capture body content FIRST - this triggers all auto-appends %>
+<% content_for :body_content do %>
+  <%= react_component "NavigationBarApp", prerender: true %>
+
+  <div class="container">
+    <%= yield %>
+  </div>
+
+  <%= react_component "Footer", prerender: true %>
+  <%= redux_store_hydration_data %>
+<% end %>
+<!DOCTYPE html>
+<html>
+<head>
+  <%= csrf_meta_tags %>
+  <%= csp_meta_tag %>
+
+  <%# Turbo/Stimulus can be explicitly appended if needed %>
+  <%= append_stylesheet_pack_tag('stimulus-bundle') %>
+  <%= append_javascript_pack_tag('stimulus-bundle') %>
+  <%= append_javascript_pack_tag('stores-registration') %>
+
+  <%# Step 2: Pack tags now include all component bundles from auto-appends above %>
+  <%= stylesheet_pack_tag(media: 'all') %>
+  <%= javascript_pack_tag(defer: true) %>
+</head>
+<body>
+  <%# Step 3: Output the captured body content %>
+  <%= yield :body_content %>
+</body>
+</html>
+```
+
+**Why This Works:**
+
+1. Rails processes the `content_for` block first, which executes all `react_component` calls
+2. Each `react_component` with `auto_load_bundle: true` triggers `append_javascript_pack_tag`
+3. When the `<head>` renders, `javascript_pack_tag` includes all accumulated appends
+4. Turbo loads early in `<head>`, satisfying its requirement
+5. Component bundles load in the correct order
+
+**Note:** While defining body content before `<!DOCTYPE html>` may look unusual, Rails processes `content_for` blocks during template evaluation, not document output order. The final HTML is correctly structured.
+
+**Additional Resources:**
+
+- [Shakapacker Preventing FOUC guide](https://github.com/shakacode/shakapacker/blob/master/docs/preventing_fouc.md#the-content_for-body_content-pattern)
+- [Turbo Handbook - Working with Script Elements](https://turbo.hotwired.dev/handbook/building#working-with-script-elements)
+
 ### Turbo Streams (Requires React on Rails Pro)
 
 > **⚡️ React on Rails Pro Feature**
