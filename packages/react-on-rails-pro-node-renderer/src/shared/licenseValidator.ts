@@ -36,7 +36,27 @@ interface LicenseData {
  */
 export type LicenseStatus = 'valid' | 'expired' | 'invalid' | 'missing';
 
-// Module-level state for caching
+// Module-level state for caching license validation results.
+//
+// Thread Safety Notes (Node.js):
+// Unlike Ruby's Mutex-based approach for concurrent access, JavaScript is single-threaded
+// for user code execution. However, when using Node.js clusters or worker threads:
+//
+// - **Cluster mode**: Each worker process has its own memory space. The cached values
+//   are computed independently per worker, which is safe and correct. No shared state
+//   issues arise because workers don't share memory for JavaScript objects.
+//
+// - **Worker threads**: Each worker thread has its own module instance and memory.
+//   Like cluster mode, there's no shared state between threads for these cached values.
+//
+// - **React on Rails Pro Node Renderer**: The node renderer spawns worker processes
+//   (not threads), so each worker maintains its own cached license state. This is
+//   intentional - license validation happens once per worker on first access, and
+//   the result is cached for the lifetime of that worker process.
+//
+// The caching here is deterministic - given the same environment/config file, every
+// worker will compute the same cached values. Redundant computation across workers
+// is acceptable since license validation is infrequent (once per worker startup).
 let cachedLicenseStatus: LicenseStatus | undefined;
 let cachedLicenseOrganization: string | undefined;
 let cachedLicensePlan: ValidPlan | undefined;

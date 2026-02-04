@@ -230,6 +230,38 @@ describe('LicenseValidator', () => {
       const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
       expect(module.getLicenseStatus()).toBe('valid');
     });
+
+    it('returns valid for empty string plan (treated as absent for backwards compat)', () => {
+      const payload = {
+        sub: 'test@example.com',
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        plan: '',
+        org: 'Acme Corp',
+      };
+
+      const token = jwt.sign(payload, testPrivateKey, { algorithm: 'RS256' });
+      process.env.REACT_ON_RAILS_PRO_LICENSE = token;
+
+      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
+      expect(module.getLicenseStatus()).toBe('valid');
+    });
+
+    it('returns valid for null plan (treated as absent)', () => {
+      const payload = {
+        sub: 'test@example.com',
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        plan: null,
+        org: 'Acme Corp',
+      };
+
+      const token = jwt.sign(payload, testPrivateKey, { algorithm: 'RS256' });
+      process.env.REACT_ON_RAILS_PRO_LICENSE = token;
+
+      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
+      expect(module.getLicenseStatus()).toBe('valid');
+    });
   });
 
   describe('getLicenseStatus with org field', () => {
