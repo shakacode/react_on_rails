@@ -114,7 +114,7 @@ The reasons "why" and "why not" are the same as for basic Rails fragment caching
 ### Considerations for Determining Your Cache Key
 
 1. Consult the [Rails docs for cache keys](http://guides.rubyonrails.org/caching_with_rails.html#cache-keys) for help with cache key definitions.
-2. If your React code depends on any values from the [Rails Context](https://github.com/shakacode/react_on_rails/blob/master/docs/core-concepts/render-functions-and-railscontext.md#rails-context), such as the `locale` or the URL `location`, then be sure to include such values in your cache key. In other words, if you are using some JavaScript such as `react-router` that depends on your URL, or on a call to `toLocalString(locale)`, then be sure to include such values in your cache key. To find the values that React on Rails uses, use some code like this:
+2. If your React code depends on any values from the [Rails Context](../../docs/core-concepts/render-functions-and-railscontext.md#rails-context), such as the `locale` or the URL `location`, then be sure to include such values in your cache key. In other words, if you are using some JavaScript such as `react-router` that depends on your URL, or on a call to `toLocalString(locale)`, then be sure to include such values in your cache key. To find the values that React on Rails uses, use some code like this:
 
 ```ruby
 the_rails_context = rails_context
