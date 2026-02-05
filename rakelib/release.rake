@@ -297,6 +297,10 @@ task :release, %i[version dry_run] do |_t, args|
   unbundled_sh_in_dir(gem_root, "bundle install#{bundle_quiet_flag}")
   unbundled_sh_in_dir(dummy_app_dir, "bundle install#{bundle_quiet_flag}")
   unbundled_sh_in_dir(pro_dummy_app_dir, "bundle install#{bundle_quiet_flag}") if Dir.exist?(pro_dummy_app_dir)
+  if Dir.exist?(pro_execjs_dummy_app_dir)
+    unbundled_sh_in_dir(pro_execjs_dummy_app_dir,
+                        "bundle install#{bundle_quiet_flag}")
+  end
   unbundled_sh_in_dir(pro_gem_root, "bundle install#{bundle_quiet_flag}")
 
   unless is_dry_run
