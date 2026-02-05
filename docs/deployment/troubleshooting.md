@@ -256,6 +256,7 @@ There are two common causes of FOUC in React on Rails applications:
   /* Borders used in layout */
   .border-solid { border-style: solid; }
   .border-r-2 { border-right-width: 2px; }
+  .border-slate-700 { border-color: #334155; }
 </style>
 ```
 
