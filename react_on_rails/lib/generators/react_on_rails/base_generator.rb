@@ -311,10 +311,10 @@ module ReactOnRails
           '\1rspack\2'
         )
 
-        # Update webpack_loader to swc (rspack works best with SWC)
+        # Update javascript_transpiler to swc (rspack works best with SWC)
         gsub_file(
           shakapacker_config_path,
-          /^(\s*webpack_loader:\s*)["']?babel["']?(\s*(?:#.*)?)$/,
+          /^(\s*javascript_transpiler:\s*)["']?babel["']?(\s*(?:#.*)?)$/,
           '\1swc\2'
         )
 

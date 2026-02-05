@@ -57,11 +57,11 @@ class BundlerSwitcher
       "\\1#{@target_bundler}\\2"
     )
 
-    # Update webpack_loader based on bundler (rspack works best with SWC)
+    # Update javascript_transpiler based on bundler (rspack works best with SWC)
     new_loader = @target_bundler == "rspack" ? "swc" : "babel"
     old_loader = @target_bundler == "rspack" ? "babel" : "swc"
     new_content = new_content.gsub(
-      /^(\s*webpack_loader:\s*)["']?#{old_loader}["']?(\s*(?:#.*)?)$/,
+      /^(\s*javascript_transpiler:\s*)["']?#{old_loader}["']?(\s*(?:#.*)?)$/,
       "\\1#{new_loader}\\2"
     )
 
@@ -143,6 +143,7 @@ if ARGV.empty?
   puts "\nExamples:"
   puts "  bin/switch-bundler rspack   # Switch to Rspack"
   puts "  bin/switch-bundler webpack  # Switch to Webpack"
+  puts "\nNote: This also updates javascript_transpiler (rspack uses swc, webpack uses babel)"
   exit 1
 end
 
