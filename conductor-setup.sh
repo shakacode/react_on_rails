@@ -80,13 +80,19 @@ echo "💎 Installing Ruby dependencies..."
 run_cmd bundle install
 
 echo "💎 Installing Ruby dependencies for spec/dummy..."
-(cd react_on_rails/spec/dummy && bundle install)
+pushd react_on_rails/spec/dummy > /dev/null
+run_cmd bundle install
+popd > /dev/null
 
 echo "💎 Installing Ruby dependencies for react_on_rails_pro..."
-(cd react_on_rails_pro && bundle install)
+pushd react_on_rails_pro > /dev/null
+run_cmd bundle install
+popd > /dev/null
 
 echo "💎 Installing Ruby dependencies for react_on_rails_pro/spec/dummy..."
-(cd react_on_rails_pro/spec/dummy && bundle install)
+pushd react_on_rails_pro/spec/dummy > /dev/null
+run_cmd bundle install
+popd > /dev/null
 
 # Enable corepack for pnpm (this project uses pnpm, not yarn)
 echo "📦 Enabling corepack for pnpm..."
