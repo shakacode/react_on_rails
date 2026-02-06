@@ -80,7 +80,7 @@ Find guidance for your specific scenario:
 | **Enable server-side rendering**    | [SSR Guide](./core-concepts/react-server-rendering.md)                                |
 | **Set up hot reloading**            | [HMR Setup](./building-features/hmr-and-hot-reloading-with-the-webpack-dev-server.md) |
 | **Use Redux with Rails**            | [Redux Integration](./building-features/react-and-redux.md)                           |
-| **Deploy to production**            | [Deployment Guide](./deployment/index.md)                                             |
+| **Deploy to production**            | [Deployment Guide](./deployment/README.md)                                            |
 | **Troubleshoot issues**             | [Troubleshooting](./deployment/troubleshooting.md)                                    |
 
 ## Core Concepts

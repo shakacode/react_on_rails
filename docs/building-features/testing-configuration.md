@@ -466,7 +466,7 @@ When running tests in Docker, consider:
 
 ## Related Documentation
 
-- [Configuration Reference](../configuration/index.md#build_test_command)
+- [Configuration Reference](../configuration/README.md#build_test_command)
 - [Shakapacker Configuration](https://github.com/shakacode/shakapacker#configuration)
 - [TestHelper Source Code](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails/lib/react_on_rails/test_helper.rb)
 
