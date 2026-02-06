@@ -2,6 +2,10 @@
 
 All notable changes to this project's source code will be documented in this file. Items under `Unreleased` is upcoming features that will be out in the next version.
 
+> **This is the unified changelog for both React on Rails (open source) and React on Rails Pro.**
+> Pro-specific changes appear under `#### Pro` sections within each release.
+> For pre-monorepo Pro history (versions 4.0.0-rc.15 and earlier), see the [archived Pro CHANGELOG](https://github.com/shakacode/react_on_rails_pro/blob/4.0.0/CHANGELOG.md).
+
 Migration instructions for the major updates can be found [here](https://www.shakacode.com/react-on-rails/docs/upgrading/upgrading-react-on-rails#upgrading-to-version-9). Some smaller migration information can be found here.
 
 ## Want to Save Time Updating?
@@ -22,6 +26,17 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 ### [Unreleased]
 
 Changes since the last non-beta release.
+
+#### Pro
+
+##### Changed
+
+- **License-Optional Attribution Model**: React on Rails Pro now works without a license for evaluation, development, testing, and CI/CD. A paid license is only required for production deployments. Added `plan` field validation to both Ruby and Node.js license validators — only `"paid"` plan (or no plan field for backwards compatibility) is accepted. Old free licenses are now treated as invalid. Documentation overhauled across README and LICENSE_SETUP guides; removed CI_SETUP.md (CI needs no license configuration). [PR 2324](https://github.com/shakacode/react_on_rails/pull/2324) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+##### Added
+
+- **Multiple License Plan Types**: License validation now supports multiple plan types beyond "paid": `startup`, `nonprofit`, `education`, `oss`, and `partner`. Non-paid plan types are displayed in the license validation success message (e.g., "License validated successfully (startup license)."). Includes thread-safe caching for plan type retrieval via `LicenseValidator.license_plan`. [PR 2334](https://github.com/shakacode/react_on_rails/pull/2334) by [justin808](https://github.com/justin808).
+- **Node Renderer Master/Worker Exports**: Added public `master` and `worker` exports to `react-on-rails-pro-node-renderer` package, allowing users to import from `react-on-rails-pro-node-renderer/master` and `react-on-rails-pro-node-renderer/worker`. [PR 2326](https://github.com/shakacode/react_on_rails/pull/2326) by [justin808](https://github.com/justin808).
 
 ### [16.3.0] - 2026-02-05
 
@@ -137,8 +152,6 @@ To migrate to React on Rails Pro:
 
 - **Strict Version Validation at Boot Time**: Applications now fail to boot (instead of logging warnings) when package.json is misconfigured with wrong versions, missing packages, or semver wildcards. Users must use exact versions in package.json (no ^, ~, >, <, \* operators). **Migration**: Update package.json to use exact versions matching installed gem (e.g., `"16.1.1"` not `"^16.1.1"`). [PR #1881](https://github.com/shakacode/react_on_rails/pull/1881) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
-- **Node Renderer Version Validation** (Pro users only): Remote node renderer now validates gem version at request time. Version mismatches in development return 412 Precondition Failed (production allows with warning). **Migration**: Ensure react_on_rails_pro gem and @shakacode-tools/react-on-rails-pro-node-renderer package versions match. [PR #1881](https://github.com/shakacode/react_on_rails/pull/1881) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-
 #### Added
 
 - **Shakapacker 9.0+ Private Output Path Integration**: Added automatic detection and integration of Shakapacker 9.0+ `private_output_path` configuration. React on Rails now automatically reads `private_output_path` from `shakapacker.yml` and sets server bundle paths, eliminating manual configuration synchronization. Includes version-aware generator templates, enhanced doctor command diagnostics for configuration validation and upgrade recommendations, and improved security with `enforce_private_server_bundles` option. [PR 2028](https://github.com/shakacode/react_on_rails/pull/2028) by [justin808](https://github.com/justin808).
@@ -153,8 +166,6 @@ To migrate to React on Rails Pro:
 
 - **Smart Error Messages with Actionable Solutions**: Added intelligent Ruby-side error handling with context-aware, actionable solutions for common issues. Features include fuzzy matching for component name typos, environment-specific debugging suggestions, color-coded error formatting, and detailed troubleshooting guides for component registration, auto-bundling, hydration mismatches, server rendering errors, and Redux store issues. See the [Improved Error Messages guide](docs/guides/improved-error-messages.md) for details. [PR 1934](https://github.com/shakacode/react_on_rails/pull/1934) by [justin808](https://github.com/justin808).
 
-- **Improved RSC Payload Error Handling**: Errors that happen during generation of RSC payload are transferred properly to rails side and logs the error message and stack. [PR #1888](https://github.com/shakacode/react_on_rails/pull/1888) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-
 - **Doctor Checks for :async Loading Strategy**: Added proactive diagnostic checks to the React on Rails doctor tool to detect usage of the `:async` loading strategy in projects without React on Rails Pro. The feature scans view files and initializer configuration, providing clear guidance to either upgrade to Pro or use alternative loading strategies like `:defer` or `:sync` to avoid component registration race conditions. [PR 2010](https://github.com/shakacode/react_on_rails/pull/2010) by [justin808](https://github.com/justin808).
 
 #### Changed
@@ -165,8 +176,6 @@ To migrate to React on Rails Pro:
   - Configured CSS Modules to use default exports (`namedExport: false`) for backward compatibility with existing `import styles from` syntax
   - Fixed webpack configuration to process SCSS rules and CSS loaders in a single pass for better performance
     [PR 1904](https://github.com/shakacode/react_on_rails/pull/1904) by [justin808](https://github.com/justin808).
-
-- **`immediate_hydration` now automatically enabled for Pro users**: The `config.immediate_hydration` configuration option has been removed. Immediate hydration is now automatically enabled for React on Rails Pro users and disabled for non-Pro users, simplifying configuration while providing optimal performance by default. Component-level overrides are still supported via the `immediate_hydration` parameter on `react_component`, `redux_store`, and `stream_react_component` helpers. [PR 1997](https://github.com/shakacode/react_on_rails/pull/1997) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 - **`generated_component_packs_loading_strategy` now defaults based on Pro license**: When using Shakapacker >= 8.2.0, the default loading strategy is now `:async` for Pro users and `:defer` for non-Pro users. This provides optimal performance for Pro users while maintaining compatibility for non-Pro users. You can still explicitly set the strategy in your configuration. [PR #1993](https://github.com/shakacode/react_on_rails/pull/1993) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
@@ -194,12 +203,7 @@ To migrate to React on Rails Pro:
 #### Fixed
 
 - **Component Registration**: Fixed "component not registered" error on core `react-on-rails` package that could occur when components were referenced before registration completed. [PR 2295](https://github.com/shakacode/react_on_rails/pull/2295) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-- **JSON Parse Race Condition in Immediate Hydration (Pro)**: Fixed a race condition where `immediate_hydration` could attempt to parse incomplete JSON props during HTML streaming on slow networks. When the JS bundle executes before the props `<script>` tag content is fully received, `el.textContent` returns truncated JSON, causing `SyntaxError: Unterminated string in JSON`. The fix uses a `nextSibling` check to verify the props script's closing tag has been parsed before attempting hydration; incomplete elements are deferred to the fallback `reactOnRailsComponentLoaded()` path. [PR 2290](https://github.com/shakacode/react_on_rails/pull/2290) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 - **webpack-cli Compatibility**: Fixed compatibility issue with webpack-dev-server v5 by upgrading webpack-cli from v4 to v6.0.1 and removing the deprecated `@webpack-cli/serve` package. Also removed deprecated `https: false` configuration from shakapacker.yml. [PR 2291](https://github.com/shakacode/react_on_rails/pull/2291) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-- **Thread-Safe Connection Management (Pro)**: Fixed race conditions in `ReactOnRailsPro::Request` connection management using double-checked locking pattern. Prevents duplicate connections at startup and ensures exception-safe connection resets. [PR 2259](https://github.com/shakacode/react_on_rails/pull/2259) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-
-- **Legacy Module Resolver Compatibility (Pro)**: Added `main` field to `react-on-rails-pro` and `react-on-rails-pro-node-renderer` package.json files for compatibility with legacy module resolvers like `eslint-import-resolver-node` that don't support Node.js conditional exports. [PR 2256](https://github.com/shakacode/react_on_rails/pull/2256) by [ihabadham](https://github.com/ihabadham).
-
 - **Hydration Mismatch on Multiple `reactOnRailsPageLoaded()` Calls**: Fixed hydration errors that occurred when `reactOnRailsPageLoaded()` was invoked multiple times for asynchronously loaded content. The fix tracks rendered components and skips re-rendering already-tracked components, while intelligently handling DOM node replacements by detecting when a node with the same ID is swapped out. Addresses [issue 2210](https://github.com/shakacode/react_on_rails/issues/2210). [PR 2211](https://github.com/shakacode/react_on_rails/pull/2211) by [justin808](https://github.com/justin808).
 
 - **TypeScript processPromise Return Type**: Fixed TypeScript compilation error in `serverRenderReactComponent.ts` where the type checker couldn't properly narrow the union type after the `isValidElement` check. Added explicit type assertion to `FinalHtmlResult` to resolve the issue. [PR 2204](https://github.com/shakacode/react_on_rails/pull/2204) by [justin808](https://github.com/justin808).
@@ -220,8 +224,6 @@ To migrate to React on Rails Pro:
 
 #### Security
 
-- **React Server Components Security Vulnerabilities (CVE-2025-55183, CVE-2025-55184, CVE-2025-67779)**: Upgraded React to v19.0.3 and react-on-rails-rsc to v19.0.4 to fix three critical security vulnerabilities in React Server Components. CVE-2025-55183 (CVSS 5.3) involved source code exposure when server function references were stringified, potentially leaking hardcoded secrets. CVE-2025-55184 and CVE-2025-67779 (both CVSS 7.5) involved denial of service attacks via cyclic promise references that could cause infinite loops and 100% CPU consumption. The fixes implement dual-layer cycle detection with a 1,000-iteration depth limit and override `toString()` methods on server references to return safe placeholders. Addresses [issue 2223](https://github.com/shakacode/react_on_rails/issues/2223). [PR 2233](https://github.com/shakacode/react_on_rails/pull/2233) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-
 - **Development Dependencies Security**: Addressed 58 Dependabot vulnerabilities in dev/test dependencies including critical issues in webpack (DOM clobbering XSS), nokogiri (libxml2 CVEs), activestorage, rack (5 DoS vulnerabilities), and jws (HMAC signature bypass). These changes only affect development environments—production gem code is unchanged. [PR 2261](https://github.com/shakacode/react_on_rails/pull/2261) by [ihabadham](https://github.com/ihabadham).
 
 - **Command Injection Protection**: Added security hardening to prevent potential command injection in package manager commands. [PR #1881](https://github.com/shakacode/react_on_rails/pull/1881) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
@@ -239,6 +241,66 @@ To migrate to React on Rails Pro:
 - **Bundle Size CI Monitoring**: Added automated bundle size tracking to CI using size-limit. Compares PR bundle sizes against the base branch and fails if any package increases by more than 0.5KB. Includes local comparison tool (`bin/compare-bundle-sizes`) and bypass mechanism (`bin/skip-bundle-size-check`) for intentional size increases. [PR 2149](https://github.com/shakacode/react_on_rails/pull/2149) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 - **Download Time CI Monitoring**: Added automated download time tracking to CI using size-limit. Compares PR client import download times against the base branch and fails if any import increases by more than 10%. [PR 2160](https://github.com/shakacode/react_on_rails/pull/2160) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+#### Pro
+
+_Includes all features from the React on Rails Pro 4.0.0 release series (previously released as 4.0.0-rc.6 through 4.0.0-rc.15). For pre-monorepo Pro history, see the [archived Pro CHANGELOG](https://github.com/shakacode/react_on_rails_pro/blob/4.0.0/CHANGELOG.md)._
+
+##### Breaking Changes
+
+- **Node Renderer Version Validation**: Remote node renderer now validates gem version at request time. Version mismatches in development return 412 Precondition Failed (production allows with warning). Ensure `react_on_rails_pro` gem and `@shakacode-tools/react-on-rails-pro-node-renderer` package versions match. [PR #1881](https://github.com/shakacode/react_on_rails/pull/1881) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **Prerender caching for streaming**: `config.prerender_caching` now controls caching for both streamed and non-streamed components. To disable for individual renders, pass `internal_option(:skip_prerender_cache)`.
+- **`ReactOnRailsPro::Utils#copy_assets` return value**: Now returns `nil` instead of `Response` object, throwing an error on failure instead. [PR 422](https://github.com/shakacode/react_on_rails_pro/pull/422) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- Added `async` gem dependency (>= 2.6) for concurrent streaming.
+- Dropped support for EOL'd Ruby 2.7. [PR 365](https://github.com/shakacode/react_on_rails_pro/pull/365) by [ahangarha](https://github.com/ahangarha).
+- Dropped support for React on Rails below 14.0.4. [PR 415](https://github.com/shakacode/react_on_rails_pro/pull/415) by [rameziophobia](https://github.com/rameziophobia).
+
+##### Added
+
+- **React Server Components Support**: Full RSC integration for Rails apps — reduce client bundle sizes and enable powerful data fetching patterns. [See the tutorial](https://www.shakacode.com/react-on-rails-pro/docs/react-server-components/tutorial). [PR 422](https://github.com/shakacode/react_on_rails_pro/pull/422) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **Streaming Server Rendering**: `stream_view_containing_react_components` and `stream_react_component` helpers for progressive page loading. Includes console log replay, error handling during streaming (initial render and suspense boundaries), and `raise_non_shell_server_rendering_errors` configuration. [PR 407](https://github.com/shakacode/react_on_rails_pro/pull/407), [PR #429](https://github.com/shakacode/react_on_rails_pro/pull/429), [PR #432](https://github.com/shakacode/react_on_rails_pro/pull/432) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **Async React Component Rendering**: `async_react_component` and `cached_async_react_component` helpers for concurrent component rendering. Multiple components execute HTTP requests to the Node renderer in parallel. Requires `ReactOnRailsPro::AsyncRendering` concern in controller. [PR 2139](https://github.com/shakacode/react_on_rails/pull/2139) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **Concurrent Streaming Performance**: Concurrent draining of streamed React components using the async gem with producer-consumer pattern and bounded buffering. [PR 2015](https://github.com/shakacode/react_on_rails/pull/2015) by [ihabadham](https://github.com/ihabadham).
+- **License Validation System**: JWT-based license validation with offline verification using RSA-256 signatures. [PR #1857](https://github.com/shakacode/react_on_rails/pull/1857) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **Improved RSC Payload Error Handling**: Errors during RSC payload generation are now transferred to Rails with error messages and stack traces. [PR #1888](https://github.com/shakacode/react_on_rails/pull/1888) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- `cached_stream_react_component` helper for cached streaming.
+- `config.concurrent_component_streaming_buffer_size` option (defaults to 64) for concurrent streaming memory buffer control.
+- `replayServerAsyncOperationLogs` configuration for capturing async operation console output during SSR. [PR 440](https://github.com/shakacode/react_on_rails_pro/pull/440) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+##### Changed
+
+- **`immediate_hydration` auto-enabled for Pro users**: The configuration option has been removed; immediate hydration is now automatically enabled for Pro users and disabled for non-Pro users. Component-level overrides still supported. [PR 1997](https://github.com/shakacode/react_on_rails/pull/1997) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **RSC rendering flow improvements**: Eliminated double rendering, reduced HTTP requests, added multi-bundle upload via communication protocol v2.0.0. [PR 515](https://github.com/shakacode/react_on_rails_pro/pull/515) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **Node Renderer: Express to Fastify**: Converted worker from Express to Fastify. [PR 398](https://github.com/shakacode/react_on_rails_pro/pull/398) by [alexeyr-ci](https://github.com/alexeyr-ci).
+- **Fastify 5 upgrade**: Default with fallback to Fastify 4 on older Node versions. [PR 478](https://github.com/shakacode/react_on_rails_pro/pull/478) by [alexeyr-ci](https://github.com/alexeyr-ci).
+- **Pino logging**: Replaced Winston, aligning with Fastify. [PR 479](https://github.com/shakacode/react_on_rails_pro/pull/479) by [alexeyr-ci](https://github.com/alexeyr-ci).
+- **HTTP/2 Cleartext communication** with Node Renderer. [PR 392](https://github.com/shakacode/react_on_rails_pro/pull/392) by [alexeyr-ci](https://github.com/alexeyr-ci).
+- **HTTPX for Node renderer**: Converted from `Net::HTTP` to HTTPX. [PR 452](https://github.com/shakacode/react_on_rails_pro/pull/452) by [alexeyr-ci](https://github.com/alexeyr-ci). Upgraded to ~> 1.5. [PR 520](https://github.com/shakacode/react_on_rails_pro/pull/520) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **Error reporting/tracing overhaul**: See [the docs](react_on_rails_pro/docs/node-renderer/error-reporting-and-tracing.md). [PR 471](https://github.com/shakacode/react_on_rails_pro/pull/471) by [alexeyr-ci](https://github.com/alexeyr-ci).
+- Added `fastifyServerOptions` config and set `bodyLimit` to 100 MB by default. [PR 511](https://github.com/shakacode/react_on_rails_pro/pull/511) by [Romex91](https://github.com/Romex91).
+- Renamed `includeTimerPolyfills` to `stubTimers`. Fail immediately on obsolete config options. [PR 506](https://github.com/shakacode/react_on_rails_pro/pull/506) by [alexeyr-ci](https://github.com/alexeyr-ci).
+- Shakapacker 8.0.0 support (drops 6.x). [PR 415](https://github.com/shakacode/react_on_rails_pro/pull/415) by [rameziophobia](https://github.com/rameziophobia).
+
+##### Fixed
+
+- **Thread-Safe Connection Management**: Fixed race conditions in `ReactOnRailsPro::Request` using double-checked locking. [PR 2259](https://github.com/shakacode/react_on_rails/pull/2259) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **JSON Parse Race Condition in Immediate Hydration**: Fixed race condition where `immediate_hydration` could parse incomplete JSON during HTML streaming. Uses `nextSibling` check to verify props script completion. [PR 2290](https://github.com/shakacode/react_on_rails/pull/2290) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **Legacy Module Resolver Compatibility**: Added `main` field to Pro package.json files for legacy module resolvers. [PR 2256](https://github.com/shakacode/react_on_rails/pull/2256) by [ihabadham](https://github.com/ihabadham).
+- **Client Disconnect Handling for Streaming**: Catches `IOError`/`Errno::EPIPE` on disconnect, stops barrier to cancel producer tasks. [PR 2137](https://github.com/shakacode/react_on_rails/pull/2137) by [justin808](https://github.com/justin808).
+- **Node Renderer Worker Restart**: Fixed "descriptor closed" error during restarts. Workers now perform graceful shutdowns with configurable `gracefulWorkerRestartTimeout`. [PR 1970](https://github.com/shakacode/react_on_rails/pull/1970) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **Body Duplication Bug On Streaming**: Fixed bug when node renderer connection closed after partial streaming. [PR 1995](https://github.com/shakacode/react_on_rails/pull/1995) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- Fixed compatibility with httpx 1.6.x by requiring http-2 >= 1.1.1. [PR 2141](https://github.com/shakacode/react_on_rails/pull/2141) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- Fixed unnecessary bundle requests when RSC is disabled. [PR 545](https://github.com/shakacode/react_on_rails_pro/pull/545) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- Made default bundle paths consistent between node-renderer and Rails. [PR 399](https://github.com/shakacode/react_on_rails_pro/pull/399) by [alexeyr-ci](https://github.com/alexeyr-ci).
+
+##### Security
+
+- **CVE-2025-55182 - React Server Components RCE**: Updated `react-on-rails-rsc` peer dependency to v19.0.3. [PR 2175](https://github.com/shakacode/react_on_rails/pull/2175) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **CVE-2025-55183, CVE-2025-55184, CVE-2025-67779**: Upgraded React to v19.0.3 and react-on-rails-rsc to v19.0.4 fixing source code exposure and denial of service vulnerabilities. [PR 2233](https://github.com/shakacode/react_on_rails/pull/2233) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+##### Deprecated
+
+- **Node Renderer `bundlePath`**: Renamed to `serverBundleCachePath`. Old option continues to work with deprecation warning. [PR 2008](https://github.com/shakacode/react_on_rails/pull/2008) by [justin808](https://github.com/justin808).
 
 ### [16.1.1] - 2025-09-24
 
