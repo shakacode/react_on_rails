@@ -2,7 +2,7 @@
 
 This document describes configuration options specific to React on Rails Pro features.
 
-For general React on Rails configuration options, see [configuration.md](configuration.md).
+For general React on Rails configuration options, see [configuration.md](index.md).
 
 ## React Server Components (RSC)
 
