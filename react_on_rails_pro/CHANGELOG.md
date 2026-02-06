@@ -1,32 +1,10 @@
-# Change Log
+# React on Rails Pro Change Log
 
-All notable changes to this project will be documented in this file. Items under `Unreleased` is upcoming features that will be out in next release.
+**Starting with version 16.2.0, Pro changes are documented in the unified [CHANGELOG.md](../CHANGELOG.md) under `#### Pro` sections within each release.**
 
-## Gem and Package Versions
-
-Gem and package versions are the same except for beta releases where the gem uses a `.beta` and the package uses a `-beta` (same for `rc`).
-
-1. **Gem**: `X.X.X.beta.X`
-2. **Package**: `X.X.X-beta.X`
-
-You can find the **package** version numbers from this repo's tags and below in this file.
+This file is kept for historical reference of pre-monorepo releases (4.0.0-rc.x and earlier).
 
 ---
-
-[HEAD compared to 3.3.1]: Click to see all changes compared to the last 3.x version. See the [4.0 Release Notes](https://github.com/shakacode/react_on_rails_pro/blob/master/docs/release-notes/4.0.md).
-
-## [Unreleased]
-
-Changes since the last non-beta release.
-
-### Changed
-
-- **License-Optional Attribution Model**: React on Rails Pro now works without a license for evaluation, development, testing, and CI/CD. A paid license is only required for production deployments. Added `plan` field validation to both Ruby and Node.js license validators — only `"paid"` plan (or no plan field for backwards compatibility) is accepted. Old free licenses are now treated as invalid. Documentation overhauled across README and LICENSE_SETUP guides; removed CI_SETUP.md (CI needs no license configuration). [PR 2324](https://github.com/shakacode/react_on_rails/pull/2324) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-
-### Added
-
-- **Multiple License Plan Types**: License validation now supports multiple plan types beyond "paid": `startup`, `nonprofit`, `education`, `oss`, and `partner`. Non-paid plan types are displayed in the license validation success message (e.g., "License validated successfully (startup license)."). Includes thread-safe caching for plan type retrieval via `LicenseValidator.license_plan`. [PR 2334](https://github.com/shakacode/react_on_rails/pull/2334) by [justin808](https://github.com/justin808).
-- **Node Renderer Master/Worker Exports**: Added public `master` and `worker` exports to `react-on-rails-pro-node-renderer` package, allowing users to import from `react-on-rails-pro-node-renderer/master` and `react-on-rails-pro-node-renderer/worker`. [PR 2326](https://github.com/shakacode/react_on_rails/pull/2326) by [justin808](https://github.com/justin808).
 
 ## [16.2.0] - 2026-01-14
 
