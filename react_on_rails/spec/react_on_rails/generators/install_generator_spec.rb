@@ -234,7 +234,46 @@ describe InstallGenerator, type: :generator do
   end
 
   context "with --rspack" do
-    before(:all) { run_generator_test_with_args(%w[--rspack], package_json: true) }
+    before(:all) do
+      run_generator_test_with_args(%w[--rspack], package_json: true) do
+        # Simulate Shakapacker being just installed (marker + config files)
+        # This allows testing that configure_rspack_in_shakapacker properly updates the config
+        simulate_existing_file(".shakapacker_just_installed", "")
+        simulate_existing_file("config/shakapacker.yml", <<~YAML)
+          # Note: You must restart bin/shakapacker-dev-server for changes to take effect
+          default: &default
+            source_path: app/javascript
+            source_entry_path: packs
+            public_root_path: public
+            public_output_path: packs
+            cache_path: tmp/shakapacker
+            webpack_compile_output: true
+            shakapacker_precompile: true
+            additional_paths: []
+            cache_manifest: false
+            javascript_transpiler: "babel"
+            assets_bundler: "webpack"
+            # precompile_hook: ~
+
+          development:
+            <<: *default
+
+          test:
+            <<: *default
+            compile: true
+
+          production:
+            <<: *default
+        YAML
+        simulate_existing_file("bin/shakapacker", "")
+        simulate_existing_file("bin/shakapacker-dev-server", "")
+        simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
+          const { generateWebpackConfig } = require('shakapacker')
+          const webpackConfig = generateWebpackConfig()
+          module.exports = webpackConfig
+        JS
+      end
+    end
 
     include_examples "base_generator", application_js: true
     include_examples "no_redux_generator"
@@ -283,10 +322,63 @@ describe InstallGenerator, type: :generator do
         expect(content).to include("new bundler.optimize.LimitChunkCountPlugin")
       end
     end
+
+    it "configures rspack in shakapacker.yml" do
+      assert_file "config/shakapacker.yml" do |content|
+        # Should have rspack as the bundler (inherited by all environments via YAML anchor)
+        expect(content).to include("assets_bundler: rspack")
+        # Should not have webpack as the bundler
+        expect(content).not_to match(/assets_bundler:\s*["']?webpack["']?/)
+        # Should use swc loader (rspack works best with SWC)
+        expect(content).to include("javascript_transpiler: swc")
+        expect(content).not_to match(/javascript_transpiler:\s*["']?babel["']?/)
+      end
+    end
+
+    it "preserves YAML structure in shakapacker.yml" do
+      assert_file "config/shakapacker.yml" do |content|
+        # YAML anchors should be preserved
+        expect(content).to include("default: &default")
+        expect(content).to include("<<: *default")
+        # Comments should be preserved
+        expect(content).to include("# Note: You must restart")
+      end
+    end
   end
 
   context "with --rspack --typescript" do
-    before(:all) { run_generator_test_with_args(%w[--rspack --typescript], package_json: true) }
+    before(:all) do
+      run_generator_test_with_args(%w[--rspack --typescript], package_json: true) do
+        # Simulate Shakapacker being just installed (marker + config files)
+        simulate_existing_file(".shakapacker_just_installed", "")
+        simulate_existing_file("config/shakapacker.yml", <<~YAML)
+          # Note: You must restart bin/shakapacker-dev-server for changes to take effect
+          default: &default
+            source_path: app/javascript
+            source_entry_path: packs
+            javascript_transpiler: "babel"
+            assets_bundler: "webpack"
+            # precompile_hook: ~
+
+          development:
+            <<: *default
+
+          test:
+            <<: *default
+            compile: true
+
+          production:
+            <<: *default
+        YAML
+        simulate_existing_file("bin/shakapacker", "")
+        simulate_existing_file("bin/shakapacker-dev-server", "")
+        simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
+          const { generateWebpackConfig } = require('shakapacker')
+          const webpackConfig = generateWebpackConfig()
+          module.exports = webpackConfig
+        JS
+      end
+    end
 
     include_examples "base_generator_common", application_js: true
     include_examples "no_redux_generator"

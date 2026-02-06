@@ -2,7 +2,6 @@
 # frozen_string_literal: true
 
 require "fileutils"
-require "yaml"
 require "json"
 
 # Script to switch between webpack and rspack bundlers
@@ -48,16 +47,25 @@ class BundlerSwitcher
     abort "❌ #{@shakapacker_config} not found" unless File.exist?(@shakapacker_config)
 
     puts "📝 Updating #{@shakapacker_config}..."
-    config = YAML.load_file(@shakapacker_config)
+    content = File.read(@shakapacker_config)
 
-    config["default"] ||= {}
-    config["default"]["assets_bundler"] = @target_bundler
+    # Use regex replacement to preserve file structure (comments, anchors, aliases)
+    # This replaces ALL occurrences of assets_bundler, not just in default section
+    old_bundler = @target_bundler == "rspack" ? "webpack" : "rspack"
+    new_content = content.gsub(
+      /^(\s*assets_bundler:\s*)["']?#{old_bundler}["']?(\s*(?:#.*)?)$/,
+      "\\1#{@target_bundler}\\2"
+    )
 
-    # Update webpack_loader based on bundler
-    # Rspack works best with SWC, webpack typically uses babel
-    config["default"]["webpack_loader"] = @target_bundler == "rspack" ? "swc" : "babel"
+    # Update javascript_transpiler based on bundler (rspack works best with SWC)
+    new_loader = @target_bundler == "rspack" ? "swc" : "babel"
+    old_loader = @target_bundler == "rspack" ? "babel" : "swc"
+    new_content = new_content.gsub(
+      /^(\s*javascript_transpiler:\s*)["']?#{old_loader}["']?(\s*(?:#.*)?)$/,
+      "\\1#{new_loader}\\2"
+    )
 
-    File.write(@shakapacker_config, YAML.dump(config))
+    File.write(@shakapacker_config, new_content)
     puts "✅ Updated assets_bundler to '#{@target_bundler}'"
   end
 
@@ -135,6 +143,7 @@ if ARGV.empty?
   puts "\nExamples:"
   puts "  bin/switch-bundler rspack   # Switch to Rspack"
   puts "  bin/switch-bundler webpack  # Switch to Webpack"
+  puts "\nNote: This also updates javascript_transpiler (rspack uses swc, webpack uses babel)"
   exit 1
 end
 
