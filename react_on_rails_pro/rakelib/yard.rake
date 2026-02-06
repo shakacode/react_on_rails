@@ -16,5 +16,5 @@ YARD::Rake::YardocTask.new do |t|
   helper.clear_markup_cache
   helper::MARKUP_PROVIDERS[:markdown].unshift const: "GithubMarkdown"
   t.files = %w[lib/react_on_rails_pro/utils.rb app/helpers/react_on_rails_pro_helper.rb]
-  t.options = ["-o", "gen-documentation", "-r", "readme-gen-docs.md"]
+  t.options = ["-o", "gen-documentation", "-r", "README.md"]
 end
