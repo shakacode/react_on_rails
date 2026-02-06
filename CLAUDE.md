@@ -331,14 +331,15 @@ cd react_on_rails_pro && bundle exec rake rbs:validate
 ```
 ## Changelog
 
-**IMPORTANT: This is a monorepo with TWO separate changelogs:**
-- **Open Source**: `/CHANGELOG.md` - for react_on_rails gem and npm package
-- **Pro**: `/CHANGELOG_PRO.md` - for react_on_rails_pro gem and npm packages
+**IMPORTANT: This is a monorepo with a SINGLE unified changelog:**
+- **`/CHANGELOG.md`** - for both react_on_rails (open source) and react_on_rails_pro
 
-When making changes, update the **appropriate changelog(s)**:
-- Open-source features/fixes → Update `/CHANGELOG.md`
-- Pro-only features/fixes → Update `/CHANGELOG_PRO.md`
-- Changes affecting both → Update **BOTH** changelogs
+When making changes, update `/CHANGELOG.md`:
+- Open-source features/fixes → Add to the regular category sections (#### Added, #### Fixed, etc.)
+- Pro-only features/fixes → Add to the `#### Pro` section under the appropriate subcategory (##### Added, ##### Fixed, etc.)
+- Changes affecting both → Add to the regular sections; Pro-specific details go in the Pro section
+
+Each release version has an optional `#### Pro` section at the end that contains Pro-specific entries organized by the same categories.
 
 ### Changelog Guidelines
 
@@ -346,9 +347,7 @@ When making changes, update the **appropriate changelog(s)**:
 - **Do NOT add entries for**: linting, formatting, refactoring, tests, or documentation fixes
 - **Format**: `[PR 1818](https://github.com/shakacode/react_on_rails/pull/1818) by [username](https://github.com/username)` (no hash in PR number)
 - **Use `/update-changelog` command** for guided changelog updates with automatic formatting
-- **Version management after releases**:
-  - Open source: `bundle exec rake update_changelog`
-  - Pro: `bundle exec rake update_changelog CHANGELOG=CHANGELOG_PRO.md`
+- **Version management after releases**: `bundle exec rake update_changelog`
 - **Examples**: Run `grep -A 3 "^#### " CHANGELOG.md | head -30` to see real formatting examples
 
 ### Beta Release Changelog Curation
