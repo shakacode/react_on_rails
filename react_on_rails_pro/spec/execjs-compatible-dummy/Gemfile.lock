@@ -1,7 +1,7 @@
 PATH
   remote: ../../..
   specs:
-    react_on_rails (16.2.0.beta.20)
+    react_on_rails (16.3.0)
       addressable
       connection_pool
       execjs (~> 2.5)
@@ -12,7 +12,7 @@ PATH
 PATH
   remote: ../..
   specs:
-    react_on_rails_pro (16.2.0.beta.20)
+    react_on_rails_pro (16.3.0)
       addressable
       async (>= 2.6)
       connection_pool
@@ -21,7 +21,7 @@ PATH
       httpx (~> 1.5)
       jwt (~> 2.7)
       rainbow
-      react_on_rails (= 16.2.0.beta.20)
+      react_on_rails (= 16.3.0)
 
 GEM
   remote: https://rubygems.org/
