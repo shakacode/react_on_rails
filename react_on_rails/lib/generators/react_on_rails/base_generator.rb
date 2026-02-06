@@ -302,11 +302,21 @@ module ReactOnRails
 
         puts Rainbow("🔧 Configuring Shakapacker for Rspack...").yellow
 
-        # Use gsub_file to preserve comments and file structure
-        # Replace assets_bundler: "webpack" with assets_bundler: "rspack"
-        gsub_file shakapacker_config_path,
-                  /^(\s*)assets_bundler:\s*["']?webpack["']?\s*$/,
-                  "\\1assets_bundler: \"rspack\""
+        # Use regex replacement to preserve file structure (comments, anchors, aliases)
+        # This replaces ALL occurrences of assets_bundler, not just in default section
+        # Using gsub_file (Thor method) for consistency with Rails generator patterns
+        gsub_file(
+          shakapacker_config_path,
+          /^(\s*assets_bundler:\s*)["']?webpack["']?(\s*(?:#.*)?)$/,
+          '\1rspack\2'
+        )
+
+        # Update javascript_transpiler to swc (rspack works best with SWC)
+        gsub_file(
+          shakapacker_config_path,
+          /^(\s*javascript_transpiler:\s*)["']?babel["']?(\s*(?:#.*)?)$/,
+          '\1swc\2'
+        )
 
         puts Rainbow("✅ Updated shakapacker.yml for Rspack").green
       end
