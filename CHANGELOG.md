@@ -2,6 +2,10 @@
 
 All notable changes to this project's source code will be documented in this file. Items under `Unreleased` is upcoming features that will be out in the next version.
 
+> **This is the unified changelog for both React on Rails (open source) and React on Rails Pro.**
+> Pro-specific changes appear under `#### Pro` sections within each release.
+> For pre-monorepo Pro history (versions 4.0.0-rc.15 and earlier), see the [archived Pro CHANGELOG](https://github.com/shakacode/react_on_rails_pro/blob/4.0.0/CHANGELOG.md).
+
 Migration instructions for the major updates can be found [here](https://www.shakacode.com/react-on-rails/docs/upgrading/upgrading-react-on-rails#upgrading-to-version-9). Some smaller migration information can be found here.
 
 ## Want to Save Time Updating?
@@ -240,7 +244,7 @@ To migrate to React on Rails Pro:
 
 #### Pro
 
-_Includes all features from the React on Rails Pro 4.0.0 release series (previously released as 4.0.0-rc.6 through 4.0.0-rc.15)._
+_Includes all features from the React on Rails Pro 4.0.0 release series (previously released as 4.0.0-rc.6 through 4.0.0-rc.15). For pre-monorepo Pro history, see the [archived Pro CHANGELOG](https://github.com/shakacode/react_on_rails_pro/blob/4.0.0/CHANGELOG.md)._
 
 ##### Breaking Changes
 
