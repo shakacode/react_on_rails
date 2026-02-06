@@ -27,7 +27,6 @@ Changes since the last non-beta release.
 
 #### Changed
 
-- **React on Rails Pro: Frictionless trial — no license required**. React on Rails Pro now runs without a license key, making it easy to try out Pro features with zero setup friction. Instead of crashing on startup, unlicensed apps display an HTML attribution comment (`<!-- Powered by React on Rails Pro (c) ShakaCode | UNLICENSED -->`) and log an informational message in development or a warning in production. Valid licenses show a `Licensed` comment with no warnings. The licensing system also now supports multiple plan types (paid, startup, nonprofit, education, oss, partner) with plan-aware attribution. [PR 2324](https://github.com/shakacode/react_on_rails/pull/2324) by [AbanoubGhadban](https://github.com/AbanoubGhadban), [PR 2334](https://github.com/shakacode/react_on_rails/pull/2334) by [justin808](https://github.com/justin808), [PR 2339](https://github.com/shakacode/react_on_rails/pull/2339) by [justin808](https://github.com/justin808).
 - **Simplified Shakapacker version handling**: Removed obsolete minimum version checks (6.5.1) and example generation pinning (8.2.0). The gemspec dependency `shakapacker >= 6.0` is now the only minimum version requirement, with autobundling requiring >= 7.0.0. [PR 2247](https://github.com/shakacode/react_on_rails/pull/2247) by [justin808](https://github.com/justin808).
 
 #### Fixed
@@ -1896,8 +1895,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/16.3.0...master
-[16.3.0]: https://github.com/shakacode/react_on_rails/compare/16.2.1...16.3.0
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...master
+[16.3.0]: https://github.com/shakacode/react_on_rails/compare/v16.2.1...v16.3.0
 [16.2.1]: https://github.com/shakacode/react_on_rails/compare/v16.2.0...v16.2.1
 [16.2.0]: https://github.com/shakacode/react_on_rails/compare/16.1.1...v16.2.0
 [16.1.1]: https://github.com/shakacode/react_on_rails/compare/16.1.0...16.1.1
