@@ -180,7 +180,7 @@ Now that you have React on Rails working, here's what to explore next:
 
 1. **[Complete Tutorial](../getting-started/tutorial.md)** - Build a full app with Redux
 2. **[Server-Side Rendering](../core-concepts/react-server-rendering.md)** - Optimize for SEO and performance
-3. **[Production Deployment](../deployment/deployment.md)** - Deploy to production
+3. **[Production Deployment](../deployment/README.md)** - Deploy to production
 
 ### Advanced Features
 

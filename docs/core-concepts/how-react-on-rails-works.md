@@ -36,7 +36,7 @@ On production deployments that use asset precompilation, such as Heroku deployme
 
 However, if you want to run a custom command to run Webpack to build your bundles, then you will:
 
-1. Define `config.build_production_command` in your [config/initializers/react_on_rails.rb](../configuration/configuration.md)
+1. Define `config.build_production_command` in your [config/initializers/react_on_rails.rb](../configuration/README.md)
 
 Then React on Rails modifies the `assets:precompile` task to run your `build_production_command`.
 
