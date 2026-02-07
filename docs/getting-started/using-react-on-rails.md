@@ -224,7 +224,7 @@ Now that you understand the core concepts, here are recommended paths forward:
 - **[React Router](../building-features/react-router.md)** - Client-side routing
 - **[Server-Side Rendering](../core-concepts/react-server-rendering.md)** - Deep dive into SSR
 - **[Internationalization](../building-features/i18n.md)** - Add i18n support
-- **[Testing](../building-features/rspec-configuration.md)** - Test your React components
+- **[Testing](../building-features/testing-configuration.md)** - Test your React components
 
 ### Deploy to Production
 

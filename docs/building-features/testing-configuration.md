@@ -1,4 +1,4 @@
-# Testing Configuration Guide
+# Testing Configuration
 
 This guide explains how to configure React on Rails for optimal testing with RSpec, Minitest, or other test frameworks.
 
@@ -33,6 +33,8 @@ test:
   public_output_path: webpack/test
 ```
 
+> **Note:** Ensure that `source_path` is correctly configured in your `config/shakapacker.yml`, or Shakapacker won't correctly detect source changes. This is only necessary if you're not using Shakapacker's defaults.
+
 **How it works:**
 
 - Shakapacker automatically compiles assets when they're requested
@@ -64,15 +66,24 @@ test:
 
 **Configuration:**
 
+Set your build command:
+
 ```ruby
 # config/initializers/react_on_rails.rb
 ReactOnRails.configure do |config|
-  config.build_test_command = "RAILS_ENV=test bin/shakapacker"
+  config.build_test_command = "NODE_ENV=test RAILS_ENV=test bin/shakapacker"
+
+  # Or use your project's package manager with a custom script:
+  # config.build_test_command = "pnpm run build:test"  # or: npm run build:test, yarn run build:test
 end
 ```
 
+Then configure your test framework:
+
+**RSpec:**
+
 ```ruby
-# spec/rails_helper.rb (for RSpec)
+# spec/rails_helper.rb
 require "react_on_rails/test_helper"
 
 RSpec.configure do |config|
@@ -81,19 +92,68 @@ RSpec.configure do |config|
 end
 ```
 
-```ruby
-# test/test_helper.rb (for Minitest)
-require "react_on_rails/test_helper"
+See [lib/react_on_rails/test_helper.rb](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails/lib/react_on_rails/test_helper.rb) for more details and customization options.
 
-class ActiveSupport::TestCase
-  # Ensures webpack assets are compiled before running tests
-  ReactOnRails::TestHelper.ensure_assets_compiled
+By default, the helper triggers compilation for examples tagged with `:js`, `:server_rendering`, or `:controller`. You can pass custom metatags as an optional second parameter if you need compilation for other specs — for example, if you use Webpack to build CSS assets for request and feature specs:
+
+```ruby
+# spec/rails_helper.rb
+RSpec.configure do |config|
+  ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config, :requires_webpack_assets)
+  config.define_derived_metadata(file_path: %r{spec/(features|requests)}) do |metadata|
+    metadata[:requires_webpack_assets] = true
+  end
 end
 ```
 
+**Minitest:**
+
+```ruby
+# test/test_helper.rb
+require "react_on_rails/test_helper"
+
+class ActiveSupport::TestCase
+  setup do
+    ReactOnRails::TestHelper.ensure_assets_compiled
+  end
+end
+```
+
+Alternatively, you can use a [Minitest plugin](https://github.com/seattlerb/minitest/blob/master/lib/minitest/test.rb#L119) to run the check in `before_setup`:
+
+```ruby
+module MyMinitestPlugin
+  def before_setup
+    super
+    ReactOnRails::TestHelper.ensure_assets_compiled
+  end
+end
+
+class Minitest::Test
+  include MyMinitestPlugin
+end
+```
+
+**Asset detection settings:**
+
+The following settings in `config/initializers/react_on_rails.rb` control how the test helper detects stale assets:
+
+```ruby
+ReactOnRails.configure do |config|
+  # Define the files to check for Webpack compilation when running tests.
+  config.webpack_generated_files = %w( manifest.json )
+
+  # If you're not hashing the server bundle, include it in the list:
+  # config.webpack_generated_files = %w( server-bundle.js manifest.json )
+end
+```
+
+> **Important:** The `build_test_command` **must not** include the `--watch` option. If you have separate server and client bundles, the command **must** build all of them.
+
 **How it works:**
 
-- Compiles assets once before the test suite starts
+- Compiles assets at most once per test run, and only when they're out of date (stale)
+- The helper checks the Webpack-generated files folder (configured via `public_root_path` and `public_output_path` in `config/shakapacker.yml`). If the folder is missing, empty, or contains files listed in `webpack_generated_files` with `mtime`s older than any source files, assets are recompiled.
 - Uses the `build_test_command` configuration
 - Fails fast if compilation has errors
 
@@ -117,11 +177,9 @@ end
 - You want explicit error handling for compilation failures
 - Your test suite is slow and you want to optimize compilation
 
-## ⚠️ Important: Don't Mix Approaches
+## Don't Mix Approaches
 
 **Do not use both approaches together.** They are mutually exclusive:
-
-❌ **Wrong:**
 
 ```yaml
 # config/shakapacker.yml
@@ -243,6 +301,18 @@ The doctor will check:
    - This shouldn't happen - assets should compile only once
    - Check that you don't also have `compile: true` in shakapacker.yml
 
+### Stale assets not recompiling
+
+**Problem:** You added a source file but the test helper doesn't trigger recompilation.
+
+**Cause:** The test helper compares `mtime`s of source files against generated output files. If you add a source file that has an older timestamp than the existing output (e.g., copied from another directory or restored from version control), it won't be detected as a change.
+
+**Solution:** Clear out your Webpack-generated files directory to force recompilation:
+
+```bash
+rm -rf public/webpack/test
+```
+
 ### Build command fails
 
 **Problem:** `build_test_command` fails with errors.
@@ -296,6 +366,23 @@ end
 - Blocks test start until compilation complete
 - Good for: Large test suites, complex webpack configs
 
+### Faster Development with Watch Mode
+
+If you're using the React on Rails test helper and want to avoid waiting for compilation on each test run, run your build command with the `--watch` flag in a separate terminal:
+
+```bash
+RAILS_ENV=test bin/shakapacker --watch
+
+# Or with your package manager:
+# pnpm run build:test --watch
+# npm run build:test -- --watch
+# yarn run build:test --watch
+```
+
+This keeps webpack running and recompiling automatically when files change, so your tests start faster.
+
+> **Note:** The `--watch` flag should only be used in a separate terminal process — never include it in `build_test_command`, which must exit after compilation.
+
 ### Caching Strategies
 
 Improve compilation speed with caching:
@@ -304,12 +391,6 @@ Improve compilation speed with caching:
 # config/shakapacker.yml
 test:
   cache_manifest: true # Cache manifest between runs
-```
-
-```ruby
-# config/initializers/react_on_rails.rb
-# If using test helper, webpack will use its own caching
-config.build_test_command = "RAILS_ENV=test bin/shakapacker"
 ```
 
 ### Parallel Testing
@@ -387,8 +468,7 @@ When running tests in Docker, consider:
 
 - [Configuration Reference](../configuration/configuration.md#build_test_command)
 - [Shakapacker Configuration](https://github.com/shakacode/shakapacker#configuration)
-- [RSpec Configuration](../building-features/rspec-configuration.md)
-- [Minitest Configuration](../building-features/minitest-configuration.md)
+- [TestHelper Source Code](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails/lib/react_on_rails/test_helper.rb)
 
 ## Need Help?
 
