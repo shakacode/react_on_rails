@@ -415,7 +415,7 @@ end
 - Requires additional setup in spec helpers
 - More configuration to maintain
 
-For more details on testing configuration, see the [Testing Configuration Guide](../guides/testing-configuration.md).
+For more details on testing configuration, see the [Testing Configuration Guide](../building-features/testing-configuration.md).
 
 ## File-Based Component Registry
 
