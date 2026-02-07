@@ -260,8 +260,6 @@ end
 
 **Note:** This workaround is not recommended for production. Upgrade to 16.2.0+ for the proper fix.
 
-<!-- TODO: Remove this section once llms.txt is implemented (shakacode/sc-website#451) -->
-
 ## For Coding Agents
 
 ### Automated Diagnostics
