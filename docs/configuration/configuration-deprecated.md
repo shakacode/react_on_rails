@@ -2,7 +2,7 @@
 
 This document lists configuration options that have been deprecated or removed from React on Rails.
 
-For current configuration options, see [configuration.md](README.md).
+For current configuration options, see [Configuration](README.md).
 
 ## Removed Options
 
