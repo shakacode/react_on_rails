@@ -30,7 +30,6 @@ The `docs/` directory is published to the [ShakaCode website](https://www.shakac
 | API/config reference | `docs/api-reference/` |
 | Deployment & troubleshooting | `docs/deployment/` |
 | Migration guides | `docs/migrating/` |
-| General user guides | `docs/guides/` |
 | Upgrade notes & release notes | `docs/upgrading/` |
 | Internal/contributor docs (NOT published) | `docs/contributor-info/` |
 | Miscellaneous | `docs/misc/` |

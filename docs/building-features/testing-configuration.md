@@ -71,7 +71,10 @@ Set your build command:
 ```ruby
 # config/initializers/react_on_rails.rb
 ReactOnRails.configure do |config|
-  config.build_test_command = "RAILS_ENV=test bin/shakapacker"
+  config.build_test_command = "NODE_ENV=test RAILS_ENV=test bin/shakapacker"
+
+  # Or use your project's package manager with a custom script:
+  # config.build_test_command = "pnpm run build:test"  # or: npm run build:test, yarn run build:test
 end
 ```
 
@@ -88,6 +91,8 @@ RSpec.configure do |config|
   ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
 end
 ```
+
+See [lib/react_on_rails/test_helper.rb](https://github.com/shakacode/react_on_rails/tree/master/react_on_rails/lib/react_on_rails/test_helper.rb) for more details and customization options.
 
 By default, the helper triggers compilation for examples tagged with `:js`, `:server_rendering`, or `:controller`. You can pass custom metatags as an optional second parameter if you need compilation for other specs — for example, if you use Webpack to build CSS assets for request and feature specs:
 
@@ -114,7 +119,7 @@ class ActiveSupport::TestCase
 end
 ```
 
-Alternatively, you can use a Minitest plugin to run the check in `before_setup`:
+Alternatively, you can use a [Minitest plugin](https://github.com/seattlerb/minitest/blob/master/lib/minitest/test.rb#L119) to run the check in `before_setup`:
 
 ```ruby
 module MyMinitestPlugin
@@ -140,9 +145,6 @@ ReactOnRails.configure do |config|
 
   # If you're not hashing the server bundle, include it in the list:
   # config.webpack_generated_files = %w( server-bundle.js manifest.json )
-
-  # The command used to compile assets (must not include --watch):
-  config.build_test_command = "RAILS_ENV=test bin/shakapacker"
 end
 ```
 
@@ -370,6 +372,11 @@ If you're using the React on Rails test helper and want to avoid waiting for com
 
 ```bash
 RAILS_ENV=test bin/shakapacker --watch
+
+# Or with your package manager:
+# pnpm run build:test --watch
+# npm run build:test -- --watch
+# yarn run build:test --watch
 ```
 
 This keeps webpack running and recompiling automatically when files change, so your tests start faster.
@@ -461,6 +468,7 @@ When running tests in Docker, consider:
 
 - [Configuration Reference](../configuration/configuration.md#build_test_command)
 - [Shakapacker Configuration](https://github.com/shakacode/shakapacker#configuration)
+- [TestHelper Source Code](https://github.com/shakacode/react_on_rails/tree/master/react_on_rails/lib/react_on_rails/test_helper.rb)
 
 ## Need Help?
 
