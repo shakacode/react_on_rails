@@ -63,7 +63,7 @@ React on Rails is configured in `config/initializers/react_on_rails.rb`:
 - Logging options
 - Auto-bundling settings
 
-For complete configuration options, see the [Configuration Reference](../configuration/configuration.md).
+For complete configuration options, see the [Configuration Reference](../configuration/README.md).
 
 For all view helper options (props, HTML options, tracing, etc.), see the [View Helpers API](../api-reference/view-helpers-api.md).
 
@@ -228,7 +228,7 @@ Now that you understand the core concepts, here are recommended paths forward:
 
 ### Deploy to Production
 
-- **[Deployment Guide](../deployment/deployment.md)** - Production deployment strategies
+- **[Deployment Guide](../deployment/README.md)** - Production deployment strategies
 - **[Heroku Deployment](../deployment/heroku-deployment.md)** - Deploy to Heroku
 - **[Troubleshooting](../deployment/troubleshooting.md)** - Common deployment issues
 
@@ -241,7 +241,7 @@ Now that you understand the core concepts, here are recommended paths forward:
 
 - **[View Helpers API](../api-reference/view-helpers-api.md)** - Complete `react_component` options
 - **[JavaScript API](../api-reference/javascript-api.md)** - ReactOnRails JavaScript methods
-- **[Configuration](../configuration/configuration.md)** - All configuration options
+- **[Configuration](../configuration/README.md)** - All configuration options
 
 ---
 

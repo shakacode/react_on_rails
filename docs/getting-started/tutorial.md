@@ -161,7 +161,7 @@ Now that you have React on Rails working locally, you're ready to deploy to prod
 For detailed deployment instructions, see:
 
 - **[Heroku Deployment Guide](../deployment/heroku-deployment.md)** - Step-by-step Heroku deployment
-- **[General Deployment Guide](../deployment/deployment.md)** - Production deployment strategies for any platform
+- **[General Deployment Guide](../deployment/README.md)** - Production deployment strategies for any platform
 
 These guides cover:
 
