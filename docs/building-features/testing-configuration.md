@@ -153,7 +153,7 @@ end
 **How it works:**
 
 - Compiles assets at most once per test run, and only when they're out of date (stale)
-- The helper checks the Webpack generated files folder (configured via `public_root_path` and `public_output_path` in `config/shakapacker.yml`). If the folder is missing, empty, or contains files listed in `webpack_generated_files` with `mtime`s older than any source files, assets are recompiled.
+- The helper checks the Webpack-generated files folder (configured via `public_root_path` and `public_output_path` in `config/shakapacker.yml`). If the folder is missing, empty, or contains files listed in `webpack_generated_files` with `mtime`s older than any source files, assets are recompiled.
 - Uses the `build_test_command` configuration
 - Fails fast if compilation has errors
 
@@ -307,7 +307,7 @@ The doctor will check:
 
 **Cause:** The test helper compares `mtime`s of source files against generated output files. If you add a source file that has an older timestamp than the existing output (e.g., copied from another directory or restored from version control), it won't be detected as a change.
 
-**Solution:** Clear out your Webpack generated files directory to force recompilation:
+**Solution:** Clear out your Webpack-generated files directory to force recompilation:
 
 ```bash
 rm -rf public/webpack/test
