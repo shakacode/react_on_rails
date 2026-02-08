@@ -7,6 +7,10 @@ inputs:
   previous-sha:
     description: 'SHA of the previous commit on master (github.event.before)'
     required: true
+  exclude-workflows:
+    description: 'Comma-separated workflow names to exclude from failure checks (e.g., "Benchmark Workflow")'
+    required: false
+    default: 'Benchmark Workflow'
 runs:
   using: composite
   steps:
@@ -15,9 +19,19 @@ runs:
       uses: actions/github-script@v7
       env:
         PREVIOUS_SHA: ${{ inputs.previous-sha }}
+        EXCLUDE_WORKFLOWS: ${{ inputs.exclude-workflows }}
       with:
         script: |
           const previousSha = process.env.PREVIOUS_SHA;
+
+          // Parse excluded workflow names (comma-separated, trimmed)
+          const excludeWorkflows = (process.env.EXCLUDE_WORKFLOWS || '')
+            .split(',')
+            .map(s => s.trim())
+            .filter(Boolean);
+          if (excludeWorkflows.length > 0) {
+            core.info(`Excluding workflows from failure checks: ${excludeWorkflows.join(', ')}`);
+          }
 
           // Query workflow runs from the last 7 days to avoid excessive API calls.
           // Why 7 days? This balances API efficiency with practical needs:
@@ -79,6 +93,16 @@ runs:
             const existing = latestByWorkflow.get(run.workflow_id);
             if (!existing || run.run_number > existing.run_number) {
               latestByWorkflow.set(run.workflow_id, run);
+            }
+          }
+
+          // Filter out excluded workflows (e.g., benchmarks that aren't CI quality gates)
+          if (excludeWorkflows.length > 0) {
+            for (const [workflowId, run] of latestByWorkflow) {
+              if (excludeWorkflows.includes(run.name)) {
+                core.info(`Excluding workflow "${run.name}" from failure checks (not a CI quality gate).`);
+                latestByWorkflow.delete(workflowId);
+              }
             }
           }
 
