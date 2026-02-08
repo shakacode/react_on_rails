@@ -4,6 +4,18 @@ Instructions for AI coding agents working on the React on Rails codebase.
 
 React on Rails is a Ruby gem + npm package that integrates React with Ruby on Rails, providing server-side rendering (SSR) via Node.js or ExecJS. This is a monorepo: the open-source gem lives at `react_on_rails/`, the npm package at `packages/react-on-rails/`, and the Pro package at `react_on_rails_pro/`.
 
+## Canonical Agent Policy
+
+`AGENTS.md` is the canonical source for repository-wide agent rules:
+
+- Commands and test/lint workflow
+- Code style and formatting expectations
+- Git/PR boundaries and safety rules
+- Directory and documentation boundaries
+
+Other agent-facing docs (for example `CLAUDE.md`) should contain only tool-specific workflow notes and link back here.
+If there is a conflict, `AGENTS.md` wins.
+
 ## Commands
 
 ```bash
@@ -30,10 +42,24 @@ rake                                 # Full suite (lint + all tests except examp
 # Type checking
 pnpm run type-check                  # TypeScript
 bundle exec rake rbs:validate        # RBS signatures
+
+# Additional test subsets
+rake run_rspec                       # All Ruby tests
+rake all_but_examples                # All tests except generated examples
+rake run_rspec:shakapacker_examples_basic  # Single example test
+
+# Full initial setup
+bundle && pnpm install && rake shakapacker_examples:gen_all && rake node_package && rake
+
+# CI/workflow linting
+actionlint                           # GitHub Actions lint
+yamllint .github/                    # YAML lint (do NOT run RuboCop on .yml files)
 ```
 
 ## Testing
 
+- **Prefer local testing over CI iteration** — don't push "hopeful" fixes. Apply the **15-minute rule**: if 15 more minutes of local testing would catch the issue before CI does, spend the 15 minutes.
+- **Never claim a test is "fixed" without running it locally first.** Use "This SHOULD fix..." or "Proposed fix (UNTESTED)" for unverified changes.
 - **Ruby**: RSpec. Unit tests in `react_on_rails/spec/react_on_rails/`, integration tests via a dummy Rails app in `react_on_rails/spec/dummy/`.
 - **JavaScript/TypeScript**: Jest. Tests in `packages/react-on-rails/tests/`.
 - **E2E**: Playwright. Tests in `react_on_rails/spec/dummy/e2e/playwright/e2e/`. Run with `cd react_on_rails/spec/dummy && pnpm test:e2e`.
@@ -60,6 +86,7 @@ cd react_on_rails/spec/dummy && bundle exec rspec spec/path/to/spec.rb
 | `rakelib/`                           | Rake task definitions                                                                                   |
 | `docs/`                              | Published to the [ShakaCode website](https://www.shakacode.com/react-on-rails/docs/) — user-facing only |
 | `docs/contributor-info/`             | Internal contributor docs (excluded from website)                                                       |
+| `analysis/`                          | Investigation and analysis documents (kebab-case `.md` files)                                           |
 
 ## Code Style
 
@@ -130,5 +157,12 @@ Prettier handles all formatting. Never manually format — run `rake autofix` in
 - Skip pre-commit hooks (`--no-verify`)
 - Commit secrets, credentials, or `.env` files
 - Commit `package-lock.json`, `yarn.lock`, or other non-pnpm lock files
-- Add files to the `docs/` root — they must go in a subdirectory (see table in Project Structure)
+- Add files to the `docs/` root — they must go in a subdirectory (`getting-started/`, `core-concepts/`, `building-features/`, `api-reference/`, `deployment/`, `migrating/`, `upgrading/`, `contributor-info/`, `misc/`)
 - Force push to `main` or `master`
+
+## Changelog
+
+Update `/CHANGELOG.md` for **user-visible changes only** (features, bug fixes, breaking changes, deprecations, performance improvements). Do **not** add entries for linting, formatting, refactoring, tests, or doc fixes.
+
+- **Format**: `[PR 1818](https://github.com/shakacode/react_on_rails/pull/1818) by [username](https://github.com/username)` (no hash before PR number)
+- **Pro-only changes** go in `/CHANGELOG_PRO.md`; changes affecting both go in **both** changelogs
