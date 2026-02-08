@@ -59,6 +59,12 @@ on:
     paths-ignore:
       - '**.md'
       - 'docs/**'
+# Cancel stale PR benchmark runs when new commits are pushed.
+# Master runs are never cancelled so every merge is measured.
+concurrency:
+  group: benchmark-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   RUBY_VERSION: '3.3.7'
   BUNDLER_VERSION: '2.5.4'
@@ -83,15 +89,16 @@ env:
 
 jobs:
   benchmark:
-    # Run on: push to master, workflow_dispatch, or PRs with 'full-ci' or 'benchmark' labels
+    # Run on: push to master, workflow_dispatch, or PRs with 'benchmark' label.
+    # The 'full-ci' label is intentionally excluded — it controls test workflows,
+    # not benchmarks. Use the dedicated 'benchmark' label to trigger perf runs on PRs.
     # See https://bencher.dev/docs/how-to/github-actions/#pull-requests for the extra pull_request condition
     if: |
       github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch' ||
       (
         github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository &&
-        (contains(github.event.pull_request.labels.*.name, 'full-ci') ||
-         contains(github.event.pull_request.labels.*.name, 'benchmark'))
+        contains(github.event.pull_request.labels.*.name, 'benchmark')
       )
     runs-on: ubuntu-latest
     permissions:
@@ -653,8 +660,101 @@ jobs:
             echo "✅ No alerts - no Bencher report to post"
           fi
 
-          # Exit with bencher's exit code to fail workflow if there was an alert
-          exit $BENCHER_EXIT_CODE
+          # Export exit code for downstream steps — don't exit yet so alerting can run
+          echo "BENCHER_EXIT_CODE=$BENCHER_EXIT_CODE" >> "$GITHUB_ENV"
+
+      # ============================================
+      # STEP 7b: ALERT ON MASTER REGRESSION
+      # ============================================
+      - name: Create GitHub Issue for master regression
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master' && env.BENCHER_EXIT_CODE != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          LABEL="performance-regression"
+          COMMIT_SHA="${{ github.sha }}"
+          COMMIT_SHORT="${COMMIT_SHA:0:7}"
+          COMMIT_URL="${{ github.server_url }}/${{ github.repository }}/commit/${COMMIT_SHA}"
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          BENCHER_URL="https://bencher.dev/perf/react-on-rails-t8a9ncxo"
+          ACTOR="${{ github.actor }}"
+
+          # Ensure the label exists (idempotent)
+          gh label create "$LABEL" \
+            --description "Automated: benchmark regression detected on master" \
+            --color "D93F0B" \
+            --force 2>/dev/null || true
+
+          # Check for an existing open issue to avoid duplicates
+          EXISTING_ISSUE=$(gh issue list \
+            --label "$LABEL" \
+            --state open \
+            --limit 1 \
+            --json number \
+            --jq '.[0].number // empty')
+
+          # Build the benchmark summary snippet
+          SUMMARY=""
+          if [ -f bench_results/summary.txt ]; then
+            SUMMARY=$(printf '\n### Benchmark Summary\n\n```\n%s\n```' "$(column -t -s $'\t' bench_results/summary.txt)")
+          fi
+
+          if [ -n "$EXISTING_ISSUE" ]; then
+            echo "Open regression issue already exists: #${EXISTING_ISSUE} — adding comment"
+
+            gh issue comment "$EXISTING_ISSUE" --body "$(cat <<EOF
+          ## New regression detected
+
+          **Commit:** [\`${COMMIT_SHORT}\`](${COMMIT_URL}) by @${ACTOR}
+          **Workflow run:** [Run #${{ github.run_number }}](${RUN_URL})
+          ${SUMMARY}
+
+          > View the full Bencher report in the [workflow run summary](${RUN_URL}) or on the [Bencher dashboard](${BENCHER_URL}).
+          EOF
+          )"
+          else
+            echo "No open regression issue found — creating one"
+
+            gh issue create \
+              --title "Performance Regression Detected on master (${COMMIT_SHORT})" \
+              --label "$LABEL" \
+              --body "$(cat <<EOF
+          ## Performance Regression Detected on master
+
+          A statistically significant performance regression was detected by
+          [Bencher](${BENCHER_URL}) using a Student's t-test (95% confidence
+          interval, up to 64 sample history).
+
+          | Detail | Value |
+          |--------|-------|
+          | **Commit** | [\`${COMMIT_SHORT}\`](${COMMIT_URL}) |
+          | **Pushed by** | @${ACTOR} |
+          | **Workflow run** | [Run #${{ github.run_number }}](${RUN_URL}) |
+          | **Bencher dashboard** | [View history](${BENCHER_URL}) |
+          ${SUMMARY}
+
+          ### What to do
+
+          1. Check the [workflow run](${RUN_URL}) for the full Bencher HTML report
+          2. Review the [Bencher dashboard](${BENCHER_URL}) to see which metrics regressed
+          3. Investigate the commit — expected trade-off or unintended regression?
+          4. If unintended, open a fix PR and reference this issue
+          5. Close this issue once resolved — subsequent regressions will open a new one
+
+          ---
+          *This issue was created automatically by the benchmark CI workflow.*
+          EOF
+          )"
+          fi
+
+      # ============================================
+      # STEP 7c: FAIL WORKFLOW ON REGRESSION
+      # ============================================
+      - name: Fail workflow if Bencher detected regression
+        if: env.BENCHER_EXIT_CODE != '0'
+        run: |
+          echo "Bencher detected a regression (exit code: $BENCHER_EXIT_CODE)"
+          exit "$BENCHER_EXIT_CODE"
 
       # ============================================
       # STEP 8: WORKFLOW COMPLETION
