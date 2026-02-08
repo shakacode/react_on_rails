@@ -501,6 +501,45 @@ Once generated, all server entrypoints will be imported into a file named `[Reac
 > [!IMPORTANT]
 > When specifying separate definitions for client and server rendering, you need to delete the generalized `ComponentName.jsx` file.
 
+### Transpiled Languages (ReScript, Reason, etc.)
+
+Components compiled by transpiled languages like ReScript produce output files with extensions that include the transpiler identifier (e.g., `.bs.js`, `.res.js`). Auto-bundling discovers these files because they end in `.js`, but it extracts the component name from the full extension — so `MyComponent.bs.js` becomes `MyComponent.bs` instead of `MyComponent`.
+
+#### Symptoms
+
+If you see errors like:
+
+- `Could not find component registered with name MyComponent.bs`
+- Component renders as `MyComponent.bs` instead of `MyComponent` in error messages
+
+Then you likely need the wrapper pattern described below.
+
+#### Solution: Wrapper File
+
+The simplest solution is a thin wrapper file in your `ror_components` directory:
+
+```text
+app/javascript/src/Comments/
+├── ReScriptShow.bs.js          # ReScript compiler output
+└── ror_components/
+    └── ReScriptShow.jsx        # Wrapper for auto-registration
+```
+
+```jsx
+// app/javascript/src/Comments/ror_components/ReScriptShow.jsx
+import ReScriptShow from '../ReScriptShow.bs.js';
+export default ReScriptShow;
+```
+
+This pattern works for any transpiled language and requires no gem configuration changes. The wrapper file can use `.js`, `.jsx`, `.ts`, or `.tsx` depending on your project setup.
+
+> [!NOTE]
+> While it's possible to add gem-level configuration for additional extensions, the wrapper-file pattern is recommended because it:
+>
+> - Works immediately with no configuration changes
+> - Makes the component registration explicit and visible in the file tree
+> - Avoids coupling your build pipeline to gem internals that may change between versions
+
 ### Using Automated Bundle Generation Feature with already defined packs
 
 As of version 13.3.4, bundles inside directories that match `config.components_subdirectory` will be automatically added as entrypoints, while bundles outside those directories need to be manually added to the `Shakapacker.config.source_entry_path` or Webpack's `entry` rules.
@@ -519,6 +558,7 @@ As of version 13.3.4, bundles inside directories that match `config.components_s
 - Run `rake react_on_rails:generate_packs` to generate the component bundles
 - Check that your component exports a default export: `export default MyComponent;`
 - Verify the component name matches the directory structure
+- If using a transpiled language (ReScript, Reason, etc.), see [Transpiled Languages](#transpiled-languages-rescript-reason-etc) — files like `MyComponent.bs.js` register as `MyComponent.bs` instead of `MyComponent`
 
 #### 2. CSS not loading (FOUC - Flash of Unstyled Content)
 
