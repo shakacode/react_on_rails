@@ -8,6 +8,7 @@
     "packages/react-on-rails",
     "packages/react-on-rails-pro",
     "packages/react-on-rails-pro-node-renderer",
+    "packages/create-react-on-rails-app",
     "react_on_rails/spec/dummy",
     "react_on_rails_pro/spec/dummy",
     "react_on_rails_pro/spec/execjs-compatible-dummy"
@@ -79,7 +80,7 @@
     "clean": "pnpm -r run clean",
     "start": "nps",
     "nps": "nps",
-    "build": "pnpm --filter react-on-rails run build && pnpm --filter react-on-rails-pro run build && pnpm --filter react-on-rails-pro-node-renderer run build",
+    "build": "pnpm --filter react-on-rails run build && pnpm --filter react-on-rails-pro run build && pnpm --filter react-on-rails-pro-node-renderer run build && pnpm --filter create-react-on-rails-app run build",
     "build-for-size-limit": "cp /tmp/.size-limit-with-limits.json .size-limit.json && pnpm build",
     "build-watch": "pnpm -r run build-watch",
     "lint": "nps eslint",

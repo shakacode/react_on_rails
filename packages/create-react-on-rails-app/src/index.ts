@@ -1,0 +1,94 @@
+import fs from 'fs';
+import path from 'path';
+import { Command } from 'commander';
+import chalk from 'chalk';
+import { CliOptions } from './types.js';
+import { validateAll } from './validators.js';
+import { createApp, validateAppName } from './create-app.js';
+import { detectPackageManager, logError, logInfo } from './utils.js';
+
+const packageJsonPath = path.resolve(__dirname, '../package.json');
+const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8')) as { version: string };
+
+function run(appName: string, rawOpts: Record<string, unknown>): void {
+  const template = rawOpts.template as string;
+  if (template !== 'javascript' && template !== 'typescript') {
+    logError(`Invalid template "${template}". Must be "javascript" or "typescript".`);
+    process.exit(1);
+  }
+
+  let packageManager = rawOpts.packageManager as string | undefined;
+  if (packageManager) {
+    if (packageManager !== 'npm' && packageManager !== 'pnpm') {
+      logError(`Invalid package manager "${packageManager}". Must be "npm" or "pnpm".`);
+      process.exit(1);
+    }
+  } else {
+    packageManager = detectPackageManager() ?? 'npm';
+  }
+
+  const options: CliOptions = {
+    template,
+    packageManager: packageManager as 'npm' | 'pnpm',
+    skipInstall: rawOpts.skipInstall as boolean,
+  };
+
+  console.log('');
+  console.log(`${chalk.bold('create-react-on-rails-app')} v${packageJson.version}`);
+  console.log('');
+
+  const nameValidation = validateAppName(appName);
+  if (!nameValidation.success) {
+    logError(nameValidation.error ?? 'Invalid app name');
+    process.exit(1);
+  }
+
+  logInfo('Checking prerequisites...');
+  const { allValid, results } = validateAll(options.packageManager);
+
+  for (const { name, result } of results) {
+    if (result.valid) {
+      console.log(chalk.green(`  ✓ ${name}: ${result.message}`));
+    } else {
+      console.log(chalk.red(`  ✗ ${name}`));
+    }
+  }
+
+  if (!allValid) {
+    console.log('');
+    for (const { result } of results) {
+      if (!result.valid) {
+        logError(result.message);
+      }
+    }
+    process.exit(1);
+  }
+
+  console.log('');
+  logInfo(
+    `Creating "${appName}" with template: ${options.template}, package manager: ${options.packageManager}`,
+  );
+
+  createApp(appName, options);
+}
+
+const program = new Command();
+
+program
+  .name('create-react-on-rails-app')
+  .description('Create a new React on Rails application')
+  .version(packageJson.version)
+  .argument('<app-name>', 'Name of the application to create')
+  .option('--template <type>', 'Template to use (javascript or typescript)', 'javascript')
+  .option('--package-manager <pm>', 'Package manager to use (npm or pnpm)')
+  .option('--skip-install', 'Skip installing dependencies', false)
+  .action((appName: string, opts: Record<string, unknown>) => {
+    try {
+      run(appName, opts);
+    } catch (error) {
+      logError(error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    }
+  });
+
+program.parse();
