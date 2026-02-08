@@ -45,6 +45,8 @@ describe "Critical styles for FOUC prevention", :rack_test do
   it "renders critical inline styles before the stylesheet bundle" do
     html = page.html
     critical_pos = html.index("data-critical-styles")
+    expect(critical_pos).not_to be_nil, "Expected critical styles <style> tag in the HTML"
+
     # stylesheet_pack_tag may not emit a link when CSS is inlined via webpack style-loader
     stylesheet_pos = html.index("client-bundle.css")
     skip "client-bundle.css not found in HTML (CSS may be inlined via style-loader)" unless stylesheet_pos
