@@ -323,6 +323,51 @@ To migrate to React on Rails Pro:
    import ReactOnRails from 'react-on-rails-pro';
 ```
 
+## Beta Release Changelog Curation
+
+When consolidating beta versions into a stable release, carefully curate entries to include only user-facing changes:
+
+**Remove these types of entries:**
+
+1. **Developer-only tooling**:
+   - yalc publish fixes (local development tool)
+   - Git dependency support (contributor workflow)
+   - CI/build script improvements
+   - Internal tooling changes
+
+2. **Beta-specific fixes**:
+   - Bugs introduced during the beta cycle (not present in last stable)
+   - Fixes for new beta-only features (e.g., bin/dev in 16.2.0.beta)
+   - Generator handling of beta/RC version formats
+
+3. **Pro-specific features** (move to Pro changelog):
+   - Node renderer fixes/improvements
+   - Streaming-related changes
+   - Async loading features (Pro-exclusive)
+
+**Keep these types of entries:**
+
+1. **User-facing fixes**:
+   - Bugs that existed in previous stable release (e.g., 16.1.x)
+   - Compatibility fixes (Rails version support, etc.)
+   - Performance improvements affecting all users
+
+2. **Breaking changes**:
+   - API changes requiring migration
+   - Removed methods/features
+   - Configuration changes
+
+**Investigation process:**
+
+For each suspicious entry:
+
+1. Check git history: `git log --oneline <last_stable>..<current_beta> -- <file>`
+2. Determine when bug was introduced (stable vs beta cycle)
+3. Verify whether fix applies to stable users or only beta users
+4. Check PR description for context about what was broken
+
+**Example reference:** See [PR #2072](https://github.com/shakacode/react_on_rails/pull/2072) for a complete example of beta changelog curation with detailed investigation notes.
+
 ## Additional Notes
 
 - Keep descriptions concise but informative
