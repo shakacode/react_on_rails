@@ -12,7 +12,7 @@ Having issues with React on Rails? This guide covers the most common problems an
 | **Compilation**      | Webpack errors, build failures              | [Build Issues](#-build-issues)                               |
 | **Runtime**          | Components not rendering, JavaScript errors | [Runtime Issues](#-runtime-issues)                           |
 | **CSS Modules**      | Styles undefined, SSR CSS crashes           | [CSS Modules Issues](#-css-modules-issues)                   |
-| **Styling (FOUC)**   | Unstyled content flash with SSR             | [Flash of Unstyled Content](#flash-of-unstyled-content-fouc) |
+| **Styling (FOUC)**   | Unstyled content flash, layout jumps        | [Flash of Unstyled Content](#flash-of-unstyled-content-fouc) |
 | **Server Rendering** | SSR not working, hydration mismatches       | [SSR Issues](#-server-side-rendering-issues)                 |
 | **Performance**      | Slow builds, large bundles, memory issues   | [Performance Issues](#-performance-issues)                   |
 
@@ -168,6 +168,10 @@ useEffect(() => {
 
 ### "Flash of Unstyled Content (FOUC)"
 
+There are two common causes of FOUC in React on Rails applications:
+
+#### Type 1: SSR with `auto_load_bundle`
+
 **Symptoms:** Page briefly shows unstyled content before CSS loads, particularly with SSR and `auto_load_bundle`
 
 **Root Cause:** When using `auto_load_bundle = true` with server-side rendering, `react_component` calls trigger `append_stylesheet_pack_tag` during body rendering, but these appends must execute BEFORE the `stylesheet_pack_tag` in the `<head>`.
@@ -192,6 +196,83 @@ useEffect(() => {
 </body>
 </html>
 ```
+
+#### Type 2: Tailwind/Utility-First CSS Frameworks
+
+**Symptoms:** Layout appears broken or jumps on initial page load—sidebars collapse, flex containers stack vertically, backgrounds are white instead of colored.
+
+**Root Cause:** When using Tailwind CSS (or similar utility-first frameworks), your layout HTML contains CSS classes like `flex`, `h-screen`, `bg-slate-100` that have no effect until the CSS bundle loads. The browser renders the raw HTML structure without any styling.
+
+**Example of problematic layout:**
+
+```erb
+<!-- These classes do nothing until Tailwind CSS loads -->
+<div class="flex flex-row h-screen w-screen">
+  <div class="flex flex-col bg-slate-100 min-w-[400px]">
+    <!-- sidebar -->
+  </div>
+  <div class="flex-1 overflow-y-auto">
+    <!-- main content -->
+  </div>
+</div>
+```
+
+**Solution:** Inline critical CSS for layout-affecting properties in the `<head>` before your main stylesheet loads. Use stable semantic selectors (not Tailwind utility class names) so the critical CSS doesn't drift when you add or remove utility classes.
+
+**Step 1:** Add semantic classes to your layout's structural elements (alongside existing Tailwind classes):
+
+```erb
+<body class="app-body bg-white">
+<div class="app-shell flex flex-row h-screen w-screen">
+  <div class="app-sidebar flex flex-col overflow-y-auto p-5 bg-slate-100 ...">
+    <!-- sidebar content -->
+  </div>
+  <div class="app-main flex-1 overflow-x-hidden overflow-y-auto">
+    <div class="app-main-content p-5">
+      <!-- main content -->
+    </div>
+  </div>
+</div>
+```
+
+**Step 2:** Create a critical styles partial (e.g., `app/views/layouts/_critical_styles.html.erb`) targeting those semantic selectors:
+
+```erb
+<%#
+  Critical CSS for preventing FOUC. Uses semantic selectors so it doesn't
+  need to change when Tailwind utility classes are added or removed.
+  Only update when the fundamental layout structure changes.
+%>
+<style data-critical-styles>
+  .app-body { background-color: #fff; }
+  .app-shell { display: flex; flex-direction: row; height: 100vh; width: 100vw; }
+  .app-sidebar {
+    display: flex; flex-direction: column; overflow-y: auto; padding: 1.25rem;
+    background-color: #f1f5f9; border-style: solid;
+    border-right-width: 2px; border-color: #334155;
+    min-width: 400px; max-width: 400px;
+  }
+  .app-main { flex: 1 1 0%; overflow-x: hidden; overflow-y: auto; }
+  .app-main-content { padding: 1.25rem; }
+</style>
+```
+
+**Step 3:** Include it in your layout's `<head>` before the stylesheet:
+
+```erb
+<head>
+  <%= render "layouts/critical_styles" %>
+  <%= stylesheet_pack_tag('application', media: 'all') %>
+</head>
+```
+
+**Guidelines for critical CSS:**
+
+- **Use semantic selectors** - `.app-shell`, `.app-sidebar`, etc. instead of mirroring Tailwind class names
+- **Keep it minimal** - Only define the layout shell (not component styles)
+- **Focus on layout-affecting properties** - `display`, `flex`, `width`, `height`, `position`
+- **Include visible defaults** - Background colors and borders that prevent jarring changes
+- **Add `data-critical-styles`** - Makes it easy to test that critical styles appear before the bundle
 
 ## 🎨 CSS Modules Issues
 

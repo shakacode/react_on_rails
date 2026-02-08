@@ -616,6 +616,8 @@ config.auto_load_bundle = false
 
 **Note**: HMR-related FOUC in development mode (dynamic CSS injection) is separate from this SSR auto-loading issue. See Shakapacker docs for details.
 
+**Note**: If you're using Tailwind CSS or another utility-first framework and see layout jumps (sidebars collapsing, flex containers stacking), you may need to inline critical CSS. See [Tailwind/Utility-First CSS FOUC](../deployment/troubleshooting.md#type-2-tailwindutility-first-css-frameworks) for the solution.
+
 #### 3. "document is not defined" errors during SSR
 
 **Problem**: Server-side rendering fails with browser-only API access.

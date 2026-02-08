@@ -27,6 +27,35 @@ shared_examples "React Component" do |dom_selector|
   end
 end
 
+describe "Critical styles for FOUC prevention", :rack_test do
+  before { visit root_path }
+
+  it "renders critical inline styles in the head" do
+    html = page.html
+    critical_pos = html.index("data-critical-styles")
+    expect(critical_pos).not_to be_nil, "Expected critical styles <style> tag in the HTML"
+
+    # Verify critical styles appear in <head> (before <body>)
+    body_pos = html.index("<body")
+    expect(body_pos).not_to be_nil, "Expected <body> tag in the HTML"
+    expect(critical_pos).to be < body_pos,
+                            "Critical styles must appear in <head> before <body>"
+  end
+
+  it "renders critical inline styles before the stylesheet bundle" do
+    html = page.html
+    critical_pos = html.index("data-critical-styles")
+    expect(critical_pos).not_to be_nil, "Expected critical styles <style> tag in the HTML"
+
+    # stylesheet_pack_tag may not emit a link when CSS is inlined via webpack style-loader
+    stylesheet_pos = html.index("client-bundle.css")
+    skip "client-bundle.css not found in HTML (CSS may be inlined via style-loader)" unless stylesheet_pos
+
+    expect(critical_pos).to be < stylesheet_pos,
+                            "Critical styles must appear before the stylesheet bundle to prevent FOUC"
+  end
+end
+
 # Basic ReactOnRails specs
 describe "Pages/Index", :js do
   subject { page }

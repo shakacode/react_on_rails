@@ -1,0 +1,91 @@
+<%#
+  Critical CSS for preventing Flash of Unstyled Content (FOUC)
+  =============================================================
+
+  ## What is the problem?
+
+  The layout uses Tailwind utility classes (flex, h-screen, bg-slate-100, etc.)
+  in the HTML. These classes have no effect until the Tailwind CSS bundle
+  (client-bundle.css) loads from webpack. On slow connections, the page renders
+  with browser defaults first: single-column, no sidebar, no colors. Then CSS
+  loads and the layout jumps into place. This is FOUC.
+
+  ## How does this fix work?
+
+  By inlining critical layout CSS using stable semantic selectors (.app-shell,
+  .app-sidebar, .app-main), the browser can render the correct layout
+  immediately - before any external CSS loads. This means the sidebar, flex
+  layout, and background colors render correctly on the very first paint.
+
+  The semantic selectors are decoupled from Tailwind class names, so this
+  partial does not need to change when Tailwind utility classes are added
+  or removed. It only needs updating when the fundamental layout structure
+  changes (e.g., sidebar width, layout direction).
+
+  Once the full Tailwind CSS bundle loads, it naturally takes over (identical
+  property values, so no visual change).
+
+  ## How to reproduce the FOUC (to verify this fix is still needed)
+
+  1. Comment out the `render "layouts/critical_styles"` line in application.html.erb
+  2. Set up the dummy app environment:
+       cd react_on_rails_pro/spec/dummy
+       bundle install && pnpm install
+       RAILS_ENV=development bin/shakapacker   # compile webpack assets
+       bin/rails db:migrate
+       rails s -p 3000
+  3. Open Chrome DevTools > Network > Throttle to "Slow 3G"
+  4. Load http://localhost:3000/ and observe unstyled single-column layout flash
+     before CSS loads and the proper two-column layout appears.
+
+  Alternatively, use Playwright with CDP network throttling:
+       const client = await context.newCDPSession(page);
+       await client.send("Network.emulateNetworkConditions", {
+         offline: false,
+         downloadThroughput: (20 * 1024) / 8,
+         uploadThroughput: (20 * 1024) / 8,
+         latency: 500,
+       });
+       await page.goto("http://localhost:3000/", { waitUntil: "commit" });
+       await page.screenshot({ path: "fouc-check.png" });
+
+  ## How to maintain this file
+
+  This file uses semantic selectors (.app-body, .app-shell, .app-sidebar, etc.)
+  that are added alongside Tailwind classes in application.html.erb. You only
+  need to update this file when the fundamental layout structure changes
+  (e.g., sidebar width, layout direction, major spacing).
+
+  The semantic selectors correspond to these elements in application.html.erb:
+    <body class="app-body ...">
+    <div class="app-shell ...">        (full-screen flex row container)
+      <div class="app-sidebar ...">    (fixed-width sidebar)
+        <div class="app-sidebar-header ..."> (logo + title row)
+      <div class="app-main ...">       (flexible main content area)
+        <div class="app-main-content ..."> (padded content wrapper)
+%>
+<!-- Critical inline styles to prevent FOUC - see _critical_styles.html.erb for docs -->
+<style data-critical-styles>
+  /* App shell: full-screen flex row */
+  .app-body { background-color: #fff; }
+  .app-shell { display: flex; flex-direction: row; height: 100vh; width: 100vw; }
+
+  /* Sidebar: fixed-width column with background and border */
+  .app-sidebar {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    padding: 1.25rem;
+    background-color: #f1f5f9;
+    border-style: solid;
+    border-right-width: 2px;
+    border-color: #334155;
+    min-width: 400px;
+    max-width: 400px;
+  }
+  .app-sidebar-header { display: flex; flex-direction: row; }
+
+  /* Main content: flexible, scrollable area */
+  .app-main { flex: 1 1 0%; overflow-x: hidden; overflow-y: auto; }
+  .app-main-content { padding: 1.25rem; }
+</style>
