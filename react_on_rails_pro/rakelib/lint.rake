@@ -12,17 +12,12 @@ namespace :lint do
     sh_in_dir(gem_root, "bundle exec rubocop .")
   end
 
-  desc "Run scss-lint as shell"
-  task :scss do
-    sh_in_dir(gem_root, "bundle exec scss-lint spec/dummy/app/assets/stylesheets/")
-  end
-
   desc "Run eslint as shell"
   task :eslint do
     sh_in_dir(gem_root, "pnpm run eslint")
   end
 
-  desc "Run all eslint, rubocop linters. Skip ruby-lint and scss"
+  desc "Run all eslint, rubocop linters"
   task lint: %i[eslint rubocop] do
     puts "Completed all linting"
   end
