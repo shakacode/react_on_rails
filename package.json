@@ -116,6 +116,8 @@
   "packageManager": "pnpm@9.14.2",
   "pnpm": {
     "overrides": {
+      "react": "$react",
+      "react-dom": "$react-dom",
       "sentry-testkit>body-parser": "npm:empty-npm-package@1.0.0",
       "sentry-testkit>express": "npm:empty-npm-package@1.0.0"
     }

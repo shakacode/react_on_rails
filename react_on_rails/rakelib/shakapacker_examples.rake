@@ -111,12 +111,16 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
         # validates version matching between gem and npm package.
         # Use --legacy-peer-deps to avoid peer dependency conflicts when
         # react-on-rails expects newer React versions
-        sh_in_dir(example_type.dir, "npm install --legacy-peer-deps")
+        # Use --install-links to copy file: dependencies instead of symlinking,
+        # preventing duplicate React instances from webpack resolving through symlinks
+        sh_in_dir(example_type.dir, "npm install --legacy-peer-deps --install-links")
         # Regenerate Shakapacker binstubs after downgrading from 9.x to 8.2.x
         # The binstub format may differ between major versions
         unbundled_sh_in_dir(example_type.dir, "bundle exec rake shakapacker:binstubs")
       else
-        sh_in_dir(example_type.dir, "npm install")
+        # Use --install-links to copy file: dependencies instead of symlinking,
+        # preventing duplicate React instances from webpack resolving through symlinks
+        sh_in_dir(example_type.dir, "npm install --install-links")
       end
       # Generate the component packs after running the generator to ensure all
       # auto-bundled components have corresponding pack files created.
