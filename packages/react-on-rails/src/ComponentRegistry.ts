@@ -15,10 +15,7 @@ export default {
       }
 
       const existing = registeredComponents.get(name);
-      // Detect HMR: covers webpack (module.hot) and rspack (module.hot)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
-      const isHMR = typeof module !== 'undefined' && (module as any).hot;
-      if (existing && existing.component !== component && !isHMR) {
+      if (existing && existing.component !== component) {
         console.error(
           `ReactOnRails: Component "${name}" was registered with a different component than previously. ` +
             'This is likely a bug — ensure each component has a unique registration name.',
