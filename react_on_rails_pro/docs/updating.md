@@ -165,7 +165,7 @@ yarn install
 
 React on Rails Pro uses a license-optional model to simplify evaluation and development.
 
-A license token is optional for:
+A license token is **optional** for non-production environments:
 
 - Evaluation and local development
 - Test environments and CI/CD pipelines

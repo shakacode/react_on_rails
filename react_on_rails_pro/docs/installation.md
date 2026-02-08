@@ -1,6 +1,6 @@
 # Installation
 
-React on Rails Pro packages are published publicly on npmjs.org and RubyGems.org. A **paid license is required only for production deployments** — no license token is needed for evaluation, local development, testing, or CI/CD. Contact [justin@shakacode.com](mailto:justin@shakacode.com) to purchase a license.
+React on Rails Pro packages are published publicly on npmjs.org and RubyGems.org. A **paid license is required for production deployments only**. No license token is needed for evaluation, local development, testing, or CI/CD. Contact [justin@shakacode.com](mailto:justin@shakacode.com) to purchase a license.
 
 **Upgrading from GitHub Packages?** See the [Upgrading Guide](./updating.md) for migration instructions.
 
