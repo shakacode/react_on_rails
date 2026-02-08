@@ -1,12 +1,65 @@
 <%#
   Critical CSS for preventing Flash of Unstyled Content (FOUC)
+  =============================================================
 
-  These styles are inlined to ensure the layout structure renders correctly
-  before the main Tailwind CSS bundle loads. Keep this minimal - only include
-  styles that cause visible layout shift if missing.
+  ## What is the problem?
 
-  To update: If you change the layout structure in application.html.erb,
-  ensure the corresponding Tailwind utilities are defined here.
+  The layout uses Tailwind utility classes (flex, h-screen, bg-slate-100, etc.)
+  in the HTML. These classes have no effect until the Tailwind CSS bundle
+  (client-bundle.css) loads from webpack. On slow connections, the page renders
+  with browser defaults first: single-column, no sidebar, no colors. Then CSS
+  loads and the layout jumps into place. This is FOUC.
+
+  ## How does this fix work?
+
+  By inlining the CSS definitions for layout-critical Tailwind classes directly
+  in the <head>, the browser can apply them immediately — before any external
+  CSS loads. This means the sidebar, flex layout, and background colors render
+  correctly on the very first paint.
+
+  Once the full Tailwind CSS bundle loads, it naturally takes over (identical
+  property values, so no visual change).
+
+  ## How to reproduce the FOUC (to verify this fix is still needed)
+
+  1. Comment out the `render "layouts/critical_styles"` line in application.html.erb
+  2. Set up the dummy app environment:
+       cd react_on_rails_pro/spec/dummy
+       bundle install && pnpm install
+       RAILS_ENV=development bin/shakapacker   # compile webpack assets
+       bin/rails db:migrate
+       rails s -p 3000
+  3. Open Chrome DevTools > Network > Throttle to "Slow 3G"
+  4. Load http://localhost:3000/ and observe unstyled single-column layout flash
+     before CSS loads and the proper two-column layout appears.
+
+  Alternatively, use Playwright with CDP network throttling:
+       const client = await context.newCDPSession(page);
+       await client.send("Network.emulateNetworkConditions", {
+         offline: false,
+         downloadThroughput: (20 * 1024) / 8,
+         uploadThroughput: (20 * 1024) / 8,
+         latency: 500,
+       });
+       await page.goto("http://localhost:3000/", { waitUntil: "commit" });
+       await page.screenshot({ path: "fouc-check.png" });
+
+  ## How to maintain this file
+
+  If you change the layout structure in application.html.erb (the Tailwind
+  classes on the outer <div> elements), update the corresponding CSS rules
+  below to match. Only layout-critical classes need to be here — decorative
+  styles (hover effects, text colors for links, etc.) can wait for the
+  full CSS bundle.
+
+  The classes below correspond to the elements in application.html.erb:
+    <body class="bg-white">
+    <div class="flex flex-row h-screen w-screen">
+      <div class="flex flex-col overflow-y-auto p-5 bg-slate-100 border-solid border-r-2 border-slate-700 min-w-[400px] max-w-[400px]">
+        <div class="flex flex-row">
+          <div class="px-2">
+      <div class="flex-1 overflow-x-hidden overflow-y-auto">
+        <div class="p-5">
 %>
 <style>
   /* Layout structure */
