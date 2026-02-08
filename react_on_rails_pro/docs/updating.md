@@ -216,7 +216,7 @@ npm list react-on-rails-pro-node-renderer
 
 Start your Rails server and verify behavior:
 
-```
+```text
 React on Rails Pro license validated successfully
 ```
 
