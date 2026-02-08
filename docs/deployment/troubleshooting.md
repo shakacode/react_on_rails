@@ -217,70 +217,62 @@ There are two common causes of FOUC in React on Rails applications:
 </div>
 ```
 
-**Solution:** Inline critical CSS for layout-affecting classes in the `<head>` before your main stylesheet loads.
+**Solution:** Inline critical CSS for layout-affecting properties in the `<head>` before your main stylesheet loads. Use stable semantic selectors (not Tailwind utility class names) so the critical CSS doesn't drift when you add or remove utility classes.
 
-**Step 1:** Create a critical styles partial (e.g., `app/views/layouts/_critical_styles.html.erb`):
+**Step 1:** Add semantic classes to your layout's structural elements (alongside existing Tailwind classes):
+
+```erb
+<body class="app-body bg-white">
+<div class="app-shell flex flex-row h-screen w-screen">
+  <div class="app-sidebar flex flex-col overflow-y-auto p-5 bg-slate-100 ...">
+    <!-- sidebar content -->
+  </div>
+  <div class="app-main flex-1 overflow-x-hidden overflow-y-auto">
+    <div class="app-main-content p-5">
+      <!-- main content -->
+    </div>
+  </div>
+</div>
+```
+
+**Step 2:** Create a critical styles partial (e.g., `app/views/layouts/_critical_styles.html.erb`) targeting those semantic selectors:
 
 ```erb
 <%#
-  Critical CSS for preventing Flash of Unstyled Content (FOUC)
-
-  These styles are inlined to ensure the layout structure renders correctly
-  before the main Tailwind CSS bundle loads. Keep this minimal - only include
-  styles that cause visible layout shift if missing.
-
-  To update: If you change the layout structure in application.html.erb,
-  ensure the corresponding Tailwind utilities are defined here.
+  Critical CSS for preventing FOUC. Uses semantic selectors so it doesn't
+  need to change when Tailwind utility classes are added or removed.
+  Only update when the fundamental layout structure changes.
 %>
-<style>
-  /* Layout structure */
-  .flex { display: flex; }
-  .flex-row { flex-direction: row; }
-  .flex-col { flex-direction: column; }
-  .flex-1 { flex: 1 1 0%; }
-
-  /* Screen sizing */
-  .h-screen { height: 100vh; }
-  .w-screen { width: 100vw; }
-  .min-w-\[400px\] { min-width: 400px; }
-  .max-w-\[400px\] { max-width: 400px; }
-
-  /* Overflow */
-  .overflow-y-auto { overflow-y: auto; }
-  .overflow-x-hidden { overflow-x: hidden; }
-
-  /* Spacing */
-  .p-5 { padding: 1.25rem; }
-  .px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
-
-  /* Background colors used in layout */
-  .bg-white { background-color: #fff; }
-  .bg-slate-100 { background-color: #f1f5f9; }
-
-  /* Borders used in layout */
-  .border-solid { border-style: solid; }
-  .border-r-2 { border-right-width: 2px; }
-  .border-slate-700 { border-color: #334155; }
+<style data-critical-styles>
+  .app-body { background-color: #fff; }
+  .app-shell { display: flex; flex-direction: row; height: 100vh; width: 100vw; }
+  .app-sidebar {
+    display: flex; flex-direction: column; overflow-y: auto; padding: 1.25rem;
+    background-color: #f1f5f9; border-style: solid;
+    border-right-width: 2px; border-color: #334155;
+    min-width: 400px; max-width: 400px;
+  }
+  .app-main { flex: 1 1 0%; overflow-x: hidden; overflow-y: auto; }
+  .app-main-content { padding: 1.25rem; }
 </style>
 ```
 
-**Step 2:** Include it in your layout's `<head>` along with a preload hint:
+**Step 3:** Include it in your layout's `<head>` before the stylesheet:
 
 ```erb
 <head>
   <%= render "layouts/critical_styles" %>
-  <%= preload_pack_asset('application.css', as: 'style') %>
   <%= stylesheet_pack_tag('application', media: 'all') %>
 </head>
 ```
 
 **Guidelines for critical CSS:**
 
-- **Keep it minimal** - Only include classes used in your layout structure (not component styles)
+- **Use semantic selectors** - `.app-shell`, `.app-sidebar`, etc. instead of mirroring Tailwind class names
+- **Keep it minimal** - Only define the layout shell (not component styles)
 - **Focus on layout-affecting properties** - `display`, `flex`, `width`, `height`, `position`
 - **Include visible defaults** - Background colors and borders that prevent jarring changes
-- **Escape special characters** - Tailwind's arbitrary value syntax like `min-w-[400px]` needs escaping: `.min-w-\[400px\]`
-- **Maintain in sync** - Update critical CSS when you change layout classes
+- **Add `data-critical-styles`** - Makes it easy to test that critical styles appear before the bundle
 
 ## 🎨 CSS Modules Issues
 

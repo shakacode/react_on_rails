@@ -12,10 +12,15 @@
 
   ## How does this fix work?
 
-  By inlining the CSS definitions for layout-critical Tailwind classes directly
-  in the <head>, the browser can apply them immediately — before any external
-  CSS loads. This means the sidebar, flex layout, and background colors render
-  correctly on the very first paint.
+  By inlining critical layout CSS using stable semantic selectors (.app-shell,
+  .app-sidebar, .app-main), the browser can render the correct layout
+  immediately - before any external CSS loads. This means the sidebar, flex
+  layout, and background colors render correctly on the very first paint.
+
+  The semantic selectors are decoupled from Tailwind class names, so this
+  partial does not need to change when Tailwind utility classes are added
+  or removed. It only needs updating when the fundamental layout structure
+  changes (e.g., sidebar width, layout direction).
 
   Once the full Tailwind CSS bundle loads, it naturally takes over (identical
   property values, so no visual change).
@@ -46,48 +51,41 @@
 
   ## How to maintain this file
 
-  If you change the layout structure in application.html.erb (the Tailwind
-  classes on the outer <div> elements), update the corresponding CSS rules
-  below to match. Only layout-critical classes need to be here — decorative
-  styles (hover effects, text colors for links, etc.) can wait for the
-  full CSS bundle.
+  This file uses semantic selectors (.app-body, .app-shell, .app-sidebar, etc.)
+  that are added alongside Tailwind classes in application.html.erb. You only
+  need to update this file when the fundamental layout structure changes
+  (e.g., sidebar width, layout direction, major spacing).
 
-  The classes below correspond to the elements in application.html.erb:
-    <body class="bg-white">
-    <div class="flex flex-row h-screen w-screen">
-      <div class="flex flex-col overflow-y-auto p-5 bg-slate-100 border-solid border-r-2 border-slate-700 min-w-[400px] max-w-[400px]">
-        <div class="flex flex-row">
-          <div class="px-2">
-      <div class="flex-1 overflow-x-hidden overflow-y-auto">
-        <div class="p-5">
+  The semantic selectors correspond to these elements in application.html.erb:
+    <body class="app-body ...">
+    <div class="app-shell ...">        (full-screen flex row container)
+      <div class="app-sidebar ...">    (fixed-width sidebar)
+        <div class="app-sidebar-header ..."> (logo + title row)
+      <div class="app-main ...">       (flexible main content area)
+        <div class="app-main-content ..."> (padded content wrapper)
 %>
-<style>
-  /* Layout structure */
-  .flex { display: flex; }
-  .flex-row { flex-direction: row; }
-  .flex-col { flex-direction: column; }
-  .flex-1 { flex: 1 1 0%; }
+<!-- Critical inline styles to prevent FOUC - see _critical_styles.html.erb for docs -->
+<style data-critical-styles>
+  /* App shell: full-screen flex row */
+  .app-body { background-color: #fff; }
+  .app-shell { display: flex; flex-direction: row; height: 100vh; width: 100vw; }
 
-  /* Screen sizing */
-  .h-screen { height: 100vh; }
-  .w-screen { width: 100vw; }
-  .min-w-\[400px\] { min-width: 400px; }
-  .max-w-\[400px\] { max-width: 400px; }
+  /* Sidebar: fixed-width column with background and border */
+  .app-sidebar {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    padding: 1.25rem;
+    background-color: #f1f5f9;
+    border-style: solid;
+    border-right-width: 2px;
+    border-color: #334155;
+    min-width: 400px;
+    max-width: 400px;
+  }
+  .app-sidebar-header { display: flex; flex-direction: row; }
 
-  /* Overflow */
-  .overflow-y-auto { overflow-y: auto; }
-  .overflow-x-hidden { overflow-x: hidden; }
-
-  /* Spacing */
-  .p-5 { padding: 1.25rem; }
-  .px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
-
-  /* Background colors */
-  .bg-white { background-color: #fff; }
-  .bg-slate-100 { background-color: #f1f5f9; }
-
-  /* Borders */
-  .border-solid { border-style: solid; }
-  .border-r-2 { border-right-width: 2px; }
-  .border-slate-700 { border-color: #334155; }
+  /* Main content: flexible, scrollable area */
+  .app-main { flex: 1 1 0%; overflow-x: hidden; overflow-y: auto; }
+  .app-main-content { padding: 1.25rem; }
 </style>

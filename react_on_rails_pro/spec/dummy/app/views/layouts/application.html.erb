@@ -21,7 +21,6 @@
           font-size: 16px !important;
       }
   </style>
-  <%= preload_pack_asset('client-bundle.css', as: 'style') %>
   <%= stylesheet_pack_tag('client-bundle',
                           media: 'all',
                           'data-turbo-track': 'reload') %>
@@ -36,10 +35,10 @@
   <% end %>
   <%= csrf_meta_tags %>
 </head>
-<body class="bg-white">
-<div class="flex flex-row h-screen w-screen">
-  <div class="flex flex-col overflow-y-auto p-5 bg-slate-100 border-solid border-r-2 border-slate-700 min-w-[400px] max-w-[400px]">
-    <div class="flex flex-row">
+<body class="app-body bg-white">
+<div class="app-shell flex flex-row h-screen w-screen">
+  <div class="app-sidebar flex flex-col overflow-y-auto p-5 bg-slate-100 border-solid border-r-2 border-slate-700 min-w-[400px] max-w-[400px]">
+    <div class="app-sidebar-header flex flex-row">
       <img style="width: 70px; height: 62px;" src="/rorp_logo.png"/>
       <div class="px-2">
         <h1 class="page-header">
@@ -52,8 +51,8 @@
     </div>
     <%= render "shared/menu" %>
   </div>
-  <div class="flex-1 overflow-x-hidden overflow-y-auto">
-    <div class="p-5">
+  <div class="app-main flex-1 overflow-x-hidden overflow-y-auto">
+    <div class="app-main-content p-5">
       <% flash.each do |key, value| %>
         <%= content_tag :div, value, class: "flash #{key}" %>
       <% end %>
