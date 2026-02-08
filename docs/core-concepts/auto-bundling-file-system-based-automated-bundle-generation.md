@@ -515,7 +515,7 @@ app/javascript/src/Comments/
 ```
 
 ```jsx
-// ror_components/ReScriptShow.jsx
+// app/javascript/src/Comments/ror_components/ReScriptShow.jsx
 import ReScriptShow from '../ReScriptShow.bs.js';
 export default ReScriptShow;
 ```
