@@ -75,7 +75,7 @@
     "typescript-eslint": "^8.29.1"
   },
   "scripts": {
-    "test": "pnpm -r run test",
+    "test": "pnpm --filter \"./packages/*\" -r run test",
     "clean": "pnpm -r run clean",
     "start": "nps",
     "nps": "nps",
@@ -116,8 +116,10 @@
   "packageManager": "pnpm@9.14.2",
   "pnpm": {
     "overrides": {
-      "react": "$react",
-      "react-dom": "$react-dom",
+      "react_on_rails>react": "$react",
+      "react_on_rails>react-dom": "$react-dom",
+      "react_on_rails_pro_dummy>react": "$react",
+      "react_on_rails_pro_dummy>react-dom": "$react-dom",
       "sentry-testkit>body-parser": "npm:empty-npm-package@1.0.0",
       "sentry-testkit>express": "npm:empty-npm-package@1.0.0"
     }

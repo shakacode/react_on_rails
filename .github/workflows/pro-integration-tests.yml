@@ -140,6 +140,9 @@ jobs:
       - name: Verify single React resolution for Pro dummy build
         working-directory: .
         run: node script/check-single-react-resolution.mjs react_on_rails/spec/dummy react_on_rails_pro/spec/dummy
+      - name: Verify React 18 resolution for ExecJS-compatible dummy
+        working-directory: .
+        run: node script/check-react-major-version.mjs react_on_rails_pro/spec/execjs-compatible-dummy 18
 
       - name: Install Ruby Gems for Pro dummy app
         run: |

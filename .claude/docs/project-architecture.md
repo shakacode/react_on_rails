@@ -36,6 +36,33 @@ This is a monorepo containing both the open-source package and the Pro package:
 - **Testing**: Jest for JS, RSpec for Ruby
 - **Linting**: ESLint for JS/TS, RuboCop for Ruby
 
+## pnpm Workspace Overrides (React Version Pinning)
+
+The root `package.json` uses `pnpm.overrides` with `>` selectors to force React 19
+on specific dummy apps while allowing others to stay on React 18:
+
+```json
+"react_on_rails>react": "$react",
+"react_on_rails_pro_dummy>react": "$react"
+```
+
+**How it works**: The selector `pkgName>dep` targets the dependency `dep` only when it
+belongs to the workspace member whose `name` field matches `pkgName`. The `$react` token
+resolves to the root `devDependencies.react` version (`^19.0.3`).
+
+**Which packages are targeted**:
+| Override selector | Workspace member | Directory |
+|---|---|---|
+| `react_on_rails` | `react_on_rails` | `react_on_rails/spec/dummy` |
+| `react_on_rails_pro_dummy` | `react_on_rails_pro_dummy` | `react_on_rails_pro/spec/dummy` |
+
+**Intentionally excluded**: `react_on_rails_pro/spec/execjs-compatible-dummy` (name=`app`)
+keeps its declared React 18 to provide React 18 test coverage.
+
+**Fragility note**: These selectors are coupled to the `name` field in each dummy app's
+`package.json`. If a package name changes, the override silently stops applying. CI guards
+(`script/check-react-major-version.mjs`) will catch version mismatches.
+
 ## Examples and Testing
 
 - **Dummy app**: `react_on_rails/spec/dummy/` - Rails app for testing integration
