@@ -118,6 +118,7 @@
     "overrides": {
       "react": "$react",
       "react-dom": "$react-dom",
+      "//app-overrides": "The 'app>' selector targets packages with name 'app' in their package.json (react_on_rails_pro/spec/execjs-compatible-dummy). If that name changes, these overrides silently stop working.",
       "app>react": "^18.3.1",
       "app>react-dom": "^18.3.1",
       "sentry-testkit>body-parser": "npm:empty-npm-package@1.0.0",

@@ -29,8 +29,13 @@ const requireBase = fs.existsSync(packageJsonPath) ? packageJsonPath : path.join
 const requireFromTarget = createRequire(requireBase);
 
 const getVersion = (packageName) => {
-  const resolvedPackageJson = requireFromTarget.resolve(`${packageName}/package.json`);
-  return JSON.parse(fs.readFileSync(resolvedPackageJson, 'utf8')).version;
+  try {
+    const resolvedPackageJson = requireFromTarget.resolve(`${packageName}/package.json`);
+    return JSON.parse(fs.readFileSync(resolvedPackageJson, 'utf8')).version;
+  } catch (error) {
+    console.error(`Failed to resolve ${packageName} in ${targetDir}: ${error.message}`);
+    process.exit(1);
+  }
 };
 
 const assertMajor = (packageName, version) => {

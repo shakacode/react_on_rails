@@ -448,6 +448,26 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
         end
       end
 
+      context "with pnpm workspace protocol 'workspace:^'" do
+        let(:package_json) { File.expand_path("fixtures/workspace_caret_package.json", __dir__) }
+
+        describe "#raw" do
+          specify { expect(node_package_version.raw).to eq("workspace:^") }
+        end
+
+        describe "#local_path_or_url?" do
+          specify { expect(node_package_version.local_path_or_url?).to be false }
+        end
+
+        describe "#workspace_protocol?" do
+          specify { expect(node_package_version.workspace_protocol?).to be true }
+        end
+
+        describe "#parts" do
+          specify { expect(node_package_version.parts).to be_nil }
+        end
+      end
+
       context "with package.json without react-on-rails dependency" do
         let(:package_json) { File.expand_path("../../package.json", __dir__) }
 
