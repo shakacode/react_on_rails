@@ -16,10 +16,10 @@ Rules:
 ## Canonical Trackers
 
 - Primary repo: https://github.com/shakacode/react_on_rails
-- Monorepo plan (legacy): `analysis/contributor-info/monorepo-merger-plan.md`
-- Issue triage matrix: `analysis/PR_ISSUE_TRIAGE_2026-02-08.md`
-- Label conventions: `analysis/triage-label-conventions.md`
-- Decision log: `analysis/merger-decisions.md`
+- Monorepo plan (legacy): `docs/MONOREPO_MERGER_PLAN.md`
+- Issue triage matrix: `internal/coordination/PR_ISSUE_TRIAGE_2026-02-08.md`
+- Label conventions: `internal/coordination/triage-label-conventions.md`
+- Decision log: `internal/coordination/merger-decisions.md`
 
 ## Workstreams
 

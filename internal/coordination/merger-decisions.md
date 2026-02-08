@@ -53,7 +53,7 @@ Record final decisions once, then reference this file to avoid repeating debates
 - Impacts:
   - All merger-related PR sequencing.
 - References:
-  - `analysis/MERGER_COMMAND_CENTER.md`
+  - `internal/coordination/MERGER_COMMAND_CENTER.md`
 
 ### D-004
 
