@@ -4,6 +4,18 @@ Instructions for AI coding agents working on the React on Rails codebase.
 
 React on Rails is a Ruby gem + npm package that integrates React with Ruby on Rails, providing server-side rendering (SSR) via Node.js or ExecJS. This is a monorepo: the open-source gem lives at `react_on_rails/`, the npm package at `packages/react-on-rails/`, and the Pro package at `react_on_rails_pro/`.
 
+## Canonical Agent Policy
+
+`AGENTS.md` is the canonical source for repository-wide agent rules:
+
+- Commands and test/lint workflow
+- Code style and formatting expectations
+- Git/PR boundaries and safety rules
+- Directory and documentation boundaries
+
+Other agent-facing docs (for example `CLAUDE.md`) should contain only tool-specific workflow notes and link back here.
+If there is a conflict, `AGENTS.md` wins.
+
 ## Commands
 
 ```bash
@@ -59,7 +71,7 @@ cd react_on_rails/spec/dummy && bundle exec rspec spec/path/to/spec.rb
 | `react_on_rails_pro/`                | Pro package (separate gem + npm, own lint config)                                                       |
 | `rakelib/`                           | Rake task definitions                                                                                   |
 | `docs/`                              | Published to the [ShakaCode website](https://www.shakacode.com/react-on-rails/docs/) — user-facing only |
-| `docs/contributor-info/`             | Internal contributor docs (excluded from website)                                                       |
+| `internal/`                          | Internal docs (coordination/planning/contributor runbooks; not user-facing docs)                       |
 
 ## Code Style
 
