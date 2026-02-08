@@ -32,8 +32,8 @@
 #
 # To use this pattern:
 # 1. Uncomment and customize the run_precompile_tasks method below
-# 2. Set shakapacker_precompile: false in config/shakapacker.yml
-# 3. Remove precompile_hook from shakapacker.yml if present
+# 2. Remove precompile_hook from config/shakapacker.yml if present
+# 3. Uncomment the run_precompile_tasks call near the bottom of this file
 #
 # See documentation: https://www.shakacode.com/react-on-rails/docs/building-features/extensible-precompile-pattern
 #
@@ -51,7 +51,9 @@
 #   # puts "✅"
 #
 #   # Example: Generate locales using direct Ruby API (faster than rake task)
-#   # This avoids shell spawning and version manager PATH issues
+#   # This avoids shell spawning and version manager PATH issues.
+#   # Exceptions (e.g., missing directories) will bubble up and stop the server,
+#   # which is the desired behavior for catching configuration issues early.
 #   print "   Locale generation... "
 #   ReactOnRails::Locales.compile if ReactOnRails.configuration.i18n_dir.present?
 #   puts "✅"

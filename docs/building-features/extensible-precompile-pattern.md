@@ -47,6 +47,8 @@ def run_precompile_tasks
   # Locale generation via direct Ruby API (faster, no shell issues)
   # compile handles all edge cases gracefully: prints warnings if no locale
   # files found, skips if output files are up-to-date, safe to call always.
+  # Exceptions (e.g., missing directories) bubble up and stop the server,
+  # which surfaces configuration issues early.
   print "   Locale generation... "
   ReactOnRails::Locales.compile if ReactOnRails.configuration.i18n_dir.present?
   puts "✅"
@@ -77,19 +79,25 @@ ReactOnRails::Dev::ServerManager.run_from_command_line(argv_with_defaults)
 
 ### 2. Configure shakapacker.yml
 
-Disable the precompile_hook in `config/shakapacker.yml`:
+Remove or comment out the `precompile_hook` in `config/shakapacker.yml`, since `bin/dev` now handles precompile tasks directly:
+
+**Before (default precompile_hook approach):**
+
+```yaml
+default: &default # ... other settings ...
+  precompile_hook: 'bundle exec rake react_on_rails:locale'
+```
+
+**After (extensible bin/dev approach):**
 
 ```yaml
 default: &default
   # ... other settings ...
 
-  # Note: precompile_hook is not used here because:
+  # precompile_hook is not used here because:
   # - In development: bin/dev runs precompile tasks before starting processes
   # - In production: build_production_command includes all build steps
   # precompile_hook: (not configured)
-
-  # Optional: set to false to disable Shakapacker's own precompile behavior
-  # shakapacker_precompile: false
 
 ```
 
@@ -195,6 +203,22 @@ If using this pattern, ensure you:
 1. Remove the `precompile_hook` from `shakapacker.yml`
 2. Remove precompile commands from Procfile entries
 3. Only call `run_precompile_tasks` once in `bin/dev`
+
+## FAQ
+
+### When should I NOT use this pattern?
+
+Stick with the default `precompile_hook` approach if:
+
+- You only have a single precompile task (e.g., locale generation)
+- Your version manager works fine with rake tasks in all contexts
+- You prefer Shakapacker to handle precompile timing automatically
+
+The extensible pattern adds configuration overhead that isn't justified for simple setups.
+
+## Compatibility
+
+This pattern requires **React on Rails 16.2+** and works with any version of Shakapacker. The `ReactOnRails::Locales.compile` API has been available since React on Rails introduced i18n support and is the same method used internally by the `react_on_rails:locale` rake task.
 
 ## See Also
 
