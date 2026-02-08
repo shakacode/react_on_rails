@@ -18,6 +18,8 @@ export default {
         );
       }
 
+      // Reference comparison lets HMR re-register the same store silently
+      // while still catching bugs where different stores share a name.
       const existing = registeredStoreGenerators.get(name);
       if (existing && existing !== store) {
         console.error(

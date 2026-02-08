@@ -33,6 +33,8 @@ export function register(storeGenerators: Record<string, StoreGenerator>): void 
       );
     }
 
+    // Reference comparison lets HMR re-register the same store silently
+    // while still catching bugs where different stores share a name.
     const existing = storeGeneratorRegistry.getIfExists(name);
     if (existing && existing !== storeGenerator) {
       console.error(

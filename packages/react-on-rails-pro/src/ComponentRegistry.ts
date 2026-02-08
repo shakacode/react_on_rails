@@ -29,6 +29,8 @@ export function register(components: Record<string, ReactComponentOrRenderFuncti
       throw new Error(`Called register with null component named ${name}`);
     }
 
+    // Reference comparison lets HMR re-register the same component silently
+    // while still catching bugs where different components share a name.
     const existing = componentRegistry.getIfExists(name);
     if (existing && existing.component !== component) {
       console.error(
