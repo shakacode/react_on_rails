@@ -77,7 +77,7 @@ module ReactOnRails
             begin
               ActiveRecord::Base.connection.execute('SELECT 1')
               puts 'DATABASE_OK'
-            rescue => e
+            rescue StandardError => e
               puts 'DATABASE_ERROR'
               puts e.message
             end
@@ -97,6 +97,12 @@ module ReactOnRails
           return { status: :error, error: "#{stdout}\n#{stderr}".strip } unless status.success?
 
           lines = stdout.strip.split("\n")
+
+          # Empty output with successful exit means the process completed without error.
+          # This can happen when ActiveRecord is not loaded or when Rails runner
+          # exits cleanly without printing anything.
+          return { status: :ok } if lines.empty?
+
           case lines.first
           when "DATABASE_OK" then { status: :ok }
           when "DATABASE_ERROR" then { status: :error, error: lines[1..].join("\n") }
@@ -149,7 +155,7 @@ module ReactOnRails
         def truncate_error(error)
           return error if error.length <= 500
 
-          "#{error[0, 500]}...\n           (Set DEBUG=1 for full error)"
+          "#{error[0, 500]}...\n           (Set DEBUG=true for full error)"
         end
       end
     end

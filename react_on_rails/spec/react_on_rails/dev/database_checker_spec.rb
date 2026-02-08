@@ -135,6 +135,67 @@ RSpec.describe ReactOnRails::Dev::DatabaseChecker do
         expect(described_class.check_database).to be true
       end
     end
+
+    context "when runner succeeds with empty output" do
+      it "returns true instead of producing a confusing empty error" do
+        allow(Open3).to receive(:capture3)
+          .with("bin/rails", "runner", anything)
+          .and_return(["", "", mock_status(success: true)])
+
+        allow(Open3).to receive(:capture3)
+          .with("bin/rails", "db:migrate:status")
+          .and_return(["", "", mock_status(success: false)])
+
+        expect(described_class.check_database).to be true
+      end
+
+      it "returns true when stdout is only whitespace" do
+        allow(Open3).to receive(:capture3)
+          .with("bin/rails", "runner", anything)
+          .and_return(["  \n  \n", "", mock_status(success: true)])
+
+        allow(Open3).to receive(:capture3)
+          .with("bin/rails", "db:migrate:status")
+          .and_return(["", "", mock_status(success: false)])
+
+        expect(described_class.check_database).to be true
+      end
+    end
+
+    context "when skip mechanisms are used" do
+      it "skips check when skip flag is true" do
+        allow(Open3).to receive(:capture3).and_call_original
+        result = described_class.check_database(skip: true)
+
+        expect(result).to be true
+        expect(Open3).not_to have_received(:capture3)
+      end
+
+      it "skips check when SKIP_DATABASE_CHECK env var is set" do
+        allow(Open3).to receive(:capture3).and_call_original
+        original_value = ENV.fetch("SKIP_DATABASE_CHECK", nil)
+        begin
+          ENV["SKIP_DATABASE_CHECK"] = "true"
+          result = described_class.check_database
+
+          expect(result).to be true
+          expect(Open3).not_to have_received(:capture3)
+        ensure
+          ENV["SKIP_DATABASE_CHECK"] = original_value
+        end
+      end
+
+      it "skips check when configuration disables it" do
+        config = double("configuration", check_database_on_dev_start: false) # rubocop:disable RSpec/VerifiedDoubles
+        allow(ReactOnRails).to receive(:configuration).and_return(config)
+        allow(Open3).to receive(:capture3).and_call_original
+
+        result = described_class.check_database
+
+        expect(result).to be true
+        expect(Open3).not_to have_received(:capture3)
+      end
+    end
   end
 
   # Helper methods
