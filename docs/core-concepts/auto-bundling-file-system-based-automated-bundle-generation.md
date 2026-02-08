@@ -503,7 +503,18 @@ Once generated, all server entrypoints will be imported into a file named `[Reac
 
 ### Transpiled Languages (ReScript, Reason, etc.)
 
-Components compiled by transpiled languages like ReScript produce output files with non-standard extensions (e.g., `.bs.js`, `.res.js`). Auto-bundling discovers these files because they end in `.js`, but it extracts the component name incorrectly — `MyComponent.bs.js` becomes `MyComponent.bs` instead of `MyComponent`.
+Components compiled by transpiled languages like ReScript produce output files with extensions that include the transpiler identifier (e.g., `.bs.js`, `.res.js`). Auto-bundling discovers these files because they end in `.js`, but it extracts the component name from the full extension — so `MyComponent.bs.js` becomes `MyComponent.bs` instead of `MyComponent`.
+
+#### Symptoms
+
+If you see errors like:
+
+- `Could not find component registered with name MyComponent.bs`
+- Component renders as `MyComponent.bs` instead of `MyComponent` in error messages
+
+Then you likely need the wrapper pattern described below.
+
+#### Solution: Wrapper File
 
 The simplest solution is a thin wrapper file in your `ror_components` directory:
 
@@ -520,7 +531,10 @@ import ReScriptShow from '../ReScriptShow.bs.js';
 export default ReScriptShow;
 ```
 
-This pattern works for any transpiled language and requires no gem configuration changes.
+This pattern works for any transpiled language and requires no gem configuration changes. The wrapper file can use `.js`, `.jsx`, `.ts`, or `.tsx` depending on your project setup.
+
+> [!NOTE]
+> While it's possible to add gem-level configuration for additional extensions, the wrapper-file pattern is recommended because it works immediately with no configuration changes and makes the component registration explicit.
 
 ### Using Automated Bundle Generation Feature with already defined packs
 
