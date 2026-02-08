@@ -196,8 +196,8 @@ module ReactOnRails
         1. Run the pack generation task:
            #{Rainbow('bundle exec rake react_on_rails:generate_packs').cyan}
 
-        2. Ensure your store is in the correct directory:
-           #{Rainbow("app/javascript/#{ReactOnRails.configuration.stores_subdirectory || 'ror_stores'}/#{component_name}.js").cyan}
+        2. Ensure your store is in a directory matching stores_subdirectory under packer_source_path:
+           #{Rainbow("#{ReactOnRails::PackerUtils.packer_source_path}/**/#{ReactOnRails.configuration.stores_subdirectory || 'ror_stores'}/#{component_name}.js").cyan}
 
         3. Check that the store file follows naming conventions:
            - Store file: #{Rainbow("#{component_name}.js").cyan} or #{Rainbow("#{component_name}.ts").cyan}

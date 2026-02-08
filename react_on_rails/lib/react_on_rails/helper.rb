@@ -169,7 +169,7 @@ module ReactOnRails
 
       # Auto-load store pack if configured
       should_auto_load = auto_load_bundle.nil? ? ReactOnRails.configuration.auto_load_bundle : auto_load_bundle
-      load_pack_for_generated_store(store_name) if should_auto_load
+      load_pack_for_generated_store(store_name, explicit_auto_load: auto_load_bundle == true) if should_auto_load
 
       redux_store_data = { store_name: store_name,
                            props: props,
@@ -359,8 +359,22 @@ module ReactOnRails
       append_stylesheet_pack_tag("generated/#{react_component_name}")
     end
 
-    def load_pack_for_generated_store(store_name)
-      return unless ReactOnRails.configuration.stores_subdirectory.present?
+    def load_pack_for_generated_store(store_name, explicit_auto_load: false)
+      unless ReactOnRails.configuration.stores_subdirectory.present?
+        if explicit_auto_load
+          raise ReactOnRails::SmartError.new(
+            error_type: :configuration_error,
+            details: "auto_load_bundle is enabled for store " \
+                     "'#{store_name}', but " \
+                     "stores_subdirectory is not configured. " \
+                     "Set config.stores_subdirectory (e.g., " \
+                     "'ror_stores') in your ReactOnRails " \
+                     "configuration so that store packs can " \
+                     "be generated and loaded."
+          )
+        end
+        return
+      end
 
       ReactOnRails::PackerUtils.raise_nested_entries_disabled unless ReactOnRails::PackerUtils.nested_entries?
       if Rails.env.development?

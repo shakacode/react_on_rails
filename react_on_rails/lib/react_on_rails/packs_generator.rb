@@ -194,7 +194,7 @@ module ReactOnRails
         FILE_CONTENT
       end
 
-      content += "ReactOnRails.register({#{client_components.join(",\n")}});"
+      content += "ReactOnRails.register({#{client_components.join(",\n")}});" if client_components.any?
 
       content += "\nReactOnRails.registerStore({#{store_names.join(",\n")}});" if store_names.any?
 
@@ -250,7 +250,10 @@ module ReactOnRails
     def generated_server_bundle_file_path
       return server_bundle_entrypoint if ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint
 
-      generated_interim_server_bundle_path = server_bundle_entrypoint.sub(".js", "-generated.js")
+      entrypoint_ext = File.extname(server_bundle_entrypoint)
+      generated_interim_server_bundle_path = server_bundle_entrypoint.sub(
+        /#{Regexp.escape(entrypoint_ext)}$/, "-generated#{entrypoint_ext}"
+      )
       generated_server_bundle_file_name = component_name(generated_interim_server_bundle_path)
       source_entrypoint_parent = Pathname(ReactOnRails::PackerUtils.packer_source_entry_path).parent
       generated_nonentrypoints_path = "#{source_entrypoint_parent}/generated"
