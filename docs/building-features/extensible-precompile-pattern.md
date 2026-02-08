@@ -36,12 +36,17 @@ def run_precompile_tasks
 
   puts "📦 Running precompile tasks..."
 
-  # Project-specific: Build ReScript files
+  # Example: Build ReScript files
   print "   ReScript build... "
-  system("yarn res:build") or exit(1)
+  unless system("yarn res:build")
+    puts "❌"
+    exit(1)
+  end
   puts "✅"
 
   # Locale generation via direct Ruby API (faster, no shell issues)
+  # compile handles all edge cases gracefully: prints warnings if no locale
+  # files found, skips if output files are up-to-date, safe to call always.
   print "   Locale generation... "
   ReactOnRails::Locales.compile if ReactOnRails.configuration.i18n_dir.present?
   puts "✅"

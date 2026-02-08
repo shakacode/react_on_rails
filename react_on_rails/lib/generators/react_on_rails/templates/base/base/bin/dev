@@ -44,7 +44,10 @@
 #
 #   # Example: Build ReScript files
 #   # print "   ReScript build... "
-#   # system("yarn res:build") or exit(1)
+#   # unless system("yarn res:build")
+#   #   puts "❌"
+#   #   exit(1)
+#   # end
 #   # puts "✅"
 #
 #   # Example: Generate locales using direct Ruby API (faster than rake task)
