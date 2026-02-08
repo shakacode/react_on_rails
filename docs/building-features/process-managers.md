@@ -16,12 +16,13 @@ React on Rails includes `bin/dev` which automatically uses Overmind or Foreman:
 
 This script will:
 
-1. Check required external services (if `.dev-services.yml` exists)
-2. Run Shakapacker's `precompile_hook` once (if configured in `config/shakapacker.yml`)
-3. Set `SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true` to prevent duplicate execution
-4. Try to use Overmind (if installed)
-5. Fall back to Foreman (if installed)
-6. Show installation instructions if neither is found
+1. Check database connectivity (unless disabled)
+2. Check required external services (if `.dev-services.yml` exists)
+3. Run Shakapacker's `precompile_hook` once (if configured in `config/shakapacker.yml`)
+4. Set `SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true` to prevent duplicate execution
+5. Try to use Overmind (if installed)
+6. Fall back to Foreman (if installed)
+7. Show installation instructions if neither is found
 
 ### Precompile Hook Integration
 
