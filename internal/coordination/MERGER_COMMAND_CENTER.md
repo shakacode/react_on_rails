@@ -19,7 +19,6 @@ Rules:
 - Monorepo plan (legacy): `docs/MONOREPO_MERGER_PLAN.md`
 - Issue triage matrix: `internal/coordination/PR_ISSUE_TRIAGE_2026-02-08.md`
 - Label conventions: `internal/coordination/triage-label-conventions.md`
-- Decision log: `internal/coordination/merger-decisions.md`
 
 ## Workstreams
 
