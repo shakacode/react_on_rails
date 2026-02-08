@@ -42,6 +42,18 @@ rake                                 # Full suite (lint + all tests except examp
 # Type checking
 pnpm run type-check                  # TypeScript
 bundle exec rake rbs:validate        # RBS signatures
+
+# Additional test subsets
+rake run_rspec                       # All Ruby tests
+rake all_but_examples                # All tests except generated examples
+rake run_rspec:shakapacker_examples_basic  # Single example test
+
+# Full initial setup
+bundle && pnpm install && rake shakapacker_examples:gen_all && rake node_package && rake
+
+# CI/workflow linting
+actionlint                           # GitHub Actions lint
+yamllint .github/                    # YAML lint (do NOT run RuboCop on .yml files)
 ```
 
 ## Testing
@@ -71,7 +83,8 @@ cd react_on_rails/spec/dummy && bundle exec rspec spec/path/to/spec.rb
 | `react_on_rails_pro/`                | Pro package (separate gem + npm, own lint config)                                                       |
 | `rakelib/`                           | Rake task definitions                                                                                   |
 | `docs/`                              | Published to the [ShakaCode website](https://www.shakacode.com/react-on-rails/docs/) — user-facing only |
-| `internal/`                          | Internal docs (coordination/planning/contributor runbooks; not user-facing docs)                       |
+| `docs/contributor-info/`             | Internal contributor docs (excluded from website)                                                       |
+| `analysis/`                          | Investigation and analysis documents (kebab-case `.md` files)                                           |
 
 ## Code Style
 
@@ -142,5 +155,12 @@ Prettier handles all formatting. Never manually format — run `rake autofix` in
 - Skip pre-commit hooks (`--no-verify`)
 - Commit secrets, credentials, or `.env` files
 - Commit `package-lock.json`, `yarn.lock`, or other non-pnpm lock files
-- Add files to the `docs/` root — they must go in a subdirectory (see table in Project Structure)
+- Add files to the `docs/` root — they must go in a subdirectory (`getting-started/`, `core-concepts/`, `building-features/`, `api-reference/`, `deployment/`, `migrating/`, `upgrading/`, `contributor-info/`, `misc/`)
 - Force push to `main` or `master`
+
+## Changelog
+
+Update `/CHANGELOG.md` for **user-visible changes only** (features, bug fixes, breaking changes, deprecations, performance improvements). Do **not** add entries for linting, formatting, refactoring, tests, or doc fixes.
+
+- **Format**: `[PR 1818](https://github.com/shakacode/react_on_rails/pull/1818) by [username](https://github.com/username)` (no hash before PR number)
+- **Pro-only changes** go in `/CHANGELOG_PRO.md`; changes affecting both go in **both** changelogs
