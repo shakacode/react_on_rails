@@ -97,7 +97,7 @@ default: &default
   # precompile_hook is not used here because:
   # - In development: bin/dev runs precompile tasks before starting processes
   # - In production: build_production_command includes all build steps
-  # precompile_hook: (not configured)
+  # precompile_hook not configured - handled by bin/dev instead
 
 ```
 
@@ -177,6 +177,18 @@ ReactOnRails::PacksGenerator.instance.generate_packs_if_stale
 | **Version manager compatibility** | Rake task may use wrong Ruby         | Direct Ruby call uses correct version         |
 | **Debugging**                     | Multiple indirection layers          | Clear sequential execution                    |
 | **When precompile runs**          | Before each webpack compile          | Once at dev server startup                    |
+
+## Execution Timing
+
+With this pattern, precompile tasks run:
+
+- Once when you start `bin/dev`
+- On manual restarts of `bin/dev`
+- **Not** on file changes during development
+- **Not** on webpack hot reload
+
+For file-watching behavior (e.g., ReScript watch mode), add a separate Procfile process instead.
+For production builds, ensure all tasks are included in `build_production_command`.
 
 ## Troubleshooting
 
