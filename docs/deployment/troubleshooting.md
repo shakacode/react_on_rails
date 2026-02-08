@@ -249,6 +249,10 @@ There are two common causes of FOUC in React on Rails applications:
   .overflow-y-auto { overflow-y: auto; }
   .overflow-x-hidden { overflow-x: hidden; }
 
+  /* Spacing */
+  .p-5 { padding: 1.25rem; }
+  .px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
+
   /* Background colors used in layout */
   .bg-white { background-color: #fff; }
   .bg-slate-100 { background-color: #f1f5f9; }
