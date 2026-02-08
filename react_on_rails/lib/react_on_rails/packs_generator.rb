@@ -490,7 +490,8 @@ module ReactOnRails
     end
 
     def store_name(file_path)
-      File.basename(file_path, File.extname(file_path))
+      basename = File.basename(file_path, File.extname(file_path))
+      basename.sub(CONTAINS_CLIENT_OR_SERVER_REGEX, "")
     end
 
     def generated_store_pack_path(file_path)
