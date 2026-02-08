@@ -501,6 +501,27 @@ Once generated, all server entrypoints will be imported into a file named `[Reac
 > [!IMPORTANT]
 > When specifying separate definitions for client and server rendering, you need to delete the generalized `ComponentName.jsx` file.
 
+### Transpiled Languages (ReScript, Reason, etc.)
+
+Components compiled by transpiled languages like ReScript produce output files with non-standard extensions (e.g., `.bs.js`, `.res.js`). Auto-bundling discovers these files because they end in `.js`, but it extracts the component name incorrectly — `MyComponent.bs.js` becomes `MyComponent.bs` instead of `MyComponent`.
+
+The simplest solution is a thin wrapper file in your `ror_components` directory:
+
+```text
+app/javascript/src/Comments/
+├── ReScriptShow.bs.js          # ReScript compiler output
+└── ror_components/
+    └── ReScriptShow.jsx        # Wrapper for auto-registration
+```
+
+```jsx
+// ror_components/ReScriptShow.jsx
+import ReScriptShow from '../ReScriptShow.bs.js';
+export default ReScriptShow;
+```
+
+This pattern works for any transpiled language and requires no gem configuration changes.
+
 ### Using Automated Bundle Generation Feature with already defined packs
 
 As of version 13.3.4, bundles inside directories that match `config.components_subdirectory` will be automatically added as entrypoints, while bundles outside those directories need to be manually added to the `Shakapacker.config.source_entry_path` or Webpack's `entry` rules.
