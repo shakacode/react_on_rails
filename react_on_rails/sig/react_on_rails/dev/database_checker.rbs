@@ -13,6 +13,7 @@ module ReactOnRails
       def self.check_pending_migrations: () -> void
       def self.print_checking_message: () -> void
       def self.print_database_ok: () -> void
+      def self.print_skipped_message: (String) -> void
       def self.print_pending_migrations_warning: () -> void
       def self.print_database_error: (String?) -> void
       def self.truncate_error: (String) -> String

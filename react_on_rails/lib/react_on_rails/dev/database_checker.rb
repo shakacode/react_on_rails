@@ -44,8 +44,12 @@ module ReactOnRails
           when :error
             print_database_error(result[:error])
             false
+          when :not_rails_app
+            print_skipped_message("bin/rails not found — skipping database check")
+            true
           else
-            true # Unknown status - let server start and show the real error
+            print_skipped_message(result[:error] || "unexpected status: #{result[:status]}")
+            true
           end
         end
 
@@ -88,7 +92,7 @@ module ReactOnRails
           stdout, stderr, status = Open3.capture3("bin/rails", "runner", check_script)
           parse_check_result(stdout, stderr, status)
         rescue Errno::ENOENT
-          { status: :not_rails_app, error: "bin/rails not found" }
+          { status: :not_rails_app }
         rescue StandardError => e
           { status: :unknown_error, error: e.message }
         end
@@ -133,6 +137,10 @@ module ReactOnRails
 
         def print_database_ok
           puts Rainbow("   Database is accessible").green
+        end
+
+        def print_skipped_message(reason)
+          puts Rainbow("   #{reason}").yellow
         end
 
         def print_pending_migrations_warning

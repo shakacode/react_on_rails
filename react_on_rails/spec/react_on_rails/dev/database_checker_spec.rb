@@ -91,12 +91,37 @@ RSpec.describe ReactOnRails::Dev::DatabaseChecker do
     end
 
     context "when bin/rails is not found" do
-      it "returns true to allow server to start and show the real error" do
+      before do
         allow(Open3).to receive(:capture3)
           .with("bin/rails", "runner", anything)
           .and_raise(Errno::ENOENT)
+      end
 
+      it "returns true to allow server to start" do
         expect(described_class.check_database).to be true
+      end
+
+      it "prints a skipped message" do
+        output = capture_stdout { described_class.check_database }
+        expect(output).to include("bin/rails not found")
+        expect(output).to include("skipping database check")
+      end
+    end
+
+    context "when an unknown error occurs" do
+      before do
+        allow(Open3).to receive(:capture3)
+          .with("bin/rails", "runner", anything)
+          .and_raise(StandardError, "something unexpected")
+      end
+
+      it "returns true to allow server to start" do
+        expect(described_class.check_database).to be true
+      end
+
+      it "prints the error as a skipped message" do
+        output = capture_stdout { described_class.check_database }
+        expect(output).to include("something unexpected")
       end
     end
 
