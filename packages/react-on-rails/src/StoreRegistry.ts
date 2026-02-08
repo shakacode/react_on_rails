@@ -10,15 +10,21 @@ export default {
    */
   register(storeGenerators: Record<string, StoreGenerator>): void {
     Object.keys(storeGenerators).forEach((name) => {
-      if (registeredStoreGenerators.has(name)) {
-        console.warn('Called registerStore for store that is already registered', name);
-      }
-
       const store = storeGenerators[name];
       if (!store) {
         throw new Error(
           'Called ReactOnRails.registerStores with a null or undefined as a value ' +
             `for the store generator with key ${name}.`,
+        );
+      }
+
+      const existing = registeredStoreGenerators.get(name);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
+      const isHMR = typeof module !== 'undefined' && (module as any).hot;
+      if (existing && existing !== store && !isHMR) {
+        console.error(
+          `ReactOnRails: Store "${name}" was registered with a different store generator than previously. ` +
+            'This is likely a bug — ensure each store has a unique registration name.',
         );
       }
 

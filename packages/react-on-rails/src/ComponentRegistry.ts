@@ -9,13 +9,19 @@ export default {
    */
   register(components: Record<string, ReactComponentOrRenderFunction>): void {
     Object.keys(components).forEach((name) => {
-      if (registeredComponents.has(name)) {
-        console.warn('Called register for component that is already registered', name);
-      }
-
       const component = components[name];
       if (!component) {
         throw new Error(`Called register with null component named ${name}`);
+      }
+
+      const existing = registeredComponents.get(name);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
+      const isHMR = typeof module !== 'undefined' && (module as any).hot;
+      if (existing && existing.component !== component && !isHMR) {
+        console.error(
+          `ReactOnRails: Component "${name}" was registered with a different component than previously. ` +
+            'This is likely a bug — ensure each component has a unique registration name.',
+        );
       }
 
       const renderFunction = isRenderFunction(component);
