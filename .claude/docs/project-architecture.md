@@ -38,30 +38,32 @@ This is a monorepo containing both the open-source package and the Pro package:
 
 ## pnpm Workspace Overrides (React Version Pinning)
 
-The root `package.json` uses `pnpm.overrides` with `>` selectors to force React 19
-on specific dummy apps while allowing others to stay on React 18:
+The root `package.json` uses `pnpm.overrides` to enforce a single React version
+across the workspace while carving out an exception for React 18 testing:
 
 ```json
-"react_on_rails>react": "$react",
-"react_on_rails_pro_dummy>react": "$react"
+"react": "$react",
+"react-dom": "$react-dom",
+"app>react": "^18.3.1",
+"app>react-dom": "^18.3.1"
 ```
 
-**How it works**: The selector `pkgName>dep` targets the dependency `dep` only when it
-belongs to the workspace member whose `name` field matches `pkgName`. The `$react` token
-resolves to the root `devDependencies.react` version (`^19.0.3`).
+**How it works**:
 
-**Which packages are targeted**:
-| Override selector | Workspace member | Directory |
-|---|---|---|
-| `react_on_rails` | `react_on_rails` | `react_on_rails/spec/dummy` |
-| `react_on_rails_pro_dummy` | `react_on_rails_pro_dummy` | `react_on_rails_pro/spec/dummy` |
+- `"react": "$react"` — Global override forcing all React to `^19.0.3`
+  (the root `devDependencies.react` version). Ensures single-copy resolution.
+- `"app>react": "^18.3.1"` — Exception for the `app` package (the execjs-compatible
+  dummy at `react_on_rails_pro/spec/execjs-compatible-dummy`), pinning it to React 18.
+  The `>` selector targets a specific package by its `name` field.
 
-**Intentionally excluded**: `react_on_rails_pro/spec/execjs-compatible-dummy` (name=`app`)
-keeps its declared React 18 to provide React 18 test coverage.
+**Why global + exception**: A global override is needed because pnpm workspace members
+with peer deps (like `packages/react-on-rails`) would otherwise get their own
+`node_modules/react` copy, causing dual-resolution failures in webpack builds.
 
-**Fragility note**: These selectors are coupled to the `name` field in each dummy app's
-`package.json`. If a package name changes, the override silently stops applying. CI guards
-(`script/check-react-major-version.mjs`) will catch version mismatches.
+**Fragility note**: The `app>` exception selector is coupled to the `name` field in
+`react_on_rails_pro/spec/execjs-compatible-dummy/package.json`. If that name changes,
+the exception silently stops working. CI guards (`script/check-react-major-version.mjs`)
+will catch version mismatches.
 
 ## Examples and Testing
 

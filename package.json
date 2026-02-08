@@ -116,10 +116,10 @@
   "packageManager": "pnpm@9.14.2",
   "pnpm": {
     "overrides": {
-      "react_on_rails>react": "$react",
-      "react_on_rails>react-dom": "$react-dom",
-      "react_on_rails_pro_dummy>react": "$react",
-      "react_on_rails_pro_dummy>react-dom": "$react-dom",
+      "react": "$react",
+      "react-dom": "$react-dom",
+      "app>react": "^18.3.1",
+      "app>react-dom": "^18.3.1",
       "sentry-testkit>body-parser": "npm:empty-npm-package@1.0.0",
       "sentry-testkit>express": "npm:empty-npm-package@1.0.0"
     }
