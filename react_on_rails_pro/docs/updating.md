@@ -161,9 +161,11 @@ yarn install
 + require('react-on-rails-pro-node-renderer/integrations/honeybadger').init();
 ```
 
-#### Step 5: Configure License Token
+#### Step 5: Configure License Token (Production Only)
 
-Add your React on Rails Pro license token as an environment variable:
+A license token is optional for evaluation, development, test, and CI/CD.
+
+For production deployments, configure your React on Rails Pro license token as an environment variable:
 
 ```bash
 export REACT_ON_RAILS_PRO_LICENSE="your-license-token-here"
@@ -179,7 +181,7 @@ echo "your-license-token-here" > config/react_on_rails_pro_license.key
 
 **Where to get your license token:** Contact [justin@shakacode.com](mailto:justin@shakacode.com) if you don't have your license token.
 
-For complete license setup instructions, see [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/LICENSE_SETUP.md).
+For complete licensing details, see [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/LICENSE_SETUP.md).
 
 ### Verify Migration
 
@@ -202,15 +204,17 @@ npm list react-on-rails-pro-node-renderer
 # Should show: react-on-rails-pro-node-renderer@16.2.0 or higher
 ```
 
-#### 3. Verify License Token
+#### 3. Verify License Status
 
-Start your Rails server. You should see a success message in the logs:
+Start your Rails server and verify behavior:
 
 ```
 React on Rails Pro license validated successfully
 ```
 
-If the license is invalid or missing, you'll see an error with instructions.
+If no license is set in non-production environments, the app still runs and logs informational status.
+
+For production, ensure a valid license is configured.
 
 #### 4. Test Your Application
 
@@ -243,11 +247,11 @@ This error occurs when you import from both `react-on-rails` and `react-on-rails
 
 The Pro package re-exports everything from core, so you don't need both.
 
-#### "License validation failed"
+#### "License validation failed" (production)
 
-- Ensure `REACT_ON_RAILS_PRO_LICENSE` environment variable is set
-- Verify the token string is correct (no extra spaces or quotes)
-- Contact [justin@shakacode.com](mailto:justin@shakacode.com) if you need a new token
+- Ensure `REACT_ON_RAILS_PRO_LICENSE` environment variable is set in production.
+- Verify the token string is correct (no extra spaces or quotes).
+- Contact [justin@shakacode.com](mailto:justin@shakacode.com) if you need a new token.
 
 ### Need Help?
 
