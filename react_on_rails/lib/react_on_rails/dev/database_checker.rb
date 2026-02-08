@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require "English"
 require "open3"
 require "rainbow"
 
