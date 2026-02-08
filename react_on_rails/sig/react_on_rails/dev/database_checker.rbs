@@ -14,9 +14,7 @@ module ReactOnRails
       def self.print_checking_message: () -> void
       def self.print_database_ok: () -> void
       def self.print_pending_migrations_warning: () -> void
-      def self.print_no_database: (String?) -> void
-      def self.print_connection_error: (String?) -> void
-      def self.print_rails_error: (String?) -> void
+      def self.print_database_error: (String?) -> void
       def self.truncate_error: (String) -> String
     end
   end

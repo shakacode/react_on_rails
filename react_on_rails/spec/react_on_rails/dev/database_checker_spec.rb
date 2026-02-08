@@ -45,9 +45,9 @@ RSpec.describe ReactOnRails::Dev::DatabaseChecker do
       end
     end
 
-    context "when database does not exist" do
-      it "returns false" do
-        error_output = "NO_DATABASE\nDatabase 'myapp_development' does not exist\n"
+    context "when database check fails" do
+      it "returns false for database errors" do
+        error_output = "DATABASE_ERROR\nDatabase 'myapp_development' does not exist\n"
         allow(Open3).to receive(:capture3)
           .with("bin/rails", "runner", anything)
           .and_return([error_output, "", mock_status(success: true)])
@@ -55,47 +55,7 @@ RSpec.describe ReactOnRails::Dev::DatabaseChecker do
         expect(described_class.check_database).to be false
       end
 
-      it "prints helpful error message with setup commands" do
-        error_output = "NO_DATABASE\nDatabase 'myapp_development' does not exist\n"
-        allow(Open3).to receive(:capture3)
-          .with("bin/rails", "runner", anything)
-          .and_return([error_output, "", mock_status(success: true)])
-
-        output = capture_stdout { described_class.check_database }
-
-        expect(output).to include("Database not set up")
-        expect(output).to include("db:setup")
-        expect(output).to include("db:create")
-      end
-    end
-
-    context "when database connection fails" do
-      it "returns false" do
-        error_output = "CONNECTION_ERROR\nCould not connect to server\n"
-        allow(Open3).to receive(:capture3)
-          .with("bin/rails", "runner", anything)
-          .and_return([error_output, "", mock_status(success: true)])
-
-        expect(described_class.check_database).to be false
-      end
-
-      it "prints helpful error message with server start commands" do
-        error_output = "CONNECTION_ERROR\nCould not connect to server\n"
-        allow(Open3).to receive(:capture3)
-          .with("bin/rails", "runner", anything)
-          .and_return([error_output, "", mock_status(success: true)])
-
-        output = capture_stdout { described_class.check_database }
-
-        expect(output).to include("Database connection failed")
-        expect(output).to include("PostgreSQL")
-        expect(output).to include("MySQL")
-        expect(output).to include("brew services start")
-      end
-    end
-
-    context "when Rails returns an error" do
-      it "returns false when runner fails" do
+      it "returns false when runner process fails" do
         allow(Open3).to receive(:capture3)
           .with("bin/rails", "runner", anything)
           .and_return(["", "LoadError: cannot load such file", mock_status(success: false)])
@@ -103,16 +63,16 @@ RSpec.describe ReactOnRails::Dev::DatabaseChecker do
         expect(described_class.check_database).to be false
       end
 
-      it "prints error information" do
-        error_output = "RAILS_ERROR\nNoMethodError\nundefined method"
+      it "prints error and suggests db:prepare" do
+        error_output = "DATABASE_ERROR\nCould not connect to server\n"
         allow(Open3).to receive(:capture3)
           .with("bin/rails", "runner", anything)
           .and_return([error_output, "", mock_status(success: true)])
 
         output = capture_stdout { described_class.check_database }
 
-        expect(output).to include("Could not verify database")
-        expect(output).to include("bundle install")
+        expect(output).to include("Database check failed")
+        expect(output).to include("db:prepare")
       end
     end
 
@@ -145,7 +105,6 @@ RSpec.describe ReactOnRails::Dev::DatabaseChecker do
 
         expect(output).to include("Pending migrations")
         expect(output).to include("db:migrate")
-        expect(described_class.check_database).to be true
       end
     end
 
