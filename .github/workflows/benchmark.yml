@@ -322,7 +322,7 @@ jobs:
           echo "✅ Benchmark results found"
           echo ""
           echo "📊 Summary:"
-          column -t -s $'\t' bench_results/summary.txt
+          column -t -s $'\t' "bench_results/summary.txt"
           echo ""
           echo "Generated files:"
           ls -lh bench_results/
@@ -464,7 +464,7 @@ jobs:
               exit 1
             fi
             echo "📊 Rails Benchmark Summary:"
-            column -t -s $'\t' bench_results/summary.txt
+            column -t -s $'\t' "bench_results/summary.txt"
             echo ""
           fi
 
@@ -474,7 +474,7 @@ jobs:
               exit 1
             fi
             echo "📊 Node Renderer Benchmark Summary:"
-            column -t -s $'\t' bench_results/node_renderer_summary.txt
+            column -t -s $'\t' "bench_results/node_renderer_summary.txt"
             echo ""
           fi
 
@@ -696,7 +696,7 @@ jobs:
           # Build the benchmark summary snippet
           SUMMARY=""
           if [ -f bench_results/summary.txt ]; then
-            SUMMARY=$(printf '\n### Benchmark Summary\n\n```\n%s\n```' "$(column -t -s $'\t' bench_results/summary.txt)")
+            SUMMARY=$(printf '\n### Benchmark Summary\n\n```\n%s\n```' "$(column -t -s $'\t' "bench_results/summary.txt")")
           fi
 
           if [ -n "$EXISTING_ISSUE" ]; then
@@ -748,13 +748,15 @@ jobs:
           fi
 
       # ============================================
-      # STEP 7c: FAIL WORKFLOW ON REGRESSION
+      # STEP 7c: FAIL WORKFLOW ON MASTER REGRESSION
       # ============================================
-      - name: Fail workflow if Bencher detected regression
-        if: env.BENCHER_EXIT_CODE != '0'
+      # Only fail on master — PR benchmarks are informational (triggered by 'benchmark' label).
+      # Regressions on PRs are surfaced via Bencher report comments, not workflow failures.
+      - name: Fail workflow if Bencher detected regression on master
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master' && env.BENCHER_EXIT_CODE != '0'
         run: |
-          echo "Bencher detected a regression (exit code: $BENCHER_EXIT_CODE)"
-          exit "$BENCHER_EXIT_CODE"
+          echo "Bencher detected a regression (exit code: ${BENCHER_EXIT_CODE:-1})"
+          exit "${BENCHER_EXIT_CODE:-1}"
 
       # ============================================
       # STEP 8: WORKFLOW COMPLETION
