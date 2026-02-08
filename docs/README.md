@@ -4,6 +4,8 @@
 
 Browsing on GitHub? This guide will help you navigate the documentation.
 
+Contributor-only planning/process docs are intentionally kept outside `docs/` under `analysis/`.
+
 ## 📚 Learning Paths
 
 Choose your journey based on your experience level:

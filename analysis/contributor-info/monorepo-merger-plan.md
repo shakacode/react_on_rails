@@ -1,9 +1,19 @@
 # React on Rails Monorepo Merger Plan
 
-**Version:** 1.0
+> Internal contributor planning document. Not end-user library documentation.
+
+**Version:** 1.1 (historical plan + context)
 **Date:** 2025-09-24
-**Status:** Planning Phase
+**Status:** Historical planning document (not the live tracker)
 **GitHub Issue:** [#1765](https://github.com/shakacode/react_on_rails/issues/1765)
+
+> [!WARNING]
+> This file contains the original phased plan and historical context. Some statuses and task checkboxes are outdated.
+>
+> For live execution tracking, use:
+> - [`analysis/MERGER_COMMAND_CENTER.md`](../MERGER_COMMAND_CENTER.md)
+> - [`analysis/PR_ISSUE_TRIAGE_2026-02-08.md`](../PR_ISSUE_TRIAGE_2026-02-08.md)
+> - [`analysis/merger-decisions.md`](../merger-decisions.md)
 
 ## Overview
 

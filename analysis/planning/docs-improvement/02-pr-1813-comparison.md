@@ -589,12 +589,12 @@ For all options and parameters, see [react_component API Reference](/api/view-he
    - `pull-requests.md`
 
 2. **Planning documents:**
-   - `docs/planning/DOCUMENTATION_IMPROVEMENT_PLAN.md` (created in PR #1813)
-   - `docs/planning/DOCS_PR_SUMMARY.md` (created in PR #1813)
+   - `analysis/planning/DOCUMENTATION_IMPROVEMENT_PLAN.md` (created in PR #1813)
+   - `analysis/planning/DOCS_PR_SUMMARY.md` (created in PR #1813)
 
 3. **Root-level internal docs:**
-   - `docs/MONOREPO_MERGER_PLAN.md`
-   - `docs/DIRECTORY_LICENSING.md`
+   - `analysis/contributor-info/monorepo-merger-plan.md`
+   - `analysis/contributor-info/directory-licensing.md`
 
 **Why This Wasn't Fixed:**
 PR #1813 was content-focused, not navigation-focused. Hiding these requires changes to website build (`gatsby-node.js`) to exclude certain paths.

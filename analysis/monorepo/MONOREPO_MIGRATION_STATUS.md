@@ -352,6 +352,6 @@ react_on_rails/                          # Root
 
 **Related Documents:**
 
-- [MONOREPO_MERGER_PLAN.md](docs/MONOREPO_MERGER_PLAN.md) - Complete 8-phase plan
-- [JS_PRO_PACKAGE_SEPARATION_PLAN.md](docs/JS_PRO_PACKAGE_SEPARATION_PLAN.md) - Phase 4 implementation details
+- [MONOREPO_MERGER_PLAN.md](../contributor-info/monorepo-merger-plan.md) - Complete 8-phase plan
+- [JS_PRO_PACKAGE_SEPARATION_PLAN.md](../contributor-info/js-pro-package-separation-plan.md) - Phase 4 implementation details
 - [LICENSE.md](LICENSE.md) - Current licensing structure

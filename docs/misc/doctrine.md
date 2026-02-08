@@ -30,7 +30,7 @@ The React on Rails setup provides several key components related to front-end de
 
 - React on Rails has taken the hard work out of figuring out the JavaScript tooling that works best with Rails. Not only could you spend lots of time researching different tooling, but then you'd have to figure out how to splice it all together. This is where a lot of "JavaScript fatigue" comes from. The following keep the code clean and consistent:
 - [Style Guide](./style.md)
-- [linters](../contributor-info/linters.md)
+- Linting is enforced by the repository tooling; see `CONTRIBUTING.md` for contributor setup.
 
 We're big believers in this quote from the Rails Doctrine:
 

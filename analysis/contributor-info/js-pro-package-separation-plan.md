@@ -1,5 +1,7 @@
 # PR #4: Split JS Pro Code to Separate Package - Implementation Plan
 
+> Internal contributor planning document. Not end-user library documentation.
+
 This comprehensive plan documents all architectural decisions and implementation steps for separating JavaScript Pro functionality from the core React-on-Rails package into a separate `react-on-rails-pro` package.
 
 ## Core Architectural Decisions

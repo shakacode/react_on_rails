@@ -393,12 +393,12 @@ docs/react-on-rails-pro/major-performance-breakthroughs-upgrade-guide.md     →
 **Contributor Info → Not in User Docs**
 
 ```
-docs/contributor-info/linters.md                → CONTRIBUTING.md or separate /contributing site
-docs/contributor-info/coding-agents-guide.md    → CONTRIBUTING.md
-docs/contributor-info/errors-with-hooks.md      → CONTRIBUTING.md
-docs/contributor-info/generator-testing.md      → CONTRIBUTING.md
-docs/contributor-info/releasing.md              → CONTRIBUTING.md
-docs/contributor-info/pull-requests.md          → CONTRIBUTING.md
+analysis/contributor-info/linters.md                → CONTRIBUTING.md or separate /contributing site
+analysis/contributor-info/coding-agents-guide.md    → CONTRIBUTING.md
+analysis/contributor-info/errors-with-hooks.md      → CONTRIBUTING.md
+analysis/contributor-info/generator-testing.md      → CONTRIBUTING.md
+analysis/contributor-info/releasing.md              → CONTRIBUTING.md
+analysis/contributor-info/pull-requests.md          → CONTRIBUTING.md
 ```
 
 **Testimonials → Marketing Website**
@@ -418,10 +418,10 @@ docs/outdated/*                                 → Excluded from build, kept fo
 **Planning/Internal → Excluded from Build**
 
 ```
-docs/planning/*                                 → Excluded via gatsby-node.js filter
-docs/MONOREPO_MERGER_PLAN.md                    → Excluded via gatsby-node.js filter
-docs/DIRECTORY_LICENSING.md                     → Excluded via gatsby-node.js filter
-docs/LICENSING_FAQ.md                           → Maybe move to root? Or exclude?
+analysis/planning/*                                 → Excluded via gatsby-node.js filter
+analysis/contributor-info/monorepo-merger-plan.md                    → Excluded via gatsby-node.js filter
+analysis/contributor-info/directory-licensing.md                     → Excluded via gatsby-node.js filter
+analysis/contributor-info/licensing-faq.md                           → Maybe move to root? Or exclude?
 ```
 
 **Misc Category → Dissolved**
@@ -625,9 +625,9 @@ docs: allFile(
         "/testimonials/",
         "/outdated/",
         "/planning/",
-        "/MONOREPO_MERGER_PLAN.md",
-        "/MONOREPO_MERGER_PLAN_REF.md",
-        "/DIRECTORY_LICENSING.md",
+        "/contributor-info/monorepo-merger-plan.md",
+        "/contributor-info/monorepo-merger-plan-reference.md",
+        "/contributor-info/directory-licensing.md",
       ]
     }
   }
@@ -857,11 +857,11 @@ echo "✅ Files reorganized. Review changes before committing."
 
 **Update `CONTRIBUTING.md` to include:**
 
-- Content from `docs/contributor-info/linters.md`
-- Content from `docs/contributor-info/coding-agents-guide.md`
-- Content from `docs/contributor-info/generator-testing.md`
-- Content from `docs/contributor-info/releasing.md`
-- Content from `docs/contributor-info/pull-requests.md`
+- Content from `analysis/contributor-info/linters.md`
+- Content from `analysis/contributor-info/coding-agents-guide.md`
+- Content from `analysis/contributor-info/generator-testing.md`
+- Content from `analysis/contributor-info/releasing.md`
+- Content from `analysis/contributor-info/pull-requests.md`
 - Content from `docs/misc/style.md`
 
 **OR create `/contributing/` documentation site** (separate from user docs)
@@ -869,7 +869,7 @@ echo "✅ Files reorganized. Review changes before committing."
 **Delete after moving:**
 
 ```bash
-rm -rf docs/contributor-info
+rm -rf analysis/contributor-info
 rm docs/misc/style.md
 ```
 
@@ -984,7 +984,7 @@ rm -rf docs/outdated
 1. `docs/home.md`
 2. `docs/README.md` (or drastically simplified)
 3. `docs/getting-started.md` (content extracted)
-4. `docs/contributor-info/*` (moved to CONTRIBUTING.md)
+4. `analysis/contributor-info/*` (moved to CONTRIBUTING.md)
 5. `docs/testimonials/*` (moved to marketing site)
 6. `docs/misc/style.md` (moved to CONTRIBUTING.md)
 

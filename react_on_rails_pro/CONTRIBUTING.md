@@ -49,6 +49,11 @@ From [How to Write a Git Commit Message](http://chris.beams.io/posts/git-commit/
 When making doc changes, we want the change to work on both [the ShakaCode docs site](https://www.shakacode.com/react-on-rails-pro/docs/) and when browsing the GitHub repo.
 The issue is that the Shakacode site is generated only from files in [`docs`](./docs), so any references from them to non-doc files must use the full GitHub URL.
 
+Documentation boundary rules:
+
+- End-user docs that are published to the site belong in `react_on_rails_pro/docs/`.
+- Internal/team-only docs belong in `../analysis/contributor-info/pro/` (or other `../analysis/` paths), not under `react_on_rails_pro/docs/`.
+
 ### Links to other docs:
 
 - When making references to doc files, use a relative URL path like:
@@ -119,7 +124,7 @@ script/ci-changes-detector origin/master
 - Push Pro changes without testing locally first
 - Modify both Pro and main gem without running full tests
 
-For comprehensive CI documentation, see [`../docs/contributor-info/ci-optimization.md`](../docs/contributor-info/ci-optimization.md) in the repository root.
+For comprehensive CI documentation, see [`../analysis/contributor-info/ci-optimization.md`](../analysis/contributor-info/ci-optimization.md) in the repository root.
 
 # IDE/Editor Setup
 
@@ -395,5 +400,5 @@ rake release[17.0.0,false,verdaccio]
 
 For complete documentation, see:
 
-- [Root Release Documentation](../docs/contributor-info/releasing.md)
+- [Root Release Documentation](../analysis/contributor-info/releasing.md)
 - Run `rake -D release` for inline help

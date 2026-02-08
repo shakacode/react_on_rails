@@ -142,14 +142,14 @@ From `getting-started.md:3-11`:
    - `pull-requests.md` - PR guidelines
 
 2. **Planning documents visible:**
-   - `docs/planning/DOCUMENTATION_IMPROVEMENT_PLAN.md`
-   - `docs/planning/DOCS_PR_SUMMARY.md`
+   - `analysis/planning/DOCUMENTATION_IMPROVEMENT_PLAN.md`
+   - `analysis/planning/DOCS_PR_SUMMARY.md`
    - These are internal planning docs, not user documentation
 
 3. **Root-level internal docs:**
-   - `docs/MONOREPO_MERGER_PLAN.md` (32KB)
-   - `docs/MONOREPO_MERGER_PLAN_REF.md`
-   - `docs/DIRECTORY_LICENSING.md`
+   - `analysis/contributor-info/monorepo-merger-plan.md` (32KB)
+   - `analysis/contributor-info/monorepo-merger-plan-reference.md`
+   - `analysis/contributor-info/directory-licensing.md`
    - Internal project management documents
 
 **Impact:**
@@ -924,7 +924,7 @@ From `README.md`:
 
 **Evidence of Potential Issues:**
 
-From `docs/planning/DOCUMENTATION_IMPROVEMENT_PLAN.md` exists but may have broken links to docs that were moved.
+From `analysis/planning/DOCUMENTATION_IMPROVEMENT_PLAN.md` exists but may have broken links to docs that were moved.
 
 ---
 

@@ -2,20 +2,21 @@
 
 **🏗️ Important: Monorepo Merger in Progress**
 
-We are currently working on merging the `react_on_rails` and `react_on_rails_pro` repositories into a unified monorepo. This will provide better development experience while maintaining separate package identities and licensing. See [docs/MONOREPO_MERGER_PLAN_REF.md](./docs/MONOREPO_MERGER_PLAN_REF.md) for details.
+We are currently working on merging the `react_on_rails` and `react_on_rails_pro` repositories into a unified monorepo. This will provide better development experience while maintaining separate package identities and licensing. See [analysis/contributor-info/monorepo-merger-plan-reference.md](./analysis/contributor-info/monorepo-merger-plan-reference.md) for details.
 
 During this transition:
 
 - Continue contributing to the current structure
 - License compliance remains critical - ensure no Pro code enters MIT-licensed areas
 - Major structural changes may be coordinated with the merger plan
+- Keep documentation boundaries strict: end-user docs in `docs/` (public), internal planning/tracking docs in `analysis/contributor-info/` or `analysis/`
 
 ---
 
-- [docs/contributor-info/Releasing](./docs/contributor-info/releasing.md) for instructions on releasing.
-- [docs/contributor-info/pull-requests](./docs/contributor-info/pull-requests.md)
-- [docs/contributor-info/rbs-type-signatures](./docs/contributor-info/rbs-type-signatures.md) for information on RBS type signatures
-- See other docs in [docs/contributor-info](./docs/contributor-info)
+- [analysis/contributor-info/Releasing](./analysis/contributor-info/releasing.md) for instructions on releasing.
+- [analysis/contributor-info/pull-requests](./analysis/contributor-info/pull-requests.md)
+- [analysis/contributor-info/rbs-type-signatures](./analysis/contributor-info/rbs-type-signatures.md) for information on RBS type signatures
+- See other internal docs in [analysis/contributor-info](./analysis/contributor-info)
 
 ## Prerequisites
 
@@ -534,7 +535,7 @@ The CI system intelligently skips unnecessary work:
 | JS code only               | Skips Ruby-only tests | ~30%       |
 | Workflow changes           | Runs lint only        | ~75%       |
 
-For more details, see [`docs/contributor-info/ci-optimization.md`](./docs/contributor-info/ci-optimization.md).
+For more details, see [`analysis/contributor-info/ci-optimization.md`](./analysis/contributor-info/ci-optimization.md).
 
 ### CI Control Commands
 
@@ -687,7 +688,7 @@ yalc add react-on-rails
 
 ### Testing the Generator
 
-The generators are covered by generator tests using Rails's generator testing helpers, but it never hurts to do a sanity check and explore the API. See [generator-testing.md](docs/contributor-info/generator-testing.md) for a script on how to run the generator on a fresh project.
+The generators are covered by generator tests using Rails's generator testing helpers, but it never hurts to do a sanity check and explore the API. See [generator-testing.md](analysis/contributor-info/generator-testing.md) for a script on how to run the generator on a fresh project.
 
 `rake run_rspec:shakapacker_examples_basic` is a great way to run tests on one generator. Once that works, you should run `rake run_rspec:shakapacker_examples`. Be aware that this will create a huge number of files under a `/gen-examples` directory. You should be sure to exclude this directory from your IDE and delete it once your testing is done.
 

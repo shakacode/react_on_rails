@@ -47,7 +47,8 @@ For merge conflicts, see `.claude/docs/merge-conflict-workflow.md`.
 ## Project Structure
 
 - **Analysis docs**: Place in `/analysis/` directory (kebab-case `.md` files)
-- **Published docs** (`docs/`): Must go in subdirectories (`getting-started/`, `core-concepts/`, `building-features/`, `api-reference/`, `deployment/`, `migrating/`, `upgrading/`, `contributor-info/`, `misc/`). Never place at `docs/` root.
+- **Published docs** (`docs/`): Must go in subdirectories (`getting-started/`, `core-concepts/`, `building-features/`, `api-reference/`, `deployment/`, `migrating/`, `upgrading/`, `misc/`). Never place at `docs/` root.
+- **Internal/contributor docs**: Keep under `/analysis/contributor-info/` (not under `/docs/`).
 - **Architecture**: See `.claude/docs/project-architecture.md` for monorepo layout, core components, and build system
 - **Pro package**: See `react_on_rails_pro/CLAUDE.md` for Pro-specific guidance
 

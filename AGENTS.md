@@ -59,7 +59,7 @@ cd react_on_rails/spec/dummy && bundle exec rspec spec/path/to/spec.rb
 | `react_on_rails_pro/`                | Pro package (separate gem + npm, own lint config)                                                       |
 | `rakelib/`                           | Rake task definitions                                                                                   |
 | `docs/`                              | Published to the [ShakaCode website](https://www.shakacode.com/react-on-rails/docs/) — user-facing only |
-| `docs/contributor-info/`             | Internal contributor docs (excluded from website)                                                       |
+| `analysis/contributor-info/`             | Internal contributor docs (excluded from website)                                                       |
 
 ## Code Style
 
