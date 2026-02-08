@@ -95,9 +95,9 @@ jobs:
       - name: Setup Node
         uses: ./.github/actions/setup-node-with-retry
         with:
-          # Pin to 22.12.x (LTS) - V8 bug from issue #56010 was fixed in 22.12.0
+          # Pin to 22.11.0 (LTS) to avoid V8 bug in 22.21.0
           # https://github.com/nodejs/node/issues/56010
-          node-version: '22.12.x'
+          node-version: '22.11.0'
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -202,9 +202,9 @@ jobs:
       - name: Setup Node
         uses: ./.github/actions/setup-node-with-retry
         with:
-          # Pin to 22.12.x (LTS) - V8 bug from issue #56010 was fixed in 22.12.0
+          # Pin to 22.11.0 (LTS) to avoid V8 bug in 22.21.0
           # https://github.com/nodejs/node/issues/56010
-          node-version: '22.12.x'
+          node-version: '22.11.0'
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -402,9 +402,9 @@ jobs:
       - name: Setup Node
         uses: ./.github/actions/setup-node-with-retry
         with:
-          # Pin to 22.12.x (LTS) - V8 bug from issue #56010 was fixed in 22.12.0
+          # Pin to 22.11.0 (LTS) to avoid V8 bug in 22.21.0
           # https://github.com/nodejs/node/issues/56010
-          node-version: '22.12.x'
+          node-version: '22.11.0'
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
