@@ -1,6 +1,7 @@
 export interface CliOptions {
   template: 'javascript' | 'typescript';
   packageManager: 'npm' | 'pnpm';
+  rspack: boolean;
   skipInstall: boolean;
 }
 

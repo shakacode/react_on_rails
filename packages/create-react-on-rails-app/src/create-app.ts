@@ -12,6 +12,10 @@ function buildGeneratorArgs(options: CliOptions): string {
     args.push('--typescript');
   }
 
+  if (options.rspack) {
+    args.push('--rspack');
+  }
+
   args.push('--ignore-warnings');
 
   return args.length > 0 ? ` ${args.join(' ')}` : '';

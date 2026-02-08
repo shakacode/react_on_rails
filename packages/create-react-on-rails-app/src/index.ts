@@ -30,6 +30,7 @@ function run(appName: string, rawOpts: Record<string, unknown>): void {
   const options: CliOptions = {
     template,
     packageManager: packageManager as 'npm' | 'pnpm',
+    rspack: rawOpts.rspack as boolean,
     skipInstall: rawOpts.skipInstall as boolean,
   };
 
@@ -66,7 +67,7 @@ function run(appName: string, rawOpts: Record<string, unknown>): void {
 
   console.log('');
   logInfo(
-    `Creating "${appName}" with template: ${options.template}, package manager: ${options.packageManager}`,
+    `Creating "${appName}" with template: ${options.template}, package manager: ${options.packageManager}${options.rspack ? ', bundler: rspack' : ''}`,
   );
 
   createApp(appName, options);
@@ -76,12 +77,35 @@ const program = new Command();
 
 program
   .name('create-react-on-rails-app')
-  .description('Create a new React on Rails application')
+  .description(
+    'Create a new React on Rails application with a single command.\n\n' +
+      'Sets up a Rails app with React, Webpack/Rspack, server-side rendering,\n' +
+      'and hot module replacement - ready to develop in minutes.',
+  )
   .version(packageJson.version)
   .argument('<app-name>', 'Name of the application to create')
-  .option('--template <type>', 'Template to use (javascript or typescript)', 'javascript')
-  .option('--package-manager <pm>', 'Package manager to use (npm or pnpm)')
-  .option('--skip-install', 'Skip installing dependencies', false)
+  .option('-t, --template <type>', 'javascript or typescript', 'typescript')
+  .option('-p, --package-manager <pm>', 'npm or pnpm (auto-detected if not specified)')
+  .option('--rspack', 'Use Rspack instead of Webpack (~20x faster builds)', false)
+  .option('--skip-install', 'Skip installing JS dependencies', false)
+  .addHelpText(
+    'after',
+    `
+Examples:
+  $ npx create-react-on-rails-app my-app
+  $ npx create-react-on-rails-app my-app --template javascript
+  $ npx create-react-on-rails-app my-app --rspack
+  $ npx create-react-on-rails-app my-app --package-manager pnpm
+
+What it does:
+  1. Creates a new Rails app with PostgreSQL
+  2. Adds the react_on_rails gem
+  3. Runs the React on Rails generator (Shakapacker, components, webpack config)
+
+After setup, run bin/dev and visit http://localhost:3000/hello_world
+
+Documentation: https://www.shakacode.com/react-on-rails/docs/`,
+  )
   .action((appName: string, opts: Record<string, unknown>) => {
     try {
       run(appName, opts);
