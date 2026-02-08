@@ -96,7 +96,7 @@
   "scripts": {
     "test": "pnpm run build:test && pnpm run lint && rspec",
     "lint": "cd ../.. && nps lint",
-    "e2e-test": "playwright test",
+    "e2e-test": "npx playwright test",
     "postinstall": "test -f post-pnpm-install.local && ./post-pnpm-install.local || true",
     "build:test": "rm -rf public/webpack/test && rm -rf ssr-generated && RAILS_ENV=test NODE_ENV=test bin/shakapacker",
     "build:dev": "rm -rf public/webpack/development && rm -rf ssr-generated && RAILS_ENV=development NODE_ENV=development bin/shakapacker",
