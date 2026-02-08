@@ -227,6 +227,9 @@ jobs:
       - name: Install Node modules with pnpm
         run: pnpm install --frozen-lockfile
 
+      - name: Build workspace packages
+        run: pnpm run build
+
       - name: Save Core dummy app ruby gems to cache
         if: env.RUN_CORE
         uses: actions/cache@v4

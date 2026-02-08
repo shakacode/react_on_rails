@@ -134,6 +134,10 @@ jobs:
         working-directory: .
         run: pnpm install --frozen-lockfile
 
+      - name: Build workspace packages
+        working-directory: .
+        run: pnpm run build
+
       - name: Install Ruby Gems for Pro dummy app
         run: |
           gem install bundler -v "2.5.4"
@@ -241,6 +245,10 @@ jobs:
       - name: Install Node modules with pnpm
         working-directory: .
         run: pnpm install --frozen-lockfile
+
+      - name: Build workspace packages
+        working-directory: .
+        run: pnpm run build
 
       - name: Run JS unit tests for Pro package
         run: pnpm --filter react-on-rails-pro-node-renderer run ci

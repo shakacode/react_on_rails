@@ -134,6 +134,10 @@ jobs:
         working-directory: .
         run: pnpm install --frozen-lockfile
 
+      - name: Build workspace packages
+        working-directory: .
+        run: pnpm run build
+
       - name: Install Ruby Gems for Pro dummy app
         run: |
           gem install bundler -v "2.5.4"
@@ -257,6 +261,10 @@ jobs:
       - name: Install Node modules with pnpm
         working-directory: .
         run: pnpm install --frozen-lockfile
+
+      - name: Build workspace packages
+        working-directory: .
+        run: pnpm run build
 
       - name: Ensure minimum required Chrome version
         run: |
@@ -453,6 +461,10 @@ jobs:
       - name: Install Node modules with pnpm
         working-directory: .
         run: pnpm install --frozen-lockfile
+
+      - name: Build workspace packages
+        working-directory: .
+        run: pnpm run build
 
       - name: Ensure minimum required Chrome version
         run: |

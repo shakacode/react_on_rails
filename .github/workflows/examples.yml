@@ -150,6 +150,9 @@ jobs:
       - name: Install Node modules with pnpm
         run: pnpm install ${{ matrix.dependency-level == 'latest' && '--frozen-lockfile' || '--no-frozen-lockfile' }}
 
+      - name: Build workspace packages
+        run: pnpm run build
+
       - name: Install Ruby Gems for package
         run: |
           cd react_on_rails

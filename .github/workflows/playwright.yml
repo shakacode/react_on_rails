@@ -71,6 +71,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      - name: Build workspace packages
+        run: pnpm run build
+
       - name: Install dummy app Ruby dependencies
         working-directory: react_on_rails/spec/dummy
         run: bundle install

@@ -6,9 +6,9 @@ namespace :dummy_apps do
   include ReactOnRails::TaskHelpers
 
   task :pnpm_install do
-    # Dummy apps are now part of the pnpm workspace, so dependencies are linked automatically
-    pnpm_install_cmd = "pnpm install"
-    sh_in_dir(dummy_app_dir, pnpm_install_cmd)
+    # Dummy apps are now part of the pnpm workspace, so install must run from the workspace root.
+    # Running `pnpm install` from a workspace member directory doesn't resolve other workspace packages.
+    sh_in_dir(monorepo_root, "pnpm install")
   end
 
   task dummy_app: [:pnpm_install] do
