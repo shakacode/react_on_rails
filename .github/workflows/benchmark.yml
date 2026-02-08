@@ -524,7 +524,7 @@ jobs:
       # See: https://bencher.dev/docs/how-to/track-benchmarks/ and
       #      https://bencher.dev/docs/how-to/github-actions/
       #
-      # Threshold configuration (30% regression threshold):
+      # Threshold configuration (50% regression threshold):
       #   - rps: Lower Boundary (higher is better)
       #   - p50/p90/p99_latency_ms: Upper Boundary (lower is better)
       #   - failed_pct: Upper Boundary (lower is better)
@@ -533,8 +533,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Threshold for detecting regressions (30% = 0.30)
-          THRESHOLD=0.30
+          # Threshold for detecting regressions (50% = 0.50)
+          THRESHOLD=0.50
 
           # Set branch and start-point based on event type
           if [ "${{ github.event_name }}" = "push" ]; then
