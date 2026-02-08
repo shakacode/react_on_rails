@@ -148,6 +148,8 @@ jobs:
         run: pnpm install ${{ matrix.dependency-level == 'latest' && '--frozen-lockfile' || '--no-frozen-lockfile' }}
       - name: Build workspace packages
         run: pnpm run build
+      - name: Verify single React resolution for core dummy build
+        run: node script/check-single-react-resolution.mjs react_on_rails/spec/dummy packages/react-on-rails
       - name: Save dummy app ruby gems to cache
         uses: actions/cache@v4
         with:
@@ -162,6 +164,8 @@ jobs:
           fi
       - name: generate file system-based packs
         run: cd react_on_rails/spec/dummy && RAILS_ENV="test" bundle exec rake react_on_rails:generate_packs
+      - name: Smoke check generated pack entrypoints
+        run: test -s react_on_rails/spec/dummy/client/app/generated/server-bundle-generated.js
       - name: Build test bundles for dummy app
         run: |
           rm -rf react_on_rails/spec/dummy/public/webpack/test

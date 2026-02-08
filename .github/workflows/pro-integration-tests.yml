@@ -137,6 +137,9 @@ jobs:
       - name: Build workspace packages
         working-directory: .
         run: pnpm run build
+      - name: Verify single React resolution for Pro dummy build
+        working-directory: .
+        run: node script/check-single-react-resolution.mjs react_on_rails/spec/dummy react_on_rails_pro/spec/dummy
 
       - name: Install Ruby Gems for Pro dummy app
         run: |
@@ -147,6 +150,8 @@ jobs:
 
       - name: Generate file-system based entrypoints
         run: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
+      - name: Smoke check generated pack entrypoints
+        run: test -s spec/dummy/client/app/generated/server-bundle-generated.js
 
       - name: Build test bundles for Pro dummy app
         run: cd spec/dummy && pnpm run build:test

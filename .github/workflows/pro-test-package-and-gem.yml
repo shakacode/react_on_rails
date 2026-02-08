@@ -95,9 +95,9 @@ jobs:
       - name: Setup Node
         uses: ./.github/actions/setup-node-with-retry
         with:
-          # Pin to 22.11.0 (LTS) to avoid V8 bug in 22.21.0
+          # Pin to 22.12.x (LTS) - V8 bug from issue #56010 was fixed in 22.12.0
           # https://github.com/nodejs/node/issues/56010
-          node-version: '22.11.0'
+          node-version: '22.12.x'
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -137,6 +137,9 @@ jobs:
       - name: Build workspace packages
         working-directory: .
         run: pnpm run build
+      - name: Verify single React resolution for Pro dummy build
+        working-directory: .
+        run: node script/check-single-react-resolution.mjs react_on_rails/spec/dummy react_on_rails_pro/spec/dummy
 
       - name: Install Ruby Gems for Pro dummy app
         run: |
@@ -147,6 +150,8 @@ jobs:
 
       - name: Generate file-system based entrypoints
         run: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
+      - name: Smoke check generated pack entrypoints
+        run: test -s spec/dummy/client/app/generated/server-bundle-generated.js
 
       - name: Build test bundles for Pro dummy app
         run: cd spec/dummy && pnpm run build:test
@@ -199,9 +204,9 @@ jobs:
       - name: Setup Node
         uses: ./.github/actions/setup-node-with-retry
         with:
-          # Pin to 22.11.0 (LTS) to avoid V8 bug in 22.21.0
+          # Pin to 22.12.x (LTS) - V8 bug from issue #56010 was fixed in 22.12.0
           # https://github.com/nodejs/node/issues/56010
-          node-version: '22.11.0'
+          node-version: '22.12.x'
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
