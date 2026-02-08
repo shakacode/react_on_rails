@@ -410,10 +410,10 @@ module ReactOnRails
     end
 
     def relative_path(from, to)
-      from_path = Pathname.new(from)
+      from_dir = Pathname.new(from).dirname
       to_path = Pathname.new(to)
 
-      to_path.relative_path_from(from_path.dirname)
+      to_path.relative_path_from(from_dir)
     end
 
     def generated_pack_path(file_path)

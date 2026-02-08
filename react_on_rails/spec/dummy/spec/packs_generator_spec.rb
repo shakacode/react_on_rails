@@ -870,6 +870,45 @@ module ReactOnRails
       end
     end
 
+    describe "#relative_path" do
+      subject { described_class.instance.send(:relative_path, from, to).to_s }
+
+      context "when target is one directory up from generated pack" do
+        let(:from) { "/app/javascript/packs/generated/MyComponent.js" }
+        let(:to) { "/app/javascript/packs/components/MyComponent.jsx" }
+
+        it { is_expected.to eq "../components/MyComponent.jsx" }
+      end
+
+      context "when target is multiple directories up from generated pack" do
+        let(:from) { "/app/javascript/packs/generated/MyComponent.js" }
+        let(:to) { "/app/javascript/src/deep/components/MyComponent.jsx" }
+
+        it { is_expected.to eq "../../src/deep/components/MyComponent.jsx" }
+      end
+
+      context "when target is deeply nested relative to generated pack" do
+        let(:from) { "/app/javascript/packs/generated/MyComponent.js" }
+        let(:to) { "/app/src/nested/deeply/components/MyComponent.jsx" }
+
+        it { is_expected.to eq "../../../src/nested/deeply/components/MyComponent.jsx" }
+      end
+
+      context "when from and to are in sibling directories" do
+        let(:from) { "/app/packs/server-bundle.js" }
+        let(:to) { "/app/generated/server-bundle-generated.js" }
+
+        it { is_expected.to eq "../generated/server-bundle-generated.js" }
+      end
+
+      context "when from and to are in the same directory" do
+        let(:from) { "/app/generated/server-bundle.js" }
+        let(:to) { "/app/generated/server-bundle-generated.js" }
+
+        it { is_expected.to eq "server-bundle-generated.js" }
+      end
+    end
+
     describe "#client_entrypoint?" do
       subject { described_class.instance.send(:client_entrypoint?, "dummy_path.js") }
 
