@@ -30,6 +30,7 @@ export function register(components: Record<string, ReactComponentOrRenderFuncti
     }
 
     const existing = componentRegistry.getIfExists(name);
+    // Detect HMR: covers webpack (module.hot) and rspack (module.hot)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const isHMR = typeof module !== 'undefined' && (module as any).hot;
     if (existing && existing.component !== component && !isHMR) {

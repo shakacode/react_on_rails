@@ -19,6 +19,7 @@ export default {
       }
 
       const existing = registeredStoreGenerators.get(name);
+      // Detect HMR: covers webpack (module.hot) and rspack (module.hot)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
       const isHMR = typeof module !== 'undefined' && (module as any).hot;
       if (existing && existing !== store && !isHMR) {

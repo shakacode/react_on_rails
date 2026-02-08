@@ -34,6 +34,7 @@ export function register(storeGenerators: Record<string, StoreGenerator>): void 
     }
 
     const existing = storeGeneratorRegistry.getIfExists(name);
+    // Detect HMR: covers webpack (module.hot) and rspack (module.hot)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const isHMR = typeof module !== 'undefined' && (module as any).hot;
     if (existing && existing !== storeGenerator && !isHMR) {
