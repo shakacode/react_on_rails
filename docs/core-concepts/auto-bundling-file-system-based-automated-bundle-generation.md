@@ -534,7 +534,11 @@ export default ReScriptShow;
 This pattern works for any transpiled language and requires no gem configuration changes. The wrapper file can use `.js`, `.jsx`, `.ts`, or `.tsx` depending on your project setup.
 
 > [!NOTE]
-> While it's possible to add gem-level configuration for additional extensions, the wrapper-file pattern is recommended because it works immediately with no configuration changes and makes the component registration explicit.
+> While it's possible to add gem-level configuration for additional extensions, the wrapper-file pattern is recommended because it:
+>
+> - Works immediately with no configuration changes
+> - Makes the component registration explicit and visible in the file tree
+> - Avoids coupling your build pipeline to gem internals that may change between versions
 
 ### Using Automated Bundle Generation Feature with already defined packs
 
@@ -554,6 +558,7 @@ As of version 13.3.4, bundles inside directories that match `config.components_s
 - Run `rake react_on_rails:generate_packs` to generate the component bundles
 - Check that your component exports a default export: `export default MyComponent;`
 - Verify the component name matches the directory structure
+- If using a transpiled language (ReScript, Reason, etc.), see [Transpiled Languages](#transpiled-languages-rescript-reason-etc) — files like `MyComponent.bs.js` register as `MyComponent.bs` instead of `MyComponent`
 
 #### 2. CSS not loading (FOUC - Flash of Unstyled Content)
 
