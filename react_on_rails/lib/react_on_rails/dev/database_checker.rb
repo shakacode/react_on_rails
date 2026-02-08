@@ -70,6 +70,10 @@ module ReactOnRails
 
         def run_database_check
           check_script = <<~RUBY
+            unless defined?(ActiveRecord)
+              puts 'DATABASE_OK'
+              exit
+            end
             begin
               ActiveRecord::Base.connection.execute('SELECT 1')
               puts 'DATABASE_OK'

@@ -76,6 +76,20 @@ RSpec.describe ReactOnRails::Dev::DatabaseChecker do
       end
     end
 
+    context "when app does not use ActiveRecord" do
+      it "returns true (DATABASE_OK from the guard clause)" do
+        allow(Open3).to receive(:capture3)
+          .with("bin/rails", "runner", anything)
+          .and_return(["DATABASE_OK\n", "", mock_status(success: true)])
+
+        allow(Open3).to receive(:capture3)
+          .with("bin/rails", "db:migrate:status")
+          .and_return(["", "", mock_status(success: false)])
+
+        expect(described_class.check_database).to be true
+      end
+    end
+
     context "when bin/rails is not found" do
       it "returns true to allow server to start and show the real error" do
         allow(Open3).to receive(:capture3)
