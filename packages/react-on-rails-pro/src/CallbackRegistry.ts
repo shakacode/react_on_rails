@@ -101,6 +101,10 @@ export default class CallbackRegistry<T> {
     return this.registeredItems.has(name);
   }
 
+  getIfExists(name: string): T | undefined {
+    return this.registeredItems.get(name);
+  }
+
   clear(): void {
     this.registeredItems.clear();
     this.notUsedItems.clear();

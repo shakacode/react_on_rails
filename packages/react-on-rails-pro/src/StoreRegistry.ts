@@ -25,15 +25,21 @@ const hydratedStoreRegistry = new CallbackRegistry<Store>('hydrated store');
  */
 export function register(storeGenerators: Record<string, StoreGenerator>): void {
   Object.keys(storeGenerators).forEach((name) => {
-    if (storeGeneratorRegistry.has(name)) {
-      console.warn('Called registerStore for store that is already registered', name);
-    }
-
     const storeGenerator = storeGenerators[name];
     if (!storeGenerator) {
       throw new Error(
         'Called ReactOnRails.registerStoreGenerators with a null or undefined as a value ' +
           `for the store generator with key ${name}.`,
+      );
+    }
+
+    const existing = storeGeneratorRegistry.getIfExists(name);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const isHMR = typeof module !== 'undefined' && (module as any).hot;
+    if (existing && existing !== storeGenerator && !isHMR) {
+      console.error(
+        `ReactOnRails: Store "${name}" was registered with a different store generator than previously. ` +
+          'This is likely a bug — ensure each store has a unique registration name.',
       );
     }
 
