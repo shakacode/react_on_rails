@@ -23,6 +23,7 @@ Use these docs for Claude-oriented operational guidance:
 
 - `.claude/docs/avoiding-ci-failure-cycles.md`
 - `.claude/docs/replicating-ci-failures.md`
+- `.claude/docs/playwright-e2e-testing.md`
 - `.claude/docs/merge-conflict-workflow.md`
 - `.claude/docs/pr-splitting-strategy.md`
 - `.claude/docs/changelog-guidelines.md`
