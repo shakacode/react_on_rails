@@ -524,17 +524,25 @@ jobs:
       # See: https://bencher.dev/docs/how-to/track-benchmarks/ and
       #      https://bencher.dev/docs/how-to/github-actions/
       #
-      # Threshold configuration (50% regression threshold):
+      # Threshold configuration using Student's t-test:
+      #   Uses historical data to detect statistically significant regressions
+      #   rather than a fixed percentage. The boundary value (0.95) is the
+      #   confidence interval — an alert fires when a new metric falls outside
+      #   the 95% CI of the historical distribution.
       #   - rps: Lower Boundary (higher is better)
       #   - p50/p90/p99_latency_ms: Upper Boundary (lower is better)
       #   - failed_pct: Upper Boundary (lower is better)
+      #
+      #   max-sample-size limits historical data to the most recent 64 runs
+      #   to keep the baseline relevant as performance evolves.
 
       - name: Track benchmarks with Bencher
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Threshold for detecting regressions (50% = 0.50)
-          THRESHOLD=0.50
+          # Confidence interval for t-test (0.95 = 95% CI)
+          BOUNDARY=0.95
+          MAX_SAMPLE=64
 
           # Set branch and start-point based on event type
           if [ "${{ github.event_name }}" = "push" ]; then
@@ -582,25 +590,30 @@ jobs:
             --quiet \
             --format html \
             --threshold-measure rps \
-            --threshold-test percentage \
-            --threshold-lower-boundary $THRESHOLD \
+            --threshold-test t_test \
+            --threshold-max-sample-size $MAX_SAMPLE \
+            --threshold-lower-boundary $BOUNDARY \
             --threshold-upper-boundary _ \
             --threshold-measure p50_latency \
-            --threshold-test percentage \
+            --threshold-test t_test \
+            --threshold-max-sample-size $MAX_SAMPLE \
             --threshold-lower-boundary _ \
-            --threshold-upper-boundary $THRESHOLD \
+            --threshold-upper-boundary $BOUNDARY \
             --threshold-measure p90_latency \
-            --threshold-test percentage \
+            --threshold-test t_test \
+            --threshold-max-sample-size $MAX_SAMPLE \
             --threshold-lower-boundary _ \
-            --threshold-upper-boundary $THRESHOLD \
+            --threshold-upper-boundary $BOUNDARY \
             --threshold-measure p99_latency \
-            --threshold-test percentage \
+            --threshold-test t_test \
+            --threshold-max-sample-size $MAX_SAMPLE \
             --threshold-lower-boundary _ \
-            --threshold-upper-boundary $THRESHOLD \
+            --threshold-upper-boundary $BOUNDARY \
             --threshold-measure failed_pct \
-            --threshold-test percentage \
+            --threshold-test t_test \
+            --threshold-max-sample-size $MAX_SAMPLE \
             --threshold-lower-boundary _ \
-            --threshold-upper-boundary $THRESHOLD \
+            --threshold-upper-boundary $BOUNDARY \
             $EXTRA_ARGS > bench_results/bencher_report.html
           BENCHER_EXIT_CODE=$?
           set -e
