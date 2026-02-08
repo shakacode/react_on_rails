@@ -512,7 +512,7 @@ jobs:
           echo "Rails server started after ${elapsed}s"
 
       - name: Install Playwright dependencies
-        run: cd spec/dummy && pnpm playwright install --with-deps
+        run: cd spec/dummy && npx playwright install --with-deps
 
       - name: Run Playwright E2E tests for Pro dummy app
         run: cd spec/dummy && pnpm e2e-test

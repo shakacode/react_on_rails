@@ -82,8 +82,8 @@
     "build:dev:server": "rm -rf public/webpack/development && pnpm run build:rescript && RAILS_ENV=development NODE_ENV=development bin/shakapacker --watch",
     "build:dev:watch": "rescript build -w && RAILS_ENV=development NODE_ENV=development bin/shakapacker --watch",
     "build:clean": "pnpm run build:rescript && rm -rf public/webpack || true",
-    "build:rescript": "pnpm exec rescript clean && pnpm exec rescript build -with-deps",
-    "build:rescript:dev": "pnpm exec rescript build -w"
+    "build:rescript": "rescript clean && rescript build -with-deps",
+    "build:rescript:dev": "rescript build -w"
   },
   "version": "0.0.0",
   "packageManager": "pnpm@9.14.2"

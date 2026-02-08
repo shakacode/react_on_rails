@@ -80,7 +80,7 @@ jobs:
 
       - name: Install Playwright browsers
         working-directory: react_on_rails/spec/dummy
-        run: pnpm exec playwright install --with-deps
+        run: npx playwright install --with-deps
 
       - name: Generate React on Rails packs
         working-directory: react_on_rails/spec/dummy
