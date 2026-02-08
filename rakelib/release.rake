@@ -151,6 +151,7 @@ This will update and release:
     - react-on-rails NPM package
     - react-on-rails-pro NPM package
     - react-on-rails-pro-node-renderer NPM package
+    - create-react-on-rails-app NPM package
     - react_on_rails RubyGem
     - react_on_rails_pro RubyGem
 
@@ -277,7 +278,8 @@ task :release, %i[version dry_run] do |_t, args|
     File.join(monorepo_root, "package.json"),
     File.join(monorepo_root, "packages", "react-on-rails", "package.json"),
     File.join(monorepo_root, "packages", "react-on-rails-pro", "package.json"),
-    File.join(monorepo_root, "packages", "react-on-rails-pro-node-renderer", "package.json")
+    File.join(monorepo_root, "packages", "react-on-rails-pro-node-renderer", "package.json"),
+    File.join(monorepo_root, "packages", "create-react-on-rails-app", "package.json")
   ]
 
   package_json_files.each do |file|
@@ -371,9 +373,17 @@ task :release, %i[version dry_run] do |_t, args|
     puts "=" * 80
 
     # Publish react-on-rails-pro-node-renderer NPM package (with retry)
-    publish_npm_with_retry(
+    current_npm_otp = publish_npm_with_retry(
       File.join(monorepo_root, "packages", "react-on-rails-pro-node-renderer"),
       "react-on-rails-pro-node-renderer@#{actual_npm_version}",
+      base_args: npm_base_args,
+      otp: current_npm_otp
+    )
+
+    # Publish create-react-on-rails-app NPM package (with retry)
+    publish_npm_with_retry(
+      File.join(monorepo_root, "packages", "create-react-on-rails-app"),
+      "create-react-on-rails-app@#{actual_npm_version}",
       base_args: npm_base_args,
       otp: current_npm_otp
     )
@@ -414,6 +424,7 @@ task :release, %i[version dry_run] do |_t, args|
     puts "  - packages/react-on-rails/package.json"
     puts "  - packages/react-on-rails-pro/package.json (version only; workspace:* converted by pnpm)"
     puts "  - packages/react-on-rails-pro-node-renderer/package.json"
+    puts "  - packages/create-react-on-rails-app/package.json"
     puts "  - Gemfile.lock files (root, dummy apps, pro)"
     puts "\nAuto-synced (no write needed):"
     puts "  - react_on_rails_pro/react_on_rails_pro.gemspec (uses ReactOnRails::VERSION)"
@@ -429,6 +440,7 @@ task :release, %i[version dry_run] do |_t, args|
         - react-on-rails@#{actual_npm_version}
         - react-on-rails-pro@#{actual_npm_version}
         - react-on-rails-pro-node-renderer@#{actual_npm_version}
+        - create-react-on-rails-app@#{actual_npm_version}
 
       Ruby Gems (RubyGems.org):
         - react_on_rails #{actual_gem_version}
