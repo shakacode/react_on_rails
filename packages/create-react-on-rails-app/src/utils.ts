@@ -1,4 +1,4 @@
-import { execSync, ExecSyncOptions } from 'child_process';
+import { execSync, spawnSync, ExecSyncOptions } from 'child_process';
 import chalk from 'chalk';
 
 export function exec(command: string, options: ExecSyncOptions = {}): string {
@@ -10,11 +10,17 @@ export function exec(command: string, options: ExecSyncOptions = {}): string {
   return String(result).trim();
 }
 
-export function execLive(command: string, cwd?: string): void {
-  execSync(command, {
+export function execLiveArgs(command: string, args: string[], cwd?: string): void {
+  const result = spawnSync(command, args, {
     stdio: 'inherit',
     cwd,
   });
+  if (result.error) {
+    throw result.error;
+  }
+  if (result.status !== 0) {
+    throw new Error(`Command "${command}" exited with code ${result.status}`);
+  }
 }
 
 export function getCommandVersion(command: string): string | null {

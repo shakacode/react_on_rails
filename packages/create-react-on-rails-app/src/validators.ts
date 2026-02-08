@@ -40,15 +40,20 @@ export function validateRuby(): ValidationResult {
   }
 
   const match = rubyVersion.match(/ruby\s+(\d+)\.(\d+)/);
-  if (match) {
-    const major = parseInt(match[1], 10);
-    const minor = parseInt(match[2], 10);
-    if (major < MIN_RUBY_MAJOR || (major === MIN_RUBY_MAJOR && minor < MIN_RUBY_MINOR)) {
-      return {
-        valid: false,
-        message: `Ruby ${major}.${minor} detected. React on Rails requires Ruby ${MIN_RUBY_MAJOR}.${MIN_RUBY_MINOR}+.`,
-      };
-    }
+  if (!match) {
+    return {
+      valid: false,
+      message: `Could not parse Ruby version from: "${rubyVersion.split('\n')[0].trim()}". Please ensure Ruby ${MIN_RUBY_MAJOR}.${MIN_RUBY_MINOR}+ is installed.`,
+    };
+  }
+
+  const major = parseInt(match[1], 10);
+  const minor = parseInt(match[2], 10);
+  if (major < MIN_RUBY_MAJOR || (major === MIN_RUBY_MAJOR && minor < MIN_RUBY_MINOR)) {
+    return {
+      valid: false,
+      message: `Ruby ${major}.${minor} detected. React on Rails requires Ruby ${MIN_RUBY_MAJOR}.${MIN_RUBY_MINOR}+.`,
+    };
   }
 
   return { valid: true, message: rubyVersion.split('\n')[0].trim() };

@@ -1,11 +1,11 @@
 import path from 'path';
 import fs from 'fs';
 import { CliOptions } from './types.js';
-import { execLive, logStep, logStepDone, logError, logSuccess, logInfo } from './utils.js';
+import { execLiveArgs, logStep, logStepDone, logError, logSuccess, logInfo } from './utils.js';
 
 const TOTAL_STEPS = 4;
 
-function buildGeneratorArgs(options: CliOptions): string {
+function buildGeneratorArgs(options: CliOptions): string[] {
   const args: string[] = [];
 
   if (options.template === 'typescript') {
@@ -18,7 +18,7 @@ function buildGeneratorArgs(options: CliOptions): string {
 
   args.push('--ignore-warnings');
 
-  return args.length > 0 ? ` ${args.join(' ')}` : '';
+  return args;
 }
 
 function printSuccessMessage(appName: string): void {
@@ -64,20 +64,26 @@ export function createApp(appName: string, options: CliOptions): void {
   // Step 1: Create Rails application
   logStep(1, TOTAL_STEPS, 'Creating Rails application...');
   try {
-    execLive(`rails new ${appName} --database=postgresql --skip-javascript`);
+    execLiveArgs('rails', ['new', appName, '--database=postgresql', '--skip-javascript']);
     logStepDone('Rails application created');
-  } catch {
+  } catch (error) {
     logError('Failed to create Rails application. Check the output above for details.');
+    if (error instanceof Error && error.message) {
+      console.error(`Debug info: ${error.message}`);
+    }
     process.exit(1);
   }
 
   // Step 2: Add react_on_rails gem
   logStep(2, TOTAL_STEPS, 'Adding react_on_rails gem...');
   try {
-    execLive('bundle add react_on_rails --strict', appPath);
+    execLiveArgs('bundle', ['add', 'react_on_rails', '--strict'], appPath);
     logStepDone('react_on_rails gem added');
-  } catch {
+  } catch (error) {
     logError('Failed to add react_on_rails gem. Check the output above for details.');
+    if (error instanceof Error && error.message) {
+      console.error(`Debug info: ${error.message}`);
+    }
     process.exit(1);
   }
 
@@ -85,10 +91,17 @@ export function createApp(appName: string, options: CliOptions): void {
   const generatorArgs = buildGeneratorArgs(options);
   logStep(3, TOTAL_STEPS, 'Running React on Rails generator...');
   try {
-    execLive(`bundle exec rails generate react_on_rails:install${generatorArgs}`, appPath);
+    execLiveArgs(
+      'bundle',
+      ['exec', 'rails', 'generate', 'react_on_rails:install', ...generatorArgs],
+      appPath,
+    );
     logStepDone('React on Rails setup complete');
-  } catch {
+  } catch (error) {
     logError('React on Rails generator failed. Check the output above for details.');
+    if (error instanceof Error && error.message) {
+      console.error(`Debug info: ${error.message}`);
+    }
     process.exit(1);
   }
 

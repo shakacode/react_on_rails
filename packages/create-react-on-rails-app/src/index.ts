@@ -11,9 +11,9 @@ const packageJsonPath = path.resolve(__dirname, '../package.json');
 const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8')) as { version: string };
 
 function run(appName: string, rawOpts: Record<string, unknown>): void {
-  const template = rawOpts.template as string;
-  if (template !== 'javascript' && template !== 'typescript') {
-    logError(`Invalid template "${template}". Must be "javascript" or "typescript".`);
+  const { template } = rawOpts;
+  if (typeof template !== 'string' || (template !== 'javascript' && template !== 'typescript')) {
+    logError(`Invalid template "${String(template)}". Must be "javascript" or "typescript".`);
     process.exit(1);
   }
 
@@ -30,8 +30,7 @@ function run(appName: string, rawOpts: Record<string, unknown>): void {
   const options: CliOptions = {
     template,
     packageManager: packageManager as 'npm' | 'pnpm',
-    rspack: rawOpts.rspack as boolean,
-    skipInstall: rawOpts.skipInstall as boolean,
+    rspack: Boolean(rawOpts.rspack),
   };
 
   console.log('');
@@ -87,7 +86,6 @@ program
   .option('-t, --template <type>', 'javascript or typescript', 'typescript')
   .option('-p, --package-manager <pm>', 'npm or pnpm (auto-detected if not specified)')
   .option('--rspack', 'Use Rspack instead of Webpack (~20x faster builds)', false)
-  .option('--skip-install', 'Skip installing JS dependencies', false)
   .addHelpText(
     'after',
     `
