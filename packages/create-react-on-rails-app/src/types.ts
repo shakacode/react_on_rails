@@ -8,8 +8,3 @@ export interface ValidationResult {
   valid: boolean;
   message: string;
 }
-
-export interface StepResult {
-  success: boolean;
-  error?: string;
-}
