@@ -871,7 +871,7 @@ module ReactOnRails
     end
 
     describe "#relative_path" do
-      subject { described_class.instance.send(:relative_path, from, to).to_s }
+      subject(:computed_relative_path) { described_class.instance.send(:relative_path, from, to).to_s }
 
       context "when target is one directory up from generated pack" do
         let(:from) { "/app/javascript/packs/generated/MyComponent.js" }
