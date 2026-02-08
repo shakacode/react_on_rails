@@ -489,7 +489,13 @@ module ReactOnRails
     end
 
     def store_name_to_path(paths)
-      paths.to_h { |path| [store_name(path), path] }
+      result = {}
+      paths.each do |path|
+        name = store_name(path)
+        raise_duplicate_store_name(name, result[name], path) if result.key?(name)
+        result[name] = path
+      end
+      result
     end
 
     def store_name(file_path)
@@ -533,6 +539,17 @@ module ReactOnRails
       msg = <<~MSG
         **ERROR** ReactOnRails: Component '#{component_name}' is missing a client specific file. For more \
         information, please see https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md
+      MSG
+
+      raise ReactOnRails::Error, msg
+    end
+
+    def raise_duplicate_store_name(name, existing_path, new_path)
+      msg = <<~MSG
+        **ERROR** ReactOnRails: Multiple store files resolve to the same name '#{name}':
+          - #{existing_path}
+          - #{new_path}
+        Rename one of the store files to have a unique base name.
       MSG
 
       raise ReactOnRails::Error, msg

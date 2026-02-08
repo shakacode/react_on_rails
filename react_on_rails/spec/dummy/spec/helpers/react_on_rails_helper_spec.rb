@@ -412,6 +412,14 @@ describe ReactOnRailsHelper do
   describe "#redux_store" do
     subject(:store) { redux_store("reduxStore", props: props, immediate_hydration: true) }
 
+    before do
+      ReactOnRails.configuration.stores_subdirectory = "ror_stores"
+    end
+
+    after do
+      ReactOnRails.configuration.stores_subdirectory = nil
+    end
+
     let(:props) do
       { name: "My Test Name" }
     end
@@ -607,6 +615,14 @@ describe ReactOnRailsHelper do
     end
 
     describe "#redux_store" do
+      before do
+        ReactOnRails.configuration.stores_subdirectory = "ror_stores"
+      end
+
+      after do
+        ReactOnRails.configuration.stores_subdirectory = nil
+      end
+
       context "when React on Rails Pro is installed" do
         before do
           allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
@@ -692,6 +708,14 @@ describe ReactOnRailsHelper do
     end
 
     describe "single attribution comment per page" do
+      before do
+        ReactOnRails.configuration.stores_subdirectory = "ror_stores"
+      end
+
+      after do
+        ReactOnRails.configuration.stores_subdirectory = nil
+      end
+
       context "when React on Rails Pro is installed" do
         before do
           allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
