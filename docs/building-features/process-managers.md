@@ -154,6 +154,51 @@ redis
    • Or add service to Procfile.dev to start automatically
 ```
 
+### Database Connectivity Check
+
+`bin/dev` automatically checks that your Rails database is accessible before starting the development server. This catches common issues like a missing database or a stopped database server, and provides clear error messages with specific commands to fix the problem.
+
+#### Behavior
+
+When `bin/dev` starts, it runs a quick Rails runner process to verify:
+
+1. The database exists and accepts connections
+2. Migrations are up to date (warns but does not block if pending)
+
+If the database is not accessible, `bin/dev` prints a clear error message and exits before starting any processes.
+
+**Note:** This check adds ~1-2 seconds to startup time as it spawns a Rails runner process.
+
+#### Disabling the Check
+
+There are three ways to disable the database check, listed by priority:
+
+1. **CLI flag** (highest priority):
+
+   ```bash
+   bin/dev --skip-database-check
+   ```
+
+2. **Environment variable**:
+
+   ```bash
+   SKIP_DATABASE_CHECK=true bin/dev
+   ```
+
+3. **Configuration** in `config/initializers/react_on_rails.rb`:
+
+   ```ruby
+   ReactOnRails.configure do |config|
+     config.check_database_on_dev_start = false
+   end
+   ```
+
+**When to disable:**
+
+- Apps that don't use a database (API-only backends with external data stores)
+- Rapid restart workflows where the 1-2 second overhead matters (e.g., TDD with guard/watchman)
+- Projects where ActiveRecord is not loaded
+
 #### Security Note
 
 ⚠️ **IMPORTANT**: Commands in `.dev-services.yml` are executed during `bin/dev` startup without shell expansion for safety. However, you should still:
@@ -171,9 +216,10 @@ redis
 
 **Execution order:**
 
-1. Service dependency checks (`.dev-services.yml`)
-2. Precompile hook (if configured in `config/shakapacker.yml`)
-3. Process manager starts processes from Procfile
+1. Database connectivity check (unless disabled)
+2. Service dependency checks (`.dev-services.yml`)
+3. Precompile hook (if configured in `config/shakapacker.yml`)
+4. Process manager starts processes from Procfile
 
 ## Installing a Process Manager
 
