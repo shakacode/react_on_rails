@@ -1,5 +1,7 @@
 # Merger Decisions Log
 
+Internal coordination document to capture finalized merger decisions, rationale, and references in one place.
+
 Last updated: 2026-02-08
 
 ## Purpose
