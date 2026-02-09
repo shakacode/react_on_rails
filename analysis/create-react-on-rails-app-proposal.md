@@ -366,25 +366,21 @@ npx create-react-on-rails-app my-app --pro
 ### Workflow
 
 1. **License Validation**
-
    - Prompt for Pro license key
    - Or read from `REACT_ON_RAILS_PRO_LICENSE` environment variable
    - Validate key format
 
 2. **Pro Installation**
-
    - Add `react-on-rails-pro` gem instead of open source version
    - Add `react-on-rails-rsc` NPM package
    - Install Pro-specific dependencies
 
 3. **Configuration**
-
    - Configure Pro settings in initializer
    - Set up RSC-specific webpack config
    - Configure server rendering pool for Pro
 
 4. **Demo Content**
-
    - Generate RSC demo component
    - Add RSC route examples
    - Include Pro feature showcase
@@ -515,24 +511,20 @@ system("npx create-react-on-rails-app #{name} #{flags.join(' ')}")
 ## Open Questions
 
 1. **Versioning Strategy**
-
    - Should CLI version match gem version exactly?
    - Or use independent versioning?
    - **Recommendation:** Match major.minor, independent patch
 
 2. **Default Template**
-
    - Should default be JavaScript or TypeScript?
    - **Recommendation:** JavaScript for lower barrier to entry
 
 3. **Interactive Mode**
-
    - How detailed should prompts be?
    - Include advanced options or keep simple?
    - **Recommendation:** Simple by default, --advanced flag for more options
 
 4. **Git Initialization**
-
    - Rails already creates git repos - any special handling needed?
    - **Recommendation:** No special handling, Rails default is fine
 
