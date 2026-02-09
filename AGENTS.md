@@ -32,7 +32,7 @@ pnpm start format.listDifferent      # Check Prettier formatting
 rake lint                            # All linting (Ruby + JS + formatting)
 
 # Auto-fix formatting
-rake autofix                         # Or: pnpm start format (Prettier only)
+rake autofix                         # Preferred for all formatting
 
 # Run tests
 rake run_rspec:gem                   # Ruby unit tests (gem code)
@@ -166,4 +166,4 @@ Prettier handles all formatting. Never manually format — run `rake autofix` in
 Update `/CHANGELOG.md` for **user-visible changes only** (features, bug fixes, breaking changes, deprecations, performance improvements). Do **not** add entries for linting, formatting, refactoring, tests, or doc fixes.
 
 - **Format**: `[PR 1818](https://github.com/shakacode/react_on_rails/pull/1818) by [username](https://github.com/username)` (no hash before PR number)
-- **Pro-only changes** go in the `#### Pro` section of `/CHANGELOG.md`; changes affecting both go in both regular and Pro sections
+- **Pro-only changes** go in the `#### Pro` section of `/CHANGELOG.md`; shared changes go in the main section only (do not duplicate into Pro)
