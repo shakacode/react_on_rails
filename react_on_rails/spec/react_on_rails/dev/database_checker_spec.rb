@@ -187,7 +187,7 @@ RSpec.describe ReactOnRails::Dev::DatabaseChecker do
         expect(described_class.check_database).to be false
       end
 
-      it "returns false with db:migrate:status unexpected output format" do
+      it "returns true with db:migrate:status unexpected output format" do
         allow(Open3).to receive(:capture3)
           .with("bin/rails", "runner", anything)
           .and_return(["DATABASE_OK\n", "", mock_status(success: true)])

@@ -124,7 +124,7 @@ module ReactOnRails
         rescue StandardError => e
           # Ignore errors - this is just a helpful warning.
           # Common case: schema_migrations table doesn't exist yet on brand new databases.
-          warn "[ReactOnRails] Migration check failed: #{e.message}" if ENV["DEBUG"]
+          warn "[ReactOnRails] Migration check failed: #{e.message}" if ENV["DEBUG"] == "1"
           nil
         end
 
