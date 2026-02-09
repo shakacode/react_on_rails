@@ -577,6 +577,7 @@ jobs:
           # so we can distinguish missing baselines (404) from actual regression alerts.
           # Use set +e to capture exit code without failing immediately.
           BENCHER_STDERR=$(mktemp)
+          trap 'rm -f "$BENCHER_STDERR"' EXIT
           set +e
           bencher run \
             --project react-on-rails-t8a9ncxo \
@@ -637,6 +638,7 @@ jobs:
             echo "⚠️ Benchmark data was collected but regression comparison is unavailable for this run"
             echo "📋 Bencher stderr output:"
             cat "$BENCHER_STDERR"
+            echo "::warning::Bencher baseline not found for start-point hash '$START_POINT_HASH' — regression comparison unavailable for this run"
             BENCHER_EXIT_CODE=0
           fi
           rm -f "$BENCHER_STDERR"
