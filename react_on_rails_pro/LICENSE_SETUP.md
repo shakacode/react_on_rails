@@ -202,7 +202,6 @@ jobs:
         run: |
           result=$(FORMAT=json bundle exec rake react_on_rails_pro:verify_license 2>/dev/null) || true
           echo "$result"
-          echo "json=$result" >> "$GITHUB_OUTPUT"
 
           status=$(echo "$result" | jq -r '.status')
           days=$(echo "$result" | jq -r '.days_remaining')
