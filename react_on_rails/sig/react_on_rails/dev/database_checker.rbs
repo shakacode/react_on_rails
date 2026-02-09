@@ -1,6 +1,11 @@
 module ReactOnRails
   module Dev
     class DatabaseChecker
+      # Result of a database check.
+      # - :ok — database is accessible and ready
+      # - :error — database is missing, inaccessible, or misconfigured
+      # - :not_rails_app — bin/rails was not found (non-Rails project)
+      # - :unknown_error — an unexpected exception occurred during the check
       type check_result = { status: Symbol, error?: String }
 
       def self.check_database: (?skip: bool) -> bool
