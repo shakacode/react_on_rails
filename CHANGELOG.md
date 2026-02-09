@@ -27,6 +27,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 Changes since the last non-beta release.
 
+#### Fixed
+
+- **Precompile Hook Detection**: Fixed `shakapacker_precompile_hook_configured?` always returning `false` for apps created with the React on Rails generator. The detection logic only matched the rake task pattern (`react_on_rails:generate_packs`) but the generator template uses the Ruby method (`generate_packs_if_stale`). Now correctly detects both patterns, including resolving script file contents. [PR 2282](https://github.com/shakacode/react_on_rails/pull/2282) by [ihabadham](https://github.com/ihabadham).
+
 #### Added
 
 - **Extensible bin/dev precompile pattern**: New alternative approach for handling precompile tasks directly in `bin/dev`, providing better support for projects with custom build steps (ReScript, TypeScript), direct Ruby API access via `ReactOnRails::Locales.compile`, and improved version manager compatibility. [PR 2349](https://github.com/shakacode/react_on_rails/pull/2349) by [justin808](https://github.com/justin808).
