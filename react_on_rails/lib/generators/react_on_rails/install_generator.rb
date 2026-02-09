@@ -2,6 +2,7 @@
 
 require "rails/generators"
 require "json"
+require "bundler"
 require_relative "generator_helper"
 require_relative "generator_messages"
 require_relative "js_dependency_manager"
@@ -218,10 +219,10 @@ module ReactOnRails
       end
 
       def shakapacker_in_lockfile?(gem_name)
-        gemfile = ENV["BUNDLE_GEMFILE"] || "Gemfile"
-        lockfile = File.join(File.dirname(gemfile), "Gemfile.lock")
-
-        File.file?(lockfile) && File.foreach(lockfile).any? { |l| l.match?(/^\s{4}#{Regexp.escape(gem_name)}\s\(/) }
+        # Always check the target app's Gemfile.lock, not inherited BUNDLE_GEMFILE
+        # See: https://github.com/shakacode/react_on_rails/issues/2287
+        File.file?("Gemfile.lock") &&
+          File.foreach("Gemfile.lock").any? { |l| l.match?(/^\s{4}#{Regexp.escape(gem_name)}\s\(/) }
       end
 
       def shakapacker_in_bundler_specs?(gem_name)
@@ -232,10 +233,10 @@ module ReactOnRails
       end
 
       def shakapacker_in_gemfile_text?(gem_name)
-        gemfile = ENV["BUNDLE_GEMFILE"] || "Gemfile"
-
-        File.file?(gemfile) &&
-          File.foreach(gemfile).any? { |l| l.match?(/^\s*gem\s+['"]#{Regexp.escape(gem_name)}['"]/) }
+        # Always check the target app's Gemfile, not inherited BUNDLE_GEMFILE
+        # See: https://github.com/shakacode/react_on_rails/issues/2287
+        File.file?("Gemfile") &&
+          File.foreach("Gemfile").any? { |l| l.match?(/^\s*gem\s+['"]#{Regexp.escape(gem_name)}['"]/) }
       end
 
       def cli_exists?(command)
@@ -263,7 +264,9 @@ module ReactOnRails
         return if shakapacker_in_gemfile?
 
         puts Rainbow("📝 Adding Shakapacker to Gemfile...").yellow
-        success = system("bundle add shakapacker --strict")
+        # Use with_unbundled_env to prevent inheriting BUNDLE_GEMFILE from parent process
+        # See: https://github.com/shakacode/react_on_rails/issues/2287
+        success = Bundler.with_unbundled_env { system("bundle add shakapacker --strict") }
         return if success
 
         handle_shakapacker_gemfile_error
@@ -273,15 +276,16 @@ module ReactOnRails
         puts Rainbow("⚙️  Installing Shakapacker (required for webpack integration)...").yellow
 
         # First run bundle install to make shakapacker available
+        # Use with_unbundled_env to prevent inheriting BUNDLE_GEMFILE from parent process
         puts Rainbow("📦 Running bundle install...").yellow
-        bundle_success = system("bundle install")
+        bundle_success = Bundler.with_unbundled_env { system("bundle install") }
         unless bundle_success
           handle_shakapacker_install_error
           return
         end
 
         # Then run the shakapacker installer
-        success = system("bundle exec rails shakapacker:install")
+        success = Bundler.with_unbundled_env { system("bundle exec rails shakapacker:install") }
         return if success
 
         handle_shakapacker_install_error
