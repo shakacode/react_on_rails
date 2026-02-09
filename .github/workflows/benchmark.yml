@@ -573,8 +573,11 @@ jobs:
             exit 1
           fi
 
-          # Run bencher and capture HTML output (stdout) while letting stderr go to logs
-          # Use set +e to capture exit code without failing immediately
+          # Run bencher and capture HTML output (stdout) while letting stderr go to a file
+          # so we can distinguish missing baselines (404) from actual regression alerts.
+          # Use set +e to capture exit code without failing immediately.
+          BENCHER_STDERR=$(mktemp)
+          trap 'rm -f "$BENCHER_STDERR"' EXIT
           set +e
           bencher run \
             --project react-on-rails-t8a9ncxo \
@@ -614,9 +617,31 @@ jobs:
             --threshold-max-sample-size $MAX_SAMPLE \
             --threshold-lower-boundary _ \
             --threshold-upper-boundary $BOUNDARY \
-            $EXTRA_ARGS > bench_results/bencher_report.html
+            $EXTRA_ARGS > bench_results/bencher_report.html 2>"$BENCHER_STDERR"
           BENCHER_EXIT_CODE=$?
           set -e
+
+          # Print stderr for visibility in logs
+          cat "$BENCHER_STDERR" >&2
+
+          # If bencher failed due to missing baseline data (404 Not Found) and there
+          # are no regression alerts, treat as a warning instead of failing the workflow.
+          # This commonly happens when the PR base commit was a docs-only change
+          # skipped by paths-ignore, so no benchmark data exists in Bencher.
+          #
+          # Safety checks before overriding exit code:
+          #   1. stderr must contain "404 Not Found" (HTTP status from Bencher API)
+          #   2. stderr must NOT contain regression indicators ("alert", "threshold",
+          #      or "boundary") to avoid suppressing actual performance regressions
+          if [ $BENCHER_EXIT_CODE -ne 0 ] && grep -q "404 Not Found" "$BENCHER_STDERR" && ! grep -qiE "alert|threshold violation|boundary violation" "$BENCHER_STDERR"; then
+            echo "⚠️ Bencher baseline not found for start-point hash '$START_POINT_HASH' — this is expected when the base commit was not benchmarked (e.g., docs-only changes skipped by paths-ignore)"
+            echo "⚠️ Benchmark data was collected but regression comparison is unavailable for this run"
+            echo "📋 Bencher stderr output:"
+            cat "$BENCHER_STDERR"
+            echo "::warning::Bencher baseline not found for start-point hash '$START_POINT_HASH' — regression comparison unavailable for this run"
+            BENCHER_EXIT_CODE=0
+          fi
+          rm -f "$BENCHER_STDERR"
 
           # Post report to job summary and PR comment(s) if there's HTML output
           if [ -s bench_results/bencher_report.html ]; then
