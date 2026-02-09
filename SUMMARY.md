@@ -57,7 +57,7 @@ Here is the new link:
 - [React & Redux](./docs/additional-reading/react-and-redux.md)
 - [Webpack Tips](./docs/additional-reading/webpack.md)
 - [Server Rendering Tips](./docs/additional-reading/server-rendering-tips.md)
-- [Code Splitting](docs/outdated/code-splitting.md)
+- [Code Splitting](react_on_rails_pro/docs/code-splitting-loadable-components.md)
 - [AngularJS Integration and Migration to React on Rails](./docs/additional-reading/angular-js-integration-migration.md)
 
 ## **Deployment**
