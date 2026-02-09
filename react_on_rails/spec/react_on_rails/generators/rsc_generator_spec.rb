@@ -2,90 +2,6 @@
 
 require_relative "../support/generator_spec_helper"
 
-# Pro-transformed serverWebpackConfig.js (after Pro generator, before RSC)
-# Contains extractLoader, object exports, LimitChunkCountPlugin — all RSC patterns target these.
-PRO_SERVER_WEBPACK_CONFIG = <<~JS
-  const { merge, config } = require('shakapacker');
-  const commonWebpackConfig = require('./commonWebpackConfig');
-
-  const bundler = config.assets_bundler === 'rspack'
-    ? require('@rspack/core')
-    : require('webpack');
-
-  function extractLoader(rule, loaderName) {
-    if (!Array.isArray(rule.use)) return null;
-    return rule.use.find((item) => {
-      const testValue = typeof item === 'string' ? item : item.loader;
-      return testValue && testValue.includes(loaderName);
-    });
-  }
-
-  const configureServer = () => {
-    const serverWebpackConfig = commonWebpackConfig();
-
-    serverWebpackConfig.plugins.unshift(new bundler.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));
-
-    serverWebpackConfig.target = 'node';
-    serverWebpackConfig.node = false;
-
-    return serverWebpackConfig;
-  };
-
-  module.exports = {
-    default: configureServer,
-    extractLoader,
-  };
-JS
-
-# Pro-transformed ServerClientOrBoth.js (destructured import, no RSC yet)
-PRO_SERVER_CLIENT_OR_BOTH = <<~JS
-  const clientWebpackConfig = require('./clientWebpackConfig');
-  const { default: serverWebpackConfig } = require('./serverWebpackConfig');
-
-  const serverClientOrBoth = (envSpecific) => {
-    const clientConfig = clientWebpackConfig();
-    const serverConfig = serverWebpackConfig();
-
-    if (envSpecific) {
-      envSpecific(clientConfig, serverConfig);
-    }
-
-    let result;
-    if (process.env.WEBPACK_SERVE || process.env.CLIENT_BUNDLE_ONLY) {
-      // eslint-disable-next-line no-console
-      console.log('[React on Rails] Creating only the client bundles.');
-      result = clientConfig;
-    } else if (process.env.SERVER_BUNDLE_ONLY) {
-      // eslint-disable-next-line no-console
-      console.log('[React on Rails] Creating only the server bundle.');
-      result = serverConfig;
-    } else {
-      // default is the standard client and server build
-      // eslint-disable-next-line no-console
-      console.log('[React on Rails] Creating both client and server bundles.');
-      result = [clientConfig, serverConfig];
-    }
-
-    return result;
-  };
-
-  module.exports = serverClientOrBoth;
-JS
-
-# Base clientWebpackConfig.js (no RSC yet)
-BASE_CLIENT_WEBPACK_CONFIG = <<~JS
-  const commonWebpackConfig = require('./commonWebpackConfig');
-
-  const configureClient = () => {
-    const clientConfig = commonWebpackConfig();
-    delete clientConfig.entry['server-bundle'];
-
-    return clientConfig;
-  };
-
-  module.exports = configureClient;
-JS
-
 describe RscGenerator, type: :generator do
   include GeneratorSpec::TestCase
 
@@ -127,9 +43,7 @@ describe RscGenerator, type: :generator do
       # Simulate Procfile.dev exists for appending
       simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
       # Simulate Pro-transformed webpack configs (what Pro generator produces)
-      simulate_existing_file("config/webpack/serverWebpackConfig.js", PRO_SERVER_WEBPACK_CONFIG)
-      simulate_existing_file("config/webpack/ServerClientOrBoth.js", PRO_SERVER_CLIENT_OR_BOTH)
-      simulate_existing_file("config/webpack/clientWebpackConfig.js", BASE_CLIENT_WEBPACK_CONFIG)
+      simulate_pro_webpack_files
 
       Dir.chdir(destination_root) do
         run_generator(["--force"])
@@ -213,7 +127,8 @@ describe RscGenerator, type: :generator do
     end
   end
 
-  # TypeScript variant
+  # TypeScript variant — only tests file extension behavior (.tsx vs .jsx).
+  # Webpack transforms are TypeScript-agnostic and covered by the main context above.
 
   context "when Pro is installed with --typescript" do
     before(:all) do

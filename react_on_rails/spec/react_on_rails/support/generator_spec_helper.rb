@@ -92,3 +92,163 @@ def assert_directory_with_keep_file(dir)
   assert_directory dir
   assert_file File.join(dir, ".keep")
 end
+
+# Simulates base-install webpack configs (use_pro? = false, use_rsc? = false).
+# Contains all structural elements that Pro gsub transforms target.
+# Used by Pro generator tests to verify standalone upgrade transforms.
+def simulate_base_webpack_files
+  simulate_existing_file("config/webpack/serverWebpackConfig.js", base_server_webpack_content)
+  simulate_existing_file("config/webpack/ServerClientOrBoth.js",
+                         server_client_or_both_content(destructured_import: false))
+end
+
+# Simulates Pro-transformed webpack configs (after Pro generator, before RSC).
+# Contains extractLoader, object exports, destructured imports — all RSC patterns target these.
+# Used by RSC generator tests to verify standalone upgrade transforms.
+def simulate_pro_webpack_files
+  simulate_existing_file("config/webpack/serverWebpackConfig.js", pro_server_webpack_content)
+  simulate_existing_file("config/webpack/ServerClientOrBoth.js",
+                         server_client_or_both_content(destructured_import: true))
+  simulate_existing_file("config/webpack/clientWebpackConfig.js", base_client_webpack_content)
+end
+
+# -- fixture data, not logic
+def base_server_webpack_content
+  <<~JS
+    const { merge, config } = require('shakapacker');
+    const commonWebpackConfig = require('./commonWebpackConfig');
+
+    const bundler = config.assets_bundler === 'rspack'
+      ? require('@rspack/core')
+      : require('webpack');
+
+    const configureServer = () => {
+      const serverWebpackConfig = commonWebpackConfig();
+
+      serverWebpackConfig.output = {
+        filename: 'server-bundle.js',
+        globalObject: 'this',
+        // If using the React on Rails Pro node server renderer, uncomment the next line
+        // libraryTarget: 'commonjs2',
+        path: serverBundleOutputPath,
+      };
+
+      serverWebpackConfig.plugins.unshift(new bundler.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));
+
+      const rules = serverWebpackConfig.module.rules;
+      rules.forEach((rule) => {
+        if (Array.isArray(rule.use)) {
+          const cssLoader = rule.use.find((item) => {
+            return item.includes('css-loader');
+          });
+          if (cssLoader && cssLoader.options) {
+            cssLoader.options.modules = { exportOnlyLocals: true };
+          }
+        }
+      });
+
+      serverWebpackConfig.devtool = 'eval';
+
+      // If using the default 'web', then libraries like Emotion and loadable-components
+      // break with SSR. The fix is to use a node renderer and change the target.
+      // If using the React on Rails Pro node server renderer, uncomment the next line
+      // serverWebpackConfig.target = 'node'
+
+      return serverWebpackConfig;
+    };
+
+    module.exports = configureServer;
+  JS
+end
+
+def pro_server_webpack_content
+  <<~JS
+    const { merge, config } = require('shakapacker');
+    const commonWebpackConfig = require('./commonWebpackConfig');
+
+    const bundler = config.assets_bundler === 'rspack'
+      ? require('@rspack/core')
+      : require('webpack');
+
+    function extractLoader(rule, loaderName) {
+      if (!Array.isArray(rule.use)) return null;
+      return rule.use.find((item) => {
+        const testValue = typeof item === 'string' ? item : item.loader;
+        return testValue && testValue.includes(loaderName);
+      });
+    }
+
+    const configureServer = () => {
+      const serverWebpackConfig = commonWebpackConfig();
+
+      serverWebpackConfig.plugins.unshift(new bundler.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));
+
+      serverWebpackConfig.target = 'node';
+      serverWebpackConfig.node = false;
+
+      return serverWebpackConfig;
+    };
+
+    module.exports = {
+      default: configureServer,
+      extractLoader,
+    };
+  JS
+end
+
+def server_client_or_both_content(destructured_import:)
+  import_line = if destructured_import
+                  "const { default: serverWebpackConfig } = require('./serverWebpackConfig');"
+                else
+                  "const serverWebpackConfig = require('./serverWebpackConfig');"
+                end
+
+  <<~JS
+    const clientWebpackConfig = require('./clientWebpackConfig');
+    #{import_line}
+
+    const serverClientOrBoth = (envSpecific) => {
+      const clientConfig = clientWebpackConfig();
+      const serverConfig = serverWebpackConfig();
+
+      if (envSpecific) {
+        envSpecific(clientConfig, serverConfig);
+      }
+
+      let result;
+      if (process.env.WEBPACK_SERVE || process.env.CLIENT_BUNDLE_ONLY) {
+        // eslint-disable-next-line no-console
+        console.log('[React on Rails] Creating only the client bundles.');
+        result = clientConfig;
+      } else if (process.env.SERVER_BUNDLE_ONLY) {
+        // eslint-disable-next-line no-console
+        console.log('[React on Rails] Creating only the server bundle.');
+        result = serverConfig;
+      } else {
+        // default is the standard client and server build
+        // eslint-disable-next-line no-console
+        console.log('[React on Rails] Creating both client and server bundles.');
+        result = [clientConfig, serverConfig];
+      }
+
+      return result;
+    };
+
+    module.exports = serverClientOrBoth;
+  JS
+end
+
+def base_client_webpack_content
+  <<~JS
+    const commonWebpackConfig = require('./commonWebpackConfig');
+
+    const configureClient = () => {
+      const clientConfig = commonWebpackConfig();
+      delete clientConfig.entry['server-bundle'];
+
+      return clientConfig;
+    };
+
+    module.exports = configureClient;
+  JS
+end

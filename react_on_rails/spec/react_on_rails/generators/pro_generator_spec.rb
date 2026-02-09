@@ -2,89 +2,6 @@
 
 require_relative "../support/generator_spec_helper"
 
-# Base install output of serverWebpackConfig.js (use_pro? = false, use_rsc? = false)
-# Contains all structural elements that Pro gsub transforms target.
-BASE_SERVER_WEBPACK_CONFIG = <<~JS
-  const { merge, config } = require('shakapacker');
-  const commonWebpackConfig = require('./commonWebpackConfig');
-
-  const bundler = config.assets_bundler === 'rspack'
-    ? require('@rspack/core')
-    : require('webpack');
-
-  const configureServer = () => {
-    const serverWebpackConfig = commonWebpackConfig();
-
-    serverWebpackConfig.output = {
-      filename: 'server-bundle.js',
-      globalObject: 'this',
-      // If using the React on Rails Pro node server renderer, uncomment the next line
-      // libraryTarget: 'commonjs2',
-      path: serverBundleOutputPath,
-    };
-
-    serverWebpackConfig.plugins.unshift(new bundler.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));
-
-    const rules = serverWebpackConfig.module.rules;
-    rules.forEach((rule) => {
-      if (Array.isArray(rule.use)) {
-        const cssLoader = rule.use.find((item) => {
-          return item.includes('css-loader');
-        });
-        if (cssLoader && cssLoader.options) {
-          cssLoader.options.modules = { exportOnlyLocals: true };
-        }
-      }
-    });
-
-    serverWebpackConfig.devtool = 'eval';
-
-    // If using the default 'web', then libraries like Emotion and loadable-components
-    // break with SSR. The fix is to use a node renderer and change the target.
-    // If using the React on Rails Pro node server renderer, uncomment the next line
-    // serverWebpackConfig.target = 'node'
-
-    return serverWebpackConfig;
-  };
-
-  module.exports = configureServer;
-JS
-
-# Base install output of ServerClientOrBoth.js (use_pro? = false)
-BASE_SERVER_CLIENT_OR_BOTH = <<~JS
-  const clientWebpackConfig = require('./clientWebpackConfig');
-  const serverWebpackConfig = require('./serverWebpackConfig');
-
-  const serverClientOrBoth = (envSpecific) => {
-    const clientConfig = clientWebpackConfig();
-    const serverConfig = serverWebpackConfig();
-
-    if (envSpecific) {
-      envSpecific(clientConfig, serverConfig);
-    }
-
-    let result;
-    if (process.env.WEBPACK_SERVE || process.env.CLIENT_BUNDLE_ONLY) {
-      // eslint-disable-next-line no-console
-      console.log('[React on Rails] Creating only the client bundles.');
-      result = clientConfig;
-    } else if (process.env.SERVER_BUNDLE_ONLY) {
-      // eslint-disable-next-line no-console
-      console.log('[React on Rails] Creating only the server bundle.');
-      result = serverConfig;
-    } else {
-      // default is the standard client and server build
-      // eslint-disable-next-line no-console
-      console.log('[React on Rails] Creating both client and server bundles.');
-      result = [clientConfig, serverConfig];
-    }
-
-    return result;
-  };
-
-  module.exports = serverClientOrBoth;
-JS
-
 describe ProGenerator, type: :generator do
   include GeneratorSpec::TestCase
 
@@ -141,8 +58,7 @@ describe ProGenerator, type: :generator do
       # Simulate Procfile.dev exists for appending
       simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
       # Simulate base webpack configs (what base install generates without --pro)
-      simulate_existing_file("config/webpack/serverWebpackConfig.js", BASE_SERVER_WEBPACK_CONFIG)
-      simulate_existing_file("config/webpack/ServerClientOrBoth.js", BASE_SERVER_CLIENT_OR_BOTH)
+      simulate_base_webpack_files
       # Mock Pro gem as installed
       allow(Gem).to receive(:loaded_specs).and_return({ "react_on_rails_pro" => double })
 
