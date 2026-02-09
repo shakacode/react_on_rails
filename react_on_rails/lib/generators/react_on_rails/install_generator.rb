@@ -2,6 +2,7 @@
 
 require "rails/generators"
 require "json"
+require "bundler"
 require_relative "generator_helper"
 require_relative "generator_messages"
 require_relative "js_dependency_manager"
