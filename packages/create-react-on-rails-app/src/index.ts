@@ -1,5 +1,3 @@
-import fs from 'fs';
-import path from 'path';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { CliOptions } from './types.js';
@@ -7,8 +5,9 @@ import { validateAll } from './validators.js';
 import { createApp, validateAppName } from './create-app.js';
 import { detectPackageManager, logError, logInfo } from './utils.js';
 
-const packageJsonPath = path.resolve(__dirname, '../package.json');
-const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8')) as { version: string };
+// Use require() for CJS compatibility - avoids __dirname + fs.readFileSync
+// eslint-disable-next-line @typescript-eslint/no-require-imports, global-require
+const packageJson = require('../package.json') as { version: string };
 
 function run(appName: string, rawOpts: Record<string, unknown>): void {
   const { template } = rawOpts;

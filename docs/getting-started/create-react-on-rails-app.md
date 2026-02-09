@@ -37,7 +37,6 @@ npx create-react-on-rails-app my-app --rspack --package-manager pnpm
 | `-t, --template <type>`      | `javascript` or `typescript`                | `typescript`  |
 | `--rspack`                   | Use Rspack instead of Webpack (~20x faster) | `false`       |
 | `-p, --package-manager <pm>` | `npm` or `pnpm`                             | auto-detected |
-| `--skip-install`             | Skip dependency installation                | `false`       |
 
 ## What It Does
 

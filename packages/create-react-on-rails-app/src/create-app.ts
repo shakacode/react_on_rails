@@ -62,6 +62,8 @@ export function createApp(appName: string, options: CliOptions): void {
   const appPath = path.resolve(process.cwd(), appName);
 
   // Step 1: Create Rails application
+  // appName is validated by validateAppName() to be [a-zA-Z0-9_-]+ only,
+  // so it's always a simple directory name safe to use with rails new.
   logStep(1, TOTAL_STEPS, 'Creating Rails application...');
   try {
     execLiveArgs('rails', ['new', appName, '--database=postgresql', '--skip-javascript']);

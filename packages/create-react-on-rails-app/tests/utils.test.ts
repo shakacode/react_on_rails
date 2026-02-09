@@ -1,15 +1,15 @@
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { detectPackageManager } from '../src/utils';
 
 jest.mock('child_process');
-const mockedExecSync = jest.mocked(execSync);
+const mockedExecFileSync = jest.mocked(execFileSync);
 
 describe('detectPackageManager', () => {
   const originalEnv = process.env;
 
   beforeEach(() => {
     process.env = { ...originalEnv };
-    (mockedExecSync as jest.Mock).mockImplementation(() => {
+    (mockedExecFileSync as jest.Mock).mockImplementation(() => {
       throw new Error('command not found');
     });
   });
@@ -30,8 +30,8 @@ describe('detectPackageManager', () => {
 
   it('falls back to checking pnpm availability', () => {
     delete process.env.npm_config_user_agent;
-    (mockedExecSync as jest.Mock).mockImplementation((cmd: string) => {
-      if (cmd === 'pnpm --version') return '9.14.2';
+    (mockedExecFileSync as jest.Mock).mockImplementation((cmd: string) => {
+      if (cmd === 'pnpm') return '9.14.2';
       throw new Error('command not found');
     });
     expect(detectPackageManager()).toBe('pnpm');
@@ -39,8 +39,8 @@ describe('detectPackageManager', () => {
 
   it('falls back to npm if pnpm not available', () => {
     delete process.env.npm_config_user_agent;
-    (mockedExecSync as jest.Mock).mockImplementation((cmd: string) => {
-      if (cmd === 'npm --version') return '10.8.2';
+    (mockedExecFileSync as jest.Mock).mockImplementation((cmd: string) => {
+      if (cmd === 'npm') return '10.8.2';
       throw new Error('command not found');
     });
     expect(detectPackageManager()).toBe('npm');
@@ -48,7 +48,7 @@ describe('detectPackageManager', () => {
 
   it('returns null if nothing available', () => {
     delete process.env.npm_config_user_agent;
-    (mockedExecSync as jest.Mock).mockImplementation(() => {
+    (mockedExecFileSync as jest.Mock).mockImplementation(() => {
       throw new Error('command not found');
     });
     expect(detectPackageManager()).toBeNull();

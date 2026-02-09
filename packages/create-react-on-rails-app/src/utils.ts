@@ -1,14 +1,5 @@
-import { execSync, spawnSync, ExecSyncOptions } from 'child_process';
+import { execFileSync, spawnSync } from 'child_process';
 import chalk from 'chalk';
-
-export function exec(command: string, options: ExecSyncOptions = {}): string {
-  const result = execSync(command, {
-    encoding: 'utf8',
-    stdio: 'pipe',
-    ...options,
-  });
-  return String(result).trim();
-}
 
 export function execLiveArgs(command: string, args: string[], cwd?: string): void {
   const result = spawnSync(command, args, {
@@ -25,7 +16,7 @@ export function execLiveArgs(command: string, args: string[], cwd?: string): voi
 
 export function getCommandVersion(command: string): string | null {
   try {
-    return exec(`${command} --version`);
+    return execFileSync(command, ['--version'], { encoding: 'utf8', stdio: 'pipe' }).trim();
   } catch {
     return null;
   }
