@@ -127,7 +127,7 @@ FORMAT=json bundle exec rake react_on_rails_pro:verify_license
 
 **Example text output:**
 
-```
+```text
 React on Rails Pro — License Status
 ========================================
 Status:        VALID
@@ -168,7 +168,11 @@ The task exits with code 0 on success and code 1 if the license is missing, inva
 
 ### GitHub Actions: Automated License Expiry Check
 
-Add this workflow to get notified before your license expires:
+Add this workflow to get notified before your license expires.
+
+> **Note:** This example uses `jq` to parse JSON. `jq` is pre-installed on
+> `ubuntu-latest` runners. If using a custom runner, add
+> `sudo apt-get install -y jq` before the license check step.
 
 ```yaml
 # .github/workflows/license-check.yml
