@@ -2,6 +2,89 @@
 
 require_relative "../support/generator_spec_helper"
 
+# Base install output of serverWebpackConfig.js (use_pro? = false, use_rsc? = false)
+# Contains all structural elements that Pro gsub transforms target.
+BASE_SERVER_WEBPACK_CONFIG = <<~JS
+  const { merge, config } = require('shakapacker');
+  const commonWebpackConfig = require('./commonWebpackConfig');
+
+  const bundler = config.assets_bundler === 'rspack'
+    ? require('@rspack/core')
+    : require('webpack');
+
+  const configureServer = () => {
+    const serverWebpackConfig = commonWebpackConfig();
+
+    serverWebpackConfig.output = {
+      filename: 'server-bundle.js',
+      globalObject: 'this',
+      // If using the React on Rails Pro node server renderer, uncomment the next line
+      // libraryTarget: 'commonjs2',
+      path: serverBundleOutputPath,
+    };
+
+    serverWebpackConfig.plugins.unshift(new bundler.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));
+
+    const rules = serverWebpackConfig.module.rules;
+    rules.forEach((rule) => {
+      if (Array.isArray(rule.use)) {
+        const cssLoader = rule.use.find((item) => {
+          return item.includes('css-loader');
+        });
+        if (cssLoader && cssLoader.options) {
+          cssLoader.options.modules = { exportOnlyLocals: true };
+        }
+      }
+    });
+
+    serverWebpackConfig.devtool = 'eval';
+
+    // If using the default 'web', then libraries like Emotion and loadable-components
+    // break with SSR. The fix is to use a node renderer and change the target.
+    // If using the React on Rails Pro node server renderer, uncomment the next line
+    // serverWebpackConfig.target = 'node'
+
+    return serverWebpackConfig;
+  };
+
+  module.exports = configureServer;
+JS
+
+# Base install output of ServerClientOrBoth.js (use_pro? = false)
+BASE_SERVER_CLIENT_OR_BOTH = <<~JS
+  const clientWebpackConfig = require('./clientWebpackConfig');
+  const serverWebpackConfig = require('./serverWebpackConfig');
+
+  const serverClientOrBoth = (envSpecific) => {
+    const clientConfig = clientWebpackConfig();
+    const serverConfig = serverWebpackConfig();
+
+    if (envSpecific) {
+      envSpecific(clientConfig, serverConfig);
+    }
+
+    let result;
+    if (process.env.WEBPACK_SERVE || process.env.CLIENT_BUNDLE_ONLY) {
+      // eslint-disable-next-line no-console
+      console.log('[React on Rails] Creating only the client bundles.');
+      result = clientConfig;
+    } else if (process.env.SERVER_BUNDLE_ONLY) {
+      // eslint-disable-next-line no-console
+      console.log('[React on Rails] Creating only the server bundle.');
+      result = serverConfig;
+    } else {
+      // default is the standard client and server build
+      // eslint-disable-next-line no-console
+      console.log('[React on Rails] Creating both client and server bundles.');
+      result = [clientConfig, serverConfig];
+    }
+
+    return result;
+  };
+
+  module.exports = serverClientOrBoth;
+JS
+
 describe ProGenerator, type: :generator do
   include GeneratorSpec::TestCase
 
@@ -57,6 +140,9 @@ describe ProGenerator, type: :generator do
       simulate_existing_file("config/initializers/react_on_rails.rb", "ReactOnRails.configure {}")
       # Simulate Procfile.dev exists for appending
       simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      # Simulate base webpack configs (what base install generates without --pro)
+      simulate_existing_file("config/webpack/serverWebpackConfig.js", BASE_SERVER_WEBPACK_CONFIG)
+      simulate_existing_file("config/webpack/ServerClientOrBoth.js", BASE_SERVER_CLIENT_OR_BOTH)
       # Mock Pro gem as installed
       allow(Gem).to receive(:loaded_specs).and_return({ "react_on_rails_pro" => double })
 
@@ -89,6 +175,55 @@ describe ProGenerator, type: :generator do
       assert_file "Procfile.dev" do |content|
         expect(content).to include("node-renderer:")
         expect(content).to include("RENDERER_PORT=3800")
+      end
+    end
+
+    describe "webpack config transforms" do
+      it "adds extractLoader function" do
+        assert_file "config/webpack/serverWebpackConfig.js" do |content|
+          expect(content).to include("function extractLoader(rule, loaderName)")
+        end
+      end
+
+      it "enables libraryTarget commonjs2" do
+        assert_file "config/webpack/serverWebpackConfig.js" do |content|
+          expect(content).to include("libraryTarget: 'commonjs2',")
+          expect(content).not_to include("// libraryTarget: 'commonjs2',")
+        end
+      end
+
+      it "sets target to node with clean comments" do
+        assert_file "config/webpack/serverWebpackConfig.js" do |content|
+          expect(content).to include("serverWebpackConfig.target = 'node';")
+          expect(content).not_to include("// serverWebpackConfig.target = 'node'")
+        end
+      end
+
+      it "disables node polyfills" do
+        assert_file "config/webpack/serverWebpackConfig.js" do |content|
+          expect(content).to include("serverWebpackConfig.node = false;")
+        end
+      end
+
+      it "adds Babel SSR caller setup" do
+        assert_file "config/webpack/serverWebpackConfig.js" do |content|
+          expect(content).to include("babelLoader.options.caller = { ssr: true };")
+        end
+      end
+
+      it "changes module.exports to object style" do
+        assert_file "config/webpack/serverWebpackConfig.js" do |content|
+          expect(content).to include("module.exports = {")
+          expect(content).to include("default: configureServer,")
+          expect(content).to include("extractLoader,")
+        end
+      end
+
+      it "updates ServerClientOrBoth.js to destructured import" do
+        assert_file "config/webpack/ServerClientOrBoth.js" do |content|
+          expect(content).to include("{ default: serverWebpackConfig }")
+          expect(content).not_to match(/^const serverWebpackConfig = require/)
+        end
       end
     end
   end

@@ -22,7 +22,7 @@ module ReactOnRails
     # - component_extension: Returns 'jsx' or 'tsx' based on TypeScript option
     # - detect_react_version: Detects installed React version
     #
-    module RscSetup
+    module RscSetup # rubocop:disable Metrics/ModuleLength
       # Main entry point for RSC setup.
       # Orchestrates creation of all RSC-related files and configuration.
       #
@@ -40,6 +40,7 @@ module ReactOnRails
 
         add_rsc_config_to_pro_initializer
         create_rsc_webpack_config
+        update_webpack_configs_for_rsc
         add_rsc_to_procfile
         create_hello_server_component
         create_hello_server_controller
@@ -267,6 +268,151 @@ module ReactOnRails
         route "get 'hello_server', to: 'hello_server#index'"
 
         puts Rainbow("✅ Added RSC routes to config/routes.rb").green
+      end
+
+      # Update webpack configs to enable RSC support.
+      # This is needed for standalone RSC upgrades where the base install
+      # created webpack configs without RSC settings enabled.
+      #
+      # Updates:
+      # - ServerClientOrBoth.js: RSC imports, rscConfig, RSC_BUNDLE_ONLY handling
+      # - serverWebpackConfig.js: RSCWebpackPlugin import, rscBundle param, plugin
+      # - clientWebpackConfig.js: RSCWebpackPlugin import, plugin
+      def update_webpack_configs_for_rsc
+        puts Rainbow("📝 Updating webpack configs for RSC...").yellow
+
+        update_server_client_or_both_for_rsc
+        update_server_webpack_config_for_rsc
+        update_client_webpack_config_for_rsc
+
+        puts Rainbow("✅ Updated webpack configs for RSC").green
+      end
+
+      def update_server_client_or_both_for_rsc
+        config_path = "config/webpack/ServerClientOrBoth.js"
+        full_path = File.join(destination_root, config_path)
+
+        return unless File.exist?(full_path)
+
+        content = File.read(full_path)
+
+        # Skip if RSC is already configured
+        return if content.include?("rscWebpackConfig")
+
+        # Add RSC import after serverWebpackConfig import
+        gsub_file(
+          config_path,
+          %r{(const \{ default: serverWebpackConfig \} = require\('\./serverWebpackConfig'\);)},
+          "\\1\nconst rscWebpackConfig = require('./rscWebpackConfig');"
+        )
+
+        # Add rscConfig variable after serverConfig
+        gsub_file(
+          config_path,
+          /^(\s*const serverConfig = serverWebpackConfig\(\);)$/,
+          "\\1\n  const rscConfig = rscWebpackConfig();"
+        )
+
+        # Update envSpecific call to include rscConfig
+        gsub_file(
+          config_path,
+          /envSpecific\(clientConfig, serverConfig\);/,
+          "envSpecific(clientConfig, serverConfig, rscConfig);"
+        )
+
+        # Add RSC_BUNDLE_ONLY handling before the else block
+        rsc_bundle_handling = <<~JS.chomp
+          } else if (process.env.RSC_BUNDLE_ONLY) {
+              // eslint-disable-next-line no-console
+              console.log('[React on Rails] Creating only the RSC bundle.');
+              result = rscConfig;
+        JS
+        gsub_file(
+          config_path,
+          %r{(\s*\} else \{\s*\n\s*// default is the standard client and server build)},
+          "  #{rsc_bundle_handling}\n\\1"
+        )
+
+        # Update default multi-bundle output to include RSC
+        gsub_file(
+          config_path,
+          /console\.log\('\[React on Rails\] Creating both client and server bundles\.'\);/,
+          "console.log('[React on Rails] Creating client, server, and RSC bundles.');"
+        )
+        gsub_file(
+          config_path,
+          /result = \[clientConfig, serverConfig\];/,
+          "result = [clientConfig, serverConfig, rscConfig];"
+        )
+      end
+
+      def update_server_webpack_config_for_rsc
+        config_path = "config/webpack/serverWebpackConfig.js"
+        full_path = File.join(destination_root, config_path)
+
+        return unless File.exist?(full_path)
+
+        content = File.read(full_path)
+
+        # Skip if RSCWebpackPlugin is already configured
+        return if content.include?("RSCWebpackPlugin")
+
+        # Add RSCWebpackPlugin import after bundler require
+        gsub_file(
+          config_path,
+          %r{(const bundler = config\.assets_bundler.*\n.*require\('@rspack/core'\).*\n.*: require\('webpack'\);)},
+          "\\1\nconst { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');"
+        )
+
+        # Add rscBundle parameter to configureServer function
+        gsub_file(
+          config_path,
+          /^const configureServer = \(\) => \{/,
+          "// rscBundle parameter: when true, skips RSCWebpackPlugin (RSC bundle doesn't need it)\n" \
+          "const configureServer = (rscBundle = false) => {"
+        )
+
+        # Add RSCWebpackPlugin to plugins after LimitChunkCountPlugin
+        rsc_plugin_code = "\n  " \
+                          "// Add RSC plugin for server bundle (handles client component references)\n  " \
+                          "// Skip for RSC bundle - it doesn't need RSCWebpackPlugin\n  " \
+                          "if (!rscBundle) {\n    " \
+                          "serverWebpackConfig.plugins.push(new RSCWebpackPlugin({ isServer: true }));\n  " \
+                          "}"
+        gsub_file(
+          config_path,
+          /(serverWebpackConfig\.plugins\.unshift\(new bundler\.optimize\.LimitChunkCountPlugin.*\);)/,
+          "\\1#{rsc_plugin_code}"
+        )
+      end
+
+      def update_client_webpack_config_for_rsc
+        config_path = "config/webpack/clientWebpackConfig.js"
+        full_path = File.join(destination_root, config_path)
+
+        return unless File.exist?(full_path)
+
+        content = File.read(full_path)
+
+        # Skip if RSCWebpackPlugin is already configured
+        return if content.include?("RSCWebpackPlugin")
+
+        # Add RSCWebpackPlugin import after commonWebpackConfig import
+        gsub_file(
+          config_path,
+          %r{(const commonWebpackConfig = require\('\./commonWebpackConfig'\);)},
+          "\\1\nconst { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');"
+        )
+
+        # Add RSCWebpackPlugin to client config before return statement
+        rsc_plugin_code = "\n  " \
+                          "// Add React Server Components plugin for client bundle\n  " \
+                          "clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));"
+        gsub_file(
+          config_path,
+          /^(\s*return clientConfig;)$/,
+          "#{rsc_plugin_code}\n\n\\1"
+        )
       end
     end
   end

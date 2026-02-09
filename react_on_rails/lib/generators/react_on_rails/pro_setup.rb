@@ -148,13 +148,20 @@ module ReactOnRails
         puts Rainbow("✅ Added Node Renderer to Procfile.dev").green
       end
 
-      # Update serverWebpackConfig.js to enable Pro settings.
+      # Update webpack configs to enable Pro settings.
       # This is needed for standalone Pro upgrades where the base install
       # created webpack configs without Pro settings enabled.
       #
-      # Uncomments:
-      # - libraryTarget: 'commonjs2' (required for Node Renderer)
-      # - serverWebpackConfig.target = 'node' (required for Node.js modules)
+      # Updates serverWebpackConfig.js:
+      # - Adds extractLoader helper function (required by rscWebpackConfig.js)
+      # - Adds Babel SSR caller setup (required for correct SSR compilation)
+      # - Enables libraryTarget: 'commonjs2' (required for Node Renderer)
+      # - Enables serverWebpackConfig.target = 'node' (required for Node.js modules)
+      # - Disables Node.js polyfills via node = false (required for real __dirname)
+      # - Changes module.exports to Pro style (required by rscWebpackConfig.js)
+      #
+      # Updates ServerClientOrBoth.js:
+      # - Changes import to destructured style (required for Pro object export)
       def update_webpack_config_for_pro
         webpack_config_path = File.join(destination_root, "config/webpack/serverWebpackConfig.js")
 
@@ -176,19 +183,111 @@ module ReactOnRails
 
         webpack_config = "config/webpack/serverWebpackConfig.js"
 
+        # Add extractLoader helper function after bundler require
+        add_extract_loader_to_server_config(webpack_config, content)
+
+        # Add Babel SSR caller setup (uses extractLoader, so must come after)
+        add_babel_ssr_caller_to_server_config(webpack_config, content)
+
         # Uncomment libraryTarget: 'commonjs2'
         library_target_pattern = %r{// If using the React on Rails Pro.*\n\s*// libraryTarget: 'commonjs2',}
         library_target_replacement = "// Required for React on Rails Pro Node Renderer\n    " \
                                      "libraryTarget: 'commonjs2',"
         gsub_file(webpack_config, library_target_pattern, library_target_replacement)
 
-        # Uncomment serverWebpackConfig.target = 'node'
-        target_node_pattern = %r{// If using the React on Rails Pro.*\n\s*// serverWebpackConfig\.target = 'node'}
-        target_node_replacement = "// React on Rails Pro uses Node renderer, so target must be 'node'\n  " \
-                                  "serverWebpackConfig.target = 'node'"
+        # Replace stale comments and uncomment target = 'node', add node = false
+        # The base template has 4 lines: 2 explanatory comments + "uncomment" hint + commented code
+        # Replace with clean Pro output matching the template's use_pro? branch
+        # rubocop:disable Layout/LineLength
+        target_node_pattern = %r{\s*// If using the default 'web',.*\n\s*// break with SSR\..*\n\s*// If using the React on Rails Pro.*\n\s*// serverWebpackConfig\.target = 'node'}
+        # rubocop:enable Layout/LineLength
+        target_node_replacement = "\n\n  " \
+                                  "// React on Rails Pro uses Node renderer, so target must be 'node'\n  " \
+                                  "// This fixes issues with libraries like Emotion and loadable-components\n  " \
+                                  "serverWebpackConfig.target = 'node';\n\n  " \
+                                  "// Disable Node.js polyfills - not needed when targeting Node\n  " \
+                                  "serverWebpackConfig.node = false;"
         gsub_file(webpack_config, target_node_pattern, target_node_replacement)
 
-        puts Rainbow("✅ Updated serverWebpackConfig.js for Pro").green
+        # Change module.exports to Pro style (exports object with default and extractLoader)
+        update_server_config_exports(webpack_config)
+
+        # Update ServerClientOrBoth.js import style
+        update_server_client_or_both_import
+
+        puts Rainbow("✅ Updated webpack configs for Pro").green
+      end
+
+      def add_extract_loader_to_server_config(webpack_config, content)
+        # Skip if extractLoader already exists
+        return if content.include?("function extractLoader")
+
+        extract_loader_code = <<~JS
+
+          function extractLoader(rule, loaderName) {
+            if (!Array.isArray(rule.use)) return null;
+            return rule.use.find((item) => {
+              const testValue = typeof item === 'string' ? item : item.loader;
+              return testValue && testValue.includes(loaderName);
+            });
+          }
+        JS
+
+        # Insert after bundler require line
+        gsub_file(
+          webpack_config,
+          %r{(const bundler = config\.assets_bundler.*\n.*require\('@rspack/core'\).*\n.*: require\('webpack'\);)},
+          "\\1#{extract_loader_code}"
+        )
+      end
+
+      def add_babel_ssr_caller_to_server_config(webpack_config, content)
+        # Skip if Babel SSR caller already exists
+        return if content.include?("babelLoader.options.caller")
+
+        babel_ssr_code = "\n\n      " \
+                         "// Set SSR caller for Babel (if using Babel instead of SWC)\n      " \
+                         "const babelLoader = extractLoader(rule, 'babel-loader');\n      " \
+                         "if (babelLoader && babelLoader.options) {\n        " \
+                         "babelLoader.options.caller = { ssr: true };\n      " \
+                         "}"
+
+        # Insert after cssLoader.options.modules = { exportOnlyLocals: true }; block
+        gsub_file(
+          webpack_config,
+          /(cssLoader\.options\.modules = \{ exportOnlyLocals: true \};\s*\n\s*\})/,
+          "\\1#{babel_ssr_code}"
+        )
+      end
+
+      def update_server_config_exports(webpack_config)
+        # Change from: module.exports = configureServer;
+        # To: module.exports = { default: configureServer, extractLoader };
+        gsub_file(
+          webpack_config,
+          /^module\.exports = configureServer;\s*$/,
+          "module.exports = {\n  default: configureServer,\n  extractLoader,\n};\n"
+        )
+      end
+
+      def update_server_client_or_both_import
+        server_client_path = "config/webpack/ServerClientOrBoth.js"
+        full_path = File.join(destination_root, server_client_path)
+
+        return unless File.exist?(full_path)
+
+        content = File.read(full_path)
+
+        # Skip if already using destructured import
+        return if content.include?("{ default: serverWebpackConfig }")
+
+        # Change from: const serverWebpackConfig = require('./serverWebpackConfig');
+        # To: const { default: serverWebpackConfig } = require('./serverWebpackConfig');
+        gsub_file(
+          server_client_path,
+          %r{^const serverWebpackConfig = require\('\./serverWebpackConfig'\);$},
+          "const { default: serverWebpackConfig } = require('./serverWebpackConfig');"
+        )
       end
     end
   end
