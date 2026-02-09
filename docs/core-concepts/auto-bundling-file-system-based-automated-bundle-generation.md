@@ -544,6 +544,102 @@ This pattern works for any transpiled language and requires no gem configuration
 
 As of version 13.3.4, bundles inside directories that match `config.components_subdirectory` will be automatically added as entrypoints, while bundles outside those directories need to be manually added to the `Shakapacker.config.source_entry_path` or Webpack's `entry` rules.
 
+## Redux Store Auto-Registration
+
+> [!NOTE]
+> Most applications use React components without Redux. If you don't use Redux stores, you can skip this section entirely.
+
+In addition to components, React on Rails can automatically register Redux stores based on file system conventions. This eliminates manual `ReactOnRails.registerStore()` calls and generates individual packs for each store. The feature works the same way as component auto-registration.
+
+### Configure Stores Subdirectory
+
+Add `stores_subdirectory` to your React on Rails initializer:
+
+```rb
+config.stores_subdirectory = "ror_stores"
+```
+
+This requires `auto_load_bundle` to be enabled (either globally or per helper call) and `nested_entries: true` in `shakapacker.yml`, just like component auto-registration.
+
+### Directory Structure
+
+Place store files inside directories matching your configured `stores_subdirectory`:
+
+```text
+app/javascript/
+└── src/
+    ├── Comments/
+    │   └── ror_stores/
+    │       └── commentsStore.js
+    └── Router/
+        └── ror_stores/
+            └── routerStore.ts       # TypeScript is supported
+```
+
+### Store File Format
+
+Each store file must export a store generator function as its default export:
+
+```js
+// app/javascript/src/Comments/ror_stores/commentsStore.js
+import { createStore } from 'redux';
+import commentsReducer from '../reducers/commentsReducer';
+
+const commentsStore = (props, railsContext) => {
+  return createStore(commentsReducer, props);
+};
+
+export default commentsStore;
+```
+
+### Usage in Rails Views
+
+Use the `redux_store` helper with `auto_load_bundle`:
+
+```erb
+<%# The store pack is loaded automatically when auto_load_bundle is enabled %>
+<%= redux_store("commentsStore", props: { comments: @comments }) %>
+<%= react_component("CommentsContainer", auto_load_bundle: true) %>
+```
+
+If `auto_load_bundle` is set globally to `true`, you can omit it from each call:
+
+```erb
+<%= redux_store("commentsStore", props: { comments: @comments }) %>
+<%= react_component("CommentsContainer") %>
+```
+
+### Generated Files
+
+Running `bundle exec rake react_on_rails:generate_packs` generates:
+
+**Client pack** (`app/javascript/packs/generated/commentsStore.js`):
+
+```js
+import ReactOnRails from 'react-on-rails/client';
+import commentsStore from '../../src/Comments/ror_stores/commentsStore.js';
+
+ReactOnRails.registerStore({ commentsStore });
+```
+
+**Server bundle** — stores are also automatically included in the generated server bundle, so server-side rendering with Redux works without manual configuration.
+
+### Name Conflict Detection
+
+Component and store names must be unique across both registries. If a component and a store share the same name, pack generation will raise an error:
+
+```
+**ERROR** ReactOnRails: The following names are used for both components and stores: myName.
+This would cause pack file conflicts in the generated directory.
+Please rename your components or stores to have unique names.
+```
+
+Duplicate store names (two store files with the same name in different directories) are also detected and raise an error.
+
+### Server/Client Variants
+
+Like components, store files support `.client` and `.server` suffixes. For example, `commentsStore.client.js` will only be used for client-side rendering, and the suffix is stripped from the registered name.
+
 ## Troubleshooting
 
 ### Common Issues and Solutions

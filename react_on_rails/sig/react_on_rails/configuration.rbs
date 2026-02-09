@@ -14,6 +14,7 @@ module ReactOnRails
     attr_accessor generated_assets_dirs: Array[String]?
     attr_accessor generated_assets_dir: String
     attr_accessor components_subdirectory: String?
+    attr_accessor stores_subdirectory: String?
     attr_accessor webpack_generated_files: Array[String]
     attr_accessor rendering_extension: String?
     attr_accessor build_test_command: String
@@ -65,6 +66,7 @@ module ReactOnRails
       ?server_render_method: String?,
       ?rendering_props_extension: String?,
       ?components_subdirectory: String?,
+      ?stores_subdirectory: String?,
       ?auto_load_bundle: bool?,
       ?immediate_hydration: bool?,
       ?component_registry_timeout: Integer?,
