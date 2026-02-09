@@ -62,7 +62,7 @@ on:
 # Cancel stale PR benchmark runs when new commits are pushed.
 # Master runs are never cancelled so every merge is measured.
 concurrency:
-  group: benchmark-${{ github.event.pull_request.number || github.sha }}
+  group: ${{ github.event.pull_request.number && format('benchmark-pr-{0}', github.event.pull_request.number) || format('benchmark-{0}', github.sha) }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
@@ -617,6 +617,10 @@ jobs:
           fi
           rm -f "$BENCHER_STDERR"
 
+          # Export exit code early so downstream alerting steps (7b/7c) always see it,
+          # even if the post-processing below (step summary, PR comments) fails.
+          echo "BENCHER_EXIT_CODE=$BENCHER_EXIT_CODE" >> "$GITHUB_ENV"
+
           # Post report to job summary and PR comment(s) if there's HTML output
           if [ -s bench_results/bencher_report.html ]; then
             echo "📊 Adding Bencher report to job summary..."
@@ -660,9 +664,6 @@ jobs:
             echo "✅ No alerts - no Bencher report to post"
           fi
 
-          # Export exit code for downstream steps — don't exit yet so alerting can run
-          echo "BENCHER_EXIT_CODE=$BENCHER_EXIT_CODE" >> "$GITHUB_ENV"
-
       # ============================================
       # STEP 7b: ALERT ON MASTER REGRESSION
       # ============================================
@@ -693,16 +694,17 @@ jobs:
             --json number \
             --jq '.[0].number // empty')
 
-          # Build the benchmark summary snippet
+          # Build the benchmark summary snippet (defensive: don't let column failure block alerting)
           SUMMARY=""
           if [ -f bench_results/summary.txt ]; then
-            SUMMARY=$(printf '\n### Benchmark Summary\n\n```\n%s\n```' "$(column -t -s $'\t' "bench_results/summary.txt")")
+            FORMATTED=$(column -t -s $'\t' "bench_results/summary.txt" 2>/dev/null) || FORMATTED=$(cat "bench_results/summary.txt")
+            SUMMARY=$(printf '\n### Benchmark Summary\n\n```\n%s\n```' "$FORMATTED")
           fi
 
           if [ -n "$EXISTING_ISSUE" ]; then
             echo "Open regression issue already exists: #${EXISTING_ISSUE} — adding comment"
 
-            gh issue comment "$EXISTING_ISSUE" --body "$(cat <<EOF
+            if ! gh issue comment "$EXISTING_ISSUE" --body "$(cat <<EOF
           ## New regression detected
 
           **Commit:** [\`${COMMIT_SHORT}\`](${COMMIT_URL}) by @${ACTOR}
@@ -711,11 +713,13 @@ jobs:
 
           > View the full Bencher report in the [workflow run summary](${RUN_URL}) or on the [Bencher dashboard](${BENCHER_URL}).
           EOF
-          )"
+          )"; then
+              echo "::warning::Failed to comment on regression issue #${EXISTING_ISSUE}"
+            fi
           else
             echo "No open regression issue found — creating one"
 
-            gh issue create \
+            if ! gh issue create \
               --title "Performance Regression Detected on master (${COMMIT_SHORT})" \
               --label "$LABEL" \
               --body "$(cat <<EOF
@@ -744,7 +748,9 @@ jobs:
           ---
           *This issue was created automatically by the benchmark CI workflow.*
           EOF
-          )"
+          )"; then
+              echo "::warning::Failed to create regression issue — check GitHub API permissions"
+            fi
           fi
 
       # ============================================
