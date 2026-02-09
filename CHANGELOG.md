@@ -41,14 +41,9 @@ Changes since the last non-beta release.
 
 #### Pro
 
-##### Changed
-
-- **License-Optional Attribution Model**: React on Rails Pro now works without a license for evaluation, development, testing, and CI/CD. A paid license is only required for production deployments. Added `plan` field validation to both Ruby and Node.js license validators — only `"paid"` plan (or no plan field for backwards compatibility) is accepted. Old free licenses are now treated as invalid. Documentation overhauled across README and LICENSE_SETUP guides; removed CI_SETUP.md (CI needs no license configuration). [PR 2324](https://github.com/shakacode/react_on_rails/pull/2324) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-
 ##### Added
 
-- **Multiple License Plan Types**: License validation now supports multiple plan types beyond "paid": `startup`, `nonprofit`, `education`, `oss`, and `partner`. Non-paid plan types are displayed in the license validation success message (e.g., "License validated successfully (startup license)."). Includes thread-safe caching for plan type retrieval via `LicenseValidator.license_plan`. [PR 2334](https://github.com/shakacode/react_on_rails/pull/2334) by [justin808](https://github.com/justin808).
-- **Node Renderer Master/Worker Exports**: Added public `master` and `worker` exports to `react-on-rails-pro-node-renderer` package, allowing users to import from `react-on-rails-pro-node-renderer/master` and `react-on-rails-pro-node-renderer/worker`. [PR 2326](https://github.com/shakacode/react_on_rails/pull/2326) by [justin808](https://github.com/justin808).
+- **License verification rake task**: New `react_on_rails_pro:verify_license` rake task for checking license status with human-readable text and JSON output (`FORMAT=json`) for CI/CD integration. Includes exit codes, automatic renewal warnings for licenses expiring within 30 days, and a GitHub Actions workflow example. [PR 2385](https://github.com/shakacode/react_on_rails/pull/2385) by [justin808](https://github.com/justin808).
 
 ### [16.3.0] - 2026-02-05
 
@@ -61,6 +56,17 @@ Changes since the last non-beta release.
 - **Rspack configuration not applying to all environments**. Fixed `bin/switch-bundler` crashing with `Psych::AliasesNotEnabled` on YAML files with anchors/aliases, and fixed the `--rspack` generator flag only updating the `default` section while leaving environment sections with `webpack`. Now uses regex replacement to update `assets_bundler` in all sections while preserving YAML structure. [PR 2275](https://github.com/shakacode/react_on_rails/pull/2275) by [ihabadham](https://github.com/ihabadham).
 - **Precompile hook not configured when Shakapacker is pre-installed**. Fixed the install generator not configuring the `precompile_hook` when Shakapacker was already installed before running `rails generate react_on_rails:install`. This caused missing component bundles during `assets:precompile` in production deployments. [PR 2280](https://github.com/shakacode/react_on_rails/pull/2280) by [ihabadham](https://github.com/ihabadham).
 - **`bin/dev` failing with `--route` flag**. Fixed `bin/dev` command failing with "Unknown argument" when the generator was run with a `--route` option. The generated script now correctly handles route arguments. [PR 2273](https://github.com/shakacode/react_on_rails/pull/2273) by [ihabadham](https://github.com/ihabadham).
+
+#### Pro
+
+##### Changed
+
+- **License-Optional Attribution Model**: React on Rails Pro now works without a license for evaluation, development, testing, and CI/CD. A paid license is only required for production deployments. Added `plan` field validation to both Ruby and Node.js license validators — only `"paid"` plan (or no plan field for backwards compatibility) is accepted. Old free licenses are now treated as invalid. Documentation overhauled across README and LICENSE_SETUP guides; removed CI_SETUP.md (CI needs no license configuration). [PR 2324](https://github.com/shakacode/react_on_rails/pull/2324) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+##### Added
+
+- **Multiple License Plan Types**: License validation now supports multiple plan types beyond "paid": `startup`, `nonprofit`, `education`, `oss`, and `partner`. Non-paid plan types are displayed in the license validation success message (e.g., "License validated successfully (startup license)."). Includes thread-safe caching for plan type retrieval via `LicenseValidator.license_plan`. [PR 2334](https://github.com/shakacode/react_on_rails/pull/2334) by [justin808](https://github.com/justin808).
+- **Node Renderer Master/Worker Exports**: Added public `master` and `worker` exports to `react-on-rails-pro-node-renderer` package, allowing users to import from `react-on-rails-pro-node-renderer/master` and `react-on-rails-pro-node-renderer/worker`. [PR 2326](https://github.com/shakacode/react_on_rails/pull/2326) by [justin808](https://github.com/justin808).
 
 ### [16.2.1] - 2026-01-18
 
