@@ -63,6 +63,25 @@ RSpec.describe ReactOnRails::Dev::DatabaseChecker do
         expect(described_class.check_database).to be false
       end
 
+      it "returns false with stderr-only errors (empty stdout)" do
+        allow(Open3).to receive(:capture3)
+          .with("bin/rails", "runner", anything)
+          .and_return(["", "FATAL: role 'postgres' does not exist", mock_status(success: false)])
+
+        expect(described_class.check_database).to be false
+      end
+
+      it "truncates long error messages" do
+        long_error = "DATABASE_ERROR\n#{'x' * 600}\n"
+        allow(Open3).to receive(:capture3)
+          .with("bin/rails", "runner", anything)
+          .and_return([long_error, "", mock_status(success: true)])
+
+        output = capture_stdout { described_class.check_database }
+        expect(output).to include("Set DEBUG=1 to see full error")
+        expect(output).not_to include("x" * 600)
+      end
+
       it "prints error and suggests db:prepare" do
         error_output = "DATABASE_ERROR\nCould not connect to server\n"
         allow(Open3).to receive(:capture3)
@@ -148,7 +167,7 @@ RSpec.describe ReactOnRails::Dev::DatabaseChecker do
     end
 
     context "when database check returns unexpected output" do
-      it "returns true if DATABASE_OK is found anywhere in output" do
+      it "returns true if DATABASE_OK is found on its own line" do
         allow(Open3).to receive(:capture3)
           .with("bin/rails", "runner", anything)
           .and_return(["Some warning\nDATABASE_OK\n", "", mock_status(success: true)])
@@ -157,6 +176,27 @@ RSpec.describe ReactOnRails::Dev::DatabaseChecker do
           .with("bin/rails", "db:migrate:status")
           .and_return(["", "", mock_status(success: false)])
 
+        expect(described_class.check_database).to be true
+      end
+
+      it "does not match DATABASE_OK as a substring of another line" do
+        allow(Open3).to receive(:capture3)
+          .with("bin/rails", "runner", anything)
+          .and_return(["Warning: DATABASE_OK_NOT_REALLY\n", "", mock_status(success: true)])
+
+        expect(described_class.check_database).to be false
+      end
+
+      it "returns false with db:migrate:status unexpected output format" do
+        allow(Open3).to receive(:capture3)
+          .with("bin/rails", "runner", anything)
+          .and_return(["DATABASE_OK\n", "", mock_status(success: true)])
+
+        allow(Open3).to receive(:capture3)
+          .with("bin/rails", "db:migrate:status")
+          .and_return(["unexpected output format without down keyword", "", mock_status(success: true)])
+
+        # Should still return true (db is OK) — migrations warning just won't show
         expect(described_class.check_database).to be true
       end
     end

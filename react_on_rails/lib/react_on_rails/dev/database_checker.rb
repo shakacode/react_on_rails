@@ -62,11 +62,9 @@ module ReactOnRails
           return true if ENV["SKIP_DATABASE_CHECK"] == "true"
 
           # 3. ReactOnRails configuration (if available)
-          if defined?(ReactOnRails) && ReactOnRails.respond_to?(:configuration)
-            config = ReactOnRails.configuration
-            return true if config.respond_to?(:check_database_on_dev_start) &&
-                           config.check_database_on_dev_start == false
-          end
+          return true if defined?(ReactOnRails) &&
+                         ReactOnRails.respond_to?(:configuration) &&
+                         ReactOnRails.configuration.check_database_on_dev_start == false
 
           false
         end
@@ -74,7 +72,7 @@ module ReactOnRails
         def run_database_check
           check_script = <<~RUBY
             unless defined?(ActiveRecord)
-              puts 'DATABASE_OK'
+              puts 'DATABASE_OK' # No ActiveRecord = no database to check
               exit
             end
             begin
@@ -110,7 +108,7 @@ module ReactOnRails
           when "DATABASE_OK" then { status: :ok }
           when "DATABASE_ERROR" then { status: :error, error: lines[1..].join("\n") }
           else
-            if stdout.include?("DATABASE_OK")
+            if lines.any? { |line| line.strip == "DATABASE_OK" }
               { status: :ok }
             else
               { status: :error, error: "#{stdout}\n#{stderr}".strip }
@@ -162,7 +160,7 @@ module ReactOnRails
         def truncate_error(error)
           return error if error.length <= 500
 
-          "#{error[0, 500]}...\n           (Set DEBUG=true for full error)"
+          "#{error[0, 500]}...\n   (Set DEBUG=1 to see full error)"
         end
       end
     end
