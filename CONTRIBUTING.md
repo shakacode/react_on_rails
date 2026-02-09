@@ -21,7 +21,6 @@ During this transition:
 
 **Note for users**: End users of react_on_rails can continue using their preferred package manager (npm, yarn, pnpm, or bun). The generators automatically detect your package manager. The pnpm commands below are for contributors working on the react_on_rails codebase itself.
 
-- [Yalc](https://github.com/whitecolor/yalc) must be installed globally for most local development.
 - **Git hooks setup** (automatic during normal setup):
 
 Git hooks are installed automatically when you run the standard setup commands. They will run automatic linting on **all changed files (staged + unstaged + untracked)** - making commits fast while preventing CI failures.
@@ -86,60 +85,64 @@ Note that you will need to run `bundle install` after making this change, but al
 
 ### JS
 
-First, be **sure** to build the NPM package:
+For testing with **external applications** (your own Rails apps), you have several options:
+
+#### Option 1: pnpm pack (Recommended)
+
+This creates a tarball that mimics the published package:
 
 ```sh
 cd <React on Rails root>
 pnpm install
-
-# Update the lib directory with babel compiled files
-pnpm run build-watch
+pnpm run build
+cd packages/react-on-rails
+pnpm pack  # Creates react-on-rails-<version>.tgz
 ```
 
-You need to do this once to make sure your app depends on our package:
+Then in your external app:
+
+```sh
+pnpm add <path-to-react_on_rails>/packages/react-on-rails/react-on-rails-*.tgz
+```
+
+This is the most reliable approach as it exactly mimics what `pnpm install react-on-rails` would install.
+
+#### Option 2: yalc (for rapid iteration)
+
+If you need to iterate quickly, [yalc](https://github.com/whitecolor/yalc) provides a local publish/link workflow:
 
 ```shell
-cd <React on Rails root>/packages/react-on-rails
+# Install yalc globally
+pnpm add -g yalc
+
+# In React on Rails root
+cd <React on Rails root>
+pnpm install
+pnpm run build
+
+# Publish to local yalc store
+cd packages/react-on-rails
 yalc publish
+
+# In your external app
 cd <your project root>
 yalc add react-on-rails
-```
-
-The workflow is:
-
-1. Make changes to the node package.
-2. **CRITICAL**: Run `yalc push` to send updates to all linked apps:
-
-```shell
-cd <React on Rails root>/packages/react-on-rails
-# Will send the updates to other folders - MUST DO THIS AFTER ANY CHANGES
-yalc push
-cd <your project root>
-
-# Will update from yalc
 pnpm install
 ```
 
-**⚠️ Common Mistake**: Forgetting to run `yalc push` after making changes to React on Rails source code will result in test apps not receiving updates, making it appear that your changes have no effect.
+After making changes, run `yalc push` from the package directory to update all linked apps.
 
-When you run `yalc push`, you'll get an informative message
-
-```terminaloutput
-$ yalc push
-react-on-rails@12.0.0-12070fd1 published in store.
-Pushing react-on-rails@12.0.0 in /Users/justin/shakacode/react-on-rails/react_on_rails/spec/dummy
-Package react-on-rails@12.0.0-12070fd1 added ==> /Users/justin/shakacode/react-on-rails/react_on_rails/spec/dummy/node_modules/react-on-rails.
-Don't forget you may need to run pnpm install after adding packages with yalc to install/update dependencies/bin scripts.
-```
-
-Of course, you can do the same with `react-on-rails-pro` and `react-on-rails-pro-node-renderer` packages.
-
-This is the approach `react_on_rails/spec/dummy` apps use, so you can also look at their implementation.
+**Note**: The internal dummy apps (`react_on_rails/spec/dummy`, etc.) use pnpm workspaces with `workspace:*` protocol. They no longer require yalc.
 
 ### Example: Testing NPM changes with the dummy app
 
-1. Add `console.log('Hello!')` to [clientStartup.ts, function render](https://github.com/shakacode/react_on_rails/blob/master/packages/react-on-rails/src/clientStartup.ts) in `/packages/react-on-rails/src/clientStartup.ts` to confirm we're getting an update to the node package client-side. Do the same for function `serverRenderReactComponent` in [/packages/react-on-rails/src/serverRenderReactComponent.ts](https://github.com/shakacode/react_on_rails/blob/master/packages/react-on-rails/src/serverRenderReactComponent.ts).
-2. Refresh the browser if the server is already running or start the server using `foreman start` from `react_on_rails/spec/dummy` and navigate to `http://localhost:3000/`. You will now see the `Hello!` message printed in the browser's console. If you did not see that message, then review the steps above for the workflow of making changes and pushing them via yalc.
+The dummy apps are part of the pnpm workspace, so changes are automatically linked.
+
+1. Build the package: `pnpm run build` (from root)
+2. Add `console.log('Hello!')` to [clientStartup.ts](https://github.com/shakacode/react_on_rails/blob/master/packages/react-on-rails/src/clientStartup.ts)
+3. Rebuild: `pnpm run build`
+4. Start the dummy server: `cd react_on_rails/spec/dummy && foreman start`
+5. Navigate to `http://localhost:3000/` - you'll see the message in the browser console
 
 ## Git dependencies
 
@@ -671,17 +674,30 @@ Then run `bundle`.
 
 The main installer can be run with `./bin/rails generate react_on_rails:install`
 
-Then use yalc to add the npm module.
+Then add the npm package using one of these methods:
 
-Be sure that your ran this first at the top level of React on Rails
+**Option 1: pnpm pack (recommended)**
 
+```sh
+# In React on Rails root
+cd packages/react-on-rails
+pnpm pack
+
+# In your test app
+pnpm add <path-to-react_on_rails>/packages/react-on-rails/react-on-rails-*.tgz
 ```
+
+**Option 2: yalc (for rapid iteration)**
+
+```sh
+# Install yalc globally if needed
+pnpm add -g yalc
+
+# In React on Rails root
+cd packages/react-on-rails
 yalc publish
-```
 
-Then add the node package to your test app:
-
-```
+# In your test app
 yalc add react-on-rails
 ```
 

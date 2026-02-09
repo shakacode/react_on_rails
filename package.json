@@ -7,7 +7,10 @@
   "workspaces": [
     "packages/react-on-rails",
     "packages/react-on-rails-pro",
-    "packages/react-on-rails-pro-node-renderer"
+    "packages/react-on-rails-pro-node-renderer",
+    "react_on_rails/spec/dummy",
+    "react_on_rails_pro/spec/dummy",
+    "react_on_rails_pro/spec/execjs-compatible-dummy"
   ],
   "directories": {
     "doc": "docs"
@@ -72,7 +75,7 @@
     "typescript-eslint": "^8.29.1"
   },
   "scripts": {
-    "test": "pnpm -r run test",
+    "test": "pnpm --filter \"./packages/*\" -r run test",
     "clean": "pnpm -r run clean",
     "start": "nps",
     "nps": "nps",
@@ -83,8 +86,6 @@
     "lint:scss": "stylelint \"react_on_rails/spec/dummy/app/assets/stylesheets/**/*.scss\" \"react_on_rails/spec/dummy/client/**/*.scss\"",
     "check": "pnpm run lint && pnpm -r run check",
     "type-check": "pnpm -r run type-check",
-    "yalc:publish": "pnpm -r run yalc:publish",
-    "yalc": "pnpm -r run yalc",
     "publish": "pnpm -r run publish",
     "knip": "knip",
     "eslint": "eslint",
@@ -115,6 +116,10 @@
   "packageManager": "pnpm@9.14.2",
   "pnpm": {
     "overrides": {
+      "react": "$react",
+      "react-dom": "$react-dom",
+      "app>react": "^18.3.1",
+      "app>react-dom": "^18.3.1",
       "sentry-testkit>body-parser": "npm:empty-npm-package@1.0.0",
       "sentry-testkit>express": "npm:empty-npm-package@1.0.0"
     }

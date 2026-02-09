@@ -224,27 +224,11 @@ jobs:
           echo "SERVER_CMD: $SERVER_CMD"
           echo "BENCH_CMD: $BENCH_CMD"
 
-      - name: Install Node modules with Pnpm for all packages
-        run: |
-          pnpm install --recursive --frozen-lockfile
-          pnpm add --global yalc
+      - name: Install Node modules with pnpm
+        run: pnpm install --frozen-lockfile
 
-      - name: yalc publish for react-on-rails
-        run: cd packages/react-on-rails && yalc publish
-
-      - name: Cache core dummy app node modules
-        if: env.RUN_CORE
-        uses: actions/cache@v4
-        with:
-          path: react_on_rails/spec/dummy/node_modules
-          key: v4-core-dummy-app-node-modules-cache-${{ hashFiles('react_on_rails/spec/dummy/pnpm-lock.yaml') }}
-
-      - name: Install Node modules for the dummy app
-        if: env.RUN_CORE
-        run: |
-          cd react_on_rails/spec/dummy
-          yalc add --link react-on-rails
-          pnpm install
+      - name: Build workspace packages
+        run: pnpm run build
 
       - name: Save Core dummy app ruby gems to cache
         if: env.RUN_CORE
@@ -371,23 +355,6 @@ jobs:
       # ============================================
       # STEP 5: SETUP PRO APPLICATION SERVER
       # ============================================
-      - name: Cache Pro dummy app node modules
-        if: env.RUN_PRO
-        uses: actions/cache@v4
-        with:
-          path: react_on_rails_pro/spec/dummy/node_modules
-          key: v4-pro-dummy-app-node-modules-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/pnpm-lock.yaml') }}
-
-      - name: yalc publish for react-on-rails-pro
-        if: env.RUN_PRO
-        run: cd packages/react-on-rails-pro && yalc publish
-
-      - name: Install Node modules with Pnpm for Pro dummy app
-        if: env.RUN_PRO
-        run: |
-          cd react_on_rails_pro/spec/dummy
-          yalc add --link react-on-rails-pro
-          pnpm install
 
       - name: Cache Pro dummy app Ruby gems
         if: env.RUN_PRO

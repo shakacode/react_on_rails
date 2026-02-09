@@ -95,9 +95,9 @@ jobs:
       - name: Setup Node
         uses: ./.github/actions/setup-node-with-retry
         with:
-          # Pin to 22.12.x (LTS) - V8 bug from issue #56010 was fixed in 22.12.0
+          # Pin to 22.11.0 (LTS) to avoid V8 bug in 22.21.0
           # https://github.com/nodejs/node/issues/56010
-          node-version: '22.12.x'
+          node-version: '22.11.0'
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -130,13 +130,19 @@ jobs:
           path: react_on_rails_pro/spec/dummy/vendor/bundle
           key: v4-pro-dummy-app-gem-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/Gemfile.lock') }}
 
-      - name: Install Node modules with pnpm for Pro package
-        run: |
-          pnpm add -g yalc
-          pnpm install --frozen-lockfile
+      - name: Install Node modules with pnpm
+        working-directory: .
+        run: pnpm install --frozen-lockfile
 
-      - name: Install Node modules with pnpm for Pro dummy app
-        run: cd spec/dummy && pnpm install
+      - name: Build workspace packages
+        working-directory: .
+        run: pnpm run build
+      - name: Verify single React resolution for Pro dummy build
+        working-directory: .
+        run: node script/check-single-react-resolution.mjs react_on_rails/spec/dummy react_on_rails_pro/spec/dummy
+      - name: Verify React 18 resolution for ExecJS-compatible dummy
+        working-directory: .
+        run: node script/check-react-major-version.mjs react_on_rails_pro/spec/execjs-compatible-dummy 18
 
       - name: Install Ruby Gems for Pro dummy app
         run: |
@@ -147,6 +153,8 @@ jobs:
 
       - name: Generate file-system based entrypoints
         run: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
+      - name: Smoke check generated pack entrypoints
+        run: test -s spec/dummy/client/app/generated/server-bundle-generated.js
 
       - name: Build test bundles for Pro dummy app
         run: cd spec/dummy && pnpm run build:test
@@ -194,9 +202,9 @@ jobs:
       - name: Setup Node
         uses: ./.github/actions/setup-node-with-retry
         with:
-          # Pin to 22.12.x (LTS) - V8 bug from issue #56010 was fixed in 22.12.0
+          # Pin to 22.11.0 (LTS) to avoid V8 bug in 22.21.0
           # https://github.com/nodejs/node/issues/56010
-          node-version: '22.12.x'
+          node-version: '22.11.0'
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -258,13 +266,13 @@ jobs:
           bundle lock --add-platform 'x86_64-linux'
           bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
 
-      - name: Install Node modules with pnpm for Pro package
-        run: |
-          pnpm add -g yalc
-          pnpm install --frozen-lockfile
+      - name: Install Node modules with pnpm
+        working-directory: .
+        run: pnpm install --frozen-lockfile
 
-      - name: Install Node modules with pnpm for Pro dummy app
-        run: cd spec/dummy && pnpm install
+      - name: Build workspace packages
+        working-directory: .
+        run: pnpm run build
 
       - name: Ensure minimum required Chrome version
         run: |
@@ -394,9 +402,9 @@ jobs:
       - name: Setup Node
         uses: ./.github/actions/setup-node-with-retry
         with:
-          # Pin to 22.12.x (LTS) - V8 bug from issue #56010 was fixed in 22.12.0
+          # Pin to 22.11.0 (LTS) to avoid V8 bug in 22.21.0
           # https://github.com/nodejs/node/issues/56010
-          node-version: '22.12.x'
+          node-version: '22.11.0'
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -458,13 +466,13 @@ jobs:
           bundle lock --add-platform 'x86_64-linux'
           bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
 
-      - name: Install Node modules with pnpm for Pro package
-        run: |
-          pnpm add -g yalc
-          pnpm install --frozen-lockfile
+      - name: Install Node modules with pnpm
+        working-directory: .
+        run: pnpm install --frozen-lockfile
 
-      - name: Install Node modules with pnpm for Pro dummy app
-        run: cd spec/dummy && pnpm install
+      - name: Build workspace packages
+        working-directory: .
+        run: pnpm run build
 
       - name: Ensure minimum required Chrome version
         run: |
@@ -507,7 +515,7 @@ jobs:
           echo "Rails server started after ${elapsed}s"
 
       - name: Install Playwright dependencies
-        run: cd spec/dummy && pnpm playwright install --with-deps
+        run: cd spec/dummy && npx playwright install --with-deps
 
       - name: Run Playwright E2E tests for Pro dummy app
         run: cd spec/dummy && pnpm e2e-test

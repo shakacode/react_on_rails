@@ -36,6 +36,35 @@ This is a monorepo containing both the open-source package and the Pro package:
 - **Testing**: Jest for JS, RSpec for Ruby
 - **Linting**: ESLint for JS/TS, RuboCop for Ruby
 
+## pnpm Workspace Overrides (React Version Pinning)
+
+The root `package.json` uses `pnpm.overrides` to enforce a single React version
+across the workspace while carving out an exception for React 18 testing:
+
+```json
+"react": "$react",
+"react-dom": "$react-dom",
+"app>react": "^18.3.1",
+"app>react-dom": "^18.3.1"
+```
+
+**How it works**:
+
+- `"react": "$react"` — Global override forcing all React to `^19.0.3`
+  (the root `devDependencies.react` version). Ensures single-copy resolution.
+- `"app>react": "^18.3.1"` — Exception for the `app` package (the execjs-compatible
+  dummy at `react_on_rails_pro/spec/execjs-compatible-dummy`), pinning it to React 18.
+  The `>` selector targets a specific package by its `name` field.
+
+**Why global + exception**: A global override is needed because pnpm workspace members
+with peer deps (like `packages/react-on-rails`) would otherwise get their own
+`node_modules/react` copy, causing dual-resolution failures in webpack builds.
+
+**Fragility note**: The `app>` exception selector is coupled to the `name` field in
+`react_on_rails_pro/spec/execjs-compatible-dummy/package.json`. If that name changes,
+the exception silently stops working. CI guards (`script/check-react-major-version.mjs`)
+will catch version mismatches.
+
 ## Examples and Testing
 
 - **Dummy app**: `react_on_rails/spec/dummy/` - Rails app for testing integration

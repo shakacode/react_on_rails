@@ -55,7 +55,15 @@ const configureServer = (rscBundle = false) => {
   };
 
   if (!rscBundle) {
-    serverWebpackConfig.plugins.push(new RSCWebpackPlugin({ isServer: true }));
+    serverWebpackConfig.plugins.push(
+      new RSCWebpackPlugin({
+        isServer: true,
+        // Limit client reference discovery to the app source directory to prevent
+        // the plugin from traversing into node_modules/ (which with pnpm workspace
+        // symlinks exposes .tsx source files that lack a configured loader)
+        clientReferences: [{ directory: './client/app', recursive: true, include: /\.(js|ts|jsx|tsx)$/ }],
+      }),
+    );
   }
   serverWebpackConfig.plugins.unshift(new webpack.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));
   // Custom output for the server-bundle that matches the config in
