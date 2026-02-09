@@ -58,6 +58,7 @@ module ReactOnRails
       same_bundle_for_client_and_server: false,
       i18n_output_format: nil,
       components_subdirectory: nil,
+      stores_subdirectory: nil,
       make_generated_server_bundle_the_entrypoint: false,
       defer_generated_component_packs: false,
       # Maximum time in milliseconds to wait for client-side component registration after page load.
@@ -66,7 +67,11 @@ module ReactOnRails
       component_registry_timeout: DEFAULT_COMPONENT_REGISTRY_TIMEOUT,
       generated_component_packs_loading_strategy: nil,
       server_bundle_output_path: DEFAULT_SERVER_BUNDLE_OUTPUT_PATH,
-      enforce_private_server_bundles: false
+      enforce_private_server_bundles: false,
+      # Whether to check database connectivity before starting bin/dev.
+      # Set to false to disable (saves ~1-2 seconds startup time).
+      # Can also be disabled via SKIP_DATABASE_CHECK=true or bin/dev --skip-database-check
+      check_database_on_dev_start: true
     )
   end
 
@@ -75,6 +80,7 @@ module ReactOnRails
                   :trace, :development_mode, :logging_on_server, :server_renderer_pool_size,
                   :server_renderer_timeout, :skip_display_none, :raise_on_prerender_error,
                   :generated_assets_dirs, :generated_assets_dir, :components_subdirectory,
+                  :stores_subdirectory,
                   :webpack_generated_files, :rendering_extension, :build_test_command,
                   :build_production_command, :i18n_dir, :i18n_yml_dir, :i18n_output_format,
                   :i18n_yml_safe_load_options, :defer_generated_component_packs,
@@ -83,7 +89,8 @@ module ReactOnRails
                   :make_generated_server_bundle_the_entrypoint,
                   :generated_component_packs_loading_strategy,
                   :component_registry_timeout,
-                  :server_bundle_output_path, :enforce_private_server_bundles
+                  :server_bundle_output_path, :enforce_private_server_bundles,
+                  :check_database_on_dev_start
 
     # Class instance variable and mutex to track if deprecation warning has been shown
     # Using mutex to ensure thread-safety in multi-threaded environments
@@ -143,8 +150,9 @@ module ReactOnRails
                    same_bundle_for_client_and_server: nil,
                    i18n_dir: nil, i18n_yml_dir: nil, i18n_output_format: nil, i18n_yml_safe_load_options: nil,
                    random_dom_id: nil, server_render_method: nil, rendering_props_extension: nil,
-                   components_subdirectory: nil, auto_load_bundle: nil,
-                   component_registry_timeout: nil, server_bundle_output_path: nil, enforce_private_server_bundles: nil)
+                   components_subdirectory: nil, stores_subdirectory: nil, auto_load_bundle: nil,
+                   component_registry_timeout: nil, server_bundle_output_path: nil, enforce_private_server_bundles: nil,
+                   check_database_on_dev_start: nil)
       self.node_modules_location = node_modules_location.present? ? node_modules_location : Rails.root
       self.generated_assets_dirs = generated_assets_dirs
       self.generated_assets_dir = generated_assets_dir
@@ -181,12 +189,14 @@ module ReactOnRails
 
       self.server_render_method = server_render_method
       self.components_subdirectory = components_subdirectory
+      self.stores_subdirectory = stores_subdirectory
       self.auto_load_bundle = auto_load_bundle
       self.make_generated_server_bundle_the_entrypoint = make_generated_server_bundle_the_entrypoint
       self.defer_generated_component_packs = defer_generated_component_packs
       self.generated_component_packs_loading_strategy = generated_component_packs_loading_strategy
       self.server_bundle_output_path = server_bundle_output_path
       self.enforce_private_server_bundles = enforce_private_server_bundles
+      self.check_database_on_dev_start = check_database_on_dev_start.nil? ? true : check_database_on_dev_start
     end
     # rubocop:enable Metrics/AbcSize
 

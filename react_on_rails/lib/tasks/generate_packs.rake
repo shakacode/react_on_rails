@@ -3,16 +3,17 @@
 # rubocop:disable Metrics/BlockLength
 namespace :react_on_rails do
   desc <<~DESC
-    If there is a file inside any directory matching config.components_subdirectory, this command generates corresponding packs.
+    If there is a file inside any directory matching config.components_subdirectory or
+    config.stores_subdirectory, this command generates corresponding packs.
 
     This task will:
     - Clean out existing generated directories (javascript/generated and javascript/packs/generated)
     - List all files being deleted for transparency
-    - Generate new pack files for discovered React components
+    - Generate new pack files for discovered React components and Redux stores
     - Skip generation if files are already up to date
 
     Generated directories:
-    - app/javascript/packs/generated/ (client pack files)
+    - app/javascript/packs/generated/ (client pack files for components and stores)
     - app/javascript/generated/ (server bundle files)
   DESC
 
@@ -23,6 +24,9 @@ namespace :react_on_rails do
       puts Rainbow("🚀 Starting React on Rails pack generation...").bold
       puts Rainbow("📁 Auto-load bundle: #{ReactOnRails.configuration.auto_load_bundle}").cyan
       puts Rainbow("📂 Components subdirectory: #{ReactOnRails.configuration.components_subdirectory}").cyan
+      if ReactOnRails.configuration.stores_subdirectory.present?
+        puts Rainbow("📂 Stores subdirectory: #{ReactOnRails.configuration.stores_subdirectory}").cyan
+      end
       puts ""
     end
 

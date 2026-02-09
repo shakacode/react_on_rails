@@ -26,7 +26,8 @@ describe DevTestsGenerator, type: :generator do
     it "changes package.json to use local react-on-rails version of module" do
       assert_file("package.json") do |contents|
         expect(contents).to match('"react-on-rails"')
-        expect(contents).to match('"postinstall"')
+        # Uses file: path to link to local package instead of yalc
+        expect(contents).to match("file:../../../packages/react-on-rails")
       end
     end
 

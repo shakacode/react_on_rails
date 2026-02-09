@@ -1,0 +1,52 @@
+{
+  "name": "create-react-on-rails-app",
+  "version": "16.3.0",
+  "description": "Create React on Rails applications with a single command",
+  "bin": {
+    "create-react-on-rails-app": "./bin/create-react-on-rails-app.js"
+  },
+  "main": "lib/index.js",
+  "scripts": {
+    "build": "pnpm run clean && tsc",
+    "build-watch": "pnpm run clean && tsc --watch",
+    "clean": "rm -rf ./lib",
+    "test": "jest tests",
+    "type-check": "tsc --noEmit --noErrorTruncation",
+    "prepublishOnly": "pnpm run build"
+  },
+  "files": [
+    "bin/",
+    "lib/**/*.js",
+    "lib/**/*.d.ts"
+  ],
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.16",
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shakacode/react_on_rails.git",
+    "directory": "packages/create-react-on-rails-app"
+  },
+  "keywords": [
+    "react",
+    "rails",
+    "react-on-rails",
+    "create-app",
+    "cli",
+    "scaffold"
+  ],
+  "author": "justin@shakacode.com",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/shakacode/react_on_rails/issues"
+  },
+  "homepage": "https://github.com/shakacode/react_on_rails#readme"
+}

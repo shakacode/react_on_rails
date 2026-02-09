@@ -24,13 +24,19 @@ const componentRegistry = new CallbackRegistry<RegisteredComponent>('component')
  */
 export function register(components: Record<string, ReactComponentOrRenderFunction>): void {
   Object.keys(components).forEach((name) => {
-    if (componentRegistry.has(name)) {
-      console.warn('Called register for component that is already registered', name);
-    }
-
     const component = components[name];
     if (!component) {
       throw new Error(`Called register with null component named ${name}`);
+    }
+
+    // Reference comparison lets HMR re-register the same component silently
+    // while still catching bugs where different components share a name.
+    const existing = componentRegistry.getIfExists(name);
+    if (existing && existing.component !== component) {
+      console.error(
+        `ReactOnRails: Component "${name}" was registered with a different component than previously. ` +
+          'This is likely a bug — ensure each component has a unique registration name.',
+      );
     }
 
     const renderFunction = isRenderFunction(component);

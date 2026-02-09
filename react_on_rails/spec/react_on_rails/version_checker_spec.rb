@@ -115,6 +115,7 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
                           react_on_rails_pro_package?: false,
                           raw: "^16.1.1",
                           local_path_or_url?: false,
+                          workspace_protocol?: false,
                           semver_wildcard?: true,
                           package_name: "react-on-rails",
                           package_json: "/fake/path/package.json")
@@ -135,6 +136,7 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
                           react_on_rails_pro_package?: false,
                           raw: "16.1.2",
                           local_path_or_url?: false,
+                          workspace_protocol?: false,
                           semver_wildcard?: false,
                           parts: %w[16 1 2],
                           package_name: "react-on-rails",
@@ -156,6 +158,7 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
                           react_on_rails_pro_package?: false,
                           raw: "16.1.1",
                           local_path_or_url?: false,
+                          workspace_protocol?: false,
                           semver_wildcard?: false,
                           parts: %w[16 1 1],
                           package_json: "/fake/path/package.json")
@@ -175,6 +178,26 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
                           react_on_rails_pro_package?: false,
                           raw: "file:../react-on-rails",
                           local_path_or_url?: true,
+                          workspace_protocol?: false,
+                          semver_wildcard?: false,
+                          package_json: "/fake/path/package.json")
+        end
+
+        before { stub_gem_version("16.1.1") }
+
+        it "does not raise an error" do
+          expect { check_version_and_raise(node_package_version) }.not_to raise_error
+        end
+      end
+
+      context "when using pnpm workspace protocol" do
+        let(:node_package_version) do
+          instance_double(VersionChecker::NodePackageVersion,
+                          react_on_rails_package?: true,
+                          react_on_rails_pro_package?: false,
+                          raw: "workspace:*",
+                          local_path_or_url?: false,
+                          workspace_protocol?: true,
                           semver_wildcard?: false,
                           package_json: "/fake/path/package.json")
         end
@@ -193,6 +216,7 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
                           react_on_rails_pro_package?: true,
                           raw: "16.1.1",
                           local_path_or_url?: false,
+                          workspace_protocol?: false,
                           semver_wildcard?: false,
                           parts: %w[16 1 1],
                           package_json: "/fake/path/package.json")
@@ -397,6 +421,46 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
 
         describe "#local_path_or_url?" do
           specify { expect(node_package_version.local_path_or_url?).to be true }
+        end
+
+        describe "#parts" do
+          specify { expect(node_package_version.parts).to be_nil }
+        end
+      end
+
+      context "with pnpm workspace protocol 'workspace:*'" do
+        let(:package_json) { File.expand_path("fixtures/workspace_protocol_package.json", __dir__) }
+
+        describe "#raw" do
+          specify { expect(node_package_version.raw).to eq("workspace:*") }
+        end
+
+        describe "#local_path_or_url?" do
+          specify { expect(node_package_version.local_path_or_url?).to be false }
+        end
+
+        describe "#workspace_protocol?" do
+          specify { expect(node_package_version.workspace_protocol?).to be true }
+        end
+
+        describe "#parts" do
+          specify { expect(node_package_version.parts).to be_nil }
+        end
+      end
+
+      context "with pnpm workspace protocol 'workspace:^'" do
+        let(:package_json) { File.expand_path("fixtures/workspace_caret_package.json", __dir__) }
+
+        describe "#raw" do
+          specify { expect(node_package_version.raw).to eq("workspace:^") }
+        end
+
+        describe "#local_path_or_url?" do
+          specify { expect(node_package_version.local_path_or_url?).to be false }
+        end
+
+        describe "#workspace_protocol?" do
+          specify { expect(node_package_version.workspace_protocol?).to be true }
         end
 
         describe "#parts" do

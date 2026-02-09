@@ -130,13 +130,19 @@ jobs:
           path: react_on_rails_pro/spec/dummy/vendor/bundle
           key: v4-pro-dummy-app-gem-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/Gemfile.lock') }}
 
-      - name: Install Node modules with pnpm for Pro package
-        run: |
-          pnpm add -g yalc
-          pnpm install --frozen-lockfile
+      - name: Install Node modules with pnpm
+        working-directory: .
+        run: pnpm install --frozen-lockfile
 
-      - name: Install Node modules with pnpm for Pro dummy app
-        run: cd spec/dummy && pnpm install
+      - name: Build workspace packages
+        working-directory: .
+        run: pnpm run build
+      - name: Verify single React resolution for Pro dummy build
+        working-directory: .
+        run: node script/check-single-react-resolution.mjs react_on_rails/spec/dummy react_on_rails_pro/spec/dummy
+      - name: Verify React 18 resolution for ExecJS-compatible dummy
+        working-directory: .
+        run: node script/check-react-major-version.mjs react_on_rails_pro/spec/execjs-compatible-dummy 18
 
       - name: Install Ruby Gems for Pro dummy app
         run: |
@@ -147,6 +153,8 @@ jobs:
 
       - name: Generate file-system based entrypoints
         run: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
+      - name: Smoke check generated pack entrypoints
+        run: test -s spec/dummy/client/app/generated/server-bundle-generated.js
 
       - name: Build test bundles for Pro dummy app
         run: cd spec/dummy && pnpm run build:test
@@ -242,11 +250,13 @@ jobs:
             react_on_rails_pro/spec/dummy/ssr-generated
           key: v4-pro-dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}
 
-      - name: Install Node modules with pnpm for Pro package
+      - name: Install Node modules with pnpm
         working-directory: .
-        run: |
-          pnpm add -g yalc
-          pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
+
+      - name: Build workspace packages
+        working-directory: .
+        run: pnpm run build
 
       - name: Run JS unit tests for Pro package
         run: pnpm --filter react-on-rails-pro-node-renderer run ci

@@ -169,8 +169,8 @@ install_dependencies() {
 }
 
 build_node_package() {
-  # Builds TypeScript packages and runs pnpm yalc:publish for local development.
-  # This compiles node_package/src/ to lib/ and makes packages available locally.
+  # Builds TypeScript packages. This compiles src/ to lib/.
+  # The dummy apps use workspace:* protocol so pnpm install links them automatically.
   print_step "Building node package..."
   if ! rake node_package; then
     print_error "Failed to build node package"

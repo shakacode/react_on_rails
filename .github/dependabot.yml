@@ -43,7 +43,7 @@ updates:
   - package-ecosystem: "npm"
     directory: "/react_on_rails_pro/spec/execjs-compatible-dummy"
     patterns:
-      - "shakapacker"
+      - "*"
     schedule:
       interval: "weekly"
     labels:
@@ -89,7 +89,7 @@ updates:
   - package-ecosystem: "bundler"
     directory: "/react_on_rails_pro/spec/execjs-compatible-dummy"
     patterns:
-      - "shakapacker"
+      - "*"
     schedule:
       interval: "weekly"
     labels:

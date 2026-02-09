@@ -10,15 +10,21 @@ export default {
    */
   register(storeGenerators: Record<string, StoreGenerator>): void {
     Object.keys(storeGenerators).forEach((name) => {
-      if (registeredStoreGenerators.has(name)) {
-        console.warn('Called registerStore for store that is already registered', name);
-      }
-
       const store = storeGenerators[name];
       if (!store) {
         throw new Error(
           'Called ReactOnRails.registerStores with a null or undefined as a value ' +
             `for the store generator with key ${name}.`,
+        );
+      }
+
+      // Reference comparison lets HMR re-register the same store silently
+      // while still catching bugs where different stores share a name.
+      const existing = registeredStoreGenerators.get(name);
+      if (existing && existing !== store) {
+        console.error(
+          `ReactOnRails: Store "${name}" was registered with a different store generator than previously. ` +
+            'This is likely a bug — ensure each store has a unique registration name.',
         );
       }
 

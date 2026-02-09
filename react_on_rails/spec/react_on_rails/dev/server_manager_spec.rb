@@ -24,6 +24,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     allow_any_instance_of(Kernel).to receive(:exit)
     allow(ReactOnRails::Dev::ProcessManager).to receive(:ensure_procfile)
     allow(ReactOnRails::Dev::ProcessManager).to receive(:run_with_process_manager)
+    allow(ReactOnRails::Dev::DatabaseChecker).to receive(:check_database).and_return(true)
   end
 
   describe ".start" do

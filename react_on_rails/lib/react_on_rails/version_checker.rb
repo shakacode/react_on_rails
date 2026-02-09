@@ -154,7 +154,8 @@ module ReactOnRails
     end
 
     def validate_exact_version!
-      return if node_package_version.raw.nil? || node_package_version.local_path_or_url?
+      return if node_package_version.raw.nil? || node_package_version.local_path_or_url? ||
+                node_package_version.workspace_protocol?
 
       return unless node_package_version.semver_wildcard?
 
@@ -178,7 +179,8 @@ module ReactOnRails
     end
 
     def validate_version_match!
-      return if node_package_version.raw.nil? || node_package_version.local_path_or_url?
+      return if node_package_version.raw.nil? || node_package_version.local_path_or_url? ||
+                node_package_version.workspace_protocol?
 
       return if node_package_version.parts == gem_version_parts
 
@@ -324,8 +326,14 @@ module ReactOnRails
         !raw.nil? && raw.include?("/") && !raw.start_with?("npm:")
       end
 
+      def workspace_protocol?
+        # pnpm workspace protocol: workspace:* or workspace:^
+        # Used for monorepo internal dependencies
+        !raw.nil? && raw.start_with?("workspace:")
+      end
+
       def parts
-        return if local_path_or_url?
+        return if local_path_or_url? || workspace_protocol?
 
         match = raw.match(VERSION_PARTS_REGEX)
         unless match

@@ -18,23 +18,23 @@
 
 ## ⚡ 30-Second Overview
 
-**Add React to any Rails view in 3 steps:**
+**Create a new React on Rails app with one command:**
 
-**1. Install:**
+```bash
+npx create-react-on-rails-app my-app
+cd my-app
+bin/dev
+```
+
+Visit [http://localhost:3000/hello_world](http://localhost:3000/hello_world) - done! TypeScript? Add `--template typescript`. [Full CLI docs →](./docs/getting-started/create-react-on-rails-app.md)
+
+**Or add to an existing Rails app:**
 
 ```bash
 bundle add react_on_rails --strict && rails g react_on_rails:install
 ```
 
-**2. Create a component** at `app/javascript/src/HelloWorld/ror_components/HelloWorld.jsx`:
-
-```jsx
-export default function HelloWorld({ name }) {
-  return <h1>Hello, {name}!</h1>;
-}
-```
-
-**3. Use in any Rails view:**
+Then use React in any Rails view:
 
 ```erb
 <%= react_component("HelloWorld", props: { name: "World" }) %>

@@ -29,7 +29,7 @@
     "prop-types": "^15.8.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-on-rails": "link:.yalc/react-on-rails",
+    "react-on-rails": "workspace:*",
     "shakapacker": "9.5.0",
     "style-loader": "^4.0.0",
     "terser-webpack-plugin": "5",
@@ -39,8 +39,6 @@
     "webpack-merge": "5"
   },
   "scripts": {
-    "preinstall": "pnpm run link-source && yalc add --link react-on-rails",
-    "link-source": "cd ../../.. && pnpm install && cd packages/react-on-rails && yalc publish"
   },
   "devDependencies": {
     "@pmmmwh/react-refresh-webpack-plugin": "^0.5.15",

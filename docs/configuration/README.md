@@ -254,9 +254,19 @@ ReactOnRails.configure do |config|
   # Change to a value like this example to enable this feature
   # config.components_subdirectory = "ror_components"
 
+  # stores_subdirectory is the name of the subdirectory matched to detect and register Redux stores automatically.
+  # Works the same way as components_subdirectory but for Redux stores used with the `redux_store` helper.
+  # Note: Redux stores are less common since React Hooks were introduced. Most new apps use
+  # components without Redux. Only configure this if your app uses Redux stores.
+  # The default is nil. You can enable the feature by updating it in the next line.
+  config.stores_subdirectory = nil
+  # Change to a value like this example to enable this feature
+  # config.stores_subdirectory = "ror_stores"
+
   # Default is false.
   # The default can be overridden as an option in calls to view helpers
-  # `render_component` and `render_component_hash`. You may set to true to change the default to auto loading.
+  # `react_component`, `react_component_hash`, and `redux_store`.
+  # You may set to true to change the default to auto loading.
   # NOTE: Requires Shakapacker 6.5.1+ for basic functionality, 7.0.0+ for full auto-registration features.
   # See version requirements matrix above for complete feature compatibility.
   config.auto_load_bundle = false
@@ -419,7 +429,7 @@ For more details on testing configuration, see the [Testing Configuration Guide]
 
 ## File-Based Component Registry
 
-If you have many components and want to avoid manually managing webpack entry points for each one, React on Rails can automatically generate component packs based on your file system structure. This feature is particularly useful for large applications with dozens of components.
+If you have many components and want to avoid manually managing webpack entry points for each one, React on Rails can automatically generate component packs based on your file system structure. This feature is particularly useful for large applications with dozens of components. Redux store auto-registration is also supported (see the linked guide).
 
 For complete information about the file-based component registry feature (including `components_subdirectory`, `auto_load_bundle`, and `make_generated_server_bundle_the_entrypoint` configuration options), see:
 
@@ -641,6 +651,21 @@ Raises exceptions when JavaScript errors occur during server rendering (developm
 config.raise_on_prerender_error = Rails.env.development?  # default
 ```
 
+### Development Server (bin/dev)
+
+#### check_database_on_dev_start
+
+**Type:** Boolean
+**Default:** `true`
+
+Controls whether `bin/dev` checks database connectivity before starting the development server. When enabled, it verifies the database exists and is accessible, and warns about pending migrations.
+
+```ruby
+config.check_database_on_dev_start = false  # Disable the check
+```
+
+This is the lowest-priority opt-out mechanism. You can also disable the check per-invocation via the `--skip-database-check` CLI flag or the `SKIP_DATABASE_CHECK=true` environment variable. See the [Process Managers guide](../building-features/process-managers.md#database-connectivity-check) for details.
+
 ### Server Renderer Pool (ExecJS)
 
 #### server_renderer_pool_size
@@ -845,6 +870,7 @@ ReactOnRails.configure do |config|
   # File-based component registry
   config.components_subdirectory = "ror_components"
   config.auto_load_bundle = true
+  # config.stores_subdirectory = "ror_stores"  # Optional: for Redux store auto-registration
 
   ################################################################################
   # Optional Overrides (most apps don't need these)

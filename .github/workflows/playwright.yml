@@ -68,21 +68,19 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
-      - name: Install yalc globally
-        run: pnpm add -g yalc
-
-      - name: Install root dependencies
+      - name: Install dependencies
         run: pnpm install
 
-      - name: Install dummy app dependencies
+      - name: Build workspace packages
+        run: pnpm run build
+
+      - name: Install dummy app Ruby dependencies
         working-directory: react_on_rails/spec/dummy
-        run: |
-          bundle install
-          pnpm install
+        run: bundle install
 
       - name: Install Playwright browsers
         working-directory: react_on_rails/spec/dummy
-        run: pnpm exec playwright install --with-deps
+        run: npx playwright install --with-deps
 
       - name: Generate React on Rails packs
         working-directory: react_on_rails/spec/dummy

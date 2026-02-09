@@ -531,6 +531,84 @@ module ReactOnRails
       end
     end
 
+    context "when stores_subdirectory is configured" do
+      before do
+        @old_stores_subdirectory = ReactOnRails.configuration.stores_subdirectory
+        ReactOnRails.configuration.stores_subdirectory = "ror_stores"
+      end
+
+      after do
+        ReactOnRails.configuration.stores_subdirectory = @old_stores_subdirectory
+      end
+
+      context "with store files in stores_subdirectory" do
+        before do
+          stores_fixture_path = File.expand_path("./fixtures/automated_packs_generation/stores", __dir__)
+          allow(ReactOnRails::PackerUtils).to receive(:packer_source_path)
+            .and_return("#{stores_fixture_path}/StoreWithAutoRegistration")
+          described_class.instance.generate_packs_if_stale
+        end
+
+        it "creates pack for the store" do
+          store_pack = "#{generated_directory}/commentsStore.js"
+          expect(File.exist?(store_pack)).to be(true)
+        end
+
+        it "generated store pack registers the store" do
+          store_pack = "#{generated_directory}/commentsStore.js"
+          pack_content = File.read(store_pack)
+
+          expect(pack_content).to include("import ReactOnRails from 'react-on-rails/client';")
+          expect(pack_content).to include("import commentsStore from")
+          expect(pack_content).to include("ReactOnRails.registerStore({commentsStore});")
+        end
+
+        it "includes store in the server bundle" do
+          generated_server_bundle_content = File.read(generated_server_bundle_file_path)
+
+          expect(generated_server_bundle_content).to include("ReactOnRails.registerStore")
+          expect(generated_server_bundle_content).to include("commentsStore")
+        end
+
+        it "generates packs for TypeScript store files too" do
+          ts_store_pack = "#{generated_directory}/routerStore.js"
+          expect(File.exist?(ts_store_pack)).to be(true)
+        end
+      end
+
+      context "when component and store have the same name" do
+        before do
+          stores_fixture_path = File.expand_path("./fixtures/automated_packs_generation/stores", __dir__)
+          allow(ReactOnRails::PackerUtils).to receive(:packer_source_path)
+            .and_return("#{stores_fixture_path}/StoreWithNameConflict")
+        end
+
+        it "raises an error for name conflict" do
+          expect { described_class.instance.generate_packs_if_stale }
+            .to raise_error(ReactOnRails::Error, /names are used for both components and stores/)
+        end
+      end
+    end
+
+    context "when stores_subdirectory is not set" do
+      before do
+        @old_stores_subdirectory = ReactOnRails.configuration.stores_subdirectory
+        ReactOnRails.configuration.stores_subdirectory = nil
+      end
+
+      after do
+        ReactOnRails.configuration.stores_subdirectory = @old_stores_subdirectory
+      end
+
+      it "does not attempt to generate store packs" do
+        component_name = "ComponentWithCommonOnly"
+        stub_packer_source_path(component_name: component_name, packer_source_path: packer_source_path)
+
+        # Should not raise any errors even without stores
+        expect { described_class.instance.generate_packs_if_stale }.not_to raise_error
+      end
+    end
+
     def generated_server_bundle_file_path
       described_class.instance.send(:generated_server_bundle_file_path)
     end
@@ -789,6 +867,45 @@ module ReactOnRails
         let(:file_path) { "/path/to/MyComponent.tsx" }
 
         it { is_expected.to eq "MyComponent" }
+      end
+    end
+
+    describe "#relative_path" do
+      subject(:computed_relative_path) { described_class.instance.send(:relative_path, from, to).to_s }
+
+      context "when target is one directory up from generated pack" do
+        let(:from) { "/app/javascript/packs/generated/MyComponent.js" }
+        let(:to) { "/app/javascript/packs/components/MyComponent.jsx" }
+
+        it { is_expected.to eq "../components/MyComponent.jsx" }
+      end
+
+      context "when target is multiple directories up from generated pack" do
+        let(:from) { "/app/javascript/packs/generated/MyComponent.js" }
+        let(:to) { "/app/javascript/src/deep/components/MyComponent.jsx" }
+
+        it { is_expected.to eq "../../src/deep/components/MyComponent.jsx" }
+      end
+
+      context "when target is deeply nested relative to generated pack" do
+        let(:from) { "/app/javascript/packs/generated/MyComponent.js" }
+        let(:to) { "/app/src/nested/deeply/components/MyComponent.jsx" }
+
+        it { is_expected.to eq "../../../src/nested/deeply/components/MyComponent.jsx" }
+      end
+
+      context "when from and to are in sibling directories" do
+        let(:from) { "/app/packs/server-bundle.js" }
+        let(:to) { "/app/generated/server-bundle-generated.js" }
+
+        it { is_expected.to eq "../generated/server-bundle-generated.js" }
+      end
+
+      context "when from and to are in the same directory" do
+        let(:from) { "/app/generated/server-bundle.js" }
+        let(:to) { "/app/generated/server-bundle-generated.js" }
+
+        it { is_expected.to eq "server-bundle-generated.js" }
       end
     end
 
