@@ -2,11 +2,7 @@
 
 require "jwt"
 require_relative "spec_helper"
-require "rake"
-
-# Load the rake task to define the LicenseTaskFormatter module
-task_file = File.expand_path("../../lib/tasks/license.rake", __dir__)
-load task_file
+require "react_on_rails_pro/license_task_formatter"
 
 RSpec.describe ReactOnRailsPro::LicenseTaskFormatter do
   let(:test_private_key) { OpenSSL::PKey::RSA.new(2048) }
