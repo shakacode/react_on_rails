@@ -600,7 +600,7 @@ React on Rails includes a performance benchmark workflow that measures RPS (requ
 #### When Benchmarks Run
 
 - **Automatically on master**: Benchmarks run on every push to master
-- **On PRs with labels**: Add the `benchmark` or `full-ci` label to your PR to run benchmarks
+- **On PRs with labels**: Add the `benchmark` label to your PR to run benchmarks
 - **Manual trigger**: Use `gh workflow run` to run benchmarks with custom parameters (see [https://github.com/cli/cli#installation](https://github.com/cli/cli#installation) if you don't have `gh`):
 
   ```bash
