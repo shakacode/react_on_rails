@@ -79,12 +79,14 @@ for (const [folderKey, files] of Object.entries(fileOrder)) {
 
 // --- Helper: check if a relative path is excluded ---
 
+/** Returns true if relativePath matches any pattern in the exclude list. */
 function isExcluded(relativePath) {
   return micromatch.isMatch(relativePath, exclude);
 }
 
 // --- Helper: list first-level directories with doc files ---
 
+/** Returns names of top-level directories under absDocsDir that contain .md/.mdx files. */
 function getDocDirectories() {
   const entries = fs.readdirSync(absDocsDir, { withFileTypes: true });
   const dirs = [];
@@ -102,6 +104,7 @@ function getDocDirectories() {
   return dirs;
 }
 
+/** Recursively checks whether dirPath contains any .md/.mdx files. Skips symlinks. */
 function hasDocFiles(dirPath) {
   const entries = fs.readdirSync(dirPath, { withFileTypes: true });
   for (const entry of entries) {
@@ -116,12 +119,16 @@ function hasDocFiles(dirPath) {
 
 // --- Helper: list doc files in a directory (non-recursive) ---
 
+/**
+ * Returns doc files in dirPath as objects with stem (name without extension)
+ * and filename (original name with extension) to allow precise exclusion checks.
+ */
 function getDocFiles(dirPath) {
   if (!fs.existsSync(dirPath)) return [];
   return fs
     .readdirSync(dirPath, { withFileTypes: true })
     .filter((e) => e.isFile() && /\.(md|mdx)$/i.test(e.name))
-    .map((e) => e.name.replace(/\.(md|mdx)$/i, ''));
+    .map((e) => ({ stem: e.name.replace(/\.(md|mdx)$/i, ''), filename: e.name }));
 }
 
 // --- Check 1: Category completeness ---
@@ -130,14 +137,12 @@ const allDirs = getDocDirectories();
 const categoryFolders = categoryOrder.filter((c) => c !== '');
 
 for (const dir of allDirs) {
-  // Check if entire directory is excluded
-  if (isExcluded(`${dir}/`) || isExcluded(`${dir}/**`)) continue;
+  // Check if entire directory is excluded (bare name, trailing slash, or glob)
+  if (isExcluded(dir) || isExcluded(`${dir}/`) || isExcluded(`${dir}/**`)) continue;
 
   // Check if all doc files in this directory are individually excluded
   const dirFiles = getDocFiles(path.join(absDocsDir, dir));
-  const nonExcludedFiles = dirFiles.filter(
-    (f) => !isExcluded(`${dir}/${f}.md`) && !isExcluded(`${dir}/${f}.mdx`),
-  );
+  const nonExcludedFiles = dirFiles.filter((f) => !isExcluded(`${dir}/${f.filename}`));
   if (nonExcludedFiles.length === 0) continue;
 
   if (!categoryFolders.includes(dir)) {
@@ -199,6 +204,7 @@ for (const pattern of exclude) {
   }
 }
 
+/** Recursively lists all relative paths under baseDir. Skips dotfiles and symlinks. */
 function listAllRelativePaths(baseDir, prefix = '') {
   const results = [];
   const entries = fs.readdirSync(baseDir, { withFileTypes: true });
@@ -221,10 +227,10 @@ function listAllRelativePaths(baseDir, prefix = '') {
 
 if (!categoryOrder.includes('')) {
   const rootFiles = getDocFiles(absDocsDir);
-  const nonExcludedRootFiles = rootFiles.filter((f) => !isExcluded(`${f}.md`) && !isExcluded(`${f}.mdx`));
+  const nonExcludedRootFiles = rootFiles.filter((f) => !isExcluded(f.filename));
   if (nonExcludedRootFiles.length > 0) {
     errors.push(
-      `Root-level doc files exist (${nonExcludedRootFiles.join(', ')}) but "" is not in categoryOrder.\n` +
+      `Root-level doc files exist (${nonExcludedRootFiles.map((f) => f.stem).join(', ')}) but "" is not in categoryOrder.\n` +
         `       Add "" to categoryOrder to display root-level files.`,
     );
   }

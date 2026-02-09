@@ -4,22 +4,24 @@ on:
   pull_request:
     paths:
       - 'docs/**'
+      - 'docs/.docs-config.yml'
       - 'react_on_rails_pro/docs/**'
+      - 'react_on_rails_pro/docs/.docs-config.yml'
       - 'scripts/validate-docs-config.cjs'
       - '.github/workflows/validate-docs-config.yml'
   push:
     branches: [master]
     paths:
       - 'docs/**'
+      - 'docs/.docs-config.yml'
       - 'react_on_rails_pro/docs/**'
+      - 'react_on_rails_pro/docs/.docs-config.yml'
       - 'scripts/validate-docs-config.cjs'
       - '.github/workflows/validate-docs-config.yml'
 
 jobs:
   validate:
     runs-on: ubuntu-latest
-    env:
-      NODE_PATH: /tmp/docs-validator/node_modules
     steps:
       - uses: actions/checkout@v4
 
@@ -32,6 +34,10 @@ jobs:
 
       - name: Validate OSS docs config
         run: node scripts/validate-docs-config.cjs docs
+        env:
+          NODE_PATH: /tmp/docs-validator/node_modules
 
       - name: Validate Pro docs config
         run: node scripts/validate-docs-config.cjs react_on_rails_pro/docs
+        env:
+          NODE_PATH: /tmp/docs-validator/node_modules
