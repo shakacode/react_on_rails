@@ -627,11 +627,16 @@ jobs:
           # are no regression alerts, treat as a warning instead of failing the workflow.
           # This commonly happens when the PR base commit was a docs-only change
           # skipped by paths-ignore, so no benchmark data exists in Bencher.
-          # We check for "alert" to avoid suppressing actual threshold violations
-          # that might appear alongside a 404.
-          if [ $BENCHER_EXIT_CODE -ne 0 ] && grep -q "404 Not Found" "$BENCHER_STDERR" && ! grep -qi "alert" "$BENCHER_STDERR"; then
+          #
+          # Safety checks before overriding exit code:
+          #   1. stderr must contain "404 Not Found" (HTTP status from Bencher API)
+          #   2. stderr must NOT contain regression indicators ("alert", "threshold",
+          #      or "boundary") to avoid suppressing actual performance regressions
+          if [ $BENCHER_EXIT_CODE -ne 0 ] && grep -q "404 Not Found" "$BENCHER_STDERR" && ! grep -qiE "alert|threshold violation|boundary violation" "$BENCHER_STDERR"; then
             echo "⚠️ Bencher baseline not found for start-point hash '$START_POINT_HASH' — this is expected when the base commit was not benchmarked (e.g., docs-only changes skipped by paths-ignore)"
             echo "⚠️ Benchmark data was collected but regression comparison is unavailable for this run"
+            echo "📋 Bencher stderr output:"
+            cat "$BENCHER_STDERR"
             BENCHER_EXIT_CODE=0
           fi
           rm -f "$BENCHER_STDERR"
