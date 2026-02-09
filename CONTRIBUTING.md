@@ -328,13 +328,13 @@ pnpm run check
 To format JavaScript/TypeScript files with Prettier:
 
 ```sh
-pnpm run format
+pnpm start format
 ```
 
 To check formatting without fixing:
 
 ```sh
-pnpm run format.listDifferent
+pnpm start format.listDifferent
 ```
 
 ### Linting
@@ -899,7 +899,7 @@ This approach:
 cd react_on_rails/
 
 # Run Prettier for JavaScript/TypeScript formatting
-pnpm run format
+pnpm start format
 
 # Run ESLint for JavaScript/TypeScript linting
 pnpm run lint
