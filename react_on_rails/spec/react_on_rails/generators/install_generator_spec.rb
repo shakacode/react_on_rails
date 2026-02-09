@@ -512,14 +512,17 @@ describe InstallGenerator, type: :generator do
       install_generator.send(:ensure_shakapacker_in_gemfile)
     end
 
-    it "clears BUNDLE_GEMFILE when running bundle install" do
-      # Mock the system calls to prevent actual execution
-      allow(install_generator).to receive(:system).and_return(true)
-
-      # Expect with_unbundled_env to be called for both bundle install and shakapacker:install
-      expect(Bundler).to receive(:with_unbundled_env).twice.and_yield
+    it "clears BUNDLE_GEMFILE when running bundle install and shakapacker:install" do
+      # Verify both system calls run inside with_unbundled_env
+      allow(Bundler).to receive(:with_unbundled_env).and_yield
+      allow(install_generator).to receive(:system).with("bundle install").and_return(true)
+      allow(install_generator).to receive(:system).with("bundle exec rails shakapacker:install").and_return(true)
 
       install_generator.send(:install_shakapacker)
+
+      expect(install_generator).to have_received(:system).with("bundle install")
+      expect(install_generator).to have_received(:system).with("bundle exec rails shakapacker:install")
+      expect(Bundler).to have_received(:with_unbundled_env).at_least(:twice)
     end
 
     context "with fake BUNDLE_GEMFILE set" do

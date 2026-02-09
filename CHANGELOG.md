@@ -39,6 +39,10 @@ Changes since the last non-beta release.
 
   [PR 2340](https://github.com/shakacode/react_on_rails/pull/2340) by [justin808](https://github.com/justin808).
 
+#### Fixed
+
+- **Fix generator inheriting BUNDLE_GEMFILE from parent process**: The `react_on_rails:install` generator now wraps bundler commands with `Bundler.with_unbundled_env` to prevent inheriting `BUNDLE_GEMFILE` from the parent process, which caused "injected gems" conflicts when running generators inside a bundled context. [PR 2288](https://github.com/shakacode/react_on_rails/pull/2288) by [ihabadham](https://github.com/ihabadham).
+
 #### Pro
 
 ##### Changed
