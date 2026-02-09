@@ -254,9 +254,17 @@ ReactOnRails.configure do |config|
   # Change to a value like this example to enable this feature
   # config.components_subdirectory = "ror_components"
 
+  # stores_subdirectory is the name of the subdirectory matched to detect and register Redux stores automatically.
+  # Works the same way as components_subdirectory but for Redux stores used with the `redux_store` helper.
+  # The default is nil. You can enable the feature by updating it in the next line.
+  config.stores_subdirectory = nil
+  # Change to a value like this example to enable this feature
+  # config.stores_subdirectory = "ror_stores"
+
   # Default is false.
   # The default can be overridden as an option in calls to view helpers
-  # `render_component` and `render_component_hash`. You may set to true to change the default to auto loading.
+  # `render_component`, `render_component_hash`, and `redux_store`.
+  # You may set to true to change the default to auto loading.
   # NOTE: Requires Shakapacker 6.5.1+ for basic functionality, 7.0.0+ for full auto-registration features.
   # See version requirements matrix above for complete feature compatibility.
   config.auto_load_bundle = false
@@ -417,11 +425,11 @@ end
 
 For more details on testing configuration, see the [Testing Configuration Guide](../building-features/testing-configuration.md).
 
-## File-Based Component Registry
+## File-Based Component and Store Registry
 
-If you have many components and want to avoid manually managing webpack entry points for each one, React on Rails can automatically generate component packs based on your file system structure. This feature is particularly useful for large applications with dozens of components.
+If you have many components or Redux stores and want to avoid manually managing webpack entry points for each one, React on Rails can automatically generate packs based on your file system structure. This feature is particularly useful for large applications with dozens of components and stores.
 
-For complete information about the file-based component registry feature (including `components_subdirectory`, `auto_load_bundle`, and `make_generated_server_bundle_the_entrypoint` configuration options), see:
+For complete information about the file-based registry feature (including `components_subdirectory`, `stores_subdirectory`, `auto_load_bundle`, and `make_generated_server_bundle_the_entrypoint` configuration options), see:
 
 [Auto-Bundling: File-System-Based Automated Bundle Generation](../core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md)
 
@@ -857,8 +865,9 @@ ReactOnRails.configure do |config|
   # Test configuration
   config.build_test_command = "RAILS_ENV=test bin/shakapacker"
 
-  # File-based component registry
+  # File-based component and store registry
   config.components_subdirectory = "ror_components"
+  config.stores_subdirectory = "ror_stores"
   config.auto_load_bundle = true
 
   ################################################################################

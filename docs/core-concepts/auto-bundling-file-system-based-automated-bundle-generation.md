@@ -34,9 +34,22 @@ Now all React components inside the directories called `ror_components` will aut
 > Example (dummy app): the configured components subdirectory is named `startup` instead of `ror_components`.
 > [Dummy initializer](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails/spec/dummy/config/initializers/react_on_rails.rb)
 
+### Configure Stores Subdirectory
+
+`stores_subdirectory` is the name of the matched directories containing Redux stores that will be automatically registered. This works the same way as `components_subdirectory` but for Redux stores.
+
+```rb
+config.stores_subdirectory = "ror_stores"
+```
+
+Now all Redux store files inside directories called `ror_stores` will automatically be registered for usage with the [`redux_store`](../api-reference/view-helpers-api.md#redux_store) view helper.
+
+> [!NOTE]
+> You can use `components_subdirectory` and `stores_subdirectory` independently or together. Both require `auto_load_bundle` to be enabled (either globally or per helper call) and `nested_entries: true` in `shakapacker.yml`.
+
 ### Configure `auto_load_bundle` Option
 
-For automated component registry, [`react_component`](../api-reference/view-helpers-api.md#react_component) and [`react_component_hash`](../api-reference/view-helpers-api.md#react_component_hash) view helper method tries to load generated bundle for component from the generated directory automatically per `auto_load_bundle` option. `auto_load_bundle` option in `config/initializers/react_on_rails` configures the default value that will be passed to component helpers. The default is `false`, and the parameter can be passed explicitly for each call.
+For automated component and store registry, view helper methods (`react_component`, `react_component_hash`, and `redux_store`) try to load generated bundles from the generated directory automatically per `auto_load_bundle` option. `auto_load_bundle` option in `config/initializers/react_on_rails` configures the default value that will be passed to these helpers. The default is `false`, and the parameter can be passed explicitly for each call.
 
 You can change the value in `config/initializers/react_on_rails` by updating it as follows:
 
@@ -297,6 +310,7 @@ In `config/initializers/react_on_rails.rb`:
 ```rb
 ReactOnRails.configure do |config|
   config.components_subdirectory = "ror_components"  # Directory name for auto-registered components
+  config.stores_subdirectory = "ror_stores"          # Directory name for auto-registered stores
   config.auto_load_bundle = true                     # Enable automatic bundle loading
   config.server_bundle_js_file = "server-bundle.js"
 end
@@ -489,6 +503,102 @@ Now when you visit your pages, React on Rails automatically:
 ![HeavyMarkdownEditor Bundle Analysis](../images/bundle-splitting-heavy-markdown.png)
 
 _Screenshots show browser dev tools network analysis demonstrating the dramatic difference in bundle sizes and load times between the two components._
+
+## Store Auto-Registration
+
+In addition to components, React on Rails can automatically register Redux stores based on file system conventions. This eliminates manual `ReactOnRails.registerStore()` calls and generates individual packs for each store.
+
+### Setup
+
+Configure `stores_subdirectory` in your React on Rails initializer:
+
+```rb
+# config/initializers/react_on_rails.rb
+ReactOnRails.configure do |config|
+  config.components_subdirectory = "ror_components"
+  config.stores_subdirectory = "ror_stores"
+  config.auto_load_bundle = true
+end
+```
+
+### Directory Structure
+
+Place store files inside directories matching your configured `stores_subdirectory`:
+
+```text
+app/javascript/
+└── src/
+    ├── Comments/
+    │   └── ror_stores/
+    │       └── commentsStore.js
+    └── Router/
+        └── ror_stores/
+            └── routerStore.ts       # TypeScript is supported
+```
+
+### Store File Format
+
+Each store file must export a store generator function as its default export:
+
+```js
+// app/javascript/src/Comments/ror_stores/commentsStore.js
+import { createStore } from 'redux';
+import commentsReducer from '../reducers/commentsReducer';
+
+const commentsStore = (props, railsContext) => {
+  return createStore(commentsReducer, props);
+};
+
+export default commentsStore;
+```
+
+### Usage in Rails Views
+
+Use the `redux_store` helper with `auto_load_bundle`:
+
+```erb
+<%# The store pack is loaded automatically when auto_load_bundle is enabled %>
+<%= redux_store("commentsStore", props: { comments: @comments }) %>
+<%= react_component("CommentsContainer", auto_load_bundle: true) %>
+```
+
+If `auto_load_bundle` is set globally to `true`, you can omit it from each call:
+
+```erb
+<%= redux_store("commentsStore", props: { comments: @comments }) %>
+<%= react_component("CommentsContainer") %>
+```
+
+### Generated Files
+
+Running `bundle exec rake react_on_rails:generate_packs` generates:
+
+**Client pack** (`app/javascript/packs/generated/commentsStore.js`):
+
+```js
+import ReactOnRails from 'react-on-rails/client';
+import commentsStore from '../../src/Comments/ror_stores/commentsStore.js';
+
+ReactOnRails.registerStore({ commentsStore });
+```
+
+**Server bundle** — stores are also automatically included in the generated server bundle, so server-side rendering with Redux works without manual configuration.
+
+### Name Conflict Detection
+
+Component and store names must be unique across both registries. If a component and a store share the same name, pack generation will raise an error:
+
+```
+**ERROR** ReactOnRails: The following names are used for both components and stores: myName.
+This would cause pack file conflicts in the generated directory.
+Please rename your components or stores to have unique names.
+```
+
+Duplicate store names (two store files with the same name in different directories) are also detected and raise an error.
+
+### Server/Client Variants
+
+Like components, store files support `.client` and `.server` suffixes. For example, `commentsStore.client.js` will only be used for client-side rendering, and the suffix is stripped from the registered name.
 
 ### Server Rendering and Client Rendering Components
 
