@@ -9,6 +9,14 @@
 
 version: 2
 
+# Group shakapacker gem + npm updates into a single PR for the execjs-compatible-dummy,
+# which is a standalone app with independently pinned gem and npm versions that must match.
+multi-ecosystem-groups:
+  execjs-dummy-shakapacker:
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 0
+
 updates:
   # NPM/PNPM packages - root workspace and dummy apps
   - package-ecosystem: "npm"
@@ -32,6 +40,28 @@ updates:
         patterns:
           - "*"
 
+  # NPM for execjs-compatible-dummy - grouped with bundler to keep shakapacker in sync
+  - package-ecosystem: "npm"
+    directory: "/react_on_rails_pro/spec/execjs-compatible-dummy"
+    patterns:
+      - "*"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "javascript"
+      - "full-ci"
+    cooldown:
+      default-days: 3
+    groups:
+      npm-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "shakapacker"
+    multi-ecosystem-group: "execjs-dummy-shakapacker"
+
   # Ruby gems - Open source and Pro gems (including dummy apps)
   # Root directory is not included because it reuses the Gemfile from react_on_rails
   - package-ecosystem: "bundler"
@@ -40,7 +70,6 @@ updates:
       - "/react_on_rails/spec/dummy"
       - "/react_on_rails_pro"
       - "/react_on_rails_pro/spec/dummy"
-      - "/react_on_rails_pro/spec/execjs-compatible-dummy"
     schedule:
       interval: "weekly"
     labels:
@@ -55,6 +84,28 @@ updates:
         applies-to: security-updates
         patterns:
           - "*"
+
+  # Bundler for execjs-compatible-dummy - grouped with npm to keep shakapacker in sync
+  - package-ecosystem: "bundler"
+    directory: "/react_on_rails_pro/spec/execjs-compatible-dummy"
+    patterns:
+      - "*"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "ruby"
+      - "full-ci"
+    cooldown:
+      default-days: 3
+    groups:
+      bundler-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "shakapacker"
+    multi-ecosystem-group: "execjs-dummy-shakapacker"
 
   # GitHub Actions
   - package-ecosystem: "github-actions"
