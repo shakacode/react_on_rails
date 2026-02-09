@@ -24,7 +24,13 @@ if (!fs.existsSync(configPath)) {
   process.exit(1);
 }
 
-const config = yaml.load(fs.readFileSync(configPath, 'utf8'));
+let config;
+try {
+  config = yaml.load(fs.readFileSync(configPath, 'utf8'));
+} catch (e) {
+  console.error(`ERROR: Failed to parse ${configPath}: ${e.message}`);
+  process.exit(1);
+}
 const errors = [];
 const warnings = [];
 
@@ -50,7 +56,7 @@ if (config.fileOrder === undefined || config.fileOrder === null) {
 }
 
 if (errors.length > 0) {
-  errors.forEach(e => console.error(`ERROR: ${e}`));
+  errors.forEach((e) => console.error(`ERROR: ${e}`));
   process.exit(1);
 }
 
@@ -99,6 +105,7 @@ function getDocDirectories() {
 function hasDocFiles(dirPath) {
   const entries = fs.readdirSync(dirPath, { withFileTypes: true });
   for (const entry of entries) {
+    if (entry.isSymbolicLink()) continue;
     if (entry.isFile() && /\.(md|mdx)$/i.test(entry.name)) return true;
     if (entry.isDirectory()) {
       if (hasDocFiles(path.join(dirPath, entry.name))) return true;
@@ -111,15 +118,16 @@ function hasDocFiles(dirPath) {
 
 function getDocFiles(dirPath) {
   if (!fs.existsSync(dirPath)) return [];
-  return fs.readdirSync(dirPath, { withFileTypes: true })
-    .filter(e => e.isFile() && /\.(md|mdx)$/i.test(e.name))
-    .map(e => e.name.replace(/\.(md|mdx)$/i, ''));
+  return fs
+    .readdirSync(dirPath, { withFileTypes: true })
+    .filter((e) => e.isFile() && /\.(md|mdx)$/i.test(e.name))
+    .map((e) => e.name.replace(/\.(md|mdx)$/i, ''));
 }
 
 // --- Check 1: Category completeness ---
 
 const allDirs = getDocDirectories();
-const categoryFolders = categoryOrder.filter(c => c !== '');
+const categoryFolders = categoryOrder.filter((c) => c !== '');
 
 for (const dir of allDirs) {
   // Check if entire directory is excluded
@@ -127,13 +135,15 @@ for (const dir of allDirs) {
 
   // Check if all doc files in this directory are individually excluded
   const dirFiles = getDocFiles(path.join(absDocsDir, dir));
-  const nonExcludedFiles = dirFiles.filter(f => !isExcluded(`${dir}/${f}.md`) && !isExcluded(`${dir}/${f}.mdx`));
+  const nonExcludedFiles = dirFiles.filter(
+    (f) => !isExcluded(`${dir}/${f}.md`) && !isExcluded(`${dir}/${f}.mdx`),
+  );
   if (nonExcludedFiles.length === 0) continue;
 
   if (!categoryFolders.includes(dir)) {
     errors.push(
       `Directory "${dir}" has docs but is not in categoryOrder or exclude.\n` +
-      `       Add it to categoryOrder or exclude in ${docsDir}/.docs-config.yml`
+        `       Add it to categoryOrder or exclude in ${docsDir}/.docs-config.yml`,
     );
   }
 }
@@ -170,7 +180,7 @@ for (const [folderKey, files] of Object.entries(fileOrder)) {
       if (existsAtRoot) {
         warnings.push(
           `File "${fileName}" in fileOrder.${folderKey} exists at root, not in ${folderKey}/. ` +
-          `Verify this is intentional (e.g., a cross-category mapping).`
+            `Verify this is intentional (e.g., a cross-category mapping).`,
         );
       } else {
         errors.push(`File "${fileName}" in fileOrder.${folderKey} does not exist`);
@@ -194,6 +204,7 @@ function listAllRelativePaths(baseDir, prefix = '') {
   const entries = fs.readdirSync(baseDir, { withFileTypes: true });
   for (const entry of entries) {
     if (entry.name.startsWith('.')) continue;
+    if (entry.isSymbolicLink()) continue;
     const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
     results.push(rel);
     if (entry.isDirectory()) {
@@ -210,11 +221,11 @@ function listAllRelativePaths(baseDir, prefix = '') {
 
 if (!categoryOrder.includes('')) {
   const rootFiles = getDocFiles(absDocsDir);
-  const nonExcludedRootFiles = rootFiles.filter(f => !isExcluded(`${f}.md`) && !isExcluded(`${f}.mdx`));
+  const nonExcludedRootFiles = rootFiles.filter((f) => !isExcluded(`${f}.md`) && !isExcluded(`${f}.mdx`));
   if (nonExcludedRootFiles.length > 0) {
     errors.push(
       `Root-level doc files exist (${nonExcludedRootFiles.join(', ')}) but "" is not in categoryOrder.\n` +
-      `       Add "" to categoryOrder to display root-level files.`
+        `       Add "" to categoryOrder to display root-level files.`,
     );
   }
 }
@@ -222,14 +233,16 @@ if (!categoryOrder.includes('')) {
 // --- Output ---
 
 if (warnings.length > 0) {
-  warnings.forEach(w => console.warn(`WARNING: ${w}`));
+  warnings.forEach((w) => console.warn(`WARNING: ${w}`));
 }
 
 if (errors.length > 0) {
   console.error('');
-  errors.forEach(e => console.error(`ERROR: ${e}`));
+  errors.forEach((e) => console.error(`ERROR: ${e}`));
   console.error(`\n${errors.length} error(s) found in ${docsDir}/.docs-config.yml`);
   process.exit(1);
 }
 
-console.log(`✓ ${docsDir}/.docs-config.yml is valid (${categoryFolders.length} categories, ${Object.keys(fileOrder).length} file orderings, ${exclude.length} exclusions)`);
+console.log(
+  `✓ ${docsDir}/.docs-config.yml is valid (${categoryFolders.length} categories, ${Object.keys(fileOrder).length} file orderings, ${exclude.length} exclusions)`,
+);
