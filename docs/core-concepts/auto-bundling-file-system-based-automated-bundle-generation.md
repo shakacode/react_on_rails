@@ -34,22 +34,9 @@ Now all React components inside the directories called `ror_components` will aut
 > Example (dummy app): the configured components subdirectory is named `startup` instead of `ror_components`.
 > [Dummy initializer](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails/spec/dummy/config/initializers/react_on_rails.rb)
 
-### Configure Stores Subdirectory
-
-`stores_subdirectory` is the name of the matched directories containing Redux stores that will be automatically registered. This works the same way as `components_subdirectory` but for Redux stores.
-
-```rb
-config.stores_subdirectory = "ror_stores"
-```
-
-Now all Redux store files inside directories called `ror_stores` will automatically be registered for usage with the [`redux_store`](../api-reference/view-helpers-api.md#redux_store) view helper.
-
-> [!NOTE]
-> You can use `components_subdirectory` and `stores_subdirectory` independently or together. Both require `auto_load_bundle` to be enabled (either globally or per helper call) and `nested_entries: true` in `shakapacker.yml`.
-
 ### Configure `auto_load_bundle` Option
 
-For automated component and store registry, view helper methods (`react_component`, `react_component_hash`, and `redux_store`) try to load generated bundles from the generated directory automatically per `auto_load_bundle` option. `auto_load_bundle` option in `config/initializers/react_on_rails` configures the default value that will be passed to these helpers. The default is `false`, and the parameter can be passed explicitly for each call.
+For automated component registry, [`react_component`](../api-reference/view-helpers-api.md#react_component) and [`react_component_hash`](../api-reference/view-helpers-api.md#react_component_hash) view helper method tries to load generated bundle for component from the generated directory automatically per `auto_load_bundle` option. `auto_load_bundle` option in `config/initializers/react_on_rails` configures the default value that will be passed to component helpers. The default is `false`, and the parameter can be passed explicitly for each call.
 
 You can change the value in `config/initializers/react_on_rails` by updating it as follows:
 
@@ -310,7 +297,6 @@ In `config/initializers/react_on_rails.rb`:
 ```rb
 ReactOnRails.configure do |config|
   config.components_subdirectory = "ror_components"  # Directory name for auto-registered components
-  config.stores_subdirectory = "ror_stores"          # Directory name for auto-registered stores
   config.auto_load_bundle = true                     # Enable automatic bundle loading
   config.server_bundle_js_file = "server-bundle.js"
 end
@@ -504,22 +490,76 @@ Now when you visit your pages, React on Rails automatically:
 
 _Screenshots show browser dev tools network analysis demonstrating the dramatic difference in bundle sizes and load times between the two components._
 
-## Store Auto-Registration
+### Server Rendering and Client Rendering Components
 
-In addition to components, React on Rails can automatically register Redux stores based on file system conventions. This eliminates manual `ReactOnRails.registerStore()` calls and generates individual packs for each store.
+If server rendering is enabled, the component will be registered for usage both in server and client rendering. To have separate definitions for client and server rendering, name the component files `ComponentName.server.jsx` and `ComponentName.client.jsx`. The `ComponentName.server.jsx` file will be used for server rendering and the `ComponentName.client.jsx` file for client rendering. If you don't want the component rendered on the server, you should only have the `ComponentName.client.jsx` file.
 
-### Setup
+> Example (dummy app): paired files such as [`ReduxApp.client.jsx`](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails/spec/dummy/client/app/startup/ReduxApp.client.jsx) and [`ReduxApp.server.jsx`](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails/spec/dummy/client/app/startup/ReduxApp.server.jsx), and [`RouterApp.client.jsx`](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails/spec/dummy/client/app/startup/RouterApp.client.jsx) and [`RouterApp.server.jsx`](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails/spec/dummy/client/app/startup/RouterApp.server.jsx).
 
-Configure `stores_subdirectory` in your React on Rails initializer:
+Once generated, all server entrypoints will be imported into a file named `[ReactOnRails.configuration.server_bundle_js_file]-generated.js`, which in turn will be imported into a source file named the same as `ReactOnRails.configuration.server_bundle_js_file`. If your server bundling logic is such that your server bundle source entrypoint is not named the same as your `ReactOnRails.configuration.server_bundle_js_file` and changing it would be difficult, please let us know.
+
+> [!IMPORTANT]
+> When specifying separate definitions for client and server rendering, you need to delete the generalized `ComponentName.jsx` file.
+
+### Transpiled Languages (ReScript, Reason, etc.)
+
+Components compiled by transpiled languages like ReScript produce output files with extensions that include the transpiler identifier (e.g., `.bs.js`, `.res.js`). Auto-bundling discovers these files because they end in `.js`, but it extracts the component name from the full extension — so `MyComponent.bs.js` becomes `MyComponent.bs` instead of `MyComponent`.
+
+#### Symptoms
+
+If you see errors like:
+
+- `Could not find component registered with name MyComponent.bs`
+- Component renders as `MyComponent.bs` instead of `MyComponent` in error messages
+
+Then you likely need the wrapper pattern described below.
+
+#### Solution: Wrapper File
+
+The simplest solution is a thin wrapper file in your `ror_components` directory:
+
+```text
+app/javascript/src/Comments/
+├── ReScriptShow.bs.js          # ReScript compiler output
+└── ror_components/
+    └── ReScriptShow.jsx        # Wrapper for auto-registration
+```
+
+```jsx
+// app/javascript/src/Comments/ror_components/ReScriptShow.jsx
+import ReScriptShow from '../ReScriptShow.bs.js';
+export default ReScriptShow;
+```
+
+This pattern works for any transpiled language and requires no gem configuration changes. The wrapper file can use `.js`, `.jsx`, `.ts`, or `.tsx` depending on your project setup.
+
+> [!NOTE]
+> While it's possible to add gem-level configuration for additional extensions, the wrapper-file pattern is recommended because it:
+>
+> - Works immediately with no configuration changes
+> - Makes the component registration explicit and visible in the file tree
+> - Avoids coupling your build pipeline to gem internals that may change between versions
+
+### Using Automated Bundle Generation Feature with already defined packs
+
+As of version 13.3.4, bundles inside directories that match `config.components_subdirectory` will be automatically added as entrypoints, while bundles outside those directories need to be manually added to the `Shakapacker.config.source_entry_path` or Webpack's `entry` rules.
+
+## Redux Store Auto-Registration
+
+> [!NOTE]
+> Most applications use React components without Redux. If you don't use Redux stores, you can skip this section entirely.
+
+In addition to components, React on Rails can automatically register Redux stores based on file system conventions. This eliminates manual `ReactOnRails.registerStore()` calls and generates individual packs for each store. The feature works the same way as component auto-registration.
+
+### Configure Stores Subdirectory
+
+Add `stores_subdirectory` to your React on Rails initializer:
 
 ```rb
-# config/initializers/react_on_rails.rb
-ReactOnRails.configure do |config|
-  config.components_subdirectory = "ror_components"
-  config.stores_subdirectory = "ror_stores"
-  config.auto_load_bundle = true
-end
+config.stores_subdirectory = "ror_stores"
 ```
+
+This requires `auto_load_bundle` to be enabled (either globally or per helper call) and `nested_entries: true` in `shakapacker.yml`, just like component auto-registration.
 
 ### Directory Structure
 
@@ -599,60 +639,6 @@ Duplicate store names (two store files with the same name in different directori
 ### Server/Client Variants
 
 Like components, store files support `.client` and `.server` suffixes. For example, `commentsStore.client.js` will only be used for client-side rendering, and the suffix is stripped from the registered name.
-
-### Server Rendering and Client Rendering Components
-
-If server rendering is enabled, the component will be registered for usage both in server and client rendering. To have separate definitions for client and server rendering, name the component files `ComponentName.server.jsx` and `ComponentName.client.jsx`. The `ComponentName.server.jsx` file will be used for server rendering and the `ComponentName.client.jsx` file for client rendering. If you don't want the component rendered on the server, you should only have the `ComponentName.client.jsx` file.
-
-> Example (dummy app): paired files such as [`ReduxApp.client.jsx`](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails/spec/dummy/client/app/startup/ReduxApp.client.jsx) and [`ReduxApp.server.jsx`](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails/spec/dummy/client/app/startup/ReduxApp.server.jsx), and [`RouterApp.client.jsx`](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails/spec/dummy/client/app/startup/RouterApp.client.jsx) and [`RouterApp.server.jsx`](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails/spec/dummy/client/app/startup/RouterApp.server.jsx).
-
-Once generated, all server entrypoints will be imported into a file named `[ReactOnRails.configuration.server_bundle_js_file]-generated.js`, which in turn will be imported into a source file named the same as `ReactOnRails.configuration.server_bundle_js_file`. If your server bundling logic is such that your server bundle source entrypoint is not named the same as your `ReactOnRails.configuration.server_bundle_js_file` and changing it would be difficult, please let us know.
-
-> [!IMPORTANT]
-> When specifying separate definitions for client and server rendering, you need to delete the generalized `ComponentName.jsx` file.
-
-### Transpiled Languages (ReScript, Reason, etc.)
-
-Components compiled by transpiled languages like ReScript produce output files with extensions that include the transpiler identifier (e.g., `.bs.js`, `.res.js`). Auto-bundling discovers these files because they end in `.js`, but it extracts the component name from the full extension — so `MyComponent.bs.js` becomes `MyComponent.bs` instead of `MyComponent`.
-
-#### Symptoms
-
-If you see errors like:
-
-- `Could not find component registered with name MyComponent.bs`
-- Component renders as `MyComponent.bs` instead of `MyComponent` in error messages
-
-Then you likely need the wrapper pattern described below.
-
-#### Solution: Wrapper File
-
-The simplest solution is a thin wrapper file in your `ror_components` directory:
-
-```text
-app/javascript/src/Comments/
-├── ReScriptShow.bs.js          # ReScript compiler output
-└── ror_components/
-    └── ReScriptShow.jsx        # Wrapper for auto-registration
-```
-
-```jsx
-// app/javascript/src/Comments/ror_components/ReScriptShow.jsx
-import ReScriptShow from '../ReScriptShow.bs.js';
-export default ReScriptShow;
-```
-
-This pattern works for any transpiled language and requires no gem configuration changes. The wrapper file can use `.js`, `.jsx`, `.ts`, or `.tsx` depending on your project setup.
-
-> [!NOTE]
-> While it's possible to add gem-level configuration for additional extensions, the wrapper-file pattern is recommended because it:
->
-> - Works immediately with no configuration changes
-> - Makes the component registration explicit and visible in the file tree
-> - Avoids coupling your build pipeline to gem internals that may change between versions
-
-### Using Automated Bundle Generation Feature with already defined packs
-
-As of version 13.3.4, bundles inside directories that match `config.components_subdirectory` will be automatically added as entrypoints, while bundles outside those directories need to be manually added to the `Shakapacker.config.source_entry_path` or Webpack's `entry` rules.
 
 ## Troubleshooting
 
