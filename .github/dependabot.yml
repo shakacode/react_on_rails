@@ -15,6 +15,7 @@ multi-ecosystem-groups:
   execjs-dummy-shakapacker:
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 0
 
 updates:
   # NPM/PNPM packages - root workspace and dummy apps
@@ -50,7 +51,6 @@ updates:
       - "dependencies"
       - "javascript"
       - "full-ci"
-    open-pull-requests-limit: 0
     cooldown:
       default-days: 3
     groups:
@@ -96,7 +96,6 @@ updates:
       - "dependencies"
       - "ruby"
       - "full-ci"
-    open-pull-requests-limit: 0
     cooldown:
       default-days: 3
     groups:
