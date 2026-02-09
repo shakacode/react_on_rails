@@ -522,69 +522,56 @@ describe InstallGenerator, type: :generator do
       install_generator.send(:install_shakapacker)
     end
 
-    it "Bundler.with_unbundled_env clears BUNDLE_GEMFILE in block" do
-      # Set a fake BUNDLE_GEMFILE to simulate parent process context
-      original_gemfile = ENV.fetch("BUNDLE_GEMFILE", nil)
-      ENV["BUNDLE_GEMFILE"] = "/fake/parent/Gemfile"
-
-      bundler_env_in_block = nil
-      Bundler.with_unbundled_env do
-        bundler_env_in_block = ENV.fetch("BUNDLE_GEMFILE", nil)
+    context "with fake BUNDLE_GEMFILE set" do
+      around do |example|
+        original_gemfile = ENV.fetch("BUNDLE_GEMFILE", nil)
+        example.run
+      ensure
+        if original_gemfile
+          ENV["BUNDLE_GEMFILE"] = original_gemfile
+        else
+          ENV.delete("BUNDLE_GEMFILE")
+        end
       end
 
-      expect(bundler_env_in_block).to be_nil
+      it "Bundler.with_unbundled_env clears BUNDLE_GEMFILE in block" do
+        ENV["BUNDLE_GEMFILE"] = "/fake/parent/Gemfile"
 
-      # Restore original value
-      if original_gemfile
-        ENV["BUNDLE_GEMFILE"] = original_gemfile
-      else
-        ENV.delete("BUNDLE_GEMFILE")
+        bundler_env_in_block = nil
+        Bundler.with_unbundled_env do
+          bundler_env_in_block = ENV.fetch("BUNDLE_GEMFILE", nil)
+        end
+
+        expect(bundler_env_in_block).to be_nil
       end
-    end
 
-    it "checks local Gemfile regardless of BUNDLE_GEMFILE env var" do
-      # Even if BUNDLE_GEMFILE points elsewhere, detection should check local Gemfile
-      original_gemfile = ENV.fetch("BUNDLE_GEMFILE", nil)
-      ENV["BUNDLE_GEMFILE"] = "/some/other/project/Gemfile"
+      it "checks local Gemfile regardless of BUNDLE_GEMFILE env var" do
+        ENV["BUNDLE_GEMFILE"] = "/some/other/project/Gemfile"
 
-      # The method should check "Gemfile" not ENV["BUNDLE_GEMFILE"]
-      # We verify this by checking it does NOT try to access the env var path
-      allow(File).to receive(:file?).with("Gemfile").and_return(false)
-      allow(File).to receive(:file?).with("/some/other/project/Gemfile").and_return(true)
+        # The method should check "Gemfile" not ENV["BUNDLE_GEMFILE"]
+        # We verify this by checking it does NOT try to access the env var path
+        allow(File).to receive(:file?).with("Gemfile").and_return(false)
+        allow(File).to receive(:file?).with("/some/other/project/Gemfile").and_return(true)
 
-      result = install_generator.send(:shakapacker_in_gemfile_text?, "shakapacker")
+        result = install_generator.send(:shakapacker_in_gemfile_text?, "shakapacker")
 
-      # If it checked ENV["BUNDLE_GEMFILE"], it would find the file and continue
-      # Since we return false for "Gemfile", the result should be false
-      expect(result).to be false
-
-      # Restore
-      if original_gemfile
-        ENV["BUNDLE_GEMFILE"] = original_gemfile
-      else
-        ENV.delete("BUNDLE_GEMFILE")
+        # If it checked ENV["BUNDLE_GEMFILE"], it would find the file and continue
+        # Since we return false for "Gemfile", the result should be false
+        expect(result).to be false
       end
-    end
 
-    it "checks local Gemfile.lock regardless of BUNDLE_GEMFILE env var" do
-      original_gemfile = ENV.fetch("BUNDLE_GEMFILE", nil)
-      ENV["BUNDLE_GEMFILE"] = "/some/other/project/Gemfile"
+      it "checks local Gemfile.lock regardless of BUNDLE_GEMFILE env var" do
+        ENV["BUNDLE_GEMFILE"] = "/some/other/project/Gemfile"
 
-      # The method should check "Gemfile.lock" not derived from ENV["BUNDLE_GEMFILE"]
-      allow(File).to receive(:file?).with("Gemfile.lock").and_return(false)
-      allow(File).to receive(:file?).with("/some/other/project/Gemfile.lock").and_return(true)
+        # The method should check "Gemfile.lock" not derived from ENV["BUNDLE_GEMFILE"]
+        allow(File).to receive(:file?).with("Gemfile.lock").and_return(false)
+        allow(File).to receive(:file?).with("/some/other/project/Gemfile.lock").and_return(true)
 
-      result = install_generator.send(:shakapacker_in_lockfile?, "shakapacker")
+        result = install_generator.send(:shakapacker_in_lockfile?, "shakapacker")
 
-      # If it derived path from ENV["BUNDLE_GEMFILE"], it would find the file
-      # Since we return false for "Gemfile.lock", the result should be false
-      expect(result).to be false
-
-      # Restore
-      if original_gemfile
-        ENV["BUNDLE_GEMFILE"] = original_gemfile
-      else
-        ENV.delete("BUNDLE_GEMFILE")
+        # If it derived path from ENV["BUNDLE_GEMFILE"], it would find the file
+        # Since we return false for "Gemfile.lock", the result should be false
+        expect(result).to be false
       end
     end
   end
