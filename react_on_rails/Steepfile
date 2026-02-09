@@ -28,6 +28,7 @@ target :lib do
   check "lib/react_on_rails.rb"
   check "lib/react_on_rails/configuration.rb"
   check "lib/react_on_rails/controller.rb"
+  check "lib/react_on_rails/dev/database_checker.rb"
   check "lib/react_on_rails/dev/file_manager.rb"
   check "lib/react_on_rails/dev/pack_generator.rb"
   check "lib/react_on_rails/dev/process_manager.rb"

@@ -4,6 +4,7 @@ require "English"
 require "open3"
 require "rainbow"
 require_relative "../packer_utils"
+require_relative "database_checker"
 require_relative "service_checker"
 
 module ReactOnRails
@@ -12,16 +13,20 @@ module ReactOnRails
       HELP_FLAGS = ["-h", "--help"].freeze
 
       class << self
-        def start(mode = :development, procfile = nil, verbose: false, route: nil, rails_env: nil)
+        def start(mode = :development, procfile = nil, verbose: false, route: nil, rails_env: nil,
+                  skip_database_check: false)
           case mode
           when :production_like
-            run_production_like(_verbose: verbose, route: route, rails_env: rails_env)
+            run_production_like(_verbose: verbose, route: route, rails_env: rails_env,
+                                skip_database_check: skip_database_check)
           when :static
             procfile ||= "Procfile.dev-static-assets"
-            run_static_development(procfile, verbose: verbose, route: route)
+            run_static_development(procfile, verbose: verbose, route: route,
+                                             skip_database_check: skip_database_check)
           when :development, :hmr
             procfile ||= "Procfile.dev"
-            run_development(procfile, verbose: verbose, route: route)
+            run_development(procfile, verbose: verbose, route: route,
+                                      skip_database_check: skip_database_check)
           else
             raise ArgumentError, "Unknown mode: #{mode}"
           end
@@ -151,7 +156,7 @@ module ReactOnRails
         # Flags that take a value as the next argument (not using = syntax)
         FLAGS_WITH_VALUES = %w[--route --rails-env].freeze
 
-        # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
+        # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
         def run_from_command_line(args = ARGV)
           require "optparse"
 
@@ -163,7 +168,7 @@ module ReactOnRails
           # Check if help flags are present in args (before OptionParser processes them)
           help_requested = args.any? { |arg| HELP_FLAGS.include?(arg) }
 
-          options = { route: nil, rails_env: nil, verbose: false }
+          options = { route: nil, rails_env: nil, verbose: false, skip_database_check: false }
 
           OptionParser.new do |opts|
             opts.banner = "Usage: dev [command] [options]"
@@ -178,6 +183,10 @@ module ReactOnRails
 
             opts.on("-v", "--verbose", "Enable verbose output for pack generation") do
               options[:verbose] = true
+            end
+
+            opts.on("--skip-database-check", "Skip database connectivity check (saves ~1-2s startup time)") do
+              options[:skip_database_check] = true
             end
 
             opts.on("-h", "--help", "Prints this help") do
@@ -200,22 +209,25 @@ module ReactOnRails
           case command
           when "production-assets", "prod"
             start(:production_like, nil, verbose: options[:verbose], route: options[:route],
-                                         rails_env: options[:rails_env])
+                                         rails_env: options[:rails_env],
+                                         skip_database_check: options[:skip_database_check])
           when "static"
-            start(:static, "Procfile.dev-static-assets", verbose: options[:verbose], route: options[:route])
+            start(:static, "Procfile.dev-static-assets", verbose: options[:verbose], route: options[:route],
+                                                         skip_database_check: options[:skip_database_check])
           when "kill"
             kill_processes
           when "help"
             show_help
           when "hmr", nil
-            start(:development, "Procfile.dev", verbose: options[:verbose], route: options[:route])
+            start(:development, "Procfile.dev", verbose: options[:verbose], route: options[:route],
+                                                skip_database_check: options[:skip_database_check])
           else
             puts "Unknown argument: #{command}"
             puts "Run 'dev help' for usage information"
             exit 1
           end
         end
-        # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
+        # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
 
         private
 
@@ -352,11 +364,13 @@ module ReactOnRails
               #{Rainbow('--route ROUTE').green.bold}        #{Rainbow('Specify route to display in URLs (default: root)').white}
               #{Rainbow('--rails-env ENV').green.bold}      #{Rainbow('Override RAILS_ENV for assets:precompile step only (prod mode only)').white}
               #{Rainbow('--verbose, -v').green.bold}        #{Rainbow('Enable verbose output for pack generation').white}
+              #{Rainbow('--skip-database-check').green.bold} #{Rainbow('Skip database connectivity check (saves ~1-2s startup time)').white}
 
             #{Rainbow('📝 EXAMPLES:').cyan.bold}
               #{Rainbow('bin/dev prod').green.bold}                    #{Rainbow('# NODE_ENV=production, RAILS_ENV=development').white}
               #{Rainbow('bin/dev prod --rails-env=production').green.bold}  #{Rainbow('# NODE_ENV=production, RAILS_ENV=production').white}
               #{Rainbow('bin/dev prod --route=dashboard').green.bold}       #{Rainbow('# Custom route in URLs').white}
+              #{Rainbow('bin/dev --skip-database-check').green.bold}        #{Rainbow('# Skip DB check for faster startup').white}
           OPTIONS
         end
         # rubocop:enable Metrics/AbcSize
@@ -372,6 +386,14 @@ module ReactOnRails
             #{Rainbow('•').yellow} #{Rainbow('Procfile.dev-prod-assets').green.bold}     - Production-optimized assets (port 3001)
 
             #{Rainbow('Edit these files to customize the development environment for your needs.').white}
+
+            #{Rainbow('🗄️  DATABASE CHECK:').cyan.bold}
+            #{Rainbow('bin/dev checks database connectivity before starting (adds ~1-2s to startup).').white}
+            #{Rainbow('Disable this check if you don\'t use a database or want faster startup:').white}
+
+            #{Rainbow('•').yellow} #{Rainbow('CLI flag:').white}     #{Rainbow('bin/dev --skip-database-check').green.bold}
+            #{Rainbow('•').yellow} #{Rainbow('Environment:').white}  #{Rainbow('SKIP_DATABASE_CHECK=true bin/dev').green.bold}
+            #{Rainbow('•').yellow} #{Rainbow('Config:').white}       #{Rainbow('config.check_database_on_dev_start = false').green.bold} #{Rainbow('(in react_on_rails.rb)').white}
 
             #{Rainbow('🔍 SERVICE DEPENDENCIES:').cyan.bold}
             #{Rainbow('Configure required external services in').white} #{Rainbow('.dev-services.yml').green.bold}#{Rainbow(':').white}
@@ -426,7 +448,7 @@ module ReactOnRails
         # rubocop:enable Metrics/AbcSize
 
         # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
-        def run_production_like(_verbose: false, route: nil, rails_env: nil)
+        def run_production_like(_verbose: false, route: nil, rails_env: nil, skip_database_check: false)
           procfile = "Procfile.dev-prod-assets"
 
           features = [
@@ -440,6 +462,9 @@ module ReactOnRails
           # either via precompile hook or via the configuration.rb adjust_precompile_task
 
           print_procfile_info(procfile, route: route)
+
+          # Check database setup before starting
+          exit 1 unless DatabaseChecker.check_database(skip: skip_database_check)
 
           # Check required services before starting
           exit 1 unless ServiceChecker.check_services
@@ -563,8 +588,11 @@ module ReactOnRails
         end
         # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 
-        def run_static_development(procfile, verbose: false, route: nil)
+        def run_static_development(procfile, verbose: false, route: nil, skip_database_check: false)
           print_procfile_info(procfile, route: route)
+
+          # Check database setup before starting
+          exit 1 unless DatabaseChecker.check_database(skip: skip_database_check)
 
           # Check required services before starting
           exit 1 unless ServiceChecker.check_services
@@ -592,8 +620,11 @@ module ReactOnRails
           ProcessManager.run_with_process_manager(procfile)
         end
 
-        def run_development(procfile, verbose: false, route: nil)
+        def run_development(procfile, verbose: false, route: nil, skip_database_check: false)
           print_procfile_info(procfile, route: route)
+
+          # Check database setup before starting
+          exit 1 unless DatabaseChecker.check_database(skip: skip_database_check)
 
           # Check required services before starting
           exit 1 unless ServiceChecker.check_services

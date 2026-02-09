@@ -641,6 +641,21 @@ Raises exceptions when JavaScript errors occur during server rendering (developm
 config.raise_on_prerender_error = Rails.env.development?  # default
 ```
 
+### Development Server (bin/dev)
+
+#### check_database_on_dev_start
+
+**Type:** Boolean
+**Default:** `true`
+
+Controls whether `bin/dev` checks database connectivity before starting the development server. When enabled, it verifies the database exists and is accessible, and warns about pending migrations.
+
+```ruby
+config.check_database_on_dev_start = false  # Disable the check
+```
+
+This is the lowest-priority opt-out mechanism. You can also disable the check per-invocation via the `--skip-database-check` CLI flag or the `SKIP_DATABASE_CHECK=true` environment variable. See the [Process Managers guide](../building-features/process-managers.md#database-connectivity-check) for details.
+
 ### Server Renderer Pool (ExecJS)
 
 #### server_renderer_pool_size
