@@ -235,6 +235,59 @@ module ReactOnRails
         end
       end
     end
+
+    describe ".hook_script_has_self_guard?" do
+      let(:hook_path) { "bin/shakapacker-precompile-hook" }
+      let(:script_full_path) { instance_double(Pathname) }
+      let(:rails_root) { instance_double(Pathname) }
+
+      before do
+        allow(Rails).to receive(:root).and_return(rails_root)
+        allow(Rails).to receive(:respond_to?).with(:root).and_return(true)
+        allow(rails_root).to receive(:join).with(hook_path).and_return(script_full_path)
+      end
+
+      it "returns true when script contains SHAKAPACKER_SKIP_PRECOMPILE_HOOK" do
+        allow(script_full_path).to receive(:file?).and_return(true)
+        allow(File).to receive(:read).with(script_full_path).and_return(<<~RUBY)
+          #!/usr/bin/env ruby
+          exit 0 if ENV["SHAKAPACKER_SKIP_PRECOMPILE_HOOK"] == "true"
+          ReactOnRails::PacksGenerator.instance.generate_packs_if_stale
+        RUBY
+
+        expect(described_class.hook_script_has_self_guard?(hook_path)).to be true
+      end
+
+      it "returns false when script does not contain the self-guard" do
+        allow(script_full_path).to receive(:file?).and_return(true)
+        allow(File).to receive(:read).with(script_full_path).and_return(<<~RUBY)
+          #!/usr/bin/env ruby
+          ReactOnRails::PacksGenerator.instance.generate_packs_if_stale
+        RUBY
+
+        expect(described_class.hook_script_has_self_guard?(hook_path)).to be false
+      end
+
+      it "returns false when hook value is a direct command (not a script file)" do
+        direct_command = "bundle exec rake react_on_rails:locale"
+        allow(rails_root).to receive(:join).with(direct_command).and_return(Pathname.new(direct_command))
+        allow(Pathname).to receive(:new).and_call_original
+
+        expect(described_class.hook_script_has_self_guard?(direct_command)).to be false
+      end
+
+      it "returns false for blank hook value" do
+        expect(described_class.hook_script_has_self_guard?("")).to be false
+        expect(described_class.hook_script_has_self_guard?(nil)).to be false
+      end
+
+      it "returns false when file read raises an error" do
+        allow(script_full_path).to receive(:file?).and_return(true)
+        allow(File).to receive(:read).with(script_full_path).and_raise(Errno::EACCES)
+
+        expect(described_class.hook_script_has_self_guard?(hook_path)).to be false
+      end
+    end
   end
 
   describe "version constants validation" do

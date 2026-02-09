@@ -1,6 +1,11 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+# Self-guard: skip if bin/dev already ran precompile tasks.
+# This prevents duplicate execution in HMR mode (two webpack processes)
+# regardless of Shakapacker version.
+exit 0 if ENV["SHAKAPACKER_SKIP_PRECOMPILE_HOOK"] == "true"
+
 # Shakapacker precompile hook for React on Rails
 #
 # This script runs before webpack compilation to generate pack files

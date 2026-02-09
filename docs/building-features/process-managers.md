@@ -57,6 +57,12 @@ default: &default
   precompile_hook: 'bundle exec rake react_on_rails:locale'
 ```
 
+> [!TIP]
+> **For HMR with SSR setups** (two webpack processes), use a script-based hook instead of a
+> direct command. Script-based hooks can include a self-guard that prevents duplicate execution
+> regardless of Shakapacker version. See the [i18n documentation](./i18n.md#internationalization)
+> for an example.
+
 See the [i18n documentation](./i18n.md#internationalization) for more details on configuring the precompile hook.
 
 ### Alternative: Extensible Precompile Pattern

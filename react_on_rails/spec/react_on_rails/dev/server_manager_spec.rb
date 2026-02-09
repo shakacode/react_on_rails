@@ -383,7 +383,11 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
             .with("9.4.0").and_return(false)
         end
 
-        it "displays warning about unsupported SHAKAPACKER_SKIP_PRECOMPILE_HOOK" do
+        it "displays version warning for direct command hooks" do
+          # Direct command hooks can't self-guard, so the version warning is shown
+          allow(ReactOnRails::PackerUtils).to receive_messages(hook_script_has_self_guard?: false,
+                                                               resolve_hook_script_path: nil)
+
           status_double = instance_double(Process::Status, success?: true)
           expect(Open3).to receive(:capture3)
             .with("bundle", "exec", "rake", "react_on_rails:locale")
@@ -394,6 +398,36 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
           end.to output(/Warning: Shakapacker 9\.3\.0 detected/).to_stdout_from_any_process
 
           expect(ENV.fetch("SHAKAPACKER_SKIP_PRECOMPILE_HOOK", nil)).to eq("true")
+        end
+
+        it "displays self-guard warning for script hooks missing the guard" do
+          hook_path = Pathname.new("/app/bin/shakapacker-precompile-hook")
+          allow(ReactOnRails::PackerUtils).to receive_messages(
+            hook_script_has_self_guard?: false,
+            resolve_hook_script_path: hook_path
+          )
+
+          status_double = instance_double(Process::Status, success?: true)
+          expect(Open3).to receive(:capture3)
+            .with("bundle", "exec", "rake", "react_on_rails:locale")
+            .and_return(["", "", status_double])
+
+          expect do
+            described_class.run_from_command_line([])
+          end.to output(/missing the self-guard line/).to_stdout_from_any_process
+        end
+
+        it "does not display warning for script hooks with self-guard" do
+          allow(ReactOnRails::PackerUtils).to receive(:hook_script_has_self_guard?).and_return(true)
+
+          status_double = instance_double(Process::Status, success?: true)
+          expect(Open3).to receive(:capture3)
+            .with("bundle", "exec", "rake", "react_on_rails:locale")
+            .and_return(["", "", status_double])
+
+          expect do
+            described_class.run_from_command_line([])
+          end.not_to output(/Warning/).to_stdout_from_any_process
         end
       end
 

@@ -179,12 +179,13 @@ module ReactOnRails
     end
 
     def self.extract_precompile_hook
-      # Access config data using private :data method since there's no public API
-      # to access the raw configuration hash needed for hook detection
+      # Prefer the public API (available in Shakapacker 9.0+)
+      return ::Shakapacker.config.precompile_hook if ::Shakapacker.config.respond_to?(:precompile_hook)
+
+      # Fallback: access config data using private :data method
       config_data = ::Shakapacker.config.send(:data)
 
       # Try symbol keys first (Shakapacker's internal format), then fall back to string keys
-      # The key is 'precompile_hook' at the top level of the config
       config_data&.[](:precompile_hook) || config_data&.[]("precompile_hook")
     end
 
@@ -193,6 +194,9 @@ module ReactOnRails
     # - The rake task: react_on_rails:generate_packs
     # - The Ruby method: generate_packs_if_stale (used by generator template)
     GENERATE_PACKS_PATTERN = /\b(react_on_rails:generate_packs|generate_packs_if_stale)\b/
+
+    # Pattern to detect the self-guard that prevents duplicate execution in HMR mode
+    SELF_GUARD_PATTERN = /SHAKAPACKER_SKIP_PRECOMPILE_HOOK/
 
     def self.hook_contains_generate_packs?(hook_value)
       # The hook value can be either:
@@ -221,6 +225,21 @@ module ReactOnRails
 
       potential_path = Rails.root.join(hook_value.to_s.strip)
       potential_path if potential_path.file?
+    end
+
+    # Check if a hook script file contains the self-guard pattern that prevents
+    # duplicate execution when SHAKAPACKER_SKIP_PRECOMPILE_HOOK is set.
+    # Returns false for direct command hooks (non-script values).
+    def self.hook_script_has_self_guard?(hook_value)
+      return false if hook_value.blank?
+
+      script_path = resolve_hook_script_path(hook_value)
+      return false unless script_path
+
+      script_contents = File.read(script_path)
+      script_contents.match?(SELF_GUARD_PATTERN)
+    rescue StandardError
+      false
     end
 
     # Returns the configured precompile hook value for logging/debugging
