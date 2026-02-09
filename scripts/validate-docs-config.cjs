@@ -70,10 +70,11 @@ if (categoryDups.length > 0) {
 }
 
 for (const [folderKey, files] of Object.entries(fileOrder)) {
-  if (!Array.isArray(files)) continue;
-  const fileDups = files.filter((f, i) => files.indexOf(f) !== i);
-  if (fileDups.length > 0) {
-    errors.push(`Duplicate entries in fileOrder.${folderKey}: ${[...new Set(fileDups)].join(', ')}`);
+  if (Array.isArray(files)) {
+    const fileDups = files.filter((f, i) => files.indexOf(f) !== i);
+    if (fileDups.length > 0) {
+      errors.push(`Duplicate entries in fileOrder.${folderKey}: ${[...new Set(fileDups)].join(', ')}`);
+    }
   }
 }
 
@@ -84,6 +85,22 @@ function isExcluded(relativePath) {
   return micromatch.isMatch(relativePath, exclude);
 }
 
+// --- Helper: recursively check for doc files ---
+
+/** Recursively checks whether dirPath contains any .md/.mdx files. Skips symlinks. */
+function hasDocFiles(dirPath) {
+  const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+  for (const entry of entries) {
+    if (!entry.isSymbolicLink()) {
+      if (entry.isFile() && /\.(md|mdx)$/i.test(entry.name)) return true;
+      if (entry.isDirectory()) {
+        if (hasDocFiles(path.join(dirPath, entry.name))) return true;
+      }
+    }
+  }
+  return false;
+}
+
 // --- Helper: list first-level directories with doc files ---
 
 /** Returns names of top-level directories under absDocsDir that contain .md/.mdx files. */
@@ -92,29 +109,15 @@ function getDocDirectories() {
   const dirs = [];
 
   for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
-    if (entry.name.startsWith('.')) continue;
-
-    // Check if this directory (or any subdirectory) contains .md/.mdx files
-    if (hasDocFiles(path.join(absDocsDir, entry.name))) {
-      dirs.push(entry.name);
+    if (entry.isDirectory() && !entry.name.startsWith('.')) {
+      // Check if this directory (or any subdirectory) contains .md/.mdx files
+      if (hasDocFiles(path.join(absDocsDir, entry.name))) {
+        dirs.push(entry.name);
+      }
     }
   }
 
   return dirs;
-}
-
-/** Recursively checks whether dirPath contains any .md/.mdx files. Skips symlinks. */
-function hasDocFiles(dirPath) {
-  const entries = fs.readdirSync(dirPath, { withFileTypes: true });
-  for (const entry of entries) {
-    if (entry.isSymbolicLink()) continue;
-    if (entry.isFile() && /\.(md|mdx)$/i.test(entry.name)) return true;
-    if (entry.isDirectory()) {
-      if (hasDocFiles(path.join(dirPath, entry.name))) return true;
-    }
-  }
-  return false;
 }
 
 // --- Helper: list doc files in a directory (non-recursive) ---
@@ -131,6 +134,24 @@ function getDocFiles(dirPath) {
     .map((e) => ({ stem: e.name.replace(/\.(md|mdx)$/i, ''), filename: e.name }));
 }
 
+// --- Helper: recursively list all relative paths ---
+
+/** Recursively lists all relative paths under baseDir. Skips dotfiles and symlinks. */
+function listAllRelativePaths(baseDir, prefix = '') {
+  const results = [];
+  const entries = fs.readdirSync(baseDir, { withFileTypes: true });
+  for (const entry of entries) {
+    if (!entry.name.startsWith('.') && !entry.isSymbolicLink()) {
+      const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+      results.push(rel);
+      if (entry.isDirectory()) {
+        results.push(...listAllRelativePaths(path.join(baseDir, entry.name), rel));
+      }
+    }
+  }
+  return results;
+}
+
 // --- Check 1: Category completeness ---
 
 const allDirs = getDocDirectories();
@@ -138,18 +159,16 @@ const categoryFolders = categoryOrder.filter((c) => c !== '');
 
 for (const dir of allDirs) {
   // Check if entire directory is excluded (bare name, trailing slash, or glob)
-  if (isExcluded(dir) || isExcluded(`${dir}/`) || isExcluded(`${dir}/**`)) continue;
-
-  // Check if all doc files in this directory are individually excluded
-  const dirFiles = getDocFiles(path.join(absDocsDir, dir));
-  const nonExcludedFiles = dirFiles.filter((f) => !isExcluded(`${dir}/${f.filename}`));
-  if (nonExcludedFiles.length === 0) continue;
-
-  if (!categoryFolders.includes(dir)) {
-    errors.push(
-      `Directory "${dir}" has docs but is not in categoryOrder or exclude.\n` +
-        `       Add it to categoryOrder or exclude in ${docsDir}/.docs-config.yml`,
-    );
+  if (!isExcluded(dir) && !isExcluded(`${dir}/`) && !isExcluded(`${dir}/**`)) {
+    // Check if all doc files in this directory are individually excluded
+    const dirFiles = getDocFiles(path.join(absDocsDir, dir));
+    const nonExcludedFiles = dirFiles.filter((f) => !isExcluded(`${dir}/${f.filename}`));
+    if (nonExcludedFiles.length > 0 && !categoryFolders.includes(dir)) {
+      errors.push(
+        `Directory "${dir}" has docs but is not in categoryOrder or exclude.\n` +
+          `       Add it to categoryOrder or exclude in ${docsDir}/.docs-config.yml`,
+      );
+    }
   }
 }
 
@@ -167,28 +186,27 @@ for (const folder of categoryFolders) {
 for (const [folderKey, files] of Object.entries(fileOrder)) {
   if (!Array.isArray(files)) {
     errors.push(`fileOrder.${folderKey} must be an array`);
-    continue;
-  }
+  } else {
+    for (const fileName of files) {
+      const inFolderMd = path.join(absDocsDir, folderKey, `${fileName}.md`);
+      const inFolderMdx = path.join(absDocsDir, folderKey, `${fileName}.mdx`);
+      const existsInFolder = fs.existsSync(inFolderMd) || fs.existsSync(inFolderMdx);
 
-  for (const fileName of files) {
-    const inFolderMd = path.join(absDocsDir, folderKey, `${fileName}.md`);
-    const inFolderMdx = path.join(absDocsDir, folderKey, `${fileName}.mdx`);
-    const existsInFolder = fs.existsSync(inFolderMd) || fs.existsSync(inFolderMdx);
+      if (!existsInFolder) {
+        // Root-level files can be listed under a category
+        // (e.g., introduction.md is at root but appears under getting-started)
+        const atRootMd = path.join(absDocsDir, `${fileName}.md`);
+        const atRootMdx = path.join(absDocsDir, `${fileName}.mdx`);
+        const existsAtRoot = fs.existsSync(atRootMd) || fs.existsSync(atRootMdx);
 
-    if (!existsInFolder) {
-      // Root-level files can be listed under a category
-      // (e.g., introduction.md is at root but appears under getting-started)
-      const atRootMd = path.join(absDocsDir, `${fileName}.md`);
-      const atRootMdx = path.join(absDocsDir, `${fileName}.mdx`);
-      const existsAtRoot = fs.existsSync(atRootMd) || fs.existsSync(atRootMdx);
-
-      if (existsAtRoot) {
-        warnings.push(
-          `File "${fileName}" in fileOrder.${folderKey} exists at root, not in ${folderKey}/. ` +
-            `Verify this is intentional (e.g., a cross-category mapping).`,
-        );
-      } else {
-        errors.push(`File "${fileName}" in fileOrder.${folderKey} does not exist`);
+        if (existsAtRoot) {
+          warnings.push(
+            `File "${fileName}" in fileOrder.${folderKey} exists at root, not in ${folderKey}/. ` +
+              `Verify this is intentional (e.g., a cross-category mapping).`,
+          );
+        } else {
+          errors.push(`File "${fileName}" in fileOrder.${folderKey} does not exist`);
+        }
       }
     }
   }
@@ -202,22 +220,6 @@ for (const pattern of exclude) {
   if (matches.length === 0) {
     warnings.push(`Exclusion "${pattern}" matches no files`);
   }
-}
-
-/** Recursively lists all relative paths under baseDir. Skips dotfiles and symlinks. */
-function listAllRelativePaths(baseDir, prefix = '') {
-  const results = [];
-  const entries = fs.readdirSync(baseDir, { withFileTypes: true });
-  for (const entry of entries) {
-    if (entry.name.startsWith('.')) continue;
-    if (entry.isSymbolicLink()) continue;
-    const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
-    results.push(rel);
-    if (entry.isDirectory()) {
-      results.push(...listAllRelativePaths(path.join(baseDir, entry.name), rel));
-    }
-  }
-  return results;
 }
 
 // --- Check 5: Root-level doc files ---
