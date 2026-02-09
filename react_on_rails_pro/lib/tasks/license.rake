@@ -16,6 +16,6 @@ namespace :react_on_rails_pro do
       ReactOnRailsPro::LicenseTaskFormatter.print_text(result, info)
     end
 
-    abort if info[:status] != :valid
+    raise "License verification failed: #{info[:status]}" if info[:status] != :valid
   end
 end
