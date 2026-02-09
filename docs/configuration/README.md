@@ -256,6 +256,8 @@ ReactOnRails.configure do |config|
 
   # stores_subdirectory is the name of the subdirectory matched to detect and register Redux stores automatically.
   # Works the same way as components_subdirectory but for Redux stores used with the `redux_store` helper.
+  # Note: Redux stores are less common since React Hooks were introduced. Most new apps use
+  # components without Redux. Only configure this if your app uses Redux stores.
   # The default is nil. You can enable the feature by updating it in the next line.
   config.stores_subdirectory = nil
   # Change to a value like this example to enable this feature
@@ -263,7 +265,7 @@ ReactOnRails.configure do |config|
 
   # Default is false.
   # The default can be overridden as an option in calls to view helpers
-  # `render_component` and `render_component_hash`.
+  # `react_component`, `react_component_hash`, and `redux_store`.
   # You may set to true to change the default to auto loading.
   # NOTE: Requires Shakapacker 6.5.1+ for basic functionality, 7.0.0+ for full auto-registration features.
   # See version requirements matrix above for complete feature compatibility.
