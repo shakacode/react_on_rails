@@ -16,7 +16,12 @@ const config: KnipConfig = {
         // Local binaries
         'bin/.*',
       ],
-      ignore: ['react_on_rails_pro/**', 'react_on_rails/vendor/**'],
+      ignore: [
+        'react_on_rails_pro/**',
+        'react_on_rails/vendor/**',
+        // Dependencies installed ad-hoc in CI, not in project package.json
+        'scripts/validate-docs-config.cjs',
+      ],
       ignoreDependencies: [
         // Required for TypeScript compilation, but we don't depend on Turbolinks itself.
         '@types/turbolinks',
