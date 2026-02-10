@@ -236,9 +236,15 @@ module ReactOnRails
       end
 
       def add_post_install_message
-        # Determine what route will be created by the generator
-        route = "hello_world" # This is the hardcoded route from base_generator.rb
-        component_name = options.redux? ? "HelloWorldApp" : "HelloWorld"
+        # Determine what route and component will be created by the generator
+        if use_rsc? && !options.redux?
+          # RSC without Redux: HelloServer replaces HelloWorld
+          route = "hello_server"
+          component_name = "HelloServer"
+        else
+          route = "hello_world"
+          component_name = options.redux? ? "HelloWorldApp" : "HelloWorld"
+        end
 
         GeneratorMessages.add_info(GeneratorMessages.helpful_message_after_installation(
                                      component_name: component_name,

@@ -69,8 +69,8 @@ module GeneratorMessages
           <%= javascript_pack_tag %>
           <%= stylesheet_pack_tag %>
 
-        • Server-side rendering - Enabled with prerender option in app/views/hello_world/index.html.erb:
-          <%= react_component("#{component_name}", props: @hello_world_props, prerender: true) %>
+        • Server-side rendering - Enabled with prerender option in app/views/#{route}/index.html.erb:
+          <%= react_component("#{component_name}", props: @#{route}_props, prerender: true) %>
 
         📚 LEARN MORE:
         ─────────────────────────────────────────────────────────────────────────
