@@ -21,6 +21,47 @@ rails generate react_on_rails:install
 - `shakapacker.yml` settings
 - other configuration files
 
+## Upgrading Precompile Hooks for SSR + HMR
+
+If your app uses server-side rendering with HMR, Shakapacker commonly runs two webpack processes during development (client HMR and server watcher). In that setup, direct-command precompile hooks are more fragile because each process can trigger the hook.
+
+Use a script-based hook with an explicit self-guard. This pattern is reliable across Shakapacker versions.
+
+### Recommended setup
+
+1. Create `bin/shakapacker-precompile-hook`:
+
+   ```ruby
+   #!/usr/bin/env ruby
+   # frozen_string_literal: true
+
+   exit 0 if ENV["SHAKAPACKER_SKIP_PRECOMPILE_HOOK"] == "true"
+   system("bundle", "exec", "rake", "react_on_rails:locale", exception: true)
+   ```
+
+2. Make it executable:
+
+   ```bash
+   chmod +x bin/shakapacker-precompile-hook
+   ```
+
+3. Configure `config/shakapacker.yml`:
+
+   ```yaml
+   default: &default
+     precompile_hook: 'bin/shakapacker-precompile-hook'
+   ```
+
+### Version guidance
+
+- **Shakapacker 9.4.0+**: Native support for `SHAKAPACKER_SKIP_PRECOMPILE_HOOK` exists.
+- **Shakapacker 9.0-9.3**: Prefer script-based hooks with the self-guard for reliable behavior.
+- **All supported versions**: Script-based hooks are the safest choice for SSR + HMR development.
+
+### CI recommendation
+
+In CI, run precompile preparation explicitly once before webpack compilation or test startup, rather than relying on hook timing in watch-like flows.
+
 ## Upgrading to v16.2.x (from v16.1.x)
 
 This release focuses on clear separation between open-source and Pro features. See the [v16.2.x Release Notes](release-notes/16.2.0.md) for full details.
