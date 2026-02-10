@@ -312,13 +312,35 @@ module ReactOnRails
         def warn_if_shakapacker_version_too_old
           # Only warn for Shakapacker versions in the range 9.0.0 to 9.3.x
           # Versions below 9.0.0 don't use the precompile_hook feature
-          # Versions 9.4.0+ support SHAKAPACKER_SKIP_PRECOMPILE_HOOK environment variable
+          # Versions 9.4.0+ support SHAKAPACKER_SKIP_PRECOMPILE_HOOK environment variable natively
           has_precompile_hook_support = PackerUtils.shakapacker_version_requirement_met?("9.0.0")
           has_skip_env_var_support = PackerUtils.shakapacker_version_requirement_met?("9.4.0")
 
           return unless has_precompile_hook_support
           return if has_skip_env_var_support
 
+          hook_value = PackerUtils.shakapacker_precompile_hook_value
+          return unless hook_value
+
+          # Case 1: Script-based hook WITH self-guard -> fully protected, no warning needed
+          return if PackerUtils.hook_script_has_self_guard?(hook_value)
+
+          # Case 2: Script-based hook WITHOUT self-guard -> actionable warning
+          script_path = PackerUtils.resolve_hook_script_path(hook_value)
+          if script_path
+            puts ""
+            puts Rainbow("⚠️  Warning: #{script_path} is missing the self-guard line").yellow.bold
+            puts ""
+            puts Rainbow("   Without it, the precompile hook may run multiple times in HMR mode").yellow
+            puts Rainbow("   (once by bin/dev, and again by each webpack process).").yellow
+            puts ""
+            puts Rainbow("   Add this line near the top of your hook script:").cyan
+            puts Rainbow('   exit 0 if ENV["SHAKAPACKER_SKIP_PRECOMPILE_HOOK"] == "true"').cyan.bold
+            puts ""
+            return
+          end
+
+          # Case 3: Direct command hook -> suggest upgrade or switch to script-based hook
           puts ""
           puts Rainbow("⚠️  Warning: Shakapacker #{PackerUtils.shakapacker_version} detected").yellow.bold
           puts ""
@@ -327,8 +349,11 @@ module ReactOnRails
           puts Rainbow("   precompile_hook to run multiple times (once by bin/dev, and again").yellow
           puts Rainbow("   by each webpack process).").yellow
           puts ""
-          puts Rainbow("   Recommendation: Upgrade to Shakapacker 9.4.0 or later:").cyan
-          puts Rainbow("   bundle update shakapacker").cyan.bold
+          puts Rainbow("   Recommendations:").cyan
+          puts Rainbow("   1. Upgrade to Shakapacker 9.4.0 or later:").cyan
+          puts Rainbow("      bundle update shakapacker").cyan.bold
+          puts Rainbow("   2. Or switch to a script-based hook with a self-guard.").cyan
+          puts Rainbow("      See: https://www.shakacode.com/react-on-rails/docs/building-features/process-managers").cyan
           puts ""
         end
         # rubocop:enable Metrics/AbcSize

@@ -33,7 +33,13 @@ If you have configured a `precompile_hook` in `config/shakapacker.yml`, `bin/dev
 - Pass this environment variable to all spawned processes (Rails, webpack, etc.)
 - Prevent webpack processes from re-running the hook independently
 
-**Note:** The `SHAKAPACKER_SKIP_PRECOMPILE_HOOK` environment variable is supported in Shakapacker 9.4.0 and later. If you're using an earlier version, `bin/dev` will display a warning recommending you upgrade to avoid duplicate hook execution.
+**Note:** Shakapacker 9.4.0+ supports `SHAKAPACKER_SKIP_PRECOMPILE_HOOK` natively. For Shakapacker 9.0-9.3, script-based hooks remain reliable when the script includes a self-guard:
+
+```ruby
+exit 0 if ENV["SHAKAPACKER_SKIP_PRECOMPILE_HOOK"] == "true"
+```
+
+`bin/dev` warns only when your hook cannot safely self-guard (for example, a direct command hook, or a script hook missing the guard line).
 
 This eliminates the need for manual coordination in your `Procfile.dev`. For example:
 
@@ -56,6 +62,46 @@ wp-server: bin/shakapacker --watch
 default: &default
   precompile_hook: 'bundle exec rake react_on_rails:locale'
 ```
+
+> [!TIP]
+> **For HMR with SSR setups** (two webpack processes), use a script-based hook instead of a
+> direct command. Script-based hooks can include a self-guard that prevents duplicate execution
+> regardless of Shakapacker version. See the [i18n documentation](./i18n.md#internationalization)
+> for an example.
+
+#### Upgrading Existing Apps
+
+If your app currently uses a direct command hook, such as:
+
+```yaml
+precompile_hook: 'bundle exec rake react_on_rails:locale'
+```
+
+migrate to a script-based hook:
+
+1. Create `bin/shakapacker-precompile-hook`:
+
+   ```ruby
+   #!/usr/bin/env ruby
+   # frozen_string_literal: true
+   exit 0 if ENV["SHAKAPACKER_SKIP_PRECOMPILE_HOOK"] == "true"
+   system("bundle", "exec", "rake", "react_on_rails:locale", exception: true)
+   ```
+
+2. Make it executable:
+
+   ```bash
+   chmod +x bin/shakapacker-precompile-hook
+   ```
+
+3. Update `config/shakapacker.yml`:
+
+   ```yaml
+   default: &default
+     precompile_hook: 'bin/shakapacker-precompile-hook'
+   ```
+
+This upgrade path works for both Shakapacker 9.0-9.3 and 9.4.0+.
 
 See the [i18n documentation](./i18n.md#internationalization) for more details on configuring the precompile hook.
 
