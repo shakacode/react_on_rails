@@ -104,15 +104,14 @@ module GeneratorHelper
   end
 
   # Check if a gem is present in Gemfile.lock
+  # Always checks the target app's Gemfile.lock, not inherited BUNDLE_GEMFILE
+  # See: https://github.com/shakacode/react_on_rails/issues/2287
   #
   # @param gem_name [String] Name of the gem to check
   # @return [Boolean] true if the gem is in Gemfile.lock
   def gem_in_lockfile?(gem_name)
-    gemfile = ENV["BUNDLE_GEMFILE"] || "Gemfile"
-    lockfile = File.join(File.dirname(gemfile), "Gemfile.lock")
-
-    File.file?(lockfile) &&
-      File.foreach(lockfile).any? { |line| line.match?(/^\s{4}#{Regexp.escape(gem_name)}\s\(/) }
+    File.file?("Gemfile.lock") &&
+      File.foreach("Gemfile.lock").any? { |line| line.match?(/^\s{4}#{Regexp.escape(gem_name)}\s\(/) }
   rescue StandardError
     false
   end
