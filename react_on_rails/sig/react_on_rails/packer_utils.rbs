@@ -5,6 +5,8 @@ module ReactOnRails
     def self.nested_entries?: () -> bool
     def self.packer_public_output_path: () -> String
     def self.precompile?: () -> bool
+    def self.extract_precompile_hook: () -> String?
+    def self.hook_contains_generate_packs?: (String? hook_value) -> bool
     def self.shakapacker_precompile_hook_configured?: () -> bool
     def self.shakapacker_precompile_hook_value: () -> String?
     def self.hook_script_has_self_guard?: (String? hook_value) -> bool

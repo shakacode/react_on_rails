@@ -302,7 +302,7 @@ module ReactOnRails
         expect(described_class.hook_script_has_self_guard?(hook_path)).to be false
       end
 
-      it "returns false when script only references variable in comments or strings" do
+      it "returns false when script checks the variable but does not exit or return" do
         allow(script_full_path).to receive(:file?).and_return(true)
         allow(File).to receive(:read).with(script_full_path).and_return(<<~RUBY)
           # SHAKAPACKER_SKIP_PRECOMPILE_HOOK should be set by bin/dev
