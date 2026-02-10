@@ -125,11 +125,45 @@ module ReactOnRails
       end
     end
 
+    describe ".extract_precompile_hook" do
+      let(:mock_config) { instance_double("::Shakapacker::Config") } # rubocop:disable RSpec/VerifiedDoubleReference
+
+      before do
+        allow(::Shakapacker).to receive(:config).and_return(mock_config)
+      end
+
+      it "prefers the public precompile_hook API when available" do
+        hook_value = "bin/shakapacker-precompile-hook"
+        allow(mock_config).to receive(:respond_to?).with(:precompile_hook).and_return(true)
+        allow(mock_config).to receive(:precompile_hook).and_return(hook_value)
+        expect(mock_config).not_to receive(:send).with(:data)
+
+        expect(described_class.extract_precompile_hook).to eq(hook_value)
+      end
+
+      it "falls back to private config data when public API is not available" do
+        hook_value = "bundle exec rake react_on_rails:locale"
+        allow(mock_config).to receive(:respond_to?).with(:precompile_hook).and_return(false)
+        allow(mock_config).to receive(:send).with(:data).and_return({ precompile_hook: hook_value })
+
+        expect(described_class.extract_precompile_hook).to eq(hook_value)
+      end
+
+      it "falls back to string key in private config data" do
+        hook_value = "bin/shakapacker-precompile-hook"
+        allow(mock_config).to receive(:respond_to?).with(:precompile_hook).and_return(false)
+        allow(mock_config).to receive(:send).with(:data).and_return({ "precompile_hook" => hook_value })
+
+        expect(described_class.extract_precompile_hook).to eq(hook_value)
+      end
+    end
+
     describe ".shakapacker_precompile_hook_configured?" do
       let(:mock_config) { instance_double("::Shakapacker::Config") } # rubocop:disable RSpec/VerifiedDoubleReference
 
       before do
         allow(::Shakapacker).to receive(:config).and_return(mock_config)
+        allow(mock_config).to receive(:respond_to?).with(:precompile_hook).and_return(false)
       end
 
       context "when precompile_hook is configured" do
@@ -263,6 +297,19 @@ module ReactOnRails
         allow(File).to receive(:read).with(script_full_path).and_return(<<~RUBY)
           #!/usr/bin/env ruby
           ReactOnRails::PacksGenerator.instance.generate_packs_if_stale
+        RUBY
+
+        expect(described_class.hook_script_has_self_guard?(hook_path)).to be false
+      end
+
+      it "returns false when script only references variable in comments or strings" do
+        allow(script_full_path).to receive(:file?).and_return(true)
+        allow(File).to receive(:read).with(script_full_path).and_return(<<~RUBY)
+          # SHAKAPACKER_SKIP_PRECOMPILE_HOOK should be set by bin/dev
+          puts "SHAKAPACKER_SKIP_PRECOMPILE_HOOK"
+          if ENV["SHAKAPACKER_SKIP_PRECOMPILE_HOOK"] == "true"
+            puts "would skip, but no early exit/return guard"
+          end
         RUBY
 
         expect(described_class.hook_script_has_self_guard?(hook_path)).to be false

@@ -195,8 +195,15 @@ module ReactOnRails
     # - The Ruby method: generate_packs_if_stale (used by generator template)
     GENERATE_PACKS_PATTERN = /\b(react_on_rails:generate_packs|generate_packs_if_stale)\b/
 
-    # Pattern to detect the self-guard that prevents duplicate execution in HMR mode
-    SELF_GUARD_PATTERN = /SHAKAPACKER_SKIP_PRECOMPILE_HOOK/
+    # Pattern to detect a real self-guard statement that exits early when
+    # SHAKAPACKER_SKIP_PRECOMPILE_HOOK is true. This avoids false positives
+    # from comments or unrelated string literals.
+    SELF_GUARD_PATTERN = /
+      (?:^|\s)
+      (?:exit|return)
+      (?:\s+0)?
+      \s+if\s+ENV\[(["'])SHAKAPACKER_SKIP_PRECOMPILE_HOOK\1\]\s*==\s*(["'])true\2
+    /x
 
     def self.hook_contains_generate_packs?(hook_value)
       # The hook value can be either:
