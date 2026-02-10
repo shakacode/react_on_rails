@@ -56,7 +56,9 @@ if (config.fileOrder === undefined || config.fileOrder === null) {
 }
 
 if (errors.length > 0) {
-  errors.forEach((e) => { console.error(`ERROR: ${e}`); });
+  errors.forEach((e) => {
+    console.error(`ERROR: ${e}`);
+  });
   process.exit(1);
 }
 
@@ -241,12 +243,16 @@ if (!categoryOrder.includes('')) {
 // --- Output ---
 
 if (warnings.length > 0) {
-  warnings.forEach((w) => { console.warn(`WARNING: ${w}`); });
+  warnings.forEach((w) => {
+    console.warn(`WARNING: ${w}`);
+  });
 }
 
 if (errors.length > 0) {
   console.error('');
-  errors.forEach((e) => { console.error(`ERROR: ${e}`); });
+  errors.forEach((e) => {
+    console.error(`ERROR: ${e}`);
+  });
   console.error(`\n${errors.length} error(s) found in ${docsDir}/.docs-config.yml`);
   process.exit(1);
 }
