@@ -27,8 +27,22 @@ def find_rails_root
   nil
 end
 
+# Detect which package manager to use based on package.json's packageManager field,
+# falling back to checking system availability
+def detect_package_manager(package_json)
+  pkg_manager = package_json["packageManager"]
+  case pkg_manager
+  when /\Apnpm@/ then "pnpm"
+  when /\Ayarn@/ then "yarn"
+  when /\Anpm@/ then "npm"
+  else
+    # No packageManager field; fall back to system detection
+    %w[pnpm yarn npm].find { |pm| system("which #{pm} > /dev/null 2>&1") }
+  end
+end
+
 # Build ReScript if needed
-# rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
+# rubocop:disable Metrics/AbcSize
 def build_rescript_if_needed
   rails_root = find_rails_root
   unless rails_root
@@ -59,17 +73,14 @@ def build_rescript_if_needed
   end
 
   Dir.chdir(rails_root) do
-    # Cross-platform package manager detection
-    if system("which yarn > /dev/null 2>&1")
-      system("yarn", "build:rescript", exception: true)
-    elsif system("which npm > /dev/null 2>&1")
-      system("npm", "run", "build:rescript", exception: true)
-    else
-      warn "❌ Error: Neither yarn nor npm found but ReScript build required"
-      warn "    Install yarn or npm to build ReScript files"
+    pm = detect_package_manager(package_json)
+    unless pm
+      warn "❌ Error: No package manager found but ReScript build required"
+      warn "    Install pnpm, yarn, or npm to build ReScript files"
       exit 1
     end
 
+    system(pm, "run", "build:rescript", exception: true)
     puts "✅ ReScript build completed successfully"
   end
 rescue JSON::ParserError => e
@@ -79,7 +90,7 @@ rescue StandardError => e
   warn "❌ ReScript build failed: #{e.message}"
   exit 1
 end
-# rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
+# rubocop:enable Metrics/AbcSize
 
 # Generate React on Rails packs if needed
 def generate_packs_if_needed
