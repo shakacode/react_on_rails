@@ -329,8 +329,8 @@ module ReactOnRails
         JS
         gsub_file(
           config_path,
-          %r{(\s*\} else \{\s*\n\s*// default is the standard client and server build)},
-          "  #{rsc_bundle_handling}\n\\1"
+          %r{\n\n(\s*\} else \{\s*\n\s*// default is the standard client and server build)},
+          "\n\n  #{rsc_bundle_handling}\n\n\\1"
         )
 
         # Update default multi-bundle output to include RSC
