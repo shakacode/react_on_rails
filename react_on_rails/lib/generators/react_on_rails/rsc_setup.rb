@@ -56,7 +56,6 @@ module ReactOnRails
       # @param force [Boolean] When true, always performs the check.
       #   When false (default), only checks if RSC is enabled (use_rsc? returns true).
       #   Use force: true in standalone generators where RSC is always the purpose.
-      # @note This should be called before setup_rsc to warn users early
       def warn_about_react_version_for_rsc(force: false)
         return unless force || use_rsc?
 
@@ -72,12 +71,8 @@ module ReactOnRails
             React Server Components in React on Rails Pro currently only supports
             React 19.0.x. React 19.1.x and later are not yet supported.
 
-            To upgrade React:
-              npm install react@19.0.3 react-dom@19.0.3
-
-            Or with your package manager:
-              pnpm add react@19.0.3 react-dom@19.0.3
-              yarn add react@19.0.3 react-dom@19.0.3
+            To install a compatible React version:
+              npm install react@~19.0.3 react-dom@~19.0.3
           MSG
         elsif patch < 3
           GeneratorMessages.add_warning(<<~MSG.strip)
@@ -306,11 +301,11 @@ module ReactOnRails
           "\\1\nconst rscWebpackConfig = require('./rscWebpackConfig');"
         )
 
-        # Add rscConfig variable after serverConfig
+        # Add rscConfig variable after serverConfig (with blank line separator)
         gsub_file(
           config_path,
           /^(\s*const serverConfig = serverWebpackConfig\(\);)$/,
-          "\\1\n  const rscConfig = rscWebpackConfig();"
+          "\\1\n\n  const rscConfig = rscWebpackConfig();"
         )
 
         # Update envSpecific call to include rscConfig
@@ -372,9 +367,8 @@ module ReactOnRails
           "const configureServer = (rscBundle = false) => {"
         )
 
-        # Add RSCWebpackPlugin to plugins after LimitChunkCountPlugin
-        rsc_plugin_code = "\n  " \
-                          "// Add RSC plugin for server bundle (handles client component references)\n  " \
+        # Add RSCWebpackPlugin to plugins before LimitChunkCountPlugin (matches template ordering)
+        rsc_plugin_code = "// Add RSC plugin for server bundle (handles client component references)\n  " \
                           "// Skip for RSC bundle - it doesn't need RSCWebpackPlugin\n  " \
                           "if (!rscBundle) {\n    " \
                           "serverWebpackConfig.plugins.push(new RSCWebpackPlugin({ isServer: true }));\n  " \
@@ -382,7 +376,7 @@ module ReactOnRails
         gsub_file(
           config_path,
           /(serverWebpackConfig\.plugins\.unshift\(new bundler\.optimize\.LimitChunkCountPlugin.*\);)/,
-          "\\1#{rsc_plugin_code}"
+          "#{rsc_plugin_code}\n  \\1"
         )
       end
 
@@ -405,12 +399,11 @@ module ReactOnRails
         )
 
         # Add RSCWebpackPlugin to client config before return statement
-        rsc_plugin_code = "\n  " \
-                          "// Add React Server Components plugin for client bundle\n  " \
+        rsc_plugin_code = "  // Add React Server Components plugin for client bundle\n  " \
                           "clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));"
         gsub_file(
           config_path,
-          /^(\s*return clientConfig;)$/,
+          /^( *return clientConfig;)$/,
           "#{rsc_plugin_code}\n\n\\1"
         )
       end

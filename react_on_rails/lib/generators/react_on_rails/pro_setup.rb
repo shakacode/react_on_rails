@@ -222,7 +222,8 @@ module ReactOnRails
         # Skip if extractLoader already exists
         return if content.include?("function extractLoader")
 
-        extract_loader_code = <<~JS
+        extract_loader_code = <<~JS.chomp
+
 
           function extractLoader(rule, loaderName) {
             if (!Array.isArray(rule.use)) return null;

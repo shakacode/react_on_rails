@@ -80,7 +80,8 @@ module ReactOnRails
           Next steps:
           1. Set your license: export REACT_ON_RAILS_PRO_LICENSE=your_token
           2. Start the app: bin/dev (or foreman start -f Procfile.dev)
-          3. The Node Renderer will start on port 3800
+          3. Visit http://localhost:3000/hello_world
+          4. The Node Renderer will start on port 3800
 
           Documentation: https://www.shakacode.com/react-on-rails-pro/docs/
         MSG
