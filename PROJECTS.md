@@ -15,7 +15,6 @@ _Please support the project by [emailing Justin Gordon](mailto:justin@shakacode.
 - **[RedFlagDeals](https://www.redflagdeals.com/)**, Canadian shopping site.
 - **[YourMechanic](https://www.yourmechanic.com/)**, home calls for mechanics.
 - **[Suntransfers](https://www.suntransfers.com/)**, airport car rides site.
-- **[Decanter](http://www.decanter.com/)**, wine site.
 - **[LocalWise](https://www.localwise.com/)**, local job site.
 - **[Ellevest](https://www.ellevest.com/)**, investments for women.
 - **[OppenheimerFunds](https://www.oppenheimerfunds.com/)**, investment site.
