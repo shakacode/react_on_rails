@@ -136,12 +136,18 @@ importers:
       jest-junit:
         specifier: ^16.0.0
         version: 16.0.0
+      js-yaml:
+        specifier: ^4.1.1
+        version: 4.1.1
       jsdom:
         specifier: ^22.1.0
         version: 22.1.0
       knip:
         specifier: ^5.46.0
         version: 5.70.2(@types/node@20.19.25)(typescript@5.9.3)
+      micromatch:
+        specifier: ^4.0.8
+        version: 4.0.8
       nps:
         specifier: ^5.9.3
         version: 5.10.0
