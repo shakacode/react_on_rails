@@ -272,12 +272,10 @@ module ReactOnRails
       end
 
       def update_server_client_or_both_import
-        server_client_path = "config/webpack/ServerClientOrBoth.js"
-        full_path = File.join(destination_root, server_client_path)
+        server_client_path = resolve_server_client_or_both_path
+        return unless server_client_path
 
-        return unless File.exist?(full_path)
-
-        content = File.read(full_path)
+        content = File.read(File.join(destination_root, server_client_path))
 
         # Skip if already using destructured import
         return if content.include?("{ default: serverWebpackConfig }")

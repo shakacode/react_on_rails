@@ -221,6 +221,32 @@ module GeneratorHelper
     @using_swc = detect_swc_configuration
   end
 
+  # Resolve the path to ServerClientOrBoth.js, handling the legacy name.
+  # Old installs may still use generateWebpackConfigs.js; this renames it
+  # and updates references in environment configs so downstream transforms
+  # can rely on the canonical name.
+  #
+  # @return [String, nil] relative config path, or nil if neither file exists
+  def resolve_server_client_or_both_path
+    new_path = "config/webpack/ServerClientOrBoth.js"
+    old_path = "config/webpack/generateWebpackConfigs.js"
+    full_new = File.join(destination_root, new_path)
+    full_old = File.join(destination_root, old_path)
+
+    if File.exist?(full_new)
+      new_path
+    elsif File.exist?(full_old)
+      FileUtils.mv(full_old, full_new)
+      %w[development.js production.js test.js].each do |env_file|
+        env_path = "config/webpack/#{env_file}"
+        if File.exist?(File.join(destination_root, env_path))
+          gsub_file(env_path, /generateWebpackConfigs/, "ServerClientOrBoth")
+        end
+      end
+      new_path
+    end
+  end
+
   private
 
   def detect_swc_configuration

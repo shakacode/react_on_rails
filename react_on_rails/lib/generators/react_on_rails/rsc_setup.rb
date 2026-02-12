@@ -284,12 +284,10 @@ module ReactOnRails
       end
 
       def update_server_client_or_both_for_rsc
-        config_path = "config/webpack/ServerClientOrBoth.js"
-        full_path = File.join(destination_root, config_path)
+        config_path = resolve_server_client_or_both_path
+        return unless config_path
 
-        return unless File.exist?(full_path)
-
-        content = File.read(full_path)
+        content = File.read(File.join(destination_root, config_path))
 
         # Skip if RSC is already configured
         return if content.include?("rscWebpackConfig")
