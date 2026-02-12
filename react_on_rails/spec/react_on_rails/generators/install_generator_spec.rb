@@ -762,6 +762,13 @@ describe InstallGenerator, type: :generator do
       assert_file "app/javascript/src/HelloServer/components/HelloServer.jsx"
     end
 
+    it "creates hello_world route and controller for Redux" do
+      assert_file "config/routes.rb" do |content|
+        expect(content).to include("hello_world")
+      end
+      assert_file "app/controllers/hello_world_controller.rb"
+    end
+
     it "installs both RSC and Redux dependencies" do
       assert_file "package.json" do |content|
         package_json = JSON.parse(content)

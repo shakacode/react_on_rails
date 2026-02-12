@@ -40,8 +40,8 @@ module ReactOnRails
                    desc: "Setup React Server Components (requires Pro)"
 
       def add_hello_world_route
-        # RSC uses HelloServer instead of HelloWorld
-        return if use_rsc?
+        # RSC uses HelloServer instead of HelloWorld, but Redux still needs hello_world route
+        return if use_rsc? && !options.redux?
 
         route "get 'hello_world', to: 'hello_world#index'"
       end
@@ -62,7 +62,8 @@ module ReactOnRails
                         bin/shakapacker-precompile-hook]
 
         # HelloWorld controller/layout only when not using RSC (RSC uses HelloServer)
-        unless use_rsc?
+        # Exception: Redux still needs the HelloWorld controller even with RSC
+        unless use_rsc? && !options.redux?
           base_files += %w[app/controllers/hello_world_controller.rb
                            app/views/layouts/hello_world.html.erb]
         end
