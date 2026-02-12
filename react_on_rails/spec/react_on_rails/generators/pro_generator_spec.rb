@@ -53,6 +53,7 @@ describe ProGenerator, type: :generator do
     before do
       prepare_destination
       simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
       # Simulate base React on Rails installed
       simulate_existing_file("config/initializers/react_on_rails.rb", "ReactOnRails.configure {}")
       # Simulate Procfile.dev exists for appending

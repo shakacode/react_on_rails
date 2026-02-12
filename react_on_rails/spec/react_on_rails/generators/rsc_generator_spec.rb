@@ -34,6 +34,7 @@ describe RscGenerator, type: :generator do
     before(:all) do
       prepare_destination
       simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
       # Simulate Pro initializer (must have multi-line block for gsub_file to work)
       simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
         ReactOnRailsPro.configure do |config|
@@ -134,6 +135,7 @@ describe RscGenerator, type: :generator do
     before(:all) do
       prepare_destination
       simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
       simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
         ReactOnRailsPro.configure do |config|
           config.server_renderer = "NodeRenderer"

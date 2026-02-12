@@ -468,6 +468,14 @@ describe InstallGenerator, type: :generator do
       end
     end
 
+    it "serverWebpackConfig includes Pro features" do
+      assert_file "config/webpack/serverWebpackConfig.js" do |content|
+        expect(content).to include("libraryTarget: 'commonjs2',")
+        expect(content).to include("function extractLoader")
+        expect(content).to include("serverWebpackConfig.target = 'node'")
+      end
+    end
+
     # TODO: When --rsc tests are added, evaluate if this negative test is redundant.
     #       If the positive RSC tests adequately cover the template conditional, remove this.
     it "Pro initializer does not include RSC configuration" do
