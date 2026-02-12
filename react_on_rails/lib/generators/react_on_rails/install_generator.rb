@@ -230,7 +230,7 @@ module ReactOnRails
         Dir.chdir(template_bin_path) do
           files_to_copy.concat(Dir.glob("*"))
         end
-        files_to_become_executable = files_to_copy.map { |filename| "bin/#{filename.delete_suffix('.tt')}" }
+        files_to_become_executable = files_to_copy.map { |filename| "bin/#{filename}" }
 
         File.chmod(0o755, *files_to_become_executable)
       end
