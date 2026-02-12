@@ -6,6 +6,7 @@ require "support/script_tag_utils"
 class PlainReactOnRailsHelper
   include ReactOnRailsHelper
   include ActionView::Helpers::TagHelper
+  include ActionView::Helpers::JavaScriptHelper
 end
 
 # rubocop:disable Metrics/BlockLength
@@ -748,6 +749,200 @@ describe ReactOnRailsHelper do
           comment_count = combined_result.scan("<!-- Powered by React on Rails").length
           expect(comment_count).to eq(1)
         end
+      end
+    end
+  end
+
+  describe "#csp_nonce" do
+    let(:helper) { PlainReactOnRailsHelper.new }
+
+    context "when CSP nonce is available" do
+      before do
+        def helper.respond_to?(method_name, *args)
+          return true if method_name == :content_security_policy_nonce
+
+          super
+        end
+
+        def helper.content_security_policy_nonce(_directive = nil)
+          "test-nonce-123"
+        end
+      end
+
+      it "returns the nonce value" do
+        expect(helper.send(:csp_nonce)).to eq("test-nonce-123")
+      end
+    end
+
+    context "when CSP is not configured" do
+      before do
+        allow(helper).to receive(:respond_to?).and_call_original
+        allow(helper).to receive(:respond_to?).with(:content_security_policy_nonce).and_return(false)
+      end
+
+      it "returns nil" do
+        expect(helper.send(:csp_nonce)).to be_nil
+      end
+    end
+
+    context "with Rails 5.2-6.0 compatibility (ArgumentError fallback)" do
+      before do
+        def helper.respond_to?(method_name, *args)
+          return true if method_name == :content_security_policy_nonce
+
+          super
+        end
+
+        def helper.content_security_policy_nonce(*args)
+          raise ArgumentError if args.any?
+
+          "fallback-nonce"
+        end
+      end
+
+      it "falls back to no-argument method" do
+        expect(helper.send(:csp_nonce)).to eq("fallback-nonce")
+      end
+    end
+  end
+
+  describe "#generate_component_script" do
+    let(:helper) { PlainReactOnRailsHelper.new }
+
+    let(:render_options) do
+      double(
+        "RenderOptions",
+        client_props: { name: "World" },
+        dom_id: "HelloWorld-react-component-0",
+        react_component_name: "HelloWorld",
+        trace: false,
+        store_dependencies: nil,
+        immediate_hydration: true
+      )
+    end
+
+    context "when CSP nonce is available" do
+      before do
+        def helper.respond_to?(method_name, *args)
+          return true if method_name == :content_security_policy_nonce
+
+          super
+        end
+
+        def helper.content_security_policy_nonce(_directive = nil)
+          "component-nonce-abc"
+        end
+      end
+
+      it "adds nonce to the immediate hydration script" do
+        result = helper.send(:generate_component_script, render_options)
+        expect(result).to include('nonce="component-nonce-abc"')
+        expect(result).to include("reactOnRailsComponentLoaded")
+      end
+
+      it "does not add nonce to the application/json script" do
+        result = helper.send(:generate_component_script, render_options)
+        # The JSON data tag should not have a nonce
+        json_tag_match = result.match(%r{<script type="application/json"[^>]*>})
+        expect(json_tag_match.to_s).not_to include("nonce=")
+      end
+    end
+
+    context "when CSP is not configured" do
+      before do
+        allow(helper).to receive(:respond_to?).and_call_original
+        allow(helper).to receive(:respond_to?).with(:content_security_policy_nonce).and_return(false)
+      end
+
+      it "does not add nonce to the immediate hydration script" do
+        result = helper.send(:generate_component_script, render_options)
+        expect(result).not_to include("nonce=")
+        expect(result).to include("reactOnRailsComponentLoaded")
+      end
+    end
+
+    context "when immediate_hydration is disabled" do
+      let(:render_options) do
+        double(
+          "RenderOptions",
+          client_props: { name: "World" },
+          dom_id: "HelloWorld-react-component-0",
+          react_component_name: "HelloWorld",
+          trace: false,
+          store_dependencies: nil,
+          immediate_hydration: false
+        )
+      end
+
+      it "does not include an immediate hydration script" do
+        result = helper.send(:generate_component_script, render_options)
+        expect(result).not_to include("reactOnRailsComponentLoaded")
+      end
+    end
+  end
+
+  describe "#generate_store_script" do
+    let(:helper) { PlainReactOnRailsHelper.new }
+
+    let(:redux_store_data) do
+      {
+        props: { count: 0 },
+        store_name: "MyStore",
+        immediate_hydration: true
+      }
+    end
+
+    context "when CSP nonce is available" do
+      before do
+        def helper.respond_to?(method_name, *args)
+          return true if method_name == :content_security_policy_nonce
+
+          super
+        end
+
+        def helper.content_security_policy_nonce(_directive = nil)
+          "store-nonce-xyz"
+        end
+      end
+
+      it "adds nonce to the immediate hydration script" do
+        result = helper.send(:generate_store_script, redux_store_data)
+        expect(result).to include('nonce="store-nonce-xyz"')
+        expect(result).to include("reactOnRailsStoreLoaded")
+      end
+
+      it "does not add nonce to the application/json script" do
+        result = helper.send(:generate_store_script, redux_store_data)
+        json_tag_match = result.match(%r{<script type="application/json"[^>]*>})
+        expect(json_tag_match.to_s).not_to include("nonce=")
+      end
+    end
+
+    context "when CSP is not configured" do
+      before do
+        allow(helper).to receive(:respond_to?).and_call_original
+        allow(helper).to receive(:respond_to?).with(:content_security_policy_nonce).and_return(false)
+      end
+
+      it "does not add nonce to the immediate hydration script" do
+        result = helper.send(:generate_store_script, redux_store_data)
+        expect(result).not_to include("nonce=")
+        expect(result).to include("reactOnRailsStoreLoaded")
+      end
+    end
+
+    context "when immediate_hydration is disabled" do
+      let(:redux_store_data) do
+        {
+          props: { count: 0 },
+          store_name: "MyStore",
+          immediate_hydration: false
+        }
+      end
+
+      it "does not include an immediate hydration script" do
+        result = helper.send(:generate_store_script, redux_store_data)
+        expect(result).not_to include("reactOnRailsStoreLoaded")
       end
     end
   end

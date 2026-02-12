@@ -24,9 +24,11 @@ module ReactOnRails
       spec_tag = if render_options.immediate_hydration
                    # Escape dom_id for JavaScript context
                    escaped_dom_id = escape_javascript(render_options.dom_id)
+                   nonce = csp_nonce
+                   script_options = nonce.present? ? { nonce: nonce } : {}
                    immediate_script = content_tag(:script, %(
           typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('#{escaped_dom_id}');
-        ).html_safe)
+        ).html_safe, script_options)
                    "#{component_specification_tag}\n#{immediate_script}"
                  else
                    component_specification_tag
@@ -49,7 +51,9 @@ module ReactOnRails
       store_hydration_scripts = if redux_store_data[:immediate_hydration]
                                   # Escape store_name for JavaScript context
                                   escaped_store_name = escape_javascript(redux_store_data[:store_name])
-                                  immediate_script = content_tag(:script, <<~JS.strip_heredoc.html_safe
+                                  nonce = csp_nonce
+                                  script_options = nonce.present? ? { nonce: nonce } : {}
+                                  immediate_script = content_tag(:script, <<~JS.strip_heredoc.html_safe, script_options
                                     typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsStoreLoaded('#{escaped_store_name}');
                                   JS
                                   )
