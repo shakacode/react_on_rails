@@ -43,7 +43,7 @@ bundle add react_on_rails_pro
 rails generate react_on_rails:pro
 ```
 
-The standalone generator only adds Pro-specific files without re-processing your existing React on Rails setup.
+The standalone generator adds Pro-specific files and modifies your existing webpack configs (`serverWebpackConfig.js` and `ServerClientOrBoth.js`) to enable Pro features like `libraryTarget: 'commonjs2'` and `target = 'node'`.
 
 ## After Running the Generator
 
@@ -57,7 +57,7 @@ See [License Configuration](#license-configuration) below for other options.
 
 ## Adding React Server Components
 
-To add RSC support, use `--rsc` (fresh install) or the RSC generator (existing app):
+RSC requires React on Rails Pro and React 19.0.x. To add RSC support, use `--rsc` (fresh install) or the RSC generator (existing app):
 
 ```bash
 # Fresh install with RSC
@@ -67,7 +67,7 @@ rails generate react_on_rails:install --rsc
 rails generate react_on_rails:rsc
 ```
 
-See [React Server Components](./react-server-components/tutorial.md) for more information.
+The RSC generator creates `rscWebpackConfig.js`, adds `RSCWebpackPlugin` to both server and client webpack configs, configures `RSC_BUNDLE_ONLY` handling in `ServerClientOrBoth.js`, and sets up the RSC bundle watcher process. See [React Server Components](./react-server-components/tutorial.md) for more information.
 
 ---
 

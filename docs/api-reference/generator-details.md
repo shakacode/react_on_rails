@@ -236,6 +236,8 @@ rails generate react_on_rails:install --pro --redux
 rails generate react_on_rails:install --pro --rspack
 ```
 
+The standalone Pro generator also modifies `config/webpack/serverWebpackConfig.js` (enables `libraryTarget: 'commonjs2'`, adds `extractLoader`, sets `target = 'node'`, changes exports to object style) and updates the import in `config/webpack/ServerClientOrBoth.js`. If your webpack configs use the legacy filename `generateWebpackConfigs.js`, the generator will rename it automatically.
+
 **Upgrading an existing React on Rails app to Pro:**
 
 For existing apps, use the standalone Pro generator to avoid re-processing base files:
@@ -260,6 +262,8 @@ rails generate react_on_rails:install --rsc
 
 - React on Rails Pro gem installed (see Pro prerequisites above)
 - React 19.0.x (RSC is not yet supported on React 19.1.x or later)
+
+RSC builds on React on Rails Pro's Node rendering infrastructure. The generator adds a separate webpack entry point for server components, configures the `RSCWebpackPlugin` in both client and server webpack configs, and sets up the `RSC_BUNDLE_ONLY` environment variable handling in `ServerClientOrBoth.js` for independent RSC bundle compilation.
 
 **What gets created:**
 
