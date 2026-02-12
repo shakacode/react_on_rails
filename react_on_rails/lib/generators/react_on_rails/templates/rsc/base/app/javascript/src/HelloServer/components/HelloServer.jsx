@@ -8,13 +8,13 @@
 
 import React from 'react';
 
-function HelloServer({ name = 'World' }) {
+const HelloServer = ({ name = 'World' }) => {
   return (
     <div>
       <h3>Hello, {name}!</h3>
       <p>This is a React Server Component.</p>
     </div>
   );
-}
+};
 
 export default HelloServer;
