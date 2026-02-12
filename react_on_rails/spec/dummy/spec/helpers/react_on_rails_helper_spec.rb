@@ -814,8 +814,8 @@ describe ReactOnRailsHelper do
     let(:helper) { PlainReactOnRailsHelper.new }
 
     let(:render_options) do
-      double(
-        "RenderOptions",
+      instance_double(
+        ReactOnRails::ReactComponent::RenderOptions,
         client_props: { name: "World" },
         dom_id: "HelloWorld-react-component-0",
         react_component_name: "HelloWorld",
@@ -857,8 +857,8 @@ describe ReactOnRailsHelper do
 
     context "when immediate_hydration is disabled" do
       let(:render_options) do
-        double(
-          "RenderOptions",
+        instance_double(
+          ReactOnRails::ReactComponent::RenderOptions,
           client_props: { name: "World" },
           dom_id: "HelloWorld-react-component-0",
           react_component_name: "HelloWorld",

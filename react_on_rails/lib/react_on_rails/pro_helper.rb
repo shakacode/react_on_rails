@@ -53,9 +53,12 @@ module ReactOnRails
                                   escaped_store_name = escape_javascript(redux_store_data[:store_name])
                                   nonce = csp_nonce
                                   script_options = nonce.present? ? { nonce: nonce } : {}
-                                  immediate_script = content_tag(:script, <<~JS.strip_heredoc.html_safe, script_options
-                                    typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsStoreLoaded('#{escaped_store_name}');
-                                  JS
+                                  immediate_script = content_tag(
+                                    :script,
+                                    <<~JS.strip_heredoc.html_safe,
+                                      typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsStoreLoaded('#{escaped_store_name}');
+                                    JS
+                                    script_options
                                   )
                                   "#{store_hydration_data}\n#{immediate_script}"
                                 else
