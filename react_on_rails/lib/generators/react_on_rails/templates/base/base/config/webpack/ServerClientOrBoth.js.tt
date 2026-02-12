@@ -1,4 +1,4 @@
-<%= add_documentation_reference(config[:message], "// https://github.com/shakacode/react_on_rails_demo_ssr_hmr/blob/master/config/webpack/webpackConfig.js") %>
+<%= add_documentation_reference(config[:message], "// https://github.com/shakacode/react_on_rails_demo_ssr_hmr/blob/master/config/webpack/ServerClientOrBoth.js") %>
 
 const clientWebpackConfig = require('./clientWebpackConfig');
 <% if use_pro? -%>
