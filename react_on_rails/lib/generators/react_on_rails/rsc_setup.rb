@@ -280,6 +280,7 @@ module ReactOnRails
         update_server_webpack_config_for_rsc
         update_client_webpack_config_for_rsc
 
+        verify_rsc_webpack_transforms
         puts Rainbow("✅ Updated webpack configs for RSC").green
       end
 
@@ -404,6 +405,51 @@ module ReactOnRails
           /^( *return clientConfig;)$/,
           "#{rsc_plugin_code}\n\n\\1"
         )
+      end
+
+      def verify_rsc_webpack_transforms
+        missing = []
+        missing.concat(check_rsc_server_config)
+        missing.concat(check_rsc_client_config)
+        missing.concat(check_rsc_scob_config)
+        return if missing.empty?
+
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Some RSC webpack transforms may not have applied correctly.
+
+          Missing expected patterns:
+          #{missing.map { |m| "  - #{m}" }.join("\n")}
+
+          This can happen if your webpack config has been customized.
+          Please verify your webpack configs manually.
+        MSG
+      end
+
+      def check_rsc_server_config
+        path = File.join(destination_root, "config/webpack/serverWebpackConfig.js")
+        return [] unless File.exist?(path)
+
+        content = File.read(path)
+        missing = []
+        missing << "RSCWebpackPlugin in serverWebpackConfig.js" unless content.include?("RSCWebpackPlugin")
+        missing << "rscBundle parameter in serverWebpackConfig.js" unless content.include?("rscBundle")
+        missing
+      end
+
+      def check_rsc_client_config
+        path = File.join(destination_root, "config/webpack/clientWebpackConfig.js")
+        return [] unless File.exist?(path)
+
+        content = File.read(path)
+        content.include?("RSCWebpackPlugin") ? [] : ["RSCWebpackPlugin in clientWebpackConfig.js"]
+      end
+
+      def check_rsc_scob_config
+        scob_path = resolve_server_client_or_both_path
+        return [] unless scob_path
+
+        content = File.read(File.join(destination_root, scob_path))
+        content.include?("rscWebpackConfig") ? [] : ["rscWebpackConfig in ServerClientOrBoth.js"]
       end
     end
   end

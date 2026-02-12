@@ -215,6 +215,7 @@ module ReactOnRails
         # Update ServerClientOrBoth.js import style
         update_server_client_or_both_import
 
+        verify_pro_webpack_transforms(webpack_config)
         puts Rainbow("✅ Updated webpack configs for Pro").green
       end
 
@@ -269,6 +270,26 @@ module ReactOnRails
           /^module\.exports = configureServer;\s*$/,
           "module.exports = {\n  default: configureServer,\n  extractLoader,\n};\n"
         )
+      end
+
+      def verify_pro_webpack_transforms(webpack_config)
+        content = File.read(File.join(destination_root, webpack_config))
+        missing = []
+        missing << "libraryTarget: 'commonjs2'" unless content.include?("libraryTarget: 'commonjs2',")
+        missing << "function extractLoader" unless content.include?("function extractLoader")
+        missing << "serverWebpackConfig.target = 'node'" unless content.include?("serverWebpackConfig.target = 'node'")
+        missing << "module.exports = {" unless content.include?("module.exports = {")
+        return if missing.empty?
+
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Some Pro webpack transforms may not have applied correctly.
+
+          The following expected patterns were not found in #{webpack_config}:
+          #{missing.map { |m| "  - #{m}" }.join("\n")}
+
+          This can happen if your webpack config has been customized.
+          Please verify #{webpack_config} manually.
+        MSG
       end
 
       def update_server_client_or_both_import
