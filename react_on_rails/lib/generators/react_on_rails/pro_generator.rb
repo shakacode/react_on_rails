@@ -76,11 +76,17 @@ module ReactOnRails
       end
 
       def print_success_message
+        route = if File.exist?(File.join(destination_root, "app/controllers/hello_server_controller.rb"))
+                  "hello_server"
+                else
+                  "hello_world"
+                end
+
         GeneratorMessages.add_info(<<~MSG)
           Next steps:
           1. Set your license: export REACT_ON_RAILS_PRO_LICENSE=your_token
           2. Start the app: bin/dev (or foreman start -f Procfile.dev)
-          3. Visit http://localhost:3000/hello_world
+          3. Visit http://localhost:3000/#{route}
           4. The Node Renderer will start on port 3800
 
           Documentation: https://www.shakacode.com/react-on-rails-pro/docs/

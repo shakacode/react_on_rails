@@ -318,7 +318,8 @@ module ReactOnRails
         # Pin to exact version matching the gem (converts Ruby format to npm format)
         # Falls back to latest if version can't be determined
         pro_packages = pro_packages_with_version
-        return if pro_packages.all? { |pkg| add_package(pkg) }
+        results = pro_packages.map { |pkg| add_package(pkg) }
+        return if results.all?
 
         GeneratorMessages.add_warning(<<~MSG.strip)
           ⚠️  Failed to add React on Rails Pro dependencies.
@@ -331,7 +332,7 @@ module ReactOnRails
           ⚠️  Error adding React on Rails Pro dependencies: #{e.message}
 
           You can install them manually by running:
-            npm install #{pro_packages_with_version.join(' ')}
+            npm install #{PRO_DEPENDENCIES.join(' ')}
         MSG
       end
 
