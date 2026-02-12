@@ -67,7 +67,7 @@ require "react_on_rails/dev"
 # Default route configuration
 # This is set by the ReactOnRails installer to point to your generated component.
 # Change this to your preferred default route, or pass --route=<route> to override.
-DEFAULT_ROUTE = "hello_world"
+DEFAULT_ROUTE = "<%= use_rsc? && !options.redux? ? 'hello_server' : 'hello_world' %>"
 
 # Main execution
 # Add the default route to ARGV if no --route option is provided

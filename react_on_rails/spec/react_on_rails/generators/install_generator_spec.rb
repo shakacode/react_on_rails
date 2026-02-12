@@ -13,6 +13,12 @@ describe InstallGenerator, type: :generator do
     include_examples "base_generator", application_js: true
     include_examples "no_redux_generator"
 
+    it "sets DEFAULT_ROUTE to hello_world in bin/dev" do
+      assert_file "bin/dev" do |content|
+        expect(content).to include('DEFAULT_ROUTE = "hello_world"')
+      end
+    end
+
     it "installs appropriate transpiler dependencies based on Shakapacker version" do
       assert_file "package.json" do |content|
         package_json = JSON.parse(content)
@@ -733,6 +739,12 @@ describe InstallGenerator, type: :generator do
       assert_file "config/routes.rb" do |content|
         expect(content).to include("hello_server")
         expect(content).to include("rsc_payload")
+      end
+    end
+
+    it "sets DEFAULT_ROUTE to hello_server in bin/dev" do
+      assert_file "bin/dev" do |content|
+        expect(content).to include('DEFAULT_ROUTE = "hello_server"')
       end
     end
   end
