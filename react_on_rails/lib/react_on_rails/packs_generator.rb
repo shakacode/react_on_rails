@@ -58,6 +58,29 @@ module ReactOnRails
       store_to_path.each_value { |store_path| create_store_pack(store_path, verbose: verbose) }
 
       create_server_pack(verbose: verbose) if ReactOnRails.configuration.server_bundle_js_file.present?
+
+      log_rsc_classification_summary if ReactOnRails::Utils.rsc_support_enabled?
+    end
+
+    def log_rsc_classification_summary
+      all_components = common_component_to_path.merge(client_component_to_path)
+      server = []
+      client = []
+
+      all_components.each do |name, path|
+        if client_entrypoint?(path)
+          client << name
+        else
+          server << name
+        end
+      end
+
+      return if server.empty? && client.empty?
+
+      summary = +"[react_on_rails] RSC component classification:\n"
+      summary << "  Server components (no 'use client'): #{server.any? ? server.join(', ') : '(none)'}\n"
+      summary << "  Client components ('use client' found): #{client.any? ? client.join(', ') : '(none)'}"
+      puts Rainbow(summary).cyan
     end
 
     def check_for_component_store_name_conflicts
@@ -128,12 +151,36 @@ module ReactOnRails
       first_js_statement_in_code(content).match?(/^["']use client["'](?:;|\s|$)/)
     end
 
+    # Patterns that indicate a file likely uses client-side features.
+    # Used as a heuristic warning — false positives (e.g., patterns in comments) are acceptable
+    # because this is a warning, not an error.
+    CLIENT_API_PATTERN = /\b(useState|useEffect|useReducer|useCallback|useMemo|useRef|useLayoutEffect|useImperativeHandle|useContext|useSyncExternalStore|useTransition|useDeferredValue)\b|\b(onClick|onChange|onSubmit|onFocus|onBlur|onKeyDown|onKeyUp|onKeyPress|onMouseDown|onMouseUp|onMouseEnter|onMouseLeave)\s*[={]|\bextends\s+(React\.)?(Component|PureComponent)\b/ # rubocop:disable Layout/LineLength
+
+    def warn_if_likely_client_component(file_path, component)
+      content = File.read(file_path)
+      matches = content.scan(CLIENT_API_PATTERN).flatten.compact.reject(&:empty?).uniq
+
+      return if matches.empty?
+
+      Rails.logger.warn(
+        "[react_on_rails] WARNING: '#{component}' (#{file_path}) appears to use client-side APIs " \
+        "(#{matches.first(3).join(', ')}#{matches.length > 3 ? ', ...' : ''}) " \
+        "but is missing the 'use client' directive. It will be registered as a server component.\n" \
+        "If this is a client component, add '\"use client\";' as the first line of the file."
+      )
+    end
+
     def pack_file_contents(file_path)
       registered_component_name = component_name(file_path)
       load_server_components = ReactOnRails::Utils.rsc_support_enabled?
 
       if load_server_components && !client_entrypoint?(file_path)
+        warn_if_likely_client_component(file_path, registered_component_name)
+
         return <<~FILE_CONTENT.strip
+          // This component is registered as a server component because no 'use client' directive was found.
+          // If this component uses hooks, event handlers, or class components, add "use client" at the top
+          // of the source file and re-run: bundle exec rake react_on_rails:generate_packs
           import registerServerComponent from '#{react_on_rails_npm_package}/registerServerComponent/client';
 
           registerServerComponent("#{registered_component_name}");

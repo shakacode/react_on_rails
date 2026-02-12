@@ -41,10 +41,15 @@ ensureReactUseAvailable();
  * ReactOnRails.register({ ClientComponent: WrappedComponent });
  * ```
  */
-const wrapServerComponentRenderer = (componentOrRenderFunction: ReactComponentOrRenderFunction) => {
+const wrapServerComponentRenderer = (
+  componentOrRenderFunction: ReactComponentOrRenderFunction,
+  componentName?: string,
+) => {
   if (typeof componentOrRenderFunction !== 'function') {
     throw new Error('wrapServerComponentRenderer: component is not a function');
   }
+
+  const displayName = componentName ?? 'Unknown';
 
   const wrapper: RenderFunction = async (props, railsContext, domNodeId) => {
     const Component = isRenderFunction(componentOrRenderFunction)
@@ -56,15 +61,21 @@ const wrapServerComponentRenderer = (componentOrRenderFunction: ReactComponentOr
     }
 
     if (!domNodeId) {
-      throw new Error('RSCClientRoot: No domNodeId provided');
+      throw new Error(`RSCClientRoot: No domNodeId provided for server component '${displayName}'`);
     }
     const domNode = document.getElementById(domNodeId);
     if (!domNode) {
-      throw new Error(`RSCClientRoot: No DOM node found for id: ${domNodeId}`);
+      throw new Error(
+        `RSCClientRoot: No DOM node found for id: ${domNodeId} (server component '${displayName}')`,
+      );
     }
 
     if (!railsContext) {
-      throw new Error('RSCClientRoot: No railsContext provided');
+      throw new Error(
+        `RSCClientRoot: No railsContext provided for server component '${displayName}'.\n` +
+          `If '${displayName}' uses client-side features (hooks, event handlers, class components),\n` +
+          `add '"use client";' at the top of the component file.`,
+      );
     }
 
     const RSCProvider = createRSCProvider({

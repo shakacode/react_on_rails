@@ -38,13 +38,31 @@ import { createRSCProvider } from '../RSCProvider.tsx';
  * ReactOnRails.register({ ClientComponent: WrappedComponent });
  * ```
  */
-const wrapServerComponentRenderer = (componentOrRenderFunction: ReactComponentOrRenderFunction) => {
+const wrapServerComponentRenderer = (
+  componentOrRenderFunction: ReactComponentOrRenderFunction,
+  componentName?: string,
+) => {
   if (typeof componentOrRenderFunction !== 'function') {
     throw new Error('wrapServerComponentRenderer: component is not a function');
   }
 
+  const displayName = componentName ?? 'Unknown';
+
   const wrapper: RenderFunction = async (props, railsContext) => {
-    assertRailsContextWithServerStreamingCapabilities(railsContext);
+    try {
+      assertRailsContextWithServerStreamingCapabilities(railsContext);
+    } catch (e) {
+      const originalMessage = e instanceof Error ? `\n\nOriginal error: ${e.message}` : '';
+      throw new Error(
+        `Server component '${displayName}' cannot be rendered in this context.\n\n` +
+          `This usually means one of:\n` +
+          `1. '${displayName}' uses client-side features (hooks, event handlers, class components)\n` +
+          `   but is missing the "use client" directive at the top of its file.\n` +
+          `   Add '"use client";' as the first line to register it as a client component.\n` +
+          `2. '${displayName}' is rendered with react_component() instead of stream_react_component().\n` +
+          `   Server components require the streaming render helper.${originalMessage}`,
+      );
+    }
 
     const Component = isRenderFunction(componentOrRenderFunction)
       ? await componentOrRenderFunction(props, railsContext)
