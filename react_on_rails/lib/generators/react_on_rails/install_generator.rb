@@ -225,6 +225,11 @@ module ReactOnRails
         template_bin_path = "#{__dir__}/templates/base/base/bin"
         directory template_bin_path, "bin"
 
+        # For --rsc without --redux, hello_world doesn't exist — update DEFAULT_ROUTE
+        if use_rsc? && !options.redux?
+          gsub_file "bin/dev", 'DEFAULT_ROUTE = "hello_world"', 'DEFAULT_ROUTE = "hello_server"'
+        end
+
         # Make these and only these files executable
         files_to_copy = []
         Dir.chdir(template_bin_path) do
