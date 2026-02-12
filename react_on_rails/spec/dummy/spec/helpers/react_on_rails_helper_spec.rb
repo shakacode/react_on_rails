@@ -758,6 +758,8 @@ describe ReactOnRailsHelper do
 
     context "when CSP nonce is available" do
       before do
+        # content_security_policy_nonce is a Rails method not present on PlainReactOnRailsHelper,
+        # so we define it on the singleton to simulate a Rails view context with CSP enabled.
         def helper.respond_to?(method_name, *args)
           return true if method_name == :content_security_policy_nonce
 
@@ -787,6 +789,8 @@ describe ReactOnRailsHelper do
 
     context "with Rails 5.2-6.0 compatibility (ArgumentError fallback)" do
       before do
+        # Simulate an older Rails where content_security_policy_nonce raises ArgumentError
+        # when called with arguments.
         def helper.respond_to?(method_name, *args)
           return true if method_name == :content_security_policy_nonce
 
@@ -823,15 +827,7 @@ describe ReactOnRailsHelper do
 
     context "when CSP nonce is available" do
       before do
-        def helper.respond_to?(method_name, *args)
-          return true if method_name == :content_security_policy_nonce
-
-          super
-        end
-
-        def helper.content_security_policy_nonce(_directive = nil)
-          "component-nonce-abc"
-        end
+        allow(helper).to receive(:csp_nonce).and_return("component-nonce-abc")
       end
 
       it "adds nonce to the immediate hydration script" do
@@ -842,7 +838,6 @@ describe ReactOnRailsHelper do
 
       it "does not add nonce to the application/json script" do
         result = helper.send(:generate_component_script, render_options)
-        # The JSON data tag should not have a nonce
         json_tag_match = result.match(%r{<script type="application/json"[^>]*>})
         expect(json_tag_match.to_s).not_to include("nonce=")
       end
@@ -850,8 +845,7 @@ describe ReactOnRailsHelper do
 
     context "when CSP is not configured" do
       before do
-        allow(helper).to receive(:respond_to?).and_call_original
-        allow(helper).to receive(:respond_to?).with(:content_security_policy_nonce).and_return(false)
+        allow(helper).to receive(:csp_nonce).and_return(nil)
       end
 
       it "does not add nonce to the immediate hydration script" do
@@ -894,15 +888,7 @@ describe ReactOnRailsHelper do
 
     context "when CSP nonce is available" do
       before do
-        def helper.respond_to?(method_name, *args)
-          return true if method_name == :content_security_policy_nonce
-
-          super
-        end
-
-        def helper.content_security_policy_nonce(_directive = nil)
-          "store-nonce-xyz"
-        end
+        allow(helper).to receive(:csp_nonce).and_return("store-nonce-xyz")
       end
 
       it "adds nonce to the immediate hydration script" do
@@ -920,8 +906,7 @@ describe ReactOnRailsHelper do
 
     context "when CSP is not configured" do
       before do
-        allow(helper).to receive(:respond_to?).and_call_original
-        allow(helper).to receive(:respond_to?).with(:content_security_policy_nonce).and_return(false)
+        allow(helper).to receive(:csp_nonce).and_return(nil)
       end
 
       it "does not add nonce to the immediate hydration script" do
@@ -953,15 +938,7 @@ describe ReactOnRailsHelper do
 
     context "when CSP nonce is available" do
       before do
-        def helper.respond_to?(method_name, *args)
-          return true if method_name == :content_security_policy_nonce
-
-          super
-        end
-
-        def helper.content_security_policy_nonce(_directive = nil)
-          "abc123"
-        end
+        allow(helper).to receive(:csp_nonce).and_return("abc123")
       end
 
       it "wraps script with nonce attribute" do
@@ -979,8 +956,7 @@ describe ReactOnRailsHelper do
 
     context "when CSP is not configured" do
       before do
-        allow(helper).to receive(:respond_to?).and_call_original
-        allow(helper).to receive(:respond_to?).with(:content_security_policy_nonce).and_return(false)
+        allow(helper).to receive(:csp_nonce).and_return(nil)
       end
 
       it "wraps script without nonce attribute" do
@@ -988,27 +964,6 @@ describe ReactOnRailsHelper do
         expect(result).not_to include("nonce=")
         expect(result).to include('id="consoleReplayLog"')
         expect(result).to include(console_script)
-      end
-    end
-
-    context "with Rails 5.2-6.0 compatibility (ArgumentError fallback)" do
-      before do
-        def helper.respond_to?(method_name, *args)
-          return true if method_name == :content_security_policy_nonce
-
-          super
-        end
-
-        def helper.content_security_policy_nonce(*args)
-          raise ArgumentError if args.any?
-
-          "fallback123"
-        end
-      end
-
-      it "falls back to no-argument method" do
-        result = helper.send(:wrap_console_script_with_nonce, console_script)
-        expect(result).to include('nonce="fallback123"')
       end
     end
 
@@ -1036,8 +991,7 @@ describe ReactOnRailsHelper do
       end
 
       before do
-        allow(helper).to receive(:respond_to?).and_call_original
-        allow(helper).to receive(:respond_to?).with(:content_security_policy_nonce).and_return(false)
+        allow(helper).to receive(:csp_nonce).and_return(nil)
       end
 
       it "preserves newlines in multi-line script" do
@@ -1054,8 +1008,7 @@ describe ReactOnRailsHelper do
       let(:script_with_quotes) { %q{console.log.apply(console, ['[SERVER] "quoted" text']);} }
 
       before do
-        allow(helper).to receive(:respond_to?).and_call_original
-        allow(helper).to receive(:respond_to?).with(:content_security_policy_nonce).and_return(false)
+        allow(helper).to receive(:csp_nonce).and_return(nil)
       end
 
       it "properly escapes content in script tag" do
