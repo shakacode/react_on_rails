@@ -12,5 +12,12 @@ Example:
     - RSC routes (rsc_payload_route, hello_server)
     - RSC bundle watcher to Procfile.dev
 
+Modifies:
+    - config/webpack/serverWebpackConfig.js (adds RSCWebpackPlugin, rscBundle param)
+    - config/webpack/clientWebpackConfig.js (adds RSCWebpackPlugin)
+    - config/webpack/ServerClientOrBoth.js (adds rscWebpackConfig, RSC_BUNDLE_ONLY)
+    - config/initializers/react_on_rails_pro.rb (adds RSC config block)
+    - package.json (adds react-on-rails-rsc)
+
 Prerequisites:
     - React on Rails Pro must be installed (rails g react_on_rails:pro)
