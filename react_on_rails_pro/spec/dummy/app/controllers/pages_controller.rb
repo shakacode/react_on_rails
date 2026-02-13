@@ -40,6 +40,10 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     stream_view_containing_react_components(template: "/pages/stream_error_demo")
   end
 
+  def stream_shell_error_demo
+    stream_view_containing_react_components(template: "/pages/stream_shell_error_demo")
+  end
+
   def stream_async_components
     stream_view_containing_react_components(template: "/pages/stream_async_components")
   end
