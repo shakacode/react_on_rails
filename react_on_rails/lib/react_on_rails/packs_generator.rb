@@ -5,6 +5,25 @@ require "set"
 
 module ReactOnRails
   # rubocop:disable Metrics/ClassLength
+  #
+  # This class handles two INDEPENDENT classification systems:
+  #
+  # 1. BUNDLE PLACEMENT (.client. / .server. file suffixes)
+  #    Controls which webpack bundle imports a file. Pre-dates React Server Components.
+  #    - Component.client.jsx → client bundle only
+  #    - Component.server.jsx → server bundle only (requires paired .client. file)
+  #    - Component.jsx (no suffix) → both bundles
+  #    Methods: common_component_to_path, client_component_to_path, server_component_to_path
+  #
+  # 2. RSC CLASSIFICATION ('use client' directive)
+  #    Controls how a component is registered when RSC support is enabled (Pro feature).
+  #    - Has 'use client' → ReactOnRails.register() → React Client Component
+  #    - Lacks 'use client' → registerServerComponent() → React Server Component
+  #    Method: client_entrypoint?
+  #
+  # These are orthogonal. A .client.jsx file can be a React Server Component (if it lacks
+  # 'use client'), and a .server.jsx file can be a React Client Component (if it has 'use client').
+  #
   class PacksGenerator
     CONTAINS_CLIENT_OR_SERVER_REGEX = /\.(server|client)($|\.)/
     COMPONENT_EXTENSIONS = /\.(jsx?|tsx?)$/

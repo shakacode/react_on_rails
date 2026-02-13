@@ -65,6 +65,52 @@ with peer deps (like `packages/react-on-rails`) would otherwise get their own
 the exception silently stops working. CI guards (`script/check-react-major-version.mjs`)
 will catch version mismatches.
 
+## File Suffixes vs. RSC Directive (Important Distinction)
+
+React on Rails has two **independent** classification systems that both use "client" / "server" terminology. Confusing them is a common mistake.
+
+### Bundle Placement: `.client.` / `.server.` file suffixes
+
+A pre-RSC React on Rails concept controlling which **webpack bundle** imports a file:
+
+- `Component.client.jsx` → client bundle only (browser)
+- `Component.server.jsx` → server bundle only (Node.js SSR). Must have a paired `.client.` file.
+- `Component.jsx` (no suffix) → both bundles
+
+This is purely about source file routing. A `.server.jsx` file is NOT a React Server Component.
+
+### RSC Classification: `'use client'` directive (Pro only)
+
+Controls how a component is **registered** when RSC support is enabled:
+
+- Has `'use client'` → `ReactOnRails.register()` → React Client Component (hooks, events OK)
+- Lacks `'use client'` → `registerServerComponent()` → React Server Component (no hooks)
+
+Checked by `client_entrypoint?` in `packs_generator.rb`.
+
+### How They Interact
+
+These are orthogonal. The suffix controls which bundle, the directive controls RSC registration:
+
+| File | `'use client'`? | Goes into | Registered as |
+|------|-----------------|-----------|---------------|
+| `Foo.jsx` | Yes | Both bundles | Client component |
+| `Foo.jsx` | No | Both bundles | Server component |
+| `Foo.client.jsx` | Yes | Client bundle | Client component |
+| `Foo.client.jsx` | No | Client bundle | Server component |
+| `Foo.server.jsx` | Yes | Server bundle | Client component |
+| `Foo.server.jsx` | No | Server bundle | Server component |
+
+In practice, paired `.client.`/`.server.` files should always have matching `'use client'` status because the client and server must agree on a component's RSC role for hydration to work.
+
+### Key code paths in `packs_generator.rb`
+
+- `common_component_to_path` (line ~484) — finds files without `.client.`/`.server.` suffix
+- `client_component_to_path` (line ~490) — finds `.client.` files
+- `server_component_to_path` (line ~501) — finds `.server.` files (requires paired `.client.`)
+- `client_entrypoint?` (line ~148) — checks for `'use client'` directive (RSC classification)
+- `pack_file_contents` (line ~173) — generates different registration code based on `client_entrypoint?`
+
 ## Examples and Testing
 
 - **Dummy app**: `react_on_rails/spec/dummy/` - Rails app for testing integration

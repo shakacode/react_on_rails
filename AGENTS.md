@@ -161,6 +161,33 @@ Prettier handles all formatting. Never manually format — run `rake autofix` in
 - Add files to the `docs/` root — they must go in a subdirectory (`getting-started/`, `core-concepts/`, `building-features/`, `api-reference/`, `deployment/`, `migrating/`, `upgrading/`, `contributor-info/`, `misc/`)
 - Force push to `main` or `master`
 
+## Key Concept: File Suffixes vs. RSC Directive
+
+React on Rails has two **independent** systems that both use "client" and "server" terminology. Do not confuse them.
+
+### 1. Bundle Placement (`.client.` / `.server.` file suffixes)
+
+A **pre-RSC React on Rails concept** that controls which webpack bundle imports a file:
+
+- `Component.client.jsx` → imported only in the **client bundle** (browser)
+- `Component.server.jsx` → imported only in the **server bundle** (Node.js SSR)
+- `Component.jsx` (no suffix) → imported in **both** bundles
+
+This controls where the source file is loaded, nothing more. A `.server.jsx` file is NOT a React Server Component — it's just a file that webpack includes only in the server bundle.
+
+### 2. RSC Classification (`'use client'` directive)
+
+A **React Server Components concept** (Pro feature) that controls how a component is registered:
+
+- File **has** `'use client'` → registered via `ReactOnRails.register()` → React Client Component
+- File **lacks** `'use client'` → registered via `registerServerComponent()` → React Server Component
+
+The `client_entrypoint?` method in `packs_generator.rb` checks for this directive.
+
+### They Are Orthogonal
+
+A `.client.jsx` file can be a React Server Component (if it lacks `'use client'`), and a `.server.jsx` file can be a React Client Component (if it has `'use client'`). In practice, paired `.client.`/`.server.` files should have consistent `'use client'` status because the client and server must agree on the component's RSC role for hydration to work.
+
 ## Changelog
 
 Update `/CHANGELOG.md` for **user-visible changes only** (features, bug fixes, breaking changes, deprecations, performance improvements). Do **not** add entries for linting, formatting, refactoring, tests, or doc fixes.
