@@ -717,9 +717,6 @@ importers:
       '@playwright/test':
         specifier: ^1.56.1
         version: 1.58.2
-      '@pmmmwh/react-refresh-webpack-plugin':
-        specifier: 0.5.3
-        version: 0.5.3(@types/webpack@5.28.5(@swc/core@1.15.3)(webpack-cli@6.0.1))(react-refresh@0.11.0)(type-fest@0.21.3)(webpack-dev-server@5.2.3)(webpack@5.103.0)
       '@tailwindcss/aspect-ratio':
         specifier: ^0.4.2
         version: 0.4.2(tailwindcss@3.4.19)
@@ -2258,32 +2255,6 @@ packages:
       webpack-plugin-serve:
         optional: true
 
-  '@pmmmwh/react-refresh-webpack-plugin@0.5.3':
-    resolution: {integrity: sha512-OoTnFb8XEYaOuMNhVDsLRnAO6MCYHNs1g6d8pBcHhDFsi1P3lPbq/IklwtbAx9cG0W4J9KswxZtwGnejrnxp+g==}
-    engines: {node: '>= 10.13'}
-    peerDependencies:
-      '@types/webpack': 4.x || 5.x
-      react-refresh: '>=0.10.0 <1.0.0'
-      sockjs-client: ^1.4.0
-      type-fest: '>=0.17.0 <3.0.0'
-      webpack: '>=4.43.0 <6.0.0'
-      webpack-dev-server: 3.x || 4.x
-      webpack-hot-middleware: 2.x
-      webpack-plugin-serve: 0.x || 1.x
-    peerDependenciesMeta:
-      '@types/webpack':
-        optional: true
-      sockjs-client:
-        optional: true
-      type-fest:
-        optional: true
-      webpack-dev-server:
-        optional: true
-      webpack-hot-middleware:
-        optional: true
-      webpack-plugin-serve:
-        optional: true
-
   '@publint/pack@0.1.2':
     resolution: {integrity: sha512-S+9ANAvUmjutrshV4jZjaiG8XQyuJIZ8a4utWmN/vW1sgQ9IfBnPndwkmQYw53QmouOIytT874u65HEmu6H5jw==}
     engines: {node: '>=18'}
@@ -3672,9 +3643,6 @@ packages:
     resolution: {integrity: sha512-OkTL9umf+He2DZkUq8f8J9of7yL6RJKI24dVITBmNfZBmri9zYZQrKkuXiKhyfPSu8tUhnVBB1iKXevvnlR4Ww==}
     engines: {node: '>= 12'}
 
-  common-path-prefix@3.0.0:
-    resolution: {integrity: sha512-QE33hToZseCH3jS0qN96O/bSh3kaw/h+Tq7ngyY9eWDUnTlTNUyqfqvCXioLe5Na5jFsL78ra/wuBU4iuEgd4w==}
-
   common-tags@1.8.2:
     resolution: {integrity: sha512-gk/Z852D2Wtb//0I+kRFNKKE9dIIVirjoqPoA1wJU+XePVXZfGeBpk45+A1rKO4Q43prqWBNY/MiIeRLbPWUaA==}
     engines: {node: '>=4.0.0'}
@@ -4874,7 +4842,7 @@ packages:
 
   glob@7.2.3:
     resolution: {integrity: sha512-nFR0zLpU2YCaRxwoCJvL6UvCH2JFyFVIvwTLsIf21AuHlMskA1hhTdk+LlYJtOlYt9v6dvszD2BGRqBL+iQK9Q==}
-    deprecated: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+    deprecated: Glob versions prior to v9 are no longer supported
 
   global-modules@2.0.0:
     resolution: {integrity: sha512-NGbfmJBp9x8IxyJSd1P+otYK8vonoJactOogrVfFRIAEY1ukil8RSKDz2Yo7wh1oihl51l/r6W4epkeKJHqL8A==}
@@ -10284,24 +10252,6 @@ snapshots:
       type-fest: 4.41.0
       webpack-dev-server: 5.2.3(tslib@2.8.1)(webpack-cli@6.0.1)(webpack@5.103.0)
 
-  '@pmmmwh/react-refresh-webpack-plugin@0.5.3(@types/webpack@5.28.5(@swc/core@1.15.3)(webpack-cli@6.0.1))(react-refresh@0.11.0)(type-fest@0.21.3)(webpack-dev-server@5.2.3)(webpack@5.103.0)':
-    dependencies:
-      ansi-html-community: 0.0.8
-      common-path-prefix: 3.0.0
-      core-js-pure: 3.48.0
-      error-stack-parser: 2.1.4
-      find-up: 5.0.0
-      html-entities: 2.6.0
-      loader-utils: 2.0.4
-      react-refresh: 0.11.0
-      schema-utils: 3.3.0
-      source-map: 0.7.6
-      webpack: 5.103.0(@swc/core@1.15.3)(webpack-cli@6.0.1)
-    optionalDependencies:
-      '@types/webpack': 5.28.5(@swc/core@1.15.3)(webpack-cli@6.0.1)
-      type-fest: 0.21.3
-      webpack-dev-server: 5.2.3(tslib@2.8.1)(webpack-cli@6.0.1)(webpack@5.103.0)
-
   '@publint/pack@0.1.2': {}
 
   '@puppeteer/browsers@2.10.10':
@@ -11822,8 +11772,6 @@ snapshots:
   commander@7.2.0: {}
 
   commander@8.3.0: {}
-
-  common-path-prefix@3.0.0: {}
 
   common-tags@1.8.2: {}
 
