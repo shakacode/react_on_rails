@@ -136,6 +136,13 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
   let pipedStream: PipeableOrReadableStream | null = null;
   const pipeToTransform = (pipeableStream: PipeableOrReadableStream) => {
     pipeableStream.pipe(transformStream);
+    if (typeof (pipeableStream as Readable).on === 'function') {
+      (pipeableStream as Readable).on('error', () => {
+        if (!transformStream.writableEnded) {
+          transformStream.end();
+        }
+      });
+    }
     pipedStream = pipeableStream;
   };
   // We need to wrap the transformStream in a Readable stream to properly handle errors:
