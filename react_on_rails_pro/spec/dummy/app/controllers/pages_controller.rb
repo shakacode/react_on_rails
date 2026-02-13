@@ -36,6 +36,10 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     render "/pages/pro/cached_react_helmet"
   end
 
+  def stream_error_demo
+    stream_view_containing_react_components(template: "/pages/stream_error_demo")
+  end
+
   def stream_async_components
     stream_view_containing_react_components(template: "/pages/stream_async_components")
   end
@@ -124,6 +128,10 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
 
   def server_router
     stream_view_containing_react_components(template: "/pages/server_router")
+  end
+
+  def server_side_hello_world_hooks
+    stream_view_containing_react_components(template: "/pages/server_side_hello_world_hooks")
   end
 
   def posts_page
