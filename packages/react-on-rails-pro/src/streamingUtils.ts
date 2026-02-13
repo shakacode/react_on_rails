@@ -138,7 +138,8 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
     pipeableStream.pipe(transformStream);
     if (typeof (pipeableStream as Readable).on === 'function') {
       (pipeableStream as Readable).on('error', () => {
-        if (!transformStream.writableEnded) {
+        // Only end when the source is truly destroyed, not on non-fatal errors
+        if ((pipeableStream as Readable).destroyed && !transformStream.writableEnded) {
           transformStream.end();
         }
       });
