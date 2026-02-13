@@ -435,9 +435,19 @@ module ReactOnRailsProHelper
 
     # Start an async task on the barrier to stream all chunks
     @async_barrier.async do
-      stream = yield
-      process_stream_chunks(stream, first_chunk_var, all_chunks)
-      on_complete&.call(all_chunks)
+      begin
+        stream = yield
+        process_stream_chunks(stream, first_chunk_var, all_chunks)
+        on_complete&.call(all_chunks)
+      rescue StandardError => e
+        # Resolve first_chunk_var if not yet resolved, to prevent caller from hanging
+        begin
+          first_chunk_var.value = nil
+        rescue StandardError
+          # Already resolved, safe to ignore
+        end
+        raise e
+      end
     end
 
     # Wait for and return the first chunk (blocking)

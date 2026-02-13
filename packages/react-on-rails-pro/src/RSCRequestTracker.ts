@@ -159,6 +159,11 @@ class RSCRequestTracker {
         stream2.destroy(err);
       });
 
+      (stream as Readable).on('error', () => {
+        if (!stream1.writableEnded) stream1.end();
+        if (!stream2.writableEnded) stream2.end();
+      });
+
       const streamInfo: RSCPayloadStreamInfo = {
         componentName,
         props,

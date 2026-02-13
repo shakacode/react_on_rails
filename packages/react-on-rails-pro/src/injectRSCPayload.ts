@@ -116,6 +116,14 @@ export default function injectRSCPayload(
   const resultStream = new PassThrough();
   let hasReceivedFirstHtmlChunk = false;
 
+  const endResultStream = () => {
+    if (flushTimeout) clearTimeout(flushTimeout);
+    flush();
+    if (!resultStream.writableEnded) {
+      resultStream.end();
+    }
+  };
+
   /**
    * Combines all buffered data into a single chunk and sends it to the result stream.
    *
@@ -250,8 +258,8 @@ export default function injectRSCPayload(
 
       // Wait for HTML stream to complete, then wait for all RSC promises
       await finished(htmlStream).then(() => Promise.all(rscPromises));
-    } catch (err) {
-      resultStream.emit('error', err);
+    } catch {
+      endResultStream();
     }
   };
 
@@ -282,8 +290,8 @@ export default function injectRSCPayload(
   /**
    * Error propagation from HTML stream to result stream.
    */
-  htmlStream.on('error', (err) => {
-    resultStream.emit('error', err);
+  htmlStream.on('error', () => {
+    endResultStream();
   });
 
   /**
@@ -316,7 +324,7 @@ export default function injectRSCPayload(
       .finally(() => {
         rscRequestTracker.clear();
       })
-      .catch((err: unknown) => resultStream.emit('error', err));
+      .catch(() => endResultStream());
   });
 
   return resultStream;

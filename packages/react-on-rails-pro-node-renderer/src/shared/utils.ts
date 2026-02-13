@@ -137,8 +137,13 @@ export const isReadableStream = (stream: unknown): stream is Readable =>
   typeof (stream as Readable).read === 'function';
 
 export const handleStreamError = (stream: Readable, onError: (error: Error) => void) => {
-  stream.on('error', onError);
   const newStreamAfterHandlingError = new PassThrough();
+  stream.on('error', (error) => {
+    onError(error);
+    if (!newStreamAfterHandlingError.writableEnded) {
+      newStreamAfterHandlingError.end();
+    }
+  });
   stream.pipe(newStreamAfterHandlingError);
   return newStreamAfterHandlingError;
 };
