@@ -70,15 +70,9 @@ export type RailsContextWithServerStreamingCapabilities = RailsContextWithServer
 const throwRailsContextMissingEntries = (missingEntries: string) => {
   throw new Error(
     `Rails context does not have server side ${missingEntries}.\n\n` +
-      'Most common cause:\n' +
-      '  A component that uses client-side features (hooks, event handlers, class components)\n' +
-      '  is missing the "use client" directive at the top of its file.\n' +
-      '  Add \'"use client";\' as the first line of the component file.\n\n' +
-      'Other possible causes:\n' +
-      '1. The component is rendered with react_component() instead of stream_react_component().\n' +
-      '   Server components require the streaming render helper.\n' +
-      '2. You are using an incompatible version of react_on_rails_pro.\n' +
-      '3. Server components support is not enabled. Set:\n' +
+      'Possible causes:\n' +
+      '1. You are using an incompatible version of react_on_rails_pro.\n' +
+      '2. Server components support is not enabled. Set:\n' +
       '   ReactOnRailsPro.configuration.enable_rsc_support = true',
   );
 };
