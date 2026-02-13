@@ -51,8 +51,7 @@ module ReactOnRails
       # Check for name conflicts between components and stores
       check_for_component_store_name_conflicts
 
-      common_component_to_path.each_value { |component_path| create_pack(component_path, verbose: verbose) }
-      client_component_to_path.each_value { |component_path| create_pack(component_path, verbose: verbose) }
+      component_to_path.each_value { |component_path| create_pack(component_path, verbose: verbose) }
 
       # Generate store packs if stores_subdirectory is configured
       store_to_path.each_value { |store_path| create_store_pack(store_path, verbose: verbose) }
@@ -63,7 +62,7 @@ module ReactOnRails
     end
 
     def log_rsc_classification_summary
-      all_components = common_component_to_path.merge(client_component_to_path)
+      all_components = component_to_path
       server = []
       client = []
 
@@ -84,7 +83,7 @@ module ReactOnRails
     end
 
     def check_for_component_store_name_conflicts
-      component_names = common_component_to_path.keys + client_component_to_path.keys
+      component_names = component_to_path.keys
       store_names = store_to_path.keys
       conflicts = component_names & store_names
 
@@ -324,8 +323,7 @@ module ReactOnRails
 
     def build_expected_files_set
       expected_pack_files = Set.new
-      common_component_to_path.each_value { |path| expected_pack_files << generated_pack_path(path) }
-      client_component_to_path.each_value { |path| expected_pack_files << generated_pack_path(path) }
+      component_to_path.each_value { |path| expected_pack_files << generated_pack_path(path) }
 
       # Include store packs in expected files
       store_to_path.each_value { |path| expected_pack_files << generated_store_pack_path(path) }
@@ -481,6 +479,10 @@ module ReactOnRails
       paths.grep(COMPONENT_EXTENSIONS)
     end
 
+    def component_to_path
+      common_component_to_path.merge(client_component_to_path)
+    end
+
     def common_component_to_path
       common_components_paths = Dir.glob("#{components_search_path}/*").grep_v(CONTAINS_CLIENT_OR_SERVER_REGEX)
       filtered_paths = filter_component_files(common_components_paths)
@@ -603,7 +605,7 @@ module ReactOnRails
     end
 
     def stale_or_missing_packs?
-      component_files = common_component_to_path.values + client_component_to_path.values
+      component_files = component_to_path.values
       store_files = store_to_path.values
       all_source_files = component_files + store_files
 
