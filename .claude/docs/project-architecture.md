@@ -71,7 +71,7 @@ React on Rails has two **independent** classification systems that both use "cli
 
 ### Bundle Placement: `.client.` / `.server.` file suffixes
 
-A pre-RSC React on Rails concept controlling which **webpack bundle** imports a file:
+A React on Rails auto-bundling feature that controls which **webpack bundle** imports a file. This exists independently of React Server Components and is used with or without RSC:
 
 - `Component.client.jsx` → client bundle only (browser)
 - `Component.server.jsx` → server bundle only (Node.js SSR). Must have a paired `.client.` file.
@@ -79,12 +79,14 @@ A pre-RSC React on Rails concept controlling which **webpack bundle** imports a 
 
 This is purely about source file routing. A `.server.jsx` file is NOT a React Server Component.
 
-### RSC Classification: `'use client'` directive (Pro only)
+### RSC Classification: `'use client'` directive
 
-Controls how a component is **registered** when RSC support is enabled:
+The `'use client'` directive is part of the React Server Components architecture. It marks a component as a React Client Component (one that can use hooks, state, event handlers, and browser APIs). Components without this directive are treated as React Server Components.
 
-- Has `'use client'` → `ReactOnRails.register()` → React Client Component (hooks, events OK)
-- Lacks `'use client'` → `registerServerComponent()` → React Server Component (no hooks)
+When auto-bundling is enabled with RSC support (Pro feature), React on Rails uses this directive to control multiple things:
+
+- **Registration**: Components with `'use client'` are registered via `ReactOnRails.register()`. Components without it are registered via `registerServerComponent()`.
+- **RSC bundling**: The RSC webpack loader uses this directive to decide whether a component is included in the RSC bundle or replaced with a client reference in that bundle.
 
 Checked by `client_entrypoint?` in `packs_generator.rb`.
 
