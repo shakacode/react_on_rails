@@ -27,13 +27,18 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 Changes since the last non-beta release.
 
+### [16.4.0.rc.1] - 2026-02-12
+
 #### Fixed
 
 - **Precompile Hook Detection**: Fixed `shakapacker_precompile_hook_configured?` always returning `false` for apps created with the React on Rails generator. The detection logic only matched the rake task pattern (`react_on_rails:generate_packs`) but the generator template uses the Ruby method (`generate_packs_if_stale`). Now correctly detects both patterns, including resolving script file contents. [PR 2282](https://github.com/shakacode/react_on_rails/pull/2282) by [ihabadham](https://github.com/ihabadham).
 - **Precompile Hook Self-Guard for HMR**: Added self-guard to the generator template's `bin/shakapacker-precompile-hook` to prevent duplicate execution in HMR mode where two webpack processes (client dev-server + server watcher) each trigger the hook. The script now exits early when `SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true` is set by `bin/dev`, regardless of Shakapacker version. The version warning is now smarter: it only warns for hooks that lack the self-guard or use direct commands. **Existing users**: add `exit 0 if ENV["SHAKAPACKER_SKIP_PRECOMPILE_HOOK"] == "true"` near the top of your `bin/shakapacker-precompile-hook` script. [PR 2388](https://github.com/shakacode/react_on_rails/pull/2388) by [justin808](https://github.com/justin808).
+- **Fix generator inheriting BUNDLE_GEMFILE from parent process**: The `react_on_rails:install` generator now wraps bundler commands with `Bundler.with_unbundled_env` to prevent inheriting `BUNDLE_GEMFILE` from the parent process, which caused "injected gems" conflicts when running generators inside a bundled context. [PR 2288](https://github.com/shakacode/react_on_rails/pull/2288) by [ihabadham](https://github.com/ihabadham).
 
 #### Added
 
+- **Auto-registration for Redux stores**: Added `stores_subdirectory` configuration option (e.g., `"ror_stores"`) for automatic Redux store registration, following the same pattern as component auto-registration via `ror_components`. Store files placed in `ror_stores/` directories are automatically discovered, and packs are generated that call `ReactOnRails.registerStore()`, eliminating manual registration boilerplate. Includes `auto_load_bundle` parameter for the `redux_store` helper. [PR 2346](https://github.com/shakacode/react_on_rails/pull/2346) by [justin808](https://github.com/justin808).
+- **create-react-on-rails-app CLI tool**: New `npx create-react-on-rails-app` command for single-command project setup. Phase 1 supports JavaScript and TypeScript templates with npm/pnpm, orchestrating `rails new` + `bundle add react_on_rails` + `rails generate react_on_rails:install` with prerequisite validation and progress output. [PR 2375](https://github.com/shakacode/react_on_rails/pull/2375) by [justin808](https://github.com/justin808).
 - **Extensible bin/dev precompile pattern**: New alternative approach for handling precompile tasks directly in `bin/dev`, providing better support for projects with custom build steps (ReScript, TypeScript), direct Ruby API access via `ReactOnRails::Locales.compile`, and improved version manager compatibility. [PR 2349](https://github.com/shakacode/react_on_rails/pull/2349) by [justin808](https://github.com/justin808).
 - **Database setup check in bin/dev**: The `bin/dev` command now checks database connectivity before starting the development server. This provides clear error messages when the database is missing or unavailable, instead of buried errors in the logs. Note: This adds ~1-2 seconds to startup time as it spawns a Rails runner process.
 
@@ -44,14 +49,15 @@ Changes since the last non-beta release.
 
   [PR 2340](https://github.com/shakacode/react_on_rails/pull/2340) by [justin808](https://github.com/justin808).
 
-#### Fixed
+#### Improved
 
-- **Fix generator inheriting BUNDLE_GEMFILE from parent process**: The `react_on_rails:install` generator now wraps bundler commands with `Bundler.with_unbundled_env` to prevent inheriting `BUNDLE_GEMFILE` from the parent process, which caused "injected gems" conflicts when running generators inside a bundled context. [PR 2288](https://github.com/shakacode/react_on_rails/pull/2288) by [ihabadham](https://github.com/ihabadham).
+- **Smarter duplicate registration warnings**: Component and store registration now only warns when a _different_ component or store is registered under an already-used name. Re-registering the same component (common with HMR) is silently accepted. [PR 2354](https://github.com/shakacode/react_on_rails/pull/2354) by [justin808](https://github.com/justin808).
 
 #### Pro
 
 ##### Added
 
+- **CSP nonce for immediate hydration scripts**: The immediate hydration inline `<script>` tags now include the CSP nonce attribute, fixing browsers blocking them when strict Content Security Policy is enabled. [PR 2398](https://github.com/shakacode/react_on_rails/pull/2398) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 - **License verification rake task**: New `react_on_rails_pro:verify_license` rake task for checking license status with human-readable text and JSON output (`FORMAT=json`) for CI/CD integration. Includes exit codes, automatic renewal warnings for licenses expiring within 30 days, and a GitHub Actions workflow example. [PR 2385](https://github.com/shakacode/react_on_rails/pull/2385) by [justin808](https://github.com/justin808).
 
 ### [16.3.0] - 2026-02-05
@@ -1984,7 +1990,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...master
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.4.0.rc.1...master
+[16.4.0.rc.1]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...v16.4.0.rc.1
 [16.3.0]: https://github.com/shakacode/react_on_rails/compare/v16.2.1...v16.3.0
 [16.2.1]: https://github.com/shakacode/react_on_rails/compare/v16.2.0...v16.2.1
 [16.2.0]: https://github.com/shakacode/react_on_rails/compare/16.1.1...v16.2.0
