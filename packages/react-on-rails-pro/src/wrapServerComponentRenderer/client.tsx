@@ -73,8 +73,7 @@ const wrapServerComponentRenderer = (
     if (!railsContext) {
       throw new Error(
         `RSCClientRoot: No railsContext provided for server component '${displayName}'.\n` +
-          `If '${displayName}' uses client-side features (hooks, event handlers, class components),\n` +
-          `add '"use client";' at the top of the component file.`,
+          `This usually means an incompatible version of react_on_rails or react_on_rails_pro.`,
       );
     }
 
