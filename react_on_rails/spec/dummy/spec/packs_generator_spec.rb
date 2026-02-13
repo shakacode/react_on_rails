@@ -254,9 +254,6 @@ module ReactOnRails
           component_pack = "#{generated_directory}/#{component_name}.js"
           pack_content = File.read(component_pack)
           expected_content = <<~CONTENT.strip
-            // This component is registered as a server component because no 'use client' directive was found.
-            // If this component uses hooks, event handlers, or class components, add "use client" at the top
-            // of the source file and re-run: bundle exec rake react_on_rails:generate_packs
             import registerServerComponent from 'react-on-rails-pro/registerServerComponent/client';
 
             registerServerComponent("#{component_name}");
@@ -291,9 +288,6 @@ module ReactOnRails
           component_pack = "#{generated_directory}/#{component_name}.js"
           pack_content = File.read(component_pack)
           expected_content = <<~CONTENT.strip
-            // This component is registered as a server component because no 'use client' directive was found.
-            // If this component uses hooks, event handlers, or class components, add "use client" at the top
-            // of the source file and re-run: bundle exec rake react_on_rails:generate_packs
             import registerServerComponent from 'react-on-rails-pro/registerServerComponent/client';
 
             registerServerComponent("#{component_name}");

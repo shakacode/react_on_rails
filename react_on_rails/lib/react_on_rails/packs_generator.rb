@@ -178,9 +178,6 @@ module ReactOnRails
         warn_if_likely_client_component(file_path, registered_component_name)
 
         return <<~FILE_CONTENT.strip
-          // This component is registered as a server component because no 'use client' directive was found.
-          // If this component uses hooks, event handlers, or class components, add "use client" at the top
-          // of the source file and re-run: bundle exec rake react_on_rails:generate_packs
           import registerServerComponent from '#{react_on_rails_npm_package}/registerServerComponent/client';
 
           registerServerComponent("#{registered_component_name}");
