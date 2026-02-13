@@ -140,7 +140,11 @@ export const handleStreamError = (stream: Readable, onError: (error: Error) => v
   const newStreamAfterHandlingError = new PassThrough();
   stream.on('error', (error) => {
     onError(error);
-    if (!newStreamAfterHandlingError.writableEnded) {
+    // Only end the PassThrough when the source is truly destroyed (e.g., stream.destroy(error)).
+    // Non-fatal errors (e.g., emitError for throwJsErrors) emit 'error' without destroying
+    // the stream, and React may continue rendering — ending the PassThrough would cause
+    // "write after end" as pipe() tries to forward subsequent data.
+    if (stream.destroyed && !newStreamAfterHandlingError.writableEnded) {
       newStreamAfterHandlingError.end();
     }
   });
