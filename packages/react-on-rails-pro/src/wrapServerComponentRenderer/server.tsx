@@ -54,13 +54,18 @@ const wrapServerComponentRenderer = (
     } catch (e) {
       const originalMessage = e instanceof Error ? `\n\nOriginal error: ${e.message}` : '';
       throw new Error(
-        `Server component '${displayName}' cannot be rendered in this context.\n\n` +
-          `This usually means one of:\n` +
-          `1. '${displayName}' uses client-side features (hooks, event handlers, class components)\n` +
-          `   but is missing the "use client" directive at the top of its file.\n` +
-          `   Add '"use client";' as the first line to register it as a client component.\n` +
-          `2. '${displayName}' is rendered with react_component() instead of stream_react_component().\n` +
-          `   Server components require the streaming render helper.${originalMessage}`,
+        `Component '${displayName}' is registered as a server component but is being rendered ` +
+          `with the react_component helper, which does not support server components.\n\n` +
+          `Most likely cause:\n` +
+          `  If '${displayName}' is a client component (uses hooks like useState/useEffect, ` +
+          `event handlers, or class components), add '"use client";' as the first line of the ` +
+          `component file. Without this directive, React on Rails auto-bundling registers it ` +
+          `as a server component.\n\n` +
+          `Other possible causes:\n` +
+          `1. If '${displayName}' is truly a server component, use stream_react_component ` +
+          `instead of react_component in your Rails view.\n` +
+          `2. If you manually called registerServerComponent for '${displayName}', ` +
+          `use ReactOnRails.register instead.${originalMessage}`,
       );
     }
 
