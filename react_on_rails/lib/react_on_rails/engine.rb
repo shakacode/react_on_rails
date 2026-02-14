@@ -70,8 +70,9 @@ module ReactOnRails
     # Check if we're running a Rails generator
     # @return [Boolean] true if running a generator
     #
-    # Uses the same pattern as detecting Rails::Server or Rails::Console context.
-    # Rails only loads the Generators module when running generator commands.
+    # Heuristic: Rails::Generators is typically only defined during generator
+    # commands. It could be defined by test helpers or gems that require
+    # "rails/generators", but this is a fallback behind the ENV check above.
     def self.running_generator?
       defined?(Rails::Generators)
     end
