@@ -108,7 +108,7 @@ module ReactOnRails
           template("#{base_path}#{config}.tt", config, force: true)
         else
           puts "Adding Shakapacker #{ReactOnRails::PackerUtils.shakapacker_version} config"
-          # Shakapacker was pre-installed — prompt before overwriting in case of user customizations.
+          # Thor handles the conflict: prompts user interactively, or respects --force/--skip flags.
           template("#{base_path}#{config}.tt", config)
         end
 

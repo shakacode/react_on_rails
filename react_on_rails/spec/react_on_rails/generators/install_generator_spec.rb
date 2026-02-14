@@ -161,44 +161,51 @@ describe InstallGenerator, type: :generator do
 
   context "when Shakapacker was pre-installed" do
     # Tests behavior when Shakapacker was already installed before running react_on_rails:install.
-    # The generator should still configure precompile_hook via gsub_file.
+    # Uses --skip so template() preserves the pre-existing shakapacker.yml,
+    # while gsub_file patchers (configure_precompile_hook) still run on it.
     before(:all) do
-      run_generator_test_with_args(%w[], package_json: true) do
-        # Simulate Shakapacker being already installed (config files pre-exist)
-        # with a shakapacker.yml with the default Shakapacker format (precompile_hook commented out)
-        simulate_existing_file("config/shakapacker.yml", <<~YAML)
-          # Note: You must restart bin/shakapacker-dev-server for changes to take effect
-          default: &default
-            source_path: app/javascript
-            source_entry_path: packs
-            public_root_path: public
-            public_output_path: packs
-            cache_path: tmp/shakapacker
-            webpack_compile_output: true
-            shakapacker_precompile: true
-            additional_paths: []
-            cache_manifest: false
-            assets_bundler: "webpack"
-            # Example: precompile_hook: 'bin/shakapacker-precompile-hook'
-            # precompile_hook: ~
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
 
-          development:
-            <<: *default
+      # Simulate Shakapacker being already installed (config files pre-exist)
+      # with a shakapacker.yml with the default Shakapacker format (precompile_hook commented out)
+      simulate_existing_file("config/shakapacker.yml", <<~YAML)
+        # Note: You must restart bin/shakapacker-dev-server for changes to take effect
+        default: &default
+          source_path: app/javascript
+          source_entry_path: packs
+          public_root_path: public
+          public_output_path: packs
+          cache_path: tmp/shakapacker
+          webpack_compile_output: true
+          shakapacker_precompile: true
+          additional_paths: []
+          cache_manifest: false
+          assets_bundler: "webpack"
+          # Example: precompile_hook: 'bin/shakapacker-precompile-hook'
+          # precompile_hook: ~
 
-          test:
-            <<: *default
-            compile: true
+        development:
+          <<: *default
 
-          production:
-            <<: *default
-        YAML
-        simulate_existing_file("bin/shakapacker", "")
-        simulate_existing_file("bin/shakapacker-dev-server", "")
-        simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
-          const { generateWebpackConfig } = require('shakapacker')
-          const webpackConfig = generateWebpackConfig()
-          module.exports = webpackConfig
-        JS
+        test:
+          <<: *default
+          compile: true
+
+        production:
+          <<: *default
+      YAML
+      simulate_existing_file("bin/shakapacker", "")
+      simulate_existing_file("bin/shakapacker-dev-server", "")
+      simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
+        const { generateWebpackConfig } = require('shakapacker')
+        const webpackConfig = generateWebpackConfig()
+        module.exports = webpackConfig
+      JS
+
+      Dir.chdir(destination_root) do
+        run_generator(["--ignore-warnings", "--skip"])
       end
     end
 
@@ -305,7 +312,7 @@ describe InstallGenerator, type: :generator do
         .with("base/base/config/shakapacker.yml.tt", "config/shakapacker.yml", force: true)
     end
 
-    it "does not pass force: true when shakapacker_just_installed is false" do
+    it "calls template without force when shakapacker_just_installed is false" do
       gen = BaseGenerator.new([], { shakapacker_just_installed: false, force: false },
                               { destination_root: destination })
       allow(gen).to receive(:template)
@@ -320,43 +327,51 @@ describe InstallGenerator, type: :generator do
   end
 
   context "with --rspack" do
+    # Uses --skip so template() preserves the pre-existing shakapacker.yml,
+    # while gsub_file patchers (configure_rspack_in_shakapacker) still run on it.
     before(:all) do
-      run_generator_test_with_args(%w[--rspack], package_json: true) do
-        # Simulate Shakapacker being already installed (config files pre-exist)
-        # This allows testing that configure_rspack_in_shakapacker properly updates the config
-        simulate_existing_file("config/shakapacker.yml", <<~YAML)
-          # Note: You must restart bin/shakapacker-dev-server for changes to take effect
-          default: &default
-            source_path: app/javascript
-            source_entry_path: packs
-            public_root_path: public
-            public_output_path: packs
-            cache_path: tmp/shakapacker
-            webpack_compile_output: true
-            shakapacker_precompile: true
-            additional_paths: []
-            cache_manifest: false
-            javascript_transpiler: "babel"
-            assets_bundler: "webpack"
-            # precompile_hook: ~
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
 
-          development:
-            <<: *default
+      # Simulate Shakapacker being already installed (config files pre-exist)
+      # This allows testing that configure_rspack_in_shakapacker properly updates the config
+      simulate_existing_file("config/shakapacker.yml", <<~YAML)
+        # Note: You must restart bin/shakapacker-dev-server for changes to take effect
+        default: &default
+          source_path: app/javascript
+          source_entry_path: packs
+          public_root_path: public
+          public_output_path: packs
+          cache_path: tmp/shakapacker
+          webpack_compile_output: true
+          shakapacker_precompile: true
+          additional_paths: []
+          cache_manifest: false
+          javascript_transpiler: "babel"
+          assets_bundler: "webpack"
+          # precompile_hook: ~
 
-          test:
-            <<: *default
-            compile: true
+        development:
+          <<: *default
 
-          production:
-            <<: *default
-        YAML
-        simulate_existing_file("bin/shakapacker", "")
-        simulate_existing_file("bin/shakapacker-dev-server", "")
-        simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
-          const { generateWebpackConfig } = require('shakapacker')
-          const webpackConfig = generateWebpackConfig()
-          module.exports = webpackConfig
-        JS
+        test:
+          <<: *default
+          compile: true
+
+        production:
+          <<: *default
+      YAML
+      simulate_existing_file("bin/shakapacker", "")
+      simulate_existing_file("bin/shakapacker-dev-server", "")
+      simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
+        const { generateWebpackConfig } = require('shakapacker')
+        const webpackConfig = generateWebpackConfig()
+        module.exports = webpackConfig
+      JS
+
+      Dir.chdir(destination_root) do
+        run_generator(["--rspack", "--ignore-warnings", "--skip"])
       end
     end
 
@@ -432,35 +447,43 @@ describe InstallGenerator, type: :generator do
   end
 
   context "with --rspack --typescript" do
+    # Uses --skip so template() preserves the pre-existing shakapacker.yml,
+    # while gsub_file patchers (configure_rspack_in_shakapacker) still run on it.
     before(:all) do
-      run_generator_test_with_args(%w[--rspack --typescript], package_json: true) do
-        # Simulate Shakapacker being already installed (config files pre-exist)
-        simulate_existing_file("config/shakapacker.yml", <<~YAML)
-          # Note: You must restart bin/shakapacker-dev-server for changes to take effect
-          default: &default
-            source_path: app/javascript
-            source_entry_path: packs
-            javascript_transpiler: "babel"
-            assets_bundler: "webpack"
-            # precompile_hook: ~
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
 
-          development:
-            <<: *default
+      # Simulate Shakapacker being already installed (config files pre-exist)
+      simulate_existing_file("config/shakapacker.yml", <<~YAML)
+        # Note: You must restart bin/shakapacker-dev-server for changes to take effect
+        default: &default
+          source_path: app/javascript
+          source_entry_path: packs
+          javascript_transpiler: "babel"
+          assets_bundler: "webpack"
+          # precompile_hook: ~
 
-          test:
-            <<: *default
-            compile: true
+        development:
+          <<: *default
 
-          production:
-            <<: *default
-        YAML
-        simulate_existing_file("bin/shakapacker", "")
-        simulate_existing_file("bin/shakapacker-dev-server", "")
-        simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
-          const { generateWebpackConfig } = require('shakapacker')
-          const webpackConfig = generateWebpackConfig()
-          module.exports = webpackConfig
-        JS
+        test:
+          <<: *default
+          compile: true
+
+        production:
+          <<: *default
+      YAML
+      simulate_existing_file("bin/shakapacker", "")
+      simulate_existing_file("bin/shakapacker-dev-server", "")
+      simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
+        const { generateWebpackConfig } = require('shakapacker')
+        const webpackConfig = generateWebpackConfig()
+        module.exports = webpackConfig
+      JS
+
+      Dir.chdir(destination_root) do
+        run_generator(["--rspack", "--typescript", "--ignore-warnings", "--skip"])
       end
     end
 
