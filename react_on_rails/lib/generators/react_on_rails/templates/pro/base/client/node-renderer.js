@@ -12,7 +12,7 @@ const config = {
   password: env.RENDERER_PASSWORD || 'devPassword',
 
   // workersCount defaults to the number of CPUs minus 1
-  workersCount: Number(env.NODE_RENDERER_CONCURRENCY) || 3,
+  workersCount: env.NODE_RENDERER_CONCURRENCY != null ? Number(env.NODE_RENDERER_CONCURRENCY) : 3,
 
   // If set to true, `supportModules` enables the server-bundle code to call a default set of NodeJS modules
   // that get added to the VM context: { Buffer, process, setTimeout, setInterval, clearTimeout, clearInterval }.
