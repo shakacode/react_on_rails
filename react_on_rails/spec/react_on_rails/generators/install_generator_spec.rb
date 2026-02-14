@@ -1070,6 +1070,8 @@ describe InstallGenerator, type: :generator do
   # Pro/RSC prerequisite validation tests
 
   context "when using --pro flag without Pro gem installed" do
+    before { GeneratorMessages.clear }
+
     let(:install_generator) { described_class.new([], { pro: true }) }
 
     specify "missing_pro_gem? returns true and error mentions --pro flag" do
@@ -1085,6 +1087,8 @@ describe InstallGenerator, type: :generator do
   end
 
   context "when using --rsc flag without Pro gem installed" do
+    before { GeneratorMessages.clear }
+
     let(:install_generator) { described_class.new([], { rsc: true }) }
 
     specify "missing_pro_gem? returns true and error mentions --rsc flag" do
