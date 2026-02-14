@@ -12,7 +12,7 @@
  * https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-import { PassThrough } from 'stream';
+import { PassThrough, Readable } from 'stream';
 import { finished } from 'stream/promises';
 import { PipeableOrReadableStream } from 'react-on-rails/types';
 import { createRSCPayloadKey } from './utils.ts';
@@ -79,6 +79,15 @@ export default function injectRSCPayload(
 ) {
   const htmlStream = new PassThrough();
   pipeableHtmlStream.pipe(htmlStream);
+  // When the source is destroyed, pipe() unpipes but does NOT end htmlStream.
+  // Listen for 'close' to ensure htmlStream ends, which triggers the cleanup chain.
+  if (typeof (pipeableHtmlStream as Readable).on === 'function') {
+    (pipeableHtmlStream as Readable).on('close', () => {
+      if (!htmlStream.writableEnded) {
+        htmlStream.end();
+      }
+    });
+  }
   const decoder = new TextDecoder();
   let rscPromise: Promise<void> | null = null;
 
@@ -288,10 +297,21 @@ export default function injectRSCPayload(
   });
 
   /**
-   * Error propagation from HTML stream to result stream.
+   * Prevent unhandled error crash. Error alone is not the end of the stream —
+   * termination is handled by the 'close' event below.
    */
-  htmlStream.on('error', () => {
-    endResultStream();
+  htmlStream.on('error', () => {});
+
+  /**
+   * 'close' fires after both normal 'end' and destroy().
+   * When htmlStream ends normally, the 'end' handler below handles cleanup.
+   * When htmlStream is destroyed (e.g., source stream failure), 'end' never fires —
+   * this handler ensures resultStream is still properly terminated.
+   */
+  htmlStream.on('close', () => {
+    if (!resultStream.writableEnded) {
+      endResultStream();
+    }
   });
 
   /**
