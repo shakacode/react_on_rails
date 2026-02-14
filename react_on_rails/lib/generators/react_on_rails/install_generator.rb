@@ -123,18 +123,21 @@ module ReactOnRails
         invoke "react_on_rails:base", [],
                { typescript: options.typescript?, redux: options.redux?, rspack: options.rspack?,
                  pro: options.pro?, rsc: options.rsc?,
-                 shakapacker_just_installed: @shakapacker_just_installed || false }
+                 shakapacker_just_installed: @shakapacker_just_installed || false,
+                 force: options[:force], skip: options[:skip] }
 
         # Component generator logic:
         # - --rsc without --redux: Skip HelloWorld, HelloServer will be generated in setup_rsc
         # - --rsc with --redux: Generate HelloWorldApp (user explicitly wants Redux) + HelloServer
         # - Without --rsc: Normal behavior (HelloWorld or HelloWorldApp based on --redux)
         if options.redux?
-          invoke "react_on_rails:react_with_redux", [], { typescript: options.typescript? }
+          invoke "react_on_rails:react_with_redux", [], { typescript: options.typescript?,
+                                                          force: options[:force], skip: options[:skip] }
         elsif !use_rsc?
           # Only generate HelloWorld if RSC is not enabled
           # For RSC, HelloServer replaces HelloWorld as the example component
-          invoke "react_on_rails:react_no_redux", [], { typescript: options.typescript? }
+          invoke "react_on_rails:react_no_redux", [], { typescript: options.typescript?,
+                                                        force: options[:force], skip: options[:skip] }
         end
 
         setup_react_dependencies
