@@ -145,17 +145,7 @@ module GeneratorMessages
     def build_shakapacker_status_section
       version_warning = check_shakapacker_version_warning
 
-      if File.exist?(".shakapacker_just_installed")
-        base_message = <<~SHAKAPACKER
-
-          📦 SHAKAPACKER SETUP:
-          ─────────────────────────────────────────────────────────────────────────
-          #{Rainbow('✓ Added to Gemfile automatically').green}
-          #{Rainbow('✓ Installer ran successfully').green}
-          #{Rainbow('✓ Webpack integration configured').green}
-        SHAKAPACKER
-        base_message + version_warning
-      elsif File.exist?("bin/shakapacker") && File.exist?("bin/shakapacker-dev-server")
+      if File.exist?("bin/shakapacker") && File.exist?("bin/shakapacker-dev-server")
         "\n📦 #{Rainbow('Shakapacker already configured ✓').green}#{version_warning}"
       else
         "\n📦 #{Rainbow('Shakapacker setup may be incomplete').yellow}#{version_warning}"
