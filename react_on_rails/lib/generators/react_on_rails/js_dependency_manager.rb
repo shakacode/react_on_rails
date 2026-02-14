@@ -207,9 +207,9 @@ module ReactOnRails
         puts "Installing React dependencies..."
 
         # RSC requires React 19.0.x specifically (not 19.1.x or later)
-        # Pin to ~19.0.3 to allow patch updates while staying within 19.0.x
+        # Pin to ~19.0.4 to allow patch updates while staying within 19.0.x
         react_deps = if respond_to?(:use_rsc?) && use_rsc?
-                       %w[react@~19.0.3 react-dom@~19.0.3 prop-types]
+                       %w[react@~19.0.4 react-dom@~19.0.4 prop-types]
                      else
                        REACT_DEPENDENCIES
                      end

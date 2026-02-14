@@ -1170,11 +1170,11 @@ describe InstallGenerator, type: :generator do
 
   # RSC React version warning tests
 
-  context "when using --rsc with React 19.0.3" do
+  context "when using --rsc with React 19.0.4" do
     let(:install_generator) { described_class.new([], { rsc: true }) }
 
     specify "warn_about_react_version_for_rsc does not add warning" do
-      allow(install_generator).to receive(:detect_react_version).and_return("19.0.3")
+      allow(install_generator).to receive(:detect_react_version).and_return("19.0.4")
 
       install_generator.send(:warn_about_react_version_for_rsc)
       expect(GeneratorMessages.messages.join("\n")).not_to include("⚠️")
