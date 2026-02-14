@@ -106,7 +106,8 @@ module ReactOnRails
           create_typescript_config
         end
         invoke "react_on_rails:base", [],
-               { typescript: options.typescript?, redux: options.redux?, rspack: options.rspack? }
+               { typescript: options.typescript?, redux: options.redux?, rspack: options.rspack?,
+                 shakapacker_just_installed: @shakapacker_just_installed || false }
         if options.redux?
           invoke "react_on_rails:react_with_redux", [], { typescript: options.typescript? }
         else
@@ -175,8 +176,11 @@ module ReactOnRails
 
         print_shakapacker_setup_banner
         ensure_shakapacker_in_gemfile
+
+        config_existed = File.exist?("config/shakapacker.yml")
+
         install_shakapacker
-        finalize_shakapacker_setup
+        finalize_shakapacker_setup(config_existed)
       end
 
       # Checks whether "shakapacker" is explicitly declared in this project's Gemfile.
@@ -291,14 +295,15 @@ module ReactOnRails
         handle_shakapacker_install_error
       end
 
-      def finalize_shakapacker_setup
+      def finalize_shakapacker_setup(config_existed)
         puts Rainbow("✅ Shakapacker installed successfully!").green
         puts Rainbow("=" * 80).cyan
         puts Rainbow("🚀 CONTINUING WITH REACT ON RAILS SETUP").cyan.bold
         puts "#{Rainbow('=' * 80).cyan}\n"
 
-        # Create marker file so base generator can avoid copying shakapacker.yml
-        File.write(".shakapacker_just_installed", "")
+        # Only safe to force-overwrite the config if Shakapacker created it fresh.
+        # If it pre-existed, the user may have customizations — let Thor prompt.
+        @shakapacker_just_installed = !config_existed
       end
 
       def handle_shakapacker_gemfile_error
