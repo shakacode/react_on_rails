@@ -248,6 +248,18 @@ module ReactOnRails
 
       def add_rsc_routes
         routes_file = File.join(destination_root, "config/routes.rb")
+
+        unless File.exist?(routes_file)
+          GeneratorMessages.add_warning(<<~MSG.strip)
+            ⚠️  config/routes.rb not found. Skipping RSC routes.
+
+            You'll need to add the following routes manually:
+              rsc_payload_route
+              get 'hello_server', to: 'hello_server#index'
+          MSG
+          return
+        end
+
         routes_content = File.read(routes_file)
 
         if routes_content.include?("rsc_payload_route")
