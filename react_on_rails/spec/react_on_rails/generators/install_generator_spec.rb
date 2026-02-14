@@ -1175,6 +1175,8 @@ describe InstallGenerator, type: :generator do
   # RSC React version warning tests
 
   context "when using --rsc with React 19.0.3" do
+    before { GeneratorMessages.clear }
+
     let(:install_generator) { described_class.new([], { rsc: true }) }
 
     specify "warn_about_react_version_for_rsc does not add warning" do
@@ -1186,6 +1188,8 @@ describe InstallGenerator, type: :generator do
   end
 
   context "when using --rsc with React 19.1.0" do
+    before { GeneratorMessages.clear }
+
     let(:install_generator) { described_class.new([], { rsc: true }) }
 
     specify "warn_about_react_version_for_rsc adds version incompatibility warning" do
@@ -1199,6 +1203,8 @@ describe InstallGenerator, type: :generator do
   end
 
   context "when using --rsc with React 18.2.0" do
+    before { GeneratorMessages.clear }
+
     let(:install_generator) { described_class.new([], { rsc: true }) }
 
     specify "warn_about_react_version_for_rsc adds version incompatibility warning" do
@@ -1211,19 +1217,23 @@ describe InstallGenerator, type: :generator do
   end
 
   context "when using --rsc with React 19.0.0" do
+    before { GeneratorMessages.clear }
+
     let(:install_generator) { described_class.new([], { rsc: true }) }
 
-    specify "warn_about_react_version_for_rsc adds CVE security warning" do
+    specify "warn_about_react_version_for_rsc adds minimum version warning" do
       allow(install_generator).to receive(:detect_react_version).and_return("19.0.0")
 
       install_generator.send(:warn_about_react_version_for_rsc)
       warning_text = GeneratorMessages.messages.join("\n")
-      expect(warning_text).to include("security vulnerabilities")
+      expect(warning_text).to include("below the recommended minimum")
       expect(warning_text).to include("CVE")
     end
   end
 
   context "when not using --rsc flag" do
+    before { GeneratorMessages.clear }
+
     let(:install_generator) { described_class.new }
 
     specify "warn_about_react_version_for_rsc does not run" do
