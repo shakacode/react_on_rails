@@ -53,7 +53,7 @@ You still need to configure your license. Set the environment variable:
 export REACT_ON_RAILS_PRO_LICENSE="your-license-token-here"
 ```
 
-See [License Configuration](#license-configuration) below for other options.
+See [License Configuration](#license-configuration-production-only) below for other options.
 
 ## Adding React Server Components
 

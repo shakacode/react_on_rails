@@ -72,16 +72,17 @@ module ReactOnRails
             React 19.0.x. React 19.1.x and later are not yet supported.
 
             To install a compatible React version:
-              npm install react@~19.0.3 react-dom@~19.0.3
+              npm install react@~19.0.4 react-dom@~19.0.4
           MSG
         elsif patch < 3
           GeneratorMessages.add_warning(<<~MSG.strip)
-            ⚠️  React #{react_version} has known security vulnerabilities.
+            ⚠️  React #{react_version} is below the recommended minimum for RSC.
 
             Please upgrade to at least React 19.0.3:
               npm install react@19.0.3 react-dom@19.0.3
 
-            See: CVE-2025-55182, CVE-2025-67779
+            Related RSC security advisories (CVE-2025-55182, CVE-2025-67779) are
+            addressed by react-on-rails-rsc 19.0.4+, installed by this generator.
           MSG
         end
       end
