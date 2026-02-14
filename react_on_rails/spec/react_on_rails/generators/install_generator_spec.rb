@@ -1209,12 +1209,12 @@ describe InstallGenerator, type: :generator do
   context "when using --rsc with React 19.0.0" do
     let(:install_generator) { described_class.new([], { rsc: true }) }
 
-    specify "warn_about_react_version_for_rsc adds CVE security warning" do
+    specify "warn_about_react_version_for_rsc adds minimum version warning" do
       allow(install_generator).to receive(:detect_react_version).and_return("19.0.0")
 
       install_generator.send(:warn_about_react_version_for_rsc)
       warning_text = GeneratorMessages.messages.join("\n")
-      expect(warning_text).to include("security vulnerabilities")
+      expect(warning_text).to include("below the recommended minimum")
       expect(warning_text).to include("CVE")
     end
   end
