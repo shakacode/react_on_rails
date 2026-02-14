@@ -107,11 +107,14 @@ module ReactOnRails
         end
         invoke "react_on_rails:base", [],
                { typescript: options.typescript?, redux: options.redux?, rspack: options.rspack?,
-                 shakapacker_just_installed: @shakapacker_just_installed || false }
+                 shakapacker_just_installed: @shakapacker_just_installed || false,
+                 force: options[:force], skip: options[:skip] }
         if options.redux?
-          invoke "react_on_rails:react_with_redux", [], { typescript: options.typescript? }
+          invoke "react_on_rails:react_with_redux", [], { typescript: options.typescript?,
+                                                          force: options[:force], skip: options[:skip] }
         else
-          invoke "react_on_rails:react_no_redux", [], { typescript: options.typescript? }
+          invoke "react_on_rails:react_no_redux", [], { typescript: options.typescript?,
+                                                        force: options[:force], skip: options[:skip] }
         end
         setup_react_dependencies
       end
