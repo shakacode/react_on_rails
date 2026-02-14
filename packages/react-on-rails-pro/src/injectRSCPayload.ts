@@ -125,14 +125,6 @@ export default function injectRSCPayload(
   const resultStream = new PassThrough();
   let hasReceivedFirstHtmlChunk = false;
 
-  const endResultStream = () => {
-    if (flushTimeout) clearTimeout(flushTimeout);
-    flush();
-    if (!resultStream.writableEnded) {
-      resultStream.end();
-    }
-  };
-
   /**
    * Combines all buffered data into a single chunk and sends it to the result stream.
    *
@@ -202,6 +194,14 @@ export default function injectRSCPayload(
     rscPayloadBuffers.length = 0;
 
     flushTimeout = null;
+  };
+
+  const endResultStream = () => {
+    if (flushTimeout) clearTimeout(flushTimeout);
+    flush();
+    if (!resultStream.writableEnded) {
+      resultStream.end();
+    }
   };
 
   /**
