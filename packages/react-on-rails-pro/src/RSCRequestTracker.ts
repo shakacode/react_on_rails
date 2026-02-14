@@ -159,7 +159,11 @@ class RSCRequestTracker {
         stream2.destroy(err);
       });
 
-      (stream as Readable).on('error', () => {
+      // 'close' fires after both normal 'end' and destroy().
+      // On normal end, pipe() already forwards 'end' — this is a no-op.
+      // On destroy (e.g., RSC payload fetch failure), pipe() unpipes but does NOT
+      // end the tee'd streams — we do it here to prevent for-await hangs.
+      (stream as Readable).on('close', () => {
         if (!stream1.writableEnded) stream1.end();
         if (!stream2.writableEnded) stream2.end();
       });

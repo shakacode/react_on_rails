@@ -118,6 +118,47 @@ describe('handleStreamError - issue #2402 reproduction', () => {
   });
 
   /**
+   * Non-fatal errors (like throwJsErrors / emitError) emit 'error' WITHOUT destroying
+   * the stream. React may continue rendering after these errors. The PassThrough must
+   * stay open so pipe() can forward subsequent data. Only 'close' should trigger
+   * termination — not 'error' alone.
+   */
+  it('non-fatal errors (emit without destroy) do not end the PassThrough', async () => {
+    const source = new Readable({ read() {} });
+    const onError = jest.fn();
+
+    const resultStream = handleStreamError(source, onError);
+
+    source.push('chunk1');
+
+    // Emit error WITHOUT destroying — simulates emitError for throwJsErrors
+    source.emit('error', new Error('non-fatal suspense boundary error'));
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(onError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'non-fatal suspense boundary error' }),
+    );
+
+    // Stream is NOT destroyed — still alive
+    expect(source.destroyed).toBe(false);
+
+    // Push more data — React continues rendering other Suspense boundaries
+    source.push('chunk2');
+    source.push(null); // End normally
+
+    const streamEnded = await Promise.race([
+      new Promise<'ended'>((resolve) => {
+        resultStream.on('end', () => resolve('ended'));
+        resultStream.resume();
+      }),
+      new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), 2000)),
+    ]);
+
+    // Stream ends normally — the non-fatal error did NOT cause premature termination
+    expect(streamEnded).toBe('ended');
+  }, 5000);
+
+  /**
    * Control test: verifies that when the source ends normally,
    * handleStreamError works correctly (the PassThrough ends too).
    */
