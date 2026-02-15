@@ -82,7 +82,12 @@ const streamRenderReactComponent = (
         onShellReady() {
           renderState.isShellReady = true;
           pipeToTransform(
-            injectRSCPayload(renderingStream, streamingTrackers.rscRequestTracker, domNodeId, railsContext.cspNonce),
+            injectRSCPayload(
+              renderingStream,
+              streamingTrackers.rscRequestTracker,
+              domNodeId,
+              railsContext.cspNonce,
+            ),
           );
         },
         onError(e) {
