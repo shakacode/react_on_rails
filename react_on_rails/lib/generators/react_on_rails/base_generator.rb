@@ -186,6 +186,7 @@ module ReactOnRails
       def handle_custom_webpack_config(base_path, config, webpack_config_path)
         # Custom config - ask user
         config_file_name = File.basename(webpack_config_path)
+        bundler_name = options.rspack? ? "rspack" : "webpack"
         puts "\n#{set_color('NOTICE:', :yellow)} Your #{config_file_name} appears to be customized."
         puts "React on Rails needs to replace it with an environment-specific loader."
         puts "Your current config will be backed up to #{config_file_name}.backup"
@@ -202,7 +203,7 @@ module ReactOnRails
         else
           puts "   #{set_color('skip', :yellow)}  #{webpack_config_path}"
           puts "   #{set_color('WARNING:', :red)} React on Rails may not work correctly " \
-               "without the environment-specific webpack config"
+               "without the environment-specific #{bundler_name} config"
         end
       end
 
