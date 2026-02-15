@@ -129,6 +129,4 @@ def run_precompile_tasks
   generate_packs_if_needed
 end
 
-if __FILE__ == $PROGRAM_NAME
-  run_precompile_tasks
-end
+run_precompile_tasks if __FILE__ == $PROGRAM_NAME
