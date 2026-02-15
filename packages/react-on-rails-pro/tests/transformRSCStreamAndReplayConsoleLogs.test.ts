@@ -34,8 +34,10 @@ describe('transformRSCStreamAndReplayConsoleLogs', () => {
   });
 
   it('adds nonce to replayed console scripts', async () => {
-    const payloadLine =
-      `${JSON.stringify({ html: '<div>Hello</div>', consoleReplayScript: '<script>console.log("x")</script>' })}\n`;
+    const payloadLine = `${JSON.stringify({
+      html: '<div>Hello</div>',
+      consoleReplayScript: '<script>console.log("x")</script>',
+    })}\n`;
     const stream = createPayloadStream(payloadLine);
 
     const transformedStream = transformRSCStreamAndReplayConsoleLogs(stream, 'abc123');
@@ -49,8 +51,10 @@ describe('transformRSCStreamAndReplayConsoleLogs', () => {
   });
 
   it('sanitizes nonce before assigning to replayed scripts', async () => {
-    const payloadLine =
-      `${JSON.stringify({ html: '<div>Hello</div>', consoleReplayScript: '<script>console.log("x")</script>' })}\n`;
+    const payloadLine = `${JSON.stringify({
+      html: '<div>Hello</div>',
+      consoleReplayScript: '<script>console.log("x")</script>',
+    })}\n`;
     const stream = createPayloadStream(payloadLine);
 
     const transformedStream = transformRSCStreamAndReplayConsoleLogs(stream, 'abc123" onclick=alert(1)');
