@@ -357,7 +357,7 @@ The project is merging `react_on_rails` and `react_on_rails_pro` into a unified 
 
 - Continue contributing to current structure
 - License compliance is critical (no Pro code in MIT areas)
-- See `docs/MONOREPO_MERGER_PLAN_REF.md` for details
+- See [Issue #2367: Merger Command Center](https://github.com/shakacode/react_on_rails/issues/2367) for live tracking
 
 ## Additional Resources
 
