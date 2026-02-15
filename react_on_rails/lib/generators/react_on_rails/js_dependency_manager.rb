@@ -53,15 +53,17 @@ module ReactOnRails
     # to handle all JS dependency installation via package_json gem.
     module JsDependencyManager
       # Core React dependencies required for React on Rails
-      # Note: @babel/preset-react and babel plugins are NOT included here because:
-      # - Shakapacker handles JavaScript transpiler configuration (babel, swc, or esbuild)
-      # - Users configure their preferred transpiler via shakapacker.yml javascript_transpiler setting
-      # - SWC is now the default and doesn't need Babel presets
-      # - For Babel users, shakapacker will install babel-loader and its dependencies
+      # Note: @babel/preset-react is handled separately in BABEL_REACT_DEPENDENCIES
+      # and is added only when SWC is not the active transpiler.
       REACT_DEPENDENCIES = %w[
         react
         react-dom
         prop-types
+      ].freeze
+
+      # Babel preset needed by the generated babel.config.js for non-SWC setups.
+      BABEL_REACT_DEPENDENCIES = %w[
+        @babel/preset-react
       ].freeze
 
       # CSS processing dependencies for webpack
@@ -144,7 +146,11 @@ module ReactOnRails
         add_react_dependencies
         add_css_dependencies
         add_rspack_dependencies if using_rspack?
-        add_swc_dependencies if using_swc?
+        if using_swc?
+          add_swc_dependencies
+        else
+          add_babel_react_dependencies
+        end
         add_pro_dependencies if using_pro
         add_rsc_dependencies if using_rsc
         add_dev_dependencies
@@ -286,6 +292,25 @@ module ReactOnRails
 
           You can install them manually by running:
             npm install --save-dev #{SWC_DEPENDENCIES.join(' ')}
+        MSG
+      end
+
+      def add_babel_react_dependencies
+        puts "Installing Babel React preset dependency..."
+        return if add_packages(BABEL_REACT_DEPENDENCIES, dev: true)
+
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Failed to add Babel React preset dependency.
+
+          You can install it manually by running:
+            npm install --save-dev #{BABEL_REACT_DEPENDENCIES.join(' ')}
+        MSG
+      rescue StandardError => e
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Error adding Babel React preset dependency: #{e.message}
+
+          You can install it manually by running:
+            npm install --save-dev #{BABEL_REACT_DEPENDENCIES.join(' ')}
         MSG
       end
 
