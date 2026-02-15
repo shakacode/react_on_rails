@@ -119,7 +119,7 @@ script/ci-changes-detector origin/master
 - Push Pro changes without testing locally first
 - Modify both Pro and main gem without running full tests
 
-For comprehensive CI documentation, see [`../docs/contributor-info/ci-optimization.md`](../docs/contributor-info/ci-optimization.md) in the repository root.
+For comprehensive CI documentation, see [`../internal/contributor-info/ci-optimization.md`](../internal/contributor-info/ci-optimization.md) in the repository root.
 
 # IDE/Editor Setup
 
@@ -395,5 +395,5 @@ rake release[17.0.0,false,verdaccio]
 
 For complete documentation, see:
 
-- [Root Release Documentation](../docs/contributor-info/releasing.md)
+- [Root Release Documentation](../internal/contributor-info/releasing.md)
 - Run `rake -D release` for inline help
