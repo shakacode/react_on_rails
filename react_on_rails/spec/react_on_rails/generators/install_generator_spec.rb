@@ -305,8 +305,8 @@ describe InstallGenerator, type: :generator do
       end
     end
 
-    it "generates unified webpack config with bundler detection" do
-      assert_file "config/webpack/development.js" do |content|
+    it "generates unified rspack config with bundler detection" do
+      assert_file "config/rspack/development.js" do |content|
         expect(content).to include("const { devServer, inliningCss, config } = require('shakapacker')")
         expect(content).to include("if (config.assets_bundler === 'rspack')")
         expect(content).to include("@rspack/plugin-react-refresh")
@@ -314,12 +314,19 @@ describe InstallGenerator, type: :generator do
       end
     end
 
-    it "generates server webpack config with bundler variable" do
-      assert_file "config/webpack/serverWebpackConfig.js" do |content|
+    it "generates server rspack config with bundler variable" do
+      assert_file "config/rspack/serverWebpackConfig.js" do |content|
         expect(content).to include("const bundler = config.assets_bundler === 'rspack'")
         expect(content).to include("? require('@rspack/core')")
         expect(content).to include(": require('webpack')")
         expect(content).to include("new bundler.optimize.LimitChunkCountPlugin")
+      end
+    end
+
+    it "writes the main rspack config to config/rspack/rspack.config.js" do
+      assert_file "config/rspack/rspack.config.js" do |content|
+        expect(content).to include("const envSpecificConfig = () =>")
+        expect(content).to include("const path = resolve(__dirname, `${env.nodeEnv}.js`)")
       end
     end
 
@@ -494,6 +501,32 @@ describe InstallGenerator, type: :generator do
       stub_const("RUBY_PLATFORM", "mswin")
       allow(install_generator).to receive(:`).with("where node").and_return("")
       expect(install_generator.send(:missing_node?)).to be true
+    end
+  end
+
+  describe "#shakapacker_configured?" do
+    let(:install_generator) { described_class.new }
+
+    before do
+      allow(File).to receive(:exist?).and_call_original
+      allow(install_generator).to receive(:shakapacker_binaries_exist?).and_return(true)
+      allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(true)
+    end
+
+    it "returns true when rspack config exists in config/rspack" do
+      allow(File).to receive(:exist?).with("config/webpack/webpack.config.js").and_return(false)
+      allow(File).to receive(:exist?).with("config/rspack/rspack.config.js").and_return(true)
+      allow(File).to receive(:exist?).with("config/rspack/rspack.config.ts").and_return(false)
+
+      expect(install_generator.send(:shakapacker_configured?)).to be true
+    end
+
+    it "returns false when no supported bundler config file exists" do
+      allow(File).to receive(:exist?).with("config/webpack/webpack.config.js").and_return(false)
+      allow(File).to receive(:exist?).with("config/rspack/rspack.config.js").and_return(false)
+      allow(File).to receive(:exist?).with("config/rspack/rspack.config.ts").and_return(false)
+
+      expect(install_generator.send(:shakapacker_configured?)).to be false
     end
   end
 
