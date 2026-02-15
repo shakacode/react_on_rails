@@ -8,7 +8,7 @@ React on Rails Pro is now released together with React on Rails using a unified 
 
 Please refer to the main release documentation:
 
-👉 **[/docs/contributor-info/releasing.md](../../../docs/contributor-info/releasing.md)**
+👉 **[/internal/contributor-info/releasing.md](../../contributor-info/releasing.md)**
 
 Or run from the repository root:
 
