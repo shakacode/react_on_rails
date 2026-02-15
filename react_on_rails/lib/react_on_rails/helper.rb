@@ -304,6 +304,9 @@ module ReactOnRails
           end
         end
 
+        nonce = csp_nonce
+        result[:cspNonce] = nonce if nonce.present?
+
         if defined?(request) && request.present?
           # Check for encoding of the request's original_url and try to force-encoding the
           # URLs as UTF-8. This situation can occur in browsers that do not encode the
