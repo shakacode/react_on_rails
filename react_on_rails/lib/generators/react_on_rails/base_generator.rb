@@ -27,6 +27,14 @@ module ReactOnRails
                    default: false,
                    desc: "Use Rspack instead of Webpack as the bundler"
 
+      # Hidden option: signals that Shakapacker was just installed by install_generator.
+      # When true, copy_packer_config uses force: true to overwrite Shakapacker's default config
+      # without prompting, since we know it's a fresh default (not user-customized).
+      class_option :shakapacker_just_installed,
+                   type: :boolean,
+                   default: false,
+                   hide: true
+
       def add_hello_world_route
         route "get 'hello_world', to: 'hello_world#index'"
       end
@@ -90,16 +98,17 @@ module ReactOnRails
       end
 
       def copy_packer_config
-        # Skip copying if Shakapacker was just installed (to avoid conflicts)
-        # Check for a temporary marker file that indicates fresh Shakapacker install
-        if File.exist?(".shakapacker_just_installed")
-          puts "Skipping Shakapacker config copy (already installed by Shakapacker installer)"
-          File.delete(".shakapacker_just_installed") # Clean up marker
+        base_path = "base/base/"
+        config = "config/shakapacker.yml"
+
+        if options.shakapacker_just_installed?
+          puts "Replacing Shakapacker default config with React on Rails version"
+          # Shakapacker's installer just created this file from scratch (no pre-existing config).
+          # Safe to overwrite silently with RoR's version-aware template (e.g., private_output_path).
+          template("#{base_path}#{config}.tt", config, force: true)
         else
           puts "Adding Shakapacker #{ReactOnRails::PackerUtils.shakapacker_version} config"
-          base_path = "base/base/"
-          config = "config/shakapacker.yml"
-          # Use template to enable version-aware configuration
+          # Thor handles the conflict: prompts user interactively, or respects --force/--skip flags.
           template("#{base_path}#{config}.tt", config)
         end
 
@@ -107,7 +116,6 @@ module ReactOnRails
         configure_rspack_in_shakapacker if options.rspack?
 
         # Always ensure precompile_hook is configured (Shakapacker 9.0+ only)
-        # This handles all scenarios: fresh install, pre-installed Shakapacker, or user declined overwrite
         configure_precompile_hook_in_shakapacker
       end
 
