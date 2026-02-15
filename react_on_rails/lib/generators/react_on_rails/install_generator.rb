@@ -62,6 +62,14 @@ module ReactOnRails
                    default: false,
                    desc: "Install React Server Components support (includes Pro). Default: false"
 
+      # Hidden option: allows tests (and advanced users) to signal that Shakapacker
+      # was just installed, triggering force-overwrite of shakapacker.yml with RoR's template.
+      # In production, this is normally detected at runtime via @shakapacker_just_installed.
+      class_option :shakapacker_just_installed,
+                   type: :boolean,
+                   default: false,
+                   hide: true
+
       # Removed: --skip-shakapacker-install (Shakapacker is now a required dependency)
 
       # Main generator entry point
@@ -120,10 +128,11 @@ module ReactOnRails
           create_css_module_types
           create_typescript_config
         end
+        just_installed = options.shakapacker_just_installed? || @shakapacker_just_installed || false
         invoke "react_on_rails:base", [],
                { typescript: options.typescript?, redux: options.redux?, rspack: options.rspack?,
                  pro: options.pro?, rsc: options.rsc?,
-                 shakapacker_just_installed: @shakapacker_just_installed || false,
+                 shakapacker_just_installed: just_installed,
                  force: options[:force], skip: options[:skip] }
 
         # Component generator logic:
