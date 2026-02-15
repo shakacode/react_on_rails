@@ -36,6 +36,7 @@ export type RailsContext = {
   search: string | null;
   httpAcceptLanguage: string;
   rscPayloadGenerationUrlPath?: string;
+  cspNonce?: string;
 } & (
   | {
       serverSide: false;
