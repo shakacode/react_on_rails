@@ -27,8 +27,9 @@ describe InstallGenerator, type: :generator do
           expect(package_json["devDependencies"]).to include("swc-loader")
         else
           # For older Shakapacker versions, SWC is NOT installed by default
-          # (Babel is the default, but we don't install Babel deps since Shakapacker handles it)
+          # (Babel is the default, and babel.config.js requires @babel/preset-react)
           expect(package_json["devDependencies"]).not_to include("@swc/core")
+          expect(package_json["devDependencies"]).to include("@babel/preset-react")
         end
       end
     end
