@@ -68,7 +68,7 @@ jobs:
   pro-lint-js-and-ruby:
     needs: detect-changes
     if: |
-      !(
+      github.actor != 'dependabot[bot]' && !(
         github.event_name == 'push' &&
         github.ref == 'refs/heads/master' &&
         needs.detect-changes.outputs.docs_only == 'true'
