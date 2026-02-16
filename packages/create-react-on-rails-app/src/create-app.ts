@@ -5,7 +5,7 @@ import { execLiveArgs, logStep, logStepDone, logError, logSuccess, logInfo } fro
 
 const TOTAL_STEPS = 4;
 
-function buildGeneratorArgs(options: CliOptions): string[] {
+export function buildGeneratorArgs(options: CliOptions): string[] {
   const args: string[] = [];
 
   if (options.template === 'typescript') {
@@ -16,12 +16,16 @@ function buildGeneratorArgs(options: CliOptions): string[] {
     args.push('--rspack');
   }
 
+  if (options.rsc) {
+    args.push('--rsc');
+  }
+
   args.push('--ignore-warnings');
 
   return args;
 }
 
-function printSuccessMessage(appName: string): void {
+function printSuccessMessage(appName: string, route: string): void {
   console.log('');
   logSuccess(`Created ${appName} with React on Rails!`);
   console.log('');
@@ -29,7 +33,7 @@ function printSuccessMessage(appName: string): void {
   console.log(`  cd ${appName}`);
   console.log('  bin/dev');
   console.log('');
-  logInfo('Then visit http://localhost:3000/hello_world');
+  logInfo(`Then visit http://localhost:3000/${route}`);
   console.log('');
   logInfo('Documentation: https://www.shakacode.com/react-on-rails/docs/');
   console.log('');
@@ -76,13 +80,18 @@ export function createApp(appName: string, options: CliOptions): void {
     process.exit(1);
   }
 
-  // Step 2: Add react_on_rails gem
-  logStep(2, TOTAL_STEPS, 'Adding react_on_rails gem...');
+  // Step 2: Add required gems
+  logStep(2, TOTAL_STEPS, `Adding required gem${options.rsc ? 's' : ''}...`);
   try {
     execLiveArgs('bundle', ['add', 'react_on_rails', '--strict'], appPath);
-    logStepDone('react_on_rails gem added');
+    if (options.rsc) {
+      execLiveArgs('bundle', ['add', 'react_on_rails_pro', '--strict'], appPath);
+      logStepDone('react_on_rails and react_on_rails_pro gems added');
+    } else {
+      logStepDone('react_on_rails gem added');
+    }
   } catch (error) {
-    logError('Failed to add react_on_rails gem. Check the output above for details.');
+    logError('Failed to add required gems. Check the output above for details.');
     if (error instanceof Error && error.message) {
       console.error(`Debug info: ${error.message}`);
     }
@@ -109,5 +118,5 @@ export function createApp(appName: string, options: CliOptions): void {
 
   // Step 4: Success
   logStep(4, TOTAL_STEPS, 'Done!');
-  printSuccessMessage(appName);
+  printSuccessMessage(appName, options.rsc ? 'hello_server' : 'hello_world');
 }
