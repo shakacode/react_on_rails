@@ -209,7 +209,7 @@ rails generate react_on_rails:install --pro
 
 **Prerequisites:**
 
-- Add `gem 'react_on_rails_pro', '~> 16.2'` to your Gemfile and run `bundle install`
+- Add `gem 'react_on_rails_pro', '>= 16.3.0'` to your Gemfile and run `bundle install`
 - Contact [justin@shakacode.com](mailto:justin@shakacode.com) for a license
 
 **What gets created:**

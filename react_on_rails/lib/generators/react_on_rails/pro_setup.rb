@@ -70,7 +70,7 @@ module ReactOnRails
           #{context_line}
 
           Add to your Gemfile:
-            gem 'react_on_rails_pro', '~> 16.2'
+            gem 'react_on_rails_pro', '>= 16.3.0'
 
           Then run: bundle install
 
