@@ -1,14 +1,28 @@
-<%= add_documentation_reference(config[:message], "// https://github.com/shakacode/react_on_rails_demo_ssr_hmr/blob/master/config/webpack/webpackConfig.js") %>
+<%= add_documentation_reference(config[:message], "// https://github.com/shakacode/react_on_rails_demo_ssr_hmr/blob/master/config/webpack/ServerClientOrBoth.js") %>
 
 const clientWebpackConfig = require('./clientWebpackConfig');
+<% if use_pro? -%>
+const { default: serverWebpackConfig } = require('./serverWebpackConfig');
+<% else -%>
 const serverWebpackConfig = require('./serverWebpackConfig');
+<% end -%>
+<% if use_rsc? -%>
+const rscWebpackConfig = require('./rscWebpackConfig');
+<% end -%>
 
-const webpackConfig = (envSpecific) => {
+const serverClientOrBoth = (envSpecific) => {
   const clientConfig = clientWebpackConfig();
   const serverConfig = serverWebpackConfig();
+<% if use_rsc? %>
+  const rscConfig = rscWebpackConfig();
+<% end %>
 
   if (envSpecific) {
+<% if use_rsc? %>
+    envSpecific(clientConfig, serverConfig, rscConfig);
+<% else %>
     envSpecific(clientConfig, serverConfig);
+<% end %>
   }
 
   let result;
@@ -21,11 +35,22 @@ const webpackConfig = (envSpecific) => {
     // eslint-disable-next-line no-console
     console.log('[React on Rails] Creating only the server bundle.');
     result = serverConfig;
+<% if use_rsc? %>
+  } else if (process.env.RSC_BUNDLE_ONLY) {
+    // eslint-disable-next-line no-console
+    console.log('[React on Rails] Creating only the RSC bundle.');
+    result = rscConfig;
+<% end %>
   } else {
     // default is the standard client and server build
     // eslint-disable-next-line no-console
+<% if use_rsc? %>
+    console.log('[React on Rails] Creating client, server, and RSC bundles.');
+    result = [clientConfig, serverConfig, rscConfig];
+<% else %>
     console.log('[React on Rails] Creating both client and server bundles.');
     result = [clientConfig, serverConfig];
+<% end %>
   }
 
   // To debug, uncomment next line and inspect "result"
@@ -33,4 +58,4 @@ const webpackConfig = (envSpecific) => {
   return result;
 };
 
-module.exports = webpackConfig;
+module.exports = serverClientOrBoth;

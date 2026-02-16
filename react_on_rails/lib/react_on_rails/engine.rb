@@ -69,8 +69,12 @@ module ReactOnRails
 
     # Check if we're running a Rails generator
     # @return [Boolean] true if running a generator
+    #
+    # Heuristic: Rails::Generators is typically only defined during generator
+    # commands. It could be defined by test helpers or gems that require
+    # "rails/generators", but this is a fallback behind the ENV check above.
     def self.running_generator?
-      !ARGV.empty? && ARGV.first&.in?(%w[generate g])
+      defined?(Rails::Generators)
     end
 
     # Check if package.json doesn't exist yet

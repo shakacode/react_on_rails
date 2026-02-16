@@ -1,0 +1,37 @@
+<h1>React Server Components Demo</h1>
+
+<p>
+  This page demonstrates <strong>React Server Components (RSC)</strong> with React on Rails Pro.
+  The component below is an <em>async server component</em> that fetches data on the server
+  and streams HTML to the browser. No component JavaScript is sent to the client.
+</p>
+
+<%#
+  stream_react_component renders the RSC with streaming support.
+
+  Key points:
+  - prerender: true enables server-side rendering with streaming
+  - Props are passed from the controller (@hello_server_props)
+  - The component streams as it resolves (async data fetching happens server-side)
+  - Only the interactive LikeButton client component ships JS to the browser
+  - Open DevTools Network tab to verify — no HelloServer.js in the client bundle
+%>
+<%= stream_react_component('HelloServer', props: @hello_server_props, prerender: true) %>
+
+<hr>
+
+<details style="margin-top: 16px;">
+  <summary><strong>What makes this different from traditional SSR?</strong></summary>
+  <ul style="margin-top: 8px;">
+    <li><strong>Traditional SSR:</strong> Server renders HTML, then ships ALL component JS to the browser for hydration. Every library used in rendering is in your bundle.</li>
+    <li><strong>RSC:</strong> Server components stay on the server permanently. Only client components (marked with <code>'use client'</code>) ship JS. Libraries used in server components are never bundled for the client.</li>
+    <li><strong>Async by default:</strong> Server components can be async functions that <code>await</code> data directly — no <code>useEffect</code>, no loading states for initial render, no client-side fetch waterfalls.</li>
+  </ul>
+</details>
+
+<p style="margin-top: 16px;">
+  <strong>Learn more:</strong>
+  <a href="https://www.shakacode.com/react-on-rails-pro/docs/react-server-components/">
+    React Server Components Documentation
+  </a>
+</p>

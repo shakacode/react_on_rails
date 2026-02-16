@@ -121,7 +121,12 @@ module ReactOnRails
 
         When using React on Rails Pro, you must use the 'react-on-rails-pro' npm package.
 
-        Fix:
+        If you're upgrading from React on Rails to Pro, run the generator with validation skipped:
+          REACT_ON_RAILS_SKIP_VALIDATION=true rails g react_on_rails:install --pro
+
+        The generator will automatically replace the base package with the Pro package.
+
+        Or fix manually:
           1. Remove the base package: #{remove_cmd}
           2. Install the Pro package: #{install_cmd}
 

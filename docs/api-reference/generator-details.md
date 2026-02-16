@@ -12,6 +12,8 @@ Options:
   -R, [--redux], [--no-redux]                      # Install Redux package and Redux version of Hello World Example. Default: false
   -T, [--typescript], [--no-typescript]            # Generate TypeScript files and install TypeScript dependencies. Default: false
       [--rspack], [--no-rspack]                    # Use Rspack instead of Webpack as the bundler. Default: false
+      [--pro], [--no-pro]                          # Install React on Rails Pro with Node Renderer. Default: false
+      [--rsc], [--no-rsc]                          # Install React Server Components support (includes Pro). Default: false
       [--ignore-warnings], [--no-ignore-warnings]  # Skip warnings. Default: false
 
 Runtime options:
@@ -42,6 +44,21 @@ can pass the redux option if you'd like to have redux setup for you automaticall
     bundler, providing significantly faster builds (~20x improvement with SWC).
     Includes unified configuration that works with both bundlers and a
     bin/switch-bundler utility to switch between bundlers post-installation.
+
+* Pro
+
+    Passing the --pro generator option sets up React on Rails Pro with Node
+    server rendering, fragment caching, and code-splitting support.
+    Requires the react_on_rails_pro gem (add it to your Gemfile first).
+    Creates the Pro initializer, node-renderer.js, and adds the Node Renderer
+    process to Procfile.dev.
+
+* RSC (React Server Components)
+
+    Passing the --rsc generator option sets up React Server Components support.
+    This automatically includes Pro setup (--rsc implies --pro). Creates RSC
+    webpack configuration, a HelloServer example component, and RSC routes.
+    Requires React 19.0.x.
 
 *******************************************************************************
 
@@ -181,6 +198,108 @@ rails generate react_on_rails:install --rspack --typescript --redux
 ```
 
 For more details on Rspack configuration, see the [Webpack Configuration](../core-concepts/webpack-configuration.md#rspack-vs-webpack) docs.
+
+### React on Rails Pro Support
+
+The generator supports a `--pro` option for setting up React on Rails Pro with Node server rendering, fragment caching, and code-splitting support:
+
+```bash
+rails generate react_on_rails:install --pro
+```
+
+**Prerequisites:**
+
+- Add `gem 'react_on_rails_pro', '>= 16.3.0'` to your Gemfile and run `bundle install`
+- Contact [justin@shakacode.com](mailto:justin@shakacode.com) for a license
+
+**What gets created:**
+
+- `config/initializers/react_on_rails_pro.rb` - Pro configuration with Node Renderer settings
+- `client/node-renderer.js` - Node Renderer bootstrap file
+- Node Renderer process added to `Procfile.dev`
+- Pro npm packages (`react-on-rails-pro`, `react-on-rails-pro-node-renderer`)
+
+**After installation:**
+
+Configure your license token: `export REACT_ON_RAILS_PRO_LICENSE="your-token"`. See [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/LICENSE_SETUP.md) for all options.
+
+**Combining with other options:**
+
+```bash
+# Pro with TypeScript
+rails generate react_on_rails:install --pro --typescript
+
+# Pro with Redux
+rails generate react_on_rails:install --pro --redux
+
+# Pro with Rspack
+rails generate react_on_rails:install --pro --rspack
+```
+
+The standalone Pro generator also modifies `config/webpack/serverWebpackConfig.js` (enables `libraryTarget: 'commonjs2'`, adds `extractLoader`, sets `target = 'node'`, changes exports to object style) and updates the import in `config/webpack/ServerClientOrBoth.js`. If your webpack configs use the legacy filename `generateWebpackConfigs.js`, the generator will rename it automatically.
+
+**Upgrading an existing React on Rails app to Pro:**
+
+For existing apps, use the standalone Pro generator to avoid re-processing base files:
+
+```bash
+rails generate react_on_rails:pro
+```
+
+See the [React on Rails Pro overview](../pro/react-on-rails-pro.md) for feature details.
+
+### React Server Components Support
+
+The generator supports a `--rsc` option for setting up React Server Components:
+
+```bash
+rails generate react_on_rails:install --rsc
+```
+
+**Note:** `--rsc` automatically includes Pro setup (`--rsc` implies `--pro`).
+
+**Prerequisites:**
+
+- React on Rails Pro gem installed (see Pro prerequisites above)
+- React 19.0.x (RSC is not yet supported on React 19.1.x or later)
+
+RSC builds on React on Rails Pro's Node rendering infrastructure. The generator adds a separate webpack entry point for server components, configures the `RSCWebpackPlugin` in both client and server webpack configs, and sets up the `RSC_BUNDLE_ONLY` environment variable handling in `ServerClientOrBoth.js` for independent RSC bundle compilation.
+
+**What gets created:**
+
+In addition to all Pro files:
+
+- `config/webpack/rscWebpackConfig.js` - RSC-specific webpack configuration
+- `app/javascript/src/HelloServer/` - Example RSC component (replaces HelloWorld)
+- `app/controllers/hello_server_controller.rb` - Controller with streaming support
+- `app/views/hello_server/index.html.erb` - View using `stream_react_component`
+- RSC routes (`rsc_payload_route`, `hello_server`)
+- RSC bundle watcher added to `Procfile.dev`
+- RSC npm package (`react-on-rails-rsc`)
+
+**Combining with other options:**
+
+```bash
+# RSC with TypeScript
+rails generate react_on_rails:install --rsc --typescript
+
+# RSC with Redux (generates both HelloWorldApp and HelloServer)
+rails generate react_on_rails:install --rsc --redux
+
+# RSC with Rspack
+rails generate react_on_rails:install --rsc --rspack
+```
+
+**Upgrading an existing Pro app to RSC:**
+
+For existing Pro apps, use the standalone RSC generator:
+
+```bash
+rails generate react_on_rails:rsc
+rails generate react_on_rails:rsc --typescript
+```
+
+See the [RSC performance guide](../pro/major-performance-breakthroughs-upgrade-guide.md) for details.
 
 ### Auto-Bundling and Component Registration
 

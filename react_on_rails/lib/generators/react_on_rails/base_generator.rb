@@ -27,27 +27,46 @@ module ReactOnRails
                    default: false,
                    desc: "Use Rspack instead of Webpack as the bundler"
 
+      # --pro
+      class_option :pro,
+                   type: :boolean,
+                   default: false,
+                   desc: "Setup React on Rails Pro with Node Renderer"
+
+      # --rsc
+      class_option :rsc,
+                   type: :boolean,
+                   default: false,
+                   desc: "Setup React Server Components (requires Pro)"
+
       def add_hello_world_route
+        # RSC uses HelloServer instead of HelloWorld, but Redux still needs hello_world route
+        return if use_rsc? && !options.redux?
+
         route "get 'hello_world', to: 'hello_world#index'"
       end
 
       def create_react_directories
-        # Create auto-bundling directory structure for non-Redux components only
-        # Redux components handle their own directory structure
-        return if options.redux?
+        # Skip HelloWorld directory for Redux (uses HelloWorldApp) or RSC (uses HelloServer)
+        return if options.redux? || use_rsc?
 
         empty_directory("app/javascript/src/HelloWorld/ror_components")
       end
 
       def copy_base_files
         base_path = "base/base/"
-        base_files = %w[app/controllers/hello_world_controller.rb
-                        app/views/layouts/hello_world.html.erb
-                        Procfile.dev
+        base_files = %w[Procfile.dev
                         Procfile.dev-static-assets
                         Procfile.dev-prod-assets
                         .dev-services.yml.example
                         bin/shakapacker-precompile-hook]
+
+        # HelloWorld controller/layout only when not using RSC (RSC uses HelloServer)
+        # Exception: Redux still needs the HelloWorld controller even with RSC
+        unless use_rsc? && !options.redux?
+          base_files += %w[app/controllers/hello_world_controller.rb
+                           app/views/layouts/hello_world.html.erb]
+        end
         base_templates = %w[config/initializers/react_on_rails.rb]
         base_files.each { |file| copy_file("#{base_path}#{file}", file) }
         base_templates.each do |file|
@@ -62,9 +81,10 @@ module ReactOnRails
         base_path = "base/base/"
         base_files = %w[app/javascript/packs/server-bundle.js]
 
-        # Only copy HelloWorld.module.css for non-Redux components
-        # Redux components handle their own CSS files
-        base_files << "app/javascript/src/HelloWorld/ror_components/HelloWorld.module.css" unless options.redux?
+        # Skip HelloWorld CSS for Redux (uses HelloWorldApp) or RSC (uses HelloServer)
+        unless options.redux? || use_rsc?
+          base_files << "app/javascript/src/HelloWorld/ror_components/HelloWorld.module.css"
+        end
 
         base_files.each { |file| copy_file("#{base_path}#{file}", file) }
       end
@@ -79,7 +99,7 @@ module ReactOnRails
                         config/webpack/development.js
                         config/webpack/production.js
                         config/webpack/serverWebpackConfig.js
-                        config/webpack/generateWebpackConfigs.js]
+                        config/webpack/ServerClientOrBoth.js]
         config = {
           message: "// The source code including full typescript support is available at:"
         }

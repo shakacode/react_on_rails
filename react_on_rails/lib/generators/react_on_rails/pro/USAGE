@@ -1,0 +1,21 @@
+Description:
+    Add React on Rails Pro to an existing React on Rails application.
+
+Example:
+    rails generate react_on_rails:pro
+
+    This will add:
+    - Pro initializer (config/initializers/react_on_rails_pro.rb)
+    - Node renderer (client/node-renderer.js)
+    - Node renderer process to Procfile.dev
+
+Modifies:
+    - config/webpack/serverWebpackConfig.js (enables Pro settings: libraryTarget,
+      target, extractLoader, Babel SSR caller, object exports)
+    - config/webpack/ServerClientOrBoth.js (switches to destructured import)
+    - package.json (replaces react-on-rails with react-on-rails-pro and
+      react-on-rails-pro-node-renderer)
+
+Prerequisites:
+    - React on Rails must be installed (rails g react_on_rails:install)
+    - react_on_rails_pro gem must be in your Gemfile

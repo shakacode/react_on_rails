@@ -33,17 +33,17 @@ module ReactOnRails
         end
 
         context "with other skip conditions also present" do
-          context "when package.json exists and ARGV indicates generator" do
+          context "when package.json exists and running a generator" do
             before do
               allow(File).to receive(:exist?).with(package_json_path).and_return(true)
-              stub_const("ARGV", ["generate", "react_on_rails:install"])
+              allow(described_class).to receive(:running_generator?).and_return(true)
             end
 
-            it "prioritizes ENV over ARGV check" do
+            it "prioritizes ENV over generator check" do
               expect(described_class.skip_version_validation?).to be true
             end
 
-            it "short-circuits before checking ARGV" do
+            it "short-circuits before checking generator context" do
               described_class.skip_version_validation?
               expect(Rails.logger).to have_received(:debug)
                 .with("[React on Rails] Skipping validation - disabled via environment variable")
@@ -100,7 +100,7 @@ module ReactOnRails
 
         context "when running a generator" do
           before do
-            stub_const("ARGV", ["generate", "react_on_rails:install"])
+            allow(described_class).to receive(:running_generator?).and_return(true)
           end
 
           it "returns true" do
@@ -114,81 +114,26 @@ module ReactOnRails
           end
         end
 
-        context "when running a generator with short form" do
+        context "when not running a generator" do
           before do
-            stub_const("ARGV", ["g", "react_on_rails:install"])
-          end
-
-          it "returns true" do
-            expect(described_class.skip_version_validation?).to be true
-          end
-        end
-
-        context "when ARGV is empty" do
-          before do
-            stub_const("ARGV", [])
+            allow(described_class).to receive(:running_generator?).and_return(false)
           end
 
           it "returns false" do
             expect(described_class.skip_version_validation?).to be false
           end
         end
-
-        context "when running other commands" do
-          %w[server console runner].each do |command|
-            context "when running '#{command}'" do
-              before do
-                stub_const("ARGV", [command])
-              end
-
-              it "returns false" do
-                expect(described_class.skip_version_validation?).to be false
-              end
-            end
-          end
-        end
       end
     end
 
     describe ".running_generator?" do
-      context "when ARGV is empty" do
-        before do
-          stub_const("ARGV", [])
-        end
+      # Uses defined?(Rails::Generators) - same pattern as Rails::Server/Rails::Console detection.
+      # Rails only loads the Generators module during `rails generate` commands.
 
-        it "returns false" do
-          expect(described_class.running_generator?).to be false
-        end
-      end
-
-      context "when ARGV.first is 'generate'" do
-        before do
-          stub_const("ARGV", %w[generate model User])
-        end
-
-        it "returns true" do
-          expect(described_class.running_generator?).to be true
-        end
-      end
-
-      context "when ARGV.first is 'g'" do
-        before do
-          stub_const("ARGV", %w[g controller Users])
-        end
-
-        it "returns true" do
-          expect(described_class.running_generator?).to be true
-        end
-      end
-
-      context "when ARGV.first is another command" do
-        before do
-          stub_const("ARGV", ["server"])
-        end
-
-        it "returns false" do
-          expect(described_class.running_generator?).to be false
-        end
+      it "uses defined?(Rails::Generators) for detection" do
+        result = described_class.running_generator?
+        expected = defined?(Rails::Generators)
+        expect(result).to eq(expected)
       end
     end
 

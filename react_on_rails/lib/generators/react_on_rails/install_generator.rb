@@ -6,13 +6,20 @@ require "bundler"
 require_relative "generator_helper"
 require_relative "generator_messages"
 require_relative "js_dependency_manager"
+require_relative "pro_setup"
+require_relative "rsc_setup"
 
 module ReactOnRails
   module Generators
+    # TODO: Extract more modules to reduce class length below 150 lines.
+    #       Candidates: ShakapackerSetup (~100 lines), TypeScriptSetup (~60 lines),
+    #       ValidationHelpers (~80 lines for Node/package manager checks).
     # rubocop:disable Metrics/ClassLength
     class InstallGenerator < Rails::Generators::Base
       include GeneratorHelper
       include JsDependencyManager
+      include ProSetup
+      include RscSetup
 
       # fetch USAGE file for details generator description
       source_root(File.expand_path(__dir__))
@@ -42,6 +49,18 @@ module ReactOnRails
                    type: :boolean,
                    default: false,
                    desc: "Skip warnings. Default: false"
+
+      # --pro
+      class_option :pro,
+                   type: :boolean,
+                   default: false,
+                   desc: "Install React on Rails Pro with Node Renderer. Default: false"
+
+      # --rsc
+      class_option :rsc,
+                   type: :boolean,
+                   default: false,
+                   desc: "Install React Server Components support (includes Pro). Default: false"
 
       # Removed: --skip-shakapacker-install (Shakapacker is now a required dependency)
 
@@ -94,10 +113,6 @@ module ReactOnRails
 
       private
 
-      def print_generator_messages
-        GeneratorMessages.messages.each { |message| puts message }
-      end
-
       def invoke_generators
         ensure_shakapacker_installed
         if options.typescript?
@@ -106,13 +121,29 @@ module ReactOnRails
           create_typescript_config
         end
         invoke "react_on_rails:base", [],
-               { typescript: options.typescript?, redux: options.redux?, rspack: options.rspack? }
+               { typescript: options.typescript?, redux: options.redux?, rspack: options.rspack?,
+                 pro: options.pro?, rsc: options.rsc? }
+
+        # Component generator logic:
+        # - --rsc without --redux: Skip HelloWorld, HelloServer will be generated in setup_rsc
+        # - --rsc with --redux: Generate HelloWorldApp (user explicitly wants Redux) + HelloServer
+        # - Without --rsc: Normal behavior (HelloWorld or HelloWorldApp based on --redux)
         if options.redux?
           invoke "react_on_rails:react_with_redux", [], { typescript: options.typescript? }
-        else
+        elsif !use_rsc?
+          # Only generate HelloWorld if RSC is not enabled
+          # For RSC, HelloServer replaces HelloWorld as the example component
           invoke "react_on_rails:react_no_redux", [], { typescript: options.typescript? }
         end
+
         setup_react_dependencies
+
+        # Invoke standalone Pro/RSC generators when flags are used
+        # Pass invoked_by_install: true so they skip message printing (we handle it)
+        invoke "react_on_rails:pro", [], { invoked_by_install: true } if use_pro?
+        return unless use_rsc?
+
+        invoke "react_on_rails:rsc", [], { typescript: options.typescript?, invoked_by_install: true }
       end
 
       def setup_react_dependencies
@@ -123,7 +154,8 @@ module ReactOnRails
       # js(.coffee) are not checked by this method, but instead produce warning messages
       # and allow the build to continue
       def installation_prerequisites_met?
-        !(missing_node? || missing_package_manager? || ReactOnRails::GitUtils.uncommitted_changes?(GeneratorMessages))
+        !(missing_node? || missing_package_manager? || missing_pro_gem? ||
+          ReactOnRails::GitUtils.uncommitted_changes?(GeneratorMessages))
       end
 
       def missing_node?
@@ -193,6 +225,11 @@ module ReactOnRails
         template_bin_path = "#{__dir__}/templates/base/base/bin"
         directory template_bin_path, "bin"
 
+        # For --rsc without --redux, hello_world doesn't exist — update DEFAULT_ROUTE
+        if use_rsc? && !options.redux?
+          gsub_file "bin/dev", 'DEFAULT_ROUTE = "hello_world"', 'DEFAULT_ROUTE = "hello_server"'
+        end
+
         # Make these and only these files executable
         files_to_copy = []
         Dir.chdir(template_bin_path) do
@@ -204,9 +241,15 @@ module ReactOnRails
       end
 
       def add_post_install_message
-        # Determine what route will be created by the generator
-        route = "hello_world" # This is the hardcoded route from base_generator.rb
-        component_name = options.redux? ? "HelloWorldApp" : "HelloWorld"
+        # Determine what route and component will be created by the generator
+        if use_rsc? && !options.redux?
+          # RSC without Redux: HelloServer replaces HelloWorld
+          route = "hello_server"
+          component_name = "HelloServer"
+        else
+          route = "hello_world"
+          component_name = options.redux? ? "HelloWorldApp" : "HelloWorld"
+        end
 
         GeneratorMessages.add_info(GeneratorMessages.helpful_message_after_installation(
                                      component_name: component_name,
@@ -219,10 +262,7 @@ module ReactOnRails
       end
 
       def shakapacker_in_lockfile?(gem_name)
-        # Always check the target app's Gemfile.lock, not inherited BUNDLE_GEMFILE
-        # See: https://github.com/shakacode/react_on_rails/issues/2287
-        File.file?("Gemfile.lock") &&
-          File.foreach("Gemfile.lock").any? { |l| l.match?(/^\s{4}#{Regexp.escape(gem_name)}\s\(/) }
+        gem_in_lockfile?(gem_name)
       end
 
       def shakapacker_in_bundler_specs?(gem_name)
@@ -431,11 +471,7 @@ module ReactOnRails
         File.write("tsconfig.json", JSON.pretty_generate(tsconfig_content))
         puts Rainbow("✅ Created tsconfig.json").green
       end
-
-      # Removed: Shakapacker auto-installation logic (now explicit dependency)
-
-      # Removed: Shakapacker 8+ is now required as explicit dependency
-      # rubocop:enable Metrics/ClassLength
     end
+    # rubocop:enable Metrics/ClassLength
   end
 end
