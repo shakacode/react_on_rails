@@ -76,7 +76,6 @@
   "devDependencies": {
     "@babel/preset-typescript": "^7.23.2",
     "@playwright/test": "^1.56.1",
-    "@pmmmwh/react-refresh-webpack-plugin": "0.5.3",
     "@tailwindcss/aspect-ratio": "^0.4.2",
     "@tailwindcss/forms": "^0.5.3",
     "@tailwindcss/typography": "^0.5.9",
