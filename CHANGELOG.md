@@ -27,6 +27,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 Changes since the last non-beta release.
 
+#### Pro
+
+##### Fixed
+
+- **Sentry SDK v9/v10 compatibility**: The node renderer Sentry integration now supports `@sentry/node` v9 and v10. Replaced `@sentry/types` import (no longer a transitive dependency in v9+) and widened peer dependency range from `<9.0.0` to `<11.0.0`. [PR 2434](https://github.com/shakacode/react_on_rails/pull/2434) by [alexeyr-ci2](https://github.com/alexeyr-ci2).
+
 ### [16.4.0.rc.1] - 2026-02-12
 
 #### Fixed
