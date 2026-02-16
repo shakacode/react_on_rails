@@ -30,6 +30,7 @@ function run(appName: string, rawOpts: Record<string, unknown>): void {
     template,
     packageManager: packageManager as 'npm' | 'pnpm',
     rspack: Boolean(rawOpts.rspack),
+    rsc: Boolean(rawOpts.rsc),
   };
 
   console.log('');
@@ -65,7 +66,7 @@ function run(appName: string, rawOpts: Record<string, unknown>): void {
 
   console.log('');
   logInfo(
-    `Creating "${appName}" with template: ${options.template}, package manager: ${options.packageManager}${options.rspack ? ', bundler: rspack' : ''}`,
+    `Creating "${appName}" with template: ${options.template}, package manager: ${options.packageManager}${options.rspack ? ', bundler: rspack' : ''}${options.rsc ? ', mode: rsc' : ''}`,
   );
 
   createApp(appName, options);
@@ -85,6 +86,7 @@ program
   .option('-t, --template <type>', 'javascript or typescript', 'typescript')
   .option('-p, --package-manager <pm>', 'npm or pnpm (auto-detected if not specified)')
   .option('--rspack', 'Use Rspack instead of Webpack (~20x faster builds)', false)
+  .option('--rsc', 'Generate React Server Components setup (installs react_on_rails_pro)', false)
   .addHelpText(
     'after',
     `
@@ -92,14 +94,16 @@ Examples:
   $ npx create-react-on-rails-app my-app
   $ npx create-react-on-rails-app my-app --template javascript
   $ npx create-react-on-rails-app my-app --rspack
+  $ npx create-react-on-rails-app my-app --rsc
   $ npx create-react-on-rails-app my-app --package-manager pnpm
 
 What it does:
   1. Creates a new Rails app with PostgreSQL
-  2. Adds the react_on_rails gem
+  2. Adds required gem(s) (react_on_rails, plus react_on_rails_pro for --rsc)
   3. Runs the React on Rails generator (Shakapacker, components, webpack config)
 
 After setup, run bin/dev and visit http://localhost:3000/hello_world
+Use --rsc to generate the HelloServer route at http://localhost:3000/hello_server
 
 Documentation: https://www.shakacode.com/react-on-rails/docs/`,
   )
