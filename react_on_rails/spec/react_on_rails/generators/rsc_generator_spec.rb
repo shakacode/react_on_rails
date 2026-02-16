@@ -129,6 +129,40 @@ describe RscGenerator, type: :generator do
     end
   end
 
+  context "when Pro is installed with legacy webpack exports" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_legacy_pro_webpack_files
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "creates backward-compatible rscWebpackConfig.js" do
+      assert_file "config/webpack/rscWebpackConfig.js" do |content|
+        expect(content).to include("const serverWebpackModule = require('./serverWebpackConfig')")
+        expect(content).to include("serverWebpackModule.default || serverWebpackModule")
+        expect(content).to include("serverWebpackModule.extractLoader ||")
+      end
+    end
+
+    it "adds RSC import to ServerClientOrBoth for legacy server import syntax" do
+      assert_file "config/webpack/ServerClientOrBoth.js" do |content|
+        expect(content).to include("const serverWebpackConfig = require('./serverWebpackConfig');")
+        expect(content).to include("const rscWebpackConfig = require('./rscWebpackConfig');")
+      end
+    end
+  end
+
   # TypeScript variant — only tests file extension behavior (.tsx vs .jsx).
   # Webpack transforms are TypeScript-agnostic and covered by the main context above.
 

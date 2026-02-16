@@ -733,7 +733,8 @@ describe InstallGenerator, type: :generator do
 
     it "creates rscWebpackConfig.js" do
       assert_file "config/webpack/rscWebpackConfig.js" do |content|
-        expect(content).to include("const { default: serverWebpackConfig")
+        expect(content).to include("const serverWebpackModule = require('./serverWebpackConfig')")
+        expect(content).to include("const serverWebpackConfig = serverWebpackModule.default || serverWebpackModule")
         expect(content).to include("serverWebpackConfig(true)")
         expect(content).to include("rsc-bundle")
         expect(content).to include("react-server")

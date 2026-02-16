@@ -311,7 +311,7 @@ module ReactOnRails
         # Add RSC import after serverWebpackConfig import
         gsub_file(
           config_path,
-          %r{(const \{ default: serverWebpackConfig \} = require\('\./serverWebpackConfig'\);)},
+          %r{(const (?:\{ default: serverWebpackConfig \}|serverWebpackConfig) = require\('\./serverWebpackConfig'\);)},
           "\\1\nconst rscWebpackConfig = require('./rscWebpackConfig');"
         )
 
