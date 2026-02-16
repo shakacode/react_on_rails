@@ -1,5 +1,4 @@
 import * as Sentry from '@sentry/node';
-import { StartSpanOptions } from '@sentry/types';
 import {
   addErrorNotifier,
   addMessageNotifier,
@@ -11,7 +10,7 @@ import {
 
 declare module '../shared/tracing.js' {
   interface UnitOfWorkOptions {
-    sentry?: StartSpanOptions;
+    sentry?: Parameters<typeof Sentry.startSpan>[0];
   }
 }
 

@@ -46,6 +46,8 @@ test('should run function and finish span', async () => {
   const reports = testkit.reports();
   expect(reports).toHaveLength(1);
   const report = reports[0]!;
+  // Note: Sentry v10 no longer sets report.tags.transaction automatically.
+  // Remove this assertion when upgrading devDependency.
   expect(report.tags.transaction).toBe(spanName);
   expect(report.message).toBe(message);
 });

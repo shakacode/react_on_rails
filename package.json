@@ -16,6 +16,10 @@
   "directories": {
     "doc": "docs"
   },
+  "// for devDependencies": [
+    "Using Sentry version over 7 here will break sentry6 integration type-check and tests.",
+    "If you need it later, you'll have to do some tricks to depend on two separate versions of @sentry/node."
+  ],
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.17.3",
     "@babel/core": "^7.20.12",
