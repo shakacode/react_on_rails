@@ -1,5 +1,6 @@
-import { validateAppName } from '../src/create-app';
+import { validateAppName, buildGeneratorArgs } from '../src/create-app';
 import fs from 'fs';
+import { CliOptions } from '../src/types';
 
 jest.mock('fs');
 const mockedFs = jest.mocked(fs);
@@ -61,5 +62,47 @@ describe('validateAppName', () => {
     const result = validateAppName('existing-app');
     expect(result.success).toBe(false);
     expect(result.error).toContain('already exists');
+  });
+});
+
+describe('buildGeneratorArgs', () => {
+  const baseOptions: CliOptions = {
+    template: 'javascript',
+    packageManager: 'npm',
+    rspack: false,
+    rsc: false,
+  };
+
+  it('includes ignore-warnings by default', () => {
+    expect(buildGeneratorArgs(baseOptions)).toEqual(['--ignore-warnings']);
+  });
+
+  it('adds typescript flag when template is typescript', () => {
+    expect(buildGeneratorArgs({ ...baseOptions, template: 'typescript' })).toEqual([
+      '--typescript',
+      '--ignore-warnings',
+    ]);
+  });
+
+  it('adds rspack flag when enabled', () => {
+    expect(buildGeneratorArgs({ ...baseOptions, rspack: true })).toEqual([
+      '--rspack',
+      '--ignore-warnings',
+    ]);
+  });
+
+  it('adds rsc flag when enabled', () => {
+    expect(buildGeneratorArgs({ ...baseOptions, rsc: true })).toEqual(['--rsc', '--ignore-warnings']);
+  });
+
+  it('combines all enabled flags in order', () => {
+    expect(
+      buildGeneratorArgs({
+        ...baseOptions,
+        template: 'typescript',
+        rspack: true,
+        rsc: true,
+      }),
+    ).toEqual(['--typescript', '--rspack', '--rsc', '--ignore-warnings']);
   });
 });
