@@ -561,7 +561,44 @@ describe InstallGenerator, type: :generator do
   end
 
   context "with --pro --rspack" do
-    before(:all) { run_generator_test_with_args(%w[--pro --rspack], package_json: true) }
+    before(:all) do
+      run_generator_test_with_args(%w[--pro --rspack], package_json: true) do
+        simulate_existing_file(".shakapacker_just_installed", "")
+        simulate_existing_file("config/shakapacker.yml", <<~YAML)
+          # Note: You must restart bin/shakapacker-dev-server for changes to take effect
+          default: &default
+            source_path: app/javascript
+            source_entry_path: packs
+            public_root_path: public
+            public_output_path: packs
+            cache_path: tmp/shakapacker
+            webpack_compile_output: true
+            shakapacker_precompile: true
+            additional_paths: []
+            cache_manifest: false
+            javascript_transpiler: "babel"
+            assets_bundler: "webpack"
+            # precompile_hook: ~
+
+          development:
+            <<: *default
+
+          test:
+            <<: *default
+            compile: true
+
+          production:
+            <<: *default
+        YAML
+        simulate_existing_file("bin/shakapacker", "")
+        simulate_existing_file("bin/shakapacker-dev-server", "")
+        simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
+          const { generateWebpackConfig } = require('shakapacker')
+          const webpackConfig = generateWebpackConfig()
+          module.exports = webpackConfig
+        JS
+      end
+    end
 
     include_examples "base_generator", application_js: true
     include_examples "no_redux_generator"
