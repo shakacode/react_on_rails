@@ -24,4 +24,25 @@ describe GeneratorMessages do
     expect(described_class.messages)
       .to contain_exactly(described_class.format_info("Test info message"))
   end
+
+  it "shows stream_react_component in RSC install message" do
+    message = described_class.helpful_message_after_installation(
+      component_name: "HelloServer",
+      route: "hello_server",
+      rsc: true
+    )
+
+    expect(message).to include("stream_react_component")
+    expect(message).not_to include('react_component("HelloServer"')
+  end
+
+  it "shows react_component in non-RSC install message" do
+    message = described_class.helpful_message_after_installation(
+      component_name: "HelloWorld",
+      route: "hello_world",
+      rsc: false
+    )
+
+    expect(message).to include('react_component("HelloWorld"')
+  end
 end
