@@ -65,9 +65,10 @@ describe RscGenerator, type: :generator do
       end
     end
 
-    it "creates HelloServer component" do
+    it "creates HelloServer component and LikeButton client component" do
       assert_file "app/javascript/src/HelloServer/ror_components/HelloServer.jsx"
       assert_file "app/javascript/src/HelloServer/components/HelloServer.jsx"
+      assert_file "app/javascript/src/HelloServer/components/LikeButton.jsx"
     end
 
     it "creates HelloServerController" do
@@ -151,6 +152,7 @@ describe RscGenerator, type: :generator do
     it "creates HelloServer component with tsx extension" do
       assert_file "app/javascript/src/HelloServer/ror_components/HelloServer.tsx"
       assert_file "app/javascript/src/HelloServer/components/HelloServer.tsx"
+      assert_file "app/javascript/src/HelloServer/components/LikeButton.tsx"
       assert_no_file "app/javascript/src/HelloServer/ror_components/HelloServer.jsx"
     end
   end

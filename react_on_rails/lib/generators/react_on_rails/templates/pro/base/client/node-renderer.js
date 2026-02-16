@@ -11,7 +11,8 @@ const config = {
   // See value in /config/initializers/react_on_rails_pro.rb
   password: env.RENDERER_PASSWORD || 'devPassword',
 
-  // workersCount defaults to the number of CPUs minus 1
+  // Number of Node.js worker threads for SSR rendering
+  // Set NODE_RENDERER_CONCURRENCY env var to override (e.g., for production tuning)
   workersCount: env.NODE_RENDERER_CONCURRENCY != null ? Number(env.NODE_RENDERER_CONCURRENCY) : 3,
 
   // If set to true, `supportModules` enables the server-bundle code to call a default set of NodeJS modules
