@@ -34,6 +34,7 @@ Changes since the last non-beta release.
 
 #### Added
 
+- **Pro and RSC generator flags**: Added `--pro` and `--rsc` flags to `rails g react_on_rails:install`, plus standalone `react_on_rails:pro` and `react_on_rails:rsc` generators for upgrading existing apps to Pro and React Server Components. Includes idempotent setup modules, webpack config transforms, prerequisite validation, and example components. [PR 2284](https://github.com/shakacode/react_on_rails/pull/2284) by [ihabadham](https://github.com/ihabadham).
 - **Extensible bin/dev precompile pattern**: New alternative approach for handling precompile tasks directly in `bin/dev`, providing better support for projects with custom build steps (ReScript, TypeScript), direct Ruby API access via `ReactOnRails::Locales.compile`, and improved version manager compatibility. [PR 2349](https://github.com/shakacode/react_on_rails/pull/2349) by [justin808](https://github.com/justin808).
 - **Database setup check in bin/dev**: The `bin/dev` command now checks database connectivity before starting the development server. This provides clear error messages when the database is missing or unavailable, instead of buried errors in the logs. Note: This adds ~1-2 seconds to startup time as it spawns a Rails runner process.
 
