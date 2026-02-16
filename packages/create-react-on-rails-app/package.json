@@ -1,6 +1,6 @@
 {
   "name": "create-react-on-rails-app",
-  "version": "16.4.0-rc.0",
+  "version": "16.4.0-rc.1",
   "description": "Create React on Rails applications with a single command",
   "bin": {
     "create-react-on-rails-app": "./bin/create-react-on-rails-app.js"

@@ -480,23 +480,27 @@ module ReactOnRails
       )
     end
 
+    # Returns the CSP script nonce for the current request, or nil if CSP is not enabled.
+    # Rails 5.2-6.0 use content_security_policy_nonce with no arguments.
+    # Rails 6.1+ accept an optional directive argument.
+    def csp_nonce
+      return unless respond_to?(:content_security_policy_nonce)
+
+      begin
+        content_security_policy_nonce(:script)
+      rescue ArgumentError
+        # Fallback for Rails versions that don't accept arguments
+        content_security_policy_nonce
+      end
+    end
+
     # Wraps console replay JavaScript code in a script tag with CSP nonce if available.
     # The console_script_code is already sanitized by scriptSanitizedVal() in the JavaScript layer,
     # so using html_safe here is secure.
     def wrap_console_script_with_nonce(console_script_code)
       return "" if console_script_code.blank?
 
-      # Get the CSP nonce if available (Rails 5.2+)
-      # Rails 5.2-6.0 use content_security_policy_nonce with no arguments
-      # Rails 6.1+ accept an optional directive argument
-      nonce = if respond_to?(:content_security_policy_nonce)
-                begin
-                  content_security_policy_nonce(:script)
-                rescue ArgumentError
-                  # Fallback for Rails versions that don't accept arguments
-                  content_security_policy_nonce
-                end
-              end
+      nonce = csp_nonce
 
       # Build the script tag with nonce if available
       script_options = { id: "consoleReplayLog" }

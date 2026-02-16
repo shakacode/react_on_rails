@@ -730,7 +730,7 @@ describe InstallGenerator, type: :generator do
       # HelloServer should exist
       assert_file "app/javascript/src/HelloServer/ror_components/HelloServer.jsx"
       assert_file "app/javascript/src/HelloServer/components/HelloServer.jsx"
-      assert_file "app/javascript/src/HelloServer/components/LikeButton.client.jsx"
+      assert_file "app/javascript/src/HelloServer/components/LikeButton.jsx"
     end
 
     it "creates HelloServer controller and view" do
@@ -782,7 +782,7 @@ describe InstallGenerator, type: :generator do
       assert_file "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.server.jsx"
       assert_file "app/javascript/src/HelloServer/ror_components/HelloServer.jsx"
       assert_file "app/javascript/src/HelloServer/components/HelloServer.jsx"
-      assert_file "app/javascript/src/HelloServer/components/LikeButton.client.jsx"
+      assert_file "app/javascript/src/HelloServer/components/LikeButton.jsx"
     end
 
     it "creates hello_world route and controller for Redux" do
@@ -823,7 +823,7 @@ describe InstallGenerator, type: :generator do
       assert_no_file "app/javascript/src/HelloServer/components/HelloServer.jsx"
       assert_file "app/javascript/src/HelloServer/ror_components/HelloServer.tsx"
       assert_file "app/javascript/src/HelloServer/components/HelloServer.tsx"
-      assert_file "app/javascript/src/HelloServer/components/LikeButton.client.tsx"
+      assert_file "app/javascript/src/HelloServer/components/LikeButton.tsx"
     end
 
     it "creates tsconfig.json file" do
