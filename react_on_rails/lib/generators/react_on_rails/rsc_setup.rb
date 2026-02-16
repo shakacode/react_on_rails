@@ -209,6 +209,8 @@ module ReactOnRails
                   "#{ror_components_dir}/HelloServer.#{ext}")
         copy_file("templates/rsc/base/app/javascript/src/HelloServer/components/HelloServer.#{ext}",
                   "#{components_dir}/HelloServer.#{ext}")
+        copy_file("templates/rsc/base/app/javascript/src/HelloServer/components/LikeButton.client.#{ext}",
+                  "#{components_dir}/LikeButton.client.#{ext}")
 
         puts Rainbow("✅ Created HelloServer component").green
       end
@@ -309,7 +311,7 @@ module ReactOnRails
         # Add RSC import after serverWebpackConfig import
         gsub_file(
           config_path,
-          %r{(const \{ default: serverWebpackConfig \} = require\('\./serverWebpackConfig'\);)},
+          %r{(const (?:\{ default: serverWebpackConfig \}|serverWebpackConfig) = require\('\./serverWebpackConfig'\);)},
           "\\1\nconst rscWebpackConfig = require('./rscWebpackConfig');"
         )
 

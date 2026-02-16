@@ -112,6 +112,15 @@ def simulate_pro_webpack_files
   simulate_existing_file("config/webpack/clientWebpackConfig.js", base_client_webpack_content)
 end
 
+# Simulates a legacy Pro webpack setup with function export style.
+# This reflects older Pro installs that predate object exports with extractLoader.
+def simulate_legacy_pro_webpack_files
+  simulate_existing_file("config/webpack/serverWebpackConfig.js", legacy_pro_server_webpack_content)
+  simulate_existing_file("config/webpack/ServerClientOrBoth.js",
+                         server_client_or_both_content(destructured_import: false))
+  simulate_existing_file("config/webpack/clientWebpackConfig.js", base_client_webpack_content)
+end
+
 # -- fixture data, not logic
 def base_server_webpack_content
   <<~JS
@@ -193,6 +202,29 @@ def pro_server_webpack_content
       default: configureServer,
       extractLoader,
     };
+  JS
+end
+
+def legacy_pro_server_webpack_content
+  <<~JS
+    const { merge, config } = require('shakapacker');
+    const commonWebpackConfig = require('./commonWebpackConfig');
+
+    const bundler = config.assets_bundler === 'rspack'
+      ? require('@rspack/core')
+      : require('webpack');
+
+    const configureServer = () => {
+      const serverWebpackConfig = commonWebpackConfig();
+
+      serverWebpackConfig.plugins.unshift(new bundler.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));
+      serverWebpackConfig.target = 'node';
+      serverWebpackConfig.node = false;
+
+      return serverWebpackConfig;
+    };
+
+    module.exports = configureServer;
   JS
 end
 

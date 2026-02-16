@@ -17,7 +17,8 @@ class HelloServerController < ApplicationController
 
   def index
     @hello_server_props = {
-      name: "React on Rails Pro"
+      name: "React on Rails Pro",
+      mission: "Render data on the server and hydrate only the interactive parts"
     }
 
     stream_view_containing_react_components(template: "hello_server/index")

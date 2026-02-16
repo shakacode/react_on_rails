@@ -1,8 +1,8 @@
-<h1>HelloServer - React Server Component</h1>
+<h1>HelloServer - React Server Components Demo</h1>
 
 <p>
   This page demonstrates React Server Components (RSC) with React on Rails Pro.
-  HelloServer runs only on the server - no JavaScript is sent to the browser for this component.
+  The main content is rendered on the server, while the nested button remains interactive on the client.
 </p>
 
 <%#
@@ -12,7 +12,8 @@
   - prerender: true enables server-side rendering
   - Props are passed from the controller (@hello_server_props)
   - The component streams as it renders (no loading spinner needed)
-  - Only the HTML is sent to browser, no JS bundle for this component
+  - Data loading happens directly in the Server Component
+  - Nested Client Components provide interactivity when needed
 %>
 <%= stream_react_component('HelloServer', props: @hello_server_props, prerender: true) %>
 

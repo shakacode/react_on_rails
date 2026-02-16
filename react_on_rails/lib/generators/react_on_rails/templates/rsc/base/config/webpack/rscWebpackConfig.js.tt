@@ -2,7 +2,19 @@
 // This creates the RSC bundle based on the server webpack config
 // See: https://www.shakacode.com/react-on-rails-pro/docs/react-server-components/
 
-const { default: serverWebpackConfig, extractLoader } = require('./serverWebpackConfig');
+const serverWebpackModule = require('./serverWebpackConfig');
+
+// Backward compatibility:
+// - New Pro config exports: { default: configureServer, extractLoader }
+// - Legacy config exports: module.exports = configureServer
+const serverWebpackConfig = serverWebpackModule.default || serverWebpackModule;
+const extractLoader = serverWebpackModule.extractLoader || ((rule, loaderName) => {
+  if (!Array.isArray(rule.use)) return null;
+  return rule.use.find((item) => {
+    const testValue = typeof item === 'string' ? item : item.loader;
+    return testValue && testValue.includes(loaderName);
+  });
+});
 
 const configureRsc = () => {
   // Pass true to skip RSCWebpackPlugin - RSC bundle doesn't need it

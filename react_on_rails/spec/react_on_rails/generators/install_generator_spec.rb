@@ -696,7 +696,8 @@ describe InstallGenerator, type: :generator do
 
     it "creates rscWebpackConfig.js" do
       assert_file "config/webpack/rscWebpackConfig.js" do |content|
-        expect(content).to include("const { default: serverWebpackConfig")
+        expect(content).to include("const serverWebpackModule = require('./serverWebpackConfig')")
+        expect(content).to include("const serverWebpackConfig = serverWebpackModule.default || serverWebpackModule")
         expect(content).to include("serverWebpackConfig(true)")
         expect(content).to include("rsc-bundle")
         expect(content).to include("react-server")
@@ -729,6 +730,7 @@ describe InstallGenerator, type: :generator do
       # HelloServer should exist
       assert_file "app/javascript/src/HelloServer/ror_components/HelloServer.jsx"
       assert_file "app/javascript/src/HelloServer/components/HelloServer.jsx"
+      assert_file "app/javascript/src/HelloServer/components/LikeButton.client.jsx"
     end
 
     it "creates HelloServer controller and view" do
@@ -780,6 +782,7 @@ describe InstallGenerator, type: :generator do
       assert_file "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.server.jsx"
       assert_file "app/javascript/src/HelloServer/ror_components/HelloServer.jsx"
       assert_file "app/javascript/src/HelloServer/components/HelloServer.jsx"
+      assert_file "app/javascript/src/HelloServer/components/LikeButton.client.jsx"
     end
 
     it "creates hello_world route and controller for Redux" do
@@ -820,6 +823,7 @@ describe InstallGenerator, type: :generator do
       assert_no_file "app/javascript/src/HelloServer/components/HelloServer.jsx"
       assert_file "app/javascript/src/HelloServer/ror_components/HelloServer.tsx"
       assert_file "app/javascript/src/HelloServer/components/HelloServer.tsx"
+      assert_file "app/javascript/src/HelloServer/components/LikeButton.client.tsx"
     end
 
     it "creates tsconfig.json file" do
