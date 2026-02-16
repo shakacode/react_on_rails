@@ -27,6 +27,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 Changes since the last non-beta release.
 
+### [16.4.0.rc.2] - 2026-02-16
+
+#### Added
+
+- **Pro and RSC generator flags**: Added `--pro` and `--rsc` flags to `rails g react_on_rails:install`, plus standalone `react_on_rails:pro` and `react_on_rails:rsc` generators for upgrading existing apps to Pro and React Server Components. Includes idempotent setup modules, webpack config transforms, prerequisite validation, and example components. [PR 2284](https://github.com/shakacode/react_on_rails/pull/2284) by [ihabadham](https://github.com/ihabadham).
+
 ### [16.4.0.rc.1] - 2026-02-12
 
 #### Fixed
@@ -37,7 +43,6 @@ Changes since the last non-beta release.
 
 #### Added
 
-- **Pro and RSC generator flags**: Added `--pro` and `--rsc` flags to `rails g react_on_rails:install`, plus standalone `react_on_rails:pro` and `react_on_rails:rsc` generators for upgrading existing apps to Pro and React Server Components. Includes idempotent setup modules, webpack config transforms, prerequisite validation, and example components. [PR 2284](https://github.com/shakacode/react_on_rails/pull/2284) by [ihabadham](https://github.com/ihabadham).
 - **Auto-registration for Redux stores**: Added `stores_subdirectory` configuration option (e.g., `"ror_stores"`) for automatic Redux store registration, following the same pattern as component auto-registration via `ror_components`. Store files placed in `ror_stores/` directories are automatically discovered, and packs are generated that call `ReactOnRails.registerStore()`, eliminating manual registration boilerplate. Includes `auto_load_bundle` parameter for the `redux_store` helper. [PR 2346](https://github.com/shakacode/react_on_rails/pull/2346) by [justin808](https://github.com/justin808).
 - **create-react-on-rails-app CLI tool**: New `npx create-react-on-rails-app` command for single-command project setup. Phase 1 supports JavaScript and TypeScript templates with npm/pnpm, orchestrating `rails new` + `bundle add react_on_rails` + `rails generate react_on_rails:install` with prerequisite validation and progress output. [PR 2375](https://github.com/shakacode/react_on_rails/pull/2375) by [justin808](https://github.com/justin808).
 - **Extensible bin/dev precompile pattern**: New alternative approach for handling precompile tasks directly in `bin/dev`, providing better support for projects with custom build steps (ReScript, TypeScript), direct Ruby API access via `ReactOnRails::Locales.compile`, and improved version manager compatibility. [PR 2349](https://github.com/shakacode/react_on_rails/pull/2349) by [justin808](https://github.com/justin808).
@@ -1991,7 +1996,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.4.0.rc.1...master
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.4.0.rc.2...master
+[16.4.0.rc.2]: https://github.com/shakacode/react_on_rails/compare/v16.4.0.rc.1...v16.4.0.rc.2
 [16.4.0.rc.1]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...v16.4.0.rc.1
 [16.3.0]: https://github.com/shakacode/react_on_rails/compare/v16.2.1...v16.3.0
 [16.2.1]: https://github.com/shakacode/react_on_rails/compare/v16.2.0...v16.2.1
