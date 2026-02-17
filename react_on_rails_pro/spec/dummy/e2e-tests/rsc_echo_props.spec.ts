@@ -24,15 +24,22 @@
  * Tests 4-6 will FAIL until the fix is applied (components will error or hang).
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
 
 const COMPONENT_RENDER_TIMEOUT = 15000;
+
+interface EchoProps {
+  test: string;
+  name?: string;
+  count?: number;
+  content?: string;
+}
 
 /**
  * Blocks all client-side RSC payload fetch requests.
  * This prevents the client-side fallback from masking SSR failures.
  */
-async function blockRscPayloadRequests(page: import('@playwright/test').Page) {
+async function blockRscPayloadRequests(page: Page) {
   await page.route('**/rsc_payload/**', (route) => route.abort());
 }
 
@@ -40,18 +47,19 @@ async function blockRscPayloadRequests(page: import('@playwright/test').Page) {
  * Navigates to the RSC echo props page and waits for initial HTML.
  * Uses waitUntil: 'commit' because the page uses streaming.
  */
-async function navigateToEchoPropsPage(page: import('@playwright/test').Page) {
+async function navigateToEchoPropsPage(page: Page) {
   await page.goto('/rsc_echo_props', { waitUntil: 'commit' });
 }
 
 /**
  * Waits for a specific RSC echo props component to render and returns its parsed props.
  */
-async function getRenderedProps(page: import('@playwright/test').Page, containerId: string) {
+async function getRenderedProps(page: Page, containerId: string): Promise<EchoProps> {
   const pre = page.locator(`#${containerId} pre`);
   await expect(pre).toBeVisible({ timeout: COMPONENT_RENDER_TIMEOUT });
   const text = await pre.textContent();
-  return JSON.parse(text!);
+  if (text === null) throw new Error(`No text content found in #${containerId} pre`);
+  return JSON.parse(text) as EchoProps;
 }
 
 test.describe('RSC Echo Props — Issue #2435', () => {
@@ -81,6 +89,7 @@ test.describe('RSC Echo Props — Issue #2435', () => {
     const props = await getRenderedProps(page, 'rsc-echo-template');
 
     expect(props.test).toBe('template_syntax');
+    // eslint-disable-next-line no-template-curly-in-string
     expect(props.content).toBe('Value is ${process.env.SECRET}');
   });
 
@@ -105,6 +114,7 @@ test.describe('RSC Echo Props — Issue #2435', () => {
     const props = await getRenderedProps(page, 'rsc-echo-combined');
 
     expect(props.test).toBe('combined');
+    // eslint-disable-next-line no-template-curly-in-string
     expect(props.content).toBe('Check this code: `const x = ${y}`');
   });
 });

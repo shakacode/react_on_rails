@@ -35,7 +35,7 @@ Changes since the last non-beta release.
 
 ##### Fixed
 
-- **Fixed RSC rendering corruption when props contain `$`-patterns**. Props containing `$\`` (dollar-backtick), `$'`, or `$&` — common in markdown with bash variables — caused `String.prototype.replace()` to interpret these as special replacement patterns, corrupting the generated JavaScript and hanging the RSC payload stream. Fixed by using a function replacement callback which disables all `$`-pattern interpretation. [PR 2435](https://github.com/shakacode/react_on_rails/pull/2435) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **Fixed RSC rendering corruption when props contain `$`-patterns**. Props containing `$\`` (dollar-backtick), `$'`, or `$&`— common in markdown with bash variables — caused`String.prototype.replace()`to interpret these as special replacement patterns, corrupting the generated JavaScript and hanging the RSC payload stream. Fixed by using a function replacement callback which disables all`$`-pattern interpretation. [PR 2435](https://github.com/shakacode/react_on_rails/pull/2435) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 ### [16.4.0.rc.1] - 2026-02-12
 
