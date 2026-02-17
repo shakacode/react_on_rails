@@ -695,9 +695,9 @@ module ReactOnRails
         props = props_string(redux_store_data[:props])
         memo << <<-JS.strip_heredoc
         reduxProps = #{props};
-        storeGenerator = ReactOnRails.getStoreGenerator('#{store_name}');
+        storeGenerator = ReactOnRails.getStoreGenerator(#{store_name.to_json});
         store = storeGenerator(reduxProps, railsContext);
-        ReactOnRails.setStore('#{store_name}', store);
+        ReactOnRails.setStore(#{store_name.to_json}, store);
         JS
       end
       result

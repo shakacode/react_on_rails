@@ -34,7 +34,7 @@ module ReactOnRailsPro
         <<-JS
         railsContext.serverSideRSCPayloadParameters = {
           renderingRequest,
-          rscBundleHash: '#{ReactOnRailsPro::Utils.rsc_bundle_hash}',
+          rscBundleHash: #{ReactOnRailsPro::Utils.rsc_bundle_hash.to_json},
         }
         if (typeof generateRSCPayload !== 'function') {
           globalThis.generateRSCPayload = function generateRSCPayload(componentName, props, railsContext) {
@@ -68,8 +68,8 @@ module ReactOnRailsPro
                        react_client_manifest_file = config.react_client_manifest_file
                        react_server_client_manifest_file = config.react_server_client_manifest_file
                        <<-JS
-                          railsContext.reactClientManifestFileName = '#{react_client_manifest_file}';
-                          railsContext.reactServerClientManifestFileName = '#{react_server_client_manifest_file}';
+                          railsContext.reactClientManifestFileName = #{react_client_manifest_file.to_json};
+                          railsContext.reactServerClientManifestFileName = #{react_server_client_manifest_file.to_json};
                        JS
                      else
                        ""
@@ -78,7 +78,7 @@ module ReactOnRailsPro
         # This function is called with specific componentName and props when generateRSCPayload is invoked
         # In that case, it replaces the empty () with ('componentName', props) in the rendering request
         <<-JS
-        (function(componentName = '#{react_component_name}', props = undefined) {
+        (function(componentName = #{react_component_name.to_json}, props = undefined) {
           var railsContext = #{rails_context};
           #{rsc_params}
           #{generate_rsc_payload_js_function(render_options)}
@@ -87,7 +87,7 @@ module ReactOnRailsPro
           var usedProps = typeof props === 'undefined' ? #{props_string} : props;
           return ReactOnRails[#{render_function_name}]({
             name: componentName,
-            domNodeId: '#{render_options.dom_id}',
+            domNodeId: #{render_options.dom_id.to_json},
             props: usedProps,
             trace: #{render_options.trace},
             railsContext: railsContext,
