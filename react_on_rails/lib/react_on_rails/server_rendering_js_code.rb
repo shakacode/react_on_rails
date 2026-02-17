@@ -40,8 +40,8 @@ module ReactOnRails
         #{redux_stores}
           var props = #{props_string};
           return ReactOnRails.serverRenderReactComponent({
-            name: '#{react_component_name}',
-            domNodeId: '#{render_options.dom_id}',
+            name: #{react_component_name.to_json},
+            domNodeId: #{render_options.dom_id.to_json},
             props: props,
             trace: #{render_options.trace},
             railsContext: railsContext
