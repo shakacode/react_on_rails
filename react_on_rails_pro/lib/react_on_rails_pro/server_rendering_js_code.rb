@@ -40,7 +40,7 @@ module ReactOnRailsPro
           globalThis.generateRSCPayload = function generateRSCPayload(componentName, props, railsContext) {
             const { renderingRequest, rscBundleHash } = railsContext.serverSideRSCPayloadParameters;
             const propsString = JSON.stringify(props);
-            const newRenderingRequest = renderingRequest.replace(/\\(\\s*\\)\\s*$/, `('${componentName}', ${propsString})`);
+            const newRenderingRequest = renderingRequest.replace(/\\(\\s*\\)\\s*$/, function() { return `(${JSON.stringify(componentName)}, ${propsString})`; });
             return runOnOtherBundle(rscBundleHash, newRenderingRequest);
           }
         }
