@@ -1,27 +1,15 @@
 /**
- * RSC Echo Props — Issue #2435 Reproduction Tests
+ * RSC Echo Props — Special Characters in Props
  *
  * Tests that RSC components correctly receive props containing special characters
- * that trigger the .replace() $-pattern corruption bug during SERVER-SIDE rendering.
- *
- * Issue: https://github.com/shakacode/react_on_rails/issues/2435
- *
- * Root cause: String.prototype.replace() interprets $-patterns in replacement strings:
- *   $`  → inserts portion of string BEFORE the match
- *   $'  → inserts portion of string AFTER the match
- *   $&  → inserts the matched substring
- *
- * When props contain "$`" (common in markdown with bash variables), the .replace() call
- * in generateRSCPayload corrupts the rendering request, producing garbled JS code.
+ * (backticks, template syntax, $-patterns) during SERVER-SIDE rendering, ensuring
+ * props are serialized safely without causing errors.
  *
  * IMPORTANT: When SSR fails, the client falls back to fetching the RSC payload via
- * a separate HTTP request to /rsc_payload/:component_name, which bypasses the buggy
- * code path and renders correctly. To ensure we're testing SSR (where the bug lives),
- * we intercept and abort all /rsc_payload/ requests so the client-side fallback cannot
- * mask the bug.
- *
- * Tests 1-3 should pass even without the fix.
- * Tests 4-6 will FAIL until the fix is applied (components will error or hang).
+ * a separate HTTP request to /rsc_payload/:component_name, which bypasses the
+ * server-side code path and renders correctly. To ensure we're testing SSR,
+ * we intercept and abort all /rsc_payload/ requests so the client-side fallback
+ * cannot mask failures.
  */
 
 import { test, expect, Page } from '@playwright/test';
@@ -62,7 +50,7 @@ async function getRenderedProps(page: Page, containerId: string): Promise<EchoPr
   return JSON.parse(text) as EchoProps;
 }
 
-test.describe('RSC Echo Props — Issue #2435', () => {
+test.describe('RSC Echo Props — Special Characters in Props', () => {
   test.beforeEach(async ({ page }) => {
     await blockRscPayloadRequests(page);
   });
@@ -93,7 +81,7 @@ test.describe('RSC Echo Props — Issue #2435', () => {
     expect(props.content).toBe('Value is ${process.env.SECRET}');
   });
 
-  test('Test 4: props with $` (dollar-backtick) render correctly — THE BUG', async ({ page }) => {
+  test('Test 4: props with $` (dollar-backtick) render correctly', async ({ page }) => {
     await navigateToEchoPropsPage(page);
     const props = await getRenderedProps(page, 'rsc-echo-dollar-backtick');
 

@@ -1,5 +1,5 @@
-<h1>RSC Echo Props — Issue #2435 Reproduction</h1>
-<p>This page reproduces the .replace() $-pattern corruption bug in generateRSCPayload.</p>
+<h1>RSC Echo Props — Special Characters in Props</h1>
+<p>This page tests that props containing special characters are serialized safely without causing errors.</p>
 
 <h2>Test 1: Safe props (baseline)</h2>
 <%= stream_react_component("RscEchoProps",
@@ -25,7 +25,7 @@
 
 <hr/>
 
-<h2>Test 4: Props with $` (THE BUG — .replace() $-pattern corruption)</h2>
+<h2>Test 4: Props with $` (dollar-backtick)</h2>
 <%= stream_react_component("RscEchoProps",
     props: { test: "dollar_backtick", content: "Price is $`100" },
     prerender: true,
@@ -41,7 +41,7 @@
 
 <hr/>
 
-<h2>Test 6: Backticks + ${} combined (issue's original example)</h2>
+<h2>Test 6: Backticks + ${} combined</h2>
 <%= stream_react_component("RscEchoProps",
     props: { test: "combined", content: "Check this code: `const x = ${y}`" },
     prerender: true,
