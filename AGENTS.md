@@ -170,7 +170,7 @@ React on Rails has two **independent** systems that both use "client" and "serve
 A React on Rails auto-bundling feature that controls which webpack bundle imports a file. This exists independently of React Server Components and is used with or without RSC:
 
 - `Component.client.jsx` → imported only in the **client bundle** (browser)
-- `Component.server.jsx` → imported only in the **server bundle** (Node.js SSR)
+- `Component.server.jsx` → imported only in the **server bundle** (and RSC bundle when RSC enabled)
 - `Component.jsx` (no suffix) → imported in **both** bundles
 
 This controls where the source file is loaded, nothing more. A `.server.jsx` file is NOT a React Server Component — it's just a file that webpack includes only in the server bundle.

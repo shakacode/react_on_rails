@@ -30,7 +30,7 @@ app/javascript/
 - Components in `ror_components/` directories are automatically discovered and registered
 - Each component gets its own webpack bundle for optimal code splitting
 - No manual `ReactOnRails.register()` calls needed
-- Supports separate `.client.jsx` and `.server.jsx` files for different rendering logic (these control **bundle placement**, not [React Server Components](../../react_on_rails_pro/docs/react-server-components/glossary.md))
+- Supports separate `.client.jsx` and `.server.jsx` files for different rendering logic (these control **client versus server bundle placement**, not [React Server Components](../../react_on_rails_pro/docs/react-server-components/glossary.md))
 
 For details, see [Auto-Bundling Guide](../core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md) and [Generator Details](../api-reference/generator-details.md).
 

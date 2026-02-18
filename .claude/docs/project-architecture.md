@@ -65,7 +65,7 @@ with peer deps (like `packages/react-on-rails`) would otherwise get their own
 the exception silently stops working. CI guards (`script/check-react-major-version.mjs`)
 will catch version mismatches.
 
-## File Suffixes vs. RSC Directive (Important Distinction)
+## `.client` and `.server` File Suffixes vs. RSC Directive (Important Distinction)
 
 React on Rails has two **independent** classification systems that both use "client" / "server" terminology. Confusing them is a common mistake.
 
@@ -74,7 +74,7 @@ React on Rails has two **independent** classification systems that both use "cli
 A React on Rails auto-bundling feature that controls which **webpack bundle** imports a file. This exists independently of React Server Components and is used with or without RSC:
 
 - `Component.client.jsx` → client bundle only (browser)
-- `Component.server.jsx` → server bundle only (Node.js SSR). Must have a paired `.client.` file.
+- `Component.server.jsx` → server bundle (and RSC bundle when RSC enabled). Must have a paired `.client.` file.
 - `Component.jsx` (no suffix) → both bundles
 
 This is purely about source file routing. A `.server.jsx` file is NOT a React Server Component.
@@ -88,11 +88,11 @@ When auto-bundling is enabled with RSC support (Pro feature), React on Rails use
 - **Registration**: Components with `'use client'` are registered via `ReactOnRails.register()`. Components without it are registered via `registerServerComponent()`.
 - **RSC bundling**: The RSC webpack loader uses this directive to decide whether a component is included in the RSC bundle or replaced with a client reference in that bundle.
 
-Checked by `client_entrypoint?` in `packs_generator.rb`.
+The `client_entrypoint?` method in `packs_generator.rb` is what detects this directive during auto-bundling.
 
 ### How They Interact
 
-These are orthogonal. The suffix controls which bundle, the directive controls RSC registration:
+These are orthogonal concerns. The file suffix controls which bundle, and the directive controls RSC registration:
 
 | File | `'use client'`? | Goes into | Registered as |
 |------|-----------------|-----------|---------------|
@@ -100,18 +100,18 @@ These are orthogonal. The suffix controls which bundle, the directive controls R
 | `Foo.jsx` | No | Both bundles | Server component |
 | `Foo.client.jsx` | Yes | Client bundle | Client component |
 | `Foo.client.jsx` | No | Client bundle | Server component |
-| `Foo.server.jsx` | Yes | Server bundle | Client component |
-| `Foo.server.jsx` | No | Server bundle | Server component |
+| `Foo.server.jsx` | Yes | Server bundle (+ RSC bundle) | Client component |
+| `Foo.server.jsx` | No | Server bundle (+ RSC bundle) | Server component |
 
 In practice, paired `.client.`/`.server.` files should always have matching `'use client'` status because the client and server must agree on a component's RSC role for hydration to work.
 
 ### Key code paths in `packs_generator.rb`
 
-- `common_component_to_path` (line ~484) — finds files without `.client.`/`.server.` suffix
-- `client_component_to_path` (line ~490) — finds `.client.` files
-- `server_component_to_path` (line ~501) — finds `.server.` files (requires paired `.client.`)
-- `client_entrypoint?` (line ~148) — checks for `'use client'` directive (RSC classification)
-- `pack_file_contents` (line ~173) — generates different registration code based on `client_entrypoint?`
+- `common_component_to_path` — finds files without `.client.`/`.server.` suffix
+- `client_component_to_path` — finds `.client.` files
+- `server_component_to_path` — finds `.server.` files (requires paired `.client.`)
+- `client_entrypoint?` — checks for `'use client'` directive (RSC classification)
+- `pack_file_contents` — generates different registration code based on `client_entrypoint?`
 
 ## Examples and Testing
 
