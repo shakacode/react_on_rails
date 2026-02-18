@@ -8,7 +8,7 @@ import { hydrateRoot } from 'react-dom/client';
 // 2. The package is guaranteed to be available at runtime in Node 18+ environments
 import { screen, act, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import { getNodeVersion } from './testUtils.js';
+import { getNodeVersion } from './testUtils.ts';
 
 /**
  * Tests React's Suspense hydration behavior for async components
