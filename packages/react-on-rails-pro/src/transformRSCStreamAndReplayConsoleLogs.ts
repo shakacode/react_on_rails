@@ -78,11 +78,10 @@ export default function transformRSCStreamAndReplayConsoleLogs(stream: ReadableS
           // eslint-disable-next-line no-await-in-loop
           ({ value, done } = await reader.read());
         }
+        controller.close();
       } catch (error) {
         console.error('Error transforming RSC stream:', error);
         controller.error(error);
-      } finally {
-        controller.close();
       }
     },
   });
