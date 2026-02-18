@@ -136,10 +136,28 @@ class RSCRequestTracker {
       //   1. stream1 - Used by React's runtime to perform server-side rendering
       //   2. stream2 - Used by react-on-rails to embed the RSC payloads
       //      into the HTML stream for client-side hydration
+      //
+      // Manual forwarding via on('data') + push() is used instead of pipe() to
+      // avoid backpressure coupling between the two destinations. With pipe(),
+      // if either destination's buffer fills (e.g., stream2 is not consumed yet
+      // because injectRSCPayload waits for the first HTML chunk), pipe() pauses
+      // the source, which stalls BOTH destinations. With push(), each destination
+      // buffers independently — stream1 keeps receiving data even if stream2's
+      // buffer is full.
       const stream1 = new PassThrough();
-      stream.pipe(stream1);
       const stream2 = new PassThrough();
-      stream.pipe(stream2);
+      stream.on('data', (chunk: Buffer) => {
+        stream1.push(chunk);
+        stream2.push(chunk);
+      });
+      stream.on('end', () => {
+        stream1.push(null);
+        stream2.push(null);
+      });
+      stream.on('error', (err: Error) => {
+        stream1.destroy(err);
+        stream2.destroy(err);
+      });
 
       const streamInfo: RSCPayloadStreamInfo = {
         componentName,
