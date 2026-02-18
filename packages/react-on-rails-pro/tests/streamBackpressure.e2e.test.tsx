@@ -8,7 +8,7 @@
  * These tests exercise the FULL rendering pipeline:
  *   streamServerRenderedReactComponent
  *     → createReactOutput (render function)
- *     → RSCRequestTracker.getRSCPayloadStream (pipe-based tee)
+ *     → RSCRequestTracker.getRSCPayloadStream (event-based tee)
  *     → renderToPipeableStream (React SSR)
  *     → injectRSCPayload (RSC script embedding)
  *     → result stream (JSON chunks with HTML + RSC payloads)

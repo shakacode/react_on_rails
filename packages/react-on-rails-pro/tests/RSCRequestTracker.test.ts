@@ -228,7 +228,7 @@ describe('RSCRequestTracker', () => {
       // Output must contain the RSC payload initialization and data scripts
       expect(result).toContain('REACT_ON_RAILS_RSC_PAYLOADS');
       expect(result).toContain('.push(');
-      expect(result).toContain(payload.replace(/"/g, '\\"'));
+      expect(result).toContain(JSON.stringify(payload));
     });
 
     it('does not deadlock with large multi-chunk payloads exceeding the default highWaterMark', async () => {
