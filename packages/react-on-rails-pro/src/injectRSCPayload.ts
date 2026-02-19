@@ -304,12 +304,12 @@ export default function injectRSCPayload(
 
   /**
    * 'close' fires after both normal 'end' and destroy().
-   * When htmlStream ends normally, the 'end' handler below handles cleanup.
-   * When htmlStream is destroyed (e.g., source stream failure), 'end' never fires —
-   * this handler ensures resultStream is still properly terminated.
+   * When htmlStream ends normally, readableEnded is true — the 'end' handler handles cleanup.
+   * When htmlStream is destroyed (e.g., source stream failure), readableEnded stays false
+   * and 'end' never fires — this handler ensures resultStream is still properly terminated.
    */
   htmlStream.on('close', () => {
-    if (!resultStream.writableEnded) {
+    if (!htmlStream.readableEnded && !resultStream.writableEnded) {
       endResultStream();
     }
   });
