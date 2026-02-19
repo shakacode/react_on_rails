@@ -11,11 +11,13 @@ const AlwaysFailsAsync = () => {
 
 const StreamErrorDemo = () => (
   <div style={{ fontFamily: 'sans-serif', padding: '20px' }}>
-    <h1>Stream Error Demo (Issue #2402)</h1>
-    <p>This component demonstrates the streaming hang bug.</p>
+    <h1>Stream Error Demo</h1>
+    <p>This component demonstrates stream error handling during SSR.</p>
     <p>The header above renders immediately as part of the shell.</p>
     <hr />
-    <Suspense fallback={<div style={{ color: 'orange' }}>Loading async content (will error after 2s)...</div>}>
+    <Suspense
+      fallback={<div style={{ color: 'orange' }}>Loading async content (will error after 2s)...</div>}
+    >
       <AlwaysFailsAsync />
     </Suspense>
     <hr />
