@@ -438,7 +438,7 @@ module ReactOnRailsProHelper
       stream = yield
       process_stream_chunks(stream, first_chunk_var, all_chunks)
       on_complete&.call(all_chunks)
-    rescue StandardError => e
+    rescue StandardError
       # Resolve first_chunk_var if not yet resolved, to prevent caller from hanging
       begin
         first_chunk_var.value = nil
