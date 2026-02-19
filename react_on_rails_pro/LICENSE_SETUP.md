@@ -91,7 +91,10 @@ When no license is present, the application runs in **unlicensed mode**. This is
 
 No license setup is needed for development. Developers can install and use React on Rails Pro immediately.
 
-For production deployments, share a paid license via environment variable or configuration file.
+For production deployments, configure a paid license via the `REACT_ON_RAILS_PRO_LICENSE` environment variable.
+
+> Migration note: `config/react_on_rails_pro_license.key` is no longer read.
+> If you used that file previously, move the token to `REACT_ON_RAILS_PRO_LICENSE`.
 
 ### For CI/CD
 
