@@ -27,6 +27,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 Changes since the last non-beta release.
 
+#### Fixed
+
+- **RSC Generator Layout Wiring**: Fixed `MissingEntryError` on fresh RSC installs caused by the generator copying `application.html.erb` to the server layout without updating the `javascript_pack_tag` entry name. The layout now correctly references the `hello-server-bundle` pack. Also improved post-install messaging to mention the `react_on_rails_helper` for RSC setups. [PR 2429](https://github.com/shakacode/react_on_rails/pull/2429) by [justin808](https://github.com/justin808).
+
 ### [16.4.0.rc.1] - 2026-02-12
 
 #### Fixed
