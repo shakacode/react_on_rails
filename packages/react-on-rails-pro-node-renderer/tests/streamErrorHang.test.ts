@@ -1,12 +1,10 @@
 /**
- * E2E test reproducing issue #2402: streaming HTTP response hangs forever
+ * E2E tests verifying that streaming HTTP responses complete gracefully
  * when the rendering stream errors.
  *
- * This test follows the same pattern as htmlStreaming.test.js (full HTTP/2
- * round-trip through Fastify), but uses a minimal bundle that returns a
- * Readable stream which errors — no React components needed.
- *
- * @see https://github.com/shakacode/react_on_rails/issues/2402
+ * Uses a full HTTP/2 round-trip through Fastify (same pattern as
+ * htmlStreaming.test.js) with a minimal bundle that returns a Readable
+ * stream which errors — no React components needed.
  */
 
 import fs from 'fs';
@@ -35,13 +33,12 @@ afterAll(async () => {
 jest.spyOn(errorReporter, 'message').mockImplementation(jest.fn());
 
 // ---------------------------------------------------------------------------
-// Helpers (kept minimal — only the parts that differ from httpRequestUtils)
+// Helpers
 // ---------------------------------------------------------------------------
 
-/** Builds a multipart form with our stream-test bundle and a custom rendering request. */
+/** Builds a multipart form with the stream-test bundle and a custom rendering request. */
 const createForm = (renderingRequest: string) => {
   const form = new FormData();
-  // Same auth/version fields as httpRequestUtils.createForm
   form.append('gemVersion', packageJson.version);
   form.append('protocolVersion', packageJson.protocolVersion);
   form.append('password', 'myPassword1');
@@ -57,8 +54,8 @@ const createForm = (renderingRequest: string) => {
 };
 
 /**
- * Same request flow as htmlStreaming.test.js's makeRequest, but adds a
- * timeout so the test can detect a hung response instead of hanging itself.
+ * Sends a streaming render request and returns the response chunks.
+ * Includes a timeout to detect hung responses instead of hanging the test.
  */
 const makeRequest = (renderingRequest: string, timeoutMs = 3000) =>
   new Promise<{ status: number | undefined; chunks: string[]; timedOut: boolean }>((resolve) => {
@@ -80,7 +77,6 @@ const makeRequest = (renderingRequest: string, timeoutMs = 3000) =>
       status = headers[':status'];
     });
 
-    // Same newline-delimited chunk parsing as htmlStreaming.test.js
     request.on('data', (data: string) => {
       const decoded = data
         .split('\n')
@@ -117,7 +113,7 @@ const makeRequest = (renderingRequest: string, timeoutMs = 3000) =>
 // ---------------------------------------------------------------------------
 
 const RENDERING_REQUEST = {
-  /** Pushes one chunk, then errors. Stream should close but doesn't (the bug). */
+  /** Pushes one chunk, then destroys the stream with an error. */
   errorMidStream: `(function() {
     var stream = new Readable({ read() {} });
     setTimeout(function() {
@@ -129,7 +125,7 @@ const RENDERING_REQUEST = {
     return stream;
   })()`,
 
-  /** Errors immediately, before any data is sent. */
+  /** Destroys the stream with an error before any data is sent. */
   errorBeforeData: `(function() {
     var stream = new Readable({ read() {} });
     setTimeout(function() {
@@ -153,7 +149,7 @@ const RENDERING_REQUEST = {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('streaming error hang - E2E (issue #2402)', () => {
+describe('streaming render error handling - E2E', () => {
   it('HTTP response completes when rendering stream errors mid-stream', async () => {
     const { status, chunks, timedOut } = await makeRequest(RENDERING_REQUEST.errorMidStream);
 
@@ -162,10 +158,10 @@ describe('streaming error hang - E2E (issue #2402)', () => {
     expect(chunks.length).toBeGreaterThanOrEqual(1);
     expect(chunks[0]).toContain('partial');
 
-    // The response completes instead of hanging
+    // The response completes gracefully
     expect(timedOut).toBe(false);
 
-    // The error IS reported to errorReporter (handleStreamError's onError fires)
+    // The error IS reported
     expect(errorReporter.message).toHaveBeenCalledWith(
       expect.stringContaining('mid-stream rendering error'),
     );
@@ -174,7 +170,7 @@ describe('streaming error hang - E2E (issue #2402)', () => {
   it('HTTP response completes when rendering stream errors before any data', async () => {
     const { timedOut } = await makeRequest(RENDERING_REQUEST.errorBeforeData);
 
-    // The response completes instead of hanging
+    // The response completes gracefully
     expect(timedOut).toBe(false);
 
     expect(errorReporter.message).toHaveBeenCalledWith(
@@ -182,7 +178,7 @@ describe('streaming error hang - E2E (issue #2402)', () => {
     );
   }, 10000);
 
-  it('control: HTTP response completes normally when stream ends properly', async () => {
+  it('HTTP response completes normally when stream ends without errors', async () => {
     const { status, chunks, timedOut } = await makeRequest(RENDERING_REQUEST.happyPath);
 
     expect(timedOut).toBe(false);
