@@ -162,12 +162,12 @@ module ReactOnRails
 
       return if matches.empty?
 
-      Rails.logger.warn(
+      puts Rainbow(
         "[react_on_rails] WARNING: '#{component}' (#{file_path}) appears to use client-side APIs " \
         "(#{matches.first(3).join(', ')}#{matches.length > 3 ? ', ...' : ''}) " \
         "but is missing the 'use client' directive. It will be registered as a server component.\n" \
         "If this is a client component, add '\"use client\";' as the first line of the file."
-      )
+      ).yellow
     end
 
     def pack_file_contents(file_path)
