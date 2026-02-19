@@ -1961,8 +1961,8 @@ such as:
 
 - Missing Lodash from generated package.json [#175](https://github.com/shakacode/react_on_rails/pull/175)
 - Rails 3.2 could not run generators [#182](https://github.com/shakacode/react_on_rails/pull/182)
-- Better placement of jquery_ujs dependency [#171](https://github.com/shakacode/react_on_rails/commit/b168abd5a55221006b2520fc75b41ea775fcd1c5)
-- Add more detailed description when adding --help option to generator [#161](https://github.com/shakacode/react_on_rails/commit/a9b7d47d0829a0b6ec6c28bfbbbb589a4149296f)
+- Better placement of jquery_ujs dependency [commit b168abd5](https://github.com/shakacode/react_on_rails/commit/b168abd5a55221006b2520fc75b41ea775fcd1c5)
+- Add more detailed description when adding --help option to generator [commit a9b7d47d](https://github.com/shakacode/react_on_rails/commit/a9b7d47d0829a0b6ec6c28bfbbbb589a4149296f)
 - Lots of better docs.
 
 ## [1.2.0]
