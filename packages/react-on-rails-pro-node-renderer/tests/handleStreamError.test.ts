@@ -99,6 +99,11 @@ describe('handleStreamError', () => {
 
     const resultStream = handleStreamError(source, onError);
 
+    const receivedChunks: string[] = [];
+    resultStream.on('data', (chunk: Buffer) => {
+      receivedChunks.push(chunk.toString());
+    });
+
     source.push('chunk1');
 
     // Emit error WITHOUT destroying — simulates non-fatal errors like Suspense boundary failures
@@ -119,12 +124,12 @@ describe('handleStreamError', () => {
     const streamEnded = await Promise.race([
       new Promise<'ended'>((resolve) => {
         resultStream.on('end', () => resolve('ended'));
-        resultStream.resume();
       }),
       new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), 2000)),
     ]);
 
     expect(streamEnded).toBe('ended');
+    expect(receivedChunks).toContain('chunk2');
   }, 5000);
 
   it('ends the PassThrough correctly when the source ends normally', async () => {
