@@ -445,7 +445,7 @@ module ReactOnRailsProHelper
       rescue StandardError
         # Already resolved, safe to ignore
       end
-      raise e
+      raise
     end
 
     # Wait for and return the first chunk (blocking)

@@ -162,9 +162,7 @@ describe('streaming render error handling - E2E', () => {
     expect(timedOut).toBe(false);
 
     // The error IS reported
-    expect(errorReporter.message).toHaveBeenCalledWith(
-      expect.stringContaining('mid-stream rendering error'),
-    );
+    expect(errorReporter.message).toHaveBeenCalledWith(expect.stringContaining('mid-stream rendering error'));
   }, 10000);
 
   it('HTTP response completes when rendering stream errors before any data', async () => {
@@ -173,9 +171,7 @@ describe('streaming render error handling - E2E', () => {
     // The response completes gracefully
     expect(timedOut).toBe(false);
 
-    expect(errorReporter.message).toHaveBeenCalledWith(
-      expect.stringContaining('immediate rendering error'),
-    );
+    expect(errorReporter.message).toHaveBeenCalledWith(expect.stringContaining('immediate rendering error'));
   }, 10000);
 
   it('HTTP response completes normally when stream ends without errors', async () => {

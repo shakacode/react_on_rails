@@ -326,12 +326,7 @@ export default function injectRSCPayload(
    */
   htmlStream.on('end', () => {
     const cleanup = () => {
-      if (flushTimeout) {
-        clearTimeout(flushTimeout);
-      }
-
-      flush();
-      resultStream.end();
+      endResultStream();
     };
 
     if (!rscPromise) {
