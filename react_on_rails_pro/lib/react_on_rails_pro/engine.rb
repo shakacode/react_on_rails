@@ -5,7 +5,9 @@ require "rails/railtie"
 module ReactOnRailsPro
   class Engine < Rails::Engine
     LICENSE_URL = "https://www.shakacode.com/react-on-rails-pro/"
+    LEGACY_LICENSE_FILE = "config/react_on_rails_pro_license.key"
     private_constant :LICENSE_URL
+    private_constant :LEGACY_LICENSE_FILE
 
     initializer "react_on_rails_pro.routes" do
       ActionDispatch::Routing::Mapper.include ReactOnRailsPro::Routes
@@ -25,6 +27,7 @@ module ReactOnRailsPro
         when :valid
           log_valid_license
         when :missing
+          log_legacy_license_migration_notice if legacy_license_file_present?
           log_license_issue("No license found", "Get a license at #{LICENSE_URL}")
         when :expired
           expiration = ReactOnRailsPro::LicenseValidator.license_expiration
@@ -77,6 +80,22 @@ module ReactOnRailsPro
           Rails.logger.warn "#{prefix} #{warning} #{action}"
         else
           Rails.logger.info "#{prefix} No license required for development/test environments."
+        end
+      end
+
+      def legacy_license_file_present?
+        Rails.root.join(LEGACY_LICENSE_FILE).exist?
+      end
+
+      def log_legacy_license_migration_notice
+        message = "[React on Rails Pro] Detected legacy license file at #{LEGACY_LICENSE_FILE}, " \
+                  "but this file is no longer read. " \
+                  "Move your token to REACT_ON_RAILS_PRO_LICENSE."
+
+        if Rails.env.production?
+          Rails.logger.warn message
+        else
+          Rails.logger.info message
         end
       end
     end
