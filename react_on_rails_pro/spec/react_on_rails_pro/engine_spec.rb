@@ -53,6 +53,18 @@ RSpec.describe ReactOnRailsPro::Engine do
           expect(mock_logger).to receive(:warn).with(/violates the license terms/)
           described_class.log_license_status
         end
+
+        context "when legacy license file exists" do
+          before do
+            allow(config_file_path).to receive(:exist?).and_return(true)
+          end
+
+          it "logs migration warning for env-var setup" do
+            expect(mock_logger).to receive(:warn).with(/legacy license file/)
+            expect(mock_logger).to receive(:warn).with(/REACT_ON_RAILS_PRO_LICENSE/)
+            described_class.log_license_status
+          end
+        end
       end
 
       context "with expired license" do
@@ -170,6 +182,18 @@ RSpec.describe ReactOnRailsPro::Engine do
         it "includes the development/test message" do
           expect(mock_logger).to receive(:info).with(%r{No license required for development/test environments})
           described_class.log_license_status
+        end
+
+        context "when legacy license file exists" do
+          before do
+            allow(config_file_path).to receive(:exist?).and_return(true)
+          end
+
+          it "logs migration info for env-var setup" do
+            expect(mock_logger).to receive(:info).with(/legacy license file/)
+            expect(mock_logger).to receive(:info).with(/REACT_ON_RAILS_PRO_LICENSE/)
+            described_class.log_license_status
+          end
         end
       end
 
