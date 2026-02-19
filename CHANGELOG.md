@@ -44,16 +44,16 @@ Changes since the last non-beta release.
 
   [PR 2340](https://github.com/shakacode/react_on_rails/pull/2340) by [justin808](https://github.com/justin808).
 
+#### Improved
+
+- **Smarter duplicate registration warnings**: Component and store registration now only warns when a _different_ component or store is registered under an already-used name. Re-registering the same component (common with HMR) is silently accepted. [PR 2354](https://github.com/shakacode/react_on_rails/pull/2354) by [justin808](https://github.com/justin808).
+
 #### Fixed
 
 - **Fixed string values interpolated into generated JS code without proper escaping**. All string values (component names, DOM IDs, Redux store names) embedded in server-rendering JavaScript now use `.to_json` instead of unescaped single-quoted interpolation, preventing potential JS breakage from special characters. [PR 2440](https://github.com/shakacode/react_on_rails/pull/2440) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 - **Precompile Hook Detection**: Fixed `shakapacker_precompile_hook_configured?` always returning `false` for apps created with the React on Rails generator. The detection logic only matched the rake task pattern (`react_on_rails:generate_packs`) but the generator template uses the Ruby method (`generate_packs_if_stale`). Now correctly detects both patterns, including resolving script file contents. [PR 2282](https://github.com/shakacode/react_on_rails/pull/2282) by [ihabadham](https://github.com/ihabadham).
 - **Precompile Hook Self-Guard for HMR**: Added self-guard to the generator template's `bin/shakapacker-precompile-hook` to prevent duplicate execution in HMR mode where two webpack processes (client dev-server + server watcher) each trigger the hook. The script now exits early when `SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true` is set by `bin/dev`, regardless of Shakapacker version. The version warning is now smarter: it only warns for hooks that lack the self-guard or use direct commands. **Existing users**: add `exit 0 if ENV["SHAKAPACKER_SKIP_PRECOMPILE_HOOK"] == "true"` near the top of your `bin/shakapacker-precompile-hook` script. [PR 2388](https://github.com/shakacode/react_on_rails/pull/2388) by [justin808](https://github.com/justin808).
 - **Fix generator inheriting BUNDLE_GEMFILE from parent process**: The `react_on_rails:install` generator now wraps bundler commands with `Bundler.with_unbundled_env` to prevent inheriting `BUNDLE_GEMFILE` from the parent process, which caused "injected gems" conflicts when running generators inside a bundled context. [PR 2288](https://github.com/shakacode/react_on_rails/pull/2288) by [ihabadham](https://github.com/ihabadham).
-
-#### Improved
-
-- **Smarter duplicate registration warnings**: Component and store registration now only warns when a _different_ component or store is registered under an already-used name. Re-registering the same component (common with HMR) is silently accepted. [PR 2354](https://github.com/shakacode/react_on_rails/pull/2354) by [justin808](https://github.com/justin808).
 
 #### Pro
 
