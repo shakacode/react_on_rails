@@ -62,6 +62,28 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
       end
     end
 
+    context "with valid license in ENV with surrounding whitespace" do
+      before do
+        valid_token = JWT.encode(valid_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = "  #{valid_token}  "
+      end
+
+      it "returns :valid" do
+        expect(described_class.license_status).to eq(:valid)
+      end
+    end
+
+    context "with valid license in ENV with trailing newline" do
+      before do
+        valid_token = JWT.encode(valid_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = "#{valid_token}\n"
+      end
+
+      it "returns :valid" do
+        expect(described_class.license_status).to eq(:valid)
+      end
+    end
+
     context "with expired license" do
       before do
         expired_token = JWT.encode(expired_payload, test_private_key, "RS256")

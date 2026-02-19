@@ -64,6 +64,7 @@ RSpec.describe ReactOnRailsPro::Engine do
             described_class.log_license_status
             expect(mock_logger).to have_received(:warn).with(/legacy license file/)
             expect(mock_logger).to have_received(:warn).with(/REACT_ON_RAILS_PRO_LICENSE/)
+            expect(mock_logger).to have_received(:warn).with(/No license found/)
           end
         end
       end
@@ -195,6 +196,7 @@ RSpec.describe ReactOnRailsPro::Engine do
             described_class.log_license_status
             expect(mock_logger).to have_received(:info).with(/legacy license file/)
             expect(mock_logger).to have_received(:info).with(/REACT_ON_RAILS_PRO_LICENSE/)
+            expect(mock_logger).to have_received(:info).with(/No license found/)
           end
         end
       end
