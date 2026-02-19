@@ -94,14 +94,14 @@ The `client_entrypoint?` method in `packs_generator.rb` is what detects this dir
 
 These are orthogonal concerns. The file suffix controls which bundle, and the directive controls RSC registration:
 
-| File | `'use client'`? | Goes into | Registered as |
-|------|-----------------|-----------|---------------|
-| `Foo.jsx` | Yes | Both bundles | Client component |
-| `Foo.jsx` | No | Both bundles | Server component |
-| `Foo.client.jsx` | Yes | Client bundle | Client component |
-| `Foo.client.jsx` | No | Client bundle | Server component |
-| `Foo.server.jsx` | Yes | Server bundle (+ RSC bundle) | Client component |
-| `Foo.server.jsx` | No | Server bundle (+ RSC bundle) | Server component |
+| File             | `'use client'`? | Goes into                    | Registered as    |
+| ---------------- | --------------- | ---------------------------- | ---------------- |
+| `Foo.jsx`        | Yes             | Both bundles                 | Client component |
+| `Foo.jsx`        | No              | Both bundles                 | Server component |
+| `Foo.client.jsx` | Yes             | Client bundle                | Client component |
+| `Foo.client.jsx` | No              | Client bundle                | Server component |
+| `Foo.server.jsx` | Yes             | Server bundle (+ RSC bundle) | Client component |
+| `Foo.server.jsx` | No              | Server bundle (+ RSC bundle) | Server component |
 
 In practice, paired `.client.`/`.server.` files should always have matching `'use client'` status because the client and server must agree on a component's RSC role for hydration to work.
 
@@ -109,7 +109,7 @@ In practice, paired `.client.`/`.server.` files should always have matching `'us
 
 - `common_component_to_path` — finds files without `.client.`/`.server.` suffix
 - `client_component_to_path` — finds `.client.` files
-- `server_component_to_path` — finds `.server.` files (requires paired `.client.`)
+- `server_component_to_path` — finds `.server.` files (requires a paired `.client.`)
 - `client_entrypoint?` — checks for `'use client'` directive (RSC classification)
 - `pack_file_contents` — generates different registration code based on `client_entrypoint?`
 
