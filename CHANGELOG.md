@@ -29,26 +29,6 @@ Changes since the last non-beta release.
 
 ### [16.4.0.rc.3] - 2026-02-18
 
-#### Fixed
-
-- **Fixed string values interpolated into generated JS code without proper escaping**. All string values (component names, DOM IDs, Redux store names) embedded in server-rendering JavaScript now use `.to_json` instead of unescaped single-quoted interpolation, preventing potential JS breakage from special characters. [PR 2440](https://github.com/shakacode/react_on_rails/pull/2440) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-
-#### Pro
-
-##### Fixed
-
-- **Fixed RSC rendering corruption when props contain `$`-patterns**. Props containing `` $` `` (dollar-backtick), `$'`, or `$&` — common in markdown with bash variables — caused `String.prototype.replace()` to interpret these as special replacement patterns, corrupting the generated JavaScript and hanging the RSC payload stream. Fixed by using a function replacement callback which disables all `$`-pattern interpretation. [PR 2440](https://github.com/shakacode/react_on_rails/pull/2440) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-
-- **Fixed RSC stream tee backpressure deadlock for large payloads**. Replaced `pipe()`-based stream teeing with manual `on('data')` + `push()` forwarding to prevent deadlocks when RSC payloads exceed the 32KB default highWaterMark buffer, which caused the stream to hang indefinitely. [PR 2444](https://github.com/shakacode/react_on_rails/pull/2444) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-
-### [16.4.0.rc.1] - 2026-02-12
-
-#### Fixed
-
-- **Precompile Hook Detection**: Fixed `shakapacker_precompile_hook_configured?` always returning `false` for apps created with the React on Rails generator. The detection logic only matched the rake task pattern (`react_on_rails:generate_packs`) but the generator template uses the Ruby method (`generate_packs_if_stale`). Now correctly detects both patterns, including resolving script file contents. [PR 2282](https://github.com/shakacode/react_on_rails/pull/2282) by [ihabadham](https://github.com/ihabadham).
-- **Precompile Hook Self-Guard for HMR**: Added self-guard to the generator template's `bin/shakapacker-precompile-hook` to prevent duplicate execution in HMR mode where two webpack processes (client dev-server + server watcher) each trigger the hook. The script now exits early when `SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true` is set by `bin/dev`, regardless of Shakapacker version. The version warning is now smarter: it only warns for hooks that lack the self-guard or use direct commands. **Existing users**: add `exit 0 if ENV["SHAKAPACKER_SKIP_PRECOMPILE_HOOK"] == "true"` near the top of your `bin/shakapacker-precompile-hook` script. [PR 2388](https://github.com/shakacode/react_on_rails/pull/2388) by [justin808](https://github.com/justin808).
-- **Fix generator inheriting BUNDLE_GEMFILE from parent process**: The `react_on_rails:install` generator now wraps bundler commands with `Bundler.with_unbundled_env` to prevent inheriting `BUNDLE_GEMFILE` from the parent process, which caused "injected gems" conflicts when running generators inside a bundled context. [PR 2288](https://github.com/shakacode/react_on_rails/pull/2288) by [ihabadham](https://github.com/ihabadham).
-
 #### Added
 
 - **Pro and RSC generator flags**: Added `--pro` and `--rsc` flags to `rails g react_on_rails:install`, plus standalone `react_on_rails:pro` and `react_on_rails:rsc` generators for upgrading existing apps to Pro and React Server Components. Includes idempotent setup modules, webpack config transforms, prerequisite validation, and example components. [PR 2284](https://github.com/shakacode/react_on_rails/pull/2284) by [ihabadham](https://github.com/ihabadham).
@@ -64,6 +44,13 @@ Changes since the last non-beta release.
 
   [PR 2340](https://github.com/shakacode/react_on_rails/pull/2340) by [justin808](https://github.com/justin808).
 
+#### Fixed
+
+- **Fixed string values interpolated into generated JS code without proper escaping**. All string values (component names, DOM IDs, Redux store names) embedded in server-rendering JavaScript now use `.to_json` instead of unescaped single-quoted interpolation, preventing potential JS breakage from special characters. [PR 2440](https://github.com/shakacode/react_on_rails/pull/2440) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **Precompile Hook Detection**: Fixed `shakapacker_precompile_hook_configured?` always returning `false` for apps created with the React on Rails generator. The detection logic only matched the rake task pattern (`react_on_rails:generate_packs`) but the generator template uses the Ruby method (`generate_packs_if_stale`). Now correctly detects both patterns, including resolving script file contents. [PR 2282](https://github.com/shakacode/react_on_rails/pull/2282) by [ihabadham](https://github.com/ihabadham).
+- **Precompile Hook Self-Guard for HMR**: Added self-guard to the generator template's `bin/shakapacker-precompile-hook` to prevent duplicate execution in HMR mode where two webpack processes (client dev-server + server watcher) each trigger the hook. The script now exits early when `SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true` is set by `bin/dev`, regardless of Shakapacker version. The version warning is now smarter: it only warns for hooks that lack the self-guard or use direct commands. **Existing users**: add `exit 0 if ENV["SHAKAPACKER_SKIP_PRECOMPILE_HOOK"] == "true"` near the top of your `bin/shakapacker-precompile-hook` script. [PR 2388](https://github.com/shakacode/react_on_rails/pull/2388) by [justin808](https://github.com/justin808).
+- **Fix generator inheriting BUNDLE_GEMFILE from parent process**: The `react_on_rails:install` generator now wraps bundler commands with `Bundler.with_unbundled_env` to prevent inheriting `BUNDLE_GEMFILE` from the parent process, which caused "injected gems" conflicts when running generators inside a bundled context. [PR 2288](https://github.com/shakacode/react_on_rails/pull/2288) by [ihabadham](https://github.com/ihabadham).
+
 #### Improved
 
 - **Smarter duplicate registration warnings**: Component and store registration now only warns when a _different_ component or store is registered under an already-used name. Re-registering the same component (common with HMR) is silently accepted. [PR 2354](https://github.com/shakacode/react_on_rails/pull/2354) by [justin808](https://github.com/justin808).
@@ -74,6 +61,11 @@ Changes since the last non-beta release.
 
 - **CSP nonce for immediate hydration scripts**: The immediate hydration inline `<script>` tags now include the CSP nonce attribute, fixing browsers blocking them when strict Content Security Policy is enabled. [PR 2398](https://github.com/shakacode/react_on_rails/pull/2398) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 - **License verification rake task**: New `react_on_rails_pro:verify_license` rake task for checking license status with human-readable text and JSON output (`FORMAT=json`) for CI/CD integration. Includes exit codes, automatic renewal warnings for licenses expiring within 30 days, and a GitHub Actions workflow example. [PR 2385](https://github.com/shakacode/react_on_rails/pull/2385) by [justin808](https://github.com/justin808).
+
+##### Fixed
+
+- **Fixed RSC rendering corruption when props contain `$`-patterns**. Props containing `` $` `` (dollar-backtick), `$'`, or `$&` — common in markdown with bash variables — caused `String.prototype.replace()` to interpret these as special replacement patterns, corrupting the generated JavaScript and hanging the RSC payload stream. Fixed by using a function replacement callback which disables all `$`-pattern interpretation. [PR 2440](https://github.com/shakacode/react_on_rails/pull/2440) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **Fixed RSC stream tee backpressure deadlock for large payloads**. Replaced `pipe()`-based stream teeing with manual `on('data')` + `push()` forwarding to prevent deadlocks when RSC payloads exceed the 32KB default highWaterMark buffer, which caused the stream to hang indefinitely. [PR 2444](https://github.com/shakacode/react_on_rails/pull/2444) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 ### [16.3.0] - 2026-02-05
 
@@ -2006,8 +1998,7 @@ such as:
 - Fix several generator-related issues.
 
 [unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.4.0.rc.3...master
-[16.4.0.rc.3]: https://github.com/shakacode/react_on_rails/compare/v16.4.0.rc.1...v16.4.0.rc.3
-[16.4.0.rc.1]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...v16.4.0.rc.1
+[16.4.0.rc.3]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...v16.4.0.rc.3
 [16.3.0]: https://github.com/shakacode/react_on_rails/compare/v16.2.1...v16.3.0
 [16.2.1]: https://github.com/shakacode/react_on_rails/compare/v16.2.0...v16.2.1
 [16.2.0]: https://github.com/shakacode/react_on_rails/compare/16.1.1...v16.2.0
