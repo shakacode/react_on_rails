@@ -27,6 +27,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 Changes since the last non-beta release.
 
+#### Pro
+
+##### Changed
+
+- **License token setup is now env-var only**: React on Rails Pro no longer loads license tokens from `config/react_on_rails_pro_license.key`. Set `REACT_ON_RAILS_PRO_LICENSE` in your environment instead.
+
 ### [16.4.0.rc.3] - 2026-02-18
 
 #### Added

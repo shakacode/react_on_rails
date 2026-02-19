@@ -51,7 +51,7 @@ This change allows your application to start even with license issues, giving yo
 
 ## Installation
 
-### Method 1: Environment Variable (Recommended)
+### Environment Variable (Required)
 
 Set the `REACT_ON_RAILS_PRO_LICENSE` environment variable:
 
@@ -72,22 +72,8 @@ heroku config:set REACT_ON_RAILS_PRO_LICENSE="your_token"
 # Add to your CI environment variables if needed
 ```
 
-### Method 2: Configuration File
-
-Create `config/react_on_rails_pro_license.key` in your Rails root:
-
-```bash
-echo "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..." > config/react_on_rails_pro_license.key
-```
-
-**Important**: Add this file to your `.gitignore` to avoid committing your license:
-
-```bash
-# Add to .gitignore
-echo "config/react_on_rails_pro_license.key" >> .gitignore
-```
-
-**Never commit your license to version control.**
+Configure your license token via the `REACT_ON_RAILS_PRO_LICENSE` environment variable.
+Never commit license tokens to version control.
 
 ## License Validation
 
@@ -339,7 +325,7 @@ Need help?
 
 ## Security Best Practices
 
-1. ✅ **Never commit licenses to Git** — Add `config/react_on_rails_pro_license.key` to `.gitignore`
+1. ✅ **Never commit licenses to Git** — Keep license tokens in environment variables or secret managers
 2. ✅ **Use environment variables in production**
 3. ✅ **Use CI secrets for production deployment pipelines**
 4. ✅ **Don't share licenses publicly**

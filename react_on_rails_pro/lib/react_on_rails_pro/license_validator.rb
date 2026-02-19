@@ -232,25 +232,12 @@ module ReactOnRailsPro
         ATTRIBUTION_REQUIRED_PLANS.include?(plan.strip)
       end
 
-      # Loads license string from env var or file
+      # Loads license string from environment variable
       # @return [String, nil] License string or nil if not found
       def load_license_string
-        # First try environment variable
+        # License must be configured via environment variable
         license = ENV.fetch("REACT_ON_RAILS_PRO_LICENSE", nil)
-        return license if license && !license.strip.empty?
-
-        # Then try config file
-        config_path = Rails.root.join("config", "react_on_rails_pro_license.key")
-        return unless config_path.exist?
-
-        begin
-          content = File.read(config_path).strip
-          return nil if content.empty?
-
-          content
-        rescue StandardError
-          nil
-        end
+        license if license && !license.strip.empty?
       end
 
       # Decodes and verifies the JWT license

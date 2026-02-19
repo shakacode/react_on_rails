@@ -1,9 +1,7 @@
 import * as jwt from 'jsonwebtoken';
-import * as fs from 'fs';
 import * as crypto from 'crypto';
 
 // Mock modules
-jest.mock('fs');
 jest.mock('../src/shared/licensePublicKey', () => ({
   PUBLIC_KEY: '',
 }));
@@ -24,10 +22,6 @@ describe('LicenseValidator', () => {
   beforeEach(() => {
     // Clear the module cache to get a fresh instance
     jest.resetModules();
-
-    // Reset fs mocks to default (no file exists)
-    jest.mocked(fs.existsSync).mockReturnValue(false);
-    jest.mocked(fs.readFileSync).mockReturnValue('');
 
     // Generate test RSA key pair
     const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
@@ -138,7 +132,6 @@ describe('LicenseValidator', () => {
 
     it('returns missing when no license is found', () => {
       delete process.env.REACT_ON_RAILS_PRO_LICENSE;
-      jest.mocked(fs.existsSync).mockReturnValue(false);
 
       const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
       expect(module.getLicenseStatus()).toBe('missing');
@@ -381,7 +374,6 @@ describe('LicenseValidator', () => {
 
     it('returns undefined when license is missing', () => {
       delete process.env.REACT_ON_RAILS_PRO_LICENSE;
-      jest.mocked(fs.existsSync).mockReturnValue(false);
 
       const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
       expect(module.getLicenseOrganization()).toBeUndefined();
@@ -464,7 +456,6 @@ describe('LicenseValidator', () => {
 
     it('returns undefined when license is missing', () => {
       delete process.env.REACT_ON_RAILS_PRO_LICENSE;
-      jest.mocked(fs.existsSync).mockReturnValue(false);
 
       const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
       expect(module.getLicensePlan()).toBeUndefined();

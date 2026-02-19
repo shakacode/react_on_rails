@@ -31,16 +31,12 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
     }
   end
 
-  let(:mock_root) { instance_double(Pathname, join: config_file_path) }
-  let(:config_file_path) { instance_double(Pathname, exist?: false) }
-
   # NOTE: REACT_ON_RAILS_PRO_LICENSE does not exist in test environments,
   # so there's no pre-existing value to preserve/restore.
   before do
     described_class.reset!
     stub_const("ReactOnRailsPro::LicensePublicKey::KEY", test_public_key)
     ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
-    allow(Rails).to receive(:root).and_return(mock_root)
   end
 
   after do
@@ -117,39 +113,6 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
     context "with missing license" do
       before do
         ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
-      end
-
-      it "returns :missing" do
-        expect(described_class.license_status).to eq(:missing)
-      end
-    end
-
-    context "with license in config file" do
-      let(:valid_token) { JWT.encode(valid_payload, test_private_key, "RS256") }
-      let(:file_config_path) { instance_double(Pathname, exist?: true) }
-
-      before do
-        ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
-        allow(mock_root).to receive(:join)
-          .with("config", "react_on_rails_pro_license.key")
-          .and_return(file_config_path)
-        allow(File).to receive(:read).with(file_config_path).and_return(valid_token)
-      end
-
-      it "returns :valid" do
-        expect(described_class.license_status).to eq(:valid)
-      end
-    end
-
-    context "when license file exists but cannot be read" do
-      let(:file_config_path) { instance_double(Pathname, exist?: true) }
-
-      before do
-        ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
-        allow(mock_root).to receive(:join)
-          .with("config", "react_on_rails_pro_license.key")
-          .and_return(file_config_path)
-        allow(File).to receive(:read).with(file_config_path).and_raise(Errno::EACCES, "Permission denied")
       end
 
       it "returns :missing" do

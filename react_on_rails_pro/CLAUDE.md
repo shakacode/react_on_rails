@@ -72,7 +72,7 @@ Order matters. If the base package isn't published first, the chain breaks.
 
 `ReactOnRailsPro::LicenseValidator` runs on engine startup via JWT validation.
 
-- License key: `config/react_on_rails_pro_license.key` or `REACT_ON_RAILS_PRO_LICENSE` env var
+- License key: `REACT_ON_RAILS_PRO_LICENSE` environment variable
 - Expired licenses cause startup failures in dummy app
 - License is checked in Pro engine initializer (`lib/react_on_rails_pro/engine.rb`)
 
