@@ -60,9 +60,10 @@ RSpec.describe ReactOnRailsPro::Engine do
           end
 
           it "logs migration warning for env-var setup" do
-            expect(mock_logger).to receive(:warn).with(/legacy license file/)
-            expect(mock_logger).to receive(:warn).with(/REACT_ON_RAILS_PRO_LICENSE/)
+            allow(mock_logger).to receive(:warn)
             described_class.log_license_status
+            expect(mock_logger).to have_received(:warn).with(/legacy license file/)
+            expect(mock_logger).to have_received(:warn).with(/REACT_ON_RAILS_PRO_LICENSE/)
           end
         end
       end
@@ -190,9 +191,10 @@ RSpec.describe ReactOnRailsPro::Engine do
           end
 
           it "logs migration info for env-var setup" do
-            expect(mock_logger).to receive(:info).with(/legacy license file/)
-            expect(mock_logger).to receive(:info).with(/REACT_ON_RAILS_PRO_LICENSE/)
+            allow(mock_logger).to receive(:info)
             described_class.log_license_status
+            expect(mock_logger).to have_received(:info).with(/legacy license file/)
+            expect(mock_logger).to have_received(:info).with(/REACT_ON_RAILS_PRO_LICENSE/)
           end
         end
       end
