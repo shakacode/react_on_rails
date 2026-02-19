@@ -987,17 +987,14 @@ module ReactOnRails
 
       before do
         allow(File).to receive(:read).with(file_path).and_return(content)
-        allow(Rails.logger).to receive(:warn)
       end
 
       context "when file contains client APIs" do
         let(:content) { "const [state, setState] = useState(false);" }
 
-        it "logs a warning via Rails.logger.warn" do
-          described_class.instance.send(:warn_if_likely_client_component, file_path, component_name)
-          expect(Rails.logger).to have_received(:warn).with(
-            /WARNING.*DummyComponent.*useState.*missing the 'use client' directive/
-          )
+        it "prints a warning to stdout" do
+          expect { described_class.instance.send(:warn_if_likely_client_component, file_path, component_name) }
+            .to output(/WARNING.*DummyComponent.*useState.*missing the 'use client' directive/).to_stdout
         end
       end
 
@@ -1005,19 +1002,17 @@ module ReactOnRails
         let(:content) { "useState(); useEffect(); useCallback(); useMemo(); useRef();" }
 
         it "shows at most 3 matches with ellipsis" do
-          described_class.instance.send(:warn_if_likely_client_component, file_path, component_name)
-          expect(Rails.logger).to have_received(:warn).with(
-            /\(useState, useEffect, useCallback, \.\.\.\)/
-          )
+          expect { described_class.instance.send(:warn_if_likely_client_component, file_path, component_name) }
+            .to output(/\(useState, useEffect, useCallback, \.\.\.\)/).to_stdout
         end
       end
 
       context "when file has no client APIs" do
         let(:content) { "export default function ServerComponent() { return <div />; }" }
 
-        it "does not log anything" do
-          described_class.instance.send(:warn_if_likely_client_component, file_path, component_name)
-          expect(Rails.logger).not_to have_received(:warn)
+        it "does not print anything" do
+          expect { described_class.instance.send(:warn_if_likely_client_component, file_path, component_name) }
+            .not_to output.to_stdout
         end
       end
     end
