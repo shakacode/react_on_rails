@@ -5,6 +5,7 @@ require "rails/railtie"
 module ReactOnRailsPro
   class Engine < Rails::Engine
     LICENSE_URL = "https://www.shakacode.com/react-on-rails-pro/"
+    # TODO: Remove this legacy migration warning path after 16.5.0 stable release (target: 2026-05-31).
     LEGACY_LICENSE_FILE = "config/react_on_rails_pro_license.key"
     private_constant :LICENSE_URL
     private_constant :LEGACY_LICENSE_FILE
