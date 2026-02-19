@@ -27,6 +27,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 Changes since the last non-beta release.
 
+### [16.4.0.rc.3] - 2026-02-18
+
 #### Fixed
 
 - **Fixed string values interpolated into generated JS code without proper escaping**. All string values (component names, DOM IDs, Redux store names) embedded in server-rendering JavaScript now use `.to_json` instead of unescaped single-quoted interpolation, preventing potential JS breakage from special characters. [PR 2440](https://github.com/shakacode/react_on_rails/pull/2440) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
@@ -36,6 +38,8 @@ Changes since the last non-beta release.
 ##### Fixed
 
 - **Fixed RSC rendering corruption when props contain `$`-patterns**. Props containing `` $` `` (dollar-backtick), `$'`, or `$&` — common in markdown with bash variables — caused `String.prototype.replace()` to interpret these as special replacement patterns, corrupting the generated JavaScript and hanging the RSC payload stream. Fixed by using a function replacement callback which disables all `$`-pattern interpretation. [PR 2440](https://github.com/shakacode/react_on_rails/pull/2440) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+- **Fixed RSC stream tee backpressure deadlock for large payloads**. Replaced `pipe()`-based stream teeing with manual `on('data')` + `push()` forwarding to prevent deadlocks when RSC payloads exceed the 32KB default highWaterMark buffer, which caused the stream to hang indefinitely. [PR 2444](https://github.com/shakacode/react_on_rails/pull/2444) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 ### [16.4.0.rc.1] - 2026-02-12
 
@@ -2001,7 +2005,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.4.0.rc.1...master
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.4.0.rc.3...master
+[16.4.0.rc.3]: https://github.com/shakacode/react_on_rails/compare/v16.4.0.rc.1...v16.4.0.rc.3
 [16.4.0.rc.1]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...v16.4.0.rc.1
 [16.3.0]: https://github.com/shakacode/react_on_rails/compare/v16.2.1...v16.3.0
 [16.2.1]: https://github.com/shakacode/react_on_rails/compare/v16.2.0...v16.2.1
