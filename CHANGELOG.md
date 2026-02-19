@@ -27,6 +27,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 Changes since the last non-beta release.
 
+#### Fixed
+
+- **Fix streaming SSR renders hanging forever when errors occur**: When a rendering stream errored during SSR, the HTTP response from the Node renderer would hang indefinitely because Node.js `stream.pipe()` does not propagate errors or closure from source to destination. Fixed by using the `'close'` event as the reliable termination signal across all layers of the streaming pipeline (Node renderer, RSC payload injection, transform streams, and Ruby async task). Also added a Ruby safety net to prevent Rails request hangs if the async rendering task raises before yielding the first chunk. [PR 2407](https://github.com/shakacode/react_on_rails/pull/2407) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 ### [16.4.0.rc.3] - 2026-02-18
 
 #### Added
