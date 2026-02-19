@@ -173,7 +173,7 @@ A React on Rails auto-bundling feature that controls which webpack bundle import
 - `Component.server.jsx` → imported only in the **server bundle** (and RSC bundle when RSC enabled)
 - `Component.jsx` (no suffix) → imported in **both** bundles
 
-This controls where the source file is loaded, nothing more. A `.server.jsx` file is NOT a React Server Component — it's just a file that webpack includes only in the server bundle.
+This controls where the source file is loaded, nothing more. A `.server.jsx` file is NOT a React Server Component — it is simply a file that webpack includes in the server bundle (and the RSC bundle when RSC is enabled).
 
 ### 2. RSC Classification (`'use client'` directive)
 
