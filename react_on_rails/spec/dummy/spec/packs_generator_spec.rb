@@ -909,6 +909,147 @@ module ReactOnRails
       end
     end
 
+    describe "CLIENT_API_PATTERN" do
+      subject { content.match?(described_class::CLIENT_API_PATTERN) }
+
+      context "with React hooks" do
+        %w[useState useEffect useReducer useCallback useMemo useRef useLayoutEffect
+           useImperativeHandle useContext useSyncExternalStore useTransition useDeferredValue].each do |hook|
+          context "with #{hook}" do
+            let(:content) { "const value = #{hook}();" }
+
+            it { is_expected.to be true }
+          end
+        end
+      end
+
+      context "with event handlers" do
+        %w[onClick onChange onSubmit onFocus onBlur onKeyDown onKeyUp onKeyPress
+           onMouseDown onMouseUp onMouseEnter onMouseLeave].each do |handler|
+          context "with #{handler} as JSX prop" do
+            let(:content) { "<button #{handler}={handleClick} />" }
+
+            it { is_expected.to be true }
+          end
+        end
+      end
+
+      context "with class components" do
+        context "with extends Component" do
+          let(:content) { "class MyComp extends Component {" }
+
+          it { is_expected.to be true }
+        end
+
+        context "with extends PureComponent" do
+          let(:content) { "class MyComp extends PureComponent {" }
+
+          it { is_expected.to be true }
+        end
+
+        context "with extends React.Component" do
+          let(:content) { "class MyComp extends React.Component {" }
+
+          it { is_expected.to be true }
+        end
+
+        context "with extends React.PureComponent" do
+          let(:content) { "class MyComp extends React.PureComponent {" }
+
+          it { is_expected.to be true }
+        end
+      end
+
+      context "with non-matching content" do
+        context "with server-only code" do
+          let(:content) { "export default function ServerComponent() { return <div />; }" }
+
+          it { is_expected.to be false }
+        end
+
+        context "with custom hook name not in the list" do
+          let(:content) { "const value = useCustomHook();" }
+
+          it { is_expected.to be false }
+        end
+
+        context "with empty content" do
+          let(:content) { "" }
+
+          it { is_expected.to be false }
+        end
+      end
+    end
+
+    describe "#warn_if_likely_client_component" do
+      let(:file_path) { "dummy_component.jsx" }
+      let(:component_name) { "DummyComponent" }
+
+      before do
+        allow(File).to receive(:read).with(file_path).and_return(content)
+      end
+
+      context "when file contains client APIs" do
+        let(:content) { "const [state, setState] = useState(false);" }
+
+        it "prints a warning to stdout" do
+          expect { described_class.instance.send(:warn_if_likely_client_component, file_path, component_name) }
+            .to output(/WARNING.*DummyComponent.*useState.*missing the 'use client' directive/).to_stdout
+        end
+      end
+
+      context "when file contains multiple client APIs" do
+        let(:content) { "useState(); useEffect(); useCallback(); useMemo(); useRef();" }
+
+        it "shows at most 3 matches with ellipsis" do
+          expect { described_class.instance.send(:warn_if_likely_client_component, file_path, component_name) }
+            .to output(/\(useState, useEffect, useCallback, \.\.\.\)/).to_stdout
+        end
+      end
+
+      context "when file has no client APIs" do
+        let(:content) { "export default function ServerComponent() { return <div />; }" }
+
+        it "does not print anything" do
+          expect { described_class.instance.send(:warn_if_likely_client_component, file_path, component_name) }
+            .not_to output.to_stdout
+        end
+      end
+    end
+
+    describe "#log_rsc_classification_summary" do
+      let(:components_directory) { "ReactServerComponents" }
+
+      before do
+        stub_packer_source_path(component_name: components_directory,
+                                packer_source_path: packer_source_path)
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+        stub_const("ReactOnRailsPro::Utils", Class.new do
+          def self.rsc_support_enabled?
+            true
+          end
+        end)
+        allow(ReactOnRailsPro::Utils).to receive_messages(rsc_support_enabled?: true)
+        # Force re-computation of component maps
+        described_class.instance.generate_packs_if_stale
+      end
+
+      it "prints classification summary to stdout" do
+        expect { described_class.instance.send(:log_rsc_classification_summary) }
+          .to output(/RSC component classification/).to_stdout
+      end
+
+      it "lists server components" do
+        expect { described_class.instance.send(:log_rsc_classification_summary) }
+          .to output(/Server components.*ReactServerComponent/).to_stdout
+      end
+
+      it "lists client components" do
+        expect { described_class.instance.send(:log_rsc_classification_summary) }
+          .to output(/Client components.*ReactClientComponent/).to_stdout
+      end
+    end
+
     describe "#client_entrypoint?" do
       subject { described_class.instance.send(:client_entrypoint?, "dummy_path.js") }
 

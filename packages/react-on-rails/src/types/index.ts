@@ -70,10 +70,11 @@ export type RailsContextWithServerStreamingCapabilities = RailsContextWithServer
 const throwRailsContextMissingEntries = (missingEntries: string) => {
   throw new Error(
     `Rails context does not have server side ${missingEntries}.\n\n` +
-      'Please ensure:\n' +
-      '1. You are using a compatible version of react_on_rails_pro\n' +
-      '2. Server components support is enabled by setting:\n' +
-      '   ReactOnRailsPro.configuration.enable_rsc_support = true',
+      'This is either a configuration issue or a bug:\n' +
+      '1. Ensure you are using a compatible version of react_on_rails_pro\n' +
+      '2. Ensure server components support is enabled:\n' +
+      '   ReactOnRailsPro.configuration.enable_rsc_support = true\n\n' +
+      'If the above are correct, please report at https://github.com/shakacode/react_on_rails/issues',
   );
 };
 

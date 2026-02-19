@@ -39,9 +39,10 @@ import wrapServerComponentRenderer from '../wrapServerComponentRenderer/server.t
 const registerServerComponent = (components: Record<string, ReactComponent>) => {
   const componentsWrappedInRSCRoute: Record<string, RenderFunction> = {};
   for (const [componentName] of Object.entries(components)) {
-    componentsWrappedInRSCRoute[componentName] = wrapServerComponentRenderer((props: unknown) => (
-      <RSCRoute componentName={componentName} componentProps={props} />
-    ));
+    componentsWrappedInRSCRoute[componentName] = wrapServerComponentRenderer(
+      (props: unknown) => <RSCRoute componentName={componentName} componentProps={props} />,
+      componentName,
+    );
   }
 
   ReactOnRails.register(componentsWrappedInRSCRoute);
