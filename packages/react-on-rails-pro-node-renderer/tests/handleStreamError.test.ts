@@ -1,42 +1,26 @@
 /**
- * Tests reproducing issue #2402: Streaming renders hang forever when errors occur during SSR.
+ * Tests for handleStreamError utility.
  *
- * Root cause: Node.js `stream.pipe()` does NOT propagate errors or end the destination.
- * When the source stream errors, the PassThrough destination stays open indefinitely,
- * causing the HTTP response to never complete and the browser to hang.
- *
- * @see https://github.com/shakacode/react_on_rails/issues/2402
+ * Verifies that the PassThrough stream returned by handleStreamError is properly
+ * terminated in all scenarios: normal completion, mid-stream errors, errors before
+ * any data, and non-fatal errors that should not interrupt rendering.
  */
 
 import { Readable, PassThrough } from 'stream';
 import { handleStreamError } from '../src/shared/utils';
 
-describe('handleStreamError - issue #2402 reproduction', () => {
-  /**
-   * This test reproduces the core bug: when a source stream errors AFTER emitting
-   * some data, the PassThrough returned by handleStreamError never ends.
-   *
-   * In the real system, this means:
-   * 1. The React rendering stream errors mid-render
-   * 2. handleStreamError's PassThrough stays open
-   * 3. Fastify's `res.send(stream)` awaits forever
-   * 4. The HTTP response never completes
-   * 5. The browser loading spinner spins forever
-   */
-  it('PassThrough stream ends when source stream errors mid-stream', async () => {
+describe('handleStreamError', () => {
+  it('ends the PassThrough when the source stream errors mid-stream', async () => {
     const source = new Readable({ read() {} });
     const onError = jest.fn();
 
     const resultStream = handleStreamError(source, onError);
 
-    // Push some data (simulating partial render)
+    // Push some data, then destroy the source
     source.push('chunk1');
     source.push('chunk2');
-
-    // Simulate an error mid-stream (e.g., RSC payload error, missing 'use client')
     source.destroy(new Error('something went wrong during rendering'));
 
-    // The error handler IS called (error is reported)
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(onError).toHaveBeenCalledWith(expect.objectContaining({ message: 'something went wrong during rendering' }));
 
@@ -53,11 +37,7 @@ describe('handleStreamError - issue #2402 reproduction', () => {
     expect(streamEnded).toBe('ended');
   }, 5000);
 
-  /**
-   * This test verifies the same bug when the source errors BEFORE emitting any data.
-   * This is the case when the initial React shell fails to render.
-   */
-  it('PassThrough stream ends when source stream errors before any data', async () => {
+  it('ends the PassThrough when the source stream errors before any data', async () => {
     const source = new Readable({ read() {} });
     const onError = jest.fn();
 
@@ -81,10 +61,6 @@ describe('handleStreamError - issue #2402 reproduction', () => {
     expect(streamEnded).toBe('ended');
   }, 5000);
 
-  /**
-   * This test shows that pipe() doesn't propagate errors to the destination.
-   * This is the fundamental Node.js behavior that causes the bug.
-   */
   it('demonstrates that pipe() does not propagate errors from source to destination', async () => {
     const source = new Readable({ read() {} });
     const destination = new PassThrough();
@@ -117,12 +93,6 @@ describe('handleStreamError - issue #2402 reproduction', () => {
     expect(destination.destroyed).toBe(false);
   });
 
-  /**
-   * Non-fatal errors (like throwJsErrors / emitError) emit 'error' WITHOUT destroying
-   * the stream. React may continue rendering after these errors. The PassThrough must
-   * stay open so pipe() can forward subsequent data. Only 'close' should trigger
-   * termination — not 'error' alone.
-   */
   it('non-fatal errors (emit without destroy) do not end the PassThrough', async () => {
     const source = new Readable({ read() {} });
     const onError = jest.fn();
@@ -131,7 +101,7 @@ describe('handleStreamError - issue #2402 reproduction', () => {
 
     source.push('chunk1');
 
-    // Emit error WITHOUT destroying — simulates emitError for throwJsErrors
+    // Emit error WITHOUT destroying — simulates non-fatal errors like Suspense boundary failures
     source.emit('error', new Error('non-fatal suspense boundary error'));
 
     await new Promise((resolve) => setTimeout(resolve, 50));
@@ -142,7 +112,7 @@ describe('handleStreamError - issue #2402 reproduction', () => {
     // Stream is NOT destroyed — still alive
     expect(source.destroyed).toBe(false);
 
-    // Push more data — React continues rendering other Suspense boundaries
+    // Push more data — rendering continues after non-fatal errors
     source.push('chunk2');
     source.push(null); // End normally
 
@@ -154,15 +124,10 @@ describe('handleStreamError - issue #2402 reproduction', () => {
       new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), 2000)),
     ]);
 
-    // Stream ends normally — the non-fatal error did NOT cause premature termination
     expect(streamEnded).toBe('ended');
   }, 5000);
 
-  /**
-   * Control test: verifies that when the source ends normally,
-   * handleStreamError works correctly (the PassThrough ends too).
-   */
-  it('PassThrough ends correctly when source ends normally', async () => {
+  it('ends the PassThrough correctly when the source ends normally', async () => {
     const source = new Readable({ read() {} });
     const onError = jest.fn();
 
@@ -184,11 +149,7 @@ describe('handleStreamError - issue #2402 reproduction', () => {
     expect(onError).not.toHaveBeenCalled();
   }, 5000);
 
-  /**
-   * This test verifies that data written before the error IS received.
-   * The issue is not about losing data — it's about the stream never closing.
-   */
-  it('data emitted before the error is received, and stream properly ends', async () => {
+  it('preserves data emitted before the error and properly ends the stream', async () => {
     const source = new Readable({ read() {} });
     const onError = jest.fn();
 
