@@ -90,9 +90,11 @@ When auto-bundling is enabled with RSC support (Pro feature), React on Rails use
 
 The `client_entrypoint?` method in `packs_generator.rb` is what detects this directive during auto-bundling.
 
-### How They Interact
+### How They Interact (RSC-enabled mode)
 
 These are orthogonal concerns. The file suffix controls which bundle, and the directive controls RSC registration:
+
+> **Note:** The "Registered as" column applies only when RSC support is enabled (Pro). Without RSC, all components are registered via `ReactOnRails.register()` regardless of the `'use client'` directive.
 
 | File             | `'use client'`? | Goes into                    | Registered as    |
 | ---------------- | --------------- | ---------------------------- | ---------------- |
