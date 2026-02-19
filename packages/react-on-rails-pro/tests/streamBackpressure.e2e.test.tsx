@@ -37,7 +37,9 @@ const testingRailsContext = {
 
 // Collect all JSON chunks from the result stream into parsed objects.
 // streamServerRenderedReactComponent emits JSON objects: {html, consoleReplayScript, hasErrors, isShellReady}
-const collectChunks = (stream: NodeJS.ReadableStream): Promise<{ html: string; hasErrors: boolean; isShellReady: boolean }[]> =>
+const collectChunks = (
+  stream: NodeJS.ReadableStream,
+): Promise<{ html: string; hasErrors: boolean; isShellReady: boolean }[]> =>
   new Promise((resolve, reject) => {
     const chunks: { html: string; hasErrors: boolean; isShellReady: boolean }[] = [];
     stream.on('data', (chunk: Buffer) => {
@@ -85,15 +87,21 @@ describe('streamServerRenderedReactComponent - RSC payload exceeding default hig
   const registerRSCRenderFunction = (name: string) => {
     ReactOnRails.register({
       [name]: (_props: Record<string, unknown>, railsContext: any) =>
-        railsContext.getRSCPayloadStream('ServerComponent', _props).then(async (rscStream: AsyncIterable<Buffer>) => {
-          // Read all data from stream1 — mirrors createFromNodeStream reading the Flight stream
-          const chunks: Buffer[] = [];
-          for await (const chunk of rscStream) {
-            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-          }
-          const totalBytes = Buffer.concat(chunks).length;
-          return React.createElement('div', { 'data-testid': 'rsc-content' }, `RSC payload: ${totalBytes} bytes`);
-        }),
+        railsContext
+          .getRSCPayloadStream('ServerComponent', _props)
+          .then(async (rscStream: AsyncIterable<Buffer>) => {
+            // Read all data from stream1 — mirrors createFromNodeStream reading the Flight stream
+            const chunks: Buffer[] = [];
+            for await (const chunk of rscStream) {
+              chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+            }
+            const totalBytes = Buffer.concat(chunks).length;
+            return React.createElement(
+              'div',
+              { 'data-testid': 'rsc-content' },
+              `RSC payload: ${totalBytes} bytes`,
+            );
+          }),
     });
   };
 

@@ -118,10 +118,7 @@ describe('RSCRequestTracker', () => {
 
       const totalBytes = pushChunks(source, 100);
 
-      const [data1, data2] = await Promise.all([
-        collectStreamData(stream1),
-        collectStreamData(stream2),
-      ]);
+      const [data1, data2] = await Promise.all([collectStreamData(stream1), collectStreamData(stream2)]);
 
       expect(data1.length).toBe(totalBytes);
       expect(data2.length).toBe(totalBytes);
