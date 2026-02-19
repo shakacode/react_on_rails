@@ -11,7 +11,7 @@ module ReactOnRails
   # 1. BUNDLE PLACEMENT (.client. / .server. file suffixes)
   #    Controls which webpack bundle imports a file. Pre-dates React Server Components.
   #    - Component.client.jsx → client bundle only
-  #    - Component.server.jsx → server bundle only (requires paired .client. file)
+  #    - Component.server.jsx → server bundle (and RSC bundle when RSC enabled; requires paired .client. file)
   #    - Component.jsx (no suffix) → both bundles
   #    Methods: common_component_to_path, client_component_to_path, server_component_to_path
   #
