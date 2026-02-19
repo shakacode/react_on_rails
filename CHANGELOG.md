@@ -27,8 +27,6 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 Changes since the last non-beta release.
 
-#### Pro
-
 ### [16.4.0.rc.3] - 2026-02-18
 
 #### Added
