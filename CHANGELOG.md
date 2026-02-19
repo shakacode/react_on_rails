@@ -33,6 +33,10 @@ Changes since the last non-beta release.
 
 #### Pro
 
+##### Changed
+
+- **License token setup is now env-var only**: React on Rails Pro no longer loads license tokens from `config/react_on_rails_pro_license.key`. Set `REACT_ON_RAILS_PRO_LICENSE` in your environment instead.
+
 ##### Fixed
 
 - **Fixed node renderer upload race condition causing ENOENT errors and asset corruption during concurrent requests**. Concurrent multipart uploads (e.g., during pod rollovers) all wrote to a single shared path (`uploads/<filename>`), causing file overwrites, `ENOENT` errors, and cross-contamination between requests. Each request now gets its own isolated upload directory (`uploads/<uuid>/`), eliminating all shared-path collisions. [PR 2456](https://github.com/shakacode/react_on_rails/pull/2456) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
