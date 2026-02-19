@@ -22,7 +22,9 @@ describe('handleStreamError', () => {
     source.destroy(new Error('something went wrong during rendering'));
 
     await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(onError).toHaveBeenCalledWith(expect.objectContaining({ message: 'something went wrong during rendering' }));
+    expect(onError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'something went wrong during rendering' }),
+    );
 
     const streamEnded = await Promise.race([
       new Promise<'ended'>((resolve) => {
