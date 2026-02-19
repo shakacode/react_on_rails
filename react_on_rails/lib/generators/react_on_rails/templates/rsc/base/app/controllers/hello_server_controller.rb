@@ -13,6 +13,8 @@
 # https://www.shakacode.com/react-on-rails-pro/docs/react-server-components/
 
 class HelloServerController < ApplicationController
+  layout "hello_world"
+
   include ReactOnRailsPro::Stream
 
   def index

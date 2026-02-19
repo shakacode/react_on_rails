@@ -38,11 +38,17 @@ module GeneratorMessages
       @output = []
     end
 
-    def helpful_message_after_installation(component_name: "HelloWorld", route: "hello_world")
+    def helpful_message_after_installation(component_name: "HelloWorld", route: "hello_world", rsc: false)
       process_manager_section = build_process_manager_section
       testing_section = build_testing_section
       package_manager = detect_package_manager
       shakapacker_status = build_shakapacker_status_section
+      render_example = build_render_example(component_name: component_name, route: route, rsc: rsc)
+      render_label = if rsc
+                       "• Streaming server rendering in app/views/#{route}/index.html.erb:"
+                     else
+                       "• Server-side rendering - Enabled with prerender option in app/views/#{route}/index.html.erb:"
+                     end
 
       <<~MSG
 
@@ -69,8 +75,8 @@ module GeneratorMessages
           <%= javascript_pack_tag %>
           <%= stylesheet_pack_tag %>
 
-        • Server-side rendering - Enabled with prerender option in app/views/#{route}/index.html.erb:
-          <%= react_component("#{component_name}", props: @#{route}_props, prerender: true) %>
+        #{render_label}
+          #{render_example}
 
         📚 LEARN MORE:
         ─────────────────────────────────────────────────────────────────────────
@@ -82,6 +88,11 @@ module GeneratorMessages
     end
 
     private
+
+    def build_render_example(component_name:, route:, rsc:)
+      helper_name = rsc ? "stream_react_component" : "react_component"
+      "<%= #{helper_name}(\"#{component_name}\", props: @#{route}_props, prerender: true) %>"
+    end
 
     def build_process_manager_section
       process_manager = detect_process_manager

@@ -253,7 +253,8 @@ module ReactOnRails
 
         GeneratorMessages.add_info(GeneratorMessages.helpful_message_after_installation(
                                      component_name: component_name,
-                                     route: route
+                                     route: route,
+                                     rsc: use_rsc?
                                    ))
       end
 
