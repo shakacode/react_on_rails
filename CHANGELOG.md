@@ -27,6 +27,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 Changes since the last non-beta release.
 
+#### Fixed
+
+- **RSC Generator Layout Wiring**: Fixed `MissingEntryError` on fresh RSC installs where `HelloServerController` fell back to Rails' `application.html.erb` (which uses `javascript_pack_tag "application"` that is not created by the RSC flow). The generator now always copies `hello_world.html.erb`, `HelloServerController` explicitly uses `layout "hello_world"`, and post-install output now shows `stream_react_component` for RSC installs. [PR 2429](https://github.com/shakacode/react_on_rails/pull/2429) by [justin808](https://github.com/justin808).
+
 #### Pro
 
 ##### Fixed
