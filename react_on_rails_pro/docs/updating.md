@@ -30,6 +30,15 @@ Package names have changed:
 
 **Important:** Pro users should now import from `react-on-rails-pro` instead of `react-on-rails`. The Pro package includes all core features plus Pro-exclusive functionality.
 
+## Breaking Changes and Deprecation Policy
+
+To reduce upgrade risk, React on Rails Pro follows this policy:
+
+1. **Deprecate first when practical** (docs/changelog + clear replacement).
+2. **Warn at runtime when practical** if a deprecated setup is detected.
+3. **Remove in a later release** with a short migration note in this guide.
+4. **Exception:** security/legal fixes may be removed immediately, but must include an explicit upgrade note.
+
 ### Your Current Setup (GitHub Packages)
 
 If you're upgrading, you currently have:
@@ -179,13 +188,11 @@ Configure your React on Rails Pro license token as an environment variable:
 export REACT_ON_RAILS_PRO_LICENSE="your-license-token-here"
 ```
 
-Or create a config file at `config/react_on_rails_pro_license.key`:
+> **Migration note (legacy key-file setup):**
+> `config/react_on_rails_pro_license.key` is no longer read by React on Rails Pro.
+> If you previously used that file, move the token into `REACT_ON_RAILS_PRO_LICENSE`.
 
-```bash
-echo "your-license-token-here" > config/react_on_rails_pro_license.key
-```
-
-⚠️ **Security Warning**: Never commit your license token to version control. Add `config/react_on_rails_pro_license.key` to your `.gitignore`. For production, use environment variables or secure secret management systems (Rails credentials, Heroku config vars, AWS Secrets Manager, etc.).
+⚠️ **Security Warning**: Never commit your license token to version control. For production, use environment variables or secure secret management systems (Rails credentials, Heroku config vars, AWS Secrets Manager, etc.).
 
 **Where to get your license token:** Contact [justin@shakacode.com](mailto:justin@shakacode.com) if you don't have your license token.
 

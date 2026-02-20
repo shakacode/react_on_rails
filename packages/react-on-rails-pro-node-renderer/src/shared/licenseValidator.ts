@@ -1,6 +1,4 @@
 import * as jwt from 'jsonwebtoken';
-import * as fs from 'fs';
-import * as path from 'path';
 import { PUBLIC_KEY } from './licensePublicKey.js';
 
 /**
@@ -54,39 +52,22 @@ export type LicenseStatus = 'valid' | 'expired' | 'invalid' | 'missing';
 //   intentional - license validation happens once per worker on first access, and
 //   the result is cached for the lifetime of that worker process.
 //
-// The caching here is deterministic - given the same environment/config file, every
+// The caching here is deterministic - given the same environment variable value, every
 // worker will compute the same cached values. Redundant computation across workers
 // is acceptable since license validation is infrequent (once per worker startup).
 let cachedLicenseStatus: LicenseStatus | undefined;
-let cachedLicenseOrganization: string | undefined;
-let cachedLicensePlan: ValidPlan | undefined;
+const UNINITIALIZED = Symbol('uninitialized');
+let cachedLicenseOrganization: string | undefined | typeof UNINITIALIZED = UNINITIALIZED;
+let cachedLicensePlan: ValidPlan | undefined | typeof UNINITIALIZED = UNINITIALIZED;
 
 /**
- * Loads the license string from environment variable or config file.
+ * Loads the license string from environment variable.
  * @returns License string or undefined if not found
  * @private
  */
 function loadLicenseString(): string | undefined {
-  // First try environment variable
   const envLicense = process.env.REACT_ON_RAILS_PRO_LICENSE?.trim();
-  if (envLicense) {
-    return envLicense;
-  }
-
-  // Then try config file (relative to project root)
-  try {
-    const configPath = path.join(process.cwd(), 'config', 'react_on_rails_pro_license.key');
-    if (fs.existsSync(configPath)) {
-      const content = fs.readFileSync(configPath, 'utf8').trim();
-      if (content) {
-        return content;
-      }
-    }
-  } catch {
-    // File read error - return undefined to indicate missing license
-  }
-
-  return undefined;
+  return envLicense || undefined;
 }
 
 /**
@@ -251,7 +232,7 @@ function determineLicenseOrganization(): string | undefined {
  * @returns The organization name or undefined if not available
  */
 export function getLicenseOrganization(): string | undefined {
-  if (cachedLicenseOrganization !== undefined) {
+  if (cachedLicenseOrganization !== UNINITIALIZED) {
     return cachedLicenseOrganization;
   }
 
@@ -289,7 +270,7 @@ function determineLicensePlan(): ValidPlan | undefined {
  * @returns The plan type (e.g., "paid", "startup") or undefined if not available
  */
 export function getLicensePlan(): ValidPlan | undefined {
-  if (cachedLicensePlan !== undefined) {
+  if (cachedLicensePlan !== UNINITIALIZED) {
     return cachedLicensePlan;
   }
 
@@ -302,6 +283,6 @@ export function getLicensePlan(): ValidPlan | undefined {
  */
 export function reset(): void {
   cachedLicenseStatus = undefined;
-  cachedLicenseOrganization = undefined;
-  cachedLicensePlan = undefined;
+  cachedLicenseOrganization = UNINITIALIZED;
+  cachedLicensePlan = UNINITIALIZED;
 }

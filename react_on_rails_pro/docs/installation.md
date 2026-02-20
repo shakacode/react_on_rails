@@ -111,13 +111,7 @@ React on Rails Pro uses a license-optional model to simplify evaluation and deve
 export REACT_ON_RAILS_PRO_LICENSE="your-license-token-here"
 ```
 
-Or create a config file at `config/react_on_rails_pro_license.key`:
-
-```bash
-echo "your-license-token-here" > config/react_on_rails_pro_license.key
-```
-
-⚠️ **Security Warning**: Never commit your license token to version control. Add `config/react_on_rails_pro_license.key` to your `.gitignore`. For production, use environment variables or secure secret management systems (Rails credentials, Heroku config vars, AWS Secrets Manager, etc.).
+⚠️ **Security Warning**: Never commit your license token to version control. For production, use environment variables or secure secret management systems (Rails credentials, Heroku config vars, AWS Secrets Manager, etc.).
 
 For complete license setup instructions, see [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/LICENSE_SETUP.md).
 

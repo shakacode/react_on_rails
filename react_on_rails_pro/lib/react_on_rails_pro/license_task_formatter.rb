@@ -42,7 +42,6 @@ module ReactOnRailsPro
 
       puts ""
       puts "No license found. Set REACT_ON_RAILS_PRO_LICENSE"
-      puts "or place a key file at config/react_on_rails_pro_license.key"
     end
 
     def print_details(result, info)
