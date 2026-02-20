@@ -153,7 +153,9 @@ export default function run(config: Partial<Config>) {
     done();
   });
   app.addHook('onResponse', async (req) => {
-    await rm(req.uploadDir, { recursive: true, force: true }).catch(() => {});
+    await rm(req.uploadDir, { recursive: true, force: true }).catch((err: unknown) => {
+      log.warn({ msg: 'Failed to clean up per-request upload directory', uploadDir: req.uploadDir, err });
+    });
   });
 
   // 10 MB limit for code including props
@@ -172,6 +174,9 @@ export default function run(config: Partial<Config>) {
     // Use regular function (not arrow) because @fastify/multipart binds `this`
     // to the Fastify request in attachFieldsToBody mode.
     async onFile(part) {
+      if (typeof this?.uploadDir !== 'string' || this.uploadDir === '') {
+        throw new Error('onFile: expected `this` to be bound to the Fastify request with uploadDir set');
+      }
       const destinationPath = path.join(this.uploadDir, part.filename);
       await saveMultipartFile(part, destinationPath);
       // eslint-disable-next-line no-param-reassign

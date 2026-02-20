@@ -1,14 +1,10 @@
 /**
  * Tests for concurrent upload isolation (GitHub issue #2449).
  *
- * These tests assert the CORRECT expected behavior: concurrent requests that
- * upload same-named files should each deliver the correct content without
- * interference.
- *
- * Currently these tests FAIL because all uploads share a single path
- * (<serverBundleCachePath>/uploads/<filename>), causing overwrites, ENOENT
- * errors, and cross-contamination. They will PASS once per-request upload
- * isolation is implemented.
+ * Each request gets its own upload directory (uploads/<uuid>/), so concurrent
+ * requests uploading same-named files never overwrite each other. These tests
+ * verify that invariant: two concurrent requests with different content for
+ * the same filename must each deliver their own correct content.
  *
  * Strategy: a preHandler barrier guarantees both requests' onFile phases
  * complete before either route handler runs, making the race deterministic.
