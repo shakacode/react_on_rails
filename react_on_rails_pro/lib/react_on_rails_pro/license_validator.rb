@@ -235,10 +235,7 @@ module ReactOnRailsPro
       # Loads license string from environment variable
       # @return [String, nil] License string or nil if not found
       def load_license_string
-        # License must be configured via environment variable
-        license = ENV.fetch("REACT_ON_RAILS_PRO_LICENSE", nil)
-        license = license&.strip
-        license if license && !license.empty?
+        ENV.fetch("REACT_ON_RAILS_PRO_LICENSE", nil)&.strip.presence
       end
 
       # Decodes and verifies the JWT license
