@@ -6,7 +6,7 @@
 import path from 'path';
 import cluster from 'cluster';
 import { randomUUID } from 'crypto';
-import { mkdir, rm } from 'fs/promises';
+import { mkdir } from 'fs/promises';
 import fastify from 'fastify';
 import fastifyFormbody from '@fastify/formbody';
 import fastifyMultipart from '@fastify/multipart';
@@ -152,12 +152,6 @@ export default function run(config: Partial<Config>) {
     req.uploadDir = path.join(serverBundleCachePath, 'uploads', randomUUID());
     done();
   });
-  app.addHook('onResponse', async (req) => {
-    await rm(req.uploadDir, { recursive: true, force: true }).catch((err: unknown) => {
-      log.warn({ msg: 'Failed to clean up per-request upload directory', uploadDir: req.uploadDir, err });
-    });
-  });
-
   // 10 MB limit for code including props
   const fieldSizeLimit = 1024 * 1024 * 10;
 
