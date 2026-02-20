@@ -7,8 +7,6 @@ require "react_on_rails_pro/license_task_formatter"
 RSpec.describe ReactOnRailsPro::LicenseTaskFormatter do
   let(:test_private_key) { OpenSSL::PKey::RSA.new(2048) }
   let(:test_public_key) { test_private_key.public_key }
-  let(:mock_root) { instance_double(Pathname, join: config_file_path) }
-  let(:config_file_path) { instance_double(Pathname, exist?: false) }
 
   let(:valid_payload) do
     {
@@ -44,7 +42,6 @@ RSpec.describe ReactOnRailsPro::LicenseTaskFormatter do
     ReactOnRailsPro::LicenseValidator.reset!
     stub_const("ReactOnRailsPro::LicensePublicKey::KEY", test_public_key)
     ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
-    allow(Rails).to receive(:root).and_return(mock_root)
   end
 
   after do
@@ -144,6 +141,7 @@ RSpec.describe ReactOnRailsPro::LicenseTaskFormatter do
         output = capture_stdout { described_class.print_text(result, info) }
         expect(output).to include("MISSING")
         expect(output).to include("REACT_ON_RAILS_PRO_LICENSE")
+        expect(output).not_to include("react_on_rails_pro_license.key")
       end
     end
 
