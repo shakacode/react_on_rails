@@ -22,7 +22,6 @@ import {
   isReadableStream,
   isErrorRenderResult,
   getRequestBundleFilePath,
-  deleteUploadedAssets,
 } from '../shared/utils.js';
 import { getConfig } from '../shared/configBuilder.js';
 import * as errorReporter from '../shared/errorReporter.js';
@@ -162,10 +161,6 @@ async function handleNewBundlesProvided(
     handleNewBundleProvided(renderingRequest, providedNewBundle, assetsToCopy),
   );
   const results = await Promise.all(handlingPromises);
-
-  if (assetsToCopy) {
-    await deleteUploadedAssets(assetsToCopy);
-  }
 
   const errorResult = results.find((result) => result !== undefined);
   return errorResult;

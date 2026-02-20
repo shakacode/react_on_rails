@@ -1,8 +1,7 @@
 import cluster from 'cluster';
 import path from 'path';
-import { rm } from 'fs/promises';
 import { MultipartFile } from '@fastify/multipart';
-import { createWriteStream, ensureDir, move, MoveOptions, copy, CopyOptions, unlink } from 'fs-extra';
+import { createWriteStream, ensureDir, move, MoveOptions, copy, CopyOptions } from 'fs-extra';
 import { Readable, pipeline, PassThrough } from 'stream';
 import { promisify } from 'util';
 import * as errorReporter from './errorReporter.js';
@@ -116,24 +115,6 @@ export async function copyUploadedAssets(uploadedAssets: Asset[], targetDirector
   await Promise.all(copyMultipleAssets);
   log.info(
     `Copied assets ${JSON.stringify(uploadedAssets.map((fileDescriptor) => fileDescriptor.filename))}`,
-  );
-}
-
-export async function deleteUploadedAssets(uploadedAssets: Asset[]): Promise<void> {
-  const deleteMultipleAssets = uploadedAssets.map((asset) => unlink(asset.savedFilePath));
-  await Promise.all(deleteMultipleAssets);
-  log.info(
-    `Deleted assets ${JSON.stringify(uploadedAssets.map((fileDescriptor) => fileDescriptor.filename))}`,
-  );
-
-  // Clean up per-request upload directories (should be empty after file deletion)
-  const parentDirs = new Set(uploadedAssets.map((asset) => path.dirname(asset.savedFilePath)));
-  await Promise.all(
-    [...parentDirs].map((dir) =>
-      rm(dir, { recursive: true, force: true }).catch((err: unknown) => {
-        log.warn({ msg: 'Failed to clean up per-request upload directory', uploadDir: dir, err });
-      }),
-    ),
   );
 }
 
