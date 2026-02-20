@@ -5,7 +5,8 @@
 
 import path from 'path';
 import cluster from 'cluster';
-import { mkdir } from 'fs/promises';
+import { randomUUID } from 'crypto';
+import { mkdir, rm } from 'fs/promises';
 import fastify from 'fastify';
 import fastifyFormbody from '@fastify/formbody';
 import fastifyMultipart from '@fastify/multipart';
@@ -45,6 +46,13 @@ declare module '@fastify/multipart' {
   interface MultipartFile {
     // We save all uploaded files and store this value
     value: Asset;
+  }
+}
+
+declare module 'fastify' {
+  // eslint-disable-next-line @typescript-eslint/no-shadow
+  interface FastifyRequest {
+    uploadDir: string;
   }
 }
 
@@ -137,6 +145,17 @@ export default function run(config: Partial<Config>) {
     done();
   });
 
+  // Each request gets its own upload directory to prevent concurrent requests
+  // from overwriting each other's files (GitHub issue #2449).
+  app.decorateRequest('uploadDir', '');
+  app.addHook('onRequest', (req, _res, done) => {
+    req.uploadDir = path.join(serverBundleCachePath, 'uploads', randomUUID());
+    done();
+  });
+  app.addHook('onResponse', async (req) => {
+    await rm(req.uploadDir, { recursive: true, force: true }).catch(() => {});
+  });
+
   // 10 MB limit for code including props
   const fieldSizeLimit = 1024 * 1024 * 10;
 
@@ -150,9 +169,10 @@ export default function run(config: Partial<Config>) {
       // For bundles and assets
       fileSize: Infinity,
     },
-    onFile: async (part) => {
-      const destinationPath = path.join(serverBundleCachePath, 'uploads', part.filename);
-      // TODO: inline here
+    // Use regular function (not arrow) because @fastify/multipart binds `this`
+    // to the Fastify request in attachFieldsToBody mode.
+    async onFile(part) {
+      const destinationPath = path.join(this.uploadDir, part.filename);
       await saveMultipartFile(part, destinationPath);
       // eslint-disable-next-line no-param-reassign
       part.value = {
