@@ -137,8 +137,21 @@ export const isReadableStream = (stream: unknown): stream is Readable =>
   typeof (stream as Readable).read === 'function';
 
 export const handleStreamError = (stream: Readable, onError: (error: Error) => void) => {
-  stream.on('error', onError);
   const newStreamAfterHandlingError = new PassThrough();
+  // Propagate errors for logging/reporting, but don't terminate — error is not the end of the stream.
+  // Non-fatal errors (e.g., emitError for throwJsErrors) emit 'error' without destroying
+  // the stream, and React may continue rendering.
+  stream.on('error', (error) => {
+    onError(error);
+  });
+  // 'close' fires after both normal 'end' and destroy().
+  // On normal end, pipe() already forwards 'end' to the PassThrough — this is a no-op.
+  // On destroy, pipe() unpipes but does NOT end the PassThrough — we do it here.
+  stream.on('close', () => {
+    if (!newStreamAfterHandlingError.writableEnded) {
+      newStreamAfterHandlingError.end();
+    }
+  });
   stream.pipe(newStreamAfterHandlingError);
   return newStreamAfterHandlingError;
 };

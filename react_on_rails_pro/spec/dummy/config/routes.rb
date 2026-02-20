@@ -22,6 +22,8 @@ Rails.application.routes.draw do
   get "console_logs_in_async_server" => "pages#console_logs_in_async_server", as: :console_logs_in_async_server
   get "redis_receiver" => "pages#redis_receiver", as: :redis_receiver
   get "redis_receiver_for_testing" => "pages#redis_receiver_for_testing", as: :redis_receiver_for_testing
+  get "stream_error_demo" => "pages#stream_error_demo", as: :stream_error_demo
+  get "stream_shell_error_demo" => "pages#stream_shell_error_demo", as: :stream_shell_error_demo
   get "stream_async_components" => "pages#stream_async_components", as: :stream_async_components
   get "stream_async_components_for_testing" => "pages#stream_async_components_for_testing",
       as: :stream_async_components_for_testing

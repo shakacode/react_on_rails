@@ -136,6 +136,16 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
   let pipedStream: PipeableOrReadableStream | null = null;
   const pipeToTransform = (pipeableStream: PipeableOrReadableStream) => {
     pipeableStream.pipe(transformStream);
+    // 'close' fires after both normal 'end' and destroy().
+    // On normal end, pipe() already forwards 'end' to transformStream — this is a no-op.
+    // On destroy, pipe() unpipes but does NOT end transformStream — we do it here.
+    if (typeof (pipeableStream as Readable).on === 'function') {
+      (pipeableStream as Readable).on('close', () => {
+        if (!transformStream.writableEnded) {
+          transformStream.end();
+        }
+      });
+    }
     pipedStream = pipeableStream;
   };
   // We need to wrap the transformStream in a Readable stream to properly handle errors:
