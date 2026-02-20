@@ -56,8 +56,9 @@ export type LicenseStatus = 'valid' | 'expired' | 'invalid' | 'missing';
 // worker will compute the same cached values. Redundant computation across workers
 // is acceptable since license validation is infrequent (once per worker startup).
 let cachedLicenseStatus: LicenseStatus | undefined;
-let cachedLicenseOrganization: string | undefined;
-let cachedLicensePlan: ValidPlan | undefined;
+const UNINITIALIZED = Symbol('uninitialized');
+let cachedLicenseOrganization: string | undefined | typeof UNINITIALIZED = UNINITIALIZED;
+let cachedLicensePlan: ValidPlan | undefined | typeof UNINITIALIZED = UNINITIALIZED;
 
 /**
  * Loads the license string from environment variable.
@@ -231,7 +232,7 @@ function determineLicenseOrganization(): string | undefined {
  * @returns The organization name or undefined if not available
  */
 export function getLicenseOrganization(): string | undefined {
-  if (cachedLicenseOrganization !== undefined) {
+  if (cachedLicenseOrganization !== UNINITIALIZED) {
     return cachedLicenseOrganization;
   }
 
@@ -269,7 +270,7 @@ function determineLicensePlan(): ValidPlan | undefined {
  * @returns The plan type (e.g., "paid", "startup") or undefined if not available
  */
 export function getLicensePlan(): ValidPlan | undefined {
-  if (cachedLicensePlan !== undefined) {
+  if (cachedLicensePlan !== UNINITIALIZED) {
     return cachedLicensePlan;
   }
 
@@ -282,6 +283,6 @@ export function getLicensePlan(): ValidPlan | undefined {
  */
 export function reset(): void {
   cachedLicenseStatus = undefined;
-  cachedLicenseOrganization = undefined;
-  cachedLicensePlan = undefined;
+  cachedLicenseOrganization = UNINITIALIZED;
+  cachedLicensePlan = UNINITIALIZED;
 }

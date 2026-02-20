@@ -400,6 +400,35 @@ describe('LicenseValidator', () => {
 
       expect(module.getLicenseOrganization()).toBe('Acme Corp');
     });
+
+    it('caches undefined result when org is absent', () => {
+      const missingOrgPayload = {
+        sub: 'test@example.com',
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        plan: 'paid',
+        // No org field
+      };
+      const validOrgPayload = {
+        sub: 'test@example.com',
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        plan: 'paid',
+        org: 'Acme Corp',
+      };
+
+      process.env.REACT_ON_RAILS_PRO_LICENSE = jwt.sign(missingOrgPayload, testPrivateKey, {
+        algorithm: 'RS256',
+      });
+
+      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
+      expect(module.getLicenseOrganization()).toBeUndefined();
+
+      process.env.REACT_ON_RAILS_PRO_LICENSE = jwt.sign(validOrgPayload, testPrivateKey, {
+        algorithm: 'RS256',
+      });
+      expect(module.getLicenseOrganization()).toBeUndefined();
+    });
   });
 
   describe('getLicensePlan', () => {
@@ -503,6 +532,35 @@ describe('LicenseValidator', () => {
       delete process.env.REACT_ON_RAILS_PRO_LICENSE;
 
       expect(module.getLicensePlan()).toBe('startup');
+    });
+
+    it('caches undefined result for invalid plan type', () => {
+      const invalidPlanPayload = {
+        sub: 'test@example.com',
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        plan: 'free',
+        org: 'Acme Corp',
+      };
+      const validPlanPayload = {
+        sub: 'test@example.com',
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        plan: 'startup',
+        org: 'Acme Corp',
+      };
+
+      process.env.REACT_ON_RAILS_PRO_LICENSE = jwt.sign(invalidPlanPayload, testPrivateKey, {
+        algorithm: 'RS256',
+      });
+
+      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
+      expect(module.getLicensePlan()).toBeUndefined();
+
+      process.env.REACT_ON_RAILS_PRO_LICENSE = jwt.sign(validPlanPayload, testPrivateKey, {
+        algorithm: 'RS256',
+      });
+      expect(module.getLicensePlan()).toBeUndefined();
     });
   });
 
