@@ -133,6 +133,21 @@ RSpec.describe ReactOnRailsPro::Engine do
           expect(mock_logger).not_to receive(:warn)
           described_class.log_license_status
         end
+
+        context "when legacy license file exists" do
+          before do
+            allow(config_file_path).to receive(:exist?).and_return(true)
+          end
+
+          it "does not log migration warning" do
+            allow(mock_logger).to receive(:warn)
+            allow(mock_logger).to receive(:info)
+            described_class.log_license_status
+            expect(mock_logger).not_to have_received(:warn).with(/legacy license file/)
+            expect(mock_logger).not_to have_received(:info).with(/legacy license file/)
+            expect(mock_logger).to have_received(:info).with(/License validated successfully/)
+          end
+        end
       end
 
       # Dynamically generate tests for plan types that display their name in log messages.
@@ -237,6 +252,19 @@ RSpec.describe ReactOnRailsPro::Engine do
         it "logs success info" do
           expect(mock_logger).to receive(:info).with(/License validated successfully/)
           described_class.log_license_status
+        end
+
+        context "when legacy license file exists" do
+          before do
+            allow(config_file_path).to receive(:exist?).and_return(true)
+          end
+
+          it "does not log migration info" do
+            allow(mock_logger).to receive(:info)
+            described_class.log_license_status
+            expect(mock_logger).not_to have_received(:info).with(/legacy license file/)
+            expect(mock_logger).to have_received(:info).with(/License validated successfully/)
+          end
         end
       end
 
