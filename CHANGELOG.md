@@ -35,7 +35,7 @@ Changes since the last non-beta release.
 
 ##### Changed
 
-- **License token setup is now env-var only**: React on Rails Pro no longer loads license tokens from `config/react_on_rails_pro_license.key`. Set `REACT_ON_RAILS_PRO_LICENSE` in your environment instead.
+- **Breaking: removed legacy key-file license fallback**: `config/react_on_rails_pro_license.key` is no longer read. Move your token to the `REACT_ON_RAILS_PRO_LICENSE` environment variable. A migration warning is logged at startup when the legacy file is detected and the environment variable is missing. [PR 2454](https://github.com/shakacode/react_on_rails/pull/2454) by [ihabadham](https://github.com/ihabadham).
 
 ##### Fixed
 
