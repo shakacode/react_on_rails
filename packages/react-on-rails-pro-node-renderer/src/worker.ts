@@ -5,7 +5,8 @@
 
 import path from 'path';
 import cluster from 'cluster';
-import { mkdir } from 'fs/promises';
+import { randomUUID } from 'crypto';
+import { mkdir, rm } from 'fs/promises';
 import fastify from 'fastify';
 import fastifyFormbody from '@fastify/formbody';
 import fastifyMultipart from '@fastify/multipart';
@@ -28,7 +29,6 @@ import {
   Asset,
   getAssetPath,
   getBundleDirectory,
-  deleteUploadedAssets,
 } from './shared/utils.js';
 import * as errorReporter from './shared/errorReporter.js';
 import { lock, unlock } from './shared/locks.js';
@@ -45,6 +45,13 @@ declare module '@fastify/multipart' {
   interface MultipartFile {
     // We save all uploaded files and store this value
     value: Asset;
+  }
+}
+
+declare module 'fastify' {
+  // eslint-disable-next-line @typescript-eslint/no-shadow
+  interface FastifyRequest {
+    uploadDir: string;
   }
 }
 
@@ -137,6 +144,23 @@ export default function run(config: Partial<Config>) {
     done();
   });
 
+  // Each request gets its own upload directory to prevent concurrent requests
+  // from overwriting each other's files (GitHub issue #2449).
+  // The directory path is lazily assigned in onFile (only for requests with file uploads).
+  app.decorateRequest('uploadDir', '');
+  // Clean up the per-request upload directory after the response is sent.
+  // Safe from a rate-limiting perspective (CodeQL js/missing-rate-limiting):
+  // this is an internal service not exposed to the internet, the path is
+  // server-generated (uploads/<UUID>), and the hook only runs rm when files
+  // were actually uploaded (uploadDir is non-empty).
+  app.addHook('onResponse', async (req) => {
+    if (req.uploadDir) {
+      await rm(req.uploadDir, { recursive: true, force: true }).catch((err: unknown) => {
+        log.warn({ msg: 'Failed to clean up per-request upload directory', uploadDir: req.uploadDir, err });
+      });
+    }
+  });
+
   // 10 MB limit for code including props
   const fieldSizeLimit = 1024 * 1024 * 10;
 
@@ -150,13 +174,29 @@ export default function run(config: Partial<Config>) {
       // For bundles and assets
       fileSize: Infinity,
     },
-    onFile: async (part) => {
-      const destinationPath = path.join(serverBundleCachePath, 'uploads', part.filename);
-      // TODO: inline here
+    // Use regular function (not arrow) because @fastify/multipart binds `this`
+    // to the Fastify request in attachFieldsToBody mode.
+    async onFile(this: FastifyRequest, part) {
+      if (typeof this?.uploadDir !== 'string') {
+        throw new Error('onFile: expected `this` to be bound to the Fastify request');
+      }
+      // Lazily assign a per-request upload directory on first file upload
+      if (this.uploadDir === '') {
+        this.uploadDir = path.join(serverBundleCachePath, 'uploads', randomUUID());
+      }
+      // Use path.basename to strip any directory components from the filename,
+      // preventing path traversal attacks (e.g. filename "../../etc/shadow").
+      const safeFilename = path.basename(part.filename);
+      if (!safeFilename) {
+        throw new Error(
+          `onFile: received file with empty or invalid filename: ${JSON.stringify(part.filename)}`,
+        );
+      }
+      const destinationPath = path.join(this.uploadDir, safeFilename);
       await saveMultipartFile(part, destinationPath);
       // eslint-disable-next-line no-param-reassign
       part.value = {
-        filename: part.filename,
+        filename: safeFilename,
         savedFilePath: destinationPath,
         type: 'asset',
       };
@@ -332,9 +372,6 @@ export default function run(config: Partial<Config>) {
           });
 
           await Promise.all(assetCopyPromises);
-
-          // Delete assets from uploads directory
-          await deleteUploadedAssets(assets);
 
           await setResponse(
             {
