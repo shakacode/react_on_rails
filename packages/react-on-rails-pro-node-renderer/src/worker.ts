@@ -187,6 +187,11 @@ export default function run(config: Partial<Config>) {
       // Use path.basename to strip any directory components from the filename,
       // preventing path traversal attacks (e.g. filename "../../etc/shadow").
       const safeFilename = path.basename(part.filename);
+      if (!safeFilename) {
+        throw new Error(
+          `onFile: received file with empty or invalid filename: ${JSON.stringify(part.filename)}`,
+        );
+      }
       const destinationPath = path.join(this.uploadDir, safeFilename);
       await saveMultipartFile(part, destinationPath);
       // eslint-disable-next-line no-param-reassign
