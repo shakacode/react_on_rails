@@ -65,6 +65,56 @@ with peer deps (like `packages/react-on-rails`) would otherwise get their own
 the exception silently stops working. CI guards (`script/check-react-major-version.mjs`)
 will catch version mismatches.
 
+## `.client` and `.server` File Suffixes vs. RSC Directive (Important Distinction)
+
+React on Rails has two **independent** classification systems that both use "client" / "server" terminology. Confusing them is a common mistake.
+
+### Bundle Placement: `.client.` / `.server.` file suffixes
+
+A React on Rails auto-bundling feature that controls which **webpack bundle** imports a file. This exists independently of React Server Components and is used with or without RSC:
+
+- `Component.client.jsx` → client bundle only (browser)
+- `Component.server.jsx` → server bundle (and RSC bundle when RSC enabled). Must have a paired `.client.` file.
+- `Component.jsx` (no suffix) → both bundles
+
+This is purely about source file routing. A `.server.jsx` file is NOT a React Server Component.
+
+### RSC Classification: `'use client'` directive
+
+The `'use client'` directive is part of the React Server Components architecture. It marks a component as a React Client Component (one that can use hooks, state, event handlers, and browser APIs). Components without this directive are treated as React Server Components.
+
+When auto-bundling is enabled with RSC support (Pro feature), React on Rails uses this directive to control multiple things:
+
+- **Registration**: Components with `'use client'` are registered via `ReactOnRails.register()`. Components without it are registered via `registerServerComponent()`.
+- **RSC bundling**: The RSC webpack loader uses this directive to decide whether a component is included in the RSC bundle or replaced with a client reference in that bundle.
+
+The `client_entrypoint?` method in `packs_generator.rb` is what detects this directive during auto-bundling.
+
+### How They Interact (RSC-enabled mode)
+
+These are orthogonal concerns. The file suffix controls which bundle, and the directive controls RSC registration:
+
+> **Note:** The "Registered as" column applies only when RSC support is enabled (Pro). Without RSC, all components are registered via `ReactOnRails.register()` regardless of the `'use client'` directive.
+
+| File             | `'use client'`? | Goes into                    | Registered as    |
+| ---------------- | --------------- | ---------------------------- | ---------------- |
+| `Foo.jsx`        | Yes             | Both bundles                 | Client component |
+| `Foo.jsx`        | No              | Both bundles                 | Server component |
+| `Foo.client.jsx` | Yes             | Client bundle                | Client component |
+| `Foo.client.jsx` | No              | Client bundle                | Server component |
+| `Foo.server.jsx` | Yes             | Server bundle (+ RSC bundle) | Client component |
+| `Foo.server.jsx` | No              | Server bundle (+ RSC bundle) | Server component |
+
+In practice, paired `.client.`/`.server.` files should always have matching `'use client'` status because the client and server must agree on a component's RSC role for hydration to work.
+
+### Key code paths in `packs_generator.rb`
+
+- `common_component_to_path` — finds files without `.client.`/`.server.` suffix
+- `client_component_to_path` — finds `.client.` files
+- `server_component_to_path` — finds `.server.` files (requires a paired `.client.`)
+- `client_entrypoint?` — checks for `'use client'` directive (RSC classification)
+- `pack_file_contents` — generates different registration code based on `client_entrypoint?`
+
 ## Examples and Testing
 
 - **Dummy app**: `react_on_rails/spec/dummy/` - Rails app for testing integration

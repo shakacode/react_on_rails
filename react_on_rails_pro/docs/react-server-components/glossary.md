@@ -9,6 +9,16 @@ A React architecture that allows components to execute exclusively on the server
 - Improved initial page load
 - Better SEO
 
+<!-- H2 is intentional here: this callout must stand out above the H3 glossary entries to prevent confusion -->
+## Important: `.client.` / `.server.` File Suffixes Are Unrelated
+
+React on Rails has a separate, older concept where files can have `.client.jsx` or `.server.jsx` suffixes. These control **which webpack bundle** imports the file (client bundle vs. server bundle for SSR) and have nothing to do with React Server Components.
+
+- `Component.client.jsx` → only imported in the client (browser) bundle
+- `Component.server.jsx` → only imported in the server and the RSC bundle
+
+A `.server.jsx` file is NOT a React Server Component. A `.client.jsx` file is NOT necessarily a React Client Component. The RSC classification is determined solely by the `'use client'` directive, regardless of file suffix. See the [auto-bundling docs](../../../docs/core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md#server-rendering-and-client-rendering-components) for details on file suffixes.
+
 ## Types of Components
 
 ### Server Components

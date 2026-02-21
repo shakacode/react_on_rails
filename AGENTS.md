@@ -161,6 +161,35 @@ Prettier handles all formatting. Never manually format — run `rake autofix` in
 - Add files to the `docs/` root — they must go in a subdirectory (`getting-started/`, `core-concepts/`, `building-features/`, `api-reference/`, `deployment/`, `migrating/`, `upgrading/`, `contributor-info/`, `misc/`)
 - Force push to `main` or `master`
 
+## Key Concept: File Suffixes vs. RSC Directive
+
+React on Rails has two **independent** systems that both use "client" and "server" terminology. Do not confuse them.
+
+### 1. Bundle Placement (`.client.` / `.server.` file suffixes)
+
+A React on Rails auto-bundling feature that controls which webpack bundle imports a file. This exists independently of React Server Components and is used with or without RSC:
+
+- `Component.client.jsx` → imported only in the **client bundle** (browser)
+- `Component.server.jsx` → imported only in the **server bundle** (and RSC bundle when RSC enabled)
+- `Component.jsx` (no suffix) → imported in **both** bundles
+
+This controls where the source file is loaded, nothing more. A `.server.jsx` file is NOT a React Server Component — it is simply a file that webpack includes in the server bundle (and the RSC bundle when RSC is enabled).
+
+### 2. RSC Classification (`'use client'` directive)
+
+The `'use client'` directive is part of the React Server Components architecture. It marks a component as a React Client Component. Components without it are treated as React Server Components.
+
+When auto-bundling is enabled with RSC support (Pro feature), React on Rails uses this directive to control:
+
+- **Registration**: `'use client'` → `ReactOnRails.register()`, no `'use client'` → `registerServerComponent()`
+- **RSC bundling**: The RSC webpack loader uses this directive to decide whether a component is included in the RSC bundle or replaced with a client reference in that bundle
+
+The `client_entrypoint?` method in `packs_generator.rb` checks for this directive.
+
+### They Are Orthogonal
+
+A `.client.jsx` file can be a React Server Component (if it lacks `'use client'`), and a `.server.jsx` file can be a React Client Component (if it has `'use client'`). In practice, paired `.client.`/`.server.` files should have consistent `'use client'` status because the client and server must agree on the component's RSC role for hydration to work.
+
 ## Changelog
 
 Update `/CHANGELOG.md` for **user-visible changes only** (features, bug fixes, breaking changes, deprecations, performance improvements). Do **not** add entries for linting, formatting, refactoring, tests, or doc fixes.
