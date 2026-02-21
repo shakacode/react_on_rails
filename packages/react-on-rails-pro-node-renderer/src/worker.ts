@@ -172,15 +172,18 @@ export default function run(config: Partial<Config>) {
     },
     // Use regular function (not arrow) because @fastify/multipart binds `this`
     // to the Fastify request in attachFieldsToBody mode.
-    async onFile(part) {
+    async onFile(this: FastifyRequest, part) {
       if (typeof this?.uploadDir !== 'string' || this.uploadDir === '') {
         throw new Error('onFile: expected `this` to be bound to the Fastify request with uploadDir set');
       }
-      const destinationPath = path.join(this.uploadDir, part.filename);
+      // Use path.basename to strip any directory components from the filename,
+      // preventing path traversal attacks (e.g. filename "../../etc/shadow").
+      const safeFilename = path.basename(part.filename);
+      const destinationPath = path.join(this.uploadDir, safeFilename);
       await saveMultipartFile(part, destinationPath);
       // eslint-disable-next-line no-param-reassign
       part.value = {
-        filename: part.filename,
+        filename: safeFilename,
         savedFilePath: destinationPath,
         type: 'asset',
       };

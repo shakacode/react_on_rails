@@ -12,8 +12,12 @@ import * as errorReporter from './shared/errorReporter.js';
 import { getLicenseStatus } from './shared/licenseValidator.js';
 
 const MILLISECONDS_IN_MINUTE = 60000;
+// How often to scan for orphaned upload directories.
 const ORPHAN_CLEANUP_INTERVAL_MS = 5 * MILLISECONDS_IN_MINUTE;
-const ORPHAN_AGE_THRESHOLD_MS = 5 * MILLISECONDS_IN_MINUTE;
+// How old a directory must be before it is considered orphaned.
+// Set well above the longest realistic upload duration so that large bundle
+// uploads in progress are never deleted by the cleanup timer.
+const ORPHAN_AGE_THRESHOLD_MS = 30 * MILLISECONDS_IN_MINUTE;
 
 export default function masterRun(runningConfig?: Partial<Config>) {
   // Check license status on startup and log appropriately

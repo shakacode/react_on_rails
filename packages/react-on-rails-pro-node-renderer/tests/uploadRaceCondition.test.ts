@@ -14,7 +14,6 @@ import fs from 'fs';
 import fsPromises from 'fs/promises';
 import os from 'os';
 import formAutoContent from 'form-auto-content';
-import { createReadStream } from 'fs-extra';
 // eslint-disable-next-line import/no-relative-packages
 import packageJson from '../package.json';
 import worker, { disableHttp2 } from '../src/worker';
@@ -36,12 +35,19 @@ disableHttp2();
  * Since preHandler runs AFTER preValidation (where onFile saves files to disk),
  * this guarantees every request's onFile phase has completed before any route
  * handler executes — making concurrent upload races deterministic.
+ *
+ * Safety: if fewer than `expectedCount` requests reach preHandler (e.g. one is
+ * rejected before this lifecycle stage), the gate resolves after 10 seconds so
+ * tests time out with a clear failure rather than hanging until Jest's global timeout.
  */
 function addBarrier(app: ReturnType<typeof worker>, routePrefix: string, expectedCount: number) {
   let arrived = 0;
   let release!: () => void;
   const gate = new Promise<void>((resolve) => {
     release = resolve;
+    // Safety valve: resolve after 10 s if not all requests arrive, so Jest
+    // reports an assertion failure rather than a cryptic timeout.
+    setTimeout(resolve, 10_000);
   });
 
   app.addHook('preHandler', async (req) => {
@@ -58,6 +64,7 @@ function addBarrier(app: ReturnType<typeof worker>, routePrefix: string, expecte
 describe('concurrent upload isolation (issue #2449)', () => {
   let tmpDirA: string;
   let tmpDirB: string;
+  let app: ReturnType<typeof worker>;
 
   beforeEach(async () => {
     await resetForTest(testName);
@@ -68,6 +75,7 @@ describe('concurrent upload isolation (issue #2449)', () => {
   });
 
   afterEach(async () => {
+    await app?.close();
     await resetForTest(testName);
     await fsPromises.rm(tmpDirA, { recursive: true, force: true }).catch(() => {});
     await fsPromises.rm(tmpDirB, { recursive: true, force: true }).catch(() => {});
@@ -87,7 +95,7 @@ describe('concurrent upload isolation (issue #2449)', () => {
       fs.writeFileSync(path.join(tmpDirA, 'loadable-stats.json'), assetContentA);
       fs.writeFileSync(path.join(tmpDirB, 'loadable-stats.json'), assetContentB);
 
-      const app = worker({ serverBundleCachePath: serverBundleCachePathForTest() });
+      app = worker({ serverBundleCachePath: serverBundleCachePathForTest() });
       addBarrier(app, '/upload-assets', 2);
 
       const bundleHashA = 'bundle-race-A';
@@ -98,14 +106,14 @@ describe('concurrent upload isolation (issue #2449)', () => {
         protocolVersion,
         railsEnv,
         targetBundles: [bundleHashA],
-        asset1: createReadStream(path.join(tmpDirA, 'loadable-stats.json')),
+        asset1: fs.createReadStream(path.join(tmpDirA, 'loadable-stats.json')),
       });
       const formB = formAutoContent({
         gemVersion,
         protocolVersion,
         railsEnv,
         targetBundles: [bundleHashB],
-        asset1: createReadStream(path.join(tmpDirB, 'loadable-stats.json')),
+        asset1: fs.createReadStream(path.join(tmpDirB, 'loadable-stats.json')),
       });
 
       const [resA, resB] = await Promise.all([
@@ -142,7 +150,7 @@ describe('concurrent upload isolation (issue #2449)', () => {
       fs.writeFileSync(path.join(tmpDirB, 'loadable-stats.json'), statsB);
       fs.writeFileSync(path.join(tmpDirB, 'manifest.json'), manifestB);
 
-      const app = worker({ serverBundleCachePath: serverBundleCachePathForTest() });
+      app = worker({ serverBundleCachePath: serverBundleCachePathForTest() });
       addBarrier(app, '/upload-assets', 2);
 
       const bundleHashA = 'bundle-multi-A';
@@ -153,16 +161,16 @@ describe('concurrent upload isolation (issue #2449)', () => {
         protocolVersion,
         railsEnv,
         targetBundles: [bundleHashA],
-        asset1: createReadStream(path.join(tmpDirA, 'loadable-stats.json')),
-        asset2: createReadStream(path.join(tmpDirA, 'manifest.json')),
+        asset1: fs.createReadStream(path.join(tmpDirA, 'loadable-stats.json')),
+        asset2: fs.createReadStream(path.join(tmpDirA, 'manifest.json')),
       });
       const formB = formAutoContent({
         gemVersion,
         protocolVersion,
         railsEnv,
         targetBundles: [bundleHashB],
-        asset1: createReadStream(path.join(tmpDirB, 'loadable-stats.json')),
-        asset2: createReadStream(path.join(tmpDirB, 'manifest.json')),
+        asset1: fs.createReadStream(path.join(tmpDirB, 'loadable-stats.json')),
+        asset2: fs.createReadStream(path.join(tmpDirB, 'manifest.json')),
       });
 
       const [resA, resB] = await Promise.all([
@@ -206,7 +214,7 @@ describe('concurrent upload isolation (issue #2449)', () => {
       fs.writeFileSync(path.join(tmpDirA, 'loadable-stats.json'), assetContentA);
       fs.writeFileSync(path.join(tmpDirB, 'loadable-stats.json'), assetContentB);
 
-      const app = worker({ serverBundleCachePath: serverBundleCachePathForTest() });
+      app = worker({ serverBundleCachePath: serverBundleCachePathForTest() });
       addBarrier(app, '/bundles/', 2);
 
       const bundleTimestampA = '1000000000001';
@@ -217,16 +225,16 @@ describe('concurrent upload isolation (issue #2449)', () => {
         protocolVersion,
         railsEnv,
         renderingRequest: 'ReactOnRails.dummy',
-        bundle: createReadStream(getFixtureBundle()),
-        asset1: createReadStream(path.join(tmpDirA, 'loadable-stats.json')),
+        bundle: fs.createReadStream(getFixtureBundle()),
+        asset1: fs.createReadStream(path.join(tmpDirA, 'loadable-stats.json')),
       });
       const formB = formAutoContent({
         gemVersion,
         protocolVersion,
         railsEnv,
         renderingRequest: 'ReactOnRails.dummy',
-        bundle: createReadStream(getFixtureBundle()),
-        asset1: createReadStream(path.join(tmpDirB, 'loadable-stats.json')),
+        bundle: fs.createReadStream(getFixtureBundle()),
+        asset1: fs.createReadStream(path.join(tmpDirB, 'loadable-stats.json')),
       });
 
       const [resA, resB] = await Promise.all([
