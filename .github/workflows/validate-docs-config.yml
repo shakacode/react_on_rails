@@ -1,0 +1,37 @@
+name: Validate Docs Config
+
+on:
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'react_on_rails_pro/docs/**'
+      - 'scripts/validate-docs-config.cjs'
+      - '.github/workflows/validate-docs-config.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'docs/**'
+      - 'react_on_rails_pro/docs/**'
+      - 'scripts/validate-docs-config.cjs'
+      - '.github/workflows/validate-docs-config.yml'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    env:
+      NODE_PATH: /tmp/docs-validator/node_modules
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install validator dependencies
+        run: npm install --prefix /tmp/docs-validator --no-package-lock js-yaml micromatch
+
+      - name: Validate OSS docs config
+        run: node scripts/validate-docs-config.cjs docs
+
+      - name: Validate Pro docs config
+        run: node scripts/validate-docs-config.cjs react_on_rails_pro/docs
