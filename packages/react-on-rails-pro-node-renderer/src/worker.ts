@@ -29,6 +29,7 @@ import {
   Asset,
   getAssetPath,
   getBundleDirectory,
+  getRequestBundleFilePath,
 } from './shared/utils.js';
 import * as errorReporter from './shared/errorReporter.js';
 import { lock, unlock } from './shared/locks.js';
@@ -322,8 +323,6 @@ export default function run(config: Partial<Config>) {
     if (!(await requestPrechecks(req, res))) {
       return;
     }
-    let lockAcquired = false;
-    let lockfileName: string | undefined;
     const assets: Asset[] = Object.values(req.body).filter(isAsset);
 
     // Handle targetBundles as either a string or an array
@@ -338,75 +337,61 @@ export default function run(config: Partial<Config>) {
     const assetsDescription = JSON.stringify(assets.map((asset) => asset.filename));
     const taskDescription = `Uploading files ${assetsDescription} to bundle directories: ${targetBundles.join(', ')}`;
 
+    log.info(taskDescription);
     try {
-      const { lockfileName: name, wasLockAcquired, errorMessage } = await lock('transferring-assets');
-      lockfileName = name;
-      lockAcquired = wasLockAcquired;
+      // Use per-bundle locks (same lock key as handleRenderRequest) so that
+      // asset copies and render-request bundle writes to the same directory
+      // are mutually exclusive. See https://github.com/shakacode/react_on_rails/issues/2463
+      const copyPromises = targetBundles.map(async (bundleTimestamp) => {
+        const bundleDirectory = getBundleDirectory(bundleTimestamp);
+        await mkdir(bundleDirectory, { recursive: true });
 
-      if (!wasLockAcquired) {
-        const msg = formatExceptionMessage(
-          taskDescription,
-          errorMessage,
-          `Failed to acquire lock ${lockfileName}. Worker: ${workerIdLabel()}.`,
-        );
-        await setResponse(errorResponseResult(msg), res);
-      } else {
-        log.info(taskDescription);
-        try {
-          // Prepare all directories first
-          const directoryPromises = targetBundles.map(async (bundleTimestamp) => {
-            const bundleDirectory = getBundleDirectory(bundleTimestamp);
+        const bundleFilePath = getRequestBundleFilePath(bundleTimestamp);
+        const { lockfileName, wasLockAcquired, errorMessage } = await lock(bundleFilePath);
 
-            // Check if bundle directory exists, create if not
-            if (!(await fileExistsAsync(bundleDirectory))) {
-              log.info(`Creating bundle directory: ${bundleDirectory}`);
-              await mkdir(bundleDirectory, { recursive: true });
-            }
-            return bundleDirectory;
-          });
-
-          const bundleDirectories = await Promise.all(directoryPromises);
-
-          // Copy assets to each bundle directory
-          const assetCopyPromises = bundleDirectories.map(async (bundleDirectory) => {
-            await copyUploadedAssets(assets, bundleDirectory);
-            log.info(`Copied assets to bundle directory: ${bundleDirectory}`);
-          });
-
-          await Promise.all(assetCopyPromises);
-
-          await setResponse(
-            {
-              status: 200,
-              headers: {},
-            },
-            res,
+        if (!wasLockAcquired) {
+          const msg = formatExceptionMessage(
+            taskDescription,
+            errorMessage,
+            `Failed to acquire lock ${lockfileName}. Worker: ${workerIdLabel()}.`,
           );
-        } catch (err) {
-          const msg = 'ERROR when trying to copy assets';
-          const message = `${msg}. ${err}. Task: ${taskDescription}`;
-          log.error({
-            msg,
-            err,
-            task: taskDescription,
-          });
-          await setResponse(errorResponseResult(message), res);
+          throw new Error(msg);
         }
-      }
-    } finally {
-      if (lockAcquired) {
+
         try {
-          if (lockfileName) {
+          await copyUploadedAssets(assets, bundleDirectory);
+          log.info(`Copied assets to bundle directory: ${bundleDirectory}`);
+        } finally {
+          try {
             await unlock(lockfileName);
+          } catch (error) {
+            log.warn({
+              msg: `Error unlocking ${lockfileName} from worker ${workerIdLabel()}`,
+              err: error,
+              task: taskDescription,
+            });
           }
-        } catch (error) {
-          log.warn({
-            msg: `Error unlocking ${lockfileName} from worker ${workerIdLabel()}`,
-            err: error,
-            task: taskDescription,
-          });
         }
-      }
+      });
+
+      await Promise.all(copyPromises);
+
+      await setResponse(
+        {
+          status: 200,
+          headers: {},
+        },
+        res,
+      );
+    } catch (err) {
+      const msg = 'ERROR when trying to copy assets';
+      const message = `${msg}. ${err}. Task: ${taskDescription}`;
+      log.error({
+        msg,
+        err,
+        task: taskDescription,
+      });
+      await setResponse(errorResponseResult(message), res);
     }
   });
 
