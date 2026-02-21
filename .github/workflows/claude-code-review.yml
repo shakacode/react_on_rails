@@ -14,6 +14,22 @@ jobs:
       id-token: write
 
     steps:
+      - name: Minimize previous Claude review comments
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate \
+            --jq '.[] | select(.user.login == "claude[bot]") | .node_id' |
+          while read -r node_id; do
+            if [ -n "$node_id" ]; then
+              gh api graphql \
+                -f query="mutation { minimizeComment(input: {subjectId: \"$node_id\", classifier: OUTDATED}) { minimizedComment { isMinimized } } }" \
+                --silent
+            fi
+          done
+
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
