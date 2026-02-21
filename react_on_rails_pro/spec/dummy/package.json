@@ -36,7 +36,7 @@
     "graphql": "^16.8.1",
     "history": "^4.6.3",
     "imports-loader": "^1.2.0",
-    "lodash": "^4.17.4",
+    "lodash": "^4.17.23",
     "mini-css-extract-plugin": "^2.4.5",
     "moment": "^2.29.4",
     "node-fetch": "^2.0.0",
