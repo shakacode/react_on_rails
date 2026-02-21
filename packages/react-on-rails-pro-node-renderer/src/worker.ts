@@ -146,15 +146,19 @@ export default function run(config: Partial<Config>) {
 
   // Each request gets its own upload directory to prevent concurrent requests
   // from overwriting each other's files (GitHub issue #2449).
+  // The directory path is lazily assigned in onFile (only for requests with file uploads).
   app.decorateRequest('uploadDir', '');
-  app.addHook('onRequest', (req, _res, done) => {
-    req.uploadDir = path.join(serverBundleCachePath, 'uploads', randomUUID());
-    done();
-  });
+  // Clean up the per-request upload directory after the response is sent.
+  // Safe from a rate-limiting perspective (CodeQL js/missing-rate-limiting):
+  // this is an internal service not exposed to the internet, the path is
+  // server-generated (uploads/<UUID>), and the hook only runs rm when files
+  // were actually uploaded (uploadDir is non-empty).
   app.addHook('onResponse', async (req) => {
-    await rm(req.uploadDir, { recursive: true, force: true }).catch((err: unknown) => {
-      log.warn({ msg: 'Failed to clean up per-request upload directory', uploadDir: req.uploadDir, err });
-    });
+    if (req.uploadDir) {
+      await rm(req.uploadDir, { recursive: true, force: true }).catch((err: unknown) => {
+        log.warn({ msg: 'Failed to clean up per-request upload directory', uploadDir: req.uploadDir, err });
+      });
+    }
   });
 
   // 10 MB limit for code including props
@@ -173,8 +177,12 @@ export default function run(config: Partial<Config>) {
     // Use regular function (not arrow) because @fastify/multipart binds `this`
     // to the Fastify request in attachFieldsToBody mode.
     async onFile(this: FastifyRequest, part) {
-      if (typeof this?.uploadDir !== 'string' || this.uploadDir === '') {
-        throw new Error('onFile: expected `this` to be bound to the Fastify request with uploadDir set');
+      if (typeof this?.uploadDir !== 'string') {
+        throw new Error('onFile: expected `this` to be bound to the Fastify request');
+      }
+      // Lazily assign a per-request upload directory on first file upload
+      if (this.uploadDir === '') {
+        this.uploadDir = path.join(serverBundleCachePath, 'uploads', randomUUID());
       }
       // Use path.basename to strip any directory components from the filename,
       // preventing path traversal attacks (e.g. filename "../../etc/shadow").
