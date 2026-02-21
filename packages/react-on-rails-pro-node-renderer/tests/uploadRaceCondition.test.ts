@@ -1,5 +1,6 @@
 /**
- * Tests for concurrent upload isolation (GitHub issue #2449).
+ * Tests for concurrent upload isolation (GitHub issue #2449) and shared
+ * per-bundle locking between /upload-assets and render requests (issue #2463).
  *
  * Each request gets its own upload directory (uploads/<uuid>/), so concurrent
  * requests uploading same-named files never overwrite each other. These tests
@@ -40,7 +41,12 @@ disableHttp2();
  * rejected before this lifecycle stage), the gate resolves after 10 seconds so
  * tests time out with a clear failure rather than hanging until Jest's global timeout.
  */
-function addBarrier(app: ReturnType<typeof worker>, routePrefix: string, expectedCount: number) {
+function addBarrier(
+  app: ReturnType<typeof worker>,
+  routePrefix: string | string[],
+  expectedCount: number,
+) {
+  const prefixes = Array.isArray(routePrefix) ? routePrefix : [routePrefix];
   let arrived = 0;
   let release!: () => void;
   const gate = new Promise<void>((resolve) => {
@@ -51,7 +57,7 @@ function addBarrier(app: ReturnType<typeof worker>, routePrefix: string, expecte
   });
 
   app.addHook('preHandler', async (req) => {
-    if (!req.url.startsWith(routePrefix)) return;
+    if (!prefixes.some((p) => req.url.startsWith(p))) return;
     arrived += 1;
     if (arrived >= expectedCount) {
       release();
@@ -79,15 +85,11 @@ describe('concurrent upload isolation (issue #2449)', () => {
     await resetForTest(testName);
     await fsPromises.rm(tmpDirA, { recursive: true, force: true }).catch(() => {});
     await fsPromises.rm(tmpDirB, { recursive: true, force: true }).catch(() => {});
-    // Clean up lockfile in case the test failed mid-lock
-    await fsPromises.unlink('transferring-assets.lock').catch(() => {});
   });
 
   describe('/upload-assets endpoint', () => {
-    // Race: both onFile handlers write to uploads/loadable-stats.json.
-    // Last writer overwrites first. The 'transferring-assets' lock serializes
-    // handlers, but both read from the same overwritten file → wrong content
-    // in at least one bundle directory.
+    // Per-request upload directories (uploads/<uuid>/) isolate file uploads.
+    // Per-bundle locks serialize writes to each bundle directory.
 
     test('concurrent requests each deliver correct single asset to their target bundle', async () => {
       const assetContentA = JSON.stringify({ version: 'A', data: 'first-request' });
@@ -270,6 +272,67 @@ describe('concurrent upload isolation (issue #2449)', () => {
 
       expect(actualA).toBe(assetContentA);
       expect(actualB).toBe(assetContentB);
+    });
+  });
+
+  describe('cross-endpoint shared lock (issue #2463)', () => {
+    // Both /upload-assets and render requests now use the same per-bundle lock
+    // (getRequestBundleFilePath). This test verifies they coordinate when
+    // targeting the same bundle directory.
+
+    test('concurrent /upload-assets and render request to same bundle both succeed', async () => {
+      const renderAssetContent = JSON.stringify({ version: 'render', source: 'render-request' });
+      const uploadAssetContent = JSON.stringify({ version: 'upload', source: 'upload-assets' });
+      fs.writeFileSync(path.join(tmpDirA, 'render-asset.json'), renderAssetContent);
+      fs.writeFileSync(path.join(tmpDirB, 'upload-asset.json'), uploadAssetContent);
+
+      app = worker({ serverBundleCachePath: serverBundleCachePathForTest() });
+      addBarrier(app, ['/upload-assets', '/bundles/'], 2);
+
+      const bundleTimestamp = '2000000000001';
+
+      // Render request: sends bundle + an asset
+      const renderForm = formAutoContent({
+        gemVersion,
+        protocolVersion,
+        railsEnv,
+        renderingRequest: 'ReactOnRails.dummy',
+        bundle: fs.createReadStream(getFixtureBundle()),
+        asset1: fs.createReadStream(path.join(tmpDirA, 'render-asset.json')),
+      });
+
+      // Upload-assets request: sends a different asset to the same bundle
+      const uploadForm = formAutoContent({
+        gemVersion,
+        protocolVersion,
+        railsEnv,
+        targetBundles: [bundleTimestamp],
+        asset1: fs.createReadStream(path.join(tmpDirB, 'upload-asset.json')),
+      });
+
+      const [renderRes, uploadRes] = await Promise.all([
+        app
+          .inject()
+          .post(`/bundles/${bundleTimestamp}/render/d41d8cd98f00b204e9800998ecf8427e`)
+          .payload(renderForm.payload)
+          .headers(renderForm.headers)
+          .end(),
+        app.inject().post('/upload-assets').payload(uploadForm.payload).headers(uploadForm.headers).end(),
+      ]);
+
+      // Both requests should succeed
+      expect(renderRes.statusCode).toBe(200);
+      expect(uploadRes.statusCode).toBe(200);
+      expect(renderRes.payload).toBe('{"html":"Dummy Object"}');
+
+      // Bundle directory should contain assets from both operations
+      const bundleDir = path.join(serverBundleCachePathForTest(), bundleTimestamp);
+
+      expect(fs.existsSync(path.join(bundleDir, 'render-asset.json'))).toBe(true);
+      expect(fs.readFileSync(path.join(bundleDir, 'render-asset.json'), 'utf-8')).toBe(renderAssetContent);
+
+      expect(fs.existsSync(path.join(bundleDir, 'upload-asset.json'))).toBe(true);
+      expect(fs.readFileSync(path.join(bundleDir, 'upload-asset.json'), 'utf-8')).toBe(uploadAssetContent);
     });
   });
 });
