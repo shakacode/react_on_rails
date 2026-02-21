@@ -304,6 +304,8 @@ module ReactOnRails
           end
         end
 
+        add_csp_nonce_to_context(result)
+
         if defined?(request) && request.present?
           # Check for encoding of the request's original_url and try to force-encoding the
           # URLs as UTF-8. This situation can occur in browsers that do not encode the
@@ -339,6 +341,11 @@ module ReactOnRails
       end
 
       @rails_context.merge(serverSide: server_side)
+    end
+
+    def add_csp_nonce_to_context(result)
+      nonce = csp_nonce
+      result[:cspNonce] = nonce if nonce.present?
     end
 
     def load_pack_for_generated_component(react_component_name, render_options)

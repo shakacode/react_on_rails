@@ -139,4 +139,16 @@ describe('injectRSCPayload', () => {
         '<div>Third chunk</div>',
     );
   });
+
+  it('adds sanitized nonce attribute to injected RSC script tags', async () => {
+    const mockRSC = createMockStream(['{"test": "data"}']);
+    const mockHTML = createMockStream(['<html><body><div>Hello, world!</div></body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId, 'abc123" onload=alert(1)');
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain('<script nonce="abc123onloadalert1">');
+    expect(resultStr).not.toContain('onload=');
+  });
 });
