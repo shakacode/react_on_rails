@@ -16,6 +16,10 @@ This means the placement of `'use client'` directly determines your bundle size.
 
 Start from the top of your component tree and work downward. This is the approach [Mux used to migrate 50,000 lines of code](https://www.mux.com/blog/what-are-react-server-components):
 
+<p align="center">
+  <img src="images/top-down-migration.svg" alt="Animated diagram showing the three phases of top-down RSC migration: Phase 1 marks the root as client, Phase 2 pushes the client boundary down to leaf components, and Phase 3 splits mixed components into server and client parts." width="840" />
+</p>
+
 ### Phase 1: Mark the Root as Client
 
 Add `'use client'` to your app entry point. Everything works exactly as before -- nothing breaks, nothing changes.
