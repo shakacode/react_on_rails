@@ -72,9 +72,9 @@ Here is the new link:
 
 ## **[CONTRIBUTING](CONTRIBUTING.md)**
 
-- [Generator Testing](./docs/contributor-info/generator-testing.md)
-- [Linting](./docs/contributor-info/linters.md)
-- [Releasing](./docs/contributor-info/releasing.md)
+- [Generator Testing](./internal/contributor-info/generator-testing.md)
+- [Linting](./internal/contributor-info/linters.md)
+- [Releasing](./internal/contributor-info/releasing.md)
 
 ## **Misc**
 
