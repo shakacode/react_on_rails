@@ -69,7 +69,7 @@ jobs:
   build-dummy-app-webpack-test-bundles:
     needs: detect-changes
     if: |
-      !(
+      github.actor != 'dependabot[bot]' && !(
         github.event_name == 'push' &&
         github.ref == 'refs/heads/master' &&
         needs.detect-changes.outputs.docs_only == 'true'
@@ -176,7 +176,7 @@ jobs:
       - detect-changes
       - build-dummy-app-webpack-test-bundles
     if: |
-      !(
+      github.actor != 'dependabot[bot]' && !(
         github.event_name == 'push' &&
         github.ref == 'refs/heads/master' &&
         needs.detect-changes.outputs.docs_only == 'true'
@@ -365,7 +365,7 @@ jobs:
       - detect-changes
       - build-dummy-app-webpack-test-bundles
     if: |
-      !(
+      github.actor != 'dependabot[bot]' && !(
         github.event_name == 'push' &&
         github.ref == 'refs/heads/master' &&
         needs.detect-changes.outputs.docs_only == 'true'
