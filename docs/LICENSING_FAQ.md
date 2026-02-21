@@ -86,7 +86,7 @@ react_on_rails/ (monorepo root)
 
 ### Q: When will this happen?
 
-**A:** The merger is planned as a 7-phase process. Each phase maintains full functionality and CI compliance. See [MONOREPO_MERGER_PLAN_REF.md](./MONOREPO_MERGER_PLAN_REF.md) for details.
+**A:** The merger is being executed in phased steps, each with CI checks and rollback options. See [Issue #2367: Merger Command Center](https://github.com/shakacode/react_on_rails/issues/2367) for the current checklist and status.
 
 ### Q: What if something goes wrong during the merger?
 
@@ -142,4 +142,4 @@ Production use requires a valid subscription.
 
 ---
 
-_For more information about the monorepo merger, see [MONOREPO_MERGER_PLAN_REF.md](./MONOREPO_MERGER_PLAN_REF.md)_
+_For more information about the monorepo merger, see [Issue #2367: Merger Command Center](https://github.com/shakacode/react_on_rails/issues/2367)._
