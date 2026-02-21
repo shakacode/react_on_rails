@@ -291,7 +291,13 @@ module ReactOnRails
         # Check for essential shakapacker configuration files and binaries
         shakapacker_binaries_exist? &&
           File.exist?("config/shakapacker.yml") &&
-          File.exist?("config/webpack/webpack.config.js")
+          shakapacker_config_file_exists?
+      end
+
+      def shakapacker_config_file_exists?
+        File.exist?("config/webpack/webpack.config.js") ||
+          File.exist?("config/rspack/rspack.config.js") ||
+          File.exist?("config/rspack/rspack.config.ts")
       end
 
       def print_shakapacker_setup_banner
