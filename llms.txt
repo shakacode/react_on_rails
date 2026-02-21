@@ -1,0 +1,111 @@
+# React on Rails
+
+> React on Rails integrates React with Ruby on Rails, providing server-side rendering (SSR), component registration, and seamless Rails view integration. React on Rails Pro adds advanced features: a high-performance Node.js rendering server, fragment caching, prerender caching, React Server Components (RSC), and streaming SSR.
+
+## Package Relationships
+
+React on Rails consists of Ruby gems and npm packages that must be paired correctly:
+
+### Open-Source (base):
+- Ruby gem: `react_on_rails`
+- npm package: `react-on-rails`
+
+### Pro (commercial, extends base):
+- Ruby gem: `react_on_rails_pro` (depends on `react_on_rails`)
+- npm package: `react-on-rails-pro` (REPLACES `react-on-rails`, do NOT use both)
+- npm package: `react-on-rails-pro-node-renderer` (standalone Fastify SSR server, optional)
+
+IMPORTANT: When using the `react_on_rails_pro` gem, you MUST use the `react-on-rails-pro` npm package. The base `react-on-rails` npm package will be rejected at runtime.
+
+## Quick Setup
+
+### Base (open-source):
+```bash
+rails generate react_on_rails:install
+```
+
+### Pro with Node Renderer:
+```bash
+bundle add react_on_rails_pro
+rails generate react_on_rails:install --pro
+```
+
+### Pro with React Server Components:
+```bash
+bundle add react_on_rails_pro
+rails generate react_on_rails:install --rsc
+```
+
+## Node Renderer API
+
+The Node Renderer is a Fastify-based Node.js server for high-performance SSR.
+
+### Correct usage:
+```js
+const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');
+
+reactOnRailsProNodeRenderer({
+  serverBundleCachePath: path.resolve(__dirname, '.node-renderer-bundles'),
+  port: 3800,
+  supportModules: true,
+  password: process.env.RENDERER_PASSWORD,
+  workersCount: 3,
+  logLevel: 'info',
+});
+```
+
+The function name is `reactOnRailsProNodeRenderer` (NOT `createServer` or `startRenderer`).
+The config key for the bundle cache directory is `serverBundleCachePath` (NOT `bundlePath`, which is deprecated).
+
+### Rails-side configuration:
+```ruby
+# config/initializers/react_on_rails_pro.rb
+ReactOnRailsPro.configure do |config|
+  config.server_renderer = "NodeRenderer"
+  config.renderer_url = ENV.fetch("REACT_RENDERER_URL", "http://localhost:3800")
+  config.renderer_password = ENV.fetch("RENDERER_PASSWORD", "devPassword")
+  config.prerender_caching = true
+end
+```
+
+Key attributes: `server_renderer`, `renderer_url`, `renderer_password`, `prerender_caching`, `ssr_timeout`, `renderer_use_fallback_exec_js`, `throw_js_errors`, `tracing`, `dependency_globs`.
+
+### Webpack server config requirements (for Pro Node Renderer):
+```js
+// serverWebpackConfig.js output section
+libraryTarget: 'commonjs2',
+
+// after output section
+serverWebpackConfig.target = 'node';
+```
+
+## Client-Side Component Registration
+
+```js
+// With base package
+import ReactOnRails from 'react-on-rails';
+ReactOnRails.register({ MyComponent });
+
+// With Pro package (use this when react_on_rails_pro gem is installed)
+import ReactOnRails from 'react-on-rails-pro';
+ReactOnRails.register({ MyComponent });
+```
+
+## Pro-Exclusive Imports
+
+```js
+import { RSCRoute } from 'react-on-rails-pro/RSCRoute';
+import registerServerComponent from 'react-on-rails-pro/registerServerComponent/client';
+import { wrapServerComponentRenderer } from 'react-on-rails-pro/wrapServerComponentRenderer/client';
+```
+
+## Documentation Links
+
+- Docs: https://www.shakacode.com/react-on-rails/docs/
+- Pro Docs: https://www.shakacode.com/react-on-rails-pro/docs/
+- Pro Installation: https://www.shakacode.com/react-on-rails-pro/docs/installation/
+- Pro Configuration: https://www.shakacode.com/react-on-rails-pro/docs/configuration/
+- Node Renderer Basics: https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/basics/
+- Node Renderer JS Config: https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/js-configuration/
+- RSC Tutorial: https://www.shakacode.com/react-on-rails-pro/docs/react-server-components/tutorial/
+- GitHub: https://github.com/shakacode/react_on_rails

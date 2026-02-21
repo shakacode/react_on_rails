@@ -191,11 +191,12 @@ High-performance standalone Node.js server for server-side rendering with connec
 **Example Configuration:**
 
 ```javascript
-// react-on-rails-pro/react-on-rails-pro-node-renderer.js
-const { reactOnRailsProNodeRenderer } = require('@shakacode-tools/react-on-rails-pro-node-renderer');
+// node-renderer.js
+const path = require('path');
+const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');
 
 reactOnRailsProNodeRenderer({
-  bundlePath: path.resolve(__dirname, '../app/assets/webpack'),
+  serverBundleCachePath: path.resolve(__dirname, '.node-renderer-bundles'),
   port: 3800,
   workersCount: 4,
   supportModules: true, // Required for loadable-components
