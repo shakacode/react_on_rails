@@ -46,17 +46,20 @@ module ReactOnRails
         puts Rainbow("=" * 80).cyan
       end
 
-      # Check if Pro gem is missing.
-      #
-      # @param force [Boolean] When true, always performs the check.
-      #   When false (default), only checks if Pro is required (use_pro? returns true).
-      #   Use force: true in standalone generators where Pro is always required.
-      # @return [Boolean] true if Pro gem is missing
+      # Check if Pro gem is missing. Attempts auto-install via bundle add.
+      # @param force [Boolean] When true, always checks (default: only if use_pro?).
+      # @return [Boolean] true if Pro gem is missing and could not be installed
       def missing_pro_gem?(force: false)
         return false unless force || use_pro?
         return false if pro_gem_installed?
 
-        # Detect context: install_generator defines :pro/:rsc options, standalone generators don't
+        # Try auto-installing (similar to ensure_shakapacker_in_gemfile in install_generator)
+        puts Rainbow("📝 Adding react_on_rails_pro to Gemfile...").yellow
+        if Bundler.with_unbundled_env { system("bundle add react_on_rails_pro --strict") }
+          @pro_gem_installed = nil
+          return false
+        end
+
         context_line = if options.key?(:pro) || options.key?(:rsc)
                          flag = options[:rsc] ? "--rsc" : "--pro"
                          "You specified #{flag}, which requires the react_on_rails_pro gem."
@@ -65,16 +68,15 @@ module ReactOnRails
                        end
 
         GeneratorMessages.add_error(<<~MSG.strip)
-          🚫 React on Rails Pro gem is not installed.
+          🚫 Failed to auto-install react_on_rails_pro gem.
 
           #{context_line}
 
-          Add to your Gemfile:
+          Please add manually to your Gemfile:
             gem 'react_on_rails_pro', '>= 16.3.0'
 
           Then run: bundle install
 
-          Try Pro free! Email justin@shakacode.com for an evaluation license.
           More info: https://www.shakacode.com/react-on-rails-pro/
         MSG
         true
