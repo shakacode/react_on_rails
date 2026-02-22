@@ -273,11 +273,11 @@ if [ "$GENERATORS_CHANGED" = true ] || [ "$JS_CHANGED" = true ]; then
   RUN_GENERATORS=true
 fi
 
-if [ "$PRO_LINT_CONFIG_CHANGED" = true ] || [ "$PRO_RUBY_CORE_CHANGED" = true ] || [ "$PRO_JS_CHANGED" = true ] || [ "$PRO_DUMMY_CHANGED" = true ] || [ "$RUBY_CORE_CHANGED" = true ]; then
+if [ "$PRO_LINT_CONFIG_CHANGED" = true ] || [ "$PRO_RUBY_CORE_CHANGED" = true ] || [ "$PRO_JS_CHANGED" = true ] || [ "$PRO_DUMMY_CHANGED" = true ] || [ "$RUBY_CORE_CHANGED" = true ] || [ "$PRO_NODE_RENDERER_CHANGED" = true ]; then
   RUN_PRO_LINT=true
 fi
 
-if [ "$PRO_RUBY_CORE_CHANGED" = true ] || [ "$PRO_RSPEC_CHANGED" = true ] || [ "$PRO_JS_CHANGED" = true ] || [ "$RUBY_CORE_CHANGED" = true ]; then
+if [ "$PRO_RUBY_CORE_CHANGED" = true ] || [ "$PRO_RSPEC_CHANGED" = true ] || [ "$PRO_JS_CHANGED" = true ] || [ "$RUBY_CORE_CHANGED" = true ] || [ "$PRO_NODE_RENDERER_CHANGED" = true ]; then
   RUN_PRO_TESTS=true
 fi
 
