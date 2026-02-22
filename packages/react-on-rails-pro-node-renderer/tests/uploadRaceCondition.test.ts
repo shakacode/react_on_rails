@@ -277,10 +277,12 @@ describe('concurrent upload isolation (issue #2449)', () => {
     // targeting the same bundle directory.
 
     test('concurrent /upload-assets and render request to same bundle both succeed', async () => {
+      // Use the SAME filename so both requests race on writing to the same
+      // destination file in the bundle directory, exercising the shared lock.
       const renderAssetContent = JSON.stringify({ version: 'render', source: 'render-request' });
       const uploadAssetContent = JSON.stringify({ version: 'upload', source: 'upload-assets' });
-      fs.writeFileSync(path.join(tmpDirA, 'render-asset.json'), renderAssetContent);
-      fs.writeFileSync(path.join(tmpDirB, 'upload-asset.json'), uploadAssetContent);
+      fs.writeFileSync(path.join(tmpDirA, 'loadable-stats.json'), renderAssetContent);
+      fs.writeFileSync(path.join(tmpDirB, 'loadable-stats.json'), uploadAssetContent);
 
       app = worker({ serverBundleCachePath: serverBundleCachePathForTest() });
       addBarrier(app, ['/upload-assets', '/bundles/'], 2);
@@ -294,16 +296,16 @@ describe('concurrent upload isolation (issue #2449)', () => {
         railsEnv,
         renderingRequest: 'ReactOnRails.dummy',
         bundle: fs.createReadStream(getFixtureBundle()),
-        asset1: fs.createReadStream(path.join(tmpDirA, 'render-asset.json')),
+        asset1: fs.createReadStream(path.join(tmpDirA, 'loadable-stats.json')),
       });
 
-      // Upload-assets request: sends a different asset to the same bundle
+      // Upload-assets request: sends the same-named asset to the same bundle
       const uploadForm = formAutoContent({
         gemVersion,
         protocolVersion,
         railsEnv,
         targetBundles: [bundleTimestamp],
-        asset1: fs.createReadStream(path.join(tmpDirB, 'upload-asset.json')),
+        asset1: fs.createReadStream(path.join(tmpDirB, 'loadable-stats.json')),
       });
 
       const [renderRes, uploadRes] = await Promise.all([
@@ -321,14 +323,12 @@ describe('concurrent upload isolation (issue #2449)', () => {
       expect(uploadRes.statusCode).toBe(200);
       expect(renderRes.payload).toBe('{"html":"Dummy Object"}');
 
-      // Bundle directory should contain assets from both operations
+      // The shared lock serializes writes, so the file should contain valid
+      // content from one of the two requests (last writer wins).
       const bundleDir = path.join(serverBundleCachePathForTest(), bundleTimestamp);
-
-      expect(fs.existsSync(path.join(bundleDir, 'render-asset.json'))).toBe(true);
-      expect(fs.readFileSync(path.join(bundleDir, 'render-asset.json'), 'utf-8')).toBe(renderAssetContent);
-
-      expect(fs.existsSync(path.join(bundleDir, 'upload-asset.json'))).toBe(true);
-      expect(fs.readFileSync(path.join(bundleDir, 'upload-asset.json'), 'utf-8')).toBe(uploadAssetContent);
+      expect(fs.existsSync(path.join(bundleDir, 'loadable-stats.json'))).toBe(true);
+      const finalContent = fs.readFileSync(path.join(bundleDir, 'loadable-stats.json'), 'utf-8');
+      expect([renderAssetContent, uploadAssetContent]).toContain(finalContent);
     });
   });
 });
