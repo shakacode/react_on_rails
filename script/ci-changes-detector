@@ -283,7 +283,7 @@ if [ "$PRO_RUBY_CORE_CHANGED" = true ] || [ "$PRO_RSPEC_CHANGED" = true ] || [ "
   RUN_PRO_TESTS=true
 fi
 
-if [ "$PRO_DUMMY_CHANGED" = true ] || [ "$PRO_RUBY_CORE_CHANGED" = true ] || [ "$PRO_JS_CHANGED" = true ] || [ "$RUBY_CORE_CHANGED" = true ]; then
+if [ "$PRO_DUMMY_CHANGED" = true ] || [ "$PRO_RUBY_CORE_CHANGED" = true ] || [ "$PRO_JS_CHANGED" = true ] || [ "$PRO_NODE_RENDERER_CHANGED" = true ] || [ "$RUBY_CORE_CHANGED" = true ]; then
   RUN_PRO_DUMMY_TESTS=true
 fi
 
