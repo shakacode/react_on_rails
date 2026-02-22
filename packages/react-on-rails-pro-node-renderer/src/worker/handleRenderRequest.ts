@@ -166,18 +166,17 @@ async function handleNewBundlesProvided(
   // handleNewBundleProvided catches its own errors, so Promise.all would also
   // wait for every promise.
   const settled = await Promise.allSettled(handlingPromises);
-  const firstFailure = settled.find(
-    (r): r is PromiseRejectedResult => r.status === 'rejected',
-  );
+  const firstFailure = settled.find((r): r is PromiseRejectedResult => r.status === 'rejected');
   if (firstFailure) {
     throw firstFailure.reason;
   }
 
+  // handleNewBundleProvided returns undefined on success or a ResponseResult on
+  // failure (e.g., lock timeout). Find the first error response, if any.
   const results = settled
     .filter((r): r is PromiseFulfilledResult<ResponseResult | undefined> => r.status === 'fulfilled')
     .map((r) => r.value);
-  const errorResult = results.find((result) => result !== undefined);
-  return errorResult;
+  return results.find((result) => result !== undefined);
 }
 
 /**

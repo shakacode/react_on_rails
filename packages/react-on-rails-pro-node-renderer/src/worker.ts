@@ -379,9 +379,7 @@ export default function run(config: Partial<Config>) {
       });
 
       const results = await Promise.allSettled(copyPromises);
-      const firstFailure = results.find(
-        (r): r is PromiseRejectedResult => r.status === 'rejected',
-      );
+      const firstFailure = results.find((r): r is PromiseRejectedResult => r.status === 'rejected');
       if (firstFailure) {
         throw firstFailure.reason;
       }

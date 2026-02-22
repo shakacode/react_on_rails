@@ -41,11 +41,7 @@ disableHttp2();
  * rejected before this lifecycle stage), the gate resolves after 10 seconds so
  * tests time out with a clear failure rather than hanging until Jest's global timeout.
  */
-function addBarrier(
-  app: ReturnType<typeof worker>,
-  routePrefix: string | string[],
-  expectedCount: number,
-) {
+function addBarrier(app: ReturnType<typeof worker>, routePrefix: string | string[], expectedCount: number) {
   const prefixes = Array.isArray(routePrefix) ? routePrefix : [routePrefix];
   let arrived = 0;
   let release!: () => void;
