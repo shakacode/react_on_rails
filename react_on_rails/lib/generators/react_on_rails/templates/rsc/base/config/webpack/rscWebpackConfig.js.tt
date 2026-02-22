@@ -39,7 +39,7 @@ const configureRsc = () => {
       const originalUse = rule.use;
       rule.use = function (data) {
         const result = originalUse.call(this, data);
-        const resultArray = Array.isArray(result) ? result : [result];
+        const resultArray = Array.isArray(result) ? result : result ? [result] : [];
         const resolvedRule = { use: resultArray };
         const jsLoader =
           extractLoader(resolvedRule, 'babel-loader') || extractLoader(resolvedRule, 'swc-loader');
