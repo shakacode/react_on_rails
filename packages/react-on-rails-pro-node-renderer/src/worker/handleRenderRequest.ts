@@ -160,9 +160,11 @@ async function handleNewBundlesProvided(
   const handlingPromises = providedNewBundles.map((providedNewBundle) =>
     handleNewBundleProvided(renderingRequest, providedNewBundle, assetsToCopy),
   );
-  // Use allSettled (not Promise.all) to ensure every in-flight bundle
-  // operation finishes before the handler returns. Otherwise the onResponse
-  // hook can delete req.uploadDir while background copies still read from it.
+  // Defensive: use allSettled so that if handleNewBundleProvided ever throws
+  // unexpectedly, all in-flight operations still complete before the handler
+  // returns and the onResponse hook deletes req.uploadDir. Currently
+  // handleNewBundleProvided catches its own errors, so Promise.all would also
+  // wait for every promise.
   const settled = await Promise.allSettled(handlingPromises);
   const firstFailure = settled.find(
     (r): r is PromiseRejectedResult => r.status === 'rejected',
