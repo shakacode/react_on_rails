@@ -342,6 +342,10 @@ export default function run(config: Partial<Config>) {
       // Use per-bundle locks (same lock key as handleRenderRequest) so that
       // asset copies and render-request bundle writes to the same directory
       // are mutually exclusive. See https://github.com/shakacode/react_on_rails/issues/2463
+      //
+      // Use allSettled (not Promise.all) to ensure every in-flight copy
+      // finishes before the handler returns. Otherwise the onResponse hook
+      // can delete req.uploadDir while background copies still read from it.
       const copyPromises = targetBundles.map(async (bundleTimestamp) => {
         const bundleDirectory = getBundleDirectory(bundleTimestamp);
         await mkdir(bundleDirectory, { recursive: true });
@@ -374,7 +378,13 @@ export default function run(config: Partial<Config>) {
         }
       });
 
-      await Promise.all(copyPromises);
+      const results = await Promise.allSettled(copyPromises);
+      const firstFailure = results.find(
+        (r): r is PromiseRejectedResult => r.status === 'rejected',
+      );
+      if (firstFailure) {
+        throw firstFailure.reason;
+      }
 
       await setResponse(
         {
