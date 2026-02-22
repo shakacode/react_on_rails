@@ -32,6 +32,7 @@ Changes since the last non-beta release.
 ##### Fixed
 
 - **Fixed node renderer upload race condition causing ENOENT errors and asset corruption during concurrent requests**. Concurrent multipart uploads (e.g., during pod rollovers) all wrote to a single shared path (`uploads/<filename>`), causing file overwrites, `ENOENT` errors, and cross-contamination between requests. Each request now gets its own isolated upload directory (`uploads/<uuid>/`), eliminating all shared-path collisions. [PR 2456](https://github.com/shakacode/react_on_rails/pull/2456) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **Fixed node renderer race condition between `/upload-assets` and render requests writing to the same bundle directory**. The `/upload-assets` endpoint used a global lock while render requests used per-bundle locks, so both could write to the same bundle directory concurrently, risking asset corruption. Now both endpoints share the same per-bundle lock key. Also switched parallel bundle processing from `Promise.all` to `Promise.allSettled` to prevent the `onResponse` cleanup hook from deleting uploaded files while in-flight copies are still reading from them. [PR 2464](https://github.com/shakacode/react_on_rails/pull/2464) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 ### [16.4.0.rc.3] - 2026-02-18
 
