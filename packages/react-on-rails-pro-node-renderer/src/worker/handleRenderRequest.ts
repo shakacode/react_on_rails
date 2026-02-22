@@ -173,7 +173,9 @@ async function handleNewBundlesProvided(
     throw firstFailure.reason;
   }
 
-  const results = settled.map((r) => (r as PromiseFulfilledResult<ResponseResult | undefined>).value);
+  const results = settled
+    .filter((r): r is PromiseFulfilledResult<ResponseResult | undefined> => r.status === 'fulfilled')
+    .map((r) => r.value);
   const errorResult = results.find((result) => result !== undefined);
   return errorResult;
 }
