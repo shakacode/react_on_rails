@@ -78,6 +78,17 @@ module ReactOnRailsPro
                        ""
                      end
 
+        key_props_param = if ReactOnRailsPro.configuration.props_transformer &&
+                              ReactOnRailsPro.configuration.enable_rsc_support &&
+                              render_options.streaming?
+                            key_props_json = render_options.props.to_json
+                                                            .gsub("\u2028", '\u2028')
+                                                            .gsub("\u2029", '\u2029')
+                            "keyProps: #{key_props_json},"
+                          else
+                            ""
+                          end
+
         # This function is called with specific componentName and props when generateRSCPayload is invoked
         # In that case, it replaces the empty () with ('componentName', props) in the rendering request
         <<-JS
@@ -92,6 +103,7 @@ module ReactOnRailsPro
             name: componentName,
             domNodeId: #{render_options.dom_id.to_json},
             props: usedProps,
+            #{key_props_param}
             trace: #{render_options.trace},
             railsContext: railsContext,
             throwJsErrors: #{ReactOnRailsPro.configuration.throw_js_errors},

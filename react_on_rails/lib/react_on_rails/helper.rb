@@ -611,7 +611,7 @@ module ReactOnRails
       return { "html" => "", "consoleReplayScript" => "" } unless render_options.prerender
 
       react_component_name = render_options.react_component_name
-      props = render_options.props
+      props = render_options.server_props
 
       # On server `location` option is added (`location = request.fullpath`)
       # React Router needs this to match the current route

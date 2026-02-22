@@ -27,6 +27,14 @@ module ReactOnRails
         options.fetch(:props) { NO_PROPS }
       end
 
+      def server_props
+        if ReactOnRails::Utils.react_on_rails_pro?
+          transformer = ReactOnRailsPro.configuration.props_transformer
+          return transformer.transform_props(react_component_name, props) if transformer
+        end
+        props
+      end
+
       def client_props
         props_extension = ReactOnRails.configuration.rendering_props_extension
         if props_extension.present?

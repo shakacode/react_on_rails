@@ -222,6 +222,7 @@ export interface RenderParams extends Params {
   name: string;
   throwJsErrors: boolean;
   renderingReturnsPromises: boolean;
+  keyProps?: unknown;
 }
 
 export interface RSCRenderParams extends Omit<RenderParams, 'railsContext'> {
@@ -351,6 +352,7 @@ export interface ReactOnRails {
 export type RSCPayloadStreamInfo = {
   stream: NodeJS.ReadableStream;
   props: unknown;
+  keyProps?: unknown;
   componentName: string;
 };
 

@@ -261,6 +261,37 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
       end
     end
 
+    describe ".props_transformer" do
+      it "is nil by default" do
+        ReactOnRailsPro.configure {} # rubocop:disable Lint/EmptyBlock
+
+        expect(ReactOnRailsPro.configuration.props_transformer).to be_nil
+      end
+
+      it "accepts a transformer that responds to transform_props" do
+        transformer = Module.new do
+          def self.transform_props(component_name, key_props)
+            key_props.merge(expanded: true)
+          end
+        end
+
+        ReactOnRailsPro.configure do |config|
+          config.props_transformer = transformer
+        end
+
+        expect(ReactOnRailsPro.configuration.props_transformer).to eq(transformer)
+      end
+
+      it "raises error if transformer does not respond to transform_props" do
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.props_transformer = Object.new
+          end
+        end.to raise_error(ReactOnRailsPro::Error,
+                           /must respond to `transform_props/)
+      end
+    end
+
     describe ".concurrent_component_streaming_buffer_size" do
       it "accepts positive integers" do
         ReactOnRailsPro.configure do |config|

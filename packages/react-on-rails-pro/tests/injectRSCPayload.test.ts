@@ -46,7 +46,45 @@ const setupTest = (mockRSC: Readable) => {
   return { railsContext, rscRequestTracker, domNodeId: 'test-node' };
 };
 
+// Test setup helper for keyProps scenarios
+const setupTestWithKeyProps = (mockRSC: Readable, keyProps: unknown) => {
+  const railsContext = {} as RailsContextWithServerStreamingCapabilities;
+  const rscRequestTracker = new RSCRequestTracker(railsContext);
+  jest.spyOn(rscRequestTracker, 'onRSCPayloadGenerated').mockImplementation((callback) => {
+    callback({ stream: mockRSC, componentName: 'test', props: { id: 1, huge_data: 'x'.repeat(1000) }, keyProps });
+  });
+
+  return { railsContext, rscRequestTracker, domNodeId: 'test-node' };
+};
+
 describe('injectRSCPayload', () => {
+  it('should use keyProps for cache key when provided in streamInfo', async () => {
+    const mockRSC = createMockStream(['{"test": "data"}']);
+    const mockHTML = createMockStream(['<html><body><div>Hello</div></body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTestWithKeyProps(mockRSC, { id: 1 });
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
+    const resultStr = await collectStreamData(result);
+
+    // Key should use keyProps {id: 1}, not full props {id: 1, huge_data: "xxx..."}
+    // The key is JSON.stringify'd inside the script, so inner quotes are escaped
+    expect(resultStr).toContain('test-{\\"id\\":1}-test-node');
+    // Should NOT contain the huge_data in the key
+    expect(resultStr).not.toContain('huge_data');
+  });
+
+  it('should fall back to props when keyProps is undefined', async () => {
+    const mockRSC = createMockStream(['{"test": "data"}']);
+    const mockHTML = createMockStream(['<html><body><div>Hello</div></body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTestWithKeyProps(mockRSC, undefined);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
+    const resultStr = await collectStreamData(result);
+
+    // Key should use full props since keyProps is undefined
+    expect(resultStr).toContain('huge_data');
+  });
+
   it('should inject RSC payload as script tags', async () => {
     const mockRSC = createMockStream(['{"test": "data"}']);
     const mockHTML = createMockStream(['<html><body><div>Hello, world!</div></body></html>']);

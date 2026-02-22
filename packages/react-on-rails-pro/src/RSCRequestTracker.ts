@@ -52,8 +52,24 @@ class RSCRequestTracker {
 
   private railsContext: RailsContextWithServerComponentMetadata;
 
+  private keyPropsOverride?: unknown;
+
   constructor(railsContext: RailsContextWithServerComponentMetadata) {
     this.railsContext = railsContext;
+  }
+
+  /**
+   * Sets a key props override for RSC payload cache key generation.
+   *
+   * When a PropsTransformer is configured, the server renders with full (transformed) props,
+   * but the RSC payload cache key should use the original compact (key) props.
+   * This override is consumed on the first getRSCPayloadStream call (the top-level RSC component)
+   * and then reset, so nested RSC components use their own props for keys.
+   *
+   * @param keyProps - Compact props to use for the RSC payload cache key
+   */
+  setKeyPropsOverride(keyProps: unknown): void {
+    this.keyPropsOverride = keyProps;
   }
 
   /**
@@ -159,9 +175,16 @@ class RSCRequestTracker {
         stream2.destroy(err);
       });
 
+      // Use keyPropsOverride for the first RSC component (top-level), then reset.
+      // This ensures the RSC payload cache key uses compact (key) props when a
+      // PropsTransformer is configured, while nested RSC components use their own props.
+      const keyProps = this.keyPropsOverride;
+      this.keyPropsOverride = undefined;
+
       const streamInfo: RSCPayloadStreamInfo = {
         componentName,
         props,
+        keyProps,
         stream: stream2,
       };
 

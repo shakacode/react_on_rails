@@ -108,6 +108,59 @@ afterEach(() => {
 });
 
 describe('RSCRequestTracker', () => {
+  describe('keyPropsOverride', () => {
+    it('sets keyProps on streamInfo when override is set before getRSCPayloadStream', async () => {
+      const source = setupSourceStream();
+      const tracker = createTracker();
+      const keyProps = { id: 1 };
+
+      tracker.setKeyPropsOverride(keyProps);
+      await tracker.getRSCPayloadStream('TestComponent', { id: 1, huge_data: 'x'.repeat(1000) });
+
+      const streams = tracker.getRSCPayloadStreams();
+      expect(streams[0].keyProps).toEqual(keyProps);
+      expect(streams[0].props).toEqual({ id: 1, huge_data: 'x'.repeat(1000) });
+
+      source.push(null);
+    });
+
+    it('consumes keyPropsOverride on first call and resets for subsequent calls', async () => {
+      const source1 = new PassThrough();
+      const source2 = new PassThrough();
+      (globalThis as any).generateRSCPayload = jest
+        .fn()
+        .mockResolvedValueOnce(source1)
+        .mockResolvedValueOnce(source2);
+      const tracker = createTracker();
+
+      tracker.setKeyPropsOverride({ id: 1 });
+      await tracker.getRSCPayloadStream('TopLevel', { id: 1, data: 'large' });
+      await tracker.getRSCPayloadStream('Nested', { nested: true });
+
+      const streams = tracker.getRSCPayloadStreams();
+      // First call uses the override
+      expect(streams[0].keyProps).toEqual({ id: 1 });
+      // Second call has no override (undefined)
+      expect(streams[1].keyProps).toBeUndefined();
+
+      source1.push(null);
+      source2.push(null);
+    });
+
+    it('leaves keyProps undefined when no override is set', async () => {
+      const source = setupSourceStream();
+      const tracker = createTracker();
+
+      await tracker.getRSCPayloadStream('TestComponent', { some: 'props' });
+
+      const streams = tracker.getRSCPayloadStreams();
+      expect(streams[0].keyProps).toBeUndefined();
+      expect(streams[0].props).toEqual({ some: 'props' });
+
+      source.push(null);
+    });
+  });
+
   describe('getRSCPayloadStream tee behavior', () => {
     it('delivers data to both stream1 and stream2 for payloads under the default highWaterMark', async () => {
       const source = setupSourceStream();

@@ -223,8 +223,8 @@ export default function injectRSCPayload(
       const rscPromises: Promise<void>[] = [];
 
       rscRequestTracker.onRSCPayloadGenerated((streamInfo) => {
-        const { stream, props, componentName } = streamInfo;
-        const rscPayloadKey = createRSCPayloadKey(componentName, props, domNodeId);
+        const { stream, props, keyProps, componentName } = streamInfo;
+        const rscPayloadKey = createRSCPayloadKey(componentName, keyProps ?? props, domNodeId);
 
         // CRITICAL TIMING: Initialize global array IMMEDIATELY when component requests RSC
         // This ensures the array exists before the component's HTML is rendered and sent.
