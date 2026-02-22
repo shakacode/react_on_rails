@@ -158,6 +158,7 @@ while IFS= read -r file; do
       PRO_RUBY_CORE_CHANGED=true
       PRO_JS_CHANGED=true
       PRO_DUMMY_CHANGED=true
+      PRO_NODE_RENDERER_CHANGED=true
       ;;
 
     # Catch-all: any file not explicitly categorized above
@@ -188,6 +189,7 @@ if [ "$DOCS_ONLY" = true ]; then
     "run_pro_lint:false"
     "run_pro_tests:false"
     "run_pro_dummy_tests:false"
+    "run_pro_node_renderer_tests:false"
   )
 
   # Output to GITHUB_OUTPUT if in GitHub Actions
@@ -273,11 +275,11 @@ if [ "$GENERATORS_CHANGED" = true ] || [ "$JS_CHANGED" = true ]; then
   RUN_GENERATORS=true
 fi
 
-if [ "$PRO_LINT_CONFIG_CHANGED" = true ] || [ "$PRO_RUBY_CORE_CHANGED" = true ] || [ "$PRO_JS_CHANGED" = true ] || [ "$PRO_DUMMY_CHANGED" = true ] || [ "$RUBY_CORE_CHANGED" = true ]; then
+if [ "$PRO_LINT_CONFIG_CHANGED" = true ] || [ "$PRO_RUBY_CORE_CHANGED" = true ] || [ "$PRO_JS_CHANGED" = true ] || [ "$PRO_DUMMY_CHANGED" = true ] || [ "$PRO_NODE_RENDERER_CHANGED" = true ] || [ "$RUBY_CORE_CHANGED" = true ]; then
   RUN_PRO_LINT=true
 fi
 
-if [ "$PRO_RUBY_CORE_CHANGED" = true ] || [ "$PRO_RSPEC_CHANGED" = true ] || [ "$PRO_JS_CHANGED" = true ] || [ "$RUBY_CORE_CHANGED" = true ]; then
+if [ "$PRO_RUBY_CORE_CHANGED" = true ] || [ "$PRO_RSPEC_CHANGED" = true ] || [ "$PRO_JS_CHANGED" = true ] || [ "$PRO_NODE_RENDERER_CHANGED" = true ] || [ "$RUBY_CORE_CHANGED" = true ]; then
   RUN_PRO_TESTS=true
 fi
 
