@@ -37,7 +37,8 @@ const configureRsc = () => {
       // SWC transpiler defines rule.use as a function: use: ({resource}) => getSwcLoaderConfig(resource)
       // Wrap it to append the RSC WebpackLoader to the returned loader(s).
       const originalUse = rule.use;
-      rule.use = function (data) {
+      // Must use `function` (not arrow) so `.call(this, data)` forwards webpack's context.
+      rule.use = function rscLoaderWrapper(data) {
         const result = originalUse.call(this, data);
         const resultArray = Array.isArray(result) ? result : result ? [result] : [];
         const resolvedRule = { use: resultArray };
