@@ -160,8 +160,18 @@ async function handleNewBundlesProvided(
   const handlingPromises = providedNewBundles.map((providedNewBundle) =>
     handleNewBundleProvided(renderingRequest, providedNewBundle, assetsToCopy),
   );
-  const results = await Promise.all(handlingPromises);
+  // Use allSettled (not Promise.all) to ensure every in-flight bundle
+  // operation finishes before the handler returns. Otherwise the onResponse
+  // hook can delete req.uploadDir while background copies still read from it.
+  const settled = await Promise.allSettled(handlingPromises);
+  const firstFailure = settled.find(
+    (r): r is PromiseRejectedResult => r.status === 'rejected',
+  );
+  if (firstFailure) {
+    throw firstFailure.reason;
+  }
 
+  const results = settled.map((r) => (r as PromiseFulfilledResult<ResponseResult | undefined>).value);
   const errorResult = results.find((result) => result !== undefined);
   return errorResult;
 }
