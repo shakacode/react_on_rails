@@ -176,7 +176,9 @@ export default function run(config: Partial<Config>) {
     },
     // Use regular function (not arrow) because @fastify/multipart binds `this`
     // to the Fastify request in attachFieldsToBody mode.
-    async onFile(this: FastifyRequest, part) {
+    // Note: do NOT annotate `this` with the local Http2Server-typed FastifyRequest;
+    // the plugin types expect the default (RawServerDefault) FastifyRequest.
+    async onFile(part) {
       if (typeof this?.uploadDir !== 'string') {
         throw new Error('onFile: expected `this` to be bound to the Fastify request');
       }
