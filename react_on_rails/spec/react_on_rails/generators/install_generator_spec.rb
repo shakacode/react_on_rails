@@ -840,6 +840,14 @@ describe InstallGenerator, type: :generator do
         expect(deps).to include("redux")
       end
     end
+
+    it "creates HelloServer controller with hello_world layout" do
+      assert_file "app/controllers/hello_server_controller.rb" do |content|
+        expect(content).to include("class HelloServerController")
+        expect(content).to include('layout "hello_world"')
+        expect(content).to include("ReactOnRailsPro::Stream")
+      end
+    end
   end
 
   context "with --rsc --typescript" do
@@ -884,6 +892,14 @@ describe InstallGenerator, type: :generator do
         expect(dev_deps).to include("@types/react")
       end
     end
+
+    it "creates HelloServer controller with hello_world layout" do
+      assert_file "app/controllers/hello_server_controller.rb" do |content|
+        expect(content).to include("class HelloServerController")
+        expect(content).to include('layout "hello_world"')
+        expect(content).to include("ReactOnRailsPro::Stream")
+      end
+    end
   end
 
   context "with --rsc --rspack" do
@@ -915,6 +931,14 @@ describe InstallGenerator, type: :generator do
         deps = package_json["dependencies"] || {}
         expect(deps).to include("react-on-rails-rsc")
         expect(deps).to include("@rspack/core")
+      end
+    end
+
+    it "creates HelloServer controller with hello_world layout" do
+      assert_file "app/controllers/hello_server_controller.rb" do |content|
+        expect(content).to include("class HelloServerController")
+        expect(content).to include('layout "hello_world"')
+        expect(content).to include("ReactOnRailsPro::Stream")
       end
     end
   end
