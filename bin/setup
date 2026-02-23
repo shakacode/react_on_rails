@@ -156,13 +156,16 @@ install_dependencies() {
 
   # Install JS dependencies if package.json exists
   # Use --frozen-lockfile to match CI behavior and ensure lockfile integrity
-  if [ -f "package.json" ]; then
+  # Skip pnpm install for workspace members (no lockfile) — they're covered by root install
+  if [ -f "package.json" ] && [ -f "pnpm-lock.yaml" ]; then
     echo "  Installing JavaScript dependencies..."
     if ! pnpm install --frozen-lockfile; then
       print_error "Failed to install JavaScript dependencies in $name"
       exit 1
     fi
     print_success "JavaScript dependencies installed"
+  elif [ -f "package.json" ]; then
+    print_success "JavaScript dependencies managed by workspace root"
   fi
 
   cd "$ROOT_DIR"
