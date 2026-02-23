@@ -90,11 +90,10 @@ module GeneratorMessages
     private
 
     def build_render_example(component_name:, route:, rsc:)
-      helper_name = rsc ? "stream_react_component" : "react_component"
       if rsc
-        "<%= #{helper_name}(\"#{component_name}\", props: @#{route}_props) %>"
+        "<%= stream_react_component(\"#{component_name}\", props: @#{route}_props) %>"
       else
-        "<%= #{helper_name}(\"#{component_name}\", props: @#{route}_props, prerender: true) %>"
+        "<%= react_component(\"#{component_name}\", props: @#{route}_props, prerender: true) %>"
       end
     end
 
