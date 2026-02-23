@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class HelloWorldController < ApplicationController
-  layout "hello_world"
+  layout "react_on_rails_default"
 
   def index
     @hello_world_props = { name: "Stranger" }
