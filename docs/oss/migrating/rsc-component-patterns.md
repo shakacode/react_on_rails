@@ -351,6 +351,8 @@ export default function Comments({ commentsPromise }) {
 
 **Benefits:** The post renders immediately. Comments stream in when ready. The promise starts on the server (close to the data source) but resolves on the client.
 
+> **Warning:** Never create promises inside Client Components for `use()` -- this causes the "uncached promise" runtime error. See [Common `use()` Mistakes](rsc-data-fetching.md#common-use-mistakes-in-client-components) for why and what to do instead.
+
 ## Decision Guide: Server or Client Component?
 
 | Feature Needed | Component Type | Reason |
