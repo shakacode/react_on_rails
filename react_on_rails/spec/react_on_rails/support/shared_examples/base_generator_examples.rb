@@ -12,6 +12,7 @@ shared_examples "base_generator_common" do
 
   it "copies common files" do
     %w[app/controllers/hello_world_controller.rb
+       app/views/layouts/react_on_rails_default.html.erb
        config/initializers/react_on_rails.rb
        Procfile.dev
        Procfile.dev-static-assets
@@ -29,6 +30,12 @@ shared_examples "base_generator_common" do
 
   it "uses env-var-driven port in Procfile.dev-prod-assets" do
     assert_file "Procfile.dev-prod-assets", /\$\{PORT:-3001\}/
+  end
+
+  it "creates HelloWorld controller with react_on_rails_default layout" do
+    assert_file "app/controllers/hello_world_controller.rb" do |content|
+      expect(content).to include('layout "react_on_rails_default"')
+    end
   end
 end
 
