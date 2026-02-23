@@ -33,7 +33,9 @@ describe GeneratorMessages do
     )
 
     expect(message).to include("stream_react_component")
-    expect(message).not_to include('react_component("HelloServer"')
+    expect(message).to include('stream_react_component("HelloServer", props: @hello_server_props)')
+    expect(message).not_to include("prerender: true")
+    expect(message).not_to include('react_component("HelloServer", props: @hello_server_props, prerender: true)')
   end
 
   it "shows react_component in non-RSC install message" do
@@ -43,6 +45,6 @@ describe GeneratorMessages do
       rsc: false
     )
 
-    expect(message).to include('react_component("HelloWorld"')
+    expect(message).to include('react_component("HelloWorld", props: @hello_world_props, prerender: true)')
   end
 end
