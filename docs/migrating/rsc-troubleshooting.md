@@ -449,6 +449,7 @@ export async function createUser(formData: FormData) {
 | `"You're importing a component that needs useState/useEffect..."` | Using hooks in a Server Component | Add `'use client'` to the component file |
 | `"Only plain objects, and a few built-ins, can be passed to Client Components..."` | Passing class instances or non-serializable values | Convert to plain objects with `.toJSON()` or manual serialization |
 | `"async/await is not yet supported in Client Components"` | Making a Client Component async | Move async logic to a Server Component, or use `useEffect`/`use()` |
+| `"A component was suspended by an uncached promise..."` | Creating a promise inside a Client Component and passing it to `use()` | Pass the promise from a Server Component as a prop, or use a Suspense-compatible library like TanStack Query. See [Common `use()` Mistakes](rsc-data-fetching.md#common-use-mistakes-in-client-components) |
 | `"createContext is not supported in Server Components"` | Using `createContext` or `useContext` in a Server Component | Move context to a `'use client'` provider wrapper |
 | `"'App' cannot be used as a JSX component. Its return type 'Promise<JSX.Element>' is not a valid JSX element type"` | TypeScript doesn't recognize async components | Upgrade to TS 5.1.2+ and `@types/react` 18.2.8+, or omit return type |
 | `"Text content does not match server-rendered HTML"` | Hydration mismatch | Ensure identical rendering on server and client; use `suppressHydrationWarning` for intentional differences |

@@ -235,6 +235,8 @@ export function Profile() {
 3. Client Components resolve the promise with `use()`
 4. Server Components can also call `getUser()` directly and `await` it -- `React.cache()` ensures no duplicate fetch
 
+> **Warning:** Never create promises inside Client Components for `use()` -- this causes the "uncached promise" runtime error. Always pass promises from Server Components as props (as shown above). See [Common `use()` Mistakes](rsc-data-fetching.md#common-use-mistakes-in-client-components) for details.
+
 ## Migrating Global State Libraries
 
 ### Redux Toolkit

@@ -409,6 +409,95 @@ export default function Comments({ commentsPromise }) {
 - `<Suspense>` shows the fallback until the promise resolves
 - The Client Component receives the data without needing its own fetch logic
 
+### Common `use()` Mistakes in Client Components
+
+Creating a promise inside a Client Component and passing it to `use()` triggers this runtime error:
+
+> **"A component was suspended by an uncached promise. Creating promises inside a Client Component or hook is not yet supported, except via a Suspense-compatible library or framework."**
+
+**Why it happens:** React tracks promises passed to `use()` by their call-position index across re-renders. On each render, it checks whether the promise at index N is the same object reference as the last render. When you create a promise inside a Client Component, every render produces a new promise instance -- React sees a different reference and throws.
+
+```jsx
+// WRONG: Creating a promise inline — new promise every render
+'use client';
+import { use } from 'react';
+
+function Comments({ postId }) {
+  const comments = use(fetch(`/api/comments/${postId}`).then(r => r.json()));
+  return <ul>{comments.map(c => <li key={c.id}>{c.text}</li>)}</ul>;
+}
+```
+
+```jsx
+// WRONG: Variable doesn't help — still a new promise every render
+'use client';
+import { use } from 'react';
+
+function Comments({ postId }) {
+  const promise = getComments(postId); // New promise object each render
+  const comments = use(promise);
+  return <ul>{comments.map(c => <li key={c.id}>{c.text}</li>)}</ul>;
+}
+```
+
+```jsx
+// WRONG: useMemo seems to work but is NOT reliable
+'use client';
+import { use, useMemo } from 'react';
+
+function Comments({ postId }) {
+  const promise = useMemo(() => getComments(postId), [postId]);
+  const comments = use(promise);
+  // React does NOT guarantee useMemo stability. From the docs:
+  // "React may choose to 'forget' some previously memoized values
+  //  and recalculate them on next render."
+  // If React discards the memoized value, a new promise is created,
+  // and use() throws the uncached promise error intermittently.
+}
+```
+
+**The two safe approaches:**
+
+```jsx
+// CORRECT: Promise created in a Server Component, passed as a prop
+// Page.jsx -- Server Component
+export default async function Page({ id }) {
+  const commentsPromise = getComments(id); // Created once on the server
+  return (
+    <Suspense fallback={<p>Loading...</p>}>
+      <Comments commentsPromise={commentsPromise} />
+    </Suspense>
+  );
+}
+
+// Comments.jsx -- Client Component
+'use client';
+import { use } from 'react';
+
+export default function Comments({ commentsPromise }) {
+  const comments = use(commentsPromise); // Safe: stable reference from props
+  return <ul>{comments.map(c => <li key={c.id}>{c.text}</li>)}</ul>;
+}
+```
+
+```jsx
+// CORRECT: Suspense-compatible library (TanStack Query)
+'use client';
+import { useSuspenseQuery } from '@tanstack/react-query';
+
+function Comments({ postId }) {
+  const { data: comments } = useSuspenseQuery({
+    queryKey: ['comments', postId],
+    queryFn: () => getComments(postId),
+  });
+  // The library manages promise identity internally —
+  // same cache key returns the same promise reference.
+  return <ul>{comments.map(c => <li key={c.id}>{c.text}</li>)}</ul>;
+}
+```
+
+> **Rule:** Never create a raw promise for `use()` inside a Client Component. Either receive it from a Server Component as a prop, or use a Suspense-compatible library like TanStack Query or SWR.
+
 ## Request Deduplication with `React.cache()`
 
 When multiple Server Components need the same data, `React.cache()` ensures the fetch happens only once per request:
