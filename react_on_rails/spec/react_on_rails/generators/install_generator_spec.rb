@@ -807,7 +807,8 @@ describe InstallGenerator, type: :generator do
       %w[config/initializers/react_on_rails.rb
          Procfile.dev
          Procfile.dev-static-assets
-         Procfile.dev-prod-assets].each { |file| assert_file(file) }
+         Procfile.dev-prod-assets
+         app/views/layouts/hello_world.html.erb].each { |file| assert_file(file) }
     end
 
     it "creates Pro initializer with RSC configuration" do
@@ -848,7 +849,8 @@ describe InstallGenerator, type: :generator do
       %w[config/initializers/react_on_rails.rb
          Procfile.dev
          Procfile.dev-static-assets
-         Procfile.dev-prod-assets].each { |file| assert_file(file) }
+         Procfile.dev-prod-assets
+         app/views/layouts/hello_world.html.erb].each { |file| assert_file(file) }
     end
 
     it "creates Pro initializer with RSC configuration" do
@@ -891,7 +893,8 @@ describe InstallGenerator, type: :generator do
       %w[config/initializers/react_on_rails.rb
          Procfile.dev
          Procfile.dev-static-assets
-         Procfile.dev-prod-assets].each { |file| assert_file(file) }
+         Procfile.dev-prod-assets
+         app/views/layouts/hello_world.html.erb].each { |file| assert_file(file) }
     end
 
     it "creates Pro initializer with RSC configuration" do
