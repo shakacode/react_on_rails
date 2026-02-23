@@ -85,10 +85,7 @@ describe('buildGeneratorArgs', () => {
   });
 
   it('adds rspack flag when enabled', () => {
-    expect(buildGeneratorArgs({ ...baseOptions, rspack: true })).toEqual([
-      '--rspack',
-      '--ignore-warnings',
-    ]);
+    expect(buildGeneratorArgs({ ...baseOptions, rspack: true })).toEqual(['--rspack', '--ignore-warnings']);
   });
 
   it('adds rsc flag when enabled', () => {

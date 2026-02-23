@@ -36,12 +36,12 @@ npx create-react-on-rails-app my-app --rspack --package-manager pnpm
 
 ### All Options
 
-| Option                       | Description                                 | Default       |
-| ---------------------------- | ------------------------------------------- | ------------- |
-| `-t, --template <type>`      | `javascript` or `typescript`                | `typescript`  |
-| `--rspack`                   | Use Rspack instead of Webpack (~20x faster) | `false`       |
-| `--rsc`                      | Generate RSC setup (`--rsc` install flow)   | `false`       |
-| `-p, --package-manager <pm>` | `npm` or `pnpm`                             | auto-detected |
+| Option                       | Description                                                    | Default       |
+| ---------------------------- | -------------------------------------------------------------- | ------------- |
+| `-t, --template <type>`      | `javascript` or `typescript`                                   | `typescript`  |
+| `--rspack`                   | Use Rspack instead of Webpack (~20x faster)                    | `false`       |
+| `--rsc`                      | Enable React Server Components (requires `react_on_rails_pro`) | `false`       |
+| `-p, --package-manager <pm>` | `npm` or `pnpm`                                                | auto-detected |
 
 ## What It Does
 
