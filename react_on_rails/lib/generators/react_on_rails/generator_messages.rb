@@ -44,11 +44,7 @@ module GeneratorMessages
       package_manager = detect_package_manager
       shakapacker_status = build_shakapacker_status_section
       render_example = build_render_example(component_name: component_name, route: route, rsc: rsc)
-      render_label = if rsc
-                       "• Streaming server rendering in app/views/#{route}/index.html.erb:"
-                     else
-                       "• Server-side rendering - Enabled with prerender option in app/views/#{route}/index.html.erb:"
-                     end
+      render_label = build_render_label(route: route, rsc: rsc)
 
       <<~MSG
 
@@ -95,6 +91,11 @@ module GeneratorMessages
       else
         "<%= react_component(\"#{component_name}\", props: @#{route}_props, prerender: true) %>"
       end
+    end
+
+    def build_render_label(route:, rsc:)
+      prefix = rsc ? "Streaming server rendering" : "Server-side rendering - Enabled with prerender option"
+      "• #{prefix} in app/views/#{route}/index.html.erb:"
     end
 
     def build_process_manager_section
