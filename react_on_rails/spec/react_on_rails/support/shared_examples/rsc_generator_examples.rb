@@ -6,7 +6,7 @@ shared_examples "rsc_common_files" do
        Procfile.dev
        Procfile.dev-static-assets
        Procfile.dev-prod-assets
-       app/views/layouts/hello_world.html.erb].each { |file| assert_file(file) }
+       app/views/layouts/react_on_rails_default.html.erb].each { |file| assert_file(file) }
   end
 
   it "creates Pro initializer with RSC configuration" do
@@ -20,10 +20,10 @@ shared_examples "rsc_common_files" do
 end
 
 shared_examples "rsc_hello_server_files" do
-  it "creates HelloServer controller with hello_world layout" do
+  it "creates HelloServer controller with react_on_rails_default layout" do
     assert_file "app/controllers/hello_server_controller.rb" do |content|
       expect(content).to include("class HelloServerController")
-      expect(content).to include('layout "hello_world"')
+      expect(content).to include('layout "react_on_rails_default"')
       expect(content).to include("ReactOnRailsPro::Stream")
     end
   end
