@@ -13,7 +13,7 @@
   - prerender: true enables server-side rendering with streaming
   - Props are passed from the controller (@hello_server_props)
   - The component streams as it resolves (async data fetching happens server-side)
-  - Only the interactive LikeButton client component ships JS to the browser
+  - The starter example is server-only to keep the initial scaffold deterministic
   - Open DevTools Network tab to verify — no HelloServer.js in the client bundle
 %>
 <%= stream_react_component('HelloServer', props: @hello_server_props, prerender: true) %>
