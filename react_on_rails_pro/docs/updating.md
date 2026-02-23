@@ -6,7 +6,7 @@
 
 This guide is for existing React on Rails Pro customers who are:
 
-- Currently using GitHub Packages authentication (private distribution)
+- Previously using GitHub Packages authentication (private distribution)
 - On version 16.2.0-beta.x or earlier
 - Upgrading to version 16.2.0 or higher
 

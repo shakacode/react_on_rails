@@ -165,31 +165,11 @@ You must be logged in and have publish permissions:
 npm login
 ```
 
-**For private packages (GitHub Packages):**
-
-- Get a GitHub personal access token with `write:packages` scope
-- Add to `~/.npmrc`:
-  ```ini
-  //npm.pkg.github.com/:_authToken=<TOKEN>
-  always-auth=true
-  ```
-- Set environment variable:
-  ```bash
-  export GITHUB_TOKEN=<TOKEN>
-  ```
-
 ### RubyGems Publishing
 
 **For public gem (rubygems.org):**
 
 - Standard RubyGems credentials via `gem push`
-
-**For private gem (GitHub Packages):**
-
-- Add to `~/.gem/credentials`:
-  ```
-  :github: Bearer <GITHUB_TOKEN>
-  ```
 
 ### Ruby Version Management
 

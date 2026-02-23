@@ -284,9 +284,8 @@ reactOnRailsProNodeRenderer(config);
 ## Making HMR Work
 
 To make HMR work, it's best to disable loadable-components when using the Dev Server.
-Note: you will need access to our **private** React on Rails Pro repository to open the following links.
 
-Take a look at the code searches for ['imports-loadable'](https://github.com/shakacode/react_on_rails_pro/search?q=imports-loadable&type=code) and ['imports-hmr'](https://github.com/shakacode/react_on_rails_pro/search?q=imports-hmr&type=code)
+Take a look at the code searches for ['imports-loadable'](https://github.com/shakacode/react_on_rails/search?q=imports-loadable&type=code) and ['imports-hmr'](https://github.com/shakacode/react_on_rails/search?q=imports-hmr&type=code)
 
 The general concept is that we have a non-loadable, HMR-ready, file that substitutes for the loadable-enabled one, with the suffixes `imports-hmr.js` instead of `imports-loadable.js`
 
@@ -313,17 +312,15 @@ And compare:
 
 ### Routes file
 
-Note: you will need access to our **private** React on Rails Pro repository to open the following links.
-
-- [spec/dummy/client/app/components/Loadable/routes/Routes.imports-hmr.jsx](https://github.com/shakacode/react_on_rails_pro/blob/master/spec/dummy/client/app/components/Loadable/routes/Routes.imports-hmr.jsx)
-- [spec/dummy/client/app/components/Loadable/routes/Routes.imports-loadable.jsx](https://github.com/shakacode/react_on_rails_pro/blob/master/spec/dummy/client/app/components/Loadable/routes/Routes.imports-loadable.jsx)
+- [spec/dummy/client/app/components/Loadable/routes/Routes.imports-hmr.jsx](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/spec/dummy/client/app/components/Loadable/routes/Routes.imports-hmr.jsx)
+- [spec/dummy/client/app/components/Loadable/routes/Routes.imports-loadable.jsx](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/spec/dummy/client/app/components/Loadable/routes/Routes.imports-loadable.jsx)
 
 ### Client-Side Startup
 
-- [spec/dummy/client/app/loadable/loadable-client.imports-hmr.js](https://github.com/shakacode/react_on_rails_pro/blob/master/spec/dummy/client/app/loadable/loadable-client.imports-hmr.js)
-- [spec/dummy/client/app/loadable/loadable-client.imports-loadable.jsx](https://github.com/shakacode/react_on_rails_pro/blob/master/spec/dummy/client/app/loadable/loadable-client.imports-loadable.jsx)
+- [spec/dummy/client/app/loadable/loadable-client.imports-hmr.js](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/spec/dummy/client/app/loadable/loadable-client.imports-hmr.js)
+- [spec/dummy/client/app/loadable/loadable-client.imports-loadable.jsx](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/spec/dummy/client/app/loadable/loadable-client.imports-loadable.jsx)
 
 ### Server-Side Startup
 
-- [spec/dummy/client/app/loadable/loadable-server.imports-hmr.jsx](https://github.com/shakacode/react_on_rails_pro/blob/master/spec/dummy/client/app/loadable/loadable-server.imports-hmr.jsx)
-- [spec/dummy/client/app/loadable/loadable-server.imports-loadable.jsx](https://github.com/shakacode/react_on_rails_pro/blob/master/spec/dummy/client/app/loadable/loadable-server.imports-loadable.jsx)
+- [spec/dummy/client/app/loadable/loadable-server.imports-hmr.jsx](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/spec/dummy/client/app/loadable/loadable-server.imports-hmr.jsx)
+- [spec/dummy/client/app/loadable/loadable-server.imports-loadable.jsx](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/spec/dummy/client/app/loadable/loadable-server.imports-loadable.jsx)
