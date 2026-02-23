@@ -30,6 +30,7 @@ Changes since the last non-beta release.
 #### Added
 
 - **TanStack Router SSR integration (Pro)**: Added `createTanStackRouterRenderFunction` and `serverRenderTanStackAppAsync` via `react-on-rails-pro/tanstack-router` for TanStack Router SSR with the Pro Node Renderer. Uses TanStack Router's public `router.load()` API for reliable async SSR. Requires `rendering_returns_promises = true` in Pro config. [PR 2516](https://github.com/shakacode/react_on_rails/pull/2516) by [justin808](https://github.com/justin808).
+- **`create-react-on-rails-app --rsc` flow**: Added `--rsc` support to `npx create-react-on-rails-app` so a single command can scaffold an RSC-ready app. The CLI now installs `react_on_rails_pro`, passes `--rsc` to `react_on_rails:install`, and points users to `/hello_server` after setup. [PR 2430](https://github.com/shakacode/react_on_rails/pull/2430) by [justin808](https://github.com/justin808).
 
 #### Fixed
 
