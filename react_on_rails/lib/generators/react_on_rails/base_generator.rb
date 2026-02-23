@@ -61,9 +61,9 @@ module ReactOnRails
                         .dev-services.yml.example
                         bin/shakapacker-precompile-hook]
 
-        # HelloServer uses the hello_world layout so React on Rails can inject generated
-        # packs without requiring a hardcoded application.js pack entry.
-        base_files << "app/views/layouts/hello_world.html.erb"
+        # react_on_rails_default layout provides empty pack tags so React on Rails can
+        # inject generated packs without requiring a hardcoded application.js pack entry.
+        base_files << "app/views/layouts/react_on_rails_default.html.erb"
 
         # HelloWorld controller only when not using RSC (RSC uses HelloServer)
         # Exception: Redux still needs the HelloWorld controller even with RSC
