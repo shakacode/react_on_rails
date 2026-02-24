@@ -128,11 +128,10 @@ module ReactOnRails
           create_css_module_types
           create_typescript_config
         end
-        just_installed = options.shakapacker_just_installed? || @shakapacker_just_installed
         invoke "react_on_rails:base", [],
                { typescript: options.typescript?, redux: options.redux?, rspack: options.rspack?,
                  pro: options.pro?, rsc: options.rsc?,
-                 shakapacker_just_installed: just_installed,
+                 shakapacker_just_installed: shakapacker_just_installed?,
                  force: options[:force], skip: options[:skip] }
 
         # Component generator logic:
@@ -215,14 +214,22 @@ module ReactOnRails
         GeneratorMessages.add_warning(warning)
       end
 
+      SHAKAPACKER_YML_PATH = "config/shakapacker.yml"
+
+      def shakapacker_just_installed?
+        options.shakapacker_just_installed? || @shakapacker_just_installed
+      end
+
       def ensure_shakapacker_installed
         return if shakapacker_configured?
 
         print_shakapacker_setup_banner
         ensure_shakapacker_in_gemfile
 
-        yml_path = "config/shakapacker.yml"
-        yml_content_before = File.exist?(yml_path) ? File.read(yml_path) : nil
+        # NOTE: File.exist?/File.read use Dir.pwd (not destination_root) because
+        # Rails generators always run from the destination root. This is consistent
+        # with other relative-path file checks in this generator (e.g. shakapacker_configured?).
+        yml_content_before = File.exist?(SHAKAPACKER_YML_PATH) ? File.read(SHAKAPACKER_YML_PATH) : nil
 
         finalize_shakapacker_setup(yml_content_before) if install_shakapacker
       end
@@ -267,12 +274,11 @@ module ReactOnRails
           component_name = options.redux? ? "HelloWorldApp" : "HelloWorld"
         end
 
-        just_installed = options.shakapacker_just_installed? || @shakapacker_just_installed
         GeneratorMessages.add_info(GeneratorMessages.helpful_message_after_installation(
                                      component_name: component_name,
                                      route: route,
                                      rsc: use_rsc?,
-                                     shakapacker_just_installed: just_installed
+                                     shakapacker_just_installed: shakapacker_just_installed?
                                    ))
       end
 
@@ -359,8 +365,7 @@ module ReactOnRails
         puts Rainbow("🚀 CONTINUING WITH REACT ON RAILS SETUP").cyan.bold
         puts "#{Rainbow('=' * 80).cyan}\n"
 
-        yml_path = "config/shakapacker.yml"
-        yml_content_after = File.exist?(yml_path) ? File.read(yml_path) : nil
+        yml_content_after = File.exist?(SHAKAPACKER_YML_PATH) ? File.read(SHAKAPACKER_YML_PATH) : nil
 
         # Force-apply the RoR template only when shakapacker wrote a fresh config:
         #   nil  → new content  (fresh install: file didn't exist before)  → true
