@@ -139,12 +139,10 @@ RSpec.describe ReactOnRailsPro::Engine do
             allow(config_file_path).to receive(:exist?).and_return(true)
           end
 
-          it "does not log migration warning" do
-            allow(mock_logger).to receive(:warn)
+          it "logs cleanup notice and valid license" do
             allow(mock_logger).to receive(:info)
             described_class.log_license_status
-            expect(mock_logger).not_to have_received(:warn).with(/legacy license file/)
-            expect(mock_logger).not_to have_received(:info).with(/legacy license file/)
+            expect(mock_logger).to have_received(:info).with(/can be safely deleted/)
             expect(mock_logger).to have_received(:info).with(/License validated successfully/)
           end
         end
@@ -259,10 +257,10 @@ RSpec.describe ReactOnRailsPro::Engine do
             allow(config_file_path).to receive(:exist?).and_return(true)
           end
 
-          it "does not log migration info" do
+          it "logs cleanup notice and valid license" do
             allow(mock_logger).to receive(:info)
             described_class.log_license_status
-            expect(mock_logger).not_to have_received(:info).with(/legacy license file/)
+            expect(mock_logger).to have_received(:info).with(/can be safely deleted/)
             expect(mock_logger).to have_received(:info).with(/License validated successfully/)
           end
         end

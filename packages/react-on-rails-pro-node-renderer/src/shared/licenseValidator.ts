@@ -67,6 +67,8 @@ let cachedLicensePlan: ValidPlan | undefined | typeof UNINITIALIZED = UNINITIALI
  */
 function loadLicenseString(): string | undefined {
   const envLicense = process.env.REACT_ON_RAILS_PRO_LICENSE?.trim();
+  // `|| undefined` converts an empty/whitespace-only env var to undefined,
+  // so it is reported as 'missing' rather than 'invalid'.
   return envLicense || undefined;
 }
 

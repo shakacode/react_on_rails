@@ -26,6 +26,7 @@ module ReactOnRailsPro
 
         case status
         when :valid
+          log_legacy_file_cleanup_notice if legacy_license_file_present?
           log_valid_license
         when :missing
           log_legacy_license_migration_notice if legacy_license_file_present?
@@ -86,6 +87,11 @@ module ReactOnRailsPro
 
       def legacy_license_file_present?
         Rails.root.join(LEGACY_LICENSE_FILE).exist?
+      end
+
+      def log_legacy_file_cleanup_notice
+        Rails.logger.info "[React on Rails Pro] Legacy license file at #{LEGACY_LICENSE_FILE} " \
+                          "is no longer read and can be safely deleted."
       end
 
       def log_legacy_license_migration_notice

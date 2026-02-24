@@ -137,6 +137,43 @@ describe('LicenseValidator', () => {
       expect(module.getLicenseStatus()).toBe('missing');
     });
 
+    it('returns valid when env var has surrounding whitespace', () => {
+      const validPayload = {
+        sub: 'test@example.com',
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        org: 'Acme Corp',
+      };
+
+      const validToken = jwt.sign(validPayload, testPrivateKey, { algorithm: 'RS256' });
+      process.env.REACT_ON_RAILS_PRO_LICENSE = `  ${validToken}  `;
+
+      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
+      expect(module.getLicenseStatus()).toBe('valid');
+    });
+
+    it('returns valid when env var has trailing newline', () => {
+      const validPayload = {
+        sub: 'test@example.com',
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        org: 'Acme Corp',
+      };
+
+      const validToken = jwt.sign(validPayload, testPrivateKey, { algorithm: 'RS256' });
+      process.env.REACT_ON_RAILS_PRO_LICENSE = `${validToken}\n`;
+
+      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
+      expect(module.getLicenseStatus()).toBe('valid');
+    });
+
+    it('returns missing when env var is whitespace only', () => {
+      process.env.REACT_ON_RAILS_PRO_LICENSE = '   ';
+
+      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
+      expect(module.getLicenseStatus()).toBe('missing');
+    });
+
     it('caches the result', () => {
       const validPayload = {
         sub: 'test@example.com',
