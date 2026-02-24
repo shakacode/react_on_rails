@@ -307,16 +307,6 @@ describe InstallGenerator, type: :generator do
   describe "copy_packer_config force behavior" do
     let(:destination) { File.expand_path("../dummy-for-generators", __dir__) }
 
-    before do
-      # Ensure destination exists and has a shakapacker.yml to trigger conflict
-      FileUtils.mkdir_p(File.join(destination, "config"))
-      File.write(File.join(destination, "config/shakapacker.yml"), "existing: config\n")
-    end
-
-    after do
-      FileUtils.rm_f(File.join(destination, "config/shakapacker.yml"))
-    end
-
     it "passes force: true when shakapacker_just_installed is true" do
       gen = BaseGenerator.new([], { shakapacker_just_installed: true, force: false },
                               { destination_root: destination })

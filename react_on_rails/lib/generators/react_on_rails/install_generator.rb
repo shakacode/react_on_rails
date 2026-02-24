@@ -65,6 +65,8 @@ module ReactOnRails
       # Hidden option: allows tests (and advanced users) to signal that Shakapacker
       # was just installed, triggering force-overwrite of shakapacker.yml with RoR's template.
       # In production, this is normally detected at runtime via @shakapacker_just_installed.
+      # Passing this flag manually overrides the runtime detection — the yml will be
+      # force-overwritten with RoR's template even if it already exists.
       class_option :shakapacker_just_installed,
                    type: :boolean,
                    default: false,
@@ -375,6 +377,12 @@ module ReactOnRails
         #   nil  → new content  (fresh install: file didn't exist before)  → true
         #   old  → new content  (user said "y" to conflict prompt)         → true
         #   old  → same content (user said "n", kept their custom config)  → false
+        #   nil  → nil          (installer succeeded but wrote nothing)    → false
+        #
+        # The nil→nil case is treated as "no change needed": if the installer
+        # returned true but did not write the yml, we assume the file was already
+        # correct and skip the force-overwrite. This is theoretically possible but
+        # extremely unlikely given how Shakapacker's installer works.
         #
         # Note: if the user said "y" and shakapacker overwrote their yml, this
         # correctly re-applies the RoR template on top of shakapacker's fresh defaults.
