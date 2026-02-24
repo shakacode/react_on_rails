@@ -1199,7 +1199,6 @@ describe InstallGenerator, type: :generator do
           true
         end
 
-        allow(install_generator).to receive(:destination_root).and_return(dir)
         Dir.chdir(dir) { install_generator.send(:ensure_shakapacker_installed) }
         expect(install_generator.instance_variable_get(:@shakapacker_just_installed)).to be true
       end
@@ -1216,7 +1215,6 @@ describe InstallGenerator, type: :generator do
           true
         end
 
-        allow(install_generator).to receive(:destination_root).and_return(dir)
         Dir.chdir(dir) { install_generator.send(:ensure_shakapacker_installed) }
         expect(install_generator.instance_variable_get(:@shakapacker_just_installed)).to be true
       end
@@ -1228,7 +1226,7 @@ describe InstallGenerator, type: :generator do
         FileUtils.mkdir_p(File.dirname(yml_path))
         File.write(yml_path, "custom: config\n")
 
-        allow(install_generator).to receive_messages(install_shakapacker: true, destination_root: dir)
+        allow(install_generator).to receive(:install_shakapacker).and_return(true)
         Dir.chdir(dir) { install_generator.send(:ensure_shakapacker_installed) }
         expect(install_generator.instance_variable_get(:@shakapacker_just_installed)).to be false
       end
@@ -1236,7 +1234,7 @@ describe InstallGenerator, type: :generator do
 
     it "does not call finalize_shakapacker_setup when install_shakapacker fails" do
       Dir.mktmpdir do |dir|
-        allow(install_generator).to receive_messages(install_shakapacker: false, destination_root: dir)
+        allow(install_generator).to receive(:install_shakapacker).and_return(false)
 
         Dir.chdir(dir) { install_generator.send(:ensure_shakapacker_installed) }
         expect(install_generator.instance_variable_get(:@shakapacker_just_installed)).to be_nil

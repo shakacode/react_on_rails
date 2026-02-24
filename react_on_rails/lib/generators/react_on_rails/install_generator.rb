@@ -152,10 +152,14 @@ module ReactOnRails
 
         # Invoke standalone Pro/RSC generators when flags are used
         # Pass invoked_by_install: true so they skip message printing (we handle it)
-        invoke "react_on_rails:pro", [], { invoked_by_install: true } if use_pro?
+        if use_pro?
+          invoke "react_on_rails:pro", [], { invoked_by_install: true,
+                                             force: options[:force], skip: options[:skip] }
+        end
         return unless use_rsc?
 
-        invoke "react_on_rails:rsc", [], { typescript: options.typescript?, invoked_by_install: true }
+        invoke "react_on_rails:rsc", [], { typescript: options.typescript?, invoked_by_install: true,
+                                           force: options[:force], skip: options[:skip] }
       end
 
       def setup_react_dependencies
