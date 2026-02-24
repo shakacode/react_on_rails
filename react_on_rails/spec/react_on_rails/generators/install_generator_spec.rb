@@ -1174,6 +1174,76 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  # Tests for ensure_shakapacker_installed detection path:
+  # the config_changed detection and @shakapacker_just_installed assignment in
+  # finalize_shakapacker_setup — the runtime path that fires during a real
+  # `rails g react_on_rails:install` when Shakapacker wasn't pre-configured.
+  describe "ensure_shakapacker_installed detection path" do
+    let(:install_generator) { described_class.new }
+
+    before do
+      allow(install_generator).to receive(:print_shakapacker_setup_banner)
+      allow(install_generator).to receive(:ensure_shakapacker_in_gemfile)
+      allow(install_generator).to receive_messages(shakapacker_configured?: false, install_shakapacker: true)
+      allow(install_generator).to receive(:puts)
+    end
+
+    it "sets @shakapacker_just_installed=true when yml did not exist before install" do
+      Dir.mktmpdir do |dir|
+        yml_path = File.join(dir, "config/shakapacker.yml")
+
+        allow(install_generator).to receive(:install_shakapacker) do
+          # Simulate shakapacker creating the yml from scratch
+          FileUtils.mkdir_p(File.dirname(yml_path))
+          File.write(yml_path, "new: shakapacker defaults\n")
+          true
+        end
+
+        allow(install_generator).to receive(:destination_root).and_return(dir)
+        Dir.chdir(dir) { install_generator.send(:ensure_shakapacker_installed) }
+        expect(install_generator.instance_variable_get(:@shakapacker_just_installed)).to be true
+      end
+    end
+
+    it "sets @shakapacker_just_installed=true when yml existed but was overwritten (user said y)" do
+      Dir.mktmpdir do |dir|
+        yml_path = File.join(dir, "config/shakapacker.yml")
+        FileUtils.mkdir_p(File.dirname(yml_path))
+        File.write(yml_path, "old: content\n")
+
+        allow(install_generator).to receive(:install_shakapacker) do
+          File.write(yml_path, "new: shakapacker defaults\n")
+          true
+        end
+
+        allow(install_generator).to receive(:destination_root).and_return(dir)
+        Dir.chdir(dir) { install_generator.send(:ensure_shakapacker_installed) }
+        expect(install_generator.instance_variable_get(:@shakapacker_just_installed)).to be true
+      end
+    end
+
+    it "sets @shakapacker_just_installed=false when yml existed and was preserved (user said n)" do
+      Dir.mktmpdir do |dir|
+        yml_path = File.join(dir, "config/shakapacker.yml")
+        FileUtils.mkdir_p(File.dirname(yml_path))
+        File.write(yml_path, "custom: config\n")
+
+        allow(install_generator).to receive_messages(install_shakapacker: true, destination_root: dir)
+        Dir.chdir(dir) { install_generator.send(:ensure_shakapacker_installed) }
+        expect(install_generator.instance_variable_get(:@shakapacker_just_installed)).to be false
+      end
+    end
+
+    it "does not call finalize_shakapacker_setup when install_shakapacker fails" do
+      Dir.mktmpdir do |dir|
+        allow(install_generator).to receive_messages(install_shakapacker: false, destination_root: dir)
+
+        Dir.chdir(dir) { install_generator.send(:ensure_shakapacker_installed) }
+        expect(install_generator.instance_variable_get(:@shakapacker_just_installed)).to be_nil
+      end
+    end
+  end
+
   # Regression test for https://github.com/shakacode/react_on_rails/issues/2287
   # Bundler subprocess commands must run in unbundled environment to prevent
   # BUNDLE_GEMFILE inheritance from parent process

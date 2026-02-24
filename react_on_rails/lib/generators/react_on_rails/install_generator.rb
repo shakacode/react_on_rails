@@ -128,7 +128,7 @@ module ReactOnRails
           create_css_module_types
           create_typescript_config
         end
-        just_installed = options.shakapacker_just_installed? || @shakapacker_just_installed || false
+        just_installed = options.shakapacker_just_installed? || @shakapacker_just_installed
         invoke "react_on_rails:base", [],
                { typescript: options.typescript?, redux: options.redux?, rspack: options.rspack?,
                  pro: options.pro?, rsc: options.rsc?,
@@ -221,9 +221,10 @@ module ReactOnRails
         print_shakapacker_setup_banner
         ensure_shakapacker_in_gemfile
 
-        config_existed = File.exist?("config/shakapacker.yml")
+        yml_path = "config/shakapacker.yml"
+        yml_content_before = File.exist?(yml_path) ? File.read(yml_path) : nil
 
-        finalize_shakapacker_setup(config_existed) if install_shakapacker
+        finalize_shakapacker_setup(yml_content_before) if install_shakapacker
       end
 
       # Checks whether "shakapacker" is explicitly declared in this project's Gemfile.
@@ -266,10 +267,12 @@ module ReactOnRails
           component_name = options.redux? ? "HelloWorldApp" : "HelloWorld"
         end
 
+        just_installed = options.shakapacker_just_installed? || @shakapacker_just_installed
         GeneratorMessages.add_info(GeneratorMessages.helpful_message_after_installation(
                                      component_name: component_name,
                                      route: route,
-                                     rsc: use_rsc?
+                                     rsc: use_rsc?,
+                                     shakapacker_just_installed: just_installed
                                    ))
       end
 
@@ -350,15 +353,23 @@ module ReactOnRails
         end
       end
 
-      def finalize_shakapacker_setup(config_existed)
+      def finalize_shakapacker_setup(yml_content_before)
         puts Rainbow("✅ Shakapacker installed successfully!").green
         puts Rainbow("=" * 80).cyan
         puts Rainbow("🚀 CONTINUING WITH REACT ON RAILS SETUP").cyan.bold
         puts "#{Rainbow('=' * 80).cyan}\n"
 
-        # Only safe to force-overwrite the config if Shakapacker created it fresh.
-        # If it pre-existed, the user may have customizations — let Thor prompt.
-        @shakapacker_just_installed = !config_existed
+        yml_path = "config/shakapacker.yml"
+        yml_content_after = File.exist?(yml_path) ? File.read(yml_path) : nil
+
+        # Force-apply the RoR template only when shakapacker wrote a fresh config:
+        #   nil  → new content  (fresh install: file didn't exist before)  → true
+        #   old  → new content  (user said "y" to conflict prompt)         → true
+        #   old  → same content (user said "n", kept their custom config)  → false
+        #
+        # Note: if the user said "y" and shakapacker overwrote their yml, this
+        # correctly re-applies the RoR template on top of shakapacker's fresh defaults.
+        @shakapacker_just_installed = yml_content_before != yml_content_after
       end
 
       def handle_shakapacker_gemfile_error

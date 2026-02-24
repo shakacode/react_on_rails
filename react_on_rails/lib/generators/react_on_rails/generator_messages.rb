@@ -38,11 +38,12 @@ module GeneratorMessages
       @output = []
     end
 
-    def helpful_message_after_installation(component_name: "HelloWorld", route: "hello_world", rsc: false)
+    def helpful_message_after_installation(component_name: "HelloWorld", route: "hello_world", rsc: false,
+                                           shakapacker_just_installed: false)
       process_manager_section = build_process_manager_section
       testing_section = build_testing_section
       package_manager = detect_package_manager
-      shakapacker_status = build_shakapacker_status_section
+      shakapacker_status = build_shakapacker_status_section(shakapacker_just_installed: shakapacker_just_installed)
       render_example = build_render_example(component_name: component_name, route: route, rsc: rsc)
       render_label = if rsc
                        "• Streaming server rendering in app/views/#{route}/index.html.erb:"
@@ -142,10 +143,20 @@ module GeneratorMessages
       end
     end
 
-    def build_shakapacker_status_section
+    def build_shakapacker_status_section(shakapacker_just_installed: false)
       version_warning = check_shakapacker_version_warning
 
-      if File.exist?("bin/shakapacker") && File.exist?("bin/shakapacker-dev-server")
+      if shakapacker_just_installed
+        <<~SHAKAPACKER
+
+          📦 SHAKAPACKER SETUP:
+          ─────────────────────────────────────────────────────────────────────────
+          #{Rainbow('✓ Added to Gemfile automatically').green}
+          #{Rainbow('✓ Installer ran successfully').green}
+          #{Rainbow('✓ Webpack integration configured').green}
+        SHAKAPACKER
+          .chomp + version_warning
+      elsif File.exist?("bin/shakapacker") && File.exist?("bin/shakapacker-dev-server")
         "\n📦 #{Rainbow('Shakapacker already configured ✓').green}#{version_warning}"
       else
         "\n📦 #{Rainbow('Shakapacker setup may be incomplete').yellow}#{version_warning}"
