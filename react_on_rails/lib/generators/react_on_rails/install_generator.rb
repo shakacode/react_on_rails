@@ -223,8 +223,7 @@ module ReactOnRails
 
         config_existed = File.exist?("config/shakapacker.yml")
 
-        install_shakapacker
-        finalize_shakapacker_setup(config_existed)
+        finalize_shakapacker_setup(config_existed) if install_shakapacker
       end
 
       # Checks whether "shakapacker" is explicitly declared in this project's Gemfile.
@@ -338,14 +337,17 @@ module ReactOnRails
         bundle_success = Bundler.with_unbundled_env { system("bundle install") }
         unless bundle_success
           handle_shakapacker_install_error
-          return
+          return false
         end
 
         # Then run the shakapacker installer
         success = Bundler.with_unbundled_env { system("bundle exec rails shakapacker:install") }
-        return if success
-
-        handle_shakapacker_install_error
+        if success
+          true
+        else
+          handle_shakapacker_install_error
+          false
+        end
       end
 
       def finalize_shakapacker_setup(config_existed)

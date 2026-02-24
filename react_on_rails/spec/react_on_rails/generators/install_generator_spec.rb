@@ -245,33 +245,41 @@ describe InstallGenerator, type: :generator do
   # (with force: true) so that version-conditional settings like private_output_path are configured.
   context "when Shakapacker was just installed (regression #2289)" do
     before(:all) do
-      run_generator_test_with_args(%w[--shakapacker-just-installed], package_json: true) do
-        # Simulate Shakapacker's installer having created its default config
-        # with private_output_path commented out (the bug scenario)
-        simulate_existing_file("config/shakapacker.yml", <<~YAML)
-          default: &default
-            source_path: app/javascript
-            source_entry_path: packs
-            # private_output_path: ssr-generated
-            # precompile_hook: ~
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
 
-          development:
-            <<: *default
+      # Simulate Shakapacker's installer having created its default config
+      # with private_output_path commented out (the bug scenario)
+      simulate_existing_file("config/shakapacker.yml", <<~YAML)
+        default: &default
+          source_path: app/javascript
+          source_entry_path: packs
+          # private_output_path: ssr-generated
+          # precompile_hook: ~
 
-          test:
-            <<: *default
-            compile: true
+        development:
+          <<: *default
 
-          production:
-            <<: *default
-        YAML
-        simulate_existing_file("bin/shakapacker", "")
-        simulate_existing_file("bin/shakapacker-dev-server", "")
-        simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
-          const { generateWebpackConfig } = require('shakapacker')
-          const webpackConfig = generateWebpackConfig()
-          module.exports = webpackConfig
-        JS
+        test:
+          <<: *default
+          compile: true
+
+        production:
+          <<: *default
+      YAML
+      simulate_existing_file("bin/shakapacker", "")
+      simulate_existing_file("bin/shakapacker-dev-server", "")
+      simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
+        const { generateWebpackConfig } = require('shakapacker')
+        const webpackConfig = generateWebpackConfig()
+        module.exports = webpackConfig
+      JS
+
+      Dir.chdir(destination_root) do
+        # Run without --force: the fix must work via --shakapacker-just-installed alone,
+        # not rely on the global --force flag overwriting all conflicting files.
+        run_generator(["--shakapacker-just-installed", "--ignore-warnings"])
       end
     end
 
@@ -303,6 +311,10 @@ describe InstallGenerator, type: :generator do
       # Ensure destination exists and has a shakapacker.yml to trigger conflict
       FileUtils.mkdir_p(File.join(destination, "config"))
       File.write(File.join(destination, "config/shakapacker.yml"), "existing: config\n")
+    end
+
+    after do
+      FileUtils.rm_f(File.join(destination, "config/shakapacker.yml"))
     end
 
     it "passes force: true when shakapacker_just_installed is true" do
