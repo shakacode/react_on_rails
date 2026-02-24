@@ -428,7 +428,67 @@ export function ClientWrapper({ children }) {
 </ClientWrapper>
 ```
 
-### Mistake 3: Confusing `'use client'` with `'use server'`
+### Mistake 3: Adding `'use client'` to a Shared Component (Chunk Contamination)
+
+When a component is imported by multiple `'use client'` files, adding `'use client'` directly to it can cause the RSC page to download much larger chunks than necessary.
+
+**The problem:** Suppose `PostsPage.jsx` has `'use client'` and statically imports `HelloWorldHooks.jsx` along with heavy dependencies (lodash, moment). If you add `'use client'` to `HelloWorldHooks.jsx` directly, webpack's client manifest may map `HelloWorldHooks.jsx` to PostsPage's chunk group -- which includes those heavy vendor dependencies. The RSC page then downloads ~382 KB just to render a tiny component that only needs ~8 KB.
+
+This happens because the RSC framework's webpack plugin iterates through chunk groups to build a module-to-chunk mapping, and the **last chunk group processed wins**. If your shared component appears in a large chunk group (via a static import chain), that large chunk group's files end up in the manifest.
+
+```jsx
+// BAD: 'use client' directly on the shared component
+// HelloWorldHooks.jsx
+'use client';
+import React, { useState } from 'react';
+
+export default function HelloWorldHooks({ name }) {
+  const [greeting, setGreeting] = useState(name);
+  return <h3>Hello, {greeting}!</h3>;
+}
+```
+
+```jsx
+// PostsPage.jsx -- also has 'use client', imports HelloWorldHooks + heavy deps
+'use client';
+import HelloWorldHooks from './HelloWorldHooks'; // static import chain
+import PreloadedPosts from './PreloadedPosts';    // → lodash (~544 KB) + moment (~700 KB)
+```
+
+When the RSC page needs `HelloWorldHooks`, the manifest may point to PostsPage's chunk group, forcing the browser to download lodash and moment even though `HelloWorldHooks` doesn't use them.
+
+```jsx
+// GOOD: Thin 'use client' wrapper isolates the chunk boundary
+// HelloWorldHooksForServerComponents.jsx (new wrapper file)
+'use client';
+import HelloWorldHooks from './HelloWorldHooks';
+export default HelloWorldHooks;
+```
+
+```jsx
+// HelloWorldHooks.jsx -- NO 'use client' directive
+import React, { useState } from 'react';
+
+export default function HelloWorldHooks({ name }) {
+  const [greeting, setGreeting] = useState(name);
+  return <h3>Hello, {greeting}!</h3>;
+}
+```
+
+```jsx
+// RSCPage.jsx -- Server Component imports the wrapper
+import HelloWorldHooks from './HelloWorldHooksForServerComponents';
+
+export default function RSCPage() {
+  return <HelloWorldHooks name="World" />;
+}
+```
+
+**Why the wrapper works:** `HelloWorldHooksForServerComponents.jsx` is a new file that doesn't appear in PostsPage's import tree. The RSC plugin creates a dedicated async chunk for it containing only the wrapper + the component (~8 KB). The manifest always maps it to this small chunk, regardless of chunk group iteration order.
+
+**Rule:** When a component is shared between a Server Component page and a heavy Client Component tree, create a thin `'use client'` wrapper file for the RSC import. Keep the original component without the directive so it can be used by both sides.
+
+### Mistake 4: Confusing `'use client'` with `'use server'`
 
 - `'use client'` marks a file's components as **Client Components**
 - `'use server'` marks **Server Actions** (functions callable from the client) -- NOT Server Components
