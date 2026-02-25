@@ -294,9 +294,16 @@ export default function injectRSCPayload(
    * propagate to handleStreamError → errorReporter in the node renderer.
    * Error alone is not the end of the stream — termination is handled by the
    * 'close' event below.
+   *
+   * We only emit here when startRSC hasn't been called yet. Once startRSC is
+   * running, finished(htmlStream) inside startRSC rejects on error, and the
+   * catch block there handles reporting — emitting here too would cause the
+   * same error to be reported twice.
    */
   htmlStream.on('error', (err) => {
-    resultStream.emit('error', err instanceof Error ? err : new Error(String(err)));
+    if (!rscPromise) {
+      resultStream.emit('error', err instanceof Error ? err : new Error(String(err)));
+    }
   });
 
   /**
