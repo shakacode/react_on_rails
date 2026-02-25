@@ -350,18 +350,21 @@ export async function buildVM(filePath: string) {
 
   // Clean up the map entry after the promise settles (fulfills or rejects).
   //
-  // Why .finally() here instead of try/finally inside the async IIFE:
+  // Analogy: We write jobs on a whiteboard so nobody starts duplicates. If we
+  // told the helper "erase it when you're done" but the helper failed so fast
+  // they erased it *before we wrote it down*, the failed job would be stuck on
+  // the whiteboard forever — blocking all retries. Instead, we attach a sticky
+  // note to the job saying "erase me when I'm done." The note can't activate
+  // until after we've written the job down, so erasing always happens in the
+  // right order.
   //
-  // An async IIFE executes synchronously until its first `await`. If the code
-  // throws before reaching any `await` (e.g. readFileAsync rejects for a
-  // missing file), the IIFE's internal finally block runs *synchronously* —
-  // before `vmCreationPromises.set()` on line 349 has executed. That means
-  // set() stores an already-rejected promise that never gets cleaned up,
-  // permanently poisoning retries for this filePath.
-  //
-  // By chaining .finally() on the promise *after* set(), we guarantee the
-  // delete() runs as a microtask after the current synchronous execution
-  // completes — so set() has always run first, and the stale entry is removed.
+  // Technically: an async IIFE runs synchronously until its first `await`. If
+  // it throws before any `await` (e.g. missing file), a try/finally inside the
+  // IIFE would run *before* set() on line 349 stores the promise — leaving a
+  // stale rejected promise in the map that permanently poisons retries.
+  // Chaining .finally() on the promise *after* set() guarantees cleanup runs
+  // as a microtask after the current synchronous execution, so set() has
+  // always run first.
   void vmCreationPromise
     .catch(() => {})
     .finally(() => {
