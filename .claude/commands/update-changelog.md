@@ -156,60 +156,67 @@ When a new version is released:
 
 ### For Regular Changelog Updates
 
-1. **ALWAYS fetch latest changes first**:
-   - **CRITICAL**: Run `git fetch origin master` to ensure you have the latest commits
-   - The workspace may be behind origin/master, causing you to miss recently merged PRs
-   - After fetching, use `origin/master` for all comparisons, NOT local `master` branch
+#### Step 1: Fetch and read current state
 
-2. **Determine the correct version tag to compare against**:
-   - First, check the tag dates: `git log --tags --simplify-by-decoration --pretty="format:%ai %d" | head -10`
-   - Find the latest version tag and its date
-   - **Also check the CHANGELOG.md** for the most recent version header: look for `### [VERSION] - DATE` pattern right after `### [Unreleased]`
-   - The most recent version in the changelog may be a beta version like `16.2.0.beta.19`
-   - Compare origin/master branch date to the tag date
-   - If the tag is NEWER than origin/master, it means the branch needs to be updated to include the tag's commits
-   - **CRITICAL**: Always use `git log TAG..BRANCH` to find commits that are in the tag but not in the branch, as the tag may be ahead
+- **CRITICAL**: Run `git fetch origin master` to ensure you have the latest commits
+- After fetching, use `origin/master` for all comparisons, NOT local `master` branch
+- Read the current CHANGELOG.md to understand the existing structure
 
-3. **Check commits and version boundaries**:
-   - **IMPORTANT**: Use `origin/master` in all commands below, not local `master`
-   - Run `git log --oneline LAST_TAG..origin/master` to see commits since the last release
-   - Also check `git log --oneline origin/master..LAST_TAG` to see if the tag is ahead of origin/master
-   - If the tag is ahead, entries in "Unreleased" section may actually belong to that tagged version
-   - **Extract ALL PR numbers** from commit messages using grep: `git log --oneline LAST_TAG..origin/master | grep -oE "#[0-9]+" | sort -u`
-   - For each PR number found, check if it's already in CHANGELOG.md using: `grep "PR XXX" CHANGELOG.md` (note: no hash in search since React on Rails uses no hash)
-   - Identify which commits contain user-visible changes (look for keywords like "Fix", "Add", "Feature", "Bug", etc.)
-   - Extract author information from commit messages
-   - **Never ask the user for PR details** - get them from the git history or use WebFetch on the PR URL
+#### Step 2: Reconcile tags with changelog sections (DO THIS FIRST)
 
-4. **Validate** that changes are user-visible (per the criteria above). If not user-visible, skip those commits.
+**This step catches missing version sections and is the #1 source of errors when skipped.**
 
-5. **Read the current CHANGELOG.md** to understand the existing structure and formatting.
+1. Get the latest git tag: `git tag --sort=-v:refname | head -5`
+2. Get the most recent version header in CHANGELOG.md (the first `### [VERSION] - DATE` after `### [Unreleased]`)
+3. **Compare them.** If the latest git tag (minus the `v` prefix) does NOT match the latest changelog version header, there are tagged releases missing from the changelog. For example:
+   - Latest tag: `v16.4.0.rc.4`
+   - Latest changelog version: `### [16.4.0.rc.3]`
+   - **Result: `16.4.0.rc.4` is missing and needs its own section**
 
-6. **Determine where entries should go**:
-   - If the latest version tag is NEWER than origin/master branch, move entries from "Unreleased" to that version section
-   - If origin/master is ahead of the latest tag, add new entries to "Unreleased"
-   - Always verify the version date in CHANGELOG.md matches the actual tag date
+4. For EACH missing tagged version (there may be multiple):
+   a. Find commits in that tag vs the previous tag: `git log --oneline PREV_TAG..MISSING_TAG`
+   b. Extract PR numbers and fetch details for user-visible changes
+   c. Check which entries currently in `### [Unreleased]` actually belong to this tagged version (compare PR numbers against the commit list)
+   d. **Create a new version section** immediately before the previous version section:
 
-7. **Add or move entries** to the appropriate section under appropriate category headings.
-   - **CRITICAL**: When moving entries from "Unreleased" to a version section, merge them with existing entries under the same category heading
-   - **NEVER create duplicate section headings** (e.g., don't create two "### Fixed" sections)
-   - If the version section already has a category heading (e.g., "### Fixed"), add the moved entries to that existing section
-   - Maintain the category order as defined above
+   ```markdown
+   ### [16.4.0.rc.4] - 2026-02-22
+   ```
 
-8. **Verify formatting**:
+   e. **Move** matching entries from Unreleased into the new section
+   f. **Add** any new entries for PRs in that tag that aren't in the changelog at all
+   g. **Update version diff links** at the bottom of the file:
+   - Update `[unreleased]:` to compare from the newest tag to master
+   - Add a link for each new version section
+
+5. Get the tag date with: `git log -1 --format="%Y-%m-%d" TAG_NAME`
+
+#### Step 3: Add new entries for post-tag commits
+
+1. Run `git log --oneline LATEST_TAG..origin/master` to find commits after the latest tag
+2. Extract PR numbers: `git log --oneline LATEST_TAG..origin/master | grep -oE "#[0-9]+" | sort -u`
+3. For each PR number, check if it's already in CHANGELOG.md: `grep "PR XXX" CHANGELOG.md`
+4. For PRs not yet in the changelog:
+   - Get PR details: `gh pr view NUMBER --json title,body,author --repo shakacode/react_on_rails`
+   - **Never ask the user for PR details** - get them from git history or the GitHub API
+   - Validate that the change is user-visible (per the criteria above). Skip CI, lint, refactoring, test-only changes.
+   - Add the entry to `### [Unreleased]` under the appropriate category heading
+
+#### Step 4: Verify and finalize
+
+1. **Verify formatting**:
    - Bold description with period
    - Proper PR link (NO hash symbol)
    - Proper author link
    - Consistent with existing entries
    - File ends with a newline character
-
-9. **Run linting** after making changes:
-
-   ```bash
-   yarn lint
-   ```
-
-10. **Show the user** the added or moved entries and explain what was done.
+2. **Verify version sections are in order** (Unreleased → newest tag → older tags)
+3. **Verify version diff links** at the bottom of the file are correct
+4. **Show the user** a summary of what was done:
+   - Which version sections were created
+   - Which entries were moved from Unreleased
+   - Which new entries were added
+   - Which PRs were skipped (and why)
 
 ### For Beta to Non-Beta Version Release
 
