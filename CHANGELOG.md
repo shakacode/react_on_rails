@@ -29,6 +29,7 @@ Changes since the last non-beta release.
 
 #### Fixed
 
+- **RSC WebpackLoader with SWC transpiler**: Fixed RSC WebpackLoader never being injected when using SWC (Shakapacker's default transpiler). The RSC config only handled array-based `rule.use` (Babel) but SWC uses a function-based `rule.use`, so `'use client'` files passed through untransformed into the RSC bundle. Now handles both array and function loader declarations. [PR 2476](https://github.com/shakacode/react_on_rails/pull/2476) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 - **RSC Generator Layout Wiring**: Fixed `MissingEntryError` on fresh RSC installs where `HelloServerController` fell back to Rails' `application.html.erb` (which uses `javascript_pack_tag "application"` that is not created by the RSC flow). The generator now always copies `hello_world.html.erb`, `HelloServerController` explicitly uses `layout "hello_world"`, and post-install output now shows `stream_react_component` for RSC installs. [PR 2429](https://github.com/shakacode/react_on_rails/pull/2429) by [justin808](https://github.com/justin808).
 
 #### Pro
