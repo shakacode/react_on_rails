@@ -38,10 +38,19 @@ Changes since the last non-beta release.
 
 - **Breaking: removed legacy key-file license fallback**: `config/react_on_rails_pro_license.key` is no longer read. Move your token to the `REACT_ON_RAILS_PRO_LICENSE` environment variable. A migration warning is logged at startup when the legacy file is detected and the environment variable is missing. [PR 2454](https://github.com/shakacode/react_on_rails/pull/2454) by [ihabadham](https://github.com/ihabadham).
 
+### [16.4.0.rc.4] - 2026-02-22
+
+#### Pro
+
+##### Improved
+
+- **Better error messages when component is missing `'use client'` with RSC**. When RSC support is enabled, components without `'use client'` silently crash at runtime with confusing errors. Improved error messages at multiple layers: runtime server and client bundles now include the component name and suggest adding `'use client'`, build-time heuristic scans for client-only patterns and emits warnings, and generated server component pack files explain the classification. [PR 2403](https://github.com/shakacode/react_on_rails/pull/2403) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 ##### Fixed
 
 - **Fixed node renderer upload race condition causing ENOENT errors and asset corruption during concurrent requests**. Concurrent multipart uploads (e.g., during pod rollovers) all wrote to a single shared path (`uploads/<filename>`), causing file overwrites, `ENOENT` errors, and cross-contamination between requests. Each request now gets its own isolated upload directory (`uploads/<uuid>/`), eliminating all shared-path collisions. [PR 2456](https://github.com/shakacode/react_on_rails/pull/2456) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 - **Fixed node renderer race condition between `/upload-assets` and render requests writing to the same bundle directory**. The `/upload-assets` endpoint used a global lock while render requests used per-bundle locks, so both could write to the same bundle directory concurrently, risking asset corruption. Now both endpoints share the same per-bundle lock key. Also switched parallel bundle processing from `Promise.all` to `Promise.allSettled` to prevent the `onResponse` cleanup hook from deleting uploaded files while in-flight copies are still reading from them. [PR 2464](https://github.com/shakacode/react_on_rails/pull/2464) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **Fixed TS2769 build error in node renderer `onFile` callback**. Removed explicit `this: FastifyRequest` annotation that was incompatible with `@fastify/multipart` type definitions, fixing `pnpm build` and `pnpm install` failures on fresh runners. [PR 2469](https://github.com/shakacode/react_on_rails/pull/2469) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 ### [16.4.0.rc.3] - 2026-02-18
 
@@ -2013,7 +2022,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.4.0.rc.3...master
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.4.0.rc.4...master
+[16.4.0.rc.4]: https://github.com/shakacode/react_on_rails/compare/v16.4.0.rc.3...v16.4.0.rc.4
 [16.4.0.rc.3]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...v16.4.0.rc.3
 [16.3.0]: https://github.com/shakacode/react_on_rails/compare/v16.2.1...v16.3.0
 [16.2.1]: https://github.com/shakacode/react_on_rails/compare/v16.2.0...v16.2.1
