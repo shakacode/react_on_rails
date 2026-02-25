@@ -12,10 +12,17 @@ shared_examples "base_generator_common" do
 
   it "copies common files" do
     %w[app/controllers/hello_world_controller.rb
+       app/views/layouts/react_on_rails_default.html.erb
        config/initializers/react_on_rails.rb
        Procfile.dev
        Procfile.dev-static-assets
        Procfile.dev-prod-assets].each { |file| assert_file(file) }
+  end
+
+  it "creates HelloWorld controller with react_on_rails_default layout" do
+    assert_file "app/controllers/hello_world_controller.rb" do |content|
+      expect(content).to include('layout "react_on_rails_default"')
+    end
   end
 end
 
