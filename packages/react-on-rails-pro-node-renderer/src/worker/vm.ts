@@ -192,7 +192,13 @@ export async function buildVM(filePath: string) {
     return Promise.resolve(true);
   }
 
-  // Create a new promise for this VM creation
+  // Create the VM creation promise. The IIFE runs synchronously until its first
+  // `await`, so we must store it in the map immediately after creation — before
+  // the microtask queue is drained — to prevent concurrent callers from starting
+  // a duplicate build. Cleanup uses `.finally()` on the stored promise rather
+  // than a try/finally inside the IIFE, because an IIFE's finally block can
+  // execute synchronously (before `vmCreationPromises.set`) when the code throws
+  // before the first `await`, which would leave a stale rejected promise in the map.
   const vmCreationPromise = (async () => {
     try {
       const { supportModules, stubTimers, additionalContext } = getConfig();
@@ -335,14 +341,21 @@ export async function buildVM(filePath: string) {
       log.error({ error }, 'Caught Error when creating context in buildVM');
       errorReporter.error(error as Error);
       throw error;
-    } finally {
-      // Always remove the promise from the map when done
-      vmCreationPromises.delete(filePath);
     }
   })();
 
-  // Store the promise
+  // Store the promise BEFORE any async work completes, so concurrent callers
+  // find it via the has() check above.
   vmCreationPromises.set(filePath, vmCreationPromise);
+
+  // Remove from the map after the promise settles. Using .finally() on the
+  // stored promise guarantees this runs after set(), unlike a try/finally
+  // inside the IIFE which can run synchronously before set() on sync throws.
+  void vmCreationPromise
+    .catch(() => {})
+    .finally(() => {
+      vmCreationPromises.delete(filePath);
+    });
 
   return vmCreationPromise;
 }

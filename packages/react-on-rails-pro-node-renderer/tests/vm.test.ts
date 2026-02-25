@@ -542,6 +542,22 @@ describe('buildVM and runInVM', () => {
       expect(vmContext1).toBe(vmContext2);
     });
 
+    test('buildVM recovers after failure for nonexistent bundle', async () => {
+      const config = getConfig();
+      config.supportModules = true;
+      config.stubTimers = false;
+
+      const nonExistentPath = path.resolve(__dirname, './tmp/nonexistent-bundle.js');
+
+      // First call should fail because the bundle file does not exist
+      await expect(buildVM(nonExistentPath)).rejects.toThrow();
+
+      // After failure, the vmCreationPromises map should be cleaned up,
+      // allowing a retry with the correct path to succeed
+      await buildVM(serverBundlePath);
+      expect(hasVMContextForBundle(serverBundlePath)).toBeTruthy();
+    });
+
     test('running runInVM before buildVM', async () => {
       resetVM();
       void prepareVM(true);
