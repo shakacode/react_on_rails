@@ -12,11 +12,12 @@
  * https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-import { PassThrough, Readable } from 'stream';
+import { PassThrough } from 'stream';
 import { finished } from 'stream/promises';
 import { PipeableOrReadableStream } from 'react-on-rails/types';
 import { createRSCPayloadKey } from './utils.ts';
 import RSCRequestTracker from './RSCRequestTracker.ts';
+import safePipe from './safePipe.ts';
 
 // In JavaScript, when an escape sequence with a backslash (\) is followed by a character
 // that isn't a recognized escape character, the backslash is ignored, and the character
@@ -78,16 +79,7 @@ export default function injectRSCPayload(
   domNodeId: string | undefined,
 ) {
   const htmlStream = new PassThrough();
-  pipeableHtmlStream.pipe(htmlStream);
-  // When the source is destroyed, pipe() unpipes but does NOT end htmlStream.
-  // Listen for 'close' to ensure htmlStream ends, which triggers the cleanup chain.
-  if (typeof (pipeableHtmlStream as Readable).on === 'function') {
-    (pipeableHtmlStream as Readable).on('close', () => {
-      if (!htmlStream.writableEnded) {
-        htmlStream.end();
-      }
-    });
-  }
+  safePipe(pipeableHtmlStream, htmlStream);
   const decoder = new TextDecoder();
   let rscPromise: Promise<void> | null = null;
 
@@ -267,7 +259,8 @@ export default function injectRSCPayload(
 
       // Wait for HTML stream to complete, then wait for all RSC promises
       await finished(htmlStream).then(() => Promise.all(rscPromises));
-    } catch {
+    } catch (e) {
+      resultStream.emit('error', e instanceof Error ? e : new Error(String(e)));
       endResultStream();
     }
   };
@@ -297,10 +290,14 @@ export default function injectRSCPayload(
   });
 
   /**
-   * Prevent unhandled error crash. Error alone is not the end of the stream —
-   * termination is handled by the 'close' event below.
+   * Report errors on htmlStream by emitting them on resultStream, where they
+   * propagate to handleStreamError → errorReporter in the node renderer.
+   * Error alone is not the end of the stream — termination is handled by the
+   * 'close' event below.
    */
-  htmlStream.on('error', () => {});
+  htmlStream.on('error', (err) => {
+    resultStream.emit('error', err instanceof Error ? err : new Error(String(err)));
+  });
 
   /**
    * 'close' fires after both normal 'end' and destroy().
@@ -339,7 +336,10 @@ export default function injectRSCPayload(
       .finally(() => {
         rscRequestTracker.clear();
       })
-      .catch(() => endResultStream());
+      .catch((e: unknown) => {
+        resultStream.emit('error', e instanceof Error ? e : new Error(String(e)));
+        endResultStream();
+      });
   });
 
   return resultStream;
