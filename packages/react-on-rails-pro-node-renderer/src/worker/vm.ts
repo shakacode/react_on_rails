@@ -348,9 +348,20 @@ export async function buildVM(filePath: string) {
   // find it via the has() check above.
   vmCreationPromises.set(filePath, vmCreationPromise);
 
-  // Remove from the map after the promise settles. Using .finally() on the
-  // stored promise guarantees this runs after set(), unlike a try/finally
-  // inside the IIFE which can run synchronously before set() on sync throws.
+  // Clean up the map entry after the promise settles (fulfills or rejects).
+  //
+  // Why .finally() here instead of try/finally inside the async IIFE:
+  //
+  // An async IIFE executes synchronously until its first `await`. If the code
+  // throws before reaching any `await` (e.g. readFileAsync rejects for a
+  // missing file), the IIFE's internal finally block runs *synchronously* —
+  // before `vmCreationPromises.set()` on line 349 has executed. That means
+  // set() stores an already-rejected promise that never gets cleaned up,
+  // permanently poisoning retries for this filePath.
+  //
+  // By chaining .finally() on the promise *after* set(), we guarantee the
+  // delete() runs as a microtask after the current synchronous execution
+  // completes — so set() has always run first, and the stale entry is removed.
   void vmCreationPromise
     .catch(() => {})
     .finally(() => {
