@@ -41,20 +41,28 @@ module ReactOnRailsPro
         buffer_size = ReactOnRailsPro.configuration.concurrent_component_streaming_buffer_size
         @main_output_queue = Async::LimitedQueue.new(buffer_size)
 
-        # Render template - components will start streaming immediately
+        # Render template - components will start streaming immediately.
+        # If a shell error occurs, consumer_stream_async raises PrerenderError here
+        # (BEFORE the response is committed), enabling a proper HTTP redirect.
         template_string = render_to_string(template: template, **render_options)
         # View may contain extra newlines, chunk already contains a newline
         # Having multiple newlines between chunks causes hydration errors
         # So we strip extra newlines from the template string and add a single newline
         response.stream.write(template_string)
 
-        begin
-          drain_streams_concurrently(parent_task)
-          # Do not close the response stream in an ensure block.
-          # If an error occurs we may need the stream open to send diagnostic/error details
-          # (for example, ApplicationController#rescue_from in the dummy app).
-          response.stream.close if close_stream_at_end
-        end
+        drain_streams_concurrently(parent_task)
+        # Do not close the response stream in an ensure block.
+        # If an error occurs we may need the stream open to send diagnostic/error details
+        # (for example, ApplicationController#rescue_from in the dummy app).
+        response.stream.close if close_stream_at_end
+      rescue StandardError
+        # Stop all streaming tasks to prevent leaked async work.
+        # For pre-commit errors (e.g., shell error raised during render_to_string),
+        # the barrier may still have pending tasks that must be cancelled.
+        # For post-commit errors (from drain_streams_concurrently), the barrier
+        # is already stopped inside that method — stopping again is a no-op.
+        @async_barrier&.stop
+        raise
       end
     end
 
