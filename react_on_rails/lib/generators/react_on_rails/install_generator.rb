@@ -64,15 +64,18 @@ module ReactOnRails
 
       # Hidden option: allows tests (and advanced users) to signal that Shakapacker
       # was just installed, triggering force-overwrite of shakapacker.yml with RoR's template.
-      # In production, this is normally detected at runtime via @shakapacker_just_installed.
-      # Passing this flag manually overrides the runtime detection — the yml will be
-      # force-overwritten with RoR's template even if it already exists.
+      # The CLI flag takes precedence over runtime detection (@shakapacker_just_installed):
+      # when this flag is set, shakapacker_just_installed? returns true immediately without
+      # consulting the ivar. Passing this flag manually overrides runtime detection — the yml
+      # will be force-overwritten with RoR's template even if it already exists.
       class_option :shakapacker_just_installed,
                    type: :boolean,
                    default: false,
                    hide: true
 
       # Removed: --skip-shakapacker-install (Shakapacker is now a required dependency)
+
+      SHAKAPACKER_YML_PATH = "config/shakapacker.yml"
 
       # Main generator entry point
       #
@@ -219,8 +222,6 @@ module ReactOnRails
         MSG
         GeneratorMessages.add_warning(warning)
       end
-
-      SHAKAPACKER_YML_PATH = "config/shakapacker.yml"
 
       def shakapacker_just_installed?
         options.shakapacker_just_installed? || @shakapacker_just_installed
