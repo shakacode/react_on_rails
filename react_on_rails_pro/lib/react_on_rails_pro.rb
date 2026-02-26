@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "rails"
+require "react_on_rails"
 
 require "react_on_rails_pro/request"
 require "react_on_rails_pro/version"
