@@ -42,8 +42,8 @@ export default function safePipe<T extends Writable>(
   destination: T,
   onError?: (err: Error) => void,
 ): T {
-  source.pipe(destination);
-
+  // Attach listeners BEFORE pipe() to avoid a theoretical race with synchronous
+  // event emission during pipe setup. This matches the ordering in utils.ts's safePipe.
   if (typeof (source as Readable).on === 'function') {
     const readableSource = source as Readable;
 
@@ -60,6 +60,8 @@ export default function safePipe<T extends Writable>(
       }
     });
   }
+
+  source.pipe(destination);
 
   return destination;
 }
