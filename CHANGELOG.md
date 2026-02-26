@@ -36,6 +36,8 @@ Changes since the last non-beta release.
 
 ##### Fixed
 
+- **Boot failure when only `react_on_rails_pro` is listed in the Gemfile.** `react_on_rails_pro.rb` never explicitly required `react_on_rails`, relying on `Bundler.require` to auto-load it via the user's Gemfile. When installation docs were updated to direct users to only add `react_on_rails_pro`, two errors surfaced on boot: `NoMethodError: undefined method 'strip_heredoc'` (from `license_public_key.rb`) and `NoMethodError: undefined method 'configure' for module ReactOnRails` (from `config/initializers/react_on_rails.rb`). Fixed by explicitly requiring `react_on_rails` in `react_on_rails_pro.rb`, completing the same design the JS package split already established for npm. [PR 2492](https://github.com/shakacode/react_on_rails/pull/2492) by [ihabadham](https://github.com/ihabadham).
+
 - **Sentry SDK v9/v10 compatibility**: The node renderer Sentry integration now supports `@sentry/node` v9 and v10. Replaced `@sentry/types` import (no longer a transitive dependency in v9+) and widened peer dependency range from `<9.0.0` to `<11.0.0`. [PR 2434](https://github.com/shakacode/react_on_rails/pull/2434) by [alexeyr-ci2](https://github.com/alexeyr-ci2).
 
 ##### Changed
