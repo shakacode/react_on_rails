@@ -81,7 +81,9 @@ const streamRenderReactComponent = (
         },
         onShellReady() {
           renderState.isShellReady = true;
-          pipeToTransform(injectRSCPayload(renderingStream, streamingTrackers.rscRequestTracker, domNodeId));
+          pipeToTransform(
+            injectRSCPayload(renderingStream, streamingTrackers.rscRequestTracker, domNodeId, renderState),
+          );
         },
         onError(e) {
           reportError(convertToError(e));

@@ -14,7 +14,7 @@
 
 import { PassThrough } from 'stream';
 import { finished } from 'stream/promises';
-import { PipeableOrReadableStream } from 'react-on-rails/types';
+import { PipeableOrReadableStream, StreamRenderState } from 'react-on-rails/types';
 import { createRSCPayloadKey } from './utils.ts';
 import RSCRequestTracker from './RSCRequestTracker.ts';
 
@@ -76,11 +76,19 @@ export default function injectRSCPayload(
   pipeableHtmlStream: PipeableOrReadableStream,
   rscRequestTracker: RSCRequestTracker,
   domNodeId: string | undefined,
+  renderState?: StreamRenderState,
 ) {
   const htmlStream = new PassThrough();
   pipeableHtmlStream.pipe(htmlStream);
   const decoder = new TextDecoder();
   let rscPromise: Promise<void> | null = null;
+
+  // RSC shell-readiness tracking: when renderState is provided, we manage
+  // isShellReady to reflect whether RSC content has resolved without errors.
+  // This allows Ruby's should_raise_streaming_prerender_error? to treat
+  // synchronous RSC component errors as shell errors (triggering redirect).
+  let isRSCComponent = false;
+  let htmlChunkCount = 0;
 
   // ========================================
   // BUFFER ARRAYS - Three data sources
@@ -226,6 +234,16 @@ export default function injectRSCPayload(
         const { stream, props, componentName } = streamInfo;
         const rscPayloadKey = createRSCPayloadKey(componentName, props, domNodeId);
 
+        // When the first RSC payload is generated, this component uses RSC.
+        // Set isShellReady back to false so that if the RSC resolution triggers
+        // an error (onError in SSR's renderToPipeableStream), the error chunk
+        // will have isShellReady=false, causing Ruby to check raise_on_prerender_error
+        // instead of raise_non_shell_server_rendering_errors.
+        if (!isRSCComponent && renderState) {
+          isRSCComponent = true;
+          renderState.isShellReady = false;
+        }
+
         // CRITICAL TIMING: Initialize global array IMMEDIATELY when component requests RSC
         // This ensures the array exists before the component's HTML is rendered and sent.
         // Client-side hydration depends on this array being present in the page.
@@ -269,8 +287,18 @@ export default function injectRSCPayload(
    * - Schedule flush to send combined data
    */
   htmlStream.on('data', (chunk: Buffer) => {
+    htmlChunkCount++;
     htmlBuffers.push(chunk);
     hasReceivedFirstHtmlChunk = true;
+
+    // On the first post-shell HTML chunk (chunk #2) for RSC components:
+    // React calls onError synchronously during the render that produces this chunk,
+    // so by now renderState.hasErrors reflects whether RSC resolved with an error.
+    // If no errors, RSC resolved successfully — restore isShellReady to true so
+    // subsequent errors are treated as non-shell errors.
+    if (htmlChunkCount === 2 && isRSCComponent && renderState && !renderState.hasErrors) {
+      renderState.isShellReady = true;
+    }
 
     if (!rscPromise) {
       rscPromise = startRSC();
