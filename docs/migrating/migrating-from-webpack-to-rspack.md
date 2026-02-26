@@ -134,6 +134,52 @@ const configureServer = (serverWebpackConfig) => {
 
 **Why this matters:** Rspack uses `@rspack/core/dist/cssExtractLoader.js` instead of Webpack's `mini-css-extract-plugin`. Without this fix, CSS extraction remains in the server bundle, causing intermittent SSR failures.
 
+### CSS Modules with SSR: Class Name Divergence
+
+**If you use `[contenthash]` in your `localIdentName` for CSS modules, class names will silently diverge between client and server builds with Rspack.** Pages load but all CSS module styles are broken. This only affects production builds — development with HMR works fine because `style-loader` injects CSS inline.
+
+The root cause is that `[contenthash]` is computed from processed CSS content, which differs between client and server builds due to different loader chains (`exportOnlyLocals: true` on server), different plugins (`CssExtractRspackPlugin` on client only), and different optimization passes.
+
+**Solution:** Replace `[contenthash]` with a custom `getLocalIdent` function that derives class names from stable inputs (file path + class name):
+
+```javascript
+// config/webpack/getLocalIdent.js
+const crypto = require('crypto');
+const path = require('path');
+
+const getLocalIdent = (context, _localIdentName, localName) => {
+  const projectRoot = path.resolve(__dirname, '../..');
+  const relativePath = path.relative(projectRoot, context.resourcePath);
+
+  const hash = crypto
+    .createHash('md5')
+    .update(relativePath + localName)
+    .digest('base64url')
+    .slice(0, 3);
+
+  const basename = path.basename(context.resourcePath);
+  const name = basename.replace(/\.(module\.)?(scss|sass|css|tsx?|jsx?)$/, '').replace(/-styles$/, '');
+  return `${name}-${localName}_${hash}`;
+};
+
+module.exports = getLocalIdent;
+```
+
+Then use it in your `commonWebpackConfig.js` where you configure CSS modules:
+
+```javascript
+const getLocalIdent = require('./getLocalIdent');
+
+// In the CSS modules configuration loop:
+if (cssLoader?.options?.modules) {
+  cssLoader.options.modules.namedExport = false;
+  cssLoader.options.modules.exportLocalsConvention = 'camelCase';
+  cssLoader.options.modules.getLocalIdent = getLocalIdent; // Stable class names across builds
+}
+```
+
+Because `getLocalIdent` uses the file path and class name (not processed CSS content), the same class name is produced in both client and server builds regardless of bundler internals.
+
 ### Server Bundle: Preserve CSS Modules Configuration
 
 When configuring SSR, merge CSS modules options instead of replacing them:
@@ -234,6 +280,19 @@ default: &default
 1. Configure `namedExport: false` (see Breaking Changes section)
 2. Ensure server config preserves CSS modules settings
 3. Filter Rspack's `cssExtractLoader` from server bundle
+
+### CSS Module Styles Broken in Production (SSR)
+
+**Symptoms:**
+
+- All CSS module styles missing in production
+- Class names in server-rendered HTML don't match CSS selectors
+- Works in development but breaks in production builds
+- No errors — just silently broken styles
+
+**Cause:** `[contenthash]` in `localIdentName` produces different hashes in client and server builds with Rspack.
+
+**Solution:** Use a custom `getLocalIdent` function instead of `[contenthash]`. See the [CSS Modules with SSR](#css-modules-with-ssr-class-name-divergence) section above.
 
 ### Intermittent SSR Failures
 

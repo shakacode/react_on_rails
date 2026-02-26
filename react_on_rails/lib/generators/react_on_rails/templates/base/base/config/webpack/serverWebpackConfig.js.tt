@@ -51,7 +51,10 @@ const configureServer = () => {
   serverWebpackConfig.module.rules.forEach((loader) => {
     if (loader.use && loader.use.filter) {
       loader.use = loader.use.filter(
-        (item) => !(typeof item === 'string' && item.match(/mini-css-extract-plugin/)),
+        (item) => !(typeof item === 'string' && (
+          item.match(/mini-css-extract-plugin/) ||
+          item.includes('cssExtractLoader') // Rspack uses this path
+        )),
       );
     }
   });
@@ -145,7 +148,11 @@ const configureServer = () => {
         } else if (typeof item.loader === 'string') {
           testValue = item.loader;
         }
-        return !(testValue.match(/mini-css-extract-plugin/) || testValue === 'style-loader');
+        return !(
+          testValue.match(/mini-css-extract-plugin/) ||
+          testValue.includes('cssExtractLoader') || // Rspack uses this path
+          testValue === 'style-loader'
+        );
       });
       const cssLoader = rule.use.find((item) => {
         let testValue;
@@ -159,7 +166,10 @@ const configureServer = () => {
         return testValue.includes('css-loader');
       });
       if (cssLoader && cssLoader.options) {
-        cssLoader.options.modules = { exportOnlyLocals: true };
+        cssLoader.options.modules = {
+          ...cssLoader.options.modules, // Preserve existing settings (namedExport, localIdentName, getLocalIdent, etc.)
+          exportOnlyLocals: true,
+        };
       }
 <% if use_pro? -%>
 
