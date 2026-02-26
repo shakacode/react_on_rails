@@ -27,6 +27,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 Changes since the last non-beta release.
 
+### [16.4.0.rc.5] - 2026-02-26
+
 #### Fixed
 
 - **RSC WebpackLoader with SWC transpiler**: Fixed RSC WebpackLoader never being injected when using SWC (Shakapacker's default transpiler). The RSC config only handled array-based `rule.use` (Babel) but SWC uses a function-based `rule.use`, so `'use client'` files passed through untransformed into the RSC bundle. Now handles both array and function loader declarations. [PR 2476](https://github.com/shakacode/react_on_rails/pull/2476) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
@@ -37,7 +39,6 @@ Changes since the last non-beta release.
 ##### Fixed
 
 - **Boot failure when only `react_on_rails_pro` is listed in the Gemfile.** `react_on_rails_pro.rb` never explicitly required `react_on_rails`, relying on `Bundler.require` to auto-load it via the user's Gemfile. When installation docs were updated to direct users to only add `react_on_rails_pro`, two errors surfaced on boot: `NoMethodError: undefined method 'strip_heredoc'` (from `license_public_key.rb`) and `NoMethodError: undefined method 'configure' for module ReactOnRails` (from `config/initializers/react_on_rails.rb`). Fixed by explicitly requiring `react_on_rails` in `react_on_rails_pro.rb`, completing the same design the JS package split already established for npm. [PR 2492](https://github.com/shakacode/react_on_rails/pull/2492) by [ihabadham](https://github.com/ihabadham).
-
 - **Sentry SDK v9/v10 compatibility**: The node renderer Sentry integration now supports `@sentry/node` v9 and v10. Replaced `@sentry/types` import (no longer a transitive dependency in v9+) and widened peer dependency range from `<9.0.0` to `<11.0.0`. [PR 2434](https://github.com/shakacode/react_on_rails/pull/2434) by [alexeyr-ci2](https://github.com/alexeyr-ci2).
 
 ##### Changed
@@ -2028,7 +2029,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.4.0.rc.4...master
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.4.0.rc.5...master
+[16.4.0.rc.5]: https://github.com/shakacode/react_on_rails/compare/v16.4.0.rc.4...v16.4.0.rc.5
 [16.4.0.rc.4]: https://github.com/shakacode/react_on_rails/compare/v16.4.0.rc.3...v16.4.0.rc.4
 [16.4.0.rc.3]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...v16.4.0.rc.3
 [16.3.0]: https://github.com/shakacode/react_on_rails/compare/v16.2.1...v16.3.0
