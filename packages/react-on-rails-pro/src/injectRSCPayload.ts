@@ -338,6 +338,10 @@ export default function injectRSCPayload(
       return;
     }
 
+    // startRSC() has a top-level try/catch that converts all RSC stream errors
+    // to resultStream.emit('error', ...) and never re-throws. So rscPromise
+    // itself never rejects. The .catch() below only guards against unexpected
+    // exceptions in cleanup() or rscRequestTracker.clear(), not RSC stream errors.
     rscPromise
       .then(cleanup)
       .finally(() => {
