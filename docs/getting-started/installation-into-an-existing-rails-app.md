@@ -4,24 +4,29 @@
 
 **If you have Rails 5 API only project**, first [convert the Rails 5 API only app to a normal Rails app](../migrating/convert-rails-5-api-only-app.md).
 
-1. Add the following to your Gemfile and `bundle install`. We recommend fixing the version of React on Rails, as you will need to keep the exact version in sync with the version in your `package.json` file.
+1. Add the following to your Gemfile and run `bundle install`.
+   We recommend fixing exact versions, as the gem and npm package versions should stay in sync.
+   For pre-release versions, gems use periods (for example, `16.4.0.rc.5`) and npm packages use dashes
+   (for example, `16.4.0-rc.5`).
 
    ```ruby
-   gem "shakapacker", "7.0.1"     # Use the latest and the exact version
-   gem "react_on_rails", "13.3.1" # Use the latest and the exact version
+   gem "shakapacker", "<shakapacker_version>"
+   gem "react_on_rails", "<react_on_rails_gem_version>"
    ```
 
    Or use `bundle add`:
 
    ```bash
-   bundle add shakapacker --version=7.0.1 --strict
-   bundle add react_on_rails --version=13.3.1 --strict
+   bundle add shakapacker --version="<shakapacker_version>" --strict
+   bundle add react_on_rails --version="<react_on_rails_gem_version>" --strict
    ```
 
-2. Run the following 2 commands to install Shakapacker with React. Note, if you are using an older version of Rails than 5.1, you'll need to install Webpacker with React per the instructions [here](https://github.com/rails/webpacker).
+2. Run the following command to install Shakapacker with React. Note, if you are using an older version of
+   Rails than 5.1, you'll need to install Webpacker with React per the instructions
+   [here](https://github.com/rails/webpacker).
 
    ```bash
-   rails shakapacker:install
+   bundle exec rails shakapacker:install
    ```
 
 3. Commit this to git (or else you cannot run the generator unless you pass the option `--ignore-warnings`).
@@ -29,13 +34,13 @@
 4. Run the generator with a simple "Hello World" example (more options below):
 
    ```bash
-   rails generate react_on_rails:install
+   bundle exec rails generate react_on_rails:install
    ```
 
    For more information about this generator use `--help` option:
 
    ```bash
-   rails generate react_on_rails:install --help
+   bundle exec rails generate react_on_rails:install --help
    ```
 
 5. Ensure that you have `overmind` or `foreman` installed.
@@ -48,7 +53,11 @@
    ./bin/dev
    ```
 
-   Note: `foreman` defaults to PORT 5000 unless you set the value of PORT in your environment. For example, you can `export PORT=3000` to use the Rails default port of 3000. For the hello_world example, this is already set.
+   If port 3000 is already in use, set an explicit port:
+
+   ```bash
+   PORT=3001 ./bin/dev
+   ```
 
 7. Visit [localhost:3000/hello_world](http://localhost:3000/hello_world).
 

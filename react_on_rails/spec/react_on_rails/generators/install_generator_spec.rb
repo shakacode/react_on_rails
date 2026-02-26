@@ -183,6 +183,7 @@ describe InstallGenerator, type: :generator do
           source_entry_path: packs
           public_root_path: public
           public_output_path: packs
+          # private_output_path: ssr-generated
           cache_path: tmp/shakapacker
           webpack_compile_output: true
           shakapacker_precompile: true
@@ -223,6 +224,17 @@ describe InstallGenerator, type: :generator do
         expect(content).to include("# Example: precompile_hook:")
         # The old commented-out line should be gone
         expect(content).not_to match(/^\s*#\s*precompile_hook:\s*~/)
+      end
+    end
+
+    it "configures private_output_path for SSR bundles on Shakapacker 9+" do
+      assert_file "config/shakapacker.yml" do |content|
+        if ReactOnRails::PackerUtils.shakapacker_version_requirement_met?("9.0.0")
+          expect(content).to include("private_output_path: ssr-generated")
+          expect(content).not_to match(/^\s*#\s*private_output_path:/)
+        else
+          expect(content).to match(/^\s*#\s*private_output_path:/)
+        end
       end
     end
 
@@ -440,6 +452,14 @@ describe InstallGenerator, type: :generator do
         # Should use swc loader (rspack works best with SWC)
         expect(content).to include("javascript_transpiler: swc")
         expect(content).not_to match(/javascript_transpiler:\s*["']?babel["']?/)
+      end
+    end
+
+    it "adds private_output_path on Shakapacker 9+ when missing" do
+      assert_file "config/shakapacker.yml" do |content|
+        if ReactOnRails::PackerUtils.shakapacker_version_requirement_met?("9.0.0")
+          expect(content).to include("private_output_path: ssr-generated")
+        end
       end
     end
 

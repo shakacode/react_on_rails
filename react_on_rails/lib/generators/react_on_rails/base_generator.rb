@@ -139,6 +139,10 @@ module ReactOnRails
 
         # Always ensure precompile_hook is configured (Shakapacker 9.0+ only)
         configure_precompile_hook_in_shakapacker
+
+        # For SSR bundles, configure Shakapacker private_output_path (9.0+ only)
+        # This keeps Shakapacker and React on Rails server bundle paths in sync.
+        configure_private_output_path_in_shakapacker
       end
 
       def add_base_gems_to_gemfile
@@ -371,6 +375,38 @@ module ReactOnRails
                   "\\1precompile_hook: 'bin/shakapacker-precompile-hook'"
 
         puts Rainbow("✅ Configured precompile_hook in shakapacker.yml").green
+      end
+
+      def configure_private_output_path_in_shakapacker
+        # private_output_path is only supported in Shakapacker 9.0+
+        return unless ReactOnRails::PackerUtils.shakapacker_version_requirement_met?("9.0.0")
+
+        shakapacker_config_path = "config/shakapacker.yml"
+        return unless File.exist?(shakapacker_config_path)
+
+        content = File.read(shakapacker_config_path)
+
+        # Already configured? Do nothing.
+        return if content.match?(/^\s*private_output_path:\s*\S+/)
+
+        # First try: uncomment an existing private_output_path placeholder line.
+        updated_content = content.sub(
+          /^(\s*)#\s*private_output_path:\s*.*$/,
+          "\\1private_output_path: ssr-generated"
+        )
+
+        # Fallback: insert directly after public_output_path in the default section.
+        if updated_content == content
+          updated_content = content.sub(
+            /^(\s*)public_output_path:\s*.*\n/,
+            "\\0\\1private_output_path: ssr-generated\n"
+          )
+        end
+
+        return if updated_content == content
+
+        File.write(shakapacker_config_path, updated_content)
+        puts Rainbow("✅ Configured private_output_path in shakapacker.yml").green
       end
     end
   end
