@@ -142,7 +142,7 @@ const configureServer = () => {
     if (Array.isArray(rule.use)) {
       // remove the mini-css-extract-plugin and style-loader
       rule.use = rule.use.filter((item) => {
-        let testValue;
+        let testValue = '';
         if (typeof item === 'string') {
           testValue = item;
         } else if (typeof item.loader === 'string') {
@@ -155,7 +155,7 @@ const configureServer = () => {
         );
       });
       const cssLoader = rule.use.find((item) => {
-        let testValue;
+        let testValue = '';
 
         if (typeof item === 'string') {
           testValue = item;
@@ -165,7 +165,7 @@ const configureServer = () => {
 
         return testValue.includes('css-loader');
       });
-      if (cssLoader && cssLoader.options) {
+      if (cssLoader && cssLoader.options && cssLoader.options.modules) {
         cssLoader.options.modules = {
           ...cssLoader.options.modules, // Preserve existing settings (namedExport, localIdentName, getLocalIdent, etc.)
           exportOnlyLocals: true,

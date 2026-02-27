@@ -254,10 +254,11 @@ module ReactOnRails
                          "babelLoader.options.caller = { ssr: true };\n      " \
                          "}"
 
-        # Insert after cssLoader.options.modules = { exportOnlyLocals: true }; block
+        # Insert after cssLoader.options.modules block (handles both old single-line
+        # and new spread syntax patterns)
         gsub_file(
           webpack_config,
-          /(cssLoader\.options\.modules = \{ exportOnlyLocals: true \};\s*\n\s*\})/,
+          /(cssLoader\.options\.modules = \{[^}]*exportOnlyLocals: true[^}]*\};\s*\n\s*\})/,
           "\\1#{babel_ssr_code}"
         )
       end

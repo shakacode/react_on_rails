@@ -148,14 +148,16 @@ const crypto = require('crypto');
 const path = require('path');
 
 const getLocalIdent = (context, _localIdentName, localName) => {
+  // Assumes this file is at config/webpack/getLocalIdent.js (2 levels from project root).
+  // Adjust '../..' if your config lives at a different depth.
   const projectRoot = path.resolve(__dirname, '../..');
   const relativePath = path.relative(projectRoot, context.resourcePath);
 
   const hash = crypto
     .createHash('md5')
-    .update(relativePath + localName)
+    .update(`${relativePath}\0${localName}`) // Null separator prevents path/name collisions
     .digest('base64url')
-    .slice(0, 3);
+    .slice(0, 5);
 
   const basename = path.basename(context.resourcePath);
   const name = basename.replace(/\.(module\.)?(scss|sass|css|tsx?|jsx?)$/, '').replace(/-styles$/, '');

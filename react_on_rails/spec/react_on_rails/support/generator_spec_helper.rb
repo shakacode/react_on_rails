@@ -150,8 +150,11 @@ def base_server_webpack_content
           const cssLoader = rule.use.find((item) => {
             return item.includes('css-loader');
           });
-          if (cssLoader && cssLoader.options) {
-            cssLoader.options.modules = { exportOnlyLocals: true };
+          if (cssLoader && cssLoader.options && cssLoader.options.modules) {
+            cssLoader.options.modules = {
+              ...cssLoader.options.modules,
+              exportOnlyLocals: true,
+            };
           }
         }
       });
