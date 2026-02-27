@@ -268,7 +268,7 @@ export default function injectRSCPayload(
       // an error, which would skip the .then() chain and leave RSC promises as
       // dangling fire-and-forget — the exact bug this fixes.
       await new Promise<void>((resolve) => {
-        htmlStream.on('close', resolve);
+        htmlStream.once('close', resolve);
       });
 
       // ALWAYS wait for all RSC promises to settle, regardless of how htmlStream
