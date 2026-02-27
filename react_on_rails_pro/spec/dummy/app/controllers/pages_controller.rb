@@ -19,6 +19,7 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     session[:something_useful] = "REALLY USEFUL"
   end
 
+  before_action :apply_config_overrides
   before_action :data
 
   before_action :initialize_shared_store, only: %i[client_side_hello_world_shared_store_controller
@@ -34,6 +35,49 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
 
   def cached_react_helmet
     render "/pages/pro/cached_react_helmet"
+  end
+
+  def error_scenarios_hub
+    render "/pages/error_scenarios_hub"
+  end
+
+  def reset_error_configs
+    ReactOnRails.configuration.raise_on_prerender_error = Rails.env.development?
+    ReactOnRailsPro.configuration.throw_js_errors = false
+    ReactOnRailsPro.configuration.raise_non_shell_server_rendering_errors = false
+    redirect_to error_scenarios_hub_path
+  end
+
+  def ssr_shell_error
+    stream_view_containing_react_components(template: "/pages/ssr_shell_error")
+  end
+
+  def ssr_async_error
+    stream_view_containing_react_components(template: "/pages/ssr_async_error")
+  end
+
+  def ssr_sync_error
+    stream_view_containing_react_components(template: "/pages/ssr_sync_error")
+  end
+
+  def ssr_async_prop_error
+    stream_view_containing_react_components(template: "/pages/ssr_async_prop_error")
+  end
+
+  def rsc_component_error
+    stream_view_containing_react_components(template: "/pages/rsc_component_error")
+  end
+
+  def non_existing_react_component
+    render "/pages/non_existing_react_component"
+  end
+
+  def non_existing_stream_react_component
+    stream_view_containing_react_components(template: "/pages/non_existing_stream_react_component")
+  end
+
+  def non_existing_rsc_payload
+    stream_view_containing_react_components(template: "/pages/non_existing_rsc_payload")
   end
 
   def stream_error_demo
@@ -197,6 +241,22 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     Rails.logger.info msg
     render_to_string(template: "/pages/pro/serialize_props",
                      locals: { name: PROPS_NAME }, formats: :json)
+  end
+
+  def apply_config_overrides
+    bool = ActiveModel::Type::Boolean.new
+
+    if params[:raise_on_prerender_error].present?
+      ReactOnRails.configuration.raise_on_prerender_error =
+        bool.cast(params[:raise_on_prerender_error])
+    end
+    if params[:throw_js_errors].present?
+      ReactOnRailsPro.configuration.throw_js_errors = bool.cast(params[:throw_js_errors])
+    end
+    return unless params[:raise_non_shell_server_rendering_errors].present?
+
+    ReactOnRailsPro.configuration.raise_non_shell_server_rendering_errors =
+      bool.cast(params[:raise_non_shell_server_rendering_errors])
   end
 
   def initialize_shared_store
