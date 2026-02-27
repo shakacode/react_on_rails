@@ -1,0 +1,1041 @@
+<%
+  # Read current config values at render time
+  throw_js_errors = ReactOnRailsPro.configuration.throw_js_errors
+  raise_on_prerender_error = ReactOnRails.configuration.raise_on_prerender_error
+  raise_non_shell = ReactOnRailsPro.configuration.raise_non_shell_server_rendering_errors
+
+  # Query params to forward to linked test pages so overrides persist across navigation
+  config_params = {
+    raise_on_prerender_error: raise_on_prerender_error,
+    throw_js_errors: throw_js_errors,
+    raise_non_shell_server_rendering_errors: raise_non_shell,
+  }
+%>
+
+<style>
+  /* Override app-level heading resets */
+  h1 { font-size: 2em; font-weight: bold; margin: 0.67em 0; }
+  h2 { font-size: 1.5em; font-weight: bold; margin: 1.5em 0 0.75em; }
+  h3 { font-size: 1.17em; font-weight: bold; margin: 1em 0 0.5em; }
+  h4 { font-size: 1em; font-weight: bold; margin: 0.75em 0 0.5em; }
+  p { margin: 0.5em 0; }
+  hr { margin: 2em 0; }
+
+  .scenario { margin-bottom: 2em; padding: 1em; border: 1px solid #ddd; border-radius: 6px; }
+  .scenario h3 { margin-top: 0; }
+  .scenario pre { background: #f5f5f5; padding: 0.75em; border-radius: 4px; overflow-x: auto; font-size: 0.85em; }
+  .scenario .label { font-weight: bold; display: inline-block; min-width: 120px; }
+  .infra-scenario { margin-bottom: 1.5em; padding: 0.75em; border: 1px dashed #aaa; border-radius: 4px; }
+  .infra-scenario h3 { margin-top: 0; }
+  .infra-scenario pre { background: #f5f5f5; padding: 0.75em; border-radius: 4px; overflow-x: auto; font-size: 0.85em; }
+  .config-card { padding: 1em; border: 1px solid #ccc; border-radius: 6px; margin-bottom: 1em; }
+  .config-card h4 { margin-top: 0; }
+  .config-val-true { color: #d32f2f; font-weight: bold; }
+  .config-val-false { color: #388e3c; font-weight: bold; }
+  .expected-behavior { background: #e3f2fd; border: 1px solid #90caf9; border-radius: 4px; padding: 0.75em; margin: 0.5em 0; }
+  .expected-behavior strong { color: #1565c0; }
+  .alt-behavior { background: #fff3e0; border: 1px solid #ffcc80; border-radius: 4px; padding: 0.5em; margin: 0.5em 0; font-size: 0.9em; }
+  .history { background: #f3e5f5; border: 1px solid #ce93d8; border-radius: 4px; padding: 0.5em; margin: 0.5em 0; font-size: 0.9em; }
+  .important-note { background: #fce4ec; border: 1px solid #ef9a9a; border-radius: 4px; padding: 0.75em; margin: 0.75em 0; }
+</style>
+
+<h1>Error Scenario Test Pages</h1>
+
+<p>
+  These pages exercise every error path in the rendering pipeline &mdash; both
+  non-streaming (<code>react_component</code>) and streaming (<code>stream_react_component</code>)
+  &mdash; to verify correct error propagation behavior: what shows in the browser,
+  what appears in node-renderer logs, and whether Rails raises or swallows the error.
+</p>
+
+<hr/>
+
+<%# ───────────────────────── CONFIG OVERRIDE CONTROLS ─────────────────────── %>
+
+<div style="padding: 1em; border: 2px solid #4caf50; border-radius: 6px; background: #e8f5e9; margin-bottom: 1.5em;">
+  <h3 style="margin-top: 0;">Override Configs (runtime)</h3>
+  <p style="margin-top: 0; font-size: 0.9em;">
+    Change values and click <strong>Apply</strong> to mutate the global config singletons.
+    Linked "Open page" test pages will use the overridden values.
+  </p>
+
+  <%= form_tag(error_scenarios_hub_path, method: :get, id: "config-override-form",
+        style: "display: flex; flex-wrap: wrap; align-items: flex-end; gap: 1em;") do %>
+    <div>
+      <label for="raise_on_prerender_error" style="display: block; font-size: 0.85em; font-weight: bold;">
+        raise_on_prerender_error
+      </label>
+      <select name="raise_on_prerender_error" id="raise_on_prerender_error" onchange="this.form.submit()">
+        <option value="true" <%= "selected" if raise_on_prerender_error %>>true</option>
+        <option value="false" <%= "selected" unless raise_on_prerender_error %>>false</option>
+      </select>
+    </div>
+
+    <div>
+      <label for="throw_js_errors" style="display: block; font-size: 0.85em; font-weight: bold;">
+        throw_js_errors
+      </label>
+      <select name="throw_js_errors" id="throw_js_errors" onchange="this.form.submit()">
+        <option value="true" <%= "selected" if throw_js_errors %>>true</option>
+        <option value="false" <%= "selected" unless throw_js_errors %>>false</option>
+      </select>
+    </div>
+
+    <div>
+      <label for="raise_non_shell_server_rendering_errors" style="display: block; font-size: 0.85em; font-weight: bold;">
+        raise_non_shell_server_rendering_errors
+      </label>
+      <select name="raise_non_shell_server_rendering_errors" id="raise_non_shell_server_rendering_errors" onchange="this.form.submit()">
+        <option value="true" <%= "selected" if raise_non_shell %>>true</option>
+        <option value="false" <%= "selected" unless raise_non_shell %>>false</option>
+      </select>
+    </div>
+
+    <noscript>
+      <div>
+        <button type="submit" style="padding: 0.4em 1.2em; font-size: 1em; cursor: pointer;">Apply</button>
+      </div>
+    </noscript>
+  <% end %>
+
+  <%= button_to "Reset to defaults", reset_error_configs_path, method: :post,
+        style: "margin-top: 0.5em; padding: 0.3em 1em; font-size: 0.9em; cursor: pointer;" %>
+</div>
+
+<%# ───────────────────────────── CONFIG DASHBOARD ───────────────────────────── %>
+
+<h2>Current Configuration</h2>
+
+<p>
+  Three configuration options control error behavior. The values below are read live from
+  <code>ReactOnRails.configuration</code> and <code>ReactOnRailsPro.configuration</code> at
+  page render time (Rails env: <code><%= Rails.env %></code>).
+</p>
+
+<%# ── raise_on_prerender_error ── %>
+<div class="config-card">
+  <h4>
+    <code>ReactOnRails.configuration.raise_on_prerender_error</code> =
+    <span class="<%= raise_on_prerender_error ? 'config-val-true' : 'config-val-false' %>"><%= raise_on_prerender_error %></span>
+  </h4>
+  <p><strong>Gem:</strong> <code>react_on_rails</code> (open-source) &nbsp;|&nbsp;
+     <strong>Default:</strong> <code>Rails.env.development?</code> &nbsp;|&nbsp;
+     <strong>Set in:</strong> <code>config/initializers/react_on_rails.rb</code></p>
+
+  <div class="history">
+    <strong>Why this config exists:</strong>
+    When server-side rendering (SSR) fails &mdash; e.g., a component throws during <code>renderToString</code>
+    &mdash; React on Rails catches the error on the JS side and returns it as an HTML error message
+    (a <code>&lt;pre&gt;</code> tag with the stack trace) along with a <code>hasErrors: true</code> flag.
+    Without this config, <strong>that error HTML would silently render into the page</strong>.
+    The developer might never notice that SSR failed because the page would still work client-side
+    (React hydrates over the error HTML).
+    <br/><br/>
+    This config was introduced in <strong>Nov 2015</strong> to give developers the choice:
+    <strong>should a failed SSR silently degrade</strong> (render error HTML inline and hope the client
+    recovers), <strong>or should it loudly fail</strong> (raise <code>PrerenderError</code> so you know
+    immediately)?
+    <br/><br/>
+    Originally it defaulted to <code>false</code> (silent degradation). In <strong>Dec 2018</strong>
+    (PR #1145), the default was changed to <code>Rails.env.development?</code> &mdash; the idea being that
+    <strong>during development, you want to see SSR errors immediately</strong> so you can fix them before
+    they reach production. In production, the default is <code>false</code> so a broken component degrades
+    gracefully rather than crashing the entire page.
+    <br/><br/>
+    This was the <em>only</em> error-related config for 6 years, until <code>throw_js_errors</code> was
+    added in 2021 to address a different concern (error tracking).
+  </div>
+
+  <p><strong>What it controls (Ruby side):</strong> Whether Rails raises <code>ReactOnRails::PrerenderError</code>
+     when the JSON result from JS contains <code>hasErrors: true</code>. This is a Ruby-only config &mdash;
+     it does <em>not</em> get passed to JavaScript. Can be overridden per-component:
+     <code>react_component("Foo", raise_on_prerender_error: true)</code>.</p>
+
+  <table border="1" cellpadding="4" cellspacing="0" style="border-collapse: collapse; font-size: 0.85em;">
+    <tr style="background: #f0f0f0;">
+      <th>Value</th>
+      <th>Non-streaming (<code>react_component</code>)</th>
+      <th>Streaming: shell error (<code>isShellReady = false</code>)</th>
+      <th>Streaming: post-shell error (<code>isShellReady = true</code>)</th>
+    </tr>
+    <tr<%= ' style="background: #e8f5e9;"'.html_safe unless raise_on_prerender_error %>>
+      <td><code>false</code></td>
+      <td>Error HTML rendered inline in the page (a <code>&lt;pre&gt;</code> tag with the error message). The page still loads and React can hydrate client-side.</td>
+      <td>Error HTML streamed inline. The stream continues.</td>
+      <td rowspan="2"><em>Not used &mdash; defers to <code>raise_non_shell_server_rendering_errors</code></em></td>
+    </tr>
+    <tr<%= ' style="background: #e8f5e9;"'.html_safe if raise_on_prerender_error %>>
+      <td><code>true</code></td>
+      <td>Rails raises <code>PrerenderError</code>. The app&rsquo;s <code>rescue_from</code> handler decides what to show (e.g., redirect, 500 page).</td>
+      <td>Rails raises <code>PrerenderError</code> &rarr; aborts streaming response.</td>
+    </tr>
+  </table>
+
+  <p>The streaming decision logic in <code>helper.rb</code>:</p>
+  <pre>def should_raise_streaming_prerender_error?(chunk_json_result, render_options)
+  chunk_json_result["hasErrors"] &&
+    (if chunk_json_result["isShellReady"]
+       render_options.raise_non_shell_server_rendering_errors  # post-shell errors
+     else
+       render_options.raise_on_prerender_error                 # shell errors
+     end)
+end</pre>
+
+  <p>The non-streaming path in <code>helper.rb</code>:</p>
+  <pre># For non-streaming react_component:
+elsif result["hasErrors"] && render_options.raise_on_prerender_error
+  raise_prerender_error(result, react_component_name, props, js_code)
+end</pre>
+</div>
+
+<%# ── throw_js_errors ── %>
+<div class="config-card">
+  <h4>
+    <code>ReactOnRailsPro.configuration.throw_js_errors</code> =
+    <span class="<%= throw_js_errors ? 'config-val-true' : 'config-val-false' %>"><%= throw_js_errors %></span>
+  </h4>
+  <p><strong>Gem:</strong> <code>react_on_rails_pro</code> &nbsp;|&nbsp;
+     <strong>Default:</strong> <code>true</code> &nbsp;|&nbsp;
+     <strong>Set in:</strong> <code>config/initializers/react_on_rails_pro.rb</code></p>
+
+  <div class="history">
+    <strong>Why this config exists:</strong>
+    The open-source <code>raise_on_prerender_error</code> controls what <em>Ruby</em> does after JS returns
+    an error. But it cannot control what happens <em>inside</em> the Node renderer process itself.
+    <br/><br/>
+    When a component throws during rendering, the JS error handler has two choices:
+    <strong>(1)</strong> catch the error and return error HTML with <code>hasErrors: true</code>
+    (the original behavior), or
+    <strong>(2)</strong> re-throw the error so the Node renderer&rsquo;s process-level error handling catches it.
+    <br/><br/>
+    <strong>The problem with option (1):</strong> The Node renderer returns a successful HTTP 200 response
+    containing error HTML. From the Node renderer&rsquo;s perspective, the request succeeded &mdash;
+    <strong>error tracking tools (Sentry, Honeybadger) running on the Node renderer never see the
+    exception</strong>. Errors are invisible to production monitoring.
+    <br/><br/>
+    <strong>Option (2) solves this:</strong> Re-throwing lets the Node renderer catch the error at the
+    process level, report it to Sentry/Honeybadger via <code>errorReporter</code>, and return an
+    HTTP error response to Rails.
+    <br/><br/>
+    Introduced in <strong>Mar 2021</strong> (Pro PR #174 / OSS PR #1365), it originally defaulted to
+    <code>false</code> for backwards compatibility. In <strong>Jun 2023</strong> (Pro PR #328), the default
+    was changed to <code>true</code> because Pro users almost always want production error visibility.
+    <br/><br/>
+    <strong>For streaming:</strong> the same idea applies but the mechanism differs. Instead of re-throwing
+    (which would crash the render), <code>emitError(error)</code> emits an <code>'error'</code> event on
+    the readable stream, which the Node renderer&rsquo;s <code>handleStreamError</code> picks up and
+    reports to error tracking.
+  </div>
+
+  <p><strong>What it controls (JS side):</strong> This is the <em>only</em> config that is passed from Ruby to
+     JavaScript (as the <code>throwJsErrors</code> parameter). It controls behavior differently for
+     streaming vs. non-streaming rendering:</p>
+
+  <table border="1" cellpadding="4" cellspacing="0" style="border-collapse: collapse; font-size: 0.85em;">
+    <tr style="background: #f0f0f0;">
+      <th>Value</th>
+      <th>Non-streaming (<code>react_component</code>)</th>
+      <th>Streaming (<code>stream_react_component</code>)</th>
+      <th>Node renderer errorReporter</th>
+    </tr>
+    <tr<%= ' style="background: #e8f5e9;"'.html_safe unless throw_js_errors %>>
+      <td><code>false</code></td>
+      <td>Error caught in JS. Returns error HTML with <code>hasErrors: true</code>. Ruby decides via <code>raise_on_prerender_error</code>.</td>
+      <td>Error recorded in <code>renderState.hasErrors</code> and serialized into JSON chunk. No <code>'error'</code> event emitted on the stream.</td>
+      <td>NOT called for component errors. Errors are invisible to Sentry/Honeybadger.</td>
+    </tr>
+    <tr<%= ' style="background: #e8f5e9;"'.html_safe if throw_js_errors %>>
+      <td><code>true</code></td>
+      <td>Error <strong>re-thrown</strong> in JS. The Node renderer catches it and returns an error HTTP response to Rails. Ruby wraps it as <code>PrerenderError</code> (always raised, regardless of <code>raise_on_prerender_error</code>).</td>
+      <td><code>emitError(error)</code> emits an <code>'error'</code> event on the readable stream, in addition to setting <code>renderState.hasErrors</code>.</td>
+      <td>Called via <code>handleStreamError</code> in <code>vm.ts</code>. Errors are reported to Sentry/Honeybadger.</td>
+    </tr>
+  </table>
+
+  <p><em>Note: Infrastructure stream errors in <code>injectRSCPayload.ts</code> emit errors on
+     <code>resultStream</code> unconditionally &mdash; they <strong>always</strong> reach
+     <code>errorReporter</code> regardless of this setting.</em></p>
+
+  <p>The non-streaming path in <code>serverRenderReactComponent.ts</code>:</p>
+  <pre>function handleRenderingError(e, options) {
+  if (options.throwJsErrors) {
+    throw e;  // Re-thrown → Node renderer returns error HTTP response → Ruby always raises
+  }
+  // Otherwise: return error HTML inline with hasErrors: true
+  return { hasErrors: true, result: handleError(...), error };
+}</pre>
+</div>
+
+<%# ── raise_non_shell_server_rendering_errors ── %>
+<div class="config-card">
+  <h4>
+    <code>ReactOnRailsPro.configuration.raise_non_shell_server_rendering_errors</code> =
+    <span class="<%= raise_non_shell ? 'config-val-true' : 'config-val-false' %>"><%= raise_non_shell %></span>
+  </h4>
+  <p><strong>Gem:</strong> <code>react_on_rails_pro</code> &nbsp;|&nbsp;
+     <strong>Default:</strong> <code>false</code> &nbsp;|&nbsp;
+     <strong>Set in:</strong> <code>config/initializers/react_on_rails_pro.rb</code></p>
+
+  <div class="history">
+    <strong>Why this config exists:</strong>
+    When streaming support was added in <strong>Oct&ndash;Nov 2024</strong>, it introduced a problem that
+    <code>raise_on_prerender_error</code> was never designed to handle: <strong>what should happen when an
+    error occurs after HTTP headers have already been sent?</strong>
+    <br/><br/>
+    With non-streaming <code>react_component</code>, the entire render completes before Rails sends any
+    response. If it fails, Rails can show an error page, redirect, or render error HTML &mdash; no problem.
+    <br/><br/>
+    With streaming <code>stream_react_component</code>, Rails sends the HTTP headers and the &ldquo;shell&rdquo;
+    (the initial HTML around <code>&lt;Suspense&gt;</code> fallbacks) immediately. Content inside Suspense
+    boundaries streams in later as it resolves. If one of those async chunks fails, <strong>Rails has
+    already committed to a 200 response</strong>. It cannot redirect. It cannot show a clean error page.
+    The only options are:
+    <br/><br/>
+    <strong>(1) Silently continue</strong> &mdash; embed the error in the JSON chunk metadata
+    (<code>hasErrors: true</code>) and let the stream finish. The user sees partial content with the failed
+    section either empty or showing an error boundary fallback. This is the default (<code>false</code>)
+    because it preserves the rest of the page.
+    <br/><br/>
+    <strong>(2) Abort the stream</strong> &mdash; raise <code>PrerenderError</code>, which terminates the
+    response mid-way. The browser receives a truncated HTML document. This is more disruptive but ensures
+    errors are not silently swallowed on the Ruby side.
+    <br/><br/>
+    The existing <code>raise_on_prerender_error</code> still handles <strong>shell errors</strong>
+    (before any HTML is sent), because at that point Rails can still show a proper error response.
+    This new config handles only the <strong>post-shell</strong> case where the response is already committed.
+  </div>
+
+  <p><strong>What it controls (Ruby side):</strong> Whether Rails raises <code>PrerenderError</code>
+     for errors that occur <em>after</em> the shell has already rendered successfully
+     (<code>isShellReady = true</code>). These are async errors inside <code>&lt;Suspense&gt;</code>
+     boundaries. Ruby-only config. <strong>Only applies to streaming</strong> &mdash; non-streaming
+     rendering does not have the concept of shell vs. post-shell.</p>
+
+  <div class="important-note">
+    <strong>RSC components are always post-shell:</strong> When a React Server Component is rendered
+    via <code>stream_react_component</code> with <code>prerender: true</code>, the component is wrapped
+    in <code>RSCProvider &gt; Suspense(fallback=null) &gt; RSCRoute &gt; PromiseWrapper</code>. The
+    <code>PromiseWrapper</code> calls React&rsquo;s <code>use(promise)</code> which <strong>suspends</strong>,
+    so the shell completes immediately with the Suspense fallback (<code>null</code>). The RSC content
+    resolves asynchronously. This means <strong>RSC errors are always classified as post-shell errors</strong>
+    (<code>isShellReady = true</code>) and are controlled by this config, <strong>not</strong>
+    <code>raise_on_prerender_error</code>.
+  </div>
+
+  <table border="1" cellpadding="4" cellspacing="0" style="border-collapse: collapse; font-size: 0.85em;">
+    <tr style="background: #f0f0f0;">
+      <th>Value</th><th>Post-shell streaming error behavior</th>
+    </tr>
+    <tr<%= ' style="background: #e8f5e9;"'.html_safe unless raise_non_shell %>>
+      <td><code>false</code></td>
+      <td>Error silently embedded in JSON chunk (<code>hasErrors: true</code>). Streaming continues. Client sees the error only if it checks the chunk metadata.</td>
+    </tr>
+    <tr<%= ' style="background: #e8f5e9;"'.html_safe if raise_non_shell %>>
+      <td><code>true</code></td>
+      <td>Rails raises <code>PrerenderError</code>. Streaming response is aborted. Client receives a truncated response.</td>
+    </tr>
+  </table>
+</div>
+
+<hr/>
+
+<%# ────────────────────── SECTION 1: NON-STREAMING ERRORS ────────────────────── %>
+
+<h2>Section 1: Non-Streaming Errors (<code>react_component</code>)</h2>
+
+<p>
+  These use the traditional <code>react_component</code> helper (not streaming).
+  The JS code runs via the Node renderer, produces a JSON result with <code>html</code> and
+  <code>hasErrors</code>, and Rails decides whether to raise or render inline.
+  These pages already exist in the dummy app.
+</p>
+
+<div class="scenario">
+  <h3>N: Non-streaming error &mdash; <%= link_to "Open page", server_side_log_throw_path(config_params) %></h3>
+
+  <p><span class="label">Component:</span> <code>HelloWorldWithLogAndThrow</code></p>
+  <p><span class="label">Helper:</span> <code>react_component</code> (non-streaming) with <code>prerender: true</code></p>
+  <p><span class="label">Timing:</span> <strong>Immediate</strong> &mdash; throws synchronously during <code>renderToString</code>.</p>
+
+  <p><strong>View template</strong> (<code>server_side_log_throw.html.erb</code>):</p>
+  <pre>&lt;%= react_component("HelloWorldWithLogAndThrow",
+    props: @app_props_server_render, prerender: true,
+    trace: true, id: "HelloWorldWithLogAndThrow-react-component-0") %&gt;</pre>
+
+  <p><strong>Component source</strong> (<code>HelloWorldWithLogAndThrow.jsx</code>) &mdash; logs to all console levels then throws:</p>
+  <pre>const HelloWorldWithLogAndThrow = (_props, _context) => {
+  console.log('console.log in HelloWorld');
+  console.warn('console.warn in HelloWorld');
+  console.error('console.error in HelloWorld');
+  throw new Error('throw in HelloWorldWithLogAndThrow');
+};</pre>
+
+  <p><strong>Error path</strong> (<code>serverRenderReactComponent.ts</code>):</p>
+  <pre>function handleRenderingError(e, options) {
+  if (options.throwJsErrors) {    // Currently: <%= throw_js_errors %>
+    throw e;                       // <%= throw_js_errors ? "CALLED — error re-thrown in JS" : "NOT taken — throwJsErrors is false" %>
+  }
+  return { hasErrors: true, result: handleError(...), error };
+}</pre>
+
+  <div class="expected-behavior">
+    <strong>Expected behavior with current config:</strong><br/>
+    <% if throw_js_errors %>
+      <span class="label">Browser:</span> The error is <strong>re-thrown in JS</strong> because
+      <code>throw_js_errors = true</code>. The Node renderer returns an error HTTP response, and Rails
+      wraps it as <code>PrerenderError</code> (always raised when <code>throwJsErrors</code> causes a re-throw,
+      regardless of <code>raise_on_prerender_error</code>). The app&rsquo;s <code>rescue_from</code> handler
+      redirects to <code>/server_side_log_throw_raise_invoker</code>.<br/>
+    <% elsif raise_on_prerender_error %>
+      <span class="label">Browser:</span> JS catches the error and returns error HTML with <code>hasErrors: true</code>.
+      Rails then raises <code>PrerenderError</code> because <code>raise_on_prerender_error = true</code>.
+      The app&rsquo;s <code>rescue_from</code> handler redirects to <code>/server_side_log_throw_raise_invoker</code>.<br/>
+    <% else %>
+      <span class="label">Browser:</span> JS catches the error and returns error HTML (a <code>&lt;pre&gt;</code> tag
+      with the error message). Rails renders it <strong>inline in the page</strong> because
+      <code>raise_on_prerender_error = false</code>. You see the error box below the page heading.<br/>
+    <% end %>
+    <span class="label">Console replay:</span> The <code>console.log</code>, <code>console.warn</code>, and
+    <code>console.error</code> calls from the component are replayed in the browser console.<br/>
+    <span class="label">errorReporter:</span>
+    <%= throw_js_errors ? "Called — the re-thrown error is caught by the Node renderer." : "Not called — throwJsErrors is false." %>
+  </div>
+
+  <p>The <code>rescue_from</code> handler in <code>ApplicationController</code>:</p>
+  <pre>rescue_from ReactOnRails::PrerenderError do |err|
+  if response.committed?
+    # Stream already started — write error HTML + JS redirect into stream
+    response.stream.write(error_message + js_redirect + meta_refresh)
+    response.stream.close
+  else
+    # Normal redirect (non-streaming path)
+    redirect_to server_side_log_throw_raise_invoker_path,
+                flash: { error: msg }
+  end
+end</pre>
+</div>
+
+<hr/>
+
+<%# ───────────────────── SECTION 2: STREAMING CLIENT COMPONENT ERRORS ───────────────────── %>
+
+<h2>Section 2: Streaming Client Component Errors (<code>stream_react_component</code>)</h2>
+
+<p>
+  These use <code>stream_react_component</code> with client components (not React Server Components).
+  These components follow the async-on-server / sync-on-client pattern: on the server they return
+  a <code>Promise</code> (enabling streaming via <code>&lt;Suspense&gt;</code>), while on the client
+  they return synchronous JSX (for hydration). React&rsquo;s <code>renderToPipeableStream</code>
+  handles the streaming, with its <code>onShellError</code> / <code>onError</code> callbacks.
+</p>
+
+<div class="scenario">
+  <h3>A: SSR Shell Error &mdash; <%= link_to "Open page", ssr_shell_error_path(config_params) %></h3>
+
+  <p><span class="label">Component:</span> <code>StreamShellErrorDemo</code> (synchronous &mdash; no async/client split needed since it throws immediately)</p>
+  <p><span class="label">Timing:</span> <strong>Immediate</strong> &mdash; throws synchronously during shell render, before any HTML is flushed.</p>
+  <p>
+    <span class="label">Error path:</span>
+    <code>onError</code> &rarr; <code>reportError</code> <strong>AND</strong>
+    <code>onShellError</code> &rarr; <code>sendErrorHtml</code><br/>
+    <em>
+      Per <a href="https://react.dev/reference/react-dom/server/renderToPipeableStream">React docs</a>:
+      &ldquo;If there is an error while generating the shell, both <code>onError</code> and
+      <code>onShellError</code> will fire.&rdquo;
+    </em>
+  </p>
+
+  <p><strong>View template</strong> (<code>ssr_shell_error.html.erb</code>):</p>
+  <pre>&lt;%= stream_react_component(
+  "StreamShellErrorDemo",
+  props: {},
+  trace: true,
+  id: "StreamShellErrorDemo-error-scenario-0",
+) %&gt;</pre>
+
+  <p><strong>Component source</strong> (<code>StreamShellErrorDemo.jsx</code>) &mdash; throws immediately on render:</p>
+  <pre>const StreamShellErrorDemo = () => {
+  throw new Error('Component crashed immediately during shell render!');
+};</pre>
+
+  <p><strong>Error handlers</strong> (<code>streamServerRenderedReactComponent.ts</code>) &mdash; React calls <strong>both</strong> callbacks:</p>
+  <pre>// 1) onError fires FIRST for every server error (shell or not)
+onError(e) {
+  reportError(convertToError(e));
+},
+
+const reportError = (error: Error) => {
+  renderState.hasErrors = true;
+  renderState.error = error;
+  if (throwJsErrors) {            // Currently: <%= throw_js_errors %>
+    emitError(error);             // <%= throw_js_errors ? "CALLED — error emitted on stream" : "NOT called — throwJsErrors is false" %>
+  }
+};
+
+// 2) onShellError fires SECOND, only for errors that prevent the shell
+onShellError(e) {
+  sendErrorHtml(convertToError(e));  // pipes error HTML box
+};</pre>
+
+  <div class="expected-behavior">
+    <strong>Expected behavior with current config:</strong><br/>
+    <% if raise_on_prerender_error %>
+      <span class="label">Browser:</span> Rails raises <code>PrerenderError</code> because
+      <code>raise_on_prerender_error = true</code> and this is a shell error (<code>isShellReady = false</code>).
+      The <code>rescue_from</code> handler redirects or writes error HTML into the stream.<br/>
+    <% else %>
+      <span class="label">Browser:</span> Error HTML box (<code>handleError</code>). No component content at all.
+      Rails does not raise because <code>raise_on_prerender_error = false</code>.<br/>
+    <% end %>
+    <span class="label">JSON chunk:</span> <code>hasErrors: true</code>, <code>isShellReady: false</code>.<br/>
+    <span class="label">errorReporter:</span>
+    <%= throw_js_errors ? "Called — emitError() emits on the stream → errorReporter.message()." : "Not called — throwJsErrors is false." %>
+  </div>
+</div>
+
+<div class="scenario">
+  <h3>B: SSR Async Error (Suspense) &mdash; <%= link_to "Open page", ssr_async_error_path(config_params) %></h3>
+
+  <p><span class="label">Component:</span> <code>StreamErrorDemo</code> (async-on-server / sync-on-client pattern)</p>
+  <p><span class="label">Timing:</span> <strong>Delayed ~2 seconds</strong> &mdash; shell renders immediately, then the async child inside <code>&lt;Suspense&gt;</code> rejects after a 2-second timeout.</p>
+  <p><span class="label">Error path:</span> <code>onError</code> &rarr; <code>reportError</code> only (<code>onShellError</code> does NOT fire &mdash; shell rendered successfully)</p>
+
+  <p><strong>View template</strong> (<code>ssr_async_error.html.erb</code>):</p>
+  <pre>&lt;%= stream_react_component(
+  "StreamErrorDemo",
+  props: {},
+  trace: true,
+  id: "StreamErrorDemo-error-scenario-0",
+) %&gt;</pre>
+
+  <p><strong>Component source</strong> (<code>StreamErrorDemo.jsx</code>) &mdash; demonstrates the async-on-server / sync-on-client pattern:</p>
+  <pre>// Async on server (returns Promise that rejects after 2s), sync on client (returns JSX)
+const AlwaysFailsAsync = () => {
+  if (typeof window !== 'undefined') {
+    return &lt;div&gt;Client-side fallback&lt;/div&gt;;   // sync on client for hydration
+  }
+  return new Promise((_resolve, reject) => {
+    setTimeout(() => reject(new Error('Async component crashed during server rendering!')), 2000);
+  });
+};
+
+const StreamErrorDemo = () => (
+  &lt;div&gt;
+    &lt;h1&gt;Stream Error Demo&lt;/h1&gt;
+    &lt;Suspense fallback={&lt;div&gt;Loading async content (will error after 2s)...&lt;/div&gt;}&gt;
+      &lt;AlwaysFailsAsync /&gt;
+    &lt;/Suspense&gt;
+    &lt;p&gt;Footer: if you can see this, the stream completed successfully.&lt;/p&gt;
+  &lt;/div&gt;
+);</pre>
+
+  <div class="expected-behavior">
+    <strong>Expected behavior with current config:</strong><br/>
+    <span class="label">Browser:</span> Shell renders (heading, footer visible). Suspense fallback shows for ~2s, then
+    the async section errors silently (React swallows the Suspense boundary error).
+    <% if raise_non_shell %>
+      <strong>However</strong>, Rails raises <code>PrerenderError</code> because
+      <code>raise_non_shell_server_rendering_errors = true</code>.
+    <% else %>
+      Rails does <strong>not</strong> raise because <code>raise_non_shell_server_rendering_errors = false</code>
+      and this is a post-shell error (<code>isShellReady = true</code>).
+    <% end %><br/>
+    <span class="label">JSON chunk:</span> <code>hasErrors: true</code>, <code>isShellReady: true</code>.<br/>
+    <span class="label">errorReporter:</span>
+    <%= throw_js_errors ? "Called — emitError() emits on the stream → errorReporter.message()." : "Not called — throwJsErrors is false." %>
+  </div>
+</div>
+
+<div class="scenario">
+  <h3>C: SSR Sync Root Throw &mdash; <%= link_to "Open page", ssr_sync_error_path(config_params) %></h3>
+
+  <p><span class="label">Component:</span> <code>AsyncComponentsTreeForTesting</code> with <code>throwSyncError: true</code> prop</p>
+  <p><span class="label">Timing:</span> <strong>Immediate</strong> &mdash; throws synchronously during root render, before any HTML is flushed. Same as Scenario A.</p>
+  <p>
+    <span class="label">Error path:</span>
+    <code>onError</code> &rarr; <code>reportError</code> <strong>AND</strong>
+    <code>onShellError</code> &rarr; <code>sendErrorHtml</code>
+  </p>
+
+  <p><strong>View template</strong> (<code>ssr_sync_error.html.erb</code>):</p>
+  <pre>&lt;%= stream_react_component(
+  "AsyncComponentsTreeForTesting",
+  props: @app_props_server_render.merge(throwSyncError: true),
+  trace: true,
+  id: "AsyncComponentsTreeForTesting-sync-error-0",
+) %&gt;</pre>
+
+  <p><strong>Component source</strong> (<code>AsyncComponentsTreeForTesting.jsx</code>) &mdash; throws before returning any JSX:</p>
+  <pre>const AsyncComponentsTreeForTesting = (props) => {
+  console.log('Sync console log from AsyncComponentsTreeForTesting');
+  if (props.throwSyncError) {
+    throw new Error('Sync error from AsyncComponentsTreeForTesting');
+  }
+  // ... returns JSX with multiple Suspense boundaries ...
+};</pre>
+
+  <div class="expected-behavior">
+    <strong>Expected behavior with current config:</strong><br/>
+    <% if raise_on_prerender_error %>
+      <span class="label">Browser:</span> Rails raises <code>PrerenderError</code> (shell error, <code>isShellReady = false</code>).<br/>
+    <% else %>
+      <span class="label">Browser:</span> Error HTML box. No streaming content.<br/>
+    <% end %>
+    <span class="label">JSON chunk:</span> <code>hasErrors: true</code>, <code>isShellReady: false</code>.<br/>
+    <span class="label">errorReporter:</span>
+    <%= throw_js_errors ? "Called." : "Not called." %>
+  </div>
+</div>
+
+<div class="scenario">
+  <h3>D: SSR Async Prop Rejection &mdash; <%= link_to "Open page", ssr_async_prop_error_path(config_params) %></h3>
+
+  <p><span class="label">Component:</span> <code>AsyncComponentsTreeForTesting</code> with <code>throwAsyncError: true</code> prop</p>
+  <p><span class="label">Timing:</span> <strong>Immediate rejection</strong> &mdash; the shell renders, but <code>AsyncHelloWorldHooks</code> (async-on-server / sync-on-client) returns <code>Promise.reject()</code> immediately. Other Suspense branches resolve normally.</p>
+  <p><span class="label">Error path:</span> <code>onError</code> &rarr; <code>reportError</code> only</p>
+
+  <p><strong>View template</strong> (<code>ssr_async_prop_error.html.erb</code>):</p>
+  <pre>&lt;%= stream_react_component(
+  "AsyncComponentsTreeForTesting",
+  props: @app_props_server_render.merge(throwAsyncError: true),
+  trace: true,
+  id: "AsyncComponentsTreeForTesting-async-prop-error-0",
+) %&gt;</pre>
+
+  <p><strong>Component source</strong> (<code>AsyncComponentsTreeForTesting.jsx</code>) &mdash; async-on-server / sync-on-client pattern:</p>
+  <pre>const AsyncHelloWorldHooks = (props) => {
+  if (typeof window !== 'undefined') {
+    return &lt;HelloWorldHooks {...props} /&gt;;   // sync on client
+  }
+  if (props.throwAsyncError) {
+    return Promise.reject(new Error('Async error from AsyncHelloWorldHooks'));
+  }
+  return new Promise((resolve) => {
+    setTimeout(() => resolve(&lt;HelloWorldHooks {...props} /&gt;), 1000);
+  });
+};</pre>
+
+  <div class="expected-behavior">
+    <strong>Expected behavior with current config:</strong><br/>
+    <span class="label">Browser:</span> Shell renders (header, footer visible). HelloWorldHooks Suspense boundary
+    errors. branch1 and branch2 resolve normally.
+    <% if raise_non_shell %>
+      <strong>However</strong>, Rails raises <code>PrerenderError</code> because
+      <code>raise_non_shell_server_rendering_errors = true</code> and this is a post-shell error.
+    <% else %>
+      Rails does <strong>not</strong> raise because <code>raise_non_shell_server_rendering_errors = false</code>
+      and this is a post-shell error (<code>isShellReady = true</code>).
+    <% end %><br/>
+    <span class="label">JSON chunk:</span> <code>hasErrors: true</code>, <code>isShellReady: true</code>.<br/>
+    <span class="label">errorReporter:</span>
+    <%= throw_js_errors ? "Called." : "Not called." %>
+  </div>
+</div>
+
+<hr/>
+
+<%# ───────────────────────────────── SECTION 3: RSC ERRORS ───────────────────────────────── %>
+
+<h2>Section 3: RSC (React Server Component) Errors</h2>
+
+<div class="important-note">
+  <strong>Why RSC errors are always &ldquo;post-shell&rdquo;:</strong>
+  When a React Server Component is rendered via <code>stream_react_component</code> with
+  <code>prerender: true</code>, the HTML rendering pipeline wraps it in:
+
+  <pre>RSCProvider                              &larr; context provider (sync)
+  &lt;Suspense fallback={null}&gt;             &larr; Suspense boundary (sync)
+    RSCRoute                             &larr; client component (sync)
+      PromiseWrapper                     &larr; calls use(promise) &rarr; SUSPENDS
+  &lt;/Suspense&gt;</pre>
+
+  <p>React&rsquo;s <code>renderToPipeableStream</code> renders this tree. When it reaches
+  <code>PromiseWrapper</code>, <code>use(promise)</code> <strong>suspends</strong> because the RSC
+  payload has not resolved yet. React renders the Suspense fallback (<code>null</code>) as the shell content
+  and fires <code>onShellReady</code> &mdash; setting <code>isShellReady = true</code>.</p>
+
+  <p>The RSC content resolves asynchronously via the promise. If the server component throws, the
+  promise rejects, <code>use()</code> throws inside the Suspense boundary, and React calls
+  <code>onError</code> (not <code>onShellError</code>). The resulting JSON chunk has
+  <code>isShellReady = true</code>, so Ruby consults
+  <code>raise_non_shell_server_rendering_errors</code> (not <code>raise_on_prerender_error</code>).</p>
+
+  <p>This means <strong>even if <code>raise_on_prerender_error = true</code>, RSC component errors will
+  not cause Rails to raise</strong> unless <code>raise_non_shell_server_rendering_errors</code> is also
+  <code>true</code>.</p>
+</div>
+
+<div class="scenario">
+  <h3>E: RSC Component Error (standalone) &mdash; <%= link_to "Open page", rsc_component_error_path(config_params) %></h3>
+
+  <p><span class="label">Component:</span> <code>DeterministicRSCErrorComponent</code> (rendered standalone via <code>stream_react_component</code> with <code>prerender: true</code>)</p>
+  <p><span class="label">Timing:</span> <strong>Immediate</strong> &mdash; throws synchronously during RSC render. Unlike <code>ErrorThrowingServerComponent</code> (50% random), this always fails.</p>
+  <p><span class="label">Error path:</span> RSC <code>onError</code> &rarr; <code>reportError</code> (always <code>console.error</code>). This is a <strong>post-shell</strong> error because of the Suspense wrapping described above.</p>
+
+  <p><strong>View template</strong> (<code>rsc_component_error.html.erb</code>):</p>
+  <pre>&lt;%= stream_react_component(
+  "DeterministicRSCErrorComponent",
+  props: {},
+  prerender: true,
+  trace: true,
+  id: "DeterministicRSCErrorComponent-error-scenario-0",
+) %&gt;</pre>
+
+  <p><strong>Component source</strong> (<code>DeterministicRSCErrorComponent.tsx</code>) &mdash; always throws:</p>
+  <pre>const DeterministicRSCErrorComponent: React.FC = () => {
+  throw new Error('Deterministic RSC error: always fails for error path testing');
+};</pre>
+
+  <p><strong>Error handler</strong> (<code>ReactOnRailsRSC.ts</code>) &mdash; RSC <code>reportError</code> always calls <code>console.error</code>:</p>
+  <pre>const reportError = (error: Error) => {
+  console.error('Error in RSC stream', error);  // always logged
+  if (throwJsErrors) {            // Currently: <%= throw_js_errors %>
+    emitError(error);             // <%= throw_js_errors ? "CALLED" : "NOT called" %>
+  }
+  renderState.hasErrors = true;
+  renderState.error = error;
+};</pre>
+
+  <div class="expected-behavior">
+    <strong>Expected behavior with current config:</strong><br/>
+    <span class="label">Browser:</span> RSC error HTML from <code>handleErrorRSC</code>.
+    <% if raise_non_shell %>
+      <strong>However</strong>, Rails raises <code>PrerenderError</code> because
+      <code>raise_non_shell_server_rendering_errors = true</code> and this is a post-shell error.
+    <% else %>
+      Rails does <strong>not</strong> raise because <code>raise_non_shell_server_rendering_errors = false</code>
+      and this is a post-shell error (<code>isShellReady = true</code>).
+    <% end %><br/>
+    <span class="label">Logs:</span> <code>Error in RSC stream ...</code> always appears in node-renderer logs.<br/>
+    <span class="label">errorReporter:</span>
+    <%= throw_js_errors ? "Called." : "Not called — throwJsErrors is false." %>
+  </div>
+</div>
+
+<div class="scenario">
+  <h3>F: RSC Component Error (via ServerComponentRouter) &mdash; <%= link_to "Open page", server_router_path(all: "deterministic-rsc-error", **config_params) %></h3>
+
+  <p><span class="label">Component:</span> <code>DeterministicRSCErrorComponent</code> rendered inside <code>ServerComponentRouter</code> via <code>RSCRoute</code></p>
+  <p><span class="label">Timing:</span> <strong>Immediate</strong> &mdash; same component as scenario E, but rendered as a child route inside the router&rsquo;s <code>&lt;ErrorBoundary&gt;</code>.</p>
+  <p><span class="label">Error path:</span> RSC <code>onError</code> &rarr; <code>reportError</code>. Client-side: <code>ErrorBoundary</code> catches the deserialized error. Also a <strong>post-shell</strong> error.</p>
+
+  <p><strong>Router setup</strong> (<code>ServerComponentRouter.tsx</code>) &mdash; the route is wrapped in <code>&lt;ErrorBoundary&gt;</code>:</p>
+  <pre>export default function App({ basePath = '/server_router', ...props }) {
+  return (
+    &lt;ErrorBoundary&gt;
+      &lt;nav&gt;...&lt;/nav&gt;
+      &lt;Suspense fallback={&lt;div&gt;Loading Page...&lt;/div&gt;}&gt;
+        &lt;Routes&gt;
+          ...
+          &lt;Route
+            path={`${basePath}/deterministic-rsc-error`}
+            element={&lt;RSCRoute componentName="DeterministicRSCErrorComponent" componentProps={{}} /&gt;}
+          /&gt;
+        &lt;/Routes&gt;
+      &lt;/Suspense&gt;
+    &lt;/ErrorBoundary&gt;
+  );
+}</pre>
+
+  <div class="expected-behavior">
+    <strong>Expected behavior with current config:</strong><br/>
+    <span class="label">Browser:</span> The <code>ErrorBoundary</code> catches the RSC error and renders
+    the <code>ErrorComponent</code> fallback. Navigation links remain visible.
+    <% if raise_non_shell %>
+      <strong>However</strong>, Rails raises <code>PrerenderError</code> because
+      <code>raise_non_shell_server_rendering_errors = true</code> and this is a post-shell error
+      (even though the ErrorBoundary catches the error client-side).
+    <% else %>
+      Rails does <strong>not</strong> raise because <code>raise_non_shell_server_rendering_errors = false</code>
+      and this is a post-shell error (<code>isShellReady = true</code>).
+    <% end %><br/>
+    <span class="label">Logs:</span> <code>Error in RSC stream ...</code> always appears in node-renderer logs.<br/>
+    <span class="label">errorReporter:</span>
+    <%= throw_js_errors ? "Called." : "Not called — throwJsErrors is false." %>
+  </div>
+</div>
+
+<hr/>
+
+<%# ─────────────────── SECTION 4: NON-EXISTING COMPONENT ERRORS ─────────────────── %>
+
+<h2>Section 4: Non-Existing Component Errors</h2>
+
+<p>
+  These scenarios render a component name (<code>NonExistentComponent</code>) that is not registered
+  in the <code>ComponentRegistry</code>. This tests the error path when
+  <code>ComponentRegistry.get()</code> cannot find the requested component.
+</p>
+
+<div class="scenario">
+  <h3>G: Non-existing component via <code>react_component</code> &mdash; <%= link_to "Open page", non_existing_react_component_path(config_params) %></h3>
+
+  <p><span class="label">Helper:</span> <code>react_component</code> (non-streaming)</p>
+  <p><span class="label">Component:</span> <code>NonExistentComponent</code> (not registered)</p>
+  <p><span class="label">Error path:</span> <code>ComponentRegistry.get()</code> throws because the component is not found.</p>
+
+  <p><strong>View template</strong> (<code>non_existing_react_component.html.erb</code>):</p>
+  <pre>&lt;%= react_component("NonExistentComponent", props: {}, prerender: true, trace: true,
+    auto_load_bundle: false, id: "non-existent-react-component-0") %&gt;</pre>
+
+  <div class="expected-behavior">
+    <strong>Expected behavior:</strong><br/>
+    The node renderer raises an error because <code>NonExistentComponent</code> is not in the registry.
+    This behaves like Scenario N &mdash; a non-streaming prerender error.
+  </div>
+</div>
+
+<div class="scenario">
+  <h3>H: Non-existing component via <code>stream_react_component</code> &mdash; <%= link_to "Open page", non_existing_stream_react_component_path(config_params) %></h3>
+
+  <p><span class="label">Helper:</span> <code>stream_react_component</code> (streaming)</p>
+  <p><span class="label">Component:</span> <code>NonExistentComponent</code> (not registered)</p>
+  <p><span class="label">Error path:</span> <code>ComponentRegistry.get()</code> throws during streaming render setup.</p>
+
+  <p><strong>View template</strong> (<code>non_existing_stream_react_component.html.erb</code>):</p>
+  <pre>&lt;%= stream_react_component("NonExistentComponent", props: {}, prerender: true, trace: true,
+    auto_load_bundle: false, id: "non-existent-stream-react-component-0") %&gt;</pre>
+
+  <div class="expected-behavior">
+    <strong>Expected behavior:</strong><br/>
+    The node renderer raises an error because <code>NonExistentComponent</code> is not in the registry.
+    This is a shell error (<code>isShellReady = false</code>) because the component lookup fails before
+    any rendering begins.
+  </div>
+</div>
+
+<div class="scenario">
+  <h3>I: Non-existing component via <code>rsc_payload_react_component</code> &mdash; <%= link_to "Open page", non_existing_rsc_payload_path(config_params) %></h3>
+
+  <p><span class="label">Helper:</span> <code>rsc_payload_react_component</code> (RSC payload streaming)</p>
+  <p><span class="label">Component:</span> <code>NonExistentComponent</code> (not registered)</p>
+  <p><span class="label">Error path:</span> <code>ComponentRegistry.get()</code> throws during RSC payload generation.</p>
+
+  <p><strong>View template</strong> (<code>non_existing_rsc_payload.html.erb</code>):</p>
+  <pre>&lt;%= rsc_payload_react_component("NonExistentComponent", props: {}, auto_load_bundle: false) %&gt;</pre>
+
+  <div class="expected-behavior">
+    <strong>Expected behavior:</strong><br/>
+    The RSC renderer raises an error because <code>NonExistentComponent</code> is not in the RSC registry.
+    This tests the <code>rsc_payload_react_component</code> error path specifically.
+  </div>
+</div>
+
+<hr/>
+
+<%# ──────────────────────── SECTION 5: INFRASTRUCTURE ERRORS ──────────────────────── %>
+
+<h2>Section 5: Infrastructure Error Paths (Not Triggerable from UI)</h2>
+
+<p>
+  These error paths live in the streaming infrastructure (<code>injectRSCPayload.ts</code>,
+  <code>safePipe.ts</code>) and cannot be triggered from component code. They handle failures
+  in the Node.js stream plumbing itself. <strong>These errors always reach
+  <code>errorReporter.message()</code> unconditionally</strong> &mdash; they emit directly on
+  <code>resultStream</code> without checking <code>throwJsErrors</code>.
+</p>
+
+<div class="infra-scenario">
+  <h3>J: htmlStream error before RSC starts</h3>
+  <p><span class="label">Trigger:</span> The HTML stream emits an <code>'error'</code> event before <code>startRSC</code> is called.</p>
+  <pre>htmlStream.on('error', (err) => {
+  if (!rscPromise) {
+    resultStream.emit('error', err instanceof Error ? err : new Error(String(err)));
+  }
+});</pre>
+  <p><span class="label">errorReporter:</span> <strong>Always called</strong> &mdash; unconditional.</p>
+</div>
+
+<div class="infra-scenario">
+  <h3>K: htmlStream error after RSC starts</h3>
+  <p><span class="label">Trigger:</span> Stream destroyed mid-rendering after RSC processing has begun.</p>
+  <pre>} catch (e) {
+  resultStream.emit('error', e instanceof Error ? e : new Error(String(e)));
+  endResultStream();
+}</pre>
+  <p><span class="label">errorReporter:</span> <strong>Always called</strong> &mdash; unconditional.</p>
+</div>
+
+<div class="infra-scenario">
+  <h3>L: RSC stream iteration error</h3>
+  <p><span class="label">Trigger:</span> RSC payload stream destroyed during <code>for-await</code> iteration. Caught by the same try/catch as H.</p>
+  <p><span class="label">errorReporter:</span> <strong>Always called</strong> &mdash; unconditional.</p>
+</div>
+
+<hr/>
+
+<%# ───────────────────────────── SUMMARY TABLE ───────────────────────────── %>
+
+<h2>Quick Reference: Error Flow Summary</h2>
+
+<p><em>Values reflect the current configuration shown above.</em></p>
+
+<table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; font-size: 0.85em;">
+  <thead style="background: #f0f0f0;">
+    <tr>
+      <th>Scenario</th>
+      <th>Helper</th>
+      <th>Component</th>
+      <th>isShellReady</th>
+      <th>Browser Result</th>
+      <th>errorReporter?</th>
+      <th>Rails raises?</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>N: Non-streaming</td>
+      <td><code>react_component</code></td>
+      <td><code>HelloWorldWithLogAndThrow</code></td>
+      <td>N/A</td>
+      <td><%= throw_js_errors ? "Redirect (re-throw)" : (raise_on_prerender_error ? "Redirect (PrerenderError)" : "Error HTML inline") %></td>
+      <td><%= throw_js_errors ? "Yes" : "No" %></td>
+      <td><%= throw_js_errors ? "Yes (re-throw)" : (raise_on_prerender_error ? "Yes (raise_on_prerender_error)" : "No") %></td>
+    </tr>
+    <tr>
+      <td>A: Shell Error</td>
+      <td><code>stream_react_component</code></td>
+      <td><code>StreamShellErrorDemo</code></td>
+      <td><code>false</code></td>
+      <td><%= raise_on_prerender_error ? "PrerenderError (rescue_from handler)" : "Error HTML box" %></td>
+      <td><%= throw_js_errors ? "Yes" : "No" %></td>
+      <td><%= raise_on_prerender_error ? "Yes (raise_on_prerender_error)" : "No" %></td>
+    </tr>
+    <tr>
+      <td>B: Async Suspense</td>
+      <td><code>stream_react_component</code></td>
+      <td><code>StreamErrorDemo</code></td>
+      <td><code>true</code></td>
+      <td><%= raise_non_shell ? "Stream aborted" : "Shell renders, async fails silently" %></td>
+      <td><%= throw_js_errors ? "Yes" : "No" %></td>
+      <td><%= raise_non_shell ? "Yes (raise_non_shell)" : "No" %></td>
+    </tr>
+    <tr>
+      <td>C: Sync Root Throw</td>
+      <td><code>stream_react_component</code></td>
+      <td><code>AsyncComponentsTreeForTesting</code></td>
+      <td><code>false</code></td>
+      <td><%= raise_on_prerender_error ? "PrerenderError (rescue_from handler)" : "Error HTML box" %></td>
+      <td><%= throw_js_errors ? "Yes" : "No" %></td>
+      <td><%= raise_on_prerender_error ? "Yes (raise_on_prerender_error)" : "No" %></td>
+    </tr>
+    <tr>
+      <td>D: Async Prop Rejection</td>
+      <td><code>stream_react_component</code></td>
+      <td><code>AsyncComponentsTreeForTesting</code></td>
+      <td><code>true</code></td>
+      <td><%= raise_non_shell ? "Stream aborted" : "Shell renders, one Suspense fails" %></td>
+      <td><%= throw_js_errors ? "Yes" : "No" %></td>
+      <td><%= raise_non_shell ? "Yes (raise_non_shell)" : "No" %></td>
+    </tr>
+    <tr>
+      <td>E: RSC Standalone</td>
+      <td><code>stream_react_component</code></td>
+      <td><code>DeterministicRSCErrorComponent</code></td>
+      <td><code>true</code> (always post-shell)</td>
+      <td><%= raise_non_shell ? "Stream aborted" : "RSC error HTML" %></td>
+      <td><%= throw_js_errors ? "Yes" : "No" %></td>
+      <td><%= raise_non_shell ? "Yes (raise_non_shell)" : "No" %></td>
+    </tr>
+    <tr>
+      <td>F: RSC via Router</td>
+      <td><code>stream_react_component</code></td>
+      <td><code>DeterministicRSCErrorComponent</code></td>
+      <td><code>true</code> (always post-shell)</td>
+      <td>ErrorBoundary fallback</td>
+      <td><%= throw_js_errors ? "Yes" : "No" %></td>
+      <td><%= raise_non_shell ? "Yes (raise_non_shell)" : "No" %></td>
+    </tr>
+    <tr style="background: #fce4ec;">
+      <td>G: Non-existing (react_component)</td>
+      <td><code>react_component</code></td>
+      <td><code>NonExistentComponent</code></td>
+      <td>N/A</td>
+      <td>Registry error</td>
+      <td><%= throw_js_errors ? "Yes" : "No" %></td>
+      <td>Yes (component not found)</td>
+    </tr>
+    <tr style="background: #fce4ec;">
+      <td>H: Non-existing (stream)</td>
+      <td><code>stream_react_component</code></td>
+      <td><code>NonExistentComponent</code></td>
+      <td><code>false</code></td>
+      <td>Registry error</td>
+      <td><%= throw_js_errors ? "Yes" : "No" %></td>
+      <td>Yes (component not found)</td>
+    </tr>
+    <tr style="background: #fce4ec;">
+      <td>I: Non-existing (rsc_payload)</td>
+      <td><code>rsc_payload_react_component</code></td>
+      <td><code>NonExistentComponent</code></td>
+      <td>&mdash;</td>
+      <td>Registry error</td>
+      <td><%= throw_js_errors ? "Yes" : "No" %></td>
+      <td>Yes (component not found)</td>
+    </tr>
+    <tr style="background: #fff8e1;">
+      <td>J&ndash;L: Infrastructure</td>
+      <td colspan="2"><em>Not triggerable from UI</em></td>
+      <td>&mdash;</td>
+      <td>Stream error forwarded</td>
+      <td><strong>Yes (always)</strong></td>
+      <td>N/A</td>
+    </tr>
+  </tbody>
+</table>
+
+<hr/>
+
+<%# ───────────────────────────── DATA FLOW DIAGRAMS ───────────────────────────── %>
+
+<h2>Error Data Flow</h2>
+
+<h3>Non-streaming (<code>react_component</code>)</h3>
+<pre>
+Component throws during renderToString (serverRenderReactComponent.ts)
+         |
+         +--- throwJsErrors == true? (currently: <%= throw_js_errors %>)
+         |     YES: throw e → Node renderer returns error HTTP response
+         |          → Ruby ALWAYS wraps as PrerenderError (rescue block, line 647)
+         |          → errorReporter sees the error
+         |     NO:  catch → return { hasErrors: true, html: errorHtml }
+         |          → errorReporter does NOT see the error
+         |
+         v (if throwJsErrors was false)
+Ruby helper.rb (non-streaming path, line 673):
+  result["hasErrors"] && raise_on_prerender_error? (currently: <%= raise_on_prerender_error %>)
+         |
+         YES → raise PrerenderError → rescue_from handler
+         NO  → render error HTML inline in page
+</pre>
+
+<h3>Streaming (<code>stream_react_component</code>)</h3>
+<pre>
+Component throws during renderToPipeableStream
+         |
+         v
+onError / onShellError callback
+         |
+         v
+reportError(error) → renderState.hasErrors = true
+         |
+         +--- throwJsErrors == true? (currently: <%= throw_js_errors %>)
+         |     YES: emitError(error) → stream 'error' event
+         |          → vm.ts handleStreamError → errorReporter.message()
+         |     NO:  (no error event, errorReporter never sees it)
+         |
+         v
+JSON chunk: { hasErrors: true, isShellReady: true|false }
+         |  (renderState reset for next chunk)
+         |
+         v
+Ruby helper.rb: should_raise_streaming_prerender_error?
+         |
+         +--- isShellReady == false? (shell error)
+         |     Check: raise_on_prerender_error (currently: <%= raise_on_prerender_error %>)
+         |
+         +--- isShellReady == true? (post-shell / RSC error)
+         |     Check: raise_non_shell_server_rendering_errors (currently: <%= raise_non_shell %>)
+         |
+         +--- Raise PrerenderError  OR  continue streaming
+</pre>

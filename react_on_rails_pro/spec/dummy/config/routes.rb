@@ -13,6 +13,19 @@ Rails.application.routes.draw do
   get "empty" => "pages#empty"
 
   # react on rails pro specific routes
+  get "error_scenarios_hub" => "pages#error_scenarios_hub", as: :error_scenarios_hub
+  post "reset_error_configs" => "pages#reset_error_configs", as: :reset_error_configs
+  get "ssr_shell_error" => "pages#ssr_shell_error", as: :ssr_shell_error
+  get "ssr_async_error" => "pages#ssr_async_error", as: :ssr_async_error
+  get "ssr_sync_error" => "pages#ssr_sync_error", as: :ssr_sync_error
+  get "ssr_async_prop_error" => "pages#ssr_async_prop_error", as: :ssr_async_prop_error
+  get "rsc_component_error" => "pages#rsc_component_error", as: :rsc_component_error
+  get "non_existing_react_component" => "pages#non_existing_react_component",
+      as: :non_existing_react_component
+  get "non_existing_stream_react_component" => "pages#non_existing_stream_react_component",
+      as: :non_existing_stream_react_component
+  get "non_existing_rsc_payload" => "pages#non_existing_rsc_payload",
+      as: :non_existing_rsc_payload
   get "server_side_redux_app_cached" => "pages#server_side_redux_app_cached"
   get "cached_react_helmet" => "pages#cached_react_helmet"
   get "loadable(/*all)" => "pages#loadable_component", as: :loadable_component
