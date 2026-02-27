@@ -149,17 +149,8 @@ const path = require('path');
 
 const getLocalIdent = (context, _localIdentName, localName) => {
   const resourcePath = context.resourcePath;
-  // resourceQuery differentiates virtual CSS modules from the same source file.
-  // CSS-in-JS tools like astroturf use matchResource (!=!) syntax to create
-  // multiple virtual .module.scss files from one source file. In rspack,
-  // resourcePath points to the source file (not the virtual path), so without
-  // the query string, all virtual modules from the same file would collide.
-  // For regular .module.scss files, resourceQuery is empty and has no effect.
-  const resourceQuery = context.resourceQuery || '';
-
-  // Assumes this file is at config/webpack/getLocalIdent.js (2 levels from project root).
-  // Adjust '../..' if your config lives at a different depth.
-  const projectRoot = path.resolve(__dirname, '../..');
+  const resourceQuery = context.resourceQuery || ''; // needed for CSS-in-JS virtual modules; safe no-op otherwise
+  const projectRoot = path.resolve(__dirname, '../..'); // adjust if config lives at a different depth
   const relativePath = path.relative(projectRoot, resourcePath);
 
   const hash = crypto
@@ -191,24 +182,7 @@ if (cssLoader?.options?.modules) {
 
 Because `getLocalIdent` uses stable inputs (file path, query string, and class name) rather than processed CSS content, the same class name is produced in both client and server builds regardless of bundler internals. The same function must be used in both builds so server-rendered HTML class names match client CSS selectors.
 
-### CSS-in-JS Virtual Module Collisions (Astroturf, etc.)
-
-**If you use astroturf or similar CSS-in-JS tools that create virtual CSS modules via webpack's `!=!` matchResource syntax, all styled components within the same source file will get identical CSS class names with rspack.** This causes style collisions that are invisible in development but break production builds.
-
-The root cause is a behavior difference between webpack and rspack:
-
-- **Webpack**: `context.resourcePath` = the virtual match resource path (e.g., `Component-Container.module.scss`)
-- **Rspack**: `context.resourcePath` = the actual source file (e.g., `Component.tsx`)
-
-The distinguishing information is only available in `context.resourceQuery` (e.g., `?styleId=Container`). The `getLocalIdent` function above already includes `resourceQuery` in the hash, which resolves this issue.
-
-**Detecting collisions after a build:**
-
-```bash
-# Check for class name collisions — high counts indicate collisions
-grep -oP '\.[A-Za-z]+-cls2_[A-Za-z0-9_-]+' public/webpack_bundles/css/*.css \
-  | sort | uniq -c | sort -rn | head -20
-```
+> **Note — CSS-in-JS virtual modules (astroturf, etc.):** The `resourceQuery` line in `getLocalIdent` above is a no-op for regular `.module.scss` files. It exists for CSS-in-JS tools that create virtual CSS modules via webpack's `!=!` matchResource syntax. In rspack, `context.resourcePath` points to the source file rather than the virtual path, so without `resourceQuery` in the hash, all virtual modules from the same file would collide. See the [troubleshooting entry](#css-in-js-styled-components-all-share-the-same-class-name) for details.
 
 ### Server Bundle: Preserve CSS Modules Configuration
 
