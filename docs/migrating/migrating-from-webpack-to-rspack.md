@@ -134,13 +134,13 @@ const configureServer = (serverWebpackConfig) => {
 
 **Why this matters:** Rspack uses `@rspack/core/dist/cssExtractLoader.js` instead of Webpack's `mini-css-extract-plugin`. Without this fix, CSS extraction remains in the server bundle, causing intermittent SSR failures.
 
-### CSS Modules with SSR: Class Name Divergence
+### CSS Modules with SSR: Stable Class Names
 
-**If you use `[contenthash]` in your `localIdentName` for CSS modules, class names will silently diverge between client and server builds with Rspack.** Pages load but all CSS module styles are broken. This only affects production builds — development with HMR works fine because `style-loader` injects CSS inline.
+**If you use `[contenthash]` in your `localIdentName` for CSS modules, class names can silently diverge between client and server builds with Rspack.** Pages load but all CSS module styles are broken. This only affects production builds — development with HMR works fine because `style-loader` injects CSS inline.
 
 The root cause is that `[contenthash]` is computed from processed CSS content, which differs between client and server builds due to different loader chains (`exportOnlyLocals: true` on server), different plugins (`CssExtractRspackPlugin` on client only), and different optimization passes.
 
-**Solution:** Replace `[contenthash]` with a custom `getLocalIdent` function that derives class names from stable inputs (file path + class name):
+**Solution:** Replace `[contenthash]` with a custom `getLocalIdent` function that derives class names from stable inputs (file path, query string, and class name):
 
 ```javascript
 // config/webpack/getLocalIdent.js
@@ -148,18 +148,27 @@ const crypto = require('crypto');
 const path = require('path');
 
 const getLocalIdent = (context, _localIdentName, localName) => {
+  const resourcePath = context.resourcePath;
+  // resourceQuery differentiates virtual CSS modules from the same source file.
+  // CSS-in-JS tools like astroturf use matchResource (!=!) syntax to create
+  // multiple virtual .module.scss files from one source file. In rspack,
+  // resourcePath points to the source file (not the virtual path), so without
+  // the query string, all virtual modules from the same file would collide.
+  // For regular .module.scss files, resourceQuery is empty and has no effect.
+  const resourceQuery = context.resourceQuery || '';
+
   // Assumes this file is at config/webpack/getLocalIdent.js (2 levels from project root).
   // Adjust '../..' if your config lives at a different depth.
   const projectRoot = path.resolve(__dirname, '../..');
-  const relativePath = path.relative(projectRoot, context.resourcePath);
+  const relativePath = path.relative(projectRoot, resourcePath);
 
   const hash = crypto
     .createHash('md5')
-    .update(`${relativePath}\0${localName}`) // Null separator prevents path/name collisions
+    .update(relativePath + resourceQuery + localName)
     .digest('base64url')
     .slice(0, 5);
 
-  const basename = path.basename(context.resourcePath);
+  const basename = path.basename(resourcePath);
   const name = basename.replace(/\.(module\.)?(scss|sass|css|tsx?|jsx?)$/, '').replace(/-styles$/, '');
   return `${name}-${localName}_${hash}`;
 };
@@ -180,7 +189,26 @@ if (cssLoader?.options?.modules) {
 }
 ```
 
-Because `getLocalIdent` uses the file path and class name (not processed CSS content), the same class name is produced in both client and server builds regardless of bundler internals.
+Because `getLocalIdent` uses stable inputs (file path, query string, and class name) rather than processed CSS content, the same class name is produced in both client and server builds regardless of bundler internals. The same function must be used in both builds so server-rendered HTML class names match client CSS selectors.
+
+### CSS-in-JS Virtual Module Collisions (Astroturf, etc.)
+
+**If you use astroturf or similar CSS-in-JS tools that create virtual CSS modules via webpack's `!=!` matchResource syntax, all styled components within the same source file will get identical CSS class names with rspack.** This causes style collisions that are invisible in development but break production builds.
+
+The root cause is a behavior difference between webpack and rspack:
+
+- **Webpack**: `context.resourcePath` = the virtual match resource path (e.g., `Component-Container.module.scss`)
+- **Rspack**: `context.resourcePath` = the actual source file (e.g., `Component.tsx`)
+
+The distinguishing information is only available in `context.resourceQuery` (e.g., `?styleId=Container`). The `getLocalIdent` function above already includes `resourceQuery` in the hash, which resolves this issue.
+
+**Detecting collisions after a build:**
+
+```bash
+# Check for class name collisions — high counts indicate collisions
+grep -oP '\.[A-Za-z]+-cls2_[A-Za-z0-9_-]+' public/webpack_bundles/css/*.css \
+  | sort | uniq -c | sort -rn | head -20
+```
 
 ### Server Bundle: Preserve CSS Modules Configuration
 
@@ -294,7 +322,19 @@ default: &default
 
 **Cause:** `[contenthash]` in `localIdentName` produces different hashes in client and server builds with Rspack.
 
-**Solution:** Use a custom `getLocalIdent` function instead of `[contenthash]`. See the [CSS Modules with SSR](#css-modules-with-ssr-class-name-divergence) section above.
+**Solution:** Use a custom `getLocalIdent` function instead of `[contenthash]`. See the [CSS Modules with SSR](#css-modules-with-ssr-stable-class-names) section above.
+
+### CSS-in-JS Styled Components All Share the Same Class Name
+
+**Symptoms:**
+
+- Multiple astroturf (or similar CSS-in-JS) styled components in the same file all get identical CSS class names
+- Styles look correct in development but are broken in production
+- Only one component's styles survive; others are overwritten
+
+**Cause:** Rspack sets `context.resourcePath` to the actual source file instead of the virtual matchResource path. All virtual CSS modules from the same source file produce the same hash.
+
+**Solution:** Include `context.resourceQuery` in the `getLocalIdent` hash. See the [CSS-in-JS Virtual Module Collisions](#css-in-js-virtual-module-collisions-astroturf-etc) section above.
 
 ### Intermittent SSR Failures
 
