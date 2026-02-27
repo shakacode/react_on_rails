@@ -13,7 +13,6 @@
  */
 
 import { PassThrough } from 'stream';
-import { finished } from 'stream/promises';
 import { PipeableOrReadableStream } from 'react-on-rails/types';
 import { createRSCPayloadKey } from './utils.ts';
 import RSCRequestTracker from './RSCRequestTracker.ts';
@@ -79,7 +78,10 @@ export default function injectRSCPayload(
   domNodeId: string | undefined,
 ) {
   const htmlStream = new PassThrough();
-  safePipe(pipeableHtmlStream, htmlStream);
+  const resultStream = new PassThrough();
+  safePipe(pipeableHtmlStream, htmlStream, (err) => {
+    resultStream.emit('error', err);
+  });
   const decoder = new TextDecoder();
   let rscPromise: Promise<void> | null = null;
 
@@ -114,7 +116,6 @@ export default function injectRSCPayload(
   // ========================================
 
   let flushTimeout: NodeJS.Timeout | null = null;
-  const resultStream = new PassThrough();
   let hasReceivedFirstHtmlChunk = false;
 
   /**
@@ -257,11 +258,28 @@ export default function injectRSCPayload(
         );
       });
 
-      // Wait for HTML stream to complete, then wait for all RSC promises
-      await finished(htmlStream).then(() => Promise.all(rscPromises));
+      // Wait for HTML stream to close.
+      // 'close' fires after BOTH normal 'end' and destroy(), and the resulting
+      // promise never rejects. This guarantees Promise.allSettled below always
+      // runs, preventing dangling RSC promises when htmlStream is destroyed
+      // (e.g., by React's fatalError calling destination.destroy(error)).
+      //
+      // Why not finished()? finished() rejects when the stream is destroyed with
+      // an error, which would skip the .then() chain and leave RSC promises as
+      // dangling fire-and-forget — the exact bug this fixes.
+      await new Promise<void>((resolve) => {
+        htmlStream.on('close', resolve);
+      });
+
+      // ALWAYS wait for all RSC promises to settle, regardless of how htmlStream
+      // closed. Promise.allSettled never rejects, so all promises are guaranteed
+      // to be awaited — no dangling fire-and-forget promises.
+      await Promise.allSettled(rscPromises);
     } catch (e) {
+      // Guard against unexpected errors (e.g., onRSCPayloadGenerated throws).
+      // Without this catch, rscPromise would reject before the close handler
+      // attaches .catch(), causing an unhandled promise rejection.
       resultStream.emit('error', e instanceof Error ? e : new Error(String(e)));
-      endResultStream();
     }
   };
 
@@ -269,15 +287,6 @@ export default function injectRSCPayload(
   // EVENT HANDLERS - Coordinate the three data sources
   // ========================================
 
-  /**
-   * HTML data handler - receives chunks from React's rendering stream.
-   *
-   * RESPONSIBILITIES:
-   * - Buffer HTML chunks for coordinated flushing
-   * - Track when first HTML chunk arrives (enables streaming)
-   * - Initialize RSC processing on first HTML data
-   * - Schedule flush to send combined data
-   */
   htmlStream.on('data', (chunk: Buffer) => {
     htmlBuffers.push(chunk);
     hasReceivedFirstHtmlChunk = true;
@@ -292,61 +301,26 @@ export default function injectRSCPayload(
   /**
    * Report errors on htmlStream by emitting them on resultStream, where they
    * propagate to handleStreamError → errorReporter in the node renderer.
-   * Error alone is not the end of the stream — termination is handled by the
-   * 'close' event below.
-   *
-   * We only emit here when startRSC hasn't been called yet. Once startRSC is
-   * running, finished(htmlStream) inside startRSC rejects on error, and the
-   * catch block there handles reporting — emitting here too would cause the
-   * same error to be reported twice.
    */
   htmlStream.on('error', (err) => {
-    if (!rscPromise) {
-      resultStream.emit('error', err instanceof Error ? err : new Error(String(err)));
-    }
+    resultStream.emit('error', err instanceof Error ? err : new Error(String(err)));
   });
 
   /**
-   * 'close' fires after both normal 'end' and destroy().
-   * When htmlStream ends normally, readableEnded is true — the 'end' handler handles cleanup.
-   * When htmlStream is destroyed (e.g., source stream failure), readableEnded stays false
-   * and 'end' never fires — this handler ensures resultStream is still properly terminated.
+   * 'close' fires after both normal 'end' and destroy(), so this single handler
+   * covers all termination paths:
+   * - No rscPromise: end resultStream immediately (no RSC to wait for).
+   * - With rscPromise: wait for RSC to finish, then flush remaining data and close.
    */
   htmlStream.on('close', () => {
-    if (!htmlStream.readableEnded && !resultStream.writableEnded) {
-      endResultStream();
-    }
-  });
-
-  /**
-   * HTML stream completion handler.
-   *
-   * CLEANUP RESPONSIBILITIES:
-   * - Cancel any pending flush timeout
-   * - Perform final flush to send remaining buffered data
-   * - Wait for RSC processing to complete
-   * - Clean up RSC payload streams
-   * - Close result stream
-   */
-  htmlStream.on('end', () => {
-    const cleanup = () => {
-      endResultStream();
-    };
-
     if (!rscPromise) {
-      cleanup();
+      endResultStream();
       return;
     }
 
-    // startRSC() has a top-level try/catch that converts all RSC stream errors
-    // to resultStream.emit('error', ...) and never re-throws. So rscPromise
-    // itself never rejects. The .catch() below only guards against unexpected
-    // exceptions in cleanup() or rscRequestTracker.clear(), not RSC stream errors.
     rscPromise
-      .then(cleanup)
-      .finally(() => {
-        rscRequestTracker.clear();
-      })
+      .then(() => endResultStream())
+      .finally(() => rscRequestTracker.clear())
       .catch((e: unknown) => {
         resultStream.emit('error', e instanceof Error ? e : new Error(String(e)));
         endResultStream();
