@@ -255,12 +255,17 @@ module ReactOnRails
                          "}"
 
         # Insert after cssLoader.options.modules block (handles both old single-line
-        # and new spread syntax patterns)
+        # and new spread syntax patterns). Use [\s\S]*? for lazy multiline matching
+        # to support nested braces (e.g., inline getLocalIdent functions).
         gsub_file(
           webpack_config,
-          /(cssLoader\.options\.modules = \{[^}]*exportOnlyLocals: true[^}]*\};\s*\n\s*\})/,
+          /(cssLoader\.options\.modules = \{[\s\S]*?exportOnlyLocals: true[\s\S]*?\};\s*\n\s*\})/m,
           "\\1#{babel_ssr_code}"
         )
+        new_content = File.read(File.join(destination_root, webpack_config))
+        return if new_content.include?("babelLoader.options.caller")
+
+        say_status :warning, "Could not insert Babel SSR caller — manual edit of #{webpack_config} required", :yellow
       end
 
       def update_server_config_exports(webpack_config)
