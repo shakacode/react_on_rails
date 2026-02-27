@@ -58,7 +58,7 @@ const configureServer = () => {
           testValue = item.loader;
         }
         return !(
-          testValue.match(/mini-css-extract-plugin/) ||
+          testValue.includes('mini-css-extract-plugin') ||
           testValue.includes('cssExtractLoader') // Rspack uses this path
         );
       });
@@ -155,7 +155,7 @@ const configureServer = () => {
           testValue = item.loader;
         }
         return !(
-          testValue.match(/mini-css-extract-plugin/) ||
+          testValue.includes('mini-css-extract-plugin') ||
           testValue.includes('cssExtractLoader') || // Rspack uses this path
           testValue === 'style-loader'
         );

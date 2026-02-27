@@ -160,7 +160,9 @@ const getLocalIdent = (context, _localIdentName, localName) => {
     .slice(0, 8);
 
   const basename = path.basename(resourcePath);
-  const name = basename.replace(/\.(module\.)?(scss|sass|css|tsx?|jsx?)$/, '').replace(/-styles$/, '');
+  const name = basename
+    .replace(/\.(module\.)?(scss|sass|css|less|styl|tsx?|jsx?)$/, '')
+    .replace(/-styles$/, '');
   return `${name}-${localName}_${hash}`;
 };
 
@@ -308,7 +310,7 @@ default: &default
 
 **Cause:** Rspack sets `context.resourcePath` to the actual source file instead of the virtual matchResource path. All virtual CSS modules from the same source file produce the same hash.
 
-**Solution:** Include `context.resourceQuery` in the `getLocalIdent` hash. See the [CSS-in-JS Virtual Module Collisions](#css-in-js-virtual-module-collisions-astroturf-etc) section above.
+**Solution:** Include `context.resourceQuery` in the `getLocalIdent` hash. See the [CSS-in-JS Styled Components All Share the Same Class Name](#css-in-js-styled-components-all-share-the-same-class-name) section above.
 
 ### Intermittent SSR Failures
 

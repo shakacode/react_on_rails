@@ -259,7 +259,7 @@ module ReactOnRails
         # to support nested braces (e.g., inline getLocalIdent functions).
         gsub_file(
           webpack_config,
-          /(cssLoader\.options\.modules = \{[\s\S]*?exportOnlyLocals: true[\s\S]*?\};\s*\n\s*\})/m,
+          /(cssLoader\.options\.modules = \{[\s\S]*?exportOnlyLocals: true[\s\S]*?\};\s*\n\s*\})/,
           "\\1#{babel_ssr_code}"
         )
         new_content = File.read(File.join(destination_root, webpack_config))
