@@ -46,16 +46,20 @@ exclude = [
   '^https://(www\.)?localwise\.com',    # SSL verification failed
   '^https://(www\.)?mycfsapp\.com',     # SSL hostname mismatch
   '^https://(www\.)?scoutapp\.com',     # SSL hostname mismatch
+  '^https://solargraph\.org',           # SSL HandshakeFailure
 
   # ============================================================================
-  # BADGE SERVICES
+  # BADGE AND CI SERVICES
   # ============================================================================
   '^https://badge\.fury\.io',  # Returns 403 for automated requests
+  '^https://coveralls\.io',    # Returns 503 for automated requests
 
   # ============================================================================
-  # SITES THAT RETURN 504 FROM CI
+  # SITES THAT RETURN 5xx FROM CI
   # ============================================================================
-  '^https://reactrails\.com',  # Works locally but 504s from CI
+  '^https://reactrails\.com',              # Works locally but 504s from CI
+  '^https://shakacode\.controlplane\.com', # Connection refused from CI
+  '^https://storybook\.js\.org',           # Intermittent connection resets from CI
 
   # ============================================================================
   # PLANNED DEPLOYMENTS NOT YET LIVE
