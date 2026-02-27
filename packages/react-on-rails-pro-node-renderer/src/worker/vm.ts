@@ -377,8 +377,8 @@ export async function buildVM(filePath: string) {
 
 /** @internal Used in tests */
 export function resetVM() {
-  // Clear all VM contexts
   vmContexts.clear();
+  vmCreationPromises.clear();
 }
 
 // Optional: Add a method to remove a specific VM if needed
