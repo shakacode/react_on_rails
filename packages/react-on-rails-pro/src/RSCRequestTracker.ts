@@ -161,8 +161,9 @@ class RSCRequestTracker {
 
       // 'close' fires after both normal 'end' and destroy().
       // On normal end, the on('end') handler above already pushed null — this is a no-op.
-      // On destroy (e.g., RSC payload fetch failure), the tee'd streams are destroyed
-      // by the error handler but NOT ended — we end them here to prevent for-await hangs.
+      // On destroy without error (e.g., stream.destroy() with no argument), no 'error'
+      // event fires so stream1/stream2 are untouched — we end them here to unblock
+      // for-await consumers. Destroyed streams (from the error handler) are skipped.
       (stream as Readable).on('close', () => {
         if (!stream1.writableEnded && !stream1.destroyed) stream1.end();
         if (!stream2.writableEnded && !stream2.destroyed) stream2.end();
