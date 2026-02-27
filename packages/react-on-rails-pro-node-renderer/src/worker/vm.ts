@@ -359,12 +359,13 @@ export async function buildVM(filePath: string) {
   // right order.
   //
   // Technically: an async IIFE runs synchronously until its first `await`. If
-  // it throws before any `await` (e.g. missing file), a try/finally inside the
-  // IIFE would run *before* set() on line 349 stores the promise — leaving a
-  // stale rejected promise in the map that permanently poisons retries.
-  // Chaining .finally() on the promise *after* set() guarantees cleanup runs
-  // as a microtask after the current synchronous execution, so set() has
-  // always run first.
+  // it throws before any `await` (e.g. `vm.createContext()` or a
+  // `vm.runInContext()` call throwing synchronously before `readFileAsync`),
+  // a try/finally inside the IIFE would run *before* `vmCreationPromises.set()`
+  // (below) has executed — leaving a stale rejected promise in the map that
+  // permanently poisons retries. Chaining .finally() on the promise *after*
+  // set() guarantees cleanup runs as a microtask after the current synchronous
+  // execution, so set() has always run first.
   void vmCreationPromise
     .catch(() => {})
     .finally(() => {
@@ -386,4 +387,5 @@ export function resetVM() {
  */
 export function removeVM(bundlePath: string) {
   vmContexts.delete(bundlePath);
+  vmCreationPromises.delete(bundlePath);
 }
