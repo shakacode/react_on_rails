@@ -152,7 +152,7 @@ def base_server_webpack_content
           });
           if (cssLoader && cssLoader.options && cssLoader.options.modules) {
             cssLoader.options.modules = {
-              ...cssLoader.options.modules,
+              ...(typeof cssLoader.options.modules === 'object' ? cssLoader.options.modules : {}),
               exportOnlyLocals: true,
             };
           }
