@@ -5,12 +5,13 @@ const path = require('path');
 const commonWebpackConfig = require('./commonWebpackConfig');
 
 function extractLoader(rule, loaderName) {
+  if (!Array.isArray(rule.use)) return null;
   return rule.use.find((item) => {
-    let testValue;
+    let testValue = '';
 
     if (typeof item === 'string') {
       testValue = item;
-    } else if (typeof item.loader === 'string') {
+    } else if (item && typeof item.loader === 'string') {
       testValue = item.loader;
     }
 
@@ -96,10 +97,10 @@ const configureServer = (rscBundle = false) => {
     if (Array.isArray(rule.use)) {
       // remove the mini-css-extract-plugin and style-loader
       rule.use = rule.use.filter((item) => {
-        let testValue;
+        let testValue = '';
         if (typeof item === 'string') {
           testValue = item;
-        } else if (typeof item.loader === 'string') {
+        } else if (item && typeof item.loader === 'string') {
           testValue = item.loader;
         }
         return !(testValue.match(/mini-css-extract-plugin/) || testValue === 'style-loader');

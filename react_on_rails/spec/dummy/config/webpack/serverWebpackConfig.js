@@ -71,20 +71,20 @@ const configureServer = () => {
       // remove the mini-css-extract-plugin and style-loader
       // eslint-disable-next-line no-param-reassign
       rule.use = rule.use.filter((item) => {
-        let testValue;
+        let testValue = '';
         if (typeof item === 'string') {
           testValue = item;
-        } else if (typeof item.loader === 'string') {
+        } else if (item && typeof item.loader === 'string') {
           testValue = item.loader;
         }
         return !(testValue.match(/mini-css-extract-plugin/) || testValue === 'style-loader');
       });
       const cssLoader = rule.use.find((item) => {
-        let testValue;
+        let testValue = '';
 
         if (typeof item === 'string') {
           testValue = item;
-        } else if (typeof item.loader === 'string') {
+        } else if (item && typeof item.loader === 'string') {
           testValue = item.loader;
         }
 

@@ -151,7 +151,7 @@ const configureServer = () => {
         let testValue = '';
         if (typeof item === 'string') {
           testValue = item;
-        } else if (typeof item.loader === 'string') {
+        } else if (item && typeof item.loader === 'string') {
           testValue = item.loader;
         }
         return !(
@@ -165,7 +165,7 @@ const configureServer = () => {
 
         if (typeof item === 'string') {
           testValue = item;
-        } else if (typeof item.loader === 'string') {
+        } else if (item && typeof item.loader === 'string') {
           testValue = item.loader;
         }
 

@@ -310,7 +310,7 @@ default: &default
 
 **Cause:** Rspack sets `context.resourcePath` to the actual source file instead of the virtual matchResource path. All virtual CSS modules from the same source file produce the same hash.
 
-**Solution:** Include `context.resourceQuery` in the `getLocalIdent` hash. See the [CSS-in-JS Styled Components All Share the Same Class Name](#css-in-js-styled-components-all-share-the-same-class-name) section above.
+**Solution:** Include `context.resourceQuery` in the `getLocalIdent` hash. See the [`getLocalIdent` implementation](#css-modules-with-ssr-stable-class-names) above, which already includes `resourceQuery` for this reason.
 
 ### Intermittent SSR Failures
 
