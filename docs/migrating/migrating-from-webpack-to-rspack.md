@@ -164,9 +164,9 @@ const getLocalIdent = (context, _localIdentName, localName) => {
 
   const hash = crypto
     .createHash('md5')
-    .update(relativePath + resourceQuery + localName)
+    .update(relativePath + '\0' + resourceQuery + '\0' + localName)
     .digest('base64url')
-    .slice(0, 5);
+    .slice(0, 8);
 
   const basename = path.basename(resourcePath);
   const name = basename.replace(/\.(module\.)?(scss|sass|css|tsx?|jsx?)$/, '').replace(/-styles$/, '');
