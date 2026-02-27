@@ -54,7 +54,7 @@ export default function safePipe<T extends Writable>(
     // 'close' fires after both normal 'end' and destroy().
     // On normal end, pipe() already forwards 'end' to the destination — this is a no-op.
     // On destroy, pipe() unpipes but does NOT end the destination — we do it here.
-    readableSource.on('close', () => {
+    readableSource.once('close', () => {
       if (!destination.writableEnded) {
         destination.end();
       }

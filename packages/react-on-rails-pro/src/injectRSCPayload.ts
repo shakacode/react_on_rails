@@ -320,11 +320,11 @@ export default function injectRSCPayload(
 
     rscPromise
       .then(() => endResultStream())
-      .finally(() => rscRequestTracker.clear())
       .catch((e: unknown) => {
         resultStream.emit('error', e instanceof Error ? e : new Error(String(e)));
         endResultStream();
-      });
+      })
+      .finally(() => rscRequestTracker.clear());
   });
 
   return resultStream;
