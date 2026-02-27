@@ -465,7 +465,7 @@ module ReactOnRailsProHelper
     # This happens BEFORE response.stream.write(template_string) in
     # stream_view_containing_react_components, so the response is NOT yet committed
     # and rescue_from can perform a proper HTTP redirect.
-    raise result if result.is_a?(Exception)
+    raise result if result.is_a?(StandardError)
 
     result
   end

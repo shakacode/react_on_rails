@@ -148,9 +148,7 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
     // propagates them to handleStreamError → errorReporter in the node renderer. Emitting on
     // the source (not the destination) keeps the pipe intact so data continues flowing for
     // non-fatal errors.
-    safePipe(pipeableStream, transformStream, (err) => {
-      emitError(err);
-    });
+    safePipe(pipeableStream, transformStream, emitError);
     pipedStream = pipeableStream;
   };
 
