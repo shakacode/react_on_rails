@@ -324,6 +324,29 @@ default: &default
 
 **Solution:** Add the file extension to webpack's resolve.extensions configuration.
 
+### UMD Libraries Behave Differently Under Rspack's Module Interop
+
+**Symptoms:**
+
+- `noConflict()` or other methods called on an import result return `undefined` or throw
+- Libraries that coexist via `noConflict()` (e.g., lodash + underscore) interfere with each other
+
+**Cause:** Rspack's ES module interop wraps CommonJS exports differently than Webpack, so the import result may not have the methods you expect. Switching to `window.*` access can also be wrong if loaders like `imports-loader?define=>false` prevent the library from setting globals in the first place.
+
+**Solution:** Audit any `noConflict()` calls or UMD workarounds. Check whether your loader chain already prevents the conflict, and remove the workaround if so. Verify behavior by testing in both bundlers.
+
+### Modern Entry Points Crash on Missing Globals
+
+**Symptoms:**
+
+- `Cannot use 'in' operator to search for 'X' in undefined`
+- `Could not find component registered with name ...` (ReactOnRails registration fails)
+- Works in development but crashes on specific pages in production
+
+**Cause:** Code in a modern entry point references a global (e.g., `window._`) that is only exposed via `expose-loader` in legacy bundles. The crash kills the script before `registerForRails()` executes, so ReactOnRails reports the component as missing. This bug can be latent under Webpack if legacy bundles happen to load first.
+
+**Solution:** Audit all entry points for code that assumes sitewide globals exist. Remove or guard any such references, especially orphaned polyfills for removed features.
+
 ### Third-Party Package Issues
 
 Some packages may not ship compiled files. Use `patch-package` to fix:
