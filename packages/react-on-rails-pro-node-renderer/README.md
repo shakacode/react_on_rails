@@ -93,19 +93,19 @@ rails generate react_on_rails:install --pro
 
 All options can be set via the config object or environment variables. Config object values take precedence over environment variables.
 
-| Option | Env Variable | Default | Description |
-|--------|-------------|---------|-------------|
-| `port` | `RENDERER_PORT` | `3800` | Port the renderer listens on |
-| `logLevel` | `RENDERER_LOG_LEVEL` | `'info'` | Log level (`fatal`, `error`, `warn`, `info`, `debug`, `trace`, `silent`) |
-| `logHttpLevel` | `RENDERER_LOG_HTTP_LEVEL` | `'error'` | HTTP server log level |
-| `serverBundleCachePath` | `RENDERER_SERVER_BUNDLE_CACHE_PATH` | Auto-detected or `/tmp/...` | Directory for cached server bundles |
-| `supportModules` | `RENDERER_SUPPORT_MODULES` | `false` | Enable Node.js globals in VM context (`Buffer`, `process`, `setTimeout`, etc.) |
-| `workersCount` | `RENDERER_WORKERS_COUNT` | CPU count - 1 | Number of worker processes. The `--pro` generator uses `NODE_RENDERER_CONCURRENCY` instead. |
-| `password` | `RENDERER_PASSWORD` | (none) | Shared secret for Rails authentication |
-| `stubTimers` | `RENDERER_STUB_TIMERS` | `true` | Stub timer functions during SSR |
-| `allWorkersRestartInterval` | `RENDERER_ALL_WORKERS_RESTART_INTERVAL` | (disabled) | Minutes between restarting all workers |
-| `delayBetweenIndividualWorkerRestarts` | `RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS` | (disabled) | Minutes between each worker restart |
-| `fastifyServerOptions` | — | `{}` | Additional [Fastify server options](https://fastify.dev/docs/latest/Reference/Server/#factory) |
+| Option                                 | Env Variable                                        | Default                     | Description                                                                                    |
+| -------------------------------------- | --------------------------------------------------- | --------------------------- | ---------------------------------------------------------------------------------------------- |
+| `port`                                 | `RENDERER_PORT`                                     | `3800`                      | Port the renderer listens on                                                                   |
+| `logLevel`                             | `RENDERER_LOG_LEVEL`                                | `'info'`                    | Log level (`fatal`, `error`, `warn`, `info`, `debug`, `trace`, `silent`)                       |
+| `logHttpLevel`                         | `RENDERER_LOG_HTTP_LEVEL`                           | `'error'`                   | HTTP server log level                                                                          |
+| `serverBundleCachePath`                | `RENDERER_SERVER_BUNDLE_CACHE_PATH`                 | Auto-detected or `/tmp/...` | Directory for cached server bundles                                                            |
+| `supportModules`                       | `RENDERER_SUPPORT_MODULES`                          | `false`                     | Enable Node.js globals in VM context (`Buffer`, `process`, `setTimeout`, etc.)                 |
+| `workersCount`                         | `RENDERER_WORKERS_COUNT`                            | CPU count - 1               | Number of worker processes. The `--pro` generator uses `NODE_RENDERER_CONCURRENCY` instead.    |
+| `password`                             | `RENDERER_PASSWORD`                                 | (none)                      | Shared secret for Rails authentication                                                         |
+| `stubTimers`                           | `RENDERER_STUB_TIMERS`                              | `true`                      | Stub timer functions during SSR                                                                |
+| `allWorkersRestartInterval`            | `RENDERER_ALL_WORKERS_RESTART_INTERVAL`             | (disabled)                  | Minutes between restarting all workers                                                         |
+| `delayBetweenIndividualWorkerRestarts` | `RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS` | (disabled)                  | Minutes between each worker restart                                                            |
+| `fastifyServerOptions`                 | —                                                   | `{}`                        | Additional [Fastify server options](https://fastify.dev/docs/latest/Reference/Server/#factory) |
 
 ## Advanced: Custom Fastify Configuration
 
@@ -116,7 +116,9 @@ import masterRun from 'react-on-rails-pro-node-renderer/master';
 import run, { configureFastify } from 'react-on-rails-pro-node-renderer/worker';
 import cluster from 'cluster';
 
-const config = { /* your config */ };
+const config = {
+  /* your config */
+};
 
 configureFastify((app) => {
   app.get('/health', (request, reply) => {

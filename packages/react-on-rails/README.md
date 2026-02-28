@@ -73,11 +73,11 @@ ReactOnRails.register({
 
 ## Exports
 
-| Export Path | Description |
-|------------|-------------|
-| `react-on-rails` | Full build with SSR utilities |
+| Export Path             | Description                         |
+| ----------------------- | ----------------------------------- |
+| `react-on-rails`        | Full build with SSR utilities       |
 | `react-on-rails/client` | Client-only build (smaller, no SSR) |
-| `react-on-rails/types` | TypeScript type exports |
+| `react-on-rails/types`  | TypeScript type exports             |
 
 ## Rails-Side Setup
 

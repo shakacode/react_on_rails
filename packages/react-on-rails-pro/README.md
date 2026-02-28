@@ -57,16 +57,16 @@ This package wraps and extends the base `react-on-rails` package. You only need 
 
 ## Exports
 
-| Export Path | Description |
-|------------|-------------|
-| `react-on-rails-pro` | Main entry — full ReactOnRails API (same as base + Pro) |
-| `react-on-rails-pro/client` | Client-only build (no SSR utilities) |
-| `react-on-rails-pro/RSCRoute` | React Server Components route component |
-| `react-on-rails-pro/RSCProvider` | RSC provider component |
-| `react-on-rails-pro/registerServerComponent/client` | Client-side server component registration |
-| `react-on-rails-pro/registerServerComponent/server` | Server-side server component registration |
-| `react-on-rails-pro/wrapServerComponentRenderer/client` | Client-side renderer wrapping |
-| `react-on-rails-pro/wrapServerComponentRenderer/server` | Server-side renderer wrapping |
+| Export Path                                             | Description                                             |
+| ------------------------------------------------------- | ------------------------------------------------------- |
+| `react-on-rails-pro`                                    | Main entry — full ReactOnRails API (same as base + Pro) |
+| `react-on-rails-pro/client`                             | Client-only build (no SSR utilities)                    |
+| `react-on-rails-pro/RSCRoute`                           | React Server Components route component                 |
+| `react-on-rails-pro/RSCProvider`                        | RSC provider component                                  |
+| `react-on-rails-pro/registerServerComponent/client`     | Client-side server component registration               |
+| `react-on-rails-pro/registerServerComponent/server`     | Server-side server component registration               |
+| `react-on-rails-pro/wrapServerComponentRenderer/client` | Client-side renderer wrapping                           |
+| `react-on-rails-pro/wrapServerComponentRenderer/server` | Server-side renderer wrapping                           |
 
 ## Rails-Side Setup
 

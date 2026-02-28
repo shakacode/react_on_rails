@@ -317,7 +317,7 @@ And compare:
 
 ### Client-Side Startup
 
-- [spec/dummy/client/app/loadable/loadable-client.imports-hmr.js](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/spec/dummy/client/app/loadable/loadable-client.imports-hmr.js)
+- [spec/dummy/client/app/loadable/loadable-client.imports-hmr.jsx](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/spec/dummy/client/app/loadable/loadable-client.imports-hmr.jsx)
 - [spec/dummy/client/app/loadable/loadable-client.imports-loadable.jsx](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/spec/dummy/client/app/loadable/loadable-client.imports-loadable.jsx)
 
 ### Server-Side Startup

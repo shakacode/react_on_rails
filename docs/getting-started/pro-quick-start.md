@@ -54,16 +54,16 @@ rails generate react_on_rails:install --pro
 
 The `--pro` flag creates:
 
-| File | Purpose |
-|------|---------|
-| `config/initializers/react_on_rails.rb` | Base React on Rails config |
-| `config/initializers/react_on_rails_pro.rb` | Pro config with NodeRenderer settings |
-| `client/node-renderer.js` | Fastify-based Node.js SSR server entry |
-| `config/webpack/serverWebpackConfig.js` | Server webpack config with `target: 'node'` and `libraryTarget: 'commonjs2'` |
-| `app/javascript/src/HelloWorld/` | Example React component with SSR |
-| `app/controllers/hello_world_controller.rb` | Rails controller |
-| `app/views/hello_world/index.html.erb` | View using `react_component` helper |
-| `Procfile.dev` | All dev processes including Node Renderer |
+| File                                        | Purpose                                                                      |
+| ------------------------------------------- | ---------------------------------------------------------------------------- |
+| `config/initializers/react_on_rails.rb`     | Base React on Rails config                                                   |
+| `config/initializers/react_on_rails_pro.rb` | Pro config with NodeRenderer settings                                        |
+| `client/node-renderer.js`                   | Fastify-based Node.js SSR server entry                                       |
+| `config/webpack/serverWebpackConfig.js`     | Server webpack config with `target: 'node'` and `libraryTarget: 'commonjs2'` |
+| `app/javascript/src/HelloWorld/`            | Example React component with SSR                                             |
+| `app/controllers/hello_world_controller.rb` | Rails controller                                                             |
+| `app/views/hello_world/index.html.erb`      | View using `react_component` helper                                          |
+| `Procfile.dev`                              | All dev processes including Node Renderer                                    |
 
 Commit:
 
@@ -78,6 +78,7 @@ git add -A && git commit -m "react_on_rails:install --pro"
 ```
 
 This starts four processes:
+
 - **Rails server** on port 3000
 - **Webpack dev server** (HMR) on port 3035
 - **Webpack SSR watcher** for server bundle
@@ -121,12 +122,12 @@ reactOnRailsProNodeRenderer({
 
 ### Key configuration options
 
-| Rails Config | Node Config | Purpose |
-|-------------|-------------|---------|
-| `config.renderer_url` | `port` | Must point to the same host:port |
-| `config.renderer_password` | `password` | Shared authentication secret |
-| `config.prerender_caching` | — | Cache SSR results in Rails cache |
-| `config.server_renderer` | — | Must be `"NodeRenderer"` to use the Node process |
+| Rails Config               | Node Config | Purpose                                          |
+| -------------------------- | ----------- | ------------------------------------------------ |
+| `config.renderer_url`      | `port`      | Must point to the same host:port                 |
+| `config.renderer_password` | `password`  | Shared authentication secret                     |
+| `config.prerender_caching` | —           | Cache SSR results in Rails cache                 |
+| `config.server_renderer`   | —           | Must be `"NodeRenderer"` to use the Node process |
 
 ## Adding React Server Components
 
