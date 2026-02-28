@@ -51,8 +51,8 @@ reactOnRailsProNodeRenderer({
 # config/initializers/react_on_rails_pro.rb
 ReactOnRailsPro.configure do |config|
   config.server_renderer = "NodeRenderer"
-  config.renderer_url = ENV["RENDERER_URL"] || "http://localhost:3800"
-  config.renderer_password = ENV["RENDERER_PASSWORD"]
+  config.renderer_url = ENV.fetch("REACT_RENDERER_URL", "http://localhost:3800")
+  config.renderer_password = ENV.fetch("RENDERER_PASSWORD", "devPassword")
 end
 ```
 
@@ -76,7 +76,7 @@ node node-renderer.js
 
 Or add to your `Procfile.dev`:
 
-```
+```text
 node-renderer: node node-renderer.js
 ```
 
@@ -100,7 +100,7 @@ All options can be set via the config object or environment variables. Config ob
 | `logHttpLevel` | `RENDERER_LOG_HTTP_LEVEL` | `'error'` | HTTP server log level |
 | `serverBundleCachePath` | `RENDERER_SERVER_BUNDLE_CACHE_PATH` | Auto-detected or `/tmp/...` | Directory for cached server bundles |
 | `supportModules` | `RENDERER_SUPPORT_MODULES` | `false` | Enable Node.js globals in VM context (`Buffer`, `process`, `setTimeout`, etc.) |
-| `workersCount` | `RENDERER_WORKERS_COUNT` | CPU count - 1 | Number of worker processes |
+| `workersCount` | `RENDERER_WORKERS_COUNT` | CPU count - 1 | Number of worker processes. The `--pro` generator uses `NODE_RENDERER_CONCURRENCY` instead. |
 | `password` | `RENDERER_PASSWORD` | (none) | Shared secret for Rails authentication |
 | `stubTimers` | `RENDERER_STUB_TIMERS` | `true` | Stub timer functions during SSR |
 | `allWorkersRestartInterval` | `RENDERER_ALL_WORKERS_RESTART_INTERVAL` | (disabled) | Minutes between restarting all workers |
@@ -109,7 +109,7 @@ All options can be set via the config object or environment variables. Config ob
 
 ## Advanced: Custom Fastify Configuration
 
-For custom routes (e.g., health checks) or plugins, import the master/worker modules directly:
+For custom routes (e.g., health checks) or plugins, import the master/worker modules directly. The example below uses ES Modules — use a `.mjs` extension, add `"type": "module"` to your `package.json`, or convert to `require()` calls:
 
 ```js
 import masterRun from 'react-on-rails-pro-node-renderer/master';
@@ -136,7 +136,7 @@ if (cluster.isPrimary) {
 Integrate with Sentry or Honeybadger:
 
 ```js
-import { addNotifier, setupTracing } from 'react-on-rails-pro-node-renderer/integrations/api';
+import { addNotifier } from 'react-on-rails-pro-node-renderer/integrations/api';
 
 addNotifier((error) => {
   Sentry.captureException(error);
@@ -155,7 +155,7 @@ See [Error Reporting and Tracing docs](https://www.shakacode.com/react-on-rails-
 
 ## Package Relationships
 
-```
+```text
 Rails App
 ├── react_on_rails gem (base Rails integration)
 ├── react_on_rails_pro gem (Pro server rendering features)

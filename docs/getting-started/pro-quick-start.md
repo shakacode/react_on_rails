@@ -91,6 +91,8 @@ You should see the HelloWorld component rendered with SSR. View the page source 
 
 ## What the generator configured
 
+The generator creates complete configuration files. Below are the key settings — see the generated files for full details including timeout, retry, and tracing options.
+
 ### Rails-side (config/initializers/react_on_rails_pro.rb)
 
 ```ruby
@@ -105,13 +107,15 @@ end
 ### Node-side (client/node-renderer.js)
 
 ```js
+const path = require('path');
 const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');
 
 reactOnRailsProNodeRenderer({
-  serverBundleCachePath: path.resolve(__dirname, './.node-renderer-bundles'),
+  serverBundleCachePath: path.resolve(__dirname, '../.node-renderer-bundles'),
   port: Number(process.env.RENDERER_PORT) || 3800,
+  password: process.env.RENDERER_PASSWORD || 'devPassword',
   supportModules: true,
-  workersCount: Number(process.env.NODE_RENDERER_CONCURRENCY || 3),
+  workersCount: Number(process.env.NODE_RENDERER_CONCURRENCY) || 3,
 });
 ```
 
@@ -146,7 +150,7 @@ See the [RSC tutorial](https://www.shakacode.com/react-on-rails-pro/docs/react-s
 - [Node Renderer Configuration](https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/js-configuration/) — All Node Renderer options
 - [Caching Guide](https://www.shakacode.com/react-on-rails-pro/docs/caching/) — Fragment and prerender caching
 - [Streaming SSR](https://www.shakacode.com/react-on-rails-pro/docs/streaming-server-rendering/) — Progressive rendering
-- [Code Splitting](https://www.shakacode.com/react-on-rails-pro/docs/code-splitting/) — Loadable components with SSR
+- [Code Splitting](https://www.shakacode.com/react-on-rails-pro/docs/code-splitting-loadable-components/) — Loadable components with SSR
 
 ## Troubleshooting
 

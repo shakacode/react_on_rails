@@ -60,6 +60,7 @@
     "react-dom": ">= 16"
   },
   "files": [
+    "README.md",
     "lib/**/*.js",
     "lib/**/*.cjs",
     "lib/**/*.mjs",

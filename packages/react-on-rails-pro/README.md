@@ -12,7 +12,7 @@ yarn add react-on-rails-pro
 pnpm add react-on-rails-pro
 ```
 
-**Important:** When using the `react_on_rails_pro` Ruby gem, you **must** use this package (`react-on-rails-pro`) instead of `react-on-rails`. The base gem will reject `react-on-rails` if the Pro gem is detected.
+**Important:** When using the `react_on_rails_pro` Ruby gem, you **must** use this package (`react-on-rails-pro`) instead of `react-on-rails`. If the Pro gem detects the base `react-on-rails` npm package at runtime, it will raise an error.
 
 ## Usage
 
@@ -41,7 +41,7 @@ registerServerComponent({ MyServerComponent });
 
 ## Package Relationship
 
-```
+```text
 react-on-rails-pro (this package)
 └── react-on-rails (base package, automatically installed as dependency)
 ```
