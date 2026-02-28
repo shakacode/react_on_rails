@@ -84,6 +84,126 @@ export default async function UserProfile({ userId }) {
 
 This eliminates the entire API layer for read-only data display. The database client, query logic, and ORM dependencies never ship to the client bundle.
 
+> **React on Rails users:** Your backend is Ruby on Rails, so you won't access the database directly from Server Components. Instead, use [async props](#data-fetching-in-react-on-rails-pro) -- Rails sends data through its normal controller/view layers, and React on Rails Pro streams it to your components.
+
+## Data Fetching in React on Rails Pro
+
+In React on Rails applications, Ruby on Rails is the backend. Rather than bypassing Rails to access the database directly from Server Components, React on Rails Pro provides **async props** -- a streaming mechanism where Rails sends props incrementally through its normal controller/view layers.
+
+This is the recommended data fetching pattern for React on Rails because:
+
+- It preserves Rails' controller/model/view architecture
+- It leverages Rails' existing data access layers (ActiveRecord, authorization, caching)
+- It supports streaming for progressive rendering with Suspense
+- Sync props render immediately; async props stream in as they become available
+
+### How Async Props Work
+
+**Rails view (ERB):**
+
+```erb
+<%= stream_react_component_with_async_props("ProductPage",
+      props: { name: product.name, price: product.price }) do |emit|
+  # Sync props (name, price) are sent immediately and render right away.
+  # Async props stream in when ready:
+  emit.call("reviews", product.reviews.as_json)
+  emit.call("recommendations", product.recommended_products.as_json)
+end %>
+```
+
+**React component (Server Component):**
+
+```tsx
+import { Suspense } from 'react';
+import type { WithAsyncProps } from 'react-on-rails-pro';
+
+type SyncProps = { name: string; price: number };
+type AsyncProps = { reviews: Review[]; recommendations: Product[] };
+type Props = WithAsyncProps<AsyncProps, SyncProps>;
+
+export default function ProductPage({
+  name, price, getReactOnRailsAsyncProp
+}: Props) {
+  const reviewsPromise = getReactOnRailsAsyncProp('reviews');
+  const recommendationsPromise = getReactOnRailsAsyncProp('recommendations');
+
+  return (
+    <div>
+      <h1>{name}</h1>
+      <p>${price}</p>
+
+      <Suspense fallback={<p>Loading reviews...</p>}>
+        <Reviews reviews={reviewsPromise} />
+      </Suspense>
+      <Suspense fallback={<p>Loading recommendations...</p>}>
+        <Recommendations items={recommendationsPromise} />
+      </Suspense>
+    </div>
+  );
+}
+
+// Async Server Component -- awaits the streamed prop
+async function Reviews({ reviews }: { reviews: Promise<Review[]> }) {
+  const resolved = await reviews;
+  return (
+    <ul>
+      {resolved.map(r => <li key={r.id}>{r.text}</li>)}
+    </ul>
+  );
+}
+```
+
+**How it works:**
+
+1. Sync props (`name`, `price`) render immediately -- the component shows content right away
+2. `getReactOnRailsAsyncProp('reviews')` returns a promise that resolves when Rails calls `emit.call("reviews", ...)`
+3. Each `<Suspense>` boundary shows its fallback until the corresponding async prop arrives
+4. Rails can perform expensive operations (database queries, external API calls) between `emit.call` invocations
+5. Content streams progressively to the browser as each async prop resolves
+
+### Simulating Delayed Data
+
+In development, you can add `sleep` calls to simulate slow data sources and see how streaming behaves:
+
+```erb
+<%= stream_react_component_with_async_props("Dashboard",
+      props: { title: "My Dashboard" }) do |emit|
+  sleep 1  # Simulate slow database query
+  emit.call("stats", DashboardStats.compute.as_json)
+
+  sleep 2  # Simulate external API call
+  emit.call("notifications", Notification.recent.as_json)
+end %>
+```
+
+The `title` prop renders instantly. After 1 second, stats stream in. After another 2 seconds, notifications appear. Each section fills in independently thanks to Suspense boundaries.
+
+### TypeScript Typing
+
+The `WithAsyncProps` type ensures type safety for both sync and async props:
+
+```tsx
+import type { WithAsyncProps } from 'react-on-rails-pro';
+
+// Define sync and async prop shapes separately
+type SyncProps = { title: string };
+type AsyncProps = {
+  users: User[];
+  posts: Post[];
+};
+
+// WithAsyncProps<AsyncProps, SyncProps> produces:
+// {
+//   title: string;
+//   getReactOnRailsAsyncProp: <K extends 'users' | 'posts'>(key: K) => Promise<AsyncProps[K]>;
+// }
+type Props = WithAsyncProps<AsyncProps, SyncProps>;
+```
+
+`getReactOnRailsAsyncProp` is fully typed -- calling `getReactOnRailsAsyncProp('users')` returns `Promise<User[]>`, and passing an invalid key is a compile-time error.
+
+> **More details:** For setup instructions, configuration options, and the RSC payload variant (`rsc_payload_react_component_with_async_props`), see the [React on Rails Pro RSC documentation](https://www.shakacode.com/react-on-rails-pro/docs/react-server-components/tutorial/).
+
 ## Migrating from React Query / TanStack Query
 
 React Query remains valuable in the RSC world for features like polling, optimistic updates, and infinite scrolling. But for simple data display, Server Components replace it entirely.
@@ -744,7 +864,7 @@ function StatsSkeleton() {
 ### Step 1: Identify Candidates
 
 For each component that fetches data:
-- Does it only display data? → Convert to Server Component
+- Does it only display data? → Convert to Server Component (or use [async props](#data-fetching-in-react-on-rails-pro) in React on Rails)
 - Does it need polling/optimistic updates? → Keep React Query/SWR, add server prefetch
 - Does it need real-time updates? → Keep client-side, pass initial data from server
 
