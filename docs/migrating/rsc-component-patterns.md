@@ -12,6 +12,19 @@ In the RSC world, components are **Server Components by default**. You opt into 
 
 This means the placement of `'use client'` directly determines your bundle size. The goal of restructuring is to push `'use client'` as far down the component tree as possible, to leaf-level interactive elements.
 
+### `'use client'` Marks a Boundary, Not a Component Type
+
+A common misconception is that every component using hooks or browser APIs needs `'use client'`. It doesn't. You only need the directive at the **boundary** — the file where code transitions from server to client. Everything imported below that boundary is automatically client code:
+
+```
+ServerPage.jsx (Server Component)
+└── imports SearchBar.jsx ('use client')   ← boundary — needs the directive
+    └── imports SearchInput.jsx            ← automatically client, NO directive needed
+    └── imports SearchResults.jsx          ← automatically client, NO directive needed
+```
+
+`SearchInput` and `SearchResults` use hooks and event handlers, but they don't need `'use client'` because `SearchBar` already established the boundary. Adding it would be redundant.
+
 ## The Top-Down Migration Strategy
 
 Start from the top of your component tree and work downward. This is the approach [Mux used to migrate 50,000 lines of code](https://www.mux.com/blog/what-are-react-server-components):
@@ -428,69 +441,9 @@ export function ClientWrapper({ children }) {
 </ClientWrapper>
 ```
 
-### Mistake 3: Chunk Contamination from Shared `'use client'` Components
+### Mistake 3: Chunk contamination from shared `'use client'` files
 
-When a component with `'use client'` is imported by another heavy Client Component, the RSC page may end up downloading much larger chunks than necessary. This doesn't always happen -- it depends on webpack's internal chunk group ordering -- but when it does, the impact can be severe (e.g., 382 KB instead of 8 KB).
-
-#### How to detect it
-
-After building, inspect your `react-client-manifest.json`. Each `'use client'` module has a `chunks` array listing the JS files the browser must download. If you see large vendor chunks listed for a small component, you have contamination:
-
-```json
-{
-  "file:///app/components/HelloWorldHooks.jsx": {
-    "id": "./components/HelloWorldHooks.jsx",
-    "chunks": ["2", "2-b77936c4.js", "rsc-PostsPage", "rsc-PostsPage-d655b05a.js"],
-    "name": "*"
-  }
-}
-```
-
-In this example, `HelloWorldHooks` (a tiny component) is mapped to PostsPage's chunk group, which includes a 375 KB vendor chunk containing lodash and moment. The browser downloads all of it.
-
-You can also check the browser DevTools **Network** tab: load your RSC page, filter to JS files, and look for unexpectedly large downloads that contain unrelated libraries. Tools like **webpack-bundle-analyzer** can help visualize which modules ended up in which chunks.
-
-#### Why it happens
-
-The RSC webpack plugin builds the client manifest by iterating through all webpack chunk groups and recording which chunks contain each `'use client'` module. If a module appears in multiple chunk groups, the **last one processed overwrites** previous mappings.
-
-When `PostsPage.jsx` (`'use client'`) statically imports `HelloWorldHooks.jsx` along with heavy dependencies (lodash, moment), `HelloWorldHooks.jsx` appears in PostsPage's chunk group. Depending on iteration order, the manifest may map `HelloWorldHooks` to PostsPage's chunks -- including the vendor chunk with lodash and moment.
-
-This behavior is **deterministic for a given build** (not random), but the specific chunk group order depends on webpack internals that are hard to predict and can change when you add or remove components.
-
-#### The fix: thin `'use client'` wrapper
-
-If you detect contamination (or want to prevent it for shared components), create a dedicated wrapper file:
-
-```jsx
-// HelloWorldHooksClient.jsx -- thin wrapper (new file)
-'use client';
-import HelloWorldHooks from './HelloWorldHooks';
-export default HelloWorldHooks;
-```
-
-```jsx
-// HelloWorldHooks.jsx -- NO 'use client' directive
-import React, { useState } from 'react';
-
-export default function HelloWorldHooks({ name }) {
-  const [greeting, setGreeting] = useState(name);
-  return <h3>Hello, {greeting}!</h3>;
-}
-```
-
-```jsx
-// RSCPage.jsx -- Server Component imports the wrapper
-import HelloWorldHooks from './HelloWorldHooksClient';
-
-export default function RSCPage() {
-  return <HelloWorldHooks name="World" />;
-}
-```
-
-The wrapper file doesn't appear in PostsPage's import tree, so the RSC plugin always maps it to its own small async chunk (~8 KB), regardless of chunk group ordering.
-
-> **When to apply this:** Check the manifest or Network tab after building. If an RSC page downloads chunks larger than expected, trace which `'use client'` module causes it and introduce a wrapper. For shared components used by both RSC pages and heavy Client Component trees, the wrapper is a safe preventive measure.
+If your RSC page downloads unexpectedly large chunks, a shared `'use client'` component may be mapped to a heavy chunk group containing unrelated dependencies. This can cause the browser to download hundreds of kilobytes of JavaScript it doesn't need. See [Chunk Contamination](rsc-troubleshooting.md#chunk-contamination) for how to detect and fix it.
 
 ### Mistake 4: Confusing `'use client'` with `'use server'`
 

@@ -13,7 +13,7 @@ React Server Components offer significant performance benefits when used correct
 - Total blocking time reduced **from 110ms to 1ms**
 - Server-only dependencies (date-fns, marked, sanitize-html) never ship to the client
 
-However, these benefits require intentional architecture changes. Simply adding `'use client'` everywhere preserves the status quo. The guides below walk you through the restructuring needed to capture real gains.
+However, these benefits require intentional architecture changes. Simply adding `'use client'` everywhere preserves the status quo -- `'use client'` is a [boundary marker, not a component annotation](rsc-component-patterns.md#use-client-marks-a-boundary-not-a-component-type). The guides below walk you through the restructuring needed to capture real gains.
 
 ## Article Series
 
