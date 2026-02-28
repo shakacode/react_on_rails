@@ -18,7 +18,7 @@ Any library that relies on these features must be used within a `'use client'` b
 
 ## The Thin Wrapper Pattern
 
-The most common solution for incompatible libraries: create a minimal `'use client'` file that re-exports the component.
+The most common solution for incompatible libraries: create a minimal `'use client'` file that re-exports the component. This works because [`'use client'` marks a boundary](rsc-component-patterns.md#use-client-marks-a-boundary-not-a-component-type) -- the wrapper establishes the server-to-client transition point, and the library code below it automatically becomes client code.
 
 ### Direct Re-export (Simplest)
 

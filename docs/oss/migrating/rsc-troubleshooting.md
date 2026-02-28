@@ -113,6 +113,72 @@ If someone imports `db-utils.js` from a Client Component (directly or transitive
 2. **Use `server-only`:** Add the import to any module containing secrets, database access, or server-only logic
 3. **Audit import chains:** Check what each `'use client'` file imports transitively
 
+## Chunk Contamination
+
+When a component with `'use client'` is also statically imported by a heavy Client Component, the RSC page may end up downloading much larger chunks than necessary. This doesn't always happen -- it depends on webpack's internal chunk group ordering -- but when it does, the impact can be severe (e.g., 382 KB instead of 8 KB).
+
+### How to Detect It
+
+After building, inspect your `react-client-manifest.json`. Each `'use client'` module has a `chunks` array listing the JS files the browser must download. If you see large vendor chunks listed for a small component, you have contamination:
+
+```json
+{
+  "file:///app/components/HelloWorldHooks.jsx": {
+    "id": "./components/HelloWorldHooks.jsx",
+    "chunks": ["2", "2-b77936c4.js", "rsc-PostsPage", "rsc-PostsPage-d655b05a.js"],
+    "name": "*"
+  }
+}
+```
+
+In this example, `HelloWorldHooks` (a tiny component) is mapped to PostsPage's chunk group, which includes a 375 KB vendor chunk containing lodash and moment. The browser downloads all of it.
+
+You can also check the browser DevTools **Network** tab: load your RSC page, filter to JS files, and look for unexpectedly large downloads that contain unrelated libraries. Tools like **webpack-bundle-analyzer** can help visualize which modules ended up in which chunks.
+
+### Why It Happens
+
+The RSC webpack plugin builds the client manifest by iterating through all webpack chunk groups and recording which chunks contain each `'use client'` module. If a module appears in multiple chunk groups, the **last one processed overwrites** previous mappings.
+
+When `PostsPage.jsx` (`'use client'`) statically imports `HelloWorldHooks.jsx` along with heavy dependencies (lodash, moment), `HelloWorldHooks.jsx` appears in PostsPage's chunk group. Depending on iteration order, the manifest may map `HelloWorldHooks` to PostsPage's chunks -- including the vendor chunk with lodash and moment.
+
+This behavior is **deterministic for a given build** (not random), but the specific chunk group order depends on webpack internals that are hard to predict and can change when you add or remove components.
+
+Redundant `'use client'` directives increase the risk: the RSC webpack plugin creates a separate async chunk for **every** file with `'use client'`. Adding the directive to components that are already client code (because they're imported by a `'use client'` parent) creates unnecessary chunks and manifest entries -- each one subject to the same last-write-wins overwrite.
+
+### How to Fix It
+
+Create a thin `'use client'` wrapper file that isolates the import tree:
+
+```jsx
+// HelloWorldHooksClient.jsx -- thin wrapper (new file)
+'use client';
+import HelloWorldHooks from './HelloWorldHooks';
+export default HelloWorldHooks;
+```
+
+```jsx
+// HelloWorldHooks.jsx -- NO 'use client' directive
+import React, { useState } from 'react';
+
+export default function HelloWorldHooks({ name }) {
+  const [greeting, setGreeting] = useState(name);
+  return <h3>Hello, {greeting}!</h3>;
+}
+```
+
+```jsx
+// RSCPage.jsx -- Server Component imports the wrapper
+import HelloWorldHooks from './HelloWorldHooksClient';
+
+export default function RSCPage() {
+  return <HelloWorldHooks name="World" />;
+}
+```
+
+The wrapper file doesn't appear in PostsPage's import tree, so the RSC plugin always maps it to its own small async chunk (~8 KB), regardless of chunk group ordering.
+
+> **When to apply this:** Check the manifest or Network tab after building. If an RSC page downloads chunks larger than expected, trace which `'use client'` module causes it and introduce a wrapper. For shared components used by both RSC pages and heavy Client Component trees, the wrapper is a safe preventive measure.
+
 ## Accidental Client Components
 
 A component that should be a Server Component becomes a Client Component because it's imported by a `'use client'` file.
@@ -247,6 +313,10 @@ export default function PageErrorBoundary({ children }) {
 ```
 
 ## `'use client'` Directive Mistakes
+
+### Only at the Boundary
+
+`'use client'` marks the server-to-client boundary, not individual components. Components imported below a `'use client'` file are automatically client code -- they don't need their own directive. Adding it redundantly creates unnecessary webpack async chunks and increases [chunk contamination](#chunk-contamination) risk. See [the boundary rule](rsc-component-patterns.md#use-client-marks-a-boundary-not-a-component-type) for details.
 
 ### Must Be at the Very Top
 
@@ -452,7 +522,7 @@ export async function createUser(formData: FormData) {
 | `"A component was suspended by an uncached promise..."` | Creating a promise inside a Client Component and passing it to `use()` | Pass the promise from a Server Component as a prop, or use a Suspense-compatible library like TanStack Query. See [Common `use()` Mistakes](rsc-data-fetching.md#common-use-mistakes-in-client-components) |
 | `"createContext is not supported in Server Components"` | Using `createContext` or `useContext` in a Server Component | Move context to a `'use client'` provider wrapper |
 | `"'App' cannot be used as a JSX component. Its return type 'Promise<JSX.Element>' is not a valid JSX element type"` | TypeScript doesn't recognize async components | Upgrade to TS 5.1.2+ and `@types/react` 18.2.8+, or omit return type |
-| RSC page downloads unexpectedly large chunks | A shared component with `'use client'` appears in multiple chunk groups; webpack's manifest may map it to a heavy chunk group containing unrelated dependencies (depends on chunk group iteration order) | Inspect `react-client-manifest.json` for oversized chunk mappings. If found, create a thin `'use client'` wrapper file for the RSC import. See [Mistake 3: Chunk Contamination](rsc-component-patterns.md#mistake-3-chunk-contamination-from-shared-use-client-components) |
+| RSC page downloads unexpectedly large chunks | A shared component with `'use client'` appears in multiple chunk groups; webpack's manifest may map it to a heavy chunk group containing unrelated dependencies (depends on chunk group iteration order) | Inspect `react-client-manifest.json` for oversized chunk mappings. If found, create a thin `'use client'` wrapper file for the RSC import. See [Chunk Contamination](#chunk-contamination) above |
 | `"Text content does not match server-rendered HTML"` | Hydration mismatch | Ensure identical rendering on server and client; use `suppressHydrationWarning` for intentional differences |
 | `"Route used params.id. params should be awaited before using its properties"` | Next.js 15 changed params to async | Await params: `const { id } = await params;` |
 
