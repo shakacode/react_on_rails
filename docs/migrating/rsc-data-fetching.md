@@ -1,12 +1,12 @@
 # RSC Migration: Data Fetching Patterns
 
-This guide covers how to migrate your data fetching from client-side patterns (`useEffect` + `fetch`, React Query, SWR) to Server Component patterns. Server Components can fetch data directly using `async`/`await`, eliminating the need for loading states, error handling boilerplate, and client-side caching in many cases.
+This guide covers how to migrate your data fetching from client-side patterns (`useEffect` + `fetch`, React Query, SWR) to Server Component patterns. In React on Rails, data flows from Rails to your components as props — eliminating the need for loading states, error handling boilerplate, and client-side caching in many cases.
 
 > **Part 3 of the [RSC Migration Series](migrating-to-rsc.md)**
 
-## The Core Shift: From `useEffect` to `async` Components
+## The Core Shift: From Client-Side Fetching to Server-Side Data
 
-In the traditional React model, components fetch data on the client after mounting. In the RSC model, components fetch data on the server before sending HTML to the browser.
+In the traditional React model, components fetch data on the client after mounting. In the RSC model, data arrives from the server as props — the component simply renders it.
 
 ### Before: Client-Side Fetching
 
@@ -45,46 +45,23 @@ export default function UserProfile({ userId }) {
 ```jsx
 // UserProfile.jsx -- Server Component (no directive)
 
-export default async function UserProfile({ userId }) {
-  const user = await fetch(`https://api.example.com/users/${userId}`)
-    .then(res => res.json());
-
+export default function UserProfile({ user }) {
   return <div>{user.name}</div>;
 }
 ```
+
+Rails prepares the data in the controller and passes it as props. The component no longer fetches, manages loading states, or handles errors — it just renders.
 
 **What changed:**
 
 - No `useState` for data, loading, or error
 - No `useEffect` lifecycle management
 - No `'use client'` directive
-- The component is `async` and uses `await` directly
-- Data fetching happens on the server, close to the data source
-- No loading spinner needed in the component itself (handled by `<Suspense>` at the parent level)
+- Data comes from Rails as props — no client-side fetching
+- No loading spinner needed in the component itself
+- No JavaScript ships to the client for this component
 
-### Direct Database Access
-
-Server Components can access your database directly -- no API route needed:
-
-```jsx
-// UserProfile.jsx -- Server Component
-import { db } from '../lib/database';
-
-export default async function UserProfile({ userId }) {
-  const user = await db.users.findUnique({ where: { id: userId } });
-
-  return (
-    <div>
-      <h1>{user.name}</h1>
-      <p>{user.email}</p>
-    </div>
-  );
-}
-```
-
-This eliminates the entire API layer for read-only data display. The database client, query logic, and ORM dependencies never ship to the client bundle.
-
-> **React on Rails users:** Your backend is Ruby on Rails, so you won't access the database directly from Server Components. Instead, use [async props](#data-fetching-in-react-on-rails-pro) -- Rails sends data through its normal controller/view layers, and React on Rails Pro streams it to your components.
+For pages with multiple data sources that should stream progressively, use [async props](#data-fetching-in-react-on-rails-pro) to receive data incrementally with Suspense.
 
 ## Data Fetching in React on Rails Pro
 
@@ -422,7 +399,7 @@ Start a fetch early without awaiting, then consume the result in a child compone
 import { cache } from 'react';
 
 const getComments = cache(async (postId) => {
-  return await db.comments.findMany({ where: { postId } });
+  return await fetchComments(postId);
 });
 
 // Export a preload function for parent components
@@ -627,8 +604,7 @@ When multiple Server Components need the same data, `React.cache()` ensures the 
 import { cache } from 'react';
 
 export const getUser = cache(async (id) => {
-  const res = await fetch(`https://api.example.com/users/${id}`);
-  return res.json();
+  return await fetchUserById(id);
 });
 ```
 
@@ -698,20 +674,20 @@ const result = cachedFn(1, 2);
 
 ## Server Actions for Mutations
 
-Server Actions replace API routes for data mutations. They work with forms and event handlers:
+Server Actions let you define server-side functions that can be called directly from forms and event handlers. In React on Rails, mutations are typically handled through Rails controllers, but Server Actions can be useful for lightweight operations:
 
 ```jsx
 // actions.js
 'use server';
 
-import { revalidatePath } from 'next/cache';
-
 export async function createComment(formData) {
   const content = formData.get('content');
   const postId = formData.get('postId');
 
-  await db.comments.create({ data: { content, postId } });
-  revalidatePath(`/posts/${postId}`); // Triggers re-render with fresh data
+  await fetch('/api/comments', {
+    method: 'POST',
+    body: JSON.stringify({ content, postId }),
+  });
 }
 ```
 
@@ -730,7 +706,7 @@ export default function CommentForm({ postId }) {
 }
 ```
 
-**Important:** Server Actions are designed for mutations, not data fetching. For reading data, use Server Components with direct `async`/`await`.
+**Note:** In React on Rails, most mutations flow through Rails controllers via standard forms or API endpoints. Server Actions are a React concept that can complement this when you need a direct server-side function call from the client.
 
 ## When to Keep Client-Side Fetching
 
