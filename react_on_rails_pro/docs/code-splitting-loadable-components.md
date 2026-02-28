@@ -293,7 +293,7 @@ The general concept is that we have a non-loadable, HMR-ready, file that substit
 
 Use the [NormalModuleReplacement plugin](https://webpack.js.org/plugins/normal-module-replacement-plugin/):
 
-[code](https://github.com/shakacode/react_on_rails_pro/blob/a361f4e163b9170f180ae07ee312fb9b4c719fc3/spec/dummy/config/webpack/environment.js#L81-L91)
+[code](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/spec/dummy/config/webpack/commonWebpackConfig.js#L41-L49)
 
 ```js
 if (isWebpackDevServer) {
