@@ -282,7 +282,8 @@ Error Boundaries do **not** catch errors thrown in Server Components. Errors fro
 ```jsx
 'use client';
 
-import { useRouter, startTransition } from 'next/navigation';
+import { useRouter } from 'next/navigation';
+import { startTransition } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 
 function ErrorFallback({ error, resetErrorBoundary }) {
@@ -525,6 +526,7 @@ export async function createUser(formData: FormData) {
 | RSC page downloads unexpectedly large chunks | A shared component with `'use client'` appears in multiple chunk groups; webpack's manifest may map it to a heavy chunk group containing unrelated dependencies (depends on chunk group iteration order) | Inspect `react-client-manifest.json` for oversized chunk mappings. If found, create a thin `'use client'` wrapper file for the RSC import. See [Chunk Contamination](#chunk-contamination) above |
 | `"Text content does not match server-rendered HTML"` | Hydration mismatch | Ensure identical rendering on server and client; use `suppressHydrationWarning` for intentional differences |
 | `"Route used params.id. params should be awaited before using its properties"` | Next.js 15 changed params to async | Await params: `const { id } = await params;` |
+| `"Refs cannot be used in Server Components, nor passed to Client Components"` | Using the `ref` prop on any element inside a Server Component -- including on Client Components. The Flight serializer rejects the literal `ref` prop before checking the target type. | Remove the `ref` prop. Refs are a client-side concept -- if a Client Component needs a ref, it should create one itself with `useRef()`. While `React.createRef()` is callable on the server, the result cannot be attached to any element. |
 
 ## Environment Variable Access
 

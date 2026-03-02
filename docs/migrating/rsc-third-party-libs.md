@@ -10,9 +10,12 @@ Server Components cannot use:
 
 - `useState`, `useEffect`, `useRef`, `useReducer`, and most React hooks
 - `createContext` / `useContext`
-- `forwardRef`, `memo`
 - Browser APIs (`window`, `localStorage`, `document`)
 - Event handlers (`onClick`, `onChange`)
+
+> **Note on `React.memo` and `forwardRef`:** These wrappers don't cause errors in Server Components -- the React Flight renderer silently unwraps them. However, their functionality has no effect: `memo` can't memoize (Server Components don't re-render), and `forwardRef` can't forward refs (the `ref` prop is explicitly rejected by the Flight serializer). Libraries that use these wrappers can still render as Server Components, unlike libraries that call hooks. `forwardRef` is deprecated in React 19 in favor of `ref` as a regular prop.
+>
+> **Note on `ref` in Server Components:** `React.createRef()` is available in the server runtime (it's a plain function, not a hook), but the resulting ref cannot be attached to any element. The Flight serializer explicitly rejects the `ref` prop on any element -- including Client Components -- with: _"Refs cannot be used in Server Components, nor passed to Client Components."_ Refs are inherently a client-side concept -- if a Client Component needs a ref, it should create one itself with `useRef()`.
 
 Any library that relies on these features must be used within a `'use client'` boundary. The React Working Group maintains a [canonical tracking list](https://github.com/reactwg/server-components/discussions/6) of library RSC support status.
 
