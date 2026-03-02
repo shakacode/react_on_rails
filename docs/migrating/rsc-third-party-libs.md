@@ -2,7 +2,7 @@
 
 Most third-party React libraries were built before Server Components existed. Many rely on hooks, Context, or browser APIs that are unavailable in Server Components. This guide covers how to identify incompatible libraries, create wrapper patterns, and choose RSC-compatible alternatives.
 
-> **Part 4 of the [RSC Migration Series](migrating-to-rsc.md)**
+> **Part 5 of the [RSC Migration Series](migrating-to-rsc.md)**
 
 ## Why Libraries Break in Server Components
 

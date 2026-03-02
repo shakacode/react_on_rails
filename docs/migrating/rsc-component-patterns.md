@@ -2,7 +2,7 @@
 
 This guide covers how to restructure your React component tree when migrating to React Server Components. The core challenge: your existing components likely mix data fetching, state management, and rendering in ways that prevent them from being Server Components. This guide shows you how to untangle them.
 
-> **Part 1 of the [RSC Migration Series](migrating-to-rsc.md)**
+> **Part 2 of the [RSC Migration Series](migrating-to-rsc.md)** | Previous: [Preparing Your App](rsc-preparing-app.md)
 
 ## The Mental Model Shift
 

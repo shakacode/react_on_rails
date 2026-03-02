@@ -2,7 +2,7 @@
 
 React Context is one of the biggest migration challenges when adopting RSC. Server Components cannot create or consume Context -- they have no access to `createContext`, `useContext`, or any Context provider. This guide covers the patterns for handling Context, providers, and global state in an RSC world.
 
-> **Part 2 of the [RSC Migration Series](migrating-to-rsc.md)**
+> **Part 3 of the [RSC Migration Series](migrating-to-rsc.md)**
 
 ## Why Context Doesn't Work in Server Components
 

@@ -2,7 +2,7 @@
 
 This guide covers the most common problems you'll encounter when migrating to React Server Components, with concrete solutions for each. Use it as a reference when you hit errors or unexpected behavior.
 
-> **Part 5 of the [RSC Migration Series](migrating-to-rsc.md)**
+> **Part 6 of the [RSC Migration Series](migrating-to-rsc.md)**
 
 ## Serialization Boundary Issues
 
