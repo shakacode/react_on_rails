@@ -69,7 +69,7 @@ How to handle libraries that aren't RSC-compatible. Covers:
 - CSS-in-JS migration (styled-components, Emotion alternatives)
 - UI library compatibility (MUI, Chakra, Radix, shadcn/ui)
 - Form, animation, charting, and date library status
-- The barrel file problem and `optimizePackageImports`
+- The barrel file problem and direct imports
 - Using `server-only` and `client-only` packages
 
 ### 6. [Troubleshooting and Common Pitfalls](rsc-troubleshooting.md)
@@ -109,7 +109,7 @@ Before diving into the React patterns, understand how RSC maps to React on Rails
 
 ## Quick-Start Migration Strategy
 
-Adapted from [Mux's migration of 50,000 lines](https://www.mux.com/blog/what-are-react-server-components), tailored for React on Rails' multi-root architecture:
+Tailored for React on Rails' multi-root architecture:
 
 1. **[Prepare your app](rsc-preparing-app.md)** -- set up the RSC infrastructure, add `'use client'` to all component entry points, and switch to streaming rendering. The app works identically -- nothing changes yet.
 2. **Pick a component and push the boundary down** -- move `'use client'` from the root component to its interactive children, letting parent components become Server Components.

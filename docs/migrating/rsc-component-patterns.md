@@ -27,7 +27,7 @@ ServerPage.jsx (Server Component)
 
 ## The Top-Down Migration Strategy
 
-Start from the top of each component tree and work downward. This is the approach [Mux used to migrate 50,000 lines of code](https://www.mux.com/blog/what-are-react-server-components):
+Start from the top of each component tree and work downward:
 
 <p align="center">
   <img src="images/top-down-migration.svg" alt="Animated diagram showing the three phases of top-down RSC migration: Phase 1 marks the root as client, Phase 2 pushes the client boundary down to leaf components, and Phase 3 splits mixed components into server and client parts." width="840" />
@@ -37,7 +37,7 @@ Start from the top of each component tree and work downward. This is the approac
 
 ### Phase 1: Mark All Entry Points as Client (already done)
 
-If you followed [Preparing Your App](rsc-preparing-app.md), this phase is already complete. Every registered component entry point has `'use client'`, so the RSC pipeline is active but all components are still Client Components.
+If you followed [Preparing Your App](rsc-preparing-app.md), this phase is already complete. Every registered component entry point has `'use client'`, so the RSC pipeline is active but all components are still Client Components. Ensure that your bundle root files (`client-bundle.js`, `server-bundle.js`) do **not** have a `'use client'` directive -- only the individual component files should.
 
 ### Phase 2: Pick a Component and Push the Boundary Down
 
@@ -48,21 +48,57 @@ Choose one registered component to migrate. The ideal first candidate is a compo
 **Step 2: Update the registration.** When a component loses its `'use client'` directive, its registration must change:
 
 - **With `auto_load_bundle`:** This happens automatically. The generated pack switches from `ReactOnRails.register` to `registerServerComponent` based on whether the file has `'use client'`.
-- **With manual registration:** Move the component from `ReactOnRails.register` in `server-bundle.js` to `registerServerComponent`:
+- **With manual registration:** The `registerServerComponent` API uses different import paths per bundle (`/server` vs `/client`). How you update registration depends on your current setup:
 
-```js
-// server-bundle.js
-import ReactOnRails from 'react-on-rails-pro';
-import registerServerComponent from 'react-on-rails-pro/registerServerComponent/server';
+  **If you have a single bundle file** (e.g., `server-bundle.js` that imports and registers all components):
 
-// Migrated component -- now a Server Component
-import ProductPage from '../components/ProductPage';
-registerServerComponent({ ProductPage });
+  ```js
+  // server-bundle.js
+  import registerServerComponent from 'react-on-rails-pro/registerServerComponent/server';
 
-// Not yet migrated -- still Client Components
-import CartPage from '../components/CartPage';
-ReactOnRails.register({ CartPage });
-```
+  // Migrated component -- now a Server Component
+  import ProductPage from '../components/ProductPage';
+  registerServerComponent({ ProductPage });
+
+  // Not yet migrated -- still Client Components
+  import CartPage from '../components/CartPage';
+  ReactOnRails.register({ CartPage });
+  ```
+
+  On the client side, create a separate entry point for each migrated component:
+
+  ```js
+  // ProductPage.client.js -- client entry point for the migrated component
+  import registerServerComponent from 'react-on-rails-pro/registerServerComponent/client';
+
+  registerServerComponent("ProductPage");
+  ```
+
+  Add `ProductPage.client.js` as a client bundle entry point in your webpack config.
+
+  **If each component has its own entry file** (e.g., `ProductPage.jsx` contains `ReactOnRails.register` and is used as a client bundle entry point):
+
+  1. **Remove** the `ReactOnRails.register` call from `ProductPage.jsx`.
+  2. **Create** `ProductPage.client.jsx` with the client-side registration:
+
+     ```js
+     // ProductPage.client.jsx -- replaces ProductPage.jsx as the client entry point
+     import registerServerComponent from 'react-on-rails-pro/registerServerComponent/client';
+
+     registerServerComponent("ProductPage");
+     ```
+
+  3. **In the server bundle**, import the component and register it:
+
+     ```js
+     // server-bundle.js (or a dedicated server entry file)
+     import registerServerComponent from 'react-on-rails-pro/registerServerComponent/server';
+     import ProductPage from '../components/ProductPage';
+
+     registerServerComponent({ ProductPage });
+     ```
+
+  4. **Update your client webpack config** to use `ProductPage.client.jsx` as the entry point instead of `ProductPage.jsx`. This preserves per-component chunking on the client side.
 
 **Step 3: Push `'use client'` down to interactive children.** Identify child components that don't use hooks or browser APIs. Those can stay as server-rendered. Add `'use client'` only to the children that need interactivity.
 

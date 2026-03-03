@@ -23,7 +23,7 @@ Before starting, ensure you have:
 
 - **React on Rails Pro 4+** with **React on Rails 15+**
 - **React 19** (`react` and `react-dom` both at 19.x)
-- **Node renderer** configured and running (RSC requires server-side JavaScript execution via the node renderer, not ExecJS). If you're still using ExecJS, migrate to the node renderer first -- see the [React on Rails Pro documentation](https://www.shakacode.com/react-on-rails-pro/).
+- **Node renderer** configured and running (RSC requires server-side JavaScript execution via the node renderer, not ExecJS). If you're still using ExecJS, migrate to the node renderer first -- see [Node Renderer Basics](https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/basics/).
 - **Shakapacker** (or webpack configured via Shakapacker)
 - **Node.js 20+**
 
@@ -37,14 +37,19 @@ yarn add react-on-rails-rsc
 npm install react-on-rails-rsc
 ```
 
-Verify that `react` and `react-dom` are at version 19:
+Verify that `react` and `react-dom` are at version 19, and that the major and minor versions of `react-on-rails-rsc` match your `react` version (e.g., `react` 19.1.x should use `react-on-rails-rsc` 19.1.x):
 
 ```bash
 yarn why react
 # Should show 19.x
+
+yarn why react-on-rails-rsc
+# Major.minor should match react (e.g., both 19.1.x)
 ```
 
 If you're on React 18 or earlier, upgrade first -- RSC requires React 19.
+
+> **Security:** `react-on-rails-rsc` versions **19.0.0 through 19.0.3** contain known vulnerabilities in the vendored `react-server-dom-webpack` package, including a Remote Code Execution flaw (CVE-2025-55182). Version **19.0.4** is the minimum version that includes fixes for all known CVEs (CVE-2025-55182, CVE-2025-55183, CVE-2025-55184, CVE-2025-67779). Always use **19.0.4 or later**.
 
 ## Step 2: Configure Rails for RSC
 
@@ -151,7 +156,9 @@ const configureRsc = () => {
   // Pass true to skip RSCWebpackPlugin - RSC bundle doesn't need it
   const rscConfig = serverWebpackConfig(true);
 
-  // Update the entry name to be `rsc-bundle` instead of `server-bundle`
+  // Rename the entry from `server-bundle` to `rsc-bundle` so webpack
+  // produces a different output filename, while keeping the same entry
+  // point file used by the server bundle.
   const rscEntry = {
     'rsc-bundle': rscConfig.entry['server-bundle'],
   };
@@ -263,7 +270,7 @@ module.exports = {
 };
 ```
 
-> **`clientReferences`**: Adjust the `directory` path to match your app's source directory. This limits which files the plugin scans for `'use client'` directives.
+> **`clientReferences`**: If omitted, the plugin defaults to scanning the entire project root recursively (`{ directory: ".", recursive: true, include: /\.(js|ts|jsx|tsx)$/ }`), which works but is slow on large codebases. Setting `directory` to your app's source directory (e.g., `'./client/app'`) limits the scan to only the files that could contain `'use client'` directives.
 
 ### 4c. Add RSCWebpackPlugin to the client webpack config
 
@@ -450,7 +457,7 @@ import { Provider } from 'react-redux';
 
 ### What about the bundle entry files?
 
-**Do not** add `'use client'` to `client-bundle.js` or `server-bundle.js`. These are webpack entry points that import and register components -- they're not React components themselves. The directive only matters on files that define or re-export the component that gets registered.
+Adding `'use client'` to `client-bundle.js` or `server-bundle.js` would technically work -- it would make all imported components Client Components, achieving the same immediate effect. However, we recommend placing the directive on **individual component files** instead. The reason is forward-looking: when you later want to convert a specific component to a Server Component (by removing `'use client'`), you need granular control per component. If the directive is only on the bundle entry file, you'd have to move it to every individual component file at that point anyway.
 
 ### Verification
 
@@ -492,7 +499,9 @@ end
 
 > **Which actions need this?** Only actions whose views use `stream_react_component`. If an action's view only uses `react_component` (and you haven't migrated it yet in the step below), it can keep the standard `render`.
 
-### 6b. Update view helpers
+### 6b. Update view helpers (optional now)
+
+This step can be done now for all components at once, or deferred and done per-component as you migrate each one to a Server Component. Either way works — `react_component` continues to function alongside the RSC pipeline.
 
 In each view, replace `react_component` with `stream_react_component`:
 
