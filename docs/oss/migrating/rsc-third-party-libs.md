@@ -2,7 +2,7 @@
 
 Most third-party React libraries were built before Server Components existed. Many rely on hooks, Context, or browser APIs that are unavailable in Server Components. This guide covers how to identify incompatible libraries, create wrapper patterns, and choose RSC-compatible alternatives.
 
-> **Part 4 of the [RSC Migration Series](migrating-to-rsc.md)**
+> **Part 5 of the [RSC Migration Series](migrating-to-rsc.md)**
 
 ## Why Libraries Break in Server Components
 
@@ -26,7 +26,7 @@ The most common solution for incompatible libraries: create a minimal `'use clie
 ### Direct Re-export (Simplest)
 
 ```jsx
-// app/ui/carousel.jsx
+// ui/carousel.jsx
 'use client';
 
 import { Carousel } from 'acme-carousel';
@@ -37,7 +37,7 @@ export default Carousel;
 Then use it in a Server Component:
 
 ```jsx
-// app/page.jsx -- Server Component
+// Page.jsx -- Server Component
 import Carousel from './ui/carousel';
 
 export default function Page() {
@@ -53,7 +53,7 @@ export default function Page() {
 ### Named Re-exports (Multiple Components)
 
 ```jsx
-// app/ui/chart-components.jsx
+// ui/chart-components.jsx
 'use client';
 
 export { AreaChart, BarChart, LineChart, Tooltip, Legend } from 'recharts';
@@ -62,7 +62,7 @@ export { AreaChart, BarChart, LineChart, Tooltip, Legend } from 'recharts';
 ### Wrapper with Default Props
 
 ```jsx
-// app/ui/date-picker.jsx
+// ui/date-picker.jsx
 'use client';
 
 import DatePicker from 'react-datepicker';
@@ -76,7 +76,7 @@ export default function AppDatePicker(props) {
 ### Provider Wrapper
 
 ```jsx
-// app/providers/query-provider.jsx
+// providers/query-provider.jsx
 'use client';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -125,7 +125,7 @@ Best-in-class RSC compatibility among full-featured headless libraries. Non-inte
 
 ### Material UI (MUI)
 
-All MUI components require `'use client'` due to Emotion dependency. None can be used as pure Server Components. **v5.14.0+** added `'use client'` directives, so components work alongside Server Components without manual wrappers. Add `@mui/material` to `optimizePackageImports` to avoid barrel file overhead.
+All MUI components require `'use client'` due to Emotion dependency. None can be used as pure Server Components. **v5.14.0+** added `'use client'` directives, so components work alongside Server Components without manual wrappers. Use direct imports (e.g., `import Button from '@mui/material/Button'`) instead of barrel imports to avoid bundling the entire library.
 
 ### Chakra UI
 
@@ -151,8 +151,12 @@ All components include `'use client'` directives. Cannot use compound components
 
 export async function submitForm(formData) {
   const name = formData.get('name');
-  await db.users.create({ data: { name } });
-  revalidatePath('/users');
+  // Call your Rails API endpoint for the mutation
+  await fetch('/api/users', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user: { name } }),
+  });
 }
 ```
 
@@ -170,6 +174,8 @@ export default function Page() {
 }
 ```
 
+> **React on Rails note:** In most React on Rails applications, form submissions go through Rails controllers via standard form posts or API endpoints. Server Actions are a React concept that can complement this, but they are not a replacement for Rails' controller/model layer. For most mutations, continue using your existing Rails API endpoints.
+
 ## Animation Libraries
 
 | Library | RSC Status | Notes |
@@ -182,7 +188,7 @@ export default function Page() {
 ### Animation Wrapper Pattern
 
 ```jsx
-// app/ui/animated-div.jsx
+// ui/animated-div.jsx
 'use client';
 
 import { motion } from 'motion/react';
@@ -216,23 +222,28 @@ All major date libraries work in Server Components since they are pure utility f
 
 | Library | RSC Pattern | Notes |
 |---------|-------------|-------|
+| **React on Rails Pro async props** | Recommended for React on Rails. Rails streams props incrementally via `stream_react_component_with_async_props`. | See [Data Fetching Migration](rsc-data-fetching.md#data-fetching-in-react-on-rails-pro) for details. |
 | **TanStack Query** | Prefetch on server with `queryClient.prefetchQuery()`, hydrate on client with `HydrationBoundary`. | See [Data Fetching Migration](rsc-data-fetching.md) for details. |
-| **Apollo Client** | Use `@apollo/client-integration-nextjs`. Separate RSC and SSR clients. | `registerApolloClient` for RSC queries, `ApolloNextAppProvider` for client queries. |
+| **Apollo Client** | Server-side queries in Server Components, `ApolloProvider` for client queries. | Requires `'use client'` wrapper for provider. |
 | **SWR** | Client-only hooks. Use `fallbackData` pattern: fetch in Server Component, pass as props. | See [Data Fetching Migration](rsc-data-fetching.md) for details. |
 
 ## Internationalization
 
 | Library | RSC Pattern | Notes |
 |---------|-------------|-------|
-| **next-intl** (v3+) | Full RSC support. `useTranslations`, `useFormatter`, `useLocale` work in Server Components. Async APIs available for async Server Components. | Recommended for Next.js. |
-| **react-i18next** | Requires `'use client'` for hook-based usage. | Partial support. |
+| **Rails I18n + react-intl** | Pass translations from Rails controller as props. Server Components use the translations object directly; Client Components use `<IntlProvider>` + `useIntl()`. | Recommended for React on Rails. See [Context guide](rsc-context-and-state.md#i18n-provider). |
+| **i18next / react-i18next** | Requires `'use client'` for hook-based usage. Server Components can use `i18next` directly (no hooks). | Framework-agnostic alternative. |
 
 ## Authentication
 
-| Library | RSC Pattern | Notes |
-|---------|-------------|-------|
-| **Clerk** | Full RSC support. `auth()` helper works directly in Server Components. | Purpose-built for App Router. |
-| **NextAuth.js / Auth.js** | `SessionProvider` requires Context (client-only). Use `getServerSession()` in Server Components. | Partial support. |
+In React on Rails, authentication is handled by Rails (Devise, OmniAuth, etc.) before the React component renders. The controller passes the authenticated user as props:
+
+```ruby
+# Rails controller handles auth, passes user to component
+stream_react_component("Dashboard", props: { user: current_user.as_json })
+```
+
+This is a simpler model than client-side auth libraries -- Rails middleware handles sessions, CSRF protection, and authorization before any React code executes. See the [auth provider pattern](rsc-context-and-state.md#auth-provider) for passing auth data to nested Client Components via Context.
 
 ## The Barrel File Problem
 
@@ -252,33 +263,37 @@ When you `import { Button } from './components'`, the bundler must parse the ent
 
 1. **Client boundary infection:** Adding `'use client'` to a barrel file forces ALL exports into the client bundle
 2. **Tree-shaking failure:** Bundlers struggle to eliminate unused exports
-3. **Mixed server/client exports:** Known bugs in Next.js when a barrel file exports both server and client components
+3. **Mixed server/client exports:** A barrel file that re-exports both server and client components can cause unexpected bundle inclusion
 
-### The Solution: `optimizePackageImports`
+### The Solution: Direct Imports
 
-For third-party packages, Next.js can automatically transform barrel imports into direct imports:
+The most reliable fix is to bypass barrel files entirely. Use direct imports instead:
 
-```js
-// next.config.js
-module.exports = {
-  experimental: {
-    optimizePackageImports: ['lucide-react', '@mui/material', 'my-lib'],
-  },
-};
+```jsx
+// BAD: Import from barrel -- pulls in everything
+import { Button } from './components';
+import { AlertIcon } from 'lucide-react';
+
+// GOOD: Import directly -- only bundles what you use
+import Button from './components/Button';
+import AlertIcon from 'lucide-react/dist/esm/icons/alert';
 ```
 
-This transforms `import { AlertIcon } from 'lucide-react'` into `import AlertIcon from 'lucide-react/dist/icons/alert'` under the hood.
+For third-party packages, check if the library provides direct import paths (most popular libraries do). For example:
+- `@mui/material/Button` instead of `{ Button } from '@mui/material'`
+- `lodash-es/debounce` instead of `{ debounce } from 'lodash-es'`
 
 ### For Your Own Code
 
-Avoid barrel files entirely. Use direct imports:
+Avoid creating barrel files that mix server and client components. If you must use a barrel file, keep separate barrels for server and client exports:
 
-```jsx
-// BAD: Import from barrel
-import { Button } from './components';
-
-// GOOD: Import directly
-import Button from './components/Button';
+```
+components/
+├── server/index.js    # Only server components
+├── client/index.js    # Only 'use client' components
+├── ServerHeader.jsx
+├── ClientSearch.jsx
+└── ...
 ```
 
 ## The `server-only` and `client-only` Packages
@@ -322,10 +337,10 @@ Use `client-only` for:
 | **Forms** | React 19 `useActionState` + Server Actions | React Hook Form, TanStack Form | Formik (less maintained) |
 | **Animation** | CSS animations, Tailwind animate | Framer Motion/Motion, React Spring | -- |
 | **Charts** | Nivo (SSR support) | Recharts, Tremor, Chart.js | -- |
-| **Data Fetching** | Native `fetch` in Server Components | TanStack Query (with hydration), Apollo, SWR | -- |
+| **Data Fetching** | React on Rails Pro async props, native `fetch` in Server Components | TanStack Query (with hydration), Apollo, SWR | -- |
 | **State** | Server Component props, `React.cache` | Zustand, Jotai (v2.6+), Redux Toolkit | Recoil (discontinued) |
-| **i18n** | next-intl v3+ | react-i18next | -- |
-| **Auth** | Clerk, Auth.js `getServerSession` | NextAuth SessionProvider | -- |
+| **i18n** | Rails I18n + react-intl | react-i18next, i18next | -- |
+| **Auth** | Rails auth (Devise, etc.) via controller props | -- | -- |
 | **Date Utils** | date-fns, dayjs (pure functions) | -- | Moment.js (not tree-shakable) |
 
 ## Next Steps

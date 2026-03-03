@@ -2,7 +2,7 @@
 
 This guide covers how to migrate your data fetching from client-side patterns (`useEffect` + `fetch`, React Query, SWR) to Server Component patterns. In React on Rails, data flows from Rails to your components as props — eliminating the need for loading states, error handling boilerplate, and client-side caching in many cases.
 
-> **Part 3 of the [RSC Migration Series](migrating-to-rsc.md)**
+> **Part 4 of the [RSC Migration Series](migrating-to-rsc.md)**
 
 ## The Core Shift: From Client-Side Fetching to Server-Side Data
 
@@ -232,7 +232,7 @@ async function ProductList() {
 When you need React Query's client features (background refetching, mutations, optimistic updates), prefetch on the server and hydrate on the client:
 
 ```jsx
-// app/products/page.jsx -- Server Component
+// ProductsPage.jsx -- Server Component
 import { dehydrate, HydrationBoundary, QueryClient } from '@tanstack/react-query';
 import { getProducts } from '../lib/data';
 import ProductList from './ProductList';
@@ -286,7 +286,7 @@ export default function ProductList() {
 SWR follows a similar pattern -- use the `fallback` prop to pass server-fetched data:
 
 ```jsx
-// app/dashboard/page.jsx -- Server Component
+// DashboardPage.jsx -- Server Component
 import { getDashboardStats } from '../lib/data';
 import DashboardStats from './DashboardStats';
 

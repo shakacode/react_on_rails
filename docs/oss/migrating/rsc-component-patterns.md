@@ -2,7 +2,7 @@
 
 This guide covers how to restructure your React component tree when migrating to React Server Components. The core challenge: your existing components likely mix data fetching, state management, and rendering in ways that prevent them from being Server Components. This guide shows you how to untangle them.
 
-> **Part 1 of the [RSC Migration Series](migrating-to-rsc.md)**
+> **Part 2 of the [RSC Migration Series](migrating-to-rsc.md)** | Previous: [Preparing Your App](rsc-preparing-app.md)
 
 ## The Mental Model Shift
 
@@ -27,48 +27,102 @@ ServerPage.jsx (Server Component)
 
 ## The Top-Down Migration Strategy
 
-Start from the top of your component tree and work downward. This is the approach [Mux used to migrate 50,000 lines of code](https://www.mux.com/blog/what-are-react-server-components):
+Start from the top of each component tree and work downward:
 
 <p align="center">
   <img src="images/top-down-migration.svg" alt="Animated diagram showing the three phases of top-down RSC migration: Phase 1 marks the root as client, Phase 2 pushes the client boundary down to leaf components, and Phase 3 splits mixed components into server and client parts." width="840" />
 </p>
 
-### Phase 1: Mark the Root as Client
+> **React on Rails multi-root note:** Unlike single-page apps with one root component, React on Rails renders multiple independent component trees on a page -- each `stream_react_component` call in your view is a separate root. This is actually an advantage for migration: you can migrate **one registered component at a time**, leaving the rest untouched.
 
-Add `'use client'` to your app entry point. Everything works exactly as before -- nothing breaks, nothing changes.
+### Phase 1: Mark All Entry Points as Client (already done)
 
-```jsx
-// App.jsx
-'use client';
+If you followed [Preparing Your App](rsc-preparing-app.md), this phase is already complete. Every registered component entry point has `'use client'`, so the RSC pipeline is active but all components are still Client Components. Ensure that your bundle root files (`client-bundle.js`, `server-bundle.js`) do **not** have a `'use client'` directive -- only the individual component files should.
 
-export default function App() {
-  // Your entire existing app, unchanged
-}
+### Phase 2: Pick a Component and Push the Boundary Down
+
+Choose one registered component to migrate. The ideal first candidate is a component that is mostly presentational -- heavy on layout and display, light on interactivity.
+
+**Step 1: Remove `'use client'` from the component entry point.** This makes it a Server Component.
+
+**Step 2: Update the registration.** When a component loses its `'use client'` directive, its registration must change:
+
+- **With `auto_load_bundle`:** This happens automatically. The generated pack switches from `ReactOnRails.register` to `registerServerComponent` based on whether the file has `'use client'`.
+- **With manual registration:** The `registerServerComponent` API uses different import paths per bundle (`/server` vs `/client`). How you update registration depends on your current setup:
+
+  **If you have a single bundle file** (e.g., `server-bundle.js` that imports and registers all components):
+
+  ```js
+  // server-bundle.js
+  import registerServerComponent from 'react-on-rails-pro/registerServerComponent/server';
+
+  // Migrated component -- now a Server Component
+  import ProductPage from '../components/ProductPage';
+  registerServerComponent({ ProductPage });
+
+  // Not yet migrated -- still Client Components
+  import CartPage from '../components/CartPage';
+  ReactOnRails.register({ CartPage });
+  ```
+
+  On the client side, create a separate entry point for each migrated component:
+
+  ```js
+  // ProductPage.client.js -- client entry point for the migrated component
+  import registerServerComponent from 'react-on-rails-pro/registerServerComponent/client';
+
+  registerServerComponent("ProductPage");
+  ```
+
+  Add `ProductPage.client.js` as a client bundle entry point in your webpack config.
+
+  **If each component has its own entry file** (e.g., `ProductPage.jsx` contains `ReactOnRails.register` and is used as a client bundle entry point):
+
+  1. **Remove** the `ReactOnRails.register` call from `ProductPage.jsx`.
+  2. **Create** `ProductPage.client.jsx` with the client-side registration:
+
+     ```js
+     // ProductPage.client.jsx -- replaces ProductPage.jsx as the client entry point
+     import registerServerComponent from 'react-on-rails-pro/registerServerComponent/client';
+
+     registerServerComponent("ProductPage");
+     ```
+
+  3. **In the server bundle**, import the component and register it:
+
+     ```js
+     // server-bundle.js (or a dedicated server entry file)
+     import registerServerComponent from 'react-on-rails-pro/registerServerComponent/server';
+     import ProductPage from '../components/ProductPage';
+
+     registerServerComponent({ ProductPage });
+     ```
+
+  4. **Update your client webpack config** to use `ProductPage.client.jsx` as the entry point instead of `ProductPage.jsx`. This preserves per-component chunking on the client side.
+
+**Step 3: Push `'use client'` down to interactive children.** Identify child components that don't use hooks or browser APIs. Those can stay as server-rendered. Add `'use client'` only to the children that need interactivity.
+
+```
+Before (all client):
+ProductPage ('use client')       <-- Entry point, registered with ReactOnRails.register
+├── ProductHeader
+│   ├── ProductImage
+│   └── ShareButton
+├── ProductSpecs
+├── ReviewList
+└── AddToCartButton
+
+After (migrated):
+ProductPage                      <-- Server Component, registered with registerServerComponent
+├── ProductHeader                <-- Server Component (no hooks)
+│   ├── ProductImage             <-- Server Component (display only)
+│   └── ShareButton ('use client')  <-- Needs onClick handler
+├── ProductSpecs                 <-- Server Component (display only)
+├── ReviewList                   <-- Server Component (display only)
+└── AddToCartButton ('use client')  <-- Needs useState + onClick
 ```
 
-### Phase 2: Push the Boundary Down
-
-Identify layout and container components that don't use hooks or browser APIs. Remove `'use client'` from these and move it to their interactive children.
-
-```
-Before:
-App ('use client')           <-- Everything is client-side
-├── Layout
-│   ├── Header
-│   │   ├── Logo
-│   │   └── SearchBar
-│   ├── Content
-│   └── Footer
-
-After:
-App                          <-- Server Component (no directive)
-├── Layout                   <-- Server Component
-│   ├── Header               <-- Server Component
-│   │   ├── Logo             <-- Server Component
-│   │   └── SearchBar ('use client')  <-- Only this needs client
-│   ├── Content              <-- Server Component
-│   └── Footer               <-- Server Component
-```
+Repeat for each registered component you want to migrate.
 
 ### Phase 3: Split Mixed Components
 
