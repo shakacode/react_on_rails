@@ -27,48 +27,66 @@ ServerPage.jsx (Server Component)
 
 ## The Top-Down Migration Strategy
 
-Start from the top of your component tree and work downward. This is the approach [Mux used to migrate 50,000 lines of code](https://www.mux.com/blog/what-are-react-server-components):
+Start from the top of each component tree and work downward. This is the approach [Mux used to migrate 50,000 lines of code](https://www.mux.com/blog/what-are-react-server-components):
 
 <p align="center">
   <img src="images/top-down-migration.svg" alt="Animated diagram showing the three phases of top-down RSC migration: Phase 1 marks the root as client, Phase 2 pushes the client boundary down to leaf components, and Phase 3 splits mixed components into server and client parts." width="840" />
 </p>
 
-### Phase 1: Mark the Root as Client
+> **React on Rails multi-root note:** Unlike single-page apps with one root component, React on Rails renders multiple independent component trees on a page -- each `stream_react_component` call in your view is a separate root. This is actually an advantage for migration: you can migrate **one registered component at a time**, leaving the rest untouched.
 
-Add `'use client'` to your app entry point. Everything works exactly as before -- nothing breaks, nothing changes.
+### Phase 1: Mark All Entry Points as Client (already done)
 
-```jsx
-// App.jsx
-'use client';
+If you followed [Preparing Your App](rsc-preparing-app.md), this phase is already complete. Every registered component entry point has `'use client'`, so the RSC pipeline is active but all components are still Client Components.
 
-export default function App() {
-  // Your entire existing app, unchanged
-}
+### Phase 2: Pick a Component and Push the Boundary Down
+
+Choose one registered component to migrate. The ideal first candidate is a component that is mostly presentational -- heavy on layout and display, light on interactivity.
+
+**Step 1: Remove `'use client'` from the component entry point.** This makes it a Server Component.
+
+**Step 2: Update the registration.** When a component loses its `'use client'` directive, its registration must change:
+
+- **With `auto_load_bundle`:** This happens automatically. The generated pack switches from `ReactOnRails.register` to `registerServerComponent` based on whether the file has `'use client'`.
+- **With manual registration:** Move the component from `ReactOnRails.register` in `server-bundle.js` to `registerServerComponent`:
+
+```js
+// server-bundle.js
+import ReactOnRails from 'react-on-rails-pro';
+import registerServerComponent from 'react-on-rails-pro/registerServerComponent/server';
+
+// Migrated component -- now a Server Component
+import ProductPage from '../components/ProductPage';
+registerServerComponent({ ProductPage });
+
+// Not yet migrated -- still Client Components
+import CartPage from '../components/CartPage';
+ReactOnRails.register({ CartPage });
 ```
 
-### Phase 2: Push the Boundary Down
-
-Identify layout and container components that don't use hooks or browser APIs. Remove `'use client'` from these and move it to their interactive children.
+**Step 3: Push `'use client'` down to interactive children.** Identify child components that don't use hooks or browser APIs. Those can stay as server-rendered. Add `'use client'` only to the children that need interactivity.
 
 ```
-Before:
-App ('use client')           <-- Everything is client-side
-├── Layout
-│   ├── Header
-│   │   ├── Logo
-│   │   └── SearchBar
-│   ├── Content
-│   └── Footer
+Before (all client):
+ProductPage ('use client')       <-- Entry point, registered with ReactOnRails.register
+├── ProductHeader
+│   ├── ProductImage
+│   └── ShareButton
+├── ProductSpecs
+├── ReviewList
+└── AddToCartButton
 
-After:
-App                          <-- Server Component (no directive)
-├── Layout                   <-- Server Component
-│   ├── Header               <-- Server Component
-│   │   ├── Logo             <-- Server Component
-│   │   └── SearchBar ('use client')  <-- Only this needs client
-│   ├── Content              <-- Server Component
-│   └── Footer               <-- Server Component
+After (migrated):
+ProductPage                      <-- Server Component, registered with registerServerComponent
+├── ProductHeader                <-- Server Component (no hooks)
+│   ├── ProductImage             <-- Server Component (display only)
+│   └── ShareButton ('use client')  <-- Needs onClick handler
+├── ProductSpecs                 <-- Server Component (display only)
+├── ReviewList                   <-- Server Component (display only)
+└── AddToCartButton ('use client')  <-- Needs useState + onClick
 ```
+
+Repeat for each registered component you want to migrate.
 
 ### Phase 3: Split Mixed Components
 
