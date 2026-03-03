@@ -277,23 +277,18 @@ This suppresses the warning but does not fix the mismatch -- use it only for non
 
 Error Boundaries do **not** catch errors thrown in Server Components. Errors from Server Components are uncaught on the client.
 
-### Workaround: Retry with `router.refresh()`
+### Workaround: Retry with Page Reload
+
+Since React on Rails renders each component tree independently via `stream_react_component`, a full page reload re-renders all Server Components on the server:
 
 ```jsx
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { startTransition } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 
 function ErrorFallback({ error, resetErrorBoundary }) {
-  const router = useRouter();
-
   function retry() {
-    startTransition(() => {
-      router.refresh();       // Re-renders Server Components on the server
-      resetErrorBoundary();   // Resets client error boundary state
-    });
+    window.location.reload();  // Re-renders Server Components on the server
   }
 
   return (
@@ -312,6 +307,8 @@ export default function PageErrorBoundary({ children }) {
   );
 }
 ```
+
+> **Note:** For finer-grained retry (re-rendering a single Server Component without a full page reload), the client would need to re-fetch the RSC payload for that component. This depends on your application's routing setup.
 
 ## `'use client'` Directive Mistakes
 
@@ -448,25 +445,6 @@ async function Page() {
 }
 ```
 
-### Params Must Be Awaited (Next.js 15+)
-
-```tsx
-// BROKEN in Next.js 15
-export default function Post({ params }: { params: { id: string } }) {
-  const post = getBlogPost(params.id);
-}
-
-// FIXED: params is now a Promise
-export default async function Post({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
-  const post = await getBlogPost(id);
-}
-```
-
 ### Runtime Validation for Server Actions
 
 TypeScript only provides compile-time checking. Server Actions are public endpoints that can receive arbitrary data. Use runtime validation:
@@ -502,7 +480,7 @@ export async function createUser(formData: FormData) {
 | **RSC Devtools** (Chrome extension) | Visualize RSC streaming data, server vs client rendering |
 | **DevConsole** | Color-coded component boundaries (green = client, blue = server) |
 | **RSC Parser** | Parse the React Flight wire format to inspect the component tree |
-| **`@next/bundle-analyzer`** | Next.js-specific wrapper around webpack-bundle-analyzer |
+| **`webpack-stats-explorer`** | Interactive exploration of webpack stats for chunk analysis |
 
 ### Key Metrics to Track
 
@@ -525,17 +503,16 @@ export async function createUser(formData: FormData) {
 | `"'App' cannot be used as a JSX component. Its return type 'Promise<JSX.Element>' is not a valid JSX element type"` | TypeScript doesn't recognize async components | Upgrade to TS 5.1.2+ and `@types/react` 18.2.8+, or omit return type |
 | RSC page downloads unexpectedly large chunks | A shared component with `'use client'` appears in multiple chunk groups; webpack's manifest may map it to a heavy chunk group containing unrelated dependencies (depends on chunk group iteration order) | Inspect `react-client-manifest.json` for oversized chunk mappings. If found, create a thin `'use client'` wrapper file for the RSC import. See [Chunk Contamination](#chunk-contamination) above |
 | `"Text content does not match server-rendered HTML"` | Hydration mismatch | Ensure identical rendering on server and client; use `suppressHydrationWarning` for intentional differences |
-| `"Route used params.id. params should be awaited before using its properties"` | Next.js 15 changed params to async | Await params: `const { id } = await params;` |
 | `"Refs cannot be used in Server Components, nor passed to Client Components"` | Using the `ref` prop on any element inside a Server Component -- including on Client Components. The Flight serializer rejects the literal `ref` prop before checking the target type. | Remove the `ref` prop. Refs are a client-side concept -- if a Client Component needs a ref, it should create one itself with `useRef()`. While `React.createRef()` is callable on the server, the result cannot be attached to any element. |
 
 ## Environment Variable Access
 
 ### Server Components
 
-Server Components have access to **all** environment variables:
+Server Components run on the server (in the node renderer), so they have access to **all** environment variables available to the Node.js process:
 
 ```jsx
-// Server Component -- full access
+// Server Component -- full access to Node.js process.env
 async function DBComponent() {
   const data = await fetch(process.env.DATABASE_URL);  // Works
   const secret = process.env.API_SECRET;               // Works
@@ -544,20 +521,27 @@ async function DBComponent() {
 
 ### Client Components
 
-Client Components only have access to specifically prefixed variables:
+Client Components only have access to environment variables that are explicitly injected into the webpack bundle. In Shakapacker, you control this via `webpack.EnvironmentPlugin` or `webpack.DefinePlugin`:
 
-- **Next.js:** `NEXT_PUBLIC_` prefix
-- **Vite:** `VITE_` prefix
+```js
+// config/webpack/environment.js (Shakapacker)
+const { environment } = require('@rails/webpacker');
+
+// Only these variables are available in Client Components
+environment.plugins.prepend('Environment',
+  new webpack.EnvironmentPlugin(['RAILS_ENV', 'PUBLIC_API_URL'])
+);
+```
 
 ```jsx
 'use client';
 function ClientComp() {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL;  // Works
-  const secret = process.env.API_SECRET;           // undefined
+  const apiUrl = process.env.PUBLIC_API_URL;  // Works (injected by webpack)
+  const secret = process.env.API_SECRET;      // undefined (not injected)
 }
 ```
 
-**Security:** Use `server-only` to protect modules that access secrets. Without it, secrets could accidentally leak to the client through import chains.
+**Security:** Never add secret keys to webpack's `EnvironmentPlugin` -- they would be embedded in the client bundle. Use `server-only` to protect modules that access secrets. Without it, secrets could accidentally leak to the client through import chains.
 
 ## When NOT to Use Server Components
 
