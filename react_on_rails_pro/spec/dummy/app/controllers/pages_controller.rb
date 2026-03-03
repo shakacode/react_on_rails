@@ -164,6 +164,21 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     render "/pages/pro/console_logs_in_async_server"
   end
 
+  # React 19 native metadata examples (no react-helmet)
+  def native_metadata
+    render "/pages/native_metadata"
+  end
+
+  def stream_native_metadata
+    stream_view_containing_react_components(template: "/pages/stream_native_metadata")
+  end
+
+  def hybrid_metadata_streaming
+    @page_title = "#{PROPS_NAME}'s Profile | React on Rails"
+    @page_description = "Profile page for #{PROPS_NAME} - metadata set by Rails controller for SEO"
+    stream_view_containing_react_components(template: "/pages/hybrid_metadata_streaming")
+  end
+
   # Demo page showing 10 async components rendering concurrently
   # Each component delays 1 second - sequential would take ~10s, concurrent takes ~1s
   def async_components_demo

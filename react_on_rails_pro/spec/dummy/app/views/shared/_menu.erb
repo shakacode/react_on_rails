@@ -61,6 +61,15 @@ end
   <li>
     <%= link_to("Async Render Function Returns a Component", async_render_function_returns_component_path, class: cp(async_render_function_returns_component_path)) %>
   </li>
+  <li>
+    <%= link_to "React 19 Native Metadata (Sync SSR)", native_metadata_path, class: cp(native_metadata_path) %>
+  </li>
+  <li>
+    <%= link_to "React 19 Native Metadata (Streaming)", stream_native_metadata_path, class: cp(stream_native_metadata_path) %>
+  </li>
+  <li>
+    <%= link_to "Hybrid Metadata + Streaming (SEO)", hybrid_metadata_streaming_path, class: cp(hybrid_metadata_streaming_path) %>
+  </li>
 </ul>
 
 <h2 class="text-red-700 text-2xl mt-5">
