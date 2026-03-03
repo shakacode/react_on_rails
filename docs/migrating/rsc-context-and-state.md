@@ -79,10 +79,10 @@ Real applications need many providers (theme, auth, i18n, query client). Create 
 // providers.jsx
 'use client';
 
-import { ThemeProvider } from 'next-themes';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 import AuthProvider from './auth-provider';
+import ThemeProvider from './theme-provider';
 
 export default function Providers({ children, user }) {
   const [queryClient] = useState(() => new QueryClient());
@@ -90,7 +90,7 @@ export default function Providers({ children, user }) {
   return (
     <AuthProvider user={user}>
       <QueryClientProvider client={queryClient}>
-        <ThemeProvider attribute="class">
+        <ThemeProvider>
           {children}
         </ThemeProvider>
       </QueryClientProvider>
@@ -100,28 +100,28 @@ export default function Providers({ children, user }) {
 ```
 
 ```jsx
-// layout.jsx -- Server Component
+// ProductPage.jsx -- Server Component (registered with registerServerComponent)
 import Providers from './providers';
-import { getUser } from './lib/auth';
 import Header from './components/Header';
 import Footer from './components/Footer';
+import ProductDetails from './components/ProductDetails';
 
-export default async function Layout({ children }) {
-  const user = await getUser();
+export default async function ProductPage({ user, productId }) {
+  const product = await getProduct(productId);
 
   return (
-    <html>
-      <body>
-        <Header />        {/* Server Component -- outside providers */}
-        <Providers user={user}>
-          {children}
-        </Providers>
-        <Footer />        {/* Server Component -- outside providers */}
-      </body>
-    </html>
+    <div>
+      <Header />           {/* Server Component -- outside providers */}
+      <Providers user={user}>
+        <ProductDetails product={product} />
+      </Providers>
+      <Footer />           {/* Server Component -- outside providers */}
+    </div>
   );
 }
 ```
+
+> **React on Rails multi-root note:** Each `stream_react_component` call in your view renders an independent component tree. If multiple registered components on the same page need the same providers (e.g., theme, auth), each component tree must include its own provider wrapper. This is different from single-page frameworks where one root layout wraps everything. In React on Rails, the HTML layout (`application.html.erb`) is a Rails template -- only the React component trees need providers.
 
 **Key insight:** Components that don't need context (static header, footer) stay **outside** the provider wrapper, keeping them as Server Components with zero JavaScript cost.
 
@@ -150,10 +150,10 @@ export default async function Navbar() {
 ```
 
 ```jsx
-// app/dashboard/page.jsx -- Server Component
+// components/Dashboard.jsx -- Server Component
 import { getUser } from '../lib/user';
 
-export default async function DashboardPage() {
+export default async function Dashboard() {
   const user = await getUser(); // Same cached result, no duplicate fetch
   return <h1>Dashboard for {user.name}</h1>;
 }
@@ -365,101 +365,132 @@ RSC reduces the need for global state libraries because data fetching moves to t
 
 ### Auth Provider
 
-Read auth state on the server, pass to a Client Component provider:
+In React on Rails, auth data typically comes from the Rails controller as props. The controller has access to the session, cookies, and your authentication system (Devise, etc.) -- pass the current user to the component:
+
+```ruby
+# app/controllers/dashboard_controller.rb
+class DashboardController < ApplicationController
+  include ReactOnRailsPro::Stream
+
+  def show
+    stream_view_containing_react_components(template: "dashboard/show")
+  end
+
+  helper_method :dashboard_props
+
+  def dashboard_props
+    { user: current_user&.as_json(only: [:id, :name, :email, :role]) }
+  end
+end
+```
+
+```erb
+<%# app/views/dashboard/show.html.erb %>
+<%= stream_react_component("Dashboard", props: dashboard_props, prerender: true) %>
+```
 
 ```jsx
-// layout.jsx -- Server Component
-import { cookies } from 'next/headers';
-import { verifyToken } from './lib/auth';
+// Dashboard.jsx -- Server Component (registered with registerServerComponent)
 import AuthProvider from './auth-provider';
 
-export default async function Layout({ children }) {
-  const cookieStore = await cookies();
-  const token = cookieStore.get('session')?.value;
-  const user = token ? await verifyToken(token) : null;
-
+export default function Dashboard({ user }) {
   return (
-    <html>
-      <body>
-        <AuthProvider user={user}>{children}</AuthProvider>
-      </body>
-    </html>
+    <AuthProvider user={user}>
+      <DashboardContent />
+    </AuthProvider>
   );
 }
 ```
 
-**Key constraints:**
-
-- Server Components can read `HttpOnly` cookies that client JavaScript cannot access (security advantage)
-- Cookies are read-only in Server Components -- use Server Actions or middleware to set cookies
-- Session refresh must happen in middleware, before the Server Component renders
+**Key advantage over client-side auth:** The Rails controller handles authentication and authorization before the component ever renders. `HttpOnly` session cookies never touch JavaScript. The component receives only the serialized user data it needs.
 
 ### Theme Provider (No Flash of Wrong Theme)
 
-For server-side theme rendering without flicker, store the preference in a cookie:
+For server-side theme rendering without flicker, read the theme preference in the Rails controller and pass it as a prop:
 
-```jsx
-// layout.jsx -- Server Component
-import { cookies } from 'next/headers';
-
-export default async function Layout({ children }) {
-  const cookieStore = await cookies();
-  const theme = cookieStore.get('theme')?.value || 'light';
-
-  return (
-    <html className={theme}>
-      <body>{children}</body>
-    </html>
-  );
-}
+```ruby
+# app/controllers/application_controller.rb
+def theme_preference
+  cookies[:theme] || current_user&.theme_preference || 'light'
+end
 ```
 
-The correct CSS class is applied during SSR -- no flash of the wrong theme on initial load. A Client Component can update the cookie via a Server Action when the user toggles themes.
+```erb
+<%# app/views/layouts/application.html.erb %>
+<html class="<%= theme_preference %>">
+  <body>
+    <%= yield %>
+  </body>
+</html>
+```
+
+The correct CSS class is applied during the initial HTML response from Rails -- no flash of the wrong theme on initial load. A Client Component can update the cookie (via a `fetch` call or form submission) when the user toggles themes.
+
+If your React components also need the theme value, pass it as a prop:
+
+```erb
+<%= stream_react_component("App", props: { theme: theme_preference, ... }) %>
+```
 
 ### i18n Provider
 
-Internationalization requires a split approach. Server Components use server-side translation functions; Client Components use a provider:
+Internationalization in React on Rails typically uses Rails I18n on the server side and a client-side library (like `react-intl` or `i18next`) for Client Components. Pass translations from Rails as props:
+
+```ruby
+# app/controllers/application_controller.rb
+helper_method :i18n_props
+
+def i18n_props
+  {
+    locale: I18n.locale.to_s,
+    messages: I18n.t('.').deep_stringify_keys, # or a subset of translations
+  }
+end
+```
 
 ```jsx
-// layout.jsx -- Server Component
-import { NextIntlClientProvider } from 'next-intl';
-import { getMessages, getLocale } from 'next-intl/server';
+// I18nProvider.jsx
+'use client';
 
-export default async function Layout({ children }) {
-  const locale = await getLocale();
-  const messages = await getMessages();
+import { IntlProvider } from 'react-intl';
 
+export default function I18nProvider({ locale, messages, children }) {
   return (
-    <html lang={locale}>
-      <body>
-        <NextIntlClientProvider messages={messages}>
-          {children}
-        </NextIntlClientProvider>
-      </body>
-    </html>
+    <IntlProvider locale={locale} messages={messages}>
+      {children}
+    </IntlProvider>
   );
 }
 ```
 
 ```jsx
-// ServerComponent.jsx -- uses server-side translation
-import { getTranslations } from 'next-intl/server';
+// ProductPage.jsx -- Server Component
+import I18nProvider from './I18nProvider';
 
-export default async function ServerComponent() {
-  const t = await getTranslations('HomePage');
-  return <h1>{t('title')}</h1>;
+export default function ProductPage({ locale, messages, ...props }) {
+  // Server Components can use the translations object directly
+  const title = messages['product_page.title'];
+
+  return (
+    <div>
+      <h1>{title}</h1>
+      <I18nProvider locale={locale} messages={messages}>
+        <InteractiveFilters />  {/* Client Component can use useIntl() */}
+      </I18nProvider>
+    </div>
+  );
 }
 ```
 
 ```jsx
-// ClientComponent.jsx -- uses client-side hook
+// InteractiveFilters.jsx -- Client Component
 'use client';
 
-import { useTranslations } from 'next-intl';
+import { useIntl } from 'react-intl';
 
-export default function ClientComponent() {
-  const t = useTranslations('Counter');
-  return <button>{t('increment')}</button>;
+export default function InteractiveFilters() {
+  const intl = useIntl();
+  return <button>{intl.formatMessage({ id: 'filters.apply' })}</button>;
 }
 ```
 
@@ -477,8 +508,8 @@ export default function ClientComponent() {
 
 3. Create a `providers.jsx` file marked with `'use client'`
 4. Move all context providers into this file
-5. Import the composed provider into your root layout
-6. Pass server-fetched data as props to the provider
+5. Import the composed provider into each registered Server Component that needs it
+6. Pass server-fetched data (from Rails controller props) into the provider
 
 ### Phase 3: Replace Server-Side Context Usage
 
