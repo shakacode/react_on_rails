@@ -232,7 +232,7 @@ async function ProductList() {
 When you need React Query's client features (background refetching, mutations, optimistic updates), prefetch on the server and hydrate on the client:
 
 ```jsx
-// app/products/page.jsx -- Server Component
+// ProductsPage.jsx -- Server Component
 import { dehydrate, HydrationBoundary, QueryClient } from '@tanstack/react-query';
 import { getProducts } from '../lib/data';
 import ProductList from './ProductList';
@@ -286,7 +286,7 @@ export default function ProductList() {
 SWR follows a similar pattern -- use the `fallback` prop to pass server-fetched data:
 
 ```jsx
-// app/dashboard/page.jsx -- Server Component
+// DashboardPage.jsx -- Server Component
 import { getDashboardStats } from '../lib/data';
 import DashboardStats from './DashboardStats';
 
