@@ -274,7 +274,20 @@ export default function injectRSCPayload(
       // ALWAYS wait for all RSC promises to settle, regardless of how htmlStream
       // closed. Promise.allSettled never rejects, so all promises are guaranteed
       // to be awaited — no dangling fire-and-forget promises.
-      await Promise.allSettled(rscPromises);
+      //
+      // Rejections are surfaced on resultStream for observability (errorReporter
+      // in the node renderer) without aborting output.
+      const settledResults = await Promise.allSettled(rscPromises);
+      for (const settledResult of settledResults) {
+        if (settledResult.status === 'rejected') {
+          resultStream.emit(
+            'error',
+            settledResult.reason instanceof Error
+              ? settledResult.reason
+              : new Error(String(settledResult.reason)),
+          );
+        }
+      }
     } catch (e) {
       // Guard against unexpected errors (e.g., onRSCPayloadGenerated throws).
       // Without this catch, rscPromise would reject before the close handler
@@ -315,6 +328,7 @@ export default function injectRSCPayload(
   htmlStream.on('close', () => {
     if (!rscPromise) {
       endResultStream();
+      rscRequestTracker.clear();
       return;
     }
 
