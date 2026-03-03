@@ -2,7 +2,7 @@
 
 React Context is one of the biggest migration challenges when adopting RSC. Server Components cannot create or consume Context -- they have no access to `createContext`, `useContext`, or any Context provider. This guide covers the patterns for handling Context, providers, and global state in an RSC world.
 
-> **Part 2 of the [RSC Migration Series](migrating-to-rsc.md)**
+> **Part 3 of the [RSC Migration Series](migrating-to-rsc.md)**
 
 ## Why Context Doesn't Work in Server Components
 
@@ -51,25 +51,22 @@ export default function ThemeProvider({ children }) {
 ```
 
 ```jsx
-// layout.jsx -- Server Component
+// ProductPage.jsx -- Server Component (registered with registerServerComponent)
 import ThemeProvider from './theme-provider';
+import ProductDetails from './ProductDetails';
 
-export default function Layout({ children }) {
+export default function ProductPage(props) {
   return (
-    <html>
-      <body>
-        <ThemeProvider>
-          {children}  {/* Server Components pass through unchanged */}
-        </ThemeProvider>
-      </body>
-    </html>
+    <ThemeProvider>
+      <ProductDetails product={props.product} />  {/* Server Component passes through unchanged */}
+    </ThemeProvider>
   );
 }
 ```
 
-**Why this works:** The Server Component (`Layout`) renders `ThemeProvider` as a Client Component, passing `{children}` (which are Server Components) through it. The children are rendered on the server and passed as pre-rendered content -- they don't become Client Components.
+**Why this works:** The Server Component (`ProductPage`) renders `ThemeProvider` as a Client Component, passing Server Component children through it. The children are rendered on the server and passed as pre-rendered content -- they don't become Client Components.
 
-**Best practice:** Render providers as deep as possible in the tree. Wrap only `{children}`, not the entire `<html>` document. This lets the framework optimize static parts outside the provider.
+**Best practice:** Render providers as deep as possible in the tree. Keep components that don't need context outside the provider wrapper.
 
 ## Pattern 2: Composing Multiple Providers
 
@@ -79,10 +76,10 @@ Real applications need many providers (theme, auth, i18n, query client). Create 
 // providers.jsx
 'use client';
 
-import { ThemeProvider } from 'next-themes';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 import AuthProvider from './auth-provider';
+import ThemeProvider from './theme-provider';
 
 export default function Providers({ children, user }) {
   const [queryClient] = useState(() => new QueryClient());
@@ -90,7 +87,7 @@ export default function Providers({ children, user }) {
   return (
     <AuthProvider user={user}>
       <QueryClientProvider client={queryClient}>
-        <ThemeProvider attribute="class">
+        <ThemeProvider>
           {children}
         </ThemeProvider>
       </QueryClientProvider>
@@ -100,254 +97,171 @@ export default function Providers({ children, user }) {
 ```
 
 ```jsx
-// layout.jsx -- Server Component
+// ProductPage.jsx -- Server Component (registered with registerServerComponent)
 import Providers from './providers';
-import { getUser } from './lib/auth';
 import Header from './components/Header';
 import Footer from './components/Footer';
+import ProductDetails from './components/ProductDetails';
 
-export default async function Layout({ children }) {
-  const user = await getUser();
+export default async function ProductPage({ user, productId }) {
+  const product = await getProduct(productId);
 
   return (
-    <html>
-      <body>
-        <Header />        {/* Server Component -- outside providers */}
-        <Providers user={user}>
-          {children}
-        </Providers>
-        <Footer />        {/* Server Component -- outside providers */}
-      </body>
-    </html>
+    <div>
+      <Header />           {/* Server Component -- outside providers */}
+      <Providers user={user}>
+        <ProductDetails product={product} />
+      </Providers>
+      <Footer />           {/* Server Component -- outside providers */}
+    </div>
   );
 }
 ```
 
 **Key insight:** Components that don't need context (static header, footer) stay **outside** the provider wrapper, keeping them as Server Components with zero JavaScript cost.
 
-## Pattern 3: `React.cache()` for Server-Side Data Sharing
+## Pattern 3: Streaming Slow Data with Async Props
 
-Server Components can't use Context, but they can share data using `React.cache()`. This memoizes a function's result within a single request -- multiple Server Components calling the same cached function get the same result without duplicate work.
+In React on Rails, data comes from Rails as props. Some data is available immediately (user session, page title), but other data requires expensive queries (analytics, recommendations, external APIs). With **async props**, you send the fast data as regular props so the shell renders immediately, and stream the slow data in the background as it becomes ready.
 
-```jsx
-// lib/user.js
-import { cache } from 'react';
-
-export const getUser = cache(async () => {
-  const res = await fetch('https://api.example.com/user');
-  return res.json();
-});
+```erb
+<%= stream_react_component_with_async_props("ProductPage",
+      props: { name: product.name, price: product.price }) do |emit|
+  # These run in the background while the shell renders
+  emit.call("reviews", product.reviews.includes(:author).as_json)
+  emit.call("recommendations", RecommendationService.for(product).as_json)
+end %>
 ```
 
-```jsx
-// components/Navbar.jsx -- Server Component
-import { getUser } from '../lib/user';
-
-export default async function Navbar() {
-  const user = await getUser(); // Cached per request
-  return <nav>Welcome, {user.name}</nav>;
-}
-```
+The component renders its shell (`name`, `price`) instantly. Each async prop streams in when Rails finishes computing it, filling in Suspense boundaries progressively:
 
 ```jsx
-// app/dashboard/page.jsx -- Server Component
-import { getUser } from '../lib/user';
+// ProductPage.jsx -- Server Component
+import { Suspense } from 'react';
 
-export default async function DashboardPage() {
-  const user = await getUser(); // Same cached result, no duplicate fetch
-  return <h1>Dashboard for {user.name}</h1>;
-}
-```
-
-**Properties of `React.cache()`:**
-
-- Scoped to the **current request only** -- no cross-request data leakage
-- Works like "server Context" -- multiple components get the same data
-- Only works in Server Components
-- Replaces the pattern of prop-drilling shared data through many components
-
-## Pattern 4: Sharing Data Between Server and Client Components
-
-When data must be available to both Server and Client Components, combine `React.cache()` with a Context provider that passes a **Promise**:
-
-```jsx
-// lib/user.js
-import { cache } from 'react';
-
-export const getUser = cache(async () => {
-  const res = await fetch('https://api.example.com/user');
-  return res.json();
-});
-```
-
-```jsx
-// user-provider.jsx
-'use client';
-
-import { createContext } from 'react';
-
-export const UserContext = createContext(null);
-
-export default function UserProvider({ children, userPromise }) {
-  return <UserContext value={userPromise}>{children}</UserContext>;
-}
-```
-
-```jsx
-// layout.jsx -- Server Component
-import UserProvider from './user-provider';
-import { getUser } from './lib/user';
-
-export default function Layout({ children }) {
-  const userPromise = getUser(); // Do NOT await
+export default function ProductPage({ name, price, getReactOnRailsAsyncProp }) {
+  const reviewsPromise = getReactOnRailsAsyncProp('reviews');
+  const recommendationsPromise = getReactOnRailsAsyncProp('recommendations');
 
   return (
-    <html>
-      <body>
-        <UserProvider userPromise={userPromise}>
-          {children}
-        </UserProvider>
-      </body>
-    </html>
+    <div>
+      <h1>{name}</h1>
+      <p>${price}</p>
+
+      <Suspense fallback={<p>Loading reviews...</p>}>
+        <Reviews reviewsPromise={reviewsPromise} />
+      </Suspense>
+      <Suspense fallback={<p>Loading recommendations...</p>}>
+        <Recommendations itemsPromise={recommendationsPromise} />
+      </Suspense>
+    </div>
   );
 }
-```
 
-```jsx
-// components/Profile.jsx -- Client Component
-'use client';
-
-import { use, useContext } from 'react';
-import { UserContext } from '../user-provider';
-
-export function Profile() {
-  const userPromise = useContext(UserContext);
-  if (!userPromise) throw new Error('Must be within UserProvider');
-  const user = use(userPromise); // Resolves the promise
-  return <p>Welcome, {user.name}</p>;
+// Server Component -- awaits the streamed prop
+async function Reviews({ reviewsPromise }) {
+  const reviews = await reviewsPromise;
+  return <ul>{reviews.map(r => <li key={r.id}>{r.text}</li>)}</ul>;
 }
 ```
 
-**How it works:**
+`getReactOnRailsAsyncProp(key)` returns a cached Promise (same object on repeated calls), so you can pass it to multiple children -- Server Components `await` it, Client Components resolve it with `use()`. No `React.cache()` or Context wiring needed.
 
-1. Server Component starts the fetch (close to data source) but doesn't await
-2. Promise is passed to the Client Component provider
-3. Client Components resolve the promise with `use()`
-4. Server Components can also call `getUser()` directly and `await` it -- `React.cache()` ensures no duplicate fetch
-
-> **Warning:** Never create promises inside Client Components for `use()` -- this causes the "uncached promise" runtime error. Always pass promises from Server Components as props (as shown above). See [Common `use()` Mistakes](rsc-data-fetching.md#common-use-mistakes-in-client-components) for details.
+> For the full async props API, TypeScript typing, and more examples, see [Data Fetching in React on Rails Pro](rsc-data-fetching.md#data-fetching-in-react-on-rails-pro).
 
 ## Migrating Global State Libraries
 
 ### Redux Toolkit
 
-Redux must be adapted for RSC. The key rules:
+The key rule for RSC: **Server Components must NOT read or write the Redux store.** Only Client Components interact with Redux. This is straightforward in React on Rails because your component's client/server split is explicit.
 
-1. **Do NOT create a global singleton store** -- create per-request stores to prevent data leakage across users
-2. **Server Components must NOT read or write the Redux store**
-3. **Only Client Components interact with Redux**
+React on Rails provides two Redux patterns. Both continue to work with RSC as long as Redux access stays in Client Components:
 
-```jsx
-// lib/store.js
-import { configureStore } from '@reduxjs/toolkit';
+**Pattern 1: Shared store (`registerStore` + `redux_store` helper)**
 
-export const makeStore = () => {
-  return configureStore({
-    reducer: { /* your reducers */ },
-  });
-};
-```
+If you use `ReactOnRails.registerStore()` with the `redux_store` view helper, no changes are needed for Client Components. The framework already creates a fresh store per request (store generators receive `(props, railsContext)` and return a new store instance). Client Components continue using `ReactOnRails.getStore()` and `<Provider>` as before.
 
 ```jsx
-// StoreProvider.jsx
+// ReduxApp.client.jsx -- Client Component (unchanged)
 'use client';
 
-import { useRef } from 'react';
 import { Provider } from 'react-redux';
-import { makeStore } from '../lib/store';
+import ReactOnRails from 'react-on-rails/client';
+import MyComponent from './MyComponent';
 
-export default function StoreProvider({ children }) {
-  const storeRef = useRef(null);
-  if (!storeRef.current) {
-    storeRef.current = makeStore();
-  }
-
-  return <Provider store={storeRef.current}>{children}</Provider>;
-}
-```
-
-**Important:** Use `useRef` for store initialization, NOT `useEffect`. `useEffect` runs only on the client and causes hydration mismatches. `useRef` initializes during the first render.
-
-**To pass server data into Redux:**
-
-```jsx
-// StoreProvider.jsx
-'use client';
-
-import { useRef } from 'react';
-import { Provider } from 'react-redux';
-import { makeStore } from '../lib/store';
-import { setInitialData } from '../lib/features/dataSlice';
-
-export default function StoreProvider({ initialData, children }) {
-  const storeRef = useRef(null);
-  if (!storeRef.current) {
-    storeRef.current = makeStore();
-    storeRef.current.dispatch(setInitialData(initialData));
-  }
-
-  return <Provider store={storeRef.current}>{children}</Provider>;
-}
-```
-
-### Zustand
-
-Zustand follows the same pattern -- per-request store factories with a Client Component provider:
-
-```jsx
-// stores/counter-store.js
-import { createStore } from 'zustand/vanilla';
-
-export const createCounterStore = (initState = { count: 0 }) => {
-  return createStore((set) => ({
-    ...initState,
-    increment: () => set((state) => ({ count: state.count + 1 })),
-    decrement: () => set((state) => ({ count: state.count - 1 })),
-  }));
-};
-```
-
-```jsx
-// providers/counter-store-provider.jsx
-'use client';
-
-import { createContext, useRef, useContext } from 'react';
-import { useStore } from 'zustand';
-import { createCounterStore } from '../stores/counter-store';
-
-const CounterStoreContext = createContext(undefined);
-
-export function CounterStoreProvider({ children }) {
-  const storeRef = useRef(null);
-  if (!storeRef.current) {
-    storeRef.current = createCounterStore();
-  }
+export default () => {
+  const store = ReactOnRails.getStore('MyStore');
 
   return (
-    <CounterStoreContext.Provider value={storeRef.current}>
-      {children}
-    </CounterStoreContext.Provider>
+    <Provider store={store}>
+      <MyComponent />
+    </Provider>
   );
-}
+};
+```
 
-export function useCounterStore(selector) {
-  const store = useContext(CounterStoreContext);
-  if (!store) throw new Error('Missing CounterStoreProvider');
-  return useStore(store, selector);
+When you migrate a component to a Server Component, use the donut pattern -- a Client Component `<Provider>` at the root with Server Components passed as `children`:
+
+```jsx
+// ReduxProvider.jsx -- Client Component (the "donut")
+'use client';
+
+import { Provider } from 'react-redux';
+import ReactOnRails from 'react-on-rails/client';
+
+export default function ReduxProvider({ children }) {
+  const store = ReactOnRails.getStore('MyStore');
+
+  return <Provider store={store}>{children}</Provider>;
 }
 ```
 
-**Critical warning:** Never use Zustand (or any state library) directly in Server Components -- the store would be shared across ALL users on the server, creating severe security and correctness issues.
+```jsx
+// ProductPage.jsx -- Server Component (migrated)
+import ReduxProvider from './ReduxProvider';
+import ProductSpecs from './ProductSpecs';
+import AddToCartButton from './AddToCartButton';
+
+export default async function ProductPage({ productId }) {
+  const product = await getProduct(productId);
+
+  return (
+    <ReduxProvider>
+      <h1>{product.name}</h1>                {/* Server-rendered */}
+      <ProductSpecs product={product} />      {/* Server Component */}
+      <AddToCartButton product={product} />   {/* Client Component -- uses useDispatch */}
+    </ReduxProvider>
+  );
+}
+```
+
+Server Components pass through the `<Provider>` unchanged (they don't consume the store). Client Components deeper in the tree (like `AddToCartButton`) can use `useSelector` and `useDispatch` as usual.
+
+**Pattern 2: Per-component store (render function with `useMemo`)**
+
+If your component creates its own store from props (the pattern used by the React on Rails generator), it already works -- the component is a Client Component with `'use client'`:
+
+```jsx
+// HelloWorldApp.client.jsx
+'use client';
+
+import { useMemo } from 'react';
+import { Provider } from 'react-redux';
+import configureStore from '../store/helloWorldStore';
+import HelloWorldContainer from '../containers/HelloWorldContainer';
+
+export default function HelloWorldApp(props) {
+  const store = useMemo(() => configureStore(props), [props]);
+
+  return (
+    <Provider store={store}>
+      <HelloWorldContainer />
+    </Provider>
+  );
+}
+```
+
+**What RSC changes for Redux:** With Server Components, only the props that Client Components actually need get serialized into the HTML. Previously, all props passed via `react_component` were encoded in the page for hydration -- even data only used for display. Now, Server Components consume display-only data on the server (it never reaches the client), so you should pass only the interactive state your Client Components need into the `<ReduxProvider>`. This reduces the HTML page size and the amount of data the browser must parse.
 
 ### General State Management Guidance
 
@@ -355,111 +269,142 @@ RSC reduces the need for global state libraries because data fetching moves to t
 
 | Use Case | Recommended Approach |
 |----------|---------------------|
-| Server data (read-only display) | Async Server Components with direct fetching |
+| Server data (read-only display) | Rails controller props → Server Component renders directly |
+| Server data (slow, shouldn't block the shell) | [Async props](rsc-data-fetching.md#data-fetching-in-react-on-rails-pro) with Suspense boundaries |
 | Server data (with client cache/revalidation) | TanStack Query with prefetch + hydrate |
 | Client UI state (modals, forms, selections) | `useState` / Context in Client Components |
-| Complex client state (undo/redo, shared across many components) | Zustand or Redux Toolkit in Client Components |
-| Request-scoped data sharing (between Server Components) | `React.cache()` |
+| Complex client state (undo/redo, shared across many components) | Redux Toolkit in Client Components |
 
 ## Specific Provider Patterns
 
 ### Auth Provider
 
-Read auth state on the server, pass to a Client Component provider:
+In React on Rails, auth data typically comes from the Rails controller as props. The controller has access to the session, cookies, and your authentication system (Devise, etc.) -- pass the current user to the component:
+
+```ruby
+# app/controllers/dashboard_controller.rb
+class DashboardController < ApplicationController
+  include ReactOnRailsPro::Stream
+
+  def show
+    stream_view_containing_react_components(template: "dashboard/show")
+  end
+
+  helper_method :dashboard_props
+
+  def dashboard_props
+    { user: current_user&.as_json(only: [:id, :name, :email, :role]) }
+  end
+end
+```
+
+```erb
+<%# app/views/dashboard/show.html.erb %>
+<%= stream_react_component("Dashboard", props: dashboard_props, prerender: true) %>
+```
 
 ```jsx
-// layout.jsx -- Server Component
-import { cookies } from 'next/headers';
-import { verifyToken } from './lib/auth';
+// Dashboard.jsx -- Server Component (registered with registerServerComponent)
 import AuthProvider from './auth-provider';
 
-export default async function Layout({ children }) {
-  const cookieStore = await cookies();
-  const token = cookieStore.get('session')?.value;
-  const user = token ? await verifyToken(token) : null;
-
+export default function Dashboard({ user }) {
   return (
-    <html>
-      <body>
-        <AuthProvider user={user}>{children}</AuthProvider>
-      </body>
-    </html>
+    <AuthProvider user={user}>
+      <DashboardContent />
+    </AuthProvider>
   );
 }
 ```
 
-**Key constraints:**
-
-- Server Components can read `HttpOnly` cookies that client JavaScript cannot access (security advantage)
-- Cookies are read-only in Server Components -- use Server Actions or middleware to set cookies
-- Session refresh must happen in middleware, before the Server Component renders
+**Key advantage over client-side auth:** The Rails controller handles authentication and authorization before the component ever renders. `HttpOnly` session cookies never touch JavaScript. The component receives only the serialized user data it needs.
 
 ### Theme Provider (No Flash of Wrong Theme)
 
-For server-side theme rendering without flicker, store the preference in a cookie:
+For server-side theme rendering without flicker, read the theme preference in the Rails controller and pass it as a prop:
 
-```jsx
-// layout.jsx -- Server Component
-import { cookies } from 'next/headers';
-
-export default async function Layout({ children }) {
-  const cookieStore = await cookies();
-  const theme = cookieStore.get('theme')?.value || 'light';
-
-  return (
-    <html className={theme}>
-      <body>{children}</body>
-    </html>
-  );
-}
+```ruby
+# app/controllers/application_controller.rb
+def theme_preference
+  cookies[:theme] || current_user&.theme_preference || 'light'
+end
 ```
 
-The correct CSS class is applied during SSR -- no flash of the wrong theme on initial load. A Client Component can update the cookie via a Server Action when the user toggles themes.
+```erb
+<%# app/views/layouts/application.html.erb %>
+<html class="<%= theme_preference %>">
+  <body>
+    <%= yield %>
+  </body>
+</html>
+```
+
+The correct CSS class is applied during the initial HTML response from Rails -- no flash of the wrong theme on initial load. A Client Component can update the cookie (via a `fetch` call or form submission) when the user toggles themes.
+
+If your React components also need the theme value, pass it as a prop:
+
+```erb
+<%= stream_react_component("App", props: { theme: theme_preference, ... }) %>
+```
 
 ### i18n Provider
 
-Internationalization requires a split approach. Server Components use server-side translation functions; Client Components use a provider:
+Internationalization in React on Rails typically uses Rails I18n on the server side and a client-side library (like `react-intl` or `i18next`) for Client Components. Pass translations from Rails as props:
+
+```ruby
+# app/controllers/application_controller.rb
+helper_method :i18n_props
+
+def i18n_props
+  {
+    locale: I18n.locale.to_s,
+    messages: I18n.t('.').deep_stringify_keys, # or a subset of translations
+  }
+end
+```
 
 ```jsx
-// layout.jsx -- Server Component
-import { NextIntlClientProvider } from 'next-intl';
-import { getMessages, getLocale } from 'next-intl/server';
+// I18nProvider.jsx
+'use client';
 
-export default async function Layout({ children }) {
-  const locale = await getLocale();
-  const messages = await getMessages();
+import { IntlProvider } from 'react-intl';
 
+export default function I18nProvider({ locale, messages, children }) {
   return (
-    <html lang={locale}>
-      <body>
-        <NextIntlClientProvider messages={messages}>
-          {children}
-        </NextIntlClientProvider>
-      </body>
-    </html>
+    <IntlProvider locale={locale} messages={messages}>
+      {children}
+    </IntlProvider>
   );
 }
 ```
 
 ```jsx
-// ServerComponent.jsx -- uses server-side translation
-import { getTranslations } from 'next-intl/server';
+// ProductPage.jsx -- Server Component
+import I18nProvider from './I18nProvider';
 
-export default async function ServerComponent() {
-  const t = await getTranslations('HomePage');
-  return <h1>{t('title')}</h1>;
+export default function ProductPage({ locale, messages, ...props }) {
+  // Server Components can use the translations object directly
+  const title = messages['product_page.title'];
+
+  return (
+    <div>
+      <h1>{title}</h1>
+      <I18nProvider locale={locale} messages={messages}>
+        <InteractiveFilters />  {/* Client Component can use useIntl() */}
+      </I18nProvider>
+    </div>
+  );
 }
 ```
 
 ```jsx
-// ClientComponent.jsx -- uses client-side hook
+// InteractiveFilters.jsx -- Client Component
 'use client';
 
-import { useTranslations } from 'next-intl';
+import { useIntl } from 'react-intl';
 
-export default function ClientComponent() {
-  const t = useTranslations('Counter');
-  return <button>{t('increment')}</button>;
+export default function InteractiveFilters() {
+  const intl = useIntl();
+  return <button>{intl.formatMessage({ id: 'filters.apply' })}</button>;
 }
 ```
 
@@ -477,21 +422,20 @@ export default function ClientComponent() {
 
 3. Create a `providers.jsx` file marked with `'use client'`
 4. Move all context providers into this file
-5. Import the composed provider into your root layout
-6. Pass server-fetched data as props to the provider
+5. Import the composed provider into each registered Server Component that needs it
+6. Pass server-fetched data (from Rails controller props) into the provider
 
 ### Phase 3: Replace Server-Side Context Usage
 
-7. Replace `useContext` in data-fetching components with direct data fetching
-8. Use `React.cache()` to share data between Server Components
-9. Pass promises to context for hybrid server/client data
+7. Replace `useContext` in data-fetching components with Rails controller props or async props
+8. For data shared between Server and Client Components, pass async prop promises directly as props (no Context needed)
+9. Remove Context providers that only existed to pass server data down the tree
 
 ### Phase 4: State Management Libraries
 
-10. Create per-request store factories (not global singletons)
-11. Remove store reads/writes from Server Components
-12. Initialize stores from server-fetched props using `useRef`
-13. Consider reducing state library usage -- RSC often eliminates the need for client-side data caching
+10. Remove store reads/writes from Server Components
+11. Move `<Provider>` wrapping into Client Component children when the parent becomes a Server Component
+12. Consider reducing state library usage -- data previously fetched client-side and stored in Redux can now come directly from Rails controller props
 
 ## Next Steps
 
