@@ -16,7 +16,8 @@
     "bench:stream": "NODE_ENV=production node scripts/bench-stream-ssr.mjs",
     "bench:rsc:ssr": "NODE_ENV=production node scripts/bench-rsc-ssr.mjs",
     "bench:payload-ssr": "NODE_ENV=production node scripts/bench-payload-ssr.mjs",
-    "bench": "pnpm run bench:string && pnpm run bench:stream && pnpm run bench:rsc:ssr && pnpm run bench:payload-ssr"
+    "bench:concurrent": "NODE_ENV=production node scripts/bench-concurrent.mjs",
+    "bench": "pnpm run bench:string && pnpm run bench:stream && pnpm run bench:rsc:ssr && pnpm run bench:payload-ssr && pnpm run bench:concurrent"
   },
   "dependencies": {
     "react": "^19.0.3",
