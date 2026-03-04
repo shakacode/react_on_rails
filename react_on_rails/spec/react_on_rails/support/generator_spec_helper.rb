@@ -148,7 +148,13 @@ def base_server_webpack_content
       rules.forEach((rule) => {
         if (Array.isArray(rule.use)) {
           const cssLoader = rule.use.find((item) => {
-            return item.includes('css-loader');
+            let testValue = '';
+            if (typeof item === 'string') {
+              testValue = item;
+            } else if (item && typeof item.loader === 'string') {
+              testValue = item.loader;
+            }
+            return testValue.includes('css-loader');
           });
           if (cssLoader && cssLoader.options && cssLoader.options.modules) {
             cssLoader.options.modules = {
