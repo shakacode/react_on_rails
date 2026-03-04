@@ -389,7 +389,8 @@ RSpec.describe "Streaming API" do
 
       mocked_response = instance_double(ActionController::Live::Response)
       mocked_stream = instance_double(ActionController::Live::Buffer)
-      allow(mocked_response).to receive(:stream).and_return(mocked_stream)
+      mocked_headers = {}
+      allow(mocked_response).to receive_messages(headers: mocked_headers, stream: mocked_stream)
       allow(mocked_stream).to receive(:write)
       allow(mocked_stream).to receive(:close)
       allow(mocked_stream).to receive(:closed?).and_return(false)
@@ -442,6 +443,16 @@ RSpec.describe "Streaming API" do
       expect(stream).to have_received(:write).with("X3")
       expect(stream).to have_received(:write).with("Y1")
       expect(stream).to have_received(:write).with("Y2")
+    end
+
+    it "sets Content-Encoding: identity to prevent compression middleware deadlock" do
+      _queues, controller, _stream = setup_stream_test(component_count: 0)
+
+      run_stream(controller) do |_parent|
+        sleep 0.1
+      end
+
+      expect(controller.response.headers["Content-Encoding"]).to eq("identity")
     end
 
     it "handles empty component list" do
