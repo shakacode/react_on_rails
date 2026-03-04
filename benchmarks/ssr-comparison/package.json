@@ -6,7 +6,7 @@
   "description": "Benchmark: renderToString vs streaming RSC SSR",
   "scripts": {
     "build": "pnpm run build:traditional && pnpm run build:rsc",
-    "build:traditional": "webpack --config webpack/webpack.traditional.js",
+    "build:traditional": "webpack --config webpack/webpack.traditional.js && webpack --config webpack/webpack.suspense.js",
     "build:client": "webpack --config webpack/webpack.client.js",
     "build:server": "webpack --config webpack/webpack.server.js",
     "build:rsc-bundle": "webpack --config webpack/webpack.rsc.js",
@@ -17,6 +17,7 @@
     "bench:rsc:ssr": "NODE_ENV=production node scripts/bench-rsc-ssr.mjs",
     "bench:payload-ssr": "NODE_ENV=production node scripts/bench-payload-ssr.mjs",
     "bench:concurrent": "NODE_ENV=production node scripts/bench-concurrent.mjs",
+    "bench:concurrent-suspense": "NODE_ENV=production node scripts/bench-concurrent-suspense.mjs",
     "bench": "pnpm run bench:string && pnpm run bench:stream && pnpm run bench:rsc:ssr && pnpm run bench:payload-ssr && pnpm run bench:concurrent"
   },
   "dependencies": {
