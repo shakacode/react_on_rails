@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Ensure mise-managed tools are on PATH for lefthook scripts.
+# Safety net for environments where shell startup files are not loaded.
+set -euo pipefail
+
+find_mise() {
+  if command -v mise >/dev/null 2>&1; then
+    command -v mise
+    return 0
+  fi
+
+  local candidates=(
+    "/opt/homebrew/bin/mise"
+    "/usr/local/bin/mise"
+    "$HOME/.local/bin/mise"
+  )
+
+  local candidate
+  for candidate in "${candidates[@]}"; do
+    if [ -x "$candidate" ]; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+MISE_BIN="$(find_mise || true)"
+if [ -z "$MISE_BIN" ]; then
+  exit 0
+fi
+
+# Remove stale shims entries first to keep ordering predictable, then prepend.
+PATH="${PATH//:$HOME\/.local\/share\/mise\/shims:/:}"
+export PATH="$HOME/.local/share/mise/shims:$PATH"
+
+# Initialize shell shims for non-interactive contexts.
+eval "$("$MISE_BIN" activate bash --shims)"

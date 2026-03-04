@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Lint Ruby files with RuboCop
 set -euo pipefail
+source "$(dirname "$0")/ensure-mise"
 
 CONTEXT="${1:-staged}"
 files="$(bin/lefthook/get-changed-files "$CONTEXT" '\.(rb|rake|ru)$')"
