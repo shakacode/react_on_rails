@@ -14,8 +14,13 @@ const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
 function extractLoader(rule, loaderName) {
   if (!Array.isArray(rule.use)) return null;
   return rule.use.find((item) => {
-    const testValue = typeof item === 'string' ? item : item.loader;
-    return testValue && testValue.includes(loaderName);
+    let testValue = '';
+    if (typeof item === 'string') {
+      testValue = item;
+    } else if (item && typeof item.loader === 'string') {
+      testValue = item.loader;
+    }
+    return testValue.includes(loaderName);
   });
 }
 

@@ -79,7 +79,7 @@ const configureServer = () => {
         } else if (item && typeof item.loader === 'string') {
           testValue = item.loader;
         }
-        return !(testValue.match(/mini-css-extract-plugin/) || testValue === 'style-loader');
+        return !(testValue.includes('mini-css-extract-plugin') || testValue === 'style-loader');
       });
       const cssLoader = rule.use.find((item) => {
         let testValue = '';
@@ -92,8 +92,11 @@ const configureServer = () => {
 
         return testValue.includes('css-loader');
       });
-      if (cssLoader && cssLoader.options) {
-        cssLoader.options.modules = { exportOnlyLocals: true };
+      if (cssLoader && cssLoader.options && cssLoader.options.modules) {
+        cssLoader.options.modules = {
+          ...(typeof cssLoader.options.modules === 'object' ? cssLoader.options.modules : {}),
+          exportOnlyLocals: true,
+        };
       }
 
       // Skip writing image files during SSR by setting emitFile to false

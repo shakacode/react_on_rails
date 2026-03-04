@@ -150,7 +150,10 @@ const path = require('path');
 const getLocalIdent = (context, _localIdentName, localName) => {
   const resourcePath = context.resourcePath;
   const resourceQuery = context.resourceQuery || ''; // needed for CSS-in-JS virtual modules; safe no-op otherwise
-  const projectRoot = path.resolve(__dirname, '../..'); // adjust if config lives at a different depth
+  // __dirname is typically config/webpack/, so '../..' resolves to the project root.
+  // If your webpack config lives at a different depth, adjust the number of '..' segments
+  // and verify with: console.log('projectRoot:', path.resolve(__dirname, '../..'))
+  const projectRoot = path.resolve(__dirname, '../..');
   const relativePath = path.relative(projectRoot, resourcePath);
 
   const hash = crypto
