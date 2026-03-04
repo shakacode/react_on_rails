@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
+# This file is intended to be sourced by lefthook scripts.
 # Ensure mise-managed tools are on PATH for lefthook scripts.
 # Safety net for environments where shell startup files are not loaded.
 
 MISE_BIN="$(command -v mise 2>/dev/null || true)"
 if [ -z "$MISE_BIN" ] && [ -x /opt/homebrew/bin/mise ]; then
   MISE_BIN="/opt/homebrew/bin/mise"
+elif [ -z "$MISE_BIN" ] && [ -x "$HOME/.local/bin/mise" ]; then
+  MISE_BIN="$HOME/.local/bin/mise"
 fi
 
 if [ -z "$MISE_BIN" ]; then
@@ -13,3 +16,4 @@ fi
 
 # Initialize shell shims for non-interactive contexts.
 eval "$(env -u MISE_SHELL "$MISE_BIN" activate bash --shims)"
+unset MISE_BIN
