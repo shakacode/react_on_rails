@@ -1,0 +1,33 @@
+{
+  "name": "ssr-comparison-benchmark",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Benchmark: renderToString vs streaming RSC SSR",
+  "scripts": {
+    "build": "pnpm run build:traditional && pnpm run build:rsc",
+    "build:traditional": "webpack --config webpack/webpack.traditional.js",
+    "build:client": "webpack --config webpack/webpack.client.js",
+    "build:server": "webpack --config webpack/webpack.server.js",
+    "build:rsc-bundle": "webpack --config webpack/webpack.rsc.js",
+    "build:rsc": "pnpm run build:client && pnpm run build:server && pnpm run build:rsc-bundle",
+    "bench:string": "NODE_ENV=production node scripts/bench-string-ssr.mjs",
+    "bench:rsc:generate": "NODE_ENV=production node --conditions=react-server scripts/generate-rsc-payload.mjs",
+    "bench:rsc:ssr": "NODE_ENV=production node scripts/bench-rsc-ssr.mjs",
+    "bench": "pnpm run bench:string && pnpm run bench:rsc:ssr"
+  },
+  "dependencies": {
+    "react": "^19.0.3",
+    "react-dom": "^19.0.3",
+    "react-on-rails-rsc": "^19.0.4"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.20.12",
+    "@babel/preset-env": "^7.20.2",
+    "@babel/preset-react": "^7.26.3",
+    "@babel/preset-typescript": "^7.27.1",
+    "babel-loader": "^9.1.3",
+    "webpack": "^5.97.0",
+    "webpack-cli": "^6.0.0"
+  }
+}
