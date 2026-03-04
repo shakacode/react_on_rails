@@ -461,8 +461,8 @@ RSpec.describe "Streaming API" do
     end
 
     it "compresses stream output with gzip when enabled and accepted by client" do
-      _queues, controller, stream, headers, _request = setup_stream_test(
-        component_count: 0,
+      queues, controller, stream, headers, _request = setup_stream_test(
+        component_count: 1,
         accept_encoding: "gzip, deflate"
       )
       compressed_chunks = []
@@ -471,21 +471,22 @@ RSpec.describe "Streaming API" do
       end
 
       run_stream(controller, compress: true) do |_parent|
-        sleep 0.1
+        queues[0].enqueue("Chunk1")
+        queues[0].close
       end
 
       compressed_body = compressed_chunks.join
       decompressed_body = Zlib::GzipReader.new(StringIO.new(compressed_body)).read
 
-      expect(decompressed_body).to eq("TEMPLATE")
+      expect(decompressed_body).to eq("TEMPLATEChunk1")
       expect(headers["Content-Encoding"]).to eq("gzip")
       expect(headers["Vary"]).to eq("Accept-Encoding")
       expect(stream).to have_received(:close)
     end
 
     it "preserves existing Vary directives when enabling gzip streaming" do
-      _queues, controller, stream, headers, _request = setup_stream_test(
-        component_count: 0,
+      queues, controller, stream, headers, _request = setup_stream_test(
+        component_count: 1,
         headers: { "Vary" => "Origin" },
         accept_encoding: "gzip"
       )
@@ -495,26 +496,59 @@ RSpec.describe "Streaming API" do
       end
 
       run_stream(controller, compress: true) do |_parent|
-        sleep 0.1
+        queues[0].enqueue("Chunk1")
+        queues[0].close
       end
 
       decompressed_body = Zlib::GzipReader.new(StringIO.new(compressed_chunks.join)).read
-      expect(decompressed_body).to eq("TEMPLATE")
+      expect(decompressed_body).to eq("TEMPLATEChunk1")
       expect(headers["Vary"]).to eq("Origin, Accept-Encoding")
     end
 
     it "keeps plain streaming when client does not accept gzip" do
-      _queues, controller, stream, headers, _request = setup_stream_test(
-        component_count: 0,
+      queues, controller, stream, headers, _request = setup_stream_test(
+        component_count: 1,
         accept_encoding: "br"
       )
 
       run_stream(controller, compress: true) do |_parent|
-        sleep 0.1
+        queues[0].enqueue("Chunk1")
+        queues[0].close
       end
 
       expect(stream).to have_received(:write).with("TEMPLATE")
+      expect(stream).to have_received(:write).with("Chunk1")
       expect(headers["Content-Encoding"]).to be_nil
+    end
+
+    it "raises if compression is requested without closing the stream" do
+      _queues, controller, _stream, _headers, _request = setup_stream_test(
+        component_count: 0,
+        accept_encoding: "gzip"
+      )
+
+      expect do
+        controller.stream_view_containing_react_components(
+          template: "ignored",
+          compress: true,
+          close_stream_at_end: false
+        )
+      end.to raise_error(ArgumentError, /compress: true requires close_stream_at_end: true/)
+    end
+
+    it "does not set gzip headers when template rendering fails before commit" do
+      _queues, controller, _stream, headers, _request = setup_stream_test(
+        component_count: 0,
+        accept_encoding: "gzip"
+      )
+      allow(controller).to receive(:render_to_string).and_raise(StandardError, "render failed")
+
+      expect do
+        controller.stream_view_containing_react_components(template: "ignored", compress: true)
+      end.to raise_error(StandardError, "render failed")
+
+      expect(headers["Content-Encoding"]).to be_nil
+      expect(headers["Vary"]).to be_nil
     end
 
     it "handles empty component list" do
@@ -618,6 +652,27 @@ RSpec.describe "Streaming API" do
         end
 
         expect(written_chunks).to eq(%w[TEMPLATE Chunk1])
+      end
+
+      it "suppresses gzip footer close errors after client disconnect" do
+        queues, controller, stream, _headers, _request = setup_stream_test(
+          component_count: 1,
+          accept_encoding: "gzip"
+        )
+
+        write_count = 0
+        allow(stream).to receive(:write) do |_chunk|
+          write_count += 1
+          raise Errno::EPIPE, "broken pipe" if write_count >= 3
+        end
+
+        expect do
+          run_stream(controller, compress: true) do |_parent|
+            queues[0].enqueue("Chunk1")
+            queues[0].enqueue("Chunk2")
+            queues[0].close
+          end
+        end.not_to raise_error
       end
     end
   end

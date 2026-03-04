@@ -14,6 +14,7 @@ module ReactOnRailsPro
     #
     # @param template [String] The path to the template file to be streamed.
     # @param close_stream_at_end [Boolean] Whether to automatically close the stream after rendering (default: true).
+    # @param compress [Boolean] Enables gzip-compressed streaming when the client accepts gzip (default: false).
     # @param render_options [Hash] Additional options to pass to `render_to_string`.
     #
     # components must be added to the view using the `stream_react_component` helper.
@@ -33,11 +34,13 @@ module ReactOnRailsPro
     #
     # @see ReactOnRails::Helper#stream_react_component
     def stream_view_containing_react_components(template:, close_stream_at_end: true, compress: false, **render_options)
+      if compress && !close_stream_at_end
+        raise ArgumentError, "compress: true requires close_stream_at_end: true to finalize gzip footer"
+      end
+
       require "async"
       require "async/barrier"
       require "async/limited_queue"
-
-      output_stream = build_output_stream(compress: compress)
 
       Sync do |parent_task|
         # Initialize async primitives for concurrent component streaming
@@ -49,6 +52,7 @@ module ReactOnRailsPro
         # If a shell error occurs, consumer_stream_async raises PrerenderError here
         # (BEFORE the response is committed), enabling a proper HTTP redirect.
         template_string = render_to_string(template: template, **render_options)
+        output_stream = build_output_stream(compress: compress)
         # View may contain extra newlines, chunk already contains a newline
         # Having multiple newlines between chunks causes hydration errors
         # So we strip extra newlines from the template string and add a single newline
@@ -95,6 +99,7 @@ module ReactOnRailsPro
         # Client disconnected - stop writing gracefully
         client_disconnected = true
         log_client_disconnect("writer", e)
+        @async_barrier.stop
       end
 
       # Wait for all component streaming tasks to complete
@@ -102,7 +107,10 @@ module ReactOnRailsPro
         @async_barrier.wait
       rescue StandardError => e
         @async_barrier.stop
-        raise e
+        raise e unless client_disconnected
+
+        log_client_disconnect("barrier", e)
+        nil
       end
     ensure
       # Close the queue first to unblock writing_task (it may be waiting on dequeue)
@@ -136,7 +144,7 @@ module ReactOnRailsPro
       return false unless compress
 
       content_encoding = response.headers["Content-Encoding"].to_s
-      return false if content_encoding.present? && !/\bidentity\b/i.match?(content_encoding)
+      return false if content_encoding.present? && content_encoding.downcase.strip != "identity"
       return false unless request_accepts_gzip?
 
       true
@@ -158,7 +166,7 @@ module ReactOnRailsPro
       headers.delete("Content-Length")
 
       vary_values = headers["Vary"].to_s.split(",").map(&:strip).reject(&:empty?)
-      return if vary_values.include?("*") || vary_values.any? { |value| value.casecmp("Accept-Encoding").zero? }
+      return if vary_values.include?("*") || vary_values.any? { |value| value.casecmp?("Accept-Encoding") }
 
       vary_values << "Accept-Encoding"
       headers["Vary"] = vary_values.join(", ")
@@ -187,14 +195,25 @@ module ReactOnRailsPro
       def write(data)
         @gzip_writer.write(data)
         @gzip_writer.flush(Zlib::SYNC_FLUSH)
+        data.bytesize
       end
 
       def close
         return if @closed
 
-        @gzip_writer.close
-        @stream.close
         @closed = true
+
+        begin
+          @gzip_writer.close
+        rescue IOError, Errno::EPIPE
+          # Client disconnected while finalizing gzip footer.
+        ensure
+          begin
+            @stream.close
+          rescue IOError, Errno::EPIPE
+            # Stream already disconnected.
+          end
+        end
       end
     end
   end
