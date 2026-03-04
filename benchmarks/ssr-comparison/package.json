@@ -14,7 +14,8 @@
     "bench:string": "NODE_ENV=production node scripts/bench-string-ssr.mjs",
     "bench:rsc:generate": "NODE_ENV=production node --conditions=react-server scripts/generate-rsc-payload.mjs",
     "bench:rsc:ssr": "NODE_ENV=production node scripts/bench-rsc-ssr.mjs",
-    "bench": "pnpm run bench:string && pnpm run bench:rsc:ssr"
+    "bench:payload-ssr": "NODE_ENV=production node scripts/bench-payload-ssr.mjs",
+    "bench": "pnpm run bench:string && pnpm run bench:rsc:ssr && pnpm run bench:payload-ssr"
   },
   "dependencies": {
     "react": "^19.0.3",
