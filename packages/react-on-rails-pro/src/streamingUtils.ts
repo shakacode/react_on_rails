@@ -31,6 +31,7 @@ import {
 import * as ComponentRegistry from './ComponentRegistry.ts';
 import PostSSRHookTracker from './PostSSRHookTracker.ts';
 import RSCRequestTracker from './RSCRequestTracker.ts';
+import safePipe from './safePipe.ts';
 
 type BufferedEvent = {
   event: 'data' | 'error' | 'end';
@@ -133,17 +134,23 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
     },
   });
 
-  let pipedStream: PipeableOrReadableStream | null = null;
-  const pipeToTransform = (pipeableStream: PipeableOrReadableStream) => {
-    pipeableStream.pipe(transformStream);
-    pipedStream = pipeableStream;
-  };
   // We need to wrap the transformStream in a Readable stream to properly handle errors:
   // 1. If we returned transformStream directly, we couldn't emit errors into it externally
   // 2. If an error is emitted into the transformStream, it would cause the render to fail
   // 3. By wrapping in Readable.from(), we can explicitly emit errors into the readableStream without affecting the transformStream
   // Note: Readable.from can merge multiple chunks into a single chunk, so we need to ensure that we can separate them later
   const { stream: readableStream, emitError } = bufferStream(transformStream);
+
+  let pipedStream: PipeableOrReadableStream | null = null;
+  const pipeToTransform = (pipeableStream: PipeableOrReadableStream) => {
+    // safePipe handles the 'close' event to end transformStream when the source is destroyed.
+    // The onError callback forwards source errors to readableStream (via emitError), which
+    // propagates them to handleStreamError → errorReporter in the node renderer. Emitting on
+    // the source (not the destination) keeps the pipe intact so data continues flowing for
+    // non-fatal errors.
+    safePipe(pipeableStream, transformStream, emitError);
+    pipedStream = pipeableStream;
+  };
 
   const writeChunk = (chunk: string) => transformStream.write(chunk);
   const endStream = () => {

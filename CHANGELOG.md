@@ -27,6 +27,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 Changes since the last non-beta release.
 
+#### Pro
+
+##### Fixed
+
+- **Fix streaming SSR hangs and silent error absorption in RSC payload injection**: Fixed two related issues: (1) streaming SSR renders hanging forever when errors occur because Node.js `stream.pipe()` doesn't propagate errors or closure from source to destination, and (2) errors in the RSC payload injection pipeline being silently absorbed, preventing them from reaching error reporters like Sentry. Introduced a shared `safePipe` utility and used `'close'` events as reliable termination signals across the streaming pipeline (Node renderer, RSC payload injection, transform streams, and Ruby async task). Also added a Ruby safety net to prevent Rails request hangs when async rendering tasks raise before the first chunk. [PR 2407](https://github.com/shakacode/react_on_rails/pull/2407) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 ### [16.4.0.rc.5] - 2026-02-26
 
 #### Fixed

@@ -438,11 +438,36 @@ module ReactOnRailsProHelper
       stream = yield
       process_stream_chunks(stream, first_chunk_var, all_chunks)
       on_complete&.call(all_chunks)
+    rescue StandardError => e
+      # Propagate the error to the calling fiber via the variable.
+      # Async::Variable can only be resolved once — if it was already resolved
+      # (first chunk was returned successfully), the assignment raises and we
+      # fall through to re-raise so barrier.wait propagates the error later.
+      begin
+        first_chunk_var.value = e
+        # Variable accepted the error — this is a pre-first-chunk failure (e.g., shell error).
+        # The caller will detect the Exception value and raise it synchronously,
+        # BEFORE the response is committed, enabling a proper HTTP redirect.
+        # Do NOT re-raise here: the caller owns the error now.
+      rescue StandardError
+        # Variable was already resolved — the first chunk was returned successfully.
+        # This is a post-first-chunk error. Re-raise so barrier.wait propagates it
+        # (the response is already committed at that point, so only JS redirect is possible).
+        raise e
+      end
     end
 
     # Wait for and return the first chunk (blocking)
     first_chunk_var.wait
-    first_chunk_var.value
+    result = first_chunk_var.value
+
+    # If the async task stored an exception (pre-first-chunk error), raise it now.
+    # This happens BEFORE response.stream.write(template_string) in
+    # stream_view_containing_react_components, so the response is NOT yet committed
+    # and rescue_from can perform a proper HTTP redirect.
+    raise result if result.is_a?(StandardError)
+
+    result
   end
 
   def process_stream_chunks(stream, first_chunk_var, all_chunks)
