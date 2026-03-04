@@ -31,6 +31,11 @@ module ReactOnRailsPro
     #
     # @see ReactOnRails::Helper#stream_react_component
     def stream_view_containing_react_components(template:, close_stream_at_end: true, **render_options)
+      # Prevent compression middleware from transforming ActionController::Live streams.
+      # Some middleware predicates call `body.each` to compute response size, which can
+      # deadlock live streams by blocking before the stream starts writing.
+      add_no_transform_cache_control_directive
+
       require "async"
       require "async/barrier"
       require "async/limited_queue"
@@ -119,6 +124,15 @@ module ReactOnRailsPro
       Rails.logger.debug do
         "[React on Rails Pro] Client disconnected during streaming (#{context}): #{exception.class}"
       end
+    end
+
+    def add_no_transform_cache_control_directive
+      headers = response.headers
+      directives = headers["Cache-Control"].to_s.split(",").map(&:strip).reject(&:empty?)
+      return if directives.any? { |directive| directive.casecmp("no-transform").zero? }
+
+      directives << "no-transform"
+      headers["Cache-Control"] = directives.join(", ")
     end
   end
 end

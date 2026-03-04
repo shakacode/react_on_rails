@@ -383,23 +383,23 @@ RSpec.describe "Streaming API" do
       end
     end
 
-    def setup_stream_test(component_count: 2)
+    def setup_stream_test(component_count: 2, headers: {})
       component_queues = Array.new(component_count) { Async::Queue.new }
       controller = StreamController.new(component_queues: component_queues)
 
       mocked_response = instance_double(ActionController::Live::Response)
       mocked_stream = instance_double(ActionController::Live::Buffer)
-      allow(mocked_response).to receive(:stream).and_return(mocked_stream)
+      allow(mocked_response).to receive_messages(stream: mocked_stream, headers: headers)
       allow(mocked_stream).to receive(:write)
       allow(mocked_stream).to receive(:close)
       allow(mocked_stream).to receive(:closed?).and_return(false)
       allow(controller).to receive(:response).and_return(mocked_response)
 
-      [component_queues, controller, mocked_stream]
+      [component_queues, controller, mocked_stream, headers]
     end
 
     it "streams components concurrently" do
-      queues, controller, stream = setup_stream_test
+      queues, controller, stream, _headers = setup_stream_test
 
       run_stream(controller) do |_parent|
         queues[1].enqueue("B1")
@@ -421,7 +421,7 @@ RSpec.describe "Streaming API" do
     end
 
     it "maintains per-component ordering" do
-      queues, controller, stream = setup_stream_test
+      queues, controller, stream, _headers = setup_stream_test
 
       run_stream(controller) do |_parent|
         queues[0].enqueue("X1")
@@ -444,8 +444,44 @@ RSpec.describe "Streaming API" do
       expect(stream).to have_received(:write).with("Y2")
     end
 
+    it "adds no-transform to Cache-Control for streaming responses" do
+      _queues, controller, _stream, headers = setup_stream_test(component_count: 0)
+
+      run_stream(controller) do |_parent|
+        sleep 0.1
+      end
+
+      expect(headers["Cache-Control"]).to eq("no-transform")
+    end
+
+    it "preserves Cache-Control directives when adding no-transform" do
+      _queues, controller, _stream, headers = setup_stream_test(
+        component_count: 0,
+        headers: { "Cache-Control" => "public, max-age=3600" }
+      )
+
+      run_stream(controller) do |_parent|
+        sleep 0.1
+      end
+
+      expect(headers["Cache-Control"]).to eq("public, max-age=3600, no-transform")
+    end
+
+    it "does not duplicate existing no-transform Cache-Control directives" do
+      _queues, controller, _stream, headers = setup_stream_test(
+        component_count: 0,
+        headers: { "Cache-Control" => "private, no-transform" }
+      )
+
+      run_stream(controller) do |_parent|
+        sleep 0.1
+      end
+
+      expect(headers["Cache-Control"]).to eq("private, no-transform")
+    end
+
     it "handles empty component list" do
-      _queues, controller, stream = setup_stream_test(component_count: 0)
+      _queues, controller, stream, _headers = setup_stream_test(component_count: 0)
 
       run_stream(controller) do |_parent|
         sleep 0.1
@@ -456,7 +492,7 @@ RSpec.describe "Streaming API" do
     end
 
     it "handles single component" do
-      queues, controller, stream = setup_stream_test(component_count: 1)
+      queues, controller, stream, _headers = setup_stream_test(component_count: 1)
 
       run_stream(controller) do |_parent|
         queues[0].enqueue("Single1")
@@ -471,7 +507,7 @@ RSpec.describe "Streaming API" do
     end
 
     it "applies backpressure with slow writer" do
-      queues, controller, stream = setup_stream_test(component_count: 1)
+      queues, controller, stream, _headers = setup_stream_test(component_count: 1)
 
       write_timestamps = []
       allow(stream).to receive(:write) do |_data|
@@ -493,7 +529,7 @@ RSpec.describe "Streaming API" do
 
     describe "client disconnect handling" do
       it "stops writing on IOError" do
-        queues, controller, stream = setup_stream_test(component_count: 1)
+        queues, controller, stream, _headers = setup_stream_test(component_count: 1)
 
         written_chunks = []
         write_count = 0
@@ -522,7 +558,7 @@ RSpec.describe "Streaming API" do
       end
 
       it "stops writing on Errno::EPIPE" do
-        queues, controller, stream = setup_stream_test(component_count: 1)
+        queues, controller, stream, _headers = setup_stream_test(component_count: 1)
 
         written_chunks = []
         write_count = 0
