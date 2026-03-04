@@ -218,7 +218,7 @@ Bug reports and pull requests are welcome. To get started, see [Contributing](ht
 
 # Work with Us
 
-ShakaCode is **[hiring passionate software engineers](http://www.shakacode.com/career)** to work on our projects, including [HiChee](https://hichee.com)!
+ShakaCode is **[hiring passionate software engineers](https://www.shakacode.com/career)** to work on our projects, including [HiChee](https://hichee.com)!
 
 # License
 
