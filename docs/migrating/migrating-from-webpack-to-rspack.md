@@ -347,6 +347,48 @@ default: &default
 
 **Solution:** Audit all entry points for code that assumes sitewide globals exist. Remove or guard any such references, especially orphaned polyfills for removed features.
 
+### `cache: false` Disables Rspack's In-Memory Cache
+
+**Symptoms:**
+
+- Subtle compilation issues after adding a "disable cache" environment variable
+- Slower rebuilds than expected even with in-memory caching supposedly enabled
+
+**Cause:** Rspack's top-level `cache` option is boolean-only (`true`/`false`), unlike Webpack's `cache: { type: 'filesystem', buildDependencies: ... }`. Setting `cache: false` to disable disk persistence actually disables rspack's **in-memory cache** entirely. Persistent (disk) caching is controlled separately via `experiments.cache`.
+
+**Solution:** Always set `cache: true` for rspack. Control disk persistence exclusively through `experiments.cache`:
+
+```javascript
+cache: isRspack
+  ? true // always enable in-memory cache; disk persistence via experiments.cache
+  : { type: 'filesystem', buildDependencies: { config: [__filename] } },
+
+// Persistent cache (disk) — opt-in for rspack
+...(isRspack && !process.env.DISABLE_FILESYS_CACHE && {
+  experiments: {
+    cache: { type: 'persistent', buildDependencies: [__filename] },
+  },
+}),
+```
+
+### Lazy Compilation Breaks Two-Server Dev Setup
+
+**Symptoms:**
+
+- Dynamic imports fail silently in development
+- Network tab shows 404s for `/lazy-compilation-using-__<N>` paths hitting your Rails server
+- Entry points fail to load with no obvious error
+
+**Cause:** Rspack's CLI [auto-enables lazy compilation](https://github.com/web-infra-dev/rspack/blob/main/packages/rspack-cli/src/commands/serve.ts#L130-L133) for web targets when using `rspack serve`. The lazy-compilation proxy uses relative URLs, so the browser resolves them against the page origin (your Rails server) instead of the dev server where the middleware lives. Webpack doesn't auto-enable this, so it's an invisible behavior change.
+
+**Solution:** Explicitly disable lazy compilation:
+
+```javascript
+...(isRspack && { lazyCompilation: false }),
+```
+
+Alternatively, configure `lazyCompilation.backend.listen` to match your dev server setup.
+
 ### Third-Party Package Issues
 
 Some packages may not ship compiled files. Use `patch-package` to fix:
