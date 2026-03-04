@@ -229,8 +229,9 @@ module ReactOnRails
           function extractLoader(rule, loaderName) {
             if (!Array.isArray(rule.use)) return null;
             return rule.use.find((item) => {
-              const testValue = typeof item === 'string' ? item : item.loader;
-              return testValue && testValue.includes(loaderName);
+              if (!item) return false;
+              const testValue = typeof item === 'string' ? item : (typeof item.loader === 'string' ? item.loader : '');
+              return testValue.includes(loaderName);
             });
           }
         JS

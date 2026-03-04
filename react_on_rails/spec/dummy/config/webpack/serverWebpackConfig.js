@@ -28,9 +28,18 @@ const configureServer = () => {
   serverWebpackConfig.module.rules.forEach((loader) => {
     if (loader.use && loader.use.filter) {
       // eslint-disable-next-line no-param-reassign
-      loader.use = loader.use.filter(
-        (item) => !(typeof item === 'string' && item.match(/mini-css-extract-plugin/)),
-      );
+      loader.use = loader.use.filter((item) => {
+        let testValue = '';
+        if (typeof item === 'string') {
+          testValue = item;
+        } else if (item && typeof item.loader === 'string') {
+          testValue = item.loader;
+        }
+        return !(
+          testValue.includes('mini-css-extract-plugin') ||
+          testValue.includes('cssExtractLoader') // Rspack uses this path
+        );
+      });
     }
   });
 

@@ -157,7 +157,7 @@ const getLocalIdent = (context, _localIdentName, localName) => {
   const relativePath = path.relative(projectRoot, resourcePath);
 
   const hash = crypto
-    .createHash('md5')
+    .createHash('sha256')
     .update(relativePath + '\0' + resourceQuery + '\0' + localName)
     .digest('base64url')
     .slice(0, 8);
