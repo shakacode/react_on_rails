@@ -35,6 +35,12 @@ module ReactOnRailsPro
       require "async/barrier"
       require "async/limited_queue"
 
+      # Prevent compression middleware (Rack::Deflater, Rack::Brotli) from iterating
+      # the Live::Buffer response body, which causes a deadlock with ActionController::Live.
+      # Setting Content-Encoding before streaming tells middleware the response is already
+      # encoded, so they skip compression entirely. See https://github.com/shakacode/react_on_rails/issues/2519
+      response.headers["Content-Encoding"] = "identity"
+
       Sync do |parent_task|
         # Initialize async primitives for concurrent component streaming
         @async_barrier = Async::Barrier.new
