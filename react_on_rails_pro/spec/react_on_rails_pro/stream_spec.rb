@@ -3,16 +3,19 @@
 require "async"
 require "async/queue"
 require "async/variable"
+require "stringio"
+require "zlib"
 require_relative "spec_helper"
 
 class StreamController
   include ReactOnRailsPro::Stream
 
-  attr_reader :response
+  attr_reader :response, :request
 
   def initialize(component_queues:, initial_response: "TEMPLATE")
     @component_queues = component_queues
     @initial_response = initial_response
+    @request = nil
   end
 
   def render_to_string(**_opts)
@@ -376,30 +379,43 @@ RSpec.describe "Streaming API" do
   end
 
   describe "Component streaming concurrency" do
-    def run_stream(controller, template: "ignored")
+    def run_stream(controller, template: "ignored", **options)
       Sync do |parent|
-        parent.async { controller.stream_view_containing_react_components(template: template) }
+        parent.async { controller.stream_view_containing_react_components(template: template, **options) }
         yield(parent)
       end
     end
 
-    def setup_stream_test(component_count: 2, headers: {})
-      component_queues = Array.new(component_count) { Async::Queue.new }
-      controller = StreamController.new(component_queues: component_queues)
-
+    def build_mocked_response(headers)
       mocked_response = instance_double(ActionController::Live::Response)
       mocked_stream = instance_double(ActionController::Live::Buffer)
       allow(mocked_response).to receive_messages(stream: mocked_stream, headers: headers)
       allow(mocked_stream).to receive(:write)
       allow(mocked_stream).to receive(:close)
       allow(mocked_stream).to receive(:closed?).and_return(false)
-      allow(controller).to receive(:response).and_return(mocked_response)
+      [mocked_response, mocked_stream]
+    end
 
-      [component_queues, controller, mocked_stream, headers]
+    def build_mocked_request(accept_encoding)
+      mocked_request = instance_double(ActionDispatch::Request)
+      allow(mocked_request).to receive(:get_header).and_return(nil)
+      allow(mocked_request).to receive(:get_header).with("HTTP_ACCEPT_ENCODING").and_return(accept_encoding)
+      mocked_request
+    end
+
+    def setup_stream_test(component_count: 2, headers: {}, accept_encoding: nil)
+      component_queues = Array.new(component_count) { Async::Queue.new }
+      controller = StreamController.new(component_queues: component_queues)
+
+      mocked_response, mocked_stream = build_mocked_response(headers)
+      mocked_request = build_mocked_request(accept_encoding)
+      allow(controller).to receive_messages(response: mocked_response, request: mocked_request)
+
+      [component_queues, controller, mocked_stream, headers, mocked_request]
     end
 
     it "streams components concurrently" do
-      queues, controller, stream, _headers = setup_stream_test
+      queues, controller, stream, _headers, _request = setup_stream_test
 
       run_stream(controller) do |_parent|
         queues[1].enqueue("B1")
@@ -421,7 +437,7 @@ RSpec.describe "Streaming API" do
     end
 
     it "maintains per-component ordering" do
-      queues, controller, stream, _headers = setup_stream_test
+      queues, controller, stream, _headers, _request = setup_stream_test
 
       run_stream(controller) do |_parent|
         queues[0].enqueue("X1")
@@ -444,44 +460,65 @@ RSpec.describe "Streaming API" do
       expect(stream).to have_received(:write).with("Y2")
     end
 
-    it "adds no-transform to Cache-Control for streaming responses" do
-      _queues, controller, _stream, headers = setup_stream_test(component_count: 0)
+    it "compresses stream output with gzip when enabled and accepted by client" do
+      _queues, controller, stream, headers, _request = setup_stream_test(
+        component_count: 0,
+        accept_encoding: "gzip, deflate"
+      )
+      compressed_chunks = []
+      allow(stream).to receive(:write) do |chunk|
+        compressed_chunks << chunk
+      end
 
-      run_stream(controller) do |_parent|
+      run_stream(controller, compress: true) do |_parent|
         sleep 0.1
       end
 
-      expect(headers["Cache-Control"]).to eq("no-transform")
+      compressed_body = compressed_chunks.join
+      decompressed_body = Zlib::GzipReader.new(StringIO.new(compressed_body)).read
+
+      expect(decompressed_body).to eq("TEMPLATE")
+      expect(headers["Content-Encoding"]).to eq("gzip")
+      expect(headers["Vary"]).to eq("Accept-Encoding")
+      expect(stream).to have_received(:close)
     end
 
-    it "preserves Cache-Control directives when adding no-transform" do
-      _queues, controller, _stream, headers = setup_stream_test(
+    it "preserves existing Vary directives when enabling gzip streaming" do
+      _queues, controller, stream, headers, _request = setup_stream_test(
         component_count: 0,
-        headers: { "Cache-Control" => "public, max-age=3600" }
+        headers: { "Vary" => "Origin" },
+        accept_encoding: "gzip"
       )
+      compressed_chunks = []
+      allow(stream).to receive(:write) do |chunk|
+        compressed_chunks << chunk
+      end
 
-      run_stream(controller) do |_parent|
+      run_stream(controller, compress: true) do |_parent|
         sleep 0.1
       end
 
-      expect(headers["Cache-Control"]).to eq("public, max-age=3600, no-transform")
+      decompressed_body = Zlib::GzipReader.new(StringIO.new(compressed_chunks.join)).read
+      expect(decompressed_body).to eq("TEMPLATE")
+      expect(headers["Vary"]).to eq("Origin, Accept-Encoding")
     end
 
-    it "does not duplicate existing no-transform Cache-Control directives" do
-      _queues, controller, _stream, headers = setup_stream_test(
+    it "keeps plain streaming when client does not accept gzip" do
+      _queues, controller, stream, headers, _request = setup_stream_test(
         component_count: 0,
-        headers: { "Cache-Control" => "private, no-transform" }
+        accept_encoding: "br"
       )
 
-      run_stream(controller) do |_parent|
+      run_stream(controller, compress: true) do |_parent|
         sleep 0.1
       end
 
-      expect(headers["Cache-Control"]).to eq("private, no-transform")
+      expect(stream).to have_received(:write).with("TEMPLATE")
+      expect(headers["Content-Encoding"]).to be_nil
     end
 
     it "handles empty component list" do
-      _queues, controller, stream, _headers = setup_stream_test(component_count: 0)
+      _queues, controller, stream, _headers, _request = setup_stream_test(component_count: 0)
 
       run_stream(controller) do |_parent|
         sleep 0.1
@@ -492,7 +529,7 @@ RSpec.describe "Streaming API" do
     end
 
     it "handles single component" do
-      queues, controller, stream, _headers = setup_stream_test(component_count: 1)
+      queues, controller, stream, _headers, _request = setup_stream_test(component_count: 1)
 
       run_stream(controller) do |_parent|
         queues[0].enqueue("Single1")
@@ -507,7 +544,7 @@ RSpec.describe "Streaming API" do
     end
 
     it "applies backpressure with slow writer" do
-      queues, controller, stream, _headers = setup_stream_test(component_count: 1)
+      queues, controller, stream, _headers, _request = setup_stream_test(component_count: 1)
 
       write_timestamps = []
       allow(stream).to receive(:write) do |_data|
@@ -529,7 +566,7 @@ RSpec.describe "Streaming API" do
 
     describe "client disconnect handling" do
       it "stops writing on IOError" do
-        queues, controller, stream, _headers = setup_stream_test(component_count: 1)
+        queues, controller, stream, _headers, _request = setup_stream_test(component_count: 1)
 
         written_chunks = []
         write_count = 0
@@ -558,7 +595,7 @@ RSpec.describe "Streaming API" do
       end
 
       it "stops writing on Errno::EPIPE" do
-        queues, controller, stream, _headers = setup_stream_test(component_count: 1)
+        queues, controller, stream, _headers, _request = setup_stream_test(component_count: 1)
 
         written_chunks = []
         write_count = 0

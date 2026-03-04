@@ -15,6 +15,7 @@ module ReactOnRailsPro
 
       stream_view_containing_react_components(
         template: custom_rsc_payload_template,
+        compress: true,
         layout: false
       )
     end
