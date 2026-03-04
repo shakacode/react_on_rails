@@ -53,11 +53,18 @@
     "./@internal/base/full": {
       "react-server": "./lib/base/full.rsc.js",
       "default": "./lib/base/full.js"
-    }
+    },
+    "./tanstack-router": "./lib/tanstack-router/index.js"
   },
   "peerDependencies": {
     "react": ">= 16",
-    "react-dom": ">= 16"
+    "react-dom": ">= 16",
+    "@tanstack/react-router": ">= 1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@tanstack/react-router": {
+      "optional": true
+    }
   },
   "files": [
     "README.md",
