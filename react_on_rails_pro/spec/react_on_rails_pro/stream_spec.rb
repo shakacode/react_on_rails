@@ -3,12 +3,14 @@
 require "async"
 require "async/queue"
 require "async/variable"
+require "stringio"
+require "zlib"
 require_relative "spec_helper"
 
 class StreamController
   include ReactOnRailsPro::Stream
 
-  attr_reader :response
+  attr_reader :response, :request
 
   def initialize(component_queues:, initial_response: "TEMPLATE")
     @component_queues = component_queues
@@ -383,7 +385,7 @@ RSpec.describe "Streaming API" do
       end
     end
 
-    def setup_stream_test(component_count: 2)
+    def setup_stream_test(component_count: 2, accept_encoding: nil)
       component_queues = Array.new(component_count) { Async::Queue.new }
       controller = StreamController.new(component_queues: component_queues)
 
@@ -394,7 +396,10 @@ RSpec.describe "Streaming API" do
       allow(mocked_stream).to receive(:write)
       allow(mocked_stream).to receive(:close)
       allow(mocked_stream).to receive(:closed?).and_return(false)
-      allow(controller).to receive(:response).and_return(mocked_response)
+
+      mocked_request_headers = { "Accept-Encoding" => accept_encoding }
+      mocked_request = double("request", headers: mocked_request_headers) # rubocop:disable RSpec/VerifiedDoubles
+      allow(controller).to receive_messages(response: mocked_response, request: mocked_request)
 
       [component_queues, controller, mocked_stream]
     end
@@ -445,14 +450,48 @@ RSpec.describe "Streaming API" do
       expect(stream).to have_received(:write).with("Y2")
     end
 
-    it "sets Content-Encoding: identity to prevent compression middleware deadlock" do
-      _queues, controller, _stream = setup_stream_test(component_count: 0)
+    describe "streaming compression" do
+      it "sets Content-Encoding: gzip and compresses output when client accepts gzip" do
+        queues, controller, stream = setup_stream_test(component_count: 1, accept_encoding: "gzip, deflate, br")
 
-      run_stream(controller) do |_parent|
-        sleep 0.1
+        written_data = []
+        allow(stream).to receive(:write) do |data|
+          written_data << data
+        end
+
+        run_stream(controller) do |_parent|
+          queues[0].enqueue("Hello")
+          queues[0].close
+          sleep 0.1
+        end
+
+        expect(controller.response.headers["Content-Encoding"]).to eq("gzip")
+        # Verify the written data is valid gzip by decompressing it
+        compressed = written_data.join
+        decompressed = Zlib::GzipReader.new(StringIO.new(compressed)).read
+        expect(decompressed).to include("TEMPLATE")
+        expect(decompressed).to include("Hello")
       end
 
-      expect(controller.response.headers["Content-Encoding"]).to eq("identity")
+      it "sets Content-Encoding: identity when client does not accept gzip" do
+        _queues, controller, _stream = setup_stream_test(component_count: 0, accept_encoding: "deflate, br")
+
+        run_stream(controller) do |_parent|
+          sleep 0.1
+        end
+
+        expect(controller.response.headers["Content-Encoding"]).to eq("identity")
+      end
+
+      it "sets Content-Encoding: identity when Accept-Encoding is missing" do
+        _queues, controller, _stream = setup_stream_test(component_count: 0, accept_encoding: nil)
+
+        run_stream(controller) do |_parent|
+          sleep 0.1
+        end
+
+        expect(controller.response.headers["Content-Encoding"]).to eq("identity")
+      end
     end
 
     it "handles empty component list" do

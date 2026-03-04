@@ -34,12 +34,13 @@ module ReactOnRailsPro
       require "async"
       require "async/barrier"
       require "async/limited_queue"
+      require "zlib"
 
       # Prevent compression middleware (Rack::Deflater, Rack::Brotli) from iterating
       # the Live::Buffer response body, which causes a deadlock with ActionController::Live.
-      # Setting Content-Encoding before streaming tells middleware the response is already
-      # encoded, so they skip compression entirely. See https://github.com/shakacode/react_on_rails/issues/2519
-      response.headers["Content-Encoding"] = "identity"
+      # We handle compression ourselves and set Content-Encoding so middleware skips.
+      # See https://github.com/shakacode/react_on_rails/issues/2519
+      setup_streaming_compression
 
       Sync do |parent_task|
         # Initialize async primitives for concurrent component streaming
@@ -124,6 +125,48 @@ module ReactOnRailsPro
 
       Rails.logger.debug do
         "[React on Rails Pro] Client disconnected during streaming (#{context}): #{exception.class}"
+      end
+    end
+
+    # Handles compression for streaming responses to avoid deadlocks with Rack
+    # compression middleware. When the client accepts gzip, we compress the stream
+    # ourselves and set Content-Encoding: gzip. Otherwise, we set Content-Encoding:
+    # identity. Either way, Rack::Deflater/Rack::Brotli see Content-Encoding is
+    # already set and skip their own compression, avoiding the Live::Buffer deadlock.
+    def setup_streaming_compression
+      if client_accepts_gzip?
+        response.headers["Content-Encoding"] = "gzip"
+        wrap_stream_with_gzip_compression
+      else
+        response.headers["Content-Encoding"] = "identity"
+      end
+    end
+
+    def client_accepts_gzip?
+      return false unless respond_to?(:request)
+
+      request.headers["Accept-Encoding"]&.match?(/\bgzip\b/)
+    end
+
+    def wrap_stream_with_gzip_compression
+      stream = response.stream
+      deflater = Zlib::Deflate.new(Zlib::DEFAULT_COMPRESSION, Zlib::MAX_WBITS + 16)
+      original_write = stream.method(:write)
+      original_close = stream.method(:close)
+
+      stream.define_singleton_method(:write) do |data|
+        compressed = deflater.deflate(data.to_s, Zlib::SYNC_FLUSH)
+        original_write.call(compressed)
+      end
+
+      stream.define_singleton_method(:close) do
+        final = deflater.finish
+        original_write.call(final) unless final.empty?
+      rescue IOError, Errno::EPIPE
+        # Client already disconnected — gzip footer is non-essential
+      ensure
+        deflater.close
+        original_close.call
       end
     end
   end
