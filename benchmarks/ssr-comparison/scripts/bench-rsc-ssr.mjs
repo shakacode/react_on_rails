@@ -98,7 +98,7 @@ async function run() {
     const element = await createFromNodeStream(payloadStream);
     await new Promise((resolve, reject) => {
       const { pipe } = renderToHtmlStream(element, {
-        onAllReady() {
+        onShellReady() {
           const pt = new PassThrough();
           pipe(pt);
           const chunks = [];
