@@ -67,6 +67,7 @@ module ReactOnRails
                         Procfile.dev-static-assets
                         Procfile.dev-prod-assets
                         .dev-services.yml.example
+                        .env.example
                         bin/shakapacker-precompile-hook]
 
         # HelloServer uses the hello_world layout so React on Rails can inject generated
