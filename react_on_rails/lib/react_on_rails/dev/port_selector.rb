@@ -1,0 +1,74 @@
+# frozen_string_literal: true
+
+require "socket"
+
+module ReactOnRails
+  module Dev
+    class PortSelector
+      DEFAULT_RAILS_PORT   = 3000
+      DEFAULT_WEBPACK_PORT = 3035
+      WEBPACK_OFFSET       = DEFAULT_WEBPACK_PORT - DEFAULT_RAILS_PORT # 35
+      MAX_ATTEMPTS         = 100
+
+      class NoPortAvailable < StandardError; end
+
+      class << self
+        # Returns { rails: Integer, webpack: Integer }.
+        # Respects existing ENV['PORT'] / ENV['SHAKAPACKER_DEV_SERVER_PORT'].
+        # Only probes when both are unset (i.e. user hasn't configured them).
+        def select_ports
+          rails_port   = explicit_rails_port
+          webpack_port = explicit_webpack_port
+
+          # If both are explicitly set, trust the user completely
+          return { rails: rails_port, webpack: webpack_port } if rails_port && webpack_port
+
+          # If only one is set, use it as the anchor and return defaults for the other
+          return { rails: rails_port, webpack: explicit_webpack_port || DEFAULT_WEBPACK_PORT } if rails_port
+
+          return { rails: DEFAULT_RAILS_PORT, webpack: webpack_port } if webpack_port
+
+          # Neither set — auto-detect a free pair
+          find_free_pair
+        end
+
+        # Public so it can be stubbed in tests
+        def port_available?(port, host = "127.0.0.1")
+          server = TCPServer.new(host, port)
+          server.close
+          true
+        rescue Errno::EADDRINUSE, Errno::EACCES
+          false
+        end
+
+        private
+
+        def explicit_rails_port
+          ENV["PORT"]&.to_i&.then { |p| p.positive? ? p : nil }
+        end
+
+        def explicit_webpack_port
+          ENV["SHAKAPACKER_DEV_SERVER_PORT"]&.to_i&.then { |p| p.positive? ? p : nil }
+        end
+
+        def find_free_pair
+          MAX_ATTEMPTS.times do |i|
+            rails_port   = DEFAULT_RAILS_PORT   + i
+            webpack_port = DEFAULT_WEBPACK_PORT + i
+
+            next unless port_available?(rails_port) && port_available?(webpack_port)
+
+            puts "Default ports in use. Using Rails :#{rails_port}, webpack :#{webpack_port}" if i.positive?
+
+            return { rails: rails_port, webpack: webpack_port }
+          end
+
+          raise NoPortAvailable,
+                "No available port pair found in range " \
+                "#{DEFAULT_RAILS_PORT}--#{DEFAULT_RAILS_PORT + MAX_ATTEMPTS - 1}. " \
+                "Run 'bin/dev kill' to free up ports."
+        end
+      end
+    end
+  end
+end
