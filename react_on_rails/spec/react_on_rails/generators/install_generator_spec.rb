@@ -1222,6 +1222,15 @@ describe InstallGenerator, type: :generator do
       end
     end
 
+    it "sets @shakapacker_just_installed=false when yml did not exist before or after install (nil→nil)" do
+      Dir.mktmpdir do |dir|
+        # install_shakapacker returns true but does not write the yml
+        allow(install_generator).to receive(:install_shakapacker).and_return(true)
+        Dir.chdir(dir) { install_generator.send(:ensure_shakapacker_installed) }
+        expect(install_generator.instance_variable_get(:@shakapacker_just_installed)).to be false
+      end
+    end
+
     it "does not call finalize_shakapacker_setup when install_shakapacker fails" do
       Dir.mktmpdir do |dir|
         allow(install_generator).to receive(:install_shakapacker).and_return(false)
