@@ -154,11 +154,12 @@ module ReactOnRails
         additions = []
         additions << "**/generated/**" unless gitignore_content.include?("**/generated/**")
         additions << "ssr-generated" unless gitignore_content.include?("ssr-generated")
+        additions << ".env" unless gitignore_content.match?(/^\.env$/)
 
         return if additions.empty?
 
         append_to_file ".gitignore" do
-          lines = ["\n# Generated React on Rails packs"]
+          lines = ["\n# React on Rails"]
           lines.concat(additions)
           "#{lines.join("\n")}\n"
         end
