@@ -30,6 +30,8 @@ import {
   getAssetPath,
   getBundleDirectory,
   getRequestBundleFilePath,
+  cleanIncompleteBundleDirectory,
+  markBundleComplete,
 } from './shared/utils.js';
 import { lock, unlock } from './shared/locks.js';
 import { startSsrRequestOptions, trace } from './shared/tracing.js';
@@ -361,7 +363,18 @@ export default function run(config: Partial<Config>) {
         }
 
         try {
+          const wasIncomplete = await cleanIncompleteBundleDirectory(bundleTimestamp);
+          if (wasIncomplete) {
+            log.warn(`Removed incomplete bundle directory before asset upload: ${bundleDirectory}`);
+          }
+
           await copyUploadedAssets(assets, bundleDirectory);
+
+          // Only mark complete when the bundle file itself is present.
+          if (await fileExistsAsync(bundleFilePath)) {
+            await markBundleComplete(bundleTimestamp);
+          }
+
           log.info(`Copied assets to bundle directory: ${bundleDirectory}`);
         } finally {
           try {

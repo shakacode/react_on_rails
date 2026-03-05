@@ -83,27 +83,32 @@ module ReactOnRailsPro
     end
 
     # Returns a string which should be used as a component in any cache key for
-    # react_component or react_component_hash when server rendering. This value is either
-    # the server bundle filename with the hash from webpack or an MD5 digest of the
-    # entire bundle.
+    # react_component or react_component_hash when server rendering. This value is an MD5 digest
+    # of server bundle contents plus copied asset contents.
     def self.bundle_hash
       return @bundle_hash if @bundle_hash && !(Rails.env.development? || Rails.env.test?)
 
       server_bundle_js_file_path = ReactOnRails::Utils.server_bundle_js_file_path
+      asset_paths = bundle_hash_asset_paths
 
-      return @bundle_hash if @bundle_hash && bundle_mtime_same?(server_bundle_js_file_path)
+      current_signature = bundle_hash_signature(server_bundle_js_file_path, asset_paths)
+      return @bundle_hash if @bundle_hash && @bundle_hash_signature == current_signature
 
-      @bundle_hash = calc_bundle_hash(server_bundle_js_file_path)
+      @bundle_hash_signature = current_signature
+      @bundle_hash = calc_bundle_hash(server_bundle_js_file_path, asset_paths)
     end
 
     def self.rsc_bundle_hash
       return @rsc_bundle_hash if @rsc_bundle_hash && !(Rails.env.development? || Rails.env.test?)
 
       server_rsc_bundle_js_file_path = rsc_bundle_js_file_path
+      asset_paths = bundle_hash_asset_paths
 
-      return @rsc_bundle_hash if @rsc_bundle_hash && bundle_mtime_same?(server_rsc_bundle_js_file_path)
+      current_signature = bundle_hash_signature(server_rsc_bundle_js_file_path, asset_paths)
+      return @rsc_bundle_hash if @rsc_bundle_hash && @rsc_bundle_hash_signature == current_signature
 
-      @rsc_bundle_hash = calc_bundle_hash(server_rsc_bundle_js_file_path)
+      @rsc_bundle_hash_signature = current_signature
+      @rsc_bundle_hash = calc_bundle_hash(server_rsc_bundle_js_file_path, asset_paths)
     end
 
     # Returns the hashed file name when using Shakapacker. Useful for creating cache keys.
@@ -126,28 +131,49 @@ module ReactOnRailsPro
       end
     end
 
-    def self.calc_bundle_hash(server_bundle_js_file_path)
-      if Rails.env.development? || Rails.env.test?
-        @test_dev_server_bundle_mtime = File.mtime(server_bundle_js_file_path)
+    def self.calc_bundle_hash(server_bundle_js_file_path, asset_paths = bundle_hash_asset_paths)
+      digest = Digest::MD5.new
+      digest << "bundle:#{server_bundle_js_file_path}\0"
+      digest.file(server_bundle_js_file_path)
+
+      asset_paths.each do |asset_path|
+        digest << "asset:#{asset_path}\0"
+        next if http_url?(asset_path)
+        next unless File.exist?(asset_path)
+        next if File.directory?(asset_path)
+
+        digest.file(asset_path)
       end
 
-      server_bundle_basename = Pathname.new(server_bundle_js_file_path).basename.to_s
+      "#{digest.hexdigest}-#{Rails.env}"
+    end
 
-      if contains_hash?(server_bundle_basename)
-        server_bundle_basename
-      else
-        "#{Digest::MD5.file(server_bundle_js_file_path)}-#{Rails.env}"
+    def self.bundle_hash_signature(server_bundle_js_file_path, asset_paths)
+      ([server_bundle_js_file_path.to_s] + asset_paths).map { |file_path| file_signature(file_path) }.join("|")
+    end
+
+    def self.file_signature(file_path)
+      path = file_path.to_s
+      return "url:#{path}" if http_url?(path)
+      return "missing:#{path}" unless File.exist?(path)
+      return "dir:#{path}" if File.directory?(path)
+
+      "#{path}:#{File.mtime(path).to_f}:#{File.size(path)}"
+    end
+
+    def self.bundle_hash_asset_paths
+      asset_paths = Array(ReactOnRailsPro.configuration.assets_to_copy).compact.map(&:to_s)
+
+      if ReactOnRailsPro.configuration.enable_rsc_support
+        asset_paths << react_client_manifest_file_path.to_s
+        asset_paths << react_server_client_manifest_file_path.to_s
       end
+
+      asset_paths.uniq.sort
     end
 
-    def self.bundle_mtime_same?(server_bundle_js_file_path)
-      @test_dev_server_bundle_mtime == File.mtime(server_bundle_js_file_path)
-    end
-
-    def self.contains_hash?(server_bundle_basename)
-      # TODO: Need to consider if the configuration value has the ".js" on the end.
-      ReactOnRails.configuration.server_bundle_js_file != server_bundle_basename &&
-        ReactOnRailsPro.configuration.rsc_bundle_js_file != server_bundle_basename
+    def self.http_url?(path)
+      path.to_s.match?(%r{https?://})
     end
 
     def self.with_trace(message = nil)

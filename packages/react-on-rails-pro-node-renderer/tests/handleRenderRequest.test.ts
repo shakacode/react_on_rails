@@ -1,4 +1,5 @@
 import path from 'path';
+import fsPromises from 'fs/promises';
 import touch from 'touch';
 import lockfile from 'lockfile';
 import {
@@ -20,6 +21,8 @@ import {
   vmSecondaryBundlePath,
   ASSET_UPLOAD_FILE,
   ASSET_UPLOAD_OTHER_FILE,
+  bundleCompleteMarkerPath,
+  getFixtureBundle,
 } from './helper';
 import { hasVMContextForBundle } from '../src/worker/vm';
 import { handleRenderRequest } from '../src/worker/handleRenderRequest';
@@ -64,7 +67,7 @@ describe(testName, () => {
   });
 
   test('If gem has posted updated bundle and no prior bundle', async () => {
-    expect.assertions(2);
+    expect.assertions(3);
     await createUploadedBundleForTest();
 
     const result = await handleRenderRequest({
@@ -82,6 +85,9 @@ describe(testName, () => {
     expect(
       hasVMContextForBundle(path.resolve(__dirname, `./tmp/${testName}/1495063024898/1495063024898.js`)),
     ).toBeTruthy();
+    await expect(
+      fsPromises.access(bundleCompleteMarkerPath(testName, String(BUNDLE_TIMESTAMP))),
+    ).resolves.toBeUndefined();
   });
 
   test('If bundle was not uploaded yet and not provided', async () => {
@@ -97,6 +103,57 @@ describe(testName, () => {
       headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
       data: 'No bundle uploaded',
     });
+  });
+
+  test('If bundle file exists without .complete marker, treat bundle as missing', async () => {
+    expect.assertions(1);
+    await fsPromises.copyFile(getFixtureBundle(), vmBundlePath(testName));
+
+    const result = await handleRenderRequest({
+      renderingRequest: 'ReactOnRails.dummy',
+      bundleTimestamp: BUNDLE_TIMESTAMP,
+    });
+
+    expect(result).toEqual({
+      status: 410,
+      headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
+      data: 'No bundle uploaded',
+    });
+  });
+
+  test('If incomplete bundle directory exists, uploaded bundle replaces stale files and marks complete', async () => {
+    const bundleDirectory = path.dirname(vmBundlePath(testName));
+    await fsPromises.writeFile(vmBundlePath(testName), 'stale bundle');
+    await fsPromises.writeFile(path.join(bundleDirectory, ASSET_UPLOAD_FILE), 'stale asset');
+    await createUploadedBundleForTest();
+    await createUploadedAsset(testName);
+
+    const result = await handleRenderRequest({
+      renderingRequest: 'ReactOnRails.dummy',
+      bundleTimestamp: BUNDLE_TIMESTAMP,
+      providedNewBundles: [
+        {
+          bundle: uploadedBundleForTest(),
+          timestamp: BUNDLE_TIMESTAMP,
+        },
+      ],
+      assetsToCopy: [
+        {
+          filename: ASSET_UPLOAD_FILE,
+          savedFilePath: uploadedAssetPath(testName),
+          type: 'asset',
+        },
+      ],
+    });
+
+    expect(result).toEqual(renderResult);
+    expect(await fsPromises.readFile(vmBundlePath(testName), 'utf-8')).toContain('Dummy Object');
+    expect(await fsPromises.readFile(path.join(bundleDirectory, ASSET_UPLOAD_FILE), 'utf-8')).not.toBe(
+      'stale asset',
+    );
+    await expect(
+      fsPromises.access(bundleCompleteMarkerPath(testName, String(BUNDLE_TIMESTAMP))),
+    ).resolves.toBeUndefined();
   });
 
   test('If bundle was already uploaded by another thread', async () => {
