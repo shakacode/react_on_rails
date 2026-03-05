@@ -231,6 +231,11 @@ module ReactOnRails
       def ensure_shakapacker_installed
         return if shakapacker_configured?
 
+        if options[:pretend]
+          say_status :pretend, "Skipping automatic Shakapacker installation in --pretend mode", :yellow
+          return
+        end
+
         print_shakapacker_setup_banner
         ensure_shakapacker_in_gemfile
 
@@ -268,7 +273,7 @@ module ReactOnRails
         end
         files_to_become_executable = files_to_copy.map { |filename| "bin/#{filename}" }
 
-        File.chmod(0o755, *files_to_become_executable)
+        File.chmod(0o755, *files_to_become_executable) unless options[:pretend]
       end
 
       def add_post_install_message

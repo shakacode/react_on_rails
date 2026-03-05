@@ -1121,6 +1121,33 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  describe "--pretend mode behavior" do
+    let(:install_generator) { described_class.new([], { pretend: true }) }
+
+    it "skips automatic shakapacker installation commands" do
+      allow(install_generator).to receive(:shakapacker_configured?).and_return(false)
+
+      expect(install_generator).to receive(:say_status)
+        .with(:pretend, "Skipping automatic Shakapacker installation in --pretend mode", :yellow)
+      expect(install_generator).not_to receive(:print_shakapacker_setup_banner)
+      expect(install_generator).not_to receive(:ensure_shakapacker_in_gemfile)
+      expect(install_generator).not_to receive(:install_shakapacker)
+      expect(install_generator).not_to receive(:finalize_shakapacker_setup)
+
+      install_generator.send(:ensure_shakapacker_installed)
+    end
+
+    it "does not chmod copied bin scripts in pretend mode" do
+      allow(install_generator).to receive(:directory)
+      allow(Dir).to receive(:chdir).and_yield
+      allow(Dir).to receive(:glob).with("*").and_return(%w[dev switch-bundler])
+
+      expect(File).not_to receive(:chmod)
+
+      install_generator.send(:add_bin_scripts)
+    end
+  end
+
   context "when detecting existing bin-files on *nix" do
     let(:install_generator) { described_class.new }
 
