@@ -145,6 +145,34 @@ module GeneratorHelper
     options[:rsc]
   end
 
+  # Determine if the project is using rspack as the bundler.
+  #
+  # Detection priority:
+  # 1. Explicit --rspack option (most reliable during fresh installs)
+  # 2. config/shakapacker.yml assets_bundler setting (for standalone generators
+  #    like `rails g react_on_rails:rsc` on an existing rspack project)
+  #
+  # @return [Boolean] true if rspack is the configured bundler
+  def using_rspack?
+    # options[:rspack] returns true/false if --rspack was declared on this generator,
+    # or nil if the option was not declared (e.g. RscGenerator, ProGenerator).
+    return options[:rspack] unless options[:rspack].nil?
+
+    rspack_configured_in_project?
+  end
+
+  # Remap a config path from config/webpack/ to config/rspack/ when using rspack.
+  # Source templates always live under config/webpack/ (template names are stable);
+  # this method handles the destination remapping.
+  #
+  # @param path [String] relative path, e.g. "config/webpack/serverWebpackConfig.js"
+  # @return [String] remapped path when rspack, unchanged otherwise
+  def destination_config_path(path)
+    return path unless using_rspack?
+
+    path.sub("config/webpack/", "config/rspack/")
+  end
+
   # Detect the installed React version from package.json
   # Uses VERSION_PARTS_REGEX pattern from VersionChecker for consistency
   #
@@ -228,8 +256,8 @@ module GeneratorHelper
   #
   # @return [String, nil] relative config path, or nil if neither file exists
   def resolve_server_client_or_both_path
-    new_path = "config/webpack/ServerClientOrBoth.js"
-    old_path = "config/webpack/generateWebpackConfigs.js"
+    new_path = destination_config_path("config/webpack/ServerClientOrBoth.js")
+    old_path = destination_config_path("config/webpack/generateWebpackConfigs.js")
     full_new = File.join(destination_root, new_path)
     full_old = File.join(destination_root, old_path)
 
@@ -238,7 +266,7 @@ module GeneratorHelper
     elsif File.exist?(full_old)
       FileUtils.mv(full_old, full_new)
       %w[development.js production.js test.js].each do |env_file|
-        env_path = "config/webpack/#{env_file}"
+        env_path = destination_config_path("config/webpack/#{env_file}")
         if File.exist?(File.join(destination_root, env_path))
           gsub_file(env_path, /generateWebpackConfigs/, "ServerClientOrBoth")
         end
@@ -295,5 +323,17 @@ module GeneratorHelper
   rescue StandardError
     # If we can't determine version, assume latest (which uses SWC)
     true
+  end
+
+  # Detect rspack from config/shakapacker.yml when no explicit --rspack option is available.
+  # Used by standalone generators (RscGenerator, ProGenerator) on existing projects.
+  def rspack_configured_in_project?
+    shakapacker_yml_path = File.join(destination_root, "config/shakapacker.yml")
+    return false unless File.exist?(shakapacker_yml_path)
+
+    config = parse_shakapacker_yml(shakapacker_yml_path)
+    config.dig("default", "assets_bundler") == "rspack"
+  rescue StandardError
+    false
   end
 end
