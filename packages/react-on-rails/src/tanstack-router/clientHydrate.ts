@@ -17,11 +17,12 @@ import type { RailsContext } from '../types/index.ts';
 export function clientHydrateTanStackApp(
   options: TanStackRouterOptions,
   props: Record<string, unknown>,
-  _railsContext: RailsContext & { serverSide: false },
+  railsContext: RailsContext & { serverSide: false },
   RouterProvider: React.ComponentType<any>,
   createBrowserHistory: () => any,
 ): ReactElement {
   const dehydratedState = props.__tanstackRouterDehydratedState as DehydratedRouterState | undefined;
+  const hasSsrPayload = dehydratedState !== undefined;
   const hasDehydratedRouter =
     dehydratedState?.dehydratedRouter !== undefined && dehydratedState.dehydratedRouter !== null;
 
@@ -42,7 +43,15 @@ export function clientHydrateTanStackApp(
       } else if (typeof router.matchRoutes === 'function' && router.__store?.setState) {
         // Fall back to injecting route matches when no dehydrated state is available.
         // This keeps the initial client route tree aligned with SSR output.
-        const matches = router.matchRoutes(router.state.location.pathname, router.state.location.search);
+        const pathname =
+          railsContext.pathname ||
+          (browserHistory.location as { pathname?: string } | undefined)?.pathname ||
+          router.state.location.pathname;
+        const search =
+          railsContext.search ??
+          (browserHistory.location as { search?: string } | undefined)?.search ??
+          router.state.location.search;
+        const matches = router.matchRoutes(pathname, search);
         router.__store.setState((s: Record<string, unknown>) => ({
           ...s,
           status: 'idle',
@@ -51,9 +60,10 @@ export function clientHydrateTanStackApp(
         }));
       }
 
-      // Only mark the router as SSR when we actually have SSR-dehydrated data.
-      // Otherwise, TanStack Router should perform normal client-only loading behavior.
-      if (hasDehydratedRouter) {
+      // Mark as SSR whenever we are hydrating a server-rendered page, even if
+      // TanStack returned null dehydration data. This prevents Transitioner
+      // from performing a client-only initial load during hydration.
+      if (hasSsrPayload) {
         (router as any).ssr = true;
       }
 
@@ -71,13 +81,13 @@ export function clientHydrateTanStackApp(
 
         // Only SSR hydration needs a manual load call.
         // For client-only renders, Transitioner handles initial loading.
-        if (hasDehydratedRouter && router.state.status !== 'idle') {
+        if (hasSsrPayload && router.state.status !== 'idle') {
           router.load().catch((err: unknown) => {
             console.error('react-on-rails/tanstack-router: Error loading routes after hydration:', err);
           });
         }
       }
-    }, [hasDehydratedRouter]); // eslint-disable-line react-hooks/exhaustive-deps -- router is a ref, intentionally stable
+    }, [hasSsrPayload]); // eslint-disable-line react-hooks/exhaustive-deps -- router is a ref, intentionally stable
 
     let app: ReactElement = createElement(RouterProvider, { router });
     if (options.AppWrapper) {

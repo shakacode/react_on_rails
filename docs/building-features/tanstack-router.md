@@ -80,6 +80,25 @@ If you pass props as a JSON string and the server render result includes `client
 - Keep `react-on-rails` up to date when upgrading `@tanstack/react-router`.
 - If TanStack internals change, React on Rails raises a clear compatibility error during SSR.
 
+## Working Examples in This Repo
+
+- OSS dummy app:
+  - Route + view:
+    - `react_on_rails/spec/dummy/config/routes.rb`
+    - `react_on_rails/spec/dummy/app/views/tanstack_router/index.html.erb`
+  - TanStack app entry:
+    - `react_on_rails/spec/dummy/client/app/startup/TanStackRouterApp.jsx`
+  - System test:
+    - `react_on_rails/spec/dummy/spec/system/integration_spec.rb`
+- Pro dummy app (async server rendering):
+  - Route + view:
+    - `react_on_rails_pro/spec/dummy/config/routes.rb`
+    - `react_on_rails_pro/spec/dummy/app/views/tanstack_router/index.html.erb`
+  - TanStack app entry:
+    - `react_on_rails_pro/spec/dummy/client/app/ror-auto-load-components/TanStackRouterAppAsync.jsx`
+  - System test:
+    - `react_on_rails_pro/spec/dummy/spec/system/integration_spec.rb`
+
 ## References
 
 - [Render-Functions Guide](../core-concepts/render-functions.md)

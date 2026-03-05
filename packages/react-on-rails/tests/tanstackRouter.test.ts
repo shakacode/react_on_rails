@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { renderToString } from 'react-dom/server';
 import { createTanStackRouterRenderFunction } from '../src/tanstack-router/index.ts';
 import type { RailsContext, ServerRenderResult } from '../src/types/index.ts';
 import type { TanStackRouter } from '../src/tanstack-router/types.ts';
@@ -95,5 +96,47 @@ describe('tanstack-router integration', () => {
     } as unknown as RailsContext);
 
     expect(React.isValidElement(result)).toBe(true);
+  });
+
+  it('hydrates with railsContext path when dehydration payload exists without dehydrated router', () => {
+    const router = buildRouter();
+    const options = {
+      createRouter: () => router,
+    };
+    const deps = {
+      RouterProvider: ({ children }: { children?: React.ReactNode }) =>
+        React.createElement('div', null, children),
+      createMemoryHistory: jest.fn(),
+      createBrowserHistory: jest.fn().mockReturnValue({
+        location: {
+          pathname: '/wrong-path',
+          search: '?wrong=1',
+          hash: '',
+          href: '/wrong-path?wrong=1',
+          state: null,
+        },
+      }),
+    };
+
+    const renderFn = createTanStackRouterRenderFunction(options, deps);
+    const result = renderFn(
+      {
+        __tanstackRouterDehydratedState: {
+          url: '/products?category=tools',
+          dehydratedRouter: null,
+        },
+      },
+      {
+        serverSide: false,
+        pathname: '/products',
+        search: '?category=tools',
+      } as unknown as RailsContext,
+    );
+
+    expect(React.isValidElement(result)).toBe(true);
+    renderToString(result as React.ReactElement);
+
+    expect(router.matchRoutes).toHaveBeenCalledWith('/products', '?category=tools');
+    expect((router as { ssr?: boolean }).ssr).toBe(true);
   });
 });

@@ -352,6 +352,9 @@ importers:
       '@hotwired/turbo-rails':
         specifier: ^8.0.4
         version: 8.0.23
+      '@tanstack/react-router':
+        specifier: ^1.139.0
+        version: 1.163.3(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       core-js:
         specifier: '3'
         version: 3.48.0
@@ -557,6 +560,9 @@ importers:
       '@shakacode/use-ssr-computation.runtime':
         specifier: ^2.0.0
         version: 2.0.0(react@19.2.3)
+      '@tanstack/react-router':
+        specifier: ^1.139.0
+        version: 1.163.3(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       autoprefixer:
         specifier: ^10.4.14
         version: 10.4.24(postcss@8.5.6)

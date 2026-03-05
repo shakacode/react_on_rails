@@ -221,6 +221,30 @@ describe "React Router", :js do
   end
 end
 
+describe "TanStack Router", :js do
+  subject { page }
+
+  before do
+    visit "/tanstack_router"
+  end
+
+  context "when rendering /tanstack_router" do
+    it { is_expected.to have_text("Woohoo, we can use tanstack-router here!") }
+
+    it "clicking links correctly renders other pages" do
+      click_on "TanStack Router Second Page"
+      expect(page).to have_current_path("/tanstack_router/second_page")
+      second_page_header_text = page.find(:css, "h2#tanstack-second-page").text
+      expect(second_page_header_text).to eq("TanStack Router Second Page")
+
+      click_on "TanStack Router Layout Only"
+      expect(page).to have_current_path("/tanstack_router")
+      home_page_header_text = page.find(:css, "h2#tanstack-home-page").text
+      expect(home_page_header_text).to eq("TanStack Router Home Page")
+    end
+  end
+end
+
 describe "Manual Rendering", :js do
   subject { page }
 
