@@ -24,7 +24,6 @@ import {
   getRequestBundleFilePath,
 } from '../shared/utils.js';
 import { getConfig } from '../shared/configBuilder.js';
-import * as errorReporter from '../shared/errorReporter.js';
 import { buildVM, hasVMContextForBundle, runInVM } from './vm.js';
 
 export type ProvidedNewBundle = {
@@ -260,7 +259,6 @@ export async function handleRenderRequest({
       error,
       'Caught top level error in handleRenderRequest',
     );
-    errorReporter.message(msg);
-    return Promise.reject(error as Error);
+    return errorResponseResult(msg);
   }
 }
