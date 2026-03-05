@@ -22,10 +22,16 @@ module ReactOnRails
           # If both are explicitly set, trust the user completely
           return { rails: rails_port, webpack: webpack_port } if rails_port && webpack_port
 
-          # If only one is set, use it as the anchor and return defaults for the other
-          return { rails: rails_port, webpack: webpack_port || DEFAULT_WEBPACK_PORT } if rails_port
+          # If only one is set, anchor it and probe for a free port on the other side
+          if rails_port
+            return { rails: rails_port,
+                     webpack: find_available_port(DEFAULT_WEBPACK_PORT, exclude: rails_port) }
+          end
 
-          return { rails: DEFAULT_RAILS_PORT, webpack: webpack_port } if webpack_port
+          if webpack_port
+            return { rails: find_available_port(DEFAULT_RAILS_PORT, exclude: webpack_port),
+                     webpack: webpack_port }
+          end
 
           # Neither set — auto-detect a free pair
           find_free_pair
@@ -46,11 +52,22 @@ module ReactOnRails
         private
 
         def explicit_rails_port
-          ENV["PORT"]&.to_i&.then { |p| p.positive? ? p : nil }
+          ENV["PORT"]&.to_i&.then { |p| p.between?(1, 65_535) ? p : nil }
         end
 
         def explicit_webpack_port
-          ENV["SHAKAPACKER_DEV_SERVER_PORT"]&.to_i&.then { |p| p.positive? ? p : nil }
+          ENV["SHAKAPACKER_DEV_SERVER_PORT"]&.to_i&.then { |p| p.between?(1, 65_535) ? p : nil }
+        end
+
+        def find_available_port(start_port, exclude:)
+          MAX_ATTEMPTS.times do |i|
+            port = start_port + i
+            next if port == exclude
+
+            return port if port_available?(port)
+          end
+
+          raise NoPortAvailable, "No available port found starting at #{start_port}."
         end
 
         def find_free_pair

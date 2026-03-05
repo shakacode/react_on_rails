@@ -65,18 +65,33 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
       end
 
       it "respects the existing PORT env var" do
+        allow(described_class).to receive(:port_available?).and_return(true)
         result = described_class.select_ports
         expect(result[:rails]).to eq(4000)
       end
 
-      it "defaults webpack to 3035 when SHAKAPACKER_DEV_SERVER_PORT is not set" do
+      it "defaults webpack to 3035 when SHAKAPACKER_DEV_SERVER_PORT is not set and 3035 is free" do
+        allow(described_class).to receive(:port_available?).and_return(true)
         result = described_class.select_ports
         expect(result[:webpack]).to eq(3035)
       end
 
-      it "does not probe for free ports" do
-        expect(described_class).not_to receive(:port_available?)
-        described_class.select_ports
+      it "finds next free webpack port when 3035 is occupied" do
+        call_count = 0
+        allow(described_class).to receive(:port_available?) do
+          call_count += 1
+          call_count > 1 # first check (3035) fails
+        end
+        result = described_class.select_ports
+        expect(result[:webpack]).to eq(3036)
+      end
+
+      it "does not return PORT value as webpack port when they would be equal" do
+        ENV["PORT"] = "3035"
+        allow(described_class).to receive(:port_available?).and_return(true)
+        result = described_class.select_ports
+        expect(result[:rails]).to eq(3035)
+        expect(result[:webpack]).not_to eq(3035)
       end
     end
 
@@ -89,18 +104,33 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
       end
 
       it "respects the existing SHAKAPACKER_DEV_SERVER_PORT env var" do
+        allow(described_class).to receive(:port_available?).and_return(true)
         result = described_class.select_ports
         expect(result[:webpack]).to eq(4035)
       end
 
-      it "defaults Rails to 3000 when PORT is not set" do
+      it "defaults Rails to 3000 when PORT is not set and 3000 is free" do
+        allow(described_class).to receive(:port_available?).and_return(true)
         result = described_class.select_ports
         expect(result[:rails]).to eq(3000)
       end
 
-      it "does not probe for free ports" do
-        expect(described_class).not_to receive(:port_available?)
-        described_class.select_ports
+      it "finds next free rails port when 3000 is occupied" do
+        call_count = 0
+        allow(described_class).to receive(:port_available?) do
+          call_count += 1
+          call_count > 1 # first check (3000) fails
+        end
+        result = described_class.select_ports
+        expect(result[:rails]).to eq(3001)
+      end
+
+      it "does not return SHAKAPACKER_DEV_SERVER_PORT value as rails port when they would be equal" do
+        ENV["SHAKAPACKER_DEV_SERVER_PORT"] = "3000"
+        allow(described_class).to receive(:port_available?).and_return(true)
+        result = described_class.select_ports
+        expect(result[:webpack]).to eq(3000)
+        expect(result[:rails]).not_to eq(3000)
       end
     end
 
@@ -131,6 +161,22 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
       it "raises an error" do
         allow(described_class).to receive(:port_available?).and_return(false)
         expect { described_class.select_ports }.to raise_error(described_class::NoPortAvailable, /No available port/)
+      end
+    end
+
+    context "when PORT contains an out-of-range value" do
+      around do |example|
+        old = ENV.fetch("PORT", nil)
+        ENV["PORT"] = "99999"
+        example.run
+        ENV["PORT"] = old
+      end
+
+      it "treats out-of-range PORT as unset and falls back to auto-detection" do
+        allow(described_class).to receive(:port_available?).and_return(true)
+        result = described_class.select_ports
+        expect(result[:rails]).to eq(3000)
+        expect(result[:webpack]).to eq(3035)
       end
     end
   end
