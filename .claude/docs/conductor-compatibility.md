@@ -13,7 +13,33 @@ The best fix is to activate mise shims in shell startup files that run for **all
 3. **`.profile`** — activate `mise activate bash --shims` (for sh/login shells)
 4. **Export `BASH_ENV` and `ENV`** from `.zshenv` — so non-interactive bash/sh child processes also get shims
 
-See [justin808-dotfiles](https://github.com/justin808/justin808-dotfiles) for a reference implementation.
+Example `.zshenv`:
+
+```bash
+# Activate mise shims for ALL zsh shells (interactive + non-interactive).
+# Non-interactive shells (Conductor, coding agents, tool calls) never source .zshrc,
+# so without this they get system Ruby/Node instead of mise-managed versions.
+# In interactive shells, `mise activate zsh` in .zshrc overrides shims with faster direct paths.
+if [ -x /opt/homebrew/bin/mise ]; then
+  eval "$(/opt/homebrew/bin/mise activate zsh --shims)"
+elif [ -x /usr/local/bin/mise ]; then
+  eval "$(/usr/local/bin/mise activate zsh --shims)"
+elif [ -x "$HOME/.local/bin/mise" ]; then
+  eval "$("$HOME/.local/bin/mise" activate zsh --shims)"
+fi
+
+# Export BASH_ENV and ENV so non-interactive bash/sh child processes also get mise shims.
+export BASH_ENV="$HOME/.bashrc"
+export ENV="$HOME/.profile"
+```
+
+Example `.bashrc` and `.profile` (both similar):
+
+```bash
+if command -v mise >/dev/null 2>&1; then
+  eval "$(mise activate bash --shims)"
+fi
+```
 
 With this setup, `bin/conductor-exec` is unnecessary — all shells automatically get mise-managed tool versions.
 
