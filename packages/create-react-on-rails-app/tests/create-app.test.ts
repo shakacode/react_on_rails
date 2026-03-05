@@ -221,7 +221,7 @@ describe('createApp', () => {
     expect(() => createApp('my-app', { ...baseOptions, rsc: true })).toThrow('process.exit');
     expect(mockedFs.rmSync).toHaveBeenCalledWith(appPath, { recursive: true, force: true });
     expect(mockedLogInfo).toHaveBeenCalledWith(
-      'Directory removed. Configure access to React on Rails Pro gem source and rerun.',
+      'Directory removed. Configure access to React on Rails Pro gem source and rerun. For custom source/git setups, rerun without --rsc and add react_on_rails_pro manually in Gemfile.',
     );
   });
 

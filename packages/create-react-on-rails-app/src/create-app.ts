@@ -108,7 +108,10 @@ export function createApp(appName: string, options: CliOptions): void {
       logInfo(`Cleaning up "${appName}" directory...`);
       try {
         fs.rmSync(appPath, { recursive: true, force: true });
-        logInfo('Directory removed. Configure access to React on Rails Pro gem source and rerun.');
+        logInfo(
+          'Directory removed. Configure access to React on Rails Pro gem source and rerun. ' +
+            'For custom source/git setups, rerun without --rsc and add react_on_rails_pro manually in Gemfile.',
+        );
       } catch {
         logInfo(
           `Delete the created "${appName}" directory and rerun without --rsc, or configure access to the private React on Rails Pro gem source first.`,
