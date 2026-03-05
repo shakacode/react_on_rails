@@ -14,7 +14,7 @@ module ReactOnRails
       class << self
         # Returns { rails: Integer, webpack: Integer }.
         # Respects existing ENV['PORT'] / ENV['SHAKAPACKER_DEV_SERVER_PORT'].
-        # Only probes when both are unset (i.e. user hasn't configured them).
+        # Probes for free ports when either or both env vars are unset.
         def select_ports
           rails_port   = explicit_rails_port
           webpack_port = explicit_webpack_port
@@ -59,7 +59,7 @@ module ReactOnRails
           ENV["SHAKAPACKER_DEV_SERVER_PORT"]&.to_i&.then { |p| p.between?(1, 65_535) ? p : nil }
         end
 
-        def find_available_port(start_port, exclude:)
+        def find_available_port(start_port, exclude: nil)
           MAX_ATTEMPTS.times do |i|
             port = start_port + i
             next if port == exclude
@@ -71,21 +71,14 @@ module ReactOnRails
         end
 
         def find_free_pair
-          MAX_ATTEMPTS.times do |i|
-            rails_port   = DEFAULT_RAILS_PORT   + i
-            webpack_port = DEFAULT_WEBPACK_PORT + i
+          rails_port   = find_available_port(DEFAULT_RAILS_PORT)
+          webpack_port = find_available_port(DEFAULT_WEBPACK_PORT, exclude: rails_port)
 
-            next unless port_available?(rails_port) && port_available?(webpack_port)
-
-            puts "Default ports in use. Using Rails :#{rails_port}, webpack :#{webpack_port}" if i.positive?
-
-            return { rails: rails_port, webpack: webpack_port }
+          if rails_port != DEFAULT_RAILS_PORT || webpack_port != DEFAULT_WEBPACK_PORT
+            puts "Default ports in use. Using Rails :#{rails_port}, webpack :#{webpack_port}"
           end
 
-          raise NoPortAvailable,
-                "No available port pair found in range " \
-                "#{DEFAULT_RAILS_PORT}--#{DEFAULT_RAILS_PORT + MAX_ATTEMPTS - 1}. " \
-                "Run 'bin/dev kill' to free up ports."
+          { rails: rails_port, webpack: webpack_port }
         end
       end
     end

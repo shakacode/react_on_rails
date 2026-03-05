@@ -27,30 +27,33 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
 
     context "when default ports are occupied" do
       it "finds the next free Rails port" do
-        call_count = 0
-        allow(described_class).to receive(:port_available?) do
-          call_count += 1
-          call_count > 1 # first check (3000) fails; && short-circuits so 3035 is never checked
+        allow(described_class).to receive(:port_available?) do |port|
+          port != 3000 # only 3000 is occupied
         end
         result = described_class.select_ports
         expect(result[:rails]).to eq(3001)
       end
 
-      it "keeps webpack port offset from Rails port" do
-        call_count = 0
-        allow(described_class).to receive(:port_available?) do
-          call_count += 1
-          call_count > 1
+      it "keeps webpack at its default when only the Rails default port is occupied" do
+        allow(described_class).to receive(:port_available?) do |port|
+          port != 3000 # 3035 is still free
         end
         result = described_class.select_ports
+        expect(result[:webpack]).to eq(3035)
+      end
+
+      it "increments webpack independently when both default ports are occupied" do
+        allow(described_class).to receive(:port_available?) do |port|
+          port != 3000 && port != 3035
+        end
+        result = described_class.select_ports
+        expect(result[:rails]).to eq(3001)
         expect(result[:webpack]).to eq(3036)
       end
 
       it "prints a message when ports are shifted" do
-        call_count = 0
-        allow(described_class).to receive(:port_available?) do
-          call_count += 1
-          call_count > 1
+        allow(described_class).to receive(:port_available?) do |port|
+          port != 3000 && port != 3035
         end
         expect { described_class.select_ports }.to output(/3001.*3036|shifted|in use/i).to_stdout
       end
