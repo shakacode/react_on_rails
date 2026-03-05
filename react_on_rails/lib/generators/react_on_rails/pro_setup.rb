@@ -229,8 +229,9 @@ module ReactOnRails
           function extractLoader(rule, loaderName) {
             if (!Array.isArray(rule.use)) return null;
             return rule.use.find((item) => {
-              const testValue = typeof item === 'string' ? item : item.loader;
-              return testValue && testValue.includes(loaderName);
+              if (!item) return false;
+              const testValue = typeof item === 'string' ? item : (typeof item.loader === 'string' ? item.loader : '');
+              return testValue.includes(loaderName);
             });
           }
         JS
@@ -244,7 +245,6 @@ module ReactOnRails
       end
 
       def add_babel_ssr_caller_to_server_config(webpack_config, content)
-        # Skip if Babel SSR caller already exists
         return if content.include?("babelLoader.options.caller")
 
         babel_ssr_code = "\n\n      " \
@@ -254,12 +254,16 @@ module ReactOnRails
                          "babelLoader.options.caller = { ssr: true };\n      " \
                          "}"
 
-        # Insert after cssLoader.options.modules = { exportOnlyLocals: true }; block
+        # Insert after cssLoader.options.modules; [\s\S]*? covers both single-line and spread syntax patterns.
         gsub_file(
           webpack_config,
-          /(cssLoader\.options\.modules = \{ exportOnlyLocals: true \};\s*\n\s*\})/,
+          /(cssLoader\.options\.modules = \{[\s\S]*?exportOnlyLocals: true[\s\S]*?\};\s*\n\s*\})/,
           "\\1#{babel_ssr_code}"
         )
+        new_content = File.read(File.join(destination_root, webpack_config))
+        return if new_content.include?("babelLoader.options.caller")
+
+        say_status :warning, "Babel SSR caller insertion failed in #{webpack_config}; manual edit required.", :yellow
       end
 
       def update_server_config_exports(webpack_config)
