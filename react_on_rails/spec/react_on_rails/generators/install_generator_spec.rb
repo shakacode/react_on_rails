@@ -1149,6 +1149,8 @@ describe InstallGenerator, type: :generator do
     it "does not create css module type files in pretend mode" do
       allow(FileUtils).to receive(:mkdir_p)
       allow(File).to receive(:write)
+      expect(install_generator).to receive(:say_status)
+        .with(:pretend, "Would create CSS module type definitions (skipped in --pretend mode)", :yellow)
 
       install_generator.send(:create_css_module_types)
 
@@ -1160,6 +1162,8 @@ describe InstallGenerator, type: :generator do
       allow(File).to receive(:exist?).and_call_original
       allow(File).to receive(:exist?).with("tsconfig.json").and_return(false)
       allow(File).to receive(:write)
+      expect(install_generator).to receive(:say_status)
+        .with(:pretend, "Would create tsconfig.json (skipped in --pretend mode)", :yellow)
 
       install_generator.send(:create_typescript_config)
 

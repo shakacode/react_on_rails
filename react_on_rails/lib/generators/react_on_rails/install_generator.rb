@@ -471,9 +471,12 @@ module ReactOnRails
       end
 
       def create_css_module_types
-        puts Rainbow("📝 Creating CSS module type definitions...").yellow
+        if options[:pretend]
+          say_status :pretend, "Would create CSS module type definitions (skipped in --pretend mode)", :yellow
+          return
+        end
 
-        return if options[:pretend]
+        puts Rainbow("📝 Creating CSS module type definitions...").yellow
 
         # Ensure the types directory exists
         FileUtils.mkdir_p("app/javascript/types")
@@ -506,7 +509,10 @@ module ReactOnRails
           return
         end
 
-        return if options[:pretend]
+        if options[:pretend]
+          say_status :pretend, "Would create tsconfig.json (skipped in --pretend mode)", :yellow
+          return
+        end
 
         tsconfig_content = {
           "compilerOptions" => {
