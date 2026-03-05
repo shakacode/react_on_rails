@@ -150,10 +150,10 @@ const path = require('path');
 const getLocalIdent = (context, _localIdentName, localName) => {
   const resourcePath = context.resourcePath;
   const resourceQuery = context.resourceQuery || ''; // needed for CSS-in-JS virtual modules; safe no-op otherwise
-  // __dirname is typically config/webpack/, so '../..' resolves to the project root.
-  // If your webpack config lives at a different depth, adjust the number of '..' segments
-  // and verify with: console.log('projectRoot:', path.resolve(__dirname, '../..'))
-  const projectRoot = path.resolve(__dirname, '../..');
+  // Prefer process.cwd() so this stays correct across custom/monorepo layouts.
+  const projectRoot = process.cwd();
+  // Alternative if process.cwd() isn't reliable in your setup:
+  // const projectRoot = path.resolve(__dirname, '../..'); // adjust depth as needed
   const relativePath = path.relative(projectRoot, resourcePath);
 
   const hash = crypto
@@ -171,6 +171,8 @@ const getLocalIdent = (context, _localIdentName, localName) => {
 
 module.exports = getLocalIdent;
 ```
+
+For third-party CSS modules, `relativePath` may include `node_modules/` segments in the hash input. That's expected and stable; the visible class name prefix still comes from `path.basename(resourcePath)`.
 
 Then use it in your `commonWebpackConfig.js` where you configure CSS modules:
 
