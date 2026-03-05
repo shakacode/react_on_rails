@@ -364,7 +364,10 @@ module ReactOnRails
         end
 
         # Then run the shakapacker installer
-        success = Bundler.with_unbundled_env { system("bundle exec rails shakapacker:install") }
+        shakapacker_install_env = options.rspack? ? { "SHAKAPACKER_ASSETS_BUNDLER" => "rspack" } : {}
+        success = Bundler.with_unbundled_env do
+          system(shakapacker_install_env, "bundle exec rails shakapacker:install")
+        end
         if success
           true
         else
