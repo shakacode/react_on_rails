@@ -18,6 +18,24 @@ function cleanupAppDirectory(
   }
 }
 
+function localGemPath(envVarName: string): string | null {
+  const value = process.env[envVarName];
+  if (!value || value.trim() === '') {
+    return null;
+  }
+
+  return path.resolve(value);
+}
+
+function localGemPath(envVarName: string): string | null {
+  const value = process.env[envVarName];
+  if (!value || value.trim() === '') {
+    return null;
+  }
+
+  return path.resolve(value);
+}
+
 export function buildGeneratorArgs(options: CliOptions): string[] {
   const args: string[] = [];
 
@@ -80,6 +98,8 @@ export function createApp(appName: string, options: CliOptions): void {
   const totalSteps = options.rsc ? 5 : 4;
   const generatorStep = options.rsc ? 4 : 3;
   const doneStep = options.rsc ? 5 : 4;
+  const reactOnRailsGemPath = localGemPath('REACT_ON_RAILS_GEM_PATH');
+  const reactOnRailsProGemPath = localGemPath('REACT_ON_RAILS_PRO_GEM_PATH');
 
   // Step 1: Create Rails application
   // appName is validated by validateAppName() to be [a-zA-Z0-9_-]+ only,
@@ -99,7 +119,12 @@ export function createApp(appName: string, options: CliOptions): void {
   // Step 2: Add react_on_rails gem
   logStep(2, totalSteps, 'Adding react_on_rails gem...');
   try {
-    execLiveArgs('bundle', ['add', 'react_on_rails', '--strict'], appPath);
+    const reactOnRailsArgs = ['add', 'react_on_rails', '--strict'];
+    if (reactOnRailsGemPath) {
+      logInfo(`Using local react_on_rails gem path: ${reactOnRailsGemPath}`);
+      reactOnRailsArgs.push('--path', reactOnRailsGemPath);
+    }
+    execLiveArgs('bundle', reactOnRailsArgs, appPath);
     logStepDone('react_on_rails gem added');
   } catch (error) {
     logError('Failed to add react_on_rails gem. Check the output above for details.');
@@ -119,6 +144,12 @@ export function createApp(appName: string, options: CliOptions): void {
     logStep(3, totalSteps, 'Adding react_on_rails_pro gem (--rsc)...');
     try {
       execLiveArgs('bundle', ['add', 'react_on_rails_pro'], appPath);
+      const reactOnRailsProArgs = ['add', 'react_on_rails_pro'];
+      if (reactOnRailsProGemPath) {
+        logInfo(`Using local react_on_rails_pro gem path: ${reactOnRailsProGemPath}`);
+        reactOnRailsProArgs.push('--path', reactOnRailsProGemPath);
+      }
+      execLiveArgs('bundle', reactOnRailsProArgs, appPath);
       logStepDone('react_on_rails_pro gem added');
     } catch (error) {
       logError('Failed to add react_on_rails_pro gem required by --rsc.');
