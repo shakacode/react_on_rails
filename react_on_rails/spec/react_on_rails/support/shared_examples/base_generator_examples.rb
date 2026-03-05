@@ -26,6 +26,10 @@ shared_examples "base_generator_common" do
   it "uses env-var-driven port in Procfile.dev-static-assets" do
     assert_file "Procfile.dev-static-assets", /\$\{PORT:-3000\}/
   end
+
+  it "uses env-var-driven port in Procfile.dev-prod-assets" do
+    assert_file "Procfile.dev-prod-assets", /\$\{PORT:-3001\}/
+  end
 end
 
 shared_examples "react_component_structure" do
