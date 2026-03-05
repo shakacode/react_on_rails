@@ -1,7 +1,15 @@
 import path from 'path';
 import fs from 'fs';
 import { CliOptions } from './types.js';
-import { execLiveArgs, logStep, logStepDone, logError, logSuccess, logInfo } from './utils.js';
+import {
+  canResolveRemoteGem,
+  execLiveArgs,
+  logStep,
+  logStepDone,
+  logError,
+  logSuccess,
+  logInfo,
+} from './utils.js';
 
 const TOTAL_STEPS = 4;
 
@@ -65,6 +73,22 @@ export function validateAppName(name: string): { success: boolean; error?: strin
 export function createApp(appName: string, options: CliOptions): void {
   const appPath = path.resolve(process.cwd(), appName);
 
+  if (options.rsc) {
+    logInfo(
+      'Note: --rsc requires access to react_on_rails_pro (private gem source or a git-based Gemfile entry).',
+    );
+    logInfo('Checking react_on_rails_pro availability before creating the app...');
+
+    if (!canResolveRemoteGem('react_on_rails_pro')) {
+      logError('Could not resolve react_on_rails_pro from your current gem sources.');
+      logInfo('Configure access to the private React on Rails Pro gem source, then rerun this command.');
+      logInfo(
+        'If you prefer git-based setup, create the app without --rsc first and add react_on_rails_pro manually.',
+      );
+      process.exit(1);
+    }
+  }
+
   // Step 1: Create Rails application
   // appName is validated by validateAppName() to be [a-zA-Z0-9_-]+ only,
   // so it's always a simple directory name safe to use with rails new.
@@ -98,7 +122,9 @@ export function createApp(appName: string, options: CliOptions): void {
       logStepDone('react_on_rails and react_on_rails_pro gems added');
     } catch (error) {
       logError('Failed to add react_on_rails_pro gem required by --rsc.');
-      logInfo('Configure access to the private React on Rails Pro gem source, or rerun without --rsc.');
+      logInfo(
+        `Delete the created "${appName}" directory and rerun without --rsc, or configure access to the private React on Rails Pro gem source first.`,
+      );
       if (error instanceof Error && error.message) {
         console.error(`Debug info: ${error.message}`);
       }

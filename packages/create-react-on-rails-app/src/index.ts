@@ -95,6 +95,7 @@ Examples:
   $ npx create-react-on-rails-app my-app --template javascript
   $ npx create-react-on-rails-app my-app --rspack
   $ npx create-react-on-rails-app my-app --rsc
+  $ npx create-react-on-rails-app my-app --rspack --rsc
   $ npx create-react-on-rails-app my-app --package-manager pnpm
 
 What it does:
@@ -102,8 +103,9 @@ What it does:
   2. Adds required gem(s) (react_on_rails, plus react_on_rails_pro for --rsc)
   3. Runs the React on Rails generator (Shakapacker, components, webpack config)
 
-After setup, run bin/dev and visit http://localhost:3000/hello_world
-Use --rsc to generate the HelloServer route at http://localhost:3000/hello_server
+After setup, run bin/dev and visit:
+  - http://localhost:3000/hello_world (default)
+  - http://localhost:3000/hello_server (--rsc)
 
 Documentation: https://www.shakacode.com/react-on-rails/docs/`,
   )

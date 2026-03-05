@@ -22,6 +22,19 @@ export function getCommandVersion(command: string): string | null {
   }
 }
 
+export function canResolveRemoteGem(gemName: string): boolean {
+  try {
+    const output = execFileSync('gem', ['list', '--remote', '--exact', gemName], {
+      encoding: 'utf8',
+      stdio: 'pipe',
+    }).trim();
+
+    return output.startsWith(`${gemName} `) || output === gemName;
+  } catch {
+    return false;
+  }
+}
+
 export function detectPackageManager(): 'npm' | 'pnpm' | null {
   const userAgent = process.env.npm_config_user_agent;
   if (userAgent) {
