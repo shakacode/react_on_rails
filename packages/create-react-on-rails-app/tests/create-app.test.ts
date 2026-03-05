@@ -1,9 +1,34 @@
-import { validateAppName, buildGeneratorArgs } from '../src/create-app';
+import path from 'path';
 import fs from 'fs';
+import { validateAppName, buildGeneratorArgs, createApp } from '../src/create-app';
 import { CliOptions } from '../src/types';
+import { canResolveRemoteGem, execLiveArgs, logError, logInfo, logStepDone } from '../src/utils';
 
 jest.mock('fs');
+jest.mock('../src/utils', () => ({
+  ...jest.requireActual('../src/utils'),
+  canResolveRemoteGem: jest.fn(),
+  execLiveArgs: jest.fn(),
+  logStep: jest.fn(),
+  logStepDone: jest.fn(),
+  logError: jest.fn(),
+  logSuccess: jest.fn(),
+  logInfo: jest.fn(),
+}));
+
 const mockedFs = jest.mocked(fs);
+const mockedCanResolveRemoteGem = jest.mocked(canResolveRemoteGem);
+const mockedExecLiveArgs = jest.mocked(execLiveArgs);
+const mockedLogError = jest.mocked(logError);
+const mockedLogInfo = jest.mocked(logInfo);
+const mockedLogStepDone = jest.mocked(logStepDone);
+
+const baseOptions: CliOptions = {
+  template: 'javascript',
+  packageManager: 'npm',
+  rspack: false,
+  rsc: false,
+};
 
 describe('validateAppName', () => {
   beforeEach(() => {
@@ -66,13 +91,6 @@ describe('validateAppName', () => {
 });
 
 describe('buildGeneratorArgs', () => {
-  const baseOptions: CliOptions = {
-    template: 'javascript',
-    packageManager: 'npm',
-    rspack: false,
-    rsc: false,
-  };
-
   it('includes ignore-warnings by default', () => {
     expect(buildGeneratorArgs(baseOptions)).toEqual(['--ignore-warnings']);
   });
@@ -101,5 +119,101 @@ describe('buildGeneratorArgs', () => {
         rsc: true,
       }),
     ).toEqual(['--typescript', '--rspack', '--rsc', '--ignore-warnings']);
+  });
+
+  it('combines rspack and rsc flags without typescript', () => {
+    expect(buildGeneratorArgs({ ...baseOptions, rspack: true, rsc: true })).toEqual([
+      '--rspack',
+      '--rsc',
+      '--ignore-warnings',
+    ]);
+  });
+});
+
+describe('createApp', () => {
+  let processExitSpy: jest.SpyInstance;
+  let consoleLogSpy: jest.SpyInstance;
+  let consoleErrorSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    mockedCanResolveRemoteGem.mockReset();
+    mockedExecLiveArgs.mockReset();
+    mockedLogError.mockReset();
+    mockedLogInfo.mockReset();
+    mockedLogStepDone.mockReset();
+    mockedCanResolveRemoteGem.mockReturnValue(true);
+
+    processExitSpy = jest.spyOn(process, 'exit').mockImplementation((() => {
+      throw new Error('process.exit');
+    }) as never);
+    consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    processExitSpy.mockRestore();
+    consoleLogSpy.mockRestore();
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('installs react_on_rails_pro and prints hello_server route for --rsc', () => {
+    const options = { ...baseOptions, rsc: true };
+    const appPath = path.resolve(process.cwd(), 'my-app');
+
+    createApp('my-app', options);
+
+    expect(mockedCanResolveRemoteGem).toHaveBeenCalledWith('react_on_rails_pro');
+    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(1, 'rails', [
+      'new',
+      'my-app',
+      '--database=postgresql',
+      '--skip-javascript',
+    ]);
+    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
+      2,
+      'bundle',
+      ['add', 'react_on_rails', '--strict'],
+      appPath,
+    );
+    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
+      3,
+      'bundle',
+      ['add', 'react_on_rails_pro', '--strict'],
+      appPath,
+    );
+    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
+      4,
+      'bundle',
+      ['exec', 'rails', 'generate', 'react_on_rails:install', '--rsc', '--ignore-warnings'],
+      appPath,
+    );
+    expect(mockedLogStepDone).toHaveBeenCalledWith('react_on_rails and react_on_rails_pro gems added');
+    expect(mockedLogInfo).toHaveBeenCalledWith('Then visit http://localhost:3000/hello_server');
+    expect(processExitSpy).not.toHaveBeenCalled();
+  });
+
+  it('checks react_on_rails_pro availability before creating app for --rsc', () => {
+    mockedCanResolveRemoteGem.mockReturnValue(false);
+
+    expect(() => createApp('my-app', { ...baseOptions, rsc: true })).toThrow('process.exit');
+    expect(mockedCanResolveRemoteGem).toHaveBeenCalledWith('react_on_rails_pro');
+    expect(mockedExecLiveArgs).not.toHaveBeenCalled();
+    expect(mockedLogError).toHaveBeenCalledWith(
+      'Could not resolve react_on_rails_pro from your current gem sources.',
+    );
+  });
+
+  it('guides user to delete app directory when react_on_rails_pro add fails', () => {
+    mockedExecLiveArgs
+      .mockImplementationOnce(() => {})
+      .mockImplementationOnce(() => {})
+      .mockImplementationOnce(() => {
+        throw new Error('pro gem install failed');
+      });
+
+    expect(() => createApp('my-app', { ...baseOptions, rsc: true })).toThrow('process.exit');
+    expect(mockedLogInfo).toHaveBeenCalledWith(
+      'Delete the created "my-app" directory and rerun without --rsc, or configure access to the private React on Rails Pro gem source first.',
+    );
   });
 });

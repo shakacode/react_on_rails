@@ -32,6 +32,9 @@ npx create-react-on-rails-app my-app --package-manager pnpm
 
 # Combine options
 npx create-react-on-rails-app my-app --rspack --package-manager pnpm
+
+# Combine RSC with Rspack
+npx create-react-on-rails-app my-app --rspack --rsc
 ```
 
 ### All Options
