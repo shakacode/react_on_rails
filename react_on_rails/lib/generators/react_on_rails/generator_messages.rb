@@ -147,7 +147,7 @@ module GeneratorMessages
       version_warning = check_shakapacker_version_warning
 
       if shakapacker_just_installed
-        <<~SHAKAPACKER
+        base = <<~SHAKAPACKER
 
           📦 SHAKAPACKER SETUP:
           ─────────────────────────────────────────────────────────────────────────
@@ -155,7 +155,7 @@ module GeneratorMessages
           #{Rainbow('✓ Installer ran successfully').green}
           #{Rainbow('✓ Webpack integration configured').green}
         SHAKAPACKER
-          .chomp + version_warning
+        base.chomp + version_warning
       elsif File.exist?("bin/shakapacker") && File.exist?("bin/shakapacker-dev-server")
         "\n📦 #{Rainbow('Shakapacker already configured ✓').green}#{version_warning}"
       else
