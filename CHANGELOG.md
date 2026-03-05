@@ -31,6 +31,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 - **Configurable host binding for Node Renderer Fastify worker**: Added a `host` setting (default: `process.env.RENDERER_HOST || 'localhost'`) to control the bind address for the Pro Node Renderer. Set it to `0.0.0.0` in containerized environments where external health checks need to reach the renderer. [PR 2585](https://github.com/shakacode/react_on_rails/pull/2585) by [justin808](https://github.com/justin808).
 
+##### Fixed
+
+- **Immutable and crash-safe bundle directories for uploaded assets**: Fixed destination-level bundle directory races by making bundle hashes depend on bundle content plus copied asset content, switching asset copies to no-overwrite semantics, and adding a `.complete` marker so interrupted uploads are detected and repopulated instead of being treated as valid. [PR 2534](https://github.com/shakacode/react_on_rails/pull/2534) by [justin808](https://github.com/justin808).
+
 ### [16.4.0.rc.8] - 2026-03-10
 
 Changes since the last non-beta release.
