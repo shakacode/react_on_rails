@@ -1289,6 +1289,17 @@ describe InstallGenerator, type: :generator do
         expect(install_generator.send(:using_rspack?)).to be false
       end
     end
+
+    context "when options[:rspack] is nil and shakapacker.yml has rspack configured" do
+      let(:install_generator) { described_class.new }
+
+      it "falls back to project detection via rspack_configured_in_project?" do
+        # options[:rspack] is false (not nil) for InstallGenerator when not passed,
+        # so stub options to return nil for :rspack to exercise the fallback branch
+        allow(install_generator).to receive_messages(rspack_configured_in_project?: true, options: { rspack: nil })
+        expect(install_generator.send(:using_rspack?)).to be true
+      end
+    end
   end
 
   describe "#destination_config_path" do
@@ -1335,12 +1346,12 @@ describe InstallGenerator, type: :generator do
       # Verify both system calls run inside with_unbundled_env
       allow(Bundler).to receive(:with_unbundled_env).and_yield
       allow(install_generator).to receive(:system).with("bundle install").and_return(true)
-      allow(install_generator).to receive(:system).with("bundle exec rails shakapacker:install").and_return(true)
+      allow(install_generator).to receive(:system).with({}, "bundle exec rails shakapacker:install").and_return(true)
 
       install_generator.send(:install_shakapacker)
 
       expect(install_generator).to have_received(:system).with("bundle install")
-      expect(install_generator).to have_received(:system).with("bundle exec rails shakapacker:install")
+      expect(install_generator).to have_received(:system).with({}, "bundle exec rails shakapacker:install")
       expect(Bundler).to have_received(:with_unbundled_env).at_least(:twice)
     end
 
