@@ -37,6 +37,14 @@ function run(appName: string, rawOpts: Record<string, unknown>): void {
   console.log(`${chalk.bold('create-react-on-rails-app')} v${packageJson.version}`);
   console.log('');
 
+  if (options.rsc) {
+    logInfo(
+      'Note: --rsc requires access to react_on_rails_pro (private gem source or a git-based Gemfile entry).',
+    );
+    logInfo('If installation fails, fix gem source access and rerun with --rsc.');
+    console.log('');
+  }
+
   const nameValidation = validateAppName(appName);
   if (!nameValidation.success) {
     logError(nameValidation.error ?? 'Invalid app name');
