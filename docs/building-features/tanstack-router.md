@@ -79,6 +79,9 @@ If you pass a JSON string that parses to a non-object value (like an array), Rea
 ## Compatibility Notes
 
 - Sync SSR uses a TanStack Router internal store API to inject matched routes before `renderToString`.
+- Sync SSR (`renderToString`) does not await async route loaders.
+  For loader-backed routes, prefer controller-provided data, client-side fetching after hydration, or the async
+  render-function path (`serverRenderTanStackAppAsync`) with React on Rails Pro NodeRenderer.
 - Keep `react-on-rails` up to date when upgrading `@tanstack/react-router`.
 - If TanStack internals change, React on Rails raises a clear compatibility error during SSR.
 

@@ -5,14 +5,16 @@ import type {
   RenderStateHtml,
 } from './types/index.ts';
 
-export function isServerRenderHash(
-  testValue: CreateReactOutputResult | RenderFunctionResult,
-): testValue is ServerRenderResult {
-  return !!(
-    (testValue as ServerRenderResult).renderedHtml ||
-    (testValue as ServerRenderResult).redirectLocation ||
-    (testValue as ServerRenderResult).routeError ||
-    (testValue as ServerRenderResult).error
+export function isServerRenderHash(testValue: unknown): testValue is ServerRenderResult {
+  if (!testValue || typeof testValue !== 'object') {
+    return false;
+  }
+
+  return (
+    'renderedHtml' in testValue ||
+    'redirectLocation' in testValue ||
+    'routeError' in testValue ||
+    'error' in testValue
   );
 }
 

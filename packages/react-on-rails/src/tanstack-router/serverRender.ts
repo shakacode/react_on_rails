@@ -1,16 +1,9 @@
 import { createElement, type ReactElement } from 'react';
 import type { TanStackRouter, TanStackRouterOptions, DehydratedRouterState } from './types.ts';
 import type { RailsContext } from '../types/index.ts';
+import { normalizeSearch, locationSearch } from './utils.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, no-underscore-dangle */
-
-function normalizeSearch(search: string | null | undefined): string {
-  if (!search) {
-    return '';
-  }
-
-  return search.startsWith('?') ? search : `?${search}`;
-}
 
 /**
  * Validates that the TanStack Router internal APIs we depend on are present.
@@ -72,7 +65,7 @@ function injectRouteMatchesSync(router: TanStackRouter, fallbackUrl: string): vo
   const parsedUrl = new URL(fallbackUrl, 'https://react-on-rails.local');
   const { location } = router.state;
   const pathname = typeof location.pathname === 'string' ? location.pathname : parsedUrl.pathname;
-  const search = typeof location.search === 'string' ? location.search : parsedUrl.search;
+  const search = locationSearch(location) || parsedUrl.search;
   const matches = router.matchRoutes(pathname, search);
 
   store.setState((s: Record<string, unknown>) => ({
@@ -94,9 +87,7 @@ function buildAppElement(
 ): ReactElement {
   let app: ReactElement = createElement(RouterProvider, { router });
   if (AppWrapper) {
-    const sanitizedWrapperProps = { ...wrapperProps } as Record<string, unknown>;
-    delete sanitizedWrapperProps.__tanstackRouterDehydratedState;
-    app = createElement(AppWrapper, { ...sanitizedWrapperProps, children: app } as any);
+    app = createElement(AppWrapper, { ...wrapperProps, children: app } as any);
   }
   return app;
 }
@@ -175,6 +166,9 @@ export async function serverRenderTanStackAppAsync(
 
   // Use the public API — await route loading
   await router.load();
+
+  // Keep server markup consistent with the synchronous render path.
+  (router as any).ssr = true;
 
   const dehydratedState: DehydratedRouterState = {
     url,

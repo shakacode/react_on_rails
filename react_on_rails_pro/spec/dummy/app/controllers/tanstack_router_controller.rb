@@ -12,16 +12,9 @@ class TanstackRouterController < ApplicationController
   private
 
   def data
-    url = request.path
-    url += "?#{request.query_string}" if request.query_string.present?
-
     @app_props_server_render = {
       helloWorldData: {
         name: "Mr. Server Side Rendering"
-      },
-      "__tanstackRouterDehydratedState" => {
-        url: url,
-        dehydratedRouter: nil
       }
     }
   end

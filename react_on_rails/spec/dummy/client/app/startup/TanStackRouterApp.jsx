@@ -47,7 +47,7 @@ const secondRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([homeRoute, secondRoute]);
 
-const baseRenderFn = createTanStackRouterRenderFunction(
+const TanStackRouterApp = createTanStackRouterRenderFunction(
   {
     createRouter: () => createRouter({ routeTree }),
   },
@@ -57,18 +57,5 @@ const baseRenderFn = createTanStackRouterRenderFunction(
     createBrowserHistory,
   },
 );
-
-const TanStackRouterApp = (props, railsContext) => {
-  const propsOrDefault = props || {};
-  const result = baseRenderFn(propsOrDefault, railsContext);
-
-  if (result && typeof result === 'object' && Object.prototype.hasOwnProperty.call(result, 'renderedHtml')) {
-    return result;
-  }
-
-  return () => result;
-};
-
-TanStackRouterApp.renderFunction = true;
 
 export default TanStackRouterApp;

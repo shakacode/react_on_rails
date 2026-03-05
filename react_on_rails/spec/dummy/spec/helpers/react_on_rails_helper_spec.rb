@@ -273,6 +273,20 @@ describe ReactOnRailsHelper do
           react_component("App", props: '["not","a","hash"]', prerender: true)
         end.to raise_error(ReactOnRails::Error, /Cannot merge result\["clientProps"\] into non-Hash props/)
       end
+
+      it "normalizes symbol and string keys so clientProps can override existing props" do
+        allow(ReactOnRails::ServerRenderingPool).to receive(:server_render_js_with_console_logging).and_return(
+          "html" => "<div>SSR App</div>",
+          "consoleReplayScript" => "",
+          "clientProps" => {
+            "name" => "Name from clientProps"
+          }
+        )
+
+        result = react_component("App", props: { name: "My Test Name" }, prerender: true)
+        expect(result).to include('"name":"Name from clientProps"')
+        expect(result.scan('"name":').length).to eq(1)
+      end
     end
 
     describe "API with component name only (no props or other options)" do

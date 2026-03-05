@@ -1,6 +1,7 @@
 import { createElement, useEffect, useRef, type ReactElement } from 'react';
 import type { TanStackRouter, TanStackRouterOptions, DehydratedRouterState } from './types.ts';
 import type { RailsContext } from '../types/index.ts';
+import { normalizeSearch, locationSearch } from './utils.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, no-underscore-dangle, import/prefer-default-export */
 
@@ -14,13 +15,6 @@ import type { RailsContext } from '../types/index.ts';
  * 4. After hydration, trigger router.load() to enable client-side navigation
  * 5. Return a React component that renders RouterProvider
  */
-function normalizeSearch(search: string | null | undefined): string {
-  if (!search) {
-    return '';
-  }
-
-  return search.startsWith('?') ? search : `?${search}`;
-}
 
 interface TanStackHydrationAppProps {
   options: TanStackRouterOptions;
@@ -54,7 +48,7 @@ function TanStackHydrationApp({
     // Hydrate router with dehydrated state from server if available.
     if (hasDehydratedRouter && typeof router.hydrate === 'function') {
       router.hydrate(dehydratedState.dehydratedRouter);
-    } else if (typeof router.matchRoutes === 'function' && router.__store?.setState) {
+    } else if (typeof router.matchRoutes === 'function' && typeof router.__store?.setState === 'function') {
       // Fall back to injecting route matches when no dehydrated state is available.
       // This keeps the initial client route tree aligned with SSR output.
       const routerLocation = router.state?.location as { pathname?: string; search?: string } | undefined;
@@ -63,7 +57,7 @@ function TanStackHydrationApp({
         (browserHistory.location as { pathname?: string } | undefined)?.pathname ||
         routerLocation?.pathname ||
         '/';
-      const searchFromRouter = typeof routerLocation?.search === 'string' ? routerLocation.search : undefined;
+      const searchFromRouter = locationSearch(routerLocation);
       const search =
         normalizeSearch(railsContext.search) ||
         normalizeSearch((browserHistory.location as { search?: string } | undefined)?.search) ||
@@ -97,18 +91,13 @@ function TanStackHydrationApp({
 
   // After mount, trigger router.load() to enable client-side navigation.
   // The SSR flag prevented auto-loading, so we do it manually here.
-  const isFirstRender = useRef(true);
   useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-
-      // Only SSR hydration needs a manual load call.
-      // For client-only renders, Transitioner handles initial loading.
-      if (hasSsrPayload) {
-        router.load().catch((err: unknown) => {
-          console.error('react-on-rails/tanstack-router: Error loading routes after hydration:', err);
-        });
-      }
+    // Only SSR hydration needs a manual load call.
+    // For client-only renders, Transitioner handles initial loading.
+    if (hasSsrPayload) {
+      router.load().catch((err: unknown) => {
+        console.error('react-on-rails/tanstack-router: Error loading routes after hydration:', err);
+      });
     }
   }, [hasSsrPayload]); // eslint-disable-line react-hooks/exhaustive-deps -- router is a ref, intentionally stable
 

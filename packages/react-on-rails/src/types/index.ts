@@ -129,13 +129,17 @@ interface ServerRenderResult {
 
 type CreateReactOutputSyncResult = ServerRenderResult | ReactElement;
 
-type CreateReactOutputAsyncResult = Promise<string | ServerRenderHashRenderedHtml | ReactElement>;
+type CreateReactOutputAsyncResult = Promise<
+  string | ServerRenderHashRenderedHtml | ReactElement | ServerRenderResult
+>;
 
 type CreateReactOutputResult = CreateReactOutputSyncResult | CreateReactOutputAsyncResult;
 
 type RenderFunctionSyncResult = ReactComponent | ServerRenderResult;
 
-type RenderFunctionAsyncResult = Promise<string | ServerRenderHashRenderedHtml | ReactComponent>;
+type RenderFunctionAsyncResult = Promise<
+  string | ServerRenderHashRenderedHtml | ReactComponent | ServerRenderResult
+>;
 
 type RenderFunctionResult = RenderFunctionSyncResult | RenderFunctionAsyncResult;
 
@@ -474,7 +478,7 @@ export interface ReactOnRailsInternal extends ReactOnRails {
   isRSCBundle: boolean;
 }
 
-export type RenderStateHtml = FinalHtmlResult | Promise<FinalHtmlResult>;
+export type RenderStateHtml = FinalHtmlResult | Promise<FinalHtmlResult | ServerRenderResult>;
 
 export type RenderState = {
   result: null | RenderStateHtml;

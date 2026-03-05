@@ -594,10 +594,9 @@ module ReactOnRails
                          begin
                            JSON.parse(raw_existing_props)
                          rescue JSON::ParserError
-                           class_name = raw_existing_props.class.name
                            raise ReactOnRails::Error,
-                                 "Cannot merge result[\"clientProps\"] into non-Hash props. " \
-                                 "Pass props as a Hash, not #{class_name}."
+                                 "Cannot merge result[\"clientProps\"] into props: failed to parse props JSON " \
+                                 "string. Ensure props is a Ruby Hash or a JSON string representing an object."
                          end
                        else
                          raw_existing_props
@@ -610,7 +609,9 @@ module ReactOnRails
               "Pass props as a Hash, not #{class_name}."
       end
 
-      render_options.set_option(:props, existing_props.merge(client_props))
+      normalized_existing_props = existing_props.deep_stringify_keys
+      normalized_client_props = client_props.deep_stringify_keys
+      render_options.set_option(:props, normalized_existing_props.merge(normalized_client_props))
     end
 
     def render_redux_store_data(redux_store_data)
