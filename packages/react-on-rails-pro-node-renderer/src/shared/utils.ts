@@ -50,11 +50,7 @@ export interface ResponseResult {
 }
 
 export function errorResponseResult(msg: string, tracingContext?: TracingContext): ResponseResult {
-  if (tracingContext) {
-    errorReporter.message(msg, tracingContext);
-  } else {
-    errorReporter.message(msg);
-  }
+  errorReporter.message(msg, tracingContext);
   return {
     headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
     status: 400,

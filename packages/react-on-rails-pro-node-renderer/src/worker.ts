@@ -309,7 +309,7 @@ export default function run(config: Partial<Config>) {
       }, startSsrRequestOptions({ renderingRequest }));
     } catch (theErr) {
       const exceptionMessage = formatExceptionMessage(renderingRequest, theErr);
-      await setResponse(errorResponseResult(exceptionMessage), res);
+      await setResponse(errorResponseResult(`Unhandled top level error: ${exceptionMessage}`), res);
     }
   });
 

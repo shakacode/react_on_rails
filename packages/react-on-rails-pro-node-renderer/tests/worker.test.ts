@@ -129,6 +129,7 @@ describe('worker', () => {
       expect(reportMessageSpy).toHaveBeenCalledTimes(1);
       expect(reportMessageSpy).toHaveBeenCalledWith(
         expect.stringContaining('Caught top level error in handleRenderRequest'),
+        undefined,
       );
       expect(res.payload).toContain('Caught top level error in handleRenderRequest');
     } finally {
