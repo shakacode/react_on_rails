@@ -63,13 +63,17 @@ function validateRouterInternals(router: TanStackRouter): void {
  * Uses private API: router.__store.setState()
  * Pinned behavior from @tanstack/react-router@1.163.3
  */
-function injectRouteMatchesSync(router: TanStackRouter): void {
+function injectRouteMatchesSync(router: TanStackRouter, fallbackUrl: string): void {
   const store = router.__store;
   if (!store) {
     return;
   }
 
-  const matches = router.matchRoutes(router.state.location.pathname, router.state.location.search);
+  const parsedUrl = new URL(fallbackUrl, 'https://react-on-rails.local');
+  const { location } = router.state;
+  const pathname = typeof location.pathname === 'string' ? location.pathname : parsedUrl.pathname;
+  const search = typeof location.search === 'string' ? location.search : parsedUrl.search;
+  const matches = router.matchRoutes(pathname, search);
 
   store.setState((s: Record<string, unknown>) => ({
     ...s,
@@ -131,7 +135,7 @@ export function serverRenderTanStackApp(
   // WORKAROUND: Synchronously populate route matches.
   // TanStack Router's router.load() is async, but renderToString is sync.
   // This injects the matched routes directly into the internal store.
-  injectRouteMatchesSync(router);
+  injectRouteMatchesSync(router, url);
 
   // WORKAROUND: Set SSR flag to prevent Suspense boundary issues.
   // This causes TanStack Router to use SafeFragment instead of React.Suspense,
