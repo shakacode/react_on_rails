@@ -319,7 +319,8 @@ module ReactOnRailsPro
           end
 
           response = HTTPX.get(path)
-          raise response.error if response.is_a?(HTTPX::ErrorResponse)
+          error = response.error if response.respond_to?(:error)
+          raise ReactOnRailsPro::Error, "Failed to fetch dev-server asset from #{path}: #{error}" if error
 
           response.body
         else

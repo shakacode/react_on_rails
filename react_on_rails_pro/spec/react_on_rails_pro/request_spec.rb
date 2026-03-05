@@ -206,7 +206,7 @@ describe ReactOnRailsPro::Request do
     end
 
     it "returns response body for HTTP urls in development mode" do
-      response = instance_double(HTTPX::Response, body: "mock bundle content")
+      response = instance_double(HTTPX::Response, body: "mock bundle content", error: nil)
       allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new("development"))
       allow(HTTPX).to receive(:get).with(url_path).and_return(response)
 
@@ -214,16 +214,15 @@ describe ReactOnRailsPro::Request do
       expect(result).to eq("mock bundle content")
     end
 
-    it "raises response.error when HTTPX returns an error response" do
+    it "raises ReactOnRailsPro::Error when HTTPX returns an error response" do
       http_error = StandardError.new("connection refused")
       error_response = instance_double(HTTPX::ErrorResponse, error: http_error)
-      allow(error_response).to receive(:is_a?).with(HTTPX::ErrorResponse).and_return(true)
       allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new("development"))
       allow(HTTPX).to receive(:get).with(url_path).and_return(error_response)
 
       expect do
         described_class.send(:get_form_body_for_file, url_path)
-      end.to raise_error(StandardError, /connection refused/)
+      end.to raise_error(ReactOnRailsPro::Error, /connection refused/)
     end
   end
 
