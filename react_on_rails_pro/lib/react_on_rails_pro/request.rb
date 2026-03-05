@@ -319,6 +319,8 @@ module ReactOnRailsPro
           end
 
           response = HTTPX.get(path)
+          raise response.error if response.is_a?(HTTPX::ErrorResponse)
+
           response.body
         else
           Pathname.new(path)
