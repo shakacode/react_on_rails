@@ -88,7 +88,6 @@ export function createApp(appName: string, options: CliOptions): void {
   const appPath = path.resolve(process.cwd(), appName);
   const totalSteps = options.rsc ? 5 : 4;
   const reactOnRailsGemPath = localGemPath('REACT_ON_RAILS_GEM_PATH');
-  const reactOnRailsProGemPath = localGemPath('REACT_ON_RAILS_PRO_GEM_PATH');
 
   // Step 1: Create Rails application
   // appName is validated by validateAppName() to be [a-zA-Z0-9_-]+ only,
@@ -130,6 +129,7 @@ export function createApp(appName: string, options: CliOptions): void {
   }
 
   if (options.rsc) {
+    const reactOnRailsProGemPath = localGemPath('REACT_ON_RAILS_PRO_GEM_PATH');
     logStep(3, totalSteps, 'Adding react_on_rails_pro gem (--rsc)...');
     try {
       const reactOnRailsProArgs = ['add', 'react_on_rails_pro', '--strict'];

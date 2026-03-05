@@ -16,13 +16,18 @@ if ! command -v rails >/dev/null 2>&1; then
   fi
 fi
 
-if ! command -v pnpm >/dev/null 2>&1; then
-  echo "pnpm is required for this smoke test." >&2
+PNPM_CMD=()
+if command -v corepack >/dev/null 2>&1; then
+  PNPM_CMD=(corepack pnpm)
+elif command -v pnpm >/dev/null 2>&1; then
+  PNPM_CMD=(pnpm)
+else
+  echo "pnpm (or corepack) is required for this smoke test." >&2
   exit 1
 fi
 
 echo "Building create-react-on-rails-app..."
-pnpm --filter create-react-on-rails-app run build >/dev/null
+"${PNPM_CMD[@]}" --filter create-react-on-rails-app run build >/dev/null
 
 WORKDIR="$(mktemp -d /tmp/create-ror-local-smoke-XXXXXX)"
 APP_JS="smoke-js-$(date +%s)"
