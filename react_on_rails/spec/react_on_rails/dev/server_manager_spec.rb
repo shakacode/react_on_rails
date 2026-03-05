@@ -98,9 +98,12 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
           .and_return({ rails: 3000, webpack: 3035 })
       end
 
-      after do
-        ENV.delete("PORT")
-        ENV.delete("SHAKAPACKER_DEV_SERVER_PORT")
+      around do |example|
+        old_port = ENV.fetch("PORT", nil)
+        old_webpack_port = ENV.fetch("SHAKAPACKER_DEV_SERVER_PORT", nil)
+        example.run
+        ENV["PORT"] = old_port
+        ENV["SHAKAPACKER_DEV_SERVER_PORT"] = old_webpack_port
       end
 
       it "sets PORT env var before starting development mode" do
