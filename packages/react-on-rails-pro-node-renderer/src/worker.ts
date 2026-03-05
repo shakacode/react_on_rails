@@ -370,8 +370,9 @@ export default function run(config: Partial<Config>) {
 
           await copyUploadedAssets(assets, bundleDirectory);
 
-          // Only mark complete when the bundle file itself is present.
-          if (await fileExistsAsync(bundleFilePath)) {
+          // Only mark complete when we cleaned an incomplete directory and
+          // the bundle file itself is present.
+          if (wasIncomplete && (await fileExistsAsync(bundleFilePath))) {
             await markBundleComplete(bundleTimestamp);
           }
 

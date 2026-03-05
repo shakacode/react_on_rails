@@ -9,6 +9,14 @@ module ReactOnRailsPro
       allow(LicenseValidator).to receive(:license_status).and_return(:valid)
     end
 
+    after do
+      described_class.instance_variable_set(:@bundle_hash, nil)
+      described_class.instance_variable_set(:@bundle_hash_signature, nil)
+      described_class.instance_variable_set(:@rsc_bundle_hash, nil)
+      described_class.instance_variable_set(:@rsc_bundle_hash_signature, nil)
+      described_class.instance_variable_set(:@server_bundle_hash, nil)
+    end
+
     describe "cache helpers .bundle_hash and .bundle_file_name" do
       context "with file in manifest", :webpacker do
         before do
@@ -26,7 +34,10 @@ module ReactOnRailsPro
 
           before do
             allow(ReactOnRails.configuration)
-              .to receive_messages(server_bundle_js_file: nil, rsc_bundle_js_file: nil)
+              .to receive_messages(
+                server_bundle_js_file: "webpack-bundle.js",
+                rsc_bundle_js_file: "rsc-webpack-bundle.js"
+              )
             allow(Shakapacker).to receive_message_chain("manifest.lookup!")
               .with("client-bundle.js")
               .and_return("/webpack/production/client-bundle-0123456789abcdef.js")
@@ -49,20 +60,17 @@ module ReactOnRailsPro
           end
 
           context "with server bundle with hash in webpack output filename" do
-            it "returns digest of bundle content plus environment" do
+            it "uses the hashed filename without reading file content when no extra assets are configured" do
               server_bundle_js_file = "/webpack/production/webpack-bundle-0123456789abcdef.js"
               server_bundle_js_file_path = File.expand_path("./public/#{server_bundle_js_file}")
               allow(ReactOnRails::Utils).to receive(:server_bundle_js_file_path)
                 .and_return(server_bundle_js_file_path)
-              digest = instance_double(Digest::MD5, hexdigest: "bundlecontenthash")
-              allow(Digest::MD5).to receive(:new).and_return(digest)
-              allow(digest).to receive(:<<)
-              allow(digest).to receive(:file)
+              allow(Digest::MD5).to receive(:new)
 
               result = described_class.bundle_hash
 
-              expect(digest).to have_received(:file).with(server_bundle_js_file_path)
-              expect(result).to eq("bundlecontenthash-#{Rails.env}")
+              expect(Digest::MD5).not_to have_received(:new)
+              expect(result).to eq("webpack-bundle-0123456789abcdef.js")
             end
           end
 
@@ -72,6 +80,7 @@ module ReactOnRailsPro
               server_bundle_js_file_path = File.expand_path("./public/#{server_bundle_js_file}")
               allow(ReactOnRails::Utils).to receive(:server_bundle_js_file_path)
                 .and_return(server_bundle_js_file_path)
+              allow(ReactOnRails.configuration).to receive(:server_bundle_js_file).and_return("webpack-bundle.js")
               digest = instance_double(Digest::MD5, hexdigest: "foobarfoobar")
               allow(Digest::MD5).to receive(:new).and_return(digest)
               allow(digest).to receive(:<<)
@@ -90,6 +99,7 @@ module ReactOnRailsPro
               rsc_bundle_js_file_path = File.expand_path("./public/#{rsc_bundle_js_file}")
               allow(described_class).to receive(:rsc_bundle_js_file_path)
                 .and_return(rsc_bundle_js_file_path)
+              allow(ReactOnRailsPro.configuration).to receive(:rsc_bundle_js_file).and_return("rsc-webpack-bundle.js")
               digest = instance_double(Digest::MD5, hexdigest: "barfoobarfoo")
               allow(Digest::MD5).to receive(:new).and_return(digest)
               allow(digest).to receive(:<<)
@@ -108,6 +118,7 @@ module ReactOnRailsPro
               asset_path = File.expand_path("./public/webpack/production/loadable-stats.json")
               allow(ReactOnRails::Utils).to receive(:server_bundle_js_file_path)
                 .and_return(server_bundle_js_file_path)
+              allow(ReactOnRails.configuration).to receive(:server_bundle_js_file).and_return("webpack-bundle.js")
               allow(ReactOnRailsPro.configuration).to receive(:assets_to_copy).and_return([asset_path])
               allow(File).to receive(:exist?).and_call_original
               allow(File).to receive(:directory?).and_call_original
@@ -123,6 +134,45 @@ module ReactOnRailsPro
               expect(digest).to have_received(:file).with(server_bundle_js_file_path)
               expect(digest).to have_received(:file).with(asset_path)
               expect(result).to eq("withassets-#{Rails.env}")
+            end
+          end
+
+          context "with server bundle and assets served from HTTP URLs" do
+            it "recomputes bundle hash based on fetched content" do
+              server_bundle_js_file_path = "http://localhost:3035/webpack/production/webpack-bundle.js"
+              asset_path = "http://localhost:3035/webpack/production/loadable-stats.json"
+              allow(ReactOnRails::Utils).to receive(:server_bundle_js_file_path)
+                .and_return(server_bundle_js_file_path)
+              allow(ReactOnRails.configuration).to receive(:server_bundle_js_file).and_return("webpack-bundle.js")
+              allow(ReactOnRailsPro.configuration).to receive(:assets_to_copy).and_return([asset_path])
+              allow(HTTPX).to receive(:get)
+                .with(server_bundle_js_file_path)
+                .and_return(
+                  instance_double(HTTPX::Response, body: "server-bundle-v1"),
+                  instance_double(HTTPX::Response, body: "server-bundle-v2")
+                )
+              allow(HTTPX).to receive(:get)
+                .with(asset_path)
+                .and_return(
+                  instance_double(HTTPX::Response, body: "asset-v1"),
+                  instance_double(HTTPX::Response, body: "asset-v2")
+                )
+
+              first_digest = instance_double(Digest::MD5, hexdigest: "hash1")
+              second_digest = instance_double(Digest::MD5, hexdigest: "hash2")
+              allow(Digest::MD5).to receive(:new).and_return(first_digest, second_digest)
+              allow(first_digest).to receive(:<<)
+              allow(second_digest).to receive(:<<)
+              allow(first_digest).to receive(:file)
+              allow(second_digest).to receive(:file)
+
+              first_result = described_class.bundle_hash
+              second_result = described_class.bundle_hash
+
+              expect(first_result).to eq("hash1-#{Rails.env}")
+              expect(second_result).to eq("hash2-#{Rails.env}")
+              expect(HTTPX).to have_received(:get).with(server_bundle_js_file_path).twice
+              expect(HTTPX).to have_received(:get).with(asset_path).twice
             end
           end
         end

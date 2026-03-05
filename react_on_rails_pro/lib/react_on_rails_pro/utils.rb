@@ -6,6 +6,8 @@
 # require "active_support"
 # require "active_support/core_ext/string"
 
+# rubocop:disable Metrics/ModuleLength
+
 module ReactOnRailsPro
   module Utils
     ###########################################################
@@ -83,13 +85,22 @@ module ReactOnRailsPro
     end
 
     # Returns a string which should be used as a component in any cache key for
-    # react_component or react_component_hash when server rendering. This value is an MD5 digest
-    # of server bundle contents plus copied asset contents.
+    # react_component or react_component_hash when server rendering.
+    # Value is either:
+    # - the hashed server bundle filename (when no copied assets are configured), or
+    # - an MD5 digest of server bundle contents plus copied asset contents.
     def self.bundle_hash
       return @bundle_hash if @bundle_hash && !(Rails.env.development? || Rails.env.test?)
 
       server_bundle_js_file_path = ReactOnRails::Utils.server_bundle_js_file_path
       asset_paths = bundle_hash_asset_paths
+
+      hashed_file_name = hash_from_bundle_file_name(server_bundle_js_file_path, asset_paths)
+      return @bundle_hash = hashed_file_name if hashed_file_name
+
+      if contains_http_url?([server_bundle_js_file_path] + asset_paths)
+        return @bundle_hash = calc_bundle_hash(server_bundle_js_file_path, asset_paths)
+      end
 
       current_signature = bundle_hash_signature(server_bundle_js_file_path, asset_paths)
       return @bundle_hash if @bundle_hash && @bundle_hash_signature == current_signature
@@ -103,6 +114,13 @@ module ReactOnRailsPro
 
       server_rsc_bundle_js_file_path = rsc_bundle_js_file_path
       asset_paths = bundle_hash_asset_paths
+
+      hashed_file_name = hash_from_bundle_file_name(server_rsc_bundle_js_file_path, asset_paths)
+      return @rsc_bundle_hash = hashed_file_name if hashed_file_name
+
+      if contains_http_url?([server_rsc_bundle_js_file_path] + asset_paths)
+        return @rsc_bundle_hash = calc_bundle_hash(server_rsc_bundle_js_file_path, asset_paths)
+      end
 
       current_signature = bundle_hash_signature(server_rsc_bundle_js_file_path, asset_paths)
       return @rsc_bundle_hash if @rsc_bundle_hash && @rsc_bundle_hash_signature == current_signature
@@ -134,22 +152,18 @@ module ReactOnRailsPro
     def self.calc_bundle_hash(server_bundle_js_file_path, asset_paths = bundle_hash_asset_paths)
       digest = Digest::MD5.new
       digest << "bundle:#{server_bundle_js_file_path}\0"
-      digest.file(server_bundle_js_file_path)
+      digest_bundle_content(digest, server_bundle_js_file_path)
 
       asset_paths.each do |asset_path|
         digest << "asset:#{asset_path}\0"
-        next if http_url?(asset_path)
-        next unless File.exist?(asset_path)
-        next if File.directory?(asset_path)
-
-        digest.file(asset_path)
+        digest_asset_content(digest, asset_path)
       end
 
       "#{digest.hexdigest}-#{Rails.env}"
     end
 
     def self.bundle_hash_signature(server_bundle_js_file_path, asset_paths)
-      ([server_bundle_js_file_path.to_s] + asset_paths).map { |file_path| file_signature(file_path) }.join("|")
+      ([server_bundle_js_file_path.to_s] + asset_paths).map { |file_path| file_signature(file_path) }.join("\0")
     end
 
     def self.file_signature(file_path)
@@ -159,6 +173,49 @@ module ReactOnRailsPro
       return "dir:#{path}" if File.directory?(path)
 
       "#{path}:#{File.mtime(path).to_f}:#{File.size(path)}"
+    end
+
+    def self.hash_from_bundle_file_name(server_bundle_js_file_path, asset_paths)
+      return nil unless asset_paths.empty?
+
+      server_bundle_basename = Pathname.new(server_bundle_js_file_path).basename.to_s
+      return nil unless contains_hash?(server_bundle_basename)
+
+      server_bundle_basename
+    end
+
+    def self.digest_bundle_content(digest, bundle_path)
+      if http_url?(bundle_path)
+        digest << http_body_for_path(bundle_path)
+      else
+        digest.file(bundle_path)
+      end
+    end
+
+    def self.digest_asset_content(digest, asset_path)
+      if http_url?(asset_path)
+        digest << http_body_for_path(asset_path)
+        return
+      end
+
+      return unless File.exist?(asset_path)
+      return if File.directory?(asset_path)
+
+      digest.file(asset_path)
+    end
+
+    def self.http_body_for_path(path)
+      if Rails.env.production?
+        raise ReactOnRailsPro::Error, "Not expected to get HTTP url for bundle or assets in production mode"
+      end
+
+      HTTPX.get(path).body.to_s
+    end
+
+    # TODO: Need to consider if the configuration value has the ".js" on the end.
+    def self.contains_hash?(server_bundle_basename)
+      ReactOnRails.configuration.server_bundle_js_file != server_bundle_basename &&
+        ReactOnRailsPro.configuration.rsc_bundle_js_file != server_bundle_basename
     end
 
     def self.bundle_hash_asset_paths
@@ -174,6 +231,10 @@ module ReactOnRailsPro
 
     def self.http_url?(path)
       path.to_s.match?(%r{https?://})
+    end
+
+    def self.contains_http_url?(paths)
+      paths.any? { |path| http_url?(path) }
     end
 
     def self.with_trace(message = nil)
@@ -258,3 +319,5 @@ module ReactOnRailsPro
     end
   end
 end
+
+# rubocop:enable Metrics/ModuleLength

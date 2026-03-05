@@ -22,6 +22,7 @@ import {
   ASSET_UPLOAD_FILE,
   ASSET_UPLOAD_OTHER_FILE,
   bundleCompleteMarkerPath,
+  getFixtureAsset,
   getFixtureBundle,
 } from './helper';
 import { hasVMContextForBundle } from '../src/worker/vm';
@@ -122,6 +123,7 @@ describe(testName, () => {
   });
 
   test('If incomplete bundle directory exists, uploaded bundle replaces stale files and marks complete', async () => {
+    expect.assertions(4);
     const bundleDirectory = path.dirname(vmBundlePath(testName));
     await fsPromises.writeFile(vmBundlePath(testName), 'stale bundle');
     await fsPromises.writeFile(path.join(bundleDirectory, ASSET_UPLOAD_FILE), 'stale asset');
@@ -148,12 +150,46 @@ describe(testName, () => {
 
     expect(result).toEqual(renderResult);
     expect(await fsPromises.readFile(vmBundlePath(testName), 'utf-8')).toContain('Dummy Object');
-    expect(await fsPromises.readFile(path.join(bundleDirectory, ASSET_UPLOAD_FILE), 'utf-8')).not.toBe(
-      'stale asset',
+    expect(await fsPromises.readFile(path.join(bundleDirectory, ASSET_UPLOAD_FILE), 'utf-8')).toBe(
+      await fsPromises.readFile(getFixtureAsset(), 'utf-8'),
     );
     await expect(
       fsPromises.access(bundleCompleteMarkerPath(testName, String(BUNDLE_TIMESTAMP))),
     ).resolves.toBeUndefined();
+  });
+
+  test('If asset copy fails after bundle move, return an error and do not mark bundle complete', async () => {
+    expect.assertions(4);
+    await createUploadedBundleForTest();
+
+    const missingAssetPath = path.join(
+      path.dirname(uploadedAssetPath(testName)),
+      'missing-loadable-stats.json',
+    );
+    const result = await handleRenderRequest({
+      renderingRequest: 'ReactOnRails.dummy',
+      bundleTimestamp: BUNDLE_TIMESTAMP,
+      providedNewBundles: [
+        {
+          bundle: uploadedBundleForTest(),
+          timestamp: BUNDLE_TIMESTAMP,
+        },
+      ],
+      assetsToCopy: [
+        {
+          filename: ASSET_UPLOAD_FILE,
+          savedFilePath: missingAssetPath,
+          type: 'asset',
+        },
+      ],
+    });
+
+    expect(result.status).toBe(400);
+    expect(result.data).toEqual(expect.stringContaining('Unexpected error when preparing the bundle'));
+    await expect(fsPromises.access(vmBundlePath(testName))).resolves.toBeUndefined();
+    await expect(
+      fsPromises.access(bundleCompleteMarkerPath(testName, String(BUNDLE_TIMESTAMP))),
+    ).rejects.toBeDefined();
   });
 
   test('If bundle was already uploaded by another thread', async () => {
