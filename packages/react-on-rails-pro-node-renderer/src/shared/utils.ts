@@ -207,7 +207,16 @@ export async function cleanIncompleteBundleDirectory(bundleTimestamp: string | n
     return false;
   }
 
-  const entries = await readdir(bundleDirectory);
+  let entries: string[];
+  try {
+    entries = await readdir(bundleDirectory);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return false;
+    }
+    throw error;
+  }
+
   await Promise.all(
     entries.map(async (entry) => {
       if (entry.endsWith('.lock')) {

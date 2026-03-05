@@ -124,21 +124,25 @@ async function handleNewBundleProvided(
         `Completed moving uploaded file ${providedNewBundle.bundle.savedFilePath} to ${bundleFilePathPerTimestamp}`,
       );
     } catch (error) {
-      const fileExists = await fileExistsAsync(bundleFilePathPerTimestamp);
-      if (!fileExists) {
-        const msg = formatExceptionMessage(
-          renderingRequest,
-          error,
-          `Unexpected error when moving the bundle from ${providedNewBundle.bundle.savedFilePath} \
-to ${bundleFilePathPerTimestamp})`,
+      const isExistingBundleWriteConflict =
+        (error as NodeJS.ErrnoException).code === 'EEXIST' &&
+        (await fileExistsAsync(bundleFilePathPerTimestamp));
+      if (isExistingBundleWriteConflict) {
+        log.info(
+          'Bundle already exists when writing %s. Assuming bundle was written by another thread',
+          bundleFilePathPerTimestamp,
         );
-        log.error(msg);
-        return errorResponseResult(msg);
+        return undefined;
       }
-      log.info(
-        'File exists when trying to overwrite bundle %s. Assuming bundle written by other thread',
-        bundleFilePathPerTimestamp,
+
+      const msg = formatExceptionMessage(
+        renderingRequest,
+        error,
+        `Unexpected error when preparing the bundle from ${providedNewBundle.bundle.savedFilePath} \
+to ${bundleFilePathPerTimestamp}`,
       );
+      log.error(msg);
+      return errorResponseResult(msg);
     }
 
     return undefined;
