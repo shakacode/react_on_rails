@@ -67,6 +67,26 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       described_class.start(:production_like)
     end
 
+    it "passes procfile_port to print_server_info in production-like mode" do
+      ENV["PORT"] = "4000"
+      env = { "NODE_ENV" => "production" }
+      argv = ["bundle", "exec", "rails", "assets:precompile"]
+      status_double = instance_double(Process::Status, success?: true)
+      allow(Open3).to receive(:capture3).with(env, *argv).and_return(["output", "", status_double])
+
+      port_at_server_info_time = nil
+      allow(described_class).to receive(:print_server_info).and_wrap_original do |m, *args, **kwargs|
+        port_at_server_info_time = args[2]
+        m.call(*args, **kwargs)
+      end
+
+      described_class.start(:production_like)
+
+      expect(port_at_server_info_time).to eq(4000)
+    ensure
+      ENV.delete("PORT")
+    end
+
     it "starts production-like mode with custom rails_env" do
       env = { "NODE_ENV" => "production", "RAILS_ENV" => "staging" }
       argv = ["bundle", "exec", "rails", "assets:precompile"]

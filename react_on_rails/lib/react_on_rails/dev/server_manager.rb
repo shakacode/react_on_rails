@@ -478,7 +478,7 @@ module ReactOnRails
 
           features = [
             "Precompiling assets with production optimizations",
-            "Running Rails server on port 3001",
+            "Running Rails server on port #{procfile_port(procfile)}",
             "No HMR (Hot Module Replacement)",
             "CSS extracted to separate files (no FOUC)"
           ]
@@ -497,7 +497,7 @@ module ReactOnRails
           print_server_info(
             "🏭 Starting production-like development server...",
             features,
-            3001,
+            procfile_port(procfile),
             route: route
           )
 
