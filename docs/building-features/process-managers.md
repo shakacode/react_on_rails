@@ -320,6 +320,23 @@ overmind start -f Procfile.dev
 foreman start -f Procfile.dev
 ```
 
+> [!WARNING]
+> When running Foreman directly (not via `bin/dev`), Foreman injects its own `PORT`
+> environment variable (starting at 5000) into every subprocess. This causes
+> `${PORT:-3000}` in `Procfile.dev` to evaluate to Foreman's injected value rather
+> than the fallback 3000.
+>
+> To avoid this, set `PORT` explicitly in your shell or `.env` file before running
+> Foreman:
+>
+> ```sh
+> PORT=3000 foreman start -f Procfile.dev
+> # or add PORT=3000 to your .env file
+> ```
+>
+> `bin/dev` handles this automatically — port detection runs before Foreman starts,
+> so `PORT` is always set correctly when Foreman launches.
+
 ## Customizing Your Setup
 
 Edit `Procfile.dev` in your project root to customize which processes run and their configuration.
