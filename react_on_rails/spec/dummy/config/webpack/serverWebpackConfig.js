@@ -86,7 +86,11 @@ const configureServer = () => {
         } else if (item && typeof item.loader === 'string') {
           testValue = item.loader;
         }
-        return !(testValue.includes('mini-css-extract-plugin') || testValue === 'style-loader');
+        return !(
+          testValue.includes('mini-css-extract-plugin') ||
+          testValue.includes('cssExtractLoader') || // Rspack uses this path
+          testValue === 'style-loader'
+        );
       });
       const cssLoader = rule.use.find((item) => {
         let testValue = '';

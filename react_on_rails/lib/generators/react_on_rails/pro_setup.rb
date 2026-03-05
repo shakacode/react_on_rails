@@ -245,7 +245,6 @@ module ReactOnRails
       end
 
       def add_babel_ssr_caller_to_server_config(webpack_config, content)
-        # Skip if Babel SSR caller already exists
         return if content.include?("babelLoader.options.caller")
 
         babel_ssr_code = "\n\n      " \
@@ -255,9 +254,7 @@ module ReactOnRails
                          "babelLoader.options.caller = { ssr: true };\n      " \
                          "}"
 
-        # Insert after cssLoader.options.modules block (handles both old single-line
-        # and new spread syntax patterns). Use [\s\S]*? for lazy multiline matching
-        # to support nested braces (e.g., inline getLocalIdent functions).
+        # Insert after cssLoader.options.modules; [\s\S]*? covers both single-line and spread syntax patterns.
         gsub_file(
           webpack_config,
           /(cssLoader\.options\.modules = \{[\s\S]*?exportOnlyLocals: true[\s\S]*?\};\s*\n\s*\})/,
@@ -266,7 +263,7 @@ module ReactOnRails
         new_content = File.read(File.join(destination_root, webpack_config))
         return if new_content.include?("babelLoader.options.caller")
 
-        say_status :warning, "Could not insert Babel SSR caller — manual edit of #{webpack_config} required", :yellow
+        say_status :warning, "Babel SSR caller insertion failed in #{webpack_config}; manual edit required.", :yellow
       end
 
       def update_server_config_exports(webpack_config)
