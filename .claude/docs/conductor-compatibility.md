@@ -4,6 +4,13 @@
 
 Conductor and coding agents run commands in non-interactive shells that don't source `.zshrc`. Without additional setup, mise's shell hook never runs and commands use system Ruby/Node instead of project-specified versions.
 
+**Symptoms:**
+
+- `ruby --version` returns system Ruby (e.g., 2.6.10) instead of project Ruby (e.g., 3.3.4)
+- Pre-commit hooks fail with wrong tool versions
+- `bundle` commands fail due to incompatible Ruby versions
+- Node/pnpm commands use wrong Node version
+
 ## Preferred Solution: Shell-Level mise Shims
 
 The best fix is to activate mise shims in shell startup files that run for **all** shell types (interactive and non-interactive):
@@ -11,7 +18,7 @@ The best fix is to activate mise shims in shell startup files that run for **all
 1. **`.zshenv`** — activate `mise activate zsh --shims` (runs for all zsh shells, including non-interactive)
 2. **`.bashrc`** — activate `mise activate bash --shims` (for bash subprocesses)
 3. **`.profile`** — activate `mise activate bash --shims` (for sh/login shells)
-4. **Export `BASH_ENV` and `ENV`** from `.zshenv` — so non-interactive bash/sh child processes also get shims
+4. **Export `BASH_ENV`** from `.zshenv` — so non-interactive `bash -c` child processes source `.bashrc` and get shims
 
 Example `.zshenv`:
 
@@ -28,7 +35,10 @@ elif [ -x "$HOME/.local/bin/mise" ]; then
   eval "$("$HOME/.local/bin/mise" activate zsh --shims)"
 fi
 
-# Export BASH_ENV and ENV so non-interactive bash/sh child processes also get mise shims.
+# Export BASH_ENV so non-interactive bash child processes also get mise shims.
+# (bash -c doesn't source .bashrc, but it does honor BASH_ENV.)
+# Note: ENV is honored by some sh implementations but not all (e.g., dash ignores it
+# for non-interactive shells). For scripts using #!/bin/sh, use conductor-exec as a fallback.
 export BASH_ENV="$HOME/.bashrc"
 export ENV="$HOME/.profile"
 ```
@@ -47,7 +57,7 @@ With this setup, `bin/conductor-exec` is unnecessary — all shells automaticall
 
 ## Fallback: `bin/conductor-exec` Wrapper
 
-If you haven't configured shell-level shims, use the `bin/conductor-exec` wrapper. It calls `mise exec --` which bypasses PATH entirely:
+If you haven't configured shell-level shims, use the `bin/conductor-exec` wrapper. It calls `mise exec --` which sets up the correct tool versions regardless of the current PATH order:
 
 ```bash
 bin/conductor-exec ruby --version
