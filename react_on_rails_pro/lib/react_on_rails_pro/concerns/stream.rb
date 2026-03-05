@@ -164,7 +164,7 @@ module ReactOnRailsPro
       identity_quality = parsed_accept_encoding.fetch("identity", wildcard_quality || 1.0)
 
       gzip_quality.positive? && gzip_quality >= identity_quality
-    rescue ArgumentError
+    rescue ArgumentError, TypeError
       false
     end
 
