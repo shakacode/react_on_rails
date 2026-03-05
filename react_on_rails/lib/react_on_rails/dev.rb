@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require_relative "dev/port_selector"
 require_relative "dev/server_manager"
 require_relative "dev/process_manager"
 require_relative "dev/pack_generator"

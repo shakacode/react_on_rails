@@ -25,6 +25,8 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     allow(ReactOnRails::Dev::ProcessManager).to receive(:ensure_procfile)
     allow(ReactOnRails::Dev::ProcessManager).to receive(:run_with_process_manager)
     allow(ReactOnRails::Dev::DatabaseChecker).to receive(:check_database).and_return(true)
+    allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+      .and_return({ rails: 3000, webpack: 3035 })
   end
 
   describe ".start" do
@@ -87,6 +89,42 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
     it "raises error for unknown mode" do
       expect { described_class.start(:unknown) }.to raise_error(ArgumentError, "Unknown mode: unknown")
+    end
+
+    context "when configuring ports" do
+      before do
+        mock_system_calls
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+          .and_return({ rails: 3000, webpack: 3035 })
+      end
+
+      after do
+        ENV.delete("PORT")
+        ENV.delete("SHAKAPACKER_DEV_SERVER_PORT")
+      end
+
+      it "sets PORT env var before starting development mode" do
+        described_class.start(:development)
+        expect(ENV.fetch("PORT", nil)).to eq("3000")
+      end
+
+      it "sets SHAKAPACKER_DEV_SERVER_PORT env var before starting development mode" do
+        described_class.start(:development)
+        expect(ENV.fetch("SHAKAPACKER_DEV_SERVER_PORT", nil)).to eq("3035")
+      end
+
+      it "sets PORT env var before starting static mode" do
+        described_class.start(:static)
+        expect(ENV.fetch("PORT", nil)).to eq("3000")
+      end
+
+      it "uses auto-detected ports when defaults are occupied" do
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+          .and_return({ rails: 3001, webpack: 3036 })
+        described_class.start(:development)
+        expect(ENV.fetch("PORT", nil)).to eq("3001")
+        expect(ENV.fetch("SHAKAPACKER_DEV_SERVER_PORT", nil)).to eq("3036")
+      end
     end
   end
 

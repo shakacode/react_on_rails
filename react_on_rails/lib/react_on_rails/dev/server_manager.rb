@@ -640,6 +640,7 @@ module ReactOnRails
             route: route
           )
 
+          configure_ports
           PackGenerator.generate(verbose: verbose)
           ProcessManager.ensure_procfile(procfile)
           ProcessManager.run_with_process_manager(procfile)
@@ -654,6 +655,7 @@ module ReactOnRails
           # Check required services before starting
           exit 1 unless ServiceChecker.check_services
 
+          configure_ports
           PackGenerator.generate(verbose: verbose)
           ProcessManager.ensure_procfile(procfile)
           ProcessManager.run_with_process_manager(procfile)
@@ -687,8 +689,18 @@ module ReactOnRails
           puts ""
         end
 
+        def configure_ports
+          selected = PortSelector.select_ports
+          ENV["PORT"] = selected[:rails].to_s
+          ENV["SHAKAPACKER_DEV_SERVER_PORT"] = selected[:webpack].to_s
+        end
+
         def procfile_port(procfile)
-          procfile == "Procfile.dev-prod-assets" ? 3001 : 3000
+          if procfile == "Procfile.dev-prod-assets"
+            ENV.fetch("PORT", 3001).to_i
+          else
+            ENV.fetch("PORT", 3000).to_i
+          end
         end
 
         def box_border(width)
