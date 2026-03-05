@@ -162,8 +162,10 @@ module ReactOnRails
       #
       # Updates ServerClientOrBoth.js:
       # - Changes import to destructured style (required for Pro object export)
+      # rubocop:disable Metrics/AbcSize
       def update_webpack_config_for_pro
-        webpack_config_path = File.join(destination_root, "config/webpack/serverWebpackConfig.js")
+        webpack_config = destination_config_path("config/webpack/serverWebpackConfig.js")
+        webpack_config_path = File.join(destination_root, webpack_config)
 
         unless File.exist?(webpack_config_path)
           puts Rainbow("ℹ️  serverWebpackConfig.js not found, skipping webpack update").yellow
@@ -180,8 +182,6 @@ module ReactOnRails
         end
 
         puts Rainbow("📝 Updating serverWebpackConfig.js for Pro...").yellow
-
-        webpack_config = "config/webpack/serverWebpackConfig.js"
 
         # Add extractLoader helper function after bundler require
         add_extract_loader_to_server_config(webpack_config, content)
@@ -218,6 +218,7 @@ module ReactOnRails
         verify_pro_webpack_transforms(webpack_config)
         puts Rainbow("✅ Updated webpack configs for Pro").green
       end
+      # rubocop:enable Metrics/AbcSize
 
       def add_extract_loader_to_server_config(webpack_config, content)
         # Skip if extractLoader already exists
