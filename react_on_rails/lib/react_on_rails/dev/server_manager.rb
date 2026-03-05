@@ -614,13 +614,15 @@ module ReactOnRails
         # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 
         def run_static_development(procfile, verbose: false, route: nil, skip_database_check: false)
-          print_procfile_info(procfile, route: route)
-
           # Check database setup before starting
           exit 1 unless DatabaseChecker.check_database(skip: skip_database_check)
 
           # Check required services before starting
           exit 1 unless ServiceChecker.check_services
+
+          # Configure ports before printing so the banner shows the correct URL
+          configure_ports
+          print_procfile_info(procfile, route: route)
 
           features = [
             "Using shakapacker --watch (no HMR)",
@@ -640,22 +642,22 @@ module ReactOnRails
             route: route
           )
 
-          configure_ports
           PackGenerator.generate(verbose: verbose)
           ProcessManager.ensure_procfile(procfile)
           ProcessManager.run_with_process_manager(procfile)
         end
 
         def run_development(procfile, verbose: false, route: nil, skip_database_check: false)
-          print_procfile_info(procfile, route: route)
-
           # Check database setup before starting
           exit 1 unless DatabaseChecker.check_database(skip: skip_database_check)
 
           # Check required services before starting
           exit 1 unless ServiceChecker.check_services
 
+          # Configure ports before printing so the banner shows the correct URL
           configure_ports
+          print_procfile_info(procfile, route: route)
+
           PackGenerator.generate(verbose: verbose)
           ProcessManager.ensure_procfile(procfile)
           ProcessManager.run_with_process_manager(procfile)

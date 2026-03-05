@@ -125,6 +125,36 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         expect(ENV.fetch("PORT", nil)).to eq("3001")
         expect(ENV.fetch("SHAKAPACKER_DEV_SERVER_PORT", nil)).to eq("3036")
       end
+
+      it "has PORT set when print_procfile_info is called in development mode" do
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+          .and_return({ rails: 3001, webpack: 3036 })
+
+        port_at_print_time = nil
+        allow(described_class).to receive(:print_procfile_info).and_wrap_original do |m, *args, **kwargs|
+          port_at_print_time = ENV.fetch("PORT", nil)
+          m.call(*args, **kwargs)
+        end
+
+        described_class.start(:development)
+
+        expect(port_at_print_time).to eq("3001")
+      end
+
+      it "has PORT set when print_procfile_info is called in static mode" do
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+          .and_return({ rails: 3001, webpack: 3036 })
+
+        port_at_print_time = nil
+        allow(described_class).to receive(:print_procfile_info).and_wrap_original do |m, *args, **kwargs|
+          port_at_print_time = ENV.fetch("PORT", nil)
+          m.call(*args, **kwargs)
+        end
+
+        described_class.start(:static)
+
+        expect(port_at_print_time).to eq("3001")
+      end
     end
   end
 
