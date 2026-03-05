@@ -132,9 +132,11 @@ describe('createApp', () => {
   let processExitSpy: jest.SpyInstance;
   let consoleLogSpy: jest.SpyInstance;
   let consoleErrorSpy: jest.SpyInstance;
+  const originalEnv = process.env;
 
   beforeEach(() => {
     mockedFs.rmSync.mockReset();
+    process.env = { ...originalEnv };
     mockedExecLiveArgs.mockReset();
     mockedLogError.mockReset();
     mockedLogInfo.mockReset();
@@ -148,6 +150,7 @@ describe('createApp', () => {
   });
 
   afterEach(() => {
+    process.env = originalEnv;
     processExitSpy.mockRestore();
     consoleLogSpy.mockRestore();
     consoleErrorSpy.mockRestore();
@@ -263,6 +266,34 @@ describe('createApp', () => {
     expect(() => createApp('my-app', { ...baseOptions, rsc: true })).toThrow('process.exit');
     expect(mockedLogInfo).toHaveBeenCalledWith(
       'Configure gem source access for react_on_rails_pro, then delete the created "my-app" directory and rerun with --rsc.',
+    );
+  });
+
+  it('uses local react_on_rails gem path when REACT_ON_RAILS_GEM_PATH is set', () => {
+    process.env.REACT_ON_RAILS_GEM_PATH = '../react_on_rails';
+    const appPath = path.resolve(process.cwd(), 'my-app');
+
+    createApp('my-app', baseOptions);
+
+    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
+      2,
+      'bundle',
+      ['add', 'react_on_rails', '--strict', '--path', path.resolve('../react_on_rails')],
+      appPath,
+    );
+  });
+
+  it('uses local pro path when REACT_ON_RAILS_PRO_GEM_PATH is set', () => {
+    process.env.REACT_ON_RAILS_PRO_GEM_PATH = '../react_on_rails_pro';
+    const appPath = path.resolve(process.cwd(), 'my-app');
+
+    createApp('my-app', { ...baseOptions, rsc: true });
+
+    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
+      3,
+      'bundle',
+      ['add', 'react_on_rails_pro', '--path', path.resolve('../react_on_rails_pro')],
+      appPath,
     );
   });
 });
