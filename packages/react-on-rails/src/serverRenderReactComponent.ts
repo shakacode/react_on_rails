@@ -22,6 +22,7 @@ import type {
 function processServerRenderHash(result: ServerRenderResult, options: RenderOptions): RenderState {
   const { redirectLocation, routeError } = result;
   const hasErrors = !!routeError;
+  const { clientProps } = result;
 
   if (hasErrors) {
     console.error(`React Router ERROR: ${JSON.stringify(routeError)}`);
@@ -39,10 +40,12 @@ function processServerRenderHash(result: ServerRenderResult, options: RenderOpti
     // Possibly, someday, we could have the Rails server redirect.
     htmlResult = '';
   } else {
-    htmlResult = result.renderedHtml;
+    htmlResult = isValidElement(result.renderedHtml)
+      ? renderToString(result.renderedHtml)
+      : result.renderedHtml;
   }
 
-  return { result: htmlResult ?? null, hasErrors };
+  return { result: htmlResult ?? null, hasErrors, clientProps };
 }
 
 function processReactElement(result: ReactElement): string {

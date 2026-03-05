@@ -31,12 +31,18 @@
  * @packageDocumentation
  */
 
-import type { RailsContext, RenderFunction, RenderFunctionResult } from '../types/index.ts';
+import type {
+  RailsContext,
+  RenderFunction,
+  RenderFunctionResult,
+  ServerRenderResult,
+} from '../types/index.ts';
 import type { TanStackRouterOptions } from './types.ts';
 import { serverRenderTanStackApp } from './serverRender.ts';
 import { clientHydrateTanStackApp } from './clientHydrate.ts';
 
 export type { TanStackRouterOptions, DehydratedRouterState } from './types.ts';
+export { serverRenderTanStackAppAsync } from './serverRender.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return */
 
@@ -104,16 +110,21 @@ export function createTanStackRouterRenderFunction(
     }
 
     if (railsContext.serverSide) {
-      // Server-side: return a ReactElement that will be passed to renderToString.
-      // The createReactOutput pipeline handles ReactElement results from render functions
-      // (it calls renderToString on them).
-      return serverRenderTanStackApp(
+      const { appElement, dehydratedState } = serverRenderTanStackApp(
         options,
         props,
         railsContext as RailsContext & { serverSide: true },
         RouterProvider,
         createMemoryHistory,
-      ) as any;
+      );
+
+      // Return as serverRenderHash so we can pass dehydrated state into client props.
+      return {
+        renderedHtml: appElement,
+        clientProps: {
+          __tanstackRouterDehydratedState: dehydratedState,
+        },
+      } satisfies ServerRenderResult;
     }
 
     // Client-side: return a ReactElement that React on Rails will hydrate/render.

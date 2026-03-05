@@ -22,6 +22,8 @@ export function clientHydrateTanStackApp(
   createBrowserHistory: () => any,
 ): ReactElement {
   const dehydratedState = props.__tanstackRouterDehydratedState as DehydratedRouterState | undefined;
+  const hasDehydratedRouter =
+    dehydratedState?.dehydratedRouter !== undefined && dehydratedState.dehydratedRouter !== null;
 
   // Create the app component that manages router lifecycle
   const AppComponent = () => {
@@ -34,10 +36,12 @@ export function clientHydrateTanStackApp(
       const browserHistory = createBrowserHistory();
       router.update({ history: browserHistory });
 
-      // Synchronously inject route matches to match server output.
-      // This prevents hydration mismatches by ensuring the client renders
-      // the same route tree as the server.
-      if (typeof router.matchRoutes === 'function' && router.__store?.setState) {
+      // Hydrate router with dehydrated state from server if available.
+      if (hasDehydratedRouter && typeof router.hydrate === 'function') {
+        router.hydrate(dehydratedState.dehydratedRouter);
+      } else if (typeof router.matchRoutes === 'function' && router.__store?.setState) {
+        // Fall back to injecting route matches when no dehydrated state is available.
+        // This keeps the initial client route tree aligned with SSR output.
         const matches = router.matchRoutes(router.state.location.pathname, router.state.location.search);
         router.__store.setState((s: Record<string, unknown>) => ({
           ...s,
@@ -47,13 +51,10 @@ export function clientHydrateTanStackApp(
         }));
       }
 
-      // Set SSR flag to prevent Transitioner from auto-calling router.load() on mount.
-      // This avoids refetching data that was already loaded during SSR.
-      (router as any).ssr = true;
-
-      // Hydrate router with dehydrated state from server
-      if (dehydratedState?.dehydratedRouter && typeof router.hydrate === 'function') {
-        router.hydrate(dehydratedState.dehydratedRouter);
+      // Only mark the router as SSR when we actually have SSR-dehydrated data.
+      // Otherwise, TanStack Router should perform normal client-only loading behavior.
+      if (hasDehydratedRouter) {
+        (router as any).ssr = true;
       }
 
       routerRef.current = router;
@@ -68,14 +69,15 @@ export function clientHydrateTanStackApp(
       if (isFirstRender.current) {
         isFirstRender.current = false;
 
-        // If the router isn't fully loaded yet, trigger loading
-        if (router.state.status !== 'idle') {
+        // Only SSR hydration needs a manual load call.
+        // For client-only renders, Transitioner handles initial loading.
+        if (hasDehydratedRouter && router.state.status !== 'idle') {
           router.load().catch((err: unknown) => {
             console.error('react-on-rails/tanstack-router: Error loading routes after hydration:', err);
           });
         }
       }
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps -- router is a ref, intentionally stable
+    }, [hasDehydratedRouter]); // eslint-disable-line react-hooks/exhaustive-deps -- router is a ref, intentionally stable
 
     let app: ReactElement = createElement(RouterProvider, { router });
     if (options.AppWrapper) {

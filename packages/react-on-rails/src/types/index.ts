@@ -120,7 +120,8 @@ type ServerRenderHashRenderedHtml = {
 };
 
 interface ServerRenderResult {
-  renderedHtml?: string | ServerRenderHashRenderedHtml;
+  renderedHtml?: string | ServerRenderHashRenderedHtml | ReactElement;
+  clientProps?: Record<string, unknown>;
   redirectLocation?: { pathname: string; search: string };
   routeError?: Error;
   error?: Error;
@@ -248,6 +249,7 @@ export type FinalHtmlResult = string | ServerRenderHashRenderedHtml;
 
 export interface RenderResult {
   html: FinalHtmlResult | null;
+  clientProps?: Record<string, unknown>;
   consoleReplayScript: string;
   hasErrors: boolean;
   renderingError?: RenderingError;
@@ -476,6 +478,7 @@ export type RenderStateHtml = FinalHtmlResult | Promise<FinalHtmlResult>;
 
 export type RenderState = {
   result: null | RenderStateHtml;
+  clientProps?: Record<string, unknown>;
   hasErrors: boolean;
   error?: RenderingError;
 };

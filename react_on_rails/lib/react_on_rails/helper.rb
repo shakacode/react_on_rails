@@ -562,19 +562,40 @@ module ReactOnRails
 
       render_options = create_render_options(react_component_name, options)
 
-      # Setup the page_loaded_js, which is the same regardless of prerendering or not!
-      # The reason is that React is smart about not doing extra work if the server rendering did its job.
-      component_specification_tag = generate_component_script(render_options)
-
       load_pack_for_generated_component(react_component_name, render_options)
       # Create the HTML rendering part
       result = server_rendered_react_component(render_options)
+
+      merge_server_rendered_client_props!(render_options, result) if result.is_a?(Hash)
+
+      # Setup the page_loaded_js, which is the same regardless of prerendering or not!
+      # The reason is that React is smart about not doing extra work if the server rendering did its job.
+      component_specification_tag = generate_component_script(render_options)
 
       {
         render_options: render_options,
         tag: component_specification_tag,
         result: result
       }
+    end
+
+    def merge_server_rendered_client_props!(render_options, result)
+      client_props = result["clientProps"]
+      return if client_props.nil? || client_props.empty?
+
+      unless client_props.is_a?(Hash)
+        raise ReactOnRails::Error, "Expected result[\"clientProps\"] to be a Hash, got #{client_props.class.name}."
+      end
+
+      existing_props = render_options.props
+      unless existing_props.is_a?(Hash)
+        class_name = existing_props.class.name
+        raise ReactOnRails::Error,
+              "Cannot merge result[\"clientProps\"] into non-Hash props. " \
+              "Pass props as a Hash, not #{class_name}."
+      end
+
+      render_options.set_option(:props, existing_props.merge(client_props))
     end
 
     def render_redux_store_data(redux_store_data)

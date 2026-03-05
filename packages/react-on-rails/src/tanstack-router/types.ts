@@ -9,30 +9,30 @@ export interface TanStackRouter {
   update: (opts: { history: TanStackHistory }) => void;
   load: () => Promise<void>;
   matchRoutes: (
-    pathname: string,
-    locationSearch: Record<string, string>,
+    pathnameOrLocation: string | { pathname: string; search?: unknown },
+    locationSearch?: unknown,
     opts?: { throwOnError?: boolean },
   ) => unknown[];
   state: {
     status: string;
     location: {
       pathname: string;
-      search: Record<string, string>;
-      searchStr: string;
-      hash: string;
-      href: string;
+      search?: unknown;
+      searchStr?: string;
+      hash?: string;
+      href?: string;
     };
     resolvedLocation: unknown;
     matches: unknown[];
   };
-  dehydrate: () => unknown;
-  hydrate: (data: unknown) => void;
+  dehydrate?: () => unknown;
+  hydrate?: (data: unknown) => void;
   // Internal APIs we need for sync SSR workaround
-  __store: {
+  __store?: {
     setState: (updater: (state: Record<string, unknown>) => Record<string, unknown>) => void;
   };
   // SSR flag (TanStack Start internal)
-  ssr?: boolean;
+  ssr?: unknown;
 }
 
 export interface TanStackHistory {
@@ -66,7 +66,7 @@ export interface TanStackRouterOptions {
    * Optional wrapper component for providers (QueryClient, Theme, etc.)
    * The router's RouterProvider will be rendered as children of this component.
    */
-  AppWrapper?: ComponentType<{ children: ReactNode }>;
+  AppWrapper?: ComponentType<{ children: ReactNode } & Record<string, unknown>>;
 }
 
 /**

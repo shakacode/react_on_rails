@@ -240,6 +240,37 @@ describe ReactOnRailsHelper do
       it { is_expected.to include json_props_sanitized }
     end
 
+    context "when server rendering returns clientProps" do
+      before do
+        allow(ReactOnRails::ServerRenderingPool).to receive(:server_render_js_with_console_logging).and_return(
+          "html" => "<div>SSR App</div>",
+          "consoleReplayScript" => "",
+          "clientProps" => {
+            "__tanstackRouterDehydratedState" => { "url" => "/products?category=tools" }
+          }
+        )
+        allow(ReactOnRails::ServerRenderingJsCode).to receive(:js_code_renderer)
+          .and_return(ReactOnRails::ServerRenderingJsCode)
+      end
+
+      it "merges clientProps into the component props JSON for client hydration" do
+        result = react_component("App", props: props, prerender: true)
+
+        expect(result).to include('"name":"My Test Name"')
+        expect(result).to include('"__tanstackRouterDehydratedState":{"url":"/products?category=tools"}')
+        expect(result).to include('<div id="App-react-component"><div>SSR App</div></div>')
+      end
+
+      it "raises a clear error when original props are not a Hash" do
+        expect do
+          react_component("App", props: '{"name":"My Test Name"}', prerender: true)
+        end.to raise_error(
+          ReactOnRails::Error,
+          /Cannot merge result\["clientProps"\] into non-Hash props/
+        )
+      end
+    end
+
     describe "API with component name only (no props or other options)" do
       subject(:react_app) { react_component("App") }
 

@@ -2,6 +2,8 @@
 
 React on Rails supports React Router for client-side routing. This guide shows how to integrate React Router into your React on Rails application.
 
+> Looking for TanStack Router? See [Using TanStack Router](./tanstack-router.md).
+
 **Important:** The React on Rails generator does not install React Router. You'll need to add it to your project manually.
 
 ## Compatibility Note
@@ -179,5 +181,6 @@ For a practical example of route organization, see the [routes configuration fil
 ## Additional Resources
 
 - [React Router Official Documentation](https://reactrouter.com/)
+- [TanStack Router Guide for React on Rails](./tanstack-router.md)
 - [React Router v6 Migration Guide](https://reactrouter.com/docs/en/v6/upgrading/v5) - If upgrading from v5
 - [React on Rails Turbo/Turbolinks Guide](./turbolinks.md)

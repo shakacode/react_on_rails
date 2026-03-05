@@ -103,6 +103,34 @@ describe('serverRenderReactComponent', () => {
     expect(hasErrors).toBeFalsy();
   });
 
+  it('passes clientProps from serverRenderHash to the final render result', () => {
+    const X3ClientProps: RenderFunction = () => ({
+      renderedHtml: React.createElement('div', null, 'Hello with client props'),
+      clientProps: {
+        __tanstackRouterDehydratedState: { url: '/test' },
+      },
+    });
+    X3ClientProps.renderFunction = true;
+
+    ComponentRegistry.register({ X3ClientProps });
+
+    const renderResult = serverRenderReactComponent({
+      name: 'X3ClientProps',
+      domNodeId: 'myDomId',
+      trace: false,
+      throwJsErrors: false,
+      renderingReturnsPromises: false,
+    });
+    assertIsString(renderResult);
+    const { html, hasErrors, clientProps }: RenderResult = JSON.parse(renderResult) as RenderResult;
+
+    expect(html).toEqual('<div>Hello with client props</div>');
+    expect(clientProps).toEqual({
+      __tanstackRouterDehydratedState: { url: '/test' },
+    });
+    expect(hasErrors).toBeFalsy();
+  });
+
   it("doesn't render object without renderedHtml property", () => {
     const X4 = (): { foo: string } => ({
       foo: 'bar',

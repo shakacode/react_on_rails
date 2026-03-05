@@ -38,9 +38,14 @@ function validateRouterInternals(router: TanStackRouter): void {
  * Pinned behavior from @tanstack/react-router@1.139.0
  */
 function injectRouteMatchesSync(router: TanStackRouter): void {
+  const store = router.__store;
+  if (!store) {
+    return;
+  }
+
   const matches = router.matchRoutes(router.state.location.pathname, router.state.location.search);
 
-  router.__store.setState((s: Record<string, unknown>) => ({
+  store.setState((s: Record<string, unknown>) => ({
     ...s,
     status: 'idle',
     resolvedLocation: (s as { location: unknown }).location,
@@ -55,13 +60,18 @@ function buildAppElement(
   router: TanStackRouter,
   RouterProvider: React.ComponentType<any>,
   AppWrapper: TanStackRouterOptions['AppWrapper'],
-  extraProps: Record<string, unknown>,
+  wrapperProps: Record<string, unknown>,
 ): ReactElement {
   let app: ReactElement = createElement(RouterProvider, { router });
   if (AppWrapper) {
-    app = createElement(AppWrapper, { ...extraProps, children: app } as any);
+    app = createElement(AppWrapper, { ...wrapperProps, children: app } as any);
   }
   return app;
+}
+
+export interface TanStackServerRenderResult {
+  appElement: ReactElement;
+  dehydratedState: DehydratedRouterState;
 }
 
 /**
@@ -79,7 +89,7 @@ export function serverRenderTanStackApp(
   railsContext: RailsContext & { serverSide: true },
   RouterProvider: React.ComponentType<any>,
   createMemoryHistory: (opts: { initialEntries: string[] }) => any,
-): ReactElement {
+): TanStackServerRenderResult {
   const router = options.createRouter();
   const url = railsContext.pathname + (railsContext.search || '');
 
@@ -106,16 +116,10 @@ export function serverRenderTanStackApp(
     dehydratedRouter: typeof router.dehydrate === 'function' ? router.dehydrate() : null,
   };
 
-  // Inject dehydrated state into props so it's available on the client.
-  // React on Rails serializes props as JSON in a <script> tag, so the client
-  // render function will receive these additional props.
-  const propsWithState = {
-    ...props,
-    __tanstackRouterDehydratedState: dehydratedState,
+  return {
+    appElement: buildAppElement(router, RouterProvider, options.AppWrapper, props),
+    dehydratedState,
   };
-
-  // Return as ReactElement — serverRenderReactComponent will call renderToString on it.
-  return buildAppElement(router, RouterProvider, options.AppWrapper, propsWithState);
 }
 
 /**
@@ -130,7 +134,7 @@ export async function serverRenderTanStackAppAsync(
   railsContext: RailsContext & { serverSide: true },
   RouterProvider: React.ComponentType<any>,
   createMemoryHistory: (opts: { initialEntries: string[] }) => any,
-): Promise<ReactElement> {
+): Promise<TanStackServerRenderResult> {
   const router = options.createRouter();
   const url = railsContext.pathname + (railsContext.search || '');
 
@@ -145,10 +149,8 @@ export async function serverRenderTanStackAppAsync(
     dehydratedRouter: typeof router.dehydrate === 'function' ? router.dehydrate() : null,
   };
 
-  const propsWithState = {
-    ...props,
-    __tanstackRouterDehydratedState: dehydratedState,
+  return {
+    appElement: buildAppElement(router, RouterProvider, options.AppWrapper, props),
+    dehydratedState,
   };
-
-  return buildAppElement(router, RouterProvider, options.AppWrapper, propsWithState);
 }
