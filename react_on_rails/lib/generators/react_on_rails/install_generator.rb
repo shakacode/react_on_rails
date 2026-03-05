@@ -67,7 +67,8 @@ module ReactOnRails
       # The CLI flag takes precedence over runtime detection (@shakapacker_just_installed):
       # when this flag is set, shakapacker_just_installed? returns true immediately without
       # consulting the ivar. Passing this flag manually overrides runtime detection — the yml
-      # will be force-overwritten with RoR's template even if it already exists.
+      # will be force-overwritten with RoR's template even if it already exists, including
+      # when Shakapacker is pre-configured (no prompt is shown).
       class_option :shakapacker_just_installed,
                    type: :boolean,
                    default: false,
