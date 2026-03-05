@@ -17,7 +17,7 @@ The best fix is to activate mise shims in shell startup files that run for **all
 
 1. **`.zshenv`** — activate `mise activate zsh --shims` (runs for all zsh shells, including non-interactive)
 2. **`.bashrc`** — activate `mise activate bash --shims` (for bash subprocesses)
-3. **`.profile`** — activate `mise activate bash --shims` (for sh/login shells)
+3. **`.profile`** — activate `mise activate bash --shims` (for sh/login shells; mise has no `sh` shell type, but `--shims` output is POSIX-compatible)
 4. **Export `BASH_ENV`** from `.zshenv` — so non-interactive `bash -c` child processes source `.bashrc` and get shims
 
 Example `.zshenv`:
