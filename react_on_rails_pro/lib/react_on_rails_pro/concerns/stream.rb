@@ -34,10 +34,6 @@ module ReactOnRailsPro
     #
     # @see ReactOnRails::Helper#stream_react_component
     def stream_view_containing_react_components(template:, close_stream_at_end: true, compress: false, **render_options)
-      if compress && !close_stream_at_end
-        raise ArgumentError, "compress: true requires close_stream_at_end: true to finalize gzip footer"
-      end
-
       require "async"
       require "async/barrier"
       require "async/limited_queue"
@@ -47,12 +43,16 @@ module ReactOnRailsPro
         @async_barrier = Async::Barrier.new
         buffer_size = ReactOnRailsPro.configuration.concurrent_component_streaming_buffer_size
         @main_output_queue = Async::LimitedQueue.new(buffer_size)
+        gzip_streaming_enabled = gzip_streaming_enabled?(compress)
+        if gzip_streaming_enabled && !close_stream_at_end
+          raise ArgumentError, "compress: true requires close_stream_at_end: true to finalize gzip footer"
+        end
 
         # Render template - components will start streaming immediately.
         # If a shell error occurs, consumer_stream_async raises PrerenderError here
         # (BEFORE the response is committed), enabling a proper HTTP redirect.
         template_string = render_to_string(template: template, **render_options)
-        output_stream = build_output_stream(compress: compress)
+        output_stream = setup_output_stream(gzip_streaming_enabled: gzip_streaming_enabled)
         # View may contain extra newlines, chunk already contains a newline
         # Having multiple newlines between chunks causes hydration errors
         # So we strip extra newlines from the template string and add a single newline
@@ -99,6 +99,8 @@ module ReactOnRailsPro
         # Client disconnected - stop writing gracefully
         client_disconnected = true
         log_client_disconnect("writer", e)
+        # `Async` does not yield between setting the flag and stopping the barrier.
+        # This guarantees the rescue path can observe `client_disconnected == true`.
         @async_barrier.stop
       end
 
@@ -134,8 +136,8 @@ module ReactOnRailsPro
       end
     end
 
-    def build_output_stream(compress:)
-      return response.stream unless gzip_streaming_enabled?(compress)
+    def setup_output_stream(gzip_streaming_enabled:)
+      return response.stream unless gzip_streaming_enabled
 
       prepare_gzip_streaming_headers
       GzipOutputStream.new(response.stream)
@@ -168,20 +170,29 @@ module ReactOnRailsPro
 
     def parse_accept_encoding(accept_encoding)
       accept_encoding.split(",").each_with_object({}) do |entry, parsed|
-        token, *params = entry.split(";").map(&:strip)
+        token, quality = parse_accept_encoding_entry(entry)
         next if token.blank?
 
-        quality = 1.0
-        params.each do |param|
-          key, value = param.split("=", 2).map(&:strip)
-          next unless key&.casecmp?("q")
-
-          quality = Float(value)
-          break
-        end
-
-        parsed[token.downcase] = quality
+        parsed[token] ||= quality
       end
+    end
+
+    def parse_accept_encoding_entry(entry)
+      token, *params = entry.split(";").map(&:strip)
+      return ["", 1.0] if token.blank?
+
+      [token.downcase, parse_accept_encoding_quality(params)]
+    end
+
+    def parse_accept_encoding_quality(params)
+      params.each do |param|
+        key, value = param.split("=", 2).map(&:strip)
+        next unless key&.casecmp?("q")
+
+        return Float(value)
+      end
+
+      1.0
     end
 
     def prepare_gzip_streaming_headers

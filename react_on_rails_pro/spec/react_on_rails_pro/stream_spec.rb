@@ -389,11 +389,13 @@ RSpec.describe "Streaming API" do
     def build_mocked_response(headers)
       mocked_response = instance_double(ActionController::Live::Response)
       mocked_stream = instance_double(ActionController::Live::Buffer)
-      allow(mocked_response).to receive_messages(stream: mocked_stream, headers: headers)
+      response_headers = ActionDispatch::Response::Headers.new
+      headers.each { |key, value| response_headers[key] = value }
+      allow(mocked_response).to receive_messages(stream: mocked_stream, headers: response_headers)
       allow(mocked_stream).to receive(:write)
       allow(mocked_stream).to receive(:close)
       allow(mocked_stream).to receive(:closed?).and_return(false)
-      [mocked_response, mocked_stream]
+      [mocked_response, mocked_stream, response_headers]
     end
 
     def build_mocked_request(accept_encoding)
@@ -407,11 +409,11 @@ RSpec.describe "Streaming API" do
       component_queues = Array.new(component_count) { Async::Queue.new }
       controller = StreamController.new(component_queues: component_queues)
 
-      mocked_response, mocked_stream = build_mocked_response(headers)
+      mocked_response, mocked_stream, mocked_headers = build_mocked_response(headers)
       mocked_request = build_mocked_request(accept_encoding)
       allow(controller).to receive_messages(response: mocked_response, request: mocked_request)
 
-      [component_queues, controller, mocked_stream, headers, mocked_request]
+      [component_queues, controller, mocked_stream, mocked_headers, mocked_request]
     end
 
     it "streams components concurrently" do
@@ -603,6 +605,24 @@ RSpec.describe "Streaming API" do
           close_stream_at_end: false
         )
       end.to raise_error(ArgumentError, /compress: true requires close_stream_at_end: true/)
+    end
+
+    it "allows compress option with open stream when gzip is not enabled" do
+      _queues, controller, stream, headers, _request = setup_stream_test(
+        component_count: 0,
+        accept_encoding: "br"
+      )
+
+      expect do
+        controller.stream_view_containing_react_components(
+          template: "ignored",
+          compress: true,
+          close_stream_at_end: false
+        )
+      end.not_to raise_error
+
+      expect(stream).not_to have_received(:close)
+      expect(headers["Content-Encoding"]).to be_nil
     end
 
     it "does not set gzip headers when template rendering fails before commit" do
