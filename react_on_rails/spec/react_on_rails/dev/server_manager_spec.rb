@@ -155,6 +155,14 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
         expect(port_at_print_time).to eq("3001")
       end
+
+      it "exits cleanly when no port pair is available" do
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+          .and_raise(ReactOnRails::Dev::PortSelector::NoPortAvailable, "No available port pair found")
+
+        expect_any_instance_of(Kernel).to receive(:exit).with(1)
+        expect { described_class.start(:development) }.not_to raise_error
+      end
     end
   end
 

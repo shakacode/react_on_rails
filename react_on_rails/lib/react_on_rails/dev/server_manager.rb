@@ -695,6 +695,9 @@ module ReactOnRails
           selected = PortSelector.select_ports
           ENV["PORT"] = selected[:rails].to_s
           ENV["SHAKAPACKER_DEV_SERVER_PORT"] = selected[:webpack].to_s
+        rescue PortSelector::NoPortAvailable => e
+          warn e.message
+          exit 1
         end
 
         def procfile_port(procfile)
