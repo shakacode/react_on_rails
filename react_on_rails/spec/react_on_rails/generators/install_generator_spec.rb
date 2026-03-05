@@ -1273,6 +1273,49 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  describe "#using_rspack?" do
+    context "when --rspack option is provided" do
+      let(:install_generator) { described_class.new([], { rspack: true }) }
+
+      it "returns true" do
+        expect(install_generator.send(:using_rspack?)).to be true
+      end
+    end
+
+    context "when --rspack option is not provided" do
+      let(:install_generator) { described_class.new }
+
+      it "returns false" do
+        expect(install_generator.send(:using_rspack?)).to be false
+      end
+    end
+  end
+
+  describe "#destination_config_path" do
+    context "with --rspack" do
+      let(:install_generator) { described_class.new([], { rspack: true }) }
+
+      it "remaps config/webpack/ to config/rspack/" do
+        expect(install_generator.send(:destination_config_path, "config/webpack/serverWebpackConfig.js"))
+          .to eq("config/rspack/serverWebpackConfig.js")
+      end
+
+      it "leaves paths without config/webpack/ unchanged" do
+        expect(install_generator.send(:destination_config_path, "app/javascript/packs/server-bundle.js"))
+          .to eq("app/javascript/packs/server-bundle.js")
+      end
+    end
+
+    context "without --rspack" do
+      let(:install_generator) { described_class.new }
+
+      it "returns path unchanged" do
+        expect(install_generator.send(:destination_config_path, "config/webpack/serverWebpackConfig.js"))
+          .to eq("config/webpack/serverWebpackConfig.js")
+      end
+    end
+  end
+
   # Regression test for https://github.com/shakacode/react_on_rails/issues/2287
   # Bundler subprocess commands must run in unbundled environment to prevent
   # BUNDLE_GEMFILE inheritance from parent process
