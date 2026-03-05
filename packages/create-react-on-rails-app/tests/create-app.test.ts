@@ -171,12 +171,7 @@ describe('createApp', () => {
       ['add', 'react_on_rails', '--strict'],
       appPath,
     );
-    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
-      3,
-      'bundle',
-      ['add', 'react_on_rails_pro', '--strict'],
-      appPath,
-    );
+    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(3, 'bundle', ['add', 'react_on_rails_pro'], appPath);
     expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
       4,
       'bundle',
@@ -215,11 +210,26 @@ describe('createApp', () => {
     expect(mockedExecLiveArgs).toHaveBeenCalledTimes(3);
     expect(mockedExecLiveArgs).not.toHaveBeenCalledWith(
       'bundle',
-      ['add', 'react_on_rails_pro', '--strict'],
+      ['add', 'react_on_rails_pro'],
       expect.anything(),
     );
     expect(mockedLogInfo).toHaveBeenCalledWith('Then visit http://localhost:3000/hello_world');
     expect(processExitSpy).not.toHaveBeenCalled();
+  });
+
+  it('cleans up app directory when react_on_rails add fails', () => {
+    const appPath = path.resolve(process.cwd(), 'my-app');
+    mockedExecLiveArgs
+      .mockImplementationOnce(() => {})
+      .mockImplementationOnce(() => {
+        throw new Error('ror gem install failed');
+      });
+
+    expect(() => createApp('my-app', baseOptions)).toThrow('process.exit');
+    expect(mockedLogError).toHaveBeenCalledWith(
+      'Failed to add react_on_rails gem. Check the output above for details.',
+    );
+    expect(mockedFs.rmSync).toHaveBeenCalledWith(appPath, { recursive: true, force: true });
   });
 
   it('cleans up app directory when react_on_rails_pro add fails', () => {
@@ -232,6 +242,7 @@ describe('createApp', () => {
       });
 
     expect(() => createApp('my-app', { ...baseOptions, rsc: true })).toThrow('process.exit');
+    expect(mockedLogError).toHaveBeenCalledWith('Failed to add react_on_rails_pro gem required by --rsc.');
     expect(mockedFs.rmSync).toHaveBeenCalledWith(appPath, { recursive: true, force: true });
     expect(mockedLogInfo).toHaveBeenCalledWith(
       'Directory removed. Configure access to React on Rails Pro gem source and rerun. For custom source/git setups, rerun without --rsc and add react_on_rails_pro manually in Gemfile.',
