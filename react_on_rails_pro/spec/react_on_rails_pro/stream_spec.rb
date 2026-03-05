@@ -521,6 +521,75 @@ RSpec.describe "Streaming API" do
       expect(headers["Content-Encoding"]).to be_nil
     end
 
+    it "keeps plain streaming when identity quality beats gzip" do
+      queues, controller, stream, headers, _request = setup_stream_test(
+        component_count: 1,
+        accept_encoding: "gzip;q=0.3, identity;q=0.9"
+      )
+
+      run_stream(controller, compress: true) do |_parent|
+        queues[0].enqueue("Chunk1")
+        queues[0].close
+      end
+
+      expect(stream).to have_received(:write).with("TEMPLATE")
+      expect(stream).to have_received(:write).with("Chunk1")
+      expect(headers["Content-Encoding"]).to be_nil
+    end
+
+    it "compresses stream output when wildcard quality beats identity" do
+      queues, controller, stream, headers, _request = setup_stream_test(
+        component_count: 1,
+        accept_encoding: "br;q=1.0, *;q=0.8, identity;q=0.5"
+      )
+      compressed_chunks = []
+      allow(stream).to receive(:write) do |chunk|
+        compressed_chunks << chunk
+      end
+
+      run_stream(controller, compress: true) do |_parent|
+        queues[0].enqueue("Chunk1")
+        queues[0].close
+      end
+
+      decompressed_body = Zlib::GzipReader.new(StringIO.new(compressed_chunks.join)).read
+      expect(decompressed_body).to eq("TEMPLATEChunk1")
+      expect(headers["Content-Encoding"]).to eq("gzip")
+    end
+
+    it "keeps plain streaming when Accept-Encoding is malformed" do
+      queues, controller, stream, headers, _request = setup_stream_test(
+        component_count: 1,
+        accept_encoding: "gzip;q=invalid"
+      )
+
+      run_stream(controller, compress: true) do |_parent|
+        queues[0].enqueue("Chunk1")
+        queues[0].close
+      end
+
+      expect(stream).to have_received(:write).with("TEMPLATE")
+      expect(stream).to have_received(:write).with("Chunk1")
+      expect(headers["Content-Encoding"]).to be_nil
+    end
+
+    it "keeps plain streaming when response already has non-identity encodings" do
+      queues, controller, stream, headers, _request = setup_stream_test(
+        component_count: 1,
+        headers: { "Content-Encoding" => "deflate, gzip" },
+        accept_encoding: "gzip"
+      )
+
+      run_stream(controller, compress: true) do |_parent|
+        queues[0].enqueue("Chunk1")
+        queues[0].close
+      end
+
+      expect(stream).to have_received(:write).with("TEMPLATE")
+      expect(stream).to have_received(:write).with("Chunk1")
+      expect(headers["Content-Encoding"]).to eq("deflate, gzip")
+    end
+
     it "raises if compression is requested without closing the stream" do
       _queues, controller, _stream, _headers, _request = setup_stream_test(
         component_count: 0,
@@ -673,6 +742,19 @@ RSpec.describe "Streaming API" do
             queues[0].close
           end
         end.not_to raise_error
+      end
+    end
+
+    describe ReactOnRailsPro::Stream::GzipOutputStream do
+      it "tracks closed state" do
+        stream = StringIO.new
+        gzip_stream = described_class.new(stream)
+
+        expect(gzip_stream.closed?).to be(false)
+
+        gzip_stream.close
+
+        expect(gzip_stream.closed?).to be(true)
       end
     end
   end

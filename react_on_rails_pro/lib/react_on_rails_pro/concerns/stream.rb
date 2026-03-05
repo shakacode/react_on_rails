@@ -109,7 +109,7 @@ module ReactOnRailsPro
         @async_barrier.stop
         raise e unless client_disconnected
 
-        log_client_disconnect("barrier", e)
+        log_client_disconnect("barrier", e, level: :warn)
         nil
       end
     ensure
@@ -125,11 +125,12 @@ module ReactOnRailsPro
       @async_barrier.stop if client_disconnected
     end
 
-    def log_client_disconnect(context, exception)
+    def log_client_disconnect(context, exception, level: :debug)
       return unless ReactOnRails.configuration.logging_on_server
 
-      Rails.logger.debug do
-        "[React on Rails Pro] Client disconnected during streaming (#{context}): #{exception.class}"
+      Rails.logger.public_send(level) do
+        "[React on Rails Pro] Client disconnected during streaming (#{context}): " \
+          "#{exception.class}: #{exception.message}"
       end
     end
 
@@ -144,7 +145,8 @@ module ReactOnRailsPro
       return false unless compress
 
       content_encoding = response.headers["Content-Encoding"].to_s
-      return false if content_encoding.present? && content_encoding.downcase.strip != "identity"
+      content_encoding_values = content_encoding.split(",").map { |value| value.downcase.strip }.reject(&:blank?)
+      return false if content_encoding_values.present? && content_encoding_values != ["identity"]
       return false unless request_accepts_gzip?
 
       true
@@ -154,10 +156,32 @@ module ReactOnRailsPro
       accept_encoding = request&.get_header("HTTP_ACCEPT_ENCODING").to_s
       return false if accept_encoding.blank?
 
-      parsed_accept_encoding = Rack::Utils.q_values(accept_encoding)
-      Rack::Utils.select_best_encoding(%w[gzip identity], parsed_accept_encoding) == "gzip"
-    rescue Rack::Utils::InvalidParameterError
+      parsed_accept_encoding = parse_accept_encoding(accept_encoding)
+      wildcard_quality = parsed_accept_encoding["*"]
+      gzip_quality = parsed_accept_encoding.fetch("gzip", wildcard_quality || 0.0)
+      identity_quality = parsed_accept_encoding.fetch("identity", wildcard_quality || 1.0)
+
+      gzip_quality.positive? && gzip_quality >= identity_quality
+    rescue ArgumentError
       false
+    end
+
+    def parse_accept_encoding(accept_encoding)
+      accept_encoding.split(",").each_with_object({}) do |entry, parsed|
+        token, *params = entry.split(";").map(&:strip)
+        next if token.blank?
+
+        quality = 1.0
+        params.each do |param|
+          key, value = param.split("=", 2).map(&:strip)
+          next unless key&.casecmp?("q")
+
+          quality = Float(value)
+          break
+        end
+
+        parsed[token.downcase] = quality
+      end
     end
 
     def prepare_gzip_streaming_headers
@@ -193,9 +217,13 @@ module ReactOnRailsPro
       end
 
       def write(data)
-        @gzip_writer.write(data)
+        bytes_written = @gzip_writer.write(data)
         @gzip_writer.flush(Zlib::SYNC_FLUSH)
-        data.bytesize
+        bytes_written
+      end
+
+      def closed?
+        @closed
       end
 
       def close
