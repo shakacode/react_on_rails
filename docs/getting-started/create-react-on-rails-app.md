@@ -15,6 +15,7 @@ Visit [http://localhost:3000/hello_world](http://localhost:3000/hello_world) to 
 This creates a TypeScript app by default. For JavaScript, use `--template javascript`.
 For React Server Components (RSC), add `--rsc` and visit `/hello_server` after setup.
 `--rsc` requires access to `react_on_rails_pro` via the private gem source.
+RSC supports both JavaScript (`.jsx`) and TypeScript (`.tsx`) templates.
 
 ## Options
 

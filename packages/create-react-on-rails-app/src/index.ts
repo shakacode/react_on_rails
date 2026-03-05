@@ -107,6 +107,8 @@ After setup, run bin/dev and visit:
   - http://localhost:3000/hello_world (default)
   - http://localhost:3000/hello_server (--rsc)
 
+--rsc supports both JavaScript and TypeScript templates.
+
 Documentation: https://www.shakacode.com/react-on-rails/docs/`,
   )
   .action((appName: string, opts: Record<string, unknown>) => {

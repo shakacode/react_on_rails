@@ -1,5 +1,5 @@
 import { execFileSync } from 'child_process';
-import { detectPackageManager } from '../src/utils';
+import { canResolveRemoteGem, detectPackageManager } from '../src/utils';
 
 jest.mock('child_process');
 const mockedExecFileSync = jest.mocked(execFileSync);
@@ -52,5 +52,29 @@ describe('detectPackageManager', () => {
       throw new Error('command not found');
     });
     expect(detectPackageManager()).toBeNull();
+  });
+});
+
+describe('canResolveRemoteGem', () => {
+  it('returns true when bundle can resolve the gem', () => {
+    (mockedExecFileSync as jest.Mock).mockImplementation((cmd: string, args: string[]) => {
+      if (cmd === 'bundle' && args[0] === 'add' && args[1] === 'react_on_rails_pro') {
+        return '';
+      }
+      throw new Error('unexpected command');
+    });
+
+    expect(canResolveRemoteGem('react_on_rails_pro')).toBe(true);
+  });
+
+  it('returns false when bundle cannot resolve the gem', () => {
+    (mockedExecFileSync as jest.Mock).mockImplementation((cmd: string, args: string[]) => {
+      if (cmd === 'bundle' && args[0] === 'add' && args[1] === 'react_on_rails_pro') {
+        throw new Error('could not find gem');
+      }
+      throw new Error('unexpected command');
+    });
+
+    expect(canResolveRemoteGem('react_on_rails_pro')).toBe(false);
   });
 });

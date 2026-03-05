@@ -77,11 +77,11 @@ export function createApp(appName: string, options: CliOptions): void {
     logInfo(
       'Note: --rsc requires access to react_on_rails_pro (private gem source or a git-based Gemfile entry).',
     );
-    logInfo('Checking react_on_rails_pro availability before creating the app...');
+    logInfo('Checking react_on_rails_pro availability with Bundler before creating the app...');
 
     if (!canResolveRemoteGem('react_on_rails_pro')) {
-      logError('Could not resolve react_on_rails_pro from your current gem sources.');
-      logInfo('Configure access to the private React on Rails Pro gem source, then rerun this command.');
+      logError('Could not resolve react_on_rails_pro via Bundler preflight checks.');
+      logInfo('Configure access to the private React on Rails Pro gem source in Bundler, then rerun.');
       logInfo(
         'If you prefer git-based setup, create the app without --rsc first and add react_on_rails_pro manually.',
       );
