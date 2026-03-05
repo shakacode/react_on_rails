@@ -1139,12 +1139,31 @@ describe InstallGenerator, type: :generator do
 
     it "does not chmod copied bin scripts in pretend mode" do
       allow(install_generator).to receive(:directory)
-      allow(Dir).to receive(:chdir).and_yield
-      allow(Dir).to receive(:glob).with("*").and_return(%w[dev switch-bundler])
+      allow(install_generator).to receive(:use_rsc?).and_return(false)
 
       expect(File).not_to receive(:chmod)
 
       install_generator.send(:add_bin_scripts)
+    end
+
+    it "does not create css module type files in pretend mode" do
+      allow(FileUtils).to receive(:mkdir_p)
+      allow(File).to receive(:write)
+
+      install_generator.send(:create_css_module_types)
+
+      expect(FileUtils).not_to have_received(:mkdir_p)
+      expect(File).not_to have_received(:write)
+    end
+
+    it "does not write tsconfig.json in pretend mode" do
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with("tsconfig.json").and_return(false)
+      allow(File).to receive(:write)
+
+      install_generator.send(:create_typescript_config)
+
+      expect(File).not_to have_received(:write)
     end
   end
 

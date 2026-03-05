@@ -473,6 +473,8 @@ module ReactOnRails
       def create_css_module_types
         puts Rainbow("📝 Creating CSS module type definitions...").yellow
 
+        return if options[:pretend]
+
         # Ensure the types directory exists
         FileUtils.mkdir_p("app/javascript/types")
 
@@ -503,6 +505,8 @@ module ReactOnRails
           puts Rainbow("⚠️  tsconfig.json already exists, skipping creation").yellow
           return
         end
+
+        return if options[:pretend]
 
         tsconfig_content = {
           "compilerOptions" => {
