@@ -34,6 +34,15 @@ module ReactOnRailsPro
     #
     # @see ReactOnRails::Helper#stream_react_component
     def stream_view_containing_react_components(template:, close_stream_at_end: true, compress: false, **render_options)
+      # Evaluate gzip eligibility before entering `Sync` so invalid argument
+      # combinations can fail without initializing async runtime state.
+      # We also decide this before render_to_string so render failures cannot
+      # accidentally leave gzip headers committed.
+      gzip_streaming_enabled = gzip_streaming_enabled?(compress)
+      if gzip_streaming_enabled && !close_stream_at_end
+        raise ArgumentError, "compress: true requires close_stream_at_end: true to finalize gzip footer"
+      end
+
       require "async"
       require "async/barrier"
       require "async/limited_queue"
@@ -43,10 +52,6 @@ module ReactOnRailsPro
         @async_barrier = Async::Barrier.new
         buffer_size = ReactOnRailsPro.configuration.concurrent_component_streaming_buffer_size
         @main_output_queue = Async::LimitedQueue.new(buffer_size)
-        gzip_streaming_enabled = gzip_streaming_enabled?(compress)
-        if gzip_streaming_enabled && !close_stream_at_end
-          raise ArgumentError, "compress: true requires close_stream_at_end: true to finalize gzip footer"
-        end
 
         # Render template - components will start streaming immediately.
         # If a shell error occurs, consumer_stream_async raises PrerenderError here
@@ -107,9 +112,10 @@ module ReactOnRailsPro
       # Wait for all component streaming tasks to complete
       begin
         @async_barrier.wait
-      rescue StandardError => e
-        @async_barrier.stop
-        raise e unless client_disconnected
+      rescue *barrier_wait_error_classes => e
+        # writer-side disconnect already stopped the barrier; avoid a redundant stop.
+        @async_barrier.stop unless client_disconnected
+        raise e unless client_disconnected && suppressible_disconnect_exception?(e)
 
         log_client_disconnect("barrier", e, level: :warn)
         nil
@@ -122,9 +128,6 @@ module ReactOnRailsPro
       # before we check it (fixes race condition where ensure runs before
       # writing_task's rescue block sets the flag)
       writing_task.wait
-
-      # If client disconnected, stop all producer tasks to avoid wasted work
-      @async_barrier.stop if client_disconnected
     end
 
     def log_client_disconnect(context, exception, level: :debug)
@@ -148,7 +151,7 @@ module ReactOnRailsPro
 
       content_encoding = response.headers["Content-Encoding"].to_s
       content_encoding_values = content_encoding.split(",").map { |value| value.downcase.strip }.reject(&:blank?)
-      return false if content_encoding_values.present? && content_encoding_values != ["identity"]
+      return false if content_encoding_values.any? { |value| value != "identity" }
       return false unless request_accepts_gzip?
 
       true
@@ -189,10 +192,33 @@ module ReactOnRailsPro
         key, value = param.split("=", 2).map(&:strip)
         next unless key&.casecmp?("q")
 
-        return Float(value)
+        return parse_quality_factor(value)
       end
 
       1.0
+    end
+
+    def parse_quality_factor(value)
+      return 0.0 if value.nil? || value.empty?
+
+      Float(value)
+    rescue ArgumentError, TypeError
+      # Treat malformed q values as excluded for this token only.
+      0.0
+    end
+
+    def barrier_wait_error_classes
+      return [StandardError] unless defined?(Async::Stop)
+
+      [StandardError, Async::Stop]
+    end
+
+    def suppressible_disconnect_exception?(exception)
+      exception.is_a?(IOError) || exception.is_a?(Errno::EPIPE) || async_stop_exception?(exception)
+    end
+
+    def async_stop_exception?(exception)
+      defined?(Async::Stop) && exception.is_a?(Async::Stop)
     end
 
     def prepare_gzip_streaming_headers
@@ -215,10 +241,14 @@ module ReactOnRailsPro
 
         def write(data)
           @stream.write(data)
+          # Return uncompressed bytesize; GzipWriter does not use this return value.
           data.bytesize
         end
 
-        def close; end
+        def close
+          # Intentionally no-op: GzipWriter closes wrapped IO on #close, but
+          # GzipOutputStream#close manages stream close sequencing explicitly.
+        end
       end
 
       def initialize(stream)

@@ -591,6 +591,26 @@ RSpec.describe "Streaming API" do
       expect(headers["Content-Encoding"]).to be_nil
     end
 
+    it "compresses when malformed q applies to a different token" do
+      queues, controller, stream, headers, _request = setup_stream_test(
+        component_count: 1,
+        accept_encoding: "gzip;q=1, deflate;q=bad"
+      )
+      compressed_chunks = []
+      allow(stream).to receive(:write) do |chunk|
+        compressed_chunks << chunk
+      end
+
+      run_stream(controller, compress: true) do |_parent|
+        queues[0].enqueue("Chunk1")
+        queues[0].close
+      end
+
+      decompressed_body = Zlib::GzipReader.new(StringIO.new(compressed_chunks.join)).read
+      expect(decompressed_body).to eq("TEMPLATEChunk1")
+      expect(headers["Content-Encoding"]).to eq("gzip")
+    end
+
     it "keeps plain streaming when gzip is explicitly excluded" do
       queues, controller, stream, headers, _request = setup_stream_test(
         component_count: 1,
@@ -622,6 +642,27 @@ RSpec.describe "Streaming API" do
       expect(stream).to have_received(:write).with("TEMPLATE")
       expect(stream).to have_received(:write).with("Chunk1")
       expect(headers["Content-Encoding"]).to eq("deflate, gzip")
+    end
+
+    it "compresses when response has only identity encodings" do
+      queues, controller, stream, headers, _request = setup_stream_test(
+        component_count: 1,
+        headers: { "Content-Encoding" => "identity, identity" },
+        accept_encoding: "gzip"
+      )
+      compressed_chunks = []
+      allow(stream).to receive(:write) do |chunk|
+        compressed_chunks << chunk
+      end
+
+      run_stream(controller, compress: true) do |_parent|
+        queues[0].enqueue("Chunk1")
+        queues[0].close
+      end
+
+      decompressed_body = Zlib::GzipReader.new(StringIO.new(compressed_chunks.join)).read
+      expect(decompressed_body).to eq("TEMPLATEChunk1")
+      expect(headers["Content-Encoding"]).to eq("gzip")
     end
 
     it "raises if compression is requested without closing the stream" do
