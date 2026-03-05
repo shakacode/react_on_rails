@@ -15,7 +15,16 @@ shared_examples "base_generator_common" do
        config/initializers/react_on_rails.rb
        Procfile.dev
        Procfile.dev-static-assets
-       Procfile.dev-prod-assets].each { |file| assert_file(file) }
+       Procfile.dev-prod-assets
+       .env.example].each { |file| assert_file(file) }
+  end
+
+  it "uses env-var-driven port in Procfile.dev" do
+    assert_file "Procfile.dev", /\$\{PORT:-3000\}/
+  end
+
+  it "uses env-var-driven port in Procfile.dev-static-assets" do
+    assert_file "Procfile.dev-static-assets", /\$\{PORT:-3000\}/
   end
 end
 
