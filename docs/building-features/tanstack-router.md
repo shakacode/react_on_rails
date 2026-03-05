@@ -11,6 +11,8 @@ It also passes router dehydration data from server to client automatically.
 ## Install
 
 ```bash
+npm install @tanstack/react-router
+yarn add @tanstack/react-router
 pnpm add @tanstack/react-router
 ```
 
@@ -71,8 +73,8 @@ React on Rails then:
 
 ## Props Requirement
 
-When using this helper with `prerender: true`, pass `props:` as a Ruby `Hash`.
-If you pass props as a JSON string and the server render result includes `clientProps`, React on Rails cannot merge the values and raises an error.
+When using this helper with `prerender: true`, pass `props:` as a Ruby `Hash` or a JSON object string.
+If you pass a JSON string that parses to a non-object value (like an array), React on Rails raises an error.
 
 ## Compatibility Notes
 

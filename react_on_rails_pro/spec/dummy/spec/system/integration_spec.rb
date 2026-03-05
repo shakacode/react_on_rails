@@ -224,7 +224,7 @@ describe "React Router", :js do
 end
 
 describe "TanStack Router Async", :js do
-  subject { page }
+  subject(:current_page) { page }
 
   before { visit "/tanstack_router_async" }
 

@@ -261,13 +261,17 @@ describe ReactOnRailsHelper do
         expect(result).to include('<div id="App-react-component"><div>SSR App</div></div>')
       end
 
-      it "raises a clear error when original props are not a Hash" do
+      it "merges clientProps when original props are provided as a JSON string" do
+        result = react_component("App", props: '{"name":"My Test Name"}', prerender: true)
+
+        expect(result).to include('"name":"My Test Name"')
+        expect(result).to include('"__tanstackRouterDehydratedState":{"url":"/products?category=tools"}')
+      end
+
+      it "raises a clear error when JSON string props parse to a non-Hash value" do
         expect do
-          react_component("App", props: '{"name":"My Test Name"}', prerender: true)
-        end.to raise_error(
-          ReactOnRails::Error,
-          /Cannot merge result\["clientProps"\] into non-Hash props/
-        )
+          react_component("App", props: '["not","a","hash"]', prerender: true)
+        end.to raise_error(ReactOnRails::Error, /Cannot merge result\["clientProps"\] into non-Hash props/)
       end
     end
 

@@ -222,7 +222,7 @@ describe "React Router", :js do
 end
 
 describe "TanStack Router", :js do
-  subject { page }
+  subject(:current_page) { page }
 
   before do
     visit "/tanstack_router"

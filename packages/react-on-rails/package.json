@@ -54,7 +54,10 @@
       "react-server": "./lib/base/full.rsc.js",
       "default": "./lib/base/full.js"
     },
-    "./tanstack-router": "./lib/tanstack-router/index.js"
+    "./tanstack-router": {
+      "types": "./lib/tanstack-router/index.d.ts",
+      "default": "./lib/tanstack-router/index.js"
+    }
   },
   "peerDependencies": {
     "react": ">= 16",

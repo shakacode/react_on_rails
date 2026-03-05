@@ -4,6 +4,14 @@ import type { RailsContext } from '../types/index.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, no-underscore-dangle */
 
+function normalizeSearch(search: string | null | undefined): string {
+  if (!search) {
+    return '';
+  }
+
+  return search.startsWith('?') ? search : `?${search}`;
+}
+
 /**
  * Validates that the TanStack Router internal APIs we depend on are present.
  * Throws a clear error if the router version has changed its internals.
@@ -24,6 +32,24 @@ function validateRouterInternals(router: TanStackRouter): void {
         'Please check that your @tanstack/react-router version is compatible.',
     );
   }
+
+  const pathname = router.state?.location?.pathname;
+  if (typeof pathname !== 'string') {
+    throw new Error(
+      'react-on-rails/tanstack-router: validateRouterInternals expected router.state.location.pathname to be a string. ' +
+        'Please check that your @tanstack/react-router version is compatible.',
+    );
+  }
+
+  const hasSearch =
+    Object.prototype.hasOwnProperty.call(router.state.location, 'search') ||
+    Object.prototype.hasOwnProperty.call(router.state.location, 'searchStr');
+  if (!hasSearch) {
+    throw new Error(
+      'react-on-rails/tanstack-router: validateRouterInternals expected router.state.location.search (or searchStr) to exist. ' +
+        'Please check that your @tanstack/react-router version is compatible.',
+    );
+  }
 }
 
 /**
@@ -35,7 +61,7 @@ function validateRouterInternals(router: TanStackRouter): void {
  * - Without pre-populated matches, SSR output would be empty
  *
  * Uses private API: router.__store.setState()
- * Pinned behavior from @tanstack/react-router@1.139.0
+ * Pinned behavior from @tanstack/react-router@1.163.3
  */
 function injectRouteMatchesSync(router: TanStackRouter): void {
   const store = router.__store;
@@ -64,7 +90,9 @@ function buildAppElement(
 ): ReactElement {
   let app: ReactElement = createElement(RouterProvider, { router });
   if (AppWrapper) {
-    app = createElement(AppWrapper, { ...wrapperProps, children: app } as any);
+    const sanitizedWrapperProps = { ...wrapperProps } as Record<string, unknown>;
+    delete sanitizedWrapperProps.__tanstackRouterDehydratedState;
+    app = createElement(AppWrapper, { ...sanitizedWrapperProps, children: app } as any);
   }
   return app;
 }
@@ -91,7 +119,7 @@ export function serverRenderTanStackApp(
   createMemoryHistory: (opts: { initialEntries: string[] }) => any,
 ): TanStackServerRenderResult {
   const router = options.createRouter();
-  const url = railsContext.pathname + (railsContext.search || '');
+  const url = railsContext.pathname + normalizeSearch(railsContext.search);
 
   // Set memory history for server-side rendering
   const memoryHistory = createMemoryHistory({ initialEntries: [url] });
@@ -136,7 +164,7 @@ export async function serverRenderTanStackAppAsync(
   createMemoryHistory: (opts: { initialEntries: string[] }) => any,
 ): Promise<TanStackServerRenderResult> {
   const router = options.createRouter();
-  const url = railsContext.pathname + (railsContext.search || '');
+  const url = railsContext.pathname + normalizeSearch(railsContext.search);
 
   const memoryHistory = createMemoryHistory({ initialEntries: [url] });
   router.update({ history: memoryHistory });

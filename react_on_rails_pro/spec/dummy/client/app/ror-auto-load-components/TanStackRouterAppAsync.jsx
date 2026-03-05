@@ -77,7 +77,12 @@ const TanStackRouterAppAsync = (props, railsContext) => {
       railsContext,
       RouterProvider,
       createMemoryHistory,
-    ).then(({ appElement }) => appElement);
+    ).then(({ appElement, dehydratedState }) => ({
+      renderedHtml: appElement,
+      clientProps: {
+        __tanstackRouterDehydratedState: dehydratedState,
+      },
+    }));
   }
 
   const result = syncRenderFn(propsOrDefault, railsContext);

@@ -69,6 +69,36 @@ describe('tanstack-router integration', () => {
     expect(deps.createMemoryHistory).toHaveBeenCalledWith({ initialEntries: ['/products?category=tools'] });
   });
 
+  it('normalizes railsContext.search when it does not include a leading "?"', () => {
+    const router = buildRouter();
+    const options = {
+      createRouter: () => router,
+    };
+    const deps = {
+      RouterProvider: ({ children }: { children?: React.ReactNode }) =>
+        React.createElement('div', null, children),
+      createMemoryHistory: jest.fn().mockReturnValue({
+        location: {
+          pathname: '/products',
+          search: '?category=tools',
+          hash: '',
+          href: '/products?category=tools',
+          state: null,
+        },
+      }),
+      createBrowserHistory: jest.fn(),
+    };
+
+    const renderFn = createTanStackRouterRenderFunction(options, deps);
+    renderFn({ initial: 'prop' }, {
+      serverSide: true,
+      pathname: '/products',
+      search: 'category=tools',
+    } as unknown as RailsContext);
+
+    expect(deps.createMemoryHistory).toHaveBeenCalledWith({ initialEntries: ['/products?category=tools'] });
+  });
+
   it('returns a client React element on client-side render', () => {
     const options = {
       createRouter: () => buildRouter(),
@@ -138,5 +168,52 @@ describe('tanstack-router integration', () => {
 
     expect(router.matchRoutes).toHaveBeenCalledWith('/products', '?category=tools');
     expect((router as { ssr?: boolean }).ssr).toBe(true);
+  });
+
+  it('does not pass __tanstackRouterDehydratedState through AppWrapper props', () => {
+    const router = buildRouter();
+    const observedProps: Array<Record<string, unknown>> = [];
+    const options = {
+      createRouter: () => router,
+      AppWrapper: ({ children, ...rest }: { children: React.ReactNode } & Record<string, unknown>) => {
+        observedProps.push(rest);
+        return React.createElement('section', null, children);
+      },
+    };
+    const deps = {
+      RouterProvider: ({ children }: { children?: React.ReactNode }) =>
+        React.createElement('div', null, children),
+      createMemoryHistory: jest.fn(),
+      createBrowserHistory: jest.fn().mockReturnValue({
+        location: {
+          pathname: '/products',
+          search: '?category=tools',
+          hash: '',
+          href: '/products?category=tools',
+          state: null,
+        },
+      }),
+    };
+
+    const renderFn = createTanStackRouterRenderFunction(options, deps);
+    const result = renderFn(
+      {
+        __tanstackRouterDehydratedState: {
+          url: '/products?category=tools',
+          dehydratedRouter: null,
+        },
+        userId: 42,
+      },
+      {
+        serverSide: false,
+        pathname: '/products',
+        search: '?category=tools',
+      } as unknown as RailsContext,
+    );
+
+    renderToString(result as React.ReactElement);
+
+    expect(observedProps).toHaveLength(1);
+    expect(observedProps[0]).toEqual({ userId: 42 });
   });
 });

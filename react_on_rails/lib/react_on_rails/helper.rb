@@ -581,13 +581,28 @@ module ReactOnRails
 
     def merge_server_rendered_client_props!(render_options, result)
       client_props = result["clientProps"]
-      return if client_props.nil? || client_props.empty?
+      return if client_props.nil?
 
       unless client_props.is_a?(Hash)
         raise ReactOnRails::Error, "Expected result[\"clientProps\"] to be a Hash, got #{client_props.class.name}."
       end
 
-      existing_props = render_options.props
+      return if client_props.empty?
+
+      raw_existing_props = render_options.props
+      existing_props = if raw_existing_props.is_a?(String)
+                         begin
+                           JSON.parse(raw_existing_props)
+                         rescue JSON::ParserError
+                           class_name = raw_existing_props.class.name
+                           raise ReactOnRails::Error,
+                                 "Cannot merge result[\"clientProps\"] into non-Hash props. " \
+                                 "Pass props as a Hash, not #{class_name}."
+                         end
+                       else
+                         raw_existing_props
+                       end
+
       unless existing_props.is_a?(Hash)
         class_name = existing_props.class.name
         raise ReactOnRails::Error,

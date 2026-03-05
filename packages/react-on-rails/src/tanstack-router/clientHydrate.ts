@@ -14,6 +14,14 @@ import type { RailsContext } from '../types/index.ts';
  * 4. After hydration, trigger router.load() to enable client-side navigation
  * 5. Return a React component that renders RouterProvider
  */
+function normalizeSearch(search: string | null | undefined): string {
+  if (!search) {
+    return '';
+  }
+
+  return search.startsWith('?') ? search : `?${search}`;
+}
+
 export function clientHydrateTanStackApp(
   options: TanStackRouterOptions,
   props: Record<string, unknown>,
@@ -43,14 +51,18 @@ export function clientHydrateTanStackApp(
       } else if (typeof router.matchRoutes === 'function' && router.__store?.setState) {
         // Fall back to injecting route matches when no dehydrated state is available.
         // This keeps the initial client route tree aligned with SSR output.
+        const routerLocation = router.state?.location as { pathname?: string; search?: string } | undefined;
         const pathname =
           railsContext.pathname ||
           (browserHistory.location as { pathname?: string } | undefined)?.pathname ||
-          router.state.location.pathname;
+          routerLocation?.pathname ||
+          '/';
+        const searchFromRouter =
+          typeof routerLocation?.search === 'string' ? routerLocation.search : undefined;
         const search =
-          railsContext.search ??
-          (browserHistory.location as { search?: string } | undefined)?.search ??
-          router.state.location.search;
+          normalizeSearch(railsContext.search) ||
+          normalizeSearch((browserHistory.location as { search?: string } | undefined)?.search) ||
+          normalizeSearch(searchFromRouter);
         const matches = router.matchRoutes(pathname, search);
         router.__store.setState((s: Record<string, unknown>) => ({
           ...s,
@@ -58,6 +70,12 @@ export function clientHydrateTanStackApp(
           resolvedLocation: (s as { location: unknown }).location,
           matches,
         }));
+      } else if (hasSsrPayload) {
+        throw new Error(
+          'react-on-rails/tanstack-router: Cannot hydrate SSR payload because required TanStack Router internals ' +
+            'are unavailable (expected router.matchRoutes and router.__store.setState). ' +
+            'Please verify @tanstack/react-router compatibility.',
+        );
       }
 
       // Mark as SSR whenever we are hydrating a server-rendered page, even if
@@ -81,7 +99,7 @@ export function clientHydrateTanStackApp(
 
         // Only SSR hydration needs a manual load call.
         // For client-only renders, Transitioner handles initial loading.
-        if (hasSsrPayload && router.state.status !== 'idle') {
+        if (hasSsrPayload) {
           router.load().catch((err: unknown) => {
             console.error('react-on-rails/tanstack-router: Error loading routes after hydration:', err);
           });
@@ -91,7 +109,9 @@ export function clientHydrateTanStackApp(
 
     let app: ReactElement = createElement(RouterProvider, { router });
     if (options.AppWrapper) {
-      app = createElement(options.AppWrapper, { ...props, children: app } as any);
+      const wrapperProps = { ...props } as Record<string, unknown>;
+      delete wrapperProps.__tanstackRouterDehydratedState;
+      app = createElement(options.AppWrapper, { ...wrapperProps, children: app } as any);
     }
 
     return app;
