@@ -7,7 +7,6 @@ module ReactOnRails
     class PortSelector
       DEFAULT_RAILS_PORT   = 3000
       DEFAULT_WEBPACK_PORT = 3035
-      WEBPACK_OFFSET       = DEFAULT_WEBPACK_PORT - DEFAULT_RAILS_PORT # 35
       MAX_ATTEMPTS         = 100
 
       class NoPortAvailable < StandardError; end
@@ -24,7 +23,7 @@ module ReactOnRails
           return { rails: rails_port, webpack: webpack_port } if rails_port && webpack_port
 
           # If only one is set, use it as the anchor and return defaults for the other
-          return { rails: rails_port, webpack: explicit_webpack_port || DEFAULT_WEBPACK_PORT } if rails_port
+          return { rails: rails_port, webpack: webpack_port || DEFAULT_WEBPACK_PORT } if rails_port
 
           return { rails: DEFAULT_RAILS_PORT, webpack: webpack_port } if webpack_port
 
