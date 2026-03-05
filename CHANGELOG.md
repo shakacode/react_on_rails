@@ -27,6 +27,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 Changes since the last non-beta release.
 
+#### Fixed
+
+- **CSS module SSR fixes for rspack**: Fixed CSS module class name divergence between client and server bundles when using rspack. Server webpack config now filters rspack's `cssExtractLoader` in addition to `mini-css-extract-plugin`, uses spread syntax to preserve existing CSS module options when setting `exportOnlyLocals: true`, and adds null guards against undefined entries in `rule.use` arrays. Note: `exportOnlyLocals: true` is no longer applied when `cssLoader.options.modules` is falsy (disabled), which is the correct behavior but a change from prior versions. [PR 2489](https://github.com/shakacode/react_on_rails/pull/2489) by [justin808](https://github.com/justin808).
+
 #### Pro
 
 ##### Fixed
