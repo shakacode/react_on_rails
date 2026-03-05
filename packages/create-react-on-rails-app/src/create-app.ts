@@ -1,15 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import { CliOptions } from './types.js';
-import {
-  canResolveRemoteGem,
-  execLiveArgs,
-  logStep,
-  logStepDone,
-  logError,
-  logSuccess,
-  logInfo,
-} from './utils.js';
+import { execLiveArgs, logStep, logStepDone, logError, logSuccess, logInfo } from './utils.js';
 
 const TOTAL_STEPS = 4;
 
@@ -77,16 +69,6 @@ export function createApp(appName: string, options: CliOptions): void {
     logInfo(
       'Note: --rsc requires access to react_on_rails_pro (private gem source or a git-based Gemfile entry).',
     );
-    logInfo('Checking react_on_rails_pro availability with Bundler before creating the app...');
-
-    if (!canResolveRemoteGem('react_on_rails_pro')) {
-      logError('Could not resolve react_on_rails_pro via Bundler preflight checks.');
-      logInfo('Configure access to the private React on Rails Pro gem source in Bundler, then rerun.');
-      logInfo(
-        'If you prefer git-based setup, create the app without --rsc first and add react_on_rails_pro manually.',
-      );
-      process.exit(1);
-    }
   }
 
   // Step 1: Create Rails application
@@ -123,9 +105,15 @@ export function createApp(appName: string, options: CliOptions): void {
       logStepDone('react_on_rails_pro gem added');
     } catch (error) {
       logError('Failed to add react_on_rails_pro gem required by --rsc.');
-      logInfo(
-        `Delete the created "${appName}" directory and rerun without --rsc, or configure access to the private React on Rails Pro gem source first.`,
-      );
+      logInfo(`Cleaning up "${appName}" directory...`);
+      try {
+        fs.rmSync(appPath, { recursive: true, force: true });
+        logInfo('Directory removed. Configure access to React on Rails Pro gem source and rerun.');
+      } catch {
+        logInfo(
+          `Delete the created "${appName}" directory and rerun without --rsc, or configure access to the private React on Rails Pro gem source first.`,
+        );
+      }
       if (error instanceof Error && error.message) {
         console.error(`Debug info: ${error.message}`);
       }
