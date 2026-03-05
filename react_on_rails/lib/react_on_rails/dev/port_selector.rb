@@ -31,7 +31,10 @@ module ReactOnRails
           find_free_pair
         end
 
-        # Public so it can be stubbed in tests
+        # Public so it can be stubbed in tests.
+        # NOTE: Inherent TOCTOU race — another process can claim the port between
+        # server.close and the caller binding to it. This is unavoidable with the
+        # probe-then-use pattern and acceptable for the worktree port-selection use case.
         def port_available?(port, host = "127.0.0.1")
           server = TCPServer.new(host, port)
           server.close
