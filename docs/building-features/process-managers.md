@@ -357,7 +357,7 @@ in parallel, `bin/dev` automatically detects and avoids port conflicts — no co
 When the default ports (3000 for Rails, 3035 for webpack-dev-server) are occupied, `bin/dev`
 scans for the next free pair and prints:
 
-```
+```text
 Default ports in use. Using Rails :3001, webpack :3036
 ```
 
