@@ -302,6 +302,28 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     end
   end
 
+  describe ".procfile_port" do
+    after { ENV.delete("PORT") }
+
+    it "returns 3000 for Procfile.dev when PORT is unset" do
+      expect(described_class.send(:procfile_port, "Procfile.dev")).to eq(3000)
+    end
+
+    it "returns 3001 for Procfile.dev-prod-assets when PORT is unset" do
+      expect(described_class.send(:procfile_port, "Procfile.dev-prod-assets")).to eq(3001)
+    end
+
+    it "returns the auto-detected port for Procfile.dev when PORT is set" do
+      ENV["PORT"] = "3001"
+      expect(described_class.send(:procfile_port, "Procfile.dev")).to eq(3001)
+    end
+
+    it "returns the PORT value for Procfile.dev-prod-assets when PORT is set" do
+      ENV["PORT"] = "4000"
+      expect(described_class.send(:procfile_port, "Procfile.dev-prod-assets")).to eq(4000)
+    end
+  end
+
   describe ".show_help" do
     it "displays help information" do
       expect { described_class.show_help }.to output(%r{Usage: bin/dev \[command\]}).to_stdout_from_any_process

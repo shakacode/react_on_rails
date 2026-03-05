@@ -69,6 +69,11 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
         expect(result[:rails]).to eq(4000)
       end
 
+      it "defaults webpack to 3035 when SHAKAPACKER_DEV_SERVER_PORT is not set" do
+        result = described_class.select_ports
+        expect(result[:webpack]).to eq(3035)
+      end
+
       it "does not probe for free ports" do
         expect(described_class).not_to receive(:port_available?)
         described_class.select_ports
@@ -86,6 +91,39 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
       it "respects the existing SHAKAPACKER_DEV_SERVER_PORT env var" do
         result = described_class.select_ports
         expect(result[:webpack]).to eq(4035)
+      end
+
+      it "defaults Rails to 3000 when PORT is not set" do
+        result = described_class.select_ports
+        expect(result[:rails]).to eq(3000)
+      end
+
+      it "does not probe for free ports" do
+        expect(described_class).not_to receive(:port_available?)
+        described_class.select_ports
+      end
+    end
+
+    context "when both PORT and SHAKAPACKER_DEV_SERVER_PORT are set" do
+      around do |example|
+        old_port = ENV.fetch("PORT", nil)
+        old_wp   = ENV.fetch("SHAKAPACKER_DEV_SERVER_PORT", nil)
+        ENV["PORT"] = "4000"
+        ENV["SHAKAPACKER_DEV_SERVER_PORT"] = "4035"
+        example.run
+        ENV["PORT"] = old_port
+        ENV["SHAKAPACKER_DEV_SERVER_PORT"] = old_wp
+      end
+
+      it "returns both explicit ports" do
+        result = described_class.select_ports
+        expect(result[:rails]).to eq(4000)
+        expect(result[:webpack]).to eq(4035)
+      end
+
+      it "does not probe for free ports" do
+        expect(described_class).not_to receive(:port_available?)
+        described_class.select_ports
       end
     end
 
