@@ -101,6 +101,8 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       around do |example|
         old_port = ENV.fetch("PORT", nil)
         old_webpack_port = ENV.fetch("SHAKAPACKER_DEV_SERVER_PORT", nil)
+        ENV.delete("PORT")
+        ENV.delete("SHAKAPACKER_DEV_SERVER_PORT")
         example.run
         ENV["PORT"] = old_port
         ENV["SHAKAPACKER_DEV_SERVER_PORT"] = old_webpack_port
@@ -344,7 +346,12 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
   end
 
   describe ".procfile_port" do
-    after { ENV.delete("PORT") }
+    around do |example|
+      old_port = ENV.fetch("PORT", nil)
+      ENV.delete("PORT")
+      example.run
+      ENV["PORT"] = old_port
+    end
 
     it "returns 3000 for Procfile.dev when PORT is unset" do
       expect(described_class.send(:procfile_port, "Procfile.dev")).to eq(3000)
