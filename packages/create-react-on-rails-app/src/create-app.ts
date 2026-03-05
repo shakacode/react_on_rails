@@ -3,7 +3,20 @@ import fs from 'fs';
 import { CliOptions } from './types.js';
 import { execLiveArgs, logStep, logStepDone, logError, logSuccess, logInfo } from './utils.js';
 
-const TOTAL_STEPS = 4;
+function cleanupAppDirectory(
+  appPath: string,
+  appName: string,
+  cleanupSuccessMessage: string,
+  cleanupFallbackMessage: string,
+): void {
+  logInfo(`Cleaning up "${appName}" directory...`);
+  try {
+    fs.rmSync(appPath, { recursive: true, force: true });
+    logInfo(cleanupSuccessMessage);
+  } catch {
+    logInfo(cleanupFallbackMessage);
+  }
+}
 
 export function buildGeneratorArgs(options: CliOptions): string[] {
   const args: string[] = [];
@@ -64,11 +77,14 @@ export function validateAppName(name: string): { success: boolean; error?: strin
 
 export function createApp(appName: string, options: CliOptions): void {
   const appPath = path.resolve(process.cwd(), appName);
+  const totalSteps = options.rsc ? 5 : 4;
+  const generatorStep = options.rsc ? 4 : 3;
+  const doneStep = options.rsc ? 5 : 4;
 
   // Step 1: Create Rails application
   // appName is validated by validateAppName() to be [a-zA-Z0-9_-]+ only,
   // so it's always a simple directory name safe to use with rails new.
-  logStep(1, TOTAL_STEPS, 'Creating Rails application...');
+  logStep(1, totalSteps, 'Creating Rails application...');
   try {
     execLiveArgs('rails', ['new', appName, '--database=postgresql', '--skip-javascript']);
     logStepDone('Rails application created');
@@ -80,8 +96,8 @@ export function createApp(appName: string, options: CliOptions): void {
     process.exit(1);
   }
 
-  // Step 2: Add required gems
-  logStep(2, TOTAL_STEPS, `Adding required gem${options.rsc ? 's' : ''}...`);
+  // Step 2: Add react_on_rails gem
+  logStep(2, totalSteps, 'Adding react_on_rails gem...');
   try {
     execLiveArgs('bundle', ['add', 'react_on_rails', '--strict'], appPath);
     logStepDone('react_on_rails gem added');
@@ -90,37 +106,39 @@ export function createApp(appName: string, options: CliOptions): void {
     if (error instanceof Error && error.message) {
       console.error(`Debug info: ${error.message}`);
     }
+    cleanupAppDirectory(
+      appPath,
+      appName,
+      'Directory removed. Fix gem installation access or connectivity issues and rerun.',
+      `Delete the created "${appName}" directory and rerun once gem installation issues are resolved.`,
+    );
     process.exit(1);
   }
 
   if (options.rsc) {
+    logStep(3, totalSteps, 'Adding react_on_rails_pro gem (--rsc)...');
     try {
-      execLiveArgs('bundle', ['add', 'react_on_rails_pro', '--strict'], appPath);
+      execLiveArgs('bundle', ['add', 'react_on_rails_pro'], appPath);
       logStepDone('react_on_rails_pro gem added');
     } catch (error) {
       logError('Failed to add react_on_rails_pro gem required by --rsc.');
-      logInfo(`Cleaning up "${appName}" directory...`);
-      try {
-        fs.rmSync(appPath, { recursive: true, force: true });
-        logInfo(
-          'Directory removed. Configure access to React on Rails Pro gem source and rerun. ' +
-            'For custom source/git setups, rerun without --rsc and add react_on_rails_pro manually in Gemfile.',
-        );
-      } catch {
-        logInfo(
-          `Configure gem source access for react_on_rails_pro, then delete the created "${appName}" directory and rerun with --rsc.`,
-        );
-      }
       if (error instanceof Error && error.message) {
         console.error(`Debug info: ${error.message}`);
       }
+      cleanupAppDirectory(
+        appPath,
+        appName,
+        'Directory removed. Configure access to React on Rails Pro gem source and rerun. ' +
+          'For custom source/git setups, rerun without --rsc and add react_on_rails_pro manually in Gemfile.',
+        `Configure gem source access for react_on_rails_pro, then delete the created "${appName}" directory and rerun with --rsc.`,
+      );
       process.exit(1);
     }
   }
 
   // Step 3: Run react_on_rails generator
   const generatorArgs = buildGeneratorArgs(options);
-  logStep(3, TOTAL_STEPS, 'Running React on Rails generator...');
+  logStep(generatorStep, totalSteps, 'Running React on Rails generator...');
   try {
     execLiveArgs(
       'bundle',
@@ -137,6 +155,6 @@ export function createApp(appName: string, options: CliOptions): void {
   }
 
   // Step 4: Success
-  logStep(4, TOTAL_STEPS, 'Done!');
+  logStep(doneStep, totalSteps, 'Done!');
   printSuccessMessage(appName, options.rsc ? 'hello_server' : 'hello_world');
 }
