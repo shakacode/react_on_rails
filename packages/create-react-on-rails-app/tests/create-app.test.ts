@@ -187,7 +187,8 @@ describe('createApp', () => {
       ['exec', 'rails', 'generate', 'react_on_rails:install', '--rsc', '--ignore-warnings'],
       appPath,
     );
-    expect(mockedLogStepDone).toHaveBeenCalledWith('react_on_rails and react_on_rails_pro gems added');
+    expect(mockedLogStepDone).toHaveBeenCalledWith('react_on_rails gem added');
+    expect(mockedLogStepDone).toHaveBeenCalledWith('react_on_rails_pro gem added');
     expect(mockedLogInfo).toHaveBeenCalledWith('Then visit http://localhost:3000/hello_server');
     expect(processExitSpy).not.toHaveBeenCalled();
   });

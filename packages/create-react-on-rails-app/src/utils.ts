@@ -36,6 +36,7 @@ export function canResolveRemoteGem(gemName: string): boolean {
       cwd: probeDir,
       encoding: 'utf8',
       stdio: 'pipe',
+      timeout: 15_000,
     });
 
     return true;
