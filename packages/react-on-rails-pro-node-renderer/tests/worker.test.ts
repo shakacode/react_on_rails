@@ -105,34 +105,36 @@ describe('worker', () => {
     const buildVMSpy = jest.spyOn(vm, 'buildVM').mockRejectedValueOnce(new Error('Injected buildVM failure'));
     const reportMessageSpy = jest.spyOn(errorReporter, 'message').mockImplementation(jest.fn());
 
-    const app = worker({
-      serverBundleCachePath: serverBundleCachePathForTest(),
-    });
+    try {
+      const app = worker({
+        serverBundleCachePath: serverBundleCachePathForTest(),
+      });
 
-    const form = formAutoContent({
-      gemVersion,
-      protocolVersion,
-      railsEnv,
-      renderingRequest: 'ReactOnRails.dummy',
-      bundle: createReadStream(getFixtureBundle()),
-    });
+      const form = formAutoContent({
+        gemVersion,
+        protocolVersion,
+        railsEnv,
+        renderingRequest: 'ReactOnRails.dummy',
+        bundle: createReadStream(getFixtureBundle()),
+      });
 
-    const res = await app
-      .inject()
-      .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
-      .payload(form.payload)
-      .headers(form.headers)
-      .end();
+      const res = await app
+        .inject()
+        .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+        .payload(form.payload)
+        .headers(form.headers)
+        .end();
 
-    expect(res.statusCode).toBe(400);
-    expect(reportMessageSpy).toHaveBeenCalledTimes(1);
-    expect(reportMessageSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Caught top level error in handleRenderRequest'),
-    );
-    expect(res.payload).toContain('Caught top level error in handleRenderRequest');
-
-    buildVMSpy.mockRestore();
-    reportMessageSpy.mockRestore();
+      expect(res.statusCode).toBe(400);
+      expect(reportMessageSpy).toHaveBeenCalledTimes(1);
+      expect(reportMessageSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Caught top level error in handleRenderRequest'),
+      );
+      expect(res.payload).toContain('Caught top level error in handleRenderRequest');
+    } finally {
+      buildVMSpy.mockRestore();
+      reportMessageSpy.mockRestore();
+    }
   });
 
   test(

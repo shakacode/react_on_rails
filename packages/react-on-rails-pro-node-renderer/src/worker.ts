@@ -31,7 +31,6 @@ import {
   getBundleDirectory,
   getRequestBundleFilePath,
 } from './shared/utils.js';
-import * as errorReporter from './shared/errorReporter.js';
 import { lock, unlock } from './shared/locks.js';
 import { startSsrRequestOptions, trace } from './shared/tracing.js';
 
@@ -296,6 +295,7 @@ export default function run(config: Partial<Config>) {
             dependencyBundleTimestamps,
             providedNewBundles,
             assetsToCopy,
+            tracingContext: context,
           });
           await setResponse(result, res);
         } catch (err) {
@@ -304,13 +304,11 @@ export default function run(config: Partial<Config>) {
             err,
             'UNHANDLED error in handleRenderRequest',
           );
-          errorReporter.message(exceptionMessage, context);
-          await setResponse(errorResponseResult(exceptionMessage), res);
+          await setResponse(errorResponseResult(exceptionMessage, context), res);
         }
       }, startSsrRequestOptions({ renderingRequest }));
     } catch (theErr) {
       const exceptionMessage = formatExceptionMessage(renderingRequest, theErr);
-      errorReporter.message(`Unhandled top level error: ${exceptionMessage}`);
       await setResponse(errorResponseResult(exceptionMessage), res);
     }
   });
