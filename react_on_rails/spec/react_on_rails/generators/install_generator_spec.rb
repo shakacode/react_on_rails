@@ -672,7 +672,6 @@ describe InstallGenerator, type: :generator do
   context "with --pro --rspack" do
     before(:all) do
       run_generator_test_with_args(%w[--pro --rspack], package_json: true) do
-        simulate_existing_file(".shakapacker_just_installed", "")
         simulate_existing_file("config/shakapacker.yml", <<~YAML)
           # Note: You must restart bin/shakapacker-dev-server for changes to take effect
           default: &default
