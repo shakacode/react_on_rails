@@ -639,6 +639,7 @@ module ReactOnRails
           print_server_info(
             "⚡ Starting development server with static assets...",
             features,
+            procfile_port(procfile),
             route: route
           )
 

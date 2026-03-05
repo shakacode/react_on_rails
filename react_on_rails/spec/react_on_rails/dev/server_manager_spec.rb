@@ -146,6 +146,21 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         expect(port_at_print_time).to eq("3001")
       end
 
+      it "passes the auto-detected port to print_server_info in static mode" do
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+          .and_return({ rails: 3001, webpack: 3036 })
+
+        port_at_server_info_time = nil
+        allow(described_class).to receive(:print_server_info).and_wrap_original do |m, *args, **kwargs|
+          port_at_server_info_time = args[2]
+          m.call(*args, **kwargs)
+        end
+
+        described_class.start(:static)
+
+        expect(port_at_server_info_time).to eq(3001)
+      end
+
       it "has PORT set when print_procfile_info is called in static mode" do
         allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
           .and_return({ rails: 3001, webpack: 3036 })
