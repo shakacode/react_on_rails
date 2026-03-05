@@ -27,15 +27,6 @@ function localGemPath(envVarName: string): string | null {
   return path.resolve(value);
 }
 
-function localGemPath(envVarName: string): string | null {
-  const value = process.env[envVarName];
-  if (!value || value.trim() === '') {
-    return null;
-  }
-
-  return path.resolve(value);
-}
-
 export function buildGeneratorArgs(options: CliOptions): string[] {
   const args: string[] = [];
 
@@ -143,7 +134,6 @@ export function createApp(appName: string, options: CliOptions): void {
   if (options.rsc) {
     logStep(3, totalSteps, 'Adding react_on_rails_pro gem (--rsc)...');
     try {
-      execLiveArgs('bundle', ['add', 'react_on_rails_pro'], appPath);
       const reactOnRailsProArgs = ['add', 'react_on_rails_pro'];
       if (reactOnRailsProGemPath) {
         logInfo(`Using local react_on_rails_pro gem path: ${reactOnRailsProGemPath}`);
