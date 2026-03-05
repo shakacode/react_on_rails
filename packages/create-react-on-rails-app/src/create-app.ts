@@ -65,12 +65,6 @@ export function validateAppName(name: string): { success: boolean; error?: strin
 export function createApp(appName: string, options: CliOptions): void {
   const appPath = path.resolve(process.cwd(), appName);
 
-  if (options.rsc) {
-    logInfo(
-      'Note: --rsc requires access to react_on_rails_pro (private gem source or a git-based Gemfile entry).',
-    );
-  }
-
   // Step 1: Create Rails application
   // appName is validated by validateAppName() to be [a-zA-Z0-9_-]+ only,
   // so it's always a simple directory name safe to use with rails new.
@@ -114,7 +108,7 @@ export function createApp(appName: string, options: CliOptions): void {
         );
       } catch {
         logInfo(
-          `Delete the created "${appName}" directory and rerun without --rsc, or configure access to the private React on Rails Pro gem source first.`,
+          `Configure gem source access for react_on_rails_pro, then delete the created "${appName}" directory and rerun with --rsc.`,
         );
       }
       if (error instanceof Error && error.message) {

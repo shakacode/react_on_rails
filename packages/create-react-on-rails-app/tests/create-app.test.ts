@@ -189,11 +189,10 @@ describe('createApp', () => {
     expect(processExitSpy).not.toHaveBeenCalled();
   });
 
-  it('still creates app before attempting react_on_rails_pro add for --rsc', () => {
-    const options = { ...baseOptions, rsc: true };
+  it('creates a standard app without rsc', () => {
     const appPath = path.resolve(process.cwd(), 'my-app');
 
-    createApp('my-app', options);
+    createApp('my-app', baseOptions);
 
     expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(1, 'rails', [
       'new',
@@ -202,11 +201,25 @@ describe('createApp', () => {
       '--skip-javascript',
     ]);
     expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
-      3,
+      2,
       'bundle',
-      ['add', 'react_on_rails_pro', '--strict'],
+      ['add', 'react_on_rails', '--strict'],
       appPath,
     );
+    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
+      3,
+      'bundle',
+      ['exec', 'rails', 'generate', 'react_on_rails:install', '--ignore-warnings'],
+      appPath,
+    );
+    expect(mockedExecLiveArgs).toHaveBeenCalledTimes(3);
+    expect(mockedExecLiveArgs).not.toHaveBeenCalledWith(
+      'bundle',
+      ['add', 'react_on_rails_pro', '--strict'],
+      expect.anything(),
+    );
+    expect(mockedLogInfo).toHaveBeenCalledWith('Then visit http://localhost:3000/hello_world');
+    expect(processExitSpy).not.toHaveBeenCalled();
   });
 
   it('cleans up app directory when react_on_rails_pro add fails', () => {
@@ -238,7 +251,7 @@ describe('createApp', () => {
 
     expect(() => createApp('my-app', { ...baseOptions, rsc: true })).toThrow('process.exit');
     expect(mockedLogInfo).toHaveBeenCalledWith(
-      'Delete the created "my-app" directory and rerun without --rsc, or configure access to the private React on Rails Pro gem source first.',
+      'Configure gem source access for react_on_rails_pro, then delete the created "my-app" directory and rerun with --rsc.',
     );
   });
 });
