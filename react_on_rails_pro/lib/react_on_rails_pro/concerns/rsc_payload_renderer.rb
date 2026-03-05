@@ -12,6 +12,7 @@ module ReactOnRailsPro
     def rsc_payload
       @rsc_payload_component_name = rsc_payload_component_name
       @rsc_payload_component_props = rsc_payload_component_props
+      response.headers["Content-Type"] = "application/x-ndjson"
 
       stream_view_containing_react_components(
         template: custom_rsc_payload_template,
