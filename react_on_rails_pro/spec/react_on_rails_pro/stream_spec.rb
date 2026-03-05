@@ -591,6 +591,22 @@ RSpec.describe "Streaming API" do
       expect(headers["Content-Encoding"]).to be_nil
     end
 
+    it "keeps plain streaming when gzip is explicitly excluded" do
+      queues, controller, stream, headers, _request = setup_stream_test(
+        component_count: 1,
+        accept_encoding: "gzip;q=0, identity;q=1"
+      )
+
+      run_stream(controller, compress: true) do |_parent|
+        queues[0].enqueue("Chunk1")
+        queues[0].close
+      end
+
+      expect(stream).to have_received(:write).with("TEMPLATE")
+      expect(stream).to have_received(:write).with("Chunk1")
+      expect(headers["Content-Encoding"]).to be_nil
+    end
+
     it "keeps plain streaming when response already has non-identity encodings" do
       queues, controller, stream, headers, _request = setup_stream_test(
         component_count: 1,
