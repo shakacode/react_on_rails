@@ -199,7 +199,7 @@ describe('createApp', () => {
     expect(mockedCanResolveRemoteGem).toHaveBeenCalledWith('react_on_rails_pro');
     expect(mockedExecLiveArgs).not.toHaveBeenCalled();
     expect(mockedLogError).toHaveBeenCalledWith(
-      'Could not resolve react_on_rails_pro from your current gem sources.',
+      'Could not resolve react_on_rails_pro via Bundler preflight checks.',
     );
   });
 
