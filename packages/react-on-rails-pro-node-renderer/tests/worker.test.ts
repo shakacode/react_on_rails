@@ -1,5 +1,7 @@
 import formAutoContent from 'form-auto-content';
 import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import querystring from 'querystring';
 import { createReadStream } from 'fs-extra';
 // eslint-disable-next-line import/no-relative-packages
@@ -21,6 +23,7 @@ import {
   serverBundleCachePath,
   assetPath,
   assetPathOther,
+  bundleCompleteMarkerPath,
 } from './helper';
 
 const testName = 'worker';
@@ -367,6 +370,37 @@ describe('worker', () => {
     expect(fs.existsSync(assetPathOther(testName, bundleHash))).toBe(true);
     expect(fs.existsSync(assetPath(testName, bundleHashOther))).toBe(true);
     expect(fs.existsSync(assetPathOther(testName, bundleHashOther))).toBe(true);
+  });
+
+  test('post /upload-assets writes .complete marker when bundle file exists', async () => {
+    const bundleHash = 'some-bundle-hash';
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rorp-upload-assets-marker-'));
+    const tempBundlePath = path.join(tempDir, `${bundleHash}.js`);
+    fs.copyFileSync(getFixtureBundle(), tempBundlePath);
+
+    try {
+      const app = worker({
+        serverBundleCachePath: serverBundleCachePathForTest(),
+        password: 'my_password',
+      });
+
+      const form = formAutoContent({
+        gemVersion,
+        protocolVersion,
+        railsEnv,
+        password: 'my_password',
+        targetBundles: [bundleHash],
+        bundle: createReadStream(tempBundlePath),
+        asset1: createReadStream(getFixtureAsset()),
+      });
+
+      const res = await app.inject().post(`/upload-assets`).payload(form.payload).headers(form.headers).end();
+
+      expect(res.statusCode).toBe(200);
+      expect(fs.existsSync(bundleCompleteMarkerPath(testName, bundleHash))).toBe(true);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 
   describe('gem version validation', () => {

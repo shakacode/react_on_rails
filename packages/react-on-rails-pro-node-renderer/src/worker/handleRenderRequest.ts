@@ -22,6 +22,9 @@ import {
   isReadableStream,
   isErrorRenderResult,
   getRequestBundleFilePath,
+  isBundleComplete,
+  cleanIncompleteBundleDirectory,
+  markBundleComplete,
 } from '../shared/utils.js';
 import { getConfig } from '../shared/configBuilder.js';
 import type { TracingContext } from '../shared/tracing.js';
@@ -103,6 +106,11 @@ async function handleNewBundleProvided(
     }
 
     try {
+      const wasIncomplete = await cleanIncompleteBundleDirectory(providedNewBundle.timestamp);
+      if (wasIncomplete) {
+        log.warn('Removed incomplete bundle directory before writing bundle %s', bundleFilePathPerTimestamp);
+      }
+
       log.info(
         `Moving uploaded file ${providedNewBundle.bundle.savedFilePath} to ${bundleFilePathPerTimestamp}`,
       );
@@ -110,6 +118,7 @@ async function handleNewBundleProvided(
       if (assetsToCopy) {
         await copyUploadedAssets(assetsToCopy, bundleDirectory);
       }
+      await markBundleComplete(providedNewBundle.timestamp);
 
       log.info(
         `Completed moving uploaded file ${providedNewBundle.bundle.savedFilePath} to ${bundleFilePathPerTimestamp}`,
@@ -234,8 +243,11 @@ export async function handleRenderRequest({
       await Promise.all(
         [...(dependencyBundleTimestamps ?? []), bundleTimestamp].map(async (timestamp) => {
           const bundleFilePath = getRequestBundleFilePath(timestamp);
-          const fileExists = await fileExistsAsync(bundleFilePath);
-          return fileExists ? null : timestamp;
+          const [fileExists, bundleComplete] = await Promise.all([
+            fileExistsAsync(bundleFilePath),
+            isBundleComplete(timestamp),
+          ]);
+          return fileExists && bundleComplete ? null : timestamp;
         }),
       )
     ).filter((timestamp) => timestamp !== null);

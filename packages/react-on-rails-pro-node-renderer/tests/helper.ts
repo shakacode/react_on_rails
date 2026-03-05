@@ -18,6 +18,7 @@ export const BUNDLE_TIMESTAMP = 1495063024898;
 export const SECONDARY_BUNDLE_TIMESTAMP = 1495063024899;
 export const ASSET_UPLOAD_FILE = 'loadable-stats.json';
 export const ASSET_UPLOAD_OTHER_FILE = 'loadable-stats-other.json';
+export const BUNDLE_COMPLETE_MARKER_FILE = '.complete';
 
 export function getFixtureBundle() {
   return path.resolve(__dirname, './fixtures/bundle.js');
@@ -101,6 +102,10 @@ export function assetPath(testName: string, bundleTimestamp: string) {
 
 export function assetPathOther(testName: string, bundleTimestamp: string) {
   return path.resolve(serverBundleCachePath(testName), bundleTimestamp, ASSET_UPLOAD_OTHER_FILE);
+}
+
+export function bundleCompleteMarkerPath(testName: string, bundleTimestamp: string) {
+  return path.resolve(serverBundleCachePath(testName), bundleTimestamp, BUNDLE_COMPLETE_MARKER_FILE);
 }
 
 export async function createUploadedBundle(testName: string) {

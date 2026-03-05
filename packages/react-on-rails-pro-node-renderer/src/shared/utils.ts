@@ -1,11 +1,13 @@
 import cluster from 'cluster';
 import path from 'path';
+import { readdir, rm, writeFile } from 'fs/promises';
 import { MultipartFile } from '@fastify/multipart';
 import { createWriteStream, ensureDir, move, MoveOptions, copy, CopyOptions } from 'fs-extra';
 import { Readable, Writable, pipeline, PassThrough } from 'stream';
 import { promisify } from 'util';
 import * as errorReporter from './errorReporter.js';
 import { getConfig } from './configBuilder.js';
+import fileExistsAsync from './fileExistsAsync.js';
 import log from './log.js';
 import type { TracingContext } from './tracing.js';
 import type { RenderResult } from '../worker/vm.js';
@@ -111,7 +113,7 @@ export function copyUploadedAsset(
 export async function copyUploadedAssets(uploadedAssets: Asset[], targetDirectory: string): Promise<void> {
   const copyMultipleAssets = uploadedAssets.map((asset) => {
     const destinationAssetFilePath = path.join(targetDirectory, asset.filename);
-    return copyUploadedAsset(asset, destinationAssetFilePath, { overwrite: true });
+    return copyUploadedAsset(asset, destinationAssetFilePath, { overwrite: false, errorOnExist: false });
   });
   await Promise.all(copyMultipleAssets);
   log.info(
@@ -181,6 +183,45 @@ export const delay = (milliseconds: number) =>
 export function getBundleDirectory(bundleTimestamp: string | number) {
   const { serverBundleCachePath } = getConfig();
   return path.join(serverBundleCachePath, `${bundleTimestamp}`);
+}
+
+export const BUNDLE_COMPLETE_MARKER_FILE = '.complete';
+
+export function getBundleCompleteMarkerPath(bundleTimestamp: string | number) {
+  const bundleDirectory = getBundleDirectory(bundleTimestamp);
+  return path.join(bundleDirectory, BUNDLE_COMPLETE_MARKER_FILE);
+}
+
+export async function isBundleComplete(bundleTimestamp: string | number): Promise<boolean> {
+  return fileExistsAsync(getBundleCompleteMarkerPath(bundleTimestamp));
+}
+
+// Deletes partial uploads while preserving in-progress lockfiles.
+export async function cleanIncompleteBundleDirectory(bundleTimestamp: string | number): Promise<boolean> {
+  if (await isBundleComplete(bundleTimestamp)) {
+    return false;
+  }
+
+  const bundleDirectory = getBundleDirectory(bundleTimestamp);
+  if (!(await fileExistsAsync(bundleDirectory))) {
+    return false;
+  }
+
+  const entries = await readdir(bundleDirectory);
+  await Promise.all(
+    entries.map(async (entry) => {
+      if (entry.endsWith('.lock')) {
+        return;
+      }
+      await rm(path.join(bundleDirectory, entry), { recursive: true, force: true });
+    }),
+  );
+
+  return true;
+}
+
+export async function markBundleComplete(bundleTimestamp: string | number): Promise<void> {
+  await writeFile(getBundleCompleteMarkerPath(bundleTimestamp), '');
 }
 
 export function getRequestBundleFilePath(bundleTimestamp: string | number) {
