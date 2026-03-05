@@ -2,12 +2,11 @@ import path from 'path';
 import fs from 'fs';
 import { validateAppName, buildGeneratorArgs, createApp } from '../src/create-app';
 import { CliOptions } from '../src/types';
-import { canResolveRemoteGem, execLiveArgs, logError, logInfo, logStepDone } from '../src/utils';
+import { execLiveArgs, logError, logInfo, logStepDone } from '../src/utils';
 
 jest.mock('fs');
 jest.mock('../src/utils', () => ({
   ...jest.requireActual('../src/utils'),
-  canResolveRemoteGem: jest.fn(),
   execLiveArgs: jest.fn(),
   logStep: jest.fn(),
   logStepDone: jest.fn(),
@@ -17,7 +16,6 @@ jest.mock('../src/utils', () => ({
 }));
 
 const mockedFs = jest.mocked(fs);
-const mockedCanResolveRemoteGem = jest.mocked(canResolveRemoteGem);
 const mockedExecLiveArgs = jest.mocked(execLiveArgs);
 const mockedLogError = jest.mocked(logError);
 const mockedLogInfo = jest.mocked(logInfo);
@@ -136,12 +134,11 @@ describe('createApp', () => {
   let consoleErrorSpy: jest.SpyInstance;
 
   beforeEach(() => {
-    mockedCanResolveRemoteGem.mockReset();
+    mockedFs.rmSync.mockReset();
     mockedExecLiveArgs.mockReset();
     mockedLogError.mockReset();
     mockedLogInfo.mockReset();
     mockedLogStepDone.mockReset();
-    mockedCanResolveRemoteGem.mockReturnValue(true);
 
     processExitSpy = jest.spyOn(process, 'exit').mockImplementation((() => {
       throw new Error('process.exit');
@@ -162,7 +159,6 @@ describe('createApp', () => {
 
     createApp('my-app', options);
 
-    expect(mockedCanResolveRemoteGem).toHaveBeenCalledWith('react_on_rails_pro');
     expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(1, 'rails', [
       'new',
       'my-app',
@@ -193,24 +189,52 @@ describe('createApp', () => {
     expect(processExitSpy).not.toHaveBeenCalled();
   });
 
-  it('checks react_on_rails_pro availability before creating app for --rsc', () => {
-    mockedCanResolveRemoteGem.mockReturnValue(false);
+  it('still creates app before attempting react_on_rails_pro add for --rsc', () => {
+    const options = { ...baseOptions, rsc: true };
+    const appPath = path.resolve(process.cwd(), 'my-app');
 
-    expect(() => createApp('my-app', { ...baseOptions, rsc: true })).toThrow('process.exit');
-    expect(mockedCanResolveRemoteGem).toHaveBeenCalledWith('react_on_rails_pro');
-    expect(mockedExecLiveArgs).not.toHaveBeenCalled();
-    expect(mockedLogError).toHaveBeenCalledWith(
-      'Could not resolve react_on_rails_pro via Bundler preflight checks.',
+    createApp('my-app', options);
+
+    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(1, 'rails', [
+      'new',
+      'my-app',
+      '--database=postgresql',
+      '--skip-javascript',
+    ]);
+    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
+      3,
+      'bundle',
+      ['add', 'react_on_rails_pro', '--strict'],
+      appPath,
     );
   });
 
-  it('guides user to delete app directory when react_on_rails_pro add fails', () => {
+  it('cleans up app directory when react_on_rails_pro add fails', () => {
+    const appPath = path.resolve(process.cwd(), 'my-app');
     mockedExecLiveArgs
       .mockImplementationOnce(() => {})
       .mockImplementationOnce(() => {})
       .mockImplementationOnce(() => {
         throw new Error('pro gem install failed');
       });
+
+    expect(() => createApp('my-app', { ...baseOptions, rsc: true })).toThrow('process.exit');
+    expect(mockedFs.rmSync).toHaveBeenCalledWith(appPath, { recursive: true, force: true });
+    expect(mockedLogInfo).toHaveBeenCalledWith(
+      'Directory removed. Configure access to React on Rails Pro gem source and rerun.',
+    );
+  });
+
+  it('falls back to manual cleanup guidance if automatic cleanup fails', () => {
+    mockedExecLiveArgs
+      .mockImplementationOnce(() => {})
+      .mockImplementationOnce(() => {})
+      .mockImplementationOnce(() => {
+        throw new Error('pro gem install failed');
+      });
+    mockedFs.rmSync.mockImplementationOnce(() => {
+      throw new Error('cleanup failed');
+    });
 
     expect(() => createApp('my-app', { ...baseOptions, rsc: true })).toThrow('process.exit');
     expect(mockedLogInfo).toHaveBeenCalledWith(

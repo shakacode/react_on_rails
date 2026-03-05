@@ -1,7 +1,4 @@
 import { execFileSync, spawnSync } from 'child_process';
-import fs from 'fs';
-import os from 'os';
-import path from 'path';
 import chalk from 'chalk';
 
 export function execLiveArgs(command: string, args: string[], cwd?: string): void {
@@ -22,28 +19,6 @@ export function getCommandVersion(command: string): string | null {
     return execFileSync(command, ['--version'], { encoding: 'utf8', stdio: 'pipe' }).trim();
   } catch {
     return null;
-  }
-}
-
-export function canResolveRemoteGem(gemName: string): boolean {
-  const probeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'react-on-rails-gem-probe-'));
-  const gemfilePath = path.join(probeDir, 'Gemfile');
-
-  try {
-    fs.writeFileSync(gemfilePath, "source 'https://rubygems.org'\n", { encoding: 'utf8' });
-
-    execFileSync('bundle', ['add', gemName, '--strict', '--skip-install'], {
-      cwd: probeDir,
-      encoding: 'utf8',
-      stdio: 'pipe',
-      timeout: 15_000,
-    });
-
-    return true;
-  } catch {
-    return false;
-  } finally {
-    fs.rmSync(probeDir, { recursive: true, force: true });
   }
 }
 
