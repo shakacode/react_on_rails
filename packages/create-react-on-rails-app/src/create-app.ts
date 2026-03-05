@@ -14,7 +14,7 @@ function cleanupAppDirectory(
     fs.rmSync(appPath, { recursive: true, force: true });
     logInfo(cleanupSuccessMessage);
   } catch {
-    logInfo(cleanupFallbackMessage);
+    logError(cleanupFallbackMessage);
   }
 }
 
@@ -87,8 +87,6 @@ export function validateAppName(name: string): { success: boolean; error?: strin
 export function createApp(appName: string, options: CliOptions): void {
   const appPath = path.resolve(process.cwd(), appName);
   const totalSteps = options.rsc ? 5 : 4;
-  const generatorStep = options.rsc ? 4 : 3;
-  const doneStep = options.rsc ? 5 : 4;
   const reactOnRailsGemPath = localGemPath('REACT_ON_RAILS_GEM_PATH');
   const reactOnRailsProGemPath = localGemPath('REACT_ON_RAILS_PRO_GEM_PATH');
 
@@ -134,7 +132,7 @@ export function createApp(appName: string, options: CliOptions): void {
   if (options.rsc) {
     logStep(3, totalSteps, 'Adding react_on_rails_pro gem (--rsc)...');
     try {
-      const reactOnRailsProArgs = ['add', 'react_on_rails_pro'];
+      const reactOnRailsProArgs = ['add', 'react_on_rails_pro', '--strict'];
       if (reactOnRailsProGemPath) {
         logInfo(`Using local react_on_rails_pro gem path: ${reactOnRailsProGemPath}`);
         reactOnRailsProArgs.push('--path', reactOnRailsProGemPath);
@@ -159,7 +157,7 @@ export function createApp(appName: string, options: CliOptions): void {
 
   // Step 3: Run react_on_rails generator
   const generatorArgs = buildGeneratorArgs(options);
-  logStep(generatorStep, totalSteps, 'Running React on Rails generator...');
+  logStep(totalSteps - 1, totalSteps, 'Running React on Rails generator...');
   try {
     execLiveArgs(
       'bundle',
@@ -176,6 +174,6 @@ export function createApp(appName: string, options: CliOptions): void {
   }
 
   // Step 4: Success
-  logStep(doneStep, totalSteps, 'Done!');
+  logStep(totalSteps, totalSteps, 'Done!');
   printSuccessMessage(appName, options.rsc ? 'hello_server' : 'hello_world');
 }

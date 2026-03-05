@@ -174,7 +174,12 @@ describe('createApp', () => {
       ['add', 'react_on_rails', '--strict'],
       appPath,
     );
-    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(3, 'bundle', ['add', 'react_on_rails_pro'], appPath);
+    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
+      3,
+      'bundle',
+      ['add', 'react_on_rails_pro', '--strict'],
+      appPath,
+    );
     expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
       4,
       'bundle',
@@ -213,7 +218,7 @@ describe('createApp', () => {
     expect(mockedExecLiveArgs).toHaveBeenCalledTimes(3);
     expect(mockedExecLiveArgs).not.toHaveBeenCalledWith(
       'bundle',
-      ['add', 'react_on_rails_pro'],
+      ['add', 'react_on_rails_pro', '--strict'],
       expect.anything(),
     );
     expect(mockedLogInfo).toHaveBeenCalledWith('Then visit http://localhost:3000/hello_world');
@@ -264,7 +269,7 @@ describe('createApp', () => {
     });
 
     expect(() => createApp('my-app', { ...baseOptions, rsc: true })).toThrow('process.exit');
-    expect(mockedLogInfo).toHaveBeenCalledWith(
+    expect(mockedLogError).toHaveBeenCalledWith(
       'Configure gem source access for react_on_rails_pro, then delete the created "my-app" directory and rerun with --rsc.',
     );
   });
@@ -292,7 +297,7 @@ describe('createApp', () => {
     expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
       3,
       'bundle',
-      ['add', 'react_on_rails_pro', '--path', path.resolve('../react_on_rails_pro')],
+      ['add', 'react_on_rails_pro', '--strict', '--path', path.resolve('../react_on_rails_pro')],
       appPath,
     );
   });
