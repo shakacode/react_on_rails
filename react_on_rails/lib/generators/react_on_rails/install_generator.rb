@@ -224,7 +224,7 @@ module ReactOnRails
       end
 
       def shakapacker_just_installed?
-        options.shakapacker_just_installed? || @shakapacker_just_installed
+        !!(options.shakapacker_just_installed? || @shakapacker_just_installed)
       end
 
       def ensure_shakapacker_installed
@@ -375,10 +375,12 @@ module ReactOnRails
         yml_content_after = File.exist?(SHAKAPACKER_YML_PATH) ? File.read(SHAKAPACKER_YML_PATH) : nil
 
         # Force-apply the RoR template only when shakapacker wrote a fresh config:
-        #   nil  → new content  (fresh install: file didn't exist before)  → true
-        #   old  → new content  (user said "y" to conflict prompt)         → true
-        #   old  → same content (user said "n", kept their custom config)  → false
-        #   nil  → nil          (installer succeeded but wrote nothing)    → false
+        #   nil  → new content  (fresh install: file didn't exist before)       → true
+        #   old  → new content  (user said "y" to conflict prompt)              → true
+        #   old  → same content (user said "n", kept their custom config)       → false
+        #   old  → same content (user said "y" but file was already identical   → false
+        #                        to Shakapacker's default; negligible in practice)
+        #   nil  → nil          (installer succeeded but wrote nothing)         → false
         #
         # The nil→nil case is treated as "no change needed": if the installer
         # returned true but did not write the yml, we assume the file was already
