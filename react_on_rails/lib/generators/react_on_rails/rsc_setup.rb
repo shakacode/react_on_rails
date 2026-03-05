@@ -27,7 +27,7 @@ module ReactOnRails
       # Orchestrates creation of all RSC-related files and configuration.
       #
       # Creates:
-      # - config/webpack/rscWebpackConfig.js
+      # - config/webpack/rscWebpackConfig.js (config/rspack/ when using rspack)
       # - Procfile.dev entry for RSC bundle watcher
       # - HelloServer component (jsx or tsx based on --typescript flag)
       # - HelloServerController
@@ -139,7 +139,7 @@ module ReactOnRails
       end
 
       def create_rsc_webpack_config
-        webpack_config_path = "config/webpack/rscWebpackConfig.js"
+        webpack_config_path = destination_config_path("config/webpack/rscWebpackConfig.js")
 
         if File.exist?(File.join(destination_root, webpack_config_path))
           puts Rainbow("ℹ️  #{webpack_config_path} already exists, skipping").yellow
@@ -356,7 +356,7 @@ module ReactOnRails
       end
 
       def update_server_webpack_config_for_rsc
-        config_path = "config/webpack/serverWebpackConfig.js"
+        config_path = destination_config_path("config/webpack/serverWebpackConfig.js")
         full_path = File.join(destination_root, config_path)
 
         return unless File.exist?(full_path)
@@ -395,7 +395,7 @@ module ReactOnRails
       end
 
       def update_client_webpack_config_for_rsc
-        config_path = "config/webpack/clientWebpackConfig.js"
+        config_path = destination_config_path("config/webpack/clientWebpackConfig.js")
         full_path = File.join(destination_root, config_path)
 
         return unless File.exist?(full_path)
@@ -441,7 +441,7 @@ module ReactOnRails
       end
 
       def check_rsc_server_config
-        path = File.join(destination_root, "config/webpack/serverWebpackConfig.js")
+        path = File.join(destination_root, destination_config_path("config/webpack/serverWebpackConfig.js"))
         return [] unless File.exist?(path)
 
         content = File.read(path)
@@ -452,7 +452,7 @@ module ReactOnRails
       end
 
       def check_rsc_client_config
-        path = File.join(destination_root, "config/webpack/clientWebpackConfig.js")
+        path = File.join(destination_root, destination_config_path("config/webpack/clientWebpackConfig.js"))
         return [] unless File.exist?(path)
 
         content = File.read(path)
