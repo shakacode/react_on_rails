@@ -108,6 +108,7 @@ export function createApp(appName: string, options: CliOptions): void {
   logStep(2, TOTAL_STEPS, `Adding required gem${options.rsc ? 's' : ''}...`);
   try {
     execLiveArgs('bundle', ['add', 'react_on_rails', '--strict'], appPath);
+    logStepDone('react_on_rails gem added');
   } catch (error) {
     logError('Failed to add react_on_rails gem. Check the output above for details.');
     if (error instanceof Error && error.message) {
@@ -119,7 +120,7 @@ export function createApp(appName: string, options: CliOptions): void {
   if (options.rsc) {
     try {
       execLiveArgs('bundle', ['add', 'react_on_rails_pro', '--strict'], appPath);
-      logStepDone('react_on_rails and react_on_rails_pro gems added');
+      logStepDone('react_on_rails_pro gem added');
     } catch (error) {
       logError('Failed to add react_on_rails_pro gem required by --rsc.');
       logInfo(
@@ -130,8 +131,6 @@ export function createApp(appName: string, options: CliOptions): void {
       }
       process.exit(1);
     }
-  } else {
-    logStepDone('react_on_rails gem added');
   }
 
   // Step 3: Run react_on_rails generator
