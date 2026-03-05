@@ -2,27 +2,28 @@
 
 ## Problem
 
-Conductor runs commands in a non-interactive shell that doesn't source `.zshrc`. This means mise's shell hook (which reorders PATH based on `.tool-versions`) never runs. Commands will use system Ruby/Node instead of project-specified versions.
+Conductor and coding agents run commands in non-interactive shells that don't source `.zshrc`. Without additional setup, mise's shell hook never runs and commands use system Ruby/Node instead of project-specified versions.
 
-**Symptoms:**
+## Preferred Solution: Shell-Level mise Shims
 
-- `ruby --version` returns system Ruby (e.g., 2.6.10) instead of project Ruby (e.g., 3.3.4)
-- Pre-commit hooks fail with wrong tool versions
-- `bundle` commands fail due to incompatible Ruby versions
-- Node/pnpm commands use wrong Node version
+The best fix is to activate mise shims in shell startup files that run for **all** shell types (interactive and non-interactive):
 
-## Solution
+1. **`.zshenv`** — activate `mise activate zsh --shims` (runs for all zsh shells, including non-interactive)
+2. **`.bashrc`** — activate `mise activate bash --shims` (for bash subprocesses)
+3. **`.profile`** — activate `mise activate bash --shims` (for sh/login shells)
+4. **Export `BASH_ENV` and `ENV`** from `.zshenv` — so non-interactive bash/sh child processes also get shims
 
-Use the `bin/conductor-exec` wrapper to ensure commands run with correct tool versions:
+See [justin808-dotfiles](https://github.com/justin808/justin808-dotfiles) for a reference implementation.
+
+With this setup, `bin/conductor-exec` is unnecessary — all shells automatically get mise-managed tool versions.
+
+**Caveat:** Ensure no system binaries shadow mise shims on PATH (e.g., `/usr/local/bin/node`). If they do, either remove the conflicting binary or use `conductor-exec` as a fallback.
+
+## Fallback: `bin/conductor-exec` Wrapper
+
+If you haven't configured shell-level shims, use the `bin/conductor-exec` wrapper. It calls `mise exec --` which bypasses PATH entirely:
 
 ```bash
-# Instead of:
-ruby --version
-bundle exec rubocop
-pnpm install
-git commit -m "message"
-
-# Use:
 bin/conductor-exec ruby --version
 bin/conductor-exec bundle exec rubocop
 bin/conductor-exec pnpm install
