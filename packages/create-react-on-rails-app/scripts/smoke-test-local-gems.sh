@@ -31,7 +31,9 @@ echo "Building create-react-on-rails-app..."
 
 WORKDIR="$(mktemp -d /tmp/create-ror-local-smoke-XXXXXX)"
 APP_JS="smoke-js-$(date +%s)"
-APP_RSC="smoke-rsc-$(date +%s)"
+APP_RSC_JS="smoke-rsc-js-$(date +%s)"
+APP_RSC_TS="smoke-rsc-ts-$(date +%s)"
+APP_RSC_RSPACK="smoke-rsc-rspack-$(date +%s)"
 
 cleanup_on_error() {
   local status=$?
@@ -56,23 +58,42 @@ echo "Workdir: $WORKDIR"
 echo "Generating JavaScript app: $APP_JS"
 (cd "$WORKDIR" && node "$CLI_BIN" "$APP_JS" --template javascript --package-manager pnpm)
 
-echo "Generating RSC app with local Pro gem: $APP_RSC"
-(cd "$WORKDIR" && node "$CLI_BIN" "$APP_RSC" --rsc --template javascript --package-manager pnpm)
+echo "Generating JavaScript RSC app with local Pro gem: $APP_RSC_JS"
+(cd "$WORKDIR" && node "$CLI_BIN" "$APP_RSC_JS" --rsc --template javascript --package-manager pnpm)
+
+echo "Generating TypeScript RSC app with local Pro gem: $APP_RSC_TS"
+(cd "$WORKDIR" && node "$CLI_BIN" "$APP_RSC_TS" --rsc --template typescript --package-manager pnpm)
+
+echo "Generating Rspack + RSC app with local Pro gem: $APP_RSC_RSPACK"
+(cd "$WORKDIR" && node "$CLI_BIN" "$APP_RSC_RSPACK" --rspack --rsc --package-manager pnpm)
 
 APP_JS_DIR="$WORKDIR/$APP_JS"
-APP_RSC_DIR="$WORKDIR/$APP_RSC"
+APP_RSC_JS_DIR="$WORKDIR/$APP_RSC_JS"
+APP_RSC_TS_DIR="$WORKDIR/$APP_RSC_TS"
+APP_RSC_RSPACK_DIR="$WORKDIR/$APP_RSC_RSPACK"
 
 echo "Verifying generated files..."
 grep -q "gem \"react_on_rails\"" "$APP_JS_DIR/Gemfile"
 grep -q "path: \"$RUBY_GEM_DIR\"" "$APP_JS_DIR/Gemfile"
 grep -q "hello_world" "$APP_JS_DIR/config/routes.rb"
 
-grep -q "gem \"react_on_rails_pro\"" "$APP_RSC_DIR/Gemfile"
-grep -q "path: \"$RUBY_PRO_GEM_DIR\"" "$APP_RSC_DIR/Gemfile"
-grep -q "hello_server" "$APP_RSC_DIR/config/routes.rb"
-test -f "$APP_RSC_DIR/app/controllers/hello_server_controller.rb"
-test -f "$APP_RSC_DIR/app/views/hello_server/index.html.erb"
-grep -q "stream_react_component('HelloServer'" "$APP_RSC_DIR/app/views/hello_server/index.html.erb"
+grep -q "gem \"react_on_rails_pro\"" "$APP_RSC_JS_DIR/Gemfile"
+grep -q "path: \"$RUBY_PRO_GEM_DIR\"" "$APP_RSC_JS_DIR/Gemfile"
+grep -q "hello_server" "$APP_RSC_JS_DIR/config/routes.rb"
+test -f "$APP_RSC_JS_DIR/app/controllers/hello_server_controller.rb"
+test -f "$APP_RSC_JS_DIR/app/views/hello_server/index.html.erb"
+test -f "$APP_RSC_JS_DIR/app/javascript/src/HelloServer/components/HelloServer.jsx"
+grep -q "stream_react_component('HelloServer'" "$APP_RSC_JS_DIR/app/views/hello_server/index.html.erb"
+
+grep -q "gem \"react_on_rails_pro\"" "$APP_RSC_TS_DIR/Gemfile"
+grep -q "path: \"$RUBY_PRO_GEM_DIR\"" "$APP_RSC_TS_DIR/Gemfile"
+grep -q "hello_server" "$APP_RSC_TS_DIR/config/routes.rb"
+test -f "$APP_RSC_TS_DIR/app/javascript/src/HelloServer/components/HelloServer.tsx"
+
+grep -q "gem \"react_on_rails_pro\"" "$APP_RSC_RSPACK_DIR/Gemfile"
+grep -q "path: \"$RUBY_PRO_GEM_DIR\"" "$APP_RSC_RSPACK_DIR/Gemfile"
+grep -q "hello_server" "$APP_RSC_RSPACK_DIR/config/routes.rb"
+grep -q "\"@rspack/core\"" "$APP_RSC_RSPACK_DIR/package.json"
 
 echo "Smoke test passed."
 echo "Generated apps left in: $WORKDIR"
