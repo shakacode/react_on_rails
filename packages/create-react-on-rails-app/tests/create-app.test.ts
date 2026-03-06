@@ -252,7 +252,9 @@ describe('createApp', () => {
       'Failed to create Rails application. Check the output above for details.',
     );
     expect(mockedFs.rmSync).toHaveBeenCalledWith(appPath, { recursive: true, force: true });
-    expect(mockedLogInfo).toHaveBeenCalledWith('Directory removed. Fix the Rails app creation issue and rerun.');
+    expect(mockedLogInfo).toHaveBeenCalledWith(
+      'Directory removed. Fix the Rails app creation issue and rerun.',
+    );
   });
 
   it('skips cleanup logging when app directory was never created', () => {
