@@ -146,10 +146,6 @@ module ReactOnRails
         add_dev_dependencies
       end
 
-      def using_rspack?
-        respond_to?(:options) && options&.rspack?
-      end
-
       def add_react_on_rails_package
         # Use exact version match between gem and npm package for all versions including pre-releases
         # Ruby gem versions use dots (16.2.0.beta.10) but npm requires hyphens (16.2.0-beta.10)
@@ -390,12 +386,8 @@ module ReactOnRails
       def add_dev_dependencies
         puts "Installing development dependencies..."
 
-        # Use Rspack-specific dev dependencies if --rspack flag is set
-        dev_deps = if respond_to?(:options) && options&.rspack?
-                     RSPACK_DEV_DEPENDENCIES
-                   else
-                     DEV_DEPENDENCIES
-                   end
+        # Use Rspack-specific dev dependencies if rspack is configured
+        dev_deps = using_rspack? ? RSPACK_DEV_DEPENDENCIES : DEV_DEPENDENCIES
 
         return if add_packages(dev_deps, dev: true)
 
