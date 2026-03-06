@@ -155,11 +155,13 @@ module ReactOnRailsPro
 
     def self.calc_bundle_hash(server_bundle_js_file_path, asset_paths = bundle_hash_asset_paths)
       digest = Digest::MD5.new
-      digest << "bundle:#{server_bundle_js_file_path}\0"
+      # Include logical paths so different declared bundle/asset sets produce
+      # different hashes even when some files are missing.
+      digest << "bundle:#{digest_path_key(server_bundle_js_file_path)}\0"
       digest_bundle_content(digest, server_bundle_js_file_path)
 
       asset_paths.each do |asset_path|
-        digest << "asset:#{asset_path}\0"
+        digest << "asset:#{digest_path_key(asset_path)}\0"
         digest_asset_content(digest, asset_path)
       end
 
@@ -192,8 +194,30 @@ module ReactOnRailsPro
       if http_url?(bundle_path)
         digest << http_body_for_path(bundle_path)
       else
+        return unless File.exist?(bundle_path)
+        return if File.directory?(bundle_path)
+
         digest.file(bundle_path)
       end
+    end
+
+    def self.digest_path_key(file_path)
+      path = file_path.to_s
+      return path if http_url?(path)
+
+      pathname = Pathname.new(path).cleanpath
+      rails_root = Rails.root.to_s
+      return pathname.to_s if rails_root.empty?
+
+      root_pathname = Pathname.new(rails_root).cleanpath
+      begin
+        relative_path = pathname.relative_path_from(root_pathname).to_s
+        return relative_path unless relative_path.start_with?("..#{File::SEPARATOR}") || relative_path == ".."
+      rescue ArgumentError
+        # Happens for unrelated roots (for example, different Windows drives).
+      end
+
+      pathname.to_s
     end
 
     def self.digest_asset_content(digest, asset_path)
@@ -234,7 +258,7 @@ module ReactOnRailsPro
     end
 
     def self.http_url?(path)
-      path.to_s.match?(%r{https?://})
+      path.to_s.match?(%r{\Ahttps?://}i)
     end
 
     def self.contains_http_url?(paths)

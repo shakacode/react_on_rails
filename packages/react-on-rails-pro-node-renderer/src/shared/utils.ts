@@ -113,7 +113,12 @@ export function copyUploadedAsset(
 export async function copyUploadedAssets(uploadedAssets: Asset[], targetDirectory: string): Promise<void> {
   const copyMultipleAssets = uploadedAssets.map((asset) => {
     const destinationAssetFilePath = path.join(targetDirectory, asset.filename);
-    return copyUploadedAsset(asset, destinationAssetFilePath, { overwrite: false, errorOnExist: false });
+    return copyUploadedAsset(asset, destinationAssetFilePath, {
+      // Bundle directories become immutable once complete. Keep existing files
+      // so concurrent or duplicate uploads cannot partially overwrite good assets.
+      overwrite: false,
+      errorOnExist: false,
+    });
   });
   await Promise.all(copyMultipleAssets);
   log.info(
@@ -217,13 +222,13 @@ export async function cleanIncompleteBundleDirectory(bundleTimestamp: string | n
     throw error;
   }
 
+  const entriesToRemove = entries.filter((entry) => !entry.endsWith('.lock'));
+  if (entriesToRemove.length === 0) {
+    return false;
+  }
+
   await Promise.all(
-    entries.map(async (entry) => {
-      if (entry.endsWith('.lock')) {
-        return;
-      }
-      await rm(path.join(bundleDirectory, entry), { recursive: true, force: true });
-    }),
+    entriesToRemove.map((entry) => rm(path.join(bundleDirectory, entry), { recursive: true, force: true })),
   );
 
   return true;

@@ -58,13 +58,21 @@ export function vmSecondaryBundlePath(testName: string) {
   );
 }
 
+const writeBundleCompleteMarker = async (testName: string, bundleTimestamp: string | number) => {
+  const completeMarkerPath = bundleCompleteMarkerPath(testName, String(bundleTimestamp));
+  await mkdirAsync(path.dirname(completeMarkerPath), { recursive: true });
+  await fsPromises.writeFile(completeMarkerPath, '');
+};
+
 export async function createVmBundle(testName: string) {
   await safeCopyFileAsync(getFixtureBundle(), vmBundlePath(testName));
+  await writeBundleCompleteMarker(testName, BUNDLE_TIMESTAMP);
   return buildVM(vmBundlePath(testName));
 }
 
 export async function createSecondaryVmBundle(testName: string) {
   await safeCopyFileAsync(getFixtureSecondaryBundle(), vmSecondaryBundlePath(testName));
+  await writeBundleCompleteMarker(testName, SECONDARY_BUNDLE_TIMESTAMP);
   return buildVM(vmSecondaryBundlePath(testName));
 }
 
