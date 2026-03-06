@@ -97,7 +97,7 @@ When `mise` is available, it runs `mise exec --` (which prepends the correct too
 If `mise` is not on PATH, it falls back to running the command directly:
 
 ```bash
-bin/conductor-exec bundle exec ruby --version
+bin/conductor-exec ruby --version
 bin/conductor-exec bundle exec rubocop
 bin/conductor-exec pnpm install
 bin/conductor-exec git commit -m "message"  # Pre-commit hooks work correctly
