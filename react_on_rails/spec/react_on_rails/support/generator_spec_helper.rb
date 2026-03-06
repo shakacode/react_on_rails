@@ -121,6 +121,54 @@ def simulate_legacy_pro_webpack_files
   simulate_existing_file("config/webpack/clientWebpackConfig.js", base_client_webpack_content)
 end
 
+# Simulates base-install webpack configs for an rspack project.
+# Mirrors simulate_base_webpack_files but in config/rspack/ with rspack shakapacker.yml.
+# Used by standalone generator tests (e.g. ProGenerator) on existing rspack projects.
+def simulate_rspack_base_webpack_files
+  simulate_rspack_shakapacker_yml
+  simulate_existing_file("config/rspack/serverWebpackConfig.js", base_server_webpack_content)
+  simulate_existing_file("config/rspack/ServerClientOrBoth.js",
+                         server_client_or_both_content(destructured_import: false))
+end
+
+# Simulates Pro-transformed webpack configs for an rspack project.
+# Mirrors simulate_pro_webpack_files but in config/rspack/ with rspack shakapacker.yml.
+# Used by RSC generator tests to verify standalone upgrade transforms on rspack projects.
+def simulate_rspack_pro_webpack_files
+  simulate_rspack_shakapacker_yml
+  simulate_existing_file("config/rspack/serverWebpackConfig.js", pro_server_webpack_content)
+  simulate_existing_file("config/rspack/ServerClientOrBoth.js",
+                         server_client_or_both_content(destructured_import: true))
+  simulate_existing_file("config/rspack/clientWebpackConfig.js", base_client_webpack_content)
+end
+
+# Simulates a legacy Pro webpack setup for an rspack project.
+# Mirrors simulate_legacy_pro_webpack_files but in config/rspack/ with rspack shakapacker.yml.
+def simulate_rspack_legacy_pro_webpack_files
+  simulate_rspack_shakapacker_yml
+  simulate_existing_file("config/rspack/serverWebpackConfig.js", legacy_pro_server_webpack_content)
+  simulate_existing_file("config/rspack/ServerClientOrBoth.js",
+                         server_client_or_both_content(destructured_import: false))
+  simulate_existing_file("config/rspack/clientWebpackConfig.js", base_client_webpack_content)
+end
+
+# Simulates config/shakapacker.yml configured for rspack.
+# This makes rspack_configured_in_project? return true for standalone generators
+# that detect the bundler via YAML (RscGenerator, ProGenerator).
+def simulate_rspack_shakapacker_yml
+  simulate_existing_file("config/shakapacker.yml", <<~YAML)
+    default: &default
+      source_path: app/javascript
+      assets_bundler: rspack
+    development:
+      <<: *default
+    test:
+      <<: *default
+    production:
+      <<: *default
+  YAML
+end
+
 # -- fixture data, not logic
 def base_server_webpack_content
   <<~JS

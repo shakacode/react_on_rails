@@ -461,6 +461,66 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  context "with --rspack --redux" do
+    # Uses --skip so template() preserves the pre-existing shakapacker.yml,
+    # while gsub_file patchers (configure_rspack_in_shakapacker) still run on it.
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+
+      simulate_existing_file("config/shakapacker.yml", <<~YAML)
+        # Note: You must restart bin/shakapacker-dev-server for changes to take effect
+        default: &default
+          source_path: app/javascript
+          source_entry_path: packs
+          public_root_path: public
+          public_output_path: packs
+          cache_path: tmp/shakapacker
+          webpack_compile_output: true
+          shakapacker_precompile: true
+          additional_paths: []
+          cache_manifest: false
+          javascript_transpiler: "babel"
+          assets_bundler: "webpack"
+          # precompile_hook: ~
+
+        development:
+          <<: *default
+
+        test:
+          <<: *default
+          compile: true
+
+        production:
+          <<: *default
+      YAML
+      simulate_existing_file("bin/shakapacker", "")
+      simulate_existing_file("bin/shakapacker-dev-server", "")
+      simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
+        const { generateWebpackConfig } = require('shakapacker')
+        const webpackConfig = generateWebpackConfig()
+        module.exports = webpackConfig
+      JS
+
+      Dir.chdir(destination_root) do
+        run_generator(["--rspack", "--redux", "--ignore-warnings", "--skip"])
+      end
+    end
+
+    include_examples "base_generator_common", application_js: true
+    include_examples "react_with_redux_generator"
+
+    it "installs both Rspack and Redux dependencies" do
+      assert_file "package.json" do |content|
+        package_json = JSON.parse(content)
+        deps = package_json["dependencies"] || {}
+        expect(deps).to include("@rspack/core")
+        expect(deps).to include("redux")
+      end
+    end
+  end
+
   context "with --rspack --typescript" do
     # Uses --skip so template() preserves the pre-existing shakapacker.yml,
     # while gsub_file patchers (configure_rspack_in_shakapacker) still run on it.
@@ -734,6 +794,23 @@ describe InstallGenerator, type: :generator do
         deps = package_json["dependencies"] || {}
         expect(deps).to include("react-on-rails-pro")
         expect(deps).to include("@rspack/core")
+      end
+    end
+
+    describe "Pro webpack config transforms in config/rspack/" do
+      it "applies Pro transforms to serverWebpackConfig in config/rspack/" do
+        assert_file "config/rspack/serverWebpackConfig.js" do |content|
+          expect(content).to include("libraryTarget: 'commonjs2',")
+          expect(content).to include("function extractLoader")
+          expect(content).to include("serverWebpackConfig.target = 'node';")
+          expect(content).to include("module.exports = {")
+        end
+      end
+
+      it "updates ServerClientOrBoth to destructured import in config/rspack/" do
+        assert_file "config/rspack/ServerClientOrBoth.js" do |content|
+          expect(content).to include("{ default: serverWebpackConfig }")
+        end
       end
     end
   end
@@ -1034,9 +1111,34 @@ describe InstallGenerator, type: :generator do
       end
     end
 
-    it "creates rscWebpackConfig.js (works with Rspack)" do
-      assert_file "config/webpack/rscWebpackConfig.js" do |content|
+    it "creates rscWebpackConfig.js in config/rspack/ (not config/webpack/)" do
+      assert_file "config/rspack/rscWebpackConfig.js" do |content|
         expect(content).to include("serverWebpackConfig(true)")
+      end
+      assert_no_file "config/webpack/rscWebpackConfig.js"
+    end
+
+    describe "RSC webpack config transforms in config/rspack/" do
+      it "adds RSCWebpackPlugin to serverWebpackConfig" do
+        assert_file "config/rspack/serverWebpackConfig.js" do |content|
+          expect(content).to include("RSCWebpackPlugin")
+          expect(content).to include("react-on-rails-rsc/WebpackPlugin")
+        end
+      end
+
+      it "adds RSCWebpackPlugin to clientWebpackConfig" do
+        assert_file "config/rspack/clientWebpackConfig.js" do |content|
+          expect(content).to include("RSCWebpackPlugin")
+          expect(content).to include("react-on-rails-rsc/WebpackPlugin")
+        end
+      end
+
+      it "adds RSC handling to ServerClientOrBoth" do
+        assert_file "config/rspack/ServerClientOrBoth.js" do |content|
+          expect(content).to include("rscWebpackConfig")
+          expect(content).to include("RSC_BUNDLE_ONLY")
+          expect(content).to include("rscConfig")
+        end
       end
     end
 
@@ -1273,6 +1375,52 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  describe "#using_rspack?" do
+    context "when --rspack option is provided" do
+      let(:install_generator) { described_class.new([], { rspack: true }) }
+
+      it "returns true" do
+        expect(install_generator.send(:using_rspack?)).to be true
+      end
+    end
+
+    context "when --rspack is false (default)" do
+      let(:install_generator) { described_class.new }
+
+      # InstallGenerator declares --rspack with default: false, so options[:rspack]
+      # is false (not nil). using_rspack? returns false via the first branch without
+      # reaching the YAML fallback (rspack_configured_in_project?).
+      it "returns false" do
+        expect(install_generator.send(:using_rspack?)).to be false
+      end
+    end
+  end
+
+  describe "#destination_config_path" do
+    context "with --rspack" do
+      let(:install_generator) { described_class.new([], { rspack: true }) }
+
+      it "remaps config/webpack/ to config/rspack/" do
+        expect(install_generator.send(:destination_config_path, "config/webpack/serverWebpackConfig.js"))
+          .to eq("config/rspack/serverWebpackConfig.js")
+      end
+
+      it "leaves paths without config/webpack/ unchanged" do
+        expect(install_generator.send(:destination_config_path, "app/javascript/packs/server-bundle.js"))
+          .to eq("app/javascript/packs/server-bundle.js")
+      end
+    end
+
+    context "without --rspack" do
+      let(:install_generator) { described_class.new }
+
+      it "returns path unchanged" do
+        expect(install_generator.send(:destination_config_path, "config/webpack/serverWebpackConfig.js"))
+          .to eq("config/webpack/serverWebpackConfig.js")
+      end
+    end
+  end
+
   # Regression test for https://github.com/shakacode/react_on_rails/issues/2287
   # Bundler subprocess commands must run in unbundled environment to prevent
   # BUNDLE_GEMFILE inheritance from parent process
@@ -1292,13 +1440,27 @@ describe InstallGenerator, type: :generator do
       # Verify both system calls run inside with_unbundled_env
       allow(Bundler).to receive(:with_unbundled_env).and_yield
       allow(install_generator).to receive(:system).with("bundle install").and_return(true)
-      allow(install_generator).to receive(:system).with("bundle exec rails shakapacker:install").and_return(true)
+      allow(install_generator).to receive(:system).with({}, "bundle exec rails shakapacker:install").and_return(true)
 
       install_generator.send(:install_shakapacker)
 
       expect(install_generator).to have_received(:system).with("bundle install")
-      expect(install_generator).to have_received(:system).with("bundle exec rails shakapacker:install")
+      expect(install_generator).to have_received(:system).with({}, "bundle exec rails shakapacker:install")
       expect(Bundler).to have_received(:with_unbundled_env).at_least(:twice)
+    end
+
+    it "passes SHAKAPACKER_ASSETS_BUNDLER=rspack to shakapacker:install when --rspack is set" do
+      rspack_generator = described_class.new([], { rspack: true })
+      allow(Bundler).to receive(:with_unbundled_env).and_yield
+      allow(rspack_generator).to receive(:system).with("bundle install").and_return(true)
+      allow(rspack_generator).to receive(:system)
+        .with({ "SHAKAPACKER_ASSETS_BUNDLER" => "rspack" }, "bundle exec rails shakapacker:install")
+        .and_return(true)
+
+      rspack_generator.send(:install_shakapacker)
+
+      expect(rspack_generator).to have_received(:system)
+        .with({ "SHAKAPACKER_ASSETS_BUNDLER" => "rspack" }, "bundle exec rails shakapacker:install")
     end
 
     context "with fake BUNDLE_GEMFILE set" do

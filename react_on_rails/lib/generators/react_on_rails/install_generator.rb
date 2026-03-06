@@ -364,7 +364,12 @@ module ReactOnRails
         end
 
         # Then run the shakapacker installer
-        success = Bundler.with_unbundled_env { system("bundle exec rails shakapacker:install") }
+        # Use options.rspack? directly (not using_rspack?): shakapacker.yml doesn't exist yet at this
+        # point, so YAML-based detection via using_rspack? would always return false here.
+        shakapacker_install_env = options.rspack? ? { "SHAKAPACKER_ASSETS_BUNDLER" => "rspack" } : {}
+        success = Bundler.with_unbundled_env do
+          system(shakapacker_install_env, "bundle exec rails shakapacker:install")
+        end
         if success
           true
         else

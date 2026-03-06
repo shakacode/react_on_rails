@@ -236,12 +236,6 @@ module ReactOnRails
         end
       end
 
-      def destination_config_path(path)
-        return path unless options.rspack?
-
-        path.sub("config/webpack/", "config/rspack/")
-      end
-
       def bundler_main_config_path
         if options.rspack?
           "config/rspack/rspack.config.js"
