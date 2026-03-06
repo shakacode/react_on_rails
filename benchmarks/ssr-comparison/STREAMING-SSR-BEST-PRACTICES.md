@@ -14,10 +14,101 @@ React Fizz calls `pushStartInstance()` / `pushEndInstance()` for every DOM node,
 time by 56%.
 
 **What we did:**
-- `ProductCardLite`: 7 elements instead of ~28 (stars as single `★★★★☆` span, specs as
-  one text line, no per-spec `<span>` wrappers)
-- `ReviewItemLite`: ~7 elements instead of ~17 (single star span, flat body paragraph)
-- `CommentThreadLite`: ~4 elements instead of ~8 (flat header, removed collapse/reply UI)
+
+### ProductCard: 28 elements → 7 elements
+
+Before — each star is its own `<span>` with hover handlers, specs are a full `<table>`:
+
+```tsx
+<div className="product-rating">
+  {[1, 2, 3, 4, 5].map((star) => (
+    <span
+      className={`star ${star <= (hoveredStar || product.rating) ? 'filled' : 'empty'}`}
+      onMouseEnter={() => setHoveredStar(star)}
+      onMouseLeave={() => setHoveredStar(0)}
+    >
+      {star <= (hoveredStar || product.rating) ? '★' : '☆'}
+    </span>
+  ))}
+  <span className="rating-count">({product.rating}/5)</span>
+</div>
+<table className="product-specs">
+  <tbody>
+    {Object.entries(product.specs).map(([key, value]) => (
+      <tr key={key}>
+        <td className="spec-key">{key}</td>
+        <td className="spec-value">{value}</td>
+      </tr>
+    ))}
+  </tbody>
+</table>
+```
+
+After — stars become one string in one `<span>`, specs become one text line in one `<p>`:
+
+```tsx
+const stars = '★'.repeat(product.rating) + '☆'.repeat(5 - product.rating);
+const specs = Object.entries(product.specs).map(([k, v]) => `${k}: ${v}`).join(' · ');
+
+<span className="product-rating">{stars} ({product.rating}/5)</span>
+<p className="product-specs">{specs}</p>
+```
+
+### ReviewItem: 17 elements → 7 elements
+
+Before — 5 individual star `<span>`s in a wrapper, meta split into separate spans, body
+split by `\n\n` into multiple `<p>` tags:
+
+```tsx
+<div className="review-stars">
+  {Array.from({ length: 5 }, (_, i) => (
+    <span className={i < review.stars ? 'star filled' : 'star empty'}>
+      {i < review.stars ? '★' : '☆'}
+    </span>
+  ))}
+</div>
+<div className="review-meta">
+  <span className="review-author">By {review.author}</span>
+  <span className="review-date"> on {review.date}</span>
+</div>
+<div className="review-body">
+  {review.body.split('\n\n').map((paragraph, i) => <p key={i}>{paragraph}</p>)}
+</div>
+```
+
+After — one span for stars, one span for meta, one `<p>` for body:
+
+```tsx
+const stars = '★'.repeat(review.stars) + '☆'.repeat(5 - review.stars);
+
+<span className="review-stars">{stars}</span>
+<span className="review-meta">By {review.author} on {review.date}</span>
+<p className="review-body">{review.body}</p>
+```
+
+### CommentThread: 8 elements → 4 elements (per comment)
+
+Before — header is `div > button + span + span`, body wrapped in `div > p`, plus
+collapse/reply buttons and reply form:
+
+```tsx
+<div className="comment-header">
+  <button className="collapse-toggle">{collapsed ? '[+]' : '[-]'}</button>
+  <span className="comment-author">{comment.author}</span>
+  <span className="comment-date"> · {comment.date}</span>
+</div>
+<div className="comment-body"><p>{comment.text}</p></div>
+<div className="comment-actions">
+  <button className="reply-toggle">{showReply ? 'Cancel' : 'Reply'}</button>
+</div>
+```
+
+After — header flattened to one `<span>`, body is just `<p>`, no UI buttons:
+
+```tsx
+<span className="comment-header">{comment.author} · {comment.date}</span>
+<p className="comment-body">{comment.text}</p>
+```
 
 **Results (bench-optimizations.mjs):**
 
@@ -44,10 +135,33 @@ repeated structural elements. Consolidate N small elements into 1 where possible
 `dangerouslySetInnerHTML` to write the entire `<thead>` + `<tbody>` + `<tfoot>` as a
 single string reduced ~200 DOM elements to 1 write operation.
 
-**How:**
+Before — React renders every `<th>`, `<tr>`, `<td>` individually (20 rows × 8 cols =
+160 cells + headers + footer ≈ 200 elements):
+
 ```tsx
-const tableHtml = `<thead>${headerHtml}</thead><tbody>${bodyHtml}</tbody>`;
-<table dangerouslySetInnerHTML={{ __html: tableHtml }} />
+<tbody>
+  {rows.map((row, i) => (
+    <tr className={i % 2 === 0 ? 'row-even' : 'row-odd'}>
+      {columns.map((col) => (
+        <td className="data-td">{row[col]}</td>
+      ))}
+    </tr>
+  ))}
+</tbody>
+```
+
+After — entire table content is a pre-built HTML string, injected as a single write:
+
+```tsx
+const bodyHtml = rows.map((row, i) =>
+  `<tr class="${i % 2 === 0 ? 'row-even' : 'row-odd'}">${
+    columns.map((col) => `<td class="data-td">${row[col]}</td>`).join('')
+  }</tr>`
+).join('');
+
+const tableHtml = `<thead>${headerHtml}</thead><tbody>${bodyHtml}</tbody><tfoot>${footerHtml}</tfoot>`;
+
+<table className="data-table" dangerouslySetInnerHTML={{ __html: tableHtml }} />
 ```
 
 **When to use:** Static, server-only data tables that don't need React hydration on the
