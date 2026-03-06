@@ -154,11 +154,11 @@ module GeneratorHelper
   #
   # @return [Boolean] true if rspack is the configured bundler
   def using_rspack?
+    return @using_rspack if defined?(@using_rspack)
+
     # options[:rspack] returns true/false if --rspack was declared on this generator,
     # or nil if the option was not declared (e.g. RscGenerator, ProGenerator).
-    return options[:rspack] unless options[:rspack].nil?
-
-    rspack_configured_in_project?
+    @using_rspack = options[:rspack].nil? ? rspack_configured_in_project? : options[:rspack]
   end
 
   # Remap a config path from config/webpack/ to config/rspack/ when using rspack.

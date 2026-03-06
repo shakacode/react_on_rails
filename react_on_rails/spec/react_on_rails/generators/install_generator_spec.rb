@@ -1384,7 +1384,7 @@ describe InstallGenerator, type: :generator do
       end
     end
 
-    context "when --rspack option is not provided" do
+    context "when --rspack is false (default)" do
       let(:install_generator) { described_class.new }
 
       # InstallGenerator declares --rspack with default: false, so options[:rspack]
