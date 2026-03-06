@@ -6,6 +6,7 @@ import fs from 'fs';
 import fsExtra from 'fs-extra';
 import { buildVM, resetVM } from '../src/worker/vm';
 import { buildConfig } from '../src/shared/configBuilder';
+import { BUNDLE_COMPLETE_MARKER_FILE } from '../src/shared/utils.js';
 
 export const mkdirAsync = fsPromises.mkdir;
 const safeCopyFileAsync = async (src: string, dest: string) => {
@@ -18,7 +19,7 @@ export const BUNDLE_TIMESTAMP = 1495063024898;
 export const SECONDARY_BUNDLE_TIMESTAMP = 1495063024899;
 export const ASSET_UPLOAD_FILE = 'loadable-stats.json';
 export const ASSET_UPLOAD_OTHER_FILE = 'loadable-stats-other.json';
-export const BUNDLE_COMPLETE_MARKER_FILE = '.complete';
+export { BUNDLE_COMPLETE_MARKER_FILE };
 
 export function getFixtureBundle() {
   return path.resolve(__dirname, './fixtures/bundle.js');

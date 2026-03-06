@@ -67,12 +67,31 @@ module ReactOnRailsPro
               server_bundle_js_file_path = File.expand_path("./public/#{server_bundle_js_file}")
               allow(ReactOnRails::Utils).to receive(:server_bundle_js_file_path)
                 .and_return(server_bundle_js_file_path)
+              described_class.instance_variable_set(:@bundle_hash_signature, "stale-signature")
               allow(Digest::MD5).to receive(:new)
 
               result = described_class.bundle_hash
 
               expect(Digest::MD5).not_to have_received(:new)
               expect(result).to eq("webpack-bundle-0123456789abcdef.js")
+              expect(described_class.instance_variable_get(:@bundle_hash_signature)).to be_nil
+            end
+          end
+
+          context "with rsc bundle with hash in webpack output filename" do
+            it "uses the hashed filename and clears stale signature memoization" do
+              rsc_bundle_js_file = "/webpack/production/rsc-webpack-bundle-0123456789abcdef.js"
+              rsc_bundle_js_file_path = File.expand_path("./public/#{rsc_bundle_js_file}")
+              allow(described_class).to receive(:rsc_bundle_js_file_path)
+                .and_return(rsc_bundle_js_file_path)
+              described_class.instance_variable_set(:@rsc_bundle_hash_signature, "stale-signature")
+              allow(Digest::MD5).to receive(:new)
+
+              result = described_class.rsc_bundle_hash
+
+              expect(Digest::MD5).not_to have_received(:new)
+              expect(result).to eq("rsc-webpack-bundle-0123456789abcdef.js")
+              expect(described_class.instance_variable_get(:@rsc_bundle_hash_signature)).to be_nil
             end
           end
 
@@ -160,14 +179,14 @@ module ReactOnRailsPro
               allow(HTTPX).to receive(:get)
                 .with(server_bundle_js_file_path)
                 .and_return(
-                  instance_double(HTTPX::Response, body: "server-bundle-v1"),
-                  instance_double(HTTPX::Response, body: "server-bundle-v2")
+                  instance_double(HTTPX::Response, status: 200, body: "server-bundle-v1"),
+                  instance_double(HTTPX::Response, status: 200, body: "server-bundle-v2")
                 )
               allow(HTTPX).to receive(:get)
                 .with(asset_path)
                 .and_return(
-                  instance_double(HTTPX::Response, body: "asset-v1"),
-                  instance_double(HTTPX::Response, body: "asset-v2")
+                  instance_double(HTTPX::Response, status: 200, body: "asset-v1"),
+                  instance_double(HTTPX::Response, status: 200, body: "asset-v2")
                 )
 
               first_digest = instance_double(Digest::MD5, hexdigest: "hash1")
@@ -250,6 +269,24 @@ module ReactOnRailsPro
           described_class.digest_bundle_content(digest, "/missing/bundle.js")
 
           expect(digest).not_to have_received(:file)
+        end
+      end
+
+      describe ".http_body_for_path" do
+        let(:url) { "http://localhost:3035/webpack/production/webpack-bundle.js" }
+
+        it "raises a ReactOnRailsPro::Error for non-200 responses" do
+          allow(HTTPX).to receive(:get).with(url).and_return(instance_double(HTTPX::Response, status: 500, body: ""))
+
+          expect { described_class.http_body_for_path(url) }
+            .to raise_error(ReactOnRailsPro::Error, /HTTP error 500 fetching/)
+        end
+
+        it "wraps transport errors with context" do
+          allow(HTTPX).to receive(:get).with(url).and_raise(StandardError, "connection refused")
+
+          expect { described_class.http_body_for_path(url) }
+            .to raise_error(ReactOnRailsPro::Error, /connection refused/)
         end
       end
     end

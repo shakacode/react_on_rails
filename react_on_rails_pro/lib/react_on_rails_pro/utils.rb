@@ -96,7 +96,7 @@ module ReactOnRailsPro
       asset_paths = bundle_hash_asset_paths
 
       hashed_file_name = hash_from_bundle_file_name(server_bundle_js_file_path, asset_paths)
-      return @bundle_hash = hashed_file_name if hashed_file_name
+      return (@bundle_hash = hashed_file_name).tap { @bundle_hash_signature = nil } if hashed_file_name
 
       if contains_http_url?([server_bundle_js_file_path] + asset_paths)
         # Intentionally do not assign @bundle_hash_signature in this branch.
@@ -121,7 +121,7 @@ module ReactOnRailsPro
       asset_paths = bundle_hash_asset_paths
 
       hashed_file_name = hash_from_bundle_file_name(server_rsc_bundle_js_file_path, asset_paths)
-      return @rsc_bundle_hash = hashed_file_name if hashed_file_name
+      return (@rsc_bundle_hash = hashed_file_name).tap { @rsc_bundle_hash_signature = nil } if hashed_file_name
 
       if contains_http_url?([server_rsc_bundle_js_file_path] + asset_paths)
         # Keep HTTP-backed bundles always recomputed in development/test.
@@ -241,7 +241,21 @@ module ReactOnRailsPro
         raise ReactOnRailsPro::Error, "Not expected to get HTTP url for bundle or assets in production mode"
       end
 
-      HTTPX.get(path).body.to_s
+      response = HTTPX.get(path)
+      if response.is_a?(HTTPX::ErrorResponse)
+        raise ReactOnRailsPro::Error, "Failed to fetch bundle/asset for hashing from #{path}: #{response.error}"
+      end
+
+      status = response.respond_to?(:status) ? response.status : nil
+      if status != 200
+        raise ReactOnRailsPro::Error, "HTTP error #{status || 'unknown'} fetching #{path} for bundle hash"
+      end
+
+      response.body.to_s
+    rescue ReactOnRailsPro::Error
+      raise
+    rescue StandardError => e
+      raise ReactOnRailsPro::Error, "Failed to fetch bundle/asset for hashing from #{path}: #{e.message}"
     end
 
     # TODO: Need to consider if the configuration value has the ".js" on the end.

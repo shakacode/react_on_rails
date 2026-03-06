@@ -371,8 +371,10 @@ export default function run(config: Partial<Config>) {
 
           await copyUploadedAssets(assets, bundleDirectory);
 
-          // Keep directories without bundle JS unmarked so render requests can
-          // still treat them as incomplete and recover safely.
+          // Mark complete only when the bundle JS exists after copy.
+          // This covers fresh directories and cleaned incomplete directories.
+          // Asset-only uploads intentionally remain incomplete so render requests
+          // can still recover safely by requesting a full bundle upload.
           const bundleFileExistsAfterCopy = await fileExistsAsync(bundleFilePath);
           if (bundleFileExistsAfterCopy && !(await isBundleComplete(bundleTimestamp))) {
             await markBundleComplete(bundleTimestamp);

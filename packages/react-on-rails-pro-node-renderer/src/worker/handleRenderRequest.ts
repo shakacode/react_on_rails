@@ -149,6 +149,8 @@ async function handleNewBundleProvided(
         if (assetsToCopy) {
           await copyUploadedAssets(assetsToCopy, bundleDirectory);
         }
+        // Complete-marker writes are idempotent. This keeps the loser path safe
+        // even if the competing writer exits after moving bundle bytes.
         if (!(await isBundleComplete(providedNewBundle.timestamp))) {
           await markBundleComplete(providedNewBundle.timestamp);
         }
