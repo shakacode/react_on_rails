@@ -191,6 +191,46 @@ describe RscGenerator, type: :generator do
     end
   end
 
+  # Rspack + legacy Pro variant — same as the legacy webpack exports context below,
+  # but with Pro configs in config/rspack/ and rspack shakapacker.yml.
+  # Verifies that the backward-compatible rscWebpackConfig.js is created in the
+  # correct rspack path when the project uses legacy-style Pro exports.
+
+  context "when Pro is installed with legacy webpack exports on an existing rspack project" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_rspack_legacy_pro_webpack_files
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "creates backward-compatible rscWebpackConfig.js in config/rspack/" do
+      assert_file "config/rspack/rscWebpackConfig.js" do |content|
+        expect(content).to include("const serverWebpackModule = require('./serverWebpackConfig')")
+        expect(content).to include("serverWebpackModule.default || serverWebpackModule")
+        expect(content).to include("serverWebpackModule.extractLoader ||")
+      end
+      assert_no_file "config/webpack/rscWebpackConfig.js"
+    end
+
+    it "adds RSC import to ServerClientOrBoth in config/rspack/ for legacy server import syntax" do
+      assert_file "config/rspack/ServerClientOrBoth.js" do |content|
+        expect(content).to include("const serverWebpackConfig = require('./serverWebpackConfig');")
+        expect(content).to include("const rscWebpackConfig = require('./rscWebpackConfig');")
+      end
+    end
+  end
+
   context "when Pro is installed with legacy webpack exports" do
     before(:all) do
       prepare_destination
