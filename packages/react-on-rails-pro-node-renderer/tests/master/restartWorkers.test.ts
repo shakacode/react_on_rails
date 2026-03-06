@@ -63,6 +63,16 @@ describe('restartWorkers', () => {
     await Promise.resolve();
     expect(worker2.send).not.toHaveBeenCalled();
 
+    // Unrelated listening events must not unblock the scheduled restart flow.
+    (cluster as unknown as EventEmitter).emit('listening', { id: 99 });
+    await Promise.resolve();
+    expect(worker2.send).not.toHaveBeenCalled();
+
+    (cluster as unknown as EventEmitter).emit('fork', { id: 3 });
+    await Promise.resolve();
+    (cluster as unknown as EventEmitter).emit('listening', { id: 99 });
+    await Promise.resolve();
+    expect(worker2.send).not.toHaveBeenCalled();
     (cluster as unknown as EventEmitter).emit('listening', { id: 3 });
     await Promise.resolve();
     await waitForTimerTick();
@@ -70,6 +80,7 @@ describe('restartWorkers', () => {
 
     worker2.emit('exit');
     await Promise.resolve();
+    (cluster as unknown as EventEmitter).emit('fork', { id: 4 });
     (cluster as unknown as EventEmitter).emit('listening', { id: 4 });
 
     await restartPromise;

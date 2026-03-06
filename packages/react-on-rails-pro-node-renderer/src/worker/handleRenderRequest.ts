@@ -140,10 +140,16 @@ async function handleNewBundleProvided(
         (error as NodeJS.ErrnoException).code === 'EEXIST' &&
         (await fileExistsAsync(bundleFilePathPerTimestamp));
       if (isExistingBundleWriteConflict) {
-        log.info(
-          'Bundle already exists when writing %s. Assuming bundle was written by another thread',
+        log.warn(
+          'Bundle already existed when writing %s while lock was held. Preserving existing bundle and ensuring completion marker.',
           bundleFilePathPerTimestamp,
         );
+        if (assetsToCopy) {
+          await copyUploadedAssets(assetsToCopy, bundleDirectory);
+        }
+        if (!(await isBundleComplete(providedNewBundle.timestamp))) {
+          await markBundleComplete(providedNewBundle.timestamp);
+        }
         return undefined;
       }
 
@@ -191,9 +197,23 @@ async function handleNewBundlesProvided(
   // handleNewBundleProvided catches its own errors, so Promise.all would also
   // wait for every promise.
   const settled = await Promise.allSettled(handlingPromises);
-  const firstFailure = settled.find((r): r is PromiseRejectedResult => r.status === 'rejected');
-  if (firstFailure) {
-    throw firstFailure.reason;
+  const failures = settled.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
+  if (failures.length > 0) {
+    failures.forEach((failure, index) => {
+      log.error(
+        'Bundle upload failed for bundle %d/%d. Error: %s',
+        index + 1,
+        failures.length,
+        failure.reason instanceof Error ? failure.reason.message : String(failure.reason),
+      );
+    });
+
+    const failureMessages = failures
+      .map((failure) => (failure.reason instanceof Error ? failure.reason.message : String(failure.reason)))
+      .join('; ');
+    throw new Error(
+      `Bundle upload failed for ${failures.length}/${handlingPromises.length} bundles: ${failureMessages}`,
+    );
   }
 
   // handleNewBundleProvided returns undefined on success or a ResponseResult on

@@ -31,6 +31,7 @@ import {
   getBundleDirectory,
   getRequestBundleFilePath,
   cleanIncompleteBundleDirectory,
+  isBundleComplete,
   markBundleComplete,
 } from './shared/utils.js';
 import { lock, unlock } from './shared/locks.js';
@@ -363,16 +364,21 @@ export default function run(config: Partial<Config>) {
         }
 
         try {
-          const wasIncomplete = await cleanIncompleteBundleDirectory(bundleTimestamp);
-          if (wasIncomplete) {
-            log.warn(`Removed incomplete bundle directory before asset upload: ${bundleDirectory}`);
+          const bundleFileExistsBeforeCopy = await fileExistsAsync(bundleFilePath);
+          if (bundleFileExistsBeforeCopy) {
+            const cleanedIncompleteDirectory = await cleanIncompleteBundleDirectory(bundleTimestamp);
+            if (cleanedIncompleteDirectory) {
+              log.warn(`Removed incomplete bundle directory before asset upload: ${bundleDirectory}`);
+            }
           }
 
           await copyUploadedAssets(assets, bundleDirectory);
 
-          // Only mark complete when we cleaned an incomplete directory and
-          // the bundle file itself is present.
-          if (wasIncomplete && (await fileExistsAsync(bundleFilePath))) {
+          // Keep directories without bundle JS unmarked so render requests can
+          // still treat them as incomplete and recover safely.
+          const bundleFileExistsAfterCopy =
+            bundleFileExistsBeforeCopy || (await fileExistsAsync(bundleFilePath));
+          if (bundleFileExistsAfterCopy && !(await isBundleComplete(bundleTimestamp))) {
             await markBundleComplete(bundleTimestamp);
           }
 
@@ -391,9 +397,26 @@ export default function run(config: Partial<Config>) {
       });
 
       const results = await Promise.allSettled(copyPromises);
-      const firstFailure = results.find((r): r is PromiseRejectedResult => r.status === 'rejected');
-      if (firstFailure) {
-        throw firstFailure.reason;
+      const failures = results.filter(
+        (result): result is PromiseRejectedResult => result.status === 'rejected',
+      );
+      if (failures.length > 0) {
+        failures.forEach((failure, index) => {
+          log.error({
+            msg: `Asset upload failed for target bundle ${index + 1}/${failures.length}`,
+            err: failure.reason,
+            task: taskDescription,
+          });
+        });
+
+        const failureMessages = failures
+          .map((failure) =>
+            failure.reason instanceof Error ? failure.reason.message : String(failure.reason),
+          )
+          .join('; ');
+        throw new Error(
+          `Asset upload failed for ${failures.length}/${targetBundles.length} target bundles: ${failureMessages}`,
+        );
       }
 
       await setResponse(

@@ -403,6 +403,35 @@ describe('worker', () => {
     }
   });
 
+  test('post /upload-assets preserves pre-uploaded assets when bundle file is not present', async () => {
+    const bundleHash = 'some-bundle-hash';
+    const bundleDir = path.join(serverBundleCachePathForTest(), bundleHash);
+    const preUploadedAssetPath = path.join(bundleDir, 'pre-uploaded.json');
+    fs.mkdirSync(bundleDir, { recursive: true });
+    fs.writeFileSync(preUploadedAssetPath, '{"source":"first-upload"}');
+
+    const app = worker({
+      serverBundleCachePath: serverBundleCachePathForTest(),
+      password: 'my_password',
+    });
+
+    const form = formAutoContent({
+      gemVersion,
+      protocolVersion,
+      railsEnv,
+      password: 'my_password',
+      targetBundles: [bundleHash],
+      asset1: createReadStream(getFixtureAsset()),
+    });
+
+    const res = await app.inject().post(`/upload-assets`).payload(form.payload).headers(form.headers).end();
+
+    expect(res.statusCode).toBe(200);
+    expect(fs.existsSync(preUploadedAssetPath)).toBe(true);
+    expect(fs.existsSync(assetPath(testName, bundleHash))).toBe(true);
+    expect(fs.existsSync(bundleCompleteMarkerPath(testName, bundleHash))).toBe(false);
+  });
+
   describe('gem version validation', () => {
     test('allows request when gem version matches package version', async () => {
       await createVmBundleForTest();

@@ -213,6 +213,37 @@ module ReactOnRailsPro
       end
     end
 
+    describe "bundle hash path helpers" do
+      describe ".http_url?" do
+        it "matches only leading http/https schemes" do
+          expect(described_class.http_url?("https://localhost:3035/packs/bundle.js")).to be(true)
+          expect(described_class.http_url?("/tmp/http://localhost:3035/packs/bundle.js")).to be(false)
+        end
+      end
+
+      describe ".digest_path_key" do
+        it "normalizes files under Rails.root to root-relative paths" do
+          allow(Rails).to receive(:root).and_return(Pathname.new("/app"))
+
+          expect(described_class.digest_path_key("/app/public/packs/bundle.js")).to eq("public/packs/bundle.js")
+          expect(described_class.digest_path_key("/tmp/packs/bundle.js")).to eq("/tmp/packs/bundle.js")
+        end
+      end
+
+      describe ".digest_bundle_content" do
+        it "skips missing bundle files without raising" do
+          digest = instance_double(Digest::MD5)
+          allow(digest).to receive(:file)
+          allow(digest).to receive(:<<)
+          allow(File).to receive(:exist?).with("/missing/bundle.js").and_return(false)
+
+          described_class.digest_bundle_content(digest, "/missing/bundle.js")
+
+          expect(digest).not_to have_received(:file)
+        end
+      end
+    end
+
     describe ".with_trace" do
       let(:logger_mock) { instance_double(ActiveSupport::Logger).as_null_object }
 

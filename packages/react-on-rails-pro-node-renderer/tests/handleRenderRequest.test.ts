@@ -122,6 +122,21 @@ describe(testName, () => {
     });
   });
 
+  test('If bundle file and .complete marker exist without VM context, load bundle from disk', async () => {
+    expect.assertions(3);
+    await fsPromises.copyFile(getFixtureBundle(), vmBundlePath(testName));
+    await fsPromises.writeFile(bundleCompleteMarkerPath(testName, String(BUNDLE_TIMESTAMP)), '');
+    expect(hasVMContextForBundle(vmBundlePath(testName))).toBe(false);
+
+    const result = await handleRenderRequest({
+      renderingRequest: 'ReactOnRails.dummy',
+      bundleTimestamp: BUNDLE_TIMESTAMP,
+    });
+
+    expect(result).toEqual(renderResult);
+    expect(hasVMContextForBundle(vmBundlePath(testName))).toBe(true);
+  });
+
   test('If incomplete bundle directory exists, uploaded bundle replaces stale files and marks complete', async () => {
     expect.assertions(4);
     const bundleDirectory = path.dirname(vmBundlePath(testName));

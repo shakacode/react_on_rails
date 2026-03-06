@@ -17,17 +17,52 @@ declare module 'cluster' {
   }
 }
 
-function waitForReplacementWorkerListening(restartedWorkerId: number) {
+function waitForReplacementWorkerListening(restartedWorker: Worker, knownWorkerIds: Set<number>) {
+  const restartedWorkerId = restartedWorker.id;
   return new Promise<void>((resolve) => {
     let timeout: NodeJS.Timeout;
+    let onFork: (replacementWorker: Worker) => void;
     let onListening: (replacementWorker: Worker) => void;
+    let replacementWorkerId: number | undefined;
+    let restartedWorkerExited = false;
+
+    const onRestartedWorkerExit = () => {
+      restartedWorkerExited = true;
+    };
 
     function cleanup() {
       clearTimeout(timeout);
+      cluster.off('fork', onFork);
       cluster.off('listening', onListening);
+      restartedWorker.off('exit', onRestartedWorkerExit);
     }
 
+    onFork = (replacementWorker: Worker) => {
+      if (!restartedWorkerExited) {
+        return;
+      }
+
+      if (knownWorkerIds.has(replacementWorker.id)) {
+        return;
+      }
+
+      if (replacementWorkerId !== undefined) {
+        return;
+      }
+
+      replacementWorkerId = replacementWorker.id;
+      log.debug(
+        'Observed replacement worker #%d after restarting worker #%d',
+        replacementWorkerId,
+        restartedWorkerId,
+      );
+    };
+
     onListening = (replacementWorker: Worker) => {
+      if (replacementWorkerId === undefined || replacementWorker.id !== replacementWorkerId) {
+        return;
+      }
+
       cleanup();
       log.debug(
         'Replacement worker #%d is listening after restarting worker #%d',
@@ -37,10 +72,23 @@ function waitForReplacementWorkerListening(restartedWorkerId: number) {
       resolve();
     };
 
+    restartedWorker.on('exit', onRestartedWorkerExit);
+    cluster.on('fork', onFork);
     cluster.on('listening', onListening);
     timeout = setTimeout(() => {
       cleanup();
-      log.warn('Timed out waiting for replacement worker after restarting worker #%d', restartedWorkerId);
+      if (replacementWorkerId === undefined) {
+        log.warn(
+          'Timed out waiting for replacement worker fork after restarting worker #%d',
+          restartedWorkerId,
+        );
+      } else {
+        log.warn(
+          'Timed out waiting for replacement worker #%d to listen after restarting worker #%d',
+          replacementWorkerId,
+          restartedWorkerId,
+        );
+      }
       resolve();
     }, REPLACEMENT_WORKER_LISTEN_TIMEOUT_MS);
   });
@@ -58,7 +106,10 @@ export default async function restartWorkers(
   for (const worker of Object.values(cluster.workers).filter((w) => !!w)) {
     log.debug('Kill worker #%d', worker.id);
     worker.isScheduledRestart = true;
-    const replacementWorkerListening = waitForReplacementWorkerListening(worker.id);
+    const knownWorkerIds = new Set(
+      Object.values(cluster.workers).flatMap((currentWorker) => (currentWorker ? [currentWorker.id] : [])),
+    );
+    const replacementWorkerListening = waitForReplacementWorkerListening(worker, knownWorkerIds);
 
     worker.send(SHUTDOWN_WORKER_MESSAGE);
 
