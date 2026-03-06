@@ -59,20 +59,15 @@ describe('restartWorkers', () => {
     expect(worker1.send).toHaveBeenCalledWith(SHUTDOWN_WORKER_MESSAGE);
     expect(worker2.send).not.toHaveBeenCalled();
 
-    worker1.emit('exit');
-    await Promise.resolve();
-    expect(worker2.send).not.toHaveBeenCalled();
-
-    // Unrelated listening events must not unblock the scheduled restart flow.
-    (cluster as unknown as EventEmitter).emit('listening', { id: 99 });
-    await Promise.resolve();
-    expect(worker2.send).not.toHaveBeenCalled();
-
+    // Fork/listening can happen before the worker 'exit' observer runs.
     (cluster as unknown as EventEmitter).emit('fork', { id: 3 });
     await Promise.resolve();
     (cluster as unknown as EventEmitter).emit('listening', { id: 99 });
     await Promise.resolve();
     expect(worker2.send).not.toHaveBeenCalled();
+
+    worker1.emit('exit');
+    await Promise.resolve();
     (cluster as unknown as EventEmitter).emit('listening', { id: 3 });
     await Promise.resolve();
     await waitForTimerTick();

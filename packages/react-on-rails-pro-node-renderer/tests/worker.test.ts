@@ -403,12 +403,14 @@ describe('worker', () => {
     }
   });
 
-  test('post /upload-assets preserves pre-uploaded assets when bundle file is not present', async () => {
+  test('post /upload-assets clears stale files for incomplete directories when bundle file is not present', async () => {
     const bundleHash = 'some-bundle-hash';
     const bundleDir = path.join(serverBundleCachePathForTest(), bundleHash);
-    const preUploadedAssetPath = path.join(bundleDir, 'pre-uploaded.json');
+    const staleAssetPath = assetPath(testName, bundleHash);
+    const staleExtraPath = path.join(bundleDir, 'pre-uploaded.json');
     fs.mkdirSync(bundleDir, { recursive: true });
-    fs.writeFileSync(preUploadedAssetPath, '{"source":"first-upload"}');
+    fs.writeFileSync(staleAssetPath, '{"source":"stale-upload"}');
+    fs.writeFileSync(staleExtraPath, '{"source":"stale-extra"}');
 
     const app = worker({
       serverBundleCachePath: serverBundleCachePathForTest(),
@@ -427,9 +429,33 @@ describe('worker', () => {
     const res = await app.inject().post(`/upload-assets`).payload(form.payload).headers(form.headers).end();
 
     expect(res.statusCode).toBe(200);
-    expect(fs.existsSync(preUploadedAssetPath)).toBe(true);
+    expect(fs.existsSync(staleExtraPath)).toBe(false);
     expect(fs.existsSync(assetPath(testName, bundleHash))).toBe(true);
+    expect(fs.readFileSync(assetPath(testName, bundleHash), 'utf8')).toBe(
+      fs.readFileSync(getFixtureAsset(), 'utf8'),
+    );
     expect(fs.existsSync(bundleCompleteMarkerPath(testName, bundleHash))).toBe(false);
+  });
+
+  test('post /upload-assets rejects targetBundles path traversal outside cache root', async () => {
+    const app = worker({
+      serverBundleCachePath: serverBundleCachePathForTest(),
+      password: 'my_password',
+    });
+
+    const form = formAutoContent({
+      gemVersion,
+      protocolVersion,
+      railsEnv,
+      password: 'my_password',
+      targetBundles: ['../../outside-cache-root'],
+      asset1: createReadStream(getFixtureAsset()),
+    });
+
+    const res = await app.inject().post(`/upload-assets`).payload(form.payload).headers(form.headers).end();
+
+    expect(res.statusCode).toBe(400);
+    expect(res.payload).toContain('outside cache root');
   });
 
   describe('gem version validation', () => {

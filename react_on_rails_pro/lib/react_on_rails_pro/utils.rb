@@ -99,6 +99,9 @@ module ReactOnRailsPro
       return @bundle_hash = hashed_file_name if hashed_file_name
 
       if contains_http_url?([server_bundle_js_file_path] + asset_paths)
+        # Intentionally do not assign @bundle_hash_signature in this branch.
+        # In development/test we want every call to re-fetch HTTP content and
+        # recompute the hash instead of memoizing by a local file signature.
         return @bundle_hash = calc_bundle_hash(server_bundle_js_file_path, asset_paths)
       end
 
@@ -121,6 +124,7 @@ module ReactOnRailsPro
       return @rsc_bundle_hash = hashed_file_name if hashed_file_name
 
       if contains_http_url?([server_rsc_bundle_js_file_path] + asset_paths)
+        # Keep HTTP-backed bundles always recomputed in development/test.
         return @rsc_bundle_hash = calc_bundle_hash(server_rsc_bundle_js_file_path, asset_paths)
       end
 

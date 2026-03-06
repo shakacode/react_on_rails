@@ -136,6 +136,8 @@ async function handleNewBundleProvided(
         `Completed moving uploaded file ${providedNewBundle.bundle.savedFilePath} to ${bundleFilePathPerTimestamp}`,
       );
     } catch (error) {
+      // On Windows and some cross-device move fallbacks, fs-extra can surface
+      // EEXIST if a competing write already created the destination path.
       const isExistingBundleWriteConflict =
         (error as NodeJS.ErrnoException).code === 'EEXIST' &&
         (await fileExistsAsync(bundleFilePathPerTimestamp));
@@ -203,7 +205,7 @@ async function handleNewBundlesProvided(
       log.error(
         'Bundle upload failed for bundle %d/%d. Error: %s',
         index + 1,
-        failures.length,
+        handlingPromises.length,
         failure.reason instanceof Error ? failure.reason.message : String(failure.reason),
       );
     });

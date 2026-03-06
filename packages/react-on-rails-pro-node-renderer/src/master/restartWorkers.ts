@@ -24,24 +24,43 @@ function waitForReplacementWorkerListening(restartedWorker: Worker, knownWorkerI
     let onFork: (replacementWorker: Worker) => void;
     let onListening: (replacementWorker: Worker) => void;
     let replacementWorkerId: number | undefined;
+    let replacementWorkerListening = false;
     let restartedWorkerExited = false;
+    let resolved = false;
+    let cleanup: () => void;
 
-    const onRestartedWorkerExit = () => {
+    function resolveIfReady() {
+      if (resolved) {
+        return;
+      }
+
+      if (!restartedWorkerExited || replacementWorkerId === undefined || !replacementWorkerListening) {
+        return;
+      }
+
+      resolved = true;
+      cleanup();
+      log.debug(
+        'Replacement worker #%d is listening after restarting worker #%d',
+        replacementWorkerId,
+        restartedWorkerId,
+      );
+      resolve();
+    }
+
+    function onRestartedWorkerExit() {
       restartedWorkerExited = true;
-    };
+      resolveIfReady();
+    }
 
-    function cleanup() {
+    cleanup = () => {
       clearTimeout(timeout);
       cluster.off('fork', onFork);
       cluster.off('listening', onListening);
       restartedWorker.off('exit', onRestartedWorkerExit);
-    }
+    };
 
     onFork = (replacementWorker: Worker) => {
-      if (!restartedWorkerExited) {
-        return;
-      }
-
       if (knownWorkerIds.has(replacementWorker.id)) {
         return;
       }
@@ -56,6 +75,8 @@ function waitForReplacementWorkerListening(restartedWorker: Worker, knownWorkerI
         replacementWorkerId,
         restartedWorkerId,
       );
+
+      resolveIfReady();
     };
 
     onListening = (replacementWorker: Worker) => {
@@ -63,13 +84,8 @@ function waitForReplacementWorkerListening(restartedWorker: Worker, knownWorkerI
         return;
       }
 
-      cleanup();
-      log.debug(
-        'Replacement worker #%d is listening after restarting worker #%d',
-        replacementWorker.id,
-        restartedWorkerId,
-      );
-      resolve();
+      replacementWorkerListening = true;
+      resolveIfReady();
     };
 
     restartedWorker.on('exit', onRestartedWorkerExit);
@@ -82,11 +98,17 @@ function waitForReplacementWorkerListening(restartedWorker: Worker, knownWorkerI
           'Timed out waiting for replacement worker fork after restarting worker #%d',
           restartedWorkerId,
         );
-      } else {
+      } else if (!replacementWorkerListening) {
         log.warn(
           'Timed out waiting for replacement worker #%d to listen after restarting worker #%d',
           replacementWorkerId,
           restartedWorkerId,
+        );
+      } else {
+        log.warn(
+          'Timed out waiting for worker #%d exit after replacement worker #%d started listening',
+          restartedWorkerId,
+          replacementWorkerId,
         );
       }
       resolve();
