@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "spec_helper"
+require_relative "../spec_helper"
 
 RSpec.describe ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool do
   describe ".renderer_bundle_file_name" do
