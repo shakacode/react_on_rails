@@ -521,6 +521,7 @@ RSpec.describe "Streaming API" do
       expect(stream).to have_received(:write).with("TEMPLATE")
       expect(stream).to have_received(:write).with("Chunk1")
       expect(headers["Content-Encoding"]).to be_nil
+      expect(headers["Vary"]).to eq("Accept-Encoding")
     end
 
     it "keeps plain streaming when identity quality beats gzip" do

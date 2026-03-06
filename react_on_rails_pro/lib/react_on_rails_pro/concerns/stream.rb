@@ -34,11 +34,12 @@ module ReactOnRailsPro
     #
     # @see ReactOnRails::Helper#stream_react_component
     def stream_view_containing_react_components(template:, close_stream_at_end: true, compress: false, **render_options)
-      # Evaluate gzip eligibility before entering `Sync` so invalid argument
-      # combinations can fail without initializing async runtime state.
+      # Evaluate compression negotiation before entering `Sync` so invalid
+      # argument combinations can fail without initializing async runtime state.
       # We also decide this before render_to_string so render failures cannot
-      # accidentally leave gzip headers committed.
-      gzip_streaming_enabled = gzip_streaming_enabled?(compress)
+      # accidentally leave gzip/Vary headers committed.
+      vary_accept_encoding = vary_accept_encoding?(compress)
+      gzip_streaming_enabled = vary_accept_encoding && request_accepts_gzip?
       if gzip_streaming_enabled && !close_stream_at_end
         raise ArgumentError, "compress: true requires close_stream_at_end: true to finalize gzip footer"
       end
@@ -57,7 +58,10 @@ module ReactOnRailsPro
         # If a shell error occurs, consumer_stream_async raises PrerenderError here
         # (BEFORE the response is committed), enabling a proper HTTP redirect.
         template_string = render_to_string(template: template, **render_options)
-        output_stream = setup_output_stream(gzip_streaming_enabled: gzip_streaming_enabled)
+        output_stream = setup_output_stream(
+          gzip_streaming_enabled: gzip_streaming_enabled,
+          vary_accept_encoding: vary_accept_encoding
+        )
         # View may contain extra newlines, chunk already contains a newline
         # Having multiple newlines between chunks causes hydration errors
         # So we strip extra newlines from the template string and add a single newline
@@ -164,22 +168,20 @@ module ReactOnRailsPro
       nil
     end
 
-    def setup_output_stream(gzip_streaming_enabled:)
+    def setup_output_stream(gzip_streaming_enabled:, vary_accept_encoding:)
+      prepare_accept_encoding_vary_header if vary_accept_encoding
       return response.stream unless gzip_streaming_enabled
 
       prepare_gzip_streaming_headers
       GzipOutputStream.new(response.stream)
     end
 
-    def gzip_streaming_enabled?(compress)
+    def vary_accept_encoding?(compress)
       return false unless compress
 
       content_encoding = response.headers["Content-Encoding"].to_s
       content_encoding_values = content_encoding.split(",").map { |value| value.downcase.strip }.reject(&:blank?)
-      return false if content_encoding_values.any? { |value| value != "identity" }
-      return false unless request_accepts_gzip?
-
-      true
+      content_encoding_values.none? { |value| value != "identity" }
     end
 
     def request_accepts_gzip?
@@ -255,7 +257,10 @@ module ReactOnRailsPro
       headers = response.headers
       headers["Content-Encoding"] = "gzip"
       headers.delete("Content-Length")
+    end
 
+    def prepare_accept_encoding_vary_header
+      headers = response.headers
       vary_values = headers["Vary"].to_s.split(",").map(&:strip).reject(&:empty?)
       return if vary_values.include?("*") || vary_values.any? { |value| value.casecmp?("Accept-Encoding") }
 
