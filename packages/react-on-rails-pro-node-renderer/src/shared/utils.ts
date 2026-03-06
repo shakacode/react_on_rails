@@ -187,7 +187,15 @@ export const delay = (milliseconds: number) =>
 
 export function getBundleDirectory(bundleTimestamp: string | number) {
   const { serverBundleCachePath } = getConfig();
-  return path.join(serverBundleCachePath, `${bundleTimestamp}`);
+  const cacheRoot = path.resolve(serverBundleCachePath);
+  const bundleDirectory = path.resolve(serverBundleCachePath, `${bundleTimestamp}`);
+  const cacheRootPrefix = cacheRoot.endsWith(path.sep) ? cacheRoot : `${cacheRoot}${path.sep}`;
+
+  if (!bundleDirectory.startsWith(cacheRootPrefix)) {
+    throw new Error(`Refusing to access bundle directory outside cache root: ${bundleDirectory}`);
+  }
+
+  return bundleDirectory;
 }
 
 export const BUNDLE_COMPLETE_MARKER_FILE = '.complete';

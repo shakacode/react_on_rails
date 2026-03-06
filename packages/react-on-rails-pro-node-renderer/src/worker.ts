@@ -364,20 +364,16 @@ export default function run(config: Partial<Config>) {
         }
 
         try {
-          const bundleFileExistsBeforeCopy = await fileExistsAsync(bundleFilePath);
-          if (bundleFileExistsBeforeCopy) {
-            const cleanedIncompleteDirectory = await cleanIncompleteBundleDirectory(bundleTimestamp);
-            if (cleanedIncompleteDirectory) {
-              log.warn(`Removed incomplete bundle directory before asset upload: ${bundleDirectory}`);
-            }
+          const cleanedIncompleteDirectory = await cleanIncompleteBundleDirectory(bundleTimestamp);
+          if (cleanedIncompleteDirectory) {
+            log.warn(`Removed incomplete bundle directory before asset upload: ${bundleDirectory}`);
           }
 
           await copyUploadedAssets(assets, bundleDirectory);
 
           // Keep directories without bundle JS unmarked so render requests can
           // still treat them as incomplete and recover safely.
-          const bundleFileExistsAfterCopy =
-            bundleFileExistsBeforeCopy || (await fileExistsAsync(bundleFilePath));
+          const bundleFileExistsAfterCopy = await fileExistsAsync(bundleFilePath);
           if (bundleFileExistsAfterCopy && !(await isBundleComplete(bundleTimestamp))) {
             await markBundleComplete(bundleTimestamp);
           }
