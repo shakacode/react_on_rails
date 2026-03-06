@@ -134,6 +134,63 @@ const configureServer = (serverWebpackConfig) => {
 
 **Why this matters:** Rspack uses `@rspack/core/dist/cssExtractLoader.js` instead of Webpack's `mini-css-extract-plugin`. Without this fix, CSS extraction remains in the server bundle, causing intermittent SSR failures.
 
+### CSS Modules with SSR: Stable Class Names
+
+**If you use `[contenthash]` in your `localIdentName` for CSS modules, class names can silently diverge between client and server builds with Rspack.** Pages load but all CSS module styles are broken. This only affects production builds — development with HMR works fine because `style-loader` injects CSS inline.
+
+The root cause is that `[contenthash]` is computed from processed CSS content, which differs between client and server builds due to different loader chains (`exportOnlyLocals: true` on server), different plugins (`CssExtractRspackPlugin` on client only), and different optimization passes.
+
+**Solution:** Replace `[contenthash]` with a custom `getLocalIdent` function that derives class names from stable inputs (file path, query string, and class name):
+
+```javascript
+// config/webpack/getLocalIdent.js
+const crypto = require('crypto');
+const path = require('path');
+
+const getLocalIdent = (context, _localIdentName, localName) => {
+  const resourcePath = context.resourcePath;
+  const resourceQuery = context.resourceQuery || ''; // needed for CSS-in-JS virtual modules; safe no-op otherwise
+  // Prefer process.cwd() so this stays correct across custom/monorepo layouts.
+  const projectRoot = process.cwd();
+  // Alternative if process.cwd() isn't reliable in your setup:
+  // const projectRoot = path.resolve(__dirname, '../..'); // adjust depth as needed
+  const relativePath = path.relative(projectRoot, resourcePath);
+
+  const hash = crypto
+    .createHash('sha256')
+    .update(relativePath + '\0' + resourceQuery + '\0' + localName)
+    .digest('base64url')
+    .slice(0, 8);
+
+  const basename = path.basename(resourcePath);
+  const name = basename
+    .replace(/\.(module\.)?(scss|sass|css|less|styl|tsx?|jsx?)$/, '')
+    .replace(/-styles$/, '');
+  return `${name}-${localName}_${hash}`;
+};
+
+module.exports = getLocalIdent;
+```
+
+For third-party CSS modules, `relativePath` may include `node_modules/` segments in the hash input. That's expected and stable; the visible class name prefix still comes from `path.basename(resourcePath)`.
+
+Then use it in your `commonWebpackConfig.js` where you configure CSS modules:
+
+```javascript
+const getLocalIdent = require('./getLocalIdent');
+
+// In the CSS modules configuration loop:
+if (cssLoader?.options?.modules) {
+  cssLoader.options.modules.namedExport = false;
+  cssLoader.options.modules.exportLocalsConvention = 'camelCase';
+  cssLoader.options.modules.getLocalIdent = getLocalIdent; // Stable class names across builds
+}
+```
+
+Because `getLocalIdent` uses stable inputs (file path, query string, and class name) rather than processed CSS content, the same class name is produced in both client and server builds regardless of bundler internals. The same function must be used in both builds so server-rendered HTML class names match client CSS selectors.
+
+> **Note — CSS-in-JS virtual modules (astroturf, etc.):** The `resourceQuery` line in `getLocalIdent` above is a no-op for regular `.module.scss` files. It exists for CSS-in-JS tools that create virtual CSS modules via webpack's `!=!` matchResource syntax. In rspack, `context.resourcePath` points to the source file rather than the virtual path, so without `resourceQuery` in the hash, all virtual modules from the same file would collide. See the [troubleshooting entry](#css-in-js-styled-components-all-share-the-same-class-name) for details.
+
 ### Server Bundle: Preserve CSS Modules Configuration
 
 When configuring SSR, merge CSS modules options instead of replacing them:
@@ -235,6 +292,31 @@ default: &default
 2. Ensure server config preserves CSS modules settings
 3. Filter Rspack's `cssExtractLoader` from server bundle
 
+### CSS Module Styles Broken in Production (SSR)
+
+**Symptoms:**
+
+- All CSS module styles missing in production
+- Class names in server-rendered HTML don't match CSS selectors
+- Works in development but breaks in production builds
+- No errors — just silently broken styles
+
+**Cause:** `[contenthash]` in `localIdentName` produces different hashes in client and server builds with Rspack.
+
+**Solution:** Use a custom `getLocalIdent` function instead of `[contenthash]`. See the [CSS Modules with SSR](#css-modules-with-ssr-stable-class-names) section above.
+
+### CSS-in-JS Styled Components All Share the Same Class Name
+
+**Symptoms:**
+
+- Multiple astroturf (or similar CSS-in-JS) styled components in the same file all get identical CSS class names
+- Styles look correct in development but are broken in production
+- Only one component's styles survive; others are overwritten
+
+**Cause:** Rspack sets `context.resourcePath` to the actual source file instead of the virtual matchResource path. All virtual CSS modules from the same source file produce the same hash.
+
+**Solution:** Include `context.resourceQuery` in the `getLocalIdent` hash. See the [`getLocalIdent` implementation](#css-modules-with-ssr-stable-class-names) above, which already includes `resourceQuery` for this reason.
+
 ### Intermittent SSR Failures
 
 **Cause:** Incomplete CSS extraction filtering in server config.
@@ -246,6 +328,71 @@ default: &default
 **Symptom:** `Module not found: Can't resolve './file.bs.js'`
 
 **Solution:** Add the file extension to webpack's resolve.extensions configuration.
+
+### UMD Libraries Behave Differently Under Rspack's Module Interop
+
+**Symptoms:**
+
+- `noConflict()` or other methods called on an import result return `undefined` or throw
+- Libraries that coexist via `noConflict()` (e.g., lodash + underscore) interfere with each other
+
+**Cause:** Rspack's ES module interop wraps CommonJS exports differently than Webpack, so the import result may not have the methods you expect. Switching to `window.*` access can also be wrong if loaders like `imports-loader?define=>false` prevent the library from setting globals in the first place.
+
+**Solution:** Audit any `noConflict()` calls or UMD workarounds. Check whether your loader chain already prevents the conflict, and remove the workaround if so. Verify behavior by testing in both bundlers.
+
+### Modern Entry Points Crash on Missing Globals
+
+**Symptoms:**
+
+- `Cannot use 'in' operator to search for 'X' in undefined`
+- `Could not find component registered with name ...` (ReactOnRails registration fails)
+- Works in development but crashes on specific pages in production
+
+**Cause:** Code in a modern entry point references a global (e.g., `window._`) that is only exposed via `expose-loader` in legacy bundles. The crash kills the script before `registerForRails()` executes, so ReactOnRails reports the component as missing. This bug can be latent under Webpack if legacy bundles happen to load first.
+
+**Solution:** Audit all entry points for code that assumes sitewide globals exist. Remove or guard any such references, especially orphaned polyfills for removed features.
+
+### `cache: false` Disables Rspack's In-Memory Cache
+
+**Symptoms:**
+
+- Subtle compilation issues after adding a "disable cache" environment variable
+- Slower rebuilds than expected even with in-memory caching supposedly enabled
+
+**Cause:** Rspack's top-level `cache` option is boolean-only (`true`/`false`), unlike Webpack's `cache: { type: 'filesystem', buildDependencies: ... }`. Setting `cache: false` to disable disk persistence actually disables rspack's **in-memory cache** entirely. Persistent (disk) caching is controlled separately via `experiments.cache`.
+
+**Solution:** Always set `cache: true` for rspack. Control disk persistence exclusively through `experiments.cache`:
+
+```javascript
+cache: isRspack
+  ? true // always enable in-memory cache; disk persistence via experiments.cache
+  : { type: 'filesystem', buildDependencies: { config: [__filename] } },
+
+// Persistent cache (disk) — opt-in for rspack
+...(isRspack && !process.env.DISABLE_FILESYS_CACHE && {
+  experiments: {
+    cache: { type: 'persistent', buildDependencies: [__filename] },
+  },
+}),
+```
+
+### Lazy Compilation Breaks Two-Server Dev Setup
+
+**Symptoms:**
+
+- Dynamic imports fail silently in development
+- Network tab shows 404s for `/lazy-compilation-using-__<N>` paths hitting your Rails server
+- Entry points fail to load with no obvious error
+
+**Cause:** Rspack's CLI [auto-enables lazy compilation](https://github.com/web-infra-dev/rspack/blob/main/packages/rspack-cli/src/commands/serve.ts#L130-L133) for web targets when using `rspack serve`. The lazy-compilation proxy uses relative URLs, so the browser resolves them against the page origin (your Rails server) instead of the dev server where the middleware lives. Webpack doesn't auto-enable this, so it's an invisible behavior change.
+
+**Solution:** Explicitly disable lazy compilation:
+
+```javascript
+...(isRspack && { lazyCompilation: false }),
+```
+
+Alternatively, configure `lazyCompilation.backend.listen` to match your dev server setup.
 
 ### Third-Party Package Issues
 

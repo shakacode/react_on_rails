@@ -62,7 +62,21 @@ module ReactOnRails
                    default: false,
                    desc: "Install React Server Components support (includes Pro). Default: false"
 
+      # Hidden option: allows tests (and advanced users) to signal that Shakapacker
+      # was just installed, triggering force-overwrite of shakapacker.yml with RoR's template.
+      # The CLI flag takes precedence over runtime detection (@shakapacker_just_installed):
+      # when this flag is set, shakapacker_just_installed? returns true immediately without
+      # consulting the ivar. Passing this flag manually overrides runtime detection — the yml
+      # will be force-overwritten with RoR's template even if it already exists, including
+      # when Shakapacker is pre-configured (no prompt is shown).
+      class_option :shakapacker_just_installed,
+                   type: :boolean,
+                   default: false,
+                   hide: true
+
       # Removed: --skip-shakapacker-install (Shakapacker is now a required dependency)
+
+      SHAKAPACKER_YML_PATH = "config/shakapacker.yml"
 
       # Main generator entry point
       #
@@ -122,28 +136,36 @@ module ReactOnRails
         end
         invoke "react_on_rails:base", [],
                { typescript: options.typescript?, redux: options.redux?, rspack: options.rspack?,
-                 pro: options.pro?, rsc: options.rsc? }
+                 pro: options.pro?, rsc: options.rsc?,
+                 shakapacker_just_installed: shakapacker_just_installed?,
+                 force: options[:force], skip: options[:skip] }
 
         # Component generator logic:
         # - --rsc without --redux: Skip HelloWorld, HelloServer will be generated in setup_rsc
         # - --rsc with --redux: Generate HelloWorldApp (user explicitly wants Redux) + HelloServer
         # - Without --rsc: Normal behavior (HelloWorld or HelloWorldApp based on --redux)
         if options.redux?
-          invoke "react_on_rails:react_with_redux", [], { typescript: options.typescript? }
+          invoke "react_on_rails:react_with_redux", [], { typescript: options.typescript?,
+                                                          force: options[:force], skip: options[:skip] }
         elsif !use_rsc?
           # Only generate HelloWorld if RSC is not enabled
           # For RSC, HelloServer replaces HelloWorld as the example component
-          invoke "react_on_rails:react_no_redux", [], { typescript: options.typescript? }
+          invoke "react_on_rails:react_no_redux", [], { typescript: options.typescript?,
+                                                        force: options[:force], skip: options[:skip] }
         end
 
         setup_react_dependencies
 
         # Invoke standalone Pro/RSC generators when flags are used
         # Pass invoked_by_install: true so they skip message printing (we handle it)
-        invoke "react_on_rails:pro", [], { invoked_by_install: true } if use_pro?
+        if use_pro?
+          invoke "react_on_rails:pro", [], { invoked_by_install: true,
+                                             force: options[:force], skip: options[:skip] }
+        end
         return unless use_rsc?
 
-        invoke "react_on_rails:rsc", [], { typescript: options.typescript?, invoked_by_install: true }
+        invoke "react_on_rails:rsc", [], { typescript: options.typescript?, invoked_by_install: true,
+                                           force: options[:force], skip: options[:skip] }
       end
 
       def setup_react_dependencies
@@ -202,13 +224,22 @@ module ReactOnRails
         GeneratorMessages.add_warning(warning)
       end
 
+      def shakapacker_just_installed?
+        !!(options.shakapacker_just_installed? || @shakapacker_just_installed)
+      end
+
       def ensure_shakapacker_installed
         return if shakapacker_configured?
 
         print_shakapacker_setup_banner
         ensure_shakapacker_in_gemfile
-        install_shakapacker
-        finalize_shakapacker_setup
+
+        # NOTE: File.exist?/File.read use Dir.pwd (not destination_root) because
+        # Rails generators always run from the destination root. This is consistent
+        # with other relative-path file checks in this generator (e.g. shakapacker_configured?).
+        yml_content_before = File.exist?(SHAKAPACKER_YML_PATH) ? File.read(SHAKAPACKER_YML_PATH) : nil
+
+        finalize_shakapacker_setup(yml_content_before) if install_shakapacker
       end
 
       # Checks whether "shakapacker" is explicitly declared in this project's Gemfile.
@@ -254,7 +285,8 @@ module ReactOnRails
         GeneratorMessages.add_info(GeneratorMessages.helpful_message_after_installation(
                                      component_name: component_name,
                                      route: route,
-                                     rsc: use_rsc?
+                                     rsc: use_rsc?,
+                                     shakapacker_just_installed: shakapacker_just_installed?
                                    ))
       end
 
@@ -322,24 +354,43 @@ module ReactOnRails
         bundle_success = Bundler.with_unbundled_env { system("bundle install") }
         unless bundle_success
           handle_shakapacker_install_error
-          return
+          return false
         end
 
         # Then run the shakapacker installer
         success = Bundler.with_unbundled_env { system("bundle exec rails shakapacker:install") }
-        return if success
-
-        handle_shakapacker_install_error
+        if success
+          true
+        else
+          handle_shakapacker_install_error
+          false
+        end
       end
 
-      def finalize_shakapacker_setup
+      def finalize_shakapacker_setup(yml_content_before)
         puts Rainbow("✅ Shakapacker installed successfully!").green
         puts Rainbow("=" * 80).cyan
         puts Rainbow("🚀 CONTINUING WITH REACT ON RAILS SETUP").cyan.bold
         puts "#{Rainbow('=' * 80).cyan}\n"
 
-        # Create marker file so base generator can avoid copying shakapacker.yml
-        File.write(".shakapacker_just_installed", "")
+        yml_content_after = File.exist?(SHAKAPACKER_YML_PATH) ? File.read(SHAKAPACKER_YML_PATH) : nil
+
+        # Force-apply the RoR template only when shakapacker wrote a fresh config:
+        #   nil  → new content  (fresh install: file didn't exist before)       → true
+        #   old  → new content  (user said "y" to conflict prompt)              → true
+        #   old  → same content (user said "n", kept their custom config)       → false
+        #   old  → same content (user said "y" but file was already identical   → false
+        #                        to Shakapacker's default; negligible in practice)
+        #   nil  → nil          (installer succeeded but wrote nothing)         → false
+        #
+        # The nil→nil case is treated as "no change needed": if the installer
+        # returned true but did not write the yml, we assume the file was already
+        # correct and skip the force-overwrite. This is theoretically possible but
+        # extremely unlikely given how Shakapacker's installer works.
+        #
+        # Note: if the user said "y" and shakapacker overwrote their yml, this
+        # correctly re-applies the RoR template on top of shakapacker's fresh defaults.
+        @shakapacker_just_installed = yml_content_before != yml_content_after
       end
 
       def handle_shakapacker_gemfile_error
