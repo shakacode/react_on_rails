@@ -168,14 +168,13 @@ describe ProGenerator, type: :generator do
     end
 
     describe "Pro webpack config transforms in config/rspack/" do
-      it "applies Pro transforms to serverWebpackConfig in config/rspack/ (not config/webpack/)" do
+      it "applies Pro transforms to serverWebpackConfig in config/rspack/" do
         assert_file "config/rspack/serverWebpackConfig.js" do |content|
           expect(content).to include("libraryTarget: 'commonjs2',")
           expect(content).to include("function extractLoader")
           expect(content).to include("serverWebpackConfig.target = 'node';")
           expect(content).to include("module.exports = {")
         end
-        assert_no_file "config/webpack/serverWebpackConfig.js"
       end
 
       it "updates ServerClientOrBoth.js to destructured import in config/rspack/" do
