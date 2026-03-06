@@ -240,6 +240,20 @@ describe('createApp', () => {
     expect(mockedFs.rmSync).toHaveBeenCalledWith(appPath, { recursive: true, force: true });
   });
 
+  it('cleans up app directory when rails new fails', () => {
+    const appPath = path.resolve(process.cwd(), 'my-app');
+    mockedExecLiveArgs.mockImplementationOnce(() => {
+      throw new Error('rails new failed');
+    });
+
+    expect(() => createApp('my-app', baseOptions)).toThrow('process.exit');
+    expect(mockedLogError).toHaveBeenCalledWith(
+      'Failed to create Rails application. Check the output above for details.',
+    );
+    expect(mockedFs.rmSync).toHaveBeenCalledWith(appPath, { recursive: true, force: true });
+    expect(mockedLogInfo).toHaveBeenCalledWith('Directory removed. Fix the Rails app creation issue and rerun.');
+  });
+
   it('cleans up app directory when react_on_rails_pro add fails', () => {
     const appPath = path.resolve(process.cwd(), 'my-app');
     mockedExecLiveArgs
@@ -300,7 +314,7 @@ describe('createApp', () => {
     expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
       2,
       'bundle',
-      ['add', 'react_on_rails', '--strict', '--path', path.resolve('../react_on_rails')],
+      ['add', 'react_on_rails', '--path', path.resolve('../react_on_rails')],
       appPath,
     );
   });
@@ -314,7 +328,7 @@ describe('createApp', () => {
     expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
       3,
       'bundle',
-      ['add', 'react_on_rails_pro', '--strict', '--path', path.resolve('../react_on_rails_pro')],
+      ['add', 'react_on_rails_pro', '--path', path.resolve('../react_on_rails_pro')],
       appPath,
     );
   });
