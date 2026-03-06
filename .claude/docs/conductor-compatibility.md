@@ -27,14 +27,14 @@ Example `.zshenv`:
 # Non-interactive shells (Conductor, coding agents, tool calls) never source .zshrc,
 # so without this they get system Ruby/Node instead of mise-managed versions.
 # In interactive shells, `mise activate zsh` in .zshrc overrides shims with faster direct paths.
-if [ -x /opt/homebrew/bin/mise ]; then
+if [ -x "$HOME/.local/bin/mise" ]; then
+  eval "$("$HOME/.local/bin/mise" activate zsh --shims)"
+elif [ -x /opt/homebrew/bin/mise ]; then
   eval "$(/opt/homebrew/bin/mise activate zsh --shims)"
 elif [ -x /usr/local/bin/mise ]; then
   eval "$(/usr/local/bin/mise activate zsh --shims)"
 elif [ -x /usr/bin/mise ]; then
   eval "$(/usr/bin/mise activate zsh --shims)"
-elif [ -x "$HOME/.local/bin/mise" ]; then
-  eval "$("$HOME/.local/bin/mise" activate zsh --shims)"
 fi
 
 # Export BASH_ENV so non-interactive bash child processes source a minimal file.
@@ -50,14 +50,14 @@ export ENV="$HOME/.profile"
 Example `~/.bash_env` (minimal and script-safe):
 
 ```bash
-if [ -x /opt/homebrew/bin/mise ]; then
+if [ -x "$HOME/.local/bin/mise" ]; then
+  eval "$("$HOME/.local/bin/mise" activate bash --shims)"
+elif [ -x /opt/homebrew/bin/mise ]; then
   eval "$(/opt/homebrew/bin/mise activate bash --shims)"
 elif [ -x /usr/local/bin/mise ]; then
   eval "$(/usr/local/bin/mise activate bash --shims)"
 elif [ -x /usr/bin/mise ]; then
   eval "$(/usr/bin/mise activate bash --shims)"
-elif [ -x "$HOME/.local/bin/mise" ]; then
-  eval "$("$HOME/.local/bin/mise" activate bash --shims)"
 fi
 ```
 
@@ -69,14 +69,14 @@ Example `.profile` (optional; safest with a bash guard so `dash`/strict `sh` jus
 
 ```sh
 if [ -n "${BASH_VERSION:-}" ]; then
-  if [ -x /opt/homebrew/bin/mise ]; then
+  if [ -x "$HOME/.local/bin/mise" ]; then
+    eval "$("$HOME/.local/bin/mise" activate bash --shims)"
+  elif [ -x /opt/homebrew/bin/mise ]; then
     eval "$(/opt/homebrew/bin/mise activate bash --shims)"
   elif [ -x /usr/local/bin/mise ]; then
     eval "$(/usr/local/bin/mise activate bash --shims)"
   elif [ -x /usr/bin/mise ]; then
     eval "$(/usr/bin/mise activate bash --shims)"
-  elif [ -x "$HOME/.local/bin/mise" ]; then
-    eval "$("$HOME/.local/bin/mise" activate bash --shims)"
   fi
 fi
 ```
@@ -92,7 +92,9 @@ Keep `bin/conductor-exec` for non-interactive `sh`/`dash` paths (`sh -c`, `#!/bi
 
 ## Fallback: `bin/conductor-exec` Wrapper
 
-If you haven't configured shell-level shims, use the `bin/conductor-exec` wrapper. It calls `mise exec --`, which prepends the correct tool directories to PATH for the invoked command:
+If you haven't configured shell-level shims, use the `bin/conductor-exec` wrapper.
+When `mise` is available, it runs `mise exec --` (which prepends the correct tool directories to PATH for that command).
+If `mise` is not on PATH, it falls back to running the command directly:
 
 ```bash
 bin/conductor-exec bundle exec ruby --version
