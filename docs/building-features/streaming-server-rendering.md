@@ -157,6 +157,37 @@ For example, with our `MyStreamingComponent`, the sequence might be:
 </script>
 ```
 
+## Compression Middleware Compatibility
+
+Streaming responses use `ActionController::Live`, which writes chunks to a `SizedQueue` (a destructive, non-idempotent data structure). Standard Rack compression middleware (`Rack::Deflater`, `Rack::Brotli`) works correctly with streaming **by default** — each chunk is compressed and flushed immediately, preserving low TTFB.
+
+However, if you pass an `:if` condition that calls `body.each` to check the response size, **streaming responses will deadlock**. The `:if` callback destructively consumes all chunks from the queue, leaving nothing for the compressor to read.
+
+```ruby
+# BAD — causes deadlocks with streaming responses
+config.middleware.use Rack::Deflater, if: lambda { |*, body|
+  sum = 0
+  body.each { |i| sum += i.length }  # destructive — drains the queue
+  sum > 512
+}
+```
+
+The [Rack SPEC](https://github.com/rack/rack/blob/main/SPEC.rdoc) states that `each` must only be called once and middleware must not call `each` directly unless the body responds to `to_ary`. Streaming bodies explicitly do not support `to_ary`.
+
+**Correct pattern** — check `to_ary` before iterating:
+
+```ruby
+config.middleware.use Rack::Deflater, if: lambda { |*, body|
+  # Streaming bodies don't support to_ary — always compress them.
+  # Rack::Deflater handles streaming correctly with sync flush per chunk.
+  return true unless body.respond_to?(:to_ary)
+
+  body.to_ary.sum(&:bytesize) > 512
+}
+```
+
+The same applies to `Rack::Brotli` or any middleware that accepts an `:if` callback.
+
 ## When to Use Streaming
 
 Streaming SSR is particularly valuable in specific scenarios. Here's when to consider it:
