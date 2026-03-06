@@ -274,6 +274,23 @@ describe('createApp', () => {
     );
   });
 
+  it('cleans up app directory when generator fails', () => {
+    const appPath = path.resolve(process.cwd(), 'my-app');
+    mockedExecLiveArgs
+      .mockImplementationOnce(() => {})
+      .mockImplementationOnce(() => {})
+      .mockImplementationOnce(() => {
+        throw new Error('generator failed');
+      });
+
+    expect(() => createApp('my-app', baseOptions)).toThrow('process.exit');
+    expect(mockedLogError).toHaveBeenCalledWith(
+      'React on Rails generator failed. Check the output above for details.',
+    );
+    expect(mockedFs.rmSync).toHaveBeenCalledWith(appPath, { recursive: true, force: true });
+    expect(mockedLogInfo).toHaveBeenCalledWith('Directory removed. Fix the generator issue and rerun.');
+  });
+
   it('uses local react_on_rails gem path when REACT_ON_RAILS_GEM_PATH is set', () => {
     process.env.REACT_ON_RAILS_GEM_PATH = '../react_on_rails';
     const appPath = path.resolve(process.cwd(), 'my-app');
