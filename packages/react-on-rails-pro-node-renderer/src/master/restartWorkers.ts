@@ -9,7 +9,7 @@ import log from '../shared/log.js';
 import { SHUTDOWN_WORKER_MESSAGE } from '../shared/utils.js';
 
 const MILLISECONDS_IN_MINUTE = 60000;
-const REPLACEMENT_WORKER_LISTEN_TIMEOUT_MS = 30000;
+const DEFAULT_REPLACEMENT_WORKER_LISTEN_TIMEOUT_MS = 30000;
 
 declare module 'cluster' {
   interface Worker {
@@ -17,7 +17,11 @@ declare module 'cluster' {
   }
 }
 
-function waitForReplacementWorkerListening(restartedWorker: Worker, knownWorkerIds: Set<number>) {
+function waitForReplacementWorkerListening(
+  restartedWorker: Worker,
+  knownWorkerIds: Set<number>,
+  replacementWorkerListenTimeoutMs: number,
+) {
   const restartedWorkerId = restartedWorker.id;
   return new Promise<void>((resolve) => {
     let timeout: NodeJS.Timeout;
@@ -112,7 +116,7 @@ function waitForReplacementWorkerListening(restartedWorker: Worker, knownWorkerI
         );
       }
       resolve();
-    }, REPLACEMENT_WORKER_LISTEN_TIMEOUT_MS);
+    }, replacementWorkerListenTimeoutMs);
   });
 }
 
@@ -128,10 +132,18 @@ export default async function restartWorkers(
   for (const worker of Object.values(cluster.workers).filter((w) => !!w)) {
     log.debug('Kill worker #%d', worker.id);
     worker.isScheduledRestart = true;
+    const replacementWorkerListenTimeoutMs = Math.max(
+      DEFAULT_REPLACEMENT_WORKER_LISTEN_TIMEOUT_MS,
+      gracefulWorkerRestartTimeout ?? 0,
+    );
     const knownWorkerIds = new Set(
       Object.values(cluster.workers).flatMap((currentWorker) => (currentWorker ? [currentWorker.id] : [])),
     );
-    const replacementWorkerListening = waitForReplacementWorkerListening(worker, knownWorkerIds);
+    const replacementWorkerListening = waitForReplacementWorkerListening(
+      worker,
+      knownWorkerIds,
+      replacementWorkerListenTimeoutMs,
+    );
 
     worker.send(SHUTDOWN_WORKER_MESSAGE);
 

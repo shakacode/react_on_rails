@@ -93,13 +93,10 @@ module ReactOnRailsPro
     # - the hashed server bundle filename (when no copied assets are configured), or
     # - an MD5 digest of server bundle contents plus copied asset contents.
     def self.bundle_hash
-      return @bundle_hash if @bundle_hash && !(Rails.env.development? || Rails.env.test?)
-
       server_bundle_js_file_path = ReactOnRails::Utils.server_bundle_js_file_path
       asset_paths = bundle_hash_asset_paths
 
       hashed_file_name = hash_from_bundle_file_name(server_bundle_js_file_path, asset_paths)
-      return (@bundle_hash = hashed_file_name).tap { @bundle_hash_signature = nil } if hashed_file_name
 
       if contains_http_url?([server_bundle_js_file_path] + asset_paths)
         # Intentionally do not assign @bundle_hash_signature in this branch.
@@ -109,25 +106,31 @@ module ReactOnRailsPro
       end
 
       BUNDLE_HASH_MUTEX.synchronize do
-        current_signature = bundle_hash_signature(server_bundle_js_file_path, asset_paths)
-        unless @bundle_hash && @bundle_hash_signature == current_signature
-          next_hash = calc_bundle_hash(server_bundle_js_file_path, asset_paths)
-          @bundle_hash = next_hash
-          @bundle_hash_signature = current_signature
-        end
+        cached_bundle_hash = @bundle_hash
+        if cached_bundle_hash && !(Rails.env.development? || Rails.env.test?)
+          cached_bundle_hash
+        elsif hashed_file_name
+          @bundle_hash = hashed_file_name
+          @bundle_hash_signature = nil
+          @bundle_hash
+        else
+          current_signature = bundle_hash_signature(server_bundle_js_file_path, asset_paths)
+          unless @bundle_hash && @bundle_hash_signature == current_signature
+            next_hash = calc_bundle_hash(server_bundle_js_file_path, asset_paths)
+            @bundle_hash = next_hash
+            @bundle_hash_signature = current_signature
+          end
 
-        @bundle_hash
+          @bundle_hash
+        end
       end
     end
 
     def self.rsc_bundle_hash
-      return @rsc_bundle_hash if @rsc_bundle_hash && !(Rails.env.development? || Rails.env.test?)
-
       server_rsc_bundle_js_file_path = rsc_bundle_js_file_path
       asset_paths = bundle_hash_asset_paths
 
       hashed_file_name = hash_from_bundle_file_name(server_rsc_bundle_js_file_path, asset_paths)
-      return (@rsc_bundle_hash = hashed_file_name).tap { @rsc_bundle_hash_signature = nil } if hashed_file_name
 
       if contains_http_url?([server_rsc_bundle_js_file_path] + asset_paths)
         # Keep HTTP-backed bundles always recomputed in development/test.
@@ -135,14 +138,23 @@ module ReactOnRailsPro
       end
 
       RSC_BUNDLE_HASH_MUTEX.synchronize do
-        current_signature = bundle_hash_signature(server_rsc_bundle_js_file_path, asset_paths)
-        unless @rsc_bundle_hash && @rsc_bundle_hash_signature == current_signature
-          next_hash = calc_bundle_hash(server_rsc_bundle_js_file_path, asset_paths)
-          @rsc_bundle_hash = next_hash
-          @rsc_bundle_hash_signature = current_signature
-        end
+        cached_bundle_hash = @rsc_bundle_hash
+        if cached_bundle_hash && !(Rails.env.development? || Rails.env.test?)
+          cached_bundle_hash
+        elsif hashed_file_name
+          @rsc_bundle_hash = hashed_file_name
+          @rsc_bundle_hash_signature = nil
+          @rsc_bundle_hash
+        else
+          current_signature = bundle_hash_signature(server_rsc_bundle_js_file_path, asset_paths)
+          unless @rsc_bundle_hash && @rsc_bundle_hash_signature == current_signature
+            next_hash = calc_bundle_hash(server_rsc_bundle_js_file_path, asset_paths)
+            @rsc_bundle_hash = next_hash
+            @rsc_bundle_hash_signature = current_signature
+          end
 
-        @rsc_bundle_hash
+          @rsc_bundle_hash
+        end
       end
     end
 

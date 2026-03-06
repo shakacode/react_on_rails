@@ -408,9 +408,11 @@ describe('worker', () => {
     const bundleDir = path.join(serverBundleCachePathForTest(), bundleHash);
     const staleAssetPath = assetPath(testName, bundleHash);
     const staleExtraPath = path.join(bundleDir, 'pre-uploaded.json');
+    const staleLockPath = path.join(bundleDir, 'stale.lock');
     fs.mkdirSync(bundleDir, { recursive: true });
     fs.writeFileSync(staleAssetPath, '{"source":"stale-upload"}');
     fs.writeFileSync(staleExtraPath, '{"source":"stale-extra"}');
+    fs.writeFileSync(staleLockPath, 'stale-lock');
 
     const app = worker({
       serverBundleCachePath: serverBundleCachePathForTest(),
@@ -431,6 +433,7 @@ describe('worker', () => {
     expect(res.statusCode).toBe(200);
     expect(fs.existsSync(staleExtraPath)).toBe(false);
     expect(fs.existsSync(assetPath(testName, bundleHash))).toBe(true);
+    expect(fs.existsSync(staleLockPath)).toBe(true);
     expect(fs.readFileSync(assetPath(testName, bundleHash), 'utf8')).toBe(
       fs.readFileSync(getFixtureAsset(), 'utf8'),
     );

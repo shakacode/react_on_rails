@@ -401,7 +401,7 @@ export default function run(config: Partial<Config>) {
       if (failures.length > 0) {
         failures.forEach((failure, index) => {
           log.error({
-            msg: `Asset upload failed for target bundle ${index + 1}/${failures.length}`,
+            msg: `Asset upload failed for target bundle ${index + 1}/${targetBundles.length}`,
             err: failure.reason,
             task: taskDescription,
           });

@@ -14,7 +14,6 @@ module ReactOnRailsPro
       described_class.instance_variable_set(:@bundle_hash_signature, nil)
       described_class.instance_variable_set(:@rsc_bundle_hash, nil)
       described_class.instance_variable_set(:@rsc_bundle_hash_signature, nil)
-      described_class.instance_variable_set(:@server_bundle_hash, nil)
     end
 
     describe "cache helpers .bundle_hash and .bundle_file_name" do

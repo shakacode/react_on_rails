@@ -143,16 +143,26 @@ async function handleNewBundleProvided(
         (await fileExistsAsync(bundleFilePathPerTimestamp));
       if (isExistingBundleWriteConflict) {
         log.warn(
-          'Bundle already existed when writing %s while lock was held. Preserving existing bundle and ensuring completion marker.',
+          'Bundle already existed when writing %s while lock was held. Preserving existing bundle, but content was not re-verified in this process.',
           bundleFilePathPerTimestamp,
         );
-        if (assetsToCopy) {
-          await copyUploadedAssets(assetsToCopy, bundleDirectory);
-        }
-        // Complete-marker writes are idempotent. This keeps the loser path safe
-        // even if the competing writer exits after moving bundle bytes.
-        if (!(await isBundleComplete(providedNewBundle.timestamp))) {
-          await markBundleComplete(providedNewBundle.timestamp);
+        try {
+          if (assetsToCopy) {
+            await copyUploadedAssets(assetsToCopy, bundleDirectory);
+          }
+          // Complete-marker writes are idempotent. This keeps the loser path safe
+          // even if the competing writer exits after moving bundle bytes.
+          if (!(await isBundleComplete(providedNewBundle.timestamp))) {
+            await markBundleComplete(providedNewBundle.timestamp);
+          }
+        } catch (recoveryError) {
+          const msg = formatExceptionMessage(
+            renderingRequest,
+            recoveryError,
+            `Error during EEXIST recovery for bundle ${bundleFilePathPerTimestamp}`,
+          );
+          log.error(msg);
+          return errorResponseResult(msg);
         }
         return undefined;
       }
