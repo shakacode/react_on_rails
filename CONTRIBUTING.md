@@ -2,13 +2,13 @@
 
 **🏗️ Important: Monorepo Merger in Progress**
 
-We are currently working on merging the `react_on_rails` and `react_on_rails_pro` repositories into a unified monorepo. This will provide better development experience while maintaining separate package identities and licensing. See [docs/MONOREPO_MERGER_PLAN_REF.md](./docs/MONOREPO_MERGER_PLAN_REF.md) for details.
+We are currently working on merging the `react_on_rails` and `react_on_rails_pro` repositories into a unified monorepo. This will provide better development experience while maintaining separate package identities and licensing. See [Issue #2367: Merger Command Center](https://github.com/shakacode/react_on_rails/issues/2367) for the current status and sequencing.
 
 During this transition:
 
 - Continue contributing to the current structure
 - License compliance remains critical - ensure no Pro code enters MIT-licensed areas
-- Major structural changes may be coordinated with the merger plan
+- Major structural changes may be coordinated with the merger tracker issue
 
 ---
 
