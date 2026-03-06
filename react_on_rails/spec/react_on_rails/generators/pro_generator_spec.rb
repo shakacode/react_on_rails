@@ -150,6 +150,43 @@ describe ProGenerator, type: :generator do
   # ProGenerator has no --rspack option; detection is via rspack_configured_in_project?.
   # Uses before (not before(:all)) to allow mocking the Pro gem check.
 
+  # Unit tests for using_rspack? on ProGenerator specifically.
+  # ProGenerator does not declare --rspack, so options[:rspack] is always nil and
+  # rspack_configured_in_project? (YAML detection) is the only real code path.
+  # Integration tests above exercise this end-to-end; these unit tests make the
+  # detection logic explicit on the class that actually uses it.
+
+  describe "#using_rspack?" do
+    context "when shakapacker.yml has assets_bundler: rspack" do
+      let(:generator) { described_class.new }
+
+      before do
+        prepare_destination
+        simulate_rspack_shakapacker_yml
+        allow(generator).to receive(:destination_root).and_return(destination_root)
+        allow(Gem).to receive(:loaded_specs).and_return({ "react_on_rails_pro" => double })
+      end
+
+      it "returns true via YAML fallback (no --rspack option available on ProGenerator)" do
+        expect(generator.send(:using_rspack?)).to be true
+      end
+    end
+
+    context "when no shakapacker.yml exists" do
+      let(:generator) { described_class.new }
+
+      before do
+        prepare_destination
+        allow(generator).to receive(:destination_root).and_return(destination_root)
+        allow(Gem).to receive(:loaded_specs).and_return({ "react_on_rails_pro" => double })
+      end
+
+      it "returns false" do
+        expect(generator.send(:using_rspack?)).to be false
+      end
+    end
+  end
+
   context "when prerequisites are met on an existing rspack project" do
     before do
       prepare_destination

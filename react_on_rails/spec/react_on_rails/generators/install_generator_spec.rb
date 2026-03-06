@@ -1391,17 +1391,6 @@ describe InstallGenerator, type: :generator do
         expect(install_generator.send(:using_rspack?)).to be false
       end
     end
-
-    context "when options[:rspack] is nil and shakapacker.yml has rspack configured" do
-      let(:install_generator) { described_class.new }
-
-      it "falls back to project detection via rspack_configured_in_project?" do
-        # options[:rspack] is false (not nil) for InstallGenerator when not passed,
-        # so stub options to return nil for :rspack to exercise the fallback branch
-        allow(install_generator).to receive_messages(rspack_configured_in_project?: true, options: { rspack: nil })
-        expect(install_generator.send(:using_rspack?)).to be true
-      end
-    end
   end
 
   describe "#destination_config_path" do

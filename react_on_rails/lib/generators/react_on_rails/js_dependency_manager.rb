@@ -17,11 +17,13 @@ module ReactOnRails
     # - add_npm_dependencies(packages, dev: false): Add packages via package_json gem
     # - package_json: Access to PackageJson instance (always available via shakapacker)
     # - destination_root: Generator destination directory
+    # - using_rspack?: Returns true if rspack is the configured bundler
+    #   (called unconditionally; provided by GeneratorHelper)
+    # - using_swc?: Returns true if SWC is the configured transpiler
+    #   (called unconditionally; provided by GeneratorHelper)
     #
     # == Optional Methods
     # Including classes may define:
-    # - using_rspack?: Returns true if rspack is the configured bundler
-    #   (provided by GeneratorHelper; drives dev dependency selection)
     # - use_pro?: Returns true if React on Rails Pro should be used
     # - use_rsc?: Returns true if React Server Components should be used
     #

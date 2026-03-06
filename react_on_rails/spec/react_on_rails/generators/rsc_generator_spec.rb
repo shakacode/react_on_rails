@@ -268,6 +268,41 @@ describe RscGenerator, type: :generator do
   # TypeScript variant — only tests file extension behavior (.tsx vs .jsx).
   # Webpack transforms are TypeScript-agnostic and covered by the main context above.
 
+  # Unit tests for using_rspack? on RscGenerator specifically.
+  # RscGenerator does not declare --rspack, so options[:rspack] is always nil and
+  # rspack_configured_in_project? (YAML detection) is the only real code path.
+  # Integration tests above exercise this end-to-end; these unit tests make the
+  # detection logic explicit on the class that actually uses it.
+
+  describe "#using_rspack?" do
+    context "when shakapacker.yml has assets_bundler: rspack" do
+      let(:generator) { described_class.new }
+
+      before do
+        prepare_destination
+        simulate_rspack_shakapacker_yml
+        allow(generator).to receive(:destination_root).and_return(destination_root)
+      end
+
+      it "returns true via YAML fallback (no --rspack option available on RscGenerator)" do
+        expect(generator.send(:using_rspack?)).to be true
+      end
+    end
+
+    context "when no shakapacker.yml exists" do
+      let(:generator) { described_class.new }
+
+      before do
+        prepare_destination
+        allow(generator).to receive(:destination_root).and_return(destination_root)
+      end
+
+      it "returns false" do
+        expect(generator.send(:using_rspack?)).to be false
+      end
+    end
+  end
+
   context "when Pro is installed with --typescript" do
     before(:all) do
       prepare_destination
