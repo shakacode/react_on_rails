@@ -230,7 +230,10 @@ module ReactOnRailsPro
         return
       end
 
-      return unless File.exist?(asset_path)
+      unless File.exist?(asset_path)
+        Rails.logger&.warn("[ReactOnRailsPro] Asset not found for bundle hash: #{asset_path}")
+        return
+      end
       return if File.directory?(asset_path)
 
       digest.file(asset_path)
