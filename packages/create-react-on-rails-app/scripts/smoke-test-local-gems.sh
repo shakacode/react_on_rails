@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../" && pwd)"
 CLI_BIN="$ROOT_DIR/packages/create-react-on-rails-app/bin/create-react-on-rails-app.js"
@@ -33,6 +33,21 @@ WORKDIR="$(mktemp -d /tmp/create-ror-local-smoke-XXXXXX)"
 APP_JS="smoke-js-$(date +%s)"
 APP_RSC="smoke-rsc-$(date +%s)"
 
+cleanup_on_error() {
+  local status=$?
+
+  if [[ "${KEEP_WORKDIR_ON_FAILURE:-0}" == "1" ]]; then
+    echo "Smoke test failed. Generated apps left in: $WORKDIR" >&2
+  else
+    rm -rf "$WORKDIR"
+    echo "Smoke test failed. Removed temp dir: $WORKDIR" >&2
+  fi
+
+  exit "$status"
+}
+
+trap cleanup_on_error ERR
+
 export CI=true
 export REACT_ON_RAILS_GEM_PATH="$RUBY_GEM_DIR"
 export REACT_ON_RAILS_PRO_GEM_PATH="$RUBY_PRO_GEM_DIR"
@@ -55,9 +70,9 @@ grep -q "hello_world" "$APP_JS_DIR/config/routes.rb"
 grep -q "gem \"react_on_rails_pro\"" "$APP_RSC_DIR/Gemfile"
 grep -q "path: \"$RUBY_PRO_GEM_DIR\"" "$APP_RSC_DIR/Gemfile"
 grep -q "hello_server" "$APP_RSC_DIR/config/routes.rb"
-grep -q "rsc_payload_route" "$APP_RSC_DIR/config/routes.rb"
 test -f "$APP_RSC_DIR/app/controllers/hello_server_controller.rb"
 test -f "$APP_RSC_DIR/app/views/hello_server/index.html.erb"
+grep -q "stream_react_component('HelloServer'" "$APP_RSC_DIR/app/views/hello_server/index.html.erb"
 
 echo "Smoke test passed."
 echo "Generated apps left in: $WORKDIR"

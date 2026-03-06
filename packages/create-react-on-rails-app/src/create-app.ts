@@ -155,7 +155,7 @@ export function createApp(appName: string, options: CliOptions): void {
     }
   }
 
-  // Step 3: Run react_on_rails generator
+  // Final generator step
   const generatorArgs = buildGeneratorArgs(options);
   logStep(totalSteps - 1, totalSteps, 'Running React on Rails generator...');
   try {
@@ -173,7 +173,7 @@ export function createApp(appName: string, options: CliOptions): void {
     process.exit(1);
   }
 
-  // Step 4: Success
+  // Final success step
   logStep(totalSteps, totalSteps, 'Done!');
   printSuccessMessage(appName, options.rsc ? 'hello_server' : 'hello_world');
 }
