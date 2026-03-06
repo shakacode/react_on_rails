@@ -92,8 +92,7 @@ module ReactOnRails
 
         puts Rainbow("📝 Creating React on Rails Pro initializer...").yellow
 
-        pro_template_path = "templates/pro/base/config/initializers/react_on_rails_pro.rb.tt"
-        template(pro_template_path, initializer_path)
+        template("templates/pro/base/config/initializers/react_on_rails_pro.rb.tt", initializer_path)
 
         puts Rainbow("✅ Created #{initializer_path}").green
       end
@@ -162,10 +161,8 @@ module ReactOnRails
       #
       # Updates ServerClientOrBoth.js:
       # - Changes import to destructured style (required for Pro object export)
-      # rubocop:disable Metrics/AbcSize
       def update_webpack_config_for_pro
-        webpack_config = destination_config_path("config/webpack/serverWebpackConfig.js")
-        webpack_config_path = File.join(destination_root, webpack_config)
+        webpack_config, webpack_config_path = webpack_config_paths
 
         unless File.exist?(webpack_config_path)
           puts Rainbow("ℹ️  serverWebpackConfig.js not found, skipping webpack update").yellow
@@ -218,7 +215,11 @@ module ReactOnRails
         verify_pro_webpack_transforms(webpack_config)
         puts Rainbow("✅ Updated webpack configs for Pro").green
       end
-      # rubocop:enable Metrics/AbcSize
+
+      def webpack_config_paths
+        config = destination_config_path("config/webpack/serverWebpackConfig.js")
+        [config, File.join(destination_root, config)]
+      end
 
       def add_extract_loader_to_server_config(webpack_config, content)
         # Skip if extractLoader already exists

@@ -156,9 +156,11 @@ module GeneratorHelper
   def using_rspack?
     return @using_rspack if defined?(@using_rspack)
 
-    # options[:rspack] returns true/false if --rspack was declared on this generator,
-    # or nil if the option was not declared (e.g. RscGenerator, ProGenerator).
-    @using_rspack = options[:rspack].nil? ? rspack_configured_in_project? : options[:rspack]
+    # options.key?(:rspack) is true when the generator declares --rspack (e.g. InstallGenerator),
+    # false when it does not (e.g. RscGenerator, ProGenerator). Using .key? rather than .nil?
+    # check on the value makes the intent explicit and avoids relying on Thor returning nil for
+    # undeclared options.
+    @using_rspack = options.key?(:rspack) ? options[:rspack] : rspack_configured_in_project?
   end
 
   # Remap a config path from config/webpack/ to config/rspack/ when using rspack.

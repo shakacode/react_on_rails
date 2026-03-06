@@ -1449,6 +1449,20 @@ describe InstallGenerator, type: :generator do
       expect(Bundler).to have_received(:with_unbundled_env).at_least(:twice)
     end
 
+    it "passes SHAKAPACKER_ASSETS_BUNDLER=rspack to shakapacker:install when --rspack is set" do
+      rspack_generator = described_class.new([], { rspack: true })
+      allow(Bundler).to receive(:with_unbundled_env).and_yield
+      allow(rspack_generator).to receive(:system).with("bundle install").and_return(true)
+      allow(rspack_generator).to receive(:system)
+        .with({ "SHAKAPACKER_ASSETS_BUNDLER" => "rspack" }, "bundle exec rails shakapacker:install")
+        .and_return(true)
+
+      rspack_generator.send(:install_shakapacker)
+
+      expect(rspack_generator).to have_received(:system)
+        .with({ "SHAKAPACKER_ASSETS_BUNDLER" => "rspack" }, "bundle exec rails shakapacker:install")
+    end
+
     context "with fake BUNDLE_GEMFILE set" do
       around do |example|
         original_gemfile = ENV.fetch("BUNDLE_GEMFILE", nil)
