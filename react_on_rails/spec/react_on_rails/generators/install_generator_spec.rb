@@ -1387,6 +1387,9 @@ describe InstallGenerator, type: :generator do
     context "when --rspack option is not provided" do
       let(:install_generator) { described_class.new }
 
+      # InstallGenerator declares --rspack with default: false, so options[:rspack]
+      # is false (not nil). using_rspack? returns false via the first branch without
+      # reaching the YAML fallback (rspack_configured_in_project?).
       it "returns false" do
         expect(install_generator.send(:using_rspack?)).to be false
       end

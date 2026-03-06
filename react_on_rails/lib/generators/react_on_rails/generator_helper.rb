@@ -277,6 +277,10 @@ module GeneratorHelper
 
   private
 
+  # NOTE: only the `default:` section is inspected — same assumption as
+  # rspack_configured_in_project?. Projects that set `javascript_transpiler`
+  # only in per-environment sections (without a `default:` block) will not be
+  # detected. In practice Shakapacker always places it in `default: &default`.
   def detect_swc_configuration
     shakapacker_yml_path = File.join(destination_root, "config/shakapacker.yml")
 
