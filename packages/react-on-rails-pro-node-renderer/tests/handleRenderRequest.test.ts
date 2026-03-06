@@ -394,6 +394,51 @@ describe(testName, () => {
     expect(secondaryAsset2Exists).toBeTruthy();
   });
 
+  test('If a provided dependency bundle already exists and is complete, skip the duplicate upload', async () => {
+    expect.assertions(4);
+    await createSecondaryVmBundle(testName);
+    await createUploadedBundle(testName);
+    await createUploadedSecondaryBundle(testName);
+
+    const renderingRequest = `
+      runOnOtherBundle(${SECONDARY_BUNDLE_TIMESTAMP}, 'ReactOnRails.dummy').then((secondaryBundleResult) => ({
+        mainBundleResult: ReactOnRails.dummy,
+        secondaryBundleResult: JSON.parse(secondaryBundleResult),
+      }));
+    `;
+
+    const result = await handleRenderRequest({
+      renderingRequest,
+      bundleTimestamp: BUNDLE_TIMESTAMP,
+      dependencyBundleTimestamps: [SECONDARY_BUNDLE_TIMESTAMP],
+      providedNewBundles: [
+        {
+          bundle: {
+            filename: '',
+            savedFilePath: uploadedBundlePath(testName),
+            type: 'asset',
+          },
+          timestamp: BUNDLE_TIMESTAMP,
+        },
+        {
+          bundle: {
+            filename: '',
+            savedFilePath: uploadedSecondaryBundlePath(testName),
+            type: 'asset',
+          },
+          timestamp: SECONDARY_BUNDLE_TIMESTAMP,
+        },
+      ],
+    });
+
+    expect(result).toEqual(renderResultFromBothBundles);
+    expect(hasVMContextForBundle(path.resolve(__dirname, `./tmp/${testName}/1495063024898/1495063024898.js`))).toBeTruthy();
+    expect(hasVMContextForBundle(path.resolve(__dirname, `./tmp/${testName}/1495063024899/1495063024899.js`))).toBeTruthy();
+    await expect(
+      fsPromises.access(bundleCompleteMarkerPath(testName, String(SECONDARY_BUNDLE_TIMESTAMP))),
+    ).resolves.toBeUndefined();
+  });
+
   test('If dependency bundle timestamps are provided but not uploaded yet', async () => {
     expect.assertions(1);
 
