@@ -129,6 +129,68 @@ describe RscGenerator, type: :generator do
     end
   end
 
+  # Rspack variant — verifies that standalone RSC generator writes to config/rspack/
+  # when it detects an existing rspack project via config/shakapacker.yml.
+  # RscGenerator has no --rspack option; detection is via rspack_configured_in_project?.
+
+  context "when Pro is installed on an existing rspack project" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      # simulate_rspack_pro_webpack_files also creates the rspack shakapacker.yml
+      # so rspack_configured_in_project? returns true (no --rspack flag available)
+      simulate_rspack_pro_webpack_files
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "creates RSC webpack config in config/rspack/ (not config/webpack/)" do
+      assert_file "config/rspack/rscWebpackConfig.js" do |content|
+        expect(content).to include("rscConfig")
+      end
+      assert_no_file "config/webpack/rscWebpackConfig.js"
+    end
+
+    describe "RSC webpack config transforms in config/rspack/" do
+      it "adds RSCWebpackPlugin to serverWebpackConfig" do
+        assert_file "config/rspack/serverWebpackConfig.js" do |content|
+          expect(content).to include("RSCWebpackPlugin")
+          expect(content).to include("react-on-rails-rsc/WebpackPlugin")
+        end
+      end
+
+      it "adds rscBundle parameter to configureServer" do
+        assert_file "config/rspack/serverWebpackConfig.js" do |content|
+          expect(content).to match(/configureServer\s*=\s*\(rscBundle\s*=\s*false\)/)
+        end
+      end
+
+      it "adds RSCWebpackPlugin to clientWebpackConfig" do
+        assert_file "config/rspack/clientWebpackConfig.js" do |content|
+          expect(content).to include("RSCWebpackPlugin")
+          expect(content).to include("new RSCWebpackPlugin({ isServer: false })")
+        end
+      end
+
+      it "adds RSC handling to ServerClientOrBoth" do
+        assert_file "config/rspack/ServerClientOrBoth.js" do |content|
+          expect(content).to include("rscWebpackConfig")
+          expect(content).to include("RSC_BUNDLE_ONLY")
+          expect(content).to include("rscConfig")
+        end
+      end
+    end
+  end
+
   context "when Pro is installed with legacy webpack exports" do
     before(:all) do
       prepare_destination

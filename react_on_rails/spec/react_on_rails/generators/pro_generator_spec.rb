@@ -144,4 +144,45 @@ describe ProGenerator, type: :generator do
       end
     end
   end
+
+  # Rspack variant — verifies that standalone Pro generator writes to config/rspack/
+  # when it detects an existing rspack project via config/shakapacker.yml.
+  # ProGenerator has no --rspack option; detection is via rspack_configured_in_project?.
+  # Uses before (not before(:all)) to allow mocking the Pro gem check.
+
+  context "when prerequisites are met on an existing rspack project" do
+    before do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails.rb", "ReactOnRails.configure {}")
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      # simulate_rspack_base_webpack_files also creates the rspack shakapacker.yml
+      # so rspack_configured_in_project? returns true (no --rspack flag available)
+      simulate_rspack_base_webpack_files
+      allow(Gem).to receive(:loaded_specs).and_return({ "react_on_rails_pro" => double })
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    describe "Pro webpack config transforms in config/rspack/" do
+      it "applies Pro transforms to serverWebpackConfig in config/rspack/ (not config/webpack/)" do
+        assert_file "config/rspack/serverWebpackConfig.js" do |content|
+          expect(content).to include("libraryTarget: 'commonjs2',")
+          expect(content).to include("function extractLoader")
+          expect(content).to include("serverWebpackConfig.target = 'node';")
+          expect(content).to include("module.exports = {")
+        end
+        assert_no_file "config/webpack/serverWebpackConfig.js"
+      end
+
+      it "updates ServerClientOrBoth.js to destructured import in config/rspack/" do
+        assert_file "config/rspack/ServerClientOrBoth.js" do |content|
+          expect(content).to include("{ default: serverWebpackConfig }")
+        end
+      end
+    end
+  end
 end
