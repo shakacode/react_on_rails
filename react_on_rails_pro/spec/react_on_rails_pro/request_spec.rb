@@ -223,14 +223,9 @@ describe ReactOnRailsPro::Request do
 
       expect do
         described_class.send(:get_form_body_for_file, url_path)
-      end.to raise_error(ReactOnRailsPro::Error, /#{Regexp.escape(url_path)}.*connection refused/)
-
-      expect do
-        described_class.send(:get_form_body_for_file, url_path)
-      rescue ReactOnRailsPro::Error => e
-        expect(e.cause).to be(http_error)
-        raise
-      end.to raise_error(ReactOnRailsPro::Error)
+      end.to raise_error(ReactOnRailsPro::Error, /#{Regexp.escape(url_path)}.*connection refused/) { |error|
+        expect(error.cause).to be(http_error)
+      }
     end
   end
 
