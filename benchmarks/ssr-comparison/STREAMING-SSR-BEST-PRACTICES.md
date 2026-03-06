@@ -131,6 +131,13 @@ repeated structural elements. Consolidate N small elements into 1 where possible
 
 ## 2. Use `dangerouslySetInnerHTML` for Large Static Tables
 
+> **Disclaimer:** This pattern is not recommended by any official React documentation or
+> widely adopted in the community for SSR performance. It carries XSS risks if used with
+> unsanitized user input, bypasses React's virtual DOM reconciliation, and may cause
+> hydration issues in React 19. We document it here solely because our experiments showed
+> a measurable improvement — the real win comes from reducing element count (Practice 1),
+> and `dangerouslySetInnerHTML` is just one way to achieve that for static content.
+
 **Finding:** The `DataSectionLite` component renders a 20×8 comparison table. Using
 `dangerouslySetInnerHTML` to write the entire `<thead>` + `<tbody>` + `<tfoot>` as a
 single string reduced ~200 DOM elements to 1 write operation.
