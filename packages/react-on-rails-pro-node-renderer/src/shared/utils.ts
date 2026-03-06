@@ -232,7 +232,9 @@ export async function cleanIncompleteBundleDirectory(bundleTimestamp: string | n
     throw error;
   }
 
-  const entriesToRemove = entries.filter((entry) => !entry.endsWith('.lock'));
+  const entriesToRemove = entries.filter(
+    (entry) => !entry.endsWith('.lock') && entry !== BUNDLE_COMPLETE_MARKER_FILE,
+  );
   if (entriesToRemove.length === 0) {
     return false;
   }

@@ -102,7 +102,9 @@ module ReactOnRailsPro
         # Intentionally do not assign @bundle_hash_signature in this branch.
         # In development/test we want every call to re-fetch HTTP content and
         # recompute the hash instead of memoizing by a local file signature.
-        return @bundle_hash = calc_bundle_hash(server_bundle_js_file_path, asset_paths)
+        result = calc_bundle_hash(server_bundle_js_file_path, asset_paths)
+        BUNDLE_HASH_MUTEX.synchronize { @bundle_hash = result }
+        return result
       end
 
       BUNDLE_HASH_MUTEX.synchronize do
@@ -134,7 +136,9 @@ module ReactOnRailsPro
 
       if contains_http_url?([server_rsc_bundle_js_file_path] + asset_paths)
         # Keep HTTP-backed bundles always recomputed in development/test.
-        return @rsc_bundle_hash = calc_bundle_hash(server_rsc_bundle_js_file_path, asset_paths)
+        result = calc_bundle_hash(server_rsc_bundle_js_file_path, asset_paths)
+        RSC_BUNDLE_HASH_MUTEX.synchronize { @rsc_bundle_hash = result }
+        return result
       end
 
       RSC_BUNDLE_HASH_MUTEX.synchronize do
@@ -292,6 +296,8 @@ module ReactOnRailsPro
       asset_paths = Array(ReactOnRailsPro.configuration.assets_to_copy).compact.map(&:to_s)
 
       if ReactOnRailsPro.configuration.enable_rsc_support
+        # Keep both hash families sensitive to manifest updates so shared node
+        # renderer cache state is invalidated consistently when RSC manifests change.
         asset_paths << react_client_manifest_file_path.to_s
         asset_paths << react_server_client_manifest_file_path.to_s
       end
