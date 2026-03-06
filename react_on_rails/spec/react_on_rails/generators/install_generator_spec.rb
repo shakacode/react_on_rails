@@ -1144,6 +1144,7 @@ describe InstallGenerator, type: :generator do
 
       expect(install_generator).to receive(:say_status)
         .with(:pretend, "Skipping chmod on bin scripts in --pretend mode", :yellow)
+      expect(Dir).not_to receive(:chdir)
       expect(File).not_to receive(:chmod)
 
       install_generator.send(:add_bin_scripts)

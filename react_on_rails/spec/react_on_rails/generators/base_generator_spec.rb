@@ -3,10 +3,6 @@
 require_relative "../support/generator_spec_helper"
 
 RSpec.describe ReactOnRails::Generators::BaseGenerator, type: :generator do
-  include GeneratorSpec::TestCase
-
-  destination File.expand_path("../dummy-for-generators", __dir__)
-
   describe "--pretend mode behavior" do
     let(:base_generator) { described_class.new([], { pretend: true }) }
 

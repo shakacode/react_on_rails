@@ -266,6 +266,11 @@ module ReactOnRails
           gsub_file "bin/dev", 'DEFAULT_ROUTE = "hello_world"', 'DEFAULT_ROUTE = "hello_server"'
         end
 
+        if options[:pretend]
+          say_status :pretend, "Skipping chmod on bin scripts in --pretend mode", :yellow
+          return
+        end
+
         # Make these and only these files executable
         files_to_copy = []
         Dir.chdir(template_bin_path) do
@@ -273,11 +278,7 @@ module ReactOnRails
         end
         files_to_become_executable = files_to_copy.map { |filename| "bin/#{filename}" }
 
-        if options[:pretend]
-          say_status :pretend, "Skipping chmod on bin scripts in --pretend mode", :yellow
-        else
-          File.chmod(0o755, *files_to_become_executable)
-        end
+        File.chmod(0o755, *files_to_become_executable)
       end
 
       def add_post_install_message
