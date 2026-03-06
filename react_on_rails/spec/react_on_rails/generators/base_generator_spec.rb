@@ -2,7 +2,7 @@
 
 require_relative "../support/generator_spec_helper"
 
-describe BaseGenerator, type: :generator do
+RSpec.describe ReactOnRails::Generators::BaseGenerator, type: :generator do
   include GeneratorSpec::TestCase
 
   destination File.expand_path("../dummy-for-generators", __dir__)
@@ -18,6 +18,8 @@ describe BaseGenerator, type: :generator do
         destination_root: "/fake/path"
       )
 
+      expect(base_generator).to receive(:say_status)
+        .with(:pretend, "Skipping chmod on shakapacker-precompile-hook in --pretend mode", :yellow)
       expect(File).not_to receive(:chmod)
 
       base_generator.copy_base_files

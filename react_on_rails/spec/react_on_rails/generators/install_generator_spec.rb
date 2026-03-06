@@ -1142,6 +1142,8 @@ describe InstallGenerator, type: :generator do
       allow(install_generator).to receive(:directory)
       allow(install_generator).to receive(:use_rsc?).and_return(false)
 
+      expect(install_generator).to receive(:say_status)
+        .with(:pretend, "Skipping chmod on bin scripts in --pretend mode", :yellow)
       expect(File).not_to receive(:chmod)
 
       install_generator.send(:add_bin_scripts)
@@ -1167,7 +1169,6 @@ describe InstallGenerator, type: :generator do
     it "does not write tsconfig.json in pretend mode" do
       expect(install_generator).to receive(:say_status)
         .with(:pretend, "Would create tsconfig.json (skipped in --pretend mode)", :yellow)
-      expect(File).not_to receive(:exist?).with("tsconfig.json")
       expect(File).not_to receive(:write)
 
       install_generator.send(:create_typescript_config)

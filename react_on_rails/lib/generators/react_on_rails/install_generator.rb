@@ -273,7 +273,11 @@ module ReactOnRails
         end
         files_to_become_executable = files_to_copy.map { |filename| "bin/#{filename}" }
 
-        File.chmod(0o755, *files_to_become_executable) unless options[:pretend]
+        if options[:pretend]
+          say_status :pretend, "Skipping chmod on bin scripts in --pretend mode", :yellow
+        else
+          File.chmod(0o755, *files_to_become_executable)
+        end
       end
 
       def add_post_install_message
