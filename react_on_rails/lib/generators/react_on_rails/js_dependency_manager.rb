@@ -20,7 +20,7 @@ module ReactOnRails
     #
     # == Optional Methods
     # Including classes may define:
-    # - options.rspack?: Returns true if --rspack flag is set (for Rspack support)
+    # - options[:rspack]: Returns true if --rspack flag is set (for Rspack support)
     # - options.typescript?: Returns true if --typescript flag is set (for TypeScript support)
     #
     # == Installation Behavior

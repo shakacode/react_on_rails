@@ -33,6 +33,13 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
       attr_writer :using_swc
 
+      # Mock using_rspack? from GeneratorHelper (defaults to false)
+      def using_rspack?
+        @using_rspack.nil? ? false : @using_rspack
+      end
+
+      attr_writer :using_rspack
+
       # Test helpers
       attr_writer :add_npm_dependencies_result
 
@@ -336,10 +343,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
     end
 
     it "adds Rspack dev dependencies when --rspack flag is set" do
-      # rubocop:disable RSpec/VerifiedDoubles
-      options = double("Options", rspack?: true)
-      # rubocop:enable RSpec/VerifiedDoubles
-      instance.options = options
+      instance.using_rspack = true
 
       instance.send(:add_dev_dependencies)
 
