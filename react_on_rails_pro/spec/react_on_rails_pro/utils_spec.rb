@@ -83,6 +83,10 @@ module ReactOnRailsPro
               allow(ReactOnRails::Utils).to receive(:server_bundle_js_file_path)
                 .and_return(server_bundle_js_file_path)
               allow(ReactOnRails.configuration).to receive(:server_bundle_js_file).and_return("webpack-bundle.js")
+              allow(File).to receive(:exist?).and_call_original
+              allow(File).to receive(:directory?).and_call_original
+              allow(File).to receive(:exist?).with(server_bundle_js_file_path).and_return(true)
+              allow(File).to receive(:directory?).with(server_bundle_js_file_path).and_return(false)
               digest = instance_double(Digest::MD5, hexdigest: "foobarfoobar")
               allow(Digest::MD5).to receive(:new).and_return(digest)
               allow(digest).to receive(:<<)
@@ -102,6 +106,10 @@ module ReactOnRailsPro
               allow(described_class).to receive(:rsc_bundle_js_file_path)
                 .and_return(rsc_bundle_js_file_path)
               allow(ReactOnRailsPro.configuration).to receive(:rsc_bundle_js_file).and_return("rsc-webpack-bundle.js")
+              allow(File).to receive(:exist?).and_call_original
+              allow(File).to receive(:directory?).and_call_original
+              allow(File).to receive(:exist?).with(rsc_bundle_js_file_path).and_return(true)
+              allow(File).to receive(:directory?).with(rsc_bundle_js_file_path).and_return(false)
               digest = instance_double(Digest::MD5, hexdigest: "barfoobarfoo")
               allow(Digest::MD5).to receive(:new).and_return(digest)
               allow(digest).to receive(:<<)
@@ -124,6 +132,8 @@ module ReactOnRailsPro
               allow(ReactOnRailsPro.configuration).to receive(:assets_to_copy).and_return([asset_path])
               allow(File).to receive(:exist?).and_call_original
               allow(File).to receive(:directory?).and_call_original
+              allow(File).to receive(:exist?).with(server_bundle_js_file_path).and_return(true)
+              allow(File).to receive(:directory?).with(server_bundle_js_file_path).and_return(false)
               allow(File).to receive(:exist?).with(asset_path).and_return(true)
               allow(File).to receive(:directory?).with(asset_path).and_return(false)
               digest = instance_double(Digest::MD5, hexdigest: "withassets")
