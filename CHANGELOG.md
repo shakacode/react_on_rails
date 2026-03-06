@@ -27,40 +27,18 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 Changes since the last non-beta release.
 
-#### Pro
-
-##### Fixed
-
-- **Fix streaming SSR hangs and silent error absorption in RSC payload injection**: Fixed two related issues: (1) streaming SSR renders hanging forever when errors occur because Node.js `stream.pipe()` doesn't propagate errors or closure from source to destination, and (2) errors in the RSC payload injection pipeline being silently absorbed, preventing them from reaching error reporters like Sentry. Introduced a shared `safePipe` utility and used `'close'` events as reliable termination signals across the streaming pipeline (Node renderer, RSC payload injection, transform streams, and Ruby async task). Also added a Ruby safety net to prevent Rails request hangs when async rendering tasks raise before the first chunk. [PR 2407](https://github.com/shakacode/react_on_rails/pull/2407) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-- **Handle HTTPX error responses when fetching dev-server bundle/assets for upload**: During development startup races, `get_form_body_for_file` could receive `HTTPX::ErrorResponse` and still call `response.body`, causing an unexpected crash path. The request layer now raises `ReactOnRailsPro::Error` with HTTPX error details before body access and includes regression tests for local path, HTTP success, and HTTP error cases. [PR 2532](https://github.com/shakacode/react_on_rails/pull/2532) by [justin808](https://github.com/justin808).
-
-### [16.4.0.rc.5] - 2026-02-26
-
 #### Fixed
 
-- **Fixed ScoutApm instrumentation depending on Gemfile ordering**. ScoutApm instrumentation for `react_component`, `react_component_hash`, and `exec_server_render_js` was previously installed at gem load time using `defined?(ScoutApm)` guards, which meant it was silently skipped if `scout_apm` appeared after `react_on_rails` in the Gemfile, and produced noisy INFO log messages if it appeared before (since ScoutApm wasn't yet initialized). Moved instrumentation into an initializer that runs after `scout_apm.start`, ensuring it works regardless of gem ordering and only after ScoutApm is fully configured. [PR 2442](https://github.com/shakacode/react_on_rails/pull/2442) by [tonyta](https://github.com/tonyta).
-- **RSC WebpackLoader with SWC transpiler**: Fixed RSC WebpackLoader never being injected when using SWC (Shakapacker's default transpiler). The RSC config only handled array-based `rule.use` (Babel) but SWC uses a function-based `rule.use`, so `'use client'` files passed through untransformed into the RSC bundle. Now handles both array and function loader declarations. [PR 2476](https://github.com/shakacode/react_on_rails/pull/2476) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-- **RSC Generator Layout Wiring**: Fixed `MissingEntryError` on fresh RSC installs where `HelloServerController` fell back to Rails' `application.html.erb` (which uses `javascript_pack_tag "application"` that is not created by the RSC flow). The generator now always copies `hello_world.html.erb`, `HelloServerController` explicitly uses `layout "hello_world"`, and post-install output now shows `stream_react_component` for RSC installs. [PR 2429](https://github.com/shakacode/react_on_rails/pull/2429) by [justin808](https://github.com/justin808).
+- **CSS module SSR fixes for rspack**: Fixed CSS module class name divergence between client and server bundles when using rspack. Server webpack config now filters rspack's `cssExtractLoader` in addition to `mini-css-extract-plugin`, uses spread syntax to preserve existing CSS module options when setting `exportOnlyLocals: true`, and adds null guards against undefined entries in `rule.use` arrays. Note: `exportOnlyLocals: true` is no longer applied when `cssLoader.options.modules` is falsy (disabled), which is the correct behavior but a change from prior versions. [PR 2489](https://github.com/shakacode/react_on_rails/pull/2489) by [justin808](https://github.com/justin808).
+- **Fixed `private_output_path` not configured on fresh Shakapacker installs**: When running `rails g react_on_rails:install` without pre-existing Shakapacker configuration, `private_output_path: ssr-generated` was left commented out in the generated `config/shakapacker.yml`. The generator now detects whether Shakapacker was just installed and passes a `shakapacker_just_installed` flag to `BaseGenerator`, which uses `force: true` when copying the config template to ensure the RoR version replaces Shakapacker's default. [PR 2411](https://github.com/shakacode/react_on_rails/pull/2411) by [ihabadham](https://github.com/ihabadham).
 
 #### Pro
 
-##### Improved
-
-- **Better error messages when component is missing `'use client'` with RSC**. When RSC support is enabled, components without `'use client'` silently crash at runtime with confusing errors. Improved error messages at multiple layers: runtime server and client bundles now include the component name and suggest adding `'use client'`, build-time heuristic scans for client-only patterns and emits warnings, and generated server component pack files explain the classification. [PR 2403](https://github.com/shakacode/react_on_rails/pull/2403) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-
 ##### Fixed
 
-- **Boot failure when only `react_on_rails_pro` is listed in the Gemfile.** `react_on_rails_pro.rb` never explicitly required `react_on_rails`, relying on `Bundler.require` to auto-load it via the user's Gemfile. When installation docs were updated to direct users to only add `react_on_rails_pro`, two errors surfaced on boot: `NoMethodError: undefined method 'strip_heredoc'` (from `license_public_key.rb`) and `NoMethodError: undefined method 'configure' for module ReactOnRails` (from `config/initializers/react_on_rails.rb`). Fixed by explicitly requiring `react_on_rails` in `react_on_rails_pro.rb`, completing the same design the JS package split already established for npm. [PR 2492](https://github.com/shakacode/react_on_rails/pull/2492) by [ihabadham](https://github.com/ihabadham).
-- **Sentry SDK v9/v10 compatibility**: The node renderer Sentry integration now supports `@sentry/node` v9 and v10. Replaced `@sentry/types` import (no longer a transitive dependency in v9+) and widened peer dependency range from `<9.0.0` to `<11.0.0`. [PR 2434](https://github.com/shakacode/react_on_rails/pull/2434) by [alexeyr-ci2](https://github.com/alexeyr-ci2).
-- **Fixed node renderer upload race condition causing ENOENT errors and asset corruption during concurrent requests**. Concurrent multipart uploads (e.g., during pod rollovers) all wrote to a single shared path (`uploads/<filename>`), causing file overwrites, `ENOENT` errors, and cross-contamination between requests. Each request now gets its own isolated upload directory (`uploads/<uuid>/`), eliminating all shared-path collisions. [PR 2456](https://github.com/shakacode/react_on_rails/pull/2456) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-- **Fixed node renderer race condition between `/upload-assets` and render requests writing to the same bundle directory**. The `/upload-assets` endpoint used a global lock while render requests used per-bundle locks, so both could write to the same bundle directory concurrently, risking asset corruption. Now both endpoints share the same per-bundle lock key. Also switched parallel bundle processing from `Promise.all` to `Promise.allSettled` to prevent the `onResponse` cleanup hook from deleting uploaded files while in-flight copies are still reading from them. [PR 2464](https://github.com/shakacode/react_on_rails/pull/2464) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-- **Fixed TS2769 build error in node renderer `onFile` callback**. Removed explicit `this: FastifyRequest` annotation that was incompatible with `@fastify/multipart` type definitions, fixing `pnpm build` and `pnpm install` failures on fresh runners. [PR 2469](https://github.com/shakacode/react_on_rails/pull/2469) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **Handle HTTPX error responses when fetching dev-server bundle/assets for upload**: During development startup races, `get_form_body_for_file` could receive `HTTPX::ErrorResponse` and still call `response.body`, causing an unexpected crash path. The request layer now raises `ReactOnRailsPro::Error` with HTTPX error details before body access and includes regression tests for local path, HTTP success, and HTTP error cases. [PR 2532](https://github.com/shakacode/react_on_rails/pull/2532) by [justin808](https://github.com/justin808).
 
-##### Changed
-
-- **Breaking: removed legacy key-file license fallback**: `config/react_on_rails_pro_license.key` is no longer read. Move your token to the `REACT_ON_RAILS_PRO_LICENSE` environment variable. A migration warning is logged at startup when the legacy file is detected and the environment variable is missing. [PR 2454](https://github.com/shakacode/react_on_rails/pull/2454) by [ihabadham](https://github.com/ihabadham).
-
-### [16.4.0.rc.3] - 2026-02-18
+### [16.4.0.rc.6] - 2026-03-04
 
 #### Added
 
@@ -83,6 +61,9 @@ Changes since the last non-beta release.
 
 #### Fixed
 
+- **Fixed ScoutApm instrumentation depending on Gemfile ordering**. ScoutApm instrumentation for `react_component`, `react_component_hash`, and `exec_server_render_js` was previously installed at gem load time using `defined?(ScoutApm)` guards, which meant it was silently skipped if `scout_apm` appeared after `react_on_rails` in the Gemfile, and produced noisy INFO log messages if it appeared before (since ScoutApm wasn't yet initialized). Moved instrumentation into an initializer that runs after `scout_apm.start`, ensuring it works regardless of gem ordering and only after ScoutApm is fully configured. [PR 2442](https://github.com/shakacode/react_on_rails/pull/2442) by [tonyta](https://github.com/tonyta).
+- **RSC WebpackLoader with SWC transpiler**: Fixed RSC WebpackLoader never being injected when using SWC (Shakapacker's default transpiler). The RSC config only handled array-based `rule.use` (Babel) but SWC uses a function-based `rule.use`, so `'use client'` files passed through untransformed into the RSC bundle. Now handles both array and function loader declarations. [PR 2476](https://github.com/shakacode/react_on_rails/pull/2476) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **RSC Generator Layout Wiring**: Fixed `MissingEntryError` on fresh RSC installs where `HelloServerController` fell back to Rails' `application.html.erb` (which uses `javascript_pack_tag "application"` that is not created by the RSC flow). The generator now always copies `hello_world.html.erb`, `HelloServerController` explicitly uses `layout "hello_world"`, and post-install output now shows `stream_react_component` for RSC installs. [PR 2429](https://github.com/shakacode/react_on_rails/pull/2429) by [justin808](https://github.com/justin808).
 - **Fixed string values interpolated into generated JS code without proper escaping**. All string values (component names, DOM IDs, Redux store names) embedded in server-rendering JavaScript now use `.to_json` instead of unescaped single-quoted interpolation, preventing potential JS breakage from special characters. [PR 2440](https://github.com/shakacode/react_on_rails/pull/2440) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 - **Precompile Hook Detection**: Fixed `shakapacker_precompile_hook_configured?` always returning `false` for apps created with the React on Rails generator. The detection logic only matched the rake task pattern (`react_on_rails:generate_packs`) but the generator template uses the Ruby method (`generate_packs_if_stale`). Now correctly detects both patterns, including resolving script file contents. [PR 2282](https://github.com/shakacode/react_on_rails/pull/2282) by [ihabadham](https://github.com/ihabadham).
 - **Precompile Hook Self-Guard for HMR**: Added self-guard to the generator template's `bin/shakapacker-precompile-hook` to prevent duplicate execution in HMR mode where two webpack processes (client dev-server + server watcher) each trigger the hook. The script now exits early when `SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true` is set by `bin/dev`, regardless of Shakapacker version. The version warning is now smarter: it only warns for hooks that lack the self-guard or use direct commands. **Existing users**: add `exit 0 if ENV["SHAKAPACKER_SKIP_PRECOMPILE_HOOK"] == "true"` near the top of your `bin/shakapacker-precompile-hook` script. [PR 2388](https://github.com/shakacode/react_on_rails/pull/2388) by [justin808](https://github.com/justin808).
@@ -95,8 +76,23 @@ Changes since the last non-beta release.
 - **CSP nonce for immediate hydration scripts**: The immediate hydration inline `<script>` tags now include the CSP nonce attribute, fixing browsers blocking them when strict Content Security Policy is enabled. [PR 2398](https://github.com/shakacode/react_on_rails/pull/2398) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 - **License verification rake task**: New `react_on_rails_pro:verify_license` rake task for checking license status with human-readable text and JSON output (`FORMAT=json`) for CI/CD integration. Includes exit codes, automatic renewal warnings for licenses expiring within 30 days, and a GitHub Actions workflow example. [PR 2385](https://github.com/shakacode/react_on_rails/pull/2385) by [justin808](https://github.com/justin808).
 
+##### Changed
+
+- **Breaking: removed legacy key-file license fallback**: `config/react_on_rails_pro_license.key` is no longer read. Move your token to the `REACT_ON_RAILS_PRO_LICENSE` environment variable. A migration warning is logged at startup when the legacy file is detected and the environment variable is missing. [PR 2454](https://github.com/shakacode/react_on_rails/pull/2454) by [ihabadham](https://github.com/ihabadham).
+
+##### Improved
+
+- **Better error messages when component is missing `'use client'` with RSC**. When RSC support is enabled, components without `'use client'` silently crash at runtime with confusing errors. Improved error messages at multiple layers: runtime server and client bundles now include the component name and suggest adding `'use client'`, build-time heuristic scans for client-only patterns and emits warnings, and generated server component pack files explain the classification. [PR 2403](https://github.com/shakacode/react_on_rails/pull/2403) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 ##### Fixed
 
+- **Fixed buildVM promise cleanup ordering in the node renderer**. `buildVM()` cleanup now runs via promise chaining after `vmCreationPromises.set()`, preventing failed synchronous VM builds from leaving stale rejected promises that block retries for the same bundle path. [PR 2484](https://github.com/shakacode/react_on_rails/pull/2484) by [justin808](https://github.com/justin808).
+- **Fix streaming SSR hangs and silent error absorption in RSC payload injection**: Fixed two related issues: (1) streaming SSR renders hanging forever when errors occur because Node.js `stream.pipe()` doesn't propagate errors or closure from source to destination, and (2) errors in the RSC payload injection pipeline being silently absorbed, preventing them from reaching error reporters like Sentry. Introduced a shared `safePipe` utility and used `'close'` events as reliable termination signals across the streaming pipeline (Node renderer, RSC payload injection, transform streams, and Ruby async task). Also added a Ruby safety net to prevent Rails request hangs when async rendering tasks raise before the first chunk. [PR 2407](https://github.com/shakacode/react_on_rails/pull/2407) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **Boot failure when only `react_on_rails_pro` is listed in the Gemfile.** `react_on_rails_pro.rb` never explicitly required `react_on_rails`, relying on `Bundler.require` to auto-load it via the user's Gemfile. When installation docs were updated to direct users to only add `react_on_rails_pro`, two errors surfaced on boot: `NoMethodError: undefined method 'strip_heredoc'` (from `license_public_key.rb`) and `NoMethodError: undefined method 'configure' for module ReactOnRails` (from `config/initializers/react_on_rails.rb`). Fixed by explicitly requiring `react_on_rails` in `react_on_rails_pro.rb`, completing the same design the JS package split already established for npm. [PR 2492](https://github.com/shakacode/react_on_rails/pull/2492) by [ihabadham](https://github.com/ihabadham).
+- **Sentry SDK v9/v10 compatibility**: The node renderer Sentry integration now supports `@sentry/node` v9 and v10. Replaced `@sentry/types` import (no longer a transitive dependency in v9+) and widened peer dependency range from `<9.0.0` to `<11.0.0`. [PR 2434](https://github.com/shakacode/react_on_rails/pull/2434) by [alexeyr-ci2](https://github.com/alexeyr-ci2).
+- **Fixed node renderer upload race condition causing ENOENT errors and asset corruption during concurrent requests**. Concurrent multipart uploads (e.g., during pod rollovers) all wrote to a single shared path (`uploads/<filename>`), causing file overwrites, `ENOENT` errors, and cross-contamination between requests. Each request now gets its own isolated upload directory (`uploads/<uuid>/`), eliminating all shared-path collisions. [PR 2456](https://github.com/shakacode/react_on_rails/pull/2456) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **Fixed node renderer race condition between `/upload-assets` and render requests writing to the same bundle directory**. The `/upload-assets` endpoint used a global lock while render requests used per-bundle locks, so both could write to the same bundle directory concurrently, risking asset corruption. Now both endpoints share the same per-bundle lock key. Also switched parallel bundle processing from `Promise.all` to `Promise.allSettled` to prevent the `onResponse` cleanup hook from deleting uploaded files while in-flight copies are still reading from them. [PR 2464](https://github.com/shakacode/react_on_rails/pull/2464) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **Fixed TS2769 build error in node renderer `onFile` callback**. Removed explicit `this: FastifyRequest` annotation that was incompatible with `@fastify/multipart` type definitions, fixing `pnpm build` and `pnpm install` failures on fresh runners. [PR 2469](https://github.com/shakacode/react_on_rails/pull/2469) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 - **Fixed RSC rendering corruption when props contain `$`-patterns**. Props containing `` $` `` (dollar-backtick), `$'`, or `$&` — common in markdown with bash variables — caused `String.prototype.replace()` to interpret these as special replacement patterns, corrupting the generated JavaScript and hanging the RSC payload stream. Fixed by using a function replacement callback which disables all `$`-pattern interpretation. [PR 2440](https://github.com/shakacode/react_on_rails/pull/2440) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 - **Fixed RSC stream tee backpressure deadlock for large payloads**. Replaced `pipe()`-based stream teeing with manual `on('data')` + `push()` forwarding to prevent deadlocks when RSC payloads exceed the 32KB default highWaterMark buffer, which caused the stream to hang indefinitely. [PR 2444](https://github.com/shakacode/react_on_rails/pull/2444) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
@@ -1292,20 +1288,20 @@ _Note: 8.0.4 skipped._
 - For an example of migration, see: [react-webpack-rails-tutorial PR #395](https://github.com/shakacode/react-webpack-rails-tutorial/pull/395)
 - For a simple example of the webpacker_lite setup, run the basic generator.
 
-## [8.0.0-beta.3] - 2017-05-27
+### 8.0.0-beta.3 - 2017-05-27
 
 #### Changed
 
-- Major updates for WebpackerLite 2.0.2. [#844](https://github.com/shakacode/react_on_rails/pull/845) by [justin808](https://github.com/justin808) with help from ](https://github.com/robwise)
+- Major updates for WebpackerLite 2.0.2. [#844](https://github.com/shakacode/react_on_rails/pull/845) by [justin808](https://github.com/justin808) with help from [robwise](https://github.com/robwise)
 - Logging no longer occurs when trace is turned to false. [#845](https://github.com/shakacode/react_on_rails/pull/845) by [conturbo](https://github.com/Conturbo)
 
-## [8.0.0-beta.2] - 2017-05-08
+### 8.0.0-beta.2 - 2017-05-08
 
 #### Changed
 
 Removed unnecessary values in default paths.yml files for generators. [#834](https://github.com/shakacode/react_on_rails/pull/834) by [justin808](https://github.com/justin808).
 
-## [8.0.0-beta.1] - 2017-05-03
+### 8.0.0-beta.1 - 2017-05-03
 
 #### Added
 
@@ -2030,9 +2026,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.4.0.rc.5...master
-[16.4.0.rc.5]: https://github.com/shakacode/react_on_rails/compare/v16.4.0.rc.3...v16.4.0.rc.5
-[16.4.0.rc.3]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...v16.4.0.rc.3
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.4.0.rc.6...master
+[16.4.0.rc.6]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...v16.4.0.rc.6
 [16.3.0]: https://github.com/shakacode/react_on_rails/compare/v16.2.1...v16.3.0
 [16.2.1]: https://github.com/shakacode/react_on_rails/compare/v16.2.0...v16.2.1
 [16.2.0]: https://github.com/shakacode/react_on_rails/compare/16.1.1...v16.2.0
@@ -2115,9 +2110,6 @@ such as:
 [8.0.2]: https://github.com/shakacode/react_on_rails/compare/8.0.1...8.0.2
 [8.0.1]: https://github.com/shakacode/react_on_rails/compare/8.0.0...8.0.1
 [8.0.0]: https://github.com/shakacode/react_on_rails/compare/7.0.4...8.0.0
-[8.0.0-beta.3]: https://github.com/shakacode/react_on_rails/compare/8.0.0-beta.2...8.0.0-beta.3
-[8.0.0-beta.2]: https://github.com/shakacode/react_on_rails/compare/8.0.0-beta.1...8.0.0-beta.2
-[8.0.0-beta.1]: https://github.com/shakacode/react_on_rails/compare/7.0.4...8.0.0-beta.1
 [7.0.4]: https://github.com/shakacode/react_on_rails/compare/7.0.3...7.0.4
 [7.0.3]: https://github.com/shakacode/react_on_rails/compare/7.0.1...7.0.3
 [7.0.1]: https://github.com/shakacode/react_on_rails/compare/7.0.0...7.0.1
