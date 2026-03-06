@@ -327,13 +327,17 @@ module GeneratorHelper
 
   # Detect rspack from config/shakapacker.yml when no explicit --rspack option is available.
   # Used by standalone generators (RscGenerator, ProGenerator) on existing projects.
+  #
+  # Note: only the `default:` section is inspected. Projects that set `assets_bundler`
+  # only in per-environment sections (without a `default:` block) will not be detected.
+  # This is not a concern in practice: Shakapacker's install template always places
+  # `assets_bundler` inside the `default: &default` block, and our generator writes
+  # it there too via configure_rspack_in_shakapacker.
   def rspack_configured_in_project?
     shakapacker_yml_path = File.join(destination_root, "config/shakapacker.yml")
     return false unless File.exist?(shakapacker_yml_path)
 
     config = parse_shakapacker_yml(shakapacker_yml_path)
     config.dig("default", "assets_bundler") == "rspack"
-  rescue StandardError
-    false
   end
 end

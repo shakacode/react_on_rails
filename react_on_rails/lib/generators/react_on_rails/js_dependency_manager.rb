@@ -20,8 +20,10 @@ module ReactOnRails
     #
     # == Optional Methods
     # Including classes may define:
-    # - options[:rspack]: Returns true if --rspack flag is set (for Rspack support)
-    # - options.typescript?: Returns true if --typescript flag is set (for TypeScript support)
+    # - using_rspack?: Returns true if rspack is the configured bundler
+    #   (provided by GeneratorHelper; drives dev dependency selection)
+    # - use_pro?: Returns true if React on Rails Pro should be used
+    # - use_rsc?: Returns true if React Server Components should be used
     #
     # == Installation Behavior
     # The module ALWAYS runs package manager install after adding dependencies.
