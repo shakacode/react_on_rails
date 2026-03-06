@@ -12,6 +12,7 @@ module ReactOnRailsPro
     #
     # @param template [String] The path to the template file to be streamed.
     # @param close_stream_at_end [Boolean] Whether to automatically close the stream after rendering (default: true).
+    # @param content_type [String, nil] Optional response content type to set immediately before the first write.
     # @param render_options [Hash] Additional options to pass to `render_to_string`.
     #
     # components must be added to the view using the `stream_react_component` helper.
@@ -30,7 +31,9 @@ module ReactOnRailsPro
     #       For more details, refer to `lib/react_on_rails/helper.rb` in the react_on_rails repository.
     #
     # @see ReactOnRails::Helper#stream_react_component
-    def stream_view_containing_react_components(template:, close_stream_at_end: true, **render_options)
+    def stream_view_containing_react_components(
+      template:, close_stream_at_end: true, content_type: nil, **render_options
+    )
       require "async"
       require "async/barrier"
       require "async/limited_queue"
@@ -48,6 +51,7 @@ module ReactOnRailsPro
         # View may contain extra newlines, chunk already contains a newline
         # Having multiple newlines between chunks causes hydration errors
         # So we strip extra newlines from the template string and add a single newline
+        response.content_type = content_type if content_type
         response.stream.write(template_string)
 
         drain_streams_concurrently(parent_task)

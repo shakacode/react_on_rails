@@ -3,34 +3,44 @@
 require "rails_helper"
 
 RSpec.describe "RSC payload endpoint" do
-  around do |example|
-    original_annotation_setting = ActionView::Base.annotate_rendered_view_with_filenames
-
-    ActionView::Base.annotate_rendered_view_with_filenames = true
-
-    example.run
-  ensure
-    ActionView::Base.annotate_rendered_view_with_filenames = original_annotation_setting
+  def request_rsc_payload
+    get "/rsc_payload/RscEchoProps", params: { props: { message: "hello" }.to_json }
   end
 
-  it "returns parseable NDJSON when view annotation comments are enabled" do
-    get "/rsc_payload/RscEchoProps", params: { props: { message: "hello" }.to_json }
-
-    expect(response).to have_http_status(:ok)
-    expect(response.media_type).to eq("application/x-ndjson")
-
-    parsed_chunks = response.body.each_line.filter_map do |line|
+  def parsed_chunks
+    response.body.each_line.filter_map do |line|
       stripped_line = line.strip
       next if stripped_line.empty?
 
       begin
         JSON.parse(stripped_line)
       rescue JSON::ParserError => e
-        raise "RSC payload line is not valid JSON: #{e.message}\nLine: #{stripped_line.inspect}"
+        raise "Non-JSON line in RSC payload response: #{stripped_line.inspect} (#{e.message})"
       end
     end
+  end
+
+  def expect_valid_rsc_payload_response
+    expect(response).to have_http_status(:ok)
+    expect(response.media_type).to eq("application/x-ndjson")
+    expect(response.body).not_to include("<!--")
 
     expect(parsed_chunks).not_to be_empty
-    expect(parsed_chunks).to all(include("html"))
+    html_chunk_message =
+      "Expected at least one RSC chunk to contain an 'html' key, got: #{parsed_chunks.inspect}"
+    expect(parsed_chunks.any? { |chunk| chunk.key?("html") }).to be(true), html_chunk_message
+  end
+
+  it "returns parseable NDJSON without view annotation comments" do
+    request_rsc_payload
+    expect_valid_rsc_payload_response
+  end
+
+  it "returns parseable NDJSON when view annotation comments are enabled" do
+    allow(ActionView::Base).to receive(:annotate_rendered_view_with_filenames).and_return(true)
+
+    request_rsc_payload
+
+    expect_valid_rsc_payload_response
   end
 end
