@@ -736,6 +736,23 @@ describe InstallGenerator, type: :generator do
         expect(deps).to include("@rspack/core")
       end
     end
+
+    describe "Pro webpack config transforms in config/rspack/" do
+      it "applies Pro transforms to serverWebpackConfig in config/rspack/" do
+        assert_file "config/rspack/serverWebpackConfig.js" do |content|
+          expect(content).to include("libraryTarget: 'commonjs2',")
+          expect(content).to include("function extractLoader")
+          expect(content).to include("serverWebpackConfig.target = 'node';")
+          expect(content).to include("module.exports = {")
+        end
+      end
+
+      it "updates ServerClientOrBoth to destructured import in config/rspack/" do
+        assert_file "config/rspack/ServerClientOrBoth.js" do |content|
+          expect(content).to include("{ default: serverWebpackConfig }")
+        end
+      end
+    end
   end
 
   context "when Pro initializer already exists" do
@@ -1034,9 +1051,34 @@ describe InstallGenerator, type: :generator do
       end
     end
 
-    it "creates rscWebpackConfig.js (works with Rspack)" do
-      assert_file "config/webpack/rscWebpackConfig.js" do |content|
+    it "creates rscWebpackConfig.js in config/rspack/ (not config/webpack/)" do
+      assert_file "config/rspack/rscWebpackConfig.js" do |content|
         expect(content).to include("serverWebpackConfig(true)")
+      end
+      assert_no_file "config/webpack/rscWebpackConfig.js"
+    end
+
+    describe "RSC webpack config transforms in config/rspack/" do
+      it "adds RSCWebpackPlugin to serverWebpackConfig" do
+        assert_file "config/rspack/serverWebpackConfig.js" do |content|
+          expect(content).to include("RSCWebpackPlugin")
+          expect(content).to include("react-on-rails-rsc/WebpackPlugin")
+        end
+      end
+
+      it "adds RSCWebpackPlugin to clientWebpackConfig" do
+        assert_file "config/rspack/clientWebpackConfig.js" do |content|
+          expect(content).to include("RSCWebpackPlugin")
+          expect(content).to include("react-on-rails-rsc/WebpackPlugin")
+        end
+      end
+
+      it "adds RSC handling to ServerClientOrBoth" do
+        assert_file "config/rspack/ServerClientOrBoth.js" do |content|
+          expect(content).to include("rscWebpackConfig")
+          expect(content).to include("RSC_BUNDLE_ONLY")
+          expect(content).to include("rscConfig")
+        end
       end
     end
 
