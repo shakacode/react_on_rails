@@ -106,6 +106,18 @@ async function handleNewBundleProvided(
     }
 
     try {
+      const [bundleFileExists, bundleComplete] = await Promise.all([
+        fileExistsAsync(bundleFilePathPerTimestamp),
+        isBundleComplete(providedNewBundle.timestamp),
+      ]);
+      if (bundleFileExists && bundleComplete) {
+        log.info(
+          'Bundle %s already exists and is complete. Skipping duplicate upload.',
+          bundleFilePathPerTimestamp,
+        );
+        return undefined;
+      }
+
       const wasIncomplete = await cleanIncompleteBundleDirectory(providedNewBundle.timestamp);
       if (wasIncomplete) {
         log.warn('Removed incomplete bundle directory before writing bundle %s', bundleFilePathPerTimestamp);
