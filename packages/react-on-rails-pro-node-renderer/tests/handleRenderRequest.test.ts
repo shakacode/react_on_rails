@@ -432,8 +432,12 @@ describe(testName, () => {
     });
 
     expect(result).toEqual(renderResultFromBothBundles);
-    expect(hasVMContextForBundle(path.resolve(__dirname, `./tmp/${testName}/1495063024898/1495063024898.js`))).toBeTruthy();
-    expect(hasVMContextForBundle(path.resolve(__dirname, `./tmp/${testName}/1495063024899/1495063024899.js`))).toBeTruthy();
+    expect(
+      hasVMContextForBundle(path.resolve(__dirname, `./tmp/${testName}/1495063024898/1495063024898.js`)),
+    ).toBeTruthy();
+    expect(
+      hasVMContextForBundle(path.resolve(__dirname, `./tmp/${testName}/1495063024899/1495063024899.js`)),
+    ).toBeTruthy();
     await expect(
       fsPromises.access(bundleCompleteMarkerPath(testName, String(SECONDARY_BUNDLE_TIMESTAMP))),
     ).resolves.toBeUndefined();
