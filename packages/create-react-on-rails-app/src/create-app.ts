@@ -9,6 +9,10 @@ function cleanupAppDirectory(
   cleanupSuccessMessage: string,
   cleanupFallbackMessage: string,
 ): void {
+  if (!fs.existsSync(appPath)) {
+    return;
+  }
+
   logInfo(`Cleaning up "${appName}" directory...`);
   try {
     fs.rmSync(appPath, { recursive: true, force: true });
@@ -98,25 +102,14 @@ export function validateAppName(name: string): { success: boolean; error?: strin
 
 export function createApp(appName: string, options: CliOptions): void {
   const appPath = path.resolve(process.cwd(), appName);
-  const createRailsStep = 'Creating Rails application...';
-  const addReactOnRailsStep = 'Adding react_on_rails gem...';
-  const addReactOnRailsProStep = 'Adding react_on_rails_pro gem (--rsc)...';
-  const runGeneratorStep = 'Running React on Rails generator...';
-  const doneStep = 'Done!';
-  const totalSteps = [
-    createRailsStep,
-    addReactOnRailsStep,
-    options.rsc ? addReactOnRailsProStep : null,
-    runGeneratorStep,
-    doneStep,
-  ].filter((step): step is string => step !== null).length;
+  const totalSteps = options.rsc ? 5 : 4;
   let currentStep = 1;
   const reactOnRailsGemPath = localGemPath('REACT_ON_RAILS_GEM_PATH');
 
   // Step 1: Create Rails application
   // appName is validated by validateAppName() to be [a-zA-Z0-9_-]+ only,
   // so it's always a simple directory name safe to use with rails new.
-  logStep(currentStep, totalSteps, createRailsStep);
+  logStep(currentStep, totalSteps, 'Creating Rails application...');
   try {
     execLiveArgs('rails', ['new', appName, '--database=postgresql', '--skip-javascript']);
     logStepDone('Rails application created');
@@ -136,7 +129,7 @@ export function createApp(appName: string, options: CliOptions): void {
 
   // Step 2: Add react_on_rails gem
   currentStep += 1;
-  logStep(currentStep, totalSteps, addReactOnRailsStep);
+  logStep(currentStep, totalSteps, 'Adding react_on_rails gem...');
   try {
     const reactOnRailsArgs = bundleAddArgs('react_on_rails', reactOnRailsGemPath);
     if (reactOnRailsGemPath) {
@@ -161,7 +154,7 @@ export function createApp(appName: string, options: CliOptions): void {
   if (options.rsc) {
     const reactOnRailsProGemPath = localGemPath('REACT_ON_RAILS_PRO_GEM_PATH');
     currentStep += 1;
-    logStep(currentStep, totalSteps, addReactOnRailsProStep);
+    logStep(currentStep, totalSteps, 'Adding react_on_rails_pro gem (--rsc)...');
     try {
       const reactOnRailsProArgs = bundleAddArgs('react_on_rails_pro', reactOnRailsProGemPath);
       if (reactOnRailsProGemPath) {
@@ -188,7 +181,7 @@ export function createApp(appName: string, options: CliOptions): void {
   // Final generator step
   const generatorArgs = buildGeneratorArgs(options);
   currentStep += 1;
-  logStep(currentStep, totalSteps, runGeneratorStep);
+  logStep(currentStep, totalSteps, 'Running React on Rails generator...');
   try {
     execLiveArgs(
       'bundle',
@@ -212,6 +205,6 @@ export function createApp(appName: string, options: CliOptions): void {
 
   // Final success step
   currentStep += 1;
-  logStep(currentStep, totalSteps, doneStep);
+  logStep(currentStep, totalSteps, 'Done!');
   printSuccessMessage(appName, options.rsc ? 'hello_server' : 'hello_world');
 }

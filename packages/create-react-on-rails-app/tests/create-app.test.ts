@@ -136,6 +136,7 @@ describe('createApp', () => {
 
   beforeEach(() => {
     mockedFs.rmSync.mockReset();
+    mockedFs.existsSync.mockReturnValue(true);
     process.env = { ...originalEnv };
     mockedExecLiveArgs.mockReset();
     mockedLogError.mockReset();
@@ -252,6 +253,17 @@ describe('createApp', () => {
     );
     expect(mockedFs.rmSync).toHaveBeenCalledWith(appPath, { recursive: true, force: true });
     expect(mockedLogInfo).toHaveBeenCalledWith('Directory removed. Fix the Rails app creation issue and rerun.');
+  });
+
+  it('skips cleanup logging when app directory was never created', () => {
+    mockedFs.existsSync.mockReturnValue(false);
+    mockedExecLiveArgs.mockImplementationOnce(() => {
+      throw new Error('rails new failed');
+    });
+
+    expect(() => createApp('my-app', baseOptions)).toThrow('process.exit');
+    expect(mockedFs.rmSync).not.toHaveBeenCalled();
+    expect(mockedLogInfo).not.toHaveBeenCalledWith('Cleaning up "my-app" directory...');
   });
 
   it('cleans up app directory when react_on_rails_pro add fails', () => {
