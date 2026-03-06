@@ -108,6 +108,7 @@ module ReactOnRailsPro
       next_hash = calc_bundle_hash(server_bundle_js_file_path, asset_paths)
       @bundle_hash = next_hash
       @bundle_hash_signature = current_signature
+      @bundle_hash
     end
 
     def self.rsc_bundle_hash
@@ -129,6 +130,7 @@ module ReactOnRailsPro
       next_hash = calc_bundle_hash(server_rsc_bundle_js_file_path, asset_paths)
       @rsc_bundle_hash = next_hash
       @rsc_bundle_hash_signature = current_signature
+      @rsc_bundle_hash
     end
 
     # Returns the hashed file name when using Shakapacker. Useful for creating cache keys.

@@ -53,9 +53,11 @@ module ReactOnRailsPro
             described_class.instance_variable_set(:@rsc_bundle_hash, nil)
             described_class.instance_variable_set(:@rsc_bundle_hash_signature, nil)
             allow(described_class).to receive(:bundle_hash_signature).and_return("signature")
+            allow(ReactOnRails.configuration).to receive(:server_bundle_js_file).and_return("webpack-bundle.js")
             allow(ReactOnRailsPro.configuration).to receive_messages(
               assets_to_copy: [],
-              enable_rsc_support: false
+              enable_rsc_support: false,
+              rsc_bundle_js_file: "rsc-webpack-bundle.js"
             )
           end
 
