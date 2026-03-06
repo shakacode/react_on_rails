@@ -31,6 +31,10 @@ RSpec.describe "RSC payload endpoint" do
     expect(parsed_chunks.any? { |chunk| chunk.key?("html") }).to be(true), html_chunk_message
   end
 
+  def render_annotated_html_inline_template
+    ApplicationController.render(inline: "<p>hello</p>", type: :erb, layout: false, formats: [:html])
+  end
+
   it "returns parseable NDJSON without view annotation comments" do
     request_rsc_payload
     expect_valid_rsc_payload_response
@@ -38,6 +42,8 @@ RSpec.describe "RSC payload endpoint" do
 
   it "returns parseable NDJSON when view annotation comments are enabled" do
     allow(ActionView::Base).to receive(:annotate_rendered_view_with_filenames).and_return(true)
+
+    expect(render_annotated_html_inline_template).to include("<!-- BEGIN inline template -->")
 
     request_rsc_payload
 

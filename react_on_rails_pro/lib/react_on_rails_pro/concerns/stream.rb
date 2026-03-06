@@ -12,7 +12,8 @@ module ReactOnRailsPro
     #
     # @param template [String] The path to the template file to be streamed.
     # @param close_stream_at_end [Boolean] Whether to automatically close the stream after rendering (default: true).
-    # @param content_type [String, nil] Optional response content type to set immediately before the first write.
+    # @param content_type [String, nil] Optional response content type. Set after rendering but before the first
+    #   stream write, overriding any content type inferred from the template format.
     # @param render_options [Hash] Additional options to pass to `render_to_string`.
     #
     # components must be added to the view using the `stream_react_component` helper.
