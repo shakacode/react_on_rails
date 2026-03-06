@@ -838,6 +838,25 @@ RSpec.describe "Streaming API" do
       end
     end
 
+    describe "writer task cleanup" do
+      it "preserves the original stream exception when waiting on the writer task also fails" do
+        controller = StreamController.new(component_queues: [])
+
+        expect do
+          Sync do |parent|
+            writing_task = parent.async { raise Zlib::Error, "gzip flush failed" }
+
+            begin
+              raise StandardError, "producer failed"
+            rescue StandardError => e
+              controller.send(:wait_for_writing_task, writing_task, pending_exception: e)
+              raise
+            end
+          end
+        end.to raise_error(StandardError, "producer failed")
+      end
+    end
+
     describe ReactOnRailsPro::Stream::GzipOutputStream do
       it "tracks closed state" do
         stream = StringIO.new
@@ -848,6 +867,17 @@ RSpec.describe "Streaming API" do
         gzip_stream.close
 
         expect(gzip_stream.closed?).to be(true)
+      end
+
+      it "raises on write after close" do
+        stream = StringIO.new
+        gzip_stream = described_class.new(stream)
+
+        gzip_stream.close
+
+        expect do
+          gzip_stream.write("late chunk")
+        end.to raise_error(IOError, /closed GzipOutputStream/)
       end
     end
   end

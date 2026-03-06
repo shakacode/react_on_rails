@@ -67,6 +67,9 @@ module ReactOnRailsPro
         # Do not close the response stream in an ensure block.
         # If an error occurs we may need the stream open to send diagnostic/error details
         # (for example, ApplicationController#rescue_from in the dummy app).
+        # With gzip enabled, any server-side error after the first write may leave
+        # clients with a truncated gzip frame, so rescue handlers should not append
+        # plain-text diagnostics directly to response.stream after streaming begins.
         output_stream.close if close_stream_at_end
       rescue StandardError
         # Stop all streaming tasks to prevent leaked async work.
@@ -94,6 +97,7 @@ module ReactOnRailsPro
     # - No exception propagates to the controller for client disconnects
     def drain_streams_concurrently(parent_task, output_stream:)
       client_disconnected = false
+      pending_exception = nil
 
       writing_task = parent_task.async do
         # Drain all remaining chunks from the queue to the response stream
@@ -113,6 +117,7 @@ module ReactOnRailsPro
       begin
         @async_barrier.wait
       rescue *barrier_wait_error_classes => e
+        pending_exception = e
         # writer-side disconnect already stopped the barrier; avoid a redundant stop.
         @async_barrier.stop unless client_disconnected
         raise e unless client_disconnected && suppressible_disconnect_exception?(e)
@@ -127,7 +132,7 @@ module ReactOnRailsPro
       # Wait for writing_task to ensure client_disconnected flag is set
       # before we check it (fixes race condition where ensure runs before
       # writing_task's rescue block sets the flag)
-      writing_task.wait
+      wait_for_writing_task(writing_task, pending_exception: pending_exception)
     end
 
     def log_client_disconnect(context, exception, level: :debug)
@@ -137,6 +142,26 @@ module ReactOnRailsPro
         "[React on Rails Pro] Client disconnected during streaming (#{context}): " \
           "#{exception.class}: #{exception.message}"
       end
+    end
+
+    def log_suppressed_stream_error(context, exception)
+      return unless ReactOnRails.configuration.logging_on_server
+
+      Rails.logger.warn do
+        "[React on Rails Pro] Suppressing secondary streaming error (#{context}) while another exception is " \
+          "already propagating: #{exception.class}: #{exception.message}"
+      end
+    end
+
+    def wait_for_writing_task(writing_task, pending_exception:)
+      return unless writing_task
+
+      writing_task.wait
+    rescue *barrier_wait_error_classes => e
+      raise e if pending_exception.nil?
+
+      log_suppressed_stream_error("writer_wait", e)
+      nil
     end
 
     def setup_output_stream(gzip_streaming_enabled:)
@@ -166,6 +191,7 @@ module ReactOnRailsPro
       gzip_quality = parsed_accept_encoding.fetch("gzip", wildcard_quality || 0.0)
       identity_quality = parsed_accept_encoding.fetch("identity", wildcard_quality || 1.0)
 
+      # Prefer gzip on ties; RFC 7231 lets the server choose among equal q values.
       gzip_quality.positive? && gzip_quality >= identity_quality
     rescue ArgumentError, TypeError
       false
@@ -208,9 +234,13 @@ module ReactOnRailsPro
     end
 
     def barrier_wait_error_classes
-      return [StandardError] unless defined?(Async::Stop)
-
-      [StandardError, Async::Stop]
+      # Async::Stop may inherit from Exception rather than StandardError in some
+      # Async versions, so list it explicitly when the gem defines it.
+      @barrier_wait_error_classes ||= if defined?(Async::Stop)
+                                        [StandardError, Async::Stop].freeze
+                                      else
+                                        [StandardError].freeze
+                                      end
     end
 
     def suppressible_disconnect_exception?(exception)
@@ -241,7 +271,6 @@ module ReactOnRailsPro
 
         def write(data)
           @stream.write(data)
-          # Return uncompressed bytesize; GzipWriter does not use this return value.
           data.bytesize
         end
 
@@ -258,9 +287,15 @@ module ReactOnRailsPro
       end
 
       def write(data)
+        raise IOError, "write to closed GzipOutputStream" if @closed
+
         bytes_written = @gzip_writer.write(data)
         @gzip_writer.flush(Zlib::SYNC_FLUSH)
         bytes_written
+      rescue Zlib::Error => e
+        raise IOError, e.message if @closed
+
+        raise e
       end
 
       def closed?
