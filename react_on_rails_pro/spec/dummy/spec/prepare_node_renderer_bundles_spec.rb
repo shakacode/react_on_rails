@@ -13,6 +13,7 @@ describe ReactOnRailsPro::PrepareNodeRenderBundles do # rubocop:disable RSpec/Fi
 
   before do
     dbl_configuration = instance_double(ReactOnRailsPro::Configuration,
+                                        enable_rsc_support: false,
                                         server_renderer: "NodeRenderer",
                                         renderer_password: "myPassword1",
                                         renderer_url: "http://localhost:3800",
