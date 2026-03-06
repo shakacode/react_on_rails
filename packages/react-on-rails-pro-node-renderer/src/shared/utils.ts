@@ -7,6 +7,7 @@ import { promisify } from 'util';
 import * as errorReporter from './errorReporter.js';
 import { getConfig } from './configBuilder.js';
 import log from './log.js';
+import type { TracingContext } from './tracing.js';
 import type { RenderResult } from '../worker/vm.js';
 
 export const TRUNCATION_FILLER = '\n... TRUNCATED ...\n';
@@ -48,8 +49,8 @@ export interface ResponseResult {
   stream?: Readable;
 }
 
-export function errorResponseResult(msg: string): ResponseResult {
-  errorReporter.message(msg);
+export function errorResponseResult(msg: string, tracingContext?: TracingContext): ResponseResult {
+  errorReporter.message(msg, tracingContext);
   return {
     headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
     status: 400,
