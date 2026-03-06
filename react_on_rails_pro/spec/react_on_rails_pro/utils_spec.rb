@@ -272,6 +272,24 @@ module ReactOnRailsPro
         end
       end
 
+      describe ".digest_asset_content" do
+        it "warns and skips missing asset files without raising" do
+          digest = instance_double(Digest::MD5)
+          logger = instance_double(ActiveSupport::Logger)
+          allow(digest).to receive(:file)
+          allow(digest).to receive(:<<)
+          allow(Rails).to receive(:logger).and_return(logger)
+          allow(logger).to receive(:warn)
+          allow(File).to receive(:exist?).with("/missing/asset.json").and_return(false)
+
+          described_class.digest_asset_content(digest, "/missing/asset.json")
+
+          expect(logger).to have_received(:warn)
+            .with("[ReactOnRailsPro] Asset not found for bundle hash: /missing/asset.json")
+          expect(digest).not_to have_received(:file)
+        end
+      end
+
       describe ".http_body_for_path" do
         let(:url) { "http://localhost:3035/webpack/production/webpack-bundle.js" }
 
