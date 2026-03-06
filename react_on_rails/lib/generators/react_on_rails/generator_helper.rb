@@ -170,7 +170,7 @@ module GeneratorHelper
   def destination_config_path(path)
     return path unless using_rspack?
 
-    path.sub("config/webpack/", "config/rspack/")
+    path.sub(%r{\Aconfig/webpack/}, "config/rspack/")
   end
 
   # Detect the installed React version from package.json
