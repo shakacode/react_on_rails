@@ -17,7 +17,8 @@ module ReactOnRailsPro
         template: custom_rsc_payload_template,
         layout: false,
         # Render as text so Rails does not inject HTML view annotation comments
-        # into the NDJSON stream. Custom template overrides must resolve to `.text.erb`.
+        # into the NDJSON stream. Custom template overrides must resolve to a
+        # text or format-neutral template, not `.html.erb`.
         formats: [:text],
         content_type: "application/x-ndjson"
       )

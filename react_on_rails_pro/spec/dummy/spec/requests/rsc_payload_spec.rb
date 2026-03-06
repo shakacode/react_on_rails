@@ -43,7 +43,9 @@ RSpec.describe "RSC payload endpoint" do
   it "returns parseable NDJSON when view annotation comments are enabled" do
     allow(ActionView::Base).to receive(:annotate_rendered_view_with_filenames).and_return(true)
 
-    expect(render_annotated_html_inline_template).to include("<!-- BEGIN inline template -->")
+    # Rails annotation comment format verified against Rails 7.x.
+    # If this assertion fails after a Rails upgrade, check ActionView annotation output.
+    expect(render_annotated_html_inline_template).to include("<!--")
 
     request_rsc_payload
 

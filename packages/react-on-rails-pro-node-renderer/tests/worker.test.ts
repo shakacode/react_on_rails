@@ -5,6 +5,8 @@ import { createReadStream } from 'fs-extra';
 // eslint-disable-next-line import/no-relative-packages
 import packageJson from '../package.json';
 import worker, { disableHttp2 } from '../src/worker';
+import * as vm from '../src/worker/vm';
+import * as errorReporter from '../src/shared/errorReporter';
 import {
   BUNDLE_TIMESTAMP,
   SECONDARY_BUNDLE_TIMESTAMP,
@@ -97,6 +99,43 @@ describe('worker', () => {
     expect(fs.existsSync(assetPathOther(testName, String(BUNDLE_TIMESTAMP)))).toBe(true);
     expect(fs.existsSync(assetPath(testName, String(SECONDARY_BUNDLE_TIMESTAMP)))).toBe(true);
     expect(fs.existsSync(assetPathOther(testName, String(SECONDARY_BUNDLE_TIMESTAMP)))).toBe(true);
+  });
+
+  test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest reports unexpected handleRenderRequest failures once', async () => {
+    const buildVMSpy = jest.spyOn(vm, 'buildVM').mockRejectedValueOnce(new Error('Injected buildVM failure'));
+    const reportMessageSpy = jest.spyOn(errorReporter, 'message').mockImplementation(jest.fn());
+
+    try {
+      const app = worker({
+        serverBundleCachePath: serverBundleCachePathForTest(),
+      });
+
+      const form = formAutoContent({
+        gemVersion,
+        protocolVersion,
+        railsEnv,
+        renderingRequest: 'ReactOnRails.dummy',
+        bundle: createReadStream(getFixtureBundle()),
+      });
+
+      const res = await app
+        .inject()
+        .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+        .payload(form.payload)
+        .headers(form.headers)
+        .end();
+
+      expect(res.statusCode).toBe(400);
+      expect(reportMessageSpy).toHaveBeenCalledTimes(1);
+      expect(reportMessageSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Caught top level error in handleRenderRequest'),
+        undefined,
+      );
+      expect(res.payload).toContain('Caught top level error in handleRenderRequest');
+    } finally {
+      buildVMSpy.mockRestore();
+      reportMessageSpy.mockRestore();
+    }
   });
 
   test(

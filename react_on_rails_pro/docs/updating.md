@@ -198,6 +198,14 @@ export REACT_ON_RAILS_PRO_LICENSE="your-license-token-here"
 
 For complete licensing details, see [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/LICENSE_SETUP.md).
 
+### Additional Upgrade Notes
+
+#### RSC payload template overrides
+
+React on Rails Pro now renders the built-in RSC payload template with `formats: [:text]` so Rails view annotations cannot inject HTML comments into NDJSON responses.
+
+If your app overrides `custom_rsc_payload_template`, make sure that override resolves to a text or format-neutral template path, such as `app/views/.../rsc_payload.text.erb`. Overrides that only exist as `.html.erb` templates will raise `ActionView::MissingTemplate` when the RSC payload endpoint renders.
+
 ### Verify Migration
 
 #### 1. Verify Gem Installation
