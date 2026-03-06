@@ -24,7 +24,7 @@ import {
   getRequestBundleFilePath,
 } from '../shared/utils.js';
 import { getConfig } from '../shared/configBuilder.js';
-import * as errorReporter from '../shared/errorReporter.js';
+import type { TracingContext } from '../shared/tracing.js';
 import { buildVM, hasVMContextForBundle, runInVM } from './vm.js';
 
 export type ProvidedNewBundle = {
@@ -190,12 +190,14 @@ export async function handleRenderRequest({
   dependencyBundleTimestamps,
   providedNewBundles,
   assetsToCopy,
+  tracingContext,
 }: {
   renderingRequest: string;
   bundleTimestamp: string | number;
   dependencyBundleTimestamps?: string[] | number[];
   providedNewBundles?: ProvidedNewBundle[] | null;
   assetsToCopy?: Asset[] | null;
+  tracingContext?: TracingContext;
 }): Promise<ResponseResult> {
   try {
     // const bundleFilePathPerTimestamp = getRequestBundleFilePath(bundleTimestamp);
@@ -260,7 +262,6 @@ export async function handleRenderRequest({
       error,
       'Caught top level error in handleRenderRequest',
     );
-    errorReporter.message(msg);
-    return Promise.reject(error as Error);
+    return errorResponseResult(msg, tracingContext);
   }
 }
