@@ -465,6 +465,11 @@ module ReactOnRails
       end
 
       def install_typescript_dependencies
+        if options[:pretend]
+          say_status :pretend, "Skipping TypeScript dependency installation in --pretend mode", :yellow
+          return
+        end
+
         puts Rainbow("📝 Installing TypeScript dependencies...").yellow
         # Delegate to shared module for consistent dependency management
         add_typescript_dependencies
@@ -504,13 +509,13 @@ module ReactOnRails
       end
 
       def create_typescript_config
-        if File.exist?("tsconfig.json")
-          puts Rainbow("⚠️  tsconfig.json already exists, skipping creation").yellow
+        if options[:pretend]
+          say_status :pretend, "Would create tsconfig.json (skipped in --pretend mode)", :yellow
           return
         end
 
-        if options[:pretend]
-          say_status :pretend, "Would create tsconfig.json (skipped in --pretend mode)", :yellow
+        if File.exist?("tsconfig.json")
+          puts Rainbow("⚠️  tsconfig.json already exists, skipping creation").yellow
           return
         end
 

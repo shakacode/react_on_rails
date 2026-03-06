@@ -1123,6 +1123,7 @@ describe InstallGenerator, type: :generator do
 
   describe "--pretend mode behavior" do
     let(:install_generator) { described_class.new([], { pretend: true }) }
+    let(:typescript_install_generator) { described_class.new([], { pretend: true, typescript: true }) }
 
     it "skips automatic shakapacker installation commands" do
       allow(install_generator).to receive(:shakapacker_configured?).and_return(false)
@@ -1146,28 +1147,30 @@ describe InstallGenerator, type: :generator do
       install_generator.send(:add_bin_scripts)
     end
 
+    it "does not install typescript dependencies in pretend mode" do
+      expect(typescript_install_generator).to receive(:say_status)
+        .with(:pretend, "Skipping TypeScript dependency installation in --pretend mode", :yellow)
+      expect(typescript_install_generator).not_to receive(:add_typescript_dependencies)
+
+      typescript_install_generator.send(:install_typescript_dependencies)
+    end
+
     it "does not create css module type files in pretend mode" do
-      allow(FileUtils).to receive(:mkdir_p)
-      allow(File).to receive(:write)
       expect(install_generator).to receive(:say_status)
         .with(:pretend, "Would create CSS module type definitions (skipped in --pretend mode)", :yellow)
+      expect(FileUtils).not_to receive(:mkdir_p)
+      expect(File).not_to receive(:write)
 
       install_generator.send(:create_css_module_types)
-
-      expect(FileUtils).not_to have_received(:mkdir_p)
-      expect(File).not_to have_received(:write)
     end
 
     it "does not write tsconfig.json in pretend mode" do
-      allow(File).to receive(:exist?).and_call_original
-      allow(File).to receive(:exist?).with("tsconfig.json").and_return(false)
-      allow(File).to receive(:write)
       expect(install_generator).to receive(:say_status)
         .with(:pretend, "Would create tsconfig.json (skipped in --pretend mode)", :yellow)
+      expect(File).not_to receive(:exist?).with("tsconfig.json")
+      expect(File).not_to receive(:write)
 
       install_generator.send(:create_typescript_config)
-
-      expect(File).not_to have_received(:write)
     end
   end
 
