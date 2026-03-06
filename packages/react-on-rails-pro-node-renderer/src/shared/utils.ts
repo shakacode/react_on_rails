@@ -116,6 +116,8 @@ export async function copyUploadedAssets(uploadedAssets: Asset[], targetDirector
     return copyUploadedAsset(asset, destinationAssetFilePath, {
       // Bundle directories become immutable once complete. Keep existing files
       // so concurrent or duplicate uploads cannot partially overwrite good assets.
+      // In incomplete directories, cleanIncompleteBundleDirectory runs first, so
+      // pre-existing files here indicate a concurrent duplicate copy, not stale data.
       overwrite: false,
       errorOnExist: false,
     });
