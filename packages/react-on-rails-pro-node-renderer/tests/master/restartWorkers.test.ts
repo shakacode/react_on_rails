@@ -82,4 +82,38 @@ describe('restartWorkers', () => {
 
     expect(log.warn).not.toHaveBeenCalled();
   });
+
+  test('handles replacement listening event emitted before fork observer assigns replacement id', async () => {
+    const worker1 = new MockWorker(1);
+    const worker2 = new MockWorker(2);
+    (cluster as unknown as EventEmitter & { workers: Record<string, MockWorker> }).workers = {
+      '1': worker1,
+      '2': worker2,
+    };
+
+    const restartPromise = restartWorkers(0, undefined);
+    expect(worker1.send).toHaveBeenCalledWith(SHUTDOWN_WORKER_MESSAGE);
+
+    // Defensive ordering: listener may fire before we process the fork event.
+    (cluster as unknown as EventEmitter).emit('listening', { id: 3 });
+    await Promise.resolve();
+    (cluster as unknown as EventEmitter).emit('fork', { id: 3 });
+    await Promise.resolve();
+    worker1.emit('exit');
+    await Promise.resolve();
+    // Allow restart loop to advance after replacement promise resolution.
+    for (let index = 0; index < 10; index += 1) {
+      await waitForTimerTick();
+    }
+
+    expect(worker2.send).toHaveBeenCalledWith(SHUTDOWN_WORKER_MESSAGE);
+
+    worker2.emit('exit');
+    await Promise.resolve();
+    (cluster as unknown as EventEmitter).emit('fork', { id: 4 });
+    (cluster as unknown as EventEmitter).emit('listening', { id: 4 });
+
+    await restartPromise;
+    expect(log.warn).not.toHaveBeenCalled();
+  });
 });
