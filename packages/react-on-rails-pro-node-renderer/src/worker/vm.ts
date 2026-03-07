@@ -353,19 +353,15 @@ export async function buildVM(filePath: string) {
   // Analogy: We write jobs on a whiteboard so nobody starts duplicates. If we
   // told the helper "erase it when you're done" but the helper failed so fast
   // they erased it *before we wrote it down*, the failed job would be stuck on
-  // the whiteboard forever — blocking all retries. Instead, we attach a sticky
-  // note to the job saying "erase me when I'm done." The note can't activate
-  // until after we've written the job down, so erasing always happens in the
-  // right order.
+  // the whiteboard forever, blocking retries. Instead, we attach a sticky note
+  // to the job saying "erase me when done." The note cannot activate until
+  // after the job is written down, so cleanup happens in the right order.
   //
-  // Technically: an async IIFE runs synchronously until its first `await`. If
-  // it throws before any `await` (e.g. `vm.createContext()` or a
-  // `vm.runInContext()` call throwing synchronously before `readFileAsync`),
-  // a try/finally inside the IIFE would run *before* `vmCreationPromises.set()`
-  // (below) has executed — leaving a stale rejected promise in the map that
-  // permanently poisons retries. Chaining .finally() on the promise *after*
-  // set() guarantees cleanup runs as a microtask after the current synchronous
-  // execution, so set() has always run first.
+  // The `.catch(() => {})` suppresses rejection on this internal chain so the
+  // `void`-ed tail does not surface as an unhandled rejection. The original
+  // `vmCreationPromise` returned to callers still resolves/rejects normally.
+  // Chaining this after `vmCreationPromises.set()` guarantees retries are not
+  // poisoned by stale entries, even if the async IIFE throws before first await.
   void vmCreationPromise
     .catch(() => {})
     .finally(() => {

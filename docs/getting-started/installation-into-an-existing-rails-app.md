@@ -59,7 +59,7 @@
    PORT=3001 ./bin/dev
    ```
 
-7. Visit [localhost:3000/hello_world](http://localhost:3000/hello_world).
+7. Visit the app on the port you used (default: [localhost:3000/hello_world](http://localhost:3000/hello_world)).
 
 ## Installation
 

@@ -252,6 +252,53 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  context "when shakapacker.yml already has private_output_path key without a value" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+
+      simulate_existing_file("config/shakapacker.yml", <<~YAML)
+        default: &default
+          source_path: app/javascript
+          source_entry_path: packs
+          public_output_path: packs
+          private_output_path:
+          assets_bundler: "webpack"
+          # precompile_hook: ~
+
+        development:
+          <<: *default
+
+        test:
+          <<: *default
+          compile: true
+
+        production:
+          <<: *default
+      YAML
+      simulate_existing_file("bin/shakapacker", "")
+      simulate_existing_file("bin/shakapacker-dev-server", "")
+      simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
+        const { generateWebpackConfig } = require('shakapacker')
+        const webpackConfig = generateWebpackConfig()
+        module.exports = webpackConfig
+      JS
+
+      Dir.chdir(destination_root) do
+        run_generator(["--ignore-warnings", "--skip"])
+      end
+    end
+
+    it "does not insert duplicate private_output_path entries" do
+      assert_file "config/shakapacker.yml" do |content|
+        if ReactOnRails::PackerUtils.shakapacker_version_requirement_met?("9.0.0")
+          expect(content.scan(/^\s*private_output_path:/).size).to eq(1)
+        end
+      end
+    end
+  end
+
   # Regression test for https://github.com/shakacode/react_on_rails/issues/2289
   # When Shakapacker is freshly installed by the generator, the RoR template must be applied
   # (with force: true) so that version-conditional settings like private_output_path are configured.

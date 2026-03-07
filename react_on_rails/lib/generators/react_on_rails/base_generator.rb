@@ -386,26 +386,27 @@ module ReactOnRails
 
         content = File.read(shakapacker_config_path)
 
-        # Already configured? Do nothing.
-        return if content.match?(/^\s*private_output_path:\s*\S+/)
+        # Any active key means the app already made an explicit choice.
+        return if content.match?(/^\s+private_output_path:/)
 
         # First try: uncomment an existing private_output_path placeholder line.
-        updated_content = content.sub(
+        gsub_file(
+          shakapacker_config_path,
           /^(\s*)#\s*private_output_path:\s*.*$/,
           "\\1private_output_path: ssr-generated"
         )
 
-        # Fallback: insert directly after public_output_path in the default section.
-        if updated_content == content
-          updated_content = content.sub(
-            /^(\s*)public_output_path:\s*.*\n/,
-            "\\0\\1private_output_path: ssr-generated\n"
+        # Fallback: insert directly after public_output_path in the same section.
+        unless File.read(shakapacker_config_path).match?(/^\s+private_output_path:\s*ssr-generated/)
+          gsub_file(
+            shakapacker_config_path,
+            /^(\s*)(public_output_path:\s*.*\n)/,
+            "\\1\\2\\1private_output_path: ssr-generated\n"
           )
         end
 
-        return if updated_content == content
+        return unless File.read(shakapacker_config_path).match?(/^\s+private_output_path:\s*ssr-generated/)
 
-        File.write(shakapacker_config_path, updated_content)
         puts Rainbow("✅ Configured private_output_path in shakapacker.yml").green
       end
     end
