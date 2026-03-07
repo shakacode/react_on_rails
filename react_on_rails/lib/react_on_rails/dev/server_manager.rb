@@ -476,9 +476,15 @@ module ReactOnRails
         def run_production_like(_verbose: false, route: nil, rails_env: nil, skip_database_check: false)
           procfile = "Procfile.dev-prod-assets"
 
+          # Set PORT before foreman starts — foreman injects its own PORT=5000
+          # into child processes when ENV["PORT"] is unset, overriding the
+          # ${PORT:-3001} fallback in the Procfile. Scan from 3001 (not 3000)
+          # so prod-assets doesn't collide with the normal dev server.
+          ENV["PORT"] ||= PortSelector.find_available_port(procfile_port(procfile)).to_s
+
           features = [
             "Precompiling assets with production optimizations",
-            "Running Rails server on port 3001",
+            "Running Rails server on port #{procfile_port(procfile)}",
             "No HMR (Hot Module Replacement)",
             "CSS extracted to separate files (no FOUC)"
           ]
@@ -497,7 +503,7 @@ module ReactOnRails
           print_server_info(
             "🏭 Starting production-like development server...",
             features,
-            3001,
+            procfile_port(procfile),
             route: route
           )
 
@@ -614,13 +620,15 @@ module ReactOnRails
         # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 
         def run_static_development(procfile, verbose: false, route: nil, skip_database_check: false)
-          print_procfile_info(procfile, route: route)
-
           # Check database setup before starting
           exit 1 unless DatabaseChecker.check_database(skip: skip_database_check)
 
           # Check required services before starting
           exit 1 unless ServiceChecker.check_services
+
+          # Configure ports before printing so the banner shows the correct URL
+          configure_ports
+          print_procfile_info(procfile, route: route)
 
           features = [
             "Using shakapacker --watch (no HMR)",
@@ -637,6 +645,7 @@ module ReactOnRails
           print_server_info(
             "⚡ Starting development server with static assets...",
             features,
+            procfile_port(procfile),
             route: route
           )
 
@@ -646,13 +655,15 @@ module ReactOnRails
         end
 
         def run_development(procfile, verbose: false, route: nil, skip_database_check: false)
-          print_procfile_info(procfile, route: route)
-
           # Check database setup before starting
           exit 1 unless DatabaseChecker.check_database(skip: skip_database_check)
 
           # Check required services before starting
           exit 1 unless ServiceChecker.check_services
+
+          # Configure ports before printing so the banner shows the correct URL
+          configure_ports
+          print_procfile_info(procfile, route: route)
 
           PackGenerator.generate(verbose: verbose)
           ProcessManager.ensure_procfile(procfile)
@@ -687,8 +698,21 @@ module ReactOnRails
           puts ""
         end
 
+        def configure_ports
+          selected = PortSelector.select_ports
+          ENV["PORT"] = selected[:rails].to_s
+          ENV["SHAKAPACKER_DEV_SERVER_PORT"] = selected[:webpack].to_s
+        rescue PortSelector::NoPortAvailable => e
+          warn e.message
+          exit 1
+        end
+
         def procfile_port(procfile)
-          procfile == "Procfile.dev-prod-assets" ? 3001 : 3000
+          if procfile == "Procfile.dev-prod-assets"
+            ENV.fetch("PORT", 3001).to_i
+          else
+            ENV.fetch("PORT", 3000).to_i
+          end
         end
 
         def box_border(width)

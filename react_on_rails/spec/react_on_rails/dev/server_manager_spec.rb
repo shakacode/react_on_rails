@@ -25,6 +25,8 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     allow(ReactOnRails::Dev::ProcessManager).to receive(:ensure_procfile)
     allow(ReactOnRails::Dev::ProcessManager).to receive(:run_with_process_manager)
     allow(ReactOnRails::Dev::DatabaseChecker).to receive(:check_database).and_return(true)
+    allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+      .and_return({ rails: 3000, webpack: 3035 })
   end
 
   describe ".start" do
@@ -65,6 +67,26 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       described_class.start(:production_like)
     end
 
+    it "passes procfile_port to print_server_info in production-like mode" do
+      ENV["PORT"] = "4000"
+      env = { "NODE_ENV" => "production" }
+      argv = ["bundle", "exec", "rails", "assets:precompile"]
+      status_double = instance_double(Process::Status, success?: true)
+      allow(Open3).to receive(:capture3).with(env, *argv).and_return(["output", "", status_double])
+
+      port_at_server_info_time = nil
+      allow(described_class).to receive(:print_server_info).and_wrap_original do |m, *args, **kwargs|
+        port_at_server_info_time = args[2]
+        m.call(*args, **kwargs)
+      end
+
+      described_class.start(:production_like)
+
+      expect(port_at_server_info_time).to eq(4000)
+    ensure
+      ENV.delete("PORT")
+    end
+
     it "starts production-like mode with custom rails_env" do
       env = { "NODE_ENV" => "production", "RAILS_ENV" => "staging" }
       argv = ["bundle", "exec", "rails", "assets:precompile"]
@@ -87,6 +109,100 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
     it "raises error for unknown mode" do
       expect { described_class.start(:unknown) }.to raise_error(ArgumentError, "Unknown mode: unknown")
+    end
+
+    context "when configuring ports" do
+      before do
+        mock_system_calls
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+          .and_return({ rails: 3000, webpack: 3035 })
+      end
+
+      around do |example|
+        old_port = ENV.fetch("PORT", nil)
+        old_webpack_port = ENV.fetch("SHAKAPACKER_DEV_SERVER_PORT", nil)
+        ENV.delete("PORT")
+        ENV.delete("SHAKAPACKER_DEV_SERVER_PORT")
+        example.run
+        ENV["PORT"] = old_port
+        ENV["SHAKAPACKER_DEV_SERVER_PORT"] = old_webpack_port
+      end
+
+      it "sets PORT env var before starting development mode" do
+        described_class.start(:development)
+        expect(ENV.fetch("PORT", nil)).to eq("3000")
+      end
+
+      it "sets SHAKAPACKER_DEV_SERVER_PORT env var before starting development mode" do
+        described_class.start(:development)
+        expect(ENV.fetch("SHAKAPACKER_DEV_SERVER_PORT", nil)).to eq("3035")
+      end
+
+      it "sets PORT env var before starting static mode" do
+        described_class.start(:static)
+        expect(ENV.fetch("PORT", nil)).to eq("3000")
+      end
+
+      it "uses auto-detected ports when defaults are occupied" do
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+          .and_return({ rails: 3001, webpack: 3036 })
+        described_class.start(:development)
+        expect(ENV.fetch("PORT", nil)).to eq("3001")
+        expect(ENV.fetch("SHAKAPACKER_DEV_SERVER_PORT", nil)).to eq("3036")
+      end
+
+      it "has PORT set when print_procfile_info is called in development mode" do
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+          .and_return({ rails: 3001, webpack: 3036 })
+
+        port_at_print_time = nil
+        allow(described_class).to receive(:print_procfile_info).and_wrap_original do |m, *args, **kwargs|
+          port_at_print_time = ENV.fetch("PORT", nil)
+          m.call(*args, **kwargs)
+        end
+
+        described_class.start(:development)
+
+        expect(port_at_print_time).to eq("3001")
+      end
+
+      it "passes the auto-detected port to print_server_info in static mode" do
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+          .and_return({ rails: 3001, webpack: 3036 })
+
+        port_at_server_info_time = nil
+        allow(described_class).to receive(:print_server_info).and_wrap_original do |m, *args, **kwargs|
+          port_at_server_info_time = args[2]
+          m.call(*args, **kwargs)
+        end
+
+        described_class.start(:static)
+
+        expect(port_at_server_info_time).to eq(3001)
+      end
+
+      it "has PORT set when print_procfile_info is called in static mode" do
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+          .and_return({ rails: 3001, webpack: 3036 })
+
+        port_at_print_time = nil
+        allow(described_class).to receive(:print_procfile_info).and_wrap_original do |m, *args, **kwargs|
+          port_at_print_time = ENV.fetch("PORT", nil)
+          m.call(*args, **kwargs)
+        end
+
+        described_class.start(:static)
+
+        expect(port_at_print_time).to eq("3001")
+      end
+
+      it "exits cleanly when no port pair is available" do
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+          .and_raise(ReactOnRails::Dev::PortSelector::NoPortAvailable, "No available port pair found")
+
+        expect_any_instance_of(Kernel).to receive(:exit).with(1)
+        expect { described_class.start(:development) }.not_to raise_error
+      end
     end
   end
 
@@ -261,6 +377,33 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
       # Should not raise an error
       expect { described_class.terminate_processes(pids) }.not_to raise_error
+    end
+  end
+
+  describe ".procfile_port" do
+    around do |example|
+      old_port = ENV.fetch("PORT", nil)
+      ENV.delete("PORT")
+      example.run
+      ENV["PORT"] = old_port
+    end
+
+    it "returns 3000 for Procfile.dev when PORT is unset" do
+      expect(described_class.send(:procfile_port, "Procfile.dev")).to eq(3000)
+    end
+
+    it "returns 3001 for Procfile.dev-prod-assets when PORT is unset" do
+      expect(described_class.send(:procfile_port, "Procfile.dev-prod-assets")).to eq(3001)
+    end
+
+    it "returns the auto-detected port for Procfile.dev when PORT is set" do
+      ENV["PORT"] = "3001"
+      expect(described_class.send(:procfile_port, "Procfile.dev")).to eq(3001)
+    end
+
+    it "returns the PORT value for Procfile.dev-prod-assets when PORT is set" do
+      ENV["PORT"] = "4000"
+      expect(described_class.send(:procfile_port, "Procfile.dev-prod-assets")).to eq(4000)
     end
   end
 

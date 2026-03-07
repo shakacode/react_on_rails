@@ -67,6 +67,7 @@ module ReactOnRails
                         Procfile.dev-static-assets
                         Procfile.dev-prod-assets
                         .dev-services.yml.example
+                        .env.example
                         bin/shakapacker-precompile-hook]
 
         # HelloServer uses the hello_world layout so React on Rails can inject generated
@@ -153,11 +154,12 @@ module ReactOnRails
         additions = []
         additions << "**/generated/**" unless gitignore_content.include?("**/generated/**")
         additions << "ssr-generated" unless gitignore_content.include?("ssr-generated")
+        additions << ".env" unless gitignore_content.match?(/^\.env$/)
 
         return if additions.empty?
 
         append_to_file ".gitignore" do
-          lines = ["\n# Generated React on Rails packs"]
+          lines = ["\n# React on Rails (generated and local files)"]
           lines.concat(additions)
           "#{lines.join("\n")}\n"
         end
