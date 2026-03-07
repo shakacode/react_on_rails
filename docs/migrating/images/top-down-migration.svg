@@ -1,0 +1,393 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 520" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+    <linearGradient id="clientGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f97316"/>
+      <stop offset="100%" stop-color="#ea580c"/>
+    </linearGradient>
+    <linearGradient id="serverGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#06b6d4"/>
+      <stop offset="100%" stop-color="#0891b2"/>
+    </linearGradient>
+    <filter id="clientGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feFlood flood-color="#f97316" flood-opacity="0.3" result="color"/>
+      <feComposite in="color" in2="blur" operator="in" result="glow"/>
+      <feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="serverGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feFlood flood-color="#06b6d4" flood-opacity="0.3" result="color"/>
+      <feComposite in="color" in2="blur" operator="in" result="glow"/>
+      <feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="labelGlow" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feFlood flood-color="#e2e8f0" flood-opacity="0.15" result="color"/>
+      <feComposite in="color" in2="blur" operator="in" result="glow"/>
+      <feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="840" height="520" rx="20" fill="url(#bgGrad)"/>
+  <rect width="840" height="520" rx="20" fill="none" stroke="#334155" stroke-width="1"/>
+
+  <!-- Title -->
+  <text x="420" y="38" text-anchor="middle" fill="#f1f5f9" font-size="18" font-weight="700" letter-spacing="0.5">Top-Down Migration Strategy</text>
+  <line x1="320" y1="50" x2="520" y2="50" stroke="#334155" stroke-width="1"/>
+
+  <!-- ============================================================ -->
+  <!-- PHASE 1: All Client                                          -->
+  <!-- ============================================================ -->
+  <g>
+    <!-- Panel -->
+    <rect x="14" y="68" width="250" height="410" rx="16" fill="#1a2332" stroke="#334155" stroke-width="1"/>
+    <rect x="14" y="68" width="250" height="40" rx="16" fill="#1e293b"/>
+    <rect x="14" y="92" width="250" height="16" fill="#1e293b"/>
+    <text x="139" y="93" text-anchor="middle" fill="#94a3b8" font-size="12" font-weight="600" letter-spacing="1">PHASE 1</text>
+    <text x="139" y="128" text-anchor="middle" fill="#e2e8f0" font-size="13" font-weight="600" filter="url(#labelGlow)">Mark Root as Client</text>
+    <text x="139" y="145" text-anchor="middle" fill="#64748b" font-size="10">Everything stays client-side</text>
+
+    <!-- Tree lines -->
+    <g stroke="#475569" stroke-width="1.5" fill="none">
+      <line x1="139" y1="186" x2="139" y2="206"/>
+      <line x1="139" y1="230" x2="139" y2="242"/>
+      <line x1="139" y1="242" x2="79" y2="242"/>
+      <line x1="139" y1="242" x2="199" y2="242"/>
+      <line x1="79" y1="242" x2="79" y2="258"/>
+      <line x1="199" y1="242" x2="199" y2="258"/>
+      <line x1="79" y1="282" x2="79" y2="298"/>
+      <line x1="79" y1="298" x2="43" y2="298"/>
+      <line x1="79" y1="298" x2="115" y2="298"/>
+      <line x1="43" y1="298" x2="43" y2="316"/>
+      <line x1="115" y1="298" x2="115" y2="316"/>
+    </g>
+
+    <!-- App (client) -->
+    <g filter="url(#clientGlow)">
+      <rect x="89" y="162" width="100" height="24" rx="12" fill="url(#clientGrad)" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.5s" begin="0.3s" fill="freeze"/>
+      </rect>
+      <text x="139" y="178" text-anchor="middle" fill="#fff" font-size="11" font-weight="600" opacity="0">App<animate attributeName="opacity" values="0;1" dur="0.5s" begin="0.3s" fill="freeze"/></text>
+    </g>
+    <!-- 'use client' badge on App -->
+    <rect x="114" y="188" width="50" height="13" rx="7" fill="#7c2d12" opacity="0">
+      <animate attributeName="opacity" values="0;0.9" dur="0.4s" begin="0.6s" fill="freeze"/>
+    </rect>
+    <text x="139" y="197" text-anchor="middle" fill="#fdba74" font-size="7" font-weight="600" opacity="0">'use client'<animate attributeName="opacity" values="0;1" dur="0.4s" begin="0.6s" fill="freeze"/></text>
+
+    <!-- Layout (client) -->
+    <g filter="url(#clientGlow)">
+      <rect x="89" y="206" width="100" height="24" rx="12" fill="url(#clientGrad)" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.5s" begin="0.7s" fill="freeze"/>
+      </rect>
+      <text x="139" y="222" text-anchor="middle" fill="#fff" font-size="11" font-weight="600" opacity="0">Layout<animate attributeName="opacity" values="0;1" dur="0.5s" begin="0.7s" fill="freeze"/></text>
+    </g>
+
+    <!-- Header (client) -->
+    <g filter="url(#clientGlow)">
+      <rect x="39" y="258" width="80" height="24" rx="12" fill="url(#clientGrad)" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.5s" begin="1.0s" fill="freeze"/>
+      </rect>
+      <text x="79" y="274" text-anchor="middle" fill="#fff" font-size="11" font-weight="600" opacity="0">Header<animate attributeName="opacity" values="0;1" dur="0.5s" begin="1.0s" fill="freeze"/></text>
+    </g>
+
+    <!-- ProductPage (client) -->
+    <g filter="url(#clientGlow)">
+      <rect x="147" y="258" width="104" height="24" rx="12" fill="url(#clientGrad)" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.5s" begin="1.0s" fill="freeze"/>
+      </rect>
+      <text x="199" y="274" text-anchor="middle" fill="#fff" font-size="10" font-weight="600" opacity="0">ProductPage<animate attributeName="opacity" values="0;1" dur="0.5s" begin="1.0s" fill="freeze"/></text>
+    </g>
+
+    <!-- Logo (client) -->
+    <g filter="url(#clientGlow)">
+      <rect x="16" y="316" width="54" height="24" rx="12" fill="url(#clientGrad)" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.5s" begin="1.3s" fill="freeze"/>
+      </rect>
+      <text x="43" y="332" text-anchor="middle" fill="#fff" font-size="10" font-weight="600" opacity="0">Logo<animate attributeName="opacity" values="0;1" dur="0.5s" begin="1.3s" fill="freeze"/></text>
+    </g>
+
+    <!-- SearchBar (client) -->
+    <g filter="url(#clientGlow)">
+      <rect x="80" y="316" width="70" height="24" rx="12" fill="url(#clientGrad)" opacity="0">
+        <animate attributeName="opacity" values="0;1" dur="0.5s" begin="1.3s" fill="freeze"/>
+      </rect>
+      <text x="115" y="332" text-anchor="middle" fill="#fff" font-size="10" font-weight="600" opacity="0">SearchBar<animate attributeName="opacity" values="0;1" dur="0.5s" begin="1.3s" fill="freeze"/></text>
+    </g>
+
+    <!-- Bundle bar -->
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.5s" begin="1.5s" fill="freeze"/>
+      <rect x="39" y="420" width="200" height="8" rx="4" fill="#1e293b" stroke="#334155" stroke-width="0.5"/>
+      <rect x="39" y="420" width="200" height="8" rx="4" fill="#f97316" opacity="0.7">
+        <animate attributeName="width" values="0;200" dur="0.8s" begin="1.7s" fill="freeze"/>
+      </rect>
+      <text x="139" y="448" text-anchor="middle" fill="#f97316" font-size="10" font-weight="600">100% Client Bundle</text>
+    </g>
+  </g>
+
+  <!-- Arrow 1 → 2 -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;1" dur="0.5s" begin="2.5s" fill="freeze"/>
+    <path d="M274,265 L284,278 L274,291" stroke="#64748b" stroke-width="2" fill="none" stroke-linecap="round"/>
+  </g>
+  <circle cx="279" cy="278" r="3" fill="#64748b" opacity="0">
+    <animate attributeName="opacity" values="0;0.8;0" dur="1.5s" begin="2.5s" repeatCount="2"/>
+    <animate attributeName="r" values="3;6;3" dur="1.5s" begin="2.5s" repeatCount="2"/>
+  </circle>
+
+  <!-- ============================================================ -->
+  <!-- PHASE 2: Push Boundary Down (SearchBar + ProductPage client) -->
+  <!-- ============================================================ -->
+  <g>
+    <!-- Panel -->
+    <rect x="295" y="68" width="250" height="410" rx="16" fill="#1a2332" stroke="#334155" stroke-width="1" opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.6s" begin="2.8s" fill="freeze"/>
+    </rect>
+    <rect x="295" y="68" width="250" height="40" rx="16" fill="#1e293b" opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.6s" begin="2.8s" fill="freeze"/>
+    </rect>
+    <rect x="295" y="92" width="250" height="16" fill="#1e293b" opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.6s" begin="2.8s" fill="freeze"/>
+    </rect>
+    <text x="420" y="93" text-anchor="middle" fill="#94a3b8" font-size="12" font-weight="600" letter-spacing="1" opacity="0">PHASE 2<animate attributeName="opacity" values="0;1" dur="0.6s" begin="2.8s" fill="freeze"/></text>
+    <text x="420" y="128" text-anchor="middle" fill="#e2e8f0" font-size="13" font-weight="600" filter="url(#labelGlow)" opacity="0">Push Boundary Down<animate attributeName="opacity" values="0;1" dur="0.5s" begin="3.0s" fill="freeze"/></text>
+    <text x="420" y="145" text-anchor="middle" fill="#64748b" font-size="10" opacity="0">Move 'use client' to child components<animate attributeName="opacity" values="0;1" dur="0.5s" begin="3.0s" fill="freeze"/></text>
+
+    <!-- Tree lines -->
+    <g stroke="#475569" stroke-width="1.5" fill="none" opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.5s" begin="3.2s" fill="freeze"/>
+      <line x1="420" y1="186" x2="420" y2="206"/>
+      <line x1="420" y1="230" x2="420" y2="242"/>
+      <line x1="420" y1="242" x2="360" y2="242"/>
+      <line x1="420" y1="242" x2="480" y2="242"/>
+      <line x1="360" y1="242" x2="360" y2="258"/>
+      <line x1="480" y1="242" x2="480" y2="258"/>
+      <line x1="360" y1="282" x2="360" y2="298"/>
+      <line x1="360" y1="298" x2="324" y2="298"/>
+      <line x1="360" y1="298" x2="396" y2="298"/>
+      <line x1="324" y1="298" x2="324" y2="316"/>
+      <line x1="396" y1="298" x2="396" y2="316"/>
+    </g>
+
+    <!-- App (server) -->
+    <g filter="url(#serverGlow)" opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.5s" begin="3.4s" fill="freeze"/>
+      <rect x="370" y="162" width="100" height="24" rx="12" fill="url(#serverGrad)"/>
+      <text x="420" y="178" text-anchor="middle" fill="#fff" font-size="11" font-weight="600">App</text>
+    </g>
+
+    <!-- Layout (server) -->
+    <g filter="url(#serverGlow)" opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.5s" begin="3.6s" fill="freeze"/>
+      <rect x="370" y="206" width="100" height="24" rx="12" fill="url(#serverGrad)"/>
+      <text x="420" y="222" text-anchor="middle" fill="#fff" font-size="11" font-weight="600">Layout</text>
+    </g>
+
+    <!-- Header (server) -->
+    <g filter="url(#serverGlow)" opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.5s" begin="3.8s" fill="freeze"/>
+      <rect x="320" y="258" width="80" height="24" rx="12" fill="url(#serverGrad)"/>
+      <text x="360" y="274" text-anchor="middle" fill="#fff" font-size="11" font-weight="600">Header</text>
+    </g>
+
+    <!-- ProductPage (CLIENT - orange!) with subtle glow highlight -->
+    <rect x="424" y="254" width="112" height="32" rx="16" fill="#f97316" opacity="0">
+      <animate attributeName="opacity" values="0;0.12;0.06" dur="1.5s" begin="3.8s" fill="freeze"/>
+    </rect>
+    <g filter="url(#clientGlow)" opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.5s" begin="3.8s" fill="freeze"/>
+      <rect x="428" y="258" width="104" height="24" rx="12" fill="url(#clientGrad)"/>
+      <text x="480" y="274" text-anchor="middle" fill="#fff" font-size="10" font-weight="600">ProductPage</text>
+    </g>
+    <!-- 'use client' badge on ProductPage -->
+    <rect x="455" y="284" width="50" height="13" rx="7" fill="#7c2d12" opacity="0">
+      <animate attributeName="opacity" values="0;0.9" dur="0.4s" begin="4.0s" fill="freeze"/>
+    </rect>
+    <text x="480" y="293" text-anchor="middle" fill="#fdba74" font-size="7" font-weight="600" opacity="0">'use client'<animate attributeName="opacity" values="0;1" dur="0.4s" begin="4.0s" fill="freeze"/></text>
+
+    <!-- Logo (server) -->
+    <g filter="url(#serverGlow)" opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.5s" begin="4.1s" fill="freeze"/>
+      <rect x="297" y="316" width="54" height="24" rx="12" fill="url(#serverGrad)"/>
+      <text x="324" y="332" text-anchor="middle" fill="#fff" font-size="10" font-weight="600">Logo</text>
+    </g>
+
+    <!-- SearchBar (CLIENT - orange!) -->
+    <g filter="url(#clientGlow)" opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.5s" begin="4.1s" fill="freeze"/>
+      <rect x="361" y="316" width="70" height="24" rx="12" fill="url(#clientGrad)"/>
+      <text x="396" y="332" text-anchor="middle" fill="#fff" font-size="10" font-weight="600">SearchBar</text>
+    </g>
+    <!-- 'use client' badge on SearchBar -->
+    <rect x="371" y="342" width="50" height="13" rx="7" fill="#7c2d12" opacity="0">
+      <animate attributeName="opacity" values="0;0.9" dur="0.4s" begin="4.3s" fill="freeze"/>
+    </rect>
+    <text x="396" y="351" text-anchor="middle" fill="#fdba74" font-size="7" font-weight="600" opacity="0">'use client'<animate attributeName="opacity" values="0;1" dur="0.4s" begin="4.3s" fill="freeze"/></text>
+
+    <!-- Bundle bar (~40%) -->
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.5s" begin="4.5s" fill="freeze"/>
+      <rect x="320" y="420" width="200" height="8" rx="4" fill="#1e293b" stroke="#334155" stroke-width="0.5"/>
+      <rect x="320" y="420" width="200" height="8" rx="4" fill="url(#serverGrad)" opacity="0.12"/>
+      <rect x="320" y="420" width="80" height="8" rx="4" fill="#f97316" opacity="0.7">
+        <animate attributeName="width" values="0;80" dur="0.6s" begin="4.7s" fill="freeze"/>
+      </rect>
+      <text x="420" y="448" text-anchor="middle" fill="#f97316" font-size="10" font-weight="600">~40% Client Bundle</text>
+    </g>
+  </g>
+
+  <!-- Arrow 2 → 3 -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;1" dur="0.5s" begin="5.2s" fill="freeze"/>
+    <path d="M555,265 L565,278 L555,291" stroke="#64748b" stroke-width="2" fill="none" stroke-linecap="round"/>
+  </g>
+  <circle cx="560" cy="278" r="3" fill="#64748b" opacity="0">
+    <animate attributeName="opacity" values="0;0.8;0" dur="1.5s" begin="5.2s" repeatCount="2"/>
+    <animate attributeName="r" values="3;6;3" dur="1.5s" begin="5.2s" repeatCount="2"/>
+  </circle>
+
+  <!-- ============================================================ -->
+  <!-- PHASE 3: Split Mixed Components (only AddCart is client)     -->
+  <!-- ============================================================ -->
+  <g>
+    <!-- Panel -->
+    <rect x="576" y="68" width="250" height="410" rx="16" fill="#1a2332" stroke="#334155" stroke-width="1" opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.6s" begin="5.5s" fill="freeze"/>
+    </rect>
+    <rect x="576" y="68" width="250" height="40" rx="16" fill="#1e293b" opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.6s" begin="5.5s" fill="freeze"/>
+    </rect>
+    <rect x="576" y="92" width="250" height="16" fill="#1e293b" opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.6s" begin="5.5s" fill="freeze"/>
+    </rect>
+    <text x="701" y="93" text-anchor="middle" fill="#94a3b8" font-size="12" font-weight="600" letter-spacing="1" opacity="0">PHASE 3<animate attributeName="opacity" values="0;1" dur="0.6s" begin="5.5s" fill="freeze"/></text>
+    <text x="701" y="128" text-anchor="middle" fill="#e2e8f0" font-size="13" font-weight="600" filter="url(#labelGlow)" opacity="0">Split Mixed Components<animate attributeName="opacity" values="0;1" dur="0.5s" begin="5.7s" fill="freeze"/></text>
+    <text x="701" y="145" text-anchor="middle" fill="#64748b" font-size="10" opacity="0">Separate data fetching from interactivity<animate attributeName="opacity" values="0;1" dur="0.5s" begin="5.7s" fill="freeze"/></text>
+
+    <!-- Tree lines -->
+    <g stroke="#475569" stroke-width="1.5" fill="none" opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.5s" begin="5.9s" fill="freeze"/>
+      <!-- App → Layout -->
+      <line x1="701" y1="186" x2="701" y2="206"/>
+      <!-- Layout → fork -->
+      <line x1="701" y1="230" x2="701" y2="242"/>
+      <line x1="701" y1="242" x2="635" y2="242"/>
+      <line x1="701" y1="242" x2="763" y2="242"/>
+      <line x1="635" y1="242" x2="635" y2="258"/>
+      <line x1="763" y1="242" x2="763" y2="258"/>
+      <!-- Header → Logo, SearchBar -->
+      <line x1="635" y1="282" x2="635" y2="298"/>
+      <line x1="635" y1="298" x2="605" y2="298"/>
+      <line x1="635" y1="298" x2="665" y2="298"/>
+      <line x1="605" y1="298" x2="605" y2="316"/>
+      <line x1="665" y1="298" x2="665" y2="316"/>
+      <!-- ProductPage → Reviews, AddCart -->
+      <line x1="763" y1="282" x2="763" y2="298"/>
+      <line x1="763" y1="298" x2="732" y2="298"/>
+      <line x1="763" y1="298" x2="793" y2="298"/>
+      <line x1="732" y1="298" x2="732" y2="316"/>
+      <line x1="793" y1="298" x2="793" y2="316"/>
+    </g>
+
+    <!-- App (server) -->
+    <g filter="url(#serverGlow)" opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.5s" begin="6.1s" fill="freeze"/>
+      <rect x="651" y="162" width="100" height="24" rx="12" fill="url(#serverGrad)"/>
+      <text x="701" y="178" text-anchor="middle" fill="#fff" font-size="11" font-weight="600">App</text>
+    </g>
+
+    <!-- Layout (server) -->
+    <g filter="url(#serverGlow)" opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.5s" begin="6.2s" fill="freeze"/>
+      <rect x="651" y="206" width="100" height="24" rx="12" fill="url(#serverGrad)"/>
+      <text x="701" y="222" text-anchor="middle" fill="#fff" font-size="11" font-weight="600">Layout</text>
+    </g>
+
+    <!-- Header (server) -->
+    <g filter="url(#serverGlow)" opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.5s" begin="6.3s" fill="freeze"/>
+      <rect x="595" y="258" width="80" height="24" rx="12" fill="url(#serverGrad)"/>
+      <text x="635" y="274" text-anchor="middle" fill="#fff" font-size="11" font-weight="600">Header</text>
+    </g>
+
+    <!-- ProductPage (CONVERTED to server! orange→cyan transition) -->
+    <g filter="url(#serverGlow)" opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.5s" begin="6.3s" fill="freeze"/>
+      <rect x="711" y="258" width="104" height="24" rx="12" fill="url(#serverGrad)" stroke="#f97316" stroke-width="2">
+        <animate attributeName="stroke" values="#f97316;#06b6d4;#06b6d4" dur="1s" begin="6.3s" fill="freeze"/>
+        <animate attributeName="stroke-width" values="2;2;0" dur="1s" begin="6.3s" fill="freeze"/>
+      </rect>
+      <text x="763" y="274" text-anchor="middle" fill="#fff" font-size="10" font-weight="600">ProductPage</text>
+    </g>
+
+    <!-- Logo (server) -->
+    <g filter="url(#serverGlow)" opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.5s" begin="6.5s" fill="freeze"/>
+      <rect x="581" y="316" width="48" height="24" rx="12" fill="url(#serverGrad)"/>
+      <text x="605" y="332" text-anchor="middle" fill="#fff" font-size="9" font-weight="600">Logo</text>
+    </g>
+
+    <!-- SearchBar (client - stays client) -->
+    <g filter="url(#clientGlow)" opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.5s" begin="6.5s" fill="freeze"/>
+      <rect x="633" y="316" width="64" height="24" rx="12" fill="url(#clientGrad)"/>
+      <text x="665" y="332" text-anchor="middle" fill="#fff" font-size="9" font-weight="600">SearchBar</text>
+    </g>
+    <!-- 'use client' badge on SearchBar -->
+    <rect x="640" y="342" width="50" height="13" rx="7" fill="#7c2d12" opacity="0">
+      <animate attributeName="opacity" values="0;0.9" dur="0.4s" begin="6.7s" fill="freeze"/>
+    </rect>
+    <text x="665" y="351" text-anchor="middle" fill="#fdba74" font-size="7" font-weight="600" opacity="0">'use client'<animate attributeName="opacity" values="0;1" dur="0.4s" begin="6.7s" fill="freeze"/></text>
+
+    <!-- Reviews (server - extracted from ProductPage) -->
+    <g filter="url(#serverGlow)" opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.5s" begin="6.7s" fill="freeze"/>
+      <rect x="703" y="316" width="58" height="24" rx="12" fill="url(#serverGrad)"/>
+      <text x="732" y="332" text-anchor="middle" fill="#fff" font-size="9" font-weight="600">Reviews</text>
+    </g>
+
+    <!-- AddCart (CLIENT - extracted interactive leaf) -->
+    <g filter="url(#clientGlow)" opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.5s" begin="6.7s" fill="freeze"/>
+      <rect x="765" y="316" width="56" height="24" rx="12" fill="url(#clientGrad)"/>
+      <text x="793" y="332" text-anchor="middle" fill="#fff" font-size="9" font-weight="600">AddCart</text>
+    </g>
+    <!-- 'use client' badge on AddCart -->
+    <rect x="768" y="342" width="50" height="13" rx="7" fill="#7c2d12" opacity="0">
+      <animate attributeName="opacity" values="0;0.9" dur="0.4s" begin="6.9s" fill="freeze"/>
+    </rect>
+    <text x="793" y="351" text-anchor="middle" fill="#fdba74" font-size="7" font-weight="600" opacity="0">'use client'<animate attributeName="opacity" values="0;1" dur="0.4s" begin="6.9s" fill="freeze"/></text>
+
+    <!-- Dashed highlight around client leaves -->
+    <rect x="761" y="312" width="64" height="32" rx="8" fill="none" stroke="#f97316" stroke-width="1" stroke-dasharray="3,3" opacity="0">
+      <animate attributeName="opacity" values="0;0.5" dur="0.5s" begin="7.1s" fill="freeze"/>
+    </rect>
+
+    <!-- Bundle bar (~15%) -->
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;1" dur="0.5s" begin="7.2s" fill="freeze"/>
+      <rect x="601" y="420" width="200" height="8" rx="4" fill="#1e293b" stroke="#334155" stroke-width="0.5"/>
+      <rect x="601" y="420" width="200" height="8" rx="4" fill="url(#serverGrad)" opacity="0.12"/>
+      <rect x="601" y="420" width="30" height="8" rx="4" fill="#f97316" opacity="0.7">
+        <animate attributeName="width" values="0;30" dur="0.6s" begin="7.4s" fill="freeze"/>
+      </rect>
+      <text x="701" y="448" text-anchor="middle" fill="#06b6d4" font-size="10" font-weight="600">~15% Client Bundle</text>
+      <text x="701" y="462" text-anchor="middle" fill="#34d399" font-size="9" font-weight="600">Only interactive leaves ship JS</text>
+    </g>
+  </g>
+
+  <!-- Legend -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;1" dur="0.6s" begin="7.8s" fill="freeze"/>
+    <rect x="275" y="496" width="12" height="12" rx="6" fill="url(#serverGrad)"/>
+    <text x="292" y="507" fill="#94a3b8" font-size="11">Server Component</text>
+    <rect x="430" y="496" width="12" height="12" rx="6" fill="url(#clientGrad)"/>
+    <text x="447" y="507" fill="#94a3b8" font-size="11">Client Component</text>
+  </g>
+</svg>
