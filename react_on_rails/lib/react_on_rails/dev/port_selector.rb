@@ -37,12 +37,19 @@ module ReactOnRails
         # NOTE: Inherent TOCTOU race — another process can claim the port between
         # server.close and the caller binding to it. This is unavoidable with the
         # probe-then-use pattern and acceptable for the worktree port-selection use case.
-        def port_available?(port, host = "127.0.0.1")
-          server = TCPServer.new(host, port)
-          server.close
-          true
-        rescue Errno::EADDRINUSE, Errno::EACCES
-          false
+        def port_available?(port)
+          # Check both IPv4 and IPv6 loopback. Node 22+ resolves "localhost"
+          # to ::1 first, so webpack-dev-server often binds only to IPv6.
+          # A pure-IPv4 probe would miss that listener.
+          %w[127.0.0.1 ::1].all? do |host|
+            server = TCPServer.new(host, port)
+            server.close
+            true
+          rescue Errno::EADDRINUSE, Errno::EACCES
+            false
+          rescue Errno::EADDRNOTAVAIL, SocketError
+            true # address family unavailable on this system
+          end
         end
 
         def find_available_port(start_port, exclude: nil)

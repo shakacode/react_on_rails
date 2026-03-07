@@ -193,8 +193,18 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
       expect(described_class.port_available?(free_port)).to be true
     end
 
-    it "returns false for a port that is already in use" do
+    it "returns false for a port that is already in use on IPv4" do
       server = TCPServer.new("127.0.0.1", 0)
+      occupied_port = server.addr[1]
+      begin
+        expect(described_class.port_available?(occupied_port)).to be false
+      ensure
+        server.close
+      end
+    end
+
+    it "returns false for a port that is already in use on IPv6 only" do
+      server = TCPServer.new("::1", 0)
       occupied_port = server.addr[1]
       begin
         expect(described_class.port_available?(occupied_port)).to be false
