@@ -31,7 +31,7 @@ Changes since the last non-beta release.
 
 ##### Fixed
 
-- **Immutable and crash-safe bundle directories for uploaded assets**: Fixed destination-level bundle directory races by making bundle hashes depend on bundle content plus copied asset content, switching asset copies to no-overwrite semantics, and adding a `.complete` marker so interrupted uploads are detected and repopulated instead of being treated as valid. [PR 2534](https://github.com/shakacode/react_on_rails/pull/2534) by [justin808](https://github.com/justin808).
+- **Immutable and crash-safe bundle directories for uploaded assets**: Fixed destination-level bundle directory races by making bundle hashes depend on bundle content plus copied asset content, switching asset copies to no-overwrite semantics, and adding a `.complete` marker so interrupted uploads are detected and repopulated instead of being treated as valid. With RSC support enabled, manifest files are intentionally included in hash dependencies so cache invalidation stays consistent across shared renderer bundle state. [PR 2534](https://github.com/shakacode/react_on_rails/pull/2534) by [justin808](https://github.com/justin808).
 
 #### Fixed
 
