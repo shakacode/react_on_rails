@@ -91,7 +91,9 @@ function buildAppElement(
 ): ReactElement {
   let app: ReactElement = createElement(RouterProvider, { router });
   if (AppWrapper) {
-    app = createElement(AppWrapper, { ...wrapperProps, children: app } as any);
+    const safeWrapperProps = { ...wrapperProps };
+    delete safeWrapperProps.__tanstackRouterDehydratedState;
+    app = createElement(AppWrapper, { ...safeWrapperProps, children: app } as any);
   }
   return app;
 }
@@ -168,10 +170,11 @@ export async function serverRenderTanStackAppAsync(
   const memoryHistory = createMemoryHistory({ initialEntries: [url] });
   router.update({ history: memoryHistory });
 
+  // Async path uses router.load() public API, so no private-internals validation is needed.
   // Use the public API — await route loading
   await router.load();
 
-  // Keep server markup consistent with the synchronous render path.
+  // Ensure SSR output avoids client-only Suspense wrappers that can cause hydration mismatch.
   (router as any).ssr = true;
 
   const dehydratedState: DehydratedRouterState = {

@@ -13,7 +13,7 @@ export function createResultObject(
 ): RenderResult {
   return {
     html,
-    clientProps: 'clientProps' in renderState ? renderState.clientProps : undefined,
+    clientProps: renderState.clientProps,
     consoleReplayScript,
     hasErrors: renderState.hasErrors,
     renderingError: renderState.error && {

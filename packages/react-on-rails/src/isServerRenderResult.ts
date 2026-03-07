@@ -5,13 +5,12 @@ export function isServerRenderHash(testValue: unknown): testValue is ServerRende
     return false;
   }
 
-  return (
+  const hasPrimaryServerRenderKey =
     'renderedHtml' in testValue ||
-    'clientProps' in testValue ||
     'redirectLocation' in testValue ||
     'routeError' in testValue ||
-    'error' in testValue
-  );
+    'error' in testValue;
+  return hasPrimaryServerRenderKey;
 }
 
 export function isPromise<T>(testValue: unknown): testValue is Promise<T> {

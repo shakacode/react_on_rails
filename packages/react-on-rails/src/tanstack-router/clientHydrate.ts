@@ -37,6 +37,7 @@ function TanStackHydrationApp({
     dehydratedState?.dehydratedRouter !== undefined && dehydratedState.dehydratedRouter !== null;
 
   const routerRef = useRef<TanStackRouter | null>(null);
+  const didTriggerPostHydrationLoadRef = useRef(false);
 
   if (routerRef.current === null) {
     const router = options.createRouter();
@@ -81,10 +82,9 @@ function TanStackHydrationApp({
       );
     }
 
-    // Mark as SSR whenever we are hydrating a server-rendered page, even if
-    // TanStack returned null dehydration data. This prevents Transitioner
-    // from performing a client-only initial load during hydration.
-    if (hasSsrPayload) {
+    // Keep SSR mode enabled on hydration paths so Transitioner does not run
+    // a client-only initial load before hydration settles.
+    if (hasSsrPayload && (router as TanStackRouter & { ssr?: unknown }).ssr !== true) {
       (router as any).ssr = true;
     }
 
@@ -106,6 +106,11 @@ function TanStackHydrationApp({
       return undefined;
     }
 
+    if (didTriggerPostHydrationLoadRef.current) {
+      return undefined;
+    }
+    didTriggerPostHydrationLoadRef.current = true;
+
     let cancelled = false;
     router.load().catch((err: unknown) => {
       if (!cancelled) {
@@ -115,6 +120,11 @@ function TanStackHydrationApp({
 
     return () => {
       cancelled = true;
+      // Best effort cancellation for router versions that expose an explicit load cancel API.
+      const cancellableRouter = router as TanStackRouter & { cancelLoad?: () => void };
+      if (typeof cancellableRouter.cancelLoad === 'function') {
+        cancellableRouter.cancelLoad();
+      }
     };
   }, [hasSsrPayload, router]);
 

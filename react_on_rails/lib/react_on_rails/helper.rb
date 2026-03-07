@@ -611,9 +611,21 @@ module ReactOnRails
               "Pass props as a Hash, not #{class_name}."
       end
 
-      normalized_existing_props = existing_props.deep_stringify_keys
-      normalized_client_props = client_props.deep_stringify_keys
-      render_options.set_option(:props, normalized_existing_props.merge(normalized_client_props))
+      render_options.set_option(:props, merge_client_props(existing_props, client_props))
+    end
+
+    def merge_client_props(existing_props, client_props)
+      merged_props = existing_props.dup
+      client_props.each do |key, value|
+        merged_props[client_prop_target_key(merged_props, key)] = value
+      end
+      merged_props
+    end
+
+    def client_prop_target_key(props, key)
+      string_key = key.to_s
+      symbol_key = string_key.to_sym
+      props.key?(symbol_key) && !props.key?(string_key) ? symbol_key : string_key
     end
 
     def render_redux_store_data(redux_store_data)
