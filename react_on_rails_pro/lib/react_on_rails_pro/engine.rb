@@ -20,6 +20,10 @@ module ReactOnRailsPro
       config.after_initialize { ReactOnRailsPro::Engine.log_license_status }
     end
 
+    initializer "react_on_rails_pro.warn_on_problematic_compression_middleware" do
+      config.after_initialize { ReactOnRailsPro::Engine.log_problematic_compression_middleware_warnings }
+    end
+
     class << self
       def log_license_status
         status = ReactOnRailsPro::LicenseValidator.license_status
@@ -38,6 +42,14 @@ module ReactOnRailsPro
         when :invalid
           log_license_issue("Invalid license", "Get a license at #{LICENSE_URL}")
         end
+      end
+
+      def log_problematic_compression_middleware_warnings(logger: Rails.logger,
+                                                          middlewares: Rails.application.middleware,
+                                                          root: Rails.root)
+        CompressionMiddlewareGuard.new(middlewares: middlewares)
+                                  .warning_messages(root: root)
+                                  .each { |message| logger.warn(message) }
       end
 
       private
