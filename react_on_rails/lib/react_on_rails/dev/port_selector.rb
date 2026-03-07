@@ -19,10 +19,14 @@ module ReactOnRails
           rails_port   = explicit_rails_port
           webpack_port = explicit_webpack_port
 
+          rails_auto   = rails_port.nil?
+          webpack_auto = webpack_port.nil?
+
           rails_port   ||= find_available_port(DEFAULT_RAILS_PORT, exclude: webpack_port)
           webpack_port ||= find_available_port(DEFAULT_WEBPACK_PORT, exclude: rails_port)
 
-          if rails_port != DEFAULT_RAILS_PORT || webpack_port != DEFAULT_WEBPACK_PORT
+          if (rails_auto && rails_port != DEFAULT_RAILS_PORT) ||
+             (webpack_auto && webpack_port != DEFAULT_WEBPACK_PORT)
             puts "Default ports in use. Using Rails :#{rails_port}, webpack :#{webpack_port}"
           end
 

@@ -476,6 +476,11 @@ module ReactOnRails
         def run_production_like(_verbose: false, route: nil, rails_env: nil, skip_database_check: false)
           procfile = "Procfile.dev-prod-assets"
 
+          # Set PORT before foreman starts — foreman injects its own PORT=5000
+          # into child processes when ENV["PORT"] is unset, overriding the
+          # ${PORT:-3001} fallback in the Procfile.
+          ENV["PORT"] ||= procfile_port(procfile).to_s
+
           features = [
             "Precompiling assets with production optimizations",
             "Running Rails server on port #{procfile_port(procfile)}",
