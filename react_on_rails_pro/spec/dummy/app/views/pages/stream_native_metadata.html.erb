@@ -1,0 +1,30 @@
+<%= stream_react_component("NativeMetadataApp",
+                         props: @app_props_server_render,
+                         trace: true,
+                         id: "NativeMetadataApp-react-component-0") %>
+
+<hr/>
+
+<h2>About This Example</h2>
+<p>
+  This page uses <code>stream_react_component</code> (streaming SSR) with React 19's native
+  <code>&lt;title&gt;</code> and <code>&lt;meta&gt;</code> tags.
+</p>
+<p>
+  <strong>How it works:</strong> The shell renders immediately with the initial title
+  "Loading... | React on Rails". When the Suspense boundary resolves (~1s later),
+  the async content streams to the browser along with scripts that update the
+  <code>&lt;title&gt;</code> in the document <code>&lt;head&gt;</code>.
+</p>
+<p>
+  <strong>Trade-off:</strong> Metadata is NOT in <code>&lt;head&gt;</code> in the initial
+  server-rendered HTML. The title updates client-side via React 19's hoisting scripts in
+  the streamed chunks. SEO crawlers that don't execute JavaScript will not see the final title.
+</p>
+<p>
+  <strong>Compare with:</strong>
+  <%= link_to "Sync SSR version", native_metadata_path %> |
+  <%= link_to "RSC version", rsc_native_metadata_path %> |
+  <%= link_to "Hybrid approach (recommended for SEO)", hybrid_metadata_streaming_path %> |
+  <%= link_to "Helmet approach (react_component_hash)", react_helmet_path %>
+</p>

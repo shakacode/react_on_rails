@@ -40,6 +40,10 @@ Rails.application.routes.draw do
   get "async_render_function_returns_string" => "pages#async_render_function_returns_string"
   get "async_render_function_returns_component" => "pages#async_render_function_returns_component"
   get "async_components_demo" => "pages#async_components_demo", as: :async_components_demo
+  get "native_metadata" => "pages#native_metadata", as: :native_metadata
+  get "stream_native_metadata" => "pages#stream_native_metadata", as: :stream_native_metadata
+  get "hybrid_metadata_streaming" => "pages#hybrid_metadata_streaming", as: :hybrid_metadata_streaming
+  get "rsc_native_metadata" => "pages#rsc_native_metadata", as: :rsc_native_metadata
   rsc_payload_route controller: "pages"
 
   # routes copied over from react on rails

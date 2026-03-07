@@ -1,0 +1,30 @@
+<%= stream_react_component("NativeMetadataRSCApp",
+                         props: @app_props_server_render,
+                         prerender: true,
+                         trace: true,
+                         id: "NativeMetadataRSCApp-react-component-0") %>
+
+<hr/>
+
+<h2>About This Example</h2>
+<p>
+  This page uses a <strong>React Server Component</strong> (no <code>'use client'</code> directive)
+  with React 19's native <code>&lt;title&gt;</code>, <code>&lt;meta&gt;</code>, and
+  <code>&lt;link&gt;</code> tags.
+</p>
+<p>
+  <strong>How it works:</strong> The component runs exclusively on the server (Node renderer).
+  During HTML streaming via <code>renderToPipeableStream</code>, React 19 hoists metadata tags
+  into the <code>&lt;head&gt;</code> section of the streamed HTML response.
+</p>
+<p>
+  <strong>Key difference from client components:</strong> Since this is a true server component
+  (registered via <code>registerServerComponent</code>), the component code never ships to the
+  browser. Data fetching, async operations, and metadata rendering all happen server-side.
+</p>
+<p>
+  <strong>Compare with:</strong>
+  <%= link_to "Client component streaming", stream_native_metadata_path %> |
+  <%= link_to "Sync SSR version", native_metadata_path %> |
+  <%= link_to "Hybrid approach (recommended for SEO)", hybrid_metadata_streaming_path %>
+</p>
