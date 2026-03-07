@@ -159,7 +159,7 @@ module ReactOnRails
         return if additions.empty?
 
         append_to_file ".gitignore" do
-          lines = ["\n# React on Rails"]
+          lines = ["\n# React on Rails (generated and local files)"]
           lines.concat(additions)
           "#{lines.join("\n")}\n"
         end
