@@ -46,9 +46,13 @@ function TanStackHydrationApp({
     router.update({ history: browserHistory });
 
     // Hydrate router with dehydrated state from server if available.
-    if (hasDehydratedRouter && typeof router.hydrate === 'function') {
+    if (hasSsrPayload && hasDehydratedRouter && typeof router.hydrate === 'function') {
       router.hydrate(dehydratedState.dehydratedRouter);
-    } else if (typeof router.matchRoutes === 'function' && typeof router.__store?.setState === 'function') {
+    } else if (
+      hasSsrPayload &&
+      typeof router.matchRoutes === 'function' &&
+      typeof router.__store?.setState === 'function'
+    ) {
       // Fall back to injecting route matches when no dehydrated state is available.
       // This keeps the initial client route tree aligned with SSR output.
       const routerLocation = router.state?.location as { pathname?: string; search?: string } | undefined;
