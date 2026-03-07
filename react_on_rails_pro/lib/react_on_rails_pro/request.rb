@@ -320,7 +320,13 @@ module ReactOnRailsPro
 
           response = HTTPX.get(path)
           error = response.error
-          raise ReactOnRailsPro::Error, "Failed to fetch dev-server asset from #{path}: #{error}", cause: error if error
+          if error
+            begin
+              raise error
+            rescue StandardError
+              raise ReactOnRailsPro::Error, "Failed to fetch dev-server asset from #{path}: #{error}"
+            end
+          end
 
           response.body
         else
