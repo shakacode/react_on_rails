@@ -274,7 +274,7 @@ module ReactOnRailsPro
         raise ReactOnRailsPro::Error, "Failed to fetch bundle/asset for hashing from #{path}: #{response.error}"
       end
 
-      status = response.respond_to?(:status) ? response.status : nil
+      status = response.status
       if status != 200
         raise ReactOnRailsPro::Error, "HTTP error #{status || 'unknown'} fetching #{path} for bundle hash"
       end

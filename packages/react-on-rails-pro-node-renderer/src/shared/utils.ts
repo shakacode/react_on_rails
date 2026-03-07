@@ -234,6 +234,11 @@ export async function cleanIncompleteBundleDirectory(bundleTimestamp: string | n
 
   // Re-check completeness after directory read to reduce a race window where
   // another writer can finish and mark complete while this cleaner is in-flight.
+  //
+  // Contract: callers must hold the per-bundle lock (keyed by the bundle JS
+  // path) before invoking this helper. Under that lock, concurrent writers to
+  // the same bundle directory are serialized, so a complete marker cannot be
+  // written mid-cleanup on valid call paths.
   if (await isBundleComplete(bundleTimestamp)) {
     return false;
   }
