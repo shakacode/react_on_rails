@@ -27,10 +27,12 @@ RSpec.describe "RSC payload endpoint" do
     expect(response).to have_http_status(:ok)
     expect(response.media_type).to eq("application/x-ndjson")
 
-    expect(parsed_chunks).not_to be_empty
+    chunks = parsed_chunks
+
+    expect(chunks).not_to be_empty
     html_chunk_message =
-      "Expected at least one RSC chunk to contain an 'html' key, got: #{parsed_chunks.inspect}"
-    expect(parsed_chunks.any? { |chunk| chunk.key?("html") }).to be(true), html_chunk_message
+      "Expected at least one RSC chunk to contain an 'html' key, got: #{chunks.inspect}"
+    expect(chunks.any? { |chunk| chunk.key?("html") }).to be(true), html_chunk_message
   end
 
   def render_annotated_html_inline_template
