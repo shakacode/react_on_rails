@@ -15,7 +15,8 @@ RSpec.describe "RSC payload endpoint" do
       begin
         JSON.parse(stripped_line)
       rescue JSON::ParserError => e
-        raise "Non-JSON line in RSC payload response: #{stripped_line.inspect} (#{e.message})"
+        raise RSpec::Expectations::ExpectationNotMetError,
+              "Non-JSON line in RSC payload response: #{stripped_line.inspect} (#{e.message})"
       end
     end
   end

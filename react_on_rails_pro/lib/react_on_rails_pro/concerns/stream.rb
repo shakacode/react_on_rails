@@ -52,8 +52,8 @@ module ReactOnRailsPro
         # View may contain extra newlines, chunk already contains a newline
         # Having multiple newlines between chunks causes hydration errors
         # So we strip extra newlines from the template string and add a single newline
-        # `formats: [:text]` makes render_to_string infer `text/plain`;
-        # override it here before the first write commits the response headers.
+        # `formats: [:text]` causes render_to_string to set response.content_type
+        # to `text/plain`; override it here before the first write commits headers.
         response.content_type = content_type if content_type
         response.stream.write(template_string)
 
