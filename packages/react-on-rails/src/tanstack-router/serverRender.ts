@@ -15,14 +15,16 @@ function validateRouterInternals(router: TanStackRouter): void {
       'react-on-rails/tanstack-router: TanStack Router internal API changed. ' +
         'Expected router.__store.setState to be a function. ' +
         'Please check that your @tanstack/react-router version is compatible, ' +
-        'or file an issue at https://github.com/shakacode/react_on_rails/issues',
+        'or file an issue at https://github.com/shakacode/react_on_rails/issues. ' +
+        'Supported @tanstack/react-router range: >=1.0.0 <2.0.0.',
     );
   }
 
   if (typeof router.matchRoutes !== 'function') {
     throw new Error(
       'react-on-rails/tanstack-router: Expected router.matchRoutes to be a function. ' +
-        'Please check that your @tanstack/react-router version is compatible.',
+        'Please check that your @tanstack/react-router version is compatible. ' +
+        'Supported range: >=1.0.0 <2.0.0.',
     );
   }
 
@@ -30,7 +32,8 @@ function validateRouterInternals(router: TanStackRouter): void {
   if (typeof pathname !== 'string') {
     throw new Error(
       'react-on-rails/tanstack-router: validateRouterInternals expected router.state.location.pathname to be a string. ' +
-        'Please check that your @tanstack/react-router version is compatible.',
+        'Please check that your @tanstack/react-router version is compatible. ' +
+        'Supported range: >=1.0.0 <2.0.0.',
     );
   }
 
@@ -40,7 +43,8 @@ function validateRouterInternals(router: TanStackRouter): void {
   if (!hasSearch) {
     throw new Error(
       'react-on-rails/tanstack-router: validateRouterInternals expected router.state.location.search (or searchStr) to exist. ' +
-        'Please check that your @tanstack/react-router version is compatible.',
+        'Please check that your @tanstack/react-router version is compatible. ' +
+        'Supported range: >=1.0.0 <2.0.0.',
     );
   }
 }
@@ -54,7 +58,7 @@ function validateRouterInternals(router: TanStackRouter): void {
  * - Without pre-populated matches, SSR output would be empty
  *
  * Uses private API: router.__store.setState()
- * Pinned behavior from @tanstack/react-router@1.163.3
+ * Verified against @tanstack/react-router@1.163.3 within the supported range >=1.0.0 <2.0.0.
  */
 function injectRouteMatchesSync(router: TanStackRouter, fallbackUrl: string): void {
   const store = router.__store;

@@ -80,7 +80,7 @@ function processPromise(
       return processReactElement(promiseResult);
     }
     // promiseResult can be a FinalHtmlResult or a ServerRenderResult hash.
-    return promiseResult;
+    return promiseResult as FinalHtmlResult | ServerRenderResult;
   });
 }
 

@@ -268,6 +268,12 @@ describe ReactOnRailsHelper do
         expect(result).to include('"__tanstackRouterDehydratedState":{"url":"/products?category=tools"}')
       end
 
+      it "treats nil props as an empty hash when merging clientProps" do
+        result = react_component("App", prerender: true)
+
+        expect(result).to include('"__tanstackRouterDehydratedState":{"url":"/products?category=tools"}')
+      end
+
       it "raises a clear error when JSON string props parse to a non-Hash value" do
         expect do
           react_component("App", props: '["not","a","hash"]', prerender: true)

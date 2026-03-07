@@ -44,7 +44,7 @@ import { clientHydrateTanStackApp } from './clientHydrate.ts';
 export type { TanStackRouterOptions, DehydratedRouterState } from './types.ts';
 export { serverRenderTanStackAppAsync } from './serverRender.ts';
 
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 interface TanStackRouterDeps {
   /**
@@ -127,14 +127,16 @@ export function createTanStackRouterRenderFunction(
       } satisfies ServerRenderResult;
     }
 
-    // Client-side: return a ReactElement that React on Rails will hydrate/render.
-    return clientHydrateTanStackApp(
-      options,
-      props,
-      railsContext as RailsContext & { serverSide: false },
-      RouterProvider,
-      createBrowserHistory,
-    ) as any;
+    // Client-side: return a React component so React on Rails can instantiate it with props.
+    return function TanStackRouterClientApp(clientProps: Record<string, unknown> = {}) {
+      return clientHydrateTanStackApp(
+        options,
+        clientProps,
+        railsContext as RailsContext & { serverSide: false },
+        RouterProvider,
+        createBrowserHistory,
+      );
+    };
   };
 
   // Mark as a render function so React on Rails executes it rather than treating it

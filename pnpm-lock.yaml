@@ -207,7 +207,7 @@ importers:
   packages/react-on-rails:
     dependencies:
       '@tanstack/react-router':
-        specifier: '>= 1.0.0'
+        specifier: '>=1.0.0 <2.0.0'
         version: 1.163.3(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       react:
         specifier: ^19.0.3
@@ -650,6 +650,9 @@ importers:
       react-error-boundary:
         specifier: ^4.1.2
         version: 4.1.2(react@19.2.3)
+      react-on-rails:
+        specifier: workspace:*
+        version: link:../../../packages/react-on-rails
       react-on-rails-pro:
         specifier: workspace:*
         version: link:../../../packages/react-on-rails-pro

@@ -85,8 +85,7 @@ const TanStackRouterAppAsync = (props, railsContext) => {
     }));
   }
 
-  const result = syncRenderFn(propsOrDefault, railsContext);
-  return () => result;
+  return syncRenderFn(propsOrDefault, railsContext);
 };
 
 TanStackRouterAppAsync.renderFunction = true;

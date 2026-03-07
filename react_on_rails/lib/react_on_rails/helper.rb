@@ -590,7 +590,9 @@ module ReactOnRails
       return if client_props.empty?
 
       raw_existing_props = render_options.props
-      existing_props = if raw_existing_props.is_a?(String)
+      existing_props = if raw_existing_props.nil?
+                         {}
+                       elsif raw_existing_props.is_a?(String)
                          begin
                            JSON.parse(raw_existing_props)
                          rescue JSON::ParserError

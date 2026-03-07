@@ -92,14 +92,27 @@ function TanStackHydrationApp({
   // After mount, trigger router.load() to enable client-side navigation.
   // The SSR flag prevented auto-loading, so we do it manually here.
   useEffect(() => {
+    if (!router) {
+      return undefined;
+    }
+
     // Only SSR hydration needs a manual load call.
     // For client-only renders, Transitioner handles initial loading.
-    if (hasSsrPayload) {
-      router.load().catch((err: unknown) => {
-        console.error('react-on-rails/tanstack-router: Error loading routes after hydration:', err);
-      });
+    if (!hasSsrPayload) {
+      return undefined;
     }
-  }, [hasSsrPayload]); // eslint-disable-line react-hooks/exhaustive-deps -- router is a ref, intentionally stable
+
+    let cancelled = false;
+    router.load().catch((err: unknown) => {
+      if (!cancelled) {
+        console.error('react-on-rails/tanstack-router: Error loading routes after hydration:', err);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hasSsrPayload, router]);
 
   let app: ReactElement = createElement(RouterProvider, { router });
   if (options.AppWrapper) {

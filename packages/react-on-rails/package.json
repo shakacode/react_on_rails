@@ -62,7 +62,7 @@
   "peerDependencies": {
     "react": ">= 16",
     "react-dom": ">= 16",
-    "@tanstack/react-router": ">= 1.0.0"
+    "@tanstack/react-router": ">=1.0.0 <2.0.0"
   },
   "peerDependenciesMeta": {
     "@tanstack/react-router": {

@@ -99,7 +99,7 @@ describe('tanstack-router integration', () => {
     expect(deps.createMemoryHistory).toHaveBeenCalledWith({ initialEntries: ['/products?category=tools'] });
   });
 
-  it('returns a client React element on client-side render', () => {
+  it('returns a client React component on client-side render', () => {
     const options = {
       createRouter: () => buildRouter(),
     };
@@ -125,7 +125,7 @@ describe('tanstack-router integration', () => {
       search: '?category=tools',
     } as unknown as RailsContext);
 
-    expect(React.isValidElement(result)).toBe(true);
+    expect(typeof result).toBe('function');
   });
 
   it('hydrates with railsContext path when dehydration payload exists without dehydrated router', () => {
@@ -149,22 +149,20 @@ describe('tanstack-router integration', () => {
     };
 
     const renderFn = createTanStackRouterRenderFunction(options, deps);
-    const result = renderFn(
-      {
-        __tanstackRouterDehydratedState: {
-          url: '/products?category=tools',
-          dehydratedRouter: null,
-        },
+    const props = {
+      __tanstackRouterDehydratedState: {
+        url: '/products?category=tools',
+        dehydratedRouter: null,
       },
-      {
-        serverSide: false,
-        pathname: '/products',
-        search: '?category=tools',
-      } as unknown as RailsContext,
-    );
+    };
+    const result = renderFn(props, {
+      serverSide: false,
+      pathname: '/products',
+      search: '?category=tools',
+    } as unknown as RailsContext);
 
-    expect(React.isValidElement(result)).toBe(true);
-    renderToString(result as React.ReactElement);
+    expect(typeof result).toBe('function');
+    renderToString(React.createElement(result as React.ComponentType<Record<string, unknown>>, props));
 
     expect(router.matchRoutes).toHaveBeenCalledWith('/products', '?category=tools');
     expect((router as { ssr?: boolean }).ssr).toBe(true);
@@ -196,22 +194,20 @@ describe('tanstack-router integration', () => {
     };
 
     const renderFn = createTanStackRouterRenderFunction(options, deps);
-    const result = renderFn(
-      {
-        __tanstackRouterDehydratedState: {
-          url: '/products?category=tools',
-          dehydratedRouter: null,
-        },
-        userId: 42,
+    const props = {
+      __tanstackRouterDehydratedState: {
+        url: '/products?category=tools',
+        dehydratedRouter: null,
       },
-      {
-        serverSide: false,
-        pathname: '/products',
-        search: '?category=tools',
-      } as unknown as RailsContext,
-    );
+      userId: 42,
+    };
+    const result = renderFn(props, {
+      serverSide: false,
+      pathname: '/products',
+      search: '?category=tools',
+    } as unknown as RailsContext);
 
-    renderToString(result as React.ReactElement);
+    renderToString(React.createElement(result as React.ComponentType<Record<string, unknown>>, props));
 
     expect(observedProps).toHaveLength(1);
     expect(observedProps[0]).toEqual({ userId: 42 });
