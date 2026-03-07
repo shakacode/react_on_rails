@@ -134,6 +134,8 @@ module ReactOnRails
           create_css_module_types
           create_typescript_config
         end
+        # `invoke` instantiates child generators with a fresh options hash, so
+        # --pretend/--force/--skip must be forwarded explicitly at each boundary.
         invoke "react_on_rails:base", [],
                { typescript: options.typescript?, redux: options.redux?, rspack: options.rspack?,
                  pro: options.pro?, rsc: options.rsc?,
@@ -275,6 +277,8 @@ module ReactOnRails
           gsub_file "bin/dev", 'DEFAULT_ROUTE = "hello_world"', 'DEFAULT_ROUTE = "hello_server"'
         end
 
+        # `directory` and `gsub_file` above are Thor actions that already honor
+        # --pretend. Only the raw Ruby filesystem calls below need an explicit guard.
         if options[:pretend]
           say_status :pretend, "Skipping chmod on bin scripts in --pretend mode", :yellow
           return
@@ -491,7 +495,7 @@ module ReactOnRails
 
       def create_css_module_types
         if options[:pretend]
-          say_status :pretend, "Would create CSS module type definitions (skipped in --pretend mode)", :yellow
+          say_status :pretend, "Skipping CSS module type definitions in --pretend mode", :yellow
           return
         end
 
@@ -524,7 +528,7 @@ module ReactOnRails
 
       def create_typescript_config
         if options[:pretend]
-          say_status :pretend, "Would create tsconfig.json (skipped in --pretend mode)", :yellow
+          say_status :pretend, "Skipping tsconfig.json creation in --pretend mode", :yellow
           return
         end
 

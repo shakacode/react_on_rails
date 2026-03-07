@@ -3,7 +3,7 @@
 require_relative "../support/generator_spec_helper"
 
 RSpec.describe ReactOnRails::Generators::BaseGenerator, type: :generator do
-  describe "--pretend mode behavior" do
+  describe "#copy_base_files in --pretend mode" do
     let(:base_generator) { described_class.new([], { pretend: true }) }
 
     it "does not chmod precompile hook script in copy_base_files" do
