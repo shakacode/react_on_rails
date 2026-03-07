@@ -674,38 +674,6 @@ When using **yalc** for local development:
 2. Ensure both packages resolve to the same version source
 3. Run `yalc installations show` to verify no stale installations exist
 
-### RSC WebpackLoader with SWC
-
-**Symptoms:** The RSC webpack loader silently fails to transform modules. Server Components work without React Server Components directives being processed. The RSC bundle builds without errors but components aren't correctly split between server and client.
-
-**Root cause:** Shakapacker may configure `swc-loader` using a non-array format (a function or a single object), so the RSC configuration helper `extractLoader()` -- which checks `Array.isArray(rule.use)` -- returns `null` and never finds the loader:
-
-```js
-// What extractLoader() expects:
-rule.use = [{ loader: 'swc-loader', options: {...} }]; // Array -- works
-
-// What Shakapacker may generate:
-rule.use = (info) => [{ loader: 'swc-loader', options: {...} }]; // Function -- not found
-rule.use = { loader: 'swc-loader', options: {...} };             // Object -- not found
-```
-
-**Fix:** Instead of trying to append the RSC loader to the existing rule, add it as a separate `enforce: 'post'` rule:
-
-```js
-// config/webpack/rscWebpackConfig.js
-const rscConfig = require('./serverWebpackConfig');
-
-// Add RSC loader as a separate post-processing rule
-rscConfig.module.rules.push({
-  test: /\.(js|jsx|ts|tsx)$/,
-  enforce: 'post',
-  exclude: /node_modules/,
-  use: [{ loader: 'react-on-rails-rsc/WebpackLoader' }],
-});
-```
-
-This approach is more robust because it doesn't depend on the structure of existing loader rules. The `enforce: 'post'` ensures the RSC loader runs after SWC/Babel transformation.
-
 ### Duplicate Package Detection
 
 **Symptoms:** Boot-time error: `"Both 'react-on-rails' and 'react-on-rails-pro' packages are installed."` This prevents the Rails application from starting.
