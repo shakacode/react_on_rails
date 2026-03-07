@@ -138,7 +138,7 @@ module ReactOnRails
                { typescript: options.typescript?, redux: options.redux?, rspack: options.rspack?,
                  pro: options.pro?, rsc: options.rsc?,
                  shakapacker_just_installed: shakapacker_just_installed?,
-                 force: options[:force], skip: options[:skip] }
+                 force: options[:force], skip: options[:skip], pretend: options[:pretend] }
 
         # Component generator logic:
         # - --rsc without --redux: Skip HelloWorld, HelloServer will be generated in setup_rsc
@@ -146,12 +146,14 @@ module ReactOnRails
         # - Without --rsc: Normal behavior (HelloWorld or HelloWorldApp based on --redux)
         if options.redux?
           invoke "react_on_rails:react_with_redux", [], { typescript: options.typescript?,
-                                                          force: options[:force], skip: options[:skip] }
+                                                          force: options[:force], skip: options[:skip],
+                                                          pretend: options[:pretend] }
         elsif !use_rsc?
           # Only generate HelloWorld if RSC is not enabled
           # For RSC, HelloServer replaces HelloWorld as the example component
           invoke "react_on_rails:react_no_redux", [], { typescript: options.typescript?,
-                                                        force: options[:force], skip: options[:skip] }
+                                                        force: options[:force], skip: options[:skip],
+                                                        pretend: options[:pretend] }
         end
 
         setup_react_dependencies
@@ -160,12 +162,14 @@ module ReactOnRails
         # Pass invoked_by_install: true so they skip message printing (we handle it)
         if use_pro?
           invoke "react_on_rails:pro", [], { invoked_by_install: true,
-                                             force: options[:force], skip: options[:skip] }
+                                             force: options[:force], skip: options[:skip],
+                                             pretend: options[:pretend] }
         end
         return unless use_rsc?
 
         invoke "react_on_rails:rsc", [], { typescript: options.typescript?, invoked_by_install: true,
-                                           force: options[:force], skip: options[:skip] }
+                                           force: options[:force], skip: options[:skip],
+                                           pretend: options[:pretend] }
       end
 
       def setup_react_dependencies

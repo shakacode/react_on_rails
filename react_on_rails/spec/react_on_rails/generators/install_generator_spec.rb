@@ -1174,6 +1174,38 @@ describe InstallGenerator, type: :generator do
 
       install_generator.send(:create_typescript_config)
     end
+
+    it "forwards pretend mode to base and react_no_redux generators" do
+      allow(install_generator).to receive(:ensure_shakapacker_installed)
+      allow(install_generator).to receive(:setup_react_dependencies)
+      allow(install_generator).to receive_messages(use_pro?: false, use_rsc?: false)
+
+      expect(install_generator).to receive(:invoke)
+        .with("react_on_rails:base", [], hash_including(pretend: true))
+      expect(install_generator).to receive(:invoke)
+        .with("react_on_rails:react_no_redux", [], hash_including(pretend: true))
+
+      install_generator.send(:invoke_generators)
+    end
+
+    it "forwards pretend mode to redux, pro, and rsc generators" do
+      redux_pro_rsc_install_generator = described_class.new([], { pretend: true, redux: true, pro: true, rsc: true })
+
+      allow(redux_pro_rsc_install_generator).to receive(:ensure_shakapacker_installed)
+      allow(redux_pro_rsc_install_generator).to receive(:setup_react_dependencies)
+      allow(redux_pro_rsc_install_generator).to receive_messages(use_pro?: true, use_rsc?: true)
+
+      expect(redux_pro_rsc_install_generator).to receive(:invoke)
+        .with("react_on_rails:base", [], hash_including(pretend: true))
+      expect(redux_pro_rsc_install_generator).to receive(:invoke)
+        .with("react_on_rails:react_with_redux", [], hash_including(pretend: true))
+      expect(redux_pro_rsc_install_generator).to receive(:invoke)
+        .with("react_on_rails:pro", [], hash_including(pretend: true))
+      expect(redux_pro_rsc_install_generator).to receive(:invoke)
+        .with("react_on_rails:rsc", [], hash_including(pretend: true))
+
+      redux_pro_rsc_install_generator.send(:invoke_generators)
+    end
   end
 
   context "when detecting existing bin-files on *nix" do
