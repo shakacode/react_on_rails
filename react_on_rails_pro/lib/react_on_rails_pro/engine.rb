@@ -7,10 +7,8 @@ module ReactOnRailsPro
     LICENSE_URL = "https://www.shakacode.com/react-on-rails-pro/"
     # TODO: Remove this legacy migration warning path after 16.5.0 stable release (target: 2026-05-31).
     LEGACY_LICENSE_FILE = "config/react_on_rails_pro_license.key"
-    RSC_STREAMING_MIDDLEWARE_WARNING_TARGETS = ["Rack::Deflater"].freeze
     private_constant :LICENSE_URL
     private_constant :LEGACY_LICENSE_FILE
-    private_constant :RSC_STREAMING_MIDDLEWARE_WARNING_TARGETS
 
     initializer "react_on_rails_pro.routes" do
       ActionDispatch::Routing::Mapper.include ReactOnRailsPro::Routes
@@ -22,8 +20,8 @@ module ReactOnRailsPro
       config.after_initialize { ReactOnRailsPro::Engine.log_license_status }
     end
 
-    initializer "react_on_rails_pro.check_rsc_streaming_middleware" do
-      config.after_initialize { ReactOnRailsPro::Engine.log_rsc_streaming_middleware_warning }
+    initializer "react_on_rails_pro.warn_on_problematic_compression_middleware" do
+      config.after_initialize { ReactOnRailsPro::Engine.log_problematic_compression_middleware_warnings }
     end
 
     class << self
@@ -46,22 +44,12 @@ module ReactOnRailsPro
         end
       end
 
-      def log_rsc_streaming_middleware_warning
-        return unless ReactOnRailsPro.configuration.enable_rsc_support
-        return if Rails.env.test?
-
-        middleware_names = middleware_stack_names
-        problematic = RSC_STREAMING_MIDDLEWARE_WARNING_TARGETS & middleware_names
-        return if problematic.empty?
-
-        route_path = ReactOnRailsPro.configuration.rsc_payload_generation_url_path
-        Rails.logger.warn(
-          "[React on Rails Pro] React Server Components support is enabled and the middleware " \
-          "stack includes #{problematic.join(', ')}. Compression and other response-transforming " \
-          "middleware can interfere with ActionController::Live NDJSON streaming. If your " \
-          "`#{route_path}` payload route is not already exempt, consider bypassing " \
-          "#{problematic.join(', ')} for that endpoint if you see stalled or corrupted RSC payloads."
-        )
+      def log_problematic_compression_middleware_warnings(logger: Rails.logger,
+                                                          middlewares: Rails.application.middleware,
+                                                          root: Rails.root)
+        CompressionMiddlewareGuard.new(middlewares: middlewares)
+                                  .warning_messages(root: root)
+                                  .each { |message| logger.warn(message) }
       end
 
       private
@@ -127,40 +115,6 @@ module ReactOnRailsPro
           Rails.logger.warn message
         else
           Rails.logger.info message
-        end
-      end
-
-      def middleware_stack_names
-        middleware_stack = Rails.application&.middleware
-        return [] unless middleware_stack
-
-        entries =
-          if middleware_stack.respond_to?(:middlewares)
-            middleware_stack.middlewares
-          elsif middleware_stack.respond_to?(:to_a)
-            middleware_stack.to_a
-          else
-            Array(middleware_stack)
-          end
-
-        entries.filter_map { |entry| middleware_entry_name(entry) }.uniq
-      end
-
-      def middleware_entry_name(entry)
-        candidate =
-          if entry.respond_to?(:klass) && entry.klass
-            entry.klass
-          elsif entry.is_a?(Array)
-            entry.first
-          else
-            entry
-          end
-
-        case candidate
-        when Module
-          candidate.name
-        else
-          candidate.to_s.presence
         end
       end
     end
