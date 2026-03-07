@@ -28,7 +28,13 @@ function localGemPath(envVarName: string): string | null {
     return null;
   }
 
-  return path.resolve(value);
+  const resolvedPath = path.resolve(value);
+  if (!fs.existsSync(resolvedPath)) {
+    logError(`Local gem path from ${envVarName} does not exist: ${resolvedPath}`);
+    process.exit(1);
+  }
+
+  return resolvedPath;
 }
 
 function bundleAddArgs(gemName: string, localPath: string | null): string[] {
@@ -102,7 +108,7 @@ export function validateAppName(name: string): { success: boolean; error?: strin
 
 export function createApp(appName: string, options: CliOptions): void {
   const appPath = path.resolve(process.cwd(), appName);
-  const baseSteps = 4; // rails new + add react_on_rails + run generator + done
+  const baseSteps = 3; // rails new + add react_on_rails + run generator
   const totalSteps = baseSteps + (options.rsc ? 1 : 0);
   let currentStep = 1;
   const reactOnRailsGemPath = localGemPath('REACT_ON_RAILS_GEM_PATH');
@@ -205,7 +211,6 @@ export function createApp(appName: string, options: CliOptions): void {
   }
 
   // Final success step
-  currentStep += 1;
   logStep(currentStep, totalSteps, 'Done!');
   printSuccessMessage(appName, options.rsc ? 'hello_server' : 'hello_world');
 }

@@ -320,7 +320,8 @@ describe('createApp', () => {
   });
 
   it('uses local react_on_rails gem path when REACT_ON_RAILS_GEM_PATH is set', () => {
-    process.env.REACT_ON_RAILS_GEM_PATH = '../react_on_rails';
+    const localGemPath = '/tmp/fake-react_on_rails';
+    process.env.REACT_ON_RAILS_GEM_PATH = localGemPath;
     const appPath = path.resolve(process.cwd(), 'my-app');
 
     createApp('my-app', baseOptions);
@@ -328,13 +329,14 @@ describe('createApp', () => {
     expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
       2,
       'bundle',
-      ['add', 'react_on_rails', '--path', path.resolve('../react_on_rails')],
+      ['add', 'react_on_rails', '--path', localGemPath],
       appPath,
     );
   });
 
   it('uses local pro path when REACT_ON_RAILS_PRO_GEM_PATH is set', () => {
-    process.env.REACT_ON_RAILS_PRO_GEM_PATH = '../react_on_rails_pro';
+    const localProGemPath = '/tmp/fake-react_on_rails_pro';
+    process.env.REACT_ON_RAILS_PRO_GEM_PATH = localProGemPath;
     const appPath = path.resolve(process.cwd(), 'my-app');
 
     createApp('my-app', { ...baseOptions, rsc: true });
@@ -342,8 +344,20 @@ describe('createApp', () => {
     expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
       3,
       'bundle',
-      ['add', 'react_on_rails_pro', '--path', path.resolve('../react_on_rails_pro')],
+      ['add', 'react_on_rails_pro', '--path', localProGemPath],
       appPath,
     );
+  });
+
+  it('exits early when local react_on_rails path does not exist', () => {
+    const missingLocalGemPath = '/tmp/missing-react_on_rails';
+    process.env.REACT_ON_RAILS_GEM_PATH = missingLocalGemPath;
+    mockedFs.existsSync.mockImplementation((targetPath) => targetPath !== missingLocalGemPath);
+
+    expect(() => createApp('my-app', baseOptions)).toThrow('process.exit');
+    expect(mockedLogError).toHaveBeenCalledWith(
+      `Local gem path from REACT_ON_RAILS_GEM_PATH does not exist: ${missingLocalGemPath}`,
+    );
+    expect(mockedExecLiveArgs).not.toHaveBeenCalled();
   });
 });
