@@ -308,7 +308,49 @@ export default function PageErrorBoundary({ children }) {
 }
 ```
 
-> **Note:** For finer-grained retry (re-rendering a single Server Component without a full page reload), the client would need to re-fetch the RSC payload for that component. This depends on your application's routing setup.
+### Finer-Grained Retry with `refetchComponent`
+
+React on Rails Pro provides `useRSC()` with a `refetchComponent` method that re-fetches a single Server Component's RSC payload without a full page reload:
+
+```jsx
+'use client';
+
+import { ErrorBoundary } from 'react-error-boundary';
+import { useRSC } from 'react-on-rails-pro/RSCProvider';
+import { isServerComponentFetchError } from 'react-on-rails-pro/ServerComponentFetchError';
+
+function ErrorFallback({ error, resetErrorBoundary }) {
+  const { refetchComponent } = useRSC();
+
+  function retry() {
+    if (isServerComponentFetchError(error)) {
+      const { serverComponentName, serverComponentProps } = error;
+      refetchComponent(serverComponentName, serverComponentProps)
+        .catch((err) => console.error('Retry failed:', err))
+        .finally(() => resetErrorBoundary());
+    } else {
+      window.location.reload();
+    }
+  }
+
+  return (
+    <div>
+      <p>Something went wrong</p>
+      <button onClick={retry}>Retry</button>
+    </div>
+  );
+}
+
+export default function PageErrorBoundary({ children }) {
+  return (
+    <ErrorBoundary FallbackComponent={ErrorFallback}>
+      {children}
+    </ErrorBoundary>
+  );
+}
+```
+
+`refetchComponent` re-fetches the RSC payload for the named component with `enforceRefetch: true`, bypassing any cached promise. This is the React on Rails equivalent of Next.js's `router.refresh()`.
 
 ## `'use client'` Directive Mistakes
 
@@ -504,6 +546,12 @@ export async function createUser(formData: FormData) {
 | RSC page downloads unexpectedly large chunks | A shared component with `'use client'` appears in multiple chunk groups; webpack's manifest may map it to a heavy chunk group containing unrelated dependencies (depends on chunk group iteration order) | Inspect `react-client-manifest.json` for oversized chunk mappings. If found, create a thin `'use client'` wrapper file for the RSC import. See [Chunk Contamination](#chunk-contamination) above |
 | `"Text content does not match server-rendered HTML"` | Hydration mismatch | Ensure identical rendering on server and client; use `suppressHydrationWarning` for intentional differences |
 | `"Refs cannot be used in Server Components, nor passed to Client Components"` | Using the `ref` prop on any element inside a Server Component -- including on Client Components. The Flight serializer rejects the literal `ref` prop before checking the target type. | Remove the `ref` prop. Refs are a client-side concept -- if a Client Component needs a ref, it should create one itself with `useRef()`. While `React.createRef()` is callable on the server, the result cannot be attached to any element. |
+| `"Both 'react-on-rails' and 'react-on-rails-pro' packages are installed"` | Both packages installed as separate top-level dependencies, often due to yalc link issues | Ensure only `react-on-rails-pro` is in your `package.json`; the base package is installed automatically as a dependency. See [Duplicate Package Detection](#duplicate-package-detection) |
+| `ReferenceError: performance is not defined` | Node renderer VM context missing the `performance` global. Triggered by `React.lazy()` in dev mode | Enable `supportModules: true` and add `performance` via `additionalContext`. See [Node Renderer VM Context](#node-renderer-vm-context----missing-globals) |
+| `"global object mismatch"` | `react-on-rails` and `react-on-rails-pro` resolved from different sources (e.g., npm vs yalc) | Force consistent resolution with `pnpm.overrides` or `yarn.resolutions`. See [Version Mismatch](#version-mismatch----global-object-mismatch) |
+| SSR hangs indefinitely / request timeout on large RSC payloads | Stream backpressure deadlock when RSC payload exceeds 16 KB | Update to latest React on Rails Pro. See [Stream Backpressure Deadlock](#stream-backpressure-deadlock) |
+| `"The 'react-on-rails' package version does not match the gem version"` | Gem and npm package installed at different versions | Install the npm package version matching your gem. See [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch) |
+| `"The 'react-on-rails' package version is not an exact version"` | Using semver ranges (`^`, `~`, `*`) instead of an exact version in package.json | Pin to the exact version without range operators. See [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch) |
 
 ## Environment Variable Access
 
@@ -542,6 +590,187 @@ function ClientComp() {
 ```
 
 **Security:** Never add secret keys to webpack's `EnvironmentPlugin` -- they would be embedded in the client bundle. Use `server-only` to protect modules that access secrets. Without it, secrets could accidentally leak to the client through import chains.
+
+## React on Rails-Specific Issues
+
+The sections above cover generic RSC pitfalls. The following issues are specific to the React on Rails stack and its node renderer architecture.
+
+### Stream Backpressure Deadlock
+
+**Symptoms:** SSR hangs indefinitely when the RSC payload is large (> 16 KB). The page never loads and eventually times out.
+
+**Cause:** This was a bug in `react-on-rails-pro` where the internal RSC stream teeing mechanism could deadlock under backpressure with large payloads.
+
+**Fix:** Upgrade to `react-on-rails-pro` >= 16.4.0.rc.3 ([PR #2444](https://github.com/shakacode/react_on_rails/pull/2444)).
+
+### Node Renderer VM Context -- Missing Globals
+
+**Symptoms:** Cryptic errors like `ReferenceError: performance is not defined` when rendering Server Components. Often triggered by `React.lazy()` which calls `performance.now()` internally in development mode.
+
+**Root cause:** The node renderer runs your JavaScript in an isolated V8 VM context (`vm.createContext`). By default, the VM context only includes basic globals. Node.js-specific globals like `performance`, `Buffer`, `TextDecoder`, etc. must be explicitly added.
+
+**Fix:** Enable `supportModules` in your node renderer configuration to inject common Node.js globals:
+
+```js
+// node-renderer.js (or wherever you configure the renderer)
+module.exports = {
+  supportModules: true, // Injects: Buffer, TextDecoder, TextEncoder,
+                        // URLSearchParams, ReadableStream, process,
+                        // setTimeout, setInterval, setImmediate,
+                        // clearTimeout, clearInterval, clearImmediate,
+                        // queueMicrotask
+};
+```
+
+Or set the environment variable:
+
+```bash
+RENDERER_SUPPORT_MODULES=true
+```
+
+For globals not covered by `supportModules` (e.g., `performance`), use `additionalContext`:
+
+```js
+module.exports = {
+  supportModules: true,
+  additionalContext: {
+    performance: require('perf_hooks').performance,
+  },
+};
+```
+
+### Version Mismatch -- "Global Object Mismatch"
+
+**Symptoms:** Runtime error `"global object mismatch"` when both `react-on-rails` and `react-on-rails-pro` JS packages are installed.
+
+**Root cause:** The `react-on-rails` and `react-on-rails-pro` packages share internal global state. If they resolve from different sources (e.g., one from npm and one from yalc during development), each gets its own copy of the shared module, and internal checks detect the mismatch.
+
+**Fix:** Force consistent package resolution using your package manager's override mechanism:
+
+```json
+// package.json (pnpm)
+{
+  "pnpm": {
+    "overrides": {
+      "react-on-rails": "file:../path/to/local/package",
+      "react-on-rails-pro": "file:../path/to/local/pro-package"
+    }
+  }
+}
+```
+
+```json
+// package.json (yarn)
+{
+  "resolutions": {
+    "react-on-rails": "file:../path/to/local/package"
+  }
+}
+```
+
+When using **yalc** for local development:
+
+1. Publish all packages in dependency order: base package first, then pro
+2. Ensure both packages resolve to the same version source
+3. Run `yalc installations show` to verify no stale installations exist
+
+### Duplicate Package Detection
+
+**Symptoms:** Boot-time error: `"Both 'react-on-rails' and 'react-on-rails-pro' packages are installed."` This prevents the Rails application from starting.
+
+**Root cause:** The `react_on_rails` gem validates that only one of the JavaScript packages is installed. During development with yalc, both packages may appear in `node_modules` simultaneously if the yalc link chain isn't set up correctly.
+
+**Fix:**
+
+1. **Verify your package setup:** `react-on-rails-pro` includes `react-on-rails` as a direct dependency. You should only have `react-on-rails-pro` in your `package.json` -- the base package is automatically installed through the dependency chain.
+
+2. **Check for stale yalc links:**
+   ```bash
+   # Remove stale yalc installations
+   yalc installations clean
+   # Re-publish and re-add in the correct order
+   cd /path/to/react-on-rails && yalc publish
+   cd /path/to/react-on-rails-pro && yalc publish
+   cd /path/to/your-app && yalc add react-on-rails-pro
+   ```
+
+3. **Inspect `node_modules`:** Confirm that `node_modules/react-on-rails` is a symlink pointing into `react-on-rails-pro`'s dependency tree, not a separate top-level installation.
+
+### Gem and npm Package Version Mismatch
+
+React on Rails requires the gem and npm package versions to match exactly. The validation runs at Rails boot time and will prevent the application from starting if versions are mismatched or improperly specified.
+
+**Symptom 1 -- Version mismatch:**
+
+```
+**ERROR** ReactOnRails: The 'react-on-rails' package version does not match the gem version.
+
+Package: 16.3.0
+    Gem: 16.4.0
+```
+
+This happens when you upgrade the gem (e.g., `bundle update react_on_rails`) without upgrading the npm package, or vice versa. Both must be the same version.
+
+**Fix:** Install the npm package version that matches your gem:
+
+```bash
+# Check your gem version
+bundle show react_on_rails
+
+# Install the matching npm package (use your package manager)
+yarn add react-on-rails@16.4.0 --exact
+# or
+pnpm add react-on-rails@16.4.0 --save-exact
+# or
+npm install react-on-rails@16.4.0 --save-exact
+```
+
+**Symptom 2 -- Non-exact version:**
+
+```
+**ERROR** ReactOnRails: The 'react-on-rails' package version is not an exact version.
+
+Detected: ^16.4.0
+     Gem: 16.4.0
+```
+
+React on Rails does not allow semver ranges (`^`, `~`, `>`, `<`, `*`) or special tags (`latest`, `next`, `beta`) in `package.json`. The version must be an exact match.
+
+**Fix:** Remove the range operator and pin to the exact version:
+
+```json
+{
+  "dependencies": {
+    "react-on-rails": "16.4.0"
+  }
+}
+```
+
+**Symptom 3 -- Pro gem with base package:**
+
+```
+**ERROR** ReactOnRails: You have the Pro gem installed but are using the base 'react-on-rails' package.
+```
+
+If you have the `react_on_rails_pro` gem in your Gemfile, you must use the `react-on-rails-pro` npm package, not `react-on-rails`.
+
+**Fix:** Replace the base package with the Pro package:
+
+```bash
+yarn remove react-on-rails && yarn add react-on-rails-pro@16.4.0 --exact
+```
+
+**Symptom 4 -- Pro package without Pro gem:**
+
+```
+**ERROR** ReactOnRails: You have the 'react-on-rails-pro' package installed but the Pro gem is not installed.
+```
+
+The `react-on-rails-pro` npm package requires the `react_on_rails_pro` gem.
+
+**Fix:** Either add the Pro gem to your Gemfile (`gem 'react_on_rails_pro'`) and run `bundle install`, or switch to the base npm package if you don't have a Pro license.
+
+> **Tip:** Set `REACT_ON_RAILS_SKIP_VALIDATION=true` to temporarily bypass version validation during setup or generator runs.
 
 ## When NOT to Use Server Components
 
