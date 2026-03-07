@@ -597,68 +597,17 @@ The sections above cover generic RSC pitfalls. The following issues are specific
 
 **Symptoms:** SSR hangs indefinitely when the RSC payload is large (> 16 KB). The page never loads and eventually times out.
 
-**Root cause:** `RSCRequestTracker.getRSCPayloadStream()` tees the RSC Flight stream into two `PassThrough` streams:
+**Cause:** This was a bug in `react-on-rails-pro` where the internal RSC stream teeing mechanism could deadlock under backpressure with large payloads.
 
-- **stream1** -- consumed immediately by React's `renderToPipeableStream` for SSR
-- **stream2** -- consumed later by `injectRSCPayload` to embed RSC data into the HTML
-
-`injectRSCPayload` only starts consuming stream2 **after** the first HTML chunk arrives from SSR. If `pipe()` is used to forward data, and the RSC payload exceeds stream2's buffer capacity (default `highWaterMark` of 16 KB), stream2's backpressure pauses the source stream. This stalls stream1 too -- SSR never produces HTML, so `injectRSCPayload` never starts, creating a deadlock.
-
-**Fix:** The tee must use manual `push()` forwarding instead of `pipe()` to decouple backpressure between the two destinations:
-
-```js
-// CORRECT: Manual forwarding -- no backpressure coupling
-const stream1 = new PassThrough();
-const stream2 = new PassThrough();
-source.on('data', (chunk) => {
-  stream1.push(chunk);
-  stream2.push(chunk);
-});
-source.on('end', () => {
-  stream1.push(null);
-  stream2.push(null);
-});
-```
-
-```js
-// WRONG: pipe() causes backpressure coupling
-const stream1 = new PassThrough();
-const stream2 = new PassThrough();
-source.pipe(stream1);
-source.pipe(stream2); // When stream2 fills up, source pauses, starving stream1
-```
-
-With `push()`, each `PassThrough` buffers independently. stream1 keeps receiving data even when stream2's buffer is full, so SSR can proceed and eventually produce HTML that unblocks stream2 consumption.
-
-> **Note:** This is already fixed in current versions of React on Rails Pro. If you're seeing this symptom, ensure you're on the latest version.
+**Fix:** Upgrade to `react-on-rails-pro` >= 16.4.0.rc.3 ([PR #2444](https://github.com/shakacode/react_on_rails/pull/2444)).
 
 ### GOAWAY Connection Reset (Node Renderer)
 
-**Symptoms:** SSR requests to the node renderer hang or fail intermittently after a period of inactivity (~2 minutes). You may see connection errors in logs but no explicit GOAWAY message.
+**Symptoms:** SSR requests to the node renderer hang or fail intermittently after a period of inactivity (~2 minutes). You may see `HTTPX::TimeoutError` or connection errors in Rails logs.
 
-**Root cause:** The node renderer uses HTTP/2 cleartext (h2c) over persistent connections managed by the HTTPX Ruby client. After approximately 2 minutes of idle time, the node renderer's Fastify server may send an HTTP/2 GOAWAY frame. The HTTPX connection pool may attempt to reuse the now-stale connection, leading to a hang or connection reset.
+**Cause:** This was a connection management bug in `react-on-rails-pro` where stale HTTP/2 connections could be reused after the node renderer sent a GOAWAY frame.
 
-**Fix:** React on Rails Pro configures HTTPX with automatic retry logic:
-
-- HTTPX's `:retries` plugin retries failed connection attempts (max 1 retry at the HTTP level)
-- The application layer retries up to `renderer_request_retry_limit` times (default: 5)
-- For streaming requests, retries are disabled after the first chunk is received to prevent duplicate output
-
-If you're seeing persistent GOAWAY-related failures:
-
-1. **Check your timeouts:** Ensure `renderer_http_pool_timeout` (default: 5s) and `ssr_timeout` (default: 5s) are appropriate for your workload
-2. **Monitor connection pool:** Set `renderer_http_pool_size` (default: 10) based on your concurrency needs
-3. **Check logs:** Look for `HTTPX::TimeoutError` or `HTTPX::Error` messages in your Rails logs
-
-```ruby
-# config/initializers/react_on_rails_pro.rb
-ReactOnRailsPro.configure do |config|
-  config.renderer_http_pool_size = 10        # Max connections per origin
-  config.renderer_http_pool_timeout = 5      # Connection timeout (seconds)
-  config.ssr_timeout = 5                     # Read timeout (seconds)
-  config.renderer_request_retry_limit = 5    # Application-level retries
-end
-```
+**Fix:** Upgrade to `react-on-rails-pro` >= 16.2.0 ([PR #2259](https://github.com/shakacode/react_on_rails/pull/2259)).
 
 ### Node Renderer VM Context -- Missing Globals
 
