@@ -47,7 +47,9 @@ function run(appName: string, rawOpts: Record<string, unknown>): void {
     logInfo(
       'Note: --rsc requires access to react_on_rails_pro (private gem source or a git-based Gemfile entry).',
     );
-    logInfo('If installation fails, fix gem source access and rerun with --rsc.');
+    logInfo(
+      'If installation fails, configure the private gem source (for example: bundle config set --global <source-key> <url-or-token>) and rerun with --rsc.',
+    );
     logInfo('Pro setup docs: https://www.shakacode.com/react-on-rails-pro/docs/installation/');
     console.log('');
   }

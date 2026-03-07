@@ -102,7 +102,8 @@ export function validateAppName(name: string): { success: boolean; error?: strin
 
 export function createApp(appName: string, options: CliOptions): void {
   const appPath = path.resolve(process.cwd(), appName);
-  const totalSteps = options.rsc ? 5 : 4;
+  const baseSteps = 4; // rails new + add react_on_rails + run generator + done
+  const totalSteps = baseSteps + (options.rsc ? 1 : 0);
   let currentStep = 1;
   const reactOnRailsGemPath = localGemPath('REACT_ON_RAILS_GEM_PATH');
 
