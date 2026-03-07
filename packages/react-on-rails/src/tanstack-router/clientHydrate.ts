@@ -1,9 +1,14 @@
 import { createElement, useEffect, useRef, type ReactElement } from 'react';
-import type { TanStackRouter, TanStackRouterOptions, DehydratedRouterState } from './types.ts';
+import type {
+  DehydratedRouterState,
+  TanStackHistory,
+  TanStackRouter,
+  TanStackRouterOptions,
+} from './types.ts';
 import type { RailsContext } from '../types/index.ts';
 import { normalizeSearch, locationSearch } from './utils.ts';
 
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, no-underscore-dangle, import/prefer-default-export */
+/* eslint-disable import/prefer-default-export */
 
 /**
  * Client-side hydration for a TanStack Router app.
@@ -20,8 +25,8 @@ interface TanStackHydrationAppProps {
   options: TanStackRouterOptions;
   incomingProps: Record<string, unknown>;
   railsContext: RailsContext & { serverSide: false };
-  RouterProvider: React.ComponentType<any>;
-  createBrowserHistory: () => any;
+  RouterProvider: React.ComponentType<{ router: TanStackRouter }>;
+  createBrowserHistory: () => TanStackHistory;
 }
 
 function TanStackHydrationApp({
@@ -31,6 +36,7 @@ function TanStackHydrationApp({
   RouterProvider,
   createBrowserHistory,
 }: TanStackHydrationAppProps): ReactElement {
+  // eslint-disable-next-line no-underscore-dangle -- Internal hydration payload key injected by server-side render.
   const dehydratedState = incomingProps.__tanstackRouterDehydratedState as DehydratedRouterState | undefined;
   const hasSsrPayload = dehydratedState !== undefined;
   const hasDehydratedRouter =
@@ -52,6 +58,7 @@ function TanStackHydrationApp({
     } else if (
       hasSsrPayload &&
       typeof router.matchRoutes === 'function' &&
+      // eslint-disable-next-line no-underscore-dangle -- TanStack Router private store API is required for hydration parity.
       typeof router.__store?.setState === 'function'
     ) {
       // Fall back to injecting route matches when no dehydrated state is available.
@@ -65,9 +72,10 @@ function TanStackHydrationApp({
       const searchFromRouter = locationSearch(routerLocation);
       const search =
         normalizeSearch(railsContext.search) ||
-        normalizeSearch((browserHistory.location as { search?: string } | undefined)?.search) ||
+        normalizeSearch(browserHistory.location.search) ||
         normalizeSearch(searchFromRouter);
       const matches = router.matchRoutes(pathname, search);
+      // eslint-disable-next-line no-underscore-dangle -- TanStack Router private store API is required for hydration parity.
       router.__store.setState((s: Record<string, unknown>) => ({
         ...s,
         status: 'idle',
@@ -84,8 +92,8 @@ function TanStackHydrationApp({
 
     // Keep SSR mode enabled on hydration paths so Transitioner does not run
     // a client-only initial load before hydration settles.
-    if (hasSsrPayload && (router as TanStackRouter & { ssr?: unknown }).ssr !== true) {
-      (router as any).ssr = true;
+    if (hasSsrPayload && router.ssr !== true) {
+      router.ssr = true;
     }
 
     routerRef.current = router;
@@ -119,6 +127,8 @@ function TanStackHydrationApp({
     });
 
     return () => {
+      // This only suppresses post-unmount logging; it does not guarantee router.load()
+      // will stop unless the router version exposes an explicit cancelLoad API.
       cancelled = true;
       // Best effort cancellation for router versions that expose an explicit load cancel API.
       const cancellableRouter = router as TanStackRouter & { cancelLoad?: () => void };
@@ -131,8 +141,9 @@ function TanStackHydrationApp({
   let app: ReactElement = createElement(RouterProvider, { router });
   if (options.AppWrapper) {
     const wrapperProps = { ...incomingProps } as Record<string, unknown>;
+    // eslint-disable-next-line no-underscore-dangle -- Internal hydration payload key should not reach user AppWrapper props.
     delete wrapperProps.__tanstackRouterDehydratedState;
-    app = createElement(options.AppWrapper, { ...wrapperProps, children: app } as any);
+    app = createElement(options.AppWrapper, wrapperProps, app);
   }
 
   return app;
@@ -142,8 +153,8 @@ export function clientHydrateTanStackApp(
   options: TanStackRouterOptions,
   props: Record<string, unknown>,
   railsContext: RailsContext & { serverSide: false },
-  RouterProvider: React.ComponentType<any>,
-  createBrowserHistory: () => any,
+  RouterProvider: React.ComponentType<{ router: TanStackRouter }>,
+  createBrowserHistory: () => TanStackHistory,
 ): ReactElement {
   return createElement(TanStackHydrationApp, {
     options,

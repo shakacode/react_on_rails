@@ -1,6 +1,9 @@
 import * as React from 'react';
 import { renderToString } from 'react-dom/server';
-import { createTanStackRouterRenderFunction } from '../src/tanstack-router/index.ts';
+import {
+  createTanStackRouterRenderFunction,
+  serverRenderTanStackAppAsync,
+} from '../src/tanstack-router/index.ts';
 import type { RailsContext, ServerRenderResult } from '../src/types/index.ts';
 import type { TanStackRouter } from '../src/tanstack-router/types.ts';
 
@@ -36,8 +39,7 @@ describe('tanstack-router integration', () => {
       createRouter: () => router,
     };
     const deps = {
-      RouterProvider: ({ children }: { children?: React.ReactNode }) =>
-        React.createElement('div', null, children),
+      RouterProvider: (_props: { router: TanStackRouter }) => React.createElement('div'),
       createMemoryHistory: jest.fn().mockReturnValue({
         location: {
           pathname: '/products',
@@ -75,8 +77,7 @@ describe('tanstack-router integration', () => {
       createRouter: () => router,
     };
     const deps = {
-      RouterProvider: ({ children }: { children?: React.ReactNode }) =>
-        React.createElement('div', null, children),
+      RouterProvider: (_props: { router: TanStackRouter }) => React.createElement('div'),
       createMemoryHistory: jest.fn().mockReturnValue({
         location: {
           pathname: '/products',
@@ -99,13 +100,41 @@ describe('tanstack-router integration', () => {
     expect(deps.createMemoryHistory).toHaveBeenCalledWith({ initialEntries: ['/products?category=tools'] });
   });
 
+  it('drops a bare "?" search string when building the server URL', () => {
+    const router = buildRouter();
+    const options = {
+      createRouter: () => router,
+    };
+    const deps = {
+      RouterProvider: (_props: { router: TanStackRouter }) => React.createElement('div'),
+      createMemoryHistory: jest.fn().mockReturnValue({
+        location: {
+          pathname: '/products',
+          search: '',
+          hash: '',
+          href: '/products',
+          state: null,
+        },
+      }),
+      createBrowserHistory: jest.fn(),
+    };
+
+    const renderFn = createTanStackRouterRenderFunction(options, deps);
+    renderFn({ initial: 'prop' }, {
+      serverSide: true,
+      pathname: '/products',
+      search: '?',
+    } as unknown as RailsContext);
+
+    expect(deps.createMemoryHistory).toHaveBeenCalledWith({ initialEntries: ['/products'] });
+  });
+
   it('returns a client React component on client-side render', () => {
     const options = {
       createRouter: () => buildRouter(),
     };
     const deps = {
-      RouterProvider: ({ children }: { children?: React.ReactNode }) =>
-        React.createElement('div', null, children),
+      RouterProvider: (_props: { router: TanStackRouter }) => React.createElement('div'),
       createMemoryHistory: jest.fn(),
       createBrowserHistory: jest.fn().mockReturnValue({
         location: {
@@ -134,8 +163,7 @@ describe('tanstack-router integration', () => {
       createRouter: () => router,
     };
     const deps = {
-      RouterProvider: ({ children }: { children?: React.ReactNode }) =>
-        React.createElement('div', null, children),
+      RouterProvider: (_props: { router: TanStackRouter }) => React.createElement('div'),
       createMemoryHistory: jest.fn(),
       createBrowserHistory: jest.fn().mockReturnValue({
         location: {
@@ -173,14 +201,13 @@ describe('tanstack-router integration', () => {
     const observedProps: Array<Record<string, unknown>> = [];
     const options = {
       createRouter: () => router,
-      AppWrapper: ({ children, ...rest }: { children: React.ReactNode } & Record<string, unknown>) => {
+      AppWrapper: ({ children, ...rest }: { children?: React.ReactNode } & Record<string, unknown>) => {
         observedProps.push(rest);
         return React.createElement('section', null, children);
       },
     };
     const deps = {
-      RouterProvider: ({ children }: { children?: React.ReactNode }) =>
-        React.createElement('div', null, children),
+      RouterProvider: (_props: { router: TanStackRouter }) => React.createElement('div'),
       createMemoryHistory: jest.fn(),
       createBrowserHistory: jest.fn().mockReturnValue({
         location: {
@@ -211,5 +238,36 @@ describe('tanstack-router integration', () => {
 
     expect(observedProps).toHaveLength(1);
     expect(observedProps[0]).toEqual({ userId: 42 });
+  });
+
+  it('enables SSR mode for async server rendering before returning dehydrated state', async () => {
+    const router = buildRouter();
+
+    const result = await serverRenderTanStackAppAsync(
+      { createRouter: () => router },
+      { initial: 'prop' },
+      {
+        serverSide: true,
+        pathname: '/products',
+        search: '?category=tools',
+      } as unknown as RailsContext & { serverSide: true },
+      (_props: { router: TanStackRouter }) => React.createElement('div'),
+      jest.fn().mockReturnValue({
+        location: {
+          pathname: '/products',
+          search: '?category=tools',
+          hash: '',
+          href: '/products?category=tools',
+          state: null,
+        },
+      }),
+    );
+
+    expect(router.load).toHaveBeenCalled();
+    expect(router.ssr).toBe(true);
+    expect(result.dehydratedState).toEqual({
+      url: '/products?category=tools',
+      dehydratedRouter: { matches: [{ id: 'products' }] },
+    });
   });
 });

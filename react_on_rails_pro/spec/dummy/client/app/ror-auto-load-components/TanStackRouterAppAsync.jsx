@@ -14,7 +14,7 @@ import {
 import {
   createTanStackRouterRenderFunction,
   serverRenderTanStackAppAsync,
-} from 'react-on-rails/tanstack-router';
+} from 'react-on-rails-pro/tanstack-router';
 
 const RootLayout = () => (
   <div className="container">

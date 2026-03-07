@@ -37,31 +37,29 @@ import type {
   RenderFunctionResult,
   ServerRenderResult,
 } from '../types/index.ts';
-import type { TanStackRouterOptions } from './types.ts';
+import type { TanStackHistory, TanStackRouter, TanStackRouterOptions } from './types.ts';
 import { serverRenderTanStackApp } from './serverRender.ts';
 import { clientHydrateTanStackApp } from './clientHydrate.ts';
 
 export type { TanStackRouterOptions, DehydratedRouterState } from './types.ts';
-export { serverRenderTanStackAppAsync } from './serverRender.ts';
-
-/* eslint-disable @typescript-eslint/no-explicit-any */
+export { serverRenderTanStackApp, serverRenderTanStackAppAsync } from './serverRender.ts';
 
 interface TanStackRouterDeps {
   /**
    * The RouterProvider component from @tanstack/react-router.
    * We require this as a parameter to avoid a direct dependency on @tanstack/react-router.
    */
-  RouterProvider: React.ComponentType<any>;
+  RouterProvider: React.ComponentType<{ router: TanStackRouter }>;
   /**
    * The createMemoryHistory function from @tanstack/react-router.
    * Used for server-side rendering.
    */
-  createMemoryHistory: (opts: { initialEntries: string[] }) => any;
+  createMemoryHistory: (opts: { initialEntries: string[] }) => TanStackHistory;
   /**
    * The createBrowserHistory function from @tanstack/react-router.
    * Used for client-side hydration.
    */
-  createBrowserHistory: () => any;
+  createBrowserHistory: () => TanStackHistory;
 }
 
 /**

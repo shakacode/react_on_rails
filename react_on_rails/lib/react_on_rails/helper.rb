@@ -625,6 +625,8 @@ module ReactOnRails
     def client_prop_target_key(props, key)
       string_key = key.to_s
       symbol_key = string_key.to_sym
+      # Preserve an existing symbol key when clientProps arrives from JSON with string keys,
+      # otherwise we would create duplicate entries that serialize to the same JSON key.
       props.key?(symbol_key) && !props.key?(string_key) ? symbol_key : string_key
     end
 

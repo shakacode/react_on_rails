@@ -63,6 +63,10 @@ const config: KnipConfig = {
         // Build output directories that should be ignored
         'lib/**',
       ],
+      ignoreDependencies: [
+        // Optional peer used only for local integration development and fixture coverage.
+        '@tanstack/react-router',
+      ],
     },
 
     // React on Rails Pro Node Renderer package workspace
@@ -184,6 +188,8 @@ const config: KnipConfig = {
         '@babel/runtime',
         // Used in webpack server config for CSS extraction
         'mini-css-extract-plugin',
+        // Webpack config merge helper is used in the dummy app config, but not detected reliably by Knip.
+        'webpack-merge',
         // This one is weird. It's long-deprecated and shouldn't be necessary.
         // Probably need to update the Webpack config.
         'node-libs-browser',

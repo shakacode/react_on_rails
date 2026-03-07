@@ -1,22 +1,28 @@
 import { createElement, type ReactElement } from 'react';
-import type { TanStackRouter, TanStackRouterOptions, DehydratedRouterState } from './types.ts';
+import type {
+  DehydratedRouterState,
+  TanStackHistory,
+  TanStackRouter,
+  TanStackRouterOptions,
+} from './types.ts';
 import type { RailsContext } from '../types/index.ts';
 import { normalizeSearch, locationSearch } from './utils.ts';
 
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, no-underscore-dangle */
+const SUPPORTED_TANSTACK_ROUTER_RANGE = '>=1.139.0 <2.0.0';
 
 /**
  * Validates that the TanStack Router internal APIs we depend on are present.
  * Throws a clear error if the router version has changed its internals.
  */
 function validateRouterInternals(router: TanStackRouter): void {
+  // eslint-disable-next-line no-underscore-dangle -- TanStack Router private store API is required for sync SSR.
   if (typeof router.__store?.setState !== 'function') {
     throw new Error(
       'react-on-rails/tanstack-router: TanStack Router internal API changed. ' +
         'Expected router.__store.setState to be a function. ' +
         'Please check that your @tanstack/react-router version is compatible, ' +
         'or file an issue at https://github.com/shakacode/react_on_rails/issues. ' +
-        'Supported @tanstack/react-router range: >=1.0.0 <2.0.0.',
+        `Supported @tanstack/react-router range: ${SUPPORTED_TANSTACK_ROUTER_RANGE}.`,
     );
   }
 
@@ -24,7 +30,7 @@ function validateRouterInternals(router: TanStackRouter): void {
     throw new Error(
       'react-on-rails/tanstack-router: Expected router.matchRoutes to be a function. ' +
         'Please check that your @tanstack/react-router version is compatible. ' +
-        'Supported range: >=1.0.0 <2.0.0.',
+        `Supported range: ${SUPPORTED_TANSTACK_ROUTER_RANGE}.`,
     );
   }
 
@@ -33,7 +39,7 @@ function validateRouterInternals(router: TanStackRouter): void {
     throw new Error(
       'react-on-rails/tanstack-router: validateRouterInternals expected router.state.location.pathname to be a string. ' +
         'Please check that your @tanstack/react-router version is compatible. ' +
-        'Supported range: >=1.0.0 <2.0.0.',
+        `Supported range: ${SUPPORTED_TANSTACK_ROUTER_RANGE}.`,
     );
   }
 
@@ -44,7 +50,23 @@ function validateRouterInternals(router: TanStackRouter): void {
     throw new Error(
       'react-on-rails/tanstack-router: validateRouterInternals expected router.state.location.search (or searchStr) to exist. ' +
         'Please check that your @tanstack/react-router version is compatible. ' +
-        'Supported range: >=1.0.0 <2.0.0.',
+        `Supported range: ${SUPPORTED_TANSTACK_ROUTER_RANGE}.`,
+    );
+  }
+}
+
+/**
+ * Enables TanStack Router's internal SSR mode and verifies the flag is writable.
+ */
+function enableRouterSsrMode(router: TanStackRouter): void {
+  const routerWithSsrFlag = router;
+  routerWithSsrFlag.ssr = true;
+
+  if (!routerWithSsrFlag.ssr) {
+    throw new Error(
+      'react-on-rails/tanstack-router: Expected router.ssr to accept a boolean flag. ' +
+        'Please check that your @tanstack/react-router version is compatible. ' +
+        `Supported range: ${SUPPORTED_TANSTACK_ROUTER_RANGE}.`,
     );
   }
 }
@@ -58,9 +80,10 @@ function validateRouterInternals(router: TanStackRouter): void {
  * - Without pre-populated matches, SSR output would be empty
  *
  * Uses private API: router.__store.setState()
- * Verified against @tanstack/react-router@1.163.3 within the supported range >=1.0.0 <2.0.0.
+ * Verified against @tanstack/react-router@1.163.3 within the supported range >=1.139.0 <2.0.0.
  */
 function injectRouteMatchesSync(router: TanStackRouter, fallbackUrl: string): void {
+  // eslint-disable-next-line no-underscore-dangle -- TanStack Router private store API is required for sync SSR.
   const store = router.__store;
   if (!store) {
     return;
@@ -85,15 +108,16 @@ function injectRouteMatchesSync(router: TanStackRouter, fallbackUrl: string): vo
  */
 function buildAppElement(
   router: TanStackRouter,
-  RouterProvider: React.ComponentType<any>,
+  RouterProvider: React.ComponentType<{ router: TanStackRouter }>,
   AppWrapper: TanStackRouterOptions['AppWrapper'],
   wrapperProps: Record<string, unknown>,
 ): ReactElement {
   let app: ReactElement = createElement(RouterProvider, { router });
   if (AppWrapper) {
     const safeWrapperProps = { ...wrapperProps };
+    // eslint-disable-next-line no-underscore-dangle -- Internal hydration payload key should not reach user AppWrapper props.
     delete safeWrapperProps.__tanstackRouterDehydratedState;
-    app = createElement(AppWrapper, { ...safeWrapperProps, children: app } as any);
+    app = createElement(AppWrapper, safeWrapperProps, app);
   }
   return app;
 }
@@ -116,8 +140,8 @@ export function serverRenderTanStackApp(
   options: TanStackRouterOptions,
   props: Record<string, unknown>,
   railsContext: RailsContext & { serverSide: true },
-  RouterProvider: React.ComponentType<any>,
-  createMemoryHistory: (opts: { initialEntries: string[] }) => any,
+  RouterProvider: React.ComponentType<{ router: TanStackRouter }>,
+  createMemoryHistory: (opts: { initialEntries: string[] }) => TanStackHistory,
 ): TanStackServerRenderResult {
   const router = options.createRouter();
   const url = railsContext.pathname + normalizeSearch(railsContext.search);
@@ -137,7 +161,7 @@ export function serverRenderTanStackApp(
   // WORKAROUND: Set SSR flag to prevent Suspense boundary issues.
   // This causes TanStack Router to use SafeFragment instead of React.Suspense,
   // which avoids hydration mismatches.
-  (router as any).ssr = true;
+  enableRouterSsrMode(router);
 
   // Build the dehydrated state to pass to the client
   const dehydratedState: DehydratedRouterState = {
@@ -161,8 +185,8 @@ export async function serverRenderTanStackAppAsync(
   options: TanStackRouterOptions,
   props: Record<string, unknown>,
   railsContext: RailsContext & { serverSide: true },
-  RouterProvider: React.ComponentType<any>,
-  createMemoryHistory: (opts: { initialEntries: string[] }) => any,
+  RouterProvider: React.ComponentType<{ router: TanStackRouter }>,
+  createMemoryHistory: (opts: { initialEntries: string[] }) => TanStackHistory,
 ): Promise<TanStackServerRenderResult> {
   const router = options.createRouter();
   const url = railsContext.pathname + normalizeSearch(railsContext.search);
@@ -170,12 +194,11 @@ export async function serverRenderTanStackAppAsync(
   const memoryHistory = createMemoryHistory({ initialEntries: [url] });
   router.update({ history: memoryHistory });
 
-  // Async path uses router.load() public API, so no private-internals validation is needed.
-  // Use the public API — await route loading
+  // Async path uses router.load() public API, so no private store access is needed.
   await router.load();
 
   // Ensure SSR output avoids client-only Suspense wrappers that can cause hydration mismatch.
-  (router as any).ssr = true;
+  enableRouterSsrMode(router);
 
   const dehydratedState: DehydratedRouterState = {
     url,

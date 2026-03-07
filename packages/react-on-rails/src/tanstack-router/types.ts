@@ -32,7 +32,7 @@ export interface TanStackRouter {
     setState: (updater: (state: Record<string, unknown>) => Record<string, unknown>) => void;
   };
   // SSR flag (TanStack Start internal)
-  ssr?: unknown;
+  ssr?: boolean;
 }
 
 export interface TanStackHistory {
@@ -66,7 +66,7 @@ export interface TanStackRouterOptions {
    * Optional wrapper component for providers (QueryClient, Theme, etc.)
    * The router's RouterProvider will be rendered as children of this component.
    */
-  AppWrapper?: ComponentType<{ children: ReactNode } & Record<string, unknown>>;
+  AppWrapper?: ComponentType<{ children?: ReactNode } & Record<string, unknown>>;
 }
 
 /**

@@ -1,5 +1,5 @@
 export function normalizeSearch(search: string | null | undefined): string {
-  if (!search) {
+  if (!search || search === '?') {
     return '';
   }
 
