@@ -42,6 +42,7 @@ Find guidance for your specific scenario:
 | **Set up hot reloading**            | [HMR Setup](./building-features/hmr-and-hot-reloading-with-the-webpack-dev-server.md) |
 | **Use Redux with Rails**            | [Redux Integration](./building-features/react-and-redux.md)                           |
 | **Deploy to production**            | [Deployment Guide](./deployment/README.md)                                            |
+| **Manage page metadata (title, meta)** | [React 19 Native Metadata](./building-features/react-19-native-metadata.md)           |
 | **Troubleshoot issues**             | [Troubleshooting](./deployment/troubleshooting.md)                                    |
 
 ## 📖 Documentation Categories
