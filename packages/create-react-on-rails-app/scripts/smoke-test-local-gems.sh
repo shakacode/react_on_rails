@@ -81,6 +81,7 @@ echo "Verifying generated files..."
 grep -q "gem \"react_on_rails\"" "$APP_JS_DIR/Gemfile"
 grep -q "path: \"$RUBY_GEM_DIR\"" "$APP_JS_DIR/Gemfile"
 grep -q "hello_world" "$APP_JS_DIR/config/routes.rb"
+! grep -q "gem \"react_on_rails_pro\"" "$APP_JS_DIR/Gemfile"
 
 grep -q "gem \"react_on_rails_pro\"" "$APP_RSC_JS_DIR/Gemfile"
 grep -q "path: \"$RUBY_PRO_GEM_DIR\"" "$APP_RSC_JS_DIR/Gemfile"
