@@ -601,14 +601,6 @@ The sections above cover generic RSC pitfalls. The following issues are specific
 
 **Fix:** Upgrade to `react-on-rails-pro` >= 16.4.0.rc.3 ([PR #2444](https://github.com/shakacode/react_on_rails/pull/2444)).
 
-### GOAWAY Connection Reset (Node Renderer)
-
-**Symptoms:** SSR requests to the node renderer hang or fail intermittently after a period of inactivity (~2 minutes). You may see `HTTPX::TimeoutError` or connection errors in Rails logs.
-
-**Cause:** This was a connection management bug in `react-on-rails-pro` where stale HTTP/2 connections could be reused after the node renderer sent a GOAWAY frame.
-
-**Fix:** Upgrade to `react-on-rails-pro` >= 16.2.0 ([PR #2259](https://github.com/shakacode/react_on_rails/pull/2259)).
-
 ### Node Renderer VM Context -- Missing Globals
 
 **Symptoms:** Cryptic errors like `ReferenceError: performance is not defined` when rendering Server Components. Often triggered by `React.lazy()` which calls `performance.now()` internally in development mode.
