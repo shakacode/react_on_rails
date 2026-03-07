@@ -550,6 +550,8 @@ export async function createUser(formData: FormData) {
 | `ReferenceError: performance is not defined` | Node renderer VM context missing the `performance` global. Triggered by `React.lazy()` in dev mode | Enable `supportModules: true` and add `performance` via `additionalContext`. See [Node Renderer VM Context](#node-renderer-vm-context----missing-globals) |
 | `"global object mismatch"` | `react-on-rails` and `react-on-rails-pro` resolved from different sources (e.g., npm vs yalc) | Force consistent resolution with `pnpm.overrides` or `yarn.resolutions`. See [Version Mismatch](#version-mismatch----global-object-mismatch) |
 | SSR hangs indefinitely / request timeout on large RSC payloads | Stream backpressure deadlock when RSC payload exceeds 16 KB | Update to latest React on Rails Pro. See [Stream Backpressure Deadlock](#stream-backpressure-deadlock) |
+| `"The 'react-on-rails' package version does not match the gem version"` | Gem and npm package installed at different versions | Install the npm package version matching your gem. See [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch) |
+| `"The 'react-on-rails' package version is not an exact version"` | Using semver ranges (`^`, `~`, `*`) instead of an exact version in package.json | Pin to the exact version without range operators. See [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch) |
 
 ## Environment Variable Access
 
@@ -725,6 +727,82 @@ This approach is more robust because it doesn't depend on the structure of exist
    ```
 
 3. **Inspect `node_modules`:** Confirm that `node_modules/react-on-rails` is a symlink pointing into `react-on-rails-pro`'s dependency tree, not a separate top-level installation.
+
+### Gem and npm Package Version Mismatch
+
+React on Rails requires the gem and npm package versions to match exactly. The validation runs at Rails boot time and will prevent the application from starting if versions are mismatched or improperly specified.
+
+**Symptom 1 -- Version mismatch:**
+
+```
+**ERROR** ReactOnRails: The 'react-on-rails' package version does not match the gem version.
+
+Package: 16.3.0
+    Gem: 16.4.0
+```
+
+This happens when you upgrade the gem (e.g., `bundle update react_on_rails`) without upgrading the npm package, or vice versa. Both must be the same version.
+
+**Fix:** Install the npm package version that matches your gem:
+
+```bash
+# Check your gem version
+bundle show react_on_rails
+
+# Install the matching npm package (use your package manager)
+yarn add react-on-rails@16.4.0 --exact
+# or
+pnpm add react-on-rails@16.4.0 --save-exact
+# or
+npm install react-on-rails@16.4.0 --save-exact
+```
+
+**Symptom 2 -- Non-exact version:**
+
+```
+**ERROR** ReactOnRails: The 'react-on-rails' package version is not an exact version.
+
+Detected: ^16.4.0
+     Gem: 16.4.0
+```
+
+React on Rails does not allow semver ranges (`^`, `~`, `>`, `<`, `*`) or special tags (`latest`, `next`, `beta`) in `package.json`. The version must be an exact match.
+
+**Fix:** Remove the range operator and pin to the exact version:
+
+```json
+{
+  "dependencies": {
+    "react-on-rails": "16.4.0"
+  }
+}
+```
+
+**Symptom 3 -- Pro gem with base package:**
+
+```
+**ERROR** ReactOnRails: You have the Pro gem installed but are using the base 'react-on-rails' package.
+```
+
+If you have the `react_on_rails_pro` gem in your Gemfile, you must use the `react-on-rails-pro` npm package, not `react-on-rails`.
+
+**Fix:** Replace the base package with the Pro package:
+
+```bash
+yarn remove react-on-rails && yarn add react-on-rails-pro@16.4.0 --exact
+```
+
+**Symptom 4 -- Pro package without Pro gem:**
+
+```
+**ERROR** ReactOnRails: You have the 'react-on-rails-pro' package installed but the Pro gem is not installed.
+```
+
+The `react-on-rails-pro` npm package requires the `react_on_rails_pro` gem.
+
+**Fix:** Either add the Pro gem to your Gemfile (`gem 'react_on_rails_pro'`) and run `bundle install`, or switch to the base npm package if you don't have a Pro license.
+
+> **Tip:** Set `REACT_ON_RAILS_SKIP_VALIDATION=true` to temporarily bypass version validation during setup or generator runs.
 
 ## When NOT to Use Server Components
 
