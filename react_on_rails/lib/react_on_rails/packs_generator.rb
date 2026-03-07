@@ -13,6 +13,8 @@ module ReactOnRails
   #    - Component.client.jsx → client bundle only
   #    - Component.server.jsx → server bundle (and RSC bundle when RSC enabled; requires a paired .client. file)
   #    - Component.jsx (no suffix) → both bundles
+  #    These suffixes only make sense for client components, as server components
+  #    exist only in the RSC bundle.
   #    Methods: common_component_to_path, client_component_to_path, server_component_to_path
   #
   # 2. RSC CLASSIFICATION ('use client' directive)

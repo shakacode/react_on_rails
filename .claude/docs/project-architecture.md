@@ -77,7 +77,7 @@ A React on Rails auto-bundling feature that controls which **webpack bundle** im
 - `Component.server.jsx` → server bundle (and RSC bundle when RSC enabled). Must have a paired `.client.` file.
 - `Component.jsx` (no suffix) → both bundles
 
-This is purely about source file routing. A `.server.jsx` file is NOT a React Server Component.
+This is purely about source file routing. A `.server.jsx` file is NOT a React Server Component. These suffixes only make sense for client components, as server components exist only in the RSC bundle.
 
 ### RSC Classification: `'use client'` directive
 
