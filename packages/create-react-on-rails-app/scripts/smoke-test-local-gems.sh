@@ -6,6 +6,11 @@ CLI_BIN="$ROOT_DIR/packages/create-react-on-rails-app/bin/create-react-on-rails-
 RUBY_GEM_DIR="$ROOT_DIR/react_on_rails"
 RUBY_PRO_GEM_DIR="$ROOT_DIR/react_on_rails_pro"
 
+if [[ ! -d "$RUBY_PRO_GEM_DIR" ]]; then
+  echo "react_on_rails_pro not found at $RUBY_PRO_GEM_DIR. Check out the Pro gem before running RSC smoke tests." >&2
+  exit 1
+fi
+
 if ! command -v rails >/dev/null 2>&1; then
   if bundle exec which rails >/dev/null 2>&1; then
     RAILS_BIN_DIR="$(dirname "$(bundle exec which rails)")"
