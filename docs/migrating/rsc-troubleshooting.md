@@ -546,7 +546,7 @@ export async function createUser(formData: FormData) {
 | RSC page downloads unexpectedly large chunks | A shared component with `'use client'` appears in multiple chunk groups; webpack's manifest may map it to a heavy chunk group containing unrelated dependencies (depends on chunk group iteration order) | Inspect `react-client-manifest.json` for oversized chunk mappings. If found, create a thin `'use client'` wrapper file for the RSC import. See [Chunk Contamination](#chunk-contamination) above |
 | `"Text content does not match server-rendered HTML"` | Hydration mismatch | Ensure identical rendering on server and client; use `suppressHydrationWarning` for intentional differences |
 | `"Refs cannot be used in Server Components, nor passed to Client Components"` | Using the `ref` prop on any element inside a Server Component -- including on Client Components. The Flight serializer rejects the literal `ref` prop before checking the target type. | Remove the `ref` prop. Refs are a client-side concept -- if a Client Component needs a ref, it should create one itself with `useRef()`. While `React.createRef()` is callable on the server, the result cannot be attached to any element. |
-| `"Both 'react-on-rails' and 'react-on-rails-pro' packages are installed"` | Both packages installed as separate top-level dependencies, often due to yalc link issues | Ensure only `react-on-rails-pro` is in your `package.json`; the base package should resolve through peer dependencies. See [`validate_no_duplicate_packages!`](#validate_no_duplicate_packages) |
+| `"Both 'react-on-rails' and 'react-on-rails-pro' packages are installed"` | Both packages installed as separate top-level dependencies, often due to yalc link issues | Ensure only `react-on-rails-pro` is in your `package.json`; the base package is installed automatically as a dependency. See [`validate_no_duplicate_packages!`](#validate_no_duplicate_packages) |
 | `ReferenceError: performance is not defined` | Node renderer VM context missing the `performance` global. Triggered by `React.lazy()` in dev mode | Enable `supportModules: true` and add `performance` via `additionalContext`. See [Node Renderer VM Context](#node-renderer-vm-context----missing-globals) |
 | `"global object mismatch"` | `react-on-rails` and `react-on-rails-pro` resolved from different sources (e.g., npm vs yalc) | Force consistent resolution with `pnpm.overrides` or `yarn.resolutions`. See [Version Mismatch](#version-mismatch----global-object-mismatch) |
 | SSR hangs indefinitely / request timeout on large RSC payloads | Stream backpressure deadlock when RSC payload exceeds 16 KB | Update to latest React on Rails Pro. See [Stream Backpressure Deadlock](#stream-backpressure-deadlock) |
@@ -712,7 +712,7 @@ This approach is more robust because it doesn't depend on the structure of exist
 
 **Fix:**
 
-1. **Verify your package setup:** `react-on-rails-pro` depends on `react-on-rails` as a peer dependency. You should only have `react-on-rails-pro` in your `package.json` -- the base package should be resolved through the dependency chain.
+1. **Verify your package setup:** `react-on-rails-pro` includes `react-on-rails` as a direct dependency. You should only have `react-on-rails-pro` in your `package.json` -- the base package is automatically installed through the dependency chain.
 
 2. **Check for stale yalc links:**
    ```bash
