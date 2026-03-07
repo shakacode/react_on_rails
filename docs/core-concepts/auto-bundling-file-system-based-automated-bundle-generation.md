@@ -791,11 +791,13 @@ config.auto_load_bundle = false
 **Solution depends on the component's intended role:**
 
 **If the component is a client component** (uses hooks, state, event handlers, or browser APIs):
+
 - Ensure it has the `'use client'` directive so it gets registered via `ReactOnRails.register()` instead of `registerServerComponent()`
 - Do not render it through `RSCRoute` — use `react_component` or `stream_react_component` instead
 - The `.server/.client` variant pattern works correctly with `react_component` and `stream_react_component` as long as the component is properly registered as a client component
 
 **If the component should be a server component** (server-side data fetching, no client interactivity):
+
 - Migrate to a single file — delete the `.client.jsx` file, since server components do not run on the client side at all
 - Adjust the `.server.jsx` variant (or rename it to drop the `.server` suffix) to properly use RSC capabilities: async data fetching, streaming with Suspense, direct access to server-only resources
 - If the component uses a render function pattern (`export default (props, railsContext) => { ... }`), convert it to a plain React component (`export default function Component(props) { ... }`) or an async component (`export default async function Component(props) { ... }`)
