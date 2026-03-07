@@ -308,7 +308,48 @@ export default function PageErrorBoundary({ children }) {
 }
 ```
 
-> **Note:** For finer-grained retry (re-rendering a single Server Component without a full page reload), the client would need to re-fetch the RSC payload for that component. This depends on your application's routing setup.
+### Finer-Grained Retry with `refetchComponent`
+
+React on Rails Pro provides `useRSC()` with a `refetchComponent` method that re-fetches a single Server Component's RSC payload without a full page reload:
+
+```jsx
+'use client';
+
+import { ErrorBoundary } from 'react-error-boundary';
+import { useRSC, isServerComponentFetchError } from 'react-on-rails-pro';
+
+function ErrorFallback({ error, resetErrorBoundary }) {
+  const { refetchComponent } = useRSC();
+
+  function retry() {
+    if (isServerComponentFetchError(error)) {
+      const { serverComponentName, serverComponentProps } = error;
+      refetchComponent(serverComponentName, serverComponentProps)
+        .catch((err) => console.error('Retry failed:', err))
+        .finally(() => resetErrorBoundary());
+    } else {
+      window.location.reload();
+    }
+  }
+
+  return (
+    <div>
+      <p>Something went wrong</p>
+      <button onClick={retry}>Retry</button>
+    </div>
+  );
+}
+
+export default function PageErrorBoundary({ children }) {
+  return (
+    <ErrorBoundary FallbackComponent={ErrorFallback}>
+      {children}
+    </ErrorBoundary>
+  );
+}
+```
+
+`refetchComponent` re-fetches the RSC payload for the named component with `enforceRefetch: true`, bypassing any cached promise. This is the React on Rails equivalent of Next.js's `router.refresh()`.
 
 ## `'use client'` Directive Mistakes
 
@@ -504,6 +545,10 @@ export async function createUser(formData: FormData) {
 | RSC page downloads unexpectedly large chunks | A shared component with `'use client'` appears in multiple chunk groups; webpack's manifest may map it to a heavy chunk group containing unrelated dependencies (depends on chunk group iteration order) | Inspect `react-client-manifest.json` for oversized chunk mappings. If found, create a thin `'use client'` wrapper file for the RSC import. See [Chunk Contamination](#chunk-contamination) above |
 | `"Text content does not match server-rendered HTML"` | Hydration mismatch | Ensure identical rendering on server and client; use `suppressHydrationWarning` for intentional differences |
 | `"Refs cannot be used in Server Components, nor passed to Client Components"` | Using the `ref` prop on any element inside a Server Component -- including on Client Components. The Flight serializer rejects the literal `ref` prop before checking the target type. | Remove the `ref` prop. Refs are a client-side concept -- if a Client Component needs a ref, it should create one itself with `useRef()`. While `React.createRef()` is callable on the server, the result cannot be attached to any element. |
+| `"Both 'react-on-rails' and 'react-on-rails-pro' JavaScript packages were detected"` | Both packages installed as separate top-level dependencies, often due to yalc link issues | Ensure only `react-on-rails-pro` is in your `package.json`; the base package should resolve through peer dependencies. See [`validate_no_duplicate_packages!`](#validate_no_duplicate_packages) |
+| `ReferenceError: performance is not defined` | Node renderer VM context missing the `performance` global. Triggered by `React.lazy()` in dev mode | Enable `supportModules: true` and add `performance` via `additionalContext`. See [Node Renderer VM Context](#node-renderer-vm-context----missing-globals) |
+| `"global object mismatch"` | `react-on-rails` and `react-on-rails-pro` resolved from different sources (e.g., npm vs yalc) | Force consistent resolution with `pnpm.overrides` or `yarn.resolutions`. See [Version Mismatch](#version-mismatch----global-object-mismatch) |
+| SSR hangs indefinitely / request timeout on large RSC payloads | Stream backpressure deadlock: stream2 buffer fills before `injectRSCPayload` starts consuming, stalling the source stream | Update to latest React on Rails Pro. See [Stream Backpressure Deadlock](#stream-backpressure-deadlock) |
 
 ## Environment Variable Access
 
@@ -542,6 +587,201 @@ function ClientComp() {
 ```
 
 **Security:** Never add secret keys to webpack's `EnvironmentPlugin` -- they would be embedded in the client bundle. Use `server-only` to protect modules that access secrets. Without it, secrets could accidentally leak to the client through import chains.
+
+## React on Rails-Specific Issues
+
+The sections above cover generic RSC pitfalls. The following issues are specific to the React on Rails stack and its node renderer architecture.
+
+### Stream Backpressure Deadlock
+
+**Symptoms:** SSR hangs indefinitely when the RSC payload is large (> 16 KB). The page never loads and eventually times out.
+
+**Root cause:** `RSCRequestTracker.getRSCPayloadStream()` tees the RSC Flight stream into two `PassThrough` streams:
+
+- **stream1** -- consumed immediately by React's `renderToPipeableStream` for SSR
+- **stream2** -- consumed later by `injectRSCPayload` to embed RSC data into the HTML
+
+`injectRSCPayload` only starts consuming stream2 **after** the first HTML chunk arrives from SSR. If `pipe()` is used to forward data, and the RSC payload exceeds stream2's buffer capacity (default `highWaterMark` of 16 KB), stream2's backpressure pauses the source stream. This stalls stream1 too -- SSR never produces HTML, so `injectRSCPayload` never starts, creating a deadlock.
+
+**Fix:** The tee must use manual `push()` forwarding instead of `pipe()` to decouple backpressure between the two destinations:
+
+```js
+// CORRECT: Manual forwarding -- no backpressure coupling
+const stream1 = new PassThrough();
+const stream2 = new PassThrough();
+source.on('data', (chunk) => {
+  stream1.push(chunk);
+  stream2.push(chunk);
+});
+source.on('end', () => {
+  stream1.push(null);
+  stream2.push(null);
+});
+```
+
+```js
+// WRONG: pipe() causes backpressure coupling
+const stream1 = new PassThrough();
+const stream2 = new PassThrough();
+source.pipe(stream1);
+source.pipe(stream2); // When stream2 fills up, source pauses, starving stream1
+```
+
+With `push()`, each `PassThrough` buffers independently. stream1 keeps receiving data even when stream2's buffer is full, so SSR can proceed and eventually produce HTML that unblocks stream2 consumption.
+
+> **Note:** This is already fixed in current versions of React on Rails Pro. If you're seeing this symptom, ensure you're on the latest version.
+
+### GOAWAY Connection Reset (Node Renderer)
+
+**Symptoms:** SSR requests to the node renderer hang or fail intermittently after a period of inactivity (~2 minutes). You may see connection errors in logs but no explicit GOAWAY message.
+
+**Root cause:** The node renderer uses HTTP/2 cleartext (h2c) over persistent connections managed by the HTTPX Ruby client. After approximately 2 minutes of idle time, the node renderer's Fastify server may send an HTTP/2 GOAWAY frame. The HTTPX connection pool may attempt to reuse the now-stale connection, leading to a hang or connection reset.
+
+**Fix:** React on Rails Pro configures HTTPX with automatic retry logic:
+
+- HTTPX's `:retries` plugin retries failed connection attempts (max 1 retry at the HTTP level)
+- The application layer retries up to `renderer_request_retry_limit` times (default: 5)
+- For streaming requests, retries are disabled after the first chunk is received to prevent duplicate output
+
+If you're seeing persistent GOAWAY-related failures:
+
+1. **Check your timeouts:** Ensure `renderer_http_pool_timeout` (default: 5s) and `ssr_timeout` (default: 5s) are appropriate for your workload
+2. **Monitor connection pool:** Set `renderer_http_pool_size` (default: 10) based on your concurrency needs
+3. **Check logs:** Look for `HTTPX::TimeoutError` or `HTTPX::Error` messages in your Rails logs
+
+```ruby
+# config/initializers/react_on_rails_pro.rb
+ReactOnRailsPro.configure do |config|
+  config.renderer_http_pool_size = 10        # Max connections per origin
+  config.renderer_http_pool_timeout = 5      # Connection timeout (seconds)
+  config.ssr_timeout = 5                     # Read timeout (seconds)
+  config.renderer_request_retry_limit = 5    # Application-level retries
+end
+```
+
+### Node Renderer VM Context -- Missing Globals
+
+**Symptoms:** Cryptic errors like `ReferenceError: performance is not defined` when rendering Server Components. Often triggered by `React.lazy()` which calls `performance.now()` internally in development mode.
+
+**Root cause:** The node renderer runs your JavaScript in an isolated V8 VM context (`vm.createContext`). By default, the VM context only includes basic globals. Node.js-specific globals like `performance`, `Buffer`, `TextDecoder`, etc. must be explicitly added.
+
+**Fix:** Enable `supportModules` in your node renderer configuration to inject common Node.js globals:
+
+```js
+// node-renderer.js (or wherever you configure the renderer)
+module.exports = {
+  supportModules: true, // Injects: Buffer, TextDecoder, TextEncoder,
+                        // URLSearchParams, ReadableStream, process,
+                        // setTimeout, setInterval, setImmediate,
+                        // clearTimeout, clearInterval, clearImmediate,
+                        // queueMicrotask
+};
+```
+
+Or set the environment variable:
+
+```bash
+RENDERER_SUPPORT_MODULES=true
+```
+
+For globals not covered by `supportModules` (e.g., `performance`), use `additionalContext`:
+
+```js
+module.exports = {
+  supportModules: true,
+  additionalContext: {
+    performance: require('perf_hooks').performance,
+  },
+};
+```
+
+### Version Mismatch -- "Global Object Mismatch"
+
+**Symptoms:** Runtime error `"global object mismatch"` when both `react-on-rails` and `react-on-rails-pro` JS packages are installed.
+
+**Root cause:** The `react-on-rails` and `react-on-rails-pro` packages share internal global state. If they resolve from different sources (e.g., one from npm and one from yalc during development), each gets its own copy of the shared module, and internal checks detect the mismatch.
+
+**Fix:** Force consistent package resolution using your package manager's override mechanism:
+
+```json
+// package.json (pnpm)
+{
+  "pnpm": {
+    "overrides": {
+      "react-on-rails": "file:../path/to/local/package",
+      "react-on-rails-pro": "file:../path/to/local/pro-package"
+    }
+  }
+}
+```
+
+```json
+// package.json (yarn)
+{
+  "resolutions": {
+    "react-on-rails": "file:../path/to/local/package"
+  }
+}
+```
+
+When using **yalc** for local development:
+
+1. Publish all packages in dependency order: base package first, then pro
+2. Ensure both packages resolve to the same version source
+3. Run `yalc installations show` to verify no stale installations exist
+
+### RSC WebpackLoader with SWC
+
+**Symptoms:** The RSC webpack loader silently fails to transform modules. Server Components work without React Server Components directives being processed. The RSC bundle builds without errors but components aren't correctly split between server and client.
+
+**Root cause:** Shakapacker may configure `swc-loader` as a function rule (not in an array), so the RSC configuration helper `extractLoader()` -- which searches `rule.use` arrays -- never finds it:
+
+```js
+// What extractLoader() expects:
+rule.use = [{ loader: 'swc-loader', options: {...} }]; // Array -- works
+
+// What Shakapacker may generate:
+rule.use = { loader: 'swc-loader', options: {...} }; // Object -- not found
+```
+
+**Fix:** Instead of trying to append the RSC loader to the existing rule, add it as a separate `enforce: 'post'` rule:
+
+```js
+// config/webpack/rscWebpackConfig.js
+const rscConfig = require('./serverWebpackConfig');
+
+// Add RSC loader as a separate post-processing rule
+rscConfig.module.rules.push({
+  test: /\.(js|jsx|ts|tsx)$/,
+  enforce: 'post',
+  exclude: /node_modules/,
+  use: [{ loader: 'react-on-rails-rsc/WebpackLoader' }],
+});
+```
+
+This approach is more robust because it doesn't depend on the structure of existing loader rules. The `enforce: 'post'` ensures the RSC loader runs after SWC/Babel transformation.
+
+### `validate_no_duplicate_packages!`
+
+**Symptoms:** Boot-time error: `"Both 'react-on-rails' and 'react-on-rails-pro' JavaScript packages were detected."` This prevents the Rails application from starting.
+
+**Root cause:** The `react_on_rails` gem validates that only one of the JavaScript packages is installed. During development with yalc, both packages may appear in `node_modules` simultaneously if the yalc link chain isn't set up correctly.
+
+**Fix:**
+
+1. **Verify your package setup:** `react-on-rails-pro` depends on `react-on-rails` as a peer dependency. You should only have `react-on-rails-pro` in your `package.json` -- the base package should be resolved through the dependency chain.
+
+2. **Check for stale yalc links:**
+   ```bash
+   # Remove stale yalc installations
+   yalc installations clean
+   # Re-publish and re-add in the correct order
+   cd /path/to/react-on-rails && yalc publish
+   cd /path/to/react-on-rails-pro && yalc publish
+   cd /path/to/your-app && yalc add react-on-rails-pro
+   ```
+
+3. **Inspect `node_modules`:** Confirm that `node_modules/react-on-rails` is a symlink pointing into `react-on-rails-pro`'s dependency tree, not a separate top-level installation.
 
 ## When NOT to Use Server Components
 
