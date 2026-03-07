@@ -19,22 +19,14 @@ module ReactOnRails
           rails_port   = explicit_rails_port
           webpack_port = explicit_webpack_port
 
-          # If both are explicitly set, trust the user completely
-          return { rails: rails_port, webpack: webpack_port } if rails_port && webpack_port
+          rails_port   ||= find_available_port(DEFAULT_RAILS_PORT, exclude: webpack_port)
+          webpack_port ||= find_available_port(DEFAULT_WEBPACK_PORT, exclude: rails_port)
 
-          # If only one is set, anchor it and probe for a free port on the other side
-          if rails_port
-            return { rails: rails_port,
-                     webpack: find_available_port(DEFAULT_WEBPACK_PORT, exclude: rails_port) }
+          if rails_port != DEFAULT_RAILS_PORT || webpack_port != DEFAULT_WEBPACK_PORT
+            puts "Default ports in use. Using Rails :#{rails_port}, webpack :#{webpack_port}"
           end
 
-          if webpack_port
-            return { rails: find_available_port(DEFAULT_RAILS_PORT, exclude: webpack_port),
-                     webpack: webpack_port }
-          end
-
-          # Neither set — auto-detect a free pair
-          find_free_pair
+          { rails: rails_port, webpack: webpack_port }
         end
 
         # Public so it can be stubbed in tests.
@@ -68,17 +60,6 @@ module ReactOnRails
           end
 
           raise NoPortAvailable, "No available port found starting at #{start_port}."
-        end
-
-        def find_free_pair
-          rails_port   = find_available_port(DEFAULT_RAILS_PORT)
-          webpack_port = find_available_port(DEFAULT_WEBPACK_PORT, exclude: rails_port)
-
-          if rails_port != DEFAULT_RAILS_PORT || webpack_port != DEFAULT_WEBPACK_PORT
-            puts "Default ports in use. Using Rails :#{rails_port}, webpack :#{webpack_port}"
-          end
-
-          { rails: rails_port, webpack: webpack_port }
         end
       end
     end
