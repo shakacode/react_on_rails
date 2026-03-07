@@ -319,6 +319,16 @@ module ReactOnRailsPro
           end
 
           response = HTTPX.get(path)
+          error = response.error
+          if error
+            # Re-raise via rescue so Ruby sets error.cause for exception chaining.
+            begin
+              raise error
+            rescue StandardError
+              raise ReactOnRailsPro::Error, "Failed to fetch dev-server asset from #{path}: #{error}"
+            end
+          end
+
           response.body
         else
           Pathname.new(path)
