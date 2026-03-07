@@ -188,6 +188,12 @@ config.middleware.use Rack::Deflater, if: lambda { |*, body|
 
 The same applies to `Rack::Brotli` or any middleware that accepts an `:if` callback.
 
+## Metadata with Streaming
+
+Streaming SSR is fully compatible with React 19's native metadata tags. You can render `<title>`, `<meta>`, and `<link>` anywhere in your component tree — including inside async components within Suspense boundaries — and React will hoist them into the document `<head>`.
+
+This is a significant advantage over `react-helmet`, which requires `renderToString` and is incompatible with streaming. For details, see [React 19 Native Metadata](react-19-native-metadata.md).
+
 ## When to Use Streaming
 
 Streaming SSR is particularly valuable in specific scenarios. Here's when to consider it:

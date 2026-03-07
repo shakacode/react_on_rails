@@ -45,6 +45,7 @@ The core React on Rails gem and npm package.
 | **Use Redux with Rails**            | [Redux Integration](./oss/building-features/react-and-redux.md)                           |
 | **Use TanStack Router**             | [TanStack Router Guide](./oss/building-features/tanstack-router.md)                       |
 | **Deploy to production**            | [Deployment Guide](./oss/deployment/README.md)                                            |
+| **Manage page metadata (title, meta)** | [React 19 Native Metadata](./oss/building-features/react-19-native-metadata.md)      |
 | **Troubleshoot issues**             | [Troubleshooting](./oss/deployment/troubleshooting.md)                                    |
 
 ## Pro
