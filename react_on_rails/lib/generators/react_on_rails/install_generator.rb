@@ -329,6 +329,7 @@ module ReactOnRails
 
       def shakapacker_config_file_exists?
         File.exist?("config/webpack/webpack.config.js") ||
+          File.exist?("config/webpack/webpack.config.ts") ||
           File.exist?("config/rspack/rspack.config.js") ||
           File.exist?("config/rspack/rspack.config.ts")
       end

@@ -299,6 +299,22 @@ module ReactOnRails
           module.exports = webpackConfig
         CONFIG
 
+        # Shakapacker v9+ rspack configs (generateRspackConfig function)
+        configs << <<~CONFIG
+          // See the shakacode/shakapacker README and docs directory for advice on customizing your rspackConfig.
+          const { generateRspackConfig } = require('shakapacker/rspack')
+
+          const rspackConfig = generateRspackConfig()
+
+          module.exports = rspackConfig
+        CONFIG
+
+        configs << <<~CONFIG
+          const { generateRspackConfig } = require('shakapacker/rspack')
+          const rspackConfig = generateRspackConfig()
+          module.exports = rspackConfig
+        CONFIG
+
         configs
       end
 
