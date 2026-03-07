@@ -321,6 +321,7 @@ module ReactOnRailsPro
           response = HTTPX.get(path)
           error = response.error
           if error
+            # Re-raise via rescue so Ruby sets error.cause for exception chaining.
             begin
               raise error
             rescue StandardError
