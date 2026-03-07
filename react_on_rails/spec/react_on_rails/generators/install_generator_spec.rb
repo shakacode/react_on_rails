@@ -461,6 +461,109 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  # Tests a fresh rspack install where Shakapacker was installed directly with rspack
+  # (no prior webpack config). This exercises different code paths than "with --rspack":
+  # - shakapacker_config_file_exists? falls through to the rspack branches (lines 333-334)
+  # - copy_webpack_main_config finds the existing stock rspack config and auto-replaces it
+  # - configure_rspack_in_shakapacker is a no-op (already rspack)
+  context "with --rspack and pre-existing rspack config (fresh rspack install)" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+
+      # Simulate Shakapacker installed directly with SHAKAPACKER_ASSETS_BUNDLER=rspack.
+      # No config/webpack/ directory exists — only config/rspack/.
+      simulate_existing_file("config/shakapacker.yml", <<~YAML)
+        default: &default
+          source_path: app/javascript
+          source_entry_path: packs
+          public_root_path: public
+          public_output_path: packs
+          cache_path: tmp/shakapacker
+          webpack_compile_output: true
+          shakapacker_precompile: true
+          additional_paths: []
+          cache_manifest: false
+          javascript_transpiler: "swc"
+          assets_bundler: "rspack"
+          # precompile_hook: ~
+
+        development:
+          <<: *default
+
+        test:
+          <<: *default
+          compile: true
+
+        production:
+          <<: *default
+      YAML
+      simulate_existing_file("bin/shakapacker", "")
+      simulate_existing_file("bin/shakapacker-dev-server", "")
+      # Stock rspack config — exact content from Shakapacker 9.4.0
+      simulate_existing_file("config/rspack/rspack.config.js", <<~JS)
+        // See the shakacode/shakapacker README and docs directory for advice on customizing your rspackConfig.
+        const { generateRspackConfig } = require('shakapacker/rspack')
+
+        const rspackConfig = generateRspackConfig()
+
+        module.exports = rspackConfig
+      JS
+
+      Dir.chdir(destination_root) do
+        run_generator(["--rspack", "--ignore-warnings", "--skip"])
+      end
+    end
+
+    include_examples "base_generator", application_js: true
+    include_examples "no_redux_generator"
+
+    it "auto-replaces stock rspack config with React on Rails environment loader" do
+      assert_file "config/rspack/rspack.config.js" do |content|
+        expect(content).to include("const envSpecificConfig = () =>")
+        expect(content).not_to include("generateRspackConfig")
+      end
+    end
+
+    it "generates all bundler configs in config/rspack/" do
+      %w[serverWebpackConfig.js clientWebpackConfig.js commonWebpackConfig.js
+         ServerClientOrBoth.js development.js production.js test.js].each do |file|
+        assert_file "config/rspack/#{file}"
+      end
+    end
+
+    it "does not create any config/webpack/ files" do
+      assert_no_file "config/webpack/webpack.config.js"
+      assert_no_file "config/webpack/serverWebpackConfig.js"
+      assert_no_file "config/webpack/clientWebpackConfig.js"
+    end
+
+    it "preserves rspack bundler setting in shakapacker.yml" do
+      assert_file "config/shakapacker.yml" do |content|
+        expect(content).to include("assets_bundler: \"rspack\"")
+        expect(content).not_to match(/assets_bundler:\s*["']?webpack["']?/)
+      end
+    end
+
+    it "installs rspack dependencies in package.json" do
+      assert_file "package.json" do |content|
+        package_json = JSON.parse(content)
+        expect(package_json["dependencies"]).to include("@rspack/core")
+        expect(package_json["dependencies"]).to include("rspack-manifest-plugin")
+        expect(package_json["devDependencies"]).to include("@rspack/cli")
+      end
+    end
+
+    it "does not install webpack-specific dependencies" do
+      assert_file "package.json" do |content|
+        package_json = JSON.parse(content)
+        expect(package_json["dependencies"]).not_to include("webpack")
+        expect(package_json["devDependencies"]).not_to include("webpack-cli")
+      end
+    end
+  end
+
   context "with --rspack --redux" do
     # Uses --skip so template() preserves the pre-existing shakapacker.yml,
     # while gsub_file patchers (configure_rspack_in_shakapacker) still run on it.
@@ -1360,18 +1463,110 @@ describe InstallGenerator, type: :generator do
 
     it "returns true when rspack config exists in config/rspack" do
       allow(File).to receive(:exist?).with("config/webpack/webpack.config.js").and_return(false)
+      allow(File).to receive(:exist?).with("config/webpack/webpack.config.ts").and_return(false)
       allow(File).to receive(:exist?).with("config/rspack/rspack.config.js").and_return(true)
       allow(File).to receive(:exist?).with("config/rspack/rspack.config.ts").and_return(false)
 
       expect(install_generator.send(:shakapacker_configured?)).to be true
     end
 
+    it "returns true when webpack TypeScript config exists" do
+      allow(File).to receive(:exist?).with("config/webpack/webpack.config.js").and_return(false)
+      allow(File).to receive(:exist?).with("config/webpack/webpack.config.ts").and_return(true)
+
+      expect(install_generator.send(:shakapacker_configured?)).to be true
+    end
+
+    it "returns true when rspack TypeScript config exists" do
+      allow(File).to receive(:exist?).with("config/webpack/webpack.config.js").and_return(false)
+      allow(File).to receive(:exist?).with("config/webpack/webpack.config.ts").and_return(false)
+      allow(File).to receive(:exist?).with("config/rspack/rspack.config.js").and_return(false)
+      allow(File).to receive(:exist?).with("config/rspack/rspack.config.ts").and_return(true)
+
+      expect(install_generator.send(:shakapacker_configured?)).to be true
+    end
+
     it "returns false when no supported bundler config file exists" do
       allow(File).to receive(:exist?).with("config/webpack/webpack.config.js").and_return(false)
+      allow(File).to receive(:exist?).with("config/webpack/webpack.config.ts").and_return(false)
       allow(File).to receive(:exist?).with("config/rspack/rspack.config.js").and_return(false)
       allow(File).to receive(:exist?).with("config/rspack/rspack.config.ts").and_return(false)
 
       expect(install_generator.send(:shakapacker_configured?)).to be false
+    end
+  end
+
+  describe "#standard_shakapacker_config?" do
+    let(:destination) { File.expand_path("../dummy-for-generators", __dir__) }
+    let(:generator) { BaseGenerator.new([], {}, { destination_root: destination }) }
+
+    it "recognizes stock webpack config with comments (Shakapacker 9.x)" do
+      # Exact content from shakapacker 9.4.0 lib/install/config/webpack/webpack.config.js
+      content = <<~JS
+        // See the shakacode/shakapacker README and docs directory for advice on customizing your webpackConfig.
+        const { generateWebpackConfig } = require('shakapacker')
+
+        const webpackConfig = generateWebpackConfig()
+
+        module.exports = webpackConfig
+      JS
+      expect(generator.send(:standard_shakapacker_config?, content)).to be true
+    end
+
+    it "recognizes stock webpack config without comments" do
+      content = <<~JS
+        const { generateWebpackConfig } = require('shakapacker')
+        const webpackConfig = generateWebpackConfig()
+        module.exports = webpackConfig
+      JS
+      expect(generator.send(:standard_shakapacker_config?, content)).to be true
+    end
+
+    it "recognizes stock rspack config with comments (Shakapacker 9.x)" do
+      # Exact content from shakapacker 9.4.0 lib/install/config/rspack/rspack.config.js
+      content = <<~JS
+        // See the shakacode/shakapacker README and docs directory for advice on customizing your rspackConfig.
+        const { generateRspackConfig } = require('shakapacker/rspack')
+
+        const rspackConfig = generateRspackConfig()
+
+        module.exports = rspackConfig
+      JS
+      expect(generator.send(:standard_shakapacker_config?, content)).to be true
+    end
+
+    it "recognizes stock rspack config without comments" do
+      content = <<~JS
+        const { generateRspackConfig } = require('shakapacker/rspack')
+        const rspackConfig = generateRspackConfig()
+        module.exports = rspackConfig
+      JS
+      expect(generator.send(:standard_shakapacker_config?, content)).to be true
+    end
+
+    it "rejects custom config with user modifications" do
+      content = <<~JS
+        const { generateRspackConfig } = require('shakapacker/rspack')
+        const rspackConfig = generateRspackConfig()
+        rspackConfig.module.rules.push({ test: /\\.svg$/, type: 'asset' })
+        module.exports = rspackConfig
+      JS
+      expect(generator.send(:standard_shakapacker_config?, content)).to be false
+    end
+
+    it "rejects React on Rails environment-loader config" do
+      content = <<~JS
+        const { env } = require('shakapacker')
+        const { existsSync } = require('fs')
+        const { resolve } = require('path')
+        const envSpecificConfig = () => {
+          const path = resolve(__dirname, `${env.nodeEnv}.js`)
+          if (existsSync(path)) { return require(path) }
+          else { throw new Error(`Could not find file to load ${path}`) }
+        }
+        module.exports = envSpecificConfig()
+      JS
+      expect(generator.send(:standard_shakapacker_config?, content)).to be false
     end
   end
 
