@@ -99,7 +99,7 @@ module ReactOnRails
       end
 
       def copy_webpack_config
-        puts "Adding #{options.rspack? ? 'Rspack' : 'Webpack'} config"
+        puts "Adding #{using_rspack? ? 'Rspack' : 'Webpack'} config"
         base_path = "base/base"
         base_files = %w[babel.config.js
                         config/webpack/clientWebpackConfig.js
@@ -136,7 +136,7 @@ module ReactOnRails
         end
 
         # Configure bundler-specific settings
-        configure_rspack_in_shakapacker if options.rspack?
+        configure_rspack_in_shakapacker if using_rspack?
 
         # Always ensure precompile_hook is configured (Shakapacker 9.0+ only)
         configure_precompile_hook_in_shakapacker
@@ -215,7 +215,7 @@ module ReactOnRails
       def handle_custom_webpack_config(base_path, config, webpack_config_path)
         # Custom config - ask user
         config_file_name = File.basename(webpack_config_path)
-        bundler_name = options.rspack? ? "rspack" : "webpack"
+        bundler_name = using_rspack? ? "rspack" : "webpack"
         puts "\n#{set_color('NOTICE:', :yellow)} Your #{config_file_name} appears to be customized."
         puts "React on Rails needs to replace it with an environment-specific loader."
         puts "Your current config will be backed up to #{config_file_name}.backup"
@@ -237,7 +237,7 @@ module ReactOnRails
       end
 
       def bundler_main_config_path
-        if options.rspack?
+        if using_rspack?
           "config/rspack/rspack.config.js"
         else
           "config/webpack/webpack.config.js"
