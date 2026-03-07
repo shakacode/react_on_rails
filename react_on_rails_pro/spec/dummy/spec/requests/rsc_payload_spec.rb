@@ -15,8 +15,10 @@ RSpec.describe "RSC payload endpoint" do
       begin
         JSON.parse(stripped_line)
       rescue JSON::ParserError => e
-        raise RSpec::Expectations::ExpectationNotMetError,
-              "Non-JSON line in RSC payload response: #{stripped_line.inspect} (#{e.message})"
+        raise "Rails view annotation leaked into RSC payload response: #{stripped_line.inspect}" \
+          if stripped_line.include?("<!--")
+
+        raise "Non-JSON line in RSC payload response: #{stripped_line.inspect} (#{e.message})"
       end
     end
   end
@@ -24,7 +26,6 @@ RSpec.describe "RSC payload endpoint" do
   def expect_valid_rsc_payload_response
     expect(response).to have_http_status(:ok)
     expect(response.media_type).to eq("application/x-ndjson")
-    expect(response.body).not_to include("<!--")
 
     expect(parsed_chunks).not_to be_empty
     html_chunk_message =

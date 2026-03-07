@@ -53,7 +53,9 @@ module ReactOnRailsPro
         # Having multiple newlines between chunks causes hydration errors
         # So we strip extra newlines from the template string and add a single newline
         # `formats: [:text]` causes render_to_string to set response.content_type
-        # to `text/plain`; override it here before the first write commits headers.
+        # to `text/plain`; override it here before the first stream write, which
+        # is when ActionController::Live commits headers. render_to_string itself
+        # never writes to response.stream, so this assignment is always safe.
         response.content_type = content_type if content_type
         response.stream.write(template_string)
 
