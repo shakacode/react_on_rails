@@ -173,6 +173,11 @@ module ReactOnRails
       end
 
       def setup_react_dependencies
+        if options[:pretend]
+          say_status :pretend, "Skipping React dependency setup in --pretend mode", :yellow
+          return
+        end
+
         setup_js_dependencies
       end
 

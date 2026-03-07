@@ -1158,6 +1158,14 @@ describe InstallGenerator, type: :generator do
       typescript_install_generator.send(:install_typescript_dependencies)
     end
 
+    it "does not set up react dependencies in pretend mode" do
+      expect(install_generator).to receive(:say_status)
+        .with(:pretend, "Skipping React dependency setup in --pretend mode", :yellow)
+      expect(install_generator).not_to receive(:setup_js_dependencies)
+
+      install_generator.send(:setup_react_dependencies)
+    end
+
     it "does not create css module type files in pretend mode" do
       expect(install_generator).to receive(:say_status)
         .with(:pretend, "Would create CSS module type definitions (skipped in --pretend mode)", :yellow)
