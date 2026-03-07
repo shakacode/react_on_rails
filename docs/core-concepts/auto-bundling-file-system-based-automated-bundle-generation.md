@@ -501,6 +501,9 @@ Once generated, all server entrypoints will be imported into a file named `[Reac
 > [!IMPORTANT]
 > When specifying separate definitions for client and server rendering, you need to delete the generalized `ComponentName.jsx` file.
 
+> [!WARNING]
+> Components with `.server.jsx`/`.client.jsx` suffixes should not be rendered through `RSCRoute` or registered with `registerServerComponent`. These suffixes are designed for traditional server-side rendering where separate client and server bundles exist. Using them with RSC not only adds unnecessary overhead but can also cause the wrong variant (the server version) to load in the browser. See [troubleshooting item #8](#8-component-with-serverclient-variants-used-with-rsc) and [issue #2509](https://github.com/shakacode/react_on_rails/issues/2509).
+
 ### Transpiled Languages (ReScript, Reason, etc.)
 
 Components compiled by transpiled languages like ReScript produce output files with extensions that include the transpiler identifier (e.g., `.bs.js`, `.res.js`). Auto-bundling discovers these files because they end in `.js`, but it extracts the component name from the full extension — so `MyComponent.bs.js` becomes `MyComponent.bs` instead of `MyComponent`.
@@ -775,6 +778,25 @@ config.auto_load_bundle = false
 - **Source maps**: Check if source maps are causing issues in production
 - **Minification**: Some code might break during minification - check console for errors
 - **Environment**: Use `bin/dev prod` to test production-like assets locally
+
+#### 8. Component with `.server/.client` variants used with RSC
+
+**Problem**: A component with `.server.jsx`/`.client.jsx` file variants is rendered through `RSCRoute` or registered with `registerServerComponent`. This adds unnecessary overhead and can cause the wrong variant (the server version) to load in the browser — the RSC bundle imports the `.server.jsx` file and its chunk reference propagates through the client manifest to the browser.
+
+**Solution depends on the component's intended role:**
+
+**If the component is a client component** (uses hooks, state, event handlers, or browser APIs):
+- Ensure it has the `'use client'` directive so it gets registered via `ReactOnRails.register()` instead of `registerServerComponent()`
+- Do not render it through `RSCRoute` — use `react_component` or `stream_react_component` instead
+- The `.server/.client` variant pattern works correctly with `react_component` and `stream_react_component` as long as the component is properly registered as a client component
+
+**If the component should be a server component** (server-side data fetching, no client interactivity):
+- Migrate to a single file — delete the `.client.jsx` file, since server components do not run on the client side at all
+- Adjust the `.server.jsx` variant (or rename it to drop the `.server` suffix) to properly use RSC capabilities: async data fetching, streaming with Suspense, direct access to server-only resources
+- If the component uses a render function pattern (`export default (props, railsContext) => { ... }`), convert it to a plain React component (`export default function Component(props) { ... }`) or an async component (`export default async function Component(props) { ... }`)
+- Remove the `'use client'` directive if present — server components must not have it
+
+**Related**: [GitHub issue #2509](https://github.com/shakacode/react_on_rails/issues/2509), [How to use different files for client and server rendering](../building-features/how-to-use-different-files-for-client-and-server-rendering.md)
 
 ### Debug Mode
 

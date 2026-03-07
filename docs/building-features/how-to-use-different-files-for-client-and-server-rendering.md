@@ -1,5 +1,8 @@
 ## How to use different versions of a file for client and server rendering
 
+> [!NOTE]
+> **React Server Components (RSC) users:** With RSC, server components run exclusively on the server and client components handle browser interactivity. This component model eliminates the need for separate `.server/.client` file variants. Using file variants with RSC can cause issues — see the [auto-bundling troubleshooting guide](../core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md#8-component-with-serverclient-variants-used-with-rsc) for details.
+
 There are 3 main ways to use different code for server vs. client rendering.
 
 ## A. Using different Entry Points
