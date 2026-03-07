@@ -232,6 +232,12 @@ export async function cleanIncompleteBundleDirectory(bundleTimestamp: string | n
     throw error;
   }
 
+  // Re-check completeness after directory read to reduce a race window where
+  // another writer can finish and mark complete while this cleaner is in-flight.
+  if (await isBundleComplete(bundleTimestamp)) {
+    return false;
+  }
+
   const entriesToRemove = entries.filter(
     (entry) => !entry.endsWith('.lock') && entry !== BUNDLE_COMPLETE_MARKER_FILE,
   );

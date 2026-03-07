@@ -28,6 +28,7 @@ function waitForReplacementWorkerListening(
     let onFork: (replacementWorker: Worker) => void;
     let onListening: (replacementWorker: Worker) => void;
     let replacementWorkerId: number | undefined;
+    const earlyListeningWorkerIds = new Set<number>();
     let replacementWorkerListening = false;
     let restartedWorkerExited = false;
     let resolved = false;
@@ -74,6 +75,9 @@ function waitForReplacementWorkerListening(
       }
 
       replacementWorkerId = replacementWorker.id;
+      if (earlyListeningWorkerIds.has(replacementWorkerId)) {
+        replacementWorkerListening = true;
+      }
       log.debug(
         'Observed replacement worker #%d after restarting worker #%d',
         replacementWorkerId,
@@ -84,7 +88,11 @@ function waitForReplacementWorkerListening(
     };
 
     onListening = (replacementWorker: Worker) => {
-      if (replacementWorkerId === undefined || replacementWorker.id !== replacementWorkerId) {
+      if (replacementWorkerId === undefined) {
+        earlyListeningWorkerIds.add(replacementWorker.id);
+        return;
+      }
+      if (replacementWorker.id !== replacementWorkerId) {
         return;
       }
 

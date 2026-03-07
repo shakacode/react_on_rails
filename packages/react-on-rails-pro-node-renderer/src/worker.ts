@@ -378,6 +378,11 @@ export default function run(config: Partial<Config>) {
           const bundleFileExistsAfterCopy = await fileExistsAsync(bundleFilePath);
           if (bundleFileExistsAfterCopy && !(await isBundleComplete(bundleTimestamp))) {
             await markBundleComplete(bundleTimestamp);
+          } else if (!bundleFileExistsAfterCopy) {
+            log.warn(
+              'Asset-only upload to %s: bundle JS not present, directory remains incomplete until full bundle upload.',
+              bundleDirectory,
+            );
           }
 
           log.info(`Copied assets to bundle directory: ${bundleDirectory}`);
