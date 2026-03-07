@@ -316,7 +316,8 @@ React on Rails Pro provides `useRSC()` with a `refetchComponent` method that re-
 'use client';
 
 import { ErrorBoundary } from 'react-error-boundary';
-import { useRSC, isServerComponentFetchError } from 'react-on-rails-pro';
+import { useRSC } from 'react-on-rails-pro/RSCProvider';
+import { isServerComponentFetchError } from 'react-on-rails-pro/ServerComponentFetchError';
 
 function ErrorFallback({ error, resetErrorBoundary }) {
   const { refetchComponent } = useRSC();
@@ -545,7 +546,7 @@ export async function createUser(formData: FormData) {
 | RSC page downloads unexpectedly large chunks | A shared component with `'use client'` appears in multiple chunk groups; webpack's manifest may map it to a heavy chunk group containing unrelated dependencies (depends on chunk group iteration order) | Inspect `react-client-manifest.json` for oversized chunk mappings. If found, create a thin `'use client'` wrapper file for the RSC import. See [Chunk Contamination](#chunk-contamination) above |
 | `"Text content does not match server-rendered HTML"` | Hydration mismatch | Ensure identical rendering on server and client; use `suppressHydrationWarning` for intentional differences |
 | `"Refs cannot be used in Server Components, nor passed to Client Components"` | Using the `ref` prop on any element inside a Server Component -- including on Client Components. The Flight serializer rejects the literal `ref` prop before checking the target type. | Remove the `ref` prop. Refs are a client-side concept -- if a Client Component needs a ref, it should create one itself with `useRef()`. While `React.createRef()` is callable on the server, the result cannot be attached to any element. |
-| `"Both 'react-on-rails' and 'react-on-rails-pro' JavaScript packages were detected"` | Both packages installed as separate top-level dependencies, often due to yalc link issues | Ensure only `react-on-rails-pro` is in your `package.json`; the base package should resolve through peer dependencies. See [`validate_no_duplicate_packages!`](#validate_no_duplicate_packages) |
+| `"Both 'react-on-rails' and 'react-on-rails-pro' packages are installed"` | Both packages installed as separate top-level dependencies, often due to yalc link issues | Ensure only `react-on-rails-pro` is in your `package.json`; the base package should resolve through peer dependencies. See [`validate_no_duplicate_packages!`](#validate_no_duplicate_packages) |
 | `ReferenceError: performance is not defined` | Node renderer VM context missing the `performance` global. Triggered by `React.lazy()` in dev mode | Enable `supportModules: true` and add `performance` via `additionalContext`. See [Node Renderer VM Context](#node-renderer-vm-context----missing-globals) |
 | `"global object mismatch"` | `react-on-rails` and `react-on-rails-pro` resolved from different sources (e.g., npm vs yalc) | Force consistent resolution with `pnpm.overrides` or `yarn.resolutions`. See [Version Mismatch](#version-mismatch----global-object-mismatch) |
 | SSR hangs indefinitely / request timeout on large RSC payloads | Stream backpressure deadlock: stream2 buffer fills before `injectRSCPayload` starts consuming, stalling the source stream | Update to latest React on Rails Pro. See [Stream Backpressure Deadlock](#stream-backpressure-deadlock) |
@@ -734,14 +735,15 @@ When using **yalc** for local development:
 
 **Symptoms:** The RSC webpack loader silently fails to transform modules. Server Components work without React Server Components directives being processed. The RSC bundle builds without errors but components aren't correctly split between server and client.
 
-**Root cause:** Shakapacker may configure `swc-loader` as a function rule (not in an array), so the RSC configuration helper `extractLoader()` -- which searches `rule.use` arrays -- never finds it:
+**Root cause:** Shakapacker may configure `swc-loader` using a non-array format (a function or a single object), so the RSC configuration helper `extractLoader()` -- which checks `Array.isArray(rule.use)` -- returns `null` and never finds the loader:
 
 ```js
 // What extractLoader() expects:
 rule.use = [{ loader: 'swc-loader', options: {...} }]; // Array -- works
 
 // What Shakapacker may generate:
-rule.use = { loader: 'swc-loader', options: {...} }; // Object -- not found
+rule.use = (info) => [{ loader: 'swc-loader', options: {...} }]; // Function -- not found
+rule.use = { loader: 'swc-loader', options: {...} };             // Object -- not found
 ```
 
 **Fix:** Instead of trying to append the RSC loader to the existing rule, add it as a separate `enforce: 'post'` rule:
@@ -763,7 +765,7 @@ This approach is more robust because it doesn't depend on the structure of exist
 
 ### `validate_no_duplicate_packages!`
 
-**Symptoms:** Boot-time error: `"Both 'react-on-rails' and 'react-on-rails-pro' JavaScript packages were detected."` This prevents the Rails application from starting.
+**Symptoms:** Boot-time error: `"Both 'react-on-rails' and 'react-on-rails-pro' packages are installed."` This prevents the Rails application from starting.
 
 **Root cause:** The `react_on_rails` gem validates that only one of the JavaScript packages is installed. During development with yalc, both packages may appear in `node_modules` simultaneously if the yalc link chain isn't set up correctly.
 
