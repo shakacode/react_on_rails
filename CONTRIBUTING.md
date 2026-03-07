@@ -12,10 +12,10 @@ During this transition:
 
 ---
 
-- [docs/contributor-info/Releasing](./docs/contributor-info/releasing.md) for instructions on releasing.
-- [docs/contributor-info/pull-requests](./docs/contributor-info/pull-requests.md)
-- [docs/contributor-info/rbs-type-signatures](./docs/contributor-info/rbs-type-signatures.md) for information on RBS type signatures
-- See other docs in [docs/contributor-info](./docs/contributor-info)
+- [internal/contributor-info/Releasing](./internal/contributor-info/releasing.md) for instructions on releasing.
+- [internal/contributor-info/pull-requests](./internal/contributor-info/pull-requests.md)
+- [internal/contributor-info/rbs-type-signatures](./internal/contributor-info/rbs-type-signatures.md) for information on RBS type signatures
+- See other docs in [internal/contributor-info](./internal/contributor-info)
 
 ## Prerequisites
 
@@ -537,7 +537,7 @@ The CI system intelligently skips unnecessary work:
 | JS code only               | Skips Ruby-only tests | ~30%       |
 | Workflow changes           | Runs lint only        | ~75%       |
 
-For more details, see [`docs/contributor-info/ci-optimization.md`](./docs/contributor-info/ci-optimization.md).
+For more details, see [`internal/contributor-info/ci-optimization.md`](./internal/contributor-info/ci-optimization.md).
 
 ### CI Control Commands
 
@@ -703,7 +703,7 @@ yalc add react-on-rails
 
 ### Testing the Generator
 
-The generators are covered by generator tests using Rails's generator testing helpers, but it never hurts to do a sanity check and explore the API. See [generator-testing.md](docs/contributor-info/generator-testing.md) for a script on how to run the generator on a fresh project.
+The generators are covered by generator tests using Rails's generator testing helpers, but it never hurts to do a sanity check and explore the API. See [generator-testing.md](internal/contributor-info/generator-testing.md) for a script on how to run the generator on a fresh project.
 
 `rake run_rspec:shakapacker_examples_basic` is a great way to run tests on one generator. Once that works, you should run `rake run_rspec:shakapacker_examples`. Be aware that this will create a huge number of files under a `/gen-examples` directory. You should be sure to exclude this directory from your IDE and delete it once your testing is done.
 
