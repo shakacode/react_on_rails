@@ -60,6 +60,9 @@ exclude = [
   '^https://reactrails\.com',              # Works locally but 504s from CI
   '^https://shakacode\.controlplane\.com', # Connection refused from CI
   '^https://storybook\.js\.org',           # Intermittent connection resets from CI
+  '^https://redux\.js\.org/?$',            # Intermittent connection resets from CI
+  '^https://angularjs\.org/?$',            # Connection failed from CI
+  '^https://frigade\.com/blog/bundle-size-reduction-with-rsc-and-frigade/?$', # Connection failed from CI
 
   # ============================================================================
   # PLANNED DEPLOYMENTS NOT YET LIVE
