@@ -10,6 +10,18 @@ import { SHUTDOWN_WORKER_MESSAGE } from '../shared/utils.js';
 
 const MILLISECONDS_IN_MINUTE = 60000;
 const DEFAULT_REPLACEMENT_WORKER_LISTEN_TIMEOUT_MS = 30000;
+const PRE_EXIT_REPLACEMENT_FORK_WINDOW_MS = 250;
+
+type ReplacementWorkerWaitResult =
+  | {
+      status: 'ready';
+      replacementWorkerId: number;
+    }
+  | {
+      status: 'timed_out';
+      reason: 'fork' | 'listening' | 'exit';
+      replacementWorkerId?: number;
+    };
 
 declare module 'cluster' {
   interface Worker {
@@ -23,11 +35,12 @@ function waitForReplacementWorkerListening(
   replacementWorkerListenTimeoutMs: number,
 ) {
   const restartedWorkerId = restartedWorker.id;
-  return new Promise<void>((resolve) => {
+  return new Promise<ReplacementWorkerWaitResult>((resolve) => {
     let timeout: NodeJS.Timeout;
     let onFork: (replacementWorker: Worker) => void;
     let onListening: (replacementWorker: Worker) => void;
     let replacementWorkerId: number | undefined;
+    const preExitForkCandidates = new Map<number, number>();
     const earlyListeningWorkerIds = new Set<number>();
     let replacementWorkerListening = false;
     let restartedWorkerExited = false;
@@ -50,11 +63,46 @@ function waitForReplacementWorkerListening(
         replacementWorkerId,
         restartedWorkerId,
       );
-      resolve();
+      resolve({
+        status: 'ready',
+        replacementWorkerId,
+      });
+    }
+
+    function setReplacementWorkerId(candidateWorkerId: number) {
+      replacementWorkerId = candidateWorkerId;
+      if (earlyListeningWorkerIds.has(replacementWorkerId)) {
+        replacementWorkerListening = true;
+      }
+      log.debug(
+        'Observed replacement worker #%d after restarting worker #%d',
+        replacementWorkerId,
+        restartedWorkerId,
+      );
     }
 
     function onRestartedWorkerExit() {
       restartedWorkerExited = true;
+
+      if (replacementWorkerId === undefined && preExitForkCandidates.size > 0) {
+        const now = Date.now();
+        const recentCandidateIds = [...preExitForkCandidates.entries()]
+          .filter(([, observedAtMs]) => now - observedAtMs <= PRE_EXIT_REPLACEMENT_FORK_WINDOW_MS)
+          .map(([candidateWorkerId]) => candidateWorkerId);
+
+        if (recentCandidateIds.length === 1) {
+          const [candidateWorkerId] = recentCandidateIds;
+          if (candidateWorkerId !== undefined) {
+            setReplacementWorkerId(candidateWorkerId);
+          }
+        } else if (recentCandidateIds.length > 1) {
+          log.warn(
+            'Observed multiple replacement candidates while restarting worker #%d; waiting for a post-exit fork event',
+            restartedWorkerId,
+          );
+        }
+      }
+
       resolveIfReady();
     }
 
@@ -74,15 +122,12 @@ function waitForReplacementWorkerListening(
         return;
       }
 
-      replacementWorkerId = replacementWorker.id;
-      if (earlyListeningWorkerIds.has(replacementWorkerId)) {
-        replacementWorkerListening = true;
+      if (!restartedWorkerExited) {
+        preExitForkCandidates.set(replacementWorker.id, Date.now());
+        return;
       }
-      log.debug(
-        'Observed replacement worker #%d after restarting worker #%d',
-        replacementWorkerId,
-        restartedWorkerId,
-      );
+
+      setReplacementWorkerId(replacementWorker.id);
 
       resolveIfReady();
     };
@@ -105,25 +150,26 @@ function waitForReplacementWorkerListening(
     cluster.on('listening', onListening);
     timeout = setTimeout(() => {
       cleanup();
+      let timeoutResult: ReplacementWorkerWaitResult;
       if (replacementWorkerId === undefined) {
-        log.warn(
-          'Timed out waiting for replacement worker fork after restarting worker #%d',
-          restartedWorkerId,
-        );
+        timeoutResult = {
+          status: 'timed_out',
+          reason: 'fork',
+        };
       } else if (!replacementWorkerListening) {
-        log.warn(
-          'Timed out waiting for replacement worker #%d to listen after restarting worker #%d',
+        timeoutResult = {
+          status: 'timed_out',
+          reason: 'listening',
           replacementWorkerId,
-          restartedWorkerId,
-        );
+        };
       } else {
-        log.warn(
-          'Timed out waiting for worker #%d exit after replacement worker #%d started listening',
-          restartedWorkerId,
+        timeoutResult = {
+          status: 'timed_out',
+          reason: 'exit',
           replacementWorkerId,
-        );
+        };
       }
-      resolve();
+      resolve(timeoutResult);
     }, replacementWorkerListenTimeoutMs);
   });
 }
@@ -177,7 +223,24 @@ export default async function restartWorkers(
       }
     });
     // eslint-disable-next-line no-await-in-loop
-    await replacementWorkerListening;
+    const replacementWorkerWaitResult = await replacementWorkerListening;
+    if (replacementWorkerWaitResult.status === 'timed_out') {
+      if (replacementWorkerWaitResult.reason === 'fork') {
+        log.warn('Timed out waiting for replacement worker fork after restarting worker #%d', worker.id);
+      } else if (replacementWorkerWaitResult.reason === 'listening') {
+        log.warn(
+          'Timed out waiting for replacement worker #%d to listen after restarting worker #%d',
+          replacementWorkerWaitResult.replacementWorkerId,
+          worker.id,
+        );
+      } else {
+        log.warn(
+          'Timed out waiting for worker #%d exit after replacement worker #%d started listening',
+          worker.id,
+          replacementWorkerWaitResult.replacementWorkerId,
+        );
+      }
+    }
     // eslint-disable-next-line no-await-in-loop
     await new Promise((resolve) => {
       setTimeout(resolve, delayBetweenIndividualWorkerRestarts * MILLISECONDS_IN_MINUTE);
