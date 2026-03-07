@@ -478,8 +478,9 @@ module ReactOnRails
 
           # Set PORT before foreman starts — foreman injects its own PORT=5000
           # into child processes when ENV["PORT"] is unset, overriding the
-          # ${PORT:-3001} fallback in the Procfile.
-          ENV["PORT"] ||= procfile_port(procfile).to_s
+          # ${PORT:-3001} fallback in the Procfile. Scan from 3001 (not 3000)
+          # so prod-assets doesn't collide with the normal dev server.
+          ENV["PORT"] ||= PortSelector.find_available_port(procfile_port(procfile)).to_s
 
           features = [
             "Precompiling assets with production optimizations",

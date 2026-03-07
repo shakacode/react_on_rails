@@ -45,16 +45,6 @@ module ReactOnRails
           false
         end
 
-        private
-
-        def explicit_rails_port
-          ENV["PORT"]&.to_i&.then { |p| p.between?(1, 65_535) ? p : nil }
-        end
-
-        def explicit_webpack_port
-          ENV["SHAKAPACKER_DEV_SERVER_PORT"]&.to_i&.then { |p| p.between?(1, 65_535) ? p : nil }
-        end
-
         def find_available_port(start_port, exclude: nil)
           MAX_ATTEMPTS.times do |i|
             port = start_port + i
@@ -64,6 +54,16 @@ module ReactOnRails
           end
 
           raise NoPortAvailable, "No available port found starting at #{start_port}."
+        end
+
+        private
+
+        def explicit_rails_port
+          ENV["PORT"]&.to_i&.then { |p| p.between?(1, 65_535) ? p : nil }
+        end
+
+        def explicit_webpack_port
+          ENV["SHAKAPACKER_DEV_SERVER_PORT"]&.to_i&.then { |p| p.between?(1, 65_535) ? p : nil }
         end
       end
     end
