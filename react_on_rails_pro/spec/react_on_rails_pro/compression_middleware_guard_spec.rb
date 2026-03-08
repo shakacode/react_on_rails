@@ -5,6 +5,7 @@ require "rack/deflater"
 
 RSpec.describe ReactOnRailsPro::CompressionMiddlewareGuard do
   let(:middleware_entry_class) { Struct.new(:klass, :args) }
+  let(:logger) { instance_double(Logger, debug: nil) }
 
   describe "#findings" do
     it "flags Rack::Deflater callbacks that iterate the body" do
@@ -31,6 +32,14 @@ RSpec.describe ReactOnRailsPro::CompressionMiddlewareGuard do
 
       guard = described_class.new(
         middlewares: [middleware_entry_class.new(Rack::Deflater, [{ if: condition }])]
+      )
+
+      expect(guard.findings).to be_empty
+    end
+
+    it "does not flag middleware without an :if callback" do
+      guard = described_class.new(
+        middlewares: [middleware_entry_class.new(Rack::Deflater, [])]
       )
 
       expect(guard.findings).to be_empty
@@ -67,6 +76,49 @@ RSpec.describe ReactOnRailsPro::CompressionMiddlewareGuard do
 
       expect(guard.findings).to be_empty
     end
+
+    it "does not crash on callable objects without source_location" do
+      callable_class = Class.new do
+        def call(*args)
+          body = args.last
+          sum = 0
+          body.each { |chunk| sum += chunk.bytesize }
+          sum > 512
+        end
+      end
+
+      guard = described_class.new(
+        middlewares: [middleware_entry_class.new(Rack::Deflater, [{ if: callable_class.new }])]
+      )
+
+      expect(guard.findings.map(&:source_location)).to eq([nil])
+    end
+
+    it "flags callbacks that iterate via Enumerable helpers" do
+      condition = lambda { |*, body|
+        body.sum(&:bytesize) > 512
+      }
+
+      guard = described_class.new(
+        middlewares: [middleware_entry_class.new(Rack::Deflater, [{ if: condition }])]
+      )
+
+      expect(guard.findings.map(&:middleware_name)).to eq(["Rack::Deflater"])
+    end
+
+    it "logs probe failures at debug and returns no findings" do
+      condition = lambda { |_env, *_rest|
+        raise ArgumentError, "unexpected"
+      }
+
+      guard = described_class.new(
+        middlewares: [middleware_entry_class.new(Rack::Deflater, [{ if: condition }])],
+        logger: logger
+      )
+
+      expect(guard.findings).to be_empty
+      expect(logger).to have_received(:debug)
+    end
   end
 
   describe "#warning_messages" do
@@ -88,6 +140,25 @@ RSpec.describe ReactOnRailsPro::CompressionMiddlewareGuard do
       expect(message).to include("compression_middleware_guard_spec.rb:#{condition.source_location.last}")
       expect(message).to include("return true unless body.respond_to?(:to_ary)")
       expect(message).to include(described_class::COMPATIBILITY_GUIDE_PATH)
+    end
+
+    it "formats warnings cleanly when source_location is unavailable" do
+      callable_class = Class.new do
+        def call(*args)
+          body = args.last
+          body.each(&:bytesize)
+          true
+        end
+      end
+
+      guard = described_class.new(
+        middlewares: [middleware_entry_class.new(Rack::Deflater, [{ if: callable_class.new }])]
+      )
+
+      message = guard.warning_messages(root: File.expand_path("../../..", __dir__)).first
+
+      expect(message).to include("custom `:if` callback that calls `body.each`")
+      expect(message).not_to include("callbackthat")
     end
   end
 end
