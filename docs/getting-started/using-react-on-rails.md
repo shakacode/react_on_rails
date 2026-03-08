@@ -190,6 +190,20 @@ For advanced server rendering (like routing + hydration state), you can return a
 
 ```js
 ({
+  renderedHtml: {
+    componentHtml,
+    redirectLocation,
+    error,
+  },
+});
+```
+
+Use with `react_component_hash` helper for multiple HTML strings (useful with React Helmet for meta tags).
+
+If you also need to send extra data back to the browser for hydration, add `clientProps`:
+
+```js
+({
   renderedHtml: '<div>SSR HTML</div>',
   clientProps: {
     // Optional: merged into client hydration props on the Rails side
@@ -200,17 +214,7 @@ For advanced server rendering (like routing + hydration state), you can return a
 });
 ```
 
-If you need multiple HTML fragments (for example React Helmet tags), return a hash under `renderedHtml` and use `react_component_hash`:
-
-```js
-({
-  renderedHtml: {
-    componentHtml,
-    title,
-    metaTags,
-  },
-});
-```
+Think of it like this: `renderedHtml` is what the user sees now, and `clientProps` is a lunchbox of data React uses after the page loads.
 
 For complete Render-Function details and examples, see the [Render-Functions Guide](../core-concepts/render-functions.md).
 
