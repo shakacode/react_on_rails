@@ -1,0 +1,18 @@
+# Docs configuration for shakacode.com website (React on Rails Pro).
+# CI validates this matches the actual folder structure.
+# The Gatsby build reads this at build time.
+
+# Folders/files that should NOT appear on the website.
+# Paths relative to react_on_rails_pro/docs/. Supports glob patterns.
+exclude:
+  - contributors-info/releasing.md
+
+# Sidebar category order. Uses folder names (kebab-case).
+# "" = root-level files (no category header).
+categoryOrder:
+  - ''
+  - node-renderer
+  - contributors-info
+  - react-server-components
+  - release-notes
+# fileOrder is optional. Omitted = all files sort alphabetically within categories.
