@@ -177,9 +177,8 @@ export function createApp(appName: string, options: CliOptions): void {
       cleanupAppDirectory(
         appPath,
         appName,
-        'Directory removed. Configure access to React on Rails Pro gem source and rerun. ' +
-          'For custom source/git setups, rerun without --rsc and add react_on_rails_pro manually in Gemfile.',
-        `Configure gem source access for react_on_rails_pro, then delete the created "${appName}" directory and rerun with --rsc.`,
+        'Directory removed. Ensure react_on_rails_pro is installable in your Bundler/RubyGems setup, then rerun with --rsc.',
+        `Ensure react_on_rails_pro is installable, then delete the created "${appName}" directory and rerun with --rsc.`,
       );
       process.exit(1);
     }
