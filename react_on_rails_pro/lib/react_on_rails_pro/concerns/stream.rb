@@ -40,6 +40,7 @@ module ReactOnRailsPro
       require "async"
       require "async/barrier"
       require "async/limited_queue"
+      warn_on_non_html_formats_without_content_type(render_options[:formats], content_type)
 
       Sync do |parent_task|
         # Initialize async primitives for concurrent component streaming
@@ -130,6 +131,20 @@ module ReactOnRailsPro
       Rails.logger.debug do
         "[React on Rails Pro] Client disconnected during streaming (#{context}): #{exception.class}"
       end
+    end
+
+    def warn_on_non_html_formats_without_content_type(formats, content_type)
+      return if content_type.present?
+
+      requested_formats = Array(formats).compact.map(&:to_sym)
+      return if requested_formats.empty? || requested_formats.all?(:html)
+
+      Rails.logger.warn(
+        "[React on Rails Pro] stream_view_containing_react_components received non-HTML formats " \
+        "#{requested_formats.inspect} without `content_type:`. Rails will commit the format-derived " \
+        "MIME type (for example `text/plain` for `:text`). Pass `content_type:` explicitly when " \
+        "streaming non-HTML responses."
+      )
     end
   end
 end

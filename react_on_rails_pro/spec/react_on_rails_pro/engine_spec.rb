@@ -291,4 +291,75 @@ RSpec.describe ReactOnRailsPro::Engine do
       end
     end
   end
+
+  describe ".log_rsc_streaming_middleware_warning" do
+    def build_application(*middleware_klasses)
+      middleware_entry_class = Struct.new(:klass)
+      middleware_stack_class = Struct.new(:middlewares)
+      rails_application_class = Struct.new(:middleware)
+      middleware_entries = middleware_klasses.map { |klass| middleware_entry_class.new(klass) }
+
+      rails_application_class.new(middleware_stack_class.new(middleware_entries))
+    end
+
+    def build_rsc_configuration(enable_rsc_support:, route_path: "rsc_payload/")
+      instance_double(
+        ReactOnRailsPro::Configuration,
+        enable_rsc_support: enable_rsc_support,
+        rsc_payload_generation_url_path: route_path
+      )
+    end
+
+    it "logs a startup warning when RSC support is enabled with Rack::Deflater in development" do
+      allow(Rails).to receive_messages(
+        application: build_application(Rack::Deflater),
+        env: ActiveSupport::StringInquirer.new("development")
+      )
+      allow(ReactOnRailsPro).to receive(:configuration)
+        .and_return(build_rsc_configuration(enable_rsc_support: true))
+
+      expect(mock_logger).to receive(:warn).with(a_string_including("Rack::Deflater", "rsc_payload/"))
+
+      described_class.log_rsc_streaming_middleware_warning
+    end
+
+    it "does not log a warning when no known streaming hazard is present" do
+      allow(Rails).to receive_messages(
+        application: build_application(ActionDispatch::Executor),
+        env: ActiveSupport::StringInquirer.new("development")
+      )
+      allow(ReactOnRailsPro).to receive(:configuration)
+        .and_return(build_rsc_configuration(enable_rsc_support: true))
+
+      expect(mock_logger).not_to receive(:warn)
+
+      described_class.log_rsc_streaming_middleware_warning
+    end
+
+    it "does not log a warning when RSC support is disabled" do
+      allow(Rails).to receive_messages(
+        application: build_application(Rack::Deflater),
+        env: ActiveSupport::StringInquirer.new("development")
+      )
+      allow(ReactOnRailsPro).to receive(:configuration)
+        .and_return(build_rsc_configuration(enable_rsc_support: false))
+
+      expect(mock_logger).not_to receive(:warn)
+
+      described_class.log_rsc_streaming_middleware_warning
+    end
+
+    it "does not log a warning in test" do
+      allow(Rails).to receive_messages(
+        application: build_application(Rack::Deflater),
+        env: ActiveSupport::StringInquirer.new("test")
+      )
+      allow(ReactOnRailsPro).to receive(:configuration)
+        .and_return(build_rsc_configuration(enable_rsc_support: true))
+
+      expect(mock_logger).not_to receive(:warn)
+
+      described_class.log_rsc_streaming_middleware_warning
+    end
+  end
 end

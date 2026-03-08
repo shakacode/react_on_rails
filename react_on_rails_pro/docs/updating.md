@@ -200,7 +200,9 @@ For complete licensing details, see [LICENSE_SETUP.md](https://github.com/shakac
 
 ### Additional Upgrade Notes
 
-#### RSC payload template overrides
+#### Upgrading to 16.4.0 or later
+
+##### RSC payload template overrides
 
 React on Rails Pro now renders the built-in RSC payload template with `formats: [:text]` so Rails view annotations cannot inject HTML comments into NDJSON responses.
 

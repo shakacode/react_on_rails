@@ -49,7 +49,11 @@ RSpec.describe "RSC payload endpoint" do
 
     # Rails annotation comment format verified against Rails 7.x.
     # If this assertion fails after a Rails upgrade, check ActionView annotation output.
-    expect(render_annotated_html_inline_template).to include("<!--")
+    annotated = nil
+    expect { annotated = render_annotated_html_inline_template }.not_to raise_error
+    expect(annotated).to include(
+      "<!--"
+    ), "Rails annotation comment format may have changed - check ActionView annotation output."
 
     request_rsc_payload
 
