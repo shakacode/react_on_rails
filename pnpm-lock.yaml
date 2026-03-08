@@ -212,20 +212,16 @@ importers:
       react-dom:
         specifier: ^19.0.3
         version: 19.2.3(react@19.2.3)
-    devDependencies:
-      '@tanstack/react-router':
-        specifier: ^1.163.3
-        version: 1.163.3(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
 
   packages/react-on-rails-pro:
     dependencies:
-      '@tanstack/react-router':
-        specifier: '>=1.139.0 <2.0.0'
-        version: 1.163.3(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       react-on-rails:
         specifier: workspace:*
         version: link:../react-on-rails
     devDependencies:
+      '@tanstack/react-router':
+        specifier: ^1.163.3
+        version: 1.163.3(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       '@types/mock-fs':
         specifier: ^4.13.4
         version: 4.13.4
@@ -356,9 +352,6 @@ importers:
       '@hotwired/turbo-rails':
         specifier: ^8.0.4
         version: 8.0.23
-      '@tanstack/react-router':
-        specifier: ^1.139.0
-        version: 1.163.3(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       core-js:
         specifier: '3'
         version: 3.48.0

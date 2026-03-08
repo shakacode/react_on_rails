@@ -63,10 +63,7 @@ const config: KnipConfig = {
         // Build output directories that should be ignored
         'lib/**',
       ],
-      ignoreDependencies: [
-        // Optional peer used only for local integration development and fixture coverage.
-        '@tanstack/react-router',
-      ],
+      ignoreDependencies: [],
     },
 
     // React on Rails Pro Node Renderer package workspace
@@ -115,6 +112,7 @@ const config: KnipConfig = {
         'src/ServerComponentFetchError.ts!',
         'src/getReactServerComponent.server.ts!',
         'src/transformRSCNodeStream.ts!',
+        'src/tanstack-router.ts!',
       ],
       project: ['src/**/*.[jt]s{x,}!', 'tests/**/*.[jt]s{x,}', '!lib/**'],
       ignore: [

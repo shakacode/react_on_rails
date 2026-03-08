@@ -96,4 +96,4 @@ authenticityToken();
 authenticityHeaders((otherHeaders = {}));
 ```
 
-For TanStack Router integration utilities, see [`react-on-rails/tanstack-router`](../building-features/tanstack-router.md).
+For TanStack Router integration utilities, see [`react-on-rails-pro/tanstack-router`](../building-features/tanstack-router.md) (requires React on Rails Pro).

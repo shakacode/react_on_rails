@@ -8,11 +8,6 @@ import type { ComponentType, ReactNode } from 'react';
 export interface TanStackRouter {
   update: (opts: { history: TanStackHistory }) => void;
   load: () => Promise<void>;
-  matchRoutes: (
-    pathnameOrLocation: string | { pathname: string; search?: unknown },
-    locationSearch?: unknown,
-    opts?: { throwOnError?: boolean },
-  ) => unknown[];
   state: {
     status: string;
     location: {
@@ -27,10 +22,6 @@ export interface TanStackRouter {
   };
   dehydrate?: () => unknown;
   hydrate?: (data: unknown) => void;
-  // Internal APIs we need for sync SSR workaround
-  __store?: {
-    setState: (updater: (state: Record<string, unknown>) => Record<string, unknown>) => void;
-  };
   // SSR flag (TanStack Start internal)
   ssr?: boolean;
 }

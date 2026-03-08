@@ -109,7 +109,7 @@ Renderer functions are not meant to be used on the server since there's no DOM o
 
 ### TanStack Router
 
-TanStack Router is supported through the `react-on-rails/tanstack-router` helper. See [TanStack Router guide](../building-features/tanstack-router.md).
+TanStack Router SSR is supported through the `react-on-rails-pro/tanstack-router` helper (requires React on Rails Pro). See [TanStack Router guide](../building-features/tanstack-router.md).
 
 ---
 

@@ -4,7 +4,7 @@ import {
   createTanStackRouterRenderFunction,
   serverRenderTanStackAppAsync,
 } from '../src/tanstack-router/index.ts';
-import type { RailsContext, ServerRenderResult } from '../src/types/index.ts';
+import type { RailsContext, ServerRenderResult } from 'react-on-rails/types';
 import type { TanStackRouter } from '../src/tanstack-router/types.ts';
 
 function buildRouter(): TanStackRouter {
@@ -21,19 +21,14 @@ function buildRouter(): TanStackRouter {
   return {
     update: jest.fn(),
     load: jest.fn().mockResolvedValue(undefined),
-    matchRoutes: jest.fn().mockReturnValue([{ id: 'products' }]),
     state,
     dehydrate: jest.fn().mockReturnValue({ matches: [{ id: 'products' }] }),
-    __store: {
-      setState: jest.fn((updater) => {
-        Object.assign(state, updater(state as unknown as Record<string, unknown>));
-      }),
-    },
+    hydrate: jest.fn(),
   };
 }
 
-describe('tanstack-router integration', () => {
-  it('returns serverRenderHash with dehydrated state in clientProps', () => {
+describe('tanstack-router integration (Pro)', () => {
+  it('returns a Promise with serverRenderHash on server-side render', async () => {
     const router = buildRouter();
     const options = {
       createRouter: () => router,
@@ -58,20 +53,25 @@ describe('tanstack-router integration', () => {
       serverSide: true,
       pathname: '/products',
       search: '?category=tools',
-    } as unknown as RailsContext) as ServerRenderResult;
+    } as unknown as RailsContext);
 
+    // Server-side should return a Promise (async path)
+    expect(result).toBeInstanceOf(Promise);
+
+    const resolved = await result as ServerRenderResult;
     expect(renderFn.renderFunction).toBe(true);
-    expect(React.isValidElement(result.renderedHtml)).toBe(true);
-    expect(result.clientProps).toEqual({
+    expect(React.isValidElement(resolved.renderedHtml)).toBe(true);
+    expect(resolved.clientProps).toEqual({
       __tanstackRouterDehydratedState: {
         url: '/products?category=tools',
         dehydratedRouter: { matches: [{ id: 'products' }] },
       },
     });
     expect(deps.createMemoryHistory).toHaveBeenCalledWith({ initialEntries: ['/products?category=tools'] });
+    expect(router.load).toHaveBeenCalled();
   });
 
-  it('normalizes railsContext.search when it does not include a leading "?"', () => {
+  it('normalizes railsContext.search when it does not include a leading "?"', async () => {
     const router = buildRouter();
     const options = {
       createRouter: () => router,
@@ -91,7 +91,7 @@ describe('tanstack-router integration', () => {
     };
 
     const renderFn = createTanStackRouterRenderFunction(options, deps);
-    renderFn({ initial: 'prop' }, {
+    await renderFn({ initial: 'prop' }, {
       serverSide: true,
       pathname: '/products',
       search: 'category=tools',
@@ -100,7 +100,7 @@ describe('tanstack-router integration', () => {
     expect(deps.createMemoryHistory).toHaveBeenCalledWith({ initialEntries: ['/products?category=tools'] });
   });
 
-  it('drops a bare "?" search string when building the server URL', () => {
+  it('drops a bare "?" search string when building the server URL', async () => {
     const router = buildRouter();
     const options = {
       createRouter: () => router,
@@ -120,7 +120,7 @@ describe('tanstack-router integration', () => {
     };
 
     const renderFn = createTanStackRouterRenderFunction(options, deps);
-    renderFn({ initial: 'prop' }, {
+    await renderFn({ initial: 'prop' }, {
       serverSide: true,
       pathname: '/products',
       search: '?',
@@ -157,45 +157,6 @@ describe('tanstack-router integration', () => {
     expect(typeof result).toBe('function');
   });
 
-  it('hydrates with railsContext path when dehydration payload exists without dehydrated router', () => {
-    const router = buildRouter();
-    const options = {
-      createRouter: () => router,
-    };
-    const deps = {
-      RouterProvider: (_props: { router: TanStackRouter }) => React.createElement('div'),
-      createMemoryHistory: jest.fn(),
-      createBrowserHistory: jest.fn().mockReturnValue({
-        location: {
-          pathname: '/wrong-path',
-          search: '?wrong=1',
-          hash: '',
-          href: '/wrong-path?wrong=1',
-          state: null,
-        },
-      }),
-    };
-
-    const renderFn = createTanStackRouterRenderFunction(options, deps);
-    const props = {
-      __tanstackRouterDehydratedState: {
-        url: '/products?category=tools',
-        dehydratedRouter: null,
-      },
-    };
-    const result = renderFn(props, {
-      serverSide: false,
-      pathname: '/products',
-      search: '?category=tools',
-    } as unknown as RailsContext);
-
-    expect(typeof result).toBe('function');
-    renderToString(React.createElement(result as React.ComponentType<Record<string, unknown>>, props));
-
-    expect(router.matchRoutes).toHaveBeenCalledWith('/products', '?category=tools');
-    expect((router as { ssr?: boolean }).ssr).toBe(true);
-  });
-
   it('does not pass __tanstackRouterDehydratedState through AppWrapper props', () => {
     const router = buildRouter();
     const observedProps: Array<Record<string, unknown>> = [];
@@ -224,7 +185,7 @@ describe('tanstack-router integration', () => {
     const props = {
       __tanstackRouterDehydratedState: {
         url: '/products?category=tools',
-        dehydratedRouter: null,
+        dehydratedRouter: { matches: [{ id: 'products' }] },
       },
       userId: 42,
     };

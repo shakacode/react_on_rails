@@ -1,18 +1,18 @@
 # Using TanStack Router
 
-React on Rails supports TanStack Router via `react-on-rails/tanstack-router`.
-This helper creates a render-function that works for both:
+React on Rails Pro supports TanStack Router SSR via `react-on-rails-pro/tanstack-router`.
+This helper creates a render-function that handles both server-side rendering and client hydration/navigation.
 
-- server-side rendering (`prerender: true`)
-- client hydration/navigation
+TanStack Router SSR **requires React on Rails Pro** with the Node Renderer and
+`rendering_returns_promises = true` in your Pro configuration. The async Node Renderer
+uses TanStack Router's public `router.load()` API for reliable, maintainable SSR.
 
-It also passes router dehydration data from server to client automatically.
+Client-side-only TanStack Router (without SSR) works with the open-source package —
+no special integration is needed since it's just a standard React app.
 
 ## Install
 
 ```bash
-npm install @tanstack/react-router
-yarn add @tanstack/react-router
 pnpm add @tanstack/react-router
 ```
 
@@ -22,7 +22,7 @@ Create a render-function with `createTanStackRouterRenderFunction` and register 
 
 ```tsx
 import ReactOnRails from 'react-on-rails';
-import { createTanStackRouterRenderFunction } from 'react-on-rails/tanstack-router';
+import { createTanStackRouterRenderFunction } from 'react-on-rails-pro/tanstack-router';
 import {
   RouterProvider,
   createBrowserHistory,
@@ -76,25 +76,23 @@ React on Rails then:
 When using this helper with `prerender: true`, pass `props:` as a Ruby `Hash` or a JSON object string.
 If you pass a JSON string that parses to a non-object value (like an array), React on Rails raises an error.
 
-## Compatibility Notes
+## Pro Configuration
 
-- Sync SSR uses a TanStack Router internal store API to inject matched routes before `renderToString`.
-- Sync SSR (`renderToString`) does not await async route loaders.
-  For loader-backed routes, prefer controller-provided data, client-side fetching after hydration, or the async
-  render-function path (`serverRenderTanStackAppAsync`) with React on Rails Pro NodeRenderer.
-- Keep `react-on-rails` up to date when upgrading `@tanstack/react-router`.
-- If TanStack internals change, React on Rails raises a clear compatibility error during SSR.
+Ensure your React on Rails Pro initializer includes:
+
+```ruby
+ReactOnRailsPro.configure do |config|
+  config.rendering_returns_promises = true
+end
+```
+
+## Compatibility
+
+- Supported `@tanstack/react-router` versions: `>=1.139.0 <2.0.0`
+- Keep `react-on-rails-pro` up to date when upgrading `@tanstack/react-router`.
 
 ## Working Examples in This Repo
 
-- OSS dummy app:
-  - Route + view:
-    - `react_on_rails/spec/dummy/config/routes.rb`
-    - `react_on_rails/spec/dummy/app/views/tanstack_router/index.html.erb`
-  - TanStack app entry:
-    - `react_on_rails/spec/dummy/client/app/startup/TanStackRouterApp.jsx`
-  - System test:
-    - `react_on_rails/spec/dummy/spec/system/integration_spec.rb`
 - Pro dummy app (async server rendering):
   - Route + view:
     - `react_on_rails_pro/spec/dummy/config/routes.rb`

@@ -1,12 +1,6 @@
 import { createElement, useEffect, useRef, type ReactElement } from 'react';
-import type {
-  DehydratedRouterState,
-  TanStackHistory,
-  TanStackRouter,
-  TanStackRouterOptions,
-} from './types.ts';
-import type { RailsContext } from '../types/index.ts';
-import { normalizeSearch, locationSearch } from './utils.ts';
+import type { DehydratedRouterState, TanStackHistory, TanStackRouter, TanStackRouterOptions } from './types.ts';
+import type { RailsContext } from 'react-on-rails/types';
 
 /* eslint-disable import/prefer-default-export */
 
@@ -15,7 +9,7 @@ import { normalizeSearch, locationSearch } from './utils.ts';
  *
  * Flow:
  * 1. Create router with browser history
- * 2. Synchronously inject route matches (same as server) to prevent hydration mismatch
+ * 2. Hydrate from dehydrated state provided by serverRenderTanStackAppAsync
  * 3. Set router.ssr = true to skip auto-load on mount (Transitioner behavior)
  * 4. After hydration, trigger router.load() to enable client-side navigation
  * 5. Return a React component that renders RouterProvider
@@ -32,7 +26,7 @@ interface TanStackHydrationAppProps {
 function TanStackHydrationApp({
   options,
   incomingProps,
-  railsContext,
+  railsContext: _railsContext,
   RouterProvider,
   createBrowserHistory,
 }: TanStackHydrationAppProps): ReactElement {
@@ -52,41 +46,14 @@ function TanStackHydrationApp({
     const browserHistory = createBrowserHistory();
     router.update({ history: browserHistory });
 
-    // Hydrate router with dehydrated state from server if available.
+    // Hydrate router with dehydrated state from server.
     if (hasSsrPayload && hasDehydratedRouter && typeof router.hydrate === 'function') {
       router.hydrate(dehydratedState.dehydratedRouter);
-    } else if (
-      hasSsrPayload &&
-      typeof router.matchRoutes === 'function' &&
-      // eslint-disable-next-line no-underscore-dangle -- TanStack Router private store API is required for hydration parity.
-      typeof router.__store?.setState === 'function'
-    ) {
-      // Fall back to injecting route matches when no dehydrated state is available.
-      // This keeps the initial client route tree aligned with SSR output.
-      const routerLocation = router.state?.location as { pathname?: string; search?: string } | undefined;
-      const pathname =
-        railsContext.pathname ||
-        (browserHistory.location as { pathname?: string } | undefined)?.pathname ||
-        routerLocation?.pathname ||
-        '/';
-      const searchFromRouter = locationSearch(routerLocation);
-      const search =
-        normalizeSearch(railsContext.search) ||
-        normalizeSearch(browserHistory.location.search) ||
-        normalizeSearch(searchFromRouter);
-      const matches = router.matchRoutes(pathname, search);
-      // eslint-disable-next-line no-underscore-dangle -- TanStack Router private store API is required for hydration parity.
-      router.__store.setState((s: Record<string, unknown>) => ({
-        ...s,
-        status: 'idle',
-        resolvedLocation: (s as { location: unknown }).location,
-        matches,
-      }));
     } else if (hasSsrPayload) {
       throw new Error(
-        'react-on-rails/tanstack-router: Cannot hydrate SSR payload because required TanStack Router internals ' +
-          'are unavailable (expected router.matchRoutes and router.__store.setState). ' +
-          'Please verify @tanstack/react-router compatibility.',
+        'react-on-rails-pro/tanstack-router: Cannot hydrate SSR payload. ' +
+          'router.hydrate() is required but not available on your TanStack Router version. ' +
+          'Ensure @tanstack/react-router >=1.139.0 <2.0.0 is installed and provides router.hydrate().',
       );
     }
 
@@ -122,15 +89,12 @@ function TanStackHydrationApp({
     let cancelled = false;
     router.load().catch((err: unknown) => {
       if (!cancelled) {
-        console.error('react-on-rails/tanstack-router: Error loading routes after hydration:', err);
+        console.error('react-on-rails-pro/tanstack-router: Error loading routes after hydration:', err);
       }
     });
 
     return () => {
-      // This only suppresses post-unmount logging; it does not guarantee router.load()
-      // will stop unless the router version exposes an explicit cancelLoad API.
       cancelled = true;
-      // Best effort cancellation for router versions that expose an explicit load cancel API.
       const cancellableRouter = router as TanStackRouter & { cancelLoad?: () => void };
       if (typeof cancellableRouter.cancelLoad === 'function') {
         cancellableRouter.cancelLoad();
