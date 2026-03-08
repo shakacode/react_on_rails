@@ -307,11 +307,13 @@ module ReactOnRails
     end
 
     def detect_bundler_config_path
+      # Check rspack paths first — when both webpack and rspack configs exist,
+      # rspack is more likely to be the active bundler (it's the newer default).
       %w[
-        config/webpack/webpack.config.js
-        config/webpack/webpack.config.ts
-        config/rspack/rspack.config.js
         config/rspack/rspack.config.ts
+        config/rspack/rspack.config.js
+        config/webpack/webpack.config.ts
+        config/webpack/webpack.config.js
       ].find { |path| File.exist?(path) }
     end
 
@@ -456,6 +458,9 @@ module ReactOnRails
     end
 
     def standard_shakapacker_config?(content)
+      # NOTE: Uses loose regex matching, unlike base_generator.rb's exact-string matching.
+      # Intentional: the system checker only needs to detect whether a config is
+      # "Shakapacker-flavored", not whether it's byte-for-byte identical to a default template.
       normalized = normalize_config_content(content)
       shakapacker_patterns = [
         # CommonJS patterns (JS configs)
