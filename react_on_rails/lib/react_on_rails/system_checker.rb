@@ -307,8 +307,8 @@ module ReactOnRails
     end
 
     def detect_bundler_config_path
-      # Check rspack paths first — when both webpack and rspack configs exist,
-      # rspack is more likely to be the active bundler (it's the newer default).
+      # Prefer rspack over webpack as a tiebreaker; projects rarely have
+      # both active simultaneously.
       %w[
         config/rspack/rspack.config.ts
         config/rspack/rspack.config.js
